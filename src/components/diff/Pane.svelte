@@ -1,15 +1,27 @@
 <script lang="ts">
   export let diff
+  export let activeDiffBlockIndex: number | undefined
+
+  $: if (activeDiffBlockIndex !== undefined) {
+    const el = document.querySelector(`.diff-${activeDiffBlockIndex}`)!
+    el.scrollIntoView({ behavior: 'smooth' })
+  }
   
-  function blockClass(tag: string, index: number): string {
-    const diffClasses = ['delete', 'insert', 'replace'].includes(tag) ? `diff diff-${index.toString()} ${tag}` : ''
-    return `block ${diffClasses}`
+  function blockClass(tag: string, index: number, activeDiffBlockIndex: number | undefined): string {
+    let ret: string = 'block';
+    if (['delete', 'insert', 'replace'].includes(tag)) {
+      ret = `${ret} diff diff-${index.toString()} ${tag}`
+      if (index === activeDiffBlockIndex) {
+        ret = `${ret} active`
+      }
+    }
+    return ret
   }
 </script>
 
 <div class="editor" contenteditable="true">
-  {#each diff as block, i}
-    <div class="{blockClass(block.tag, i)}">
+  {#each diff as block}
+    <div class="{blockClass(block.tag, block.diff_block_index, activeDiffBlockIndex)}">
       {#each block.lines as line}
         <div class="line">
           {#if line.length === 0}
@@ -46,6 +58,11 @@
   }
   .editor .block.replace {
     background-color: purple;
+  }
+
+  .editor .block.active {
+    border-top: 0.1em yellow solid;
+    border-bottom: 0.1em yellow solid;
   }
 
   .editor .line {

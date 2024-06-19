@@ -5,11 +5,13 @@
   let lineHeight = 16 // todo
   let oldDiff: any[] = []
   let newDiff: any[] = []
+  let blocksNum: number = 0
 
   async function diff_button_on_click() {
     let diffs: any = await invoke("diff", { oldFilepath: '', newFilepath: '' })
     oldDiff = diffs[0] as any[]
     newDiff = diffs[1] as any[]
+    blocksNum = diffs[2] as number
   }
 </script>
 
@@ -19,6 +21,6 @@
   <button on:click={() => lineHeight++}>Line height</button>
   <button on:click={diff_button_on_click}>Diff</button>
 
-  <Tab oldDiff={oldDiff} newDiff={newDiff} lineHeight={lineHeight} />
+  <Tab oldDiff={oldDiff} newDiff={newDiff} blocksNum={blocksNum} lineHeight={lineHeight} />
 </div>
 

@@ -27,10 +27,11 @@ pub struct DiffBlockOp {
     tag: DiffTag,
     lines: Vec<String>,
     new_lines_num: usize,
+    diff_block_index: usize,
 }
 
 #[tauri::command]
-pub fn diff(_old_filepath: &str, _new_filepath: &str) -> (Vec::<DiffBlockOp>, Vec::<DiffBlockOp>) {
+pub fn diff(_old_filepath: &str, _new_filepath: &str) -> (Vec::<DiffBlockOp>, Vec::<DiffBlockOp>, usize) {
     // todo
     let s = s().to_owned();
     let t = t().to_owned();
@@ -40,28 +41,31 @@ pub fn diff(_old_filepath: &str, _new_filepath: &str) -> (Vec::<DiffBlockOp>, Ve
     let new_lines = t.lines().collect::<Vec<&str>>();
     let mut old_blocks = Vec::<DiffBlockOp>::new();
     let mut new_blocks = Vec::<DiffBlockOp>::new();
+    let mut diff_blocks_num = 0;
     diff.ops().iter().for_each(|x| {
         let tag = x.tag();
         match tag {
             DiffTag::Equal => {
                 let old_range = x.old_range();
                 let str = old_lines[old_range.start..old_range.end].iter().map(|x| x.to_string()).collect::<Vec<_>>();
-                old_blocks.push(DiffBlockOp{ tag: tag, lines: str.clone(), new_lines_num: 0 });
-                new_blocks.push(DiffBlockOp{ tag: tag, lines: str.clone(), new_lines_num: 0 });
+                old_blocks.push(DiffBlockOp{ tag: tag, lines: str.clone(), new_lines_num: 0, diff_block_index: 0 });
+                new_blocks.push(DiffBlockOp{ tag: tag, lines: str.clone(), new_lines_num: 0, diff_block_index: 0 });
             },
             DiffTag::Delete => {
                 let old_range = x.old_range();
                 let old_str = old_lines[old_range.start..old_range.end].iter().map(|x| x.to_string()).collect::<Vec<_>>();
                 let new_lines_num = old_range.end - old_range.start;
-                old_blocks.push(DiffBlockOp{ tag: tag, lines: old_str, new_lines_num: 0 });
-                new_blocks.push(DiffBlockOp{ tag: tag, lines: Vec::new(), new_lines_num: new_lines_num });
+                old_blocks.push(DiffBlockOp{ tag: tag, lines: old_str, new_lines_num: 0, diff_block_index: diff_blocks_num });
+                new_blocks.push(DiffBlockOp{ tag: tag, lines: Vec::new(), new_lines_num: new_lines_num, diff_block_index: diff_blocks_num });
+                diff_blocks_num += 1;
             },
             DiffTag::Insert => {
                 let new_range = x.new_range();
                 let new_str = new_lines[new_range.start..new_range.end].iter().map(|x| x.to_string()).collect::<Vec<_>>();
                 let new_lines_num = new_range.end - new_range.start;
-                old_blocks.push(DiffBlockOp{ tag: tag, lines: Vec::new(), new_lines_num: new_lines_num });
-                new_blocks.push(DiffBlockOp{ tag: tag, lines: new_str, new_lines_num: 0 });
+                old_blocks.push(DiffBlockOp{ tag: tag, lines: Vec::new(), new_lines_num: new_lines_num, diff_block_index: diff_blocks_num });
+                new_blocks.push(DiffBlockOp{ tag: tag, lines: new_str, new_lines_num: 0, diff_block_index: diff_blocks_num });
+                diff_blocks_num += 1;
             },
             DiffTag::Replace => {
                 let old_range = x.old_range();
@@ -75,12 +79,13 @@ pub fn diff(_old_filepath: &str, _new_filepath: &str) -> (Vec::<DiffBlockOp>, Ve
                     Less => (old_str_lines_num.abs_diff(new_str_lines_num), 0),
                     Greater => (0, old_str_lines_num.abs_diff(new_str_lines_num)),
                 };
-                old_blocks.push(DiffBlockOp{ tag: tag, lines: old_str, new_lines_num: new_lines_nums.0 });
-                new_blocks.push(DiffBlockOp{ tag: tag, lines: new_str, new_lines_num: new_lines_nums.1 });
+                old_blocks.push(DiffBlockOp{ tag: tag, lines: old_str, new_lines_num: new_lines_nums.0, diff_block_index: diff_blocks_num });
+                new_blocks.push(DiffBlockOp{ tag: tag, lines: new_str, new_lines_num: new_lines_nums.1, diff_block_index: diff_blocks_num });
+                diff_blocks_num += 1;
             },
         }
     });
-    (old_blocks, new_blocks)
+    (old_blocks, new_blocks, diff_blocks_num)
 }
 
 #[tauri::command]
