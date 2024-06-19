@@ -27,7 +27,7 @@
 
 <h2>Diff</h2>
 <div class="editors" style="display: flex; flex-direction: column; line-height: {lineHeight}px;">
-  <div style="display: flex; position: fixed; top: 0;">
+  <div style="display: flex; position: fixed; top: 0; z-index: 10000;">
     <h3>Diff blocks</h3>
     <button on:click={prevBlock} disabled={blocksNum === 0}>prev</button>
     <button on:click={nextBlock} disabled={blocksNum === 0}>next</button>
