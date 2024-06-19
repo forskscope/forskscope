@@ -1,6 +1,8 @@
 <script lang="ts">
-  export let diff
+  export let filepath: string
+  export let diff: any // todo
   export let activeDiffBlockIndex: number | undefined
+  export let innerText: string
 
   $: if (activeDiffBlockIndex !== undefined) {
     const el = document.querySelector(`.diff-${activeDiffBlockIndex}`)!
@@ -19,7 +21,8 @@
   }
 </script>
 
-<div class="editor" contenteditable="true">
+<h3>{filepath}</h3>
+<div class="editor" bind:innerText={innerText} contenteditable="true">
   {#each diff as block}
     <div class="{blockClass(block.tag, block.diff_block_index, activeDiffBlockIndex)}">
       {#each block.lines as line}
