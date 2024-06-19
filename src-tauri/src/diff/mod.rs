@@ -83,14 +83,14 @@ pub fn list_dir(dirpath: &str) -> Vec<Vec<String>> {
     Vec::from([dirs, files])
 }
 
-fn diff_contents(_old_content: &str, _new_content: &str) -> (Vec::<DiffBlockOp>, Vec::<DiffBlockOp>, usize) {
+fn diff_contents(old_content: &str, new_content: &str) -> (Vec::<DiffBlockOp>, Vec::<DiffBlockOp>, usize) {
     // todo
-    let s = s().to_owned();
-    let t = t().to_owned();
+    let old_content = if old_content.is_empty() { s() } else { old_content.to_owned() };
+    let new_content = if new_content.is_empty() { t() } else { new_content.to_owned() };
 
-    let diff = TextDiff::configure().diff_lines(s.as_str(), t.as_str());
-    let old_lines = s.lines().collect::<Vec<&str>>();
-    let new_lines = t.lines().collect::<Vec<&str>>();
+    let diff = TextDiff::configure().diff_lines(old_content.as_str(), new_content.as_str());
+    let old_lines = old_content.lines().collect::<Vec<&str>>();
+    let new_lines = new_content.lines().collect::<Vec<&str>>();
     let mut old_blocks = Vec::<DiffBlockOp>::new();
     let mut new_blocks = Vec::<DiffBlockOp>::new();
     let mut diff_blocks_num = 0;
