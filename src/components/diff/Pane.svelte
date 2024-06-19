@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { createEventDispatcher } from 'svelte';
+
+  const dispatch = createEventDispatcher();
+
   export let filepath: string
   export let diff: any // todo
   export let activeDiffBlockIndex: number | undefined
@@ -19,10 +23,14 @@
     }
     return ret
   }
+
+  function onInput() {
+    dispatch('input')
+  }
 </script>
 
 <h3>{filepath}</h3>
-<div class="editor" bind:innerText={innerText} contenteditable="true">
+<div class="editor" contenteditable="true" bind:innerText={innerText} on:input={onInput}>
   {#each diff as block}
     <div class="{blockClass(block.tag, block.diff_block_index, activeDiffBlockIndex)}">
       {#each block.lines as line}

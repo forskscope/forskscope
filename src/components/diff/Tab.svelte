@@ -12,7 +12,6 @@
   let lineHeight: number = 16 // todo
   let activeDiffBlockIndex: number
 
-
   let oldDiff: any[] = []
   let newDiff: any[] = []
   let blocksNum: number = 0
@@ -23,7 +22,8 @@
     content: string,
   }
 
-  async function diff_button_on_click() {
+  // todo: work w/ old|new filepath
+  async function init() {
     const oldDiffRequest: DiffRequest = { diff_request_type: 'Content', content: '' }
     const newDiffRequest: DiffRequest = { diff_request_type: 'Content', content: '' }
     let diffs: any = await invoke("diff", { oldDiffRequest: oldDiffRequest, newDiffRequest: newDiffRequest })
@@ -33,7 +33,7 @@
     blocksNum = diffs[2] as number
   }
 
-  onMount(diff_button_on_click)
+  onMount(init)
 
   function prevBlock() {
     if (activeDiffBlockIndex === undefined) {
@@ -50,10 +50,21 @@
     const maxIndex = blocksNum - 1
     activeDiffBlockIndex = activeDiffBlockIndex < maxIndex ? activeDiffBlockIndex + 1 : maxIndex
   }
+
+  async function onInput() {
+    const oldDiffRequest: DiffRequest = { diff_request_type: 'Content', content: oldInnerText }
+    const newDiffRequest: DiffRequest = { diff_request_type: 'Content', content: newInnerText }
+    let diffs: any = await invoke("diff", { oldDiffRequest: oldDiffRequest, newDiffRequest: newDiffRequest })
+
+    console.log(diffs, oldDiffRequest, newInnerText)
+
+    oldDiff = diffs[0] as any[]
+    newDiff = diffs[1] as any[]
+    blocksNum = diffs[2] as number
+  }
 </script>
 
-<button on:click={() => lineHeight++}>Line height</button>
-<button on:click={diff_button_on_click}>Diff</button>
+<button on:click={() => lineHeight++}>Line height</button><!-- todo -->
 
 <h2>Diff</h2>
 <div class="editors" style="display: flex; flex-direction: column; line-height: {lineHeight}px;">
@@ -63,16 +74,10 @@
     <button on:click={nextBlock} disabled={blocksNum === 0}>next</button>
   </div>
   <div style="display: flex;">
-    <Pane filepath={oldFilepath} diff={oldDiff} activeDiffBlockIndex={activeDiffBlockIndex} bind:innerText={oldInnerText} />
-    <Pane filepath={newFilepath} diff={newDiff} activeDiffBlockIndex={activeDiffBlockIndex} bind:innerText={newInnerText} />
+    <Pane filepath={oldFilepath} diff={oldDiff} activeDiffBlockIndex={activeDiffBlockIndex} bind:innerText={oldInnerText} on:input={onInput} />
+    <Pane filepath={newFilepath} diff={newDiff} activeDiffBlockIndex={activeDiffBlockIndex} bind:innerText={newInnerText} on:input={onInput} />
   </div>
 </div>
-
-{oldInnerText}
-
-<br>
-
-{newInnerText}
 
 <style>
   .editors {
