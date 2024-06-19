@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-
+  
   const dispatch = createEventDispatcher();
 
   export let filepath: string
@@ -79,7 +79,6 @@
     position: relative;
     width: auto;
     padding-left: 2.5em;
-    text-align: left;
     counter-increment: linenumber;
   }
   .editor .line > div {

@@ -14,18 +14,16 @@
   }
 </script>
 
-<div class="container">
-  <h1>Explorer</h1>
+<h1>Explorer</h1>
 
-  <input id="greet-input" placeholder="Enter a name..." bind:value={name} />
-  <button on:click={list_dir_on_click}>List dir</button>
+<input id="greet-input" placeholder="Enter a name..." bind:value={name} />
+<button on:click={list_dir_on_click}>List dir</button>
 
-  <ul>
-    {#each dirs as dir}
-      <li style="color: yellow;">{dir}</li>
-    {/each}
-    {#each files as file}
-      <li>{file}</li>
-    {/each}
-  </ul>
-</div>
+<ul>
+  {#each dirs as dir}
+    <li style="color: yellow;">{dir}</li>
+  {/each}
+  {#each files as file}
+    <li>{file}</li>
+  {/each}
+</ul>
