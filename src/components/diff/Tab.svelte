@@ -1,8 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core"
-  import { getCurrent, type DragDropEvent } from "@tauri-apps/api/webview"
-  import type { UnlistenFn } from "@tauri-apps/api/event";
-  import { onMount, onDestroy } from 'svelte'
+  import { onMount } from 'svelte'
   import Pane from './Pane.svelte'
 
   export let oldFilepath
@@ -34,20 +32,7 @@
     blocksNum = diffs[2] as number
   }
 
-  let unlisten: UnlistenFn | undefined
-  async function listenDragDrop() {
-    unlisten = await getCurrent().onDragDropEvent((event: any) => {
-      console.log(event.payload)
-    })
-  }
-
-  onMount(() => {
-    init()
-    
-    listenDragDrop()
-  })
-
-  onDestroy(() => unlisten && unlisten())
+  onMount(init)
 
   function prevBlock() {
     if (activeDiffBlockIndex === undefined) {
