@@ -1,6 +1,6 @@
 # Patch Hygge
 
-Diff and merge GUI tool with cross-platform support written in Rust and Svelte
+Diff and merge GUI tool with cross-platform support build with Tauri: Rust and Svelte
 
 ## Recommended IDE Setup
 
