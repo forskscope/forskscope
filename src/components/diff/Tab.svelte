@@ -1,6 +1,8 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core"
-  import { onMount } from 'svelte'
+  import { getCurrent, type DragDropEvent } from "@tauri-apps/api/webview"
+  import type { UnlistenFn } from "@tauri-apps/api/event";
+  import { onMount, onDestroy } from 'svelte'
   import Pane from './Pane.svelte'
 
   export let oldFilepath
@@ -9,7 +11,6 @@
   let oldInnerText: string
   let newInnerText: string
 
-  let lineHeight: number = 16 // todo
   let activeDiffBlockIndex: number
 
   let oldDiff: any[] = []
@@ -33,7 +34,20 @@
     blocksNum = diffs[2] as number
   }
 
-  onMount(init)
+  let unlisten: UnlistenFn | undefined
+  async function listenDragDrop() {
+    unlisten = await getCurrent().onDragDropEvent((event: any) => {
+      console.log(event.payload)
+    })
+  }
+
+  onMount(() => {
+    init()
+    
+    listenDragDrop()
+  })
+
+  onDestroy(() => unlisten && unlisten())
 
   function prevBlock() {
     if (activeDiffBlockIndex === undefined) {
@@ -64,10 +78,8 @@
   }
 </script>
 
-<button on:click={() => lineHeight++}>Line height</button><!-- todo -->
-
 <h2>Diff</h2>
-<div class="editors" style="display: flex; flex-direction: column; line-height: {lineHeight}px;">
+<div class="editors" style="display: flex; flex-direction: column;">
   <div style="display: flex; position: fixed; right: 0; bottom: 0; z-index: 10000;">
     <h3>Diff blocks</h3>
     <button on:click={prevBlock} disabled={blocksNum === 0}>prev</button>
