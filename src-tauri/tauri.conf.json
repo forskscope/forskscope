@@ -3,13 +3,12 @@
   "version": "0.1.0",
   "identifier": "com.patch-hygge",
   "build": {
-    "beforeDevCommand": "trunk serve",
+    "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "trunk build",
-    "frontendDist": "../dist"
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../build"
   },
   "app": {
-    "withGlobalTauri": true,
     "windows": [
       {
         "title": "patch-hygge",
