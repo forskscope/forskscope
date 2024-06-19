@@ -17,8 +17,6 @@
 <div class="container">
   <h1>Explorer</h1>
 
-  <a href="..">Return</a>
-
   <input id="greet-input" placeholder="Enter a name..." bind:value={name} />
   <button on:click={list_dir_on_click}>List dir</button>
 
