@@ -14,18 +14,17 @@
   -webkit-text-size-adjust: 100%;
 }
 
-.container {
+h1,
+h2 {
+  padding: 0;
   margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
 }
-
-.row {
-  display: flex;
-  justify-content: center;
+h1 {
+  position: fixed;
+  top: 0.2rem;
+  right: 0.7rem;
+  font-size: 0.9rem;
+  opacity: 0.4;
 }
 
 a {
@@ -36,10 +35,6 @@ a {
 
 a:hover {
   color: #535bf2;
-}
-
-h1 {
-  text-align: center;
 }
 
 input,

@@ -1,6 +1,12 @@
 <script lang="ts">
-  export let diff
+  import { createEventDispatcher } from 'svelte';
+  
+  const dispatch = createEventDispatcher();
+
+  export let filepath: string
+  export let diff: any // todo
   export let activeDiffBlockIndex: number | undefined
+  export let innerText: string
 
   $: if (activeDiffBlockIndex !== undefined) {
     const el = document.querySelector(`.diff-${activeDiffBlockIndex}`)!
@@ -17,9 +23,14 @@
     }
     return ret
   }
+
+  function onInput() {
+    dispatch('input')
+  }
 </script>
 
-<div class="editor" contenteditable="true">
+<h3>{filepath}</h3>
+<div class="editor" contenteditable="true" bind:innerText={innerText} on:input={onInput}>
   {#each diff as block}
     <div class="{blockClass(block.tag, block.diff_block_index, activeDiffBlockIndex)}">
       {#each block.lines as line}
@@ -41,7 +52,6 @@
 <style>
   .editor {
     width: 50%;
-    text-align: left;
     font-family: monospace;
     /* flex-shrink: 0; */
     /* flex: 0 0 auto; */
@@ -68,7 +78,7 @@
   .editor .line {
     position: relative;
     width: auto;
-    padding-left: 2em;
+    padding-left: 2.5em;
     counter-increment: linenumber;
   }
   .editor .line > div {
