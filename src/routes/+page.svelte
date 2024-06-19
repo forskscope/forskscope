@@ -7,8 +7,13 @@
   let newDiff: any[] = []
   let blocksNum: number = 0
 
+  type DiffRequestType = 'Content' | 'Filepath'
+
   async function diff_button_on_click() {
-    let diffs: any = await invoke("diff", { oldFilepath: '', newFilepath: '' })
+    const oldDiffRequest: any = { diff_request_type: 'Content', content: '' }
+    const newDiffRequest: any = { diff_request_type: 'Content', content: '' }
+    let diffs: any = await invoke("diff", { oldDiffRequest: oldDiffRequest, newDiffRequest: newDiffRequest })
+
     oldDiff = diffs[0] as any[]
     newDiff = diffs[1] as any[]
     blocksNum = diffs[2] as number
