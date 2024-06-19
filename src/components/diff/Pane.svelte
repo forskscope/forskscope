@@ -2,17 +2,14 @@
   export let diff
   
   function blockClass(tag: string, index: number): string {
-    const diffClass = ['delete', 'insert', 'replace'].includes(tag) ? 'diff-' + index.toString() : ''
-    return diffClass
-  }
-  function blockBackgroundColor(tag: string): string {
-    return tag === 'delete' ? 'red' : tag === 'insert' ? 'green' : tag === 'replace' ? 'purple' : 'black'
+    const diffClasses = ['delete', 'insert', 'replace'].includes(tag) ? `diff diff-${index.toString()} ${tag}` : ''
+    return `block ${diffClasses}`
   }
 </script>
 
 <div class="editor" contenteditable="true">
   {#each diff as block, i}
-    <div class="{blockClass(block.tag, i)}" style="background-color: {blockBackgroundColor(block.tag)};">
+    <div class="{blockClass(block.tag, i)}">
       {#each block.lines as line}
         <div class="line">
           {#if line.length === 0}
@@ -40,6 +37,17 @@
     white-space: nowrap; */
     counter-reset: linenumber;
   }
+
+  .editor .block.delete {
+    background-color: red;
+  }
+  .editor .block.insert {
+    background-color: green;
+  }
+  .editor .block.replace {
+    background-color: purple;
+  }
+
   .editor .line {
     position: relative;
     width: auto;
@@ -59,19 +67,5 @@
     text-align: right;
     margin-right: 5px; /* 行番号とテキストの間のスペース */
     color: gray;
-  }
-
-  .drop-area {
-    width: 100%;
-    height: 200px;
-    border: 2px dashed #ccc;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: #ccc;
-  }
-  .drop-area.dragging {
-    border-color: red;
   }
 </style>
