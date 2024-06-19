@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core"
-  import Tab from '../components/diff/Tab.svelte'
+  import DiffTab from '../components/diff/Tab.svelte'
 
   let lineHeight = 16 // todo
   let oldDiff: any[] = []
@@ -26,6 +26,6 @@
   <button on:click={() => lineHeight++}>Line height</button>
   <button on:click={diff_button_on_click}>Diff</button>
 
-  <Tab oldDiff={oldDiff} newDiff={newDiff} blocksNum={blocksNum} lineHeight={lineHeight} />
+  <DiffTab oldDiff={oldDiff} newDiff={newDiff} blocksNum={blocksNum} lineHeight={lineHeight} />
 </div>
 

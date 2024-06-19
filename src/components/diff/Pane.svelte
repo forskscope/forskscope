@@ -41,7 +41,6 @@
 <style>
   .editor {
     width: 50%;
-    text-align: left;
     font-family: monospace;
     /* flex-shrink: 0; */
     /* flex: 0 0 auto; */
@@ -68,7 +67,8 @@
   .editor .line {
     position: relative;
     width: auto;
-    padding-left: 2em;
+    padding-left: 2.5em;
+    text-align: left;
     counter-increment: linenumber;
   }
   .editor .line > div {
