@@ -41,8 +41,15 @@ pub struct DiffBlockOp {
     diff_block_index: usize,
 }
 
+#[derive(Serialize)]
+pub struct DiffResponse {
+    old_blocks: Vec::<DiffBlockOp>,
+    new_blocks: Vec::<DiffBlockOp>,
+    diff_blocks_num: usize,
+}
+
 #[tauri::command]
-pub fn diff(old_diff_request: DiffRequest, new_diff_request: DiffRequest) -> (Vec::<DiffBlockOp>, Vec::<DiffBlockOp>, usize) {
+pub fn diff(old_diff_request: DiffRequest, new_diff_request: DiffRequest) -> DiffResponse {
     let old_content = match old_diff_request.diff_request_type {
         DiffRequestType::Content => old_diff_request.content,
         DiffRequestType::Filepath => {
@@ -67,12 +74,18 @@ pub fn file_content(filepath: &str) -> String {
     (if filepath.is_empty() { s() } else { t() }).to_owned()
 }
 
+#[derive(Serialize)]
+pub struct ListDirReponse {
+    current_dir: String,
+    dirs: Vec<String>,
+    files: Vec<String>,
+}
 #[tauri::command]
-pub fn list_dir(dirpath: &str) -> Vec<Vec<String>> {
-    let dirpath = if dirpath.is_empty() { "." } else { dirpath };
+pub fn list_dir(current_dir: &str) -> ListDirReponse {
+    let current_dir = if current_dir.is_empty() { std::env::current_dir().expect("Failed to get current directory").canonicalize().expect("Failed to canonicalize path").display().to_string() } else { current_dir.to_owned() };
     let mut dirs = Vec::<String>::new();
     let mut files = Vec::<String>::new();
-    for x in std::fs::read_dir(dirpath).unwrap() {
+    for x in std::fs::read_dir(current_dir.as_str()).unwrap() {
         let dir_entry = x.unwrap();
         let name = dir_entry.file_name().to_string_lossy().to_string();
         match dir_entry.file_type() {
@@ -80,10 +93,14 @@ pub fn list_dir(dirpath: &str) -> Vec<Vec<String>> {
             _ => {}
         }
     }
-    Vec::from([dirs, files])
+    ListDirReponse {
+        current_dir: current_dir,
+        dirs: dirs,
+        files: files,
+    }
 }
 
-fn diff_contents(old_content: &str, new_content: &str) -> (Vec::<DiffBlockOp>, Vec::<DiffBlockOp>, usize) {
+fn diff_contents(old_content: &str, new_content: &str) -> DiffResponse {
     // todo
     let old_content = if old_content.is_empty() { s() } else { old_content.to_owned() };
     let new_content = if new_content.is_empty() { t() } else { new_content.to_owned() };
@@ -137,5 +154,9 @@ fn diff_contents(old_content: &str, new_content: &str) -> (Vec::<DiffBlockOp>, V
             },
         }
     });
-    (old_blocks, new_blocks, diff_blocks_num)
+    DiffResponse {
+        old_blocks: old_blocks,
+        new_blocks:new_blocks,
+        diff_blocks_num: diff_blocks_num
+    }
 }

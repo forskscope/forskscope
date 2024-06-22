@@ -3,8 +3,8 @@
   import { onMount } from 'svelte'
   import Pane from './Pane.svelte'
 
-  export let oldFilepath
-  export let newFilepath
+  export let oldFilepath: string
+  export let newFilepath: string
   
   let oldInnerText: string
   let newInnerText: string
@@ -22,17 +22,40 @@
   }
 
   // todo: work w/ old|new filepath
-  async function init() {
-    const oldDiffRequest: DiffRequest = { diff_request_type: 'Content', content: '' }
-    const newDiffRequest: DiffRequest = { diff_request_type: 'Content', content: '' }
-    let diffs: any = await invoke("diff", { oldDiffRequest: oldDiffRequest, newDiffRequest: newDiffRequest })
+  let initialized: boolean = false
+  async function ready() {
+    if (initialized) return
 
-    oldDiff = diffs[0] as any[]
-    newDiff = diffs[1] as any[]
-    blocksNum = diffs[2] as number
+    let ret: {
+      old_blocks: unknown[],
+      new_blocks: unknown[],
+      diff_blocks_num: number,
+    }
+
+    if (oldFilepath && newFilepath) {
+      const params = { oldDiffRequest: <DiffRequest>{
+        diff_request_type: "Filepath",
+        content: oldFilepath,
+      }, newDiffRequest: <DiffRequest>{
+        diff_request_type: "Filepath",
+        content: newFilepath,
+      } }
+      ret = await invoke("diff", params)
+    } else {
+      const oldDiffRequest: DiffRequest = { diff_request_type: 'Content', content: '' }
+      const newDiffRequest: DiffRequest = { diff_request_type: 'Content', content: '' }
+      const params = { oldDiffRequest: oldDiffRequest, newDiffRequest: newDiffRequest }
+      ret = await invoke("diff", params)
+    }
+
+    oldDiff = ret.old_blocks
+    newDiff = ret.new_blocks
+    blocksNum = ret.diff_blocks_num
+
+    initialized = true
   }
 
-  onMount(init)
+  onMount(ready)
 
   function prevBlock() {
     if (activeDiffBlockIndex === undefined) {
@@ -63,24 +86,34 @@
   }
 </script>
 
-<h2>Diff</h2>
+<h3>Diff</h3>
 <div class="editors" style="display: flex; flex-direction: column;">
   <div style="display: flex; position: fixed; right: 0; bottom: 0; z-index: 10000;">
     <h3>Diff blocks</h3>
     <button on:click={prevBlock} disabled={blocksNum === 0}>prev</button>
     <button on:click={nextBlock} disabled={blocksNum === 0}>next</button>
   </div>
-  <div style="display: flex;">
-    <Pane filepath={oldFilepath} diff={oldDiff} activeDiffBlockIndex={activeDiffBlockIndex} bind:innerText={oldInnerText} on:input={onInput} />
-    <Pane filepath={newFilepath} diff={newDiff} activeDiffBlockIndex={activeDiffBlockIndex} bind:innerText={newInnerText} on:input={onInput} />
+  <div class="panes">
+    <div class="pane">
+      <Pane filepath={oldFilepath} diff={oldDiff} activeDiffBlockIndex={activeDiffBlockIndex} bind:innerText={oldInnerText} on:input={onInput} />
+    </div>
+    <div class="pane">
+      <Pane filepath={newFilepath} diff={newDiff} activeDiffBlockIndex={activeDiffBlockIndex} bind:innerText={newInnerText} on:input={onInput} />
+    </div>
   </div>
 </div>
 
 <style>
   .editors {
     width: 100%;
-    height: 90vh;
+    height: 100%;
     display: flex;
     overflow-y: auto;
+  }
+  .panes {
+    display: flex;
+  }
+  .pane {
+    width: 50%;
   }
 </style>
