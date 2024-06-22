@@ -34,3 +34,5 @@
     <li>{path}
   {/each}
 </ul>
+
+todo: font size, diff algorithm, ...

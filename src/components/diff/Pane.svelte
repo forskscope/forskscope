@@ -29,29 +29,34 @@
   }
 </script>
 
-<h3>{filepath}</h3>
-<div class="editor" contenteditable="true" bind:innerText={innerText} on:input={onInput}>
-  {#each diff as block}
-    <div class="{blockClass(block.tag, block.diff_block_index, activeDiffBlockIndex)}">
-      {#each block.lines as line}
-        <div class="line">
-          {#if line.length === 0}
-            <br>
-          {:else}
-            <div>{line}</div>
-          {/if}
-        </div>
-      {/each}
-      {#each Array(block.new_lines_num) as _}
-        <br>
-      {/each}
-    </div>
-  {/each}
+<div class="wrapper">
+  <h3>{filepath}</h3>
+  <div class="editor" contenteditable="true" bind:innerText={innerText} on:input={onInput}>
+    {#each diff as block}
+      <div class="{blockClass(block.tag, block.diff_block_index, activeDiffBlockIndex)}">
+        {#each block.lines as line}
+          <div class="line">
+            {#if line.length === 0}
+              <br>
+            {:else}
+              <div>{line}</div>
+            {/if}
+          </div>
+        {/each}
+        {#each Array(block.new_lines_num) as _}
+          <br>
+        {/each}
+      </div>
+    {/each}
+  </div>
 </div>
 
 <style>
+  .wrapper {
+    display: flex;
+    flex-direction: column;
+  }
   .editor {
-    width: 50%;
     font-family: monospace;
     /* flex-shrink: 0; */
     /* flex: 0 0 auto; */
