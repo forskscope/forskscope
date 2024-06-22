@@ -14,6 +14,7 @@ fn main() {
             #[cfg(debug_assertions)] // only include this code on debug builds
             {
                 let window = app.get_webview_window("main").unwrap();
+                // todo
                 window.set_zoom(1.20).unwrap();
                 window.open_devtools();
                 window.close_devtools();

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core"
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import Pane from './Pane.svelte'
 
   export let oldFilepath: string
@@ -21,11 +21,7 @@
     content: string,
   }
 
-  // todo: work w/ old|new filepath
-  let initialized: boolean = false
-  async function ready() {
-    if (initialized) return
-
+  async function diff() {
     let ret: {
       old_blocks: unknown[],
       new_blocks: unknown[],
@@ -51,11 +47,32 @@
     oldDiff = ret.old_blocks
     newDiff = ret.new_blocks
     blocksNum = ret.diff_blocks_num
+  }
 
-    initialized = true
+  const handleKeydown = (event: KeyboardEvent) => {
+    console.log(event.key)
+    switch (event.key) {
+      case 'F7': prevBlock(); break;
+      case 'F8': nextBlock(); break;
+      default:
+    }
+  }
+
+  let initialized: boolean = false
+  async function ready() {
+    if (!initialized) {
+      await diff()
+      initialized = true
+    }
+
+    window.addEventListener('keydown', handleKeydown)
   }
 
   onMount(ready)
+
+  onDestroy(() => {
+    window.removeEventListener('keydown', handleKeydown)
+  })
 
   function prevBlock() {
     if (activeDiffBlockIndex === undefined) {
@@ -84,15 +101,29 @@
     newDiff = diffs[1] as any[]
     blocksNum = diffs[2] as number
   }
+
+  function handleScrollToTop() {
+    document.querySelector('.editors > .start')!.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+  function handleScrollToBottom() {
+    document.querySelector('.editors > .end')!.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
 </script>
 
 <h3>Diff</h3>
 <div class="editors" style="display: flex; flex-direction: column;">
-  <div style="display: flex; position: fixed; right: 0; bottom: 0; z-index: 10000;">
-    <h3>Diff blocks</h3>
-    <button on:click={prevBlock} disabled={blocksNum === 0}>prev</button>
-    <button on:click={nextBlock} disabled={blocksNum === 0}>next</button>
-  </div>
+  <span class='start'></span>
+  <nav style="display: flex; position: fixed; right: 0; bottom: 0; z-index: 10000;">
+    <div style="display: flex;">
+      <h3>Diff blocks</h3>
+      <button on:click={prevBlock} disabled={blocksNum === 0}>prev</button>
+      <button on:click={nextBlock} disabled={blocksNum === 0}>next</button>
+    </div>
+    <div>
+      <button on:click={handleScrollToTop}>Top</button>
+      <button on:click={handleScrollToBottom}>Bottom</button>
+    </div>
+  </nav>
   <div class="panes">
     <div class="pane">
       <Pane filepath={oldFilepath} diff={oldDiff} activeDiffBlockIndex={activeDiffBlockIndex} bind:innerText={oldInnerText} on:input={onInput} />
@@ -101,6 +132,7 @@
       <Pane filepath={newFilepath} diff={newDiff} activeDiffBlockIndex={activeDiffBlockIndex} bind:innerText={newInnerText} on:input={onInput} />
     </div>
   </div>
+  <span class='end'></span>
 </div>
 
 <style>
