@@ -3,8 +3,9 @@
   import type { UnlistenFn, Event as TauriEvent } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from 'svelte'
 
-  import Tab from '../components/diff/Tab.svelte'
-  import { diffTabsStore, diffTabIndexStore, updateDiffTabIndexStore } from '../stores'
+  import Tabs from '../components/diff/Tabs.svelte'
+  import { type DiffTab } from '../types'
+  import { diffTabsStore, pushToDiffTabsStore } from '../stores'
 
   async function ready() {
     await listenDragDrop()
@@ -13,6 +14,14 @@
   async function listenDragDrop() {
     unlisten = await getCurrent().onDragDropEvent((event: TauriEvent<DragDropEvent>) => {
       console.log(event.payload)
+      // todo
+      if (event.payload.type === 'dropped' && event.payload.paths.length == 2) {
+        const paths = event.payload.paths
+        const oldFilepath = paths[0]
+        const newFilepath = paths[1]
+        const diffTab = <DiffTab>{oldFilepath: oldFilepath, newFilepath: newFilepath}
+        pushToDiffTabsStore(diffTab)
+      }
     })
   }
 
@@ -25,24 +34,18 @@
 <h1>Patch Hygge</h1>
 
 <div class="wrapper">
-  <div class="tabs">
-    {#each $diffTabsStore as _diffTab, i}
-      <h2><label><input type="radio" name="diffTabs" value={i} checked={i === $diffTabIndexStore} on:change={(event) => updateDiffTabIndexStore(Number(event.currentTarget.value))}>{(i + 1).toString()}</label></h2>
-    {/each}
-  </div>
-  {#each $diffTabsStore as diffTab, i}
-    {#if i === $diffTabIndexStore}
-      <Tab oldFilepath={diffTab.oldFilepath} newFilepath={diffTab.newFilepath} />
-    {/if}
-  {/each}
+  {#if 0 < $diffTabsStore.length }
+    <Tabs />
+  {:else}
+    <div style="width: 100%; height: 100%; border: 2px dashed grey; display: flex; justify-content: center; align-items: center;">
+      Drop two files to compare
+    </div>
+  {/if}
 </div>
 
 <style>
   .wrapper {
     width: 100vw;
     height: 60vh;
-  }
-  .tabs {
-    display: flex;
   }
 </style>
