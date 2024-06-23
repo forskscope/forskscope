@@ -9,7 +9,6 @@ use crate::diff::{diff, list_dir};
 
 fn main() {
     tauri::Builder::default()
-
         .setup(|app| {
             #[cfg(debug_assertions)] // only include this code on debug builds
             {
@@ -21,7 +20,6 @@ fn main() {
             }
             Ok(())
         })
-        
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![diff, list_dir])
         .run(tauri::generate_context!())

@@ -5,6 +5,9 @@
 
   export let oldFilepath: string
   export let newFilepath: string
+
+  const fnkeyPrevDiff = 'F7'
+  const fnkeyNextDiff = 'F8'
   
   let oldInnerText: string
   let newInnerText: string
@@ -52,8 +55,8 @@
   const handleKeydown = (event: KeyboardEvent) => {
     console.log(event.key)
     switch (event.key) {
-      case 'F7': prevBlock(); break;
-      case 'F8': nextBlock(); break;
+      case fnkeyPrevDiff: prevBlock(); break;
+      case fnkeyNextDiff: nextBlock(); break;
       default:
     }
   }
@@ -116,8 +119,8 @@
   <nav style="display: flex; position: fixed; right: 0; bottom: 0; z-index: 10000;">
     <div style="display: flex;">
       <h3>Diff blocks</h3>
-      <button on:click={prevBlock} disabled={blocksNum === 0}>prev</button>
-      <button on:click={nextBlock} disabled={blocksNum === 0}>next</button>
+      <button on:click={prevBlock} disabled={blocksNum === 0}>prev {fnkeyPrevDiff}</button>
+      <button on:click={nextBlock} disabled={blocksNum === 0}>next {fnkeyNextDiff}</button>
     </div>
     <div>
       <button on:click={handleScrollToTop}>Top</button>
