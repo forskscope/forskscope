@@ -3,25 +3,6 @@ use similar::{TextDiff, DiffTag};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering::{Equal, Less, Greater};
 
-// todo
-// const S: &str = "Oh a charming cat!\nWow, nice.\nGood day.";
-// const T: &str = "A great dog.\n\nWow, nice.\nBetter day.";
-use std::sync::OnceLock;
-fn s() -> String {
-    static S: OnceLock<String> = OnceLock::new();
-    S.get_or_init(|| {
-        let ret = std::fs::read_to_string("./Cargo.lock").unwrap();
-        format!("{}\n{}", ret.split("\n").take(30).collect::<Vec<_>>().join("\n"), ret.split("\n").take(2).collect::<Vec<_>>().join("\n"))
-    }).to_owned()
-}
-fn t() -> String {
-    static T: OnceLock<String> = OnceLock::new();
-    T.get_or_init(|| {
-        let ret = std::fs::read_to_string("./Cargo.lock").unwrap();
-        format!("{}\n\n{}", ret.split("\n").take(3).collect::<Vec<_>>().join("\n"), ret.split("\n").take(40).collect::<Vec<_>>().join("\n"))
-    }).to_owned()
-}
-
 #[derive(Deserialize)]
 enum DiffRequestType {
     Content,
@@ -68,12 +49,6 @@ pub fn diff(old_diff_request: DiffRequest, new_diff_request: DiffRequest) -> Dif
     diff_contents(old_content.as_str(), new_content.as_str())
 }
 
-#[tauri::command]
-pub fn file_content(filepath: &str) -> String {
-    // todo
-    (if filepath.is_empty() { s() } else { t() }).to_owned()
-}
-
 #[derive(Serialize)]
 pub struct ListDirReponse {
     current_dir: String,
@@ -101,11 +76,7 @@ pub fn list_dir(current_dir: &str) -> ListDirReponse {
 }
 
 fn diff_contents(old_content: &str, new_content: &str) -> DiffResponse {
-    // todo
-    let old_content = if old_content.is_empty() { s() } else { old_content.to_owned() };
-    let new_content = if new_content.is_empty() { t() } else { new_content.to_owned() };
-
-    let diff = TextDiff::configure().diff_lines(old_content.as_str(), new_content.as_str());
+    let diff = TextDiff::configure().diff_lines(old_content, new_content);
     let old_lines = old_content.lines().collect::<Vec<&str>>();
     let new_lines = new_content.lines().collect::<Vec<&str>>();
     let mut old_blocks = Vec::<DiffBlockOp>::new();
