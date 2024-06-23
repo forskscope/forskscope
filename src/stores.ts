@@ -2,7 +2,7 @@ import { writable, type Writable } from 'svelte/store'
 import { type DiffTab } from './types'
 
 // diff tabs
-export const diffTabsStore: Writable<DiffTab[]> = writable([<DiffTab>{oldFilepath: '', newFilepath: ''}])
+export const diffTabsStore: Writable<DiffTab[]> = writable([])
 export function pushToDiffTabsStore(value: DiffTab) {
   diffTabsStore.update(current => {
     const updated = [...current, value]

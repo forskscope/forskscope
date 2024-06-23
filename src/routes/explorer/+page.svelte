@@ -3,10 +3,12 @@
 
   import Pane from '../../components/explorer/Pane.svelte'
   import { type DiffTab } from '../../types'
-  import { pushToDiffTabsStore, updateDiffTabIndexStore } from '../../stores'
+  import { pushToDiffTabsStore } from '../../stores'
 
-  let filter = ''
-
+  const filterMinLength: number = 2
+  let filterInput: string = ''
+  let filter: string = ''
+  $: filter = filterInput.length < filterMinLength ? '' : filterInput;
   
   function compare() {
     const diffTab = <DiffTab>{oldFilepath: `${oldDir}/${oldFilename}`, newFilepath: `${newDir}/${newFilename}`}
@@ -33,7 +35,7 @@
 
 <h1>Explorer</h1>
 
-<input id="filter-input" placeholder="Filter" bind:value={filter} />
+<input id="filter-input" placeholder="Filter" bind:value={filterInput} />
 <button on:click={compare} disabled={!oldFilename || !newFilename}>Compare</button>
 
 <div class="wrapper">
