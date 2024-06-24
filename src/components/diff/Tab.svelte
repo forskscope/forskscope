@@ -131,6 +131,14 @@
     <div class="pane">
       <Pane filepath={oldFilepath} diff={oldDiff} activeDiffBlockIndex={activeDiffBlockIndex} bind:innerText={oldInnerText} on:input={onInput} />
     </div>
+
+    <!-- todo -->
+    <div class="divider" style="margin-top: 5.3rem;">
+      {#each oldDiff as block}
+        <div style="width: 2rem; height: {block.lines.length * 1.5}rem; background-color: {['delete', 'insert', 'replace'].includes(block.tag) ? 'greenyellow' : 'grey'};"></div>
+      {/each}
+    </div>
+
     <div class="pane">
       <Pane filepath={newFilepath} diff={newDiff} activeDiffBlockIndex={activeDiffBlockIndex} bind:innerText={newInnerText} on:input={onInput} />
     </div>
