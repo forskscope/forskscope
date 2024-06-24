@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import { goto } from '$app/navigation';
 
   import Pane from '../../components/explorer/Pane.svelte'
@@ -10,8 +11,10 @@
   let filter: string = ''
   $: filter = filterInput.length < filterMinLength ? '' : filterInput;
   
-  function compare() {
-    const diffTab = <DiffTab>{oldFilepath: `${oldDir}/${oldFilename}`, newFilepath: `${newDir}/${newFilename}`}
+  async function compare() {
+    const oldFilepath = await invoke('path_join', {path1: oldDir, path2: oldFilename})
+    const newFilepath = await invoke('path_join', {path1: newDir, path2: newFilename})
+    const diffTab = <DiffTab>{oldFilepath: oldFilepath, newFilepath: newFilepath}
     pushToDiffTabsStore(diffTab)
     goto('/')
   }

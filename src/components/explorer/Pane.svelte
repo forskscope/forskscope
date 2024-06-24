@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount, createEventDispatcher } from 'svelte';
-  
+
   export let filter: string
 
   const dispatch = createEventDispatcher();
@@ -19,12 +19,12 @@
   }
 
   async function update(subdir: string) {
-    dir = dir ? `${dir}/${subdir}` : ''
+    dir = dir ? await invoke('path_join', {path1: dir, path2: subdir}) : ''
     filename = ''
     dispatch('selectedChange', { dir: dir, filename: filename })
 
     // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    const ret = await invoke("list_dir", { currentDir: dir }) as {current_dir: string, dirs: string[], files: string[]}
+    const ret = await invoke('list_dir', { currentDir: dir }) as {current_dir: string, dirs: string[], files: string[]}
 
     dir = ret.current_dir
     dirs = ret.dirs

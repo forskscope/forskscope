@@ -5,7 +5,7 @@ mod diff;
 
 use tauri::Manager;
 
-use crate::diff::{diff, list_dir};
+use crate::diff::{diff, list_dir, path_join};
 
 fn main() {
     tauri::Builder::default()
@@ -21,7 +21,7 @@ fn main() {
             Ok(())
         })
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![diff, list_dir])
+        .invoke_handler(tauri::generate_handler![diff, path_join, list_dir])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

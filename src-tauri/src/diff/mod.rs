@@ -2,6 +2,8 @@ use similar::{DiffTag, TextDiff};
 
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering::{Equal, Greater, Less};
+use std::fs::{read, read_to_string};
+use std::path::Path;
 
 #[derive(Deserialize)]
 enum DiffRequestType {
@@ -31,22 +33,47 @@ pub struct DiffResponse {
 
 #[tauri::command]
 pub fn diff(old_diff_request: DiffRequest, new_diff_request: DiffRequest) -> DiffResponse {
-    let old_content = match old_diff_request.diff_request_type {
-        DiffRequestType::Content => old_diff_request.content,
-        DiffRequestType::Filepath => {
-            // todo
-            std::fs::read_to_string(old_diff_request.content).unwrap()
-        }
-    };
-    let new_content = match new_diff_request.diff_request_type {
-        DiffRequestType::Content => new_diff_request.content,
-        DiffRequestType::Filepath => {
-            // todo
-            std::fs::read_to_string(new_diff_request.content).unwrap()
-        }
-    };
-
+    let old_content = read_content(&old_diff_request);
+    let new_content = read_content(&new_diff_request);
     diff_contents(old_content.as_str(), new_content.as_str())
+}
+
+fn read_content(diff_request: &DiffRequest) -> String {
+    match diff_request.diff_request_type {
+        DiffRequestType::Content => diff_request.content.to_owned(),
+        DiffRequestType::Filepath => {
+            match read_to_string(diff_request.content.as_str()) {
+                Ok(x) => x,
+                // todo
+                Err(_) => {
+                    let read_as_bytes = read(diff_request.content.as_str()).expect(
+                        format!(
+                            "Failed to read as text file: {}",
+                            diff_request.content.as_str()
+                        )
+                        .as_str(),
+                    );
+                    read_as_bytes
+                        .iter()
+                        .map(|x| format!("{} ", x.to_string()))
+                        .collect::<String>()
+                        .trim_end()
+                        .to_owned()
+                }
+            }
+        }
+    }
+}
+
+#[tauri::command]
+pub fn path_join(path1: &str, path2: &str) -> String {
+    let path1 = Path::new(path1);
+    let path2 = Path::new(path2);
+    path1
+        .join(path2)
+        .into_os_string()
+        .into_string()
+        .unwrap_or_else(|oss| oss.to_string_lossy().into_owned())
 }
 
 #[derive(Serialize)]
