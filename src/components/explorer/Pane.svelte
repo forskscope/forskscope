@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { onMount, createEventDispatcher } from 'svelte';
 
+  export let paneType: 'old' | 'new'
   export let filter: string
 
   const dispatch = createEventDispatcher();
@@ -10,6 +11,7 @@
   let files: string[] = []
 
   let dir: string = ''
+  let addressBarInput: string = ''
   let filename: string = ''
 
   let selected: string | undefined
@@ -23,12 +25,23 @@
     filename = ''
     dispatch('selectedChange', { dir: dir, filename: filename })
 
-    // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    const ret = await invoke('list_dir', { currentDir: dir }) as {current_dir: string, dirs: string[], files: string[]}
+    await list_dir(dir)
+  }
 
-    dir = ret.current_dir
-    dirs = ret.dirs
-    files = ret.files
+  async function list_dir(target: string) {
+    invoke('list_dir', { currentDir: target })
+      .then((res) => {
+        const ret = res as {current_dir: string, dirs: string[], files: string[]}
+        dir = ret.current_dir
+        addressBarInput = dir
+        dirs = ret.dirs
+        files = ret.files
+      })
+      .catch((err) => {
+        // todo
+        console.log(err)
+        alert(`Error: ${err}`)
+      })
   }
 
   async function ready() {
@@ -38,21 +51,49 @@
   onMount(ready)
 </script>
 
-<div>
-  <span style="color: grey;">{dir}</span>
-  /
-  <span style="color: cyan;">{filename}</span>
+<div class="address-bar">
+  <input placeholder="explore path" bind:value={addressBarInput}>
+  <button on:click={() => list_dir(addressBarInput)}>Go to</button>
 </div>
-<ul>
-  <li style="color: magenta;" on:dblclick={() => update('..')}>..</li>
-  {#each dirs as dir}
-    {#if !filter || dir.includes(filter)}
-      <li style="color: yellow;" on:dblclick={() => update(dir)}>{dir}</li>
-    {/if}
-  {/each}
-  {#each files as file}
-    {#if !filter || file.includes(filter)}
-      <li><label><input type="radio" name="old" value={file} on:change={handleSelected}>{file}</label></li>
-    {/if}
-  {/each}
-</ul>
+<div class="current-dir">
+  <ul class="dirs">
+    <li style="color: magenta;" on:dblclick={() => update('..')}>..</li>
+    {#each dirs as dir}
+      {#if !filter || dir.includes(filter)}
+        <li style="color: yellow;" on:dblclick={() => update(dir)}>{dir}</li>
+      {/if}
+    {/each}
+  </ul>
+  <ul class="files">
+    {#each files as file, i}
+      {#if !filter || file.includes(filter)}
+        <li>
+          <input type="radio" id="{paneType}-{(i + 1)}" name={paneType} value={file} on:change={handleSelected}>
+          <label for="{paneType}-{(i + 1)}">{file}</label>
+        </li>
+      {/if}
+    {/each}
+  </ul>
+</div>
+
+<style>
+  .address-bar {
+    width: 97%;
+  }
+  .address-bar input {
+    width: calc(90% - 5.7rem);
+  }
+  .address-bar button {
+    width: 5.4rem;
+  }
+
+  .current-dir ul {
+    list-style: none;
+  }
+  .files input {
+    display: none;
+  }
+  .files input:checked + label {
+    color: cyan;
+  }
+</style>

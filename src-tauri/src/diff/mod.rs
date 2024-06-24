@@ -67,13 +67,14 @@ fn read_content(diff_request: &DiffRequest) -> String {
 
 #[tauri::command]
 pub fn path_join(path1: &str, path2: &str) -> String {
-    let path1 = Path::new(path1);
-    let path2 = Path::new(path2);
-    path1
-        .join(path2)
+    let p1 = Path::new(path1);
+    let p2 = Path::new(path2);
+    p1.join(p2)
+        .canonicalize()
+        .expect(format!("Failed to canonicalize combined {} and {}", path1, path2).as_str())
         .into_os_string()
         .into_string()
-        .unwrap_or_else(|oss| oss.to_string_lossy().into_owned())
+        .unwrap_or_else(|x| x.to_string_lossy().into_owned())
 }
 
 #[derive(Serialize)]
@@ -83,22 +84,25 @@ pub struct ListDirReponse {
     files: Vec<String>,
 }
 #[tauri::command]
-pub fn list_dir(current_dir: &str) -> ListDirReponse {
+pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
     let current_dir = if current_dir.is_empty() {
         std::env::current_dir()
             .expect("Failed to get current directory")
-            .canonicalize()
-            .expect("Failed to canonicalize path")
-            .display()
-            .to_string()
+            .into_os_string()
+            .into_string()
+            .expect("Failed to get os specific path")
     } else {
         current_dir.to_owned()
     };
     let mut dirs = Vec::<String>::new();
     let mut files = Vec::<String>::new();
-    let read = std::fs::read_dir(current_dir.as_str())
-        .expect(format!("Failed to read {}", current_dir).as_str());
-    for x in read {
+
+    let read = std::fs::read_dir(current_dir.as_str());
+    // todo: return error to frontend
+    if let Err(_) = read {
+        return Err(format!("Invalid path: {}", current_dir.as_str()));
+    }
+    for x in read.unwrap() {
         match x {
             Ok(dir_entry) => {
                 let name = dir_entry.file_name().to_string_lossy().to_string();
@@ -113,14 +117,15 @@ pub fn list_dir(current_dir: &str) -> ListDirReponse {
                     _ => {}
                 }
             }
+            // todo
             Err(err) => println!("Failed to get dir/file info due to {}", err),
         }
     }
-    ListDirReponse {
+    Ok(ListDirReponse {
         current_dir: current_dir,
         dirs: dirs,
         files: files,
-    }
+    })
 }
 
 fn diff_contents(old_content: &str, new_content: &str) -> DiffResponse {

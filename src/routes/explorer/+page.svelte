@@ -39,14 +39,17 @@
 <h1>Explorer</h1>
 
 <input id="filter-input" placeholder="Filter" bind:value={filterInput} />
-<button on:click={compare} disabled={!oldFilename || !newFilename}>Compare</button>
+<div>
+  {oldFilename} , {newFilename}
+  <button on:click={compare} disabled={!oldFilename || !newFilename}>Compare</button>
+</div>
 
 <div class="wrapper">
   <div class="explorer old">
-    <Pane filter={filter} on:selectedChange={handleOldSelected} />
+    <Pane paneType="old" filter={filter} on:selectedChange={handleOldSelected} />
   </div>
   <div class="explorer new">
-    <Pane filter={filter} on:selectedChange={handleNewSelected} />
+    <Pane paneType="new" filter={filter} on:selectedChange={handleNewSelected} />
   </div>
 </div>
 
