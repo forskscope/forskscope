@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "identifier": "com.patch-hygge",
   "build": {
-    "beforeDevCommand": "bun run dev",
+    "beforeDevCommand": "bun run dev || npm run dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "bun run build || npm run build",
     "frontendDist": "../build"
