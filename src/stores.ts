@@ -10,6 +10,23 @@ export function pushToDiffTabsStore(value: DiffTab) {
     return updated
   })
 }
+export function removeDiffTabsStore(index: number) {
+  const u1 = diffTabIndexStore.subscribe(diffTabIndex => {
+    const u2 = diffTabsStore.subscribe(diffTabs => {
+      if (diffTabIndex === 0) return
+      const isLastTabActive = diffTabIndex === diffTabs.length - 1
+      if (isLastTabActive) {
+        diffTabIndexStore.update(current => current - 1)
+      }
+    })
+    u2()
+  })
+  u1()
+  
+  diffTabsStore.update(current => {
+    return current.filter((_, i) => i !== index)
+  })
+}
 
 // selected index on diff tabs
 export const diffTabIndexStore: Writable<number> = writable(0)

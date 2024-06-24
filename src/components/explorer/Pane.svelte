@@ -68,8 +68,8 @@
     {#each files as file, i}
       {#if !filter || file.includes(filter)}
         <li>
-          <input type="radio" id="{paneType}-{(i + 1)}" name={paneType} value={file} on:change={handleSelected}>
-          <label for="{paneType}-{(i + 1)}">{file}</label>
+          <input type="radio" id="{paneType}-{i + 1}" name={paneType} value={file} on:change={handleSelected}>
+          <label for="{paneType}-{i + 1}">{file}</label>
         </li>
       {/if}
     {/each}
