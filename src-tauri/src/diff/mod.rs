@@ -1,4 +1,5 @@
 use similar::{DiffTag, TextDiff};
+use tauri::Manager;
 
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering::{Equal, Greater, Less};
@@ -29,6 +30,22 @@ pub struct DiffResponse {
     old_blocks: Vec<DiffBlockOp>,
     new_blocks: Vec<DiffBlockOp>,
     diff_blocks_num: usize,
+}
+
+#[tauri::command]
+pub fn startup_args(app_handle: tauri::AppHandle) -> Vec<String> {
+    app_handle
+        .env()
+        .args_os
+        .into_iter()
+        // first arg is executable themself
+        .skip(1)
+        .map(|x| {
+            x.to_os_string()
+                .into_string()
+                .unwrap_or_else(|x| x.to_string_lossy().into_owned())
+        })
+        .collect()
 }
 
 #[tauri::command]

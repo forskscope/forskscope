@@ -1,18 +1,16 @@
 <script lang="ts">
-  import { getCurrent, type DragDropEvent } from "@tauri-apps/api/webview"
-  import type { UnlistenFn, Event as TauriEvent } from "@tauri-apps/api/event";
+  import { invoke } from '@tauri-apps/api/core'
+  import { getCurrent, type DragDropEvent } from '@tauri-apps/api/webview'
+  import { type UnlistenFn, type Event as TauriEvent } from '@tauri-apps/api/event'
   import { onMount, onDestroy } from 'svelte'
 
   import Tabs from '../components/diff/Tabs.svelte'
   import { type DiffTab } from '../types'
   import { diffTabsStore, pushToDiffTabsStore } from '../stores'
 
-  async function ready() {
-    await listenDragDrop()
-  }
-  let unlisten: UnlistenFn | undefined
+  let unlistenDragDrop: UnlistenFn | undefined
   async function listenDragDrop() {
-    unlisten = await getCurrent().onDragDropEvent((event: TauriEvent<DragDropEvent>) => {
+    unlistenDragDrop = await getCurrent().onDragDropEvent((event: TauriEvent<DragDropEvent>) => {
       console.log(event.payload)
       // todo
       if (event.payload.type === 'dropped' && event.payload.paths.length == 2) {
@@ -25,13 +23,23 @@
     })
   }
 
+  let startupArgs: string[] = []
+  async function ready() {
+    startupArgs = await invoke('startup_args') as string[]
+    await listenDragDrop()
+  }
   onMount(ready)
   onDestroy(() => {
-    unlisten && unlisten()
+    unlistenDragDrop && unlistenDragDrop()
   })
 </script>
 
 <h1>Patch Hygge</h1>
+
+<!-- todo -->
+{#each startupArgs as arg}
+  {arg},
+{/each}
 
 <div class="wrapper">
   {#if 0 < $diffTabsStore.length }

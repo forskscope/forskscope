@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { invoke } from "@tauri-apps/api/core"
+  import { onMount, createEventDispatcher } from 'svelte'
 
   export let paneType: 'old' | 'new'
   export let filter: string
 
-  const dispatch = createEventDispatcher();
+  const dispatch = createEventDispatcher()
 
   let dirs: string[] = []
   let files: string[] = []
