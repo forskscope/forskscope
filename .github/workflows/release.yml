@@ -10,6 +10,9 @@ defaults:
 permissions:
   contents: write
 
+env:
+  PRODUCT_BASENAME: patch-hygge
+
 jobs:
   release:
     name: Deploy Release
@@ -26,7 +29,7 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            tag: linux-x86_64-gnu
+            tag: linux-x64-gnu
           # - target: aarch64-unknown-linux-gnu
           #   os: ubuntu-latest
           #   tag: linux-aarch64-gnu
@@ -38,41 +41,40 @@ jobs:
           #   tag: linux-aarch64-musl
           - target: aarch64-apple-darwin
             os: macos-latest
-            tag: osx-x86_64
+            tag: macos-arm64
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            tag: windows-x86_64-msvc
+            tag: windows-x64
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-    - name: Install Node.js packages
-      run: npm install
-    - name: Install tauri requirements on Linux
-      if: matrix.target == 'x86_64-unknown-linux-gnu'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          libwebkit2gtk-4.1-dev \
-          build-essential \
-          curl \
-          wget \
-          file \
-          libxdo-dev \
-          libssl-dev \
-          libayatana-appindicator3-dev \
-          librsvg2-dev
-    - name: Install Rust
-      run: bash .github/workflows/scripts/install-rust.sh stable ${{ matrix.target }}
-    - name: Build asset
-      run: bash .github/workflows/scripts/make-release-asset.sh ${{ matrix.os }} ${{ matrix.target }} ${{ matrix.tag }}
-    - name: Update release with new asset
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: gh release upload $APP_TAG $APP_ASSET
-
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Node.js packages
+        run: npm install
+      - name: Install tauri requirements on Linux
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+      - name: Install Rust
+        run: bash .github/workflows/scripts/install-rust.sh stable ${{ matrix.target }}
+      - name: Build asset
+        run: bash .github/workflows/scripts/make-release-asset.sh ${{ matrix.os }} ${{ matrix.target }} ${{ matrix.tag }} $PRODUCT_BASENAME
+      - name: Update release with new asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload $APP_TAG $APP_ASSET
 #  publish:
 #    name: Publish to crates.io
 #    runs-on: ubuntu-latest
