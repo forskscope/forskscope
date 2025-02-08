@@ -26,11 +26,11 @@ jobs:
           - build: msrv
             os: ubuntu-24.04
             # sync MSRV with docs: guide/src/guide/installation.md and Cargo.toml
-            rust: 1.78.0
+            rust: 1.84.0
     steps:
-    - uses: actions/checkout@v3
-    - name: Install Rust
-      run: bash .github/workflows/scripts/install-rust.sh ${{ matrix.rust }}
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: bash .github/workflows/scripts/install-rust.sh ${{ matrix.rust }}
     #- name: Build and run tests
     #  run: cargo test --locked
     #- name: Test no default
@@ -40,10 +40,10 @@ jobs:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Install Rust
-      run: rustup update stable && rustup default stable && rustup component add rustfmt
-    - run: cargo fmt --check
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: rustup update stable && rustup default stable && rustup component add rustfmt
+      - run: cd src-tauri && cargo fmt --check && cd ..
 
   # The success job is here to consolidate the total success/failure state of
   # all other jobs. This job is then included in the GitHub branch protection
