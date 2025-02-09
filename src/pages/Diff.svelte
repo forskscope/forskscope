@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
   import FileHandle from '../components/diff/FileHandle.svelte'
+  import { filepathFromDialog } from '../components/diff/utils'
 
   interface LinesDiff {
     diffKind: string
@@ -71,14 +72,39 @@
   {#if 0 < diffResult.length}
     <div class="row">
       <div class="col">
-        <h3>Old</h3>
-        {oldFilepath}
+        <button
+          onclick={async () => {
+            const filepath = await filepathFromDialog()
+            if (filepath === null) return
+            oldFilepath = filepath
+            diff()
+          }}
+        >
+          <h3>Old</h3>
+          {oldFilepath}
+        </button>
       </div>
       <div class="col">
-        <h3>New</h3>
-        {newFilepath}
+        <button
+          onclick={async () => {
+            const filepath = await filepathFromDialog()
+            if (filepath === null) return
+            newFilepath = filepath
+            diff()
+          }}
+        >
+          <h3>New</h3>
+          {newFilepath}
+        </button>
       </div>
     </div>
+    {#if !diffResult.some((x) => x.diffKind !== 'equal')}
+      <!-- todo: The same files -->
+      <div class="row">
+        <div class="col">The files are the same</div>
+        <div class="col">The files are the same</div>
+      </div>
+    {/if}
   {/if}
   {#each diffResult as diffBlock, i}
     <label for={`replaced-detail-${i}`}>

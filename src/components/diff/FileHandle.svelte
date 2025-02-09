@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { open as tauriDialogOpen } from '@tauri-apps/plugin-dialog'
-
   import DragDrop from '../common/DragDrop.svelte'
+  import { filepathFromDialog } from './utils'
 
   const {
     oldFilepath,
@@ -49,18 +48,6 @@
     if (!filepath) return
     _newFilepath = filepath
     filepathsOnChangeIfReady()
-  }
-
-  const filepathFromDialog = async (): Promise<string | null> => {
-    const filepath: string | null = await tauriDialogOpen({
-      filters: [
-        {
-          name: 'All files',
-          extensions: ['*'],
-        },
-      ],
-    })
-    return filepath
   }
 </script>
 
