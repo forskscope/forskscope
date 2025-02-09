@@ -1,8 +1,7 @@
+use tauri::Manager;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod core;
-
-#[cfg(debug_assertions)]
-use tauri::Manager;
 
 use core::handlers::diff_filepaths;
 

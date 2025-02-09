@@ -1,15 +1,21 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
   import FileHandle from '../components/diff/FileHandle.svelte'
+  import { filepathFromDialog } from '../components/diff/utils'
 
   interface LinesDiff {
     diffKind: string
     linesCount: number
     oldLines: string[]
     newLines: string[]
-    charsDiffIfReplace: CharsDiff[]
+    replaceDiffLines: ReplaceLineDiff[]
   }
-  interface CharsDiff {
+
+  interface ReplaceLineDiff {
+    charsDiff: ReplaceCharsDiff[]
+  }
+
+  interface ReplaceCharsDiff {
     diffKind: string
     oldStr: string
     newStr: string
@@ -71,53 +77,83 @@
   {#if 0 < diffResult.length}
     <div class="row">
       <div class="col">
-        <h3>Old</h3>
-        {oldFilepath}
+        <button
+          onclick={async () => {
+            const filepath = await filepathFromDialog()
+            if (filepath === null) return
+            oldFilepath = filepath
+            diff()
+          }}
+        >
+          <h3>Old</h3>
+          {oldFilepath}
+        </button>
       </div>
       <div class="col">
-        <h3>New</h3>
-        {newFilepath}
+        <button
+          onclick={async () => {
+            const filepath = await filepathFromDialog()
+            if (filepath === null) return
+            newFilepath = filepath
+            diff()
+          }}
+        >
+          <h3>New</h3>
+          {newFilepath}
+        </button>
       </div>
     </div>
+    {#if !diffResult.some((x) => x.diffKind !== 'equal')}
+      <!-- todo: The same files -->
+      <div class="row">
+        <div class="col">The files are the same</div>
+        <div class="col">The files are the same</div>
+      </div>
+    {/if}
   {/if}
   {#each diffResult as diffBlock, i}
-    <label for={`replaced-detail-${i}`}>
-      <div class="row">
-        <div
-          class={`col old ${diffBlock.diffKind}`}
-          style={`height: calc(var(--line-height) * ${diffBlock.linesCount})`}
-        >
+    <div class="row">
+      <div
+        class={`col old ${diffBlock.diffKind}`}
+        style={`height: calc(var(--line-height) * ${diffBlock.linesCount})`}
+      >
+        {#if diffBlock.diffKind === 'replace'}
+          <div class="replace-diff-chars">
+            {#each diffBlock.replaceDiffLines as replaceDiffLine}
+              <div class="diff-line">
+                {#each replaceDiffLine.charsDiff as replaceDiffChars}
+                  <span class={replaceDiffChars.diffKind}>{replaceDiffChars.oldStr}</span>
+                {/each}
+              </div>
+            {/each}
+          </div>
+        {:else}
           {#each diffBlock.oldLines as line}
             <div class="diff-line">{line}</div>
           {/each}
-        </div>
-        <div
-          class={`col new ${diffBlock.diffKind}`}
-          style={`height: calc(var(--line-height) * ${diffBlock.linesCount})`}
-        >
+        {/if}
+      </div>
+      <div
+        class={`col new ${diffBlock.diffKind}`}
+        style={`height: calc(var(--line-height) * ${diffBlock.linesCount})`}
+      >
+        {#if diffBlock.diffKind === 'replace'}
+          <div class="replace-diff-chars">
+            {#each diffBlock.replaceDiffLines as replaceDiffLine}
+              <div class="diff-line">
+                {#each replaceDiffLine.charsDiff as replaceDiffChars}
+                  <span class={replaceDiffChars.diffKind}>{replaceDiffChars.newStr}</span>
+                {/each}
+              </div>
+            {/each}
+          </div>
+        {:else}
           {#each diffBlock.newLines as line}
             <div class="diff-line">{line}</div>
           {/each}
-        </div>
+        {/if}
       </div>
-    </label>
-    {#if diffBlock.charsDiffIfReplace}
-      <label>
-        <input type="checkbox" class="replaced-detail-toggle" id={`replaced-detail-${i}`} />
-        <div class="replaced-detail row">
-          <div class="col">
-            {#each diffBlock.charsDiffIfReplace as x}
-              <span class={`old ${x.diffKind}`}>{x.oldStr}</span>
-            {/each}
-          </div>
-          <div class="col">
-            {#each diffBlock.charsDiffIfReplace as x}
-              <span class={`new ${x.diffKind}`}>{x.newStr}</span>
-            {/each}
-          </div>
-        </div>
-      </label>
-    {/if}
+    </div>
   {/each}
 </div>
 
@@ -172,64 +208,46 @@
   }
 
   .delete.old {
-    background-color: coral;
+    background-color: #cd9200;
   }
   .delete.new {
-    background-color: darkslategray;
+    background-color: #636363;
   }
 
   .insert.old {
-    background-color: darkslategray;
+    background-color: #636363;
   }
   .insert.new {
-    background-color: darkcyan;
+    background-color: #00cd92;
   }
 
   .replace.old {
-    background-color: purple;
+    background-color: #cd0092;
   }
   .replace.new {
-    background-color: darkolivegreen;
+    background-color: #9200cd;
   }
 
-  .replaced-detail {
-    position: fixed;
-    left: 0;
-    bottom: 0;
-    width: 100vw;
-    height: 0;
-    max-height: 7.2em;
-    display: flex;
-    background-color: black;
-    color: white;
-    opacity: 0;
+  .replace-diff-chars {
+    white-space: pre;
   }
-  .replaced-detail-toggle:checked + .replaced-detail {
-    height: 70vh;
-    opacity: 0.87;
-    transition:
-      opacity 0.4s ease,
-      height 1.1s ease;
+
+  .old .replace-diff-chars .delete {
+    background-color: #ffc600;
   }
-  .replaced-detail .col {
-    white-space: pre-line;
+  .new .replace-diff-chars .delete {
+    background-color: #c6ff00;
   }
-  .replaced-detail .delete.old {
-    background-color: coral;
+  .old .replace-diff-chars .insert {
+    background-color: #00c6ff;
   }
-  .replaced-detail .delete.new {
-    background-color: darkslategray;
+  .new .replace-diff-chars .insert {
+    background-color: #00ffc6;
   }
-  .replaced-detail .insert.old {
-    background-color: darkslategray;
+  .old .replace-diff-chars .replace {
+    background-color: #ff00c6;
   }
-  .replaced-detail .insert.new {
-    background-color: darkcyan;
-  }
-  .replaced-detail .replace.old {
-    background-color: purple;
-  }
-  .replaced-detail .replace.new {
-    background-color: darkolivegreen;
+  .new .replace-diff-chars .replace {
+    background-color: #c600ff;
   }
 </style>
