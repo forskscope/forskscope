@@ -1,7 +1,7 @@
 use similar::{DiffTag, TextDiff};
 use std::ops::Range;
 
-use super::types::{LinesDiff, ReplaceCharsDiff, ReplaceLineDiff};
+use super::types::{LinesDiff, ReplaceDetailLinesDiff, ReplaceDiffChars};
 
 pub fn lines_diff(old_content: &str, new_content: &str) -> Vec<LinesDiff> {
     let diff = TextDiff::configure().diff_lines(old_content, new_content);
@@ -21,7 +21,7 @@ pub fn lines_diff(old_content: &str, new_content: &str) -> Vec<LinesDiff> {
                         lines_count,
                         old_lines: lines.to_owned(),
                         new_lines: lines,
-                        replace_diff_lines: None,
+                        replace_detail: None,
                     }
                 }
                 DiffTag::Delete => {
@@ -33,7 +33,7 @@ pub fn lines_diff(old_content: &str, new_content: &str) -> Vec<LinesDiff> {
                         lines_count,
                         old_lines,
                         new_lines: vec![],
-                        replace_diff_lines: None,
+                        replace_detail: None,
                     }
                 }
                 DiffTag::Insert => {
@@ -45,10 +45,10 @@ pub fn lines_diff(old_content: &str, new_content: &str) -> Vec<LinesDiff> {
                         lines_count,
                         old_lines: vec![],
                         new_lines,
-                        replace_diff_lines: None,
+                        replace_detail: None,
                     }
                 }
-                DiffTag::Replace => replace_diff_lines(
+                DiffTag::Replace => replace_lines_diff(
                     old_lines.as_ref(),
                     new_lines.as_ref(),
                     x.old_range().by_ref(),
@@ -60,7 +60,7 @@ pub fn lines_diff(old_content: &str, new_content: &str) -> Vec<LinesDiff> {
         .collect::<Vec<LinesDiff>>()
 }
 
-fn replace_diff_lines(
+fn replace_lines_diff(
     old_lines: &Vec<String>,
     new_lines: &Vec<String>,
     old_range: &Range<usize>,
@@ -79,158 +79,185 @@ fn replace_diff_lines(
 
     let old_str = old_lines.join("\n");
     let new_str = new_lines.join("\n");
-    let replace_diff_chars = replace_diff_chars(old_str.as_str(), new_str.as_str());
-    let mut replace_diff_lines: Vec<ReplaceLineDiff> = vec![];
-    let mut replace_diff_line: Vec<ReplaceCharsDiff> = vec![];
-    replace_diff_chars.iter().for_each(|x| {
-        if x.diff_kind.is_none() {
-            replace_diff_lines.push(ReplaceLineDiff {
-                chars_diff: replace_diff_line.clone(),
-            });
-            replace_diff_line = vec![];
-        } else {
-            replace_diff_line.push(ReplaceCharsDiff {
-                diff_kind: x.diff_kind,
-                old_str: x.old_str.clone(),
-                new_str: x.new_str.clone(),
-            })
-        }
-    });
-    if 0 < replace_diff_line.len() {
-        replace_diff_lines.push(ReplaceLineDiff {
-            chars_diff: replace_diff_line,
-        });
-    }
 
+    let replace_detail = replace_diff_lines(old_str.as_str(), new_str.as_str());
     LinesDiff {
         diff_kind: diff_kind.to_owned(),
         lines_count,
         old_lines,
         new_lines,
-        replace_diff_lines: Some(replace_diff_lines),
+        replace_detail: Some(replace_detail),
     }
 }
 
-fn replace_diff_chars(old_str: &str, new_str: &str) -> Vec<ReplaceCharsDiff> {
-    let ret = TextDiff::configure()
+fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
+    let mut old_lines: Vec<Vec<ReplaceDiffChars>> = vec![];
+    let mut new_lines: Vec<Vec<ReplaceDiffChars>> = vec![];
+
+    let mut old_line: Vec<ReplaceDiffChars> = vec![];
+    let mut new_line: Vec<ReplaceDiffChars> = vec![];
+    let mut old_chars = String::new();
+    let mut new_chars = String::new();
+    TextDiff::configure()
         .diff_chars(old_str, new_str)
         .ops()
         .iter()
-        .flat_map(|x| {
+        .for_each(|x| {
             let diff_kind = x.tag();
             match diff_kind {
                 DiffTag::Equal => {
                     let old_range = x.old_range();
                     let str = &old_str[old_range.start..old_range.end];
-                    let lines = str.split("\n");
-                    lines
-                        .enumerate()
-                        .flat_map(|(i, x)| {
-                            let mut ret: Vec<ReplaceCharsDiff> = vec![];
-                            if 0 < i {
-                                ret.push(ReplaceCharsDiff {
-                                    diff_kind: None,
-                                    old_str: "".to_owned(),
-                                    new_str: "".to_owned(),
-                                })
+                    str.chars().for_each(|x| {
+                        if x == '\n' {
+                            if 0 < old_chars.len() {
+                                old_line.push(ReplaceDiffChars {
+                                    diff_kind,
+                                    chars: old_chars.clone(),
+                                });
+                                old_chars = String::new();
+                                new_line.push(ReplaceDiffChars {
+                                    diff_kind,
+                                    chars: new_chars.clone(),
+                                });
+                                new_chars = String::new();
                             }
-                            ret.push(ReplaceCharsDiff {
-                                diff_kind: Some(diff_kind),
-                                old_str: x.to_owned(),
-                                new_str: x.to_owned(),
-                            });
-                            ret
-                        })
-                        .collect::<Vec<ReplaceCharsDiff>>()
+                            old_lines.push(old_line.clone());
+                            old_line = vec![];
+                            new_lines.push(new_line.clone());
+                            new_line = vec![];
+                        } else {
+                            old_chars.push(x);
+                            new_chars.push(x);
+                        }
+                    });
+                    if 0 < old_chars.len() {
+                        old_line.push(ReplaceDiffChars {
+                            diff_kind,
+                            chars: old_chars.clone(),
+                        });
+                        old_chars = String::new();
+                        new_line.push(ReplaceDiffChars {
+                            diff_kind,
+                            chars: new_chars.clone(),
+                        });
+                        new_chars = String::new();
+                    }
                 }
                 DiffTag::Delete => {
                     let old_range = x.old_range();
                     let str = &old_str[old_range.start..old_range.end];
-                    let lines = str.split("\n");
-                    lines
-                        .enumerate()
-                        .flat_map(|(i, x)| {
-                            let mut ret: Vec<ReplaceCharsDiff> = vec![];
-                            if 0 < i {
-                                ret.push(ReplaceCharsDiff {
-                                    diff_kind: None,
-                                    old_str: "".to_owned(),
-                                    new_str: "".to_owned(),
-                                })
+                    str.chars().for_each(|x| {
+                        if x == '\n' {
+                            if 0 < old_chars.len() {
+                                old_line.push(ReplaceDiffChars {
+                                    diff_kind,
+                                    chars: old_chars.clone(),
+                                });
+                                old_chars = String::new();
                             }
-                            ret.push(ReplaceCharsDiff {
-                                diff_kind: Some(diff_kind),
-                                old_str: x.to_owned(),
-                                new_str: "".to_owned(),
-                            });
-                            ret
-                        })
-                        .collect::<Vec<ReplaceCharsDiff>>()
+                            old_lines.push(old_line.clone());
+                            old_line = vec![];
+                        } else {
+                            old_chars.push(x);
+                        }
+                    });
+                    if 0 < old_chars.len() {
+                        old_line.push(ReplaceDiffChars {
+                            diff_kind,
+                            chars: old_chars.clone(),
+                        });
+                        old_chars = String::new();
+                    }
                 }
                 DiffTag::Insert => {
                     let new_range = x.new_range();
                     let str = &new_str[new_range.start..new_range.end];
-                    let lines = str.split("\n");
-                    lines
-                        .enumerate()
-                        .flat_map(|(i, x)| {
-                            let mut ret: Vec<ReplaceCharsDiff> = vec![];
-                            if 0 < i {
-                                ret.push(ReplaceCharsDiff {
-                                    diff_kind: None,
-                                    old_str: "".to_owned(),
-                                    new_str: "".to_owned(),
-                                })
+                    str.chars().for_each(|x| {
+                        if x == '\n' {
+                            if 0 < new_chars.len() {
+                                new_line.push(ReplaceDiffChars {
+                                    diff_kind,
+                                    chars: new_chars.clone(),
+                                });
+                                new_chars = String::new();
                             }
-                            ret.push(ReplaceCharsDiff {
-                                diff_kind: Some(diff_kind),
-                                old_str: "".to_owned(),
-                                new_str: x.to_owned(),
-                            });
-                            ret
-                        })
-                        .collect::<Vec<ReplaceCharsDiff>>()
+                            new_lines.push(new_line.clone());
+                            new_line = vec![];
+                        } else {
+                            new_chars.push(x);
+                        }
+                    });
+                    if 0 < new_chars.len() {
+                        new_line.push(ReplaceDiffChars {
+                            diff_kind,
+                            chars: new_chars.clone(),
+                        });
+                        new_chars = String::new();
+                    }
                 }
                 DiffTag::Replace => {
+                    println!("--- {:?}", x);
                     let old_range = x.old_range();
-                    let new_range = x.new_range();
                     let old_str = (&old_str[old_range.start..old_range.end]).to_owned();
-                    let new_str = (&new_str[new_range.start..new_range.end]).to_owned();
-                    let old_lines = old_str.split("\n");
-                    let new_lines = new_str.split("\n");
-                    let lines = if old_lines.clone().count() < new_lines.clone().count() {
-                        new_lines.clone()
-                    } else {
-                        old_lines.clone()
-                    };
-                    lines
-                        .into_iter()
-                        .enumerate()
-                        .flat_map(|(i, _x)| {
-                            let old_lines = old_lines.clone();
-                            let new_lines = new_lines.clone();
-
-                            let mut ret: Vec<ReplaceCharsDiff> = vec![];
-                            if 0 < i {
-                                ret.push(ReplaceCharsDiff {
-                                    diff_kind: None,
-                                    old_str: "".to_owned(),
-                                    new_str: "".to_owned(),
-                                })
+                    old_str.chars().for_each(|x| {
+                        if x == '\n' {
+                            if 0 < old_chars.len() {
+                                old_line.push(ReplaceDiffChars {
+                                    diff_kind,
+                                    chars: old_chars.clone(),
+                                });
+                                old_chars = String::new();
                             }
-                            let old_line = old_lines.clone().nth(i).unwrap_or_default();
-                            let new_line = new_lines.clone().nth(i).unwrap_or_default();
-                            ret.push(ReplaceCharsDiff {
-                                diff_kind: Some(diff_kind),
-                                old_str: old_line.to_owned(),
-                                new_str: new_line.to_owned(),
-                            });
-                            ret
-                        })
-                        .collect::<Vec<ReplaceCharsDiff>>()
+                            old_lines.push(old_line.clone());
+                            old_line = vec![];
+                        } else {
+                            old_chars.push(x);
+                        }
+                    });
+                    if 0 < old_chars.len() {
+                        old_line.push(ReplaceDiffChars {
+                            diff_kind,
+                            chars: old_chars.clone(),
+                        });
+                        old_chars = String::new();
+                    }
+
+                    let new_range = x.new_range();
+                    let new_str = (&new_str[new_range.start..new_range.end]).to_owned();
+                    new_str.chars().for_each(|x| {
+                        if x == '\n' {
+                            if 0 < new_chars.len() {
+                                new_line.push(ReplaceDiffChars {
+                                    diff_kind,
+                                    chars: new_chars.clone(),
+                                });
+                                new_chars = String::new();
+                            }
+                            new_lines.push(new_line.clone());
+                            new_line = vec![];
+                        } else {
+                            new_chars.push(x);
+                        }
+                    });
+                    if 0 < new_chars.len() {
+                        new_line.push(ReplaceDiffChars {
+                            diff_kind,
+                            chars: new_chars.clone(),
+                        });
+                        new_chars = String::new();
+                    }
                 }
             }
-        })
-        .collect::<Vec<ReplaceCharsDiff>>();
-    ret
+        });
+    if 0 < old_line.len() {
+        old_lines.push(old_line);
+    }
+    if 0 < new_line.len() {
+        new_lines.push(new_line);
+    }
+    ReplaceDetailLinesDiff {
+        old_lines,
+        new_lines,
+    }
 }

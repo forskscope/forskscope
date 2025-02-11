@@ -1,6 +1,7 @@
 use similar::DiffTag;
 
-use serde::{Deserialize, Serialize};
+// use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -9,21 +10,21 @@ pub struct LinesDiff {
     pub lines_count: usize,
     pub old_lines: Vec<String>,
     pub new_lines: Vec<String>,
-    pub replace_diff_lines: Option<Vec<ReplaceLineDiff>>,
+    pub replace_detail: Option<ReplaceDetailLinesDiff>,
 }
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ReplaceLineDiff {
-    pub chars_diff: Vec<ReplaceCharsDiff>,
+pub struct ReplaceDetailLinesDiff {
+    pub old_lines: Vec<Vec<ReplaceDiffChars>>,
+    pub new_lines: Vec<Vec<ReplaceDiffChars>>,
 }
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ReplaceCharsDiff {
-    pub diff_kind: Option<DiffTag>,
-    pub old_str: String,
-    pub new_str: String,
+pub struct ReplaceDiffChars {
+    pub diff_kind: DiffTag,
+    pub chars: String,
 }
 
 // #[derive(Serialize)]
