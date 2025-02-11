@@ -1,19 +1,5 @@
-<header>
-  <nav>
-    <a href="/">Home</a>
-    <a href="explorer">Explorer</a>
-    <a href="settings">Settings</a>
-  </nav>
-</header>
+<script lang="ts">
+  import '../styles.css'
+</script>
 
-<main>
-    <slot></slot>
-</main>
-
-<footer></footer>
-
-<style>
-  header {
-    margin-bottom: 0.9rem;
-  }
-</style>
+<slot />
