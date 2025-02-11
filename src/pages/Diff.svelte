@@ -8,17 +8,17 @@
     linesCount: number
     oldLines: string[]
     newLines: string[]
-    replaceDiffLines: ReplaceLineDiff[]
+    replaceDetail: ReplaceDetailLinesDiff | null
   }
 
-  interface ReplaceLineDiff {
-    charsDiff: ReplaceCharsDiff[]
+  interface ReplaceDetailLinesDiff {
+    oldLines: ReplaceDiffChars[][]
+    newLines: ReplaceDiffChars[][]
   }
 
-  interface ReplaceCharsDiff {
+  interface ReplaceDiffChars {
     diffKind: string
-    oldStr: string
-    newStr: string
+    chars: string
   }
 
   const DIFF_LINE_HEIGHT: string = '1.34em'
@@ -119,10 +119,10 @@
       >
         {#if diffBlock.diffKind === 'replace'}
           <div class="replace-diff-chars">
-            {#each diffBlock.replaceDiffLines as replaceDiffLine}
+            {#each diffBlock.replaceDetail!.oldLines as line}
               <div class="diff-line">
-                {#each replaceDiffLine.charsDiff as replaceDiffChars}
-                  <span class={replaceDiffChars.diffKind}>{replaceDiffChars.oldStr}</span>
+                {#each line as chars}
+                  <span class={chars.diffKind}>{chars.chars}</span>
                 {/each}
               </div>
             {/each}
@@ -139,10 +139,10 @@
       >
         {#if diffBlock.diffKind === 'replace'}
           <div class="replace-diff-chars">
-            {#each diffBlock.replaceDiffLines as replaceDiffLine}
+            {#each diffBlock.replaceDetail!.newLines as line}
               <div class="diff-line">
-                {#each replaceDiffLine.charsDiff as replaceDiffChars}
-                  <span class={replaceDiffChars.diffKind}>{replaceDiffChars.newStr}</span>
+                {#each line as chars}
+                  <span class={chars.diffKind}>{chars.chars}</span>
                 {/each}
               </div>
             {/each}
