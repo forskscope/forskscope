@@ -197,7 +197,6 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                     }
                 }
                 DiffTag::Replace => {
-                    println!("--- {:?}", x);
                     let old_range = x.old_range();
                     let old_str = (&old_str[old_range.start..old_range.end]).to_owned();
                     old_str.chars().for_each(|x| {
