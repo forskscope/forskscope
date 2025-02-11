@@ -74,7 +74,6 @@ fn replace_lines_diff(
     } else {
         old_lines_count
     };
-
     let old_lines = old_lines[old_range.start..old_range.end].to_vec();
     let new_lines = new_lines[new_range.start..new_range.end].to_vec();
 
