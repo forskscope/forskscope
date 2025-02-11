@@ -5,10 +5,7 @@
 
   const {
     oldOrNew,
-    filepath,
     linesDiffs,
-    isCompletelyEqual,
-    filepathFromDialogOnClick,
   }: {
     oldOrNew: OldOrNew
     filepath: string
@@ -26,69 +23,44 @@
   }
 </script>
 
-<div>
-  <button onclick={filepathFromDialogOnClick}>
-    <h3>{oldOrNew.toUpperCase()}</h3>
-    {filepath}
-  </button>
-</div>
-
-<div class="diff" style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
-  {#if isCompletelyEqual}
-    <!-- todo: The same files -->
-    <div>The files are the same</div>
-  {/if}
-  <div class={oldOrNew}>
-    {#each linesDiffs as linesDiff, i}
-      <div
-        class={linesDiff.diffKind}
-        style={`height: calc(var(--line-height) * ${linesDiff.linesCount})`}
-      >
-        {#if linesDiff.diffKind === 'replace'}
-          <div class="replace-diff-chars">
-            {#each replaceDetailLines(linesDiff.replaceDetail!) as line}
-              <div class="diff-line">
-                {#each line as chars}
-                  <span class={chars.diffKind}>{chars.chars}</span>
-                {/each}
-              </div>
-            {/each}
-          </div>
-        {:else}
-          {#each lines(linesDiff) as line}
-            <div class="diff-line">{line}</div>
+<div class={`diff-lines ${oldOrNew}`} style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
+  {#each linesDiffs as linesDiff, i}
+    <div
+      class={linesDiff.diffKind}
+      style={`height: calc(var(--line-height) * ${linesDiff.linesCount})`}
+    >
+      {#if linesDiff.diffKind === 'replace'}
+        <div class="replace-diff-chars">
+          {#each replaceDetailLines(linesDiff.replaceDetail!) as line}
+            <div class="diff-line">
+              {#each line as chars}
+                <span class={chars.diffKind}>{chars.chars}</span>
+              {/each}
+            </div>
           {/each}
-        {/if}
-      </div>
-    {/each}
-  </div>
+        </div>
+      {:else}
+        {#each lines(linesDiff) as line}
+          <div class="diff-line">{line}</div>
+        {/each}
+      {/if}
+    </div>
+  {/each}
 </div>
 
 <style>
-  h3 {
-    padding: 0;
-    margin: 0;
-    display: inline-block;
-  }
-
-  .diff {
+  .diff-lines {
     counter-reset: line-number;
+    width: fit-content;
   }
 
   .diff-line {
-    height: var(--line-height);
     counter-increment: line-number;
-
-    /* todo: layout w/ horizontally or vertically long text */
-    max-width: calc(50vw - 1em);
-    overflow-x: scroll;
+    height: var(--line-height);
   }
 
   .diff-line::before {
     content: counter(line-number);
-  }
-
-  .diff-line::before {
     width: 3em;
     padding-right: 0.7em;
     display: inline-block;

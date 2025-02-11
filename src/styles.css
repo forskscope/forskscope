@@ -1,11 +1,15 @@
 html body {
+  width: 100vw;
+  height: 100vh;
   padding: 0;
   margin: 0;
+  /* todo: useful or not ? */
+  overflow: hidden;
 }
 
 #app {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
 }
 
 .d-flex {
@@ -14,6 +18,15 @@ html body {
 
 .flex-column {
   flex-direction: column !important;
+}
+
+.row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.row .col {
+  flex: 1;
 }
 
 /* todo: delete below */

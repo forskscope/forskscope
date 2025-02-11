@@ -4,6 +4,7 @@
   import type { LinesDiff } from '../types'
   import DiffCol from '../components/diff/DiffCol.svelte'
   import { filepathFromDialog } from '../components/diff/utils'
+  import DiffColHeader from '../components/diff/DiffColHeader.svelte'
 
   let oldFilepath: string = $state('')
   let newFilepath: string = $state('')
@@ -59,11 +60,10 @@
 
 {#if 0 < linesDiffs.length}
   <div class="row">
-    <div class="col">
-      <DiffCol
-        oldOrNew="old"
+    <div class="col diff">
+      <DiffColHeader
+        oldOrNew="new"
         filepath={oldFilepath}
-        {linesDiffs}
         {isCompletelyEqual}
         filepathFromDialogOnClick={async () => {
           const filepath = await filepathFromDialog()
@@ -72,12 +72,25 @@
           diff()
         }}
       />
+      <div class="content">
+        <DiffCol
+          oldOrNew="old"
+          filepath={oldFilepath}
+          {linesDiffs}
+          {isCompletelyEqual}
+          filepathFromDialogOnClick={async () => {
+            const filepath = await filepathFromDialog()
+            if (filepath === null) return
+            oldFilepath = filepath
+            diff()
+          }}
+        />
+      </div>
     </div>
-    <div class="col">
-      <DiffCol
+    <div class="col diff">
+      <DiffColHeader
         oldOrNew="new"
         filepath={newFilepath}
-        {linesDiffs}
         {isCompletelyEqual}
         filepathFromDialogOnClick={async () => {
           const filepath = await filepathFromDialog()
@@ -86,18 +99,35 @@
           diff()
         }}
       />
+      <div class="content">
+        <DiffCol
+          oldOrNew="new"
+          filepath={newFilepath}
+          {linesDiffs}
+          {isCompletelyEqual}
+          filepathFromDialogOnClick={async () => {
+            const filepath = await filepathFromDialog()
+            if (filepath === null) return
+            newFilepath = filepath
+            diff()
+          }}
+        />
+      </div>
     </div>
   </div>
 {/if}
 
 <style>
-  .row {
+  .diff {
+    width: 100%;
+    /* adjust x scrollbar */
+    min-width: 0;
+    /* todo: fit height to window */
+    height: calc(100vh - 5.7rem);
     display: flex;
-    gap: 0.9rem;
+    flex-direction: column;
   }
-
-  .row > .col {
-    flex-grow: 1;
-    flex-basis: 0;
+  .diff .content {
+    overflow: auto;
   }
 </style>
