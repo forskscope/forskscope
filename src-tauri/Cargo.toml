@@ -1,9 +1,15 @@
 [package]
 name = "patch-hygge"
-version = "0.4.0"
+version = "0.4.1"
+edition = "2021"
+
 description = "Diff and merge GUI tool with cross-platform support build with Tauri: Rust and Svelte"
 authors = ["nabbisen <nabbisen@scqr.net>"]
-edition = "2021"
+license-file = "../LICENSE"
+
+categories = ["gui", "visualization", "development-tools", "text-processing"]
+keywords = ["gui", "compare", "diff", "merge", "tool"]
+rust-version = "1.81.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
