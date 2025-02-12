@@ -1,12 +1,15 @@
 use similar::{DiffTag, TextDiff};
 use std::ops::Range;
 
-use super::types::{LinesDiff, ReplaceDetailLinesDiff, ReplaceDiffChars};
+use super::{
+    str::split_lines_with_endings,
+    types::{LinesDiff, ReplaceDetailLinesDiff, ReplaceDiffChars},
+};
 
 pub fn lines_diff(old_content: &str, new_content: &str) -> Vec<LinesDiff> {
     let diff = TextDiff::configure().diff_lines(old_content, new_content);
-    let old_lines: Vec<String> = old_content.lines().map(|line| line.to_owned()).collect();
-    let new_lines: Vec<String> = new_content.lines().map(|line| line.to_owned()).collect();
+    let old_lines: Vec<String> = split_lines_with_endings(old_content);
+    let new_lines: Vec<String> = split_lines_with_endings(new_content);
     diff.ops()
         .iter()
         .map(|x| {
@@ -77,8 +80,8 @@ fn replace_lines_diff(
     let old_lines = old_lines[old_range.start..old_range.end].to_vec();
     let new_lines = new_lines[new_range.start..new_range.end].to_vec();
 
-    let old_str = old_lines.join("\n");
-    let new_str = new_lines.join("\n");
+    let old_str = old_lines.join("");
+    let new_str = new_lines.join("");
 
     let replace_detail = replace_diff_lines(old_str.as_str(), new_str.as_str());
     LinesDiff {
@@ -109,7 +112,9 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                     let old_range = x.old_range();
                     let str = &old_str[old_range.start..old_range.end];
                     str.chars().for_each(|x| {
-                        if x == '\n' {
+                        old_chars.push(x);
+                        new_chars.push(x);
+                        if x == '\n' || x == '\r' {
                             if 0 < old_chars.len() {
                                 old_line.push(ReplaceDiffChars {
                                     diff_kind,
@@ -126,9 +131,6 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                             old_line = vec![];
                             new_lines.push(new_line.clone());
                             new_line = vec![];
-                        } else {
-                            old_chars.push(x);
-                            new_chars.push(x);
                         }
                     });
                     if 0 < old_chars.len() {
@@ -148,7 +150,8 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                     let old_range = x.old_range();
                     let str = &old_str[old_range.start..old_range.end];
                     str.chars().for_each(|x| {
-                        if x == '\n' {
+                        old_chars.push(x);
+                        if x == '\n' || x == '\r' {
                             if 0 < old_chars.len() {
                                 old_line.push(ReplaceDiffChars {
                                     diff_kind,
@@ -158,8 +161,6 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                             }
                             old_lines.push(old_line.clone());
                             old_line = vec![];
-                        } else {
-                            old_chars.push(x);
                         }
                     });
                     if 0 < old_chars.len() {
@@ -174,7 +175,8 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                     let new_range = x.new_range();
                     let str = &new_str[new_range.start..new_range.end];
                     str.chars().for_each(|x| {
-                        if x == '\n' {
+                        new_chars.push(x);
+                        if x == '\n' || x == '\r' {
                             if 0 < new_chars.len() {
                                 new_line.push(ReplaceDiffChars {
                                     diff_kind,
@@ -184,8 +186,6 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                             }
                             new_lines.push(new_line.clone());
                             new_line = vec![];
-                        } else {
-                            new_chars.push(x);
                         }
                     });
                     if 0 < new_chars.len() {
@@ -200,7 +200,8 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                     let old_range = x.old_range();
                     let old_str = (&old_str[old_range.start..old_range.end]).to_owned();
                     old_str.chars().for_each(|x| {
-                        if x == '\n' {
+                        old_chars.push(x);
+                        if x == '\n' || x == '\r' {
                             if 0 < old_chars.len() {
                                 old_line.push(ReplaceDiffChars {
                                     diff_kind,
@@ -210,8 +211,6 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                             }
                             old_lines.push(old_line.clone());
                             old_line = vec![];
-                        } else {
-                            old_chars.push(x);
                         }
                     });
                     if 0 < old_chars.len() {
@@ -225,7 +224,8 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                     let new_range = x.new_range();
                     let new_str = (&new_str[new_range.start..new_range.end]).to_owned();
                     new_str.chars().for_each(|x| {
-                        if x == '\n' {
+                        new_chars.push(x);
+                        if x == '\n' || x == '\r' {
                             if 0 < new_chars.len() {
                                 new_line.push(ReplaceDiffChars {
                                     diff_kind,
@@ -235,8 +235,6 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                             }
                             new_lines.push(new_line.clone());
                             new_line = vec![];
-                        } else {
-                            new_chars.push(x);
                         }
                     });
                     if 0 < new_chars.len() {
