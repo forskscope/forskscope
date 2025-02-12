@@ -62,7 +62,7 @@
   <div class="row">
     <div class="col diff">
       <DiffColHeader
-        oldOrNew="new"
+        oldOrNew="old"
         filepath={oldFilepath}
         {isCompletelyEqual}
         filepathFromDialogOnClick={async () => {
