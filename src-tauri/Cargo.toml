@@ -20,6 +20,12 @@ rust-version = "1.81.0"
 name = "patch_hygge_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[profile.dev]         # to improve productivity
+strip = "debuginfo"   # reduce size
+opt-level = 1         # slightly optimize
+lto = false           # disable link-time optimizations
+incremental = true
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
