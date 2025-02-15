@@ -1,3 +1,9 @@
+export interface DiffResponse {
+    oldCharset: string
+    newCharset: string
+    linesDiffs: LinesDiff[]
+}
+
 export interface LinesDiff {
     diffKind: string
     linesCount: number

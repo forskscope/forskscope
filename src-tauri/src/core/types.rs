@@ -5,6 +5,14 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DiffResponse {
+    pub old_charset: String,
+    pub new_charset: String,
+    pub lines_diffs: Vec<LinesDiff>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LinesDiff {
     pub diff_kind: DiffTag,
     pub lines_count: usize,
@@ -33,3 +41,8 @@ pub struct ReplaceDiffChars {
 //     pub dirs: Vec<String>,
 //     pub files: Vec<String>,
 // }
+
+pub struct ReadContent {
+    pub charset: String,
+    pub content: String,
+}

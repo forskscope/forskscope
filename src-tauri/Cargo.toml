@@ -1,6 +1,6 @@
 [package]
 name = "patch-hygge"
-version = "0.5.3"
+version = "0.5.4"
 edition = "2021"
 
 description = "Diff and merge GUI tool with cross-platform support build with Tauri: Rust and Svelte"
@@ -36,3 +36,5 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 similar = { version = "^2.7", features = ["serde"] }
 tauri-plugin-dialog = "2"
+chardetng = "^0.1"
+encoding_rs = "^0.8"
