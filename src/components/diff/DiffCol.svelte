@@ -1,15 +1,26 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
   import type { LinesDiff, OldOrNew, ReplaceDetailLinesDiff, ReplaceDiffChars } from '../../types'
 
   const DIFF_LINE_HEIGHT: string = '1.34em'
+  const LINES_DIFF_CLASS_PREFIX: string = 'diff-lines-'
 
   const {
     oldOrNew,
     linesDiffs,
+    focusedLinesDiffIndex,
   }: {
     oldOrNew: OldOrNew
     linesDiffs: LinesDiff[]
+    focusedLinesDiffIndex: number | null
   } = $props()
+
+  onMount(async () => {
+    if (focusedLinesDiffIndex === null || oldOrNew !== 'old') return
+    document
+      .querySelector(`.${LINES_DIFF_CLASS_PREFIX}${focusedLinesDiffIndex}`)!
+      .scrollIntoView({ behavior: 'smooth', inline: 'center' })
+  })
 
   const lines = (linesDiff: LinesDiff): string[] => {
     return oldOrNew === 'old' ? linesDiff.oldLines : linesDiff.newLines
@@ -20,10 +31,10 @@
   }
 </script>
 
-<div class={`diff-lines ${oldOrNew}`} style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
+<div class={`lines-diffs ${oldOrNew}`} style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
   {#each linesDiffs as linesDiff, i}
     <div
-      class={linesDiff.diffKind}
+      class={`${linesDiff.diffKind} ${LINES_DIFF_CLASS_PREFIX}${i} ${focusedLinesDiffIndex === i ? 'focused' : ''}`}
       style={`height: calc(var(--line-height) * ${linesDiff.linesCount})`}
     >
       {#if linesDiff.diffKind === 'replace'}
@@ -46,10 +57,14 @@
 </div>
 
 <style>
-  .diff-lines {
+  .lines-diffs {
     counter-reset: line-number;
     width: fit-content;
     min-width: 100%;
+  }
+
+  .focused {
+    box-shadow: inset 12px 0 0 salmon;
   }
 
   .diff-line {

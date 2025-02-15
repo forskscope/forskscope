@@ -1,6 +1,6 @@
 <script lang="ts">
   import DragDrop from '../common/DragDrop.svelte'
-  import { filepathFromDialog } from './utils'
+  import { filepathFromDialog } from './scripts'
 
   const {
     oldFilepath,
