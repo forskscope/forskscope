@@ -1,11 +1,12 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
   import FileHandle from './FileHandle.svelte'
-  import type { LinesDiff } from '../../types'
+  import type { DiffResponse, LinesDiff } from '../../types'
   import DiffCol from './DiffCol.svelte'
   import { filepathFromDialog } from './scripts'
   import DiffColHeader from './DiffColHeader.svelte'
   import { debounce } from '../../utils'
+  import DiffColFooter from './DiffColFooter.svelte'
 
   let oldFilepath: string = $state('')
   let newFilepath: string = $state('')
@@ -17,6 +18,8 @@
 
   let oldContent: HTMLDivElement | null = $state(null)
   let newContent: HTMLDivElement | null = $state(null)
+  let oldCharset: string = $state('')
+  let newCharset: string = $state('')
 
   const linesDiffIndexDiffOnly: number[] = $derived(
     linesDiffs
@@ -28,9 +31,14 @@
 
   const diff = async () => {
     invoke('diff_filepaths', { old: oldFilepath, new: newFilepath })
-      .then((ret: unknown) => {
-        console.log(ret) // todo
-        linesDiffs = ret as LinesDiff[]
+      .then((res: unknown) => {
+        console.log(res) // todo
+
+        const diffResponse = res as DiffResponse
+        linesDiffs = diffResponse.linesDiffs
+        oldCharset = diffResponse.oldCharset
+        newCharset = diffResponse.newCharset
+
         showsFileHandler = false
       })
       .catch((error: unknown) => {
@@ -48,8 +56,10 @@
   const resetOnClick = () => {
     oldFilepath = ''
     newFilepath = ''
-    linesDiffs = []
     showsFileHandler = true
+    linesDiffs = []
+    oldCharset = ''
+    newCharset = ''
   }
 
   const oldContentOnScroll = (
@@ -119,6 +129,7 @@
           <DiffCol oldOrNew="old" {linesDiffs} {focusedLinesDiffIndex} />
         {/key}
       </div>
+      <DiffColFooter oldOrNew="old" charset={oldCharset} />
     </div>
     <div class="col diff">
       <DiffColHeader
@@ -137,6 +148,7 @@
           <DiffCol oldOrNew="new" {linesDiffs} {focusedLinesDiffIndex} />
         {/key}
       </div>
+      <DiffColFooter oldOrNew="new" charset={newCharset} />
     </div>
   </div>
 {/if}

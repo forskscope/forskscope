@@ -6,7 +6,7 @@ use super::{
     types::{LinesDiff, ReplaceDetailLinesDiff, ReplaceDiffChars},
 };
 
-pub fn lines_diff(old_content: &str, new_content: &str) -> Vec<LinesDiff> {
+pub fn lines_diffs(old_content: &str, new_content: &str) -> Vec<LinesDiff> {
     let diff = TextDiff::configure().diff_lines(old_content, new_content);
     let old_lines: Vec<String> = split_lines_with_endings(old_content);
     let new_lines: Vec<String> = split_lines_with_endings(new_content);
@@ -110,7 +110,11 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
             match diff_kind {
                 DiffTag::Equal => {
                     let old_range = x.old_range();
-                    let str = &old_str[old_range.start..old_range.end];
+                    // let str = &old_str[old_range.start..old_range.end];
+                    let (start, end) =
+                        multibyte_str_byte_indices(old_str, old_range.start, old_range.end)
+                            .unwrap();
+                    let str = &old_str[start..end];
                     str.chars().for_each(|x| {
                         old_chars.push(x);
                         new_chars.push(x);
@@ -148,7 +152,11 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                 }
                 DiffTag::Delete => {
                     let old_range = x.old_range();
-                    let str = &old_str[old_range.start..old_range.end];
+                    // let str = &old_str[old_range.start..old_range.end];
+                    let (start, end) =
+                        multibyte_str_byte_indices(old_str, old_range.start, old_range.end)
+                            .unwrap();
+                    let str = &old_str[start..end];
                     str.chars().for_each(|x| {
                         old_chars.push(x);
                         if x == '\n' || x == '\r' {
@@ -173,7 +181,11 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                 }
                 DiffTag::Insert => {
                     let new_range = x.new_range();
-                    let str = &new_str[new_range.start..new_range.end];
+                    // let str = &new_str[new_range.start..new_range.end];
+                    let (start, end) =
+                        multibyte_str_byte_indices(new_str, new_range.start, new_range.end)
+                            .unwrap();
+                    let str = &new_str[start..end];
                     str.chars().for_each(|x| {
                         new_chars.push(x);
                         if x == '\n' || x == '\r' {
@@ -198,7 +210,11 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                 }
                 DiffTag::Replace => {
                     let old_range = x.old_range();
-                    let old_str = (&old_str[old_range.start..old_range.end]).to_owned();
+                    // let old_str = (&old_str[old_range.start..old_range.end]).to_owned();
+                    let (old_start, old_end) =
+                        multibyte_str_byte_indices(old_str, old_range.start, old_range.end)
+                            .unwrap();
+                    let old_str = &old_str[old_start..old_end];
                     old_str.chars().for_each(|x| {
                         old_chars.push(x);
                         if x == '\n' || x == '\r' {
@@ -222,7 +238,11 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
                     }
 
                     let new_range = x.new_range();
-                    let new_str = (&new_str[new_range.start..new_range.end]).to_owned();
+                    // let new_str = (&new_str[new_range.start..new_range.end]).to_owned();
+                    let (new_start, new_end) =
+                        multibyte_str_byte_indices(new_str, new_range.start, new_range.end)
+                            .unwrap();
+                    let new_str = &new_str[new_start..new_end];
                     new_str.chars().for_each(|x| {
                         new_chars.push(x);
                         if x == '\n' || x == '\r' {
@@ -257,4 +277,26 @@ fn replace_diff_lines(old_str: &str, new_str: &str) -> ReplaceDetailLinesDiff {
         old_lines,
         new_lines,
     }
+}
+
+fn multibyte_str_byte_indices(
+    text: &str,
+    index_start: usize,
+    index_end: usize,
+) -> Option<(usize, usize)> {
+    let char_indices = text.char_indices().collect::<Vec<_>>();
+
+    // Ensure the start and end indices are within bounds
+    if index_start >= char_indices.len()
+        || index_end > char_indices.len()
+        || index_start >= index_end
+    {
+        return None;
+    }
+
+    // Get the byte indices corresponding to the char indices
+    let byte_start = char_indices[index_start].0;
+    let byte_end = char_indices[index_end - 1].0 + char_indices[index_end - 1].1.len_utf8();
+
+    Some((byte_start, byte_end))
 }

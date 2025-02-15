@@ -1,8 +1,8 @@
 // use tauri::Manager;
 
-use super::diff::lines_diff;
+use super::diff::lines_diffs;
 use super::file::filepath_content;
-use super::types::LinesDiff;
+use super::types::DiffResponse;
 
 // #[tauri::command]
 // pub fn startup_args(app_handle: tauri::AppHandle) -> Vec<String> {
@@ -21,10 +21,15 @@ use super::types::LinesDiff;
 // }
 
 #[tauri::command]
-pub fn diff_filepaths(old: &str, new: &str) -> Vec<LinesDiff> {
-    let old_content = filepath_content(old);
-    let new_content = filepath_content(new);
-    lines_diff(old_content.as_str(), new_content.as_str())
+pub fn diff_filepaths(old: &str, new: &str) -> DiffResponse {
+    let old_read = filepath_content(old);
+    let new_read = filepath_content(new);
+    let lines_diffs = lines_diffs(old_read.content.as_str(), new_read.content.as_str());
+    DiffResponse {
+        old_charset: old_read.charset.to_owned(),
+        new_charset: new_read.charset.to_owned(),
+        lines_diffs,
+    }
 }
 
 // #[tauri::command]
