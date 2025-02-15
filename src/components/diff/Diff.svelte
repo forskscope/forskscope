@@ -1,11 +1,11 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
-  import FileHandle from '../components/diff/FileHandle.svelte'
-  import type { LinesDiff } from '../types'
-  import DiffCol from '../components/diff/DiffCol.svelte'
-  import { filepathFromDialog } from '../components/diff/utils'
-  import DiffColHeader from '../components/diff/DiffColHeader.svelte'
-  import { debounce } from '../scripts'
+  import FileHandle from './FileHandle.svelte'
+  import type { LinesDiff } from '../../types'
+  import DiffCol from './DiffCol.svelte'
+  import { filepathFromDialog } from './scripts'
+  import DiffColHeader from './DiffColHeader.svelte'
+  import { debounce } from '../../utils'
 
   let oldFilepath: string = $state('')
   let newFilepath: string = $state('')
@@ -13,9 +13,16 @@
   let showsFileHandler: boolean = $state(true)
 
   let linesDiffs: LinesDiff[] = $state([])
+  let focusedLinesDiffIndex: number | null = $state(null)
 
   let oldContent: HTMLDivElement | null = $state(null)
   let newContent: HTMLDivElement | null = $state(null)
+
+  const linesDiffIndexDiffOnly: number[] = $derived(
+    linesDiffs
+      .map((x, i) => (x.diffKind !== 'equal' ? i : undefined))
+      .filter((x) => x !== undefined)
+  )
 
   const isCompletelyEqual = $derived(!linesDiffs.some((x) => x.diffKind !== 'equal'))
 
@@ -85,6 +92,14 @@
 >
 <button onclick={resetOnClick}>Reset</button>
 
+{#if 0 < linesDiffIndexDiffOnly.length}
+  <select bind:value={focusedLinesDiffIndex}>
+    {#each linesDiffIndexDiffOnly as item}
+      <option value={item}>{item}</option>
+    {/each}
+  </select>
+{/if}
+
 {#if 0 < linesDiffs.length}
   <div class="row">
     <div class="col diff">
@@ -100,7 +115,9 @@
         }}
       />
       <div class="content" onscroll={oldContentOnScroll} bind:this={oldContent}>
-        <DiffCol oldOrNew="old" {linesDiffs} />
+        {#key focusedLinesDiffIndex}
+          <DiffCol oldOrNew="old" {linesDiffs} {focusedLinesDiffIndex} />
+        {/key}
       </div>
     </div>
     <div class="col diff">
@@ -116,7 +133,9 @@
         }}
       />
       <div class="content" onscroll={newContentOnScroll} bind:this={newContent}>
-        <DiffCol oldOrNew="new" {linesDiffs} />
+        {#key focusedLinesDiffIndex}
+          <DiffCol oldOrNew="new" {linesDiffs} {focusedLinesDiffIndex} />
+        {/key}
       </div>
     </div>
   </div>

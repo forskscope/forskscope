@@ -1,6 +1,6 @@
 <script>
   import Toast from '../components/common/Toast.svelte'
-  import Diff from '../pages/Diff.svelte'
+  import Diff from '../components/diff/Diff.svelte'
 </script>
 
 <div id="app">
