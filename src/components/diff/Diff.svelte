@@ -7,38 +7,44 @@
   import DiffColHeader from './DiffColHeader.svelte'
   import { debounce } from '../../utils'
   import DiffColFooter from './DiffColFooter.svelte'
+  import OpHeaderCol from './OpHeaderCol.svelte'
+  import OpCol from './OpCol.svelte'
+  import { DIFF_LINE_HEIGHT } from './consts'
+  import OpFooterCol from './OpFooterCol.svelte'
 
   let oldFilepath: string = $state('')
   let newFilepath: string = $state('')
 
   let oldContent: HTMLDivElement | null = $state(null)
   let newContent: HTMLDivElement | null = $state(null)
+  let borderOp: HTMLDivElement | null = $state(null)
   let oldCharset: string = $state('')
   let newCharset: string = $state('')
 
   let linesDiffs: LinesDiff[] = $state([])
-  let focusedLinesDiffIndex: number = $state(0)
+  let focusedLinesDiffIndex: number | null = $state(null)
 
   let showsFileHandler: boolean = $state(true)
 
-  const linesDiffIndexDiffOnly: number[] = $derived(
-    linesDiffs
-      .map((x, i) => (x.diffKind !== 'equal' ? i : undefined))
-      .filter((x) => x !== undefined)
-  )
+  // todo: not equal diffs in linesDiffs can changed to be 'equal'
+  // const linesDiffsDiffOnly: number[] = $derived(
+  //   linesDiffs
+  //     .map((x, i) => (x.diffKind !== 'equal' ? i : undefined))
+  //     .filter((x) => x !== undefined)
+  // )
   const prevLinesDiffIndex: number = $derived.by(() => {
-    if (focusedLinesDiffIndex === 0) return 0
+    if (focusedLinesDiffIndex === null) return 0
+    if (focusedLinesDiffIndex === 0) return focusedLinesDiffIndex
     const foundIndex = linesDiffs.findLastIndex(
-      (x, i) => i < focusedLinesDiffIndex && x.diffKind !== 'equal'
+      (x, i) => i < focusedLinesDiffIndex! && x.diffKind !== 'equal'
     )
     return 0 <= foundIndex ? foundIndex : focusedLinesDiffIndex
   })
   const nextLinesDiffIndex: number = $derived.by(() => {
-    if (focusedLinesDiffIndex === linesDiffs.length - 1) {
-      return focusedLinesDiffIndex
-    }
+    if (focusedLinesDiffIndex === null) return 0
+    if (focusedLinesDiffIndex === linesDiffs.length - 1) return focusedLinesDiffIndex
     const foundIndex = linesDiffs.findIndex(
-      (x, i) => focusedLinesDiffIndex < i && x.diffKind !== 'equal'
+      (x, i) => focusedLinesDiffIndex! < i && x.diffKind !== 'equal'
     )
     return 0 <= foundIndex ? foundIndex : focusedLinesDiffIndex
   })
@@ -87,6 +93,7 @@
     const scrollTop = e.currentTarget.scrollTop
     debounce(() => {
       newContent!.scrollTop = scrollTop
+      borderOp!.scrollTop = scrollTop
     }, 10)
   }
   const newContentOnScroll = (
@@ -98,6 +105,18 @@
     const scrollTop = e.currentTarget.scrollTop
     debounce(() => {
       oldContent!.scrollTop = scrollTop
+      borderOp!.scrollTop = scrollTop
+    }, 10)
+  }
+  const borderOpOnScroll = (
+    e: UIEvent & {
+      currentTarget: EventTarget & HTMLDivElement
+    }
+  ) => {
+    const scrollTop = e.currentTarget.scrollTop
+    debounce(() => {
+      oldContent!.scrollTop = scrollTop
+      newContent!.scrollTop = scrollTop
     }, 10)
   }
 
@@ -118,69 +137,108 @@
       default:
     }
   }
+
+  const linesDiffReplaceOnClick = (linesDiffIndex: number) => {
+    const x = linesDiffs[linesDiffIndex]
+    x.diffKind = 'equal'
+    x.newLines = x.oldLines
+    linesDiffs[linesDiffIndex] = x
+    if (focusedLinesDiffIndex === linesDiffIndex) focusedLinesDiffIndex = null
+  }
 </script>
 
-<h2>Diff</h2>
+<div class="keyboard-listener" onkeydown={onKeyDown} role="button" tabindex="0">
+  <h2>Diff</h2>
+  {#if showsFileHandler}
+    {#key [oldFilepath, newFilepath]}
+      <FileHandle {oldFilepath} {newFilepath} {filepathsOnChange} />
+    {/key}
+  {/if}
+  <label
+    ><input
+      type="checkbox"
+      bind:checked={showsFileHandler}
+      disabled={linesDiffs.length === 0}
+    />L</label
+  >
+  <button onclick={resetOnClick}>Reset</button>
 
-{#if showsFileHandler}
-  {#key [oldFilepath, newFilepath]}
-    <FileHandle {oldFilepath} {newFilepath} {filepathsOnChange} />
-  {/key}
-{/if}
-<label
-  ><input
-    type="checkbox"
-    bind:checked={showsFileHandler}
-    disabled={linesDiffs.length === 0}
-  />L</label
->
-<button onclick={resetOnClick}>Reset</button>
-
-{#if 0 < linesDiffs.length}
-  <div class="row" onkeydown={onKeyDown} role="button" tabindex="0">
-    <div class="col diff">
-      <DiffColHeader
-        oldOrNew="old"
-        filepath={oldFilepath}
-        {isCompletelyEqual}
-        filepathFromDialogOnClick={async () => {
-          const filepath = await filepathFromDialog()
-          if (filepath === null) return
-          oldFilepath = filepath
-          diff()
-        }}
-      />
-      <div class="content" onscroll={oldContentOnScroll} bind:this={oldContent}>
-        {#key focusedLinesDiffIndex}
-          <DiffCol oldOrNew="old" {linesDiffs} {focusedLinesDiffIndex} />
-        {/key}
+  {#if 0 < linesDiffs.length}
+    <div class="row" style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
+      <div class="col diff">
+        <header>
+          <DiffColHeader
+            oldOrNew="old"
+            filepath={oldFilepath}
+            {isCompletelyEqual}
+            filepathFromDialogOnClick={async () => {
+              const filepath = await filepathFromDialog()
+              if (filepath === null) return
+              oldFilepath = filepath
+              diff()
+            }}
+          />
+        </header>
+        <div class="content" onscroll={oldContentOnScroll} bind:this={oldContent}>
+          {#key focusedLinesDiffIndex}
+            <DiffCol oldOrNew="old" {linesDiffs} {focusedLinesDiffIndex} />
+          {/key}
+        </div>
+        <footer>
+          <DiffColFooter oldOrNew="old" charset={oldCharset} />
+        </footer>
       </div>
-      <DiffColFooter oldOrNew="old" charset={oldCharset} />
-    </div>
-    <div class="col diff">
-      <DiffColHeader
-        oldOrNew="new"
-        filepath={newFilepath}
-        {isCompletelyEqual}
-        filepathFromDialogOnClick={async () => {
-          const filepath = await filepathFromDialog()
-          if (filepath === null) return
-          newFilepath = filepath
-          diff()
-        }}
-      />
-      <div class="content" onscroll={newContentOnScroll} bind:this={newContent}>
-        {#key focusedLinesDiffIndex}
-          <DiffCol oldOrNew="new" {linesDiffs} {focusedLinesDiffIndex} />
-        {/key}
+      <div class="col border">
+        <header>
+          <OpHeaderCol />
+        </header>
+        <div class="op" onscroll={borderOpOnScroll} bind:this={borderOp}>
+          <OpCol {linesDiffs} {focusedLinesDiffIndex} replaceOnClick={linesDiffReplaceOnClick} />
+        </div>
+        <footer>
+          <OpFooterCol />
+        </footer>
       </div>
-      <DiffColFooter oldOrNew="new" charset={newCharset} />
+      <div class="col diff">
+        <header>
+          <DiffColHeader
+            oldOrNew="new"
+            filepath={newFilepath}
+            {isCompletelyEqual}
+            filepathFromDialogOnClick={async () => {
+              const filepath = await filepathFromDialog()
+              if (filepath === null) return
+              newFilepath = filepath
+              diff()
+            }}
+          />
+        </header>
+        <div class="content" onscroll={newContentOnScroll} bind:this={newContent}>
+          {#key focusedLinesDiffIndex}
+            <DiffCol oldOrNew="new" {linesDiffs} {focusedLinesDiffIndex} />
+          {/key}
+        </div>
+        <footer>
+          <DiffColFooter oldOrNew="new" charset={newCharset} />
+        </footer>
+      </div>
     </div>
-  </div>
-{/if}
+  {/if}
+</div>
 
 <style>
-  .diff {
+  .keyboard-listener:focus {
+    outline: none;
+    border: none;
+    box-shadow: none;
+  }
+
+  .col header {
+    height: 3.9rem;
+  }
+
+  .diff,
+  .border {
     width: 100%;
     /* adjust x scrollbar */
     min-width: 0;
@@ -189,7 +247,16 @@
     display: flex;
     flex-direction: column;
   }
-  .diff .content {
+
+  .diff .content,
+  .border .op {
     overflow: auto;
+  }
+
+  .col.border {
+    flex-grow: 0;
+    flex-basis: 1.4rem;
+    background-color: black;
+    color: white;
   }
 </style>
