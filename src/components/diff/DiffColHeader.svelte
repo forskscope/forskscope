@@ -19,7 +19,9 @@
 <div>
   <button onclick={filepathFromDialogOnClick}>
     <h3>{oldOrNew.toUpperCase()}</h3>
-    {filepath}
+    <div>
+      {filepath}
+    </div>
   </button>
 </div>
 
@@ -29,9 +31,23 @@
 {/if}
 
 <style>
+  button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+  }
+
   h3 {
     padding: 0;
-    margin: 0;
+    margin: 0 1rem 0 0;
     display: inline-block;
+  }
+
+  button div {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    direction: rtl;
+    text-align: right;
   }
 </style>

@@ -11,21 +11,37 @@
   let oldFilepath: string = $state('')
   let newFilepath: string = $state('')
 
-  let showsFileHandler: boolean = $state(true)
-
-  let linesDiffs: LinesDiff[] = $state([])
-  let focusedLinesDiffIndex: number | null = $state(null)
-
   let oldContent: HTMLDivElement | null = $state(null)
   let newContent: HTMLDivElement | null = $state(null)
   let oldCharset: string = $state('')
   let newCharset: string = $state('')
+
+  let linesDiffs: LinesDiff[] = $state([])
+  let focusedLinesDiffIndex: number = $state(0)
+
+  let showsFileHandler: boolean = $state(true)
 
   const linesDiffIndexDiffOnly: number[] = $derived(
     linesDiffs
       .map((x, i) => (x.diffKind !== 'equal' ? i : undefined))
       .filter((x) => x !== undefined)
   )
+  const prevLinesDiffIndex: number = $derived.by(() => {
+    if (focusedLinesDiffIndex === 0) return 0
+    const foundIndex = linesDiffs.findLastIndex(
+      (x, i) => i < focusedLinesDiffIndex && x.diffKind !== 'equal'
+    )
+    return 0 <= foundIndex ? foundIndex : focusedLinesDiffIndex
+  })
+  const nextLinesDiffIndex: number = $derived.by(() => {
+    if (focusedLinesDiffIndex === linesDiffs.length - 1) {
+      return focusedLinesDiffIndex
+    }
+    const foundIndex = linesDiffs.findIndex(
+      (x, i) => focusedLinesDiffIndex < i && x.diffKind !== 'equal'
+    )
+    return 0 <= foundIndex ? foundIndex : focusedLinesDiffIndex
+  })
 
   const isCompletelyEqual = $derived(!linesDiffs.some((x) => x.diffKind !== 'equal'))
 
@@ -84,6 +100,24 @@
       oldContent!.scrollTop = scrollTop
     }, 10)
   }
+
+  const onKeyDown = (
+    e: KeyboardEvent & {
+      currentTarget: EventTarget & HTMLDivElement
+    }
+  ) => {
+    switch (e.key) {
+      case 'F7': {
+        focusedLinesDiffIndex = prevLinesDiffIndex
+        break
+      }
+      case 'F8': {
+        focusedLinesDiffIndex = nextLinesDiffIndex
+        break
+      }
+      default:
+    }
+  }
 </script>
 
 <h2>Diff</h2>
@@ -102,16 +136,8 @@
 >
 <button onclick={resetOnClick}>Reset</button>
 
-{#if 0 < linesDiffIndexDiffOnly.length}
-  <select bind:value={focusedLinesDiffIndex}>
-    {#each linesDiffIndexDiffOnly as item}
-      <option value={item}>{item}</option>
-    {/each}
-  </select>
-{/if}
-
 {#if 0 < linesDiffs.length}
-  <div class="row">
+  <div class="row" onkeydown={onKeyDown} role="button" tabindex="0">
     <div class="col diff">
       <DiffColHeader
         oldOrNew="old"
