@@ -15,9 +15,6 @@
   let oldFilepath: string = $state('')
   let newFilepath: string = $state('')
 
-  let oldContent: HTMLDivElement | null = $state(null)
-  let newContent: HTMLDivElement | null = $state(null)
-  let borderOp: HTMLDivElement | null = $state(null)
   let oldCharset: string = $state('')
   let newCharset: string = $state('')
 
@@ -84,42 +81,6 @@
     newCharset = ''
   }
 
-  const oldContentOnScroll = (
-    e: UIEvent & {
-      currentTarget: EventTarget & HTMLDivElement
-    }
-  ) => {
-    if (e.currentTarget.scrollLeft !== oldContent!.scrollLeft) return
-    const scrollTop = e.currentTarget.scrollTop
-    debounce(() => {
-      newContent!.scrollTop = scrollTop
-      borderOp!.scrollTop = scrollTop
-    }, 10)
-  }
-  const newContentOnScroll = (
-    e: UIEvent & {
-      currentTarget: EventTarget & HTMLDivElement
-    }
-  ) => {
-    if (e.currentTarget.scrollLeft !== newContent!.scrollLeft) return
-    const scrollTop = e.currentTarget.scrollTop
-    debounce(() => {
-      oldContent!.scrollTop = scrollTop
-      borderOp!.scrollTop = scrollTop
-    }, 10)
-  }
-  const borderOpOnScroll = (
-    e: UIEvent & {
-      currentTarget: EventTarget & HTMLDivElement
-    }
-  ) => {
-    const scrollTop = e.currentTarget.scrollTop
-    debounce(() => {
-      oldContent!.scrollTop = scrollTop
-      newContent!.scrollTop = scrollTop
-    }, 10)
-  }
-
   const onKeyDown = (
     e: KeyboardEvent & {
       currentTarget: EventTarget & HTMLDivElement
@@ -164,63 +125,61 @@
   <button onclick={resetOnClick}>Reset</button>
 
   {#if 0 < linesDiffs.length}
-    <div class="row" style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
+    <div class="row header">
       <div class="col diff">
-        <header>
-          <DiffColHeader
-            oldOrNew="old"
-            filepath={oldFilepath}
-            {isCompletelyEqual}
-            filepathFromDialogOnClick={async () => {
-              const filepath = await filepathFromDialog()
-              if (filepath === null) return
-              oldFilepath = filepath
-              diff()
-            }}
-          />
-        </header>
-        <div class="content" onscroll={oldContentOnScroll} bind:this={oldContent}>
-          {#key focusedLinesDiffIndex}
-            <DiffCol oldOrNew="old" {linesDiffs} {focusedLinesDiffIndex} />
-          {/key}
-        </div>
-        <footer>
-          <DiffColFooter oldOrNew="old" charset={oldCharset} />
-        </footer>
+        <DiffColHeader
+          oldOrNew="old"
+          filepath={oldFilepath}
+          {isCompletelyEqual}
+          filepathFromDialogOnClick={async () => {
+            const filepath = await filepathFromDialog()
+            if (filepath === null) return
+            oldFilepath = filepath
+            diff()
+          }}
+        />
       </div>
-      <div class="col border">
-        <header>
-          <OpHeaderCol />
-        </header>
-        <div class="op" onscroll={borderOpOnScroll} bind:this={borderOp}>
-          <OpCol {linesDiffs} {focusedLinesDiffIndex} replaceOnClick={linesDiffReplaceOnClick} />
-        </div>
-        <footer>
-          <OpFooterCol />
-        </footer>
+      <div class="col op">
+        <OpHeaderCol />
       </div>
       <div class="col diff">
-        <header>
-          <DiffColHeader
-            oldOrNew="new"
-            filepath={newFilepath}
-            {isCompletelyEqual}
-            filepathFromDialogOnClick={async () => {
-              const filepath = await filepathFromDialog()
-              if (filepath === null) return
-              newFilepath = filepath
-              diff()
-            }}
-          />
-        </header>
-        <div class="content" onscroll={newContentOnScroll} bind:this={newContent}>
-          {#key focusedLinesDiffIndex}
-            <DiffCol oldOrNew="new" {linesDiffs} {focusedLinesDiffIndex} />
-          {/key}
-        </div>
-        <footer>
-          <DiffColFooter oldOrNew="new" charset={newCharset} />
-        </footer>
+        <DiffColHeader
+          oldOrNew="new"
+          filepath={newFilepath}
+          {isCompletelyEqual}
+          filepathFromDialogOnClick={async () => {
+            const filepath = await filepathFromDialog()
+            if (filepath === null) return
+            newFilepath = filepath
+            diff()
+          }}
+        />
+      </div>
+    </div>
+    <div class="row content" style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
+      <div class="col diff">
+        {#key focusedLinesDiffIndex}
+          <DiffCol oldOrNew="old" {linesDiffs} {focusedLinesDiffIndex} />
+        {/key}
+      </div>
+      <div class="col op">
+        <OpCol {linesDiffs} {focusedLinesDiffIndex} replaceOnClick={linesDiffReplaceOnClick} />
+      </div>
+      <div class="col diff">
+        {#key focusedLinesDiffIndex}
+          <DiffCol oldOrNew="new" {linesDiffs} {focusedLinesDiffIndex} />
+        {/key}
+      </div>
+    </div>
+    <div class="row footer">
+      <div class="col diff">
+        <DiffColFooter oldOrNew="old" charset={oldCharset} />
+      </div>
+      <div class="col op">
+        <OpFooterCol />
+      </div>
+      <div class="col diff">
+        <DiffColFooter oldOrNew="new" charset={newCharset} />
       </div>
     </div>
   {/if}
@@ -231,29 +190,34 @@
     outline: none;
     border: none;
     box-shadow: none;
+    /* min-height: 0; */
   }
 
-  .col header {
-    height: 3.9rem;
+  .row.header {
+    height: 2.7rem;
   }
 
-  .diff,
-  .border {
-    width: 100%;
+  .row.content {
+    height: 75vh;
+    overflow-x: hidden;
+    overflow-y: scroll;
+  }
+
+  .row.footer {
+    height: 1.5rem;
+  }
+
+  .col.diff,
+  .col.op {
     /* adjust x scrollbar */
-    min-width: 0;
-    /* todo: fit height to window */
-    height: calc(100vh - 5.7rem);
+    /* min-width: 0; */
     display: flex;
     flex-direction: column;
+    height: max-content;
+    overflow: hidden;
   }
 
-  .diff .content,
-  .border .op {
-    overflow: auto;
-  }
-
-  .col.border {
+  .col.op {
     flex-grow: 0;
     flex-basis: 1.4rem;
     background-color: black;
