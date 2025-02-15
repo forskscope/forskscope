@@ -1,6 +1,6 @@
 [package]
 name = "patch-hygge"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 
 description = "Diff and merge GUI tool with cross-platform support build with Tauri: Rust and Svelte"
@@ -19,6 +19,12 @@ rust-version = "1.81.0"
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "patch_hygge_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[profile.dev]         # to improve productivity
+strip = "debuginfo"   # reduce size
+opt-level = 1         # slightly optimize
+lto = false           # disable link-time optimizations
+incremental = true
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
