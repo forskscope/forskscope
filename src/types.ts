@@ -5,7 +5,7 @@ export interface DiffResponse {
 }
 
 export interface LinesDiff {
-    diffKind: string
+    diffKind: DiffKind
     linesCount: number
     oldLines: string[]
     newLines: string[]
@@ -18,8 +18,10 @@ export interface ReplaceDetailLinesDiff {
 }
 
 export interface ReplaceDiffChars {
-    diffKind: string
+    diffKind: DiffKind
     chars: string
 }
 
 export type OldOrNew = "old" | "new"
+
+export type DiffKind = "equal" | "delete" | "insert" | "replace"
