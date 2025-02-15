@@ -1,7 +1,7 @@
 
-let _toasts: ToastContent[] = $state([])
+let _toasts: Toast[] = $state([])
 
-import type { ToastContent } from '../types/Toast.svelte.js'
+import type { Toast } from '../types/Toast.svelte.js'
 
 const DEFAULT_DURATION_MILLISECONDS: number = 5000
 
@@ -29,7 +29,7 @@ const errorToast = (messages: string, durationMilliseconds?: number) => {
     })
 }
 
-const show = (toast: ToastContent) => {
+const show = (toast: Toast) => {
     _toasts.push(toast)
     setTimeout(hide, toast.durationMilliseconds)
 }
