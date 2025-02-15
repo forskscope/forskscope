@@ -29,36 +29,46 @@
   }
 </script>
 
-<div class={`lines-diffs ${oldOrNew}`}>
-  {#each linesDiffs as linesDiff, i}
-    <div
-      class={`${linesDiff.diffKind} ${LINES_DIFF_CLASS_PREFIX}${i} ${focusedLinesDiffIndex === i ? 'focused' : ''}`}
-      style={`height: calc(var(--line-height) * ${linesDiff.linesCount})`}
-    >
-      {#if linesDiff.diffKind === 'replace'}
-        <div class="replace-diff-chars">
-          {#each replaceDetailLines(linesDiff.replaceDetail!) as line}
-            <div class="diff-line">
-              {#each line as chars}
-                <span class={chars.diffKind}>{chars.chars}</span>
-              {/each}
-            </div>
+<div class="wrapper">
+  <div class={`lines-diffs ${oldOrNew}`}>
+    {#each linesDiffs as linesDiff, i}
+      <div
+        class={`${linesDiff.diffKind} ${LINES_DIFF_CLASS_PREFIX}${i} ${focusedLinesDiffIndex === i ? 'focused' : ''}`}
+        style={`height: calc(var(--line-height) * ${linesDiff.linesCount})`}
+      >
+        {#if linesDiff.diffKind === 'replace'}
+          <div class="replace-diff-chars">
+            {#each replaceDetailLines(linesDiff.replaceDetail!) as line}
+              <div class="diff-line">
+                {#each line as chars}
+                  <span class={chars.diffKind}>{chars.chars}</span>
+                {/each}
+              </div>
+            {/each}
+          </div>
+        {:else}
+          {#each lines(linesDiff) as line}
+            <div class="diff-line">{line}</div>
           {/each}
-        </div>
-      {:else}
-        {#each lines(linesDiff) as line}
-          <div class="diff-line">{line}</div>
-        {/each}
-      {/if}
-    </div>
-  {/each}
+        {/if}
+      </div>
+    {/each}
+  </div>
 </div>
 
 <style>
+  .wrapper {
+    width: 100%;
+    overflow-x: scroll;
+    overflow-y: hidden;
+  }
+
   .lines-diffs {
     counter-reset: line-number;
     width: fit-content;
     min-width: 100%;
+    height: fit-content;
+    min-height: 100%;
     font-family: monospace;
   }
 
