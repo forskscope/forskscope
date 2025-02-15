@@ -1,9 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import type { LinesDiff, OldOrNew, ReplaceDetailLinesDiff, ReplaceDiffChars } from '../../types'
-
-  const DIFF_LINE_HEIGHT: string = '1.34em'
-  const LINES_DIFF_CLASS_PREFIX: string = 'diff-lines-'
+  import { LINES_DIFF_CLASS_PREFIX } from './consts'
 
   const {
     oldOrNew,
@@ -31,7 +29,7 @@
   }
 </script>
 
-<div class={`lines-diffs ${oldOrNew}`} style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
+<div class={`lines-diffs ${oldOrNew}`}>
   {#each linesDiffs as linesDiff, i}
     <div
       class={`${linesDiff.diffKind} ${LINES_DIFF_CLASS_PREFIX}${i} ${focusedLinesDiffIndex === i ? 'focused' : ''}`}

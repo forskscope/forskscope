@@ -33,6 +33,7 @@
 <style>
   button {
     width: 100%;
+    padding: 0.3rem 0.4rem;
     display: flex;
     align-items: center;
   }
@@ -41,6 +42,8 @@
     padding: 0;
     margin: 0 1rem 0 0;
     display: inline-block;
+    font-size: 0.8rem;
+    font-weight: normal;
   }
 
   button div {
@@ -49,5 +52,7 @@
     text-overflow: ellipsis;
     direction: rtl;
     text-align: right;
+    font-size: 1.05rem;
+    font-weight: bold;
   }
 </style>
