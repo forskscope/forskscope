@@ -8,10 +8,7 @@
     linesDiffs,
   }: {
     oldOrNew: OldOrNew
-    filepath: string
     linesDiffs: LinesDiff[]
-    isCompletelyEqual: boolean
-    filepathFromDialogOnClick: () => void
   } = $props()
 
   const lines = (linesDiff: LinesDiff): string[] => {
@@ -52,6 +49,7 @@
   .diff-lines {
     counter-reset: line-number;
     width: fit-content;
+    min-width: 100%;
   }
 
   .diff-line {

@@ -5,6 +5,7 @@
   import DiffCol from '../components/diff/DiffCol.svelte'
   import { filepathFromDialog } from '../components/diff/utils'
   import DiffColHeader from '../components/diff/DiffColHeader.svelte'
+  import { debounce } from '../scripts'
 
   let oldFilepath: string = $state('')
   let newFilepath: string = $state('')
@@ -12,6 +13,9 @@
   let showsFileHandler: boolean = $state(true)
 
   let linesDiffs: LinesDiff[] = $state([])
+
+  let oldContent: HTMLDivElement | null = $state(null)
+  let newContent: HTMLDivElement | null = $state(null)
 
   const isCompletelyEqual = $derived(!linesDiffs.some((x) => x.diffKind !== 'equal'))
 
@@ -39,6 +43,29 @@
     newFilepath = ''
     linesDiffs = []
     showsFileHandler = true
+  }
+
+  const oldContentOnScroll = (
+    e: UIEvent & {
+      currentTarget: EventTarget & HTMLDivElement
+    }
+  ) => {
+    if (e.currentTarget.scrollLeft !== oldContent!.scrollLeft) return
+    const scrollTop = e.currentTarget.scrollTop
+    debounce(() => {
+      newContent!.scrollTop = scrollTop
+    }, 10)
+  }
+  const newContentOnScroll = (
+    e: UIEvent & {
+      currentTarget: EventTarget & HTMLDivElement
+    }
+  ) => {
+    if (e.currentTarget.scrollLeft !== newContent!.scrollLeft) return
+    const scrollTop = e.currentTarget.scrollTop
+    debounce(() => {
+      oldContent!.scrollTop = scrollTop
+    }, 10)
   }
 </script>
 
@@ -72,19 +99,8 @@
           diff()
         }}
       />
-      <div class="content">
-        <DiffCol
-          oldOrNew="old"
-          filepath={oldFilepath}
-          {linesDiffs}
-          {isCompletelyEqual}
-          filepathFromDialogOnClick={async () => {
-            const filepath = await filepathFromDialog()
-            if (filepath === null) return
-            oldFilepath = filepath
-            diff()
-          }}
-        />
+      <div class="content" onscroll={oldContentOnScroll} bind:this={oldContent}>
+        <DiffCol oldOrNew="old" {linesDiffs} />
       </div>
     </div>
     <div class="col diff">
@@ -99,19 +115,8 @@
           diff()
         }}
       />
-      <div class="content">
-        <DiffCol
-          oldOrNew="new"
-          filepath={newFilepath}
-          {linesDiffs}
-          {isCompletelyEqual}
-          filepathFromDialogOnClick={async () => {
-            const filepath = await filepathFromDialog()
-            if (filepath === null) return
-            newFilepath = filepath
-            diff()
-          }}
-        />
+      <div class="content" onscroll={newContentOnScroll} bind:this={newContent}>
+        <DiffCol oldOrNew="new" {linesDiffs} />
       </div>
     </div>
   </div>
