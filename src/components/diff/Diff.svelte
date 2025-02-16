@@ -58,6 +58,7 @@
         newCharset = diffResponse.newCharset
 
         showsFileHandler = false
+        focusedLinesDiffIndex = null
       })
       .catch((error: unknown) => {
         console.error(error)
