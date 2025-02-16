@@ -1,6 +1,4 @@
 <script lang="ts">
-  import type { OldOrNew } from '../../../types'
-
   const {
     charset,
   }: {

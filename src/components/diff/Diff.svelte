@@ -125,65 +125,67 @@
   <button onclick={resetOnClick}>Reset</button>
 
   {#if 0 < linesDiffs.length}
-    <div class="row header">
-      <div class="col diff">
-        <DiffHeaderCol
-          oldOrNew="old"
-          filepath={oldFilepath}
-          {isCompletelyEqual}
-          filepathFromDialogOnClick={async () => {
-            const filepath = await filepathFromDialog()
-            if (filepath === null) return
-            oldFilepath = filepath
-            diff()
-          }}
-        />
+    <div class="rows">
+      <div class="row header">
+        <div class="col diff old">
+          <DiffHeaderCol
+            oldOrNew="old"
+            filepath={oldFilepath}
+            {isCompletelyEqual}
+            filepathFromDialogOnClick={async () => {
+              const filepath = await filepathFromDialog()
+              if (filepath === null) return
+              oldFilepath = filepath
+              diff()
+            }}
+          />
+        </div>
+        <div class="col separator">
+          <SeparatorHeaderCol />
+        </div>
+        <div class="col diff new">
+          <DiffHeaderCol
+            oldOrNew="new"
+            filepath={newFilepath}
+            {isCompletelyEqual}
+            filepathFromDialogOnClick={async () => {
+              const filepath = await filepathFromDialog()
+              if (filepath === null) return
+              newFilepath = filepath
+              diff()
+            }}
+          />
+        </div>
       </div>
-      <div class="col separator">
-        <SeparatorHeaderCol />
+      <div class="row content" style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
+        <div class="col diff old">
+          {#key focusedLinesDiffIndex}
+            <DiffCol oldOrNew="old" {linesDiffs} {focusedLinesDiffIndex} />
+          {/key}
+        </div>
+        <div class="col separator">
+          <SeparatorCol
+            {linesDiffs}
+            {focusedLinesDiffIndex}
+            replaceOnClick={linesDiffReplaceOnClick}
+          />
+        </div>
+        <div class="col diff new">
+          {#key focusedLinesDiffIndex}
+            <DiffCol oldOrNew="new" {linesDiffs} {focusedLinesDiffIndex} />
+          {/key}
+        </div>
       </div>
-      <div class="col diff">
-        <DiffHeaderCol
-          oldOrNew="new"
-          filepath={newFilepath}
-          {isCompletelyEqual}
-          filepathFromDialogOnClick={async () => {
-            const filepath = await filepathFromDialog()
-            if (filepath === null) return
-            newFilepath = filepath
-            diff()
-          }}
-        />
-      </div>
-    </div>
-    <div class="row content" style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
-      <div class="col diff">
-        {#key focusedLinesDiffIndex}
-          <DiffCol oldOrNew="old" {linesDiffs} {focusedLinesDiffIndex} />
-        {/key}
-      </div>
-      <div class="col separator">
-        <SeparatorCol
-          {linesDiffs}
-          {focusedLinesDiffIndex}
-          replaceOnClick={linesDiffReplaceOnClick}
-        />
-      </div>
-      <div class="col diff">
-        {#key focusedLinesDiffIndex}
-          <DiffCol oldOrNew="new" {linesDiffs} {focusedLinesDiffIndex} />
-        {/key}
-      </div>
-    </div>
-    <div class="row footer">
-      <div class="col diff">
-        <DiffFooterCol charset={oldCharset} />
-      </div>
-      <div class="col separator">
-        <SeparatorFooterCol />
-      </div>
-      <div class="col diff">
-        <DiffFooterCol charset={newCharset} />
+      <div class="row footer">
+        <div class="col diff old">
+          <DiffFooterCol charset={oldCharset} />
+        </div>
+        <div class="col separator">
+          <SeparatorFooterCol />
+        </div>
+        <div class="col diff new">
+          <DiffFooterCol charset={newCharset} />
+        </div>
       </div>
     </div>
   {/if}
@@ -197,14 +199,31 @@
     /* min-height: 0; */
   }
 
+  .rows {
+    height: 85vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .row.header,
+  .row.footer {
+    flex-grow: 0;
+  }
+
   .row.header {
     height: 2.7rem;
   }
+  .row.header .col {
+    overflow-x: auto;
+  }
 
   .row.content {
-    height: 75vh;
-    overflow-x: hidden;
-    overflow-y: scroll;
+    height: 100%;
+    overflow-y: auto;
+  }
+  .row.content .col {
+    height: fit-content;
+    overflow-y: hidden;
   }
 
   .row.footer {
