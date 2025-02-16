@@ -11,15 +11,14 @@
   } = $props()
 </script>
 
-<div class={`lines-diffs ${oldOrNew}`} contenteditable>
+<div class={`lines-diffs ${oldOrNew}`} contenteditable={oldOrNew === 'new'}>
   {#each linesDiffs as linesDiff}
     <div
       class={`lines-diff ${linesDiff.diffKind}`}
       style={`height: calc(var(--line-height) * ${linesDiff.linesCount})`}
-      contenteditable
     >
       {#each diffLines(linesDiff, oldOrNew) as line}
-        <div class="diff-line" contenteditable>{line}</div>
+        <div class="diff-line">{line}</div>
       {/each}
     </div>
   {/each}
