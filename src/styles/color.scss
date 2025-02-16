@@ -2,68 +2,77 @@
     background-color: #ffffff;
     color: #222222;
 
-    .lines-diffs {
-        background-color: #f8f9fa;
-        color: #222222;
+    .layer.effect {
 
-        &.old {
-            .delete {
-                background-color: #ffdada;
-                color: #b71c1c;
-            }
+        .lines-diffs {
+            background-color: #f8f9fa;
+            color: #222222;
 
-            .insert {
-                background-color: #e0f8d4;
-                color: #2e7d32;
-            }
+            &.old {
 
-            .replace {
-                background-color: #ffe4b3;
-                color: #8a6d3b;
-            }
+                .lines-diff {
+                    &.delete {
+                        background-color: #ffdada;
+                        color: #b71c1c;
+                    }
 
-            .replace-diff-chars {
-                .delete {
-                    background-color: #ffe1b3;
+                    &.insert {
+                        background-color: #e0f8d4;
+                        color: #2e7d32;
+                    }
+
+                    &.replace {
+                        background-color: #ffe4b3;
+                        color: #8a6d3b;
+                    }
+
+                    .replace-diff-chars {
+                        .delete {
+                            background-color: #ffe1b3;
+                        }
+
+                        .insert {
+                            background-color: #f2ffb3;
+                        }
+
+                        .replace {
+                            background-color: #fff7b3;
+                        }
+                    }
                 }
-
-                .insert {
-                    background-color: #f2ffb3;
-                }
-
-                .replace {
-                    background-color: #fff7b3;
-                }
-            }
-        }
-
-        &.new {
-            .insert {
-                background-color: #c8f7b8;
-                color: #1b5e20;
             }
 
-            .delete {
-                background-color: #ffcccc;
-                color: #9a0007;
-            }
+            &.new {
 
-            .replace {
-                background-color: #ffdb99;
-                color: #795548;
-            }
+                .lines-diff {
+                    &.insert {
+                        background-color: #c8f7b8;
+                        color: #1b5e20;
+                    }
 
-            .replace-diff-chars {
-                .delete {
-                    background-color: #ffcc99;
-                }
+                    &.delete {
+                        background-color: #ffcccc;
+                        color: #9a0007;
+                    }
 
-                .insert {
-                    background-color: #f7ff99;
-                }
+                    &.replace {
+                        background-color: #ffdb99;
+                        color: #795548;
+                    }
 
-                .replace {
-                    background-color: #fff399;
+                    .replace-diff-chars {
+                        .delete {
+                            background-color: #ffcc99;
+                        }
+
+                        .insert {
+                            background-color: #f7ff99;
+                        }
+
+                        .replace {
+                            background-color: #fff399;
+                        }
+                    }
                 }
             }
         }
@@ -74,68 +83,77 @@
     background-color: #1e1e1e;
     color: #e0e0e0;
 
-    .lines-diffs {
-        background-color: #2c2c2c;
-        color: #e0e0e0;
+    .layer.effect {
 
-        &.old {
-            .insert {
-                background-color: #1e402e;
-                color: #8bf7a3;
-            }
+        .lines-diffs {
+            background-color: #2c2c2c;
+            color: #e0e0e0;
 
-            .delete {
-                background-color: #521818;
-                color: #ff7f7f;
-            }
+            &.old {
 
-            .replace {
-                background-color: #554024;
-                color: #ffcc80;
-            }
+                .lines-diff {
+                    &.insert {
+                        background-color: #1e402e;
+                        color: #8bf7a3;
+                    }
 
-            .replace-diff-chars {
-                .delete {
-                    background-color: #553724
+                    &.delete {
+                        background-color: #521818;
+                        color: #ff7f7f;
+                    }
+
+                    &.replace {
+                        background-color: #554024;
+                        color: #ffcc80;
+                    }
+
+                    .replace-diff-chars {
+                        .delete {
+                            background-color: #553724
+                        }
+
+                        .insert {
+                            background-color: #4b5524;
+                        }
+
+                        .replace {
+                            background-color: #554b24;
+                        }
+                    }
                 }
-
-                .insert {
-                    background-color: #4b5524;
-                }
-
-                .replace {
-                    background-color: #554b24;
-                }
-            }
-        }
-
-        &.new {
-            .insert {
-                background-color: #245837;
-                color: #a3ffb5;
             }
 
-            .delete {
-                background-color: #4a0f0f;
-                color: #ff6f6f;
-            }
+            &.new {
 
-            .replace {
-                background-color: #3b2c1a;
-                color: #ffdd94;
-            }
+                .lines-diff {
+                    &.insert {
+                        background-color: #245837;
+                        color: #a3ffb5;
+                    }
 
-            .replace-diff-chars {
-                .delete {
-                    background-color: #3b251a;
-                }
+                    &.delete {
+                        background-color: #4a0f0f;
+                        color: #ff6f6f;
+                    }
 
-                .insert {
-                    background-color: #303b1a;
-                }
+                    &.replace {
+                        background-color: #3b2c1a;
+                        color: #ffdd94;
+                    }
 
-                .replace {
-                    background-color: #3b371a;
+                    .replace-diff-chars {
+                        .delete {
+                            background-color: #3b251a;
+                        }
+
+                        .insert {
+                            background-color: #303b1a;
+                        }
+
+                        .replace {
+                            background-color: #3b371a;
+                        }
+                    }
                 }
             }
         }
@@ -146,68 +164,77 @@
     background-color: #121212;
     color: #d0d0d0;
 
-    .lines-diffs {
-        background-color: #1a1a1a;
-        color: #d0d0d0;
+    .layer.effect {
 
-        &.old {
-            .insert {
-                background-color: #163b2a;
-                color: #7cd3a0;
-            }
+        .lines-diffs {
+            background-color: #1a1a1a;
+            color: #d0d0d0;
 
-            .delete {
-                background-color: #3b1b1b;
-                color: #f18b7a;
-            }
+            &.old {
 
-            .replace {
-                background-color: #453b28;
-                color: #f3d589;
-            }
+                .lines-diff {
+                    &.insert {
+                        background-color: #163b2a;
+                        color: #7cd3a0;
+                    }
 
-            .replace-diff-chars {
-                .delete {
-                    background-color: #453328;
+                    &.delete {
+                        background-color: #3b1b1b;
+                        color: #f18b7a;
+                    }
+
+                    &.replace {
+                        background-color: #453b28;
+                        color: #f3d589;
+                    }
+
+                    .replace-diff-chars {
+                        .delete {
+                            background-color: #453328;
+                        }
+
+                        .insert {
+                            background-color: #424528;
+                        }
+
+                        .replace {
+                            background-color: #454028;
+                        }
+                    }
                 }
-
-                .insert {
-                    background-color: #424528;
-                }
-
-                .replace {
-                    background-color: #454028;
-                }
-            }
-        }
-
-        &.new {
-            .insert {
-                background-color: #1a4d38;
-                color: #8dd7a3;
             }
 
-            .delete {
-                background-color: #4a2424;
-                color: #f28b82;
-            }
+            &.new {
 
-            .replace {
-                background-color: #3b3222;
-                color: #fdd888;
-            }
+                .lines-diff {
+                    &.insert {
+                        background-color: #1a4d38;
+                        color: #8dd7a3;
+                    }
 
-            .replace-diff-chars {
-                .delete {
-                    background-color: #3b2c22;
-                }
+                    &.delete {
+                        background-color: #4a2424;
+                        color: #f28b82;
+                    }
 
-                .insert {
-                    background-color: #363b22;
-                }
+                    &.replace {
+                        background-color: #3b3222;
+                        color: #fdd888;
+                    }
 
-                .replace {
-                    background-color: #3b3a22;
+                    .replace-diff-chars {
+                        .delete {
+                            background-color: #3b2c22;
+                        }
+
+                        .insert {
+                            background-color: #363b22;
+                        }
+
+                        .replace {
+                            background-color: #3b3a22;
+                        }
+                    }
                 }
             }
         }
@@ -218,70 +245,85 @@
     background-color: #272822;
     color: #f8f8f2;
 
-    .lines-diffs {
-        background-color: #3b3b32;
-        color: #f8f8f2;
+    .layer.effect {
 
-        &.old {
-            .insert {
-                background-color: #133b2d;
-                color: #90e020;
-            }
+        .lines-diffs {
+            background-color: #3b3b32;
+            color: #f8f8f2;
 
-            .delete {
-                background-color: #3b1616;
-                color: #d96c85;
-            }
+            &.old {
 
-            .replace {
-                background-color: #3b2a1a;
-                color: #fd972e;
-            }
+                .lines-diff {
+                    &.insert {
+                        background-color: #133b2d;
+                        color: #90e020;
+                    }
 
-            .replace-diff-chars {
-                .delete {
-                    background-color: #3b231a;
+                    &.delete {
+                        background-color: #3b1616;
+                        color: #d96c85;
+                    }
+
+                    &.replace {
+                        background-color: #3b2a1a;
+                        color: #fd972e;
+                    }
+
+                    .replace-diff-chars {
+                        .delete {
+                            background-color: #3b231a;
+                        }
+
+                        .insert {
+                            background-color: #353b1a;
+                        }
+
+                        .replace {
+                            background-color: #3b351a;
+                        }
+                    }
                 }
+            }
 
-                .insert {
-                    background-color: #353b1a;
-                }
+            &.new {
 
-                .replace {
-                    background-color: #3b351a;
+                .lines-diff {
+                    &.insert {
+                        background-color: #1a503d;
+                        color: #a6e22e;
+                    }
+
+                    &.delete {
+                        background-color: #4d1a1a;
+                        color: #f92672;
+                    }
+
+                    &.replace {
+                        background-color: #4a311e;
+                        color: #fd971f;
+                    }
+
+                    .replace-diff-chars {
+                        .delete {
+                            background-color: #4a261e;
+                        }
+
+                        .insert {
+                            background-color: #484a1e;
+                        }
+
+                        .replace {
+                            background-color: #4a3f1e;
+                        }
+                    }
                 }
             }
         }
+    }
+}
 
-        &.new {
-            .insert {
-                background-color: #1a503d;
-                color: #a6e22e;
-            }
-
-            .delete {
-                background-color: #4d1a1a;
-                color: #f92672;
-            }
-
-            .replace {
-                background-color: #4a311e;
-                color: #fd971f;
-            }
-
-            .replace-diff-chars {
-                .delete {
-                    background-color: #4a261e;
-                }
-
-                .insert {
-                    background-color: #484a1e;
-                }
-
-                .replace {
-                    background-color: #4a3f1e;
-                }
-            }
-        }
+.lines-diff {
+    &.focused {
+        box-shadow: inset 12px 0 0 salmon;
     }
 }

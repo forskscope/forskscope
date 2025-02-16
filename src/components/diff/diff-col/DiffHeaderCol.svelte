@@ -1,7 +1,5 @@
 <script lang="ts">
-  import type { LinesDiff, OldOrNew, ReplaceDetailLinesDiff, ReplaceDiffChars } from '../../types'
-
-  const DIFF_LINE_HEIGHT: string = '1.34em'
+  import type { OldOrNew } from '../../../types'
 
   const {
     oldOrNew,
