@@ -3,7 +3,7 @@ use tauri::Manager;
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod core;
 
-use core::handlers::diff_filepaths;
+use core::handlers::{diff_filepaths, list_dir, open_with_file_manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,7 +20,11 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![diff_filepaths])
+        .invoke_handler(tauri::generate_handler![
+            diff_filepaths,
+            list_dir,
+            open_with_file_manager
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

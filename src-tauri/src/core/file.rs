@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::Read;
+use std::process::Command;
 
 use chardetng::EncodingDetector;
 
@@ -9,7 +10,7 @@ const UTF8_CHARSET: &str = "UTF-8";
 const NOT_TEXTFILE_CHARSET: &str = "(bytes array)";
 
 pub fn filepath_content(filepath: &str) -> ReadContent {
-    let mut file = File::open(filepath).unwrap();
+    let mut file = File::open(filepath).expect(format!("failed to open {}", filepath).as_str());
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
 
@@ -49,5 +50,34 @@ pub fn filepath_content(filepath: &str) -> ReadContent {
     ReadContent {
         charset: encoding.name().to_owned(),
         content: decoded.to_string(),
+    }
+}
+
+pub fn file_manager_command() -> &'static str {
+    #[cfg(target_os = "windows")]
+    {
+        "explorer"
+    }
+    #[cfg(target_os = "macos")]
+    {
+        "open"
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if Command::new("nautilus").arg("--version").output().is_ok() {
+            "nautilus"
+        } else if Command::new("dolphin").arg("--version").output().is_ok() {
+            "dolphin"
+        } else if Command::new("nemo").arg("--version").output().is_ok() {
+            "nemo"
+        } else if Command::new("thunar").arg("--version").output().is_ok() {
+            "thunar"
+        } else {
+            "xdg-open"
+        }
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        compile_error!("Unsupported operating system")
     }
 }

@@ -35,12 +35,13 @@ pub struct ReplaceDiffChars {
     pub chars: String,
 }
 
-// #[derive(Serialize)]
-// pub struct ListDirReponse {
-//     pub current_dir: String,
-//     pub dirs: Vec<String>,
-//     pub files: Vec<String>,
-// }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListDirReponse {
+    pub current_dir: String,
+    pub dirs: Vec<String>,
+    pub files: Vec<String>,
+}
 
 pub struct ReadContent {
     pub charset: String,
