@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
-  import type { DiffResponse, LinesDiff } from '../../types'
+  import type { DiffFilepaths, DiffResponse, LinesDiff, OldOrNew } from '../../types'
   import { DIFF_LINE_HEIGHT } from './consts'
   import DiffCol from './diff-col/DiffCol.svelte'
   import DiffHeaderCol from './diff-col/DiffHeaderCol.svelte'
@@ -8,11 +8,13 @@
   import SeparatorCol from './separator-col/SeparatorCol.svelte'
   import SeparatorHeaderCol from './separator-col/SeparatorHeaderCol.svelte'
   import SeparatorFooterCol from './separator-col/SeparatorFooterCol.svelte'
-  import FileHandle from './file-handle/FileHandle.svelte'
-  import { filepathFromDialog } from './file-handle/scripts'
+  import { filepathFromDialog } from '../../scripts'
+  import { onMount } from 'svelte'
 
-  let oldFilepath: string = $state('')
-  let newFilepath: string = $state('')
+  const { diffFilepaths }: { diffFilepaths: DiffFilepaths } = $props()
+
+  let oldFilepath: string = $state(diffFilepaths.old)
+  let newFilepath: string = $state(diffFilepaths.new)
 
   let oldCharset: string = $state('')
   let newCharset: string = $state('')
@@ -21,6 +23,10 @@
   let focusedLinesDiffIndex: number | null = $state(null)
 
   let showsFileHandler: boolean = $state(true)
+
+  onMount(async () => {
+    await diff()
+  })
 
   // todo: not equal diffs in linesDiffs can changed to be 'equal'
   // const linesDiffsDiffOnly: number[] = $derived(
@@ -58,6 +64,7 @@
         newCharset = diffResponse.newCharset
 
         showsFileHandler = false
+        focusedLinesDiffIndex = null
       })
       .catch((error: unknown) => {
         console.error(error)
@@ -65,19 +72,15 @@
       })
   }
 
-  const filepathsOnChange = (oldValue: string, newValue: string) => {
-    oldFilepath = oldValue
-    newFilepath = newValue
+  const changeFilepath = async (oldOrNew: OldOrNew) => {
+    const filepath = await filepathFromDialog()
+    if (filepath === null) return
+    if (oldOrNew === 'old') {
+      oldFilepath = filepath
+    } else {
+      newFilepath = filepath
+    }
     diff()
-  }
-
-  const resetOnClick = () => {
-    oldFilepath = ''
-    newFilepath = ''
-    showsFileHandler = true
-    linesDiffs = []
-    oldCharset = ''
-    newCharset = ''
   }
 
   const onKeyDown = (
@@ -109,80 +112,59 @@
 
 <div class="keyboard-listener" onkeydown={onKeyDown} role="button" tabindex="0">
   <h2>Diff</h2>
-  {#if showsFileHandler}
-    {#key [oldFilepath, newFilepath]}
-      <FileHandle {oldFilepath} {newFilepath} {filepathsOnChange} />
-    {/key}
-  {/if}
-  <label
-    ><input
-      type="checkbox"
-      bind:checked={showsFileHandler}
-      disabled={linesDiffs.length === 0}
-    />L</label
-  >
-  <button onclick={resetOnClick}>Reset</button>
 
   {#if 0 < linesDiffs.length}
-    <div class="row header">
-      <div class="col diff">
-        <DiffHeaderCol
-          oldOrNew="old"
-          filepath={oldFilepath}
-          {isCompletelyEqual}
-          filepathFromDialogOnClick={async () => {
-            const filepath = await filepathFromDialog()
-            if (filepath === null) return
-            oldFilepath = filepath
-            diff()
-          }}
-        />
+    <div class="rows">
+      <div class="row header">
+        <div class="col diff old">
+          <DiffHeaderCol
+            oldOrNew="old"
+            filepath={oldFilepath}
+            {isCompletelyEqual}
+            filepathFromDialogOnClick={async () => changeFilepath('old')}
+          />
+        </div>
+        <div class="col separator">
+          <SeparatorHeaderCol />
+        </div>
+        <div class="col diff new">
+          <DiffHeaderCol
+            oldOrNew="new"
+            filepath={newFilepath}
+            {isCompletelyEqual}
+            filepathFromDialogOnClick={async () => changeFilepath('new')}
+          />
+        </div>
       </div>
-      <div class="col separator">
-        <SeparatorHeaderCol />
+      <div class="row content" style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
+        <div class="col diff old">
+          {#key focusedLinesDiffIndex}
+            <DiffCol oldOrNew="old" {linesDiffs} {focusedLinesDiffIndex} />
+          {/key}
+        </div>
+        <div class="col separator">
+          <SeparatorCol
+            {linesDiffs}
+            {focusedLinesDiffIndex}
+            replaceOnClick={linesDiffReplaceOnClick}
+          />
+        </div>
+        <div class="col diff new">
+          {#key focusedLinesDiffIndex}
+            <DiffCol oldOrNew="new" {linesDiffs} {focusedLinesDiffIndex} />
+          {/key}
+        </div>
       </div>
-      <div class="col diff">
-        <DiffHeaderCol
-          oldOrNew="new"
-          filepath={newFilepath}
-          {isCompletelyEqual}
-          filepathFromDialogOnClick={async () => {
-            const filepath = await filepathFromDialog()
-            if (filepath === null) return
-            newFilepath = filepath
-            diff()
-          }}
-        />
-      </div>
-    </div>
-    <div class="row content" style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
-      <div class="col diff">
-        {#key focusedLinesDiffIndex}
-          <DiffCol oldOrNew="old" {linesDiffs} {focusedLinesDiffIndex} />
-        {/key}
-      </div>
-      <div class="col separator">
-        <SeparatorCol
-          {linesDiffs}
-          {focusedLinesDiffIndex}
-          replaceOnClick={linesDiffReplaceOnClick}
-        />
-      </div>
-      <div class="col diff">
-        {#key focusedLinesDiffIndex}
-          <DiffCol oldOrNew="new" {linesDiffs} {focusedLinesDiffIndex} />
-        {/key}
-      </div>
-    </div>
-    <div class="row footer">
-      <div class="col diff">
-        <DiffFooterCol charset={oldCharset} />
-      </div>
-      <div class="col separator">
-        <SeparatorFooterCol />
-      </div>
-      <div class="col diff">
-        <DiffFooterCol charset={newCharset} />
+      <div class="row footer">
+        <div class="col diff old">
+          <DiffFooterCol charset={oldCharset} />
+        </div>
+        <div class="col separator">
+          <SeparatorFooterCol />
+        </div>
+        <div class="col diff new">
+          <DiffFooterCol charset={newCharset} />
+        </div>
       </div>
     </div>
   {/if}
@@ -196,14 +178,32 @@
     /* min-height: 0; */
   }
 
+  .rows {
+    height: 85vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .row.header,
+  .row.footer {
+    flex-grow: 0;
+  }
+
   .row.header {
     height: 2.7rem;
   }
+  .row.header .col {
+    overflow-x: auto;
+  }
 
   .row.content {
-    height: 75vh;
-    overflow-x: hidden;
-    overflow-y: scroll;
+    height: 100%;
+    overflow-y: auto;
+  }
+  .row.content .col {
+    height: fit-content;
+    min-height: 100%;
+    overflow-y: hidden;
   }
 
   .row.footer {

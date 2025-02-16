@@ -1,8 +1,11 @@
 // use tauri::Manager;
 
+use std::path::Path;
+use std::process::Command;
+
 use super::diff::lines_diffs;
-use super::file::filepath_content;
-use super::types::DiffResponse;
+use super::file::{file_manager_command, filepath_content};
+use super::types::{DiffResponse, ListDirReponse};
 
 // #[tauri::command]
 // pub fn startup_args(app_handle: tauri::AppHandle) -> Vec<String> {
@@ -49,47 +52,62 @@ pub fn diff_filepaths(old: &str, new: &str) -> DiffResponse {
 //         .unwrap_or_else(|x| x.to_string_lossy().into_owned())
 // }
 
-// #[tauri::command]
-// pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
-//     let current_dir = if current_dir.is_empty() {
-//         std::env::current_dir()
-//             .expect("Failed to get current directory")
-//             .into_os_string()
-//             .into_string()
-//             .expect("Failed to get os specific path")
-//     } else {
-//         current_dir.to_owned()
-//     };
-//     let mut dirs = Vec::<String>::new();
-//     let mut files = Vec::<String>::new();
+#[tauri::command]
+pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
+    let target_dir = if current_dir.is_empty() {
+        std::env::current_dir().expect("Failed to get current directory")
+    } else {
+        Path::new(current_dir)
+            .canonicalize()
+            .expect(format!("Failed to canonicalize path: {}", current_dir).as_str())
+    };
+    let mut dirs = Vec::<String>::new();
+    let mut files = Vec::<String>::new();
 
-//     let read = std::fs::read_dir(current_dir.as_str());
-//     // todo: return error to frontend
-//     if let Err(_) = read {
-//         return Err(format!("Invalid path: {}", current_dir.as_str()));
-//     }
-//     for x in read.unwrap() {
-//         match x {
-//             Ok(dir_entry) => {
-//                 let name = dir_entry.file_name().to_string_lossy().to_string();
-//                 match dir_entry.file_type() {
-//                     Ok(file_type) => {
-//                         if file_type.is_dir() {
-//                             dirs.push(name)
-//                         } else {
-//                             files.push(name)
-//                         }
-//                     }
-//                     _ => {}
-//                 }
-//             }
-//             // todo
-//             Err(err) => println!("Failed to get dir/file info due to {}", err),
-//         }
-//     }
-//     Ok(ListDirReponse {
-//         current_dir: current_dir,
-//         dirs: dirs,
-//         files: files,
-//     })
-// }
+    let read = match std::fs::read_dir(target_dir.as_path()) {
+        Ok(x) => x,
+        Err(err) => {
+            return Err(format!("Invalid path: {} ({})", current_dir, err));
+        }
+    };
+    for x in read {
+        match x {
+            Ok(dir_entry) => {
+                let name = dir_entry.file_name().to_string_lossy().to_string();
+                match dir_entry.file_type() {
+                    Ok(file_type) => {
+                        if file_type.is_dir() {
+                            dirs.push(name)
+                        } else {
+                            files.push(name)
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            // todo
+            Err(err) => println!("Failed to get dir/file info due to {}", err),
+        }
+    }
+    Ok(ListDirReponse {
+        current_dir: target_dir.to_str().unwrap().to_owned(),
+        dirs: dirs,
+        files: files,
+    })
+}
+
+#[tauri::command]
+pub fn open_with_file_manager(dirpath: &str) -> Result<(), String> {
+    let dirpath = Path::new(dirpath)
+        .canonicalize()
+        .expect(format!("Failed to get path {}", dirpath).as_str());
+
+    let command = file_manager_command();
+
+    Command::new(command)
+        .arg(dirpath)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}

@@ -14,14 +14,12 @@
   } = $props()
 </script>
 
-<div>
-  <button onclick={filepathFromDialogOnClick}>
-    <h3>{oldOrNew.toUpperCase()}</h3>
-    <div>
-      {filepath}
-    </div>
-  </button>
-</div>
+<button onclick={filepathFromDialogOnClick}>
+  <h3>{oldOrNew.toUpperCase()}</h3>
+  <div>
+    {filepath}
+  </div>
+</button>
 
 {#if isCompletelyEqual}
   <!-- todo: The same files -->

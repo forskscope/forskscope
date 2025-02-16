@@ -25,3 +25,17 @@ export interface ReplaceDiffChars {
 export type OldOrNew = "old" | "new"
 
 export type DiffKind = "equal" | "delete" | "insert" | "replace"
+
+export const APP_THEMES = ['light-theme', 'dark-theme', 'night-theme', 'monokai-theme']
+export type AppTheme = typeof APP_THEMES[number]
+
+export interface DiffFilepaths {
+    old: string,
+    new: string,
+}
+
+export interface ListDirReponse {
+    currentDir: string,
+    dirs: string[],
+    files: string[],
+}
