@@ -1,16 +1,15 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
-  import FileHandle from './FileHandle.svelte'
   import type { DiffResponse, LinesDiff } from '../../types'
-  import DiffCol from './DiffCol.svelte'
-  import { filepathFromDialog } from './scripts'
-  import DiffColHeader from './DiffColHeader.svelte'
-  import { debounce } from '../../utils'
-  import DiffColFooter from './DiffColFooter.svelte'
-  import OpHeaderCol from './OpHeaderCol.svelte'
-  import OpCol from './OpCol.svelte'
   import { DIFF_LINE_HEIGHT } from './consts'
-  import OpFooterCol from './OpFooterCol.svelte'
+  import DiffCol from './diff-col/DiffCol.svelte'
+  import DiffHeaderCol from './diff-col/DiffHeaderCol.svelte'
+  import DiffFooterCol from './diff-col/DiffFooterCol.svelte'
+  import SeparatorCol from './separator-col/SeparatorCol.svelte'
+  import SeparatorHeaderCol from './separator-col/SeparatorHeaderCol.svelte'
+  import SeparatorFooterCol from './separator-col/SeparatorFooterCol.svelte'
+  import FileHandle from './file-handle/FileHandle.svelte'
+  import { filepathFromDialog } from './file-handle/scripts'
 
   let oldFilepath: string = $state('')
   let newFilepath: string = $state('')
@@ -127,7 +126,7 @@
   {#if 0 < linesDiffs.length}
     <div class="row header">
       <div class="col diff">
-        <DiffColHeader
+        <DiffHeaderCol
           oldOrNew="old"
           filepath={oldFilepath}
           {isCompletelyEqual}
@@ -139,11 +138,11 @@
           }}
         />
       </div>
-      <div class="col op">
-        <OpHeaderCol />
+      <div class="col separator">
+        <SeparatorHeaderCol />
       </div>
       <div class="col diff">
-        <DiffColHeader
+        <DiffHeaderCol
           oldOrNew="new"
           filepath={newFilepath}
           {isCompletelyEqual}
@@ -162,8 +161,12 @@
           <DiffCol oldOrNew="old" {linesDiffs} {focusedLinesDiffIndex} />
         {/key}
       </div>
-      <div class="col op">
-        <OpCol {linesDiffs} {focusedLinesDiffIndex} replaceOnClick={linesDiffReplaceOnClick} />
+      <div class="col separator">
+        <SeparatorCol
+          {linesDiffs}
+          {focusedLinesDiffIndex}
+          replaceOnClick={linesDiffReplaceOnClick}
+        />
       </div>
       <div class="col diff">
         {#key focusedLinesDiffIndex}
@@ -173,13 +176,13 @@
     </div>
     <div class="row footer">
       <div class="col diff">
-        <DiffColFooter oldOrNew="old" charset={oldCharset} />
+        <DiffFooterCol charset={oldCharset} />
       </div>
-      <div class="col op">
-        <OpFooterCol />
+      <div class="col separator">
+        <SeparatorFooterCol />
       </div>
       <div class="col diff">
-        <DiffColFooter oldOrNew="new" charset={newCharset} />
+        <DiffFooterCol charset={newCharset} />
       </div>
     </div>
   {/if}
@@ -207,17 +210,7 @@
     height: 1.5rem;
   }
 
-  .col.diff,
-  .col.op {
-    /* adjust x scrollbar */
-    /* min-width: 0; */
-    display: flex;
-    flex-direction: column;
-    height: max-content;
-    overflow: hidden;
-  }
-
-  .col.op {
+  .col.separator {
     flex-grow: 0;
     flex-basis: 1.4rem;
     background-color: black;

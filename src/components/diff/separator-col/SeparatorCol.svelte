@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { LinesDiff } from '../../types'
-  import { LINES_DIFF_CLASS_PREFIX } from './consts'
+  import type { LinesDiff } from '../../../types'
+  import { LINES_DIFF_CLASS_PREFIX } from '../consts'
 
   const {
     linesDiffs,
