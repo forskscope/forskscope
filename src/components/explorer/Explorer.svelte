@@ -155,7 +155,9 @@
   {/each}
 </div>
 
-<button class="diff" onclick={diffOnClick} disabled={!diffOnClickEnabled}>diff</button>
+{#if diffOnClickEnabled}
+  <button class="diff" onclick={diffOnClick}>diff</button>
+{/if}
 
 <style>
   .explorer-panes,
@@ -253,13 +255,5 @@
   button.diff {
     width: 90%;
     margin-left: 5%;
-  }
-
-  button.diff:disabled,
-  button.diff:disabled:hover,
-  button.diff:disabled:active,
-  button.diff:disabled:focus {
-    background: none;
-    opacity: 0.27;
   }
 </style>

@@ -152,7 +152,9 @@
 <div class="keyboard-listener" onkeydown={onKeyDown} role="button" tabindex="0">
   <div class="d-flex" style="gap: 1.1rem;">
     <h2>Diff</h2>
-    <label>Chars diff<input type="checkbox" bind:checked={showsCharsDiffs} /></label>
+    {#if 0 < charsDiffs.length}
+      <label>Chars diff<input type="checkbox" bind:checked={showsCharsDiffs} /></label>
+    {/if}
   </div>
 
   {#if !loaded}<p>(...... Loading ......)</p>{/if}
