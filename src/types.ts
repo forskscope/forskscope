@@ -5,19 +5,24 @@ export interface DiffResponse {
 }
 
 export interface LinesDiff {
+    diffIndex: number
     diffKind: DiffKind
     linesCount: number
     oldLines: string[]
     newLines: string[]
-    replaceDetail: ReplaceDetailLinesDiff | null
 }
 
-export interface ReplaceDetailLinesDiff {
-    oldLines: ReplaceDiffChars[][]
-    newLines: ReplaceDiffChars[][]
+export interface CharsDiffResponse {
+    diffs: CharsDiffLines[],
 }
 
-export interface ReplaceDiffChars {
+export interface CharsDiffLines {
+    diffIndex: number,
+    oldLines: CharsDiff[][]
+    newLines: CharsDiff[][]
+}
+
+export interface CharsDiff {
     diffKind: DiffKind
     chars: string
 }

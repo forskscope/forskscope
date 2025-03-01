@@ -3,9 +3,9 @@
 use std::path::Path;
 use std::process::Command;
 
-use super::diff::lines_diffs;
+use super::diff::{chars_diffs, lines_diffs};
 use super::file::{file_manager_command, filepath_content};
-use super::types::{DiffResponse, ListDirReponse};
+use super::types::{CharsDiffResponse, DiffResponse, LinesDiff, ListDirReponse};
 
 // #[tauri::command]
 // pub fn startup_args(app_handle: tauri::AppHandle) -> Vec<String> {
@@ -33,6 +33,12 @@ pub async fn diff_filepaths(old: &str, new: &str) -> Result<DiffResponse, ()> {
         new_charset: new_read.charset.to_owned(),
         lines_diffs,
     })
+}
+
+#[tauri::command(async)]
+pub async fn diff_chars(lines_diffs: Vec<LinesDiff>) -> Result<CharsDiffResponse, ()> {
+    let diffs = chars_diffs(&lines_diffs);
+    Ok(CharsDiffResponse { diffs })
 }
 
 // #[tauri::command]
