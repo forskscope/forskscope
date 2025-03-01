@@ -34,8 +34,6 @@
   let showsCharsDiffs: boolean = $state(false)
   let focusedLinesDiffIndex: number | null = $state(null)
 
-  let showsFileHandler: boolean = $state(true)
-
   let loaded: boolean = $state(false)
 
   onMount(async () => {
@@ -89,7 +87,6 @@
     oldCharset = diffResponse.oldCharset
     newCharset = diffResponse.newCharset
 
-    showsFileHandler = false
     focusedLinesDiffIndex = null
   }
 
