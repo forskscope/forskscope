@@ -48,7 +48,8 @@
   //     .map((x, i) => (x.diffKind !== 'equal' ? i : undefined))
   //     .filter((x) => x !== undefined)
   // )
-  const prevLinesDiffIndex: number = $derived.by(() => {
+  const prevLinesDiffIndex: number | null = $derived.by(() => {
+    if (isCompletelyEqual) return null
     if (focusedLinesDiffIndex === null) return 0
     if (focusedLinesDiffIndex === 0) return focusedLinesDiffIndex
     const foundIndex = linesDiffs.findLastIndex(
@@ -56,7 +57,8 @@
     )
     return 0 <= foundIndex ? foundIndex : focusedLinesDiffIndex
   })
-  const nextLinesDiffIndex: number = $derived.by(() => {
+  const nextLinesDiffIndex: number | null = $derived.by(() => {
+    if (isCompletelyEqual) return null
     if (focusedLinesDiffIndex === null) return 0
     if (focusedLinesDiffIndex === linesDiffs.length - 1) return focusedLinesDiffIndex
     const foundIndex = linesDiffs.findIndex(
