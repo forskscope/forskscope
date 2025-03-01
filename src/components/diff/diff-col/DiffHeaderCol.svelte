@@ -12,12 +12,17 @@
     isCompletelyEqual: boolean
     filepathFromDialogOnClick: () => void
   } = $props()
+
+  const lastSlashIndex: number = $derived(filepath.lastIndexOf('/'))
+  const parentDirsPath: string = $derived(filepath.substring(0, lastSlashIndex + 1))
+  const filename: string = $derived(filepath.substring(lastSlashIndex + 1))
 </script>
 
 <button onclick={filepathFromDialogOnClick}>
   <h3>{oldOrNew.toUpperCase()}</h3>
-  <div>
-    {filepath}
+  <div class="filepath">
+    <div class="parent-dirs">{parentDirsPath}</div>
+    <div class="filename">{filename}</div>
   </div>
 </button>
 
@@ -42,13 +47,24 @@
     font-weight: normal;
   }
 
-  button div {
+  .filepath {
+    display: flex;
+    overflow: hidden;
+    align-items: center;
+  }
+
+  /* Allows shrinking */
+  .parent-dirs {
+    flex: 1;
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    direction: rtl;
-    text-align: right;
-    font-size: 1.05rem;
-    font-weight: bold;
+  }
+
+  /* Prevent from truncated */
+  .filename {
+    flex-shrink: 0;
+    margin-left: 0.02rem;
   }
 </style>
