@@ -2567,7 +2567,7 @@ dependencies = [
 
 [[package]]
 name = "patch-hygge"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "chardetng",
  "encoding_rs",
