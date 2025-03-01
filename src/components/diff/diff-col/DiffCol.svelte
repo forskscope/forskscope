@@ -1,20 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type {
-    LinesDiff,
-    OldOrNew,
-    ReplaceDetailLinesDiff,
-    ReplaceDiffChars,
-  } from '../../../types'
+  import type { DiffKind, LinesDiff, OldOrNew, CharsDiff, CharsDiffLines } from '../../../types'
   import { LINES_DIFF_CLASS_PREFIX } from '../consts'
 
   const {
     oldOrNew,
     linesDiffs,
+    charsDiffs,
+    showsCharsDiffs,
     focusedLinesDiffIndex,
   }: {
     oldOrNew: OldOrNew
     linesDiffs: LinesDiff[]
+    charsDiffs: CharsDiffLines[]
+    showsCharsDiffs: boolean
     focusedLinesDiffIndex: number | null
   } = $props()
 
@@ -29,11 +28,14 @@
     return oldOrNew === 'old' ? linesDiff.oldLines : linesDiff.newLines
   }
 
-  const replaceDetailLines = (
-    linesDiff: ReplaceDetailLinesDiff,
-    oldOrNew: OldOrNew
-  ): ReplaceDiffChars[][] => {
-    return oldOrNew === 'old' ? linesDiff.oldLines : linesDiff.newLines
+  const hasReplaceCharsDiff = (diffKind: DiffKind, diffIndex: number): boolean => {
+    if (diffKind !== 'replace') return false
+    return charsDiffs.some((x) => x.diffIndex === diffIndex)
+  }
+
+  const charsDiff = (diffIndex: number, oldOrNew: OldOrNew): CharsDiff[][] => {
+    const charsDiff = charsDiffs.find((x) => x.diffIndex === diffIndex)!
+    return oldOrNew === 'old' ? charsDiff.oldLines : charsDiff.newLines
   }
 </script>
 
@@ -44,9 +46,9 @@
         class={`lines-diff ${linesDiff.diffKind} ${LINES_DIFF_CLASS_PREFIX}${i} ${focusedLinesDiffIndex === i ? 'focused' : ''}`}
         style={`height: calc(var(--line-height) * ${linesDiff.linesCount})`}
       >
-        {#if linesDiff.diffKind === 'replace'}
-          <div class="replace-diff-chars">
-            {#each replaceDetailLines(linesDiff.replaceDetail!, oldOrNew) as line}
+        {#if showsCharsDiffs && hasReplaceCharsDiff(linesDiff.diffKind, linesDiff.diffIndex)}
+          <div class="chars-diff">
+            {#each charsDiff(linesDiff.diffIndex, oldOrNew) as line}
               <div class="diff-line">
                 {#each line as chars}
                   <span class={chars.diffKind} style={`width: ${chars.chars.length}em;`}

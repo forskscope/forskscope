@@ -40,3 +40,25 @@ pub fn split_lines_with_endings(input: &str) -> Vec<String> {
 
     lines
 }
+
+pub fn multibyte_str_byte_indices(
+    text: &str,
+    index_start: usize,
+    index_end: usize,
+) -> Option<(usize, usize)> {
+    let char_indices = text.char_indices().collect::<Vec<_>>();
+
+    // Ensure the start and end indices are within bounds
+    if index_start >= char_indices.len()
+        || index_end > char_indices.len()
+        || index_start >= index_end
+    {
+        return None;
+    }
+
+    // Get the byte indices corresponding to the char indices
+    let byte_start = char_indices[index_start].0;
+    let byte_end = char_indices[index_end - 1].0 + char_indices[index_end - 1].1.len_utf8();
+
+    Some((byte_start, byte_end))
+}

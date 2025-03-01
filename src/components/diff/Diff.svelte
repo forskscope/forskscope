@@ -1,6 +1,13 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
-  import type { DiffFilepaths, DiffResponse, LinesDiff, OldOrNew } from '../../types'
+  import type {
+    DiffFilepaths,
+    DiffResponse,
+    LinesDiff,
+    OldOrNew,
+    CharsDiffLines,
+    CharsDiffResponse,
+  } from '../../types'
   import { DIFF_LINE_HEIGHT } from './consts'
   import DiffCol from './diff-col/DiffCol.svelte'
   import DiffHeaderCol from './diff-col/DiffHeaderCol.svelte'
@@ -11,7 +18,10 @@
   import { filepathFromDialog } from '../../scripts'
   import { onMount } from 'svelte'
 
-  const { diffFilepaths }: { diffFilepaths: DiffFilepaths } = $props()
+  const {
+    diffFilepaths,
+    removeDiffTab,
+  }: { diffFilepaths: DiffFilepaths; removeDiffTab: () => void } = $props()
 
   let oldFilepath: string = $state(diffFilepaths.old)
   let newFilepath: string = $state(diffFilepaths.new)
@@ -20,6 +30,8 @@
   let newCharset: string = $state('')
 
   let linesDiffs: LinesDiff[] = $state([])
+  let charsDiffs: CharsDiffLines[] = $state([])
+  let showsCharsDiffs: boolean = $state(false)
   let focusedLinesDiffIndex: number | null = $state(null)
 
   let showsFileHandler: boolean = $state(true)
@@ -28,7 +40,6 @@
 
   onMount(async () => {
     await diff()
-    loaded = true
   })
 
   // todo: not equal diffs in linesDiffs can changed to be 'equal'
@@ -57,6 +68,12 @@
   const isCompletelyEqual = $derived(!linesDiffs.some((x) => x.diffKind !== 'equal'))
 
   const diff = async () => {
+    await diffLines()
+    loaded = true
+    await diffChars()
+  }
+
+  const diffLines = async () => {
     let res: unknown = await invoke('diff_filepaths', { old: oldFilepath, new: newFilepath }).catch(
       (error: unknown) => {
         console.error(error)
@@ -74,6 +91,22 @@
     focusedLinesDiffIndex = null
   }
 
+  const diffChars = async () => {
+    const replaceLinesDiffs = linesDiffs.filter((x) => x.diffKind === 'replace')
+    if (replaceLinesDiffs.length === 0) return
+
+    let res: unknown = await invoke('diff_chars', {
+      linesDiffs: replaceLinesDiffs,
+    }).catch((error: unknown) => {
+      console.error(error)
+      return
+    })
+    console.log(res) // todo
+
+    const charsDiffResponse = res as CharsDiffResponse
+    charsDiffs = charsDiffResponse.diffs
+  }
+
   const changeFilepath = async (oldOrNew: OldOrNew) => {
     const filepath = await filepathFromDialog()
     if (filepath === null) return
@@ -82,7 +115,15 @@
     } else {
       newFilepath = filepath
     }
-    diff()
+    await diff()
+  }
+
+  const linesDiffReplaceOnClick = (linesDiffIndex: number) => {
+    const x = linesDiffs[linesDiffIndex]
+    x.diffKind = 'equal'
+    x.newLines = x.oldLines
+    linesDiffs[linesDiffIndex] = x
+    if (focusedLinesDiffIndex === linesDiffIndex) focusedLinesDiffIndex = null
   }
 
   const onKeyDown = (
@@ -91,6 +132,11 @@
     }
   ) => {
     switch (e.key) {
+      case 'w': {
+        if (e.ctrlKey) {
+          removeDiffTab()
+        }
+      }
       case 'F7': {
         focusedLinesDiffIndex = prevLinesDiffIndex
         break
@@ -102,18 +148,13 @@
       default:
     }
   }
-
-  const linesDiffReplaceOnClick = (linesDiffIndex: number) => {
-    const x = linesDiffs[linesDiffIndex]
-    x.diffKind = 'equal'
-    x.newLines = x.oldLines
-    linesDiffs[linesDiffIndex] = x
-    if (focusedLinesDiffIndex === linesDiffIndex) focusedLinesDiffIndex = null
-  }
 </script>
 
 <div class="keyboard-listener" onkeydown={onKeyDown} role="button" tabindex="0">
-  <h2>Diff</h2>
+  <div class="d-flex" style="gap: 1.1rem;">
+    <h2>Diff</h2>
+    <label>Chars diff<input type="checkbox" bind:checked={showsCharsDiffs} /></label>
+  </div>
 
   {#if !loaded}<p>(...... Loading ......)</p>{/if}
 
@@ -143,7 +184,13 @@
       <div class="row content" style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
         <div class="col diff old">
           {#key focusedLinesDiffIndex}
-            <DiffCol oldOrNew="old" {linesDiffs} {focusedLinesDiffIndex} />
+            <DiffCol
+              oldOrNew="old"
+              {linesDiffs}
+              {charsDiffs}
+              {showsCharsDiffs}
+              {focusedLinesDiffIndex}
+            />
           {/key}
         </div>
         <div class="col separator">
@@ -155,7 +202,13 @@
         </div>
         <div class="col diff new">
           {#key focusedLinesDiffIndex}
-            <DiffCol oldOrNew="new" {linesDiffs} {focusedLinesDiffIndex} />
+            <DiffCol
+              oldOrNew="new"
+              {linesDiffs}
+              {charsDiffs}
+              {showsCharsDiffs}
+              {focusedLinesDiffIndex}
+            />
           {/key}
         </div>
       </div>

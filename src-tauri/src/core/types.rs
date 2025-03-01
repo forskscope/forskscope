@@ -1,7 +1,7 @@
 use similar::DiffTag;
 
 // use serde::{Deserialize, Serialize};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,26 +11,33 @@ pub struct DiffResponse {
     pub lines_diffs: Vec<LinesDiff>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LinesDiff {
+    pub diff_index: usize,
     pub diff_kind: DiffTag,
     pub lines_count: usize,
     pub old_lines: Vec<String>,
     pub new_lines: Vec<String>,
-    pub replace_detail: Option<ReplaceDetailLinesDiff>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CharsDiffResponse {
+    pub diffs: Vec<CharsDiffLines>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CharsDiffLines {
+    pub diff_index: usize,
+    pub old_lines: Vec<Vec<CharsDiff>>,
+    pub new_lines: Vec<Vec<CharsDiff>>,
 }
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ReplaceDetailLinesDiff {
-    pub old_lines: Vec<Vec<ReplaceDiffChars>>,
-    pub new_lines: Vec<Vec<ReplaceDiffChars>>,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct ReplaceDiffChars {
+pub struct CharsDiff {
     pub diff_kind: DiffTag,
     pub chars: String,
 }

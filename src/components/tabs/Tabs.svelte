@@ -28,6 +28,13 @@
     diffFilepathsList.push(diffFilepaths)
     activeTabIndex = diffFilepathsList.length - 1
   }
+
+  const removeTab = (tabIndex: number) => {
+    if (tabIndex === activeTabIndex) {
+      activeTabIndex -= 1
+    }
+    diffFilepathsList.splice(tabIndex, 1)
+  }
 </script>
 
 <button class="shows-file-handle" onclick={() => (showsFileHandle = !showsFileHandle)}>+</button>
@@ -38,14 +45,7 @@
       <div class={`header ${tabIndex === activeTabIndex ? 'active' : ''}`}>
         <label><input type="radio" value={tabIndex} bind:group={activeTabIndex} />{tabIndex}</label>
         {#if 0 < tabIndex}
-          <button
-            onclick={() => {
-              if (tabIndex === activeTabIndex) {
-                activeTabIndex -= 1
-              }
-              diffFilepathsList.splice(tabIndex, 1)
-            }}>x</button
-          >
+          <button onclick={() => removeTab(tabIndex)}>x</button>
         {/if}
       </div>
     {/each}
@@ -54,7 +54,11 @@
 <div class="active-tab">
   {#each diffFilepathsList as diffFilepaths, tabIndex}
     <div class={tabIndex === activeTabIndex ? '' : 'd-none'}>
-      <AppTab {diffFilepaths} diffFilepathsOnSelected={addDiffTab} />
+      <AppTab
+        {diffFilepaths}
+        diffFilepathsOnSelected={addDiffTab}
+        removeDiffTab={() => removeTab(tabIndex)}
+      />
     </div>
   {/each}
 </div>
