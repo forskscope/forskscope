@@ -25,15 +25,15 @@
 
         .replace-diff-chars {
             .delete {
-                background-color: #ffe1b3;
+                background-color: hsl(36, 100%, 50%);
             }
 
             .insert {
-                background-color: #f2ffb3;
+                background-color: hsl(70, 100%, 50%);
             }
 
             .replace {
-                background-color: #fff7b3;
+                background-color: hsl(54, 100%, 50%);
             }
         }
     }
@@ -56,15 +56,15 @@
 
         .replace-diff-chars {
             .delete {
-                background-color: #ffcc99;
+                background-color: hsl(30, 100%, 50%);
             }
 
             .insert {
-                background-color: #f7ff99;
+                background-color: hsl(65, 100%, 50%);
             }
 
             .replace {
-                background-color: #fff399;
+                background-color: hsl(53, 100%, 50%);
             }
         }
     }
@@ -97,15 +97,15 @@
 
         .replace-diff-chars {
             .delete {
-                background-color: #553724
+                background-color: hsl(23, 40%, 10%)
             }
 
             .insert {
-                background-color: #4b5524;
+                background-color: hsl(72, 40%, 10%);
             }
 
             .replace {
-                background-color: #554b24;
+                background-color: hsl(48, 40%, 10%);
             }
         }
     }
@@ -128,15 +128,15 @@
 
         .replace-diff-chars {
             .delete {
-                background-color: #3b251a;
+                background-color: hsl(20, 39%, 10%);
             }
 
             .insert {
-                background-color: #303b1a;
+                background-color: hsl(80, 39%, 10%);
             }
 
             .replace {
-                background-color: #3b371a;
+                background-color: hsl(53, 39%, 10%);
             }
         }
     }
@@ -169,15 +169,15 @@
 
         .replace-diff-chars {
             .delete {
-                background-color: #453328;
+                background-color: hsl(23, 27%, 10%);
             }
 
             .insert {
-                background-color: #424528;
+                background-color: hsl(66, 27%, 10%);
             }
 
             .replace {
-                background-color: #454028;
+                background-color: hsl(50, 27%, 10%);
             }
         }
     }
@@ -200,15 +200,15 @@
 
         .replace-diff-chars {
             .delete {
-                background-color: #3b2c22;
+                background-color: hsl(24, 27%, 10%);
             }
 
             .insert {
-                background-color: #363b22;
+                background-color: hsl(72, 27%, 10%);
             }
 
             .replace {
-                background-color: #3b3a22;
+                background-color: hsl(58, 27%, 10%);
             }
         }
     }
@@ -241,15 +241,15 @@
 
         .replace-diff-chars {
             .delete {
-                background-color: #3b231a;
+                background-color: hsl(16, 39%, 10%);
             }
 
             .insert {
-                background-color: #353b1a;
+                background-color: hsl(71, 39%, 10%);
             }
 
             .replace {
-                background-color: #3b351a;
+                background-color: hsl(49, 39%, 10%);
             }
         }
     }
@@ -272,15 +272,15 @@
 
         .replace-diff-chars {
             .delete {
-                background-color: #4a261e;
+                background-color: hsl(11, 42%, 10%);
             }
 
             .insert {
-                background-color: #484a1e;
+                background-color: hsl(63, 42%, 10%);
             }
 
             .replace {
-                background-color: #4a3f1e;
+                background-color: hsl(45, 42%, 10%);
             }
         }
     }
