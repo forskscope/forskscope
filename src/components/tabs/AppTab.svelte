@@ -5,15 +5,11 @@
 
   const {
     diffFilepaths,
-    addDiffTab,
+    diffFilepathsOnSelected,
   }: {
     diffFilepaths: DiffFilepaths | null
-    addDiffTab: (diffFilepaths: DiffFilepaths) => void
+    diffFilepathsOnSelected: (diffFilepaths: DiffFilepaths) => void
   } = $props()
-
-  const diffFilepathsOnSelected = (diffFilepaths: DiffFilepaths) => {
-    addDiffTab(diffFilepaths)
-  }
 </script>
 
 {#if diffFilepaths === null}
