@@ -23,16 +23,16 @@ use super::types::{DiffResponse, ListDirReponse};
 //         .collect()
 // }
 
-#[tauri::command]
-pub fn diff_filepaths(old: &str, new: &str) -> DiffResponse {
+#[tauri::command(async)]
+pub async fn diff_filepaths(old: &str, new: &str) -> Result<DiffResponse, ()> {
     let old_read = filepath_content(old);
     let new_read = filepath_content(new);
     let lines_diffs = lines_diffs(old_read.content.as_str(), new_read.content.as_str());
-    DiffResponse {
+    Ok(DiffResponse {
         old_charset: old_read.charset.to_owned(),
         new_charset: new_read.charset.to_owned(),
         lines_diffs,
-    }
+    })
 }
 
 // #[tauri::command]

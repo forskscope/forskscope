@@ -24,8 +24,11 @@
 
   let showsFileHandler: boolean = $state(true)
 
+  let loaded: boolean = $state(false)
+
   onMount(async () => {
     await diff()
+    loaded = true
   })
 
   // todo: not equal diffs in linesDiffs can changed to be 'equal'
@@ -54,22 +57,21 @@
   const isCompletelyEqual = $derived(!linesDiffs.some((x) => x.diffKind !== 'equal'))
 
   const diff = async () => {
-    invoke('diff_filepaths', { old: oldFilepath, new: newFilepath })
-      .then((res: unknown) => {
-        console.log(res) // todo
-
-        const diffResponse = res as DiffResponse
-        linesDiffs = diffResponse.linesDiffs
-        oldCharset = diffResponse.oldCharset
-        newCharset = diffResponse.newCharset
-
-        showsFileHandler = false
-        focusedLinesDiffIndex = null
-      })
-      .catch((error: unknown) => {
+    let res: unknown = await invoke('diff_filepaths', { old: oldFilepath, new: newFilepath }).catch(
+      (error: unknown) => {
         console.error(error)
         return
-      })
+      }
+    )
+    console.log(res) // todo
+
+    const diffResponse = res as DiffResponse
+    linesDiffs = diffResponse.linesDiffs
+    oldCharset = diffResponse.oldCharset
+    newCharset = diffResponse.newCharset
+
+    showsFileHandler = false
+    focusedLinesDiffIndex = null
   }
 
   const changeFilepath = async (oldOrNew: OldOrNew) => {
@@ -112,6 +114,8 @@
 
 <div class="keyboard-listener" onkeydown={onKeyDown} role="button" tabindex="0">
   <h2>Diff</h2>
+
+  {#if !loaded}<p>(...... Loading ......)</p>{/if}
 
   {#if 0 < linesDiffs.length}
     <div class="rows">
