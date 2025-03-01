@@ -3,41 +3,45 @@
   import type { DiffFilepaths, OldOrNew } from '../../../types'
 
   const {
+    oldFilepath,
+    newFilepath,
     filepathsOnChange,
   }: {
+    oldFilepath: string
+    newFilepath: string
     filepathsOnChange: (diffFilepaths: DiffFilepaths) => void
   } = $props()
 
-  let oldFilepath: string = $state('')
-  let newFilepath: string = $state('')
+  let _oldFilepath: string = $state(oldFilepath)
+  let _newFilepath: string = $state(newFilepath)
 
-  const readyForDiff: boolean = $derived(0 < oldFilepath.length && 0 < newFilepath.length)
+  const readyForDiff: boolean = $derived(0 < _oldFilepath.length && 0 < _newFilepath.length)
 
   const openOldFileOnClick = async (oldOrNew: OldOrNew) => {
     const filepath = await filepathFromDialog()
     if (!filepath) return
     if (oldOrNew === 'old') {
-      oldFilepath = filepath
+      _oldFilepath = filepath
     } else {
-      newFilepath = filepath
+      _newFilepath = filepath
     }
   }
 
   const diffOnClick = () => {
-    filepathsOnChange({ old: oldFilepath, new: newFilepath } as DiffFilepaths)
-    oldFilepath = ''
-    newFilepath = ''
+    filepathsOnChange({ old: _oldFilepath, new: _newFilepath } as DiffFilepaths)
+    _oldFilepath = ''
+    _newFilepath = ''
   }
 </script>
 
 <div class="wrapper">
   <div class="select-file">
     <button onclick={() => openOldFileOnClick('old')}>Old file</button>
-    <div class={0 < oldFilepath.length ? 'selected' : ''}>{oldFilepath}</div>
+    <div class={0 < _oldFilepath.length ? 'selected' : ''}>{_oldFilepath}</div>
   </div>
   <div class="select-file">
     <button onclick={() => openOldFileOnClick('new')}>New file</button>
-    <div class={0 < newFilepath.length ? 'selected' : ''}>{newFilepath}</div>
+    <div class={0 < _newFilepath.length ? 'selected' : ''}>{_newFilepath}</div>
   </div>
   <button class="diff" onclick={diffOnClick} disabled={!readyForDiff}>Diff</button>
 </div>

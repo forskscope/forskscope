@@ -9,6 +9,9 @@
 
   let showsFileHandle: boolean = $state(false)
 
+  let fileHandleOldFilepath: string = $state('')
+  let fileHandleNewFilepath: string = $state('')
+
   const filepathsOnChange = (diffFilepaths: DiffFilepaths) => {
     diffFilepathsList.push(diffFilepaths)
     activeTabIndex = diffFilepathsList.length - 1
@@ -20,12 +23,23 @@
     activeTabIndex = diffFilepathsList.length - 1
   }
 
-  const onDrop = (filepaths: string[]) => {
+  const filesOnDropped = (filepaths: string[]) => {
     if (filepaths.length === 0) return
-    const diffFilepaths =
-      filepaths.length === 1
-        ? ({ old: filepaths[0], new: filepaths[0] } as DiffFilepaths)
-        : ({ old: filepaths[0], new: filepaths[1] } as DiffFilepaths)
+
+    // open file handle
+    if (filepaths.length === 1) {
+      if (0 < fileHandleOldFilepath.length) {
+        fileHandleNewFilepath = filepaths[0]
+      } else {
+        fileHandleOldFilepath = filepaths[0]
+        fileHandleNewFilepath = ''
+      }
+      showsFileHandle = true
+      return
+    }
+
+    // show diff directly
+    const diffFilepaths = { old: filepaths[0], new: filepaths[1] } as DiffFilepaths
     diffFilepathsList.push(diffFilepaths)
     activeTabIndex = diffFilepathsList.length - 1
   }
@@ -65,12 +79,18 @@
 </div>
 
 <div class="drag-drop">
-  <DragDrop {onDrop} />
+  <DragDrop onDrop={filesOnDropped} />
 </div>
 
 <div class={`select-files ${showsFileHandle ? '' : 'd-none'}`}>
   <button onclick={() => (showsFileHandle = !showsFileHandle)}>x</button>
-  <FileHandle {filepathsOnChange} />
+  {#key [fileHandleOldFilepath, fileHandleNewFilepath]}
+    <FileHandle
+      oldFilepath={fileHandleOldFilepath}
+      newFilepath={fileHandleNewFilepath}
+      {filepathsOnChange}
+    />
+  {/key}
 </div>
 
 <style>
