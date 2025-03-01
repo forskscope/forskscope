@@ -1,10 +1,12 @@
-use std::fs::File;
 use std::io::Read;
 use std::process::Command;
+use std::time::UNIX_EPOCH;
+use std::{fs::File, path::Path};
 
 use chardetng::EncodingDetector;
+use chrono::{Local, TimeZone};
 
-use super::types::ReadContent;
+use super::types::{FileAttr, ListDirReponse, ReadContent};
 
 const UTF8_CHARSET: &str = "UTF-8";
 const NOT_TEXTFILE_CHARSET: &str = "(bytes array)";
@@ -53,33 +55,64 @@ pub fn filepath_content(filepath: &str) -> ReadContent {
     }
 }
 
-pub fn file_manager_command() -> &'static str {
-    #[cfg(target_os = "windows")]
-    {
-        "explorer"
-    }
-    #[cfg(target_os = "macos")]
-    {
-        "open"
-    }
-    #[cfg(target_os = "linux")]
-    {
-        if Command::new("nautilus").arg("--version").output().is_ok() {
-            "nautilus"
-        } else if Command::new("dolphin").arg("--version").output().is_ok() {
-            "dolphin"
-        } else if Command::new("nemo").arg("--version").output().is_ok() {
-            "nemo"
-        } else if Command::new("thunar").arg("--version").output().is_ok() {
-            "thunar"
-        } else {
-            "xdg-open"
+pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
+    let target_dir = if current_dir.is_empty() {
+        std::env::current_dir().expect("Failed to get current directory")
+    } else {
+        Path::new(current_dir)
+            .canonicalize()
+            .expect(format!("Failed to canonicalize path: {}", current_dir).as_str())
+    };
+    let mut dirs = Vec::<String>::new();
+    let mut files = Vec::<FileAttr>::new();
+
+    let read = match std::fs::read_dir(target_dir.as_path()) {
+        Ok(x) => x,
+        Err(err) => {
+            return Err(format!("Invalid path: {} ({})", current_dir, err));
+        }
+    };
+    for x in read {
+        match x {
+            Ok(dir_entry) => {
+                let name = dir_entry.file_name().to_string_lossy().to_string();
+                match dir_entry.metadata() {
+                    Ok(metadata) => {
+                        if metadata.is_dir() {
+                            dirs.push(name)
+                        } else {
+                            let modified = metadata
+                                .modified()
+                                .unwrap()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap();
+                            let local_timestamp = Local.timestamp_nanos(modified.as_nanos() as i64);
+                            let last_modified =
+                                local_timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
+                            files.push(FileAttr {
+                                name,
+                                bytes_size: format!(
+                                    "{} bytes",
+                                    comma_separated_bytes_size(metadata.len())
+                                ),
+                                human_readable_size: human_readable_size(metadata.len()),
+                                last_modified,
+                            })
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            // todo
+            Err(err) => println!("Failed to get dir/file info due to {}", err),
         }
     }
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    {
-        compile_error!("Unsupported operating system")
-    }
+
+    Ok(ListDirReponse {
+        current_dir: target_dir.to_str().unwrap().to_owned(),
+        dirs: dirs,
+        files: files,
+    })
 }
 
 pub fn comma_separated_bytes_size(size: u64) -> String {
@@ -126,4 +159,33 @@ pub fn human_readable_size(size: u64) -> String {
         comma_separated_int
     };
     format!("{} {}", comma_separated_size, unit)
+}
+
+pub fn file_manager_command() -> &'static str {
+    #[cfg(target_os = "windows")]
+    {
+        "explorer"
+    }
+    #[cfg(target_os = "macos")]
+    {
+        "open"
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if Command::new("nautilus").arg("--version").output().is_ok() {
+            "nautilus"
+        } else if Command::new("dolphin").arg("--version").output().is_ok() {
+            "dolphin"
+        } else if Command::new("nemo").arg("--version").output().is_ok() {
+            "nemo"
+        } else if Command::new("thunar").arg("--version").output().is_ok() {
+            "thunar"
+        } else {
+            "xdg-open"
+        }
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        compile_error!("Unsupported operating system")
+    }
 }

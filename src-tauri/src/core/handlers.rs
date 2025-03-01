@@ -2,15 +2,10 @@
 
 use std::path::Path;
 use std::process::Command;
-use std::time::UNIX_EPOCH;
-
-use chrono::{Local, TimeZone};
 
 use super::diff::{chars_diffs, lines_diffs};
-use super::file::{
-    comma_separated_bytes_size, file_manager_command, filepath_content, human_readable_size,
-};
-use super::types::{CharsDiffResponse, DiffResponse, FileAttr, LinesDiff, ListDirReponse};
+use super::file::{self, file_manager_command, filepath_content};
+use super::types::{CharsDiffResponse, DiffResponse, LinesDiff, ListDirReponse};
 
 // #[tauri::command]
 // pub fn startup_args(app_handle: tauri::AppHandle) -> Vec<String> {
@@ -65,62 +60,7 @@ pub async fn diff_chars(lines_diffs: Vec<LinesDiff>) -> Result<CharsDiffResponse
 
 #[tauri::command]
 pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
-    let target_dir = if current_dir.is_empty() {
-        std::env::current_dir().expect("Failed to get current directory")
-    } else {
-        Path::new(current_dir)
-            .canonicalize()
-            .expect(format!("Failed to canonicalize path: {}", current_dir).as_str())
-    };
-    let mut dirs = Vec::<String>::new();
-    let mut files = Vec::<FileAttr>::new();
-
-    let read = match std::fs::read_dir(target_dir.as_path()) {
-        Ok(x) => x,
-        Err(err) => {
-            return Err(format!("Invalid path: {} ({})", current_dir, err));
-        }
-    };
-    for x in read {
-        match x {
-            Ok(dir_entry) => {
-                let name = dir_entry.file_name().to_string_lossy().to_string();
-                match dir_entry.metadata() {
-                    Ok(metadata) => {
-                        if metadata.is_dir() {
-                            dirs.push(name)
-                        } else {
-                            let modified = metadata
-                                .modified()
-                                .unwrap()
-                                .duration_since(UNIX_EPOCH)
-                                .unwrap();
-                            let local_timestamp = Local.timestamp_nanos(modified.as_nanos() as i64);
-                            let last_modified =
-                                local_timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
-                            files.push(FileAttr {
-                                name,
-                                bytes_size: format!(
-                                    "{} bytes",
-                                    comma_separated_bytes_size(metadata.len())
-                                ),
-                                human_readable_size: human_readable_size(metadata.len()),
-                                last_modified,
-                            })
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            // todo
-            Err(err) => println!("Failed to get dir/file info due to {}", err),
-        }
-    }
-    Ok(ListDirReponse {
-        current_dir: target_dir.to_str().unwrap().to_owned(),
-        dirs: dirs,
-        files: files,
-    })
+    file::list_dir(current_dir)
 }
 
 #[tauri::command]
