@@ -11,6 +11,7 @@
 
   const filepathsOnChange = (diffFilepaths: DiffFilepaths) => {
     diffFilepathsList.push(diffFilepaths)
+    activeTabIndex = diffFilepathsList.length - 1
     showsFileHandle = false
   }
 
