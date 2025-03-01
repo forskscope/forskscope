@@ -2,6 +2,14 @@
 
 Diff and merge GUI tool with cross-platform support build with Tauri: Rust and Svelte
 
+## Screenshots (on the way)
+
+![explorer-01](docs/.assets/explorer-01.png)
+
+![diff-01-lines](docs/.assets/diff-01-lines.png)
+
+![diff-02-chars](docs/.assets/diff-02-chars.png)
+
 ## Build
 
 With Bun:
