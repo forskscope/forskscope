@@ -47,7 +47,16 @@ pub struct CharsDiff {
 pub struct ListDirReponse {
     pub current_dir: String,
     pub dirs: Vec<String>,
-    pub files: Vec<String>,
+    pub files: Vec<FileAttr>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileAttr {
+    pub name: String,
+    pub bytes_size: String,
+    pub human_readable_size: String,
+    pub last_modified: String,
 }
 
 pub struct ReadContent {

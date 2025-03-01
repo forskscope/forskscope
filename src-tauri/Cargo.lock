@@ -2570,6 +2570,7 @@ name = "patch-hygge"
 version = "0.8.2"
 dependencies = [
  "chardetng",
+ "chrono",
  "encoding_rs",
  "serde",
  "serde_json",

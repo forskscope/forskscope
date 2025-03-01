@@ -81,3 +81,49 @@ pub fn file_manager_command() -> &'static str {
         compile_error!("Unsupported operating system")
     }
 }
+
+pub fn comma_separated_bytes_size(size: u64) -> String {
+    let size_str = size.to_string();
+
+    let mut ret = String::new();
+    for (i, c) in size_str.chars().rev().enumerate() {
+        if i != 0 && i % 3 == 0 {
+            ret.push(',');
+        }
+        ret.push(c);
+    }
+
+    ret.chars().rev().collect()
+}
+
+pub fn human_readable_size(size: u64) -> String {
+    const UNIT: u64 = 1024;
+    const K: u64 = UNIT;
+    const M: u64 = UNIT.pow(2);
+    const G: u64 = UNIT.pow(3);
+    const T: u64 = UNIT.pow(4);
+
+    let (size, unit) = if size >= T {
+        (size as f64 / T as f64, "TB")
+    } else if size >= G {
+        (size as f64 / G as f64, "GB")
+    } else if size >= M {
+        (size as f64 / M as f64, "MB")
+    } else if size >= K {
+        (size as f64 / K as f64, "KB")
+    } else {
+        (size as f64, "bytes")
+    };
+
+    let size_str = size.to_string();
+    let size_str_parts = size_str.split(".").collect::<Vec<&str>>();
+    let int = size_str_parts[0].parse::<u64>().unwrap();
+    let comma_separated_int = comma_separated_bytes_size(int);
+
+    let comma_separated_size = if 1 < size_str_parts.len() {
+        format!("{}.{:.2}", comma_separated_int, size_str_parts[1])
+    } else {
+        comma_separated_int
+    };
+    format!("{} {}", comma_separated_size, unit)
+}

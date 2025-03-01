@@ -42,5 +42,12 @@ export interface DiffFilepaths {
 export interface ListDirReponse {
     currentDir: string,
     dirs: string[],
-    files: string[],
+    files: FileAttr[],
+}
+
+export interface FileAttr {
+    name: string,
+    bytesSize: string,
+    humanReadableSize: string,
+    lastModified: string,
 }

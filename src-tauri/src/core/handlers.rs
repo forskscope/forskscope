@@ -2,10 +2,15 @@
 
 use std::path::Path;
 use std::process::Command;
+use std::time::UNIX_EPOCH;
+
+use chrono::{Local, TimeZone};
 
 use super::diff::{chars_diffs, lines_diffs};
-use super::file::{file_manager_command, filepath_content};
-use super::types::{CharsDiffResponse, DiffResponse, LinesDiff, ListDirReponse};
+use super::file::{
+    comma_separated_bytes_size, file_manager_command, filepath_content, human_readable_size,
+};
+use super::types::{CharsDiffResponse, DiffResponse, FileAttr, LinesDiff, ListDirReponse};
 
 // #[tauri::command]
 // pub fn startup_args(app_handle: tauri::AppHandle) -> Vec<String> {
@@ -68,7 +73,7 @@ pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
             .expect(format!("Failed to canonicalize path: {}", current_dir).as_str())
     };
     let mut dirs = Vec::<String>::new();
-    let mut files = Vec::<String>::new();
+    let mut files = Vec::<FileAttr>::new();
 
     let read = match std::fs::read_dir(target_dir.as_path()) {
         Ok(x) => x,
@@ -80,12 +85,28 @@ pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
         match x {
             Ok(dir_entry) => {
                 let name = dir_entry.file_name().to_string_lossy().to_string();
-                match dir_entry.file_type() {
-                    Ok(file_type) => {
-                        if file_type.is_dir() {
+                match dir_entry.metadata() {
+                    Ok(metadata) => {
+                        if metadata.is_dir() {
                             dirs.push(name)
                         } else {
-                            files.push(name)
+                            let modified = metadata
+                                .modified()
+                                .unwrap()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap();
+                            let local_timestamp = Local.timestamp_nanos(modified.as_nanos() as i64);
+                            let last_modified =
+                                local_timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
+                            files.push(FileAttr {
+                                name,
+                                bytes_size: format!(
+                                    "{} bytes",
+                                    comma_separated_bytes_size(metadata.len())
+                                ),
+                                human_readable_size: human_readable_size(metadata.len()),
+                                last_modified,
+                            })
                         }
                     }
                     _ => {}

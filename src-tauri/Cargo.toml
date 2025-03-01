@@ -45,3 +45,4 @@ similar = { version = "^2.7", features = ["serde"] }
 tauri-plugin-dialog = "2"
 chardetng = "^0.1"
 encoding_rs = "^0.8"
+chrono = { version = "0.4.40", default-features = false, features = ["clock", "iana-time-zone", "std"] }
