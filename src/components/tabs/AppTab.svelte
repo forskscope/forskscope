@@ -6,14 +6,16 @@
   const {
     diffFilepaths,
     diffFilepathsOnSelected,
+    removeDiffTab,
   }: {
     diffFilepaths: DiffFilepaths | null
     diffFilepathsOnSelected: (diffFilepaths: DiffFilepaths) => void
+    removeDiffTab: () => void
   } = $props()
 </script>
 
 {#if diffFilepaths === null}
   <Explorer {diffFilepathsOnSelected} />
 {:else}
-  <Diff {diffFilepaths} />
+  <Diff {diffFilepaths} {removeDiffTab} />
 {/if}

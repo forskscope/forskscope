@@ -54,7 +54,11 @@
 <div class="active-tab">
   {#each diffFilepathsList as diffFilepaths, tabIndex}
     <div class={tabIndex === activeTabIndex ? '' : 'd-none'}>
-      <AppTab {diffFilepaths} diffFilepathsOnSelected={addDiffTab} />
+      <AppTab
+        {diffFilepaths}
+        diffFilepathsOnSelected={addDiffTab}
+        removeDiffTab={() => removeTab(tabIndex)}
+      />
     </div>
   {/each}
 </div>

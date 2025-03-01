@@ -18,7 +18,10 @@
   import { filepathFromDialog } from '../../scripts'
   import { onMount } from 'svelte'
 
-  const { diffFilepaths }: { diffFilepaths: DiffFilepaths } = $props()
+  const {
+    diffFilepaths,
+    removeDiffTab,
+  }: { diffFilepaths: DiffFilepaths; removeDiffTab: () => void } = $props()
 
   let oldFilepath: string = $state(diffFilepaths.old)
   let newFilepath: string = $state(diffFilepaths.new)
@@ -129,6 +132,11 @@
     }
   ) => {
     switch (e.key) {
+      case 'w': {
+        if (e.ctrlKey) {
+          removeDiffTab()
+        }
+      }
       case 'F7': {
         focusedLinesDiffIndex = prevLinesDiffIndex
         break
