@@ -4,7 +4,7 @@ use std::path::Path;
 use std::process::Command;
 
 use super::diff::{chars_diffs, lines_diffs};
-use super::file::{file_manager_command, filepath_content};
+use super::file::{self, file_manager_command, filepath_content};
 use super::types::{CharsDiffResponse, DiffResponse, LinesDiff, ListDirReponse};
 
 // #[tauri::command]
@@ -60,46 +60,7 @@ pub async fn diff_chars(lines_diffs: Vec<LinesDiff>) -> Result<CharsDiffResponse
 
 #[tauri::command]
 pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
-    let target_dir = if current_dir.is_empty() {
-        std::env::current_dir().expect("Failed to get current directory")
-    } else {
-        Path::new(current_dir)
-            .canonicalize()
-            .expect(format!("Failed to canonicalize path: {}", current_dir).as_str())
-    };
-    let mut dirs = Vec::<String>::new();
-    let mut files = Vec::<String>::new();
-
-    let read = match std::fs::read_dir(target_dir.as_path()) {
-        Ok(x) => x,
-        Err(err) => {
-            return Err(format!("Invalid path: {} ({})", current_dir, err));
-        }
-    };
-    for x in read {
-        match x {
-            Ok(dir_entry) => {
-                let name = dir_entry.file_name().to_string_lossy().to_string();
-                match dir_entry.file_type() {
-                    Ok(file_type) => {
-                        if file_type.is_dir() {
-                            dirs.push(name)
-                        } else {
-                            files.push(name)
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            // todo
-            Err(err) => println!("Failed to get dir/file info due to {}", err),
-        }
-    }
-    Ok(ListDirReponse {
-        current_dir: target_dir.to_str().unwrap().to_owned(),
-        dirs: dirs,
-        files: files,
-    })
+    file::list_dir(current_dir)
 }
 
 #[tauri::command]

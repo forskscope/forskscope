@@ -1,10 +1,12 @@
-use std::fs::File;
 use std::io::Read;
 use std::process::Command;
+use std::time::UNIX_EPOCH;
+use std::{fs::File, path::Path};
 
 use chardetng::EncodingDetector;
+use chrono::{Local, TimeZone};
 
-use super::types::ReadContent;
+use super::types::{FileAttr, ListDirReponse, ReadContent};
 
 const UTF8_CHARSET: &str = "UTF-8";
 const NOT_TEXTFILE_CHARSET: &str = "(bytes array)";
@@ -51,6 +53,112 @@ pub fn filepath_content(filepath: &str) -> ReadContent {
         charset: encoding.name().to_owned(),
         content: decoded.to_string(),
     }
+}
+
+pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
+    let target_dir = if current_dir.is_empty() {
+        std::env::current_dir().expect("Failed to get current directory")
+    } else {
+        Path::new(current_dir)
+            .canonicalize()
+            .expect(format!("Failed to canonicalize path: {}", current_dir).as_str())
+    };
+    let mut dirs = Vec::<String>::new();
+    let mut files = Vec::<FileAttr>::new();
+
+    let read = match std::fs::read_dir(target_dir.as_path()) {
+        Ok(x) => x,
+        Err(err) => {
+            return Err(format!("Invalid path: {} ({})", current_dir, err));
+        }
+    };
+    for x in read {
+        match x {
+            Ok(dir_entry) => {
+                let name = dir_entry.file_name().to_string_lossy().to_string();
+                match dir_entry.metadata() {
+                    Ok(metadata) => {
+                        if metadata.is_dir() {
+                            dirs.push(name)
+                        } else {
+                            let modified = metadata
+                                .modified()
+                                .unwrap()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap();
+                            let local_timestamp = Local.timestamp_nanos(modified.as_nanos() as i64);
+                            let last_modified =
+                                local_timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
+                            files.push(FileAttr {
+                                name,
+                                bytes_size: format!(
+                                    "{} bytes",
+                                    comma_separated_bytes_size(metadata.len())
+                                ),
+                                human_readable_size: human_readable_size(metadata.len()),
+                                last_modified,
+                            })
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            // todo
+            Err(err) => println!("Failed to get dir/file info due to {}", err),
+        }
+    }
+
+    Ok(ListDirReponse {
+        current_dir: target_dir.to_str().unwrap().to_owned(),
+        dirs: dirs,
+        files: files,
+    })
+}
+
+pub fn comma_separated_bytes_size(size: u64) -> String {
+    let size_str = size.to_string();
+
+    let mut ret = String::new();
+    for (i, c) in size_str.chars().rev().enumerate() {
+        if i != 0 && i % 3 == 0 {
+            ret.push(',');
+        }
+        ret.push(c);
+    }
+
+    ret.chars().rev().collect()
+}
+
+pub fn human_readable_size(size: u64) -> String {
+    const UNIT: u64 = 1024;
+    const K: u64 = UNIT;
+    const M: u64 = UNIT.pow(2);
+    const G: u64 = UNIT.pow(3);
+    const T: u64 = UNIT.pow(4);
+
+    let (size, unit) = if size >= T {
+        (size as f64 / T as f64, "TB")
+    } else if size >= G {
+        (size as f64 / G as f64, "GB")
+    } else if size >= M {
+        (size as f64 / M as f64, "MB")
+    } else if size >= K {
+        (size as f64 / K as f64, "KB")
+    } else {
+        (size as f64, "bytes")
+    };
+
+    let size_str = size.to_string();
+    let size_str_parts = size_str.split(".").collect::<Vec<&str>>();
+    let int = size_str_parts[0].parse::<u64>().unwrap();
+    let comma_separated_int = comma_separated_bytes_size(int);
+
+    let comma_separated_size = if 1 < size_str_parts.len() {
+        format!("{}.{:.2}", comma_separated_int, size_str_parts[1])
+    } else {
+        comma_separated_int
+    };
+    format!("{} {}", comma_separated_size, unit)
 }
 
 pub fn file_manager_command() -> &'static str {

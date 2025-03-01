@@ -112,25 +112,41 @@
           <div class="dirs-files">
             {#if !isRootDir(pane.listDirResponse.currentDir)}
               <button
+                class="dir"
                 ondblclick={() => changeDir('..', pane.listDirResponse!.currentDir, pane.oldOrNew)}
                 >..</button
               >
             {/if}
             {#each pane.listDirResponse.dirs as dir}
               <button
+                class="dir"
                 ondblclick={() => changeDir(dir, pane.listDirResponse!.currentDir, pane.oldOrNew)}
-                >{dir}</button
+                >📁 {dir}</button
               >
             {/each}
+            {#if 0 < pane.listDirResponse.files.length}
+              <div class="file header">
+                <div>Name</div>
+                <div>Size</div>
+                <div>Last Modified</div>
+              </div>
+            {/if}
             {#each pane.listDirResponse.files as file}
-              <label
+              <label class="file"
                 ><input
                   type="radio"
                   name={`${pane.oldOrNew}SelectedFile`}
-                  value={file}
+                  value={file.name}
                   onchange={(e) => selectedFileOnChange(e, pane.oldOrNew)}
-                />{file}</label
-              >
+                />
+                <div>📜 {file.name}</div>
+                {#if file.humanReadableSize !== file.bytesSize}
+                  <div>{file.humanReadableSize} ({file.bytesSize})</div>
+                {:else}
+                  <div>{file.bytesSize}</div>
+                {/if}
+                <div>{file.lastModified}</div>
+              </label>
             {/each}
           </div>
         </div>
@@ -139,7 +155,9 @@
   {/each}
 </div>
 
-<button class="diff" onclick={diffOnClick} disabled={!diffOnClickEnabled}>diff</button>
+{#if diffOnClickEnabled}
+  <button class="diff" onclick={diffOnClick}>diff</button>
+{/if}
 
 <style>
   .explorer-panes,
@@ -185,19 +203,53 @@
     height: fit-content;
   }
 
-  .dirs-files label,
-  .dirs-files button {
+  .dirs-files .dir,
+  .dirs-files .file {
     width: 100%;
     display: block;
   }
 
-  .dirs-files button {
+  .dirs-files .dir {
     width: auto;
     background: inherit;
     color: inherit;
     border: none;
     text-align: left;
     box-shadow: none;
+  }
+
+  .dirs-files .file {
+    display: flex;
+    gap: 1.1rem;
+  }
+
+  .dirs-files .file.header > div {
+    opacity: 0.57;
+    font-size: 0.87rem;
+    font-weight: bold;
+  }
+
+  .dirs-files .file input[type='radio'] {
+    display: none;
+  }
+
+  .dirs-files .file:has(input[type='radio']:checked) {
+    opacity: 0.87;
+  }
+
+  .dirs-files .file input[type='radio']:checked + div {
+    border-bottom: 0.02rem solid yellow;
+  }
+
+  .dirs-files .file > div {
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .dirs-files .file > div:nth-of-type(1) {
+    flex: 2;
   }
 
   button.diff {

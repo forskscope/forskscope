@@ -34,8 +34,6 @@
   let showsCharsDiffs: boolean = $state(false)
   let focusedLinesDiffIndex: number | null = $state(null)
 
-  let showsFileHandler: boolean = $state(true)
-
   let loaded: boolean = $state(false)
 
   onMount(async () => {
@@ -89,7 +87,6 @@
     oldCharset = diffResponse.oldCharset
     newCharset = diffResponse.newCharset
 
-    showsFileHandler = false
     focusedLinesDiffIndex = null
   }
 
@@ -155,7 +152,9 @@
 <div class="keyboard-listener" onkeydown={onKeyDown} role="button" tabindex="0">
   <div class="d-flex" style="gap: 1.1rem;">
     <h2>Diff</h2>
-    <label>Chars diff<input type="checkbox" bind:checked={showsCharsDiffs} /></label>
+    {#if 0 < charsDiffs.length}
+      <label>Chars diff<input type="checkbox" bind:checked={showsCharsDiffs} /></label>
+    {/if}
   </div>
 
   {#if !loaded}<p>(...... Loading ......)</p>{/if}
