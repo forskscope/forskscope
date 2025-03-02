@@ -50,10 +50,10 @@ pub struct ListDirReponse {
     pub files: Vec<FileAttr>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Eq, PartialEq, Ord, PartialOrd)]
 #[serde(rename_all = "camelCase")]
 pub struct FileAttr {
-    pub name: String,
+    pub name: String, // first field is default sort key
     pub bytes_size: String,
     pub human_readable_size: String,
     pub last_modified: String,

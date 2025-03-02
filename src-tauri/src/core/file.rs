@@ -108,6 +108,9 @@ pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
         }
     }
 
+    dirs.sort();
+    files.sort();
+
     Ok(ListDirReponse {
         current_dir: target_dir.to_str().unwrap().to_owned(),
         dirs: dirs,

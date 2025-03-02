@@ -2,6 +2,7 @@
   import { invoke } from '@tauri-apps/api/core'
   import { onMount } from 'svelte'
   import type { DiffFilepaths, ListDirReponse, OldOrNew } from '../../types'
+  import { dirpathFromDialog } from '../../scripts'
 
   interface ExplorePane {
     oldOrNew: OldOrNew
@@ -41,25 +42,30 @@
     diffFilepathsOnSelected({ old: oldFilepath, new: newFilepath } as DiffFilepaths)
   }
 
-  const changeDir = (selectedDir: string, currentDir: string, oldOrNew: OldOrNew) => {
-    invoke('list_dir', { currentDir: `${currentDir}/${selectedDir}` })
-      .then((res: unknown) => {
-        console.log(res) // todo
+  const selectDir = async (oldOrNew: OldOrNew) => {
+    const dirpath = await dirpathFromDialog()
+    if (dirpath === null) return
+    await changeDir(dirpath, oldOrNew)
+  }
 
-        const listDirResponse = res as ListDirReponse
-        if (oldOrNew === 'old') {
-          oldExplorerPane.listDirResponse = listDirResponse
-          oldSelectedFile = ''
-        } else {
-          newExplorerPane.listDirResponse = listDirResponse
-          newSelectedFile = ''
-        }
-      })
+  const changeDir = async (dirpath: string, oldOrNew: OldOrNew) => {
+    const res: unknown = await invoke('list_dir', { currentDir: dirpath })
       // todo
       .catch((error: unknown) => {
         console.error(error)
         return
       })
+
+    console.log(res) // todo
+
+    const listDirResponse = res as ListDirReponse
+    if (oldOrNew === 'old') {
+      oldExplorerPane.listDirResponse = listDirResponse
+      oldSelectedFile = ''
+    } else {
+      newExplorerPane.listDirResponse = listDirResponse
+      newSelectedFile = ''
+    }
   }
 
   const isRootDir = (dir: string): boolean => {
@@ -106,31 +112,55 @@
       <div class="explorer-pane">
         <div class="current-dir">
           <h3>{pane.listDirResponse.currentDir}</h3>
-          <button onclick={() => openWithFileManager(pane.oldOrNew)}>/!/</button>
+          <div>
+            <button class="select-dir" onclick={() => selectDir(pane.oldOrNew)}>🔎</button>
+            <button class="file-manager" onclick={() => openWithFileManager(pane.oldOrNew)}
+              >🗃️</button
+            >
+          </div>
         </div>
         <div class="dirs-files-wrapper">
           <div class="dirs-files">
-            {#if !isRootDir(pane.listDirResponse.currentDir)}
-              <button
-                class="dir"
-                ondblclick={() => changeDir('..', pane.listDirResponse!.currentDir, pane.oldOrNew)}
-                >..</button
-              >
-            {/if}
-            {#each pane.listDirResponse.dirs as dir}
-              <button
-                class="dir"
-                ondblclick={() => changeDir(dir, pane.listDirResponse!.currentDir, pane.oldOrNew)}
-                >📁 {dir}</button
-              >
-            {/each}
             {#if 0 < pane.listDirResponse.files.length}
-              <div class="file header">
-                <div>Name</div>
-                <div>Size</div>
-                <div>Last Modified</div>
+              <div class="header">
+                <div class="file header">
+                  <div>Name</div>
+                  <div>Size</div>
+                  <div>Last Modified</div>
+                </div>
               </div>
             {/if}
+            {#if !isRootDir(pane.listDirResponse.currentDir)}
+              <div
+                role="button"
+                tabindex="0"
+                class="parent-dir"
+                ondblclick={() =>
+                  changeDir(`${pane.listDirResponse!.currentDir}/..`, pane.oldOrNew)}
+              >
+                ⇡ ..
+              </div>
+            {/if}
+            {#each pane.listDirResponse.dirs as dir}
+              <label class="dir"
+                ><input
+                  type="radio"
+                  name={`${pane.oldOrNew}SelectedFile`}
+                  value={''}
+                  onchange={(e) => selectedFileOnChange(e, pane.oldOrNew)}
+                />
+                <div
+                  role="button"
+                  tabindex="0"
+                  ondblclick={() =>
+                    changeDir(`${pane.listDirResponse!.currentDir}/${dir}`, pane.oldOrNew)}
+                >
+                  📁 {dir}
+                </div>
+                <div></div>
+                <div></div>
+              </label>
+            {/each}
             {#each pane.listDirResponse.files as file}
               <label class="file"
                 ><input
@@ -183,14 +213,21 @@
   .current-dir {
     display: flex;
     justify-content: space-between;
+    align-items: center;
   }
 
   h3 {
+    margin: 0.7rem 0.4rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     direction: rtl;
     text-align: right;
+  }
+
+  .select-dir,
+  .file-manager {
+    padding: 0.3rem 0.6rem;
   }
 
   .dirs-files-wrapper {
@@ -203,53 +240,51 @@
     height: fit-content;
   }
 
-  .dirs-files .dir,
-  .dirs-files .file {
+  .dirs-files .header,
+  .dirs-files label {
     width: 100%;
-    display: block;
-  }
-
-  .dirs-files .dir {
-    width: auto;
-    background: inherit;
-    color: inherit;
-    border: none;
-    text-align: left;
-    box-shadow: none;
-  }
-
-  .dirs-files .file {
     display: flex;
     gap: 1.1rem;
   }
 
-  .dirs-files .file.header > div {
-    opacity: 0.57;
-    font-size: 0.87rem;
-    font-weight: bold;
-  }
-
-  .dirs-files .file input[type='radio'] {
-    display: none;
-  }
-
-  .dirs-files .file:has(input[type='radio']:checked) {
-    opacity: 0.87;
-  }
-
-  .dirs-files .file input[type='radio']:checked + div {
-    border-bottom: 0.02rem solid yellow;
-  }
-
-  .dirs-files .file > div {
+  .dirs-files .header > div,
+  .dirs-files label > div {
     flex: 1;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
 
-  .dirs-files .file > div:nth-of-type(1) {
+  .dirs-files .header > div:nth-of-type(1),
+  .dirs-files label > div:nth-of-type(1) {
     flex: 2;
+  }
+
+  .dirs-files .header > div {
+    opacity: 0.57;
+    font-size: 0.87rem;
+    font-weight: bold;
+  }
+
+  .dirs-files .parent-dir,
+  .dirs-files label {
+    margin: 0.08rem 0;
+  }
+
+  .dirs-files label input[type='radio'] {
+    display: none;
+  }
+
+  .dirs-files label:has(input[type='radio']:checked) {
+    opacity: 0.87;
+  }
+
+  .dirs-files label input[type='radio']:checked + div {
+    border-bottom: 0.02rem solid grey;
+  }
+
+  .dirs-files .file input[type='radio']:checked + div {
+    border-bottom-color: yellow;
   }
 
   button.diff {
