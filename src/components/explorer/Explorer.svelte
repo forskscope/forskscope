@@ -2,6 +2,7 @@
   import { invoke } from '@tauri-apps/api/core'
   import { onMount } from 'svelte'
   import type { DiffFilepaths, ListDirReponse, OldOrNew } from '../../types'
+  import { dirpathFromDialog } from '../../scripts'
 
   interface ExplorePane {
     oldOrNew: OldOrNew
@@ -41,25 +42,30 @@
     diffFilepathsOnSelected({ old: oldFilepath, new: newFilepath } as DiffFilepaths)
   }
 
-  const changeDir = (selectedDir: string, currentDir: string, oldOrNew: OldOrNew) => {
-    invoke('list_dir', { currentDir: `${currentDir}/${selectedDir}` })
-      .then((res: unknown) => {
-        console.log(res) // todo
+  const selectDir = async (oldOrNew: OldOrNew) => {
+    const dirpath = await dirpathFromDialog()
+    if (dirpath === null) return
+    await changeDir(dirpath, oldOrNew)
+  }
 
-        const listDirResponse = res as ListDirReponse
-        if (oldOrNew === 'old') {
-          oldExplorerPane.listDirResponse = listDirResponse
-          oldSelectedFile = ''
-        } else {
-          newExplorerPane.listDirResponse = listDirResponse
-          newSelectedFile = ''
-        }
-      })
+  const changeDir = async (dirpath: string, oldOrNew: OldOrNew) => {
+    const res: unknown = await invoke('list_dir', { currentDir: dirpath })
       // todo
       .catch((error: unknown) => {
         console.error(error)
         return
       })
+
+    console.log(res) // todo
+
+    const listDirResponse = res as ListDirReponse
+    if (oldOrNew === 'old') {
+      oldExplorerPane.listDirResponse = listDirResponse
+      oldSelectedFile = ''
+    } else {
+      newExplorerPane.listDirResponse = listDirResponse
+      newSelectedFile = ''
+    }
   }
 
   const isRootDir = (dir: string): boolean => {
@@ -106,8 +112,12 @@
       <div class="explorer-pane">
         <div class="current-dir">
           <h3>{pane.listDirResponse.currentDir}</h3>
-          <button class="file-manager" onclick={() => openWithFileManager(pane.oldOrNew)}>🗃️</button
-          >
+          <div>
+            <button class="select-dir" onclick={() => selectDir(pane.oldOrNew)}>🔎</button>
+            <button class="file-manager" onclick={() => openWithFileManager(pane.oldOrNew)}
+              >🗃️</button
+            >
+          </div>
         </div>
         <div class="dirs-files-wrapper">
           <div class="dirs-files">
@@ -125,7 +135,8 @@
                 role="button"
                 tabindex="0"
                 class="parent-dir"
-                ondblclick={() => changeDir('..', pane.listDirResponse!.currentDir, pane.oldOrNew)}
+                ondblclick={() =>
+                  changeDir(`${pane.listDirResponse!.currentDir}/..`, pane.oldOrNew)}
               >
                 ⇡ ..
               </div>
@@ -141,7 +152,8 @@
                 <div
                   role="button"
                   tabindex="0"
-                  ondblclick={() => changeDir(dir, pane.listDirResponse!.currentDir, pane.oldOrNew)}
+                  ondblclick={() =>
+                    changeDir(`${pane.listDirResponse!.currentDir}/${dir}`, pane.oldOrNew)}
                 >
                   📁 {dir}
                 </div>
@@ -213,6 +225,7 @@
     text-align: right;
   }
 
+  .select-dir,
   .file-manager {
     padding: 0.3rem 0.6rem;
   }

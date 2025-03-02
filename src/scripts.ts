@@ -11,3 +11,11 @@ export const filepathFromDialog = async (): Promise<string | null> => {
     })
     return filepath
 }
+
+export const dirpathFromDialog = async (): Promise<string | null> => {
+    const dirpath: string | null = await tauriDialogOpen({
+        directory: true,
+        multiple: false,
+    })
+    return dirpath
+}
