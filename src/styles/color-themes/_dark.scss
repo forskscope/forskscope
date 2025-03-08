@@ -1,0 +1,71 @@
+.dark-theme {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+
+    .lines-diffs {
+        background-color: #2c2c2c;
+        color: #e0e0e0;
+    }
+
+    .old {
+        .insert {
+            background-color: #1e402e;
+            color: #8bf7a3;
+        }
+
+        .delete {
+            background-color: #521818;
+            color: #ff7f7f;
+        }
+
+        .replace {
+            background-color: #554024;
+            color: #ffcc80;
+        }
+
+        .chars-diff {
+            .delete {
+                background-color: hsl(23, 40%, 10%)
+            }
+
+            .insert {
+                background-color: hsl(72, 40%, 10%);
+            }
+
+            .replace {
+                background-color: hsl(48, 40%, 10%);
+            }
+        }
+    }
+
+    .new {
+        .insert {
+            background-color: #245837;
+            color: #a3ffb5;
+        }
+
+        .delete {
+            background-color: #4a0f0f;
+            color: #ff6f6f;
+        }
+
+        .replace {
+            background-color: #3b2c1a;
+            color: #ffdd94;
+        }
+
+        .chars-diff {
+            .delete {
+                background-color: hsl(20, 39%, 10%);
+            }
+
+            .insert {
+                background-color: hsl(80, 39%, 10%);
+            }
+
+            .replace {
+                background-color: hsl(53, 39%, 10%);
+            }
+        }
+    }
+}

@@ -1,0 +1,71 @@
+.night-theme {
+    background-color: #121212;
+    color: #d0d0d0;
+
+    .lines-diffs {
+        background-color: #1a1a1a;
+        color: #d0d0d0;
+    }
+
+    .old {
+        .insert {
+            background-color: #163b2a;
+            color: #7cd3a0;
+        }
+
+        .delete {
+            background-color: #3b1b1b;
+            color: #f18b7a;
+        }
+
+        .replace {
+            background-color: #453b28;
+            color: #f3d589;
+        }
+
+        .chars-diff {
+            .delete {
+                background-color: hsl(23, 27%, 10%);
+            }
+
+            .insert {
+                background-color: hsl(66, 27%, 10%);
+            }
+
+            .replace {
+                background-color: hsl(50, 27%, 10%);
+            }
+        }
+    }
+
+    .new {
+        .insert {
+            background-color: #1a4d38;
+            color: #8dd7a3;
+        }
+
+        .delete {
+            background-color: #4a2424;
+            color: #f28b82;
+        }
+
+        .replace {
+            background-color: #3b3222;
+            color: #fdd888;
+        }
+
+        .chars-diff {
+            .delete {
+                background-color: hsl(24, 27%, 10%);
+            }
+
+            .insert {
+                background-color: hsl(72, 27%, 10%);
+            }
+
+            .replace {
+                background-color: hsl(58, 27%, 10%);
+            }
+        }
+    }
+}
