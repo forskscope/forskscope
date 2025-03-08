@@ -1,0 +1,10 @@
+@use "./light";
+@use "./dark";
+@use "./night";
+@use "./monokai";
+
+.lines-diff {
+    &.focused {
+        box-shadow: inset 12px 0 0 salmon;
+    }
+}
