@@ -39,6 +39,11 @@ export interface DiffFilepaths {
     new: string,
 }
 
+export interface StartupParam {
+    oldFilepath: string | null,
+    newFilepath: string | null,
+}
+
 export interface ListDirReponse {
     currentDir: string,
     dirs: string[],

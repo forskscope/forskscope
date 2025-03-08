@@ -10,6 +10,14 @@ Diff and merge GUI tool with cross-platform support build with Tauri: Rust and S
 
 ![diff-02-chars](docs/.assets/diff-02-chars.png)
 
+## Executable
+
+Available in [Assets](https://github.com/nabbisen/patch-hygge/releases/latest) in Releases.
+
+```sh
+patch-hygge <old-filepath> <new-filepath>
+```
+
 ## Build
 
 With Bun:
