@@ -1,8 +1,10 @@
 <script lang="ts">
-  import type { DiffFilepaths } from '../../types'
+  import type { DiffFilepaths, StartupParam } from '../../types'
   import FileHandle from './file-handle/FileHandle.svelte'
   import DragDrop from '../common/DragDrop.svelte'
   import AppTab from './AppTab.svelte'
+  import { onMount } from 'svelte'
+  import { invoke } from '@tauri-apps/api/core'
 
   let diffFilepathsList: (DiffFilepaths | null)[] = $state([null])
   let activeTabIndex: number = $state(0)
@@ -13,8 +15,7 @@
   let fileHandleNewFilepath: string = $state('')
 
   const filepathsOnChange = (diffFilepaths: DiffFilepaths) => {
-    diffFilepathsList.push(diffFilepaths)
-    activeTabIndex = diffFilepathsList.length - 1
+    addDiffTab(diffFilepaths)
     showsFileHandle = false
   }
 
@@ -50,6 +51,26 @@
     }
     diffFilepathsList.splice(tabIndex, 1)
   }
+
+  onMount(async () => {
+    const res = (await invoke('ready').catch((error: unknown) => {
+      console.error(error)
+      return
+    })) as StartupParam
+
+    if (res.oldFilepath) {
+      if (res.newFilepath) {
+        // show startup diff tab
+        addDiffTab({
+          old: res.oldFilepath,
+          new: res.newFilepath,
+        } as DiffFilepaths)
+      } else {
+        // start with a file dropped
+        filesOnDropped([res.oldFilepath])
+      }
+    }
+  })
 </script>
 
 <button class="shows-file-handle" onclick={() => (showsFileHandle = !showsFileHandle)}>+</button>

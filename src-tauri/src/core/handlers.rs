@@ -3,6 +3,10 @@
 use std::path::Path;
 use std::process::Command;
 
+use tauri::State;
+
+use crate::types::StartupParam;
+
 use super::diff::{chars_diffs, lines_diffs};
 use super::file::{self, file_manager_command, filepath_content};
 use super::types::{CharsDiffResponse, DiffResponse, LinesDiff, ListDirReponse};
@@ -77,4 +81,17 @@ pub fn open_with_file_manager(dirpath: &str) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn ready(state: State<StartupParam>) -> Result<StartupParam, String> {
+    let startup_param = StartupParam {
+        old_filepath: state.old_filepath.clone(),
+        new_filepath: state.new_filepath.clone(),
+    };
+
+    // clean up startup param
+    std::mem::drop(state);
+
+    Ok(startup_param)
 }
