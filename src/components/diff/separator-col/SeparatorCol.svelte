@@ -45,10 +45,6 @@
     position: relative;
   }
 
-  .focused {
-    box-shadow: inset 12px 0 0 salmon;
-  }
-
   .diff-line {
     counter-increment: line-number;
     height: var(--line-height);
