@@ -41,6 +41,7 @@
     transform: translateY(1.2rem);
     animation: toast-fade-in 1.5s ease forwards;
   }
+  /* todo: color vars */
   .toast.info {
     background-color: #636363;
     color: #ffffff;

@@ -280,10 +280,12 @@
   }
 
   .dirs-files label input[type='radio']:checked + div {
+    /* todo: color vars */
     border-bottom: 0.02rem solid grey;
   }
 
   .dirs-files .file input[type='radio']:checked + div {
+    /* todo: color vars */
     border-bottom-color: yellow;
   }
 

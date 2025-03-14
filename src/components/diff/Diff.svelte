@@ -271,7 +271,9 @@
   .col.separator {
     flex-grow: 0;
     flex-basis: 1.4rem;
+    /* todo: color vars */
     background-color: black;
+    /* todo: color vars */
     color: white;
   }
 </style>

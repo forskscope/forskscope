@@ -99,6 +99,7 @@
     padding-right: 0.7em;
     display: inline-block;
     text-align: right;
+    /* todo: color vars */
     color: darkgray;
   }
 </style>

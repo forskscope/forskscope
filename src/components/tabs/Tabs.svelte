@@ -1,10 +1,9 @@
 <script lang="ts">
   import type { DiffFilepaths, StartupParam } from '../../types'
-  import FileHandle from './file-handle/FileHandle.svelte'
-  import DragDrop from '../common/DragDrop.svelte'
-  import AppTab from './AppTab.svelte'
+  import Tab from './Tab.svelte'
   import { onMount } from 'svelte'
   import { invoke } from '@tauri-apps/api/core'
+  import SelectFiles from './SelectFiles.svelte'
 
   let diffFilepathsList: (DiffFilepaths | null)[] = $state([null])
   let activeTabIndex: number = $state(0)
@@ -13,11 +12,6 @@
 
   let fileHandleOldFilepath: string = $state('')
   let fileHandleNewFilepath: string = $state('')
-
-  const filepathsOnChange = (diffFilepaths: DiffFilepaths) => {
-    addDiffTab(diffFilepaths)
-    showsFileHandle = false
-  }
 
   const addDiffTab = (diffFilepaths: DiffFilepaths) => {
     diffFilepathsList.push(diffFilepaths)
@@ -73,8 +67,6 @@
   })
 </script>
 
-<button class="shows-file-handle" onclick={() => (showsFileHandle = !showsFileHandle)}>+</button>
-
 <div class="tabs">
   <div class="headers">
     {#each diffFilepathsList as _diffFilepaths, tabIndex}
@@ -90,7 +82,7 @@
 <div class="active-tab">
   {#each diffFilepathsList as diffFilepaths, tabIndex}
     <div class={tabIndex === activeTabIndex ? '' : 'd-none'}>
-      <AppTab
+      <Tab
         {diffFilepaths}
         diffFilepathsOnSelected={addDiffTab}
         removeDiffTab={() => removeTab(tabIndex)}
@@ -99,43 +91,9 @@
   {/each}
 </div>
 
-<div class="drag-drop">
-  <DragDrop onDrop={filesOnDropped} />
-</div>
-
-<div class={`select-files ${showsFileHandle ? '' : 'd-none'}`}>
-  <button onclick={() => (showsFileHandle = !showsFileHandle)}>x</button>
-  {#key [fileHandleOldFilepath, fileHandleNewFilepath]}
-    <FileHandle
-      oldFilepath={fileHandleOldFilepath}
-      newFilepath={fileHandleNewFilepath}
-      {filepathsOnChange}
-    />
-  {/key}
-</div>
+<SelectFiles {addDiffTab} {filesOnDropped} />
 
 <style>
-  .drag-drop {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 0;
-    pointer-events: none;
-  }
-
-  .select-files {
-    position: fixed;
-    left: 10vw;
-    top: 10vh;
-    width: 80vw;
-    height: 80vh;
-    padding: 0.4rem 0;
-    background-color: yellow;
-    color: #252525;
-  }
-
   input[type='radio'] {
     display: none;
   }
@@ -149,10 +107,12 @@
     width: 5.7rem;
     display: flex;
     align-items: center;
+    /* todo: color vars */
     border: 0.01rem solid yellow;
   }
   .header.active {
     font-size: 110%;
+    /* todo: color vars */
     border-color: coral;
     border-width: 0.32rem;
   }
@@ -171,9 +131,5 @@
   }
   .header label:hover {
     opacity: 0.6;
-  }
-
-  .shows-file-handle {
-    padding: 0.5rem 1.5rem;
   }
 </style>
