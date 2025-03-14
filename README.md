@@ -1,5 +1,10 @@
 # Patch Hygge
 
+[![Releases Workflow](https://github.com/nabbisen/patch-hygge/actions/workflows/release-executable.yaml/badge.svg)](https://github.com/nabbisen/patch-hygge/actions/workflows/)
+[![License](https://img.shields.io/github/license/nabbisen/patch-hygge)](https://github.com/nabbisen/patch-hygge/blob/main/LICENSE)
+
+## Summary
+
 Diff and merge GUI tool with cross-platform support build with Tauri: Rust and Svelte
 
 ## Screenshots (on the way)
