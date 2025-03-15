@@ -2,7 +2,7 @@
     --diff-primary-background-color: #1a1a1a;
     --diff-primary-text-color: #d0d0d0;
 
-    --diff-focused-border-color: #d0d0d0;
+    --diff-focused-border-color: #444444;
 
     --diff-old-line-insert-background-color: #163b2a;
     --diff-old-line-insert-text-color: #7cd3a0;
@@ -11,9 +11,9 @@
     --diff-old-line-replace-background-color: #453b28;
     --diff-old-line-replace-text-color: #f3d589;
 
-    --diff-old-char-delete-background-color: hsl(23, 27%, 10%);
-    --diff-old-char-insert-background-color: hsl(66, 27%, 10%);
-    --diff-old-char-replace-background-color: hsl(50, 27%, 10%);
+    --diff-old-char-delete-background-color: hsl(23, 27%, 30%);
+    --diff-old-char-insert-background-color: hsl(66, 27%, 33%);
+    --diff-old-char-replace-background-color: hsl(50, 27%, 33%);
 
     --diff-new-line-insert-background-color: #1a4d38;
     --diff-new-line-insert-text-color: #8dd7a3;
@@ -22,7 +22,7 @@
     --diff-new-line-replace-background-color: #3b3222;
     --diff-new-line-replace-text-color: #fdd888;
 
-    --diff-new-char-delete-background-color: hsl(24, 27%, 10%);
-    --diff-new-char-insert-background-color: hsl(72, 27%, 10%);
-    --diff-new-char-replace-background-color: hsl(58, 27%, 10%);
+    --diff-new-char-delete-background-color: hsl(24, 27%, 30%);
+    --diff-new-char-insert-background-color: hsl(72, 27%, 33%);
+    --diff-new-char-replace-background-color: hsl(58, 27%, 33%);
 }
