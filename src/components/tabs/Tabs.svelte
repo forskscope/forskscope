@@ -69,13 +69,18 @@
 
 <div class="tabs">
   <div class="headers">
-    {#each diffFilepathsList as _diffFilepaths, tabIndex}
-      <div class={`header ${tabIndex === activeTabIndex ? 'active' : ''}`}>
-        <label><input type="radio" value={tabIndex} bind:group={activeTabIndex} />{tabIndex}</label>
+    {#each diffFilepathsList as diffFilepaths, tabIndex}
+      <label class={`header ${tabIndex === activeTabIndex ? 'active' : ''}`}>
+        <input type="radio" value={tabIndex} bind:group={activeTabIndex} />
+        <span>
+          {tabIndex === 0
+            ? '💻️'
+            : diffFilepaths!.new.split('/')[diffFilepaths!.new.split('/').length - 1]}
+        </span>
         {#if 0 < tabIndex}
           <button onclick={() => removeTab(tabIndex)}>x</button>
         {/if}
-      </div>
+      </label>
     {/each}
   </div>
 </div>
@@ -104,32 +109,46 @@
     overflow-x: auto;
   }
   .header {
-    width: 5.7rem;
+    padding: 0 0.5rem;
     display: flex;
     align-items: center;
     /* todo: color vars */
-    border: 0.01rem solid yellow;
+    border: 0.01rem solid var(--tab-header-default-border-color);
   }
   .header.active {
-    font-size: 110%;
+    font-size: 105%;
     /* todo: color vars */
-    border-color: coral;
-    border-width: 0.32rem;
+    border-color: var(--tab-header-active-border-color);
+    border-width: 0.12rem;
+  }
+  .header:hover {
+    opacity: 0.72;
+  }
+
+  .header:not(:first-of-type) > span {
+    display: inline-block;
+    width: 5.7rem;
+    text-align: right;
+  }
+
+  .header span {
+    text-overflow: ellipsis;
+    overflow: hidden;
   }
 
   .header button {
     width: 1.4rem;
     padding: 0.1rem 0.4rem;
-    margin: 0 0.3rem;
-    flex-grow: 0;
+    margin: 0 0 0 0.8rem;
+    background: transparent;
+    color: var(--tab-header-default-border-color);
+    border-radius: 0.06rem;
+    box-shadow: none;
+    border: 0.02rem solid var(--tab-header-default-border-color);
   }
-  .header label {
-    width: 100%;
-    display: block;
-    flex: 1;
-    text-align: center;
-  }
-  .header label:hover {
-    opacity: 0.6;
+  .header button:hover {
+    background-color: var(--tab-header-active-border-color);
+    color: var(--tab-header-default-border-color);
+    border-color: var(--tab-header-active-border-color);
   }
 </style>
