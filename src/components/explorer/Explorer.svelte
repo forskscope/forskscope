@@ -2,7 +2,7 @@
   import { invoke } from '@tauri-apps/api/core'
   import { onMount } from 'svelte'
   import type { DiffFilepaths, ListDirReponse, OldOrNew } from '../../types'
-  import { dirpathFromDialog } from '../../scripts'
+  import { openDirectoryDialog } from '../../scripts'
 
   interface ExplorePane {
     oldOrNew: OldOrNew
@@ -43,7 +43,7 @@
   }
 
   const selectDir = async (oldOrNew: OldOrNew) => {
-    const dirpath = await dirpathFromDialog()
+    const dirpath = await openDirectoryDialog()
     if (dirpath === null) return
     await changeDir(dirpath, oldOrNew)
   }
@@ -186,7 +186,7 @@
 </div>
 
 {#if diffOnClickEnabled}
-  <button class="diff" onclick={diffOnClick}>diff</button>
+  <button class="diff" onclick={diffOnClick}>Compare</button>
 {/if}
 
 <style>

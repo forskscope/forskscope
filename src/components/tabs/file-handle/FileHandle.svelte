@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { filepathFromDialog } from '../../../scripts'
+  import { openFileDialog } from '../../../scripts'
   import type { DiffFilepaths, OldOrNew } from '../../../types'
 
   const {
@@ -18,7 +18,7 @@
   const readyForDiff: boolean = $derived(0 < _oldFilepath.length && 0 < _newFilepath.length)
 
   const openOldFileOnClick = async (oldOrNew: OldOrNew) => {
-    const filepath = await filepathFromDialog()
+    const filepath = await openFileDialog()
     if (!filepath) return
     if (oldOrNew === 'old') {
       _oldFilepath = filepath
@@ -43,7 +43,7 @@
     <button onclick={() => openOldFileOnClick('new')}>New file</button>
     <div class={0 < _newFilepath.length ? 'selected' : ''}>{_newFilepath}</div>
   </div>
-  <button class="diff" onclick={diffOnClick} disabled={!readyForDiff}>Diff</button>
+  <button class="diff" onclick={diffOnClick} disabled={!readyForDiff}>Compare</button>
 </div>
 
 <style>

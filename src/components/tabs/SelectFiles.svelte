@@ -51,7 +51,10 @@
 <button class="shows-file-handle" onclick={() => (showsFileHandle = !showsFileHandle)}>+</button>
 
 <div class={`select-files ${showsFileHandle ? '' : 'd-none'}`}>
-  <button onclick={() => (showsFileHandle = !showsFileHandle)}>x</button>
+  <header>
+    <button onclick={() => (showsFileHandle = !showsFileHandle)}>x</button>
+  </header>
+
   {#key [fileHandleOldFilepath, fileHandleNewFilepath]}
     <FileHandle
       oldFilepath={fileHandleOldFilepath}
@@ -62,6 +65,11 @@
 </div>
 
 <style>
+  header {
+    width: 100%;
+    text-align: right;
+  }
+
   .drag-drop {
     position: fixed;
     left: 0;

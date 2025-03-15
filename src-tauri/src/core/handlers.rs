@@ -45,22 +45,13 @@ pub async fn diff_chars(lines_diffs: Vec<LinesDiff>) -> Result<CharsDiffResponse
     Ok(CharsDiffResponse { diffs })
 }
 
-// #[tauri::command]
-// pub fn diff_contents(old: &str, new: &str) -> Vec<LinesDiff> {
-//     lines_diff(old, new)
-// }
-
-// #[tauri::command]
-// pub fn path_join(path1: &str, path2: &str) -> String {
-//     let p1 = Path::new(path1);
-//     let p2 = Path::new(path2);
-//     p1.join(p2)
-//         .canonicalize()
-//         .expect(format!("Failed to canonicalize combined {} and {}", path1, path2).as_str())
-//         .into_os_string()
-//         .into_string()
-//         .unwrap_or_else(|x| x.to_string_lossy().into_owned())
-// }
+#[tauri::command]
+pub fn save(filepath: &str, content: &str, charset: &str) -> Result<(), String> {
+    match file::save(filepath, content, charset) {
+        Ok(_) => Ok(()),
+        Err(err) => Err(err.to_string()),
+    }
+}
 
 #[tauri::command]
 pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {

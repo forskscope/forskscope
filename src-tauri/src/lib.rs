@@ -5,7 +5,7 @@ use types::StartupParam;
 mod core;
 pub mod types;
 
-use core::handlers::{diff_chars, diff_filepaths, list_dir, open_with_file_manager, ready};
+use core::handlers::{diff_chars, diff_filepaths, list_dir, open_with_file_manager, ready, save};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(startup_param: StartupParam) {
@@ -28,7 +28,8 @@ pub fn run(startup_param: StartupParam) {
             diff_chars,
             list_dir,
             open_with_file_manager,
-            ready
+            ready,
+            save
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

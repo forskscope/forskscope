@@ -15,7 +15,7 @@
   import SeparatorCol from './separator-col/SeparatorCol.svelte'
   import SeparatorHeaderCol from './separator-col/SeparatorHeaderCol.svelte'
   import SeparatorFooterCol from './separator-col/SeparatorFooterCol.svelte'
-  import { filepathFromDialog } from '../../scripts'
+  import { openFileDialog, saveFileDialog } from '../../scripts'
   import { onMount } from 'svelte'
 
   const {
@@ -107,7 +107,7 @@
   }
 
   const changeFilepath = async (oldOrNew: OldOrNew) => {
-    const filepath = await filepathFromDialog()
+    const filepath = await openFileDialog()
     if (filepath === null) return
     if (oldOrNew === 'old') {
       oldFilepath = filepath
@@ -123,6 +123,22 @@
     x.newLines = x.oldLines
     linesDiffs[linesDiffIndex] = x
     if (focusedLinesDiffIndex === linesDiffIndex) focusedLinesDiffIndex = null
+  }
+
+  const saveAsOnClick = async () => {
+    const filepath = await saveFileDialog(newFilepath).catch((error: unknown) => {
+      console.error(error)
+      return
+    })
+    if (!filepath) return
+    await invoke('save', {
+      filepath: filepath,
+      content: linesDiffs.reduce((a, b) => `${a}${b.newLines.join('')}`, ''),
+      charset: newCharset,
+    }).catch((error: unknown) => {
+      console.error(error)
+      return
+    })
   }
 
   const onKeyDown = (
@@ -215,13 +231,13 @@
       </div>
       <div class="row footer">
         <div class="col diff old">
-          <DiffFooterCol charset={oldCharset} />
+          <DiffFooterCol charset={oldCharset} saveAsOnClick={undefined} />
         </div>
         <div class="col separator">
           <SeparatorFooterCol />
         </div>
         <div class="col diff new">
-          <DiffFooterCol charset={newCharset} />
+          <DiffFooterCol charset={newCharset} {saveAsOnClick} />
         </div>
       </div>
     </div>

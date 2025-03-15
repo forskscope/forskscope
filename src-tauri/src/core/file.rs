@@ -1,10 +1,11 @@
-use std::io::Read;
+use std::io::{self, Read, Write};
 use std::process::Command;
 use std::time::UNIX_EPOCH;
 use std::{fs::File, path::Path};
 
 use chardetng::EncodingDetector;
 use chrono::{Local, TimeZone};
+use encoding_rs::{Encoding, UTF_8};
 
 use super::types::{FileAttr, ListDirReponse, ReadContent};
 
@@ -162,6 +163,14 @@ pub fn human_readable_size(size: u64) -> String {
         comma_separated_int
     };
     format!("{} {}", comma_separated_size, unit)
+}
+
+pub fn save(filepath: &str, content: &str, charset: &str) -> Result<(), io::Error> {
+    let encoding = Encoding::for_label(charset.as_bytes()).unwrap_or(UTF_8);
+    let (encoded, _, _) = encoding.encode(content);
+    let mut file = File::create(filepath)?;
+    file.write_all(&encoded)?;
+    Ok(())
 }
 
 pub fn file_manager_command() -> &'static str {

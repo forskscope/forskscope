@@ -1,7 +1,10 @@
-import { open as tauriDialogOpen } from '@tauri-apps/plugin-dialog'
+import { open as tauriDialogOpen, save as tauriDialogSave } from '@tauri-apps/plugin-dialog'
 
-export const filepathFromDialog = async (): Promise<string | null> => {
+export const openFileDialog = async (defaultPath?: string): Promise<string | null> => {
     const filepath: string | null = await tauriDialogOpen({
+        defaultPath,
+        directory: false,
+        multiple: false,
         filters: [
             {
                 name: 'All files',
@@ -12,10 +15,16 @@ export const filepathFromDialog = async (): Promise<string | null> => {
     return filepath
 }
 
-export const dirpathFromDialog = async (): Promise<string | null> => {
+export const openDirectoryDialog = async (defaultPath?: string): Promise<string | null> => {
     const dirpath: string | null = await tauriDialogOpen({
+        defaultPath,
         directory: true,
         multiple: false,
     })
     return dirpath
+}
+
+export const saveFileDialog = async (defaultPath?: string): Promise<string | null> => {
+    const filepath: string | null = await tauriDialogSave({ defaultPath })
+    return filepath
 }
