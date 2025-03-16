@@ -1,10 +1,7 @@
 <script lang="ts">
-  import type { DiffFilepaths, StartupParam } from '../../types'
+  import type { DiffFilepaths } from '../../types'
   import Tab from './Tab.svelte'
-  import { onMount } from 'svelte'
-  import { invoke } from '@tauri-apps/api/core'
   import SelectFiles from './SelectFiles.svelte'
-  import DragDrop from '../common/DragDrop.svelte'
 
   interface TabControl {
     label?: string
@@ -19,33 +16,10 @@
 
   let showsFileHandle: boolean = $state(false)
 
-  let fileHandleOldFilepath: string = $state('')
-  let fileHandleNewFilepath: string = $state('')
-
   const addDiffTab = (diffFilepaths: DiffFilepaths) => {
     diffFilepathsList.push(diffFilepaths)
     activeTabIndex = diffFilepathsList.length
-  }
-
-  const filesOnDropped = (filepaths: string[]) => {
-    if (filepaths.length === 0) return
-
-    // open file handle
-    if (filepaths.length === 1) {
-      if (0 < fileHandleOldFilepath.length) {
-        fileHandleNewFilepath = filepaths[0]
-      } else {
-        fileHandleOldFilepath = filepaths[0]
-        fileHandleNewFilepath = ''
-      }
-      showsFileHandle = true
-      return
-    }
-
-    // show diff directly
-    const diffFilepaths = { old: filepaths[0], new: filepaths[1] } as DiffFilepaths
-    diffFilepathsList.push(diffFilepaths)
-    activeTabIndex = diffFilepathsList.length - 1
+    showsFileHandle = false
   }
 
   const removeTab = (tabIndex: number) => {
@@ -54,26 +28,6 @@
     }
     diffFilepathsList.splice(tabIndex, 1)
   }
-
-  onMount(async () => {
-    const res = (await invoke('ready').catch((error: unknown) => {
-      console.error(error)
-      return
-    })) as StartupParam
-
-    if (res.oldFilepath) {
-      if (res.newFilepath) {
-        // show startup diff tab
-        addDiffTab({
-          old: res.oldFilepath,
-          new: res.newFilepath,
-        } as DiffFilepaths)
-      } else {
-        // start with a file dropped
-        filesOnDropped([res.oldFilepath])
-      }
-    }
-  })
 
   const tabControls = $derived([
     { label: '💻️', className: 'explorer' } as TabControl,
@@ -134,19 +88,7 @@
   {/each}
 </div>
 
-<div class={showsFileHandle ? '' : 'd-none'}>
-  <SelectFiles
-    {addDiffTab}
-    {filesOnDropped}
-    close={() => {
-      showsFileHandle = false
-    }}
-  />
-</div>
-
-<div class="drag-drop">
-  <DragDrop onDrop={filesOnDropped} />
-</div>
+<SelectFiles {showsFileHandle} {addDiffTab} />
 
 <style>
   .tabs {
@@ -213,15 +155,5 @@
     background-color: var(--tab-header-active-border-color);
     color: var(--tab-header-default-border-color);
     border-color: var(--tab-header-active-border-color);
-  }
-
-  .drag-drop {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 0;
-    pointer-events: none;
   }
 </style>

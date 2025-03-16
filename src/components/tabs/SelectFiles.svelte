@@ -3,15 +3,14 @@
   import FileHandle from './file-handle/FileHandle.svelte'
   import { onMount } from 'svelte'
   import { invoke } from '@tauri-apps/api/core'
+  import DragDrop from '../common/DragDrop.svelte'
 
   let {
+    showsFileHandle,
     addDiffTab,
-    filesOnDropped,
-    close,
   }: {
+    showsFileHandle: boolean
     addDiffTab: (diffFilepaths: DiffFilepaths) => void
-    filesOnDropped: (filepaths: string[]) => void
-    close: () => void
   } = $props()
 
   let fileHandleOldFilepath: string = $state('')
@@ -23,6 +22,7 @@
       return
     })) as StartupParam
 
+    console.log(res)
     if (res.oldFilepath) {
       if (res.newFilepath) {
         // show startup diff tab
@@ -32,29 +32,62 @@
         } as DiffFilepaths)
       } else {
         // start with a file dropped
-        filesOnDropped([res.oldFilepath])
+        fileHandleOldFilepath = res.oldFilepath
+        showsFileHandle = true
       }
     }
   })
 
   const filepathsOnChange = (diffFilepaths: DiffFilepaths) => {
     addDiffTab(diffFilepaths)
-    close()
+    closeFileHandle()
+  }
+
+  const closeFileHandle = () => {
+    showsFileHandle = false
+  }
+
+  const filesOnDropped = (filepaths: string[]) => {
+    if (filepaths.length === 0) return
+
+    // open file handle
+    if (filepaths.length === 1) {
+      if (0 < fileHandleOldFilepath.length) {
+        fileHandleNewFilepath = filepaths[0]
+      } else {
+        fileHandleOldFilepath = filepaths[0]
+        fileHandleNewFilepath = ''
+      }
+      showsFileHandle = true
+      return
+    }
+
+    // show diff directly
+    addDiffTab({
+      old: filepaths[0],
+      new: filepaths[1],
+    } as DiffFilepaths)
   }
 </script>
 
-<div class="select-files">
-  <header>
-    <button onclick={close}>x</button>
-  </header>
+<div class={showsFileHandle ? '' : 'd-none'}>
+  <div class="select-files">
+    <header>
+      <button onclick={closeFileHandle}>x</button>
+    </header>
 
-  {#key [fileHandleOldFilepath, fileHandleNewFilepath]}
-    <FileHandle
-      oldFilepath={fileHandleOldFilepath}
-      newFilepath={fileHandleNewFilepath}
-      {filepathsOnChange}
-    />
-  {/key}
+    {#key [fileHandleOldFilepath, fileHandleNewFilepath]}
+      <FileHandle
+        oldFilepath={fileHandleOldFilepath}
+        newFilepath={fileHandleNewFilepath}
+        {filepathsOnChange}
+      />
+    {/key}
+  </div>
+</div>
+
+<div class="drag-drop">
+  <DragDrop onDrop={filesOnDropped} />
 </div>
 
 <style>
@@ -70,5 +103,15 @@
     width: 80vw;
     height: 80vh;
     padding: 0.4rem 0;
+  }
+
+  .drag-drop {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    pointer-events: none;
   }
 </style>
