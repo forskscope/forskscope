@@ -146,6 +146,10 @@
     })
   }
 
+  const showsCharsDiffsOnChange = (value: boolean) => {
+    showsCharsDiffs = value
+  }
+
   const switchOldNewOnClick = () => {
     const orgOldFilepath = oldFilepath
     oldFilepath = newFilepath
@@ -199,13 +203,6 @@
 </script>
 
 <div class="diff-panes" onkeydown={onKeyDown} role="button" tabindex="0" bind:this={diffPanes}>
-  <div class="header d-flex">
-    <h2>Diff</h2>
-    {#if charsDiffsReady && 0 < charsDiffs!.length}
-      <label>Chars diff<input type="checkbox" bind:checked={showsCharsDiffs} /></label>
-    {/if}
-  </div>
-
   {#if !loaded}<p>(...... Loading ......)</p>{/if}
 
   {#if 0 < linesDiffs.length}
@@ -219,7 +216,12 @@
           />
         </div>
         <div class="col separator">
-          <SeparatorHeaderCol {charsDiffsReady} {switchOldNewOnClick} />
+          <SeparatorHeaderCol
+            {showsCharsDiffs}
+            {charsDiffsReady}
+            {showsCharsDiffsOnChange}
+            {switchOldNewOnClick}
+          />
         </div>
         <div class="col diff new">
           <DiffHeaderCol
@@ -289,7 +291,7 @@
   }
 
   .rows {
-    height: calc(100vh - 3.9rem);
+    height: calc(100vh - 1.9rem);
     display: flex;
     flex-direction: column;
   }

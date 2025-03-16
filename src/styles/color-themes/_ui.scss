@@ -35,16 +35,16 @@ button {
 }
 
 .diff-panes {
-    .header {
+    .row.header {
         border-bottom: 0.2rem solid var(--primary-border-color);
     }
 
-    .footer {
+    .row.footer {
         border-top: 0.2rem solid var(--primary-border-color);
     }
 
-    .header,
-    .main {
+    .row.header .diff,
+    .content .separator {
         button {
             background-color: transparent;
             color: var(--secondary-text-color);

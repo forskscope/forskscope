@@ -16,39 +16,36 @@
   const filename: string = $derived(filepath.substring(lastSlashIndex + 1))
 </script>
 
-<button onclick={filepathFromDialogOnClick}>
-  <h3>{oldOrNew.toUpperCase()}</h3>
-  <div class="filepath">
+<div class="wrapper">
+  <h3 class="filepath">
     <div class="parent-dirs">{parentDirsPath}</div>
     <div class="filename">{filename}</div>
-  </div>
-</button>
+  </h3>
+  <button onclick={filepathFromDialogOnClick}>⚓️</button>
+</div>
 
 <style>
-  button {
-    width: 100%;
-    padding: 0.3rem 0.4rem;
+  .wrapper {
+    height: 100%;
     display: flex;
     align-items: center;
-  }
-
-  h3 {
-    padding: 0;
-    margin: 0 1rem 0 0;
-    display: inline-block;
-    font-size: 0.8rem;
-    font-weight: normal;
+    gap: 0.2rem;
   }
 
   .filepath {
-    display: flex;
+    width: calc(100% - 2.4rem);
+    margin-left: 0.2rem;
+    margin-top: 0.2rem;
+    display: inline-flex;
     overflow: hidden;
     align-items: center;
+    font-size: 1rem;
+    font-weight: normal;
   }
 
   /* Allows shrinking */
   .parent-dirs {
-    flex: 1;
+    flex-shrink: 1;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -59,5 +56,11 @@
   .filename {
     flex-shrink: 0;
     margin-left: 0.02rem;
+  }
+
+  button {
+    width: 2rem;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.9rem;
   }
 </style>

@@ -15,15 +15,15 @@ html body {
 }
 
 h1,
-h2 {
+h2,
+h3 {
     padding: 0;
     margin: 0;
 }
 
 a,
 button,
-.button,
-*[role="button"] {
+.button {
     cursor: pointer;
 }
 

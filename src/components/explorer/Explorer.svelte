@@ -21,6 +21,16 @@
 
   const diffOnClickEnabled = $derived(0 < oldSelectedFile.length && 0 < newSelectedFile.length)
 
+  const lastSlashIndex = (dirpath: string): number => {
+    return dirpath.lastIndexOf('/')
+  }
+  const parentDirsPath = (dirpath: string): string => {
+    return dirpath.substring(0, lastSlashIndex(dirpath) + 1)
+  }
+  const dirname = (dirpath: string): string => {
+    return dirpath.substring(lastSlashIndex(dirpath) + 1)
+  }
+
   onMount(async () => {
     invoke('list_dir', { currentDir: '' })
       .then((res: unknown) => {
@@ -110,12 +120,15 @@
   <h2>Explorer</h2>
 </div>
 
-<div class="main explorer-panes">
+<div class="content explorer-panes">
   {#each [oldExplorerPane, newExplorerPane] as pane}
     {#if pane.listDirResponse !== null}
       <div class="explorer-pane">
         <div class="current-dir">
-          <h3>{pane.listDirResponse.currentDir}</h3>
+          <h3 class="dirpath">
+            <div class="parent-dirs">{parentDirsPath(pane.listDirResponse.currentDir)}</div>
+            <div class="dirname">{dirname(pane.listDirResponse.currentDir)}</div>
+          </h3>
           <div>
             <button class="select-dir" onclick={() => selectDir(pane.oldOrNew)}>⚓️</button>
             <button class="file-manager" onclick={() => openWithFileManager(pane.oldOrNew)}
@@ -206,7 +219,7 @@
   h2 {
     font-size: 0.87rem;
   }
-  .main {
+  .content {
     height: calc(100vh - 4.9rem);
   }
   .footer {
@@ -240,13 +253,29 @@
     align-items: center;
   }
 
-  h3 {
-    margin: 0.7rem 0.4rem;
+  .dirpath {
+    width: calc(100% - 3.2rem);
+    margin-left: 0.2rem;
+    display: inline-flex;
+    overflow: hidden;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: normal;
+  }
+
+  /* Allows shrinking */
+  .parent-dirs {
+    flex-shrink: 1;
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    direction: rtl;
-    text-align: right;
+  }
+
+  /* Prevent from truncated */
+  .dirname {
+    flex-shrink: 0;
+    margin-left: 0.02rem;
   }
 
   .select-dir,

@@ -4,7 +4,8 @@
 }
 
 .tabs label>input[type="radio"],
-.dirs-files label>input[type="radio"] {
+.dirs-files label>input[type="radio"],
+.menus-toggle>input[type="checkbox"] {
   display: none;
 }
 
