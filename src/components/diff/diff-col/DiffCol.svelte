@@ -80,7 +80,7 @@
   .lines-diffs {
     width: fit-content;
     min-width: 100%;
-    min-height: 72vh;
+    min-height: calc(100vh - 6.1rem);
     overflow: hidden;
     font-family: monospace;
 
@@ -100,7 +100,7 @@
     width: 3em;
     padding-right: 0.7em;
     display: inline-block;
-    text-align: right;
+    text-align: center;
     color: var(--secondary-text-color);
   }
 </style>
