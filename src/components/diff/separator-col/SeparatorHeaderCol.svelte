@@ -1,5 +1,12 @@
+<script lang="ts">
+  let {
+    charsDiffsReady,
+    switchOldNewOnClick,
+  }: { charsDiffsReady: boolean; switchOldNewOnClick: () => void } = $props()
+</script>
+
 <!-- todo: switch new/old -->
-<div><button>&lt;&gt;</button></div>
+<div><button onclick={switchOldNewOnClick} disabled={!charsDiffsReady}>&lt;&gt;</button></div>
 
 <style>
   button {

@@ -12,7 +12,7 @@
   }: {
     oldOrNew: OldOrNew
     linesDiffs: LinesDiff[]
-    charsDiffs: CharsDiffLines[]
+    charsDiffs: CharsDiffLines[] | null
     showsCharsDiffs: boolean
     focusedLinesDiffIndex: number | null
   } = $props()
@@ -30,10 +30,12 @@
 
   const hasReplaceCharsDiff = (diffKind: DiffKind, diffIndex: number): boolean => {
     if (diffKind !== 'replace') return false
-    return charsDiffs.some((x) => x.diffIndex === diffIndex)
+    return charsDiffs !== null && charsDiffs.some((x) => x.diffIndex === diffIndex)
   }
 
   const charsDiff = (diffIndex: number, oldOrNew: OldOrNew): CharsDiff[][] => {
+    if (charsDiffs === null) return [[]]
+
     const charsDiff = charsDiffs.find((x) => x.diffIndex === diffIndex)!
     return oldOrNew === 'old' ? charsDiff.oldLines : charsDiff.newLines
   }
@@ -99,7 +101,6 @@
     padding-right: 0.7em;
     display: inline-block;
     text-align: right;
-    /* todo: color vars */
-    color: darkgray;
+    color: var(--secondary-text-color);
   }
 </style>

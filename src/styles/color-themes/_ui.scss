@@ -1,4 +1,63 @@
 #app {
-    background-color: var(--background-primary-color);
-    color: var(--text-primary-color);
+    background-color: var(--secondary-background-color);
+    color: var(--secondary-text-color);
+}
+
+*:disabled {
+    color: var(--muted-text-color);
+}
+
+button:disabled {
+    background-color: var(--button-muted-background-color);
+}
+
+input,
+button {
+    background-color: var(--button-primary-background-color);
+    color: var(--button-primary-text-color);
+}
+
+.explorer-pane {
+    background-color: var(--primary-background-color);
+    color: var(--primary-text-color);
+
+    .dirs-files {
+        .header {
+            background-color: var(--primary-text-color);
+            color: var(--primary-background-color);
+        }
+
+        label input[type='radio']:checked+div,
+        .file input[type='radio']:checked+div {
+            border-bottom-color: var(--focused-border-color);
+        }
+    }
+}
+
+.diff-panes {
+    .header {
+        border-bottom: 0.2rem solid var(--primary-border-color);
+    }
+
+    .footer {
+        border-top: 0.2rem solid var(--primary-border-color);
+    }
+
+    .header,
+    .main {
+        button {
+            background-color: transparent;
+            color: var(--secondary-text-color);
+            box-shadow: none;
+
+            &:not(:disabled):hover {
+                background-color: var(--focused-border-color);
+            }
+        }
+    }
+}
+
+.select-files {
+    background-color: var(--primary-text-color);
+    color: var(--primary-background-color);
 }

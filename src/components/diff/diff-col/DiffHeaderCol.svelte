@@ -4,12 +4,10 @@
   const {
     oldOrNew,
     filepath,
-    isCompletelyEqual,
     filepathFromDialogOnClick,
   }: {
     oldOrNew: OldOrNew
     filepath: string
-    isCompletelyEqual: boolean
     filepathFromDialogOnClick: () => void
   } = $props()
 
@@ -25,11 +23,6 @@
     <div class="filename">{filename}</div>
   </div>
 </button>
-
-{#if isCompletelyEqual}
-  <!-- todo: The same files -->
-  <div>The files are the same</div>
-{/if}
 
 <style>
   button {

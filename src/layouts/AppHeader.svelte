@@ -1,27 +1,36 @@
 <script lang="ts">
-  import { APP_THEMES, type AppTheme } from '../types'
-
-  // todo: color theme switcher
-  let activeTheme: string = $state('night-theme')
-
-  let { activeThemeOnChange }: { activeThemeOnChange: (theme: AppTheme) => void } = $props()
+  let { toggleSettings }: { toggleSettings: () => void } = $props()
 </script>
 
-<h1>Patch Hygge</h1>
+<div>
+  <h1>Patch Hygge</h1>
 
-<!-- todo: color theme switcher -->
-<div style="display: flex;">
-  {#each APP_THEMES as theme}
-    <label
-      ><input
-        type="radio"
-        name="themes"
-        value={theme}
-        onchange={(e) => {
-          activeThemeOnChange(e.currentTarget.value)
-        }}
-        checked={theme === activeTheme}
-      />{theme}</label
-    >
-  {/each}
+  <button
+    onclick={() => {
+      toggleSettings()
+    }}
+    >⚙️
+  </button>
 </div>
+
+<style>
+  div {
+    position: fixed;
+    top: 0.2rem;
+    right: 0.7rem;
+    display: flex;
+    align-items: center;
+    font-size: 1.1rem;
+    opacity: 0.4;
+    gap: 0.4rem;
+    z-index: 1001;
+  }
+
+  h1 {
+    font-size: 0.9rem;
+  }
+
+  button {
+    padding: 0 0.3rem;
+  }
+</style>

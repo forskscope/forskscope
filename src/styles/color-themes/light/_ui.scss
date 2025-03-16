@@ -1,10 +1,34 @@
 .light-theme {
-    --background-primary-color: #ffffff;
-    --text-primary-color: #222222;
+    --primary-background-color: #f2f2f2;
+    --primary-text-color: #111111;
+
+    --secondary-background-color: #eaeaea;
+    --secondary-text-color: #333333;
+
+    --muted-text-color: #777777;
 
     --tab-header-default-border-color: #252525;
     --tab-header-active-border-color: #caca16;
 
-    --select-files-background-color: #f0f8e0;
-    --select-files-text-color: #222222;
+    // --select-files-background-color: #f0f8e0;
+    // --select-files-text-color: #222222;
+
+    --button-primary-background-color: #007bff;
+    --button-primary-text-color: #ffffff;
+
+    --button-muted-background-color: #e0e0e0;
+
+    --primary-border-color: #ccc;
+    --focused-border-color: #007bff;
+
+    // --border-muted: #e0e0e0;
+    // --border-error: #dc3545;
+
+    // --link-color: #007bff;
+
+    // --primary-color: #007bff;
+    // --secondary-color: #6c757d;
+    // --accent-color: #28a745;
+    // --warning-color: #ffc107;
+    // --error-color: #dc3545;
 }

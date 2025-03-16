@@ -1,6 +1,5 @@
 <script lang="ts">
-  import '../styles/app-global.scss'
-  import '../styles/color-themes/index.scss'
+  import '../styles/index.scss'
 </script>
 
 <slot />

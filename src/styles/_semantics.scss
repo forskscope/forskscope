@@ -1,0 +1,43 @@
+:root {
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+}
+
+html body {
+    width: 100vw;
+    height: 100vh;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+}
+
+h1,
+h2 {
+    padding: 0;
+    margin: 0;
+}
+
+a,
+button,
+.button,
+*[role="button"] {
+    cursor: pointer;
+}
+
+input,
+button {
+    padding: 0.6em 1.2em;
+    font-size: 1em;
+    font-weight: 500;
+    border: 1px solid transparent;
+    border-radius: 0.06rem;
+    box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+    outline: none;
+}
+
+button:not(:disabled):hover {
+    opacity: 0.87;
+}

@@ -1,10 +1,34 @@
 .monokai-theme {
-    --background-primary-color: #272822;
-    --text-primary-color: #f8f8f2;
+    --primary-background-color: #272822;
+    --primary-text-color: #f8f8f2;
+
+    --secondary-background-color: #3e3d32;
+    --secondary-text-color: #75715e;
+
+    --muted-text-color: #f1efef;
 
     --tab-header-default-border-color: #ababab;
     --tab-header-active-border-color: #eaea27;
 
-    --select-files-background-color: #2e3e1e;
-    --select-files-text-color: #e0e0e0;
+    // --select-files-background-color: #2e3e1e;
+    // --select-files-text-color: #e0e0e0;
+
+    --button-primary-background-color: #f92672;
+    --button-primary-text-color: #272822;
+
+    --button-muted-background-color: #555;
+
+    --primary-border-color: #3e3d32;
+    --focused-border-color: #f92672;
+
+    // --border-muted: #555;
+    // --border-error: #f44336;
+
+    // --link-color: #f92672;
+
+    // --primary-color: #f92672;
+    // --secondary-color: #75715e;
+    // --accent-color: #a6e22e;
+    // --warning-color: #fd971f;
+    // --error-color: #f44336;
 }

@@ -40,6 +40,8 @@
     const oldFilepath: string = `${oldExplorerPane.listDirResponse!.currentDir}/${oldSelectedFile}`
     const newFilepath: string = `${newExplorerPane.listDirResponse!.currentDir}/${newSelectedFile}`
     diffFilepathsOnSelected({ old: oldFilepath, new: newFilepath } as DiffFilepaths)
+
+    // todo reset radio selection
   }
 
   const selectDir = async (oldOrNew: OldOrNew) => {
@@ -104,18 +106,20 @@
   }
 </script>
 
-<h2>Explorer</h2>
+<div class="header">
+  <h2>Explorer</h2>
+</div>
 
-<div class="explorer-panes">
+<div class="main explorer-panes">
   {#each [oldExplorerPane, newExplorerPane] as pane}
     {#if pane.listDirResponse !== null}
       <div class="explorer-pane">
         <div class="current-dir">
           <h3>{pane.listDirResponse.currentDir}</h3>
           <div>
-            <button class="select-dir" onclick={() => selectDir(pane.oldOrNew)}>🔎</button>
+            <button class="select-dir" onclick={() => selectDir(pane.oldOrNew)}>⚓️</button>
             <button class="file-manager" onclick={() => openWithFileManager(pane.oldOrNew)}
-              >🗃️</button
+              >📦️</button
             >
           </div>
         </div>
@@ -141,6 +145,7 @@
                 ⇡ ..
               </div>
             {/if}
+
             {#each pane.listDirResponse.dirs as dir}
               <label class="dir"
                 ><input
@@ -161,6 +166,7 @@
                 <div></div>
               </label>
             {/each}
+
             {#each pane.listDirResponse.files as file}
               <label class="file"
                 ><input
@@ -169,7 +175,7 @@
                   value={file.name}
                   onchange={(e) => selectedFileOnChange(e, pane.oldOrNew)}
                 />
-                <div>📜 {file.name}</div>
+                <div role="button" tabindex="0">📜 {file.name}</div>
                 {#if file.humanReadableSize !== file.bytesSize}
                   <div>{file.humanReadableSize} ({file.bytesSize})</div>
                 {:else}
@@ -185,11 +191,29 @@
   {/each}
 </div>
 
-{#if diffOnClickEnabled}
-  <button class="diff" onclick={diffOnClick}>Compare</button>
-{/if}
+<div class="footer">
+  {#if diffOnClickEnabled}
+    <button class="compare" onclick={diffOnClick}>Compare</button>
+  {/if}
+</div>
 
 <style>
+  .header {
+    height: 1.4rem;
+    display: flex;
+    align-items: center;
+  }
+  h2 {
+    font-size: 0.87rem;
+  }
+  .main {
+    height: calc(100vh - 4.9rem);
+  }
+  .footer {
+    height: 1.9rem;
+    text-align: center;
+  }
+
   .explorer-panes,
   .explorer-pane,
   .dirs-files {
@@ -280,17 +304,12 @@
   }
 
   .dirs-files label input[type='radio']:checked + div {
-    /* todo: color vars */
-    border-bottom: 0.02rem solid grey;
+    border-bottom-width: 0.02rem;
+    border-bottom-style: solid;
   }
 
-  .dirs-files .file input[type='radio']:checked + div {
-    /* todo: color vars */
-    border-bottom-color: yellow;
-  }
-
-  button.diff {
-    width: 90%;
-    margin-left: 5%;
+  button.compare {
+    width: 12rem;
+    padding: 0.2rem 0;
   }
 </style>

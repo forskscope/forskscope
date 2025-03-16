@@ -1,10 +1,34 @@
 .dark-theme {
-    --background-primary-color: #1e1e1e;
-    --text-primary-color: #e0e0e0;
+    --primary-background-color: #181818;
+    --primary-text-color: #e0e0e0;
+
+    --secondary-background-color: #222222;
+    --secondary-text-color: #b0b0b0;
+
+    --muted-text-color: #7a7a7a;
 
     --tab-header-default-border-color: #ababab;
     --tab-header-active-border-color: #eaea27;
 
-    --select-files-background-color: #2e3e1e;
-    --select-files-text-color: #e0e0e0;
+    // --select-files-background-color: #2e3e1e;
+    // --select-files-text-color: #e0e0e0;
+
+    --button-primary-background-color: #1e90ff;
+    --button-primary-text-color: #181818;
+
+    --button-muted-background-color: #666;
+
+    --primary-border-color: #444;
+    --focused-border-color: #1e90ff;
+
+    // --border-muted: #666;
+    // --border-error: #ff4500;
+
+    // --link-color: #1e90ff;
+
+    // --primary-color: #1e90ff;
+    // --secondary-color: #555555;
+    // --accent-color: #32cd32;
+    // --warning-color: #ffcc00;
+    // --error-color: #ff4500;
 }

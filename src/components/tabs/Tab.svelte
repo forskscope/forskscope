@@ -8,13 +8,13 @@
     diffFilepathsOnSelected,
     removeDiffTab,
   }: {
-    diffFilepaths: DiffFilepaths | null
+    diffFilepaths: DiffFilepaths | undefined
     diffFilepathsOnSelected: (diffFilepaths: DiffFilepaths) => void
     removeDiffTab: () => void
   } = $props()
 </script>
 
-{#if diffFilepaths === null}
+{#if !diffFilepaths}
   <Explorer {diffFilepathsOnSelected} />
 {:else}
   <Diff {diffFilepaths} {removeDiffTab} />

@@ -68,7 +68,7 @@
 }
 
 .separator {
-    .lines-diff.focused {
-        box-shadow: inset 12px 0 0 var(--diff-focused-border-color);
+    .lines-diff.focused button {
+        background-color: var(--focused-border-color);
     }
 }

@@ -1,6 +1,6 @@
 # Patch Hygge
 
-[![Releases Workflow](https://github.com/nabbisen/patch-hygge/actions/workflows/release-executable.yaml/badge.svg)](https://github.com/nabbisen/patch-hygge/actions/workflows/)
+[![Releases Workflow](https://github.com/nabbisen/patch-hygge/actions/workflows/release-executable.yaml/badge.svg)](https://github.com/nabbisen/patch-hygge/actions/workflows/release-executable.yaml)
 [![License](https://img.shields.io/github/license/nabbisen/patch-hygge)](https://github.com/nabbisen/patch-hygge/blob/main/LICENSE)
 
 ## Summary

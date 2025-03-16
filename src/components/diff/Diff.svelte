@@ -30,14 +30,17 @@
   let newCharset: string = $state('')
 
   let linesDiffs: LinesDiff[] = $state([])
-  let charsDiffs: CharsDiffLines[] = $state([])
+  let charsDiffs: CharsDiffLines[] | null = $state(null)
   let showsCharsDiffs: boolean = $state(false)
   let focusedLinesDiffIndex: number | null = $state(null)
 
   let loaded: boolean = $state(false)
 
+  let diffPanes: HTMLDivElement
+
   onMount(async () => {
     await diff()
+    diffPanes.focus()
   })
 
   // todo: not equal diffs in linesDiffs can changed to be 'equal'
@@ -64,6 +67,8 @@
     )
     return 0 <= foundIndex ? foundIndex : focusedLinesDiffIndex
   })
+
+  const charsDiffsReady = $derived(charsDiffs !== null)
 
   const isCompletelyEqual = $derived(!linesDiffs.some((x) => x.diffKind !== 'equal'))
 
@@ -141,6 +146,34 @@
     })
   }
 
+  const switchOldNewOnClick = () => {
+    const orgOldFilepath = oldFilepath
+    oldFilepath = newFilepath
+    newFilepath = orgOldFilepath
+
+    linesDiffs = linesDiffs.map((x) => {
+      const ret = x
+      const orgOldLines = ret.oldLines
+      ret.oldLines = ret.newLines
+      ret.newLines = orgOldLines
+      return ret
+    })
+
+    const orgOldCharset = oldCharset
+    oldCharset = newCharset
+    newCharset = orgOldCharset
+
+    charsDiffs = charsDiffs!.map((x) => {
+      const ret = x
+      const orgOldLines = ret.oldLines
+      ret.oldLines = ret.newLines
+      ret.newLines = orgOldLines
+      return ret
+    })
+
+    focusedLinesDiffIndex = null
+  }
+
   const onKeyDown = (
     e: KeyboardEvent & {
       currentTarget: EventTarget & HTMLDivElement
@@ -165,10 +198,10 @@
   }
 </script>
 
-<div class="keyboard-listener" onkeydown={onKeyDown} role="button" tabindex="0">
-  <div class="d-flex" style="gap: 1.1rem;">
+<div class="diff-panes" onkeydown={onKeyDown} role="button" tabindex="0" bind:this={diffPanes}>
+  <div class="header d-flex">
     <h2>Diff</h2>
-    {#if 0 < charsDiffs.length}
+    {#if charsDiffsReady && 0 < charsDiffs!.length}
       <label>Chars diff<input type="checkbox" bind:checked={showsCharsDiffs} /></label>
     {/if}
   </div>
@@ -182,18 +215,16 @@
           <DiffHeaderCol
             oldOrNew="old"
             filepath={oldFilepath}
-            {isCompletelyEqual}
             filepathFromDialogOnClick={async () => changeFilepath('old')}
           />
         </div>
         <div class="col separator">
-          <SeparatorHeaderCol />
+          <SeparatorHeaderCol {charsDiffsReady} {switchOldNewOnClick} />
         </div>
         <div class="col diff new">
           <DiffHeaderCol
             oldOrNew="new"
             filepath={newFilepath}
-            {isCompletelyEqual}
             filepathFromDialogOnClick={async () => changeFilepath('new')}
           />
         </div>
@@ -231,13 +262,13 @@
       </div>
       <div class="row footer">
         <div class="col diff old">
-          <DiffFooterCol charset={oldCharset} saveAsOnClick={undefined} />
+          <DiffFooterCol charset={oldCharset} {isCompletelyEqual} saveAsOnClick={undefined} />
         </div>
         <div class="col separator">
           <SeparatorFooterCol />
         </div>
         <div class="col diff new">
-          <DiffFooterCol charset={newCharset} {saveAsOnClick} />
+          <DiffFooterCol charset={newCharset} {isCompletelyEqual} {saveAsOnClick} />
         </div>
       </div>
     </div>
@@ -245,15 +276,20 @@
 </div>
 
 <style>
-  .keyboard-listener:focus {
+  .diff-panes:focus {
     outline: none;
     border: none;
     box-shadow: none;
     /* min-height: 0; */
   }
 
+  .header {
+    height: 2rem;
+    gap: 1.1rem;
+  }
+
   .rows {
-    height: 85vh;
+    height: calc(100vh - 3.9rem);
     display: flex;
     flex-direction: column;
   }
@@ -287,9 +323,5 @@
   .col.separator {
     flex-grow: 0;
     flex-basis: 1.4rem;
-    /* todo: color vars */
-    background-color: black;
-    /* todo: color vars */
-    color: white;
   }
 </style>

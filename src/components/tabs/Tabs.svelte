@@ -4,8 +4,17 @@
   import { onMount } from 'svelte'
   import { invoke } from '@tauri-apps/api/core'
   import SelectFiles from './SelectFiles.svelte'
+  import DragDrop from '../common/DragDrop.svelte'
 
-  let diffFilepathsList: (DiffFilepaths | null)[] = $state([null])
+  interface TabControl {
+    label?: string
+    className?: string
+    diffFilepaths?: DiffFilepaths
+    buttonLabel?: string
+    buttonOnClick?: Function
+  }
+
+  let diffFilepathsList: DiffFilepaths[] = $state([])
   let activeTabIndex: number = $state(0)
 
   let showsFileHandle: boolean = $state(false)
@@ -15,7 +24,7 @@
 
   const addDiffTab = (diffFilepaths: DiffFilepaths) => {
     diffFilepathsList.push(diffFilepaths)
-    activeTabIndex = diffFilepathsList.length - 1
+    activeTabIndex = diffFilepathsList.length
   }
 
   const filesOnDropped = (filepaths: string[]) => {
@@ -65,30 +74,59 @@
       }
     }
   })
+
+  const tabControls = $derived([
+    { label: '💻️', className: 'explorer' } as TabControl,
+    ...diffFilepathsList.map((x, i) => {
+      const label = x!.new.split('/')[x!.new.split('/').length - 1]
+      const className = 'diff'
+      const diffFilepaths = { old: x.old, new: x.new } as DiffFilepaths
+      const buttonLabel = '✖️'
+      const buttonOnClick = () => {
+        removeTab(i - 1)
+      }
+      return { label, className, diffFilepaths, buttonLabel, buttonOnClick } as TabControl
+    }),
+    {
+      className: 'add-diff-tab',
+      buttonLabel: '➕️',
+      buttonOnClick: () => {
+        showsFileHandle = !showsFileHandle
+      },
+    } as TabControl,
+  ])
 </script>
 
 <div class="tabs">
   <div class="headers">
-    {#each diffFilepathsList as diffFilepaths, tabIndex}
-      <label class={`header ${tabIndex === activeTabIndex ? 'active' : ''}`}>
-        <input type="radio" value={tabIndex} bind:group={activeTabIndex} />
-        <span>
-          {tabIndex === 0
-            ? '💻️'
-            : diffFilepaths!.new.split('/')[diffFilepaths!.new.split('/').length - 1]}
-        </span>
-        {#if 0 < tabIndex}
-          <button onclick={() => removeTab(tabIndex)}>x</button>
+    {#each tabControls as tabControl, tabIndex}
+      <label
+        class={`header ${tabControl.className} ${tabIndex === activeTabIndex ? 'active' : ''}`}
+      >
+        <input
+          type="radio"
+          value={tabIndex}
+          bind:group={activeTabIndex}
+          disabled={!tabControl.label}
+        />
+        <span>{tabControl.label}</span>
+        {#if tabControl.buttonOnClick}
+          <button
+            onclick={() => {
+              tabControl.buttonOnClick!()
+            }}>{tabControl.buttonLabel}</button
+          >
         {/if}
       </label>
     {/each}
   </div>
 </div>
+
 <div class="active-tab">
-  {#each diffFilepathsList as diffFilepaths, tabIndex}
+  {#each tabControls as tabControl, tabIndex}
     <div class={tabIndex === activeTabIndex ? '' : 'd-none'}>
       <Tab
-        {diffFilepaths}
+        diffFilepaths={tabControl.diffFilepaths}
         diffFilepathsOnSelected={addDiffTab}
         removeDiffTab={() => removeTab(tabIndex)}
       />
@@ -96,11 +134,30 @@
   {/each}
 </div>
 
-<SelectFiles {addDiffTab} {filesOnDropped} />
+<div class={showsFileHandle ? '' : 'd-none'}>
+  <SelectFiles
+    {addDiffTab}
+    {filesOnDropped}
+    close={() => {
+      showsFileHandle = false
+    }}
+  />
+</div>
+
+<div class="drag-drop">
+  <DragDrop onDrop={filesOnDropped} />
+</div>
 
 <style>
-  input[type='radio'] {
-    display: none;
+  .tabs {
+    height: 1.6rem;
+  }
+
+  .active-tab {
+    height: calc(100vh - 1rem);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
 
   .headers {
@@ -125,7 +182,7 @@
     opacity: 0.72;
   }
 
-  .header:not(:first-of-type) > span {
+  .header.diff > span {
     display: inline-block;
     width: 5.7rem;
     text-align: right;
@@ -146,9 +203,25 @@
     box-shadow: none;
     border: 0.02rem solid var(--tab-header-default-border-color);
   }
+  .header:not(.diff) button {
+    padding: 0 0.1rem;
+    margin: 0;
+    border: none;
+  }
+  .header.explorer:hover,
   .header button:hover {
     background-color: var(--tab-header-active-border-color);
     color: var(--tab-header-default-border-color);
     border-color: var(--tab-header-active-border-color);
+  }
+
+  .drag-drop {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    pointer-events: none;
   }
 </style>
