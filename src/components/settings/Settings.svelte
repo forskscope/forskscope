@@ -73,45 +73,51 @@
 <div class="wrapper">
   <div class="settings">
     {#each SELECTORS as selector}
-      <h3>{selector.title}</h3>
-      <div>
-        {#each selector.items as item}
-          <label
-            ><input
-              type="radio"
-              name={selector.groupName}
-              value={item}
-              onchange={(e) => {
-                selector.handler(e.currentTarget.value)
-              }}
-              checked={item === selector.defaultValue}
-            />{item.replace(selector.valueSuffix, '')}</label
-          >
-        {/each}
+      <div class="setting">
+        <h3>{selector.title}</h3>
+        <div>
+          {#each selector.items as item}
+            <label
+              ><input
+                type="radio"
+                name={selector.groupName}
+                value={item}
+                onchange={(e) => {
+                  selector.handler(e.currentTarget.value)
+                }}
+                checked={item === selector.defaultValue}
+              />{item.replace(selector.valueSuffix, '')}</label
+            >
+          {/each}
+        </div>
       </div>
     {/each}
-    <h3>Diff Font Size</h3>
-    <div>
-      <input
-        type="number"
-        bind:value={diffFontSize}
-        onchange={() => {
-          diffFontSizeOnChange(diffFontSize)
-        }}
-      />
+    <div class="setting">
+      <h3>Diff Font Size</h3>
+      <div>
+        <input
+          type="number"
+          bind:value={diffFontSize}
+          onchange={() => {
+            diffFontSizeOnChange(diffFontSize)
+          }}
+        />
+      </div>
     </div>
-    <h3>UI Font Size (Ratio to Diff)</h3>
-    <div>
-      <input
-        type="number"
-        step="0.05"
-        min="0.2"
-        max="1"
-        bind:value={uiFontSizeScale}
-        onchange={() => {
-          uiFontSizeScaleOnChange(uiFontSizeScale)
-        }}
-      />
+    <div class="setting">
+      <h3>UI Font Size (Ratio to Diff)</h3>
+      <div>
+        <input
+          type="number"
+          step="0.05"
+          min="0.2"
+          max="1"
+          bind:value={uiFontSizeScale}
+          onchange={() => {
+            uiFontSizeScaleOnChange(uiFontSizeScale)
+          }}
+        />
+      </div>
     </div>
   </div>
 </div>
@@ -127,10 +133,16 @@
     color: var(--secondary-text-color);
     opacity: 0.93;
     z-index: 1000;
+    overflow: scroll;
   }
 
   .settings {
+    width: 100%;
     max-width: 20rem;
+    height: auto;
     margin: 2.5rem auto 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.4rem;
   }
 </style>

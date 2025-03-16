@@ -1,6 +1,6 @@
 [package]
 name = "patch-hygge"
-version = "0.12.1"
+version = "0.12.2"
 edition = "2021"
 
 description = "Diff and merge GUI tool with cross-platform support build with Tauri: Rust and Svelte"
