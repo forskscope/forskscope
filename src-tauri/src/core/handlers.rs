@@ -1,31 +1,39 @@
 // use tauri::Manager;
 
+use serde::Serialize;
 use std::path::Path;
 use std::process::Command;
 
-use tauri::State;
-
-use crate::types::StartupParam;
+use tauri::Manager;
 
 use super::diff::{chars_diffs, lines_diffs};
-use super::file::{self, file_manager_command, filepath_content};
+use super::file::{self, arg_to_filepath, file_manager_command, filepath_content};
 use super::types::{CharsDiffResponse, DiffResponse, LinesDiff, ListDirReponse};
 
-// #[tauri::command]
-// pub fn startup_args(app_handle: tauri::AppHandle) -> Vec<String> {
-//     app_handle
-//         .env()
-//         .args_os
-//         .into_iter()
-//         // first arg is executable themself
-//         .skip(1)
-//         .map(|x| {
-//             x.to_os_string()
-//                 .into_string()
-//                 .unwrap_or_else(|x| x.to_string_lossy().into_owned())
-//         })
-//         .collect()
-// }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartupParam {
+    pub old_filepath: Option<String>,
+    pub new_filepath: Option<String>,
+}
+
+#[tauri::command]
+pub fn ready(app_handle: tauri::AppHandle) -> StartupParam {
+    let mut args = app_handle
+        .env()
+        .args_os
+        .into_iter()
+        // first arg is executable themself
+        .skip(1);
+
+    let old_filepath = arg_to_filepath(&args.next());
+    let new_filepath = arg_to_filepath(&args.next());
+
+    StartupParam {
+        old_filepath,
+        new_filepath,
+    }
+}
 
 #[tauri::command(async)]
 pub async fn diff_filepaths(old: &str, new: &str) -> Result<DiffResponse, ()> {
@@ -72,17 +80,4 @@ pub fn open_with_file_manager(dirpath: &str) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     Ok(())
-}
-
-#[tauri::command]
-pub fn ready(state: State<StartupParam>) -> Result<StartupParam, String> {
-    let startup_param = StartupParam {
-        old_filepath: state.old_filepath.clone(),
-        new_filepath: state.new_filepath.clone(),
-    };
-
-    // clean up startup param
-    std::mem::drop(state);
-
-    Ok(startup_param)
 }

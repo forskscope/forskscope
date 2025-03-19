@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::io::{self, Read, Write};
 use std::process::Command;
 use std::time::UNIX_EPOCH;
@@ -113,7 +114,7 @@ pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
     files.sort();
 
     Ok(ListDirReponse {
-        current_dir: target_dir.to_str().unwrap().to_owned(),
+        current_dir: target_dir.to_string_lossy().to_string(),
         dirs: dirs,
         files: files,
     })
@@ -199,5 +200,18 @@ pub fn file_manager_command() -> &'static str {
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
         compile_error!("Unsupported operating system")
+    }
+}
+
+pub fn arg_to_filepath(arg: &Option<OsString>) -> Option<String> {
+    if let Some(s) = arg {
+        let s = s.to_string_lossy();
+        if Path::new(s.as_ref()).is_file() {
+            Some(s.into_owned())
+        } else {
+            None
+        }
+    } else {
+        None
     }
 }

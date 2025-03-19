@@ -1,14 +1,11 @@
 use tauri::Manager;
-use types::StartupParam;
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod core;
-pub mod types;
 
 use core::handlers::{diff_chars, diff_filepaths, list_dir, open_with_file_manager, ready, save};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run(startup_param: StartupParam) {
+pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
@@ -20,7 +17,6 @@ pub fn run(startup_param: StartupParam) {
 
             Ok(())
         })
-        .manage(startup_param)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
