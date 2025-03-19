@@ -59,6 +59,7 @@ pub struct FileAttr {
     pub last_modified: String,
 }
 
+#[derive(Clone)]
 pub struct ReadContent {
     pub charset: String,
     pub content: String,

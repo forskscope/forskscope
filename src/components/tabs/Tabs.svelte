@@ -26,7 +26,7 @@
     if (tabIndex === activeTabIndex) {
       activeTabIndex -= 1
     }
-    diffFilepathsList.splice(tabIndex, 1)
+    diffFilepathsList.splice(tabIndex - 1, 1)
   }
 
   const tabControls = $derived([

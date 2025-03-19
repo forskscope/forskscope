@@ -1,5 +1,5 @@
 use std::ffi::OsString;
-use std::io::{self, Read, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::process::Command;
 use std::time::UNIX_EPOCH;
 use std::{fs::File, path::Path};
@@ -13,7 +13,32 @@ use super::types::{FileAttr, ListDirReponse, ReadContent};
 const UTF8_CHARSET: &str = "UTF-8";
 const NOT_TEXTFILE_CHARSET: &str = "(bytes array)";
 
-pub fn filepath_content(filepath: &str) -> ReadContent {
+pub fn filepaths_content(old: &str, new: &str) -> Result<Vec<ReadContent>, String> {
+    if is_textfile(old) && is_textfile(new) {
+        return Ok(vec![textfile_content(old), textfile_content(new)]);
+    }
+
+    if old.ends_with(".xlsx") && new.ends_with(".xlsx") {
+        // todo
+        return Ok(vec![]);
+    }
+
+    Err("Neither textfile(s) nor comparable file(s)".to_owned())
+}
+
+fn is_textfile(filepath: &str) -> bool {
+    let file = File::open(filepath);
+    match file {
+        Ok(f) => {
+            let mut reader = BufReader::new(f);
+            let mut buffer = String::new();
+            reader.read_line(&mut buffer).is_ok()
+        }
+        Err(_) => false,
+    }
+}
+
+fn textfile_content(filepath: &str) -> ReadContent {
     let mut file = File::open(filepath).expect(format!("failed to open {}", filepath).as_str());
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();

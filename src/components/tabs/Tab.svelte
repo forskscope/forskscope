@@ -17,5 +17,5 @@
 {#if !diffFilepaths}
   <Explorer {diffFilepathsOnSelected} />
 {:else}
-  <Diff {diffFilepaths} {removeDiffTab} />
+  <Diff {diffFilepaths} close={removeDiffTab} />
 {/if}

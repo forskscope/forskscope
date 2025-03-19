@@ -7,7 +7,7 @@ use std::process::Command;
 use tauri::Manager;
 
 use super::diff::{chars_diffs, lines_diffs};
-use super::file::{self, arg_to_filepath, file_manager_command, filepath_content};
+use super::file::{self, arg_to_filepath, file_manager_command, filepaths_content};
 use super::types::{CharsDiffResponse, DiffResponse, LinesDiff, ListDirReponse};
 
 #[derive(Serialize)]
@@ -36,10 +36,18 @@ pub fn ready(app_handle: tauri::AppHandle) -> StartupParam {
 }
 
 #[tauri::command(async)]
-pub async fn diff_filepaths(old: &str, new: &str) -> Result<DiffResponse, ()> {
-    let old_read = filepath_content(old);
-    let new_read = filepath_content(new);
+pub async fn diff_filepaths(old: &str, new: &str) -> Result<DiffResponse, String> {
+    let read_contents = filepaths_content(old, new);
+    if let Err(err) = read_contents {
+        return Err(err);
+    }
+    let (old_read, new_read) = match filepaths_content(old, new) {
+        Ok(read_contents) => (&read_contents[0].clone(), &read_contents[1].clone()),
+        Err(err) => return Err(err),
+    };
+
     let lines_diffs = lines_diffs(old_read.content.as_str(), new_read.content.as_str());
+
     Ok(DiffResponse {
         old_charset: old_read.charset.to_owned(),
         new_charset: new_read.charset.to_owned(),

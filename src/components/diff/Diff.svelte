@@ -17,11 +17,9 @@
   import SeparatorFooterCol from './separator-col/SeparatorFooterCol.svelte'
   import { openFileDialog, saveFileDialog } from '../../scripts'
   import { onMount } from 'svelte'
+  import { errorToast } from '../../stores/Toast.svelte'
 
-  const {
-    diffFilepaths,
-    removeDiffTab,
-  }: { diffFilepaths: DiffFilepaths; removeDiffTab: () => void } = $props()
+  const { diffFilepaths, close }: { diffFilepaths: DiffFilepaths; close: () => void } = $props()
 
   let oldFilepath: string = $state(diffFilepaths.old)
   let newFilepath: string = $state(diffFilepaths.new)
@@ -79,12 +77,18 @@
   }
 
   const diffLines = async () => {
+    let isError = false
     let res: unknown = await invoke('diff_filepaths', { old: oldFilepath, new: newFilepath }).catch(
       (error: unknown) => {
-        console.error(error)
-        return
+        errorToast(error as string)
+        isError = true
       }
     )
+    if (isError) {
+      close()
+      return
+    }
+
     console.log(res) // todo
 
     const diffResponse = res as DiffResponse
@@ -186,7 +190,7 @@
     switch (e.key) {
       case 'w': {
         if (e.ctrlKey) {
-          removeDiffTab()
+          close()
         }
       }
       case 'F7': {
