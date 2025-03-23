@@ -3,6 +3,7 @@
   import { onMount } from 'svelte'
   import type { DiffFilepaths, ListDirReponse, OldOrNew } from '../../types'
   import { openDirectoryDialog } from '../../scripts'
+  import Tooltip from '../common/Tooltip.svelte'
 
   interface ExplorePane {
     oldOrNew: OldOrNew
@@ -84,6 +85,14 @@
     return dir === '/' || dir.endsWith(':\\')
   }
 
+  const copyCurrentDir = (oldOrNew: OldOrNew) => {
+    if (oldOrNew === 'old') {
+      newExplorerPane.listDirResponse = oldExplorerPane.listDirResponse
+    } else {
+      oldExplorerPane.listDirResponse = newExplorerPane.listDirResponse
+    }
+  }
+
   const selectedFileOnChange = (
     e: Event & {
       currentTarget: EventTarget & HTMLInputElement
@@ -130,10 +139,19 @@
             <div class="dirname">{dirname(pane.listDirResponse.currentDir)}</div>
           </h3>
           <div>
-            <button class="select-dir" onclick={() => selectDir(pane.oldOrNew)}>⚓️</button>
-            <button class="file-manager" onclick={() => openWithFileManager(pane.oldOrNew)}
-              >📦️</button
-            >
+            <Tooltip position="top" messages="copy current dir pos">
+              <button class="select-dir" onclick={() => copyCurrentDir(pane.oldOrNew)}
+                >{#if pane.oldOrNew === 'old'}→{:else}←{/if}</button
+              >
+            </Tooltip>
+            <Tooltip position="top" messages="select dir dialog">
+              <button class="select-dir" onclick={() => selectDir(pane.oldOrNew)}>⚓️</button>
+            </Tooltip>
+            <Tooltip position="top" messages="run file manager">
+              <button class="file-manager" onclick={() => openWithFileManager(pane.oldOrNew)}
+                >📦️</button
+              >
+            </Tooltip>
           </div>
         </div>
         <div class="dirs-files-wrapper">
@@ -207,6 +225,8 @@
 <div class="footer">
   {#if diffOnClickEnabled}
     <button class="compare" onclick={diffOnClick}>Compare</button>
+  {:else}
+    <span>Select files to compare</span>
   {/if}
 </div>
 
@@ -265,8 +285,8 @@
 
   /* Allows shrinking */
   .parent-dirs {
-    flex-shrink: 1;
     min-width: 0;
+    flex-shrink: 1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -324,6 +344,11 @@
     margin: 0.08rem 0;
   }
 
+  .dirs-files .parent-dir,
+  .dirs-files label div:first-of-type {
+    cursor: pointer;
+  }
+
   .dirs-files label input[type='radio'] {
     display: none;
   }
@@ -337,8 +362,12 @@
     border-bottom-style: solid;
   }
 
-  button.compare {
+  .footer button.compare {
     width: 12rem;
     padding: 0.2rem 0;
+  }
+
+  .footer span {
+    opacity: 0.57;
   }
 </style>

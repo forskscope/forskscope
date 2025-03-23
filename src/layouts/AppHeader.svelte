@@ -1,16 +1,20 @@
 <script lang="ts">
+  import Tooltip from '../components/common/Tooltip.svelte'
+
   let { toggleSettings }: { toggleSettings: () => void } = $props()
 </script>
 
 <div>
   <h1>Patch Hygge</h1>
 
-  <button
-    onclick={() => {
-      toggleSettings()
-    }}
-    >⚙️
-  </button>
+  <Tooltip position="bottom" messages="settings">
+    <button
+      onclick={() => {
+        toggleSettings()
+      }}
+      >⚙️
+    </button>
+  </Tooltip>
 </div>
 
 <style>
@@ -21,16 +25,17 @@
     display: flex;
     align-items: center;
     font-size: 1.1rem;
-    opacity: 0.4;
     gap: 0.4rem;
     z-index: 1001;
   }
 
   h1 {
     font-size: 0.9rem;
+    opacity: 0.4;
   }
 
   button {
     padding: 0 0.3rem;
+    opacity: 0.63;
   }
 </style>
