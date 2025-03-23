@@ -1,6 +1,6 @@
 [package]
 name = "patch-hygge"
-version = "0.13.0"
+version = "0.14.0"
 edition = "2021"
 
 description = "Diff and merge GUI tool with cross-platform support build with Tauri: Rust and Svelte"
@@ -46,3 +46,4 @@ tauri-plugin-dialog = "2"
 chardetng = "^0.1"
 encoding_rs = "^0.8"
 chrono = { version = "^0.4", default-features = false, features = ["clock", "iana-time-zone", "std"] }
+sheets-diff = { version = "1.1.1", features = ["serde"] }

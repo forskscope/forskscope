@@ -7,6 +7,8 @@ use std::{fs::File, path::Path};
 use chardetng::EncodingDetector;
 use chrono::{Local, TimeZone};
 use encoding_rs::{Encoding, UTF_8};
+use sheets_diff::core::diff::Diff;
+use sheets_diff::core::unified_format::unified_diff;
 
 use super::types::{FileAttr, ListDirReponse, ReadContent};
 
@@ -20,7 +22,56 @@ pub fn filepaths_content(old: &str, new: &str) -> Result<Vec<ReadContent>, Strin
 
     if old.ends_with(".xlsx") && new.ends_with(".xlsx") {
         // todo
-        return Ok(vec![]);
+        let diff = Diff::new(old, new);
+        let split_unified_diff = unified_diff(&diff).split();
+        let old_content = split_unified_diff
+            .old
+            // todo: define function
+            .iter()
+            .map(|x| {
+                let mut ret: Vec<String> = vec![x.title.to_owned()];
+                ret.extend(x.lines.iter().flat_map(|x| {
+                    let mut ret: Vec<String> = vec![];
+                    if let Some(pos) = &x.pos {
+                        ret.push(pos.to_owned());
+                    }
+                    if let Some(text) = &x.text {
+                        ret.push(text.to_owned());
+                    }
+                    ret
+                }));
+                ret.join("\n")
+            })
+            .collect();
+        let new_content = split_unified_diff
+            .new
+            // todo: define function
+            .iter()
+            .map(|x| {
+                let mut ret: Vec<String> = vec![x.title.to_owned()];
+                ret.extend(x.lines.iter().flat_map(|x| {
+                    let mut ret: Vec<String> = vec![];
+                    if let Some(pos) = &x.pos {
+                        ret.push(pos.to_owned());
+                    }
+                    if let Some(text) = &x.text {
+                        ret.push(text.to_owned());
+                    }
+                    ret
+                }));
+                ret.join("\n")
+            })
+            .collect();
+        return Ok(vec![
+            ReadContent {
+                charset: "(Excel)".to_owned(),
+                content: old_content,
+            },
+            ReadContent {
+                charset: "(Excel)".to_owned(),
+                content: new_content,
+            },
+        ]);
     }
 
     Err("Neither textfile(s) nor comparable file(s)".to_owned())

@@ -2,6 +2,8 @@
   import type { DiffFilepaths } from '../../types'
   import Tab from './Tab.svelte'
   import SelectFiles from './SelectFiles.svelte'
+  import { invoke } from '@tauri-apps/api/core'
+  import { errorToast } from '../../stores/Toast.svelte'
 
   interface TabControl {
     label?: string
@@ -16,7 +18,16 @@
 
   let showsFileHandle: boolean = $state(false)
 
-  const addDiffTab = (diffFilepaths: DiffFilepaths) => {
+  const addDiffTab = async (diffFilepaths: DiffFilepaths) => {
+    const errorMessages = await invoke('validate_filepaths', {
+      old: diffFilepaths.old,
+      new: diffFilepaths.new,
+    })
+    if (errorMessages) {
+      errorToast(errorMessages as string)
+      return
+    }
+
     diffFilepathsList.push(diffFilepaths)
     activeTabIndex = diffFilepathsList.length
     showsFileHandle = false
