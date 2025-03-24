@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { T } from '../../stores/translation.svelte'
   import {
     APP_DIFF_FONT_FAMILIES,
     APP_THEMES,
@@ -28,6 +29,7 @@
     uiFontFamilyOnChange,
     diffFontSizeOnChange,
     uiFontSizeScaleOnChange,
+    close,
   }: {
     activeTheme: AppTheme
     activeDiffFontFamily: AppDiffFontFamily
@@ -39,6 +41,7 @@
     uiFontFamilyOnChange: (value: AppUiFontFamily) => void
     diffFontSizeOnChange: (value: number) => void
     uiFontSizeScaleOnChange: (value: number) => void
+    close: () => void
   } = $props()
 
   const SELECTORS = [
@@ -71,54 +74,57 @@
 
 <!-- todo: color theme switcher -->
 <div class="wrapper">
-  <div class="settings">
-    {#each SELECTORS as selector}
+  <div class="position-relative">
+    <div class="settings">
+      {#each SELECTORS as selector}
+        <div class="setting">
+          <h3>{T(selector.title)}</h3>
+          <div>
+            {#each selector.items as item}
+              <label
+                ><input
+                  type="radio"
+                  name={selector.groupName}
+                  value={item}
+                  onchange={(e) => {
+                    selector.handler(e.currentTarget.value)
+                  }}
+                  checked={item === selector.defaultValue}
+                />{item.replace(selector.valueSuffix, '')}</label
+              >
+            {/each}
+          </div>
+        </div>
+      {/each}
       <div class="setting">
-        <h3>{selector.title}</h3>
+        <h3>{T('Diff Font Size')}</h3>
         <div>
-          {#each selector.items as item}
-            <label
-              ><input
-                type="radio"
-                name={selector.groupName}
-                value={item}
-                onchange={(e) => {
-                  selector.handler(e.currentTarget.value)
-                }}
-                checked={item === selector.defaultValue}
-              />{item.replace(selector.valueSuffix, '')}</label
-            >
-          {/each}
+          <input
+            type="number"
+            bind:value={diffFontSize}
+            onchange={() => {
+              diffFontSizeOnChange(diffFontSize)
+            }}
+          />
         </div>
       </div>
-    {/each}
-    <div class="setting">
-      <h3>Diff Font Size</h3>
-      <div>
-        <input
-          type="number"
-          bind:value={diffFontSize}
-          onchange={() => {
-            diffFontSizeOnChange(diffFontSize)
-          }}
-        />
+      <div class="setting">
+        <h3>{T('UI Font Size (Ratio to Diff)')}</h3>
+        <div>
+          <input
+            type="number"
+            step="0.05"
+            min="0.2"
+            max="1"
+            bind:value={uiFontSizeScale}
+            onchange={() => {
+              uiFontSizeScaleOnChange(uiFontSizeScale)
+            }}
+          />
+        </div>
       </div>
     </div>
-    <div class="setting">
-      <h3>UI Font Size (Ratio to Diff)</h3>
-      <div>
-        <input
-          type="number"
-          step="0.05"
-          min="0.2"
-          max="1"
-          bind:value={uiFontSizeScale}
-          onchange={() => {
-            uiFontSizeScaleOnChange(uiFontSizeScale)
-          }}
-        />
-      </div>
-    </div>
+    <button class="close" onclick={close}>X</button>
   </div>
 </div>
 
@@ -144,5 +150,11 @@
     display: flex;
     flex-direction: column;
     gap: 1.4rem;
+  }
+
+  .close {
+    position: absolute;
+    right: 0.5rem;
+    top: 0.2rem;
   }
 </style>

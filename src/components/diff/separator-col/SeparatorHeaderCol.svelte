@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { T } from '../../../stores/translation.svelte'
+
   let {
     showsCharsDiffs,
     charsDiffsReady,
@@ -38,9 +40,11 @@
             showsCharsDiffsOnChange(_showsCharsDiffs)
           }}
           disabled={!charsDiffsReady}
-        />Show chars diff</label
+        />{T('Show chars diff')}</label
       >
-      <button onclick={switchOldNewOnClick} disabled={!charsDiffsReady}>Switch left/right</button>
+      <button onclick={switchOldNewOnClick} disabled={!charsDiffsReady}
+        >{T('Switch left/right')}</button
+      >
     </div>
   </div>
 {/if}

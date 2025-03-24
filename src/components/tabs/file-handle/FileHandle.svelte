@@ -1,5 +1,6 @@
 <script lang="ts">
   import { openFileDialog } from '../../../scripts'
+  import { T } from '../../../stores/translation.svelte'
   import type { DiffFilepaths, OldOrNew } from '../../../types'
 
   const {
@@ -36,14 +37,22 @@
 
 <div class="wrapper">
   <div class="select-file">
-    <button onclick={() => openOldFileOnClick('old')}>Old file</button>
-    <div class={0 < _oldFilepath.length ? 'selected' : ''}>{_oldFilepath}</div>
+    <button onclick={() => openOldFileOnClick('old')}>{T('Old file')}</button>
+    {#if 0 < _oldFilepath.length}
+      <div>{_oldFilepath}</div>
+    {:else}
+      <span>({T('Not selected')})</span>
+    {/if}
   </div>
   <div class="select-file">
-    <button onclick={() => openOldFileOnClick('new')}>New file</button>
-    <div class={0 < _newFilepath.length ? 'selected' : ''}>{_newFilepath}</div>
+    <button onclick={() => openOldFileOnClick('new')}>{T('New file')}</button>
+    {#if 0 < _newFilepath.length}
+      <div>{_newFilepath}</div>
+    {:else}
+      <span>({T('Not selected')})</span>
+    {/if}
   </div>
-  <button class="diff" onclick={diffOnClick} disabled={!readyForDiff}>Compare</button>
+  <button class="diff" onclick={diffOnClick} disabled={!readyForDiff}>{T('Compare')}</button>
 </div>
 
 <style>
@@ -64,15 +73,10 @@
   .select-file button {
     width: 6.3rem;
   }
-  .select-file div::before {
-    content: '(not selected)';
-  }
-  .select-file div.selected {
+
+  .select-file div {
     font-size: 120%;
     font-weight: bold;
-  }
-  .select-file div.selected::before {
-    content: '';
   }
 
   button.diff {

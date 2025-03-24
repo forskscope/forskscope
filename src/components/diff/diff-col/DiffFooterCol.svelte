@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { T } from '../../../stores/translation.svelte'
+
   const {
     charset,
     isCompletelyEqual,
@@ -14,12 +16,12 @@
   <span>{charset} </span>
 
   {#if isCompletelyEqual}
-    <span>(Completely equal)</span>
+    <span>({T('Completely equal')})</span>
   {/if}
 
   <span>
     {#if saveAsOnClick}
-      <button onclick={saveAsOnClick}>Save as</button>
+      <button onclick={saveAsOnClick}>{T('Save as')}</button>
     {/if}
   </span>
 </div>

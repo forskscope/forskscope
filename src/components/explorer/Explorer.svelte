@@ -4,6 +4,7 @@
   import type { DiffFilepaths, ListDirReponse, OldOrNew } from '../../types'
   import { openDirectoryDialog } from '../../scripts'
   import Tooltip from '../common/Tooltip.svelte'
+  import { T } from '../../stores/translation.svelte'
 
   interface ExplorePane {
     oldOrNew: OldOrNew
@@ -139,15 +140,15 @@
             <div class="dirname">{dirname(pane.listDirResponse.currentDir)}</div>
           </h3>
           <div>
-            <Tooltip position="top" messages="copy current dir pos">
+            <Tooltip position="top" messages={T('Copy current dir pos')}>
               <button class="select-dir" onclick={() => copyCurrentDir(pane.oldOrNew)}
                 >{#if pane.oldOrNew === 'old'}→{:else}←{/if}</button
               >
             </Tooltip>
-            <Tooltip position="top" messages="select dir dialog">
+            <Tooltip position="top" messages={T('Select dir dialog')}>
               <button class="select-dir" onclick={() => selectDir(pane.oldOrNew)}>⚓️</button>
             </Tooltip>
-            <Tooltip position="top" messages="run file manager">
+            <Tooltip position="top" messages={T('Run file manager')}>
               <button class="file-manager" onclick={() => openWithFileManager(pane.oldOrNew)}
                 >📦️</button
               >
@@ -159,9 +160,9 @@
             {#if 0 < pane.listDirResponse.files.length}
               <div class="header">
                 <div class="file header">
-                  <div>Name</div>
-                  <div>Size</div>
-                  <div>Last Modified</div>
+                  <div>{T('Name')}</div>
+                  <div>{T('Size')}</div>
+                  <div>{T('Last modified')}</div>
                 </div>
               </div>
             {/if}
@@ -224,9 +225,9 @@
 
 <div class="footer">
   {#if diffOnClickEnabled}
-    <button class="compare" onclick={diffOnClick}>Compare</button>
+    <button class="compare" onclick={diffOnClick}>{T('Compare')}</button>
   {:else}
-    <span>Select files to compare</span>
+    <span>{T('Select files to compare')}</span>
   {/if}
 </div>
 

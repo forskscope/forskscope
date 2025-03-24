@@ -20,11 +20,13 @@
 <style>
   .tooltip-container {
     position: relative;
-    display: inline-block;
+    display: inline-flex;
   }
 
   .tooltip {
     position: absolute;
+    min-width: 5.7rem;
+    max-width: fit-content;
     padding: 0.44rem;
     background-color: #636363ce;
     color: #ffffff;

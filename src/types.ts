@@ -62,3 +62,6 @@ export interface FileAttr {
     humanReadableSize: string,
     lastModified: string,
 }
+
+export const APP_LANGUAGES = ['en', 'ja']
+export type AppLanguage = typeof APP_LANGUAGES[number]

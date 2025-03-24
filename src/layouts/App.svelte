@@ -3,15 +3,12 @@
   import Toast from '../components/common/Toast.svelte'
   import Tabs from '../components/tabs/Tabs.svelte'
   import type { AppDiffFontFamily, AppTheme, AppUiFontFamily } from '../types'
-  import Settings from '../components/settings/Settings.svelte'
 
   let activeTheme: AppTheme = $state('dark-theme')
   let activeDiffFontFamily: AppDiffFontFamily = $state('monospace-diff-font-family')
   let activeUiFontFamily: AppUiFontFamily = $state('sans-serif-ui-font-family')
   let diffFontSize: number = $state(16)
   let uiFontSizeScale: number = $state(1.0)
-
-  let showsSettings: boolean = $state(false)
 
   const themeOnChange = (value: AppTheme) => {
     activeTheme = value
@@ -32,10 +29,6 @@
   const uiFontSizeScaleOnChange = (value: number) => {
     uiFontSizeScale = value
   }
-
-  const toggleSettings = () => {
-    showsSettings = !showsSettings
-  }
 </script>
 
 <div
@@ -45,24 +38,20 @@
 >
   <Toast />
   <header>
-    <AppHeader {toggleSettings} />
+    <AppHeader
+      {activeTheme}
+      {activeDiffFontFamily}
+      {activeUiFontFamily}
+      {diffFontSize}
+      {uiFontSizeScale}
+      {themeOnChange}
+      {diffFontFamilyOnChange}
+      {uiFontFamilyOnChange}
+      {diffFontSizeOnChange}
+      {uiFontSizeScaleOnChange}
+    />
   </header>
   <main>
     <Tabs />
-
-    <div class={showsSettings ? '' : 'd-none'}>
-      <Settings
-        {activeTheme}
-        {activeDiffFontFamily}
-        {activeUiFontFamily}
-        {diffFontSize}
-        {uiFontSizeScale}
-        {themeOnChange}
-        {diffFontFamilyOnChange}
-        {uiFontFamilyOnChange}
-        {diffFontSizeOnChange}
-        {uiFontSizeScaleOnChange}
-      />
-    </div>
   </main>
 </div>

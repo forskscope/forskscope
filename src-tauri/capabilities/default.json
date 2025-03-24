@@ -8,6 +8,15 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "dialog:default"
+    "dialog:default",
+    "fs:allow-read-text-file",
+    {
+      "identifier": "fs:allow-resource-read-recursive",
+      "allow": [
+        {
+          "path": "$RESOURCE/translations/*"
+        }
+      ]
+    }
   ]
 }

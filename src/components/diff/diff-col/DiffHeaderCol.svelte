@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { T } from '../../../stores/translation.svelte'
   import type { OldOrNew } from '../../../types'
+  import Tooltip from '../../common/Tooltip.svelte'
 
   const {
     oldOrNew,
@@ -21,7 +23,9 @@
     <div class="parent-dirs">{parentDirsPath}</div>
     <div class="filename">{filename}</div>
   </h3>
-  <button onclick={filepathFromDialogOnClick}>⚓️</button>
+  <Tooltip position="left" messages={T('Select file')}>
+    <button onclick={filepathFromDialogOnClick}>⚓️</button>
+  </Tooltip>
 </div>
 
 <style>
