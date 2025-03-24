@@ -1,5 +1,6 @@
 use std::ffi::OsString;
 use std::io::{self, BufRead, BufReader, Read, Write};
+use std::path::PathBuf;
 use std::process::Command;
 use std::time::UNIX_EPOCH;
 use std::{fs::File, path::Path};
@@ -12,9 +13,12 @@ use sheets_diff::core::unified_format::unified_diff;
 
 use super::types::{FileAttr, ListDirReponse, ReadContent};
 
+/// default charset
 const UTF8_CHARSET: &str = "UTF-8";
+/// label text on charset on non text file
 const NOT_TEXTFILE_CHARSET: &str = "(bytes array)";
 
+/// get content from file paths on old file and new file
 pub fn filepaths_content(old: &str, new: &str) -> Result<Vec<ReadContent>, String> {
     if is_textfile(old) && is_textfile(new) {
         return Ok(vec![textfile_content(old), textfile_content(new)]);
@@ -77,6 +81,7 @@ pub fn filepaths_content(old: &str, new: &str) -> Result<Vec<ReadContent>, Strin
     Err("Neither textfile(s) nor comparable file(s)".to_owned())
 }
 
+/// check if file is text file
 fn is_textfile(filepath: &str) -> bool {
     let file = File::open(filepath);
     match file {
@@ -89,6 +94,7 @@ fn is_textfile(filepath: &str) -> bool {
     }
 }
 
+/// get content from text file
 fn textfile_content(filepath: &str) -> ReadContent {
     let mut file = File::open(filepath).expect(format!("failed to open {}", filepath).as_str());
     let mut buffer = Vec::new();
@@ -133,14 +139,10 @@ fn textfile_content(filepath: &str) -> ReadContent {
     }
 }
 
+/// list files and directories in directory
 pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
-    let target_dir = if current_dir.is_empty() {
-        std::env::current_dir().expect("Failed to get current directory")
-    } else {
-        Path::new(current_dir)
-            .canonicalize()
-            .expect(format!("Failed to canonicalize path: {}", current_dir).as_str())
-    };
+    let target_dir = target_dir(current_dir);
+
     let mut dirs = Vec::<String>::new();
     let mut files = Vec::<FileAttr>::new();
 
@@ -171,7 +173,7 @@ pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
                                 name,
                                 bytes_size: format!(
                                     "{} bytes",
-                                    comma_separated_bytes_size(metadata.len())
+                                    comma_separated_number(metadata.len())
                                 ),
                                 human_readable_size: human_readable_size(metadata.len()),
                                 last_modified,
@@ -196,11 +198,12 @@ pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
     })
 }
 
-pub fn comma_separated_bytes_size(size: u64) -> String {
-    let size_str = size.to_string();
+/// add separator commnas to number
+pub fn comma_separated_number(num: u64) -> String {
+    let num_str = num.to_string();
 
     let mut ret = String::new();
-    for (i, c) in size_str.chars().rev().enumerate() {
+    for (i, c) in num_str.chars().rev().enumerate() {
         if i != 0 && i % 3 == 0 {
             ret.push(',');
         }
@@ -210,6 +213,7 @@ pub fn comma_separated_bytes_size(size: u64) -> String {
     ret.chars().rev().collect()
 }
 
+/// convert file size to human readable number
 pub fn human_readable_size(size: u64) -> String {
     const UNIT: u64 = 1024;
     const K: u64 = UNIT;
@@ -232,7 +236,7 @@ pub fn human_readable_size(size: u64) -> String {
     let size_str = size.to_string();
     let size_str_parts = size_str.split(".").collect::<Vec<&str>>();
     let int = size_str_parts[0].parse::<u64>().unwrap();
-    let comma_separated_int = comma_separated_bytes_size(int);
+    let comma_separated_int = comma_separated_number(int);
 
     let comma_separated_size = if 1 < size_str_parts.len() {
         format!("{}.{:.2}", comma_separated_int, size_str_parts[1])
@@ -242,6 +246,7 @@ pub fn human_readable_size(size: u64) -> String {
     format!("{} {}", comma_separated_size, unit)
 }
 
+/// save to file
 pub fn save(filepath: &str, content: &str, charset: &str) -> Result<(), io::Error> {
     let encoding = Encoding::for_label(charset.as_bytes()).unwrap_or(UTF_8);
     let (encoded, _, _) = encoding.encode(content);
@@ -250,6 +255,7 @@ pub fn save(filepath: &str, content: &str, charset: &str) -> Result<(), io::Erro
     Ok(())
 }
 
+/// command to run file manager
 pub fn file_manager_command() -> &'static str {
     #[cfg(target_os = "windows")]
     {
@@ -279,6 +285,7 @@ pub fn file_manager_command() -> &'static str {
     }
 }
 
+/// convert executable argument to file path
 pub fn arg_to_filepath(arg: &Option<OsString>) -> Option<String> {
     if let Some(s) = arg {
         let s = s.to_string_lossy();
@@ -290,4 +297,36 @@ pub fn arg_to_filepath(arg: &Option<OsString>) -> Option<String> {
     } else {
         None
     }
+}
+
+/// target dir
+fn target_dir(current_dir: &str) -> PathBuf {
+    let ret = if current_dir.is_empty() {
+        let current_dir = std::env::current_dir().expect("Failed to get current directory");
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            current_dir
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            // extended-length path prefix sometimes appears on windows
+            const WINDOWS_EXTENDED_LENGTH_PATH_PREFIX: &str = r"\\?\";
+
+            let current_dir_str = current_dir
+                .to_str()
+                .expect("Failed to convert current_dir to string");
+            if current_dir_str.starts_with(WINDOWS_EXTENDED_LENGTH_PATH_PREFIX) {
+                PathBuf::from(&current_dir_str[WINDOWS_EXTENDED_LENGTH_PATH_PREFIX.len()..])
+            } else {
+                current_dir
+            }
+        }
+    } else {
+        Path::new(current_dir)
+            .canonicalize()
+            .expect(format!("Failed to canonicalize path: {}", current_dir).as_str())
+    };
+    ret
 }
