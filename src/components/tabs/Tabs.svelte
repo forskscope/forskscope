@@ -18,22 +18,13 @@
 
   let showsFileHandle: boolean = $state(false)
 
-  const addDiffTab = async (diffFilepaths: DiffFilepaths) => {
-    const errorMessages = await invoke('validate_filepaths', {
-      old: diffFilepaths.old,
-      new: diffFilepaths.new,
-    })
-    if (errorMessages) {
-      errorToast(errorMessages as string)
-      return
-    }
-
+  const diffFilepathsOnSelected = async (diffFilepaths: DiffFilepaths) => {
     diffFilepathsList.push(diffFilepaths)
     activeTabIndex = diffFilepathsList.length
     showsFileHandle = false
   }
 
-  const removeTab = (tabIndex: number) => {
+  const removeDiffTab = (tabIndex: number) => {
     if (tabIndex === activeTabIndex) {
       activeTabIndex -= 1
     }
@@ -48,7 +39,7 @@
       const diffFilepaths = { old: x.old, new: x.new } as DiffFilepaths
       const buttonLabel = '✖️'
       const buttonOnClick = () => {
-        removeTab(i - 1)
+        removeDiffTab(i - 1)
       }
       return { label, className, diffFilepaths, buttonLabel, buttonOnClick } as TabControl
     }),
@@ -92,14 +83,14 @@
     <div class={tabIndex === activeTabIndex ? '' : 'd-none'}>
       <Tab
         diffFilepaths={tabControl.diffFilepaths}
-        diffFilepathsOnSelected={addDiffTab}
-        removeDiffTab={() => removeTab(tabIndex)}
+        {diffFilepathsOnSelected}
+        removeDiffTab={() => removeDiffTab(tabIndex)}
       />
     </div>
   {/each}
 </div>
 
-<SelectFiles {showsFileHandle} {addDiffTab} />
+<SelectFiles {showsFileHandle} {diffFilepathsOnSelected} />
 
 <style>
   .tabs {

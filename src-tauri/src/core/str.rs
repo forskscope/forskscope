@@ -41,6 +41,7 @@ pub fn split_lines_with_endings(input: &str) -> Vec<String> {
     lines
 }
 
+/// get byte start and end of multi byte string
 pub fn multibyte_str_byte_indices(
     text: &str,
     index_start: usize,
@@ -61,4 +62,42 @@ pub fn multibyte_str_byte_indices(
     let byte_end = char_indices[index_end - 1].0 + char_indices[index_end - 1].1.len_utf8();
 
     Some((byte_start, byte_end))
+}
+
+/// convert bytes array to hex chars string
+pub fn bytes_to_hex_dump(bytes: &[u8]) -> String {
+    const BYTES_PER_ROW: usize = 8;
+
+    let mut output = String::new();
+
+    for (i, chunk) in bytes.chunks(BYTES_PER_ROW).enumerate() {
+        // address offset
+        output.push_str(&format!("{:08x}  ", i * BYTES_PER_ROW));
+
+        // hex bytes
+        for (j, byte) in chunk.iter().enumerate() {
+            if j > 0 && j % 4 == 0 {
+                output.push(' '); // Extra spacing every 4 bytes
+            }
+            output.push_str(&format!("{:02x} ", byte));
+        }
+
+        // ascii section
+        let hex_width = (BYTES_PER_ROW * 3) + (BYTES_PER_ROW / 4); // Account for spaces
+        output.push_str(&" ".repeat(hex_width - chunk.len() * 3 - (chunk.len() / 4)));
+
+        // ascii representation
+        output.push('|');
+        for &byte in chunk {
+            output.push(if byte.is_ascii_graphic() || byte.is_ascii_whitespace() {
+                byte as char
+            } else {
+                '.'
+            });
+        }
+        output.push('|');
+        output.push('\n');
+    }
+
+    output
 }

@@ -78,12 +78,13 @@
 
   const diffLines = async () => {
     let isError = false
-    let res: unknown = await invoke('diff_filepaths', { old: oldFilepath, new: newFilepath }).catch(
-      (error: unknown) => {
-        errorToast(error as string)
-        isError = true
-      }
-    )
+    let res: unknown = await invoke('diff_filepaths', {
+      old: oldFilepath,
+      new: newFilepath,
+    }).catch((error: unknown) => {
+      errorToast(error as string)
+      isError = true
+    })
     if (isError) {
       close()
       return

@@ -57,6 +57,7 @@ pub struct FileAttr {
     pub bytes_size: String,
     pub human_readable_size: String,
     pub last_modified: String,
+    pub binary_comparison_only: bool,
 }
 
 #[derive(Clone)]

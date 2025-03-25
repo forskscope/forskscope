@@ -61,6 +61,7 @@ export interface FileAttr {
     bytesSize: string,
     humanReadableSize: string,
     lastModified: string,
+    binaryComparisonOnly: boolean
 }
 
 export const APP_LANGUAGES = ['en', 'ja']

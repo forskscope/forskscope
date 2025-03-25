@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::fs;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
@@ -8,8 +9,9 @@ use chardetng::EncodingDetector;
 use chrono::{Local, TimeZone};
 use encoding_rs::{Encoding, UTF_8};
 use sheets_diff::core::diff::Diff;
-use sheets_diff::core::unified_format::unified_diff;
+use sheets_diff::core::unified_format::{unified_diff, SplitUnifiedDiffContent};
 
+use super::str::bytes_to_hex_dump;
 use super::types::{FileAttr, ListDirReponse, ReadContent};
 
 /// default charset
@@ -24,60 +26,15 @@ pub fn filepaths_content(old: &str, new: &str) -> Result<Vec<ReadContent>, Strin
     }
 
     if old.ends_with(".xlsx") && new.ends_with(".xlsx") {
-        // todo
         let diff = Diff::new(old, new);
         let split_unified_diff = unified_diff(&diff).split();
-        let old_content = split_unified_diff
-            .old
-            // todo: define function
-            .iter()
-            .map(|x| {
-                let mut ret: Vec<String> = vec![x.title.to_owned()];
-                ret.extend(x.lines.iter().flat_map(|x| {
-                    let mut ret: Vec<String> = vec![];
-                    if let Some(pos) = &x.pos {
-                        ret.push(pos.to_owned());
-                    }
-                    if let Some(text) = &x.text {
-                        ret.push(text.to_owned());
-                    }
-                    ret
-                }));
-                ret.join("\n")
-            })
-            .collect();
-        let new_content = split_unified_diff
-            .new
-            // todo: define function
-            .iter()
-            .map(|x| {
-                let mut ret: Vec<String> = vec![x.title.to_owned()];
-                ret.extend(x.lines.iter().flat_map(|x| {
-                    let mut ret: Vec<String> = vec![];
-                    if let Some(pos) = &x.pos {
-                        ret.push(pos.to_owned());
-                    }
-                    if let Some(text) = &x.text {
-                        ret.push(text.to_owned());
-                    }
-                    ret
-                }));
-                ret.join("\n")
-            })
-            .collect();
         return Ok(vec![
-            ReadContent {
-                charset: "(Excel)".to_owned(),
-                content: old_content,
-            },
-            ReadContent {
-                charset: "(Excel)".to_owned(),
-                content: new_content,
-            },
+            excel_content(&split_unified_diff.old),
+            excel_content(&split_unified_diff.new),
         ]);
     }
 
-    Err("Neither textfile(s) nor comparable file(s)".to_owned())
+    Ok(vec![binary_content(old), binary_content(new)])
 }
 
 /// check if file is text file
@@ -138,6 +95,41 @@ fn textfile_content(filepath: &str) -> ReadContent {
     }
 }
 
+/// read content from ms excel
+fn excel_content(split_unified_diff_content: &Vec<SplitUnifiedDiffContent>) -> ReadContent {
+    let content = split_unified_diff_content
+        .iter()
+        .map(|x| {
+            let mut ret: Vec<String> = vec![x.title.to_owned()];
+            ret.extend(x.lines.iter().flat_map(|x| {
+                let mut ret: Vec<String> = vec![];
+                if let Some(pos) = &x.pos {
+                    ret.push(pos.to_owned());
+                }
+                if let Some(text) = &x.text {
+                    ret.push(text.to_owned());
+                }
+                ret
+            }));
+            ret.join("\n")
+        })
+        .collect();
+    ReadContent {
+        charset: "(Excel)".to_owned(),
+        content,
+    }
+}
+
+/// read content as bynary
+fn binary_content(filepath: &str) -> ReadContent {
+    let read_bytes = fs::read(Path::new(filepath)).expect("Failed to read file in binary mode");
+    let hex_dump = bytes_to_hex_dump(&read_bytes);
+    ReadContent {
+        charset: "(binary)".to_owned(),
+        content: hex_dump,
+    }
+}
+
 /// list files and directories in directory
 pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
     let target_dir = target_dir(current_dir);
@@ -158,26 +150,26 @@ pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
                 match dir_entry.metadata() {
                     Ok(metadata) => {
                         if metadata.is_dir() {
-                            dirs.push(name)
-                        } else {
-                            let modified = metadata
-                                .modified()
-                                .unwrap()
-                                .duration_since(UNIX_EPOCH)
-                                .unwrap();
-                            let local_timestamp = Local.timestamp_nanos(modified.as_nanos() as i64);
-                            let last_modified =
-                                local_timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
-                            files.push(FileAttr {
-                                name,
-                                bytes_size: format!(
-                                    "{} bytes",
-                                    comma_separated_number(metadata.len())
-                                ),
-                                human_readable_size: human_readable_size(metadata.len()),
-                                last_modified,
-                            })
+                            dirs.push(name);
+                            continue;
                         }
+
+                        let modified = metadata
+                            .modified()
+                            .unwrap()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap();
+                        let local_timestamp = Local.timestamp_nanos(modified.as_nanos() as i64);
+                        let last_modified = local_timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
+                        files.push(FileAttr {
+                            name,
+                            bytes_size: format!("{} bytes", comma_separated_number(metadata.len())),
+                            human_readable_size: human_readable_size(metadata.len()),
+                            last_modified,
+                            binary_comparison_only: !validate_filepath(
+                                &dir_entry.path().to_string_lossy(),
+                            ),
+                        })
                     }
                     _ => {}
                 }
@@ -195,54 +187,6 @@ pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
         dirs: dirs,
         files: files,
     })
-}
-
-/// add separator commnas to number
-pub fn comma_separated_number(num: u64) -> String {
-    let num_str = num.to_string();
-
-    let mut ret = String::new();
-    for (i, c) in num_str.chars().rev().enumerate() {
-        if i != 0 && i % 3 == 0 {
-            ret.push(',');
-        }
-        ret.push(c);
-    }
-
-    ret.chars().rev().collect()
-}
-
-/// convert file size to human readable number
-pub fn human_readable_size(size: u64) -> String {
-    const UNIT: u64 = 1024;
-    const K: u64 = UNIT;
-    const M: u64 = UNIT.pow(2);
-    const G: u64 = UNIT.pow(3);
-    const T: u64 = UNIT.pow(4);
-
-    let (size, unit) = if size >= T {
-        (size as f64 / T as f64, "TB")
-    } else if size >= G {
-        (size as f64 / G as f64, "GB")
-    } else if size >= M {
-        (size as f64 / M as f64, "MB")
-    } else if size >= K {
-        (size as f64 / K as f64, "KB")
-    } else {
-        (size as f64, "bytes")
-    };
-
-    let size_str = size.to_string();
-    let size_str_parts = size_str.split(".").collect::<Vec<&str>>();
-    let int = size_str_parts[0].parse::<u64>().unwrap();
-    let comma_separated_int = comma_separated_number(int);
-
-    let comma_separated_size = if 1 < size_str_parts.len() {
-        format!("{}.{:.2}", comma_separated_int, size_str_parts[1])
-    } else {
-        comma_separated_int
-    };
-    format!("{} {}", comma_separated_size, unit)
 }
 
 /// save to file
@@ -299,6 +243,11 @@ pub fn arg_to_filepath(arg: &Option<OsString>) -> Option<String> {
     }
 }
 
+/// validate file path to compare
+fn validate_filepath(filepath: &str) -> bool {
+    is_textfile(filepath) || filepath.ends_with(".xlsx")
+}
+
 /// target dir
 fn target_dir(current_dir: &str) -> PathBuf {
     let ret = if current_dir.is_empty() {
@@ -327,4 +276,52 @@ fn target_dir(current_dir: &str) -> PathBuf {
             windows_ret.into()
         }
     }
+}
+
+/// add separator commnas to number
+fn comma_separated_number(num: u64) -> String {
+    let num_str = num.to_string();
+
+    let mut ret = String::new();
+    for (i, c) in num_str.chars().rev().enumerate() {
+        if i != 0 && i % 3 == 0 {
+            ret.push(',');
+        }
+        ret.push(c);
+    }
+
+    ret.chars().rev().collect()
+}
+
+/// convert file size to human readable number
+fn human_readable_size(size: u64) -> String {
+    const UNIT: u64 = 1024;
+    const K: u64 = UNIT;
+    const M: u64 = UNIT.pow(2);
+    const G: u64 = UNIT.pow(3);
+    const T: u64 = UNIT.pow(4);
+
+    let (size, unit) = if size >= T {
+        (size as f64 / T as f64, "TB")
+    } else if size >= G {
+        (size as f64 / G as f64, "GB")
+    } else if size >= M {
+        (size as f64 / M as f64, "MB")
+    } else if size >= K {
+        (size as f64 / K as f64, "KB")
+    } else {
+        (size as f64, "bytes")
+    };
+
+    let size_str = size.to_string();
+    let size_str_parts = size_str.split(".").collect::<Vec<&str>>();
+    let int = size_str_parts[0].parse::<u64>().unwrap();
+    let comma_separated_int = comma_separated_number(int);
+
+    let comma_separated_size = if 1 < size_str_parts.len() {
+        format!("{}.{:.2}", comma_separated_int, size_str_parts[1])
+    } else {
+        comma_separated_int
+    };
+    format!("{} {}", comma_separated_size, unit)
 }

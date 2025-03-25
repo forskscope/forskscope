@@ -7,10 +7,10 @@
 
   let {
     showsFileHandle,
-    addDiffTab,
+    diffFilepathsOnSelected,
   }: {
     showsFileHandle: boolean
-    addDiffTab: (diffFilepaths: DiffFilepaths) => void
+    diffFilepathsOnSelected: (diffFilepaths: DiffFilepaths) => void
   } = $props()
 
   let fileHandleOldFilepath: string = $state('')
@@ -26,7 +26,7 @@
     if (res.oldFilepath) {
       if (res.newFilepath) {
         // show startup diff tab
-        addDiffTab({
+        diffFilepathsOnSelected({
           old: res.oldFilepath,
           new: res.newFilepath,
         } as DiffFilepaths)
@@ -39,7 +39,7 @@
   })
 
   const filepathsOnChange = (diffFilepaths: DiffFilepaths) => {
-    addDiffTab(diffFilepaths)
+    diffFilepathsOnSelected(diffFilepaths)
     closeFileHandle()
   }
 
@@ -63,7 +63,7 @@
     }
 
     // show diff directly
-    addDiffTab({
+    diffFilepathsOnSelected({
       old: filepaths[0],
       new: filepaths[1],
     } as DiffFilepaths)

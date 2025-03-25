@@ -200,7 +200,7 @@
             {/each}
 
             {#each pane.listDirResponse.files as file}
-              <label class="file"
+              <label class={`file ${file.binaryComparisonOnly ? 'binary-comparison-only' : ''}`}
                 ><input
                   type="radio"
                   name={`${pane.oldOrNew}SelectedFile`}
@@ -361,6 +361,10 @@
   .dirs-files label input[type='radio']:checked + div {
     border-bottom-width: 0.02rem;
     border-bottom-style: solid;
+  }
+
+  .file.binary-comparison-only {
+    opacity: 0.5;
   }
 
   .footer button.compare {
