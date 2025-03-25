@@ -1,7 +1,6 @@
 use std::ffi::OsString;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
-use std::process::Command;
 use std::time::UNIX_EPOCH;
 use std::{fs::File, path::Path};
 
@@ -267,6 +266,7 @@ pub fn file_manager_command() -> &'static str {
     }
     #[cfg(target_os = "linux")]
     {
+        use std::process::Command;
         if Command::new("nautilus").arg("--version").output().is_ok() {
             "nautilus"
         } else if Command::new("dolphin").arg("--version").output().is_ok() {
@@ -302,31 +302,29 @@ pub fn arg_to_filepath(arg: &Option<OsString>) -> Option<String> {
 /// target dir
 fn target_dir(current_dir: &str) -> PathBuf {
     let ret = if current_dir.is_empty() {
-        let current_dir = std::env::current_dir().expect("Failed to get current directory");
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            current_dir
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            // extended-length path prefix sometimes appears on windows
-            const WINDOWS_EXTENDED_LENGTH_PATH_PREFIX: &str = r"\\?\";
-
-            let current_dir_str = current_dir
-                .to_str()
-                .expect("Failed to convert current_dir to string");
-            if current_dir_str.starts_with(WINDOWS_EXTENDED_LENGTH_PATH_PREFIX) {
-                PathBuf::from(&current_dir_str[WINDOWS_EXTENDED_LENGTH_PATH_PREFIX.len()..])
-            } else {
-                current_dir
-            }
-        }
+        std::env::current_dir().expect("Failed to get current directory")
     } else {
         Path::new(current_dir)
             .canonicalize()
             .expect(format!("Failed to canonicalize path: {}", current_dir).as_str())
     };
-    ret
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        ret
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // extended-length path prefix sometimes appears on windows
+        const WINDOWS_EXTENDED_LENGTH_PATH_PREFIX: &str = r"\\?\";
+
+        let windows_ret = ret
+            .to_str()
+            .expect("Failed to convert current_dir to string");
+        if windows_ret.starts_with(WINDOWS_EXTENDED_LENGTH_PATH_PREFIX) {
+            PathBuf::from(&windows_ret[WINDOWS_EXTENDED_LENGTH_PATH_PREFIX.len()..])
+        } else {
+            windows_ret.into()
+        }
+    }
 }
