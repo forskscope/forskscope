@@ -1,12 +1,12 @@
 // use tauri::Manager;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use tauri::Manager;
 
 use super::diff::{self, chars_diffs, lines_diffs, startup_compare_set_item};
-use super::file::{self, file_manager_command, filepaths_content};
+use super::file::{self, file_manager_command, filepaths_content, os_path_buf};
 use super::types::{CharsDiffResponse, CompareSet, DiffResponse, LinesDiff, ListDirReponse};
 
 #[tauri::command]
@@ -21,6 +21,14 @@ pub fn ready(app_handle: tauri::AppHandle) -> CompareSet {
     let old = startup_compare_set_item(&args.next());
     let new = startup_compare_set_item(&args.next());
     CompareSet { old, new }
+}
+
+#[tauri::command]
+pub fn os_str_filepath(filename: &str, dirpath: &str) -> Result<String, String> {
+    Ok(os_path_buf(&PathBuf::from(dirpath).join(filename))
+        .to_str()
+        .expect("Failed to convert PathBuf to str")
+        .to_owned())
 }
 
 #[tauri::command]

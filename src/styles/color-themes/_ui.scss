@@ -85,8 +85,13 @@ select {
             color: var(--app-secondary-text-color);
             box-shadow: none;
 
-            &:not(:disabled):hover {
-                background-color: var(--focused-border-color);
+            &:not(:disabled) {
+                background-color: var(--app-secondary-background-color);
+            }
+
+            &:not(:disabled):hover,
+            &.focused {
+                background-color: var(--button-primary-background-color);
             }
         }
     }
