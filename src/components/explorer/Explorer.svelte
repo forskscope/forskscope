@@ -457,7 +457,8 @@
   }
 
   .dirs-files .parent-dir,
-  .dirs-files label div:first-of-type {
+  .dirs-files .dir,
+  .dirs-files .file {
     cursor: pointer;
   }
 
