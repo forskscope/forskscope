@@ -5,7 +5,15 @@
 
 ## Summary
 
-Diff and merge GUI tool with cross-platform support build with Tauri: Rust and Svelte
+Diff and merge 🔍️ GUI tool 💻️ with cross-platform support 🤍 powered by Tauri, Rust and Svelte.
+
+## Executable
+
+Available in [Assets](https://github.com/nabbisen/patch-hygge/releases/latest) in Releases.
+
+```sh
+patch-hygge <old-filepath> <new-filepath>
+```
 
 ## Screenshots
 
@@ -16,11 +24,3 @@ Diff and merge GUI tool with cross-platform support build with Tauri: Rust and S
 ![diff-02-chars](docs/.assets/diff-02-chars.png)
 
 ![settings-01](docs/.assets/settings-01.png)
-
-## Executable
-
-Available in [Assets](https://github.com/nabbisen/patch-hygge/releases/latest) in Releases.
-
-```sh
-patch-hygge <old-filepath> <new-filepath>
-```

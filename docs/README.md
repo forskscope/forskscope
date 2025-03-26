@@ -1,4 +1,4 @@
-# Patch-Hygge Development
+# Patch Hygge Development
 
 ## Build
 
