@@ -2,7 +2,9 @@ use tauri::Manager;
 
 mod core;
 
-use core::handlers::{diff_chars, diff_filepaths, list_dir, open_with_file_manager, ready, save};
+use core::handlers::{
+    diff_chars, diff_filepaths, list_dir, open_with_file_manager, ready, save, validate_filepath,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -27,6 +29,7 @@ pub fn run() {
             open_with_file_manager,
             ready,
             save,
+            validate_filepath
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -21,7 +21,7 @@
   let oldSelectedFile: string = $state('')
   let newSelectedFile: string = $state('')
 
-  const diffOnClickEnabled = $derived(0 < oldSelectedFile.length && 0 < newSelectedFile.length)
+  const diffOnClickEnabled = $derived(oldSelectedFile && newSelectedFile)
 
   const lastSlashIndex = (dirpath: string): number => {
     return dirpath.lastIndexOf('/')

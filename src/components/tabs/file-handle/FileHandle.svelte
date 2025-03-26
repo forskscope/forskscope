@@ -1,7 +1,11 @@
 <script lang="ts">
+  import { invoke } from '@tauri-apps/api/core'
   import { openFileDialog } from '../../../scripts'
   import { T } from '../../../stores/translation.svelte'
   import type { DiffFilepaths, OldOrNew } from '../../../types'
+
+  const DEFAULT_COMPARE_BUTTON_LABEL: string = 'Compare'
+  const BINARY_MODE_COMPARE_BUTTON_LABEL: string = 'Binary Compare'
 
   const {
     oldFilepath,
@@ -16,7 +20,20 @@
   let _oldFilepath: string = $state(oldFilepath)
   let _newFilepath: string = $state(newFilepath)
 
-  const readyForDiff: boolean = $derived(0 < _oldFilepath.length && 0 < _newFilepath.length)
+  let compareButtonLabel: string = $state(DEFAULT_COMPARE_BUTTON_LABEL)
+
+  const readyToCompare: boolean = $derived(0 < _oldFilepath.length && 0 < _newFilepath.length)
+
+  $effect(() => {
+    if (_oldFilepath) {
+      setCompareButtonLabel()
+    }
+  })
+  $effect(() => {
+    if (_newFilepath) {
+      setCompareButtonLabel()
+    }
+  })
 
   const openOldFileOnClick = async (oldOrNew: OldOrNew) => {
     const filepath = await openFileDialog()
@@ -28,7 +45,27 @@
     }
   }
 
-  const diffOnClick = () => {
+  const setCompareButtonLabel = async () => {
+    if (_oldFilepath) {
+      const validateOldFilepath = await invoke('validate_filepath', { filepath: _oldFilepath })
+      if (!validateOldFilepath) {
+        compareButtonLabel = BINARY_MODE_COMPARE_BUTTON_LABEL
+        return
+      }
+    }
+
+    if (_newFilepath) {
+      const validateNewFilepath = await invoke('validate_filepath', { filepath: _newFilepath })
+      if (!validateNewFilepath) {
+        compareButtonLabel = BINARY_MODE_COMPARE_BUTTON_LABEL
+        return
+      }
+    }
+
+    compareButtonLabel = DEFAULT_COMPARE_BUTTON_LABEL
+  }
+
+  const compareOnClick = () => {
     filepathsOnChange({ old: _oldFilepath, new: _newFilepath } as DiffFilepaths)
     _oldFilepath = ''
     _newFilepath = ''
@@ -52,7 +89,9 @@
       <span>({T('Not selected')})</span>
     {/if}
   </div>
-  <button class="diff" onclick={diffOnClick} disabled={!readyForDiff}>{T('Compare')}</button>
+  <button class="compare" onclick={compareOnClick} disabled={!readyToCompare}
+    >{T(compareButtonLabel)}</button
+  >
 </div>
 
 <style>
@@ -79,7 +118,7 @@
     font-weight: bold;
   }
 
-  button.diff {
+  button.compare {
     width: 80%;
     margin-left: 10%;
   }

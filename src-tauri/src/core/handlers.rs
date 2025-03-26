@@ -35,6 +35,11 @@ pub fn ready(app_handle: tauri::AppHandle) -> StartupParam {
     }
 }
 
+#[tauri::command]
+pub fn validate_filepath(filepath: &str) -> Result<bool, String> {
+    Ok(file::validate_filepath(filepath))
+}
+
 #[tauri::command(async)]
 pub async fn diff_filepaths(old: &str, new: &str) -> Result<DiffResponse, String> {
     let (old_read, new_read) = match filepaths_content(old, new) {

@@ -19,6 +19,11 @@ const UTF8_CHARSET: &str = "UTF-8";
 /// label text on charset on non text file
 const NOT_TEXTFILE_CHARSET: &str = "(bytes array)";
 
+/// validate file path to compare
+pub fn validate_filepath(filepath: &str) -> bool {
+    is_textfile(filepath) || filepath.ends_with(".xlsx")
+}
+
 /// get content from file paths on old file and new file
 pub fn filepaths_content(old: &str, new: &str) -> Result<Vec<ReadContent>, String> {
     if is_textfile(old) && is_textfile(new) {
@@ -35,99 +40,6 @@ pub fn filepaths_content(old: &str, new: &str) -> Result<Vec<ReadContent>, Strin
     }
 
     Ok(vec![binary_content(old), binary_content(new)])
-}
-
-/// check if file is text file
-fn is_textfile(filepath: &str) -> bool {
-    let file = File::open(filepath);
-    match file {
-        Ok(f) => {
-            let mut reader = BufReader::new(f);
-            let mut buffer = String::new();
-            reader.read_line(&mut buffer).is_ok()
-        }
-        Err(_) => false,
-    }
-}
-
-/// get content from text file
-fn textfile_content(filepath: &str) -> ReadContent {
-    let mut file = File::open(filepath).expect(format!("failed to open {}", filepath).as_str());
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer).unwrap();
-
-    let is_binary = buffer.windows(2).any(|window| window[0] == 0x00);
-    if is_binary {
-        const BYTES_ARRAY_ROW_LENGTH: usize = 16;
-        let mut grid = String::new();
-        for chunk in buffer.chunks(BYTES_ARRAY_ROW_LENGTH) {
-            for byte in chunk {
-                grid.push_str(&format!("{:02X} ", byte));
-            }
-            grid.push_str("\n");
-        }
-        return ReadContent {
-            charset: NOT_TEXTFILE_CHARSET.to_owned(),
-            content: grid,
-        };
-    }
-
-    match std::str::from_utf8(&buffer) {
-        Ok(x) => {
-            return ReadContent {
-                charset: UTF8_CHARSET.to_owned(),
-                content: x.to_owned(),
-            }
-        }
-        Err(_) => (),
-    }
-
-    let mut detector = EncodingDetector::new();
-    detector.feed(&buffer, true);
-    let encoding = detector.guess(None, false);
-    let (decoded, _, had_errors) = encoding.decode(&buffer);
-    if had_errors {
-        eprint!("not binary, not utf-8 text and not any other encoded text.")
-    }
-    ReadContent {
-        charset: encoding.name().to_owned(),
-        content: decoded.to_string(),
-    }
-}
-
-/// read content from ms excel
-fn excel_content(split_unified_diff_content: &Vec<SplitUnifiedDiffContent>) -> ReadContent {
-    let content = split_unified_diff_content
-        .iter()
-        .map(|x| {
-            let mut ret: Vec<String> = vec![x.title.to_owned()];
-            ret.extend(x.lines.iter().flat_map(|x| {
-                let mut ret: Vec<String> = vec![];
-                if let Some(pos) = &x.pos {
-                    ret.push(pos.to_owned());
-                }
-                if let Some(text) = &x.text {
-                    ret.push(text.to_owned());
-                }
-                ret
-            }));
-            ret.join("\n")
-        })
-        .collect();
-    ReadContent {
-        charset: "(Excel)".to_owned(),
-        content,
-    }
-}
-
-/// read content as bynary
-fn binary_content(filepath: &str) -> ReadContent {
-    let read_bytes = fs::read(Path::new(filepath)).expect("Failed to read file in binary mode");
-    let hex_dump = bytes_to_hex_dump(&read_bytes);
-    ReadContent {
-        charset: "(binary)".to_owned(),
-        content: hex_dump,
-    }
 }
 
 /// list files and directories in directory
@@ -243,9 +155,97 @@ pub fn arg_to_filepath(arg: &Option<OsString>) -> Option<String> {
     }
 }
 
-/// validate file path to compare
-fn validate_filepath(filepath: &str) -> bool {
-    is_textfile(filepath) || filepath.ends_with(".xlsx")
+/// check if file is text file
+fn is_textfile(filepath: &str) -> bool {
+    let file = File::open(filepath);
+    match file {
+        Ok(f) => {
+            let mut reader = BufReader::new(f);
+            let mut buffer = String::new();
+            reader.read_line(&mut buffer).is_ok()
+        }
+        Err(_) => false,
+    }
+}
+
+/// get content from text file
+fn textfile_content(filepath: &str) -> ReadContent {
+    let mut file = File::open(filepath).expect(format!("failed to open {}", filepath).as_str());
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).unwrap();
+
+    let is_binary = buffer.windows(2).any(|window| window[0] == 0x00);
+    if is_binary {
+        const BYTES_ARRAY_ROW_LENGTH: usize = 16;
+        let mut grid = String::new();
+        for chunk in buffer.chunks(BYTES_ARRAY_ROW_LENGTH) {
+            for byte in chunk {
+                grid.push_str(&format!("{:02X} ", byte));
+            }
+            grid.push_str("\n");
+        }
+        return ReadContent {
+            charset: NOT_TEXTFILE_CHARSET.to_owned(),
+            content: grid,
+        };
+    }
+
+    match std::str::from_utf8(&buffer) {
+        Ok(x) => {
+            return ReadContent {
+                charset: UTF8_CHARSET.to_owned(),
+                content: x.to_owned(),
+            }
+        }
+        Err(_) => (),
+    }
+
+    let mut detector = EncodingDetector::new();
+    detector.feed(&buffer, true);
+    let encoding = detector.guess(None, false);
+    let (decoded, _, had_errors) = encoding.decode(&buffer);
+    if had_errors {
+        eprint!("not binary, not utf-8 text and not any other encoded text.")
+    }
+    ReadContent {
+        charset: encoding.name().to_owned(),
+        content: decoded.to_string(),
+    }
+}
+
+/// read content from ms excel
+fn excel_content(split_unified_diff_content: &Vec<SplitUnifiedDiffContent>) -> ReadContent {
+    let content = split_unified_diff_content
+        .iter()
+        .map(|x| {
+            let mut ret: Vec<String> = vec![x.title.to_owned()];
+            ret.extend(x.lines.iter().flat_map(|x| {
+                let mut ret: Vec<String> = vec![];
+                if let Some(pos) = &x.pos {
+                    ret.push(pos.to_owned());
+                }
+                if let Some(text) = &x.text {
+                    ret.push(text.to_owned());
+                }
+                ret
+            }));
+            ret.join("\n")
+        })
+        .collect();
+    ReadContent {
+        charset: "(Excel)".to_owned(),
+        content,
+    }
+}
+
+/// read content as bynary
+fn binary_content(filepath: &str) -> ReadContent {
+    let read_bytes = fs::read(Path::new(filepath)).expect("Failed to read file in binary mode");
+    let hex_dump = bytes_to_hex_dump(&read_bytes);
+    ReadContent {
+        charset: "(binary)".to_owned(),
+        content: hex_dump,
+    }
 }
 
 /// target dir
