@@ -287,13 +287,6 @@
 </div>
 
 <style>
-  .diff-panes:focus {
-    outline: none;
-    border: none;
-    box-shadow: none;
-    /* min-height: 0; */
-  }
-
   .header {
     height: 2rem;
     gap: 1.1rem;

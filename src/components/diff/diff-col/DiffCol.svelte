@@ -21,7 +21,7 @@
     if (focusedLinesDiffIndex === null || oldOrNew !== 'old') return
     document
       .querySelector(`.${LINES_DIFF_CLASS_PREFIX}${focusedLinesDiffIndex}`)!
-      .scrollIntoView({ behavior: 'smooth', inline: 'center' })
+      .scrollIntoView({ behavior: 'smooth' })
   })
 
   const diffLines = (linesDiff: LinesDiff, oldOrNew: OldOrNew): string[] => {

@@ -15,20 +15,18 @@
 
 <div class="lines-diffs">
   {#each linesDiffs as linesDiff, i}
-    <div
+    <button
       class={`lines-diff ${LINES_DIFF_CLASS_PREFIX}${i} ${focusedLinesDiffIndex === i ? 'focused' : ''}`}
       style={`height: calc(var(--line-height) * ${linesDiff.linesCount})`}
+      onclick={() => {
+        replaceOnClick(i)
+      }}
+      disabled={linesDiff.diffKind === 'equal'}
     >
-      {#each linesDiff.oldLines.length < linesDiff.newLines.length ? linesDiff.newLines : linesDiff.oldLines as line, j}
-        <div class="diff-line">
-          {#if j === 0 && linesDiff.diffKind !== 'equal'}<button
-              onclick={() => {
-                replaceOnClick(i)
-              }}>⇨</button
-            >{/if}
-        </div>
-      {/each}
-    </div>
+      {#if linesDiff.diffKind !== 'equal'}
+        <span>⇨</span>
+      {/if}
+    </button>
   {/each}
 </div>
 
@@ -41,22 +39,11 @@
     min-height: 100%;
   }
 
-  .lines-diff {
-    position: relative;
-  }
-
-  .diff-line {
-    counter-increment: line-number;
-    height: var(--line-height);
-  }
-
   button {
-    position: absolute;
-    top: 5%;
-    left: 0;
-    height: 90%;
     padding: 0;
-    display: inline-flex;
+    display: flex;
+    justify-content: center;
     align-items: center;
+    width: 100%;
   }
 </style>
