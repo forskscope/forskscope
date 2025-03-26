@@ -6,6 +6,7 @@
   import Tooltip from '../common/Tooltip.svelte'
   import { T } from '../../stores/translation.svelte'
   import { BINARY_MODE_COMPARE_BUTTON_LABEL, DEFAULT_COMPARE_BUTTON_LABEL } from '../../consts'
+  import { osStrFilepath } from '../../utils/file.svelte'
 
   interface ExplorePane {
     oldOrNew: OldOrNew
@@ -50,6 +51,7 @@
   })
 
   const lastSlashIndex = (dirpath: string): number => {
+    // todo: windows file system
     return dirpath.lastIndexOf('/')
   }
   const parentDirsPath = (dirpath: string): string => {
@@ -59,8 +61,8 @@
     return dirpath.substring(lastSlashIndex(dirpath) + 1)
   }
 
-  onMount(async () => {
-    const res = await invoke('list_dir', { currentDir: '' })
+  const listDir = async (currentDir: string): Promise<ListDirReponse> => {
+    const res = await invoke('list_dir', { currentDir })
       // todo
       .catch((error: unknown) => {
         console.error(error)
@@ -69,13 +71,25 @@
 
     console.log(res) // todo
 
-    oldExplorerPane.listDirResponse = res as ListDirReponse
+    return res as ListDirReponse
+  }
+
+  onMount(async () => {
+    const listDirReponse = await listDir('')
+
+    oldExplorerPane.listDirResponse = listDirReponse
     newExplorerPane.listDirResponse = oldExplorerPane.listDirResponse // todo
   })
 
-  const compareOnClick = () => {
-    const oldFilepath: string = `${oldExplorerPane.listDirResponse!.currentDir}/${oldSelectedFile}`
-    const newFilepath: string = `${newExplorerPane.listDirResponse!.currentDir}/${newSelectedFile}`
+  const compareOnClick = async () => {
+    const oldFilepath: string = await osStrFilepath(
+      oldSelectedFile,
+      oldExplorerPane.listDirResponse!.currentDir
+    )
+    const newFilepath: string = await osStrFilepath(
+      newSelectedFile,
+      newExplorerPane.listDirResponse!.currentDir
+    )
 
     const compareSet = {
       old: {
@@ -95,20 +109,13 @@
   const selectDir = async (oldOrNew: OldOrNew) => {
     const dirpath = await openDirectoryDialog()
     if (dirpath === null) return
-    await changeDir(dirpath, oldOrNew)
+    await changeDir('', dirpath, oldOrNew)
   }
 
-  const changeDir = async (dirpath: string, oldOrNew: OldOrNew) => {
-    const res: unknown = await invoke('list_dir', { currentDir: dirpath })
-      // todo
-      .catch((error: unknown) => {
-        console.error(error)
-        return
-      })
+  const changeDir = async (dirname: string, parentDirpath: string, oldOrNew: OldOrNew) => {
+    const dirpath = await osStrFilepath(dirname, parentDirpath)
+    const listDirResponse = await listDir(dirpath)
 
-    console.log(res) // todo
-
-    const listDirResponse = res as ListDirReponse
     if (oldOrNew === 'old') {
       oldExplorerPane.listDirResponse = listDirResponse
       oldSelectedFile = ''
@@ -119,6 +126,7 @@
   }
 
   const isRootDir = (dir: string): boolean => {
+    // todo: windows file system
     return dir === '/' || dir.endsWith(':\\')
   }
 
@@ -157,6 +165,36 @@
       newSelectedFile = filename
       newBinaryComparisonOnly = binaryComparisonOnly
     }
+  }
+
+  const filenameOnDblClick = async (filename: string) => {
+    if (oldExplorerPane.listDirResponse === null || newExplorerPane.listDirResponse === null) return
+
+    const oldFound = oldExplorerPane.listDirResponse.files.find((x) => x.name === filename)
+    if (!oldFound) return
+    const newFound = newExplorerPane.listDirResponse.files.find((x) => x.name === filename)
+    if (!newFound) return
+
+    const oldFilepath: string = await osStrFilepath(
+      filename,
+      oldExplorerPane.listDirResponse!.currentDir
+    )
+    const newFilepath: string = await osStrFilepath(
+      filename,
+      newExplorerPane.listDirResponse!.currentDir
+    )
+
+    const compareSet = {
+      old: {
+        filepath: oldFilepath,
+        binaryComparisonOnly: oldFound.binaryComparisonOnly,
+      } as CompareSetItem,
+      new: {
+        filepath: newFilepath,
+        binaryComparisonOnly: newFound.binaryComparisonOnly,
+      } as CompareSetItem,
+    } as CompareSet
+    compareSetOnSelected(compareSet)
   }
 
   const openWithFileManager = (oldOrNew: OldOrNew) => {
@@ -260,8 +298,9 @@
                 role="button"
                 tabindex="0"
                 class="parent-dir"
-                ondblclick={() =>
-                  changeDir(`${pane.listDirResponse!.currentDir}/..`, pane.oldOrNew)}
+                ondblclick={() => {
+                  changeDir('..', pane.listDirResponse!.currentDir, pane.oldOrNew)
+                }}
               >
                 ⇡ ..
               </div>
@@ -282,8 +321,9 @@
                   role="button"
                   tabindex="0"
                   class={`name ${digestDiffClass(dir, true)}`}
-                  ondblclick={() =>
-                    changeDir(`${pane.listDirResponse!.currentDir}/${dir}`, pane.oldOrNew)}
+                  ondblclick={() => {
+                    changeDir(dir, pane.listDirResponse!.currentDir, pane.oldOrNew)
+                  }}
                 >
                   {dir}
                 </div>
@@ -309,7 +349,14 @@
                       file.binaryComparisonOnly
                     )}
                 />
-                <div role="button" tabindex="0" class={`name ${digestDiffClass(file.name, false)}`}>
+                <div
+                  role="button"
+                  tabindex="0"
+                  class={`name ${digestDiffClass(file.name, false)}`}
+                  ondblclick={() => {
+                    filenameOnDblClick(file.name)
+                  }}
+                >
                   {file.name}
                 </div>
                 {#if file.humanReadableSize !== file.bytesSize}
@@ -426,14 +473,16 @@
   }
 
   .dirs-files .header,
-  .dirs-files label {
+  .dir,
+  .file {
     width: 100%;
     display: flex;
     gap: 1.1rem;
   }
 
   .dirs-files .header > div,
-  .dirs-files label > div {
+  .dir > div,
+  .file > div {
     flex: 1;
     overflow: hidden;
     white-space: nowrap;
@@ -441,7 +490,8 @@
   }
 
   .dirs-files .header > div:nth-of-type(1),
-  .dirs-files label > div:nth-of-type(1) {
+  .dir > .name,
+  .file > .name {
     flex: 2;
   }
 
@@ -451,14 +501,14 @@
     font-weight: bold;
   }
 
-  .dirs-files .parent-dir,
+  .parent-dir,
   .dirs-files label {
     margin: 0.08rem 0;
   }
 
-  .dirs-files .parent-dir,
-  .dirs-files .dir,
-  .dirs-files .file {
+  .parent-dir,
+  .dir,
+  .file {
     cursor: pointer;
   }
 
@@ -470,7 +520,7 @@
     opacity: 0.87;
   }
 
-  .dirs-files label input[type='radio']:checked + div {
+  .dirs-files label input[type='radio']:checked + .name {
     border-bottom-width: 0.02rem;
     border-bottom-style: solid;
   }
