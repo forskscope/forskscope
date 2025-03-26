@@ -15,7 +15,7 @@
   import SeparatorCol from './separator-col/SeparatorCol.svelte'
   import SeparatorHeaderCol from './separator-col/SeparatorHeaderCol.svelte'
   import SeparatorFooterCol from './separator-col/SeparatorFooterCol.svelte'
-  import { openFileDialog, saveFileDialog } from '../../scripts'
+  import { openFileDialog, saveFileDialog } from '../../utils/dialog.svelte'
   import { onMount } from 'svelte'
   import { errorToast } from '../../stores/Toast.svelte'
 

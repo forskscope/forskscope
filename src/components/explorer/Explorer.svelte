@@ -2,7 +2,7 @@
   import { invoke } from '@tauri-apps/api/core'
   import { onMount } from 'svelte'
   import type { CompareSet, CompareSetItem, ListDirReponse, OldOrNew } from '../../types'
-  import { openDirectoryDialog } from '../../scripts'
+  import { openDirectoryDialog } from '../../utils/dialog.svelte'
   import Tooltip from '../common/Tooltip.svelte'
   import { T } from '../../stores/translation.svelte'
   import { BINARY_MODE_COMPARE_BUTTON_LABEL, DEFAULT_COMPARE_BUTTON_LABEL } from '../../consts'

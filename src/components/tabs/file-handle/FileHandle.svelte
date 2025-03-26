@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
-  import { openFileDialog } from '../../../scripts'
+  import { openFileDialog } from '../../../utils/dialog.svelte'
   import { T } from '../../../stores/translation.svelte'
   import type { CompareSet, CompareSetItem, OldOrNew } from '../../../types'
   import { BINARY_MODE_COMPARE_BUTTON_LABEL, DEFAULT_COMPARE_BUTTON_LABEL } from '../../../consts'
