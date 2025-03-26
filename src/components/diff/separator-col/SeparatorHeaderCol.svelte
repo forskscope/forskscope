@@ -26,9 +26,10 @@
   <div class="menus">
     <div class="header">
       <button
+        class="close"
         onclick={() => {
           showsMenus = false
-        }}>x</button
+        }}>✖️</button
       >
     </div>
     <div class="content">
@@ -72,20 +73,19 @@
     width: 14.4rem;
     height: 8.7rem;
     padding: 0.3rem 1.1rem;
-    background: var(--secondary-background-color);
     border-radius: 0.2rem;
     opacity: 0.93;
     z-index: 100;
   }
 
   .menus .header {
-    height: 1.4rem;
+    height: 1.6rem;
     text-align: right;
   }
 
-  .menus .header button {
+  .menus .header .close {
     font-size: 0.9rem;
-    padding: 0.2rem;
+    padding: 0.2rem 0.5rem;
   }
 
   .menus .content {

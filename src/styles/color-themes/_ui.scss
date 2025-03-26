@@ -1,10 +1,15 @@
 #app {
-    background-color: var(--secondary-background-color);
-    color: var(--secondary-text-color);
+    background-color: var(--app-primary-background-color);
+    color: var(--app-primary-text-color);
 }
 
 *:disabled {
     color: var(--muted-text-color);
+}
+
+button {
+    background-color: var(--button-primary-background-color);
+    color: var(--button-primary-text-color);
 }
 
 button:disabled {
@@ -12,19 +17,41 @@ button:disabled {
 }
 
 input,
-button {
-    background-color: var(--button-primary-background-color);
-    color: var(--button-primary-text-color);
+select {
+    background-color: var(--form-primary-background-color);
+    color: var(--form-primary-text-color);
+}
+
+.tab-header {
+    background-color: var(--app-secondary-background-color);
+    color: var(--app-secondary-text-color);
+    border-color: var(--primary-border-color);
+
+    &.active {
+        border-color: var(--focused-border-color);
+    }
 }
 
 .explorer-pane {
-    background-color: var(--primary-background-color);
-    color: var(--primary-text-color);
+    &.old {
+        background-color: var(--explorer-old-pane-background-color);
+        color: var(--explorer-old-pane-text-color);
+    }
+
+    &.new {
+        background-color: var(--explorer-new-pane-background-color);
+        color: var(--explorer-new-pane-text-color);
+    }
+
+    .current-dir {
+        background-color: var(--app-secondary-background-color);
+        color: var(--app-secondary-text-color);
+    }
 
     .dirs-files {
         .header {
-            background-color: var(--primary-text-color);
-            color: var(--primary-background-color);
+            background-color: var(--app-primary-background-color);
+            color: var(--app-primary-text-color);
         }
 
         label input[type='radio']:checked+div,
@@ -32,6 +59,10 @@ button {
             border-bottom-color: var(--focused-border-color);
         }
     }
+}
+
+.footer h2 {
+    color: var(--muted-text-color);
 }
 
 .diff-panes {
@@ -43,11 +74,15 @@ button {
         border-top: 0.2rem solid var(--primary-border-color);
     }
 
-    .row.header .diff,
+    .content .separator,
+    .diff-line::before {
+        background-color: var(--app-secondary-background-color);
+    }
+
     .content .separator {
         button {
             background-color: transparent;
-            color: var(--secondary-text-color);
+            color: var(--app-secondary-text-color);
             box-shadow: none;
 
             &:not(:disabled):hover {
@@ -55,9 +90,19 @@ button {
             }
         }
     }
+
+    .menus {
+        background: var(--app-secondary-background-color);
+    }
 }
 
 .select-files {
-    background-color: var(--primary-text-color);
-    color: var(--primary-background-color);
+    background-color: var(--app-secondary-background-color);
+    color: var(--app-secondary-text-color);
+    border-color: var(--focused-border-color);
+}
+
+.settings-wrapper {
+    background-color: var(--app-secondary-background-color);
+    color: var(--app-secondary-text-color);
 }

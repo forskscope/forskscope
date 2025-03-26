@@ -1,7 +1,9 @@
 export const APP_LANGUAGES = ['en', 'ja']
 export const APP_DEFAULT_LANGUAGE = APP_LANGUAGES[0]
 
-export const APP_THEMES = ['light-theme', 'dark-theme', 'night-theme', 'monokai-theme']
+export const APP_THEMES = ['dark-theme', 'light-theme', 'night-theme']
+export const APP_DEFAULT_THEME = APP_THEMES[0]
+
 export const APP_DIFF_FONT_FAMILIES = ['sans-serif-diff-font-family', 'serif-diff-font-family', 'monospace-diff-font-family']
 export const APP_UI_FONT_FAMILIES = ['sans-serif-ui-font-family', 'serif-ui-font-family', 'monospace-ui-font-family']
 

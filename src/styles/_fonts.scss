@@ -1,0 +1,51 @@
+#app {
+    font-size: var(--ui-font-size);
+
+    .lines-diffs {
+        font-size: var(--diff-font-size);
+    }
+
+    .settings {
+        font-size: 14px !important;
+        font-family: monospace !important;
+
+        input,
+        label {
+            font-size: 18px !important;
+        }
+
+        input {
+            padding: 3px 12px;
+        }
+    }
+
+    &.sans-serif-diff-font-family {
+        .lines-diffs {
+            font-family: sans-serif;
+        }
+    }
+
+    &.serif-diff-font-family {
+        .lines-diffs {
+            font-family: serif;
+        }
+    }
+
+    &.monospace-diff-font-family {
+        .lines-diffs {
+            font-family: monospace;
+        }
+    }
+
+    &.sans-serif-ui-font-family {
+        font-family: sans-serif;
+    }
+
+    &.serif-ui-font-family {
+        font-family: serif;
+    }
+
+    &.monospace-ui-font-family {
+        font-family: monospace;
+    }
+}

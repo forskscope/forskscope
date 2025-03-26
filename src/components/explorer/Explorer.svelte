@@ -165,27 +165,23 @@
   }
 </script>
 
-<div class="header">
-  <h2>Explorer</h2>
-</div>
-
 <div class="content explorer-panes">
   {#each [oldExplorerPane, newExplorerPane] as pane}
     {#if pane.listDirResponse !== null}
-      <div class="explorer-pane">
+      <div class={`explorer-pane ${pane.oldOrNew}`}>
         <div class="current-dir">
           <h3 class="dirpath">
             <div class="parent-dirs">{parentDirsPath(pane.listDirResponse.currentDir)}</div>
             <div class="dirname">{dirname(pane.listDirResponse.currentDir)}</div>
           </h3>
           <div>
-            <Tooltip position="top" messages={T('Copy current dir pos')}>
-              <button class="select-dir" onclick={() => copyCurrentDir(pane.oldOrNew)}
-                >{#if pane.oldOrNew === 'old'}→{:else}←{/if}</button
-              >
-            </Tooltip>
             <Tooltip position="top" messages={T('Select dir dialog')}>
               <button class="select-dir" onclick={() => selectDir(pane.oldOrNew)}>⚓️</button>
+            </Tooltip>
+            <Tooltip position="top" messages={T('Sync dir pos')}>
+              <button class="sync-dir" onclick={() => copyCurrentDir(pane.oldOrNew)}
+                >{#if pane.oldOrNew === 'old'}→{:else}←{/if}</button
+              >
             </Tooltip>
             <Tooltip position="top" messages={T('Run file manager')}>
               <button class="file-manager" onclick={() => openWithFileManager(pane.oldOrNew)}
@@ -198,11 +194,9 @@
           <div class="dirs-files">
             {#if 0 < pane.listDirResponse.files.length}
               <div class="header">
-                <div class="file header">
-                  <div>{T('Name')}</div>
-                  <div>{T('Size')}</div>
-                  <div>{T('Last modified')}</div>
-                </div>
+                <div>{T('Name')}</div>
+                <div>{T('Size')}</div>
+                <div>{T('Last modified')}</div>
               </div>
             {/if}
             {#if !isRootDir(pane.listDirResponse.currentDir)}
@@ -275,6 +269,7 @@
 </div>
 
 <div class="footer">
+  <h2>Explorer</h2>
   {#if compareOnClickEnabled}
     <button class="compare" onclick={compareOnClick}>{T(compareButtonLabel)}</button>
   {:else}
@@ -283,20 +278,22 @@
 </div>
 
 <style>
-  .header {
-    height: 1.4rem;
-    display: flex;
-    align-items: center;
-  }
-  h2 {
-    font-size: 0.87rem;
-  }
   .content {
-    height: calc(100vh - 4.9rem);
+    height: calc(100vh - 3.3rem);
   }
+
   .footer {
-    height: 1.9rem;
+    position: relative;
+    height: 1.7rem;
     text-align: center;
+  }
+
+  h2 {
+    position: absolute;
+    right: 0.4rem;
+    top: 0.3rem;
+    font-size: 0.8rem;
+    pointer-events: none;
   }
 
   .explorer-panes,
@@ -350,8 +347,12 @@
     margin-left: 0.02rem;
   }
 
-  .select-dir,
-  .file-manager {
+  .current-dir button {
+    padding: 0.2rem 0.4rem;
+  }
+
+  .current-dir button.select-dir {
+    margin-right: 0.3rem;
     padding: 0.3rem 0.6rem;
   }
 

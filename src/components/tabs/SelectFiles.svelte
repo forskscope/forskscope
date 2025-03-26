@@ -8,10 +8,14 @@
   let {
     showsFileHandle,
     compareSetOnSelected,
+    closeSelectFiles,
   }: {
     showsFileHandle: boolean
     compareSetOnSelected: (compareSet: CompareSet) => void
+    closeSelectFiles: () => void
   } = $props()
+
+  let _showsFileHandle: boolean = $state(showsFileHandle)
 
   let fileHandleOldFilepath: string = $state('')
   let fileHandleNewFilepath: string = $state('')
@@ -32,18 +36,14 @@
       } else {
         // start with a file dropped
         fileHandleOldFilepath = compareSet.old.filepath
-        showsFileHandle = true
+        _showsFileHandle = true
       }
     }
   })
 
   const compareSetOnChange = (compareSet: CompareSet) => {
     compareSetOnSelected(compareSet)
-    closeFileHandle()
-  }
-
-  const closeFileHandle = () => {
-    showsFileHandle = false
+    closeSelectFiles()
   }
 
   const filesOnDropped = async (filepaths: string[]) => {
@@ -57,7 +57,7 @@
         fileHandleOldFilepath = filepaths[0]
         fileHandleNewFilepath = ''
       }
-      showsFileHandle = true
+      _showsFileHandle = true
       return
     }
 
@@ -90,10 +90,10 @@
   }
 </script>
 
-<div class={showsFileHandle ? '' : 'd-none'}>
+<div class={_showsFileHandle ? '' : 'd-none'}>
   <div class="select-files">
     <header>
-      <button onclick={closeFileHandle}>x</button>
+      <button onclick={closeSelectFiles}>x</button>
     </header>
 
     {#key [fileHandleOldFilepath, fileHandleNewFilepath]}
@@ -123,6 +123,8 @@
     width: 80vw;
     height: 80vh;
     padding: 0.4rem 0;
+    border-width: 0.02rem;
+    border-style: solid;
   }
 
   .drag-drop {
