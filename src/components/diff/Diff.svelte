@@ -73,7 +73,10 @@
   const diff = async () => {
     await diffLines()
     loaded = true
-    await diffChars()
+
+    if (!compareSet.old.binaryComparisonOnly && !compareSet.new.binaryComparisonOnly) {
+      await diffChars()
+    }
   }
 
   const diffLines = async () => {
