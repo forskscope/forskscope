@@ -3,8 +3,8 @@ use tauri::Manager;
 mod core;
 
 use core::handlers::{
-    binary_comparison_only, diff_chars, diff_filepaths, list_dir, open_with_file_manager, ready,
-    save,
+    binary_comparison_only, diff_chars, diff_filepaths, dir_digest_diff, file_digest_diff,
+    list_dir, open_with_file_manager, ready, save,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -27,6 +27,8 @@ pub fn run() {
             binary_comparison_only,
             diff_filepaths,
             diff_chars,
+            dir_digest_diff,
+            file_digest_diff,
             list_dir,
             open_with_file_manager,
             ready,

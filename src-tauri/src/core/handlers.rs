@@ -28,6 +28,16 @@ pub fn binary_comparison_only(filepath: &str) -> Result<bool, String> {
     Ok(diff::binary_comparison_only(filepath))
 }
 
+#[tauri::command]
+pub fn file_digest_diff(filename: &str, old_dir: &str, new_dir: &str) -> Result<bool, String> {
+    diff::file_digest_diff(filename, old_dir, new_dir)
+}
+
+#[tauri::command]
+pub fn dir_digest_diff(dirname: &str, old_dir: &str, new_dir: &str) -> Result<bool, String> {
+    diff::dir_digest_diff(dirname, old_dir, new_dir)
+}
+
 #[tauri::command(async)]
 pub async fn diff_filepaths(old: &str, new: &str) -> Result<DiffResponse, String> {
     let (old_read, new_read) = match filepaths_content(old, new) {
