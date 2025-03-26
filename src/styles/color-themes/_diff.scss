@@ -2,15 +2,19 @@
     color: var(--line-diff-text-color);
 
     &.old {
-        .delete {
+
+        .delete,
+        .delete .diff-line::before {
             background-color: var(--line-diff-delete-old-background-color);
         }
 
-        .insert {
+        .insert,
+        .insert .diff-line::before {
             background-color: var(--app-secondary-background-color);
         }
 
-        .replace {
+        .replace,
+        .replace .diff-line::before {
             background-color: var(--line-diff-replace-old-background-color);
         }
 
@@ -32,15 +36,19 @@
     }
 
     &.new {
-        .delete {
+
+        .delete,
+        .delete .diff-line::before {
             background-color: var(--app-secondary-background-color);
         }
 
-        .insert {
+        .insert,
+        .insert .diff-line::before {
             background-color: var(--line-diff-insert-new-background-color);
         }
 
-        .replace {
+        .replace,
+        .replace .diff-line::before {
             background-color: var(--line-diff-replace-new-background-color);
         }
 

@@ -66,17 +66,15 @@
     return 0 <= foundIndex ? foundIndex : focusedLinesDiffIndex
   })
 
-  const charsDiffsReady: boolean = $derived(charsDiffs !== null)
+  const charsDiffsAvailable: boolean = $derived(
+    !compareSet.old.binaryComparisonOnly && !compareSet.new.binaryComparisonOnly
+  )
 
   const isCompletelyEqual: boolean = $derived(!linesDiffs.some((x) => x.diffKind !== 'equal'))
 
   const diff = async () => {
     await diffLines()
     loaded = true
-
-    if (!compareSet.old.binaryComparisonOnly && !compareSet.new.binaryComparisonOnly) {
-      await diffChars()
-    }
   }
 
   const diffLines = async () => {
@@ -154,7 +152,10 @@
     })
   }
 
-  const showsCharsDiffsOnChange = (value: boolean) => {
+  const showsCharsDiffsOnChange = async (value: boolean) => {
+    if (charsDiffs === null) {
+      await diffChars()
+    }
     showsCharsDiffs = value
   }
 
@@ -226,7 +227,7 @@
         <div class="col separator">
           <SeparatorHeaderCol
             {showsCharsDiffs}
-            {charsDiffsReady}
+            {charsDiffsAvailable}
             {showsCharsDiffsOnChange}
             {switchOldNewOnClick}
           />

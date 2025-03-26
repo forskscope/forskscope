@@ -3,13 +3,13 @@
 
   let {
     showsCharsDiffs,
-    charsDiffsReady,
+    charsDiffsAvailable,
     showsCharsDiffsOnChange,
     switchOldNewOnClick,
   }: {
     showsCharsDiffs: boolean
-    charsDiffsReady: boolean
-    showsCharsDiffsOnChange: (value: boolean) => void
+    charsDiffsAvailable: boolean
+    showsCharsDiffsOnChange: (value: boolean) => Promise<void>
     switchOldNewOnClick: () => void
   } = $props()
 
@@ -40,12 +40,10 @@
           onchange={() => {
             showsCharsDiffsOnChange(_showsCharsDiffs)
           }}
-          disabled={!charsDiffsReady}
+          disabled={!charsDiffsAvailable}
         />{T('Show chars diff')}</label
       >
-      <button onclick={switchOldNewOnClick} disabled={!charsDiffsReady}
-        >{T('Switch left/right')}</button
-      >
+      <button onclick={switchOldNewOnClick}>{T('Switch left/right')}</button>
     </div>
   </div>
 {/if}
