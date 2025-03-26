@@ -136,9 +136,11 @@
   }
 
   .header.diff > span {
-    display: inline-block;
     width: 5.7rem;
+    display: inline-block;
     text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .header span {
