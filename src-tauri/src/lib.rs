@@ -4,7 +4,7 @@ mod core;
 
 use core::handlers::{
     binary_comparison_only, diff_chars, diff_filepaths, dir_digest_diff, file_digest_diff,
-    list_dir, open_with_file_manager, os_str_filepath, ready, save,
+    list_dir, open_with_file_manager, ready, save,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -31,7 +31,6 @@ pub fn run() {
             file_digest_diff,
             list_dir,
             open_with_file_manager,
-            os_str_filepath,
             ready,
             save,
         ])

@@ -13,3 +13,6 @@ export const OLD_OR_NEW = ['old', 'old']
 
 export const DEFAULT_COMPARE_BUTTON_LABEL: string = 'Compare'
 export const BINARY_MODE_COMPARE_BUTTON_LABEL: string = 'Binary Compare'
+
+// os independent path separator is available **in frontend**
+export const PATH_SEPARATOR: string = "/"

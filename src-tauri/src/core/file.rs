@@ -114,28 +114,6 @@ pub fn save(filepath: &str, content: &str, charset: &str) -> Result<(), io::Erro
     Ok(())
 }
 
-/// convert pathbuf to os dependent one
-pub fn os_path_buf(path_buf: &PathBuf) -> PathBuf {
-    #[cfg(not(target_os = "windows"))]
-    {
-        path_buf.to_owned()
-    }
-    #[cfg(target_os = "windows")]
-    {
-        // extended-length path prefix sometimes appears on windows
-        const WINDOWS_EXTENDED_LENGTH_PATH_PREFIX: &str = r"\\?\";
-
-        let windows_path_buf = path_buf
-            .to_str()
-            .expect("Failed to convert current_dir to string");
-        if windows_path_buf.starts_with(WINDOWS_EXTENDED_LENGTH_PATH_PREFIX) {
-            PathBuf::from(&windows_path_buf[WINDOWS_EXTENDED_LENGTH_PATH_PREFIX.len()..])
-        } else {
-            windows_path_buf.into()
-        }
-    }
-}
-
 /// command to run file manager
 pub fn file_manager_command() -> &'static str {
     #[cfg(target_os = "windows")]
@@ -271,6 +249,28 @@ fn binary_content(filepath: &str) -> ReadContent {
     ReadContent {
         charset: "(binary)".to_owned(),
         content: hex_dump,
+    }
+}
+
+/// convert pathbuf to os dependent one
+fn os_path_buf(path_buf: &PathBuf) -> PathBuf {
+    #[cfg(not(target_os = "windows"))]
+    {
+        path_buf.to_owned()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // extended-length path prefix sometimes appears on windows
+        const WINDOWS_EXTENDED_LENGTH_PATH_PREFIX: &str = r"\\?\";
+
+        let windows_path_buf = path_buf
+            .to_str()
+            .expect("Failed to convert current_dir to string");
+        if windows_path_buf.starts_with(WINDOWS_EXTENDED_LENGTH_PATH_PREFIX) {
+            PathBuf::from(&windows_path_buf[WINDOWS_EXTENDED_LENGTH_PATH_PREFIX.len()..])
+        } else {
+            windows_path_buf.into()
+        }
     }
 }
 

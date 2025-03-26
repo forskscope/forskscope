@@ -2,6 +2,7 @@
   import type { CompareSet } from '../../types'
   import Tab from './Tab.svelte'
   import SelectFiles from './SelectFiles.svelte'
+  import { PATH_SEPARATOR } from '../../consts'
 
   const DEFAULT_ACTIVE_TAB_INDEX: number = 0
   const MIN_TABS_COUNT: number = 2
@@ -22,7 +23,8 @@
   const tabControls = $derived([
     { label: '💻️', className: 'explorer' } as TabControl,
     ...compareSets.map((x, i) => {
-      const label = x!.new.filepath.split('/')[x!.new.filepath.split('/').length - 1]
+      const label =
+        x!.new.filepath.split(PATH_SEPARATOR)[x!.new.filepath.split(PATH_SEPARATOR).length - 1]
       const className = 'diff'
       const compareSet = {
         old: {

@@ -1,12 +1,12 @@
 // use tauri::Manager;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use tauri::Manager;
 
 use super::diff::{self, chars_diffs, lines_diffs, startup_compare_set_item};
-use super::file::{self, file_manager_command, filepaths_content, os_path_buf};
+use super::file::{self, file_manager_command, filepaths_content};
 use super::types::{CharsDiffResponse, CompareSet, DiffResponse, LinesDiff, ListDirReponse};
 
 #[tauri::command]
@@ -21,29 +21,6 @@ pub fn ready(app_handle: tauri::AppHandle) -> CompareSet {
     let old = startup_compare_set_item(&args.next());
     let new = startup_compare_set_item(&args.next());
     CompareSet { old, new }
-}
-
-#[tauri::command]
-pub fn os_str_filepath(filename: &str, dirpath: &str) -> Result<String, String> {
-    Ok(os_path_buf(&PathBuf::from(dirpath).join(filename))
-        .to_str()
-        .expect("Failed to convert PathBuf to str")
-        .to_owned())
-}
-
-#[tauri::command]
-pub fn binary_comparison_only(filepath: &str) -> Result<bool, String> {
-    Ok(diff::binary_comparison_only(filepath))
-}
-
-#[tauri::command]
-pub fn file_digest_diff(filename: &str, old_dir: &str, new_dir: &str) -> Result<bool, String> {
-    diff::file_digest_diff(filename, old_dir, new_dir)
-}
-
-#[tauri::command]
-pub fn dir_digest_diff(dirname: &str, old_dir: &str, new_dir: &str) -> Result<bool, String> {
-    diff::dir_digest_diff(dirname, old_dir, new_dir)
 }
 
 #[tauri::command(async)]
@@ -69,16 +46,31 @@ pub async fn diff_chars(lines_diffs: Vec<LinesDiff>) -> Result<CharsDiffResponse
 }
 
 #[tauri::command]
+pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
+    file::list_dir(current_dir)
+}
+
+#[tauri::command]
+pub fn binary_comparison_only(filepath: &str) -> Result<bool, String> {
+    Ok(diff::binary_comparison_only(filepath))
+}
+
+#[tauri::command]
+pub fn file_digest_diff(filename: &str, old_dir: &str, new_dir: &str) -> Result<bool, String> {
+    diff::file_digest_diff(filename, old_dir, new_dir)
+}
+
+#[tauri::command]
+pub fn dir_digest_diff(dirname: &str, old_dir: &str, new_dir: &str) -> Result<bool, String> {
+    diff::dir_digest_diff(dirname, old_dir, new_dir)
+}
+
+#[tauri::command]
 pub fn save(filepath: &str, content: &str, charset: &str) -> Result<(), String> {
     match file::save(filepath, content, charset) {
         Ok(_) => Ok(()),
         Err(err) => Err(err.to_string()),
     }
-}
-
-#[tauri::command]
-pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
-    file::list_dir(current_dir)
 }
 
 #[tauri::command]

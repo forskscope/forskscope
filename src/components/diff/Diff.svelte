@@ -219,7 +219,6 @@
       <div class="row header">
         <div class="col diff old">
           <DiffHeaderCol
-            oldOrNew="old"
             filepath={oldFilepath}
             filepathFromDialogOnClick={async () => changeFilepath('old')}
           />
@@ -234,7 +233,6 @@
         </div>
         <div class="col diff new">
           <DiffHeaderCol
-            oldOrNew="new"
             filepath={newFilepath}
             filepathFromDialogOnClick={async () => changeFilepath('new')}
           />

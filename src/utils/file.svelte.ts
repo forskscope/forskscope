@@ -1,14 +1,6 @@
 import { invoke } from "@tauri-apps/api/core"
+import { PATH_SEPARATOR } from "../consts"
 
-export const osStrFilepath = async (filename: string, dirpath: string): Promise<string> => {
-    const res = await invoke('os_str_filepath', {
-        filename,
-        dirpath,
-    })
-        // todo
-        .catch((error: unknown) => {
-            console.error(error)
-            return
-        })
-    return res as string
+export const pathJoin = (filename: string, dirpath: string): string => {
+    return `${dirpath}${PATH_SEPARATOR}${filename}`
 }

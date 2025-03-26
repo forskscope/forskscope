@@ -5,8 +5,12 @@
   import { openDirectoryDialog } from '../../utils/dialog.svelte'
   import Tooltip from '../common/Tooltip.svelte'
   import { T } from '../../stores/translation.svelte'
-  import { BINARY_MODE_COMPARE_BUTTON_LABEL, DEFAULT_COMPARE_BUTTON_LABEL } from '../../consts'
-  import { osStrFilepath } from '../../utils/file.svelte'
+  import {
+    BINARY_MODE_COMPARE_BUTTON_LABEL,
+    DEFAULT_COMPARE_BUTTON_LABEL,
+    PATH_SEPARATOR,
+  } from '../../consts'
+  import { pathJoin } from '../../utils/file.svelte'
 
   interface ExplorePane {
     oldOrNew: OldOrNew
@@ -51,8 +55,7 @@
   })
 
   const lastSlashIndex = (dirpath: string): number => {
-    // todo: windows file system
-    return dirpath.lastIndexOf('/')
+    return dirpath.lastIndexOf(PATH_SEPARATOR)
   }
   const parentDirsPath = (dirpath: string): string => {
     return dirpath.substring(0, lastSlashIndex(dirpath) + 1)
@@ -81,12 +84,12 @@
     newExplorerPane.listDirResponse = oldExplorerPane.listDirResponse // todo
   })
 
-  const compareOnClick = async () => {
-    const oldFilepath: string = await osStrFilepath(
+  const compareOnClick = () => {
+    const oldFilepath: string = pathJoin(
       oldSelectedFile,
       oldExplorerPane.listDirResponse!.currentDir
     )
-    const newFilepath: string = await osStrFilepath(
+    const newFilepath: string = pathJoin(
       newSelectedFile,
       newExplorerPane.listDirResponse!.currentDir
     )
@@ -113,7 +116,7 @@
   }
 
   const changeDir = async (dirname: string, parentDirpath: string, oldOrNew: OldOrNew) => {
-    const dirpath = await osStrFilepath(dirname, parentDirpath)
+    const dirpath = pathJoin(dirname, parentDirpath)
     const listDirResponse = await listDir(dirpath)
 
     if (oldOrNew === 'old') {
@@ -126,8 +129,7 @@
   }
 
   const isRootDir = (dir: string): boolean => {
-    // todo: windows file system
-    return dir === '/' || dir.endsWith(':\\')
+    return dir === PATH_SEPARATOR || dir.endsWith(`:${PATH_SEPARATOR}`)
   }
 
   const syncDir = (oldOrNew: OldOrNew) => {
@@ -167,7 +169,7 @@
     }
   }
 
-  const filenameOnDblClick = async (filename: string) => {
+  const filenameOnDblClick = (filename: string) => {
     if (oldExplorerPane.listDirResponse === null || newExplorerPane.listDirResponse === null) return
 
     const oldFound = oldExplorerPane.listDirResponse.files.find((x) => x.name === filename)
@@ -175,14 +177,8 @@
     const newFound = newExplorerPane.listDirResponse.files.find((x) => x.name === filename)
     if (!newFound) return
 
-    const oldFilepath: string = await osStrFilepath(
-      filename,
-      oldExplorerPane.listDirResponse!.currentDir
-    )
-    const newFilepath: string = await osStrFilepath(
-      filename,
-      newExplorerPane.listDirResponse!.currentDir
-    )
+    const oldFilepath: string = pathJoin(filename, oldExplorerPane.listDirResponse!.currentDir)
+    const newFilepath: string = pathJoin(filename, newExplorerPane.listDirResponse!.currentDir)
 
     const compareSet = {
       old: {
