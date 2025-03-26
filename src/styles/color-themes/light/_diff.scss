@@ -1,28 +1,18 @@
 .light-theme {
-    --diff-primary-background-color: #f8f9fa;
-    --diff-primary-text-color: #222222;
+    --line-diff-text-color: hsl(0, 0%, 3%);
+    --char-diff-text-color: hsl(0, 0%, 3%);
 
-    // --diff-focused-border-color: #dddddd;
+    --line-diff-delete-old-background-color: hsl(10, 80%, 75%);
 
-    --diff-old-line-insert-background-color: #ffdada;
-    --diff-old-line-insert-text-color: #b71c1c;
-    --diff-old-line-delete-background-color: #e0f8d4;
-    --diff-old-line-delete-text-color: #2e7d32;
-    --diff-old-line-replace-background-color: #ffe4b3;
-    --diff-old-line-replace-text-color: #8a6d3b;
+    --line-diff-insert-new-background-color: hsl(220, 90%, 71%);
 
-    --diff-old-char-delete-background-color: hsl(36, 100%, 50%);
-    --diff-old-char-insert-background-color: hsl(70, 100%, 44%);
-    --diff-old-char-replace-background-color: hsl(54, 100%, 44%);
+    --line-diff-replace-old-background-color: hsl(30, 20%, 80%);
+    --line-diff-replace-new-background-color: hsl(200, 30%, 80%);
 
-    --diff-new-line-insert-background-color: #c8f7b8;
-    --diff-new-line-insert-text-color: #1b5e20;
-    --diff-new-line-delete-background-color: #ffcccc;
-    --diff-new-line-delete-text-color: #9a0007;
-    --diff-new-line-replace-background-color: #ffdb99;
-    --diff-new-line-replace-text-color: #795548;
+    --char-diff-delete-old-background-color: hsl(30, 80%, 70%);
 
-    --diff-new-char-delete-background-color: hsl(30, 100%, 50%);
-    --diff-new-char-insert-background-color: hsl(65, 100%, 44%);
-    --diff-new-char-replace-background-color: hsl(53, 100%, 44%);
+    --char-diff-insert-new-background-color: hsl(200, 90%, 70%);
+
+    --char-diff-replace-old-background-color: hsl(30, 20%, 72%);
+    --char-diff-replace-new-background-color: hsl(200, 20%, 72%);
 }

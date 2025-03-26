@@ -1,34 +1,36 @@
 .light-theme {
-    --primary-background-color: #f2f2f2;
-    --primary-text-color: #111111;
+    // app common
+    --app-primary-background-color: hsl(40, 0%, 87%);
+    --app-primary-text-color: hsl(40, 0%, 16%);
 
-    --secondary-background-color: #eaeaea;
-    --secondary-text-color: #333333;
+    --app-secondary-background-color: hsl(40, 0%, 81%);
+    --app-secondary-text-color: hsl(40, 0%, 12%);
 
-    --muted-text-color: #777777;
+    // explorer tab
+    --explorer-old-pane-background-color: hsl(218, 10%, 93%);
+    --explorer-old-pane-text-color: hsl(40, 0%, 7%);
 
-    --tab-header-default-border-color: #252525;
-    --tab-header-active-border-color: #caca16;
+    --explorer-new-pane-background-color: hsl(222, 10%, 95%);
+    --explorer-new-pane-text-color: hsl(220, 0%, 7%);
 
-    // --select-files-background-color: #f0f8e0;
-    // --select-files-text-color: #222222;
+    // diff tab
+    --diff-primary-background-color: hsl(220, 0%, 93%);
+    --diff-primary-text-color: hsl(220, 0%, 5%);
 
-    --button-primary-background-color: #007bff;
-    --button-primary-text-color: #ffffff;
+    --diff-pane-background-color: hsl(0, 0%, 95%);
+    --diff-pane-text-color: hsl(0, 0%, 7%);
 
-    --button-muted-background-color: #e0e0e0;
+    // semantics
+    --muted-text-color: hsl(0, 0%, 64%);
 
-    --primary-border-color: #ccc;
-    --focused-border-color: #007bff;
+    --form-primary-background-color: var(--app-primary-background-color);
+    --form-primary-text-color: var(--app-primary-text-color);
 
-    // --border-muted: #e0e0e0;
-    // --border-error: #dc3545;
+    --button-primary-background-color: hsl(220, 100%, 36%);
+    --button-primary-text-color: hsl(0, 0%, 93%);
 
-    // --link-color: #007bff;
+    --button-muted-background-color: hsl(0, 0%, 82%);
 
-    // --primary-color: #007bff;
-    // --secondary-color: #6c757d;
-    // --accent-color: #28a745;
-    // --warning-color: #ffc107;
-    // --error-color: #dc3545;
+    --primary-border-color: hsl(0, 0%, 50%);
+    --focused-border-color: hsl(220, 100%, 60%);
 }

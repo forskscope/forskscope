@@ -1,7 +1,17 @@
 <script lang="ts">
-  import { APP_DIFF_FONT_FAMILIES, APP_THEMES, APP_UI_FONT_FAMILIES } from '../../consts'
-  import { T } from '../../stores/translation.svelte'
-  import { type AppDiffFontFamily, type AppTheme, type AppUiFontFamily } from '../../types'
+  import {
+    APP_DEFAULT_LANGUAGE,
+    APP_DIFF_FONT_FAMILIES,
+    APP_THEMES,
+    APP_UI_FONT_FAMILIES,
+  } from '../../consts'
+  import { setTranslation, T } from '../../stores/translation.svelte'
+  import {
+    type AppDiffFontFamily,
+    type AppLanguage,
+    type AppTheme,
+    type AppUiFontFamily,
+  } from '../../types'
 
   interface Selector {
     title: string
@@ -38,6 +48,12 @@
     close: () => void
   } = $props()
 
+  let language: AppLanguage = $state(APP_DEFAULT_LANGUAGE)
+
+  const languageOnChange = async () => {
+    await setTranslation(language)
+  }
+
   const SELECTORS = [
     {
       title: 'Theme',
@@ -67,9 +83,18 @@
 </script>
 
 <!-- todo: color theme switcher -->
-<div class="wrapper">
+<div class="settings-wrapper">
   <div class="position-relative">
+    <button class="close" onclick={close}>✖️</button>
     <div class="settings">
+      <div class="setting">
+        <h3>🌐 {T('Languages')}</h3>
+        <select bind:value={language} onchange={languageOnChange}>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+        </select>
+      </div>
+
       {#each SELECTORS as selector}
         <div class="setting">
           <h3>{T(selector.title)}</h3>
@@ -90,6 +115,7 @@
           </div>
         </div>
       {/each}
+
       <div class="setting">
         <h3>{T('Diff Font Size')}</h3>
         <div>
@@ -118,19 +144,16 @@
         </div>
       </div>
     </div>
-    <button class="close" onclick={close}>X</button>
   </div>
 </div>
 
 <style>
-  .wrapper {
+  .settings-wrapper {
     position: fixed;
     left: 0rem;
     top: 0;
     width: 100vw;
     height: 100vh;
-    background-color: var(--secondary-background-color);
-    color: var(--secondary-text-color);
     opacity: 0.93;
     z-index: 1000;
     overflow: scroll;
@@ -148,7 +171,8 @@
 
   .close {
     position: absolute;
-    right: 0.5rem;
-    top: 0.2rem;
+    right: 0.8rem;
+    top: 0;
+    padding: 0.3rem 0.7rem;
   }
 </style>

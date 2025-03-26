@@ -98,7 +98,7 @@
     left: 0;
     top: 0;
     width: 3em;
-    padding-right: 0.7em;
+    margin-right: 0.7rem;
     display: inline-block;
     text-align: center;
     color: var(--secondary-text-color);

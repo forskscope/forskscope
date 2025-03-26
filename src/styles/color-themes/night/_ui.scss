@@ -1,34 +1,36 @@
 .night-theme {
-    --primary-background-color: #121212;
-    --primary-text-color: #e0e0e0;
+    // app common
+    --app-primary-background-color: hsl(40, 4%, 10%);
+    --app-primary-text-color: hsl(40, 0%, 91%);
 
-    --secondary-background-color: #1e1e1e;
-    --secondary-text-color: #b0b0b0;
+    --app-secondary-background-color: hsl(40, 4%, 14%);
+    --app-secondary-text-color: hsl(40, 0%, 93%);
 
-    --muted-text-color: #7a7a7a;
+    // explorer tab
+    --explorer-old-pane-background-color: hsl(218, 24%, 18%);
+    --explorer-old-pane-text-color: hsl(40, 0%, 91%);
 
-    --tab-header-default-border-color: #ababab;
-    --tab-header-active-border-color: #eaea27;
+    --explorer-new-pane-background-color: hsl(222, 24%, 20%);
+    --explorer-new-pane-text-color: hsl(220, 0%, 91%);
 
-    // --select-files-background-color: #2e3e1e;
-    // --select-files-text-color: #e0e0e0;
+    // diff tab
+    --diff-primary-background-color: hsl(220, 44%, 20%);
+    --diff-primary-text-color: hsl(220, 0%, 91%);
 
-    --button-primary-background-color: #00bcd4;
-    --button-primary-text-color: #121212;
+    --diff-pane-background-color: hsl(0, 0%, 10%);
+    --diff-pane-text-color: hsl(0, 0%, 91%);
 
-    --button-muted-background-color: #666;
+    // semantics
+    --muted-text-color: hsl(0, 0%, 40%);
 
-    --primary-border-color: #444;
-    --focused-border-color: #00bcd4;
+    --form-primary-background-color: var(--app-primary-text-color);
+    --form-primary-text-color: var(--app-primary-background-color);
 
-    // --border-muted: #666;
-    // --border-error: #f44336;
+    --button-primary-background-color: hsl(220, 44%, 27%);
+    --button-primary-text-color: hsl(0, 0%, 87%);
 
-    // --link-color: #00bcd4;
+    --button-muted-background-color: hsl(0, 0%, 20%);
 
-    // --primary-color: #00bcd4;
-    // --secondary-color: #757575;
-    // --accent-color: #8bc34a;
-    // --warning-color: #ffeb3b;
-    // --error-color: #f44336;
+    --primary-border-color: hsl(0, 0%, 29%);
+    --focused-border-color: hsl(220, 12%, 22%);
 }

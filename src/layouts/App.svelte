@@ -3,8 +3,9 @@
   import Toast from '../components/common/Toast.svelte'
   import Tabs from '../components/tabs/Tabs.svelte'
   import type { AppDiffFontFamily, AppTheme, AppUiFontFamily } from '../types'
+  import { APP_DEFAULT_THEME } from '../consts'
 
-  let activeTheme: AppTheme = $state('dark-theme')
+  let activeTheme: AppTheme = $state(APP_DEFAULT_THEME)
   let activeDiffFontFamily: AppDiffFontFamily = $state('monospace-diff-font-family')
   let activeUiFontFamily: AppUiFontFamily = $state('sans-serif-ui-font-family')
   let diffFontSize: number = $state(16)

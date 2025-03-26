@@ -1,6 +1,6 @@
 {
     "Languages": "言語",
-    "Copy current dir pos": "現在の場所で同期",
+    "Sync dir pos": "現在の場所で同期",
     "Select dir dialog": "現在の場所を選択",
     "Select file": "ファイルを選択",
     "Run file manager": "ファイルマネージャー起動",

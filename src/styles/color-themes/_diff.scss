@@ -1,67 +1,62 @@
 .diff {
-    .lines-diffs {
-        background-color: var(--diff-primary-background-color);
-        color: var(--diff-primary-text-color);
-    }
+    color: var(--line-diff-text-color);
 
     &.old {
-        .insert {
-            background-color: var(--diff-old-line-insert-background-color);
-            color: var(--diff-old-line-insert-text-color);
+        .delete {
+            background-color: var(--line-diff-delete-old-background-color);
         }
 
-        .delete {
-            background-color: var(--diff-old-line-delete-background-color);
-            color: var(--diff-old-line-delete-text-color);
+        .insert {
+            background-color: var(--app-secondary-background-color);
         }
 
         .replace {
-            background-color: var(--diff-old-line-replace-background-color);
-            color: var(--diff-old-line-replace-text-color);
+            background-color: var(--line-diff-replace-old-background-color);
         }
 
         .chars-diff {
             .delete {
-                background-color: var(--diff-old-char-delete-background-color);
+                background-color: var(--char-diff-delete-old-background-color);
+                color: var(--char-diff-text-color);
             }
 
             .insert {
-                background-color: var(--diff-old-char-insert-background-color);
+                background-color: var(--app-secondary-background-color);
             }
 
             .replace {
-                background-color: var(--diff-old-char-replace-background-color);
+                background-color: var(--char-diff-replace-old-background-color);
+                color: var(--char-diff-text-color);
             }
         }
     }
 
     &.new {
-        .insert {
-            background-color: var(--diff-new-line-insert-background-color);
-            color: var(--diff-new-line-insert-text-color);
+        .delete {
+            background-color: var(--app-secondary-background-color);
         }
 
-        .delete {
-            background-color: var(--diff-new-line-delete-background-color);
-            color: var(--diff-new-line-delete-text-color);
+        .insert {
+            background-color: var(--line-diff-insert-new-background-color);
         }
 
         .replace {
-            background-color: var(--diff-new-line-replace-background-color);
-            color: var(--diff-new-line-replace-text-color);
+            background-color: var(--line-diff-replace-new-background-color);
         }
 
         .chars-diff {
             .delete {
-                background-color: var(--diff-new-char-delete-background-color);
+                background-color: var(--app-secondary-background-color);
             }
 
             .insert {
-                background-color: var(--diff-new-char-insert-background-color);
+                background-color: var(--char-diff-insert-new-background-color);
+                color: var(--char-diff-text-color);
             }
 
             .replace {
-                background-color: var(--diff-new-char-replace-background-color);
+                background-color: var(--char-diff-replace-new-background-color);
+                color: var(--char-diff-text-color);
             }
         }
     }

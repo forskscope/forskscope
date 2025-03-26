@@ -2,8 +2,9 @@
   import type { CompareSet } from '../../types'
   import Tab from './Tab.svelte'
   import SelectFiles from './SelectFiles.svelte'
-  import { invoke } from '@tauri-apps/api/core'
-  import { errorToast } from '../../stores/Toast.svelte'
+
+  const DEFAULT_ACTIVE_TAB_INDEX: number = 0
+  const MIN_TABS_COUNT: number = 2
 
   interface TabControl {
     label?: string
@@ -14,22 +15,9 @@
   }
 
   let compareSets: CompareSet[] = $state([])
-  let activeTabIndex: number = $state(0)
+  let activeTabIndex: number = $state(DEFAULT_ACTIVE_TAB_INDEX)
 
   let showsFileHandle: boolean = $state(false)
-
-  const compareSetOnSelected = async (compareSet: CompareSet) => {
-    compareSets.push(compareSet)
-    activeTabIndex = compareSets.length
-    showsFileHandle = false
-  }
-
-  const removeDiffTab = (tabIndex: number) => {
-    if (tabIndex === activeTabIndex) {
-      activeTabIndex -= 1
-    }
-    compareSets.splice(tabIndex - 1, 1)
-  }
 
   const tabControls = $derived([
     { label: '💻️', className: 'explorer' } as TabControl,
@@ -60,31 +48,49 @@
       },
     } as TabControl,
   ])
+
+  const compareSetOnSelected = async (compareSet: CompareSet) => {
+    compareSets.push(compareSet)
+    activeTabIndex = compareSets.length
+    showsFileHandle = false
+  }
+
+  const removeDiffTab = (tabIndex: number) => {
+    if (tabIndex === activeTabIndex) {
+      activeTabIndex -= 1
+    }
+    compareSets.splice(tabIndex - 1, 1)
+    if (compareSets.length == MIN_TABS_COUNT) {
+      activeTabIndex = DEFAULT_ACTIVE_TAB_INDEX
+    }
+  }
+
+  const closeSelectFiles = () => {
+    showsFileHandle = false
+  }
 </script>
 
-<div class="tabs">
-  <div class="headers">
-    {#each tabControls as tabControl, tabIndex}
-      <label
-        class={`header ${tabControl.className} ${tabIndex === activeTabIndex ? 'active' : ''}`}
-      >
-        <input
-          type="radio"
-          value={tabIndex}
-          bind:group={activeTabIndex}
-          disabled={!tabControl.label}
-        />
-        <span>{tabControl.label}</span>
-        {#if tabControl.buttonOnClick}
-          <button
-            onclick={() => {
-              tabControl.buttonOnClick!()
-            }}>{tabControl.buttonLabel}</button
-          >
-        {/if}
-      </label>
-    {/each}
-  </div>
+<div class="tab-headers">
+  {#each tabControls as tabControl, tabIndex}
+    <label
+      class={`tab-header ${tabControl.className} ${tabIndex === activeTabIndex ? 'active' : ''}`}
+    >
+      <input
+        type="radio"
+        value={tabIndex}
+        bind:group={activeTabIndex}
+        disabled={!tabControl.label}
+      />
+      <span>{tabControl.label}</span>
+      {#if tabControl.buttonOnClick}
+        <button
+          onclick={() => {
+            tabControl.buttonOnClick!()
+          }}>{tabControl.buttonLabel}</button
+        >
+      {/if}
+    </label>
+  {/each}
 </div>
 
 <div class="active-tab">
@@ -99,43 +105,34 @@
   {/each}
 </div>
 
-<SelectFiles {showsFileHandle} {compareSetOnSelected} />
+{#key showsFileHandle}
+  <SelectFiles {showsFileHandle} {compareSetOnSelected} {closeSelectFiles} />
+{/key}
 
 <style>
-  .tabs {
+  .tab-headers {
     height: 1.6rem;
-  }
-
-  .active-tab {
-    height: calc(100vh - 1rem);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-  }
-
-  .headers {
     max-width: 100%;
     display: flex;
     overflow-x: auto;
   }
-  .header {
+  .tab-header {
     padding: 0 0.5rem;
     display: flex;
     align-items: center;
-    /* todo: color vars */
-    border: 0.01rem solid var(--tab-header-default-border-color);
+    border-width: 0.01rem;
+    border-style: solid;
   }
-  .header.active {
+  .tab-header.active {
     font-size: 105%;
-    /* todo: color vars */
-    border-color: var(--tab-header-active-border-color);
     border-width: 0.12rem;
+    border-style: solid;
   }
-  .header:hover {
+  .tab-header:hover {
     opacity: 0.72;
   }
 
-  .header.diff > span {
+  .tab-header.diff > span {
     width: 5.7rem;
     display: inline-block;
     text-align: right;
@@ -143,30 +140,37 @@
     text-overflow: ellipsis;
   }
 
-  .header span {
+  .tab-header span {
     text-overflow: ellipsis;
     overflow: hidden;
   }
 
-  .header button {
+  .tab-header button {
     width: 1.4rem;
-    padding: 0.1rem 0.4rem;
-    margin: 0 0 0 0.8rem;
-    background: transparent;
-    color: var(--tab-header-default-border-color);
-    border-radius: 0.06rem;
+    padding: 0;
+    margin-left: 0.6rem;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
     box-shadow: none;
-    border: 0.02rem solid var(--tab-header-default-border-color);
+    border: none;
+    opacity: 0.87;
   }
-  .header:not(.diff) button {
-    padding: 0 0.1rem;
-    margin: 0;
+
+  .tab-header.add-diff-tab {
     border: none;
   }
-  .header.explorer:hover,
-  .header button:hover {
-    background-color: var(--tab-header-active-border-color);
-    color: var(--tab-header-default-border-color);
-    border-color: var(--tab-header-active-border-color);
+  .tab-header.add-diff-tab button {
+    padding: 0.2rem;
+    margin: 0;
+    font-size: 0.72rem;
+    border-radius: 0.3rem;
+  }
+
+  .active-tab {
+    height: calc(100vh - 1rem);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
 </style>

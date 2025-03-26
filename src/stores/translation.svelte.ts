@@ -13,7 +13,10 @@ const T = (key: string): string => {
 
 const setTranslation = async (language: AppLanguage) => {
     // no translation dictionary on app default language
-    if (language === APP_DEFAULT_LANGUAGE) return
+    if (language === APP_DEFAULT_LANGUAGE) {
+        translation = {}
+        return
+    }
 
     const path = await resolveResource(`translations/${language}.json`)
     const updated = JSON.parse(await readTextFile(path))
