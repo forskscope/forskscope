@@ -1,15 +1,8 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
   import Tooltip from '../components/common/Tooltip.svelte'
   import Settings from '../components/settings/Settings.svelte'
-  import { setTranslation, T } from '../stores/translation.svelte.js'
-  import {
-    type AppDiffFontFamily,
-    type AppLanguage,
-    type AppTheme,
-    type AppUiFontFamily,
-  } from '../types'
-  import { APP_DEFAULT_LANGUAGE } from '../consts'
+  import { T } from '../stores/translation.svelte'
+  import { type AppDiffFontFamily, type AppTheme, type AppUiFontFamily } from '../types'
 
   let {
     activeTheme,
@@ -35,27 +28,10 @@
     uiFontSizeScaleOnChange: (value: number) => void
   } = $props()
 
-  let language: AppLanguage = $state(APP_DEFAULT_LANGUAGE)
-
-  let showsLanguages: boolean = $state(false)
   let showsSettings: boolean = $state(false)
-
-  onMount(async () => {
-    // todo : default language from settings stored
-    await setTranslation(language)
-  })
-
-  const toggleLanguages = () => {
-    showsLanguages = !showsLanguages
-  }
 
   const toggleSettings = () => {
     showsSettings = !showsSettings
-  }
-
-  const languageOnChange = async () => {
-    await setTranslation(language)
-    showsLanguages = false
   }
 
   const closeSettings = () => {
@@ -65,23 +41,6 @@
 
 <div class="headers">
   <h1>Patch Hygge</h1>
-
-  <div class="languages">
-    <Tooltip position="bottom" messages={T('Languages')}>
-      <button
-        onclick={() => {
-          toggleLanguages()
-        }}
-        >🌐
-      </button>
-      <div class={showsLanguages ? '' : 'd-none'}>
-        <select bind:value={language} onchange={languageOnChange}>
-          <option value="en">English</option>
-          <option value="ja">日本語</option>
-        </select>
-      </div>
-    </Tooltip>
-  </div>
 
   <div class="settings">
     <Tooltip position="bottom" messages={T('Settings')}>
@@ -131,11 +90,5 @@
   button {
     padding: 0 0.3rem;
     opacity: 0.63;
-  }
-
-  .languages div {
-    position: absolute;
-    right: 1rem;
-    top: 2.2em;
   }
 </style>

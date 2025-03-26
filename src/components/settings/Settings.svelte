@@ -1,7 +1,17 @@
 <script lang="ts">
-  import { APP_DIFF_FONT_FAMILIES, APP_THEMES, APP_UI_FONT_FAMILIES } from '../../consts'
-  import { T } from '../../stores/translation.svelte'
-  import { type AppDiffFontFamily, type AppTheme, type AppUiFontFamily } from '../../types'
+  import {
+    APP_DEFAULT_LANGUAGE,
+    APP_DIFF_FONT_FAMILIES,
+    APP_THEMES,
+    APP_UI_FONT_FAMILIES,
+  } from '../../consts'
+  import { setTranslation, T } from '../../stores/translation.svelte'
+  import {
+    type AppDiffFontFamily,
+    type AppLanguage,
+    type AppTheme,
+    type AppUiFontFamily,
+  } from '../../types'
 
   interface Selector {
     title: string
@@ -38,6 +48,12 @@
     close: () => void
   } = $props()
 
+  let language: AppLanguage = $state(APP_DEFAULT_LANGUAGE)
+
+  const languageOnChange = async () => {
+    await setTranslation(language)
+  }
+
   const SELECTORS = [
     {
       title: 'Theme',
@@ -70,6 +86,14 @@
 <div class="wrapper">
   <div class="position-relative">
     <div class="settings">
+      <div class="setting">
+        <h3>🌐 {T('Languages')}</h3>
+        <select bind:value={language} onchange={languageOnChange}>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+        </select>
+      </div>
+
       {#each SELECTORS as selector}
         <div class="setting">
           <h3>{T(selector.title)}</h3>
@@ -90,6 +114,7 @@
           </div>
         </div>
       {/each}
+
       <div class="setting">
         <h3>{T('Diff Font Size')}</h3>
         <div>
