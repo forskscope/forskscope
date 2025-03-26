@@ -1,27 +1,42 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
   import { onMount } from 'svelte'
-  import type { DiffFilepaths, ListDirReponse, OldOrNew } from '../../types'
+  import type { CompareSet, CompareSetItem, ListDirReponse, OldOrNew } from '../../types'
   import { openDirectoryDialog } from '../../scripts'
   import Tooltip from '../common/Tooltip.svelte'
   import { T } from '../../stores/translation.svelte'
+  import { BINARY_MODE_COMPARE_BUTTON_LABEL, DEFAULT_COMPARE_BUTTON_LABEL } from '../../consts'
 
   interface ExplorePane {
     oldOrNew: OldOrNew
     listDirResponse: ListDirReponse | null
   }
 
-  const {
-    diffFilepathsOnSelected,
-  }: { diffFilepathsOnSelected: (diffFilepaths: DiffFilepaths) => void } = $props()
+  interface CompareSetItemSource {
+    filename: string
+    binaryComparisonOnly: boolean
+  }
+
+  const { compareSetOnSelected }: { compareSetOnSelected: (compareSet: CompareSet) => void } =
+    $props()
 
   let oldExplorerPane: ExplorePane = $state({ oldOrNew: 'old', listDirResponse: null })
   let newExplorerPane: ExplorePane = $state({ oldOrNew: 'new', listDirResponse: null })
 
   let oldSelectedFile: string = $state('')
+  let oldBinaryComparisonOnly: boolean = $state(false)
   let newSelectedFile: string = $state('')
+  let newBinaryComparisonOnly: boolean = $state(false)
 
-  const diffOnClickEnabled = $derived(oldSelectedFile && newSelectedFile)
+  const compareButtonLabel: string = $derived(
+    oldBinaryComparisonOnly || newBinaryComparisonOnly
+      ? BINARY_MODE_COMPARE_BUTTON_LABEL
+      : DEFAULT_COMPARE_BUTTON_LABEL
+  )
+
+  const compareOnClickEnabled: boolean = $derived(
+    0 < oldSelectedFile.length && 0 < newSelectedFile.length
+  )
 
   const lastSlashIndex = (dirpath: string): number => {
     return dirpath.lastIndexOf('/')
@@ -34,24 +49,34 @@
   }
 
   onMount(async () => {
-    invoke('list_dir', { currentDir: '' })
-      .then((res: unknown) => {
-        console.log(res) // todo
-
-        oldExplorerPane.listDirResponse = res as ListDirReponse
-        newExplorerPane.listDirResponse = oldExplorerPane.listDirResponse // todo
-      })
+    const res = await invoke('list_dir', { currentDir: '' })
       // todo
       .catch((error: unknown) => {
         console.error(error)
         return
       })
+
+    console.log(res) // todo
+
+    oldExplorerPane.listDirResponse = res as ListDirReponse
+    newExplorerPane.listDirResponse = oldExplorerPane.listDirResponse // todo
   })
 
-  const diffOnClick = () => {
+  const compareOnClick = () => {
     const oldFilepath: string = `${oldExplorerPane.listDirResponse!.currentDir}/${oldSelectedFile}`
     const newFilepath: string = `${newExplorerPane.listDirResponse!.currentDir}/${newSelectedFile}`
-    diffFilepathsOnSelected({ old: oldFilepath, new: newFilepath } as DiffFilepaths)
+
+    const compareSet = {
+      old: {
+        filepath: oldFilepath,
+        binaryComparisonOnly: oldBinaryComparisonOnly,
+      } as CompareSetItem,
+      new: {
+        filepath: newFilepath,
+        binaryComparisonOnly: newBinaryComparisonOnly,
+      } as CompareSetItem,
+    } as CompareSet
+    compareSetOnSelected(compareSet)
 
     // todo reset radio selection
   }
@@ -94,18 +119,32 @@
     }
   }
 
-  const selectedFileOnChange = (
-    e: Event & {
-      currentTarget: EventTarget & HTMLInputElement
-    },
-    oldOrNew: OldOrNew
-  ) => {
-    const checked = e.currentTarget.checked
+  const selectedDirOnChange = (oldOrNew: OldOrNew, checked: boolean) => {
     if (!checked) return
+
     if (oldOrNew === 'old') {
-      oldSelectedFile = e.currentTarget.value
+      oldSelectedFile = ''
+      oldBinaryComparisonOnly = false
     } else {
-      newSelectedFile = e.currentTarget.value
+      newSelectedFile = ''
+      newBinaryComparisonOnly = false
+    }
+  }
+
+  const selectedFileOnChange = (
+    oldOrNew: OldOrNew,
+    checked: boolean,
+    filename: string,
+    binaryComparisonOnly: boolean
+  ) => {
+    if (!checked) return
+
+    if (oldOrNew === 'old') {
+      oldSelectedFile = filename
+      oldBinaryComparisonOnly = binaryComparisonOnly
+    } else {
+      newSelectedFile = filename
+      newBinaryComparisonOnly = binaryComparisonOnly
     }
   }
 
@@ -183,8 +222,11 @@
                 ><input
                   type="radio"
                   name={`${pane.oldOrNew}SelectedFile`}
-                  value={''}
-                  onchange={(e) => selectedFileOnChange(e, pane.oldOrNew)}
+                  onchange={(
+                    e: Event & {
+                      currentTarget: EventTarget & HTMLInputElement
+                    }
+                  ) => selectedDirOnChange(pane.oldOrNew, e.currentTarget.checked)}
                 />
                 <div
                   role="button"
@@ -204,8 +246,17 @@
                 ><input
                   type="radio"
                   name={`${pane.oldOrNew}SelectedFile`}
-                  value={file.name}
-                  onchange={(e) => selectedFileOnChange(e, pane.oldOrNew)}
+                  onchange={(
+                    e: Event & {
+                      currentTarget: EventTarget & HTMLInputElement
+                    }
+                  ) =>
+                    selectedFileOnChange(
+                      pane.oldOrNew,
+                      e.currentTarget.checked,
+                      file.name,
+                      file.binaryComparisonOnly
+                    )}
                 />
                 <div role="button" tabindex="0">📜 {file.name}</div>
                 {#if file.humanReadableSize !== file.bytesSize}
@@ -224,8 +275,8 @@
 </div>
 
 <div class="footer">
-  {#if diffOnClickEnabled}
-    <button class="compare" onclick={diffOnClick}>{T('Compare')}</button>
+  {#if compareOnClickEnabled}
+    <button class="compare" onclick={compareOnClick}>{T(compareButtonLabel)}</button>
   {:else}
     <span>{T('Select files to compare')}</span>
   {/if}

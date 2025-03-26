@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
   import type {
-    DiffFilepaths,
+    CompareSet,
     DiffResponse,
     LinesDiff,
     OldOrNew,
@@ -19,10 +19,10 @@
   import { onMount } from 'svelte'
   import { errorToast } from '../../stores/Toast.svelte'
 
-  const { diffFilepaths, close }: { diffFilepaths: DiffFilepaths; close: () => void } = $props()
+  const { compareSet, close }: { compareSet: CompareSet; close: () => void } = $props()
 
-  let oldFilepath: string = $state(diffFilepaths.old)
-  let newFilepath: string = $state(diffFilepaths.new)
+  let oldFilepath: string = $state(compareSet.old.filepath)
+  let newFilepath: string = $state(compareSet.new.filepath)
 
   let oldCharset: string = $state('')
   let newCharset: string = $state('')
@@ -66,9 +66,9 @@
     return 0 <= foundIndex ? foundIndex : focusedLinesDiffIndex
   })
 
-  const charsDiffsReady = $derived(charsDiffs !== null)
+  const charsDiffsReady: boolean = $derived(charsDiffs !== null)
 
-  const isCompletelyEqual = $derived(!linesDiffs.some((x) => x.diffKind !== 'equal'))
+  const isCompletelyEqual: boolean = $derived(!linesDiffs.some((x) => x.diffKind !== 'equal'))
 
   const diff = async () => {
     await diffLines()

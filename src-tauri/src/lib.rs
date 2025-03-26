@@ -3,7 +3,8 @@ use tauri::Manager;
 mod core;
 
 use core::handlers::{
-    diff_chars, diff_filepaths, list_dir, open_with_file_manager, ready, save, validate_filepath,
+    binary_comparison_only, diff_chars, diff_filepaths, list_dir, open_with_file_manager, ready,
+    save,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -23,13 +24,13 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            binary_comparison_only,
             diff_filepaths,
             diff_chars,
             list_dir,
             open_with_file_manager,
             ready,
             save,
-            validate_filepath
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

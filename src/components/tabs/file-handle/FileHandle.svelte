@@ -2,23 +2,23 @@
   import { invoke } from '@tauri-apps/api/core'
   import { openFileDialog } from '../../../scripts'
   import { T } from '../../../stores/translation.svelte'
-  import type { DiffFilepaths, OldOrNew } from '../../../types'
-
-  const DEFAULT_COMPARE_BUTTON_LABEL: string = 'Compare'
-  const BINARY_MODE_COMPARE_BUTTON_LABEL: string = 'Binary Compare'
+  import type { CompareSet, CompareSetItem, OldOrNew } from '../../../types'
+  import { BINARY_MODE_COMPARE_BUTTON_LABEL, DEFAULT_COMPARE_BUTTON_LABEL } from '../../../consts'
 
   const {
     oldFilepath,
     newFilepath,
-    filepathsOnChange,
+    compareSetOnChange,
   }: {
     oldFilepath: string
     newFilepath: string
-    filepathsOnChange: (diffFilepaths: DiffFilepaths) => void
+    compareSetOnChange: (compareSet: CompareSet) => void
   } = $props()
 
   let _oldFilepath: string = $state(oldFilepath)
+  let _oldBinaryComparisonOnly: boolean = $state(false)
   let _newFilepath: string = $state(newFilepath)
+  let _newBinaryComparisonOnly: boolean = $state(false)
 
   let compareButtonLabel: string = $state(DEFAULT_COMPARE_BUTTON_LABEL)
 
@@ -29,6 +29,7 @@
       setCompareButtonLabel()
     }
   })
+
   $effect(() => {
     if (_newFilepath) {
       setCompareButtonLabel()
@@ -47,16 +48,20 @@
 
   const setCompareButtonLabel = async () => {
     if (_oldFilepath) {
-      const validateOldFilepath = await invoke('validate_filepath', { filepath: _oldFilepath })
-      if (!validateOldFilepath) {
+      _oldBinaryComparisonOnly = (await invoke('binary_comparison_only', {
+        filepath: _oldFilepath,
+      })) as boolean
+      if (_oldBinaryComparisonOnly) {
         compareButtonLabel = BINARY_MODE_COMPARE_BUTTON_LABEL
         return
       }
     }
 
     if (_newFilepath) {
-      const validateNewFilepath = await invoke('validate_filepath', { filepath: _newFilepath })
-      if (!validateNewFilepath) {
+      _newBinaryComparisonOnly = (await invoke('binary_comparison_only', {
+        filepath: _newFilepath,
+      })) as boolean
+      if (_newBinaryComparisonOnly) {
         compareButtonLabel = BINARY_MODE_COMPARE_BUTTON_LABEL
         return
       }
@@ -66,7 +71,18 @@
   }
 
   const compareOnClick = () => {
-    filepathsOnChange({ old: _oldFilepath, new: _newFilepath } as DiffFilepaths)
+    const compareSet = {
+      old: {
+        filepath: _oldFilepath,
+        binaryComparisonOnly: _oldBinaryComparisonOnly,
+      } as CompareSetItem,
+      new: {
+        filepath: _newFilepath,
+        binaryComparisonOnly: _newBinaryComparisonOnly,
+      } as CompareSetItem,
+    } as CompareSet
+    compareSetOnChange(compareSet)
+
     _oldFilepath = ''
     _newFilepath = ''
   }

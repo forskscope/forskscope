@@ -1,7 +1,8 @@
 
 import { resolveResource } from '@tauri-apps/api/path';
 import { readTextFile } from '@tauri-apps/plugin-fs';
-import { APP_LANGUAGES, type AppLanguage } from '../types';
+import { type AppLanguage } from '../types';
+import { APP_DEFAULT_LANGUAGE } from '../consts';
 
 let translation: { [key: string]: string } = $state({});
 
@@ -11,8 +12,8 @@ const T = (key: string): string => {
 }
 
 const setTranslation = async (language: AppLanguage) => {
-    // no translation dictionary on app default language (`en` English)
-    if (language === APP_LANGUAGES[0]) return
+    // no translation dictionary on app default language
+    if (language === APP_DEFAULT_LANGUAGE) return
 
     const path = await resolveResource(`translations/${language}.json`)
     const updated = JSON.parse(await readTextFile(path))

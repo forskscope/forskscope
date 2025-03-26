@@ -1,8 +1,11 @@
+use std::ffi::OsString;
+
 use similar::{DiffTag, TextDiff};
 
 use super::{
+    file::{arg_to_filepath, validate_filepath},
     str::{multibyte_str_byte_indices, split_lines_with_endings},
-    types::{CharsDiff, CharsDiffLines, LinesDiff},
+    types::{CharsDiff, CharsDiffLines, CompareSetItem, LinesDiff},
 };
 
 pub fn lines_diffs(old_content: &str, new_content: &str) -> Vec<LinesDiff> {
@@ -277,5 +280,30 @@ fn chars_diff(diff_index: usize, old_str: &str, new_str: &str) -> CharsDiffLines
         diff_index,
         old_lines,
         new_lines,
+    }
+}
+
+/// decide comparison mode
+pub fn binary_comparison_only(filepath: &str) -> bool {
+    match validate_filepath(filepath) {
+        Some(x) => !x,
+        None => false,
+    }
+}
+
+/// get compare set item from startup args
+pub fn startup_compare_set_item(filepath: &Option<OsString>) -> CompareSetItem {
+    match arg_to_filepath(&filepath) {
+        Some(filepath) => {
+            let binary_comparison_only = binary_comparison_only(filepath.as_str());
+            CompareSetItem {
+                filepath,
+                binary_comparison_only,
+            }
+        }
+        None => CompareSetItem {
+            filepath: String::new(),
+            binary_comparison_only: false,
+        },
     }
 }

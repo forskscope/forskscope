@@ -4,12 +4,12 @@
   import Settings from '../components/settings/Settings.svelte'
   import { setTranslation, T } from '../stores/translation.svelte.js'
   import {
-    APP_LANGUAGES,
     type AppDiffFontFamily,
     type AppLanguage,
     type AppTheme,
     type AppUiFontFamily,
   } from '../types'
+  import { APP_DEFAULT_LANGUAGE } from '../consts'
 
   let {
     activeTheme,
@@ -35,7 +35,7 @@
     uiFontSizeScaleOnChange: (value: number) => void
   } = $props()
 
-  let language: AppLanguage = $state(APP_LANGUAGES[0])
+  let language: AppLanguage = $state(APP_DEFAULT_LANGUAGE)
 
   let showsLanguages: boolean = $state(false)
   let showsSettings: boolean = $state(false)

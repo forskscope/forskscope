@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { DiffFilepaths } from '../../types'
+  import type { CompareSet } from '../../types'
   import Tab from './Tab.svelte'
   import SelectFiles from './SelectFiles.svelte'
   import { invoke } from '@tauri-apps/api/core'
@@ -8,19 +8,19 @@
   interface TabControl {
     label?: string
     className?: string
-    diffFilepaths?: DiffFilepaths
+    compareSet?: CompareSet
     buttonLabel?: string
     buttonOnClick?: Function
   }
 
-  let diffFilepathsList: DiffFilepaths[] = $state([])
+  let compareSets: CompareSet[] = $state([])
   let activeTabIndex: number = $state(0)
 
   let showsFileHandle: boolean = $state(false)
 
-  const diffFilepathsOnSelected = async (diffFilepaths: DiffFilepaths) => {
-    diffFilepathsList.push(diffFilepaths)
-    activeTabIndex = diffFilepathsList.length
+  const compareSetOnSelected = async (compareSet: CompareSet) => {
+    compareSets.push(compareSet)
+    activeTabIndex = compareSets.length
     showsFileHandle = false
   }
 
@@ -28,20 +28,29 @@
     if (tabIndex === activeTabIndex) {
       activeTabIndex -= 1
     }
-    diffFilepathsList.splice(tabIndex - 1, 1)
+    compareSets.splice(tabIndex - 1, 1)
   }
 
   const tabControls = $derived([
     { label: '💻️', className: 'explorer' } as TabControl,
-    ...diffFilepathsList.map((x, i) => {
-      const label = x!.new.split('/')[x!.new.split('/').length - 1]
+    ...compareSets.map((x, i) => {
+      const label = x!.new.filepath.split('/')[x!.new.filepath.split('/').length - 1]
       const className = 'diff'
-      const diffFilepaths = { old: x.old, new: x.new } as DiffFilepaths
+      const compareSet = {
+        old: {
+          filepath: x.old.filepath,
+          binaryComparisonOnly: x.old.binaryComparisonOnly,
+        },
+        new: {
+          filepath: x.new.filepath,
+          binaryComparisonOnly: x.new.binaryComparisonOnly,
+        },
+      } as CompareSet
       const buttonLabel = '✖️'
       const buttonOnClick = () => {
         removeDiffTab(i - 1)
       }
-      return { label, className, diffFilepaths, buttonLabel, buttonOnClick } as TabControl
+      return { label, className, compareSet, buttonLabel, buttonOnClick } as TabControl
     }),
     {
       className: 'add-diff-tab',
@@ -82,15 +91,15 @@
   {#each tabControls as tabControl, tabIndex}
     <div class={tabIndex === activeTabIndex ? '' : 'd-none'}>
       <Tab
-        diffFilepaths={tabControl.diffFilepaths}
-        {diffFilepathsOnSelected}
+        compareSet={tabControl.compareSet}
+        {compareSetOnSelected}
         removeDiffTab={() => removeDiffTab(tabIndex)}
       />
     </div>
   {/each}
 </div>
 
-<SelectFiles {showsFileHandle} {diffFilepathsOnSelected} />
+<SelectFiles {showsFileHandle} {compareSetOnSelected} />
 
 <style>
   .tabs {

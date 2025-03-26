@@ -11,6 +11,7 @@ use encoding_rs::{Encoding, UTF_8};
 use sheets_diff::core::diff::Diff;
 use sheets_diff::core::unified_format::{unified_diff, SplitUnifiedDiffContent};
 
+use super::diff::binary_comparison_only;
 use super::str::bytes_to_hex_dump;
 use super::types::{FileAttr, ListDirReponse, ReadContent};
 
@@ -20,8 +21,11 @@ const UTF8_CHARSET: &str = "UTF-8";
 const NOT_TEXTFILE_CHARSET: &str = "(bytes array)";
 
 /// validate file path to compare
-pub fn validate_filepath(filepath: &str) -> bool {
-    is_textfile(filepath) || filepath.ends_with(".xlsx")
+pub fn validate_filepath(filepath: &str) -> Option<bool> {
+    if !Path::new(filepath).exists() {
+        return None;
+    }
+    Some(is_textfile(filepath) || filepath.ends_with(".xlsx"))
 }
 
 /// get content from file paths on old file and new file
@@ -78,7 +82,7 @@ pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
                             bytes_size: format!("{} bytes", comma_separated_number(metadata.len())),
                             human_readable_size: human_readable_size(metadata.len()),
                             last_modified,
-                            binary_comparison_only: !validate_filepath(
+                            binary_comparison_only: binary_comparison_only(
                                 &dir_entry.path().to_string_lossy(),
                             ),
                         })

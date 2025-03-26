@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { DiffFilepaths, StartupParam } from '../../types'
+  import type { CompareSet, CompareSetItem } from '../../types'
   import FileHandle from './file-handle/FileHandle.svelte'
   import { onMount } from 'svelte'
   import { invoke } from '@tauri-apps/api/core'
@@ -7,39 +7,38 @@
 
   let {
     showsFileHandle,
-    diffFilepathsOnSelected,
+    compareSetOnSelected,
   }: {
     showsFileHandle: boolean
-    diffFilepathsOnSelected: (diffFilepaths: DiffFilepaths) => void
+    compareSetOnSelected: (compareSet: CompareSet) => void
   } = $props()
 
   let fileHandleOldFilepath: string = $state('')
   let fileHandleNewFilepath: string = $state('')
 
   onMount(async () => {
-    const res = (await invoke('ready').catch((error: unknown) => {
+    const res = await invoke('ready').catch((error: unknown) => {
       console.error(error)
       return
-    })) as StartupParam
+    })
 
     console.log(res)
-    if (res.oldFilepath) {
-      if (res.newFilepath) {
+
+    const compareSet = res as CompareSet
+    if (0 < compareSet.old.filepath.length) {
+      if (0 < compareSet.new.filepath.length) {
         // show startup diff tab
-        diffFilepathsOnSelected({
-          old: res.oldFilepath,
-          new: res.newFilepath,
-        } as DiffFilepaths)
+        compareSetOnSelected(compareSet)
       } else {
         // start with a file dropped
-        fileHandleOldFilepath = res.oldFilepath
+        fileHandleOldFilepath = compareSet.old.filepath
         showsFileHandle = true
       }
     }
   })
 
-  const filepathsOnChange = (diffFilepaths: DiffFilepaths) => {
-    diffFilepathsOnSelected(diffFilepaths)
+  const compareSetOnChange = (compareSet: CompareSet) => {
+    compareSetOnSelected(compareSet)
     closeFileHandle()
   }
 
@@ -47,7 +46,7 @@
     showsFileHandle = false
   }
 
-  const filesOnDropped = (filepaths: string[]) => {
+  const filesOnDropped = async (filepaths: string[]) => {
     if (filepaths.length === 0) return
 
     // open file handle
@@ -63,10 +62,31 @@
     }
 
     // show diff directly
-    diffFilepathsOnSelected({
-      old: filepaths[0],
-      new: filepaths[1],
-    } as DiffFilepaths)
+    const oldFilepath = filepaths[0]
+    const oldBinaryComparisonOnly = await invoke('binary_comparison_only', {
+      filepath: oldFilepath,
+    }).catch((error: unknown) => {
+      console.error(error)
+      return
+    })
+    const newFilepath = filepaths[1]
+    const newBinaryComparisonOnly = await invoke('binary_comparison_only', {
+      filepath: newFilepath,
+    }).catch((error: unknown) => {
+      console.error(error)
+      return
+    })
+
+    compareSetOnSelected({
+      old: {
+        filepath: oldFilepath,
+        binaryComparisonOnly: oldBinaryComparisonOnly,
+      } as CompareSetItem,
+      new: {
+        filepath: newFilepath,
+        binaryComparisonOnly: newBinaryComparisonOnly,
+      } as CompareSetItem,
+    } as CompareSet)
   }
 </script>
 
@@ -80,7 +100,7 @@
       <FileHandle
         oldFilepath={fileHandleOldFilepath}
         newFilepath={fileHandleNewFilepath}
-        {filepathsOnChange}
+        {compareSetOnChange}
       />
     {/key}
   </div>

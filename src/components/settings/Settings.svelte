@@ -1,13 +1,7 @@
 <script lang="ts">
+  import { APP_DIFF_FONT_FAMILIES, APP_THEMES, APP_UI_FONT_FAMILIES } from '../../consts'
   import { T } from '../../stores/translation.svelte'
-  import {
-    APP_DIFF_FONT_FAMILIES,
-    APP_THEMES,
-    APP_UI_FONT_FAMILIES,
-    type AppDiffFontFamily,
-    type AppTheme,
-    type AppUiFontFamily,
-  } from '../../types'
+  import { type AppDiffFontFamily, type AppTheme, type AppUiFontFamily } from '../../types'
 
   interface Selector {
     title: string

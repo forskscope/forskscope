@@ -1,3 +1,15 @@
+import type { APP_DIFF_FONT_FAMILIES, APP_LANGUAGES, APP_THEMES, APP_UI_FONT_FAMILIES, DIFF_KIND, OLD_OR_NEW } from "./consts"
+
+export type AppLanguage = typeof APP_LANGUAGES[number]
+
+export type AppTheme = typeof APP_THEMES[number]
+export type AppDiffFontFamily = typeof APP_DIFF_FONT_FAMILIES[number]
+export type AppUiFontFamily = typeof APP_UI_FONT_FAMILIES[number]
+
+export type DiffKind = typeof DIFF_KIND[number]
+
+export type OldOrNew = typeof OLD_OR_NEW[number]
+
 export interface DiffResponse {
     oldCharset: string
     newCharset: string
@@ -27,27 +39,14 @@ export interface CharsDiff {
     chars: string
 }
 
-export type OldOrNew = "old" | "new"
-
-export type DiffKind = "equal" | "delete" | "insert" | "replace"
-
-export const APP_THEMES = ['light-theme', 'dark-theme', 'night-theme', 'monokai-theme']
-export type AppTheme = typeof APP_THEMES[number]
-
-export const APP_DIFF_FONT_FAMILIES = ['sans-serif-diff-font-family', 'serif-diff-font-family', 'monospace-diff-font-family']
-export type AppDiffFontFamily = typeof APP_DIFF_FONT_FAMILIES[number]
-
-export const APP_UI_FONT_FAMILIES = ['sans-serif-ui-font-family', 'serif-ui-font-family', 'monospace-ui-font-family']
-export type AppUiFontFamily = typeof APP_UI_FONT_FAMILIES[number]
-
-export interface DiffFilepaths {
-    old: string,
-    new: string,
+export interface CompareSet {
+    old: CompareSetItem,
+    new: CompareSetItem,
 }
 
-export interface StartupParam {
-    oldFilepath: string | null,
-    newFilepath: string | null,
+export interface CompareSetItem {
+    filepath: string,
+    binaryComparisonOnly: boolean,
 }
 
 export interface ListDirReponse {
@@ -63,6 +62,3 @@ export interface FileAttr {
     lastModified: string,
     binaryComparisonOnly: boolean
 }
-
-export const APP_LANGUAGES = ['en', 'ja']
-export type AppLanguage = typeof APP_LANGUAGES[number]

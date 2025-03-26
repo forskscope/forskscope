@@ -5,6 +5,20 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CompareSet {
+    pub old: CompareSetItem,
+    pub new: CompareSetItem,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompareSetItem {
+    pub filepath: String,
+    pub binary_comparison_only: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DiffResponse {
     pub old_charset: String,
     pub new_charset: String,

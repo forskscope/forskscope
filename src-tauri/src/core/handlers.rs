@@ -1,24 +1,16 @@
 // use tauri::Manager;
 
-use serde::Serialize;
 use std::path::Path;
 use std::process::Command;
 
 use tauri::Manager;
 
-use super::diff::{chars_diffs, lines_diffs};
-use super::file::{self, arg_to_filepath, file_manager_command, filepaths_content};
-use super::types::{CharsDiffResponse, DiffResponse, LinesDiff, ListDirReponse};
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StartupParam {
-    pub old_filepath: Option<String>,
-    pub new_filepath: Option<String>,
-}
+use super::diff::{self, chars_diffs, lines_diffs, startup_compare_set_item};
+use super::file::{self, file_manager_command, filepaths_content};
+use super::types::{CharsDiffResponse, CompareSet, DiffResponse, LinesDiff, ListDirReponse};
 
 #[tauri::command]
-pub fn ready(app_handle: tauri::AppHandle) -> StartupParam {
+pub fn ready(app_handle: tauri::AppHandle) -> CompareSet {
     let mut args = app_handle
         .env()
         .args_os
@@ -26,18 +18,14 @@ pub fn ready(app_handle: tauri::AppHandle) -> StartupParam {
         // first arg is executable themself
         .skip(1);
 
-    let old_filepath = arg_to_filepath(&args.next());
-    let new_filepath = arg_to_filepath(&args.next());
-
-    StartupParam {
-        old_filepath,
-        new_filepath,
-    }
+    let old = startup_compare_set_item(&args.next());
+    let new = startup_compare_set_item(&args.next());
+    CompareSet { old, new }
 }
 
 #[tauri::command]
-pub fn validate_filepath(filepath: &str) -> Result<bool, String> {
-    Ok(file::validate_filepath(filepath))
+pub fn binary_comparison_only(filepath: &str) -> Result<bool, String> {
+    Ok(diff::binary_comparison_only(filepath))
 }
 
 #[tauri::command(async)]
