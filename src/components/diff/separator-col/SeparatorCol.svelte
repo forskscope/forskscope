@@ -24,7 +24,7 @@
           {#if j === 0 && linesDiff.diffKind !== 'equal'}<button
               onclick={() => {
                 replaceOnClick(i)
-              }}>=></button
+              }}>⇨</button
             >{/if}
         </div>
       {/each}
