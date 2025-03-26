@@ -1,6 +1,6 @@
 .dark-theme {
     --line-diff-text-color: hsl(0, 0%, 93%);
-    --char-diff-text-color: hsl(0, 0%, 93%);
+    --char-diff-text-color: hsl(0, 0%, 97%);
 
     --line-diff-delete-old-background-color: hsl(10, 80%, 25%);
 
@@ -13,6 +13,6 @@
 
     --char-diff-insert-new-background-color: hsl(200, 90%, 32%);
 
-    --char-diff-replace-old-background-color: hsl(30, 10%, 31%);
-    --char-diff-replace-new-background-color: hsl(200, 10%, 31%);
+    --char-diff-replace-old-background-color: hsl(30, 10%, 37%);
+    --char-diff-replace-new-background-color: hsl(200, 10%, 37%);
 }

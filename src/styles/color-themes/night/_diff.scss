@@ -1,6 +1,6 @@
 .night-theme {
     --line-diff-text-color: hsl(0, 0%, 87%);
-    --char-diff-text-color: hsl(0, 0%, 87%);
+    --char-diff-text-color: hsl(0, 0%, 93%);
 
     --line-diff-delete-old-background-color: hsl(10, 67%, 29%);
 
@@ -13,6 +13,6 @@
 
     --char-diff-insert-new-background-color: hsl(200, 82%, 34%);
 
-    --char-diff-replace-old-background-color: hsl(30, 10%, 33%);
-    --char-diff-replace-new-background-color: hsl(200, 10%, 31%);
+    --char-diff-replace-old-background-color: hsl(30, 10%, 36%);
+    --char-diff-replace-new-background-color: hsl(200, 10%, 36%);
 }

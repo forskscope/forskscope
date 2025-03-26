@@ -357,7 +357,7 @@
   }
 
   .dirs-files-wrapper {
-    height: 60vh;
+    height: 80vh;
     overflow: auto;
   }
 
