@@ -14,6 +14,7 @@
   } from '../../types'
 
   interface Selector {
+    icon?: string
     title: string
     groupName: string
     items: string[]
@@ -56,6 +57,7 @@
 
   const SELECTORS = [
     {
+      icon: '🎨',
       title: 'Theme',
       groupName: 'theme',
       items: APP_THEMES,
@@ -88,7 +90,7 @@
     <button class="close" onclick={close}>✖️</button>
     <div class="settings">
       <div class="setting">
-        <h3>🌐 {T('Languages')}</h3>
+        <h3>🌐 {T('Language')}</h3>
         <select bind:value={language} onchange={languageOnChange}>
           <option value="en">English</option>
           <option value="ja">日本語</option>
@@ -97,7 +99,7 @@
 
       {#each SELECTORS as selector}
         <div class="setting">
-          <h3>{T(selector.title)}</h3>
+          <h3>{selector.icon} {T(selector.title)}</h3>
           <div>
             {#each selector.items as item}
               <label
