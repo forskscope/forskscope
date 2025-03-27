@@ -4,7 +4,7 @@
   import type { CompareSet, CompareSetItem, ListDirReponse, OldOrNew } from '../../types'
   import { openDirectoryDialog } from '../../utils/dialog.svelte'
   import Tooltip from '../common/Tooltip.svelte'
-  import { T } from '../../stores/translation.svelte'
+  import { T } from '../../stores/settings/translation.svelte'
   import { BINARY_MODE_COMPARE_BUTTON_LABEL, DEFAULT_COMPARE_BUTTON_LABEL } from '../../consts'
   import { pathJoin } from '../../utils/file.svelte'
   import { PATH_SEPARATOR } from '../../stores/file.svelte'

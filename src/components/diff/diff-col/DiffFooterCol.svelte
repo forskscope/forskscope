@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { T } from '../../../stores/translation.svelte'
+  import { T } from '../../../stores/settings/translation.svelte'
 
   const {
     charset,

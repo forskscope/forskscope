@@ -1,32 +1,7 @@
 <script lang="ts">
   import Tooltip from '../components/common/Tooltip.svelte'
   import Settings from '../components/settings/Settings.svelte'
-  import { T } from '../stores/translation.svelte'
-  import { type AppDiffFontFamily, type AppTheme, type AppUiFontFamily } from '../types'
-
-  let {
-    activeTheme,
-    activeDiffFontFamily,
-    activeUiFontFamily,
-    diffFontSize,
-    uiFontSizeScale,
-    themeOnChange,
-    diffFontFamilyOnChange,
-    uiFontFamilyOnChange,
-    diffFontSizeOnChange,
-    uiFontSizeScaleOnChange,
-  }: {
-    activeTheme: AppTheme
-    activeDiffFontFamily: AppDiffFontFamily
-    activeUiFontFamily: AppUiFontFamily
-    diffFontSize: number
-    uiFontSizeScale: number
-    themeOnChange: (value: AppTheme) => void
-    diffFontFamilyOnChange: (value: AppDiffFontFamily) => void
-    uiFontFamilyOnChange: (value: AppUiFontFamily) => void
-    diffFontSizeOnChange: (value: number) => void
-    uiFontSizeScaleOnChange: (value: number) => void
-  } = $props()
+  import { T } from '../stores/settings/translation.svelte'
 
   let showsSettings: boolean = $state(false)
 
@@ -55,19 +30,7 @@
 </div>
 
 <div class={showsSettings ? '' : 'd-none'}>
-  <Settings
-    {activeTheme}
-    {activeDiffFontFamily}
-    {activeUiFontFamily}
-    {diffFontSize}
-    {uiFontSizeScale}
-    {themeOnChange}
-    {diffFontFamilyOnChange}
-    {uiFontFamilyOnChange}
-    {diffFontSizeOnChange}
-    {uiFontSizeScaleOnChange}
-    close={closeSettings}
-  />
+  <Settings {closeSettings} />
 </div>
 
 <style>
