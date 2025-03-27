@@ -4,12 +4,18 @@
   import Tabs from '../components/tabs/Tabs.svelte'
   import type { AppDiffFontFamily, AppTheme, AppUiFontFamily } from '../types'
   import { APP_DEFAULT_THEME } from '../consts'
+  import { onMount } from 'svelte'
+  import { _setPathSeparator } from '../stores/file.svelte'
 
   let activeTheme: AppTheme = $state(APP_DEFAULT_THEME)
   let activeDiffFontFamily: AppDiffFontFamily = $state('monospace-diff-font-family')
   let activeUiFontFamily: AppUiFontFamily = $state('sans-serif-ui-font-family')
   let diffFontSize: number = $state(16)
   let uiFontSizeScale: number = $state(1.0)
+
+  onMount(async () => {
+    await _setPathSeparator()
+  })
 
   const themeOnChange = (value: AppTheme) => {
     activeTheme = value

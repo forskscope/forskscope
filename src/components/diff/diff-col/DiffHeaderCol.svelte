@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { PATH_SEPARATOR } from '../../../consts'
   import { T } from '../../../stores/translation.svelte'
+  import { PATH_SEPARATOR } from '../../../stores/file.svelte'
   import Tooltip from '../../common/Tooltip.svelte'
 
   const {
@@ -11,7 +11,7 @@
     filepathFromDialogOnClick: () => void
   } = $props()
 
-  const lastSlashIndex: number = $derived(filepath.lastIndexOf(PATH_SEPARATOR))
+  const lastSlashIndex: number = $derived(filepath.lastIndexOf(PATH_SEPARATOR!))
   const parentDirsPath: string = $derived(filepath.substring(0, lastSlashIndex + 1))
   const filename: string = $derived(filepath.substring(lastSlashIndex + 1))
 </script>

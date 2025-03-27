@@ -1,6 +1,6 @@
 // use tauri::Manager;
 
-use std::path::Path;
+use std::path::{Path, MAIN_SEPARATOR};
 use std::process::Command;
 
 use tauri::Manager;
@@ -48,6 +48,11 @@ pub async fn diff_chars(lines_diffs: Vec<LinesDiff>) -> Result<CharsDiffResponse
 #[tauri::command]
 pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
     file::list_dir(current_dir)
+}
+
+#[tauri::command]
+pub fn path_separator() -> Result<char, String> {
+    Ok(MAIN_SEPARATOR)
 }
 
 #[tauri::command]

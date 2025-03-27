@@ -1,6 +1,6 @@
 use std::{
     ffi::OsString,
-    fs::{self, File},
+    fs::{metadata, read_dir, File},
     io::{BufReader, Read},
     path::{Path, PathBuf},
 };
@@ -329,8 +329,8 @@ pub fn startup_compare_set_item(filepath: &Option<OsString>) -> CompareSetItem {
 
 /// digest comparison around file paths
 fn filepaths_digest_diff(old_filepath: &PathBuf, new_filepath: &PathBuf) -> Result<bool, String> {
-    let old_metadata = fs::metadata(old_filepath).expect("Failed to get file metadata on old");
-    let new_metadata = fs::metadata(new_filepath).expect("Failed to get file metadata on new");
+    let old_metadata = metadata(old_filepath).expect("Failed to get file metadata on old");
+    let new_metadata = metadata(new_filepath).expect("Failed to get file metadata on new");
 
     // compare file size
     if old_metadata.len() != new_metadata.len() {
@@ -361,8 +361,8 @@ fn filepaths_digest_diff(old_filepath: &PathBuf, new_filepath: &PathBuf) -> Resu
             return Ok(false);
         }
 
-        if old_bytes == 0 {
-            // EOF reached in both files
+        // EOF reached
+        if old_bytes == 0 || new_bytes == 0 {
             break;
         }
 
@@ -381,8 +381,8 @@ fn dirpaths_digest_diff(old_dirpath: &PathBuf, new_dirpath: &PathBuf) -> Result<
     let mut new_files = vec![];
     let mut new_dirs = vec![];
 
-    let old_entries = fs::read_dir(old_dirpath).expect("Failed to read dir on old");
-    let new_entries = fs::read_dir(new_dirpath).expect("Failed to read dir on new");
+    let old_entries = read_dir(old_dirpath).expect("Failed to read dir on old");
+    let new_entries = read_dir(new_dirpath).expect("Failed to read dir on new");
 
     for entry in old_entries {
         let entry = entry.expect("Failed to get entry on old read dir");
@@ -425,11 +425,13 @@ fn dirpaths_digest_diff(old_dirpath: &PathBuf, new_dirpath: &PathBuf) -> Result<
     }
 
     // compare directories recursively
-    for (subdir1, subdir2) in old_dirs.iter().zip(new_dirs.iter()) {
-        if subdir1.file_name() != subdir2.file_name() {
+    for (old_subdir, new_subdir) in old_dirs.iter().zip(new_dirs.iter()) {
+        if old_subdir.file_name() != new_subdir.file_name() {
             return Ok(false);
         }
-        if !dirpaths_digest_diff(subdir1, subdir2)? {
+        if !dirpaths_digest_diff(old_subdir, new_subdir)
+            .expect("Failed to digest compare subdirectories")
+        {
             return Ok(false);
         }
     }

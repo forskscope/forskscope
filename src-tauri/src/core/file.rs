@@ -1,6 +1,6 @@
 use std::ffi::OsString;
 use std::fs;
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Error as IOError, Read, Write};
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
 use std::{fs::File, path::Path};
@@ -106,7 +106,7 @@ pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
 }
 
 /// save to file
-pub fn save(filepath: &str, content: &str, charset: &str) -> Result<(), io::Error> {
+pub fn save(filepath: &str, content: &str, charset: &str) -> Result<(), IOError> {
     let encoding = Encoding::for_label(charset.as_bytes()).unwrap_or(UTF_8);
     let (encoded, _, _) = encoding.encode(content);
     let mut file = File::create(filepath)?;

@@ -1,6 +1,5 @@
-import { invoke } from "@tauri-apps/api/core"
-import { PATH_SEPARATOR } from "../consts"
+import { PATH_SEPARATOR } from "../stores/file.svelte"
 
 export const pathJoin = (filename: string, dirpath: string): string => {
-    return `${dirpath}${PATH_SEPARATOR}${filename}`
+    return `${dirpath}${PATH_SEPARATOR!}${filename}`
 }

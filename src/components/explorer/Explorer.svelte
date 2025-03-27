@@ -5,12 +5,9 @@
   import { openDirectoryDialog } from '../../utils/dialog.svelte'
   import Tooltip from '../common/Tooltip.svelte'
   import { T } from '../../stores/translation.svelte'
-  import {
-    BINARY_MODE_COMPARE_BUTTON_LABEL,
-    DEFAULT_COMPARE_BUTTON_LABEL,
-    PATH_SEPARATOR,
-  } from '../../consts'
+  import { BINARY_MODE_COMPARE_BUTTON_LABEL, DEFAULT_COMPARE_BUTTON_LABEL } from '../../consts'
   import { pathJoin } from '../../utils/file.svelte'
+  import { PATH_SEPARATOR } from '../../stores/file.svelte'
 
   interface ExplorePane {
     oldOrNew: OldOrNew
@@ -55,7 +52,7 @@
   })
 
   const lastSlashIndex = (dirpath: string): number => {
-    return dirpath.lastIndexOf(PATH_SEPARATOR)
+    return dirpath.lastIndexOf(PATH_SEPARATOR!)
   }
   const parentDirsPath = (dirpath: string): string => {
     return dirpath.substring(0, lastSlashIndex(dirpath) + 1)
@@ -129,7 +126,11 @@
   }
 
   const isRootDir = (dir: string): boolean => {
-    return dir === PATH_SEPARATOR || dir.endsWith(`:${PATH_SEPARATOR}`)
+    if (PATH_SEPARATOR! === '\\') {
+      return dir.endsWith(`:${PATH_SEPARATOR!}`)
+    } else {
+      return dir === PATH_SEPARATOR!
+    }
   }
 
   const syncDir = (oldOrNew: OldOrNew) => {
