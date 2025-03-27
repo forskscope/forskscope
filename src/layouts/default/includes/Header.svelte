@@ -1,7 +1,7 @@
 <script lang="ts">
-  import Tooltip from '../components/common/Tooltip.svelte'
-  import Settings from '../components/settings/Settings.svelte'
-  import { T } from '../stores/settings/translation.svelte'
+  import Tooltip from '../../../components/common/Tooltip.svelte'
+  import Settings from '../../../components/settings/Settings.svelte'
+  import { T } from '../../../stores/settings/translation.svelte'
 
   let showsSettings: boolean = $state(false)
 
