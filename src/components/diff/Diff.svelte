@@ -18,14 +18,12 @@
   import { openFileDialog, saveFileDialog } from '../../utils/dialog.svelte'
   import { onMount } from 'svelte'
   import { errorToast } from '../../stores/Toast.svelte'
-  import { activeCompareSet, removeActiveCompareSet } from '../../stores/tabs.svelte'
+  import { removeActiveCompareSet } from '../../stores/tabs.svelte'
 
-  // todo
-  let compareSet: CompareSet | null = $state(null)
-  // todo
-  let oldFilepath: string | null = $state(null)
-  // todo
-  let newFilepath: string | null = $state(null)
+  const { compareSet }: { compareSet: CompareSet } = $props()
+
+  let oldFilepath: string | null = $state(compareSet.old.filepath)
+  let newFilepath: string | null = $state(compareSet.new.filepath)
 
   let oldCharset: string = $state('')
   let newCharset: string = $state('')
@@ -40,10 +38,6 @@
   let diffPanes: HTMLDivElement
 
   onMount(async () => {
-    compareSet = activeCompareSet()!
-    oldFilepath = compareSet.old.filepath
-    newFilepath = compareSet.new.filepath
-
     await diff()
     diffPanes.focus()
   })

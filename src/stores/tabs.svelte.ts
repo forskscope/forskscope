@@ -27,9 +27,8 @@ export const spliceCompareSet = (index: number) => {
     }
 }
 
-export const activeCompareSet = (): CompareSet | null => {
-    if (activeCompareSetIndex === null) return null
-    return get(compareSets)[activeCompareSetIndex]
+export const isActiveCompareSetIndex = (index: number | null): boolean => {
+    return index === activeCompareSetIndex
 }
 
 export const activateCompareSet = (index: number) => {
