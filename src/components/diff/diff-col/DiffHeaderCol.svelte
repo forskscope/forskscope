@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { T } from '../../../stores/translation.svelte'
+  import { T } from '../../../stores/settings/translation.svelte'
   import { PATH_SEPARATOR } from '../../../stores/file.svelte'
   import Tooltip from '../../common/Tooltip.svelte'
 

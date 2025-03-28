@@ -2,10 +2,22 @@
   import {
     APP_DEFAULT_LANGUAGE,
     APP_DIFF_FONT_FAMILIES,
+    APP_MAX_DIFF_FONT_SIZE,
+    APP_MAX_UI_FONT_SCALE_SIZE,
+    APP_MIN_DIFF_FONT_SIZE,
+    APP_MIN_UI_FONT_SCALE_SIZE,
     APP_THEMES,
     APP_UI_FONT_FAMILIES,
+    APP_UI_FONT_SCALE_SIZE_STEP,
   } from '../../consts'
-  import { setTranslation, T } from '../../stores/translation.svelte'
+  import {
+    activeDiffFontFamily,
+    activeTheme,
+    activeUiFontFamily,
+    diffFontSize,
+    uiFontSizeScale,
+  } from '../../stores/settings/theme.svelte'
+  import { setTranslation, T } from '../../stores/settings/translation.svelte'
   import {
     type AppDiffFontFamily,
     type AppLanguage,
@@ -24,32 +36,32 @@
   }
 
   let {
-    activeTheme,
-    activeDiffFontFamily,
-    activeUiFontFamily,
-    diffFontSize,
-    uiFontSizeScale,
-    themeOnChange,
-    diffFontFamilyOnChange,
-    uiFontFamilyOnChange,
-    diffFontSizeOnChange,
-    uiFontSizeScaleOnChange,
-    close,
+    closeSettings,
   }: {
-    activeTheme: AppTheme
-    activeDiffFontFamily: AppDiffFontFamily
-    activeUiFontFamily: AppUiFontFamily
-    diffFontSize: number
-    uiFontSizeScale: number
-    themeOnChange: (value: AppTheme) => void
-    diffFontFamilyOnChange: (value: AppDiffFontFamily) => void
-    uiFontFamilyOnChange: (value: AppUiFontFamily) => void
-    diffFontSizeOnChange: (value: number) => void
-    uiFontSizeScaleOnChange: (value: number) => void
-    close: () => void
+    closeSettings: () => void
   } = $props()
 
   let language: AppLanguage = $state(APP_DEFAULT_LANGUAGE)
+
+  const themeOnChange = (value: AppTheme) => {
+    $activeTheme = value
+  }
+
+  const diffFontFamilyOnChange = (value: AppDiffFontFamily) => {
+    $activeDiffFontFamily = value
+  }
+
+  const uiFontFamilyOnChange = (value: AppUiFontFamily) => {
+    $activeUiFontFamily = value
+  }
+
+  const diffFontSizeOnChange = (value: number) => {
+    $diffFontSize = value
+  }
+
+  const uiFontSizeScaleOnChange = (value: number) => {
+    $uiFontSizeScale = value
+  }
 
   const languageOnChange = async () => {
     await setTranslation(language)
@@ -62,7 +74,7 @@
       groupName: 'theme',
       items: APP_THEMES,
       handler: themeOnChange,
-      defaultValue: activeTheme,
+      defaultValue: $activeTheme,
       valueSuffix: '-theme',
     } as Selector,
     {
@@ -70,7 +82,7 @@
       groupName: 'diffFontFamily',
       items: APP_DIFF_FONT_FAMILIES,
       handler: diffFontFamilyOnChange,
-      defaultValue: activeDiffFontFamily,
+      defaultValue: $activeDiffFontFamily,
       valueSuffix: '-diff-font-family',
     } as Selector,
     {
@@ -78,7 +90,7 @@
       groupName: 'uiFontFamily',
       items: APP_UI_FONT_FAMILIES,
       handler: uiFontFamilyOnChange,
-      defaultValue: activeUiFontFamily,
+      defaultValue: $activeUiFontFamily,
       valueSuffix: '-ui-font-family',
     } as Selector,
   ]
@@ -87,7 +99,7 @@
 <!-- todo: color theme switcher -->
 <div class="settings-wrapper">
   <div class="position-relative">
-    <button class="close" onclick={close}>✖️</button>
+    <button class="close" onclick={closeSettings}>✖️</button>
     <div class="settings">
       <div class="setting">
         <h3>🌐 {T('Language')}</h3>
@@ -123,9 +135,11 @@
         <div>
           <input
             type="number"
-            bind:value={diffFontSize}
+            min={APP_MIN_DIFF_FONT_SIZE}
+            max={APP_MAX_DIFF_FONT_SIZE}
+            bind:value={$diffFontSize}
             onchange={() => {
-              diffFontSizeOnChange(diffFontSize)
+              diffFontSizeOnChange($diffFontSize)
             }}
           />
         </div>
@@ -135,12 +149,12 @@
         <div>
           <input
             type="number"
-            step="0.05"
-            min="0.2"
-            max="1"
-            bind:value={uiFontSizeScale}
+            step={APP_UI_FONT_SCALE_SIZE_STEP}
+            min={APP_MIN_UI_FONT_SCALE_SIZE}
+            max={APP_MAX_UI_FONT_SCALE_SIZE}
+            bind:value={$uiFontSizeScale}
             onchange={() => {
-              uiFontSizeScaleOnChange(uiFontSizeScale)
+              uiFontSizeScaleOnChange($uiFontSizeScale)
             }}
           />
         </div>
@@ -165,7 +179,7 @@
     width: 100%;
     max-width: 20rem;
     height: auto;
-    margin: 2.5rem auto 0;
+    margin: 0.7rem auto 0;
     display: flex;
     flex-direction: column;
     gap: 1.4rem;

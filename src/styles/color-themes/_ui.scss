@@ -22,13 +22,26 @@ select {
     color: var(--form-primary-text-color);
 }
 
-.tab-header {
+.tab {
     background-color: var(--app-secondary-background-color);
     color: var(--app-secondary-text-color);
     border-color: var(--primary-border-color);
 
-    &.active {
+    button {
+        background: transparent;
+        color: var(--app-secondary-text-color);
+    }
+
+    &.active button {
         border-color: var(--focused-border-color);
+    }
+
+    &:hover:not(:has(.close:hover)) .diff,
+    &:hover .explorer,
+    &:hover .add,
+    .close:hover {
+        background-color: var(--app-secondary-text-color);
+        color: var(--app-secondary-background-color);
     }
 }
 
@@ -36,11 +49,25 @@ select {
     &.old {
         background-color: var(--explorer-old-pane-background-color);
         color: var(--explorer-old-pane-text-color);
+
+        label input[type='radio']:checked+div,
+        .file input[type='radio']:checked+div,
+        .name:hover {
+            background-color: var(--explorer-old-pane-text-color);
+            color: var(--explorer-old-pane-background-color);
+        }
     }
 
     &.new {
         background-color: var(--explorer-new-pane-background-color);
         color: var(--explorer-new-pane-text-color);
+
+        label input[type='radio']:checked+div,
+        .file input[type='radio']:checked+div,
+        .name:hover {
+            background-color: var(--explorer-new-pane-text-color);
+            color: var(--explorer-new-pane-background-color);
+        }
     }
 
     .current-dir {
@@ -52,11 +79,6 @@ select {
         .header {
             background-color: var(--app-primary-background-color);
             color: var(--app-primary-text-color);
-        }
-
-        label input[type='radio']:checked+div,
-        .file input[type='radio']:checked+div {
-            border-bottom-color: var(--focused-border-color);
         }
     }
 }

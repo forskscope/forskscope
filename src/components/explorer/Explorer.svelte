@@ -4,10 +4,11 @@
   import type { CompareSet, CompareSetItem, ListDirReponse, OldOrNew } from '../../types'
   import { openDirectoryDialog } from '../../utils/dialog.svelte'
   import Tooltip from '../common/Tooltip.svelte'
-  import { T } from '../../stores/translation.svelte'
+  import { T } from '../../stores/settings/translation.svelte'
   import { BINARY_MODE_COMPARE_BUTTON_LABEL, DEFAULT_COMPARE_BUTTON_LABEL } from '../../consts'
   import { pathJoin } from '../../utils/file.svelte'
   import { PATH_SEPARATOR } from '../../stores/file.svelte'
+  import { pushCompareSet } from '../../stores/tabs.svelte'
 
   interface ExplorePane {
     oldOrNew: OldOrNew
@@ -18,9 +19,6 @@
     name: string
     equal: boolean
   }
-
-  const { compareSetOnSelected }: { compareSetOnSelected: (compareSet: CompareSet) => void } =
-    $props()
 
   let oldExplorerPane: ExplorePane = $state({ oldOrNew: 'old', listDirResponse: null })
   let newExplorerPane: ExplorePane = $state({ oldOrNew: 'new', listDirResponse: null })
@@ -101,7 +99,7 @@
         binaryComparisonOnly: newBinaryComparisonOnly,
       } as CompareSetItem,
     } as CompareSet
-    compareSetOnSelected(compareSet)
+    pushCompareSet(compareSet)
 
     // todo reset radio selection
   }
@@ -191,7 +189,7 @@
         binaryComparisonOnly: newFound.binaryComparisonOnly,
       } as CompareSetItem,
     } as CompareSet
-    compareSetOnSelected(compareSet)
+    pushCompareSet(compareSet)
   }
 
   const openWithFileManager = (oldOrNew: OldOrNew) => {
@@ -308,6 +306,7 @@
                 ><input
                   type="radio"
                   name={`${pane.oldOrNew}SelectedFile`}
+                  checked={dir === (pane.oldOrNew === 'old' ? oldSelectedFile : newSelectedFile)}
                   onchange={(
                     e: Event & {
                       currentTarget: EventTarget & HTMLInputElement
@@ -334,6 +333,8 @@
                 ><input
                   type="radio"
                   name={`${pane.oldOrNew}SelectedFile`}
+                  checked={file.name ===
+                    (pane.oldOrNew === 'old' ? oldSelectedFile : newSelectedFile)}
                   onchange={(
                     e: Event & {
                       currentTarget: EventTarget & HTMLInputElement
@@ -514,7 +515,11 @@
   }
 
   .dirs-files label:has(input[type='radio']:checked) {
-    opacity: 0.87;
+    opacity: 0.93;
+  }
+
+  .dirs-files label:not(:has(input[type='radio']:checked)) .name:hover {
+    opacity: 0.77;
   }
 
   .dirs-files label input[type='radio']:checked + .name {

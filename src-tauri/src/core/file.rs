@@ -30,8 +30,16 @@ pub fn validate_filepath(filepath: &str) -> Option<bool> {
 
 /// get content from file paths on old file and new file
 pub fn filepaths_content(old: &str, new: &str) -> Result<Vec<ReadContent>, String> {
-    if is_textfile(old) && is_textfile(new) {
+    let old_is_textfile = is_textfile(old);
+    let new_is_textfile = is_textfile(new);
+    if old_is_textfile && new_is_textfile {
         return Ok(vec![textfile_content(old), textfile_content(new)]);
+    }
+    if old_is_textfile && new.is_empty() {
+        return Ok(vec![textfile_content(old), ReadContent::default()]);
+    }
+    if old.is_empty() && new_is_textfile {
+        return Ok(vec![ReadContent::default(), textfile_content(new)]);
     }
 
     if old.ends_with(".xlsx") && new.ends_with(".xlsx") {

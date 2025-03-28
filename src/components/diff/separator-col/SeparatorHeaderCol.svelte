@@ -1,14 +1,16 @@
 <script lang="ts">
-  import { T } from '../../../stores/translation.svelte'
+  import { T } from '../../../stores/settings/translation.svelte'
 
   let {
     showsCharsDiffs,
     charsDiffsAvailable,
+    switchOldNewAvailable,
     showsCharsDiffsOnChange,
     switchOldNewOnClick,
   }: {
     showsCharsDiffs: boolean
     charsDiffsAvailable: boolean
+    switchOldNewAvailable: boolean
     showsCharsDiffsOnChange: (value: boolean) => Promise<void>
     switchOldNewOnClick: () => void
   } = $props()
@@ -43,7 +45,9 @@
           disabled={!charsDiffsAvailable}
         />{T('Show chars diff')}</label
       >
-      <button onclick={switchOldNewOnClick}>{T('Switch left/right')}</button>
+      <button onclick={switchOldNewOnClick} disabled={!switchOldNewAvailable}
+        >{T('Switch left/right')}</button
+      >
     </div>
   </div>
 {/if}

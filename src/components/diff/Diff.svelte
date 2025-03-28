@@ -18,11 +18,18 @@
   import { openFileDialog, saveFileDialog } from '../../utils/dialog.svelte'
   import { onMount } from 'svelte'
   import { errorToast } from '../../stores/Toast.svelte'
+  import {
+    getActiveCompareSet,
+    removeActiveCompareSet,
+    updateActiveCompareSet,
+  } from '../../stores/tabs.svelte'
 
-  const { compareSet, close }: { compareSet: CompareSet; close: () => void } = $props()
+  const { compareSet }: { compareSet: CompareSet } = $props()
 
-  let oldFilepath: string = $state(compareSet.old.filepath)
-  let newFilepath: string = $state(compareSet.new.filepath)
+  let _compareSet: CompareSet = $state(compareSet)
+
+  const oldFilepath: string = $derived(_compareSet.old.filepath)
+  const newFilepath: string = $derived(_compareSet.new.filepath)
 
   let oldCharset: string = $state('')
   let newCharset: string = $state('')
@@ -67,8 +74,12 @@
   })
 
   const charsDiffsAvailable: boolean = $derived(
-    !compareSet.old.binaryComparisonOnly && !compareSet.new.binaryComparisonOnly
+    oldFilepath !== newFilepath &&
+      !compareSet!.old.binaryComparisonOnly &&
+      !compareSet!.new.binaryComparisonOnly
   )
+
+  const switchOldNewAvailable: boolean = $derived(oldFilepath !== newFilepath)
 
   const isCompletelyEqual: boolean = $derived(!linesDiffs.some((x) => x.diffKind !== 'equal'))
 
@@ -87,8 +98,7 @@
       isError = true
     })
     if (isError) {
-      close()
-      return
+      removeActiveCompareSet()
     }
 
     console.log(res) // todo
@@ -121,10 +131,13 @@
     const filepath = await openFileDialog()
     if (filepath === null) return
     if (oldOrNew === 'old') {
-      oldFilepath = filepath
+      const _oldFilepath = filepath
+      await updateActiveCompareSet(_oldFilepath, newFilepath)
     } else {
-      newFilepath = filepath
+      const _newFilepath = filepath
+      await updateActiveCompareSet(oldFilepath, _newFilepath)
     }
+    _compareSet = getActiveCompareSet()!
     await diff()
   }
 
@@ -137,7 +150,7 @@
   }
 
   const saveAsOnClick = async () => {
-    const filepath = await saveFileDialog(newFilepath).catch((error: unknown) => {
+    const filepath = await saveFileDialog(newFilepath!).catch((error: unknown) => {
       console.error(error)
       return
     })
@@ -159,10 +172,9 @@
     showsCharsDiffs = value
   }
 
-  const switchOldNewOnClick = () => {
-    const orgOldFilepath = oldFilepath
-    oldFilepath = newFilepath
-    newFilepath = orgOldFilepath
+  const switchOldNewOnClick = async () => {
+    await updateActiveCompareSet(newFilepath, oldFilepath)
+    _compareSet = getActiveCompareSet()!
 
     linesDiffs = linesDiffs.map((x) => {
       const ret = x
@@ -195,7 +207,7 @@
     switch (e.key) {
       case 'w': {
         if (e.ctrlKey) {
-          close()
+          removeActiveCompareSet()
         }
       }
       case 'F7': {
@@ -219,7 +231,7 @@
       <div class="row header">
         <div class="col diff old">
           <DiffHeaderCol
-            filepath={oldFilepath}
+            filepath={oldFilepath!}
             filepathFromDialogOnClick={async () => changeFilepath('old')}
           />
         </div>
@@ -227,13 +239,14 @@
           <SeparatorHeaderCol
             {showsCharsDiffs}
             {charsDiffsAvailable}
+            {switchOldNewAvailable}
             {showsCharsDiffsOnChange}
             {switchOldNewOnClick}
           />
         </div>
         <div class="col diff new">
           <DiffHeaderCol
-            filepath={newFilepath}
+            filepath={newFilepath!}
             filepathFromDialogOnClick={async () => changeFilepath('new')}
           />
         </div>
