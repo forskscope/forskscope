@@ -1,11 +1,14 @@
 <script lang="ts">
+  import { blur, crossfade, draw, fade, fly, scale, slide } from 'svelte/transition'
   import Diff from '../../../components/diff/Diff.svelte'
   import Explorer from '../../../components/explorer/Explorer.svelte'
-  import { activeTabIndex, EXPLORER_TAB_INDEX } from '../../../stores/tabs.svelte'
+  import { activeCompareSet, exploreIsActive } from '../../../stores/tabs.svelte'
 </script>
 
-{#if $activeTabIndex === EXPLORER_TAB_INDEX}
+{#if exploreIsActive()}
   <Explorer />
 {:else}
-  <Diff />
+  {#key activeCompareSet()}
+    <Diff />
+  {/key}
 {/if}

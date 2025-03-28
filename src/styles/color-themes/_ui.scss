@@ -22,13 +22,17 @@ select {
     color: var(--form-primary-text-color);
 }
 
-.tab-header {
-    background-color: var(--app-secondary-background-color);
-    color: var(--app-secondary-text-color);
-    border-color: var(--primary-border-color);
+.tab {
+    button {
+        background-color: var(--app-secondary-background-color);
+        color: var(--app-secondary-text-color);
+        border-color: var(--primary-border-color);
+    }
 
     &.active {
-        border-color: var(--focused-border-color);
+        button {
+            border-color: var(--focused-border-color);
+        }
     }
 }
 

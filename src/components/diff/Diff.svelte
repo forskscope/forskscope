@@ -18,7 +18,7 @@
   import { openFileDialog, saveFileDialog } from '../../utils/dialog.svelte'
   import { onMount } from 'svelte'
   import { errorToast } from '../../stores/Toast.svelte'
-  import { activeTabIndex, compareSets } from '../../stores/tabs.svelte'
+  import { activeCompareSet } from '../../stores/tabs.svelte'
 
   // todo
   let compareSet: CompareSet | null = $state(null)
@@ -40,7 +40,7 @@
   let diffPanes: HTMLDivElement
 
   onMount(async () => {
-    compareSet = $compareSets[$activeTabIndex - 1] // todo remove - 1
+    compareSet = activeCompareSet()!
     oldFilepath = compareSet.old.filepath
     newFilepath = compareSet.new.filepath
 

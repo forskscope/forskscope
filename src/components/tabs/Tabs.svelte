@@ -1,125 +1,90 @@
 <script lang="ts">
-  import { type CompareSet } from '../../types'
-  import { PATH_SEPARATOR } from '../../stores/file.svelte'
-  import { activeTabIndex, compareSets, spliceCompareSet } from '../../stores/tabs.svelte'
+  import {
+    activateCompareSet,
+    activateExplorer,
+    compareSets,
+    exploreIsActive,
+    isActiveCompareSet,
+    spliceCompareSet,
+  } from '../../stores/tabs.svelte'
   import { openMultipleFilesDialog } from '../../utils/dialog.svelte'
   import { filepathsToCompareSet } from '../../utils/diff.svelte'
 
-  const DEFAULT_ACTIVE_TAB_INDEX: number = 0
-  const MIN_TABS_COUNT: number = 2
-
-  interface TabControl {
-    label?: string
-    className?: string
-    compareSet?: CompareSet
-    buttonLabel?: string
-    buttonOnClick?: Function
-  }
-
-  const tabControls = $derived([
-    { label: '💻️', className: 'explorer' } as TabControl,
-    ...$compareSets.map((x, i) => {
-      const label = x!.new.filepath.split(PATH_SEPARATOR!)[
-        x!.new.filepath.split(PATH_SEPARATOR!).length - 1
-      ]
-      const className = 'diff'
-      const compareSet = {
-        old: {
-          filepath: x.old.filepath,
-          binaryComparisonOnly: x.old.binaryComparisonOnly,
-        },
-        new: {
-          filepath: x.new.filepath,
-          binaryComparisonOnly: x.new.binaryComparisonOnly,
-        },
-      } as CompareSet
-      const buttonLabel = '✖️'
-      const buttonOnClick = () => {
-        removeDiffTab(i - 1)
-      }
-      return { label, className, compareSet, buttonLabel, buttonOnClick } as TabControl
-    }),
-    {
-      className: 'add-diff-tab',
-      buttonLabel: '➕️',
-      buttonOnClick: async () => {
-        const filepaths = await openMultipleFilesDialog()
-        filepathsToCompareSet(filepaths)
-      },
-    } as TabControl,
-  ])
-
-  const removeDiffTab = (tabIndex: number) => {
-    if (tabIndex === $activeTabIndex) {
-      $activeTabIndex -= 1
-    }
-    spliceCompareSet(tabIndex - 1) // todo remove -1
-    if ($compareSets.length == MIN_TABS_COUNT) {
-      $activeTabIndex = DEFAULT_ACTIVE_TAB_INDEX
-    }
+  const addButtonOnClick = async () => {
+    const filepaths = await openMultipleFilesDialog()
+    filepathsToCompareSet(filepaths)
   }
 </script>
 
-<div class="tab-headers">
-  {#each tabControls as tabControl, tabIndex}
-    <label
-      class={`tab-header ${tabControl.className} ${tabIndex === $activeTabIndex ? 'active' : ''}`}
+<div class="tabs">
+  <div class="tab">
+    <button
+      class={`explorer ${exploreIsActive() ? 'active' : ''}`}
+      onclick={() => activateExplorer()}
     >
-      <input
-        type="radio"
-        value={tabIndex}
-        bind:group={$activeTabIndex}
-        disabled={!tabControl.label}
-      />
-      <span>{tabControl.label}</span>
-      {#if tabControl.buttonOnClick}
-        <button
-          onclick={() => {
-            tabControl.buttonOnClick!()
-          }}>{tabControl.buttonLabel}</button
+      <span>💻️</span>
+    </button>
+  </div>
+  {#each $compareSets as compareSet, i}
+    <div class="tab">
+      <button
+        class={`diff ${isActiveCompareSet(i) ? 'active' : ''}`}
+        onclick={() => activateCompareSet(i)}
+      >
+        <span
+          >{compareSet.new.filepath.split('/')[compareSet.new.filepath.split('/').length - 1]}</span
         >
-      {/if}
-    </label>
+      </button>
+      <button class="close" onclick={() => spliceCompareSet(i)}>✖️</button>
+    </div>
   {/each}
+  <div class="tab">
+    <button class="add" onclick={addButtonOnClick}>
+      <span>➕️</span>
+    </button>
+  </div>
 </div>
 
 <style>
-  .tab-headers {
+  .tabs {
     height: 1.6rem;
     max-width: 100%;
     display: flex;
     overflow-x: auto;
+    box-sizing: border-box;
   }
-  .tab-header {
-    padding: 0 0.5rem;
-    display: flex;
-    align-items: center;
+  .tab {
     border-width: 0.01rem;
     border-style: solid;
+    box-sizing: border-box;
   }
-  .tab-header.active {
+  .tab.active {
     font-size: 105%;
     border-width: 0.12rem;
     border-style: solid;
   }
-  .tab-header:hover {
+  .tab:hover {
     opacity: 0.72;
   }
 
-  .tab-header.diff > span {
+  .tab button {
+    width: 100%;
+    height: 100%;
+    padding: 0 0.5rem;
+  }
+
+  .tab:has(.diff) {
+    padding: 0 0.5rem;
+    display: flex;
+  }
+
+  .tab .diff span {
     width: 5.7rem;
-    display: inline-block;
-    text-align: right;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .tab-header span {
     text-overflow: ellipsis;
     overflow: hidden;
   }
 
-  .tab-header button {
+  .tab .close {
     width: 1.4rem;
     padding: 0;
     margin-left: 0.6rem;
@@ -131,13 +96,11 @@
     opacity: 0.87;
   }
 
-  .tab-header.add-diff-tab {
-    border: none;
-  }
-  .tab-header.add-diff-tab button {
+  .tab.add {
     padding: 0.2rem;
     margin: 0;
     font-size: 0.72rem;
+    border: none;
     border-radius: 0.3rem;
   }
 </style>
