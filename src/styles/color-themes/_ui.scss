@@ -23,16 +23,25 @@ select {
 }
 
 .tab {
+    background-color: var(--app-secondary-background-color);
+    color: var(--app-secondary-text-color);
+    border-color: var(--primary-border-color);
+
     button {
-        background-color: var(--app-secondary-background-color);
+        background: transparent;
         color: var(--app-secondary-text-color);
-        border-color: var(--primary-border-color);
     }
 
-    &.active {
-        button {
-            border-color: var(--focused-border-color);
-        }
+    &.active button {
+        border-color: var(--focused-border-color);
+    }
+
+    &:hover:not(:has(.close:hover)) .diff,
+    &:hover .explorer,
+    &:hover .add,
+    .close:hover {
+        background-color: var(--app-secondary-text-color);
+        color: var(--app-secondary-background-color);
     }
 }
 

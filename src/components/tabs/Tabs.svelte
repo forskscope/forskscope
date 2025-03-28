@@ -63,7 +63,7 @@
     border-style: solid;
   }
   .tab:hover {
-    opacity: 0.72;
+    opacity: 0.87;
   }
 
   .tab button {
@@ -77,8 +77,9 @@
     display: flex;
   }
 
-  .tab .diff span {
-    width: 5.7rem;
+  .tab .diff {
+    width: 7.2rem;
+    white-space: pre;
     text-overflow: ellipsis;
     overflow: hidden;
   }
