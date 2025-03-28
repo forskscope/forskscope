@@ -48,4 +48,20 @@
     top: 0;
     z-index: 1001;
   }
+
+  main,
+  .app-header,
+  .app-body {
+    box-sizing: border-box;
+  }
+  main {
+    display: flex;
+    flex-direction: column;
+  }
+  .app-header {
+    height: 1.6rem;
+  }
+  .app-body {
+    flex: 1;
+  }
 </style>

@@ -47,7 +47,6 @@
 
 <style>
   .tabs {
-    height: 1.6rem;
     max-width: 100%;
     display: flex;
     overflow-x: auto;
