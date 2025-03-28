@@ -1,15 +1,9 @@
 <script lang="ts">
-  import { createCompareSetItem, type CompareSet, type CompareSetItem } from '../../types'
+  import { type CompareSet } from '../../types'
   import { PATH_SEPARATOR } from '../../stores/file.svelte'
-  import {
-    activeTabIndex,
-    compareSets,
-    pushCompareSet,
-    spliceCompareSet,
-  } from '../../stores/tabs.svelte'
-  import { openFileDialog, openMultipleFilesDialog } from '../../utils/dialog.svelte'
-  import { invoke } from '@tauri-apps/api/core'
-  import { binaryComparisonOnly } from '../../utils/diff.svelte'
+  import { activeTabIndex, compareSets, spliceCompareSet } from '../../stores/tabs.svelte'
+  import { openMultipleFilesDialog } from '../../utils/dialog.svelte'
+  import { filepathsToCompareSet } from '../../utils/diff.svelte'
 
   const DEFAULT_ACTIVE_TAB_INDEX: number = 0
   const MIN_TABS_COUNT: number = 2
@@ -50,24 +44,7 @@
       buttonLabel: '➕️',
       buttonOnClick: async () => {
         const filepaths = await openMultipleFilesDialog()
-        if (filepaths === null || filepaths.length === 0) return
-
-        const oldFilepath = filepaths[0]
-        const oldBinaryComparisonOnly = await binaryComparisonOnly(oldFilepath)
-        const oldCompareSetItem = {
-          filepath: oldFilepath,
-          binaryComparisonOnly: oldBinaryComparisonOnly,
-        } as CompareSetItem
-
-        let newCompareSetItem: CompareSetItem = createCompareSetItem()
-        if (1 < filepaths.length) {
-          const newFilepath = filepaths[1]
-          newCompareSetItem.filepath = newFilepath
-          newCompareSetItem.binaryComparisonOnly = await binaryComparisonOnly(newFilepath)
-        }
-
-        const compareSet = { old: oldCompareSetItem, new: newCompareSetItem } as CompareSet
-        pushCompareSet(compareSet)
+        filepathsToCompareSet(filepaths)
       },
     } as TabControl,
   ])
