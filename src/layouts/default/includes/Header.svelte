@@ -29,20 +29,18 @@
   </div>
 </div>
 
-<div class={showsSettings ? '' : 'd-none'}>
+{#if showsSettings}
   <Settings {closeSettings} />
-</div>
+{/if}
 
 <style>
   .headers {
-    position: fixed;
-    top: 0.2rem;
-    right: 0.7rem;
+    margin-right: 0.4rem;
+    margin-top: 0.2rem;
     display: flex;
     align-items: center;
     font-size: 1.1rem;
     gap: 0.4rem;
-    z-index: 1001;
   }
 
   h1 {

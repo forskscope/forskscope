@@ -172,7 +172,7 @@
     width: 100%;
     max-width: 20rem;
     height: auto;
-    margin: 2.5rem auto 0;
+    margin: 0.7rem auto 0;
     display: flex;
     flex-direction: column;
     gap: 1.4rem;
