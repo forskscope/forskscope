@@ -306,6 +306,7 @@
                 ><input
                   type="radio"
                   name={`${pane.oldOrNew}SelectedFile`}
+                  checked={dir === (pane.oldOrNew === 'old' ? oldSelectedFile : newSelectedFile)}
                   onchange={(
                     e: Event & {
                       currentTarget: EventTarget & HTMLInputElement
@@ -332,6 +333,8 @@
                 ><input
                   type="radio"
                   name={`${pane.oldOrNew}SelectedFile`}
+                  checked={file.name ===
+                    (pane.oldOrNew === 'old' ? oldSelectedFile : newSelectedFile)}
                   onchange={(
                     e: Event & {
                       currentTarget: EventTarget & HTMLInputElement
@@ -512,7 +515,11 @@
   }
 
   .dirs-files label:has(input[type='radio']:checked) {
-    opacity: 0.87;
+    opacity: 0.93;
+  }
+
+  .dirs-files label:not(:has(input[type='radio']:checked)) .name:hover {
+    opacity: 0.77;
   }
 
   .dirs-files label input[type='radio']:checked + .name {
