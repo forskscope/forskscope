@@ -87,47 +87,40 @@ select {
     color: var(--muted-text-color);
 }
 
-.diff-panes {
-    .row.header {
-        border-bottom: 0.2rem solid var(--primary-border-color);
-    }
+.diff-header {
+    border-bottom: 0.2rem solid var(--primary-border-color);
+}
 
-    .row.footer {
-        border-top: 0.2rem solid var(--primary-border-color);
-    }
+.diff-footer {
+    border-top: 0.2rem solid var(--primary-border-color);
+}
 
-    .content .separator,
-    .diff-line::before {
-        background-color: var(--app-secondary-background-color);
-    }
+.diff-content .divider,
+.diff-line::before {
+    background-color: var(--app-secondary-background-color);
+}
 
-    .content .separator {
-        button {
-            background-color: transparent;
-            color: var(--app-secondary-text-color);
-            box-shadow: none;
+.diff-content .divider {
+    button {
+        background-color: transparent;
+        color: var(--app-secondary-text-color);
+        box-shadow: none;
 
-            &:not(:disabled) {
-                background-color: var(--app-secondary-background-color);
-            }
+        &:not(:disabled) {
+            background-color: var(--app-secondary-background-color);
+        }
 
-            &:not(:disabled):hover,
-            &.focused {
-                background-color: var(--button-primary-background-color);
-            }
+        &:not(:disabled):hover,
+        &.focused {
+            background-color: var(--button-primary-background-color);
         }
     }
-
-    .menus {
-        background: var(--app-secondary-background-color);
-    }
 }
 
-.select-files {
-    background-color: var(--app-secondary-background-color);
-    color: var(--app-secondary-text-color);
-    border-color: var(--focused-border-color);
+.diff-header .menus {
+    background: var(--app-secondary-background-color);
 }
+
 
 .settings-wrapper {
     background-color: var(--app-secondary-background-color);

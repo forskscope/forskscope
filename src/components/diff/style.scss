@@ -18,12 +18,32 @@
     min-height: 0;
     flex: 1 1 0;
     overflow: auto;
+    white-space: nowrap;
+    counter-reset: line-number;
 }
 
+.diff-line {
+    counter-increment: line-number;
+    height: var(--line-height);
+}
+
+.diff-line::before {
+    content: counter(line-number);
+    position: sticky;
+    left: 0;
+    top: 0;
+    width: 2.4em;
+    padding-right: 0.7rem;
+    display: inline-block;
+    text-align: right;
+}
+
+// divider
 .divider {
     width: 2.4rem;
 }
 
+// header, footer
 .diff-header,
 .diff-footer {
     height: 1.8rem;
@@ -52,6 +72,7 @@
     padding: 0.1rem;
 }
 
+// responsive
 @media (max-width: 50.0rem) {
     .diff-header {
         height: 3.6rem;

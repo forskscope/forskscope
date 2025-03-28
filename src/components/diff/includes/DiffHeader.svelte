@@ -3,13 +3,13 @@
 </script>
 
 <div class="old-or-new old">
-  <div class="filepath" style="background-color: orange;">
+  <div class="filepath">
     {getActiveCompareSet()?.old.filepath}
   </div>
   <button>!!</button>
 </div>
 <div class="divider"></div>
 <div class="old-or-new new">
-  <div class="filepath" style="background-color: green;">{getActiveCompareSet()?.new.filepath}</div>
+  <div class="filepath">{getActiveCompareSet()?.new.filepath}</div>
   <button>!!</button>
 </div>

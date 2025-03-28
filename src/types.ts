@@ -10,10 +10,10 @@ export type DiffKind = typeof DIFF_KIND[number]
 
 export type OldOrNew = typeof OLD_OR_NEW[number]
 
-export interface DiffResponse {
+export interface LinesDiffResponse {
     oldCharset: string
     newCharset: string
-    linesDiffs: LinesDiff[]
+    diffs: LinesDiff[]
 }
 
 export interface LinesDiff {
@@ -68,4 +68,9 @@ export interface FileAttr {
     humanReadableSize: string,
     lastModified: string,
     binaryComparisonOnly: boolean
+}
+
+export interface BackendCommandResult {
+    response: unknown
+    isError: boolean
 }

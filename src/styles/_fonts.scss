@@ -1,7 +1,7 @@
 #app {
     font-size: var(--ui-font-size);
 
-    .lines-diffs {
+    .diff-content {
         font-size: var(--diff-font-size);
     }
 
@@ -20,19 +20,19 @@
     }
 
     &.sans-serif-diff-font-family {
-        .lines-diffs {
+        .diff-content {
             font-family: sans-serif;
         }
     }
 
     &.serif-diff-font-family {
-        .lines-diffs {
+        .diff-content {
             font-family: serif;
         }
     }
 
     &.monospace-diff-font-family {
-        .lines-diffs {
+        .diff-content {
             font-family: monospace;
         }
     }

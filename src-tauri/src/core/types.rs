@@ -19,10 +19,10 @@ pub struct CompareSetItem {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DiffResponse {
+pub struct LinesDiffResponse {
     pub old_charset: String,
     pub new_charset: String,
-    pub lines_diffs: Vec<LinesDiff>,
+    pub diffs: Vec<LinesDiff>,
 }
 
 #[derive(Serialize, Deserialize)]

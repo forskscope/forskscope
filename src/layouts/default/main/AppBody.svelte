@@ -16,11 +16,9 @@
 
 {#each $compareSets as compareSet, i}
   <!-- preserve operations w/ d-none instead of {#if} -->
-  <!--   
-  <div class={`${isActiveCompareSetIndex(i) ? '' : 'd-none'}`}>
-    <Diff {compareSet} />
-  </div>
-   -->
+  <!-- <div class={`diff-wapper ${isActiveCompareSetIndex(i) ? '' : 'd-none'}`}> -->
+  <!-- <Diff {compareSet} /> -->
+  <!-- todo -->
+  <DiffRoot {compareSet} visible={isActiveCompareSetIndex(i)} />
+  <!-- </div> -->
 {/each}
-
-<DiffRoot />

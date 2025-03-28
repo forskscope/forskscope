@@ -7,7 +7,7 @@ use tauri::Manager;
 
 use super::diff::{self, chars_diffs, lines_diffs, startup_compare_set_item};
 use super::file::{self, file_manager_command, filepaths_content};
-use super::types::{CharsDiffResponse, CompareSet, DiffResponse, LinesDiff, ListDirReponse};
+use super::types::{CharsDiffResponse, CompareSet, LinesDiff, LinesDiffResponse, ListDirReponse};
 
 #[tauri::command]
 pub fn ready(app_handle: tauri::AppHandle) -> CompareSet {
@@ -24,18 +24,18 @@ pub fn ready(app_handle: tauri::AppHandle) -> CompareSet {
 }
 
 #[tauri::command(async)]
-pub async fn diff_filepaths(old: &str, new: &str) -> Result<DiffResponse, String> {
+pub async fn diff_filepaths(old: &str, new: &str) -> Result<LinesDiffResponse, String> {
     let (old_read, new_read) = match filepaths_content(old, new) {
         Ok(read_contents) => (&read_contents[0].clone(), &read_contents[1].clone()),
         Err(err) => return Err(err),
     };
 
-    let lines_diffs = lines_diffs(old_read.content.as_str(), new_read.content.as_str());
+    let diffs = lines_diffs(old_read.content.as_str(), new_read.content.as_str());
 
-    Ok(DiffResponse {
+    Ok(LinesDiffResponse {
         old_charset: old_read.charset.to_owned(),
         new_charset: new_read.charset.to_owned(),
-        lines_diffs,
+        diffs,
     })
 }
 
