@@ -11,6 +11,7 @@
     uiFontSizeScale,
   } from '../../stores/settings/theme.svelte'
   import AppHeader from './main/AppHeader.svelte'
+  import AppBody from './main/AppBody.svelte'
 
   onMount(async () => {
     await _setPathSeparator()
@@ -29,6 +30,9 @@
   <main>
     <div class="app-header">
       <AppHeader />
+    </div>
+    <div class="app-body">
+      <AppBody />
     </div>
   </main>
 </div>

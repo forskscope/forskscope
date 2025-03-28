@@ -18,11 +18,14 @@
   import { openFileDialog, saveFileDialog } from '../../utils/dialog.svelte'
   import { onMount } from 'svelte'
   import { errorToast } from '../../stores/Toast.svelte'
+  import { activeTabIndex, compareSets } from '../../stores/tabs.svelte'
 
-  const { compareSet, close }: { compareSet: CompareSet; close: () => void } = $props()
-
-  let oldFilepath: string = $state(compareSet.old.filepath)
-  let newFilepath: string = $state(compareSet.new.filepath)
+  // todo
+  let compareSet: CompareSet | null = $state(null)
+  // todo
+  let oldFilepath: string | null = $state(null)
+  // todo
+  let newFilepath: string | null = $state(null)
 
   let oldCharset: string = $state('')
   let newCharset: string = $state('')
@@ -37,6 +40,10 @@
   let diffPanes: HTMLDivElement
 
   onMount(async () => {
+    compareSet = $compareSets[$activeTabIndex - 1] // todo remove - 1
+    oldFilepath = compareSet.old.filepath
+    newFilepath = compareSet.new.filepath
+
     await diff()
     diffPanes.focus()
   })
@@ -67,7 +74,7 @@
   })
 
   const charsDiffsAvailable: boolean = $derived(
-    !compareSet.old.binaryComparisonOnly && !compareSet.new.binaryComparisonOnly
+    !compareSet!.old.binaryComparisonOnly && !compareSet!.new.binaryComparisonOnly
   )
 
   const isCompletelyEqual: boolean = $derived(!linesDiffs.some((x) => x.diffKind !== 'equal'))
@@ -137,7 +144,7 @@
   }
 
   const saveAsOnClick = async () => {
-    const filepath = await saveFileDialog(newFilepath).catch((error: unknown) => {
+    const filepath = await saveFileDialog(newFilepath!).catch((error: unknown) => {
       console.error(error)
       return
     })
@@ -219,7 +226,7 @@
       <div class="row header">
         <div class="col diff old">
           <DiffHeaderCol
-            filepath={oldFilepath}
+            filepath={oldFilepath!}
             filepathFromDialogOnClick={async () => changeFilepath('old')}
           />
         </div>
@@ -233,7 +240,7 @@
         </div>
         <div class="col diff new">
           <DiffHeaderCol
-            filepath={newFilepath}
+            filepath={newFilepath!}
             filepathFromDialogOnClick={async () => changeFilepath('new')}
           />
         </div>

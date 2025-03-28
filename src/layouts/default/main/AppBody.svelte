@@ -2,20 +2,11 @@
   import type { CompareSet } from '../../../types'
   import Diff from '../../../components/diff/Diff.svelte'
   import Explorer from '../../../components/explorer/Explorer.svelte'
-
-  const {
-    compareSet,
-    compareSetOnSelected,
-    removeDiffTab,
-  }: {
-    compareSet: CompareSet | undefined
-    compareSetOnSelected: (compareSet: CompareSet) => void
-    removeDiffTab: () => void
-  } = $props()
+  import { activeTabIndex, EXPLORER_TAB_INDEX } from '../../../stores/tabs.svelte'
 </script>
 
-{#if !compareSet}
-  <Explorer {compareSetOnSelected} />
+{#if $activeTabIndex === EXPLORER_TAB_INDEX}
+  <Explorer />
 {:else}
-  <Diff {compareSet} close={removeDiffTab} />
+  <Diff />
 {/if}

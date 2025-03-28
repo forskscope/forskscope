@@ -3,7 +3,7 @@
   import AppBody from '../../layouts/default/main/AppBody.svelte'
   import SelectFiles from './SelectFiles.svelte'
   import { PATH_SEPARATOR } from '../../stores/file.svelte'
-  import { activeTabIndex, compareSets } from '../../stores/tabs.svelte'
+  import { activeTabIndex, compareSets, spliceCompareSet } from '../../stores/tabs.svelte'
 
   const DEFAULT_ACTIVE_TAB_INDEX: number = 0
   const MIN_TABS_COUNT: number = 2
@@ -60,7 +60,7 @@
     if (tabIndex === $activeTabIndex) {
       $activeTabIndex -= 1
     }
-    $compareSets.splice(tabIndex - 1, 1)
+    spliceCompareSet(tabIndex - 1) // todo remove -1
     if ($compareSets.length == MIN_TABS_COUNT) {
       $activeTabIndex = DEFAULT_ACTIVE_TAB_INDEX
     }
@@ -91,18 +91,6 @@
         >
       {/if}
     </label>
-  {/each}
-</div>
-
-<div class="active-tab">
-  {#each tabControls as tabControl, tabIndex}
-    <div class={tabIndex === $activeTabIndex ? '' : 'd-none'}>
-      <AppBody
-        compareSet={tabControl.compareSet}
-        {compareSetOnSelected}
-        removeDiffTab={() => removeDiffTab(tabIndex)}
-      />
-    </div>
   {/each}
 </div>
 
@@ -166,12 +154,5 @@
     margin: 0;
     font-size: 0.72rem;
     border-radius: 0.3rem;
-  }
-
-  .active-tab {
-    height: calc(100vh - 1rem);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
   }
 </style>
