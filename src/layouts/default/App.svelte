@@ -63,5 +63,6 @@
   }
   .app-body {
     flex: 1;
+    display: flex;
   }
 </style>

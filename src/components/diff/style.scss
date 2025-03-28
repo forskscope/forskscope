@@ -1,0 +1,64 @@
+.diff-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.diff-body {
+    // setting `0` at flex-basis instead of `auto` 
+    // is necessary to show diff-pane scroll bar
+    flex: 1 1 0;
+    // necessary for horizontal scroll bar
+    width: 100vw;
+    display: flex;
+    overflow: hidden;
+}
+
+.diff-content {
+    min-height: 0;
+    flex: 1 1 0;
+    overflow: auto;
+}
+
+.divider {
+    width: 2.4rem;
+}
+
+.diff-header,
+.diff-footer {
+    height: 1.8rem;
+}
+
+.diff-header,
+.diff-header .old-or-new,
+.diff-footer {
+    display: flex;
+}
+
+.diff-header .old-or-new,
+.diff-header .filepath,
+.diff-footer .old-or-new {
+    flex: 1;
+}
+
+.diff-header .filepath {
+    // todo: split into divs to emphasize filename
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.diff-header button {
+    width: 2.2rem;
+    padding: 0.1rem;
+}
+
+@media (max-width: 50.0rem) {
+    .diff-header {
+        height: 3.6rem;
+        flex-direction: column;
+    }
+
+    .diff-body {
+        flex-direction: column;
+    }
+}
