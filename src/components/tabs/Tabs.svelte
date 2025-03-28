@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CompareSet } from '../../types'
-  import Tab from './Tab.svelte'
+  import AppBody from '../../layouts/default/main/AppBody.svelte'
   import SelectFiles from './SelectFiles.svelte'
   import { PATH_SEPARATOR } from '../../stores/file.svelte'
 
@@ -99,7 +99,7 @@
 <div class="active-tab">
   {#each tabControls as tabControl, tabIndex}
     <div class={tabIndex === activeTabIndex ? '' : 'd-none'}>
-      <Tab
+      <AppBody
         compareSet={tabControl.compareSet}
         {compareSetOnSelected}
         removeDiffTab={() => removeDiffTab(tabIndex)}
