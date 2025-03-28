@@ -2,8 +2,13 @@
   import {
     APP_DEFAULT_LANGUAGE,
     APP_DIFF_FONT_FAMILIES,
+    APP_MAX_DIFF_FONT_SIZE,
+    APP_MAX_UI_FONT_SCALE_SIZE,
+    APP_MIN_DIFF_FONT_SIZE,
+    APP_MIN_UI_FONT_SCALE_SIZE,
     APP_THEMES,
     APP_UI_FONT_FAMILIES,
+    APP_UI_FONT_SCALE_SIZE_STEP,
   } from '../../consts'
   import {
     activeDiffFontFamily,
@@ -130,6 +135,8 @@
         <div>
           <input
             type="number"
+            min={APP_MIN_DIFF_FONT_SIZE}
+            max={APP_MAX_DIFF_FONT_SIZE}
             bind:value={$diffFontSize}
             onchange={() => {
               diffFontSizeOnChange($diffFontSize)
@@ -142,9 +149,9 @@
         <div>
           <input
             type="number"
-            step="0.05"
-            min="0.2"
-            max="1"
+            step={APP_UI_FONT_SCALE_SIZE_STEP}
+            min={APP_MIN_UI_FONT_SCALE_SIZE}
+            max={APP_MAX_UI_FONT_SCALE_SIZE}
             bind:value={$uiFontSizeScale}
             onchange={() => {
               uiFontSizeScaleOnChange($uiFontSizeScale)
