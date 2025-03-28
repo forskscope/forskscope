@@ -1,9 +1,15 @@
 <script lang="ts">
-  import type { CompareSet } from '../../types'
-  import AppBody from '../../layouts/default/main/AppBody.svelte'
-  import SelectFiles from './SelectFiles.svelte'
+  import { createCompareSetItem, type CompareSet, type CompareSetItem } from '../../types'
   import { PATH_SEPARATOR } from '../../stores/file.svelte'
-  import { activeTabIndex, compareSets, spliceCompareSet } from '../../stores/tabs.svelte'
+  import {
+    activeTabIndex,
+    compareSets,
+    pushCompareSet,
+    spliceCompareSet,
+  } from '../../stores/tabs.svelte'
+  import { openFileDialog, openMultipleFilesDialog } from '../../utils/dialog.svelte'
+  import { invoke } from '@tauri-apps/api/core'
+  import { binaryComparisonOnly } from '../../utils/diff.svelte'
 
   const DEFAULT_ACTIVE_TAB_INDEX: number = 0
   const MIN_TABS_COUNT: number = 2
@@ -15,8 +21,6 @@
     buttonLabel?: string
     buttonOnClick?: Function
   }
-
-  let showsFileHandle: boolean = $state(false)
 
   const tabControls = $derived([
     { label: '💻️', className: 'explorer' } as TabControl,
@@ -44,17 +48,29 @@
     {
       className: 'add-diff-tab',
       buttonLabel: '➕️',
-      buttonOnClick: () => {
-        showsFileHandle = !showsFileHandle
+      buttonOnClick: async () => {
+        const filepaths = await openMultipleFilesDialog()
+        if (filepaths === null || filepaths.length === 0) return
+
+        const oldFilepath = filepaths[0]
+        const oldBinaryComparisonOnly = await binaryComparisonOnly(oldFilepath)
+        const oldCompareSetItem = {
+          filepath: oldFilepath,
+          binaryComparisonOnly: oldBinaryComparisonOnly,
+        } as CompareSetItem
+
+        let newCompareSetItem: CompareSetItem = createCompareSetItem()
+        if (1 < filepaths.length) {
+          const newFilepath = filepaths[1]
+          newCompareSetItem.filepath = newFilepath
+          newCompareSetItem.binaryComparisonOnly = await binaryComparisonOnly(newFilepath)
+        }
+
+        const compareSet = { old: oldCompareSetItem, new: newCompareSetItem } as CompareSet
+        pushCompareSet(compareSet)
       },
     } as TabControl,
   ])
-
-  const compareSetOnSelected = async (compareSet: CompareSet) => {
-    $compareSets.push(compareSet)
-    $activeTabIndex = $compareSets.length
-    showsFileHandle = false
-  }
 
   const removeDiffTab = (tabIndex: number) => {
     if (tabIndex === $activeTabIndex) {
@@ -64,10 +80,6 @@
     if ($compareSets.length == MIN_TABS_COUNT) {
       $activeTabIndex = DEFAULT_ACTIVE_TAB_INDEX
     }
-  }
-
-  const closeSelectFiles = () => {
-    showsFileHandle = false
   }
 </script>
 
@@ -93,10 +105,6 @@
     </label>
   {/each}
 </div>
-
-{#key showsFileHandle}
-  <SelectFiles {showsFileHandle} {compareSetOnSelected} {closeSelectFiles} />
-{/key}
 
 <style>
   .tab-headers {

@@ -12,6 +12,7 @@
   } from '../../stores/settings/theme.svelte'
   import AppHeader from './main/AppHeader.svelte'
   import AppBody from './main/AppBody.svelte'
+  import AppFooter from './main/AppFooter.svelte'
 
   onMount(async () => {
     await _setPathSeparator()
@@ -33,6 +34,9 @@
     </div>
     <div class="app-body">
       <AppBody />
+    </div>
+    <div class="app-footer">
+      <AppFooter />
     </div>
   </main>
 </div>

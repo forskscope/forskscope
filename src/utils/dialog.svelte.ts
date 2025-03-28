@@ -15,6 +15,21 @@ export const openFileDialog = async (defaultPath?: string): Promise<string | nul
     return filepath
 }
 
+export const openMultipleFilesDialog = async (defaultPath?: string): Promise<string[] | null> => {
+    const filepaths: string[] | null = await tauriDialogOpen({
+        defaultPath,
+        directory: false,
+        multiple: true,
+        filters: [
+            {
+                name: 'All files',
+                extensions: ['*'],
+            },
+        ],
+    })
+    return filepaths
+}
+
 export const openDirectoryDialog = async (defaultPath?: string): Promise<string | null> => {
     const dirpath: string | null = await tauriDialogOpen({
         defaultPath,

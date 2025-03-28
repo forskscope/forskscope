@@ -49,6 +49,13 @@ export interface CompareSetItem {
     binaryComparisonOnly: boolean,
 }
 
+export function createCompareSetItem(): CompareSetItem {
+    return {
+        filepath: "",
+        binaryComparisonOnly: false
+    } as CompareSetItem
+}
+
 export interface ListDirReponse {
     currentDir: string,
     dirs: string[],
