@@ -3,6 +3,7 @@
   import AppBody from '../../layouts/default/main/AppBody.svelte'
   import SelectFiles from './SelectFiles.svelte'
   import { PATH_SEPARATOR } from '../../stores/file.svelte'
+  import { activeTabIndex } from '../../stores/tabs.svelte'
 
   const DEFAULT_ACTIVE_TAB_INDEX: number = 0
   const MIN_TABS_COUNT: number = 2
@@ -16,7 +17,6 @@
   }
 
   let compareSets: CompareSet[] = $state([])
-  let activeTabIndex: number = $state(DEFAULT_ACTIVE_TAB_INDEX)
 
   let showsFileHandle: boolean = $state(false)
 
@@ -54,17 +54,17 @@
 
   const compareSetOnSelected = async (compareSet: CompareSet) => {
     compareSets.push(compareSet)
-    activeTabIndex = compareSets.length
+    $activeTabIndex = compareSets.length
     showsFileHandle = false
   }
 
   const removeDiffTab = (tabIndex: number) => {
-    if (tabIndex === activeTabIndex) {
-      activeTabIndex -= 1
+    if (tabIndex === $activeTabIndex) {
+      $activeTabIndex -= 1
     }
     compareSets.splice(tabIndex - 1, 1)
     if (compareSets.length == MIN_TABS_COUNT) {
-      activeTabIndex = DEFAULT_ACTIVE_TAB_INDEX
+      $activeTabIndex = DEFAULT_ACTIVE_TAB_INDEX
     }
   }
 
@@ -76,12 +76,12 @@
 <div class="tab-headers">
   {#each tabControls as tabControl, tabIndex}
     <label
-      class={`tab-header ${tabControl.className} ${tabIndex === activeTabIndex ? 'active' : ''}`}
+      class={`tab-header ${tabControl.className} ${tabIndex === $activeTabIndex ? 'active' : ''}`}
     >
       <input
         type="radio"
         value={tabIndex}
-        bind:group={activeTabIndex}
+        bind:group={$activeTabIndex}
         disabled={!tabControl.label}
       />
       <span>{tabControl.label}</span>
@@ -98,7 +98,7 @@
 
 <div class="active-tab">
   {#each tabControls as tabControl, tabIndex}
-    <div class={tabIndex === activeTabIndex ? '' : 'd-none'}>
+    <div class={tabIndex === $activeTabIndex ? '' : 'd-none'}>
       <AppBody
         compareSet={tabControl.compareSet}
         {compareSetOnSelected}
