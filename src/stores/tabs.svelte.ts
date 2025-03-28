@@ -1,5 +1,6 @@
 import { get, writable, type Writable } from "svelte/store";
 import type { CompareSet } from "../types";
+import { binaryComparisonOnly } from "../utils/diff.svelte";
 
 let activeCompareSetIndex: number | null = $state(null)
 
@@ -25,6 +26,19 @@ export const spliceCompareSet = (index: number) => {
     if (!activeCompareSetIndexIsPreserved) {
         activeCompareSetIndex! -= 1
     }
+}
+
+export const getActiveCompareSet = (): CompareSet | null => {
+    if (activeCompareSetIndex === null) return null
+    return get(compareSets)[activeCompareSetIndex]
+}
+
+export const updateActiveCompareSet = async (oldFilepath: string, newFilepath: string) => {
+    const activeCompareSet = getActiveCompareSet()!
+    activeCompareSet.old.filepath = oldFilepath
+    activeCompareSet.old.binaryComparisonOnly = await binaryComparisonOnly(oldFilepath)
+    activeCompareSet.new.filepath = newFilepath
+    activeCompareSet.new.binaryComparisonOnly = await binaryComparisonOnly(newFilepath)
 }
 
 export const isActiveCompareSetIndex = (index: number | null): boolean => {
