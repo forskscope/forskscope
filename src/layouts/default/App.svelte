@@ -1,7 +1,6 @@
 <script lang="ts">
   import Header from './includes/Header.svelte'
   import Toast from '../../components/common/Toast.svelte'
-  import Tabs from '../../components/tabs/Tabs.svelte'
   import { onMount } from 'svelte'
   import { _setPathSeparator } from '../../stores/file.svelte'
   import {
@@ -11,6 +10,7 @@
     diffFontSize,
     uiFontSizeScale,
   } from '../../stores/settings/theme.svelte'
+  import AppHeader from './main/AppHeader.svelte'
 
   onMount(async () => {
     await _setPathSeparator()
@@ -27,6 +27,8 @@
     <Header />
   </header>
   <main>
-    <Tabs />
+    <div class="app-header">
+      <AppHeader />
+    </div>
   </main>
 </div>
