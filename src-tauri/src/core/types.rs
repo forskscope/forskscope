@@ -74,7 +74,7 @@ pub struct FileAttr {
     pub binary_comparison_only: bool,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct ReadContent {
     pub charset: String,
     pub content: String,
