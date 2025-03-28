@@ -3,7 +3,7 @@
   import AppBody from '../../layouts/default/main/AppBody.svelte'
   import SelectFiles from './SelectFiles.svelte'
   import { PATH_SEPARATOR } from '../../stores/file.svelte'
-  import { activeTabIndex } from '../../stores/tabs.svelte'
+  import { activeTabIndex, compareSets } from '../../stores/tabs.svelte'
 
   const DEFAULT_ACTIVE_TAB_INDEX: number = 0
   const MIN_TABS_COUNT: number = 2
@@ -16,13 +16,11 @@
     buttonOnClick?: Function
   }
 
-  let compareSets: CompareSet[] = $state([])
-
   let showsFileHandle: boolean = $state(false)
 
   const tabControls = $derived([
     { label: '💻️', className: 'explorer' } as TabControl,
-    ...compareSets.map((x, i) => {
+    ...$compareSets.map((x, i) => {
       const label = x!.new.filepath.split(PATH_SEPARATOR!)[
         x!.new.filepath.split(PATH_SEPARATOR!).length - 1
       ]
@@ -53,8 +51,8 @@
   ])
 
   const compareSetOnSelected = async (compareSet: CompareSet) => {
-    compareSets.push(compareSet)
-    $activeTabIndex = compareSets.length
+    $compareSets.push(compareSet)
+    $activeTabIndex = $compareSets.length
     showsFileHandle = false
   }
 
@@ -62,8 +60,8 @@
     if (tabIndex === $activeTabIndex) {
       $activeTabIndex -= 1
     }
-    compareSets.splice(tabIndex - 1, 1)
-    if (compareSets.length == MIN_TABS_COUNT) {
+    $compareSets.splice(tabIndex - 1, 1)
+    if ($compareSets.length == MIN_TABS_COUNT) {
       $activeTabIndex = DEFAULT_ACTIVE_TAB_INDEX
     }
   }
