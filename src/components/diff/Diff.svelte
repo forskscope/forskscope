@@ -18,7 +18,7 @@
   import { openFileDialog, saveFileDialog } from '../../utils/dialog.svelte'
   import { onMount } from 'svelte'
   import { errorToast } from '../../stores/Toast.svelte'
-  import { activeCompareSet } from '../../stores/tabs.svelte'
+  import { activeCompareSet, removeActiveCompareSet } from '../../stores/tabs.svelte'
 
   // todo
   let compareSet: CompareSet | null = $state(null)
@@ -94,8 +94,7 @@
       isError = true
     })
     if (isError) {
-      close()
-      return
+      removeActiveCompareSet()
     }
 
     console.log(res) // todo
@@ -202,7 +201,7 @@
     switch (e.key) {
       case 'w': {
         if (e.ctrlKey) {
-          close()
+          removeActiveCompareSet()
         }
       }
       case 'F7': {

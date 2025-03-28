@@ -5,11 +5,6 @@ let activeCompareSetIndex: number | null = $state(null)
 
 export const compareSets: Writable<CompareSet[]> = writable([])
 
-export const activeCompareSet = (): CompareSet | null => {
-    if (activeCompareSetIndex === null) return null
-    return get(compareSets)[activeCompareSetIndex!]
-}
-
 export const pushCompareSet = (compareSet: CompareSet) => {
     compareSets.update((x) => { x.push(compareSet); return x })
     activeCompareSetIndex = get(compareSets).length - 1
@@ -17,16 +12,40 @@ export const pushCompareSet = (compareSet: CompareSet) => {
 
 export const spliceCompareSet = (index: number) => {
     compareSets.update((x) => { x.splice(index, 1); return x })
+
     if (get(compareSets).length === 0) {
         activeCompareSetIndex = null
+        return
     }
-    else if (activeCompareSetIndex === index) {
-        activeCompareSetIndex = activeCompareSetIndex! - 1
+
+    const activeCompareSetIndexIsPreserved =
+        activeCompareSetIndex === null ||
+        activeCompareSetIndex === 0 ||
+        activeCompareSetIndex < index
+    if (!activeCompareSetIndexIsPreserved) {
+        activeCompareSetIndex! -= 1
     }
+}
+
+export const activeCompareSet = (): CompareSet | null => {
+    if (activeCompareSetIndex === null) return null
+    return get(compareSets)[activeCompareSetIndex]
 }
 
 export const activateCompareSet = (index: number) => {
     activeCompareSetIndex = index
+}
+
+export const removeActiveCompareSet = () => {
+    if (activeCompareSetIndex === null) return
+
+    spliceCompareSet(activeCompareSetIndex)
+    if (activeCompareSetIndex !== null) {
+        // ask svelte to update view
+        const i = activeCompareSetIndex
+        activeCompareSetIndex = null
+        activeCompareSetIndex = i
+    }
 }
 
 export const activateExplorer = () => {
