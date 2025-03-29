@@ -45,8 +45,8 @@ export const updateCompareSet = async (index: number, oldFilepath: string, newFi
     return _compareSet
 }
 
-export const isActiveCompareSetIndex = (index: number | null): boolean => {
-    return index === activeCompareSetIndex
+export const isActiveCompareSet = (index: number | null): boolean => {
+    return index !== null && index === activeCompareSetIndex
 }
 
 export const activateCompareSet = (index: number) => {
@@ -66,10 +66,6 @@ export const removeCompareSet = (index: number) => {
 
 export const activateExplorer = () => {
     activeCompareSetIndex = null
-}
-
-export const isActiveCompareSet = (index: number | null) => {
-    return index !== null && index === activeCompareSetIndex
 }
 
 export const exploreIsActive = (): boolean => {

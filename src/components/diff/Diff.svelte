@@ -10,7 +10,7 @@
   import type { BackendCommandResult } from '../../types/backend.svelte'
   import {
     getCompareSet,
-    isActiveCompareSetIndex,
+    isActiveCompareSet,
     removeCompareSet,
     updateCompareSet,
   } from '../../stores/compareSets.svelte'
@@ -47,7 +47,7 @@
     return linesDiffResponse.diffs.findLastIndex((x) => x.diffKind !== 'equal')
   })
 
-  const visible: boolean = $derived(isActiveCompareSetIndex(compareSetIndex))
+  const visible: boolean = $derived(isActiveCompareSet(compareSetIndex))
 
   const mergeHistory: MergeHistoryItem[] = $state([])
 
