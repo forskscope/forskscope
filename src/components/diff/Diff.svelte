@@ -9,13 +9,11 @@
   } from '../../types'
   import { removeActiveCompareSet } from '../../stores/tabs.svelte'
   import View from '../../layouts/default/view/View.svelte'
-  import DiffOldHeader from './includes/header/DiffOldHeader.svelte'
-  import DiffHeaderDivider from './includes/header/DiffHeaderDivider.svelte'
-  import DiffNewHeader from './includes/header/DiffNewHeader.svelte'
+  import DiffHeaderDivider from './includes/DiffHeaderDivider.svelte'
   import DiffContent from './content/DiffContent.svelte'
-  import DiffOldFooter from './includes/footer/DiffOldFooter.svelte'
-  import DiffFooterDivider from './includes/footer/DiffFooterDivider.svelte'
-  import DiffNewFooter from './includes/footer/DiffNewFooter.svelte'
+  import DiffFooterDivider from './includes/DiffFooterDivider.svelte'
+  import DiffHeader from './includes/DiffHeader.svelte'
+  import DiffFooter from './includes/DiffFooter.svelte'
 
   const { compareSet, visible }: { compareSet: CompareSet; visible: boolean } = $props()
 
@@ -65,12 +63,12 @@
 
 {#if linesDiffResponse !== null}
   <View {visible} scrollSyncs={true}>
-    {#snippet leftHeader()}<DiffOldHeader />{/snippet}
+    {#snippet leftHeader()}<DiffHeader oldOrNew="old" {compareSet} />{/snippet}
     {#snippet headerDivider()}
       <!-- todo: <DiffHeaderDivider /> -->
       <button onclick={diffChars}>chars</button>
     {/snippet}
-    {#snippet rightHeader()}<DiffNewHeader />{/snippet}
+    {#snippet rightHeader()}<DiffHeader oldOrNew="new" {compareSet} />{/snippet}
     {#snippet leftContent()}
       <DiffContent
         oldOrNew="old"
@@ -90,9 +88,9 @@
         {focusedLinesDiffIndex}
       />
     {/snippet}
-    {#snippet leftFooter()}<DiffOldFooter linesDiffResponse={linesDiffResponse!} />{/snippet}
+    {#snippet leftFooter()}<DiffFooter oldOrNew="old" {linesDiffResponse} />{/snippet}
     {#snippet footerDivider()}<DiffFooterDivider />{/snippet}
-    {#snippet rightFooter()}<DiffNewFooter linesDiffResponse={linesDiffResponse!} />{/snippet}
+    {#snippet rightFooter()}<DiffFooter oldOrNew="new" {linesDiffResponse} />{/snippet}
   </View>
 {:else}
   <!-- todo: loading -->
