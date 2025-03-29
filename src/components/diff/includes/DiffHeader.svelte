@@ -1,6 +1,5 @@
 <script lang="ts">
   import { T } from '../../../stores/settings/translation.svelte'
-  import { getActiveCompareSet, updateActiveCompareSet } from '../../../stores/tabs.svelte'
   import { openFileDialog } from '../../../utils/dialog.svelte'
   import Tooltip from '../../common/Tooltip.svelte'
   import type { CompareSet, OldOrNew } from '../../../types'
@@ -8,9 +7,11 @@
   const {
     oldOrNew,
     compareSet,
+    filepathOnChange,
   }: {
     oldOrNew: OldOrNew
     compareSet: CompareSet
+    filepathOnChange: (oldOrNew: OldOrNew, filepath: string) => void
   } = $props()
 
   const filepath: string = $derived(
@@ -24,15 +25,7 @@
   const filepathOnClick = async () => {
     const filepath = await openFileDialog()
     if (filepath === null) return
-
-    const compareSet = getActiveCompareSet()!
-    if (oldOrNew === 'old') {
-      const _oldFilepath = filepath
-      await updateActiveCompareSet(_oldFilepath, compareSet.new.filepath)
-    } else {
-      const _newFilepath = filepath
-      await updateActiveCompareSet(compareSet.old.filepath, _newFilepath)
-    }
+    filepathOnChange(oldOrNew, filepath)
   }
 </script>
 

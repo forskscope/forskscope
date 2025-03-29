@@ -28,17 +28,21 @@ export const spliceCompareSet = (index: number) => {
     }
 }
 
-export const getActiveCompareSet = (): CompareSet | null => {
-    if (activeCompareSetIndex === null) return null
-    return get(compareSets)[activeCompareSetIndex]
+export const getCompareSet = (index: number): CompareSet => {
+    return get(compareSets)[index]
 }
 
-export const updateActiveCompareSet = async (oldFilepath: string, newFilepath: string) => {
-    const activeCompareSet = getActiveCompareSet()!
-    activeCompareSet.old.filepath = oldFilepath
-    activeCompareSet.old.binaryComparisonOnly = await binaryComparisonOnly(oldFilepath)
-    activeCompareSet.new.filepath = newFilepath
-    activeCompareSet.new.binaryComparisonOnly = await binaryComparisonOnly(newFilepath)
+export const updateCompareSet = async (index: number, oldFilepath: string, newFilepath: string): Promise<CompareSet> => {
+    const oldBinaryComparisonOnly = await binaryComparisonOnly(oldFilepath)
+    const newBinaryComparisonOnly = await binaryComparisonOnly(newFilepath)
+
+    const _compareSet = getCompareSet(index)!
+    _compareSet.old.filepath = oldFilepath
+    _compareSet.old.binaryComparisonOnly = oldBinaryComparisonOnly
+    _compareSet.new.filepath = newFilepath
+    _compareSet.new.binaryComparisonOnly = newBinaryComparisonOnly
+
+    return _compareSet
 }
 
 export const isActiveCompareSetIndex = (index: number | null): boolean => {
@@ -49,10 +53,9 @@ export const activateCompareSet = (index: number) => {
     activeCompareSetIndex = index
 }
 
-export const removeActiveCompareSet = () => {
-    if (activeCompareSetIndex === null) return
+export const removeCompareSet = (index: number) => {
+    spliceCompareSet(index)
 
-    spliceCompareSet(activeCompareSetIndex)
     if (activeCompareSetIndex !== null) {
         // ask svelte to update view
         const i = activeCompareSetIndex

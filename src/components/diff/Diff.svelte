@@ -6,8 +6,14 @@
     CharsDiffResponse,
     CompareSet,
     LinesDiffResponse,
+    OldOrNew,
   } from '../../types'
-  import { removeActiveCompareSet } from '../../stores/tabs.svelte'
+  import {
+    getCompareSet,
+    isActiveCompareSetIndex,
+    removeCompareSet,
+    updateCompareSet,
+  } from '../../stores/compareSets.svelte'
   import View from '../../layouts/default/view/View.svelte'
   import DiffHeaderDivider from './includes/DiffHeaderDivider.svelte'
   import DiffContent from './content/DiffContent.svelte'
@@ -15,7 +21,9 @@
   import DiffHeader from './includes/DiffHeader.svelte'
   import DiffFooter from './includes/DiffFooter.svelte'
 
-  const { compareSet, visible }: { compareSet: CompareSet; visible: boolean } = $props()
+  const { compareSetIndex }: { compareSetIndex: number } = $props()
+
+  let compareSet: CompareSet = $state(getCompareSet(compareSetIndex))
 
   let linesDiffResponse: LinesDiffResponse | null = $state(null)
   let charsDiffResponse: CharsDiffResponse | null = $state(null)
@@ -27,6 +35,8 @@
   const oldFilepath: string = $derived(compareSet.old.filepath)
   const newFilepath: string = $derived(compareSet.new.filepath)
 
+  const visible: boolean = $derived(isActiveCompareSetIndex(compareSetIndex))
+
   onMount(async () => {
     await diffLines()
   })
@@ -37,13 +47,12 @@
       new: newFilepath,
     })
     if (res.isError) {
-      removeActiveCompareSet()
+      removeCompareSet(compareSetIndex)
       return
     }
 
+    reset()
     linesDiffResponse = res.response as LinesDiffResponse
-
-    focusedLinesDiffIndex = null
   }
 
   const diffChars = async () => {
@@ -59,16 +68,36 @@
     // todo: move to another ui
     showsCharsDiffs = true
   }
+
+  const filepathOnChange = async (oldOrNew: OldOrNew, filepath: string) => {
+    if (oldOrNew === 'old') {
+      const _oldFilepath = filepath
+      compareSet = await updateCompareSet(compareSetIndex, _oldFilepath, compareSet.new.filepath)
+    } else {
+      const _newFilepath = filepath
+      compareSet = await updateCompareSet(compareSetIndex, compareSet.old.filepath, _newFilepath)
+    }
+
+    await diffLines()
+  }
+
+  const reset = () => {
+    linesDiffResponse = null
+    charsDiffResponse = null
+
+    focusedLinesDiffIndex = null
+    showsCharsDiffs = false
+  }
 </script>
 
 {#if linesDiffResponse !== null}
   <View {visible} scrollSyncs={true}>
-    {#snippet leftHeader()}<DiffHeader oldOrNew="old" {compareSet} />{/snippet}
+    {#snippet leftHeader()}<DiffHeader oldOrNew="old" {compareSet} {filepathOnChange} />{/snippet}
     {#snippet headerDivider()}
       <!-- todo: <DiffHeaderDivider /> -->
       <button onclick={diffChars}>chars</button>
     {/snippet}
-    {#snippet rightHeader()}<DiffHeader oldOrNew="new" {compareSet} />{/snippet}
+    {#snippet rightHeader()}<DiffHeader oldOrNew="new" {compareSet} {filepathOnChange} />{/snippet}
     {#snippet leftContent()}
       <DiffContent
         oldOrNew="old"

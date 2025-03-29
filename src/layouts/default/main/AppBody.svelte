@@ -5,7 +5,7 @@
     compareSets,
     exploreIsActive,
     isActiveCompareSetIndex,
-  } from '../../../stores/tabs.svelte'
+  } from '../../../stores/compareSets.svelte'
 </script>
 
 <!-- views -->
@@ -15,6 +15,6 @@
   <Explorer />
 </div>
 
-{#each $compareSets as compareSet, i}
-  <Diff {compareSet} visible={isActiveCompareSetIndex(i)} />
+{#each $compareSets as _, i}
+  <Diff compareSetIndex={i} />
 {/each}

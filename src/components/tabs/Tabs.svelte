@@ -6,7 +6,7 @@
     exploreIsActive,
     isActiveCompareSet,
     spliceCompareSet,
-  } from '../../stores/tabs.svelte'
+  } from '../../stores/compareSets.svelte'
   import { openMultipleFilesDialog } from '../../utils/dialog.svelte'
   import { filepathsToCompareSet } from '../../utils/diff.svelte'
 

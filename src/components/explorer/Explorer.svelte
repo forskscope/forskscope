@@ -8,7 +8,7 @@
   import { BINARY_MODE_COMPARE_BUTTON_LABEL, DEFAULT_COMPARE_BUTTON_LABEL } from '../../consts'
   import { pathJoin } from '../../utils/file.svelte'
   import { PATH_SEPARATOR } from '../../stores/file.svelte'
-  import { pushCompareSet } from '../../stores/tabs.svelte'
+  import { pushCompareSet } from '../../stores/compareSets.svelte'
 
   interface ExplorePane {
     oldOrNew: OldOrNew
