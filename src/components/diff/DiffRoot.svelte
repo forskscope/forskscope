@@ -1,12 +1,16 @@
 <script lang="ts">
   import DiffBody from './main/DiffBody.svelte'
-  import DiffFooter from './includes/DiffFooter.svelte'
-  import DiffHeader from './includes/DiffHeader.svelte'
-  import './style.scss'
   import { onMount } from 'svelte'
   import { invokeWithGuard } from '../../utils/backend.svelte'
   import type { BackendCommandResult, CompareSet, LinesDiffResponse } from '../../types'
   import { removeActiveCompareSet } from '../../stores/tabs.svelte'
+  import View from '../../layouts/default/view/View.svelte'
+  import DiffOldHeader from './includes/header/DiffOldHeader.svelte'
+  import DiffNewHeader from './includes/header/DiffNewHeader.svelte'
+  import DiffHeaderDivider from './includes/header/DiffHeaderDivider.svelte'
+  import DiffOldFooter from './includes/footer/DiffOldFooter.svelte'
+  import DiffNewFooter from './includes/footer/DiffNewFooter.svelte'
+  import DiffFooterDivider from './includes/footer/DiffFooterDivider.svelte'
 
   const { compareSet, visible }: { compareSet: CompareSet; visible: boolean } = $props()
 
@@ -41,17 +45,21 @@
 </script>
 
 {#if linesDiffResponse !== null}
-  <div class={`diff-main ${visible ? '' : 'd-none'}`}>
-    <div class="diff-header">
-      <DiffHeader />
-    </div>
-    <div class="diff-body">
-      <DiffBody {linesDiffResponse} {showsCharsDiffs} {focusedLinesDiffIndex} />
-    </div>
-    <div class="diff-footer">
-      <DiffFooter {linesDiffResponse} />
-    </div>
-  </div>
+  <View {visible} syncsScroll={true}>
+    {#snippet leftHeader()}<DiffOldHeader />{/snippet}
+    {#snippet headerDivider()}<DiffHeaderDivider />{/snippet}
+    {#snippet rightHeader()}<DiffNewHeader />{/snippet}
+    {#snippet leftContent()}<div style="width: 110vw; height: 110vh;">
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      </div>{/snippet}
+    {#snippet contentDivider()}b{/snippet}
+    {#snippet rightContent()}<div style="width: 110vw; height: 110vh;">
+        cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+      </div>{/snippet}
+    {#snippet leftFooter()}<DiffOldFooter linesDiffResponse={linesDiffResponse!} />{/snippet}
+    {#snippet footerDivider()}<DiffFooterDivider />{/snippet}
+    {#snippet rightFooter()}<DiffNewFooter linesDiffResponse={linesDiffResponse!} />{/snippet}
+  </View>
 {:else}
   <!-- todo: loading -->
   (...... Loading ......)

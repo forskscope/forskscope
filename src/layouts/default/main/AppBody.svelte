@@ -9,6 +9,8 @@
   } from '../../../stores/tabs.svelte'
 </script>
 
+<!-- views -->
+
 <!-- preserve locations w/ d-none instead of {#if} -->
 <div class={`${exploreIsActive() ? '' : 'd-none'}`}>
   <Explorer />

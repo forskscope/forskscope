@@ -1,0 +1,56 @@
+.view-container,
+.view-header,
+.view-body,
+.view-footer,
+.content {
+    display: flex;
+    min-height: 0;
+    box-sizing: border-box;
+}
+
+.view-container {
+    flex-direction: column;
+}
+
+.view-container,
+.view-body,
+.content {
+    flex: 1;
+}
+
+.view-body,
+.view-body .content {
+    // setting `0` at flex-basis instead of `auto` 
+    // is necessary to show diff-pane scroll bar */
+    flex-basis: 0;
+}
+
+.view-body {
+    // necessary for horizontal scroll bar
+    width: 100vw;
+}
+
+.view-body .content {
+    overflow: scroll;
+}
+
+.view-header,
+.view-footer {
+    height: 1.6rem;
+}
+
+.divider {
+    width: 2.2rem;
+}
+
+// responsive
+@media (max-width: 50.0rem) {
+    .view-header {
+        height: 3.6rem;
+        flex-direction: column;
+    }
+
+    .view-body {
+        flex-direction: column;
+    }
+}
