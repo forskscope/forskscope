@@ -9,6 +9,16 @@
   import { pathJoin } from '../../utils/file.svelte'
   import { PATH_SEPARATOR } from '../../stores/file.svelte'
   import { pushCompareSet } from '../../stores/compareSets.svelte'
+  import {
+    ArrowLeft,
+    ArrowRight,
+    ArrowUp,
+    Check,
+    File,
+    Folder,
+    HardDrive,
+    TriangleAlert,
+  } from 'lucide-svelte'
 
   interface ExplorePane {
     oldOrNew: OldOrNew
@@ -243,12 +253,14 @@
     })
   }
 
+  const DIGEST_DIFF_EQUAL_CLASS: string = 'digest-equal'
+  const DIGEST_DIFF_DIFFERENT_CLASS: string = 'digest-different'
   const digestDiffClass = (name: string, isDir: boolean): string => {
     let found = isDir
       ? dirDigestDiffs.find((x) => x.name === name)
       : fileDigestDiffs.find((x) => x.name === name)
     if (found) {
-      return found.equal ? 'digest-equal' : 'digest-different'
+      return found.equal ? DIGEST_DIFF_EQUAL_CLASS : DIGEST_DIFF_DIFFERENT_CLASS
     }
     return ''
   }
@@ -265,16 +277,17 @@
           </h3>
           <div>
             <Tooltip position="top" messages={T('Select dir dialog')}>
-              <button class="select-dir" onclick={() => selectDir(pane.oldOrNew)}>⚓️</button>
+              <button class="select-dir" onclick={() => selectDir(pane.oldOrNew)}><Folder /></button
+              >
             </Tooltip>
             <Tooltip position="top" messages={T('Sync dir pos')}>
               <button class="sync-dir" onclick={() => syncDir(pane.oldOrNew)}
-                >{#if pane.oldOrNew === 'old'}→{:else}←{/if}</button
+                >{#if pane.oldOrNew === 'old'}<ArrowRight />{:else}<ArrowLeft />{/if}</button
               >
             </Tooltip>
             <Tooltip position="top" messages={T('Run file manager')}>
               <button class="file-manager" onclick={() => openWithFileManager(pane.oldOrNew)}
-                >📦️</button
+                ><HardDrive /></button
               >
             </Tooltip>
           </div>
@@ -297,7 +310,7 @@
                   changeDir('..', pane.listDirResponse!.currentDir, pane.oldOrNew)
                 }}
               >
-                ⇡ ..
+                <ArrowUp /> ..
               </div>
             {/if}
 
@@ -316,12 +329,23 @@
                 <div
                   role="button"
                   tabindex="0"
-                  class={`name ${digestDiffClass(dir, true)}`}
+                  class="name"
                   ondblclick={() => {
                     changeDir(dir, pane.listDirResponse!.currentDir, pane.oldOrNew)
                   }}
                 >
-                  {dir}
+                  <div class="digest">
+                    {#if digestDiffClass(dir, true) === DIGEST_DIFF_EQUAL_CLASS}
+                      <Check /><Folder />
+                    {:else if digestDiffClass(dir, true) === DIGEST_DIFF_DIFFERENT_CLASS}
+                      <TriangleAlert /><Folder />
+                    {:else}
+                      <Folder />
+                    {/if}
+                  </div>
+                  <div>
+                    {dir}
+                  </div>
                 </div>
                 <div></div>
                 <div></div>
@@ -355,7 +379,16 @@
                     filenameOnDblClick(file.name)
                   }}
                 >
-                  {file.name}
+                  <div class="digest">
+                    {#if digestDiffClass(file.name, false) === DIGEST_DIFF_EQUAL_CLASS}
+                      <Check /><File />
+                    {:else if digestDiffClass(file.name, false) === DIGEST_DIFF_DIFFERENT_CLASS}
+                      <TriangleAlert /><File />
+                    {:else}
+                      <File />
+                    {/if}
+                  </div>
+                  <div>{file.name}</div>
                 </div>
                 {#if file.humanReadableSize !== file.bytesSize}
                   <div>{file.humanReadableSize} ({file.bytesSize})</div>
@@ -493,6 +526,24 @@
     flex: 2;
   }
 
+  .dir > .name,
+  .file > .name {
+    display: inline-flex;
+  }
+
+  .dir .digest,
+  .file .digest {
+    width: 2.5em;
+    margin-right: 0.4rem;
+    display: inline-flex;
+    justify-content: flex-end;
+    gap: 0.2em;
+  }
+
+  .parent-dir {
+    padding-left: 1.4rem;
+  }
+
   .dirs-files .header > div {
     opacity: 0.57;
     font-size: 0.87rem;
@@ -525,34 +576,6 @@
   .dirs-files label input[type='radio']:checked + .name {
     border-bottom-width: 0.02rem;
     border-bottom-style: solid;
-  }
-
-  .dir .name::before,
-  .file .name::before {
-    width: 2.5em;
-    margin-right: 0.4rem;
-    display: inline-flex;
-    justify-content: flex-end;
-    gap: 0.2em;
-  }
-
-  .dir .name::before {
-    content: '📁';
-  }
-  .dir .name.digest-different::before {
-    content: '⚠📁';
-  }
-  .dir .name.digest-equal::before {
-    content: '✔📁';
-  }
-  .file .name::before {
-    content: '📜';
-  }
-  .file .name.digest-different::before {
-    content: '⚠📜';
-  }
-  .file .name.digest-equal::before {
-    content: '✔📜';
   }
 
   .file.binary-comparison-only {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { X } from 'lucide-svelte'
   import { T } from '../../../stores/settings/translation.svelte'
 
   const {
@@ -31,7 +32,7 @@
         class="close"
         onclick={() => {
           showsMenus = false
-        }}>✖️</button
+        }}><X /></button
       >
     </div>
     <div class="content">

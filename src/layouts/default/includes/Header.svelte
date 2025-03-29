@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Cog } from 'lucide-svelte'
   import Tooltip from '../../../components/common/Tooltip.svelte'
   import Settings from '../../../components/settings/Settings.svelte'
   import { T } from '../../../stores/settings/translation.svelte'
@@ -23,7 +24,7 @@
         onclick={() => {
           toggleSettings()
         }}
-        >⚙️
+        ><Cog />
       </button>
     </Tooltip>
   </div>

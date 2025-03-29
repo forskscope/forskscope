@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LaptopMinimal, Plus, X } from 'lucide-svelte'
   import {
     activateCompareSet,
     activateExplorer,
@@ -22,7 +23,7 @@
       class={`explorer ${exploreIsActive() ? 'active' : ''}`}
       onclick={() => activateExplorer()}
     >
-      <span>💻️</span>
+      <span><LaptopMinimal /></span>
     </button>
   </div>
   {#each $compareSets as compareSet, i}
@@ -35,12 +36,12 @@
           >{compareSet.new.filepath.split('/')[compareSet.new.filepath.split('/').length - 1]}</span
         >
       </button>
-      <button class="close" onclick={() => spliceCompareSet(i)}>✖️</button>
+      <button class="close" onclick={() => spliceCompareSet(i)}><X /></button>
     </div>
   {/each}
   <div class="tab">
     <button class="add" onclick={addButtonOnClick}>
-      <span>➕️</span>
+      <span><Plus /></span>
     </button>
   </div>
 </div>

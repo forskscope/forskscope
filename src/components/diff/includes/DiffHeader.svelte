@@ -3,6 +3,7 @@
   import { openFileDialog } from '../../../utils/dialog.svelte'
   import Tooltip from '../../common/Tooltip.svelte'
   import type { CompareSet, OldOrNew } from '../../../types'
+  import { FileInput } from 'lucide-svelte'
 
   const {
     oldOrNew,
@@ -35,7 +36,7 @@
     <div class="filename">{filename}</div>
   </h3>
   <Tooltip position="left" messages={T('Select file')}>
-    <button onclick={filepathOnClick}>⚓️</button>
+    <button onclick={filepathOnClick}><FileInput /></button>
   </Tooltip>
 </div>
 
