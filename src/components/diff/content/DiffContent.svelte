@@ -9,7 +9,7 @@
     LinesDiffResponse,
     OldOrNew,
   } from '../../../types'
-  import { DIFF_LINE_HEIGHT, LINES_DIFF_CLASS_PREFIX } from '../consts'
+  import { LINES_DIFF_CLASS_PREFIX } from '../consts'
 
   const {
     oldOrNew,

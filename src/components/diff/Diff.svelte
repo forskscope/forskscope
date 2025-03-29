@@ -131,6 +131,12 @@
       .querySelector(`.diff .content .new .focused`)!
       .scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'start' })
   }
+
+  const mergeOnClick = (index: number) => {
+    if (!linesDiffResponse) return
+    linesDiffResponse.diffs[index].newLines = linesDiffResponse.diffs[index].oldLines
+    linesDiffResponse.diffs[index].diffKind = 'equal'
+  }
 </script>
 
 {#if linesDiffResponse !== null}
@@ -155,7 +161,7 @@
       />
     {/snippet}
     {#snippet contentDivider()}
-      <DiffContentDivider {linesDiffResponse} {focusedLinesDiffIndex} />
+      <DiffContentDivider {linesDiffResponse} {focusedLinesDiffIndex} {mergeOnClick} />
     {/snippet}
     {#snippet rightContent()}
       <DiffContent

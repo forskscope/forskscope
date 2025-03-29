@@ -1,23 +1,21 @@
 <script lang="ts">
   import { ArrowRight } from 'lucide-svelte'
   import type { LinesDiff, LinesDiffResponse } from '../../../types'
-  import { DIFF_LINE_HEIGHT, LINES_DIFF_CLASS_PREFIX } from '../consts'
+  import { LINES_DIFF_CLASS_PREFIX } from '../consts'
 
   const {
     linesDiffResponse,
     focusedLinesDiffIndex,
+    mergeOnClick,
   }: {
     linesDiffResponse: LinesDiffResponse | null
     focusedLinesDiffIndex: number | null
+    mergeOnClick: (index: number) => void
   } = $props()
 
   const linesDiffs: LinesDiff[] = $derived(
     linesDiffResponse !== null ? linesDiffResponse.diffs : []
   )
-
-  const mergeOnClick = (i: number) => {
-    // todo
-  }
 </script>
 
 <div class="lines-diffs">
