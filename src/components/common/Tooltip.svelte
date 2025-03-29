@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { TooltipPosition } from '../../types/Tooltip.svelte'
 
-  let {
+  const {
     messages,
     position,
     children,

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { T } from '../../../stores/settings/translation.svelte'
 
-  let {
+  const {
     showsCharsDiffs,
     charsDiffsAvailable,
     switchOldNewAvailable,

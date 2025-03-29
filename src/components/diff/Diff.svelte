@@ -2,7 +2,7 @@
   import { invoke } from '@tauri-apps/api/core'
   import type {
     CompareSet,
-    DiffResponse,
+    LinesDiffResponse,
     LinesDiff,
     OldOrNew,
     CharsDiffLines,
@@ -103,8 +103,8 @@
 
     console.log(res) // todo
 
-    const diffResponse = res as DiffResponse
-    linesDiffs = diffResponse.linesDiffs
+    const diffResponse = res as LinesDiffResponse
+    linesDiffs = diffResponse.diffs
     oldCharset = diffResponse.oldCharset
     newCharset = diffResponse.newCharset
 

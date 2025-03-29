@@ -35,7 +35,7 @@
     valueSuffix: string
   }
 
-  let {
+  const {
     closeSettings,
   }: {
     closeSettings: () => void
