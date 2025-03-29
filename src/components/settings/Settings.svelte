@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Languages, X, Palette, GitCompare, Monitor } from 'lucide-svelte'
+  import { Languages, X, Palette } from 'lucide-svelte'
   import {
     APP_DEFAULT_LANGUAGE,
     APP_DIFF_FONT_FAMILIES,
@@ -24,7 +24,7 @@
     type AppLanguage,
     type AppTheme,
     type AppUiFontFamily,
-  } from '../../types'
+  } from '../../types/settings.svelte'
 
   interface Selector {
     icon?: ConstructorOfATypedSvelteComponent

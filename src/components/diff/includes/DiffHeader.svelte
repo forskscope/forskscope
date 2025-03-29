@@ -2,7 +2,7 @@
   import { T } from '../../../stores/settings/translation.svelte'
   import { openFileDialog } from '../../../utils/dialog.svelte'
   import Tooltip from '../../common/Tooltip.svelte'
-  import type { CompareSet, OldOrNew } from '../../../types'
+  import type { CompareSet, OldOrNew } from '../../../types/compareSets.svelte'
   import { FileInput } from 'lucide-svelte'
 
   const {

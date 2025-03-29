@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
   import { onMount } from 'svelte'
-  import type { CompareSet, CompareSetItem, ListDirReponse, OldOrNew } from '../../types'
+  import type { CompareSet, CompareSetItem, OldOrNew } from '../../types/compareSets.svelte'
   import { openDirectoryDialog } from '../../utils/dialog.svelte'
   import Tooltip from '../common/Tooltip.svelte'
   import { T } from '../../stores/settings/translation.svelte'
@@ -19,6 +19,7 @@
     HardDrive,
     TriangleAlert,
   } from 'lucide-svelte'
+  import type { ListDirReponse } from '../../types/file.svelte'
 
   interface ExplorePane {
     oldOrNew: OldOrNew

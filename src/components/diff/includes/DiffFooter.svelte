@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { LinesDiffResponse, OldOrNew } from '../../../types'
+  import type { OldOrNew } from '../../../types/compareSets.svelte'
+  import type { LinesDiffResponse } from '../../../types/diff.svelte'
 
   const {
     oldOrNew,

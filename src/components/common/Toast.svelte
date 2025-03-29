@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { _toasts } from '../../stores/Toast.svelte.js'
+  import { _toasts } from '../../stores/Toast.svelte'
 </script>
 
 <div class="toasts-container">

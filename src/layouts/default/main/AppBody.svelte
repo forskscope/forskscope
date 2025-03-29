@@ -1,11 +1,7 @@
 <script lang="ts">
   import Diff from '../../../components/diff/Diff.svelte'
   import Explorer from '../../../components/explorer/Explorer.svelte'
-  import {
-    compareSets,
-    exploreIsActive,
-    isActiveCompareSetIndex,
-  } from '../../../stores/compareSets.svelte'
+  import { compareSets, exploreIsActive } from '../../../stores/compareSets.svelte'
 </script>
 
 <!-- views -->

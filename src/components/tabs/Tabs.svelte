@@ -9,7 +9,7 @@
     spliceCompareSet,
   } from '../../stores/compareSets.svelte'
   import { openMultipleFilesDialog } from '../../utils/dialog.svelte'
-  import { filepathsToCompareSet } from '../../utils/diff.svelte'
+  import { filepathsToCompareSet } from '../../utils/compareSets.svelte'
 
   const addButtonOnClick = async () => {
     const filepaths = await openMultipleFilesDialog()

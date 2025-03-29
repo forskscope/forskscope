@@ -1,4 +1,4 @@
-import type { AppDiffFontFamily, AppLanguage, AppTheme, AppUiFontFamily, DiffKind, OldOrNew } from "./types"
+import type { AppDiffFontFamily, AppLanguage, AppTheme, AppUiFontFamily } from "./types/settings.svelte"
 
 export const APP_LANGUAGES: string[] = ['en', 'ja']
 export const APP_DEFAULT_LANGUAGE: AppLanguage = APP_LANGUAGES[0]
