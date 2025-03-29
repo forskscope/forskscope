@@ -19,13 +19,13 @@
     focusedLinesDiffIndex,
   }: {
     oldOrNew: OldOrNew
-    linesDiffResponse: LinesDiffResponse
+    linesDiffResponse: LinesDiffResponse | null
     charsDiffResponse: CharsDiffResponse | null
     showsCharsDiffs: boolean
     focusedLinesDiffIndex: number | null
   } = $props()
 
-  let linesDiffs: LinesDiff[] = $derived(linesDiffResponse.diffs)
+  let linesDiffs: LinesDiff[] = $derived(linesDiffResponse !== null ? linesDiffResponse.diffs : [])
 
   const charsDiffs: CharsDiffLines[] = $derived(
     charsDiffResponse !== null ? charsDiffResponse.diffs : []
@@ -48,11 +48,7 @@
   }
 </script>
 
-<div
-  class={`diff-content ${oldOrNew}`}
-  style={`--line-height: ${DIFF_LINE_HEIGHT};`}
-  contenteditable={oldOrNew === 'new'}
->
+<div class={`diff-content ${oldOrNew}`} contenteditable={oldOrNew === 'new'}>
   {#each linesDiffs as linesDiff, i}
     <div
       class={`lines-diff ${linesDiff.diffKind} ${LINES_DIFF_CLASS_PREFIX}${i} ${focusedLinesDiffIndex === i ? 'focused' : ''}`}

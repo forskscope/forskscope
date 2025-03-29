@@ -101,8 +101,13 @@ select {
     color: var(--app-secondary-text-color);
 }
 
-.diff-content .divider {
-    button {
+// todo: focused diff lines effect ?
+// .diff .content .focused {
+//     border-bottom: 1rem solid orange;
+// }
+
+.diff .view-body .divider {
+    button.merge {
         background-color: transparent;
         color: var(--app-secondary-text-color);
         box-shadow: none;

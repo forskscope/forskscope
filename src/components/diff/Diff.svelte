@@ -20,6 +20,8 @@
   import DiffFooterDivider from './includes/DiffFooterDivider.svelte'
   import DiffHeader from './includes/DiffHeader.svelte'
   import DiffFooter from './includes/DiffFooter.svelte'
+  import DiffContentDivider from './content/DiffContentDivider.svelte'
+  import { DIFF_LINE_HEIGHT, LINES_DIFF_CLASS_PREFIX } from './consts'
 
   const { compareSetIndex }: { compareSetIndex: number } = $props()
 
@@ -34,6 +36,16 @@
 
   const oldFilepath: string = $derived(compareSet.old.filepath)
   const newFilepath: string = $derived(compareSet.new.filepath)
+
+  const firstFocusedLinesDiffIndex: number = $derived.by(() => {
+    if (!linesDiffResponse) return -1
+    return linesDiffResponse.diffs.findIndex((x) => x.diffKind !== 'equal')
+  })
+
+  const lastFocusedLinesDiffIndex: number = $derived.by(() => {
+    if (!linesDiffResponse) return -1
+    return linesDiffResponse.diffs.findLastIndex((x) => x.diffKind !== 'equal')
+  })
 
   const visible: boolean = $derived(isActiveCompareSetIndex(compareSetIndex))
 
@@ -92,29 +104,63 @@
     diffChars()
     showsCharsDiffs = !showsCharsDiffs
   }
+
+  const focusedLinesDiffIndexOnChange = (delta: number) => {
+    if (!linesDiffResponse) return
+
+    if (focusedLinesDiffIndex === null) {
+      focusedLinesDiffIndex = firstFocusedLinesDiffIndex
+      return
+    }
+
+    if (focusedLinesDiffIndex === firstFocusedLinesDiffIndex && delta < 0) return
+    if (focusedLinesDiffIndex === lastFocusedLinesDiffIndex && 0 < delta) return
+
+    if (0 < delta) {
+      focusedLinesDiffIndex = linesDiffResponse.diffs.findIndex((x, i) => {
+        return x.diffKind !== 'equal' && focusedLinesDiffIndex! < i
+      })
+    } else {
+      focusedLinesDiffIndex = linesDiffResponse.diffs.findLastIndex((x, i) => {
+        return x.diffKind !== 'equal' && i < focusedLinesDiffIndex!
+      })
+    }
+
+    // scroll into view
+    document
+      .querySelector(`.diff .content .new .focused`)!
+      .scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'start' })
+  }
 </script>
 
 {#if linesDiffResponse !== null}
-  <View {visible} scrollSyncs={true}>
+  <View
+    mainClass="diff"
+    customStyle={`--line-height: ${DIFF_LINE_HEIGHT};`}
+    {visible}
+    scrollSyncs={true}
+  >
     {#snippet leftHeader()}<DiffHeader oldOrNew="old" {compareSet} {filepathOnChange} />{/snippet}
     {#snippet headerDivider()}
-      <DiffHeaderDivider />
+      <DiffHeaderDivider {focusedLinesDiffIndexOnChange} />
     {/snippet}
     {#snippet rightHeader()}<DiffHeader oldOrNew="new" {compareSet} {filepathOnChange} />{/snippet}
     {#snippet leftContent()}
       <DiffContent
         oldOrNew="old"
-        linesDiffResponse={linesDiffResponse!}
+        {linesDiffResponse}
         {charsDiffResponse}
         {showsCharsDiffs}
         {focusedLinesDiffIndex}
       />
     {/snippet}
-    {#snippet contentDivider()}b{/snippet}
+    {#snippet contentDivider()}
+      <DiffContentDivider {linesDiffResponse} {focusedLinesDiffIndex} />
+    {/snippet}
     {#snippet rightContent()}
       <DiffContent
         oldOrNew="new"
-        linesDiffResponse={linesDiffResponse!}
+        {linesDiffResponse}
         {charsDiffResponse}
         {showsCharsDiffs}
         {focusedLinesDiffIndex}

@@ -2,6 +2,8 @@
   import './style.scss'
 
   const {
+    mainClass,
+    customStyle,
     visible,
     scrollSyncs,
     leftHeader,
@@ -14,6 +16,8 @@
     footerDivider,
     rightFooter,
   }: {
+    mainClass: string
+    customStyle?: string
     visible: boolean
     scrollSyncs: boolean
     leftHeader: any
@@ -28,6 +32,7 @@
   } = $props()
 
   let leftContentEl: HTMLDivElement | undefined
+  let contentDividerEl: HTMLDivElement | undefined
   let rightContentEl: HTMLDivElement | undefined
 
   let scrollTimeout: number | null = null
@@ -45,11 +50,15 @@
     // smooth scroll
     scrollTimeout = requestAnimationFrame(() => {
       el.scrollTo(left, top)
+      if (contentDividerEl) contentDividerEl.scroll(left, top)
     })
   }
 </script>
 
-<div class={`view-container ${visible ? '' : 'd-none'}`}>
+<div
+  class={`${mainClass} view-container ${visible ? '' : 'd-none'}`}
+  style={customStyle ? customStyle : ''}
+>
   <div class="view-header">
     <div class="content">
       {@render leftHeader()}
@@ -65,7 +74,7 @@
     <div class="content" bind:this={leftContentEl} onscroll={(e) => scrollSync(e, rightContentEl)}>
       {@render leftContent()}
     </div>
-    <div class="divider">
+    <div class="divider" bind:this={contentDividerEl}>
       {@render contentDivider()}
     </div>
     <div class="content" bind:this={rightContentEl} onscroll={(e) => scrollSync(e, leftContentEl)}>
