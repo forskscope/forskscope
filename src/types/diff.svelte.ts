@@ -30,3 +30,9 @@ export interface CharsDiff {
     diffKind: DiffKind
     chars: string
 }
+
+export interface MergeHistoryItem {
+    diffIndex: number,
+    orgNewLines: string[]
+    orgDiffKind: DiffKind
+}

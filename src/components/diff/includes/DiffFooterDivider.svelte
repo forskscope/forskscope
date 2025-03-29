@@ -1,7 +1,10 @@
 <script lang="ts">
-  import { Menu } from 'lucide-svelte'
+  import { Menu, Undo } from 'lucide-svelte'
 
-  const { toggleCharsDiffs }: { toggleCharsDiffs: () => void } = $props()
+  const {
+    toggleCharsDiffs,
+    undoMergeOnClick,
+  }: { toggleCharsDiffs: () => void; undoMergeOnClick: () => void } = $props()
 
   let showsMenus: boolean = $state(false)
 </script>
@@ -13,6 +16,7 @@
 
   <div class={`menus ${showsMenus ? 'active' : 'd-none'}`}>
     <button onclick={toggleCharsDiffs}>chars diff</button>
+    <button onclick={undoMergeOnClick}><Undo /> undo merge</button>
   </div>
 </div>
 

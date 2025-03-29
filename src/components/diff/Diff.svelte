@@ -2,7 +2,11 @@
   import { onMount } from 'svelte'
   import { invokeWithGuard } from '../../utils/backend.svelte'
   import type { CompareSet, OldOrNew } from '../../types/compareSets.svelte'
-  import type { CharsDiffResponse, LinesDiffResponse } from '../../types/diff.svelte'
+  import type {
+    CharsDiffResponse,
+    LinesDiffResponse,
+    MergeHistoryItem,
+  } from '../../types/diff.svelte'
   import type { BackendCommandResult } from '../../types/backend.svelte'
   import {
     getCompareSet,
@@ -44,6 +48,8 @@
   })
 
   const visible: boolean = $derived(isActiveCompareSetIndex(compareSetIndex))
+
+  const mergeHistory: MergeHistoryItem[] = []
 
   onMount(async () => {
     await diffLines()
@@ -130,8 +136,25 @@
 
   const mergeOnClick = (index: number) => {
     if (!linesDiffResponse) return
-    linesDiffResponse.diffs[index].newLines = linesDiffResponse.diffs[index].oldLines
-    linesDiffResponse.diffs[index].diffKind = 'equal'
+
+    const merged = linesDiffResponse.diffs[index]
+
+    mergeHistory.push({
+      diffIndex: merged.diffIndex,
+      orgNewLines: merged.newLines,
+      orgDiffKind: merged.diffKind,
+    } as MergeHistoryItem)
+
+    merged.newLines = linesDiffResponse.diffs[index].oldLines
+    merged.diffKind = 'equal'
+  }
+
+  const undoMergeOnClick = () => {
+    const mergeHistoryItem = mergeHistory.pop()
+    if (!linesDiffResponse || !mergeHistoryItem) return
+    const reverted = linesDiffResponse.diffs[mergeHistoryItem.diffIndex]
+    reverted.newLines = mergeHistoryItem.orgNewLines
+    reverted.diffKind = mergeHistoryItem.orgDiffKind
   }
 </script>
 
@@ -142,11 +165,16 @@
     {visible}
     scrollSyncs={true}
   >
-    {#snippet leftHeader()}<DiffHeader oldOrNew="old" {compareSet} {filepathOnChange} />{/snippet}
+    {#snippet leftHeader()}
+      <DiffHeader oldOrNew="old" {compareSet} {filepathOnChange} />
+    {/snippet}
     {#snippet headerDivider()}
       <DiffHeaderDivider {focusedLinesDiffIndexOnChange} />
     {/snippet}
-    {#snippet rightHeader()}<DiffHeader oldOrNew="new" {compareSet} {filepathOnChange} />{/snippet}
+    {#snippet rightHeader()}
+      <DiffHeader oldOrNew="new" {compareSet} {filepathOnChange} />
+    {/snippet}
+
     {#snippet leftContent()}
       <DiffContent
         oldOrNew="old"
@@ -168,9 +196,16 @@
         {focusedLinesDiffIndex}
       />
     {/snippet}
-    {#snippet leftFooter()}<DiffFooter oldOrNew="old" {linesDiffResponse} />{/snippet}
-    {#snippet footerDivider()}<DiffFooterDivider {toggleCharsDiffs} />{/snippet}
-    {#snippet rightFooter()}<DiffFooter oldOrNew="new" {linesDiffResponse} />{/snippet}
+
+    {#snippet leftFooter()}
+      <DiffFooter oldOrNew="old" {linesDiffResponse} />
+    {/snippet}
+    {#snippet footerDivider()}
+      <DiffFooterDivider {toggleCharsDiffs} {undoMergeOnClick} />
+    {/snippet}
+    {#snippet rightFooter()}
+      <DiffFooter oldOrNew="new" {linesDiffResponse} />
+    {/snippet}
   </View>
 {:else}
   <!-- todo: loading -->

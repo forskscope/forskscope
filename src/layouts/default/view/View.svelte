@@ -70,6 +70,7 @@
       {@render rightHeader()}
     </div>
   </div>
+
   <div class="view-body">
     <div class="content" bind:this={leftContentEl} onscroll={(e) => scrollSync(e, rightContentEl)}>
       {@render leftContent()}
@@ -81,6 +82,7 @@
       {@render rightContent()}
     </div>
   </div>
+
   <div class="view-footer">
     <div class="content">
       {@render leftFooter()}
