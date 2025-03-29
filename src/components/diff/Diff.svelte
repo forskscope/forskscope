@@ -56,6 +56,8 @@
   }
 
   const diffChars = async () => {
+    if (charsDiffResponse !== null) return
+
     const replaceLinesDiffs = linesDiffResponse!.diffs.filter((x) => x.diffKind === 'replace')
     if (replaceLinesDiffs.length === 0) return
 
@@ -64,9 +66,6 @@
     })
 
     charsDiffResponse = res.response as CharsDiffResponse
-
-    // todo: move to another ui
-    showsCharsDiffs = true
   }
 
   const filepathOnChange = async (oldOrNew: OldOrNew, filepath: string) => {
@@ -88,14 +87,18 @@
     focusedLinesDiffIndex = null
     showsCharsDiffs = false
   }
+
+  const toggleCharsDiffs = () => {
+    diffChars()
+    showsCharsDiffs = !showsCharsDiffs
+  }
 </script>
 
 {#if linesDiffResponse !== null}
   <View {visible} scrollSyncs={true}>
     {#snippet leftHeader()}<DiffHeader oldOrNew="old" {compareSet} {filepathOnChange} />{/snippet}
     {#snippet headerDivider()}
-      <!-- todo: <DiffHeaderDivider /> -->
-      <button onclick={diffChars}>chars</button>
+      <DiffHeaderDivider />
     {/snippet}
     {#snippet rightHeader()}<DiffHeader oldOrNew="new" {compareSet} {filepathOnChange} />{/snippet}
     {#snippet leftContent()}
@@ -118,7 +121,7 @@
       />
     {/snippet}
     {#snippet leftFooter()}<DiffFooter oldOrNew="old" {linesDiffResponse} />{/snippet}
-    {#snippet footerDivider()}<DiffFooterDivider />{/snippet}
+    {#snippet footerDivider()}<DiffFooterDivider {toggleCharsDiffs} />{/snippet}
     {#snippet rightFooter()}<DiffFooter oldOrNew="new" {linesDiffResponse} />{/snippet}
   </View>
 {:else}
