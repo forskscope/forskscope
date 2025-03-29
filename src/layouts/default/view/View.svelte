@@ -3,7 +3,7 @@
 
   const {
     visible,
-    syncsScroll,
+    scrollSyncs,
     leftHeader,
     headerDivider,
     rightHeader,
@@ -15,7 +15,7 @@
     rightFooter,
   }: {
     visible: boolean
-    syncsScroll: boolean
+    scrollSyncs: boolean
     leftHeader: any
     headerDivider: any
     rightHeader: any
@@ -30,15 +30,17 @@
   let leftContentEl: HTMLDivElement | undefined
   let rightContentEl: HTMLDivElement | undefined
 
-  const syncScroll = (
+  const scrollSync = (
     e: UIEvent & {
       currentTarget: EventTarget & HTMLDivElement
     },
     el: HTMLDivElement | undefined
   ) => {
-    if (!el || !syncsScroll) return
+    if (!el || !scrollSyncs) return
     const left: number = e.currentTarget.scrollLeft
     const top: number = e.currentTarget.scrollTop
+    // todo: smooth and accurate scroll
+    if (Math.abs(left - el.scrollLeft) < 50 && Math.abs(top - el.scrollTop) < 50) return
     el.scrollTo(left, top)
   }
 </script>
@@ -56,13 +58,13 @@
     </div>
   </div>
   <div class="view-body">
-    <div class="content" bind:this={leftContentEl} onscroll={(e) => syncScroll(e, rightContentEl)}>
+    <div class="content" bind:this={leftContentEl} onscroll={(e) => scrollSync(e, rightContentEl)}>
       {@render leftContent()}
     </div>
     <div class="divider">
       {@render contentDivider()}
     </div>
-    <div class="content" bind:this={rightContentEl} onscroll={(e) => syncScroll(e, leftContentEl)}>
+    <div class="content" bind:this={rightContentEl} onscroll={(e) => scrollSync(e, leftContentEl)}>
       {@render rightContent()}
     </div>
   </div>

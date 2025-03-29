@@ -9,7 +9,7 @@
     LinesDiffResponse,
     OldOrNew,
   } from '../../../types'
-  import { LINES_DIFF_CLASS_PREFIX } from '../consts'
+  import { DIFF_LINE_HEIGHT, LINES_DIFF_CLASS_PREFIX } from '../consts'
 
   const {
     oldOrNew,
@@ -17,34 +17,19 @@
     charsDiffResponse,
     showsCharsDiffs,
     focusedLinesDiffIndex,
-    scrollLeft,
-    scrollTop,
-    onScroll,
   }: {
     oldOrNew: OldOrNew
     linesDiffResponse: LinesDiffResponse
     charsDiffResponse: CharsDiffResponse | null
     showsCharsDiffs: boolean
     focusedLinesDiffIndex: number | null
-    scrollLeft: number
-    scrollTop: number
-    onScroll: (scrollLeft: number, scrollTop: number) => void
   } = $props()
-
-  let diffContent: HTMLDivElement | undefined
 
   let linesDiffs: LinesDiff[] = $derived(linesDiffResponse.diffs)
 
   const charsDiffs: CharsDiffLines[] = $derived(
     charsDiffResponse !== null ? charsDiffResponse.diffs : []
   )
-
-  $effect(() => {
-    if (!isNaN(scrollTop) && !isNaN(scrollLeft)) {
-      if (!diffContent) return
-      diffContent.scrollTo(scrollLeft, scrollTop)
-    }
-  })
 
   const diffLines = (linesDiff: LinesDiff, oldOrNew: OldOrNew): string[] => {
     return oldOrNew === 'old' ? linesDiff.oldLines : linesDiff.newLines
@@ -65,11 +50,7 @@
 
 <div
   class={`diff-content ${oldOrNew}`}
-  bind:this={diffContent}
-  onscroll={(e) => {
-    const t = e.currentTarget
-    onScroll(t.scrollLeft, t.scrollTop)
-  }}
+  style={`--line-height: ${DIFF_LINE_HEIGHT};`}
   contenteditable={oldOrNew === 'new'}
 >
   {#each linesDiffs as linesDiff, i}
@@ -97,3 +78,26 @@
     </div>
   {/each}
 </div>
+
+<style>
+  .diff-content {
+    counter-reset: line-number;
+  }
+
+  .diff-line {
+    height: var(--line-height);
+    white-space: nowrap;
+    counter-increment: line-number;
+  }
+
+  .diff-line::before {
+    content: counter(line-number);
+    position: sticky;
+    left: 0;
+    top: 0;
+    width: 3em;
+    padding-right: 0.7rem;
+    display: inline-block;
+    text-align: right;
+  }
+</style>

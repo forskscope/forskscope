@@ -98,6 +98,7 @@ select {
 .diff-content .divider,
 .diff-line::before {
     background-color: var(--app-secondary-background-color);
+    color: var(--app-secondary-text-color);
 }
 
 .diff-content .divider {
