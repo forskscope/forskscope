@@ -183,6 +183,47 @@
       })
     }
   }
+
+  // todo: save as
+  // const saveAsOnClick = async () => {
+  //   const filepath = await saveFileDialog(newFilepath!).catch((error: unknown) => {
+  //     console.error(error)
+  //     return
+  //   })
+  //   if (!filepath) return
+  //   await invoke('save', {
+  //     filepath: filepath,
+  //     content: linesDiffs.reduce((a, b) => `${a}${b.newLines.join('')}`, ''),
+  //     charset: newCharset,
+  //   }).catch((error: unknown) => {
+  //     console.error(error)
+  //     return
+  //   })
+  // }
+
+  // todo: keyboard shotcuts
+  // const onKeyDown = (
+  //   e: KeyboardEvent & {
+  //     currentTarget: EventTarget & HTMLDivElement
+  //   }
+  // ) => {
+  //   switch (e.key) {
+  //     case 'w': {
+  //       if (e.ctrlKey) {
+  //         removeActiveCompareSet()
+  //       }
+  //     }
+  //     case 'F7': {
+  //       focusedLinesDiffIndex = prevLinesDiffIndex
+  //       break
+  //     }
+  //     case 'F8': {
+  //       focusedLinesDiffIndex = nextLinesDiffIndex
+  //       break
+  //     }
+  //     default:
+  //   }
+  // }
 </script>
 
 {#if linesDiffResponse !== null}
