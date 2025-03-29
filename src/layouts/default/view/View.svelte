@@ -30,6 +30,7 @@
   let leftContentEl: HTMLDivElement | undefined
   let rightContentEl: HTMLDivElement | undefined
 
+  let scrollTimeout: number | null = null
   const scrollSync = (
     e: UIEvent & {
       currentTarget: EventTarget & HTMLDivElement
@@ -37,11 +38,14 @@
     el: HTMLDivElement | undefined
   ) => {
     if (!el || !scrollSyncs) return
+
+    if (scrollTimeout !== null) cancelAnimationFrame(scrollTimeout)
     const left: number = e.currentTarget.scrollLeft
     const top: number = e.currentTarget.scrollTop
-    // todo: smooth and accurate scroll
-    if (Math.abs(left - el.scrollLeft) < 50 && Math.abs(top - el.scrollTop) < 50) return
-    el.scrollTo(left, top)
+    // smooth scroll
+    scrollTimeout = requestAnimationFrame(() => {
+      el.scrollTo(left, top)
+    })
   }
 </script>
 
