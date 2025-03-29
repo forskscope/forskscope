@@ -49,7 +49,7 @@
 
   const visible: boolean = $derived(isActiveCompareSetIndex(compareSetIndex))
 
-  const mergeHistory: MergeHistoryItem[] = []
+  const mergeHistory: MergeHistoryItem[] = $state([])
 
   onMount(async () => {
     await diffLines()
@@ -102,11 +102,6 @@
     showsCharsDiffs = false
   }
 
-  const toggleCharsDiffs = () => {
-    diffChars()
-    showsCharsDiffs = !showsCharsDiffs
-  }
-
   const focusedLinesDiffIndexOnChange = (delta: number) => {
     if (!linesDiffResponse) return
 
@@ -149,12 +144,44 @@
     merged.diffKind = 'equal'
   }
 
-  const undoMergeOnClick = () => {
-    const mergeHistoryItem = mergeHistory.pop()
-    if (!linesDiffResponse || !mergeHistoryItem) return
-    const reverted = linesDiffResponse.diffs[mergeHistoryItem.diffIndex]
-    reverted.newLines = mergeHistoryItem.orgNewLines
-    reverted.diffKind = mergeHistoryItem.orgDiffKind
+  const toggleCharsDiffs = () => {
+    diffChars()
+    showsCharsDiffs = !showsCharsDiffs
+  }
+
+  const switchFilepaths = async () => {
+    compareSet = await updateCompareSet(
+      compareSetIndex,
+      compareSet.new.filepath,
+      compareSet.old.filepath
+    )
+
+    if (linesDiffResponse === null) {
+      diffLines()
+      return
+    }
+
+    linesDiffResponse.diffs = linesDiffResponse.diffs.map((x) => {
+      const ret = x
+      const orgOldLines = ret.oldLines
+      ret.oldLines = ret.newLines
+      ret.newLines = orgOldLines
+      return ret
+    })
+
+    const oldCharset = linesDiffResponse.oldCharset
+    linesDiffResponse.oldCharset = linesDiffResponse.newCharset
+    linesDiffResponse.newCharset = oldCharset
+
+    if (charsDiffResponse !== null) {
+      charsDiffResponse.diffs = charsDiffResponse.diffs.map((x) => {
+        const ret = x
+        const orgOldLines = ret.oldLines
+        ret.oldLines = ret.newLines
+        ret.newLines = orgOldLines
+        return ret
+      })
+    }
   }
 </script>
 
@@ -201,7 +228,7 @@
       <DiffFooter oldOrNew="old" {linesDiffResponse} />
     {/snippet}
     {#snippet footerDivider()}
-      <DiffFooterDivider {toggleCharsDiffs} {undoMergeOnClick} />
+      <DiffFooterDivider {linesDiffResponse} {mergeHistory} {toggleCharsDiffs} {switchFilepaths} />
     {/snippet}
     {#snippet rightFooter()}
       <DiffFooter oldOrNew="new" {linesDiffResponse} />
