@@ -17,7 +17,7 @@
   import DiffHeader from './includes/DiffHeader.svelte'
   import DiffFooter from './includes/DiffFooter.svelte'
   import DiffContentDivider from './content/DiffContentDivider.svelte'
-  import { DIFF_LINE_HEIGHT } from './consts'
+  import { DIFF_LINE_HEIGHT, DIFF_MAIN_CLASS_PREFIX } from './consts'
   import {
     deltaModifyingFocusedDiffLinesIndex,
     diffCharsFromLinesDiffResponse,
@@ -98,7 +98,7 @@
       focusedLinesDiffIndex,
       linesDiffResponse
     )
-    scrollIntoFocusedDiffLines()
+    scrollIntoFocusedDiffLines(compareSetIndex)
   }
 
   const mergeOnClick = (index: number) => {
@@ -198,7 +198,12 @@
   // }
 </script>
 
-<View mainClass="diff" customStyle={`--line-height: ${DIFF_LINE_HEIGHT};`} {visible} scrollSyncs>
+<View
+  mainClass={`diff ${DIFF_MAIN_CLASS_PREFIX}${compareSetIndex}`}
+  customStyle={`--line-height: ${DIFF_LINE_HEIGHT};`}
+  {visible}
+  scrollSyncs
+>
   {#snippet leftHeader()}
     <DiffHeader oldOrNew="old" {compareSet} {filepathOnChange} />
   {/snippet}

@@ -1,6 +1,7 @@
 import type { BackendCommandResult } from "../../types/backend"
 import type { CharsDiffLines, CharsDiffResponse, LinesDiff, LinesDiffResponse } from "../../types/diff"
 import { invokeWithGuard } from "../../utils/backend.svelte"
+import { DIFF_MAIN_CLASS_PREFIX } from "./consts"
 
 export const diffCharsFromLinesDiffResponse = async (linesDiffResponse: LinesDiffResponse): Promise<CharsDiffResponse | null> => {
     const replaceLinesDiffs = linesDiffResponse.diffs.filter((x) => x.diffKind === 'replace')
@@ -44,9 +45,9 @@ export const deltaModifyingFocusedDiffLinesIndex = (
     }
 }
 
-export const scrollIntoFocusedDiffLines = () => {
+export const scrollIntoFocusedDiffLines = (compareSetIndex: number) => {
     document
-        .querySelector(`.diff .content .new .focused`)!
+        .querySelector(`.${DIFF_MAIN_CLASS_PREFIX}${compareSetIndex} .content .new .focused`)!
         .scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'start' })
 }
 
