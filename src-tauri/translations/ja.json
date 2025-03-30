@@ -17,6 +17,7 @@
     "Switch left/right": "左右を入れ換える",
     "Switch files causes merge history cleared": "左右を入れ換えるとマージ履歴がクリアされます",
     "Undo a merge history": "マージ履歴を一つ取り消す",
+    "Reload diff": "差分再取得",
     "Completely equal": "完全に一致",
     "Save as": "名前を付けて保存",
     "Settings": "設定",

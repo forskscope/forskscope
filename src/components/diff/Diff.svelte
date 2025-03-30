@@ -46,9 +46,13 @@
 
   const mergeHistory: MergeHistoryItem[] = $state([])
 
-  onMount(async () => {
-    await diffLines()
+  onMount(() => {
+    diffLines()
   })
+
+  const reloadDiff = () => {
+    diffLines()
+  }
 
   const diffLines = async () => {
     const res: BackendCommandResult = await invokeWithGuard('diff_filepaths', {
@@ -90,6 +94,8 @@
 
     focusedLinesDiffIndex = null
     showsCharsDiffs = false
+
+    mergeHistory.splice(0)
   }
 
   const focusedLinesDiffIndexOnChange = (delta: number) => {
@@ -252,7 +258,13 @@
     <DiffFooter oldOrNew="old" {linesDiffResponse} />
   {/snippet}
   {#snippet footerDivider()}
-    <DiffFooterDivider {mergeHistory} {toggleCharsDiffs} {switchFilepaths} {undoMergeHistory} />
+    <DiffFooterDivider
+      {mergeHistory}
+      {toggleCharsDiffs}
+      {switchFilepaths}
+      {undoMergeHistory}
+      {reloadDiff}
+    />
   {/snippet}
   {#snippet rightFooter()}
     <DiffFooter oldOrNew="new" {linesDiffResponse} />
