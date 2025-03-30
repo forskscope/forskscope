@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Languages, X, Palette } from 'lucide-svelte'
   import {
     APP_DEFAULT_LANGUAGE,
     APP_DIFF_FONT_FAMILIES,
@@ -23,10 +24,10 @@
     type AppLanguage,
     type AppTheme,
     type AppUiFontFamily,
-  } from '../../types'
+  } from '../../types/settings'
 
   interface Selector {
-    icon?: string
+    icon?: ConstructorOfATypedSvelteComponent
     title: string
     groupName: string
     items: string[]
@@ -35,7 +36,7 @@
     valueSuffix: string
   }
 
-  let {
+  const {
     closeSettings,
   }: {
     closeSettings: () => void
@@ -69,7 +70,7 @@
 
   const SELECTORS = [
     {
-      icon: '🎨',
+      icon: Palette,
       title: 'Theme',
       groupName: 'theme',
       items: APP_THEMES,
@@ -99,10 +100,10 @@
 <!-- todo: color theme switcher -->
 <div class="settings-wrapper">
   <div class="position-relative">
-    <button class="close" onclick={closeSettings}>✖️</button>
+    <button class="close" onclick={closeSettings}><X /></button>
     <div class="settings">
       <div class="setting">
-        <h3>🌐 {T('Language')}</h3>
+        <h3><Languages /> {T('Language')}</h3>
         <select bind:value={language} onchange={languageOnChange}>
           <option value="en">English</option>
           <option value="ja">日本語</option>
@@ -111,7 +112,7 @@
 
       {#each SELECTORS as selector}
         <div class="setting">
-          <h3>{selector.icon} {T(selector.title)}</h3>
+          <h3><selector.icon /> {T(selector.title)}</h3>
           <div>
             {#each selector.items as item}
               <label

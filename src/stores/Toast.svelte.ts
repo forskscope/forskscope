@@ -1,7 +1,7 @@
 
 let _toasts: Toast[] = $state([])
 
-import type { Toast } from '../types/Toast.svelte.js'
+import type { Toast } from '../types/Toast.js'
 
 const DEFAULT_DURATION_MILLISECONDS: number = 5000
 

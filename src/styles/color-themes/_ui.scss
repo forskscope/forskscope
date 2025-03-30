@@ -32,10 +32,6 @@ select {
         color: var(--app-secondary-text-color);
     }
 
-    &.active button {
-        border-color: var(--focused-border-color);
-    }
-
     &:hover:not(:has(.close:hover)) .diff,
     &:hover .explorer,
     &:hover .add,
@@ -43,16 +39,26 @@ select {
         background-color: var(--app-secondary-text-color);
         color: var(--app-secondary-background-color);
     }
+
+    .active::before {
+        background-color: var(--app-secondary-text-color);
+    }
 }
 
-.explorer-pane {
+.explorer-container {
+    .row.headers {
+        background-color: var(--app-primary-background-color);
+        color: var(--app-primary-text-color);
+    }
+
     &.old {
         background-color: var(--explorer-old-pane-background-color);
         color: var(--explorer-old-pane-text-color);
 
-        label input[type='radio']:checked+div,
-        .file input[type='radio']:checked+div,
-        .name:hover {
+        // label input[type='radio']:checked+div,
+        // .file input[type='radio']:checked+div,
+        .row.selected .name,
+        .row:not(.headers) .name:hover {
             background-color: var(--explorer-old-pane-text-color);
             color: var(--explorer-old-pane-background-color);
         }
@@ -62,9 +68,10 @@ select {
         background-color: var(--explorer-new-pane-background-color);
         color: var(--explorer-new-pane-text-color);
 
-        label input[type='radio']:checked+div,
-        .file input[type='radio']:checked+div,
-        .name:hover {
+        // label input[type='radio']:checked+div,
+        // .file input[type='radio']:checked+div,
+        .row.selected .name,
+        .row:not(.headers):hover .name {
             background-color: var(--explorer-new-pane-text-color);
             color: var(--explorer-new-pane-background-color);
         }
@@ -74,60 +81,55 @@ select {
         background-color: var(--app-secondary-background-color);
         color: var(--app-secondary-text-color);
     }
-
-    .dirs-files {
-        .header {
-            background-color: var(--app-primary-background-color);
-            color: var(--app-primary-text-color);
-        }
-    }
 }
 
 .footer h2 {
     color: var(--muted-text-color);
 }
 
-.diff-panes {
-    .row.header {
-        border-bottom: 0.2rem solid var(--primary-border-color);
-    }
-
-    .row.footer {
-        border-top: 0.2rem solid var(--primary-border-color);
-    }
-
-    .content .separator,
-    .diff-line::before {
-        background-color: var(--app-secondary-background-color);
-    }
-
-    .content .separator {
-        button {
-            background-color: transparent;
-            color: var(--app-secondary-text-color);
-            box-shadow: none;
-
-            &:not(:disabled) {
-                background-color: var(--app-secondary-background-color);
-            }
-
-            &:not(:disabled):hover,
-            &.focused {
-                background-color: var(--button-primary-background-color);
-            }
-        }
-    }
-
-    .menus {
-        background: var(--app-secondary-background-color);
-    }
+.diff-header {
+    border-bottom: 0.2rem solid var(--primary-border-color);
 }
 
-.select-files {
+.diff-footer {
+    border-top: 0.2rem solid var(--primary-border-color);
+}
+
+.diff-content .divider,
+.diff-line::before {
     background-color: var(--app-secondary-background-color);
     color: var(--app-secondary-text-color);
-    border-color: var(--focused-border-color);
 }
+
+// todo: focused diff lines effect ?
+// .diff .content .focused {
+//     border-bottom: 1rem solid orange;
+// }
+
+.diff .view-body .divider {
+    button.merge {
+        width: 100%;
+        padding: 0;
+
+        background-color: transparent;
+        color: var(--app-secondary-text-color);
+        box-shadow: none;
+
+        &:not(:disabled) {
+            background-color: var(--app-secondary-background-color);
+        }
+
+        &:not(:disabled):hover,
+        &.focused {
+            background-color: var(--button-primary-background-color);
+        }
+    }
+}
+
+.diff-header .menus {
+    background: var(--app-secondary-background-color);
+}
+
 
 .settings-wrapper {
     background-color: var(--app-secondary-background-color);

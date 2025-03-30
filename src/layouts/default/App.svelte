@@ -13,6 +13,7 @@
   import AppHeader from './main/AppHeader.svelte'
   import AppBody from './main/AppBody.svelte'
   import AppFooter from './main/AppFooter.svelte'
+  import './style.scss'
 
   onMount(async () => {
     await _setPathSeparator()
@@ -40,28 +41,3 @@
     </div>
   </main>
 </div>
-
-<style>
-  header {
-    position: fixed;
-    right: 0;
-    top: 0;
-    z-index: 1001;
-  }
-
-  main,
-  .app-header,
-  .app-body {
-    box-sizing: border-box;
-  }
-  main {
-    display: flex;
-    flex-direction: column;
-  }
-  .app-header {
-    height: 1.6rem;
-  }
-  .app-body {
-    flex: 1;
-  }
-</style>

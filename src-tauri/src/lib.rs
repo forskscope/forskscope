@@ -14,13 +14,11 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let window = app.get_webview_window("main").unwrap();
-
             #[cfg(debug_assertions)]
             {
+                let window = app.get_webview_window("main").unwrap();
                 window.open_devtools();
             }
-
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

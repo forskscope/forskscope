@@ -15,6 +15,12 @@ button {
     outline: none;
 }
 
+button {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+}
+
 button:not(:disabled):hover {
     opacity: 0.87;
 }

@@ -1,342 +1,272 @@
 <script lang="ts">
-  import { invoke } from '@tauri-apps/api/core'
-  import type {
-    CompareSet,
-    DiffResponse,
-    LinesDiff,
-    OldOrNew,
-    CharsDiffLines,
-    CharsDiffResponse,
-  } from '../../types'
-  import { DIFF_LINE_HEIGHT } from './consts'
-  import DiffCol from './diff-col/DiffCol.svelte'
-  import DiffHeaderCol from './diff-col/DiffHeaderCol.svelte'
-  import DiffFooterCol from './diff-col/DiffFooterCol.svelte'
-  import SeparatorCol from './separator-col/SeparatorCol.svelte'
-  import SeparatorHeaderCol from './separator-col/SeparatorHeaderCol.svelte'
-  import SeparatorFooterCol from './separator-col/SeparatorFooterCol.svelte'
-  import { openFileDialog, saveFileDialog } from '../../utils/dialog.svelte'
   import { onMount } from 'svelte'
-  import { errorToast } from '../../stores/Toast.svelte'
+  import { invokeWithGuard } from '../../utils/backend.svelte'
+  import type { CompareSet, OldOrNew } from '../../types/compareSets'
+  import type { CharsDiffResponse, LinesDiffResponse, MergeHistoryItem } from '../../types/diff'
+  import type { BackendCommandResult } from '../../types/backend'
   import {
-    getActiveCompareSet,
-    removeActiveCompareSet,
-    updateActiveCompareSet,
-  } from '../../stores/tabs.svelte'
+    getCompareSet,
+    isActiveCompareSet,
+    removeCompareSet,
+    updateCompareSet,
+  } from '../../stores/compareSets.svelte'
+  import View from '../../layouts/default/view/View.svelte'
+  import DiffHeaderDivider from './includes/DiffHeaderDivider.svelte'
+  import DiffContent from './content/DiffContent.svelte'
+  import DiffFooterDivider from './includes/DiffFooterDivider.svelte'
+  import DiffHeader from './includes/DiffHeader.svelte'
+  import DiffFooter from './includes/DiffFooter.svelte'
+  import DiffContentDivider from './content/DiffContentDivider.svelte'
+  import { DIFF_LINE_HEIGHT, DIFF_MAIN_CLASS_PREFIX } from './consts'
+  import {
+    deltaModifyingFocusedDiffLinesIndex,
+    diffCharsFromLinesDiffResponse,
+    scrollIntoFocusedDiffLines,
+    switchCharsDiffLinesList,
+    switchLinesDiffs,
+  } from './helpers.svelte'
+  import { confirm } from '@tauri-apps/plugin-dialog'
+  import { T } from '../../stores/settings/translation.svelte'
 
-  const { compareSet }: { compareSet: CompareSet } = $props()
+  const { compareSetIndex }: { compareSetIndex: number } = $props()
 
-  let _compareSet: CompareSet = $state(compareSet)
+  let compareSet: CompareSet = $state(getCompareSet(compareSetIndex))
 
-  const oldFilepath: string = $derived(_compareSet.old.filepath)
-  const newFilepath: string = $derived(_compareSet.new.filepath)
+  let linesDiffResponse: LinesDiffResponse | null = $state(null)
+  let charsDiffResponse: CharsDiffResponse | null = $state(null)
 
-  let oldCharset: string = $state('')
-  let newCharset: string = $state('')
-
-  let linesDiffs: LinesDiff[] = $state([])
-  let charsDiffs: CharsDiffLines[] | null = $state(null)
+  // todo
   let showsCharsDiffs: boolean = $state(false)
   let focusedLinesDiffIndex: number | null = $state(null)
 
-  let loaded: boolean = $state(false)
+  const oldFilepath: string = $derived(compareSet.old.filepath)
+  const newFilepath: string = $derived(compareSet.new.filepath)
 
-  let diffPanes: HTMLDivElement
+  const visible: boolean = $derived(isActiveCompareSet(compareSetIndex))
 
-  onMount(async () => {
-    await diff()
-    diffPanes.focus()
+  const mergeHistory: MergeHistoryItem[] = $state([])
+
+  onMount(() => {
+    diffLines()
   })
 
-  // todo: not equal diffs in linesDiffs can changed to be 'equal'
-  // const linesDiffsDiffOnly: number[] = $derived(
-  //   linesDiffs
-  //     .map((x, i) => (x.diffKind !== 'equal' ? i : undefined))
-  //     .filter((x) => x !== undefined)
-  // )
-  const prevLinesDiffIndex: number | null = $derived.by(() => {
-    if (isCompletelyEqual) return null
-    if (focusedLinesDiffIndex === null) return 0
-    if (focusedLinesDiffIndex === 0) return focusedLinesDiffIndex
-    const foundIndex = linesDiffs.findLastIndex(
-      (x, i) => i < focusedLinesDiffIndex! && x.diffKind !== 'equal'
-    )
-    return 0 <= foundIndex ? foundIndex : focusedLinesDiffIndex
-  })
-  const nextLinesDiffIndex: number | null = $derived.by(() => {
-    if (isCompletelyEqual) return null
-    if (focusedLinesDiffIndex === null) return 0
-    if (focusedLinesDiffIndex === linesDiffs.length - 1) return focusedLinesDiffIndex
-    const foundIndex = linesDiffs.findIndex(
-      (x, i) => focusedLinesDiffIndex! < i && x.diffKind !== 'equal'
-    )
-    return 0 <= foundIndex ? foundIndex : focusedLinesDiffIndex
-  })
-
-  const charsDiffsAvailable: boolean = $derived(
-    oldFilepath !== newFilepath &&
-      !compareSet!.old.binaryComparisonOnly &&
-      !compareSet!.new.binaryComparisonOnly
-  )
-
-  const switchOldNewAvailable: boolean = $derived(oldFilepath !== newFilepath)
-
-  const isCompletelyEqual: boolean = $derived(!linesDiffs.some((x) => x.diffKind !== 'equal'))
-
-  const diff = async () => {
-    await diffLines()
-    loaded = true
+  const reloadDiff = () => {
+    diffLines()
   }
 
   const diffLines = async () => {
-    let isError = false
-    let res: unknown = await invoke('diff_filepaths', {
+    const res: BackendCommandResult = await invokeWithGuard('diff_filepaths', {
       old: oldFilepath,
       new: newFilepath,
-    }).catch((error: unknown) => {
-      errorToast(error as string)
-      isError = true
     })
-    if (isError) {
-      removeActiveCompareSet()
+    if (res.isError) {
+      removeCompareSet(compareSetIndex)
+      return
     }
 
-    console.log(res) // todo
-
-    const diffResponse = res as DiffResponse
-    linesDiffs = diffResponse.linesDiffs
-    oldCharset = diffResponse.oldCharset
-    newCharset = diffResponse.newCharset
-
-    focusedLinesDiffIndex = null
+    reset()
+    linesDiffResponse = res.response as LinesDiffResponse
   }
 
   const diffChars = async () => {
-    const replaceLinesDiffs = linesDiffs.filter((x) => x.diffKind === 'replace')
-    if (replaceLinesDiffs.length === 0) return
+    if (charsDiffResponse !== null) return
 
-    let res: unknown = await invoke('diff_chars', {
-      linesDiffs: replaceLinesDiffs,
-    }).catch((error: unknown) => {
-      console.error(error)
-      return
-    })
-    console.log(res) // todo
-
-    const charsDiffResponse = res as CharsDiffResponse
-    charsDiffs = charsDiffResponse.diffs
+    const res = await diffCharsFromLinesDiffResponse(linesDiffResponse!)
+    if (res === null) return
+    charsDiffResponse = res
   }
 
-  const changeFilepath = async (oldOrNew: OldOrNew) => {
-    const filepath = await openFileDialog()
-    if (filepath === null) return
+  const filepathOnChange = async (oldOrNew: OldOrNew, filepath: string) => {
     if (oldOrNew === 'old') {
       const _oldFilepath = filepath
-      await updateActiveCompareSet(_oldFilepath, newFilepath)
+      compareSet = await updateCompareSet(compareSetIndex, _oldFilepath, compareSet.new.filepath)
     } else {
       const _newFilepath = filepath
-      await updateActiveCompareSet(oldFilepath, _newFilepath)
+      compareSet = await updateCompareSet(compareSetIndex, compareSet.old.filepath, _newFilepath)
     }
-    _compareSet = getActiveCompareSet()!
-    await diff()
+
+    await diffLines()
   }
 
-  const linesDiffReplaceOnClick = (linesDiffIndex: number) => {
-    const x = linesDiffs[linesDiffIndex]
-    x.diffKind = 'equal'
-    x.newLines = x.oldLines
-    linesDiffs[linesDiffIndex] = x
-    if (focusedLinesDiffIndex === linesDiffIndex) focusedLinesDiffIndex = null
-  }
-
-  const saveAsOnClick = async () => {
-    const filepath = await saveFileDialog(newFilepath!).catch((error: unknown) => {
-      console.error(error)
-      return
-    })
-    if (!filepath) return
-    await invoke('save', {
-      filepath: filepath,
-      content: linesDiffs.reduce((a, b) => `${a}${b.newLines.join('')}`, ''),
-      charset: newCharset,
-    }).catch((error: unknown) => {
-      console.error(error)
-      return
-    })
-  }
-
-  const showsCharsDiffsOnChange = async (value: boolean) => {
-    if (charsDiffs === null) {
-      await diffChars()
-    }
-    showsCharsDiffs = value
-  }
-
-  const switchOldNewOnClick = async () => {
-    await updateActiveCompareSet(newFilepath, oldFilepath)
-    _compareSet = getActiveCompareSet()!
-
-    linesDiffs = linesDiffs.map((x) => {
-      const ret = x
-      const orgOldLines = ret.oldLines
-      ret.oldLines = ret.newLines
-      ret.newLines = orgOldLines
-      return ret
-    })
-
-    const orgOldCharset = oldCharset
-    oldCharset = newCharset
-    newCharset = orgOldCharset
-
-    charsDiffs = charsDiffs!.map((x) => {
-      const ret = x
-      const orgOldLines = ret.oldLines
-      ret.oldLines = ret.newLines
-      ret.newLines = orgOldLines
-      return ret
-    })
+  const reset = () => {
+    linesDiffResponse = null
+    charsDiffResponse = null
 
     focusedLinesDiffIndex = null
+    showsCharsDiffs = false
+
+    mergeHistory.splice(0)
   }
 
-  const onKeyDown = (
-    e: KeyboardEvent & {
-      currentTarget: EventTarget & HTMLDivElement
+  const focusedLinesDiffIndexOnChange = (delta: number) => {
+    focusedLinesDiffIndex = deltaModifyingFocusedDiffLinesIndex(
+      delta,
+      focusedLinesDiffIndex,
+      linesDiffResponse
+    )
+    scrollIntoFocusedDiffLines(compareSetIndex)
+  }
+
+  const mergeOnClick = (index: number) => {
+    if (!linesDiffResponse) return
+
+    const merged = linesDiffResponse.diffs[index]
+
+    mergeHistory.push({
+      diffIndex: merged.diffIndex,
+      orgNewLines: merged.newLines,
+      orgDiffKind: merged.diffKind,
+    } as MergeHistoryItem)
+
+    merged.newLines = linesDiffResponse.diffs[index].oldLines
+    merged.diffKind = 'equal'
+  }
+
+  const toggleCharsDiffs = () => {
+    diffChars()
+    showsCharsDiffs = !showsCharsDiffs
+  }
+
+  const switchFilepaths = async () => {
+    // todo: confirm or restore all merged or else ?
+    const confirmed = await confirm(T('Switch files causes merge history cleared'))
+    if (!confirmed) return
+
+    compareSet = await updateCompareSet(
+      compareSetIndex,
+      compareSet.new.filepath,
+      compareSet.old.filepath
+    )
+
+    if (linesDiffResponse === null) {
+      diffLines()
+      return
     }
-  ) => {
-    switch (e.key) {
-      case 'w': {
-        if (e.ctrlKey) {
-          removeActiveCompareSet()
-        }
-      }
-      case 'F7': {
-        focusedLinesDiffIndex = prevLinesDiffIndex
-        break
-      }
-      case 'F8': {
-        focusedLinesDiffIndex = nextLinesDiffIndex
-        break
-      }
-      default:
+
+    linesDiffResponse.diffs = switchLinesDiffs(linesDiffResponse.diffs)
+
+    const oldCharset = linesDiffResponse.oldCharset
+    linesDiffResponse.oldCharset = linesDiffResponse.newCharset
+    linesDiffResponse.newCharset = oldCharset
+
+    if (charsDiffResponse !== null) {
+      charsDiffResponse.diffs = switchCharsDiffLinesList(charsDiffResponse.diffs)
     }
   }
+
+  const undoMergeHistory = () => {
+    const mergeHistoryItem = mergeHistory.pop()
+    if (!linesDiffResponse || !mergeHistoryItem) return
+    const reverted = linesDiffResponse.diffs[mergeHistoryItem.diffIndex]
+    reverted.newLines = mergeHistoryItem.orgNewLines
+    reverted.diffKind = mergeHistoryItem.orgDiffKind
+  }
+
+  // todo: save as
+  // const saveAsOnClick = async () => {
+  //   const filepath = await saveFileDialog(newFilepath!).catch((error: unknown) => {
+  //     console.error(error)
+  //     return
+  //   })
+  //   if (!filepath) return
+  //   await invoke('save', {
+  //     filepath: filepath,
+  //     content: linesDiffs.reduce((a, b) => `${a}${b.newLines.join('')}`, ''),
+  //     charset: newCharset,
+  //   }).catch((error: unknown) => {
+  //     console.error(error)
+  //     return
+  //   })
+  // }
+
+  // todo: keyboard shotcuts
+  // const onKeyDown = (
+  //   e: KeyboardEvent & {
+  //     currentTarget: EventTarget & HTMLDivElement
+  //   }
+  // ) => {
+  //   switch (e.key) {
+  //     case 'w': {
+  //       if (e.ctrlKey) {
+  //         removeActiveCompareSet()
+  //       }
+  //     }
+  //     case 'F7': {
+  //       focusedLinesDiffIndex = prevLinesDiffIndex
+  //       break
+  //     }
+  //     case 'F8': {
+  //       focusedLinesDiffIndex = nextLinesDiffIndex
+  //       break
+  //     }
+  //     default:
+  //   }
+  // }
 </script>
 
-<div class="diff-panes" onkeydown={onKeyDown} role="button" tabindex="0" bind:this={diffPanes}>
-  {#if !loaded}<p>(...... Loading ......)</p>{/if}
+<View
+  mainClass={`diff ${DIFF_MAIN_CLASS_PREFIX}${compareSetIndex}`}
+  customStyle={`--line-height: ${DIFF_LINE_HEIGHT};`}
+  {visible}
+  scrollSyncs
+>
+  {#snippet leftHeader()}
+    <DiffHeader oldOrNew="old" {compareSet} {filepathOnChange} />
+  {/snippet}
+  {#snippet headerDivider()}
+    <DiffHeaderDivider {focusedLinesDiffIndexOnChange} />
+  {/snippet}
+  {#snippet rightHeader()}
+    <DiffHeader oldOrNew="new" {compareSet} {filepathOnChange} />
+  {/snippet}
 
-  {#if 0 < linesDiffs.length}
-    <div class="rows">
-      <div class="row header">
-        <div class="col diff old">
-          <DiffHeaderCol
-            filepath={oldFilepath!}
-            filepathFromDialogOnClick={async () => changeFilepath('old')}
-          />
-        </div>
-        <div class="col separator">
-          <SeparatorHeaderCol
-            {showsCharsDiffs}
-            {charsDiffsAvailable}
-            {switchOldNewAvailable}
-            {showsCharsDiffsOnChange}
-            {switchOldNewOnClick}
-          />
-        </div>
-        <div class="col diff new">
-          <DiffHeaderCol
-            filepath={newFilepath!}
-            filepathFromDialogOnClick={async () => changeFilepath('new')}
-          />
-        </div>
-      </div>
-      <div class="row content" style={`--line-height: ${DIFF_LINE_HEIGHT};`}>
-        <div class="col diff old">
-          {#key focusedLinesDiffIndex}
-            <DiffCol
-              oldOrNew="old"
-              {linesDiffs}
-              {charsDiffs}
-              {showsCharsDiffs}
-              {focusedLinesDiffIndex}
-            />
-          {/key}
-        </div>
-        <div class="col separator">
-          <SeparatorCol
-            {linesDiffs}
-            {focusedLinesDiffIndex}
-            replaceOnClick={linesDiffReplaceOnClick}
-          />
-        </div>
-        <div class="col diff new">
-          {#key focusedLinesDiffIndex}
-            <DiffCol
-              oldOrNew="new"
-              {linesDiffs}
-              {charsDiffs}
-              {showsCharsDiffs}
-              {focusedLinesDiffIndex}
-            />
-          {/key}
-        </div>
-      </div>
-      <div class="row footer">
-        <div class="col diff old">
-          <DiffFooterCol charset={oldCharset} {isCompletelyEqual} saveAsOnClick={undefined} />
-        </div>
-        <div class="col separator">
-          <SeparatorFooterCol />
-        </div>
-        <div class="col diff new">
-          <DiffFooterCol charset={newCharset} {isCompletelyEqual} {saveAsOnClick} />
-        </div>
-      </div>
-    </div>
-  {/if}
-</div>
+  {#snippet leftContent()}
+    {#if linesDiffResponse !== null}
+      <DiffContent
+        oldOrNew="old"
+        {linesDiffResponse}
+        {charsDiffResponse}
+        {showsCharsDiffs}
+        {focusedLinesDiffIndex}
+      />
+    {:else}
+      <!-- todo: loading -->
+      (...... Loading ......)
+    {/if}
+  {/snippet}
+  {#snippet contentDivider()}
+    {#if linesDiffResponse !== null}
+      <DiffContentDivider {linesDiffResponse} {focusedLinesDiffIndex} {mergeOnClick} />
+    {/if}
+  {/snippet}
+  {#snippet rightContent()}
+    {#if linesDiffResponse !== null}
+      <DiffContent
+        oldOrNew="new"
+        {linesDiffResponse}
+        {charsDiffResponse}
+        {showsCharsDiffs}
+        {focusedLinesDiffIndex}
+      />
+    {:else}
+      <!-- todo: loading -->
+      (...... Loading ......)
+    {/if}
+  {/snippet}
 
-<style>
-  .header {
-    height: 2rem;
-    gap: 1.1rem;
-  }
-
-  .rows {
-    height: calc(100vh - 1.9rem);
-    display: flex;
-    flex-direction: column;
-  }
-
-  .row.header,
-  .row.footer {
-    flex-grow: 0;
-  }
-
-  .row.header {
-    height: 2.7rem;
-  }
-  .row.header .col {
-    overflow-x: auto;
-  }
-
-  .row.content {
-    height: 100%;
-    overflow-y: auto;
-  }
-  .row.content .col {
-    height: fit-content;
-    min-height: 100%;
-    overflow-y: hidden;
-  }
-
-  .row.footer {
-    height: 1.5rem;
-  }
-
-  .col.separator {
-    flex-grow: 0;
-    flex-basis: 1.4rem;
-  }
-</style>
+  {#snippet leftFooter()}
+    <DiffFooter oldOrNew="old" {linesDiffResponse} />
+  {/snippet}
+  {#snippet footerDivider()}
+    <DiffFooterDivider
+      {mergeHistory}
+      {toggleCharsDiffs}
+      {switchFilepaths}
+      {undoMergeHistory}
+      {reloadDiff}
+    />
+  {/snippet}
+  {#snippet rightFooter()}
+    <DiffFooter oldOrNew="new" {linesDiffResponse} />
+  {/snippet}
+</View>

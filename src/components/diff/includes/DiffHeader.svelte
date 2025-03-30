@@ -1,37 +1,49 @@
 <script lang="ts">
   import { T } from '../../../stores/settings/translation.svelte'
-  import { PATH_SEPARATOR } from '../../../stores/file.svelte'
+  import { openFileDialog } from '../../../utils/dialog.svelte'
   import Tooltip from '../../common/Tooltip.svelte'
+  import type { CompareSet, OldOrNew } from '../../../types/compareSets'
+  import { FileInput } from 'lucide-svelte'
 
   const {
-    filepath,
-    filepathFromDialogOnClick,
+    oldOrNew,
+    compareSet,
+    filepathOnChange,
   }: {
-    filepath: string
-    filepathFromDialogOnClick: () => void
+    oldOrNew: OldOrNew
+    compareSet: CompareSet
+    filepathOnChange: (oldOrNew: OldOrNew, filepath: string) => void
   } = $props()
 
-  const lastSlashIndex: number = $derived(filepath.lastIndexOf(PATH_SEPARATOR!))
+  const filepath: string = $derived(
+    oldOrNew === 'old' ? compareSet.old.filepath : compareSet.new.filepath
+  )
+
+  const lastSlashIndex: number = $derived(filepath.lastIndexOf('/'))
   const parentDirsPath: string = $derived(filepath.substring(0, lastSlashIndex + 1))
   const filename: string = $derived(filepath.substring(lastSlashIndex + 1))
+
+  const filepathOnClick = async () => {
+    const filepath = await openFileDialog()
+    if (filepath === null) return
+    filepathOnChange(oldOrNew, filepath)
+  }
 </script>
 
-<div class="wrapper">
+<div class={`old-or-new ${oldOrNew}`}>
   <h3 class="filepath">
     <div class="parent-dirs">{parentDirsPath}</div>
     <div class="filename">{filename}</div>
   </h3>
   <Tooltip position="left" messages={T('Select file')}>
-    <button onclick={filepathFromDialogOnClick}>⚓️</button>
+    <button onclick={filepathOnClick}><FileInput /></button>
   </Tooltip>
 </div>
 
 <style>
-  .wrapper {
-    height: 100%;
+  .old-or-new {
     display: flex;
-    align-items: center;
-    gap: 0.2rem;
+    flex: 1;
   }
 
   .filepath {
@@ -45,7 +57,7 @@
     font-weight: normal;
   }
 
-  /* Allows shrinking */
+  /* allows shrinking */
   .parent-dirs {
     flex-shrink: 1;
     min-width: 0;
@@ -54,15 +66,14 @@
     text-overflow: ellipsis;
   }
 
-  /* Prevent from truncated */
+  /* prevent from truncated */
   .filename {
     flex-shrink: 0;
     margin-left: 0.02rem;
   }
 
   button {
-    width: 2rem;
-    padding: 0.1rem 0.4rem;
-    font-size: 0.9rem;
+    width: 2.2rem;
+    padding: 0.3rem;
   }
 </style>

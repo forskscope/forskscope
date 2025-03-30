@@ -1,15 +1,14 @@
 import { invoke } from "@tauri-apps/api/core"
-import { createCompareSetItem, type CompareSet, type CompareSetItem } from "../types"
-import { pushCompareSet } from "../stores/tabs.svelte"
+import { createCompareSetItem, type CompareSet, type CompareSetItem } from "../types/compareSets"
+import { pushCompareSet } from "../stores/compareSets.svelte"
+import { invokeWithGuard } from "./backend.svelte"
 
 export const binaryComparisonOnly = async (filepath: string): Promise<boolean> => {
-    const res = (await invoke('binary_comparison_only', { filepath })
-        // todo
-        .catch((error: unknown) => {
-            console.error(error)
-            return
-        }))
-    return res as unknown as boolean
+    const res = await invokeWithGuard('binary_comparison_only', { filepath })
+    if (res.isError) {
+        return false
+    }
+    return res.response as unknown as boolean
 }
 
 export const filepathsToCompareSet = async (filepaths: string[] | null) => {

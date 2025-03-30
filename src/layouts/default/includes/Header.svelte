@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Cog } from 'lucide-svelte'
   import Tooltip from '../../../components/common/Tooltip.svelte'
   import Settings from '../../../components/settings/Settings.svelte'
   import { T } from '../../../stores/settings/translation.svelte'
@@ -18,12 +19,12 @@
   <h1>Patch Hygge</h1>
 
   <div class="settings">
-    <Tooltip position="bottom" messages={T('Settings')}>
+    <Tooltip position="left" messages={T('Settings')}>
       <button
         onclick={() => {
           toggleSettings()
         }}
-        >⚙️
+        ><Cog />
       </button>
     </Tooltip>
   </div>

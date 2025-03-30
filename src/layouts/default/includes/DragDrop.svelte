@@ -1,6 +1,6 @@
 <script lang="ts">
   import DragDrop from '../../../components/common/DragDrop.svelte'
-  import { filepathsToCompareSet } from '../../../utils/diff.svelte'
+  import { filepathsToCompareSet } from '../../../utils/compareSets.svelte'
 
   const filesOnDropped = async (filepaths: string[]) => {
     filepathsToCompareSet(filepaths)

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LaptopMinimal, Plus, X } from 'lucide-svelte'
   import {
     activateCompareSet,
     activateExplorer,
@@ -6,9 +7,9 @@
     exploreIsActive,
     isActiveCompareSet,
     spliceCompareSet,
-  } from '../../stores/tabs.svelte'
+  } from '../../stores/compareSets.svelte'
   import { openMultipleFilesDialog } from '../../utils/dialog.svelte'
-  import { filepathsToCompareSet } from '../../utils/diff.svelte'
+  import { filepathsToCompareSet } from '../../utils/compareSets.svelte'
 
   const addButtonOnClick = async () => {
     const filepaths = await openMultipleFilesDialog()
@@ -22,7 +23,7 @@
       class={`explorer ${exploreIsActive() ? 'active' : ''}`}
       onclick={() => activateExplorer()}
     >
-      <span>💻️</span>
+      <span><LaptopMinimal /></span>
     </button>
   </div>
   {#each $compareSets as compareSet, i}
@@ -35,35 +36,45 @@
           >{compareSet.new.filepath.split('/')[compareSet.new.filepath.split('/').length - 1]}</span
         >
       </button>
-      <button class="close" onclick={() => spliceCompareSet(i)}>✖️</button>
+      <button class="close" onclick={() => spliceCompareSet(i)}><X /></button>
     </div>
   {/each}
   <div class="tab">
     <button class="add" onclick={addButtonOnClick}>
-      <span>➕️</span>
+      <span><Plus /></span>
     </button>
   </div>
 </div>
 
 <style>
+  .tabs,
+  .tab {
+    box-sizing: border-box;
+  }
+
   .tabs {
     max-width: 100%;
     display: flex;
     overflow-x: auto;
-    box-sizing: border-box;
   }
+
   .tab {
+    position: relative;
     border-width: 0.01rem;
-    border-style: solid;
-    box-sizing: border-box;
-  }
-  .tab.active {
-    font-size: 105%;
-    border-width: 0.12rem;
     border-style: solid;
   }
   .tab:hover {
     opacity: 0.87;
+  }
+
+  .tab .active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    display: inline-block;
+    height: 0.03rem;
+    width: 100%;
   }
 
   .tab button {
@@ -79,9 +90,12 @@
 
   .tab .diff {
     width: 7.2rem;
+    justify-content: flex-start;
+  }
+  .tab .diff span {
     white-space: pre;
-    text-overflow: ellipsis;
     overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .tab .close {
