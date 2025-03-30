@@ -8,24 +8,18 @@
     mergeHistory,
     toggleCharsDiffs,
     switchFilepaths,
+    undoMergeHistory,
   }: {
     linesDiffResponse: LinesDiffResponse | null
     mergeHistory: MergeHistoryItem[]
     toggleCharsDiffs: () => void
     switchFilepaths: () => void
+    undoMergeHistory: () => void
   } = $props()
 
   let showsMenus: boolean = $state(false)
 
   const undoMergeHistoryEnabled: boolean = $derived(0 < mergeHistory.length)
-
-  const undoMergeHistory = () => {
-    const mergeHistoryItem = mergeHistory.pop()
-    if (!linesDiffResponse || !mergeHistoryItem) return
-    const reverted = linesDiffResponse.diffs[mergeHistoryItem.diffIndex]
-    reverted.newLines = mergeHistoryItem.orgNewLines
-    reverted.diffKind = mergeHistoryItem.orgDiffKind
-  }
 </script>
 
 <div class="menus-wrapper">

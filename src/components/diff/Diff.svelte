@@ -180,6 +180,14 @@
     }
   }
 
+  const undoMergeHistory = () => {
+    const mergeHistoryItem = mergeHistory.pop()
+    if (!linesDiffResponse || !mergeHistoryItem) return
+    const reverted = linesDiffResponse.diffs[mergeHistoryItem.diffIndex]
+    reverted.newLines = mergeHistoryItem.orgNewLines
+    reverted.diffKind = mergeHistoryItem.orgDiffKind
+  }
+
   // todo: save as
   // const saveAsOnClick = async () => {
   //   const filepath = await saveFileDialog(newFilepath!).catch((error: unknown) => {
@@ -265,7 +273,13 @@
       <DiffFooter oldOrNew="old" {linesDiffResponse} />
     {/snippet}
     {#snippet footerDivider()}
-      <DiffFooterDivider {linesDiffResponse} {mergeHistory} {toggleCharsDiffs} {switchFilepaths} />
+      <DiffFooterDivider
+        {linesDiffResponse}
+        {mergeHistory}
+        {toggleCharsDiffs}
+        {switchFilepaths}
+        {undoMergeHistory}
+      />
     {/snippet}
     {#snippet rightFooter()}
       <DiffFooter oldOrNew="new" {linesDiffResponse} />
