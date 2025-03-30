@@ -34,6 +34,10 @@
     overflow: scroll;
 }
 
+.view-body .content>* {
+    flex: 1;
+}
+
 .view-body .divider {
     overflow: hidden;
 }

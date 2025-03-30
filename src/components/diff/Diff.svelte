@@ -198,12 +198,7 @@
   // }
 </script>
 
-<View
-  mainClass="diff"
-  customStyle={`--line-height: ${DIFF_LINE_HEIGHT};`}
-  {visible}
-  scrollSyncs={true}
->
+<View mainClass="diff" customStyle={`--line-height: ${DIFF_LINE_HEIGHT};`} {visible} scrollSyncs>
   {#snippet leftHeader()}
     <DiffHeader oldOrNew="old" {compareSet} {filepathOnChange} />
   {/snippet}

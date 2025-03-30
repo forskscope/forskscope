@@ -19,7 +19,7 @@
     mainClass: string
     customStyle?: string
     visible: boolean
-    scrollSyncs: boolean
+    scrollSyncs?: boolean
     leftHeader: any
     headerDivider: any
     rightHeader: any
