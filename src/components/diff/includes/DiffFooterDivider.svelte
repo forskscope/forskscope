@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Menu, RefreshCw, Undo } from 'lucide-svelte'
+  import { ArrowRightLeft, Menu, RefreshCw, ScanSearch, Undo } from 'lucide-svelte'
   import { T } from '../../../stores/settings/translation.svelte'
   import type { LinesDiffResponse, MergeHistoryItem } from '../../../types/diff'
 
@@ -28,13 +28,21 @@
   >
 
   <div class={`menus ${showsMenus ? 'active' : 'd-none'}`}>
-    <button onclick={toggleCharsDiffs}>{T('Show chars diff')}</button>
-    <button onclick={switchFilepaths}>{T('Switch left/right')}</button>
+    <button onclick={toggleCharsDiffs}>
+      <ScanSearch />
+      {T('Show chars diff')}
+    </button>
+    <button onclick={switchFilepaths}>
+      <ArrowRightLeft />
+      {T('Switch left/right')}
+    </button>
     <button onclick={undoMergeHistory} disabled={!undoMergeHistoryEnabled}>
-      <Undo />{T('Undo a merge history')}
+      <Undo />
+      {T('Undo a merge history')}
     </button>
     <button onclick={reloadDiff}>
-      <RefreshCw />{T('Reload diff')}
+      <RefreshCw />
+      {T('Reload diff')}
     </button>
   </div>
 </div>
