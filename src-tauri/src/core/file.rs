@@ -13,7 +13,7 @@ use sheets_diff::core::unified_format::{unified_diff, SplitUnifiedDiffContent};
 
 use super::diff::binary_comparison_only;
 use super::str::bytes_to_hex_dump;
-use super::types::{FileAttr, ListDirReponse, ReadContent};
+use super::types::{FileAttr, ListDirResponse, ReadContent};
 
 /// default charset
 const UTF8_CHARSET: &str = "UTF-8";
@@ -55,8 +55,11 @@ pub fn filepaths_content(old: &str, new: &str) -> Result<Vec<ReadContent>, Strin
 }
 
 /// list files and directories in directory
-pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
-    let target_dir = target_dir(current_dir);
+pub fn list_dir(current_dir: &str) -> Result<ListDirResponse, String> {
+    let target_dir = match target_dir(current_dir) {
+        Ok(x) => x,
+        Err(err) => return Err(err.to_string()),
+    };
 
     let mut dirs = Vec::<String>::new();
     let mut files = Vec::<FileAttr>::new();
@@ -106,7 +109,7 @@ pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
     dirs.sort();
     files.sort();
 
-    Ok(ListDirReponse {
+    Ok(ListDirResponse {
         current_dir: target_dir.to_string_lossy().to_string(),
         dirs: dirs,
         files: files,
@@ -283,15 +286,13 @@ fn os_path_buf(path_buf: &PathBuf) -> PathBuf {
 }
 
 /// target dir
-fn target_dir(current_dir: &str) -> PathBuf {
+fn target_dir(current_dir: &str) -> Result<PathBuf, IOError> {
     let ret = if current_dir.is_empty() {
         std::env::current_dir().expect("Failed to get current directory")
     } else {
-        Path::new(current_dir)
-            .canonicalize()
-            .expect(format!("Failed to canonicalize path: {}", current_dir).as_str())
+        Path::new(current_dir).canonicalize()?
     };
-    os_path_buf(&ret)
+    Ok(os_path_buf(&ret))
 }
 
 /// add separator commnas to number

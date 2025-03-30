@@ -7,7 +7,7 @@ use tauri::Manager;
 
 use super::diff::{self, chars_diffs, lines_diffs, startup_compare_set_item};
 use super::file::{self, file_manager_command, filepaths_content};
-use super::types::{CharsDiffResponse, CompareSet, LinesDiff, LinesDiffResponse, ListDirReponse};
+use super::types::{CharsDiffResponse, CompareSet, LinesDiff, LinesDiffResponse, ListDirResponse};
 
 #[tauri::command]
 pub fn ready(app_handle: tauri::AppHandle) -> CompareSet {
@@ -46,7 +46,7 @@ pub async fn diff_chars(lines_diffs: Vec<LinesDiff>) -> Result<CharsDiffResponse
 }
 
 #[tauri::command]
-pub fn list_dir(current_dir: &str) -> Result<ListDirReponse, String> {
+pub fn list_dir(current_dir: &str) -> Result<ListDirResponse, String> {
     file::list_dir(current_dir)
 }
 

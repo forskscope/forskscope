@@ -32,10 +32,6 @@ select {
         color: var(--app-secondary-text-color);
     }
 
-    &.active button {
-        border-color: var(--focused-border-color);
-    }
-
     &:hover:not(:has(.close:hover)) .diff,
     &:hover .explorer,
     &:hover .add,
@@ -43,16 +39,26 @@ select {
         background-color: var(--app-secondary-text-color);
         color: var(--app-secondary-background-color);
     }
+
+    .active::before {
+        background-color: var(--app-secondary-text-color);
+    }
 }
 
-.explorer-pane {
+.explorer-container {
+    .row.headers {
+        background-color: var(--app-primary-background-color);
+        color: var(--app-primary-text-color);
+    }
+
     &.old {
         background-color: var(--explorer-old-pane-background-color);
         color: var(--explorer-old-pane-text-color);
 
-        label input[type='radio']:checked+div,
-        .file input[type='radio']:checked+div,
-        .name:hover {
+        // label input[type='radio']:checked+div,
+        // .file input[type='radio']:checked+div,
+        .row.selected .name,
+        .row:not(.headers) .name:hover {
             background-color: var(--explorer-old-pane-text-color);
             color: var(--explorer-old-pane-background-color);
         }
@@ -62,9 +68,10 @@ select {
         background-color: var(--explorer-new-pane-background-color);
         color: var(--explorer-new-pane-text-color);
 
-        label input[type='radio']:checked+div,
-        .file input[type='radio']:checked+div,
-        .name:hover {
+        // label input[type='radio']:checked+div,
+        // .file input[type='radio']:checked+div,
+        .row.selected .name,
+        .row:not(.headers):hover .name {
             background-color: var(--explorer-new-pane-text-color);
             color: var(--explorer-new-pane-background-color);
         }
@@ -73,13 +80,6 @@ select {
     .current-dir {
         background-color: var(--app-secondary-background-color);
         color: var(--app-secondary-text-color);
-    }
-
-    .dirs-files {
-        .header {
-            background-color: var(--app-primary-background-color);
-            color: var(--app-primary-text-color);
-        }
     }
 }
 

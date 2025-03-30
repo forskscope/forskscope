@@ -58,7 +58,7 @@ pub struct CharsDiff {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ListDirReponse {
+pub struct ListDirResponse {
     pub current_dir: String,
     pub dirs: Vec<String>,
     pub files: Vec<FileAttr>,

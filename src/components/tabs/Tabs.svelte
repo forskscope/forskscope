@@ -47,24 +47,34 @@
 </div>
 
 <style>
+  .tabs,
+  .tab {
+    box-sizing: border-box;
+  }
+
   .tabs {
     max-width: 100%;
     display: flex;
     overflow-x: auto;
-    box-sizing: border-box;
   }
+
   .tab {
+    position: relative;
     border-width: 0.01rem;
-    border-style: solid;
-    box-sizing: border-box;
-  }
-  .tab.active {
-    font-size: 105%;
-    border-width: 0.12rem;
     border-style: solid;
   }
   .tab:hover {
     opacity: 0.87;
+  }
+
+  .tab .active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    display: inline-block;
+    height: 0.03rem;
+    width: 100%;
   }
 
   .tab button {

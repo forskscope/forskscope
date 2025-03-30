@@ -19,7 +19,7 @@
   <h1>Patch Hygge</h1>
 
   <div class="settings">
-    <Tooltip position="bottom" messages={T('Settings')}>
+    <Tooltip position="left" messages={T('Settings')}>
       <button
         onclick={() => {
           toggleSettings()

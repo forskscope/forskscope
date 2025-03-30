@@ -1,4 +1,4 @@
-export interface ListDirReponse {
+export interface ListDirResponse {
     currentDir: string,
     dirs: string[],
     files: FileAttr[],
