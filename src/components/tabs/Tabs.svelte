@@ -80,9 +80,12 @@
 
   .tab .diff {
     width: 7.2rem;
+    justify-content: flex-start;
+  }
+  .tab .diff span {
     white-space: pre;
-    text-overflow: ellipsis;
     overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .tab .close {
