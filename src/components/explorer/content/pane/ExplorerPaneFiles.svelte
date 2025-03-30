@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Check, File, Icon, TriangleAlert } from 'lucide-svelte'
+  import { Check, File, TriangleAlert } from 'lucide-svelte'
   import type { FileAttr } from '../../../../types/file'
   import ExplorerPaneRow from './template/ExplorerPaneRow.svelte'
   import type { OldOrNew } from '../../../../types/compareSets'
@@ -12,8 +12,7 @@
     newSelectedFileIndex,
     fileDigestDiffs,
     statusIconName,
-    pushCompareSetFromSelectedFiles,
-    pushCompareSetIfSameNameFileExists,
+    pushCompareSetIfReady,
   } from '../../../../stores/explorer.svelte'
 
   const MAIN_CLASS_BASE: string = 'file'
@@ -43,7 +42,7 @@
   }
 
   const rowOnDblClick = (i: number) => {
-    pushCompareSetIfSameNameFileExists(oldOrNew, i)
+    pushCompareSetIfReady(oldOrNew, i)
   }
 </script>
 

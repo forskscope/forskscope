@@ -101,12 +101,42 @@ export const pushCompareSetFromSelectedFiles = async () => {
     pushCompareSetFromFilepaths(oldFilepath, newFilepath)
 }
 
-export const pushCompareSetIfSameNameFileExists = async (oldOrNew: OldOrNew, index: number) => {
+// "ready" means either of:
+// case: same name files exist
+// case: both old/new files are selected
+export const pushCompareSetIfReady = async (oldOrNew: OldOrNew, index: number) => {
     const _oldListDirResponse = listDirResponse("old")
     if (_oldListDirResponse === null) return
     const _newListDirResponse = listDirResponse("new")
     if (_newListDirResponse === null) return
 
+    if (await pushCompareSetIfSameNameFileExists(_oldListDirResponse, _newListDirResponse, oldOrNew, index)) return
+    pushCompareSetIfOldNewFilesSelected(_oldListDirResponse, _newListDirResponse)
+}
+
+const pushCompareSetIfOldNewFilesSelected = async (
+    _oldListDirResponse: ListDirResponse,
+    _newListDirResponse: ListDirResponse
+): Promise<boolean> => {
+    const _oldSelectedFileIndex = get(oldSelectedFileIndex)
+    if (_oldSelectedFileIndex === null) return false
+    const _newSelectedFileIndex = get(newSelectedFileIndex)
+    if (_newSelectedFileIndex === null) return false
+
+    const oldFilepath = `${_oldListDirResponse.currentDir}/${_oldListDirResponse.files[_oldSelectedFileIndex].name}`
+    const newFilepath = `${_newListDirResponse.currentDir}/${_newListDirResponse.files[_newSelectedFileIndex].name}`
+
+    await pushCompareSetFromFilepaths(oldFilepath, newFilepath)
+
+    return true
+}
+
+const pushCompareSetIfSameNameFileExists = async (
+    _oldListDirResponse: ListDirResponse,
+    _newListDirResponse: ListDirResponse,
+    oldOrNew: OldOrNew,
+    index: number
+): Promise<boolean> => {
     const filename = oldOrNew === "old" ?
         _oldListDirResponse.files[index].name :
         _newListDirResponse.files[index].name
@@ -115,12 +145,14 @@ export const pushCompareSetIfSameNameFileExists = async (oldOrNew: OldOrNew, ind
         _newListDirResponse.files.find((x) => x.name === filename)
         : _oldListDirResponse.files.find((x) => x.name === filename)
 
-    if (!found) return
+    if (!found) return false
 
     const oldFilepath = `${_oldListDirResponse.currentDir}/${filename}`
     const newFilepath = `${_newListDirResponse.currentDir}/${filename}`
 
-    pushCompareSetFromFilepaths(oldFilepath, newFilepath)
+    await pushCompareSetFromFilepaths(oldFilepath, newFilepath)
+
+    return true
 }
 
 export const setDigestDiffs = () => {
