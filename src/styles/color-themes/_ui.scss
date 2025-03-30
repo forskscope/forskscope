@@ -108,6 +108,9 @@ select {
 
 .diff .view-body .divider {
     button.merge {
+        width: 100%;
+        padding: 0;
+
         background-color: transparent;
         color: var(--app-secondary-text-color);
         box-shadow: none;
