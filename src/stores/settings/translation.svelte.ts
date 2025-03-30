@@ -18,6 +18,7 @@ const setTranslation = async (language: AppLanguage) => {
         return
     }
 
+    // todo: translation to TOML or JSON5 manipulated in backend
     const path = await resolveResource(`translations/${language}.json`)
     const updated = JSON.parse(await readTextFile(path))
     translation = updated
