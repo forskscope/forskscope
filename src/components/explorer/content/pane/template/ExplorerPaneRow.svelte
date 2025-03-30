@@ -100,6 +100,7 @@
   }
 
   .row:not(.headers):not(.footer) .col.name {
+    /* todo */
     position: sticky;
   }
 
