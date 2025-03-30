@@ -14,16 +14,22 @@
   }
 </script>
 
-<div>
-  <button onclick={prevDiffFocus}><MoveUp /></button>
-  <button onclick={nextDiffFocus}><MoveDown /></button>
+<div class="menus-wrapper">
+  <div class="menus">
+    <button onclick={prevDiffFocus}><MoveUp /></button>
+    <button onclick={nextDiffFocus}><MoveDown /></button>
+  </div>
 </div>
 
 <style>
-  div {
-    width: 100%;
-    height: 100%;
-    overflow-y: scroll;
+  .menus-wrapper {
+    position: relative;
+    display: flex;
+    justify-content: center;
+  }
+  .menus {
+    position: relative;
+    top: -0.7rem;
     display: inline-flex;
     flex-direction: column;
     justify-content: center;
@@ -32,7 +38,7 @@
   }
 
   button {
-    padding: 0.1rem;
+    padding: 0.1rem 0.2rem;
     font-size: 0.9rem;
   }
 </style>
