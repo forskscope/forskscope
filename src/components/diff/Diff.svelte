@@ -25,6 +25,8 @@
     switchCharsDiffLinesList,
     switchLinesDiffs,
   } from './helpers.svelte'
+  import { confirm } from '@tauri-apps/plugin-dialog'
+  import { T } from '../../stores/settings/translation.svelte'
 
   const { compareSetIndex }: { compareSetIndex: number } = $props()
 
@@ -120,6 +122,10 @@
   }
 
   const switchFilepaths = async () => {
+    // todo: confirm or restore all merged or else ?
+    const confirmed = await confirm(T('Switch files causes merge history cleared'))
+    if (!confirmed) return
+
     compareSet = await updateCompareSet(
       compareSetIndex,
       compareSet.new.filepath,
