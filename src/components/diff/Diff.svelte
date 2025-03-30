@@ -17,7 +17,14 @@
   import DiffHeader from './includes/DiffHeader.svelte'
   import DiffFooter from './includes/DiffFooter.svelte'
   import DiffContentDivider from './content/DiffContentDivider.svelte'
-  import { DIFF_LINE_HEIGHT, LINES_DIFF_CLASS_PREFIX } from './consts'
+  import { DIFF_LINE_HEIGHT } from './consts'
+  import {
+    deltaModifyingFocusedDiffLinesIndex,
+    diffCharsFromLinesDiffResponse,
+    scrollIntoFocusedDiffLines,
+    switchCharsDiffLinesList,
+    switchLinesDiffs,
+  } from './helpers.svelte'
 
   const { compareSetIndex }: { compareSetIndex: number } = $props()
 
@@ -32,16 +39,6 @@
 
   const oldFilepath: string = $derived(compareSet.old.filepath)
   const newFilepath: string = $derived(compareSet.new.filepath)
-
-  const firstFocusedLinesDiffIndex: number = $derived.by(() => {
-    if (!linesDiffResponse) return -1
-    return linesDiffResponse.diffs.findIndex((x) => x.diffKind !== 'equal')
-  })
-
-  const lastFocusedLinesDiffIndex: number = $derived.by(() => {
-    if (!linesDiffResponse) return -1
-    return linesDiffResponse.diffs.findLastIndex((x) => x.diffKind !== 'equal')
-  })
 
   const visible: boolean = $derived(isActiveCompareSet(compareSetIndex))
 
@@ -68,14 +65,9 @@
   const diffChars = async () => {
     if (charsDiffResponse !== null) return
 
-    const replaceLinesDiffs = linesDiffResponse!.diffs.filter((x) => x.diffKind === 'replace')
-    if (replaceLinesDiffs.length === 0) return
-
-    const res: BackendCommandResult = await invokeWithGuard('diff_chars', {
-      linesDiffs: replaceLinesDiffs,
-    })
-
-    charsDiffResponse = res.response as CharsDiffResponse
+    const res = await diffCharsFromLinesDiffResponse(linesDiffResponse!)
+    if (res === null) return
+    charsDiffResponse = res
   }
 
   const filepathOnChange = async (oldOrNew: OldOrNew, filepath: string) => {
@@ -99,30 +91,12 @@
   }
 
   const focusedLinesDiffIndexOnChange = (delta: number) => {
-    if (!linesDiffResponse) return
-
-    if (focusedLinesDiffIndex === null) {
-      focusedLinesDiffIndex = firstFocusedLinesDiffIndex
-      return
-    }
-
-    if (focusedLinesDiffIndex === firstFocusedLinesDiffIndex && delta < 0) return
-    if (focusedLinesDiffIndex === lastFocusedLinesDiffIndex && 0 < delta) return
-
-    if (0 < delta) {
-      focusedLinesDiffIndex = linesDiffResponse.diffs.findIndex((x, i) => {
-        return x.diffKind !== 'equal' && focusedLinesDiffIndex! < i
-      })
-    } else {
-      focusedLinesDiffIndex = linesDiffResponse.diffs.findLastIndex((x, i) => {
-        return x.diffKind !== 'equal' && i < focusedLinesDiffIndex!
-      })
-    }
-
-    // scroll into view
-    document
-      .querySelector(`.diff .content .new .focused`)!
-      .scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'start' })
+    focusedLinesDiffIndex = deltaModifyingFocusedDiffLinesIndex(
+      delta,
+      focusedLinesDiffIndex,
+      linesDiffResponse
+    )
+    scrollIntoFocusedDiffLines()
   }
 
   const mergeOnClick = (index: number) => {
@@ -157,26 +131,14 @@
       return
     }
 
-    linesDiffResponse.diffs = linesDiffResponse.diffs.map((x) => {
-      const ret = x
-      const orgOldLines = ret.oldLines
-      ret.oldLines = ret.newLines
-      ret.newLines = orgOldLines
-      return ret
-    })
+    linesDiffResponse.diffs = switchLinesDiffs(linesDiffResponse.diffs)
 
     const oldCharset = linesDiffResponse.oldCharset
     linesDiffResponse.oldCharset = linesDiffResponse.newCharset
     linesDiffResponse.newCharset = oldCharset
 
     if (charsDiffResponse !== null) {
-      charsDiffResponse.diffs = charsDiffResponse.diffs.map((x) => {
-        const ret = x
-        const orgOldLines = ret.oldLines
-        ret.oldLines = ret.newLines
-        ret.newLines = orgOldLines
-        return ret
-      })
+      charsDiffResponse.diffs = switchCharsDiffLinesList(charsDiffResponse.diffs)
     }
   }
 
