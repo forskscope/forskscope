@@ -24,7 +24,7 @@
     type AppLanguage,
     type AppTheme,
     type AppUiFontFamily,
-  } from '../../types/settings.svelte'
+  } from '../../types/settings'
 
   interface Selector {
     icon?: ConstructorOfATypedSvelteComponent

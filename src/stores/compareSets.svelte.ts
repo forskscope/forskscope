@@ -1,5 +1,5 @@
 import { get, writable, type Writable } from "svelte/store";
-import type { CompareSet } from "../types/compareSets.svelte";
+import type { CompareSet } from "../types/compareSets";
 import { binaryComparisonOnly } from "../utils/compareSets.svelte";
 
 let activeCompareSetIndex: number | null = $state(null)

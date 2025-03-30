@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ArrowRight } from 'lucide-svelte'
-  import type { LinesDiff, LinesDiffResponse } from '../../../types/diff.svelte'
+  import type { LinesDiff, LinesDiffResponse } from '../../../types/diff'
   import { LINES_DIFF_CLASS_PREFIX } from '../consts'
 
   const {

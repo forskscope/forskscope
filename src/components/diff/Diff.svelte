@@ -1,13 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { invokeWithGuard } from '../../utils/backend.svelte'
-  import type { CompareSet, OldOrNew } from '../../types/compareSets.svelte'
-  import type {
-    CharsDiffResponse,
-    LinesDiffResponse,
-    MergeHistoryItem,
-  } from '../../types/diff.svelte'
-  import type { BackendCommandResult } from '../../types/backend.svelte'
+  import type { CompareSet, OldOrNew } from '../../types/compareSets'
+  import type { CharsDiffResponse, LinesDiffResponse, MergeHistoryItem } from '../../types/diff'
+  import type { BackendCommandResult } from '../../types/backend'
   import {
     getCompareSet,
     isActiveCompareSet,

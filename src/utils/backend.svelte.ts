@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core"
 import { errorToast } from "../stores/Toast.svelte"
-import type { BackendCommandResult } from "../types/backend.svelte"
+import type { BackendCommandResult } from "../types/backend"
 
 export const invokeWithGuard = async (command: string, args: Record<string, any>): Promise<BackendCommandResult> => {
     let isError = false

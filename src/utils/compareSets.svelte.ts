@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
-import { createCompareSetItem, type CompareSet, type CompareSetItem } from "../types/compareSets.svelte"
+import { createCompareSetItem, type CompareSet, type CompareSetItem } from "../types/compareSets"
 import { pushCompareSet } from "../stores/compareSets.svelte"
 
 export const binaryComparisonOnly = async (filepath: string): Promise<boolean> => {

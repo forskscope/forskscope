@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { OldOrNew } from '../../../types/compareSets.svelte'
+  import type { OldOrNew } from '../../../types/compareSets'
   import type {
     CharsDiff,
     CharsDiffLines,
@@ -7,7 +7,7 @@
     DiffKind,
     LinesDiff,
     LinesDiffResponse,
-  } from '../../../types/diff.svelte'
+  } from '../../../types/diff'
   import { LINES_DIFF_CLASS_PREFIX } from '../consts'
 
   const {

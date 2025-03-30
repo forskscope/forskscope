@@ -1,7 +1,7 @@
 <script lang="ts">
   import { CircleCheck, X } from 'lucide-svelte'
-  import type { OldOrNew } from '../../../types/compareSets.svelte'
-  import type { LinesDiffResponse } from '../../../types/diff.svelte'
+  import type { OldOrNew } from '../../../types/compareSets'
+  import type { LinesDiffResponse } from '../../../types/diff'
   import Tooltip from '../../common/Tooltip.svelte'
   import { T } from '../../../stores/settings/translation.svelte'
 

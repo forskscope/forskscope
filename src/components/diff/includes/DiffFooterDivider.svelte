@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Menu, Undo } from 'lucide-svelte'
   import { T } from '../../../stores/settings/translation.svelte'
-  import type { LinesDiffResponse, MergeHistoryItem } from '../../../types/diff.svelte'
+  import type { LinesDiffResponse, MergeHistoryItem } from '../../../types/diff'
 
   const {
     linesDiffResponse,
