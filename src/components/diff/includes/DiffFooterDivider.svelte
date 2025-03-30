@@ -4,13 +4,11 @@
   import type { LinesDiffResponse, MergeHistoryItem } from '../../../types/diff'
 
   const {
-    linesDiffResponse,
     mergeHistory,
     toggleCharsDiffs,
     switchFilepaths,
     undoMergeHistory,
   }: {
-    linesDiffResponse: LinesDiffResponse | null
     mergeHistory: MergeHistoryItem[]
     toggleCharsDiffs: () => void
     switchFilepaths: () => void

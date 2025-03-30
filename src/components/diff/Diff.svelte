@@ -230,24 +230,24 @@
   // }
 </script>
 
-{#if linesDiffResponse !== null}
-  <View
-    mainClass="diff"
-    customStyle={`--line-height: ${DIFF_LINE_HEIGHT};`}
-    {visible}
-    scrollSyncs={true}
-  >
-    {#snippet leftHeader()}
-      <DiffHeader oldOrNew="old" {compareSet} {filepathOnChange} />
-    {/snippet}
-    {#snippet headerDivider()}
-      <DiffHeaderDivider {focusedLinesDiffIndexOnChange} />
-    {/snippet}
-    {#snippet rightHeader()}
-      <DiffHeader oldOrNew="new" {compareSet} {filepathOnChange} />
-    {/snippet}
+<View
+  mainClass="diff"
+  customStyle={`--line-height: ${DIFF_LINE_HEIGHT};`}
+  {visible}
+  scrollSyncs={true}
+>
+  {#snippet leftHeader()}
+    <DiffHeader oldOrNew="old" {compareSet} {filepathOnChange} />
+  {/snippet}
+  {#snippet headerDivider()}
+    <DiffHeaderDivider {focusedLinesDiffIndexOnChange} />
+  {/snippet}
+  {#snippet rightHeader()}
+    <DiffHeader oldOrNew="new" {compareSet} {filepathOnChange} />
+  {/snippet}
 
-    {#snippet leftContent()}
+  {#snippet leftContent()}
+    {#if linesDiffResponse !== null}
       <DiffContent
         oldOrNew="old"
         {linesDiffResponse}
@@ -255,11 +255,18 @@
         {showsCharsDiffs}
         {focusedLinesDiffIndex}
       />
-    {/snippet}
-    {#snippet contentDivider()}
+    {:else}
+      <!-- todo: loading -->
+      (...... Loading ......)
+    {/if}
+  {/snippet}
+  {#snippet contentDivider()}
+    {#if linesDiffResponse !== null}
       <DiffContentDivider {linesDiffResponse} {focusedLinesDiffIndex} {mergeOnClick} />
-    {/snippet}
-    {#snippet rightContent()}
+    {/if}
+  {/snippet}
+  {#snippet rightContent()}
+    {#if linesDiffResponse !== null}
       <DiffContent
         oldOrNew="new"
         {linesDiffResponse}
@@ -267,25 +274,19 @@
         {showsCharsDiffs}
         {focusedLinesDiffIndex}
       />
-    {/snippet}
+    {:else}
+      <!-- todo: loading -->
+      (...... Loading ......)
+    {/if}
+  {/snippet}
 
-    {#snippet leftFooter()}
-      <DiffFooter oldOrNew="old" {linesDiffResponse} />
-    {/snippet}
-    {#snippet footerDivider()}
-      <DiffFooterDivider
-        {linesDiffResponse}
-        {mergeHistory}
-        {toggleCharsDiffs}
-        {switchFilepaths}
-        {undoMergeHistory}
-      />
-    {/snippet}
-    {#snippet rightFooter()}
-      <DiffFooter oldOrNew="new" {linesDiffResponse} />
-    {/snippet}
-  </View>
-{:else}
-  <!-- todo: loading -->
-  (...... Loading ......)
-{/if}
+  {#snippet leftFooter()}
+    <DiffFooter oldOrNew="old" {linesDiffResponse} />
+  {/snippet}
+  {#snippet footerDivider()}
+    <DiffFooterDivider {mergeHistory} {toggleCharsDiffs} {switchFilepaths} {undoMergeHistory} />
+  {/snippet}
+  {#snippet rightFooter()}
+    <DiffFooter oldOrNew="new" {linesDiffResponse} />
+  {/snippet}
+</View>

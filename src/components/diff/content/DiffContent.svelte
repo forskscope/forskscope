@@ -18,13 +18,13 @@
     focusedLinesDiffIndex,
   }: {
     oldOrNew: OldOrNew
-    linesDiffResponse: LinesDiffResponse | null
+    linesDiffResponse: LinesDiffResponse
     charsDiffResponse: CharsDiffResponse | null
     showsCharsDiffs: boolean
     focusedLinesDiffIndex: number | null
   } = $props()
 
-  let linesDiffs: LinesDiff[] = $derived(linesDiffResponse !== null ? linesDiffResponse.diffs : [])
+  let linesDiffs: LinesDiff[] = $derived(linesDiffResponse.diffs)
 
   const charsDiffs: CharsDiffLines[] = $derived(
     charsDiffResponse !== null ? charsDiffResponse.diffs : []

@@ -8,14 +8,12 @@
     focusedLinesDiffIndex,
     mergeOnClick,
   }: {
-    linesDiffResponse: LinesDiffResponse | null
+    linesDiffResponse: LinesDiffResponse
     focusedLinesDiffIndex: number | null
     mergeOnClick: (index: number) => void
   } = $props()
 
-  const linesDiffs: LinesDiff[] = $derived(
-    linesDiffResponse !== null ? linesDiffResponse.diffs : []
-  )
+  const linesDiffs: LinesDiff[] = $derived(linesDiffResponse.diffs)
 </script>
 
 <div class="lines-diffs">
