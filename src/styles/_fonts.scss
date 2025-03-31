@@ -1,7 +1,8 @@
 #app {
     font-size: var(--ui-font-size);
 
-    .diff-content {
+    .diff .view-body .content,
+    .diff .view-body .divider button {
         font-size: var(--diff-font-size);
     }
 

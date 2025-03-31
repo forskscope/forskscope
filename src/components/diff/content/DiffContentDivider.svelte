@@ -32,3 +32,9 @@
     </button>
   {/each}
 </div>
+
+<style>
+  button {
+    display: block;
+  }
+</style>
