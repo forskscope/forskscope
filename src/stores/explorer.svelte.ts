@@ -26,6 +26,12 @@ export const initialize = async () => {
     newListDirResponse.set(listDirResponse)
 }
 
+// todo: export if necessary on explorer pane footer detail shown
+// export const listDirResponse = (oldOrNew: OldOrNew): ListDirResponse | null => {
+const listDirResponse = (oldOrNew: OldOrNew): ListDirResponse | null => {
+    return oldOrNew === "old" ? get(oldListDirResponse) : get(newListDirResponse)
+}
+
 export const selectFile = (oldOrNew: OldOrNew, index: number) => {
     if (oldOrNew === "old") {
         oldSelectedFileIndex.set(index)
@@ -205,22 +211,6 @@ export const statusIconName = (name: string, isDir: boolean): string | null => {
     const found = isDir ? get(dirDigestDiffs).find((x) => x.name === name) : get(fileDigestDiffs).find((x) => x.name === name)
     if (!found) return null
     return found.equal ? "Check" : "TriangleAlert"
-}
-
-export const numberOfDirs = (oldOrNew: OldOrNew): number | null => {
-    const _listDirResponse = listDirResponse(oldOrNew)
-    if (_listDirResponse === null) return null
-    return _listDirResponse.dirs.length
-}
-
-export const numberOfFiles = (oldOrNew: OldOrNew): number | null => {
-    const _listDirResponse = listDirResponse(oldOrNew)
-    if (_listDirResponse === null) return null
-    return _listDirResponse.files.length
-}
-
-const listDirResponse = (oldOrNew: OldOrNew): ListDirResponse | null => {
-    return oldOrNew === "old" ? get(oldListDirResponse) : get(newListDirResponse)
 }
 
 const currentDirpath = (oldOrNew: OldOrNew): string | null => {

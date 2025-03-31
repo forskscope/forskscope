@@ -1,12 +1,5 @@
-// `min-height: 0;` hides explorer content
-// though it is required by diff vertical scroll ...
-.view-body:has(.explorer-container) {
-    min-height: unset;
-}
-
 // specific class wrapping prevents affecting external views
 .explorer-container {
-    height: 100%;
     flex-direction: column;
 
     &,
@@ -18,27 +11,15 @@
         box-sizing: border-box;
     }
 
-    // &,
-    // .body,
-    // .content {
-    //     flex: 1;
-    // }
-
-    // .body,
-    // .body .content,
-    // .body .content .files {
-    //     // setting `0` at flex-basis instead of `auto` 
-    //     // is necessary to show diff-pane scroll bar */
-    //     flex-basis: 0;
-    // }
+    .body,
+    .body .content,
+    .body .content .files {
+        min-height: 0;
+    }
 
     .body,
     .body .content,
     .body .content .files {
-        // necessary for horizontal scroll bar
-        // width: 100vw;
-        // necessary for vertical scroll bar
-        // min-height: 0;
         flex: 1;
     }
 

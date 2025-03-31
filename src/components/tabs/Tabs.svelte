@@ -93,7 +93,7 @@
     justify-content: flex-start;
   }
   .tab .diff span {
-    white-space: pre;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }

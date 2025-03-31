@@ -56,7 +56,7 @@
 </script>
 
 <div
-  class={`${mainClass} view-container ${visible ? '' : 'd-none'}`}
+  class={`view-container ${mainClass} ${visible ? '' : 'd-none'}`}
   style={customStyle ? customStyle : ''}
 >
   <div class="view-header">
