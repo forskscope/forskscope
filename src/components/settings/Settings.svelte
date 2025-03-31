@@ -1,40 +1,11 @@
 <script lang="ts">
-  import { Languages, X, Palette } from 'lucide-svelte'
-  import {
-    APP_DEFAULT_LANGUAGE,
-    APP_DIFF_FONT_FAMILIES,
-    APP_MAX_DIFF_FONT_SIZE,
-    APP_MAX_UI_FONT_SCALE_SIZE,
-    APP_MIN_DIFF_FONT_SIZE,
-    APP_MIN_UI_FONT_SCALE_SIZE,
-    APP_THEMES,
-    APP_UI_FONT_FAMILIES,
-    APP_UI_FONT_SCALE_SIZE_STEP,
-  } from '../../consts'
-  import {
-    activeDiffFontFamily,
-    activeTheme,
-    activeUiFontFamily,
-    diffFontSize,
-    uiFontSizeScale,
-  } from '../../stores/settings/theme.svelte'
-  import { setTranslation, T } from '../../stores/settings/translation.svelte'
-  import {
-    type AppDiffFontFamily,
-    type AppLanguage,
-    type AppTheme,
-    type AppUiFontFamily,
-  } from '../../types/settings'
-
-  interface Selector {
-    icon?: ConstructorOfATypedSvelteComponent
-    title: string
-    groupName: string
-    items: string[]
-    handler: Function
-    defaultValue: string
-    valueSuffix: string
-  }
+  import { X } from 'lucide-svelte'
+  import { CATEGORIES } from '../../consts'
+  import { T } from '../../stores/settings/translation.svelte'
+  import { type Category } from '../../types/settings'
+  import ThemeSettings from './content/ThemeSettings.svelte'
+  import TypographySettings from './content/TypographySettings.svelte'
+  import LocaleSettings from './content/LocaleSettings.svelte'
 
   const {
     closeSettings,
@@ -42,123 +13,30 @@
     closeSettings: () => void
   } = $props()
 
-  let language: AppLanguage = $state(APP_DEFAULT_LANGUAGE)
-
-  const themeOnChange = (value: AppTheme) => {
-    $activeTheme = value
-  }
-
-  const diffFontFamilyOnChange = (value: AppDiffFontFamily) => {
-    $activeDiffFontFamily = value
-  }
-
-  const uiFontFamilyOnChange = (value: AppUiFontFamily) => {
-    $activeUiFontFamily = value
-  }
-
-  const diffFontSizeOnChange = (value: number) => {
-    $diffFontSize = value
-  }
-
-  const uiFontSizeScaleOnChange = (value: number) => {
-    $uiFontSizeScale = value
-  }
-
-  const languageOnChange = async () => {
-    await setTranslation(language)
-  }
-
-  const SELECTORS = [
-    {
-      icon: Palette,
-      title: 'Theme',
-      groupName: 'theme',
-      items: APP_THEMES,
-      handler: themeOnChange,
-      defaultValue: $activeTheme,
-      valueSuffix: '-theme',
-    } as Selector,
-    {
-      title: 'Diff Font',
-      groupName: 'diffFontFamily',
-      items: APP_DIFF_FONT_FAMILIES,
-      handler: diffFontFamilyOnChange,
-      defaultValue: $activeDiffFontFamily,
-      valueSuffix: '-diff-font-family',
-    } as Selector,
-    {
-      title: 'UI Font',
-      groupName: 'uiFontFamily',
-      items: APP_UI_FONT_FAMILIES,
-      handler: uiFontFamilyOnChange,
-      defaultValue: $activeUiFontFamily,
-      valueSuffix: '-ui-font-family',
-    } as Selector,
-  ]
+  let category: Category = $state(CATEGORIES[0])
 </script>
 
 <!-- todo: color theme switcher -->
 <div class="settings-wrapper">
   <div class="position-relative">
     <button class="close" onclick={closeSettings}><X /></button>
-    <div class="settings">
-      <div class="setting">
-        <h3><Languages /> {T('Language')}</h3>
-        <select bind:value={language} onchange={languageOnChange}>
-          <option value="en">English</option>
-          <option value="ja">日本語</option>
-        </select>
+    <div class="row">
+      <div class="col categories">
+        {#each CATEGORIES as x}
+          <label>
+            <input type="radio" bind:group={category} value={x} />
+            {T(x)}
+          </label>
+        {/each}
       </div>
-
-      {#each SELECTORS as selector}
-        <div class="setting">
-          <h3><selector.icon /> {T(selector.title)}</h3>
-          <div>
-            {#each selector.items as item}
-              <label
-                ><input
-                  type="radio"
-                  name={selector.groupName}
-                  value={item}
-                  onchange={(e) => {
-                    selector.handler(e.currentTarget.value)
-                  }}
-                  checked={item === selector.defaultValue}
-                />{item.replace(selector.valueSuffix, '')}</label
-              >
-            {/each}
-          </div>
-        </div>
-      {/each}
-
-      <div class="setting">
-        <h3>{T('Diff Font Size')}</h3>
-        <div>
-          <input
-            type="number"
-            min={APP_MIN_DIFF_FONT_SIZE}
-            max={APP_MAX_DIFF_FONT_SIZE}
-            bind:value={$diffFontSize}
-            onchange={() => {
-              diffFontSizeOnChange($diffFontSize)
-            }}
-          />
-        </div>
-      </div>
-      <div class="setting">
-        <h3>{T('UI Font Size (Ratio to Diff)')}</h3>
-        <div>
-          <input
-            type="number"
-            step={APP_UI_FONT_SCALE_SIZE_STEP}
-            min={APP_MIN_UI_FONT_SCALE_SIZE}
-            max={APP_MAX_UI_FONT_SCALE_SIZE}
-            bind:value={$uiFontSizeScale}
-            onchange={() => {
-              uiFontSizeScaleOnChange($uiFontSizeScale)
-            }}
-          />
-        </div>
+      <div class={`col settings ${category}`}>
+        {#if category === 'Theme'}
+          <ThemeSettings />
+        {:else if category === 'Typography'}
+          <TypographySettings />
+        {:else if category === 'Locale'}
+          <LocaleSettings />
+        {/if}
       </div>
     </div>
   </div>
@@ -176,20 +54,32 @@
     overflow: scroll;
   }
 
-  .settings {
+  .row {
     width: 100%;
-    max-width: 20rem;
+    max-width: 30rem;
     height: auto;
-    margin: 0.7rem auto 0;
+    padding-top: 2.2rem;
+    margin: 0 auto;
+  }
+
+  .categories {
+    max-width: 6.3rem;
     display: flex;
     flex-direction: column;
     gap: 1.4rem;
+    white-space: unset;
+  }
+
+  .settings {
+    display: flex;
+    flex-direction: column;
+    gap: 1.7rem;
   }
 
   .close {
     position: absolute;
-    right: 0.8rem;
-    top: 0;
-    padding: 0.3rem 0.7rem;
+    right: 1.1rem;
+    top: 0.7rem;
+    padding: 0.4rem 0.7rem;
   }
 </style>

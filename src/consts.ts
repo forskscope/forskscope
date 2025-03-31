@@ -1,7 +1,10 @@
 import type { AppDiffFontFamily, AppLanguage, AppTheme, AppUiFontFamily } from "./types/settings"
 
+export const CATEGORIES: string[] = ['Theme', 'Typography', 'Locale']
+
 export const APP_LANGUAGES: string[] = ['en', 'ja']
 export const APP_DEFAULT_LANGUAGE: AppLanguage = APP_LANGUAGES[0]
+export const APP_LANGUAGE_LABELS: { [key: AppLanguage]: string } = { 'en': 'English', 'ja': '日本語', };
 
 export const APP_THEMES: string[] = ['dark-theme', 'light-theme', 'night-theme']
 export const APP_DEFAULT_THEME: AppTheme = APP_THEMES[0]
