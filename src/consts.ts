@@ -17,10 +17,10 @@ export const APP_DEFAULT_UI_FONT_FAMILY: AppUiFontFamily = APP_UI_FONT_FAMILIES[
 export const APP_DEFAULT_DIFF_FONT_SIZE: number = 18
 export const APP_MIN_DIFF_FONT_SIZE: number = 6
 export const APP_MAX_DIFF_FONT_SIZE: number = 50
-export const APP_DEFAULT_UI_FONT_SCALE_SIZE: number = 0.9
-export const APP_MIN_UI_FONT_SCALE_SIZE: number = 0.2
-export const APP_MAX_UI_FONT_SCALE_SIZE: number = 1.5
-export const APP_UI_FONT_SCALE_SIZE_STEP: number = 0.05
+export const APP_DEFAULT_UI_FONT_SIZE_SCALE: number = 0.9
+export const APP_MIN_UI_FONT_SIZE_SCALE: number = 0.2
+export const APP_MAX_UI_FONT_SIZE_SCALE: number = 1.5
+export const APP_UI_FONT_SIZE_SCALE_STEP: number = 0.05
 
 export const DIFF_KIND: string[] = ['equal', 'delete', 'insert', 'replace']
 
