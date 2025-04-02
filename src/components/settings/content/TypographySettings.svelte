@@ -2,11 +2,11 @@
   import {
     APP_DIFF_FONT_FAMILIES,
     APP_MAX_DIFF_FONT_SIZE,
-    APP_MAX_UI_FONT_SCALE_SIZE,
+    APP_MAX_UI_FONT_SIZE_SCALE,
     APP_MIN_DIFF_FONT_SIZE,
-    APP_MIN_UI_FONT_SCALE_SIZE,
+    APP_MIN_UI_FONT_SIZE_SCALE,
     APP_UI_FONT_FAMILIES,
-    APP_UI_FONT_SCALE_SIZE_STEP,
+    APP_UI_FONT_SIZE_SCALE_STEP,
   } from '../../../consts'
   import {
     activeDiffFontFamily,
@@ -70,9 +70,9 @@
       type: 'number',
       title: 'UI Font Size (Ratio to Diff)',
       defaultValue: $uiFontSizeScale,
-      min: APP_MIN_UI_FONT_SCALE_SIZE,
-      max: APP_MAX_UI_FONT_SCALE_SIZE,
-      step: APP_UI_FONT_SCALE_SIZE_STEP,
+      min: APP_MIN_UI_FONT_SIZE_SCALE,
+      max: APP_MAX_UI_FONT_SIZE_SCALE,
+      step: APP_UI_FONT_SIZE_SCALE_STEP,
       onchange: uiFontSizeScaleOnChange,
     } as SettingsSelectorNumber,
   ]

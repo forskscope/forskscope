@@ -3,7 +3,7 @@ import type { ListDirResponse } from "../types/file"
 import { pathJoin } from "../utils/file.svelte"
 import type { OldOrNew } from "../types/compareSets"
 import { invokeWithGuard } from "../utils/backend.svelte"
-import { pushCompareSetFromFilepaths } from "./compareSets.svelte"
+import { activateExplorer, pushCompareSetFromFilepaths } from "./compareSets.svelte"
 import { errorToast } from "./Toast.svelte"
 import { T } from "./settings/translation.svelte"
 import type { DigestDiff } from "../types/explorer"
@@ -24,6 +24,20 @@ export const initialize = async () => {
     const listDirResponse = await listDir('')
     oldListDirResponse.set(listDirResponse)
     newListDirResponse.set(listDirResponse)
+}
+
+export const filepathsToListDir = async (filepaths: string[] | null) => {
+    if (filepaths === null || filepaths.length === 0) return
+
+    await changeDir("old", filepaths[0], "")
+
+    if (1 < filepaths.length) {
+        await changeDir("new", filepaths[1], "")
+    } else {
+        newListDirResponse.set(get(oldListDirResponse))
+    }
+
+    activateExplorer()
 }
 
 // todo: export if necessary on explorer pane footer detail shown
