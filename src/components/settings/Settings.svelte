@@ -51,7 +51,7 @@
     height: 100vh;
     opacity: 0.93;
     z-index: 1000;
-    overflow: scroll;
+    overflow: auto;
   }
 
   .row {
