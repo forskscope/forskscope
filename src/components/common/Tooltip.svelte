@@ -34,7 +34,7 @@
     text-align: center;
     opacity: 0.2;
     visibility: hidden;
-    z-index: 1;
+    z-index: 1001;
     transition:
       opacity 0.3s,
       visibility 0.3s;

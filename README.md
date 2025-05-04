@@ -5,7 +5,7 @@
 
 ## Summary
 
-Diff through Exploring 🕵️‍♀️ GUI tool 💻️ named after "*forske forskjell*" (research difference) 🤍 with cross-platform support
+Diff through Exploring 🕵️‍♀️ GUI tool with cross-platform support 💻️ named after "*forske forskjell*" (research difference) 🤍
 
 ## Screenshots
 
