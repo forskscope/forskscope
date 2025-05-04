@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    patch_hygge_lib::run()
+    forskscope_lib::run()
 }

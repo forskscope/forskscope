@@ -1,11 +1,11 @@
-# Patch Hygge
+# ForskScope
 
-[![Releases Workflow](https://github.com/nabbisen/patch-hygge/actions/workflows/release-executable.yaml/badge.svg)](https://github.com/nabbisen/patch-hygge/actions/workflows/release-executable.yaml)
-[![License](https://img.shields.io/github/license/nabbisen/patch-hygge)](https://github.com/nabbisen/patch-hygge/blob/main/LICENSE)
+[![Releases Workflow](https://github.com/nabbisen/forskscope/actions/workflows/release-executable.yaml/badge.svg)](https://github.com/nabbisen/forskscope/actions/workflows/release-executable.yaml)
+[![License](https://img.shields.io/github/license/nabbisen/forskscope)](https://github.com/nabbisen/forskscope/blob/main/LICENSE)
 
 ## Summary
 
-Diff and merge 🔍️ GUI tool 💻️ with cross-platform support 🤍 powered by Tauri, Rust and Svelte.
+Diff through Exploring 🕵️‍♀️ GUI tool 💻️ named after "*forske forskjell*" (research difference) 🤍 with cross-platform support
 
 ## Screenshots
 
@@ -21,10 +21,10 @@ Diff and merge 🔍️ GUI tool 💻️ with cross-platform support 🤍 powered
 
 ### Executable
 
-Available in [Assets](https://github.com/nabbisen/patch-hygge/releases/latest) in Releases.
+Available in [Assets](https://github.com/nabbisen/forskscope/releases/latest) in Releases.
 
 ```sh
-patch-hygge <old-filepath> <new-filepath>
+forskscope <old-filepath> <new-filepath>
 ```
 
 ### Usage

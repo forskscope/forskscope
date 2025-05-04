@@ -16,7 +16,7 @@
 </script>
 
 <div class="headers">
-  <h1>Patch Hygge</h1>
+  <h1>ForskScope</h1>
 
   <div class="settings">
     <Tooltip position="left" messages={T('Settings')}>

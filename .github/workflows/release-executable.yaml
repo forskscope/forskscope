@@ -12,7 +12,7 @@ defaults:
     shell: bash
 
 env:
-  PRODUCT_BASENAME: patch-hygge
+  PRODUCT_BASENAME: forskscope
   TAG: ${{ github.ref_name }}            # tag or branch name
   JOB_WORKDIR: tmp-${{ github.run_id }}  # unique number
 

@@ -1084,6 +1084,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "forskscope"
+version = "0.22.0"
+dependencies = [
+ "chardetng",
+ "chrono",
+ "encoding_rs",
+ "serde",
+ "serde_json",
+ "sheets-diff",
+ "similar",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-opener",
+]
+
+[[package]]
 name = "futf"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2544,24 +2562,6 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "patch-hygge"
-version = "0.21.1"
-dependencies = [
- "chardetng",
- "chrono",
- "encoding_rs",
- "serde",
- "serde_json",
- "sheets-diff",
- "similar",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-opener",
 ]
 
 [[package]]
