@@ -41,6 +41,12 @@ forskscope <old-filepath> <new-filepath>
 
 ## [Development](docs/README.md)
 
+## 🤝 Open-source, with care
+
+This project is lovingly built and maintained by volunteers.  
+We hope it helps streamline your API development.  
+Please understand that the project has its own direction — while we welcome feedback, it might not fit every edge case 🌱
+
 ## Acknowledgements
 
 Depends on:
