@@ -125,7 +125,8 @@ jobs:
         run: gh release upload ${{ github.ref_name }} ${RELEASE_ASSET_FILENAME}
 
       # [ packaging ]
-      - name: ArchLinux AUR SSH and asset hash setup
+      # - archlinux
+      - name: ArchLinux AUR ssh and asset hash setup
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: |
           mkdir -p ~/.ssh
@@ -139,20 +140,37 @@ jobs:
 
           RELEASE_ASSET_SHA256=$(sha256sum "${RELEASE_ASSET_FILENAME}" | awk '{print $1}')
           echo "RELEASE_ASSET_SHA256=${RELEASE_ASSET_SHA256}" >> $GITHUB_ENV
-
-      - name: ArchLinux AUR update
+      
+      - name: ArchLinux AUR repository clone
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         env:
           AUR_REPO_URL: "ssh://aur@aur.archlinux.org/${{ env.PRODUCT_BASENAME }}.git"
           AUR_DIR: "aur-repo-${{ github.run_id }}"
         run: |
           git clone "${AUR_REPO_URL}" "${AUR_DIR}"
-          cd "${AUR_DIR}"
-
+          echo "AUR_DIR=${AUR_DIR}" >> $GITHUB_ENV
+      
+      - name: ArchLinux AUR PKGBUILD modify
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        working-directory: "${{ env.AUR_DIR }}"
+        run: |
           sed -i "s/^pkgname=.*/pkgname=${{ env.PRODUCT_BASENAME }}/" PKGBUILD
           sed -i "s/^pkgver=.*/pkgver=${{ github.ref_name }}/" PKGBUILD
           sed -i "s/^sha256sums=(.*)/sha256sums=('${RELEASE_ASSET_SHA256}')/" PKGBUILD
-
+      
+      - name: ArchLinux docker image cache
+        uses: actions/cache@v4
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        with:
+          path: /var/lib/docker
+          key: ${{ runner.os }}-docker-${{ hashFiles('PKGBUILD') }}
+          restore-keys: |
+            ${{ runner.os }}-docker-
+      
+      - name: ArchLinux AUR .SRCINFO modify
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        working-directory: "${{ env.AUR_DIR }}"
+        run: |
           docker run --rm \
             -v "$(pwd)":/src \
             archlinux:latest bash -c " \
@@ -161,7 +179,11 @@ jobs:
               su - builduser -c 'cd /src && makepkg --printsrcinfo > .SRCINFO' \
             "
           sudo chown -R "$(id -u):$(id -g)" .
-
+      
+      - name: ArchLinux AUR git commit and push
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        working-directory: "${{ env.AUR_DIR }}"
+        run: |
           if ! git diff --quiet --exit-code; then
             git config user.email "${{ secrets.AUR_EMAIL }}"
             git config user.name "GitHub Actions AUR Updater"
@@ -174,10 +196,9 @@ jobs:
           else
             echo "no changes detected for AUR, skipping."
           fi
-        
-      - name: ArchLinux AUR SSH clean up
+      
+      - name: ArchLinux AUR ssh clean up
         if: always() && matrix.target == 'x86_64-unknown-linux-gnu'
         run: |
           rm -f ~/.ssh/aur_key
           rm -f ~/.ssh/known_hosts
-        
