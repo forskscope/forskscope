@@ -7,6 +7,7 @@ use core::handlers::{
     list_dir, open_with_file_manager, path_separator, ready, save,
 };
 
+/// lib entry point
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()

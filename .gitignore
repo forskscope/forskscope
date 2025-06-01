@@ -13,3 +13,8 @@ vite.config.ts.timestamp-*
 bun.lock
 bun.lockb
 Cargo.lock
+
+# packaging
+# - arch
+.packaging/arch/*
+!.packaging/arch/PKGBUILD
