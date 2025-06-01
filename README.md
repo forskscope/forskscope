@@ -19,17 +19,33 @@ Diff through Exploring 🕵️‍♀️ GUI tool with cross-platform support �
 
 ## Install
 
-### Executable
+### Linux
 
-Available in [Assets](https://github.com/nabbisen/forskscope/releases/latest) in Releases.
+#### ArchLinux
 
 ```sh
-forskscope <old-filepath> <new-filepath>
+# install
+yay -S forskscope
+
+# uninstall
+# yay -Rs forskscope
 ```
 
-### Usage
+#### Other distro
 
-(todo)
+executable is offered: https://github.com/forskscope/forskscope/releases/latest
+
+### Windows / macOS
+
+executable is offered: https://github.com/forskscope/forskscope/releases/latest
+
+## Usage
+
+```sh
+forskscope
+
+forskscope <old-filepath> <new-filepath>
+```
 
 ## Features
 
