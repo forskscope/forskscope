@@ -19,6 +19,10 @@ env:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+
+    outputs:
+      linux_asset_sha256: ${{ steps.linux_asset.outputs.linux_asset_sha256 }}
+    
     strategy:
       matrix:
         include:
@@ -104,12 +108,16 @@ jobs:
           sudo /usr/sbin/purge
       
       - name: Create archive as release asset - Linux
+        id: linux_asset
         if: >
           matrix.target != 'aarch64-apple-darwin' &&
           matrix.target != 'x86_64-pc-windows-msvc'
         run: |
           cd "${{ env.JOB_WORKDIR }}"
           tar czf "../${RELEASE_ASSET_FILENAME}" "${RELEASE_SRC_DIR}"
+
+          RELEASE_ASSET_SHA256=$(sha256sum "../${RELEASE_ASSET_FILENAME}" | awk '{print $1}')
+          echo "linux_asset_sha256=${RELEASE_ASSET_SHA256}" >> $GITHUB_OUTPUT
       
       - name: Create archive as release asset - Windows / macOS
         if: >
@@ -124,10 +132,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload ${{ github.ref_name }} ${RELEASE_ASSET_FILENAME}
 
-      # [ packaging ]
-      # - archlinux
-      - name: ArchLinux AUR ssh and asset hash setup
-        if: matrix.target == 'x86_64-unknown-linux-gnu'
+  # [ packaging ]
+  # - archlinux
+  archlinux-aur-publish:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: SSH setup
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
@@ -137,12 +148,8 @@ jobs:
           chmod 600 ~/.ssh/known_hosts
           echo -e "Host aur.archlinux.org\n  User aur\n  IdentityFile ~/.ssh/aur_key\n  StrictHostKeyChecking yes\n  LogLevel ERROR" >> ~/.ssh/config
           chmod 600 ~/.ssh/config
-
-          RELEASE_ASSET_SHA256=$(sha256sum "${RELEASE_ASSET_FILENAME}" | awk '{print $1}')
-          echo "RELEASE_ASSET_SHA256=${RELEASE_ASSET_SHA256}" >> $GITHUB_ENV
       
-      - name: ArchLinux AUR repository clone
-        if: matrix.target == 'x86_64-unknown-linux-gnu'
+      - name: AUR repository git clone
         env:
           AUR_REPO_URL: "ssh://aur@aur.archlinux.org/${{ env.PRODUCT_BASENAME }}.git"
           AUR_DIR: "aur-repo-${{ github.run_id }}"
@@ -150,25 +157,22 @@ jobs:
           git clone "${AUR_REPO_URL}" "${AUR_DIR}"
           echo "AUR_DIR=${AUR_DIR}" >> $GITHUB_ENV
       
-      - name: ArchLinux AUR PKGBUILD modify
-        if: matrix.target == 'x86_64-unknown-linux-gnu'
+      - name: PKGBUILD modify
         working-directory: "${{ env.AUR_DIR }}"
         run: |
           sed -i "s/^pkgname=.*/pkgname=${{ env.PRODUCT_BASENAME }}/" PKGBUILD
           sed -i "s/^pkgver=.*/pkgver=${{ github.ref_name }}/" PKGBUILD
-          sed -i "s/^sha256sums=(.*)/sha256sums=('${RELEASE_ASSET_SHA256}')/" PKGBUILD
+          sed -i "s/^sha256sums=(.*)/sha256sums=('${{ needs.build.outputs.linux_asset_sha256 }}')/" PKGBUILD
       
-      - name: ArchLinux docker image cache
+      - name: Docker image cache
         uses: actions/cache@v4
-        if: matrix.target == 'x86_64-unknown-linux-gnu'
         with:
           path: /var/lib/docker
           key: ${{ runner.os }}-docker-${{ hashFiles('PKGBUILD') }}
           restore-keys: |
             ${{ runner.os }}-docker-
       
-      - name: ArchLinux AUR .SRCINFO modify
-        if: matrix.target == 'x86_64-unknown-linux-gnu'
+      - name: .SRCINFO modify
         working-directory: "${{ env.AUR_DIR }}"
         run: |
           docker run --rm \
@@ -180,8 +184,7 @@ jobs:
             "
           sudo chown -R "$(id -u):$(id -g)" .
       
-      - name: ArchLinux AUR git commit and push
-        if: matrix.target == 'x86_64-unknown-linux-gnu'
+      - name: AUR repository git commit and push
         working-directory: "${{ env.AUR_DIR }}"
         run: |
           if ! git diff --quiet --exit-code; then
@@ -197,8 +200,8 @@ jobs:
             echo "no changes detected for AUR, skipping."
           fi
       
-      - name: ArchLinux AUR ssh clean up
-        if: always() && matrix.target == 'x86_64-unknown-linux-gnu'
+      - name: SSH clean up
+        if: always()
         run: |
           rm -f ~/.ssh/aur_key
           rm -f ~/.ssh/known_hosts
