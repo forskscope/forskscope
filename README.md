@@ -3,6 +3,8 @@
 [![Releases Workflow](https://github.com/nabbisen/forskscope/actions/workflows/release-executable.yaml/badge.svg)](https://github.com/nabbisen/forskscope/actions/workflows/release-executable.yaml)
 [![License](https://img.shields.io/github/license/nabbisen/forskscope)](https://github.com/nabbisen/forskscope/blob/main/LICENSE)
 
+![logo](docs/.assets/logo.png)
+
 ## Summary
 
 Diff through Exploring 🕵️‍♀️ GUI tool with cross-platform support 💻️ named after "*forske forskjell*" (research difference) 🤍
@@ -31,13 +33,9 @@ yay -S forskscope
 # yay -Rs forskscope
 ```
 
-#### Other distro
+### Windows / Linux other distro / macOS
 
-executable is offered: https://github.com/forskscope/forskscope/releases/latest
-
-### Windows / macOS
-
-executable is offered: https://github.com/forskscope/forskscope/releases/latest
+Executable is found in GitHub Releases: https://github.com/forskscope/forskscope/releases/latest
 
 ## Usage
 
