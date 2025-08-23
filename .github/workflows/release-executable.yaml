@@ -138,6 +138,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
       - name: SSH setup
         run: |
           mkdir -p ~/.ssh
@@ -164,14 +167,17 @@ jobs:
           sed -i "s/^pkgver=.*/pkgver=${{ github.ref_name }}/" PKGBUILD
           sed -i "s/^sha256sums=(.*)/sha256sums=('${{ needs.build.outputs.linux_asset_sha256 }}')/" PKGBUILD
       
-      - name: .desktop modify and icon prepare
+      - name: .desktop modify
         working-directory: "${{ env.AUR_DIR }}"
         run: |
           sed -i "s/^Name=.*/Name=${{ env.PRODUCT_BASENAME }}/" PKGBUILD
           sed -i "s/^Exec=.*/Exec=${{ env.PRODUCT_BASENAME }}/" PKGBUILD
           sed -i "s/^Version=.*/Version=${{ github.ref_name }}/" PKGBUILD
           sed -i "s/^Icon=.*/Icon=${{ env.PRODUCT_BASENAME }}.png/" PKGBUILD
-          cp ../../../docs/.assets/logo.png ${{ env.PRODUCT_BASENAME }}.png
+      
+      - name: .desktop icon prepare
+        run: |
+          cp docs/.assets/logo.png ${{ env.AUR_DIR }}/${{ env.PRODUCT_BASENAME }}.png
       
       - name: Docker image cache
         uses: actions/cache@v4
