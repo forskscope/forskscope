@@ -14,4 +14,14 @@ package() {
   tar -xf "${srcdir}/${pkgname}@Linux-x64-gnu-${pkgver}.tar.gz" -C "${srcdir}"
 
   install -Dm755 "${srcdir}/${pkgname}@Linux-x64-gnu-${pkgver}/${pkgname}" "${pkgdir}/usr/bin/${pkgname}"
+
+  # .desktop
+  # prepare dir
+  install -d "${pkgdir}/usr/share/applications"
+  install -m644 "${srcdir}/${pkgname}/.desktop" "${pkgdir}/usr/share/applications/${pkgname}.desktop"
+  
+  # icon
+  # prepare dir
+  install -d "${pkgdir}/usr/share/icons/hicolor/scalable/apps"
+  install -m644 "${srcdir}/${pkgname}.png" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/${pkgname}.png"
 }

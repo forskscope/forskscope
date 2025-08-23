@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=        # modified in GitHub Actions workflow
+Version=     # modified in GitHub Actions workflow
+Comment=Diff and merge GUI tool with cross-platform support build with Tauri: Rust and Svelte (Pre-built binary)
+Exec=        # modified in GitHub Actions workflow
+Icon=        # modified in GitHub Actions workflow
+Terminal=false
+Type=Application
+Categories=Programming;

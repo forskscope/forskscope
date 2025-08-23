@@ -18,3 +18,4 @@ Cargo.lock
 # - archlinux
 .packaging/linux/archlinux/*
 !.packaging/linux/archlinux/PKGBUILD
+!.packaging/linux/archlinux/.desktop
