@@ -159,6 +159,11 @@ jobs:
         run: |
           git clone "${AUR_REPO_URL}" "${AUR_DIR}"
           echo "AUR_DIR=${AUR_DIR}" >> $GITHUB_ENV
+            
+      - name: .desktop and icon prepare
+        run: |
+          cp .packaging/linux/archlinux/.desktop "${{ env.AUR_DIR }}/"
+          cp docs/.assets/logo.svg "${{ env.AUR_DIR }}/"
       
       - name: PKGBUILD modify
         working-directory: "${{ env.AUR_DIR }}"
@@ -166,18 +171,14 @@ jobs:
           sed -i "s/^pkgname=.*/pkgname=${{ env.PRODUCT_BASENAME }}/" PKGBUILD
           sed -i "s/^pkgver=.*/pkgver=${{ github.ref_name }}/" PKGBUILD
           sed -i "s/^sha256sums=(.*)/sha256sums=('${{ needs.build.outputs.linux_asset_sha256 }}')/" PKGBUILD
-      
+                  
       - name: .desktop modify
         working-directory: "${{ env.AUR_DIR }}"
         run: |
-          sed -i "s/^Name=.*/Name=${{ env.PRODUCT_BASENAME }}/" PKGBUILD
-          sed -i "s/^Exec=.*/Exec=${{ env.PRODUCT_BASENAME }}/" PKGBUILD
-          sed -i "s/^Version=.*/Version=${{ github.ref_name }}/" PKGBUILD
-          sed -i "s/^Icon=.*/Icon=${{ env.PRODUCT_BASENAME }}.png/" PKGBUILD
-      
-      - name: .desktop icon prepare
-        run: |
-          cp docs/.assets/logo.png ${{ env.AUR_DIR }}/${{ env.PRODUCT_BASENAME }}.png
+          sed -i "s/^Name=.*/Name=${{ env.PRODUCT_BASENAME }}/" .desktop
+          sed -i "s/^Exec=.*/Exec=${{ env.PRODUCT_BASENAME }}/" .desktop
+          sed -i "s/^Version=.*/Version=${{ github.ref_name }}/" .desktop
+          sed -i "s/^Icon=.*/Icon=${{ env.PRODUCT_BASENAME }}.png/" .desktop
       
       - name: Docker image cache
         uses: actions/cache@v4
@@ -206,7 +207,7 @@ jobs:
             git config user.email "${{ secrets.AUR_EMAIL }}"
             git config user.name "GitHub Actions AUR Updater"
             
-            git add PKGBUILD .SRCINFO
+            git add PKGBUILD .SRCINFO .desktop logo.svg
             git commit -m "${{ github.ref_name }}: new release update"
 
             git push
