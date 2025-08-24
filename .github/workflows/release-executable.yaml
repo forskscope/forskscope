@@ -162,6 +162,7 @@ jobs:
             
       - name: .desktop and icon prepare
         run: |
+          cp .packaging/linux/archlinux/PKGBUILD "${{ env.AUR_DIR }}/"
           cp .packaging/linux/archlinux/.desktop "${{ env.AUR_DIR }}/"
           cp docs/.assets/logo.svg "${{ env.AUR_DIR }}/"
       
@@ -170,15 +171,15 @@ jobs:
         run: |
           sed -i "s/^pkgname=.*/pkgname=${{ env.PRODUCT_BASENAME }}/" PKGBUILD
           sed -i "s/^pkgver=.*/pkgver=${{ github.ref_name }}/" PKGBUILD
-          sed -i "s/^sha256sums=(.*)/sha256sums=('${{ needs.build.outputs.linux_asset_sha256 }}')/" PKGBUILD
+          sed -i "s/^sha256sums=.*/sha256sums=('${{ needs.build.outputs.linux_asset_sha256 }}')/" PKGBUILD
                   
       - name: .desktop modify
         working-directory: "${{ env.AUR_DIR }}"
         run: |
           sed -i "s/^Name=.*/Name=${{ env.PRODUCT_BASENAME }}/" .desktop
-          sed -i "s/^Exec=.*/Exec=${{ env.PRODUCT_BASENAME }}/" .desktop
+          sed -i "s/^Exec=.*/Exec=${{ env.PRODUCT_BASENAME }} %F/" .desktop
           sed -i "s/^Version=.*/Version=${{ github.ref_name }}/" .desktop
-          sed -i "s/^Icon=.*/Icon=${{ env.PRODUCT_BASENAME }}.png/" .desktop
+          sed -i "s/^Icon=.*/Icon=${{ env.PRODUCT_BASENAME }}/" .desktop
       
       - name: Docker image cache
         uses: actions/cache@v4

@@ -10,13 +10,13 @@ depends=('webkit2gtk' 'gtk3' 'libappindicator-gtk3')
 source=(
   "${pkgname}@Linux-x64-gnu-${pkgver}.tar.gz::${url}/releases/download/${pkgver}/${pkgname}@Linux-x64-gnu-${pkgver}.tar.gz"
   ".desktop"
-  "icon.svg"
+  "logo.svg"
 )
 sha256sums= # modified in GitHub Actions workflow
 
 package() {
+  # app
   tar -xf "${srcdir}/${pkgname}@Linux-x64-gnu-${pkgver}.tar.gz" -C "${srcdir}"
-
   install -Dm755 "${srcdir}/${pkgname}@Linux-x64-gnu-${pkgver}/${pkgname}" "${pkgdir}/usr/bin/${pkgname}"
 
   # .desktop

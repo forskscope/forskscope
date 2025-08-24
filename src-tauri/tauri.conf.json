@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "forskscope",
-  "version": "0.22.7",
-  "identifier": "com.forskscope.app",
+  "version": "0.22.8",
+  "identifier": "com.forskscope",
   "build": {
     "beforeDevCommand": "bun run dev || npm run dev",
     "devUrl": "http://localhost:1420",
