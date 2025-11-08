@@ -1,6 +1,6 @@
 [package]
 name = "forskscope"
-version = "0.22.10"
+version = "0.22.11"
 edition = "2021"
 
 description = "Diff and merge GUI tool with cross-platform support build with Tauri: Rust and Svelte"
