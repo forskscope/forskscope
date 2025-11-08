@@ -13,6 +13,7 @@ defaults:
 
 env:
   PRODUCT_BASENAME: forskscope
+  PRODUCT_DISPLAY_NAME: ForskScope
   TAG: ${{ github.ref_name }}            # tag or branch name
   JOB_WORKDIR: tmp-${{ github.run_id }}  # unique number
 
@@ -172,7 +173,7 @@ jobs:
       - name: .desktop modify
         working-directory: "${{ env.AUR_DIR }}"
         run: |
-          sed -i "s/^Name=.*/Name=${{ env.PRODUCT_BASENAME }}/" ${{ env.AUR_PKGBUILD_DESKTOP }}
+          sed -i "s/^Name=.*/Name=${{ env.PRODUCT_DISPLAY_NAME }}/" ${{ env.AUR_PKGBUILD_DESKTOP }}
           sed -i "s/^Exec=.*/Exec=${{ env.PRODUCT_BASENAME }} %F/" ${{ env.AUR_PKGBUILD_DESKTOP }}
           sed -i "s/^Version=.*/Version=${{ github.ref_name }}/" ${{ env.AUR_PKGBUILD_DESKTOP }}
           sed -i "s/^Icon=.*/Icon=${{ env.PRODUCT_BASENAME }}/" ${{ env.AUR_PKGBUILD_DESKTOP }}
