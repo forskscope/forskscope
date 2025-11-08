@@ -1,6 +1,6 @@
 [package]
 name = "forskscope"
-version = "0.22.10"
+version = "0.22.11"
 edition = "2021"
 
 description = "Diff and merge GUI tool with cross-platform support build with Tauri: Rust and Svelte"
@@ -24,7 +24,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 opt-level = "z"
 lto = true
 # panic = "abort"
-strip = true
+# strip = true # ref: https://github.com/tauri-apps/tauri/issues/14186
+strip = "debuginfo"
 codegen-units = 1
 
 [profile.dev]         # to improve productivity
