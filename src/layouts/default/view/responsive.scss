@@ -1,0 +1,35 @@
+@media (max-width: 40.0rem) {
+    .view-container:not(.orientation-horizontal) {
+        .view-header {
+            height: 3.6rem;
+            flex-direction: column;
+        }
+
+        .view-body {
+            flex-direction: column;
+        }
+
+        // todo: responsive content divider
+        .view-body>.divider {
+            width: 100%;
+            height: 2.4rem;
+        }
+    }
+}
+
+.view-container.orientation-vertical {
+    .view-header {
+        height: 3.6rem !important;
+        flex-direction: column !important;
+    }
+
+    .view-body {
+        flex-direction: column !important;
+    }
+
+    // todo: responsive content divider
+    .view-body>.divider {
+        width: 100% !important;
+        height: 2.4rem !important;
+    }
+}

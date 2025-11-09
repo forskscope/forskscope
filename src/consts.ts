@@ -9,6 +9,14 @@ export const APP_LANGUAGE_LABELS: { [key: AppLanguage]: string } = { 'en': 'Engl
 export const APP_THEMES: string[] = ['dark-theme', 'light-theme', 'night-theme']
 export const APP_DEFAULT_THEME: AppTheme = APP_THEMES[0]
 
+export const APP_VIEW_ORIENTATION_HORIZONTAL = "orientation-horizontal";
+export const APP_VIEW_ORIENTATION_VERTICAL = "orientation-vertical";
+export const APP_VIEW_ORIENTATIONS = [
+    { id: 'responsive', viewOrientationClass: '' },
+    { id: 'horizontally-fixed', viewOrientationClass: APP_VIEW_ORIENTATION_HORIZONTAL },
+    { id: 'vertically-fixed', viewOrientationClass: APP_VIEW_ORIENTATION_VERTICAL },
+]
+
 export const APP_DIFF_FONT_FAMILIES: string[] = ['sans-serif-diff-font-family', 'serif-diff-font-family', 'monospace-diff-font-family']
 export const APP_UI_FONT_FAMILIES: string[] = ['sans-serif-ui-font-family', 'serif-ui-font-family', 'monospace-ui-font-family']
 export const APP_DEFAULT_DIFF_FONT_FAMILY: AppDiffFontFamily = APP_DIFF_FONT_FAMILIES[2]

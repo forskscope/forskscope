@@ -1,5 +1,6 @@
 <script lang="ts">
-  import './style.scss'
+  import './index.scss'
+  import { viewOrientationClass } from '../../../stores/settings/theme.svelte'
 
   const {
     mainClass,
@@ -56,7 +57,7 @@
 </script>
 
 <div
-  class={`view-container ${mainClass} ${visible ? '' : 'd-none'}`}
+  class={`view-container ${mainClass} ${$viewOrientationClass} ${visible ? '' : 'd-none'}`}
   style={customStyle ? customStyle : ''}
 >
   <div class="view-header">

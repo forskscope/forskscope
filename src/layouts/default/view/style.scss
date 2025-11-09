@@ -58,21 +58,3 @@
 .view-footer>.divider {
     width: 2.2rem;
 }
-
-// responsive
-@media (max-width: 50.0rem) {
-    .view-header {
-        height: 3.6rem;
-        flex-direction: column;
-    }
-
-    .view-body {
-        flex-direction: column;
-    }
-
-    // todo: responsive content divider
-    .view-body>.divider {
-        width: 100%;
-        height: 2.4rem;
-    }
-}
