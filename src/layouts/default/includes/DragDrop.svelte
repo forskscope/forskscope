@@ -1,10 +1,10 @@
 <script lang="ts">
   import DragDrop from '../../../components/common/DragDrop.svelte'
-  import { filepathsToListDir } from '../../../stores/explorer.svelte'
+  import { filepathsToListDirForSide } from '../../../stores/explorer.svelte'
   import { invokeWithGuard } from '../../../utils/backend.svelte'
   import { filepathsToCompareSet } from '../../../utils/compareSets.svelte'
 
-  const filesOnDropped = async (filepaths: string[]) => {
+  const filesOnDropped = async (filepaths: string[], position: { x: number; y: number }) => {
     if (filepaths.length === 0) return
 
     const res = await invokeWithGuard('is_file', { filepath: filepaths[0] })
@@ -14,7 +14,9 @@
     if (isFile) {
       filepathsToCompareSet(filepaths)
     } else {
-      filepathsToListDir(filepaths)
+      const windowWidth = window.innerWidth
+      const side = position.x < windowWidth / 2 ? 'old' : 'new'
+      filepathsToListDirForSide(side, filepaths)
     }
   }
 </script>

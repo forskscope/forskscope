@@ -116,6 +116,82 @@ pub fn list_dir(current_dir: &str) -> Result<ListDirResponse, String> {
     })
 }
 
+/// list files recursively
+pub fn list_dir_recursive(current_dir: &str) -> Result<ListDirResponse, String> {
+    let target_dir = match target_dir(current_dir) {
+        Ok(x) => x,
+        Err(err) => return Err(err.to_string()),
+    };
+
+    let mut files = Vec::<FileAttr>::new();
+    let root_path = target_dir.clone();
+
+    visit_dirs(&target_dir, &root_path, &mut files)?;
+
+    files.sort();
+
+    Ok(ListDirResponse {
+        current_dir: target_dir.to_string_lossy().to_string(),
+        dirs: vec![],
+        files: files,
+    })
+}
+
+fn visit_dirs(dir: &Path, root: &Path, files: &mut Vec<FileAttr>) -> Result<(), String> {
+    if dir.is_dir() {
+        let read = std::fs::read_dir(dir).map_err(|e| format!("Failed to read dir: {}", e))?;
+        for entry in read {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            let file_name = entry.file_name();
+            let file_name_str = file_name.to_string_lossy();
+
+            // Ignore common non-project directories/files
+            if file_name_str == "node_modules"
+                || file_name_str == ".git"
+                || file_name_str == ".DS_Store"
+                || file_name_str == "target"
+                || file_name_str == "dist"
+                || file_name_str == "build"
+                || file_name_str == ".svelte-kit"
+            {
+                continue;
+            }
+
+            if path.is_dir() {
+                visit_dirs(&path, root, files)?;
+            } else {
+                let relative_path = path.strip_prefix(root).unwrap();
+                // Ensure we use forward slashes for consistency in UI or keep OS separator?
+                // The UI might expect standard paths. to_string_lossy() usually keeps OS separator.
+                // Let's keep it as is for now, but maybe normalize if needed.
+                let name = relative_path.to_string_lossy().to_string();
+
+                match entry.metadata() {
+                    Ok(metadata) => {
+                        let modified = metadata
+                            .modified()
+                            .unwrap()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap();
+                        let local_timestamp = Local.timestamp_nanos(modified.as_nanos() as i64);
+                        let last_modified = local_timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
+                        files.push(FileAttr {
+                            name,
+                            bytes_size: format!("{} bytes", comma_separated_number(metadata.len())),
+                            human_readable_size: human_readable_size(metadata.len()),
+                            last_modified,
+                            binary_comparison_only: binary_comparison_only(&path.to_string_lossy()),
+                        })
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// save to file
 pub fn save(filepath: &str, content: &str, charset: &str) -> Result<(), IOError> {
     let encoding = Encoding::for_label(charset.as_bytes()).unwrap_or(UTF_8);

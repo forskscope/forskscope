@@ -88,6 +88,10 @@
 <style>
   .row {
     flex: 1;
+    height: 28px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
   }
 
   .row:not(.headers):not(.footer) {

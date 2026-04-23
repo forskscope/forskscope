@@ -4,7 +4,7 @@ mod core;
 
 use core::handlers::{
     binary_comparison_only, diff_chars, diff_filepaths, dir_digest_diff, file_digest_diff, is_file,
-    list_dir, open_with_file_manager, path_separator, ready, save,
+    list_dir, list_dir_recursive, open_with_file_manager, path_separator, ready, save,
 };
 
 /// lib entry point
@@ -30,6 +30,7 @@ pub fn run() {
             file_digest_diff,
             is_file,
             list_dir,
+            list_dir_recursive,
             open_with_file_manager,
             path_separator,
             ready,
