@@ -1,4 +1,4 @@
-# Maintainer: nabbisen <nabbisen@scqr.net>
+# Maintainer: nabbisen
 pkgname=    # modified in GitHub Actions workflow
 pkgver=     # modified in GitHub Actions workflow
 pkgrel=1

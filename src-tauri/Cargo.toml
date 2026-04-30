@@ -1,10 +1,10 @@
 [package]
 name = "forskscope"
-version = "0.22.12"
+version = "0.22.13"
 edition = "2021"
 
 description = "Diff and merge GUI tool with cross-platform support build with Tauri: Rust and Svelte"
-authors = ["nabbisen <nabbisen@scqr.net>"]
+authors = ["nabbisen"]
 license-file = "../LICENSE"
 
 categories = ["gui", "visualization", "development-tools", "text-processing"]
