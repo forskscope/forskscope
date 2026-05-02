@@ -40,6 +40,13 @@ export const filepathsToListDir = async (filepaths: string[] | null) => {
     activateExplorer()
 }
 
+export const filepathsToListDirForSide = async (oldOrNew: OldOrNew, filepaths: string[] | null) => {
+    if (filepaths === null || filepaths.length === 0) return
+
+    await changeDir(oldOrNew, filepaths[0], "")
+    activateExplorer()
+}
+
 // todo: export if necessary on explorer pane footer detail shown
 // export const listDirResponse = (oldOrNew: OldOrNew): ListDirResponse | null => {
 const listDirResponse = (oldOrNew: OldOrNew): ListDirResponse | null => {
@@ -49,8 +56,32 @@ const listDirResponse = (oldOrNew: OldOrNew): ListDirResponse | null => {
 export const selectFile = (oldOrNew: OldOrNew, index: number) => {
     if (oldOrNew === "old") {
         oldSelectedFileIndex.set(index)
+        // Sync selection to new
+        const oldFiles = get(oldListDirResponse)?.files
+        const newFiles = get(newListDirResponse)?.files
+        if (oldFiles && newFiles) {
+            const filename = oldFiles[index].name
+            const newIndex = newFiles.findIndex(f => f.name === filename)
+            if (newIndex !== -1) {
+                newSelectedFileIndex.set(newIndex)
+            } else {
+                newSelectedFileIndex.set(null)
+            }
+        }
     } else {
         newSelectedFileIndex.set(index)
+        // Sync selection to old
+        const newFiles = get(newListDirResponse)?.files
+        const oldFiles = get(oldListDirResponse)?.files
+        if (newFiles && oldFiles) {
+            const filename = newFiles[index].name
+            const oldIndex = oldFiles.findIndex(f => f.name === filename)
+            if (oldIndex !== -1) {
+                oldSelectedFileIndex.set(oldIndex)
+            } else {
+                oldSelectedFileIndex.set(null)
+            }
+        }
     }
 }
 
@@ -232,7 +263,7 @@ const currentDirpath = (oldOrNew: OldOrNew): string | null => {
 }
 
 const listDir = async (currentDir: string): Promise<ListDirResponse | null> => {
-    const res = await invokeWithGuard('list_dir', { currentDir })
+    const res = await invokeWithGuard('list_dir_recursive', { currentDir })
     if (res.isError) {
         return null
     }

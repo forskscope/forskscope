@@ -68,6 +68,12 @@ pub fn list_dir(current_dir: &str) -> Result<ListDirResponse, String> {
 }
 
 #[tauri::command]
+/// list directory recursively
+pub fn list_dir_recursive(current_dir: &str) -> Result<ListDirResponse, String> {
+    file::list_dir_recursive(current_dir)
+}
+
+#[tauri::command]
 // todo: remove ?
 pub fn path_separator() -> Result<char, String> {
     Ok(MAIN_SEPARATOR)
