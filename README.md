@@ -73,6 +73,7 @@ git mergetool
 - **Git difftool / mergetool** compatible (`forskscope old new` or `old remote merged`)
 - **Compare profiles** — named presets for ignore-whitespace, ignore-case, and algorithm (Myers / Patience / Histogram)
 - **Session persistence** — open tabs are restored on next launch
+- **Patch export** — export a unified-diff `.patch` file from any file or directory comparison; compatible with `patch -p1` and `git apply`
 - **Safe saves** — atomic write, `.bak` backup, external-change detection
 - **Search within diff** — Ctrl+F highlights matching rows across both panes
 - **Navigation history** — back/forward per explorer pane

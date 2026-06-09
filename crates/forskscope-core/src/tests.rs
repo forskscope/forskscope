@@ -9,4 +9,5 @@ mod document_tests;
 mod encoding_tests;
 mod ignore_tests;
 mod merge_tests;
+mod patch_tests;
 mod save_tests;

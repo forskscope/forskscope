@@ -1,9 +1,15 @@
 # RFC 039: Patch Export, Apply, and Review Workflow
 
-**Status.** Proposed
+**Status.** Implemented (v0.39.0) — export only; guarded apply deferred
 
 ## Status
-Proposed. (Originally proposed in RFC package v0.4.)
+Implemented (v0.39.0). The *export* half of this RFC shipped in v0.39.0:
+`patch_from_file_diff`, `patch_from_directories`, and `to_unified` are
+available in `forskscope-core::patch`. The guarded *apply* workflow
+(preflight, atomic write, backup-protected application) is intentionally
+deferred — it depends on RFC-023 (Atomic File Operations) and RFC-027
+(Report Export) which are still proposed. When those ship, a follow-up
+release will close the apply gap without renumbering this RFC.
 
 ## Summary
 

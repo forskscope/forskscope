@@ -23,6 +23,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 055 | [Breadcrumb Path Navigation](./done/055-breadcrumb-path-navigation.md) | v0.36.0 |
 | 056 | [Ignore Patterns for Files and Directories](./done/056-ignore-patterns-for-files-and-directories.md) | v0.36.0 |
 | 057 | [Settings Dialog Layout Refinements](./done/057-settings-dialog-layout-refinements.md) | v0.36.0 |
+| 039 | [Patch Export, Apply, and Review Workflow](./done/039-patch-export-apply-and-review-workflow.md) | v0.39.0 (export; apply deferred) |
 
 ## Proposed
 
@@ -59,7 +60,6 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 036 | [Live Reload, File Watcher, and External Modification Handling](./proposed/036-live-reload-file-watcher-and-external-modification-handling.md) |
 | 037 | [Scalable Directory Compare Index and Incremental Refresh](./proposed/037-scalable-directory-compare-index-and-incremental-refresh.md) |
 | 038 | [VCS Context Integration Boundary](./proposed/038-vcs-context-integration-boundary.md) |
-| 039 | [Patch Export, Apply, and Review Workflow](./proposed/039-patch-export-apply-and-review-workflow.md) |
 | 040 | [Editor Adapter Verification Harness and Golden Corpus](./proposed/040-editor-adapter-verification-harness-and-golden-corpus.md) |
 | 041 | [v1.0 Product Stabilization and RFC Governance](./proposed/041-v1-product-stabilization-and-rfc-governance.md) |
 | 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) |

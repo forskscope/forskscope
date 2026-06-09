@@ -5,6 +5,51 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.39.0] — 2026-06-09
+
+Patch export (RFC-039 export slice).
+
+### Added
+
+- **`forskscope-core::patch` — unified-diff patch export** (RFC-039)
+
+  A new `patch` module adds deterministic patch generation from the
+  existing diff model. Three public entry points are available:
+
+  - `patch_from_file_diff(path, diff, options)` — builds a `PatchDocument`
+    for a single two-file comparison. Returns `None` when the inputs are
+    identical. The `PatchOptions` struct controls context line count
+    (default 3), whether file-creation/deletion entries are included, and
+    whether binary files emit a notice.
+
+  - `patch_from_directories(left, right, diff_options, patch_options)` —
+    walks both directory trees with `recursive_diff` and assembles one
+    patch covering every differing file: `Modify` for changed files, `Add`
+    for right-only files, `Delete` for left-only files.
+
+  - `to_unified(patch)` — serialises a `PatchDocument` to a
+    standards-conformant unified-diff string. Output is byte-for-byte
+    reproducible. Format features:
+    - git-style `--- a/` / `+++ b/` file headers; new files reference
+      `/dev/null` on the old side, deleted files on the new side.
+    - Standard `@@ -old +new @@` hunk headers; single-line ranges omit
+      the `,1` count, matching `diff -u` and `git diff` exactly.
+    - `\ No newline at end of file` marker emitted correctly when a source
+      file lacks a trailing newline.
+    - Path separators normalised to `/` for cross-platform portability.
+    - Summary comment header (`# forskscope patch: N files, +A -D`).
+
+  The module performs no I/O during export. The guarded *apply* workflow
+  (preflight, atomic write, backup-protected application) is deferred to a
+  follow-up release pending RFC-023 and RFC-027.
+
+- **11 unit tests + 2 GNU-`patch` integration tests** — the integration
+  tests feed generated patches to the system `patch` tool and verify the
+  patched files match the expected right-side content, confirming format
+  correctness against a real consumer. Total core test count: 97.
+
+---
+
 ## [0.38.0] — 2026-06-09
 
 Explorer row alignment and path bar polish.

@@ -19,6 +19,7 @@ pub mod error;
 pub mod file_kind;
 pub mod ignore;
 pub mod merge;
+pub mod patch;
 pub mod path;
 pub mod save;
 pub mod xlsx;
@@ -33,6 +34,10 @@ pub use error::{CoreError, IoOperation, Result};
 pub use file_kind::FileKind;
 pub use ignore::IgnoreRules;
 pub use merge::{HunkState, MergeHunk, MergeSession};
+pub use patch::{
+    LineOrigin, PatchDocument, PatchFileChange, PatchFormat, PatchHunk, PatchLine, PatchOptions,
+    PatchSummary, patch_from_directories, patch_from_file_diff, to_unified,
+};
 pub use save::{BackupPolicy, SaveOutcome, SaveRequest, save_text};
 
 #[cfg(test)]

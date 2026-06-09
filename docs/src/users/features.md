@@ -22,6 +22,13 @@
 | Excel `.xlsx` | ✓ (read-only) | — |
 | Binary / other | Hex preview | — |
 
+## Patch export
+
+Export the differences between two files or two directory trees as a
+standard unified-diff patch file. The patch is compatible with `patch -p1`
+and `git apply`. See [Patch export](../intermediate/patch-export.md) for
+details.
+
 ## Appearance
 
 - Three built-in themes: dark (default), light, night.
