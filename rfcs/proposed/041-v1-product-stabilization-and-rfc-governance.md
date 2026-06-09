@@ -1,0 +1,145 @@
+# RFC 041: v1.0 Product Stabilization and RFC Governance
+
+**Status.** Proposed
+
+## Status
+Proposed. (Originally proposed in RFC package v0.4.)
+
+## Summary
+
+Define the stabilization policy for ForskScope v1.0 and the governance rules for accepting, deferring, or rejecting further RFCs.
+
+## Motivation
+
+The migration scope has grown from a framework change into a serious product redesign. Without explicit stabilization rules, the project risks endless feature expansion before v1.0. This RFC protects product coherence and release readiness.
+
+## Goals
+
+- Freeze critical contracts before v1.0.
+- Define what must be stable for users.
+- Define what may still evolve internally.
+- Prevent late-stage scope creep.
+- Establish RFC states and acceptance requirements.
+
+## Non-Goals
+
+- Freeze every internal implementation detail.
+- Prevent post-v1 innovation.
+- Promise full WinMerge feature parity in v1.0.
+
+## v1.0 Stability Targets
+
+### Must Stabilize
+
+```text
+- session schema versioning
+- document operation model
+- save and backup safety behavior
+- dirty/external-change semantics
+- command IDs and shortcut registry
+- basic two-way text diff/merge workflow
+- directory comparison basics
+- editor adapter safety boundary
+```
+
+### May Evolve After v1
+
+```text
+- advanced three-way merge heuristics
+- VCS provider depth
+- patch apply sophistication
+- report templates
+- theme details
+- performance optimizations
+- optional future Iced UI backend
+```
+
+## RFC States
+
+```text
+Draft
+  idea captured, not accepted
+
+Accepted
+  design direction approved, implementation may begin
+
+Implemented
+  merged and covered by tests
+
+Deferred
+  valuable but not needed for current milestone
+
+Rejected
+  intentionally out of scope or superseded
+
+Reopened
+  accepted/implemented RFC needs correction due to evidence
+```
+
+## Acceptance Requirements
+
+Each implementation RFC must include:
+
+```text
+- user-facing behavior
+- internal model impact
+- data persistence impact
+- security/safety impact
+- accessibility impact where UI is affected
+- tests/acceptance criteria
+- migration notes from current Tauri/Svelte behavior
+```
+
+## Scope Control Rules
+
+1. v1.0 prioritizes trustworthy two-way diff/merge over broad editor features.
+2. Three-way merge may ship only if unresolved conflict safety is complete.
+3. VCS integration must remain optional and read-mostly before v1.0.
+4. Patch apply must not ship without preflight and backup policy.
+5. Any feature that can overwrite files requires a dedicated safety review.
+
+## Release Readiness Checklist
+
+```text
+Product:
+  [ ] Two-way file compare works end to end
+  [ ] Result buffer save works with backup policy
+  [ ] Directory compare works for practical project trees
+  [ ] Basic keyboard navigation is complete
+
+Safety:
+  [ ] Save checks external modifications
+  [ ] Undo/redo covers merge operations
+  [ ] Error messages are actionable
+  [ ] Large-file mode prevents UI lockups
+
+Engineering:
+  [ ] Core tests pass
+  [ ] Editor harness tests pass
+  [ ] Packaging smoke tests pass
+  [ ] Session schema migration tests pass
+
+Documentation:
+  [ ] User guide covers common workflows
+  [ ] Recovery/backup behavior is documented
+  [ ] Known limitations are documented
+```
+
+## Iced Reconsideration Gate
+
+Iced should be reconsidered only if all conditions are met:
+
+```text
+- Dioxus/WebView shows unacceptable platform risk
+- core/editor operation model is stable
+- a viable Iced editor widget/prototype exists
+- migration cost is estimated with evidence
+- the Iced path does not regress merge safety
+```
+
+## Acceptance Criteria
+
+- All existing RFCs are assigned a state before v1.0 planning freeze.
+- v1.0 must-have and may-evolve lists are approved.
+- New feature RFCs after freeze require explicit milestone justification.
+- Safety-affecting RFCs require acceptance tests before implementation is marked done.

@@ -1,0 +1,20 @@
+[package]
+name = "forskscope-ui-dioxus"
+description = "ForskScope desktop UI (Dioxus): explorer, diff/merge workspace, settings."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "forskscope"
+path = "src/main.rs"
+
+[dependencies]
+forskscope-core = { workspace = true }
+dioxus = { workspace = true }
+dioxus-swdir-tree = { workspace = true }
+app-json-settings = { workspace = true }
+serde = { workspace = true }

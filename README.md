@@ -3,74 +3,81 @@
 [![Releases Workflow](https://github.com/nabbisen/forskscope/actions/workflows/release-executable.yaml/badge.svg)](https://github.com/nabbisen/forskscope/actions/workflows/release-executable.yaml)
 [![License](https://img.shields.io/github/license/nabbisen/forskscope)](https://github.com/nabbisen/forskscope/blob/main/LICENSE)
 
-![logo](docs/.assets/logo.png)
-
-## Summary
+![logo](docs/src/assets/logo.png)
 
 Diff through Exploring 🕵️‍♀️ GUI tool with cross-platform support 💻️ named after "*forske forskjell*" (research difference) 🤍
 
-## Screenshots
+---
 
-![explorer-01](docs/.assets/explorer-01.png)
+## Overview
 
-![diff-01-lines](docs/.assets/diff-01-lines.png)
+ForskScope is a desktop diff and merge workstation for developers and operators who want a practical WinMerge-style experience on Unix/Linux, macOS, and Windows without being forced into an IDE or a Git GUI.
 
-![diff-02-chars](docs/.assets/diff-02-chars.png)
-
-![settings-01](docs/.assets/settings-01.png)
-
-## Install
-
-### Linux
-
-#### ArchLinux
-
-```sh
-# install
-yay -S forskscope
-
-# uninstall
-# yay -Rs forskscope
-```
-
-### Windows / Linux other distro / macOS
-
-Executable is found in GitHub Releases: https://github.com/forskscope/forskscope/releases/latest
-
-## Usage
-
-```sh
-forskscope
-
-forskscope <old-filepath> <new-filepath>
-```
-
-## Features
-
-(todo)
-
-### Designed in mind
-
-(todo)
-
-## [Development](docs/README.md)
+It is built on a GUI-independent Rust core (`forskscope-core`) and a Dioxus desktop frontend, giving a fast, local, offline experience with a calm default layout.
 
 ---
 
-## Open-source, with care
+## Why / When
 
-This project is lovingly built and maintained by volunteers.  
-We hope it helps streamline your work.  
-Please understand that the project has its own direction — while we welcome feedback, it might not fit every edge case 🌱
+Use ForskScope when you need to:
 
-## Acknowledgements
+- compare two text files or directories side by side before accepting a change;
+- selectively apply individual hunks from a left (old/source) file into a right (new/target) file and save safely;
+- inspect differences visually without a terminal, an IDE, or a remote service;
+- work primarily on Unix/Linux and want the WinMerge workflow on your platform.
 
-Depends on:
+ForskScope is deliberately **not** a Git GUI, IDE, cloud diff service, or file synchronization suite — it has one job, and its scope is kept narrow so it stays trustworthy.
 
-- GUI app development: [tauri](https://github.com/tauri-apps/tauri), [svelte](https://github.com/sveltejs/svelte) & [sveltekit](https://github.com/sveltejs/kit)
-    - Icons: [lucide](https://github.com/lucide-icons/lucide)
-    - Builder & bundler: [Vite](https://github.com/vitejs/vite)
-- Differ: [similar](https://github.com/mitsuhiko/similar), [sheets-diff-rs](https://github.com/nabbisen/sheets-diff-rs)
-    - Text file reader: [encoding_rs](https://github.com/hsivonen/encoding_rs) & [chardetng](https://github.com/hsivonen/chardetng)
+---
 
-and other helpful empowerment resources.
+## Quick Start
+
+**Requirements:** a Rust toolchain (≥ 1.85) and the GTK 3 / WebKitGTK 4.1 runtime libraries on Linux.
+
+```sh
+# Linux — install runtime libraries (Debian/Ubuntu)
+sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev
+
+# Build from source
+git clone https://github.com/forskscope/forskscope
+cd forskscope
+cargo build --release
+./target/release/forskscope
+```
+
+**Open two files directly:**
+
+```sh
+forskscope path/to/old.rs path/to/new.rs
+```
+
+**Workflow at a glance:**
+
+1. Launch the app — the Explorer workspace opens.
+2. Navigate the left and right directory panes; select a file on each side, then click **Compare**.
+3. Use **◀ ▶** to move between differences.
+4. Click **▶** in the action column of a changed hunk to apply it from left to right.
+5. Click **Save** — the merge result is written with conflict detection and an automatic `.bak` backup.
+
+---
+
+## Design Notes
+
+**One job, done well.** The scope is intentionally narrow: local two-pane text diff and merge. Binary and Excel files can be compared (read-only) but not merged; three-way merge and directory synchronization are future work.
+
+**Less is more.** The default layout shows only what the current workflow step needs. Navigation, apply, and save are always visible when they apply. Advanced controls (inline character diff, redo, future compare profiles) are one click away behind a disclosure, not front-loaded.
+
+**Model-backed merge.** Every merge action goes through a transaction log in the Rust core. The UI never recomputes merge results from rendered content. Undo, redo, dirty state, and save safety are derived from the core model, not from the DOM.
+
+**Local-first and private.** No accounts, no telemetry, no cloud upload. Files compared on your machine stay on your machine.
+
+---
+
+## More Detail
+
+Full documentation is in [`docs/`](docs/src/SUMMARY.md), structured as an mdbook.
+
+- [Features and tutorials](docs/src/users/features.md) — for new users.
+- [Architecture overview](docs/src/maintainers/architecture.md) — for contributors.
+- [RFC directory](rfcs/README.md) — design decisions and rationale.
+- [Changelog](CHANGELOG.md)

@@ -1,0 +1,90 @@
+# ForskScope RFCs
+
+This directory follows the lifecycle defined in
+[RFC 000 — RFC lifecycle policy](./done/000-rfc-lifecycle-policy.md)
+(4-folder variant: `proposed/`, `done/`, `archive/`; folder is the source of
+truth for state). RFC numbers are stable and never reused.
+
+**Adoption note:** the migration RFC packages originally numbered the roadmap RFC
+as "RFC-000". At adoption it was renumbered to RFC-042 — because RFC-000 is the
+lifecycle policy itself — and all inbound references were updated. This is the
+only renumbering; none will follow.
+
+## Implemented
+
+| ID | Title | Shipped in |
+|----|-------|------------|
+| 000 | [RFC lifecycle policy](./done/000-rfc-lifecycle-policy.md) | Implemented |
+| 001 | [Core Extraction and Canonical Domain Model](./done/001-core-extraction-and-domain-model.md) | Implemented (v0.23.0) |
+| 002 | [Diff Engine Migration to `similar` v3 and Normalized Diff Model](./done/002-similar-v3-diff-engine.md) | Implemented (v0.23.0) |
+| 003 | [Dioxus Application Shell, State Runtime, and Workspace Model](./done/003-dioxus-application-shell.md) | Implemented (v0.23.0) |
+
+## Proposed
+
+| ID | Title |
+|----|-------|
+| 004 | [Editor Adapter and CodeMirror Bridge](./proposed/004-editor-adapter-and-codemirror-bridge.md) |
+| 005 | [Explorer Workspace and Paired Directory Workflow](./proposed/005-explorer-workspace.md) |
+| 006 | [Diff/Merge Workspace and Merge Transaction Model](./proposed/006-diff-merge-workspace.md) |
+| 007 | [Save, Session, and File Safety Policy](./proposed/007-save-session-file-safety.md) |
+| 008 | [Directory Comparison and Background Job Model](./proposed/008-directory-comparison-background-jobs.md) |
+| 009 | [Settings, Theme, Localization, and Accessibility](./proposed/009-settings-theme-localization-accessibility.md) |
+| 010 | [Packaging, Diagnostics, QA, and Release Gates](./proposed/010-packaging-diagnostics-qa.md) |
+| 011 | [Workspace Session Persistence](./proposed/011-workspace-session-persistence.md) |
+| 012 | [Text Encoding, Newline, and Binary Policy](./proposed/012-text-encoding-newline-binary-policy.md) |
+| 013 | [Large File, Performance, and Virtualization Strategy](./proposed/013-large-file-performance-virtualization.md) |
+| 014 | [Search, Filter, and Navigation](./proposed/014-search-filter-navigation.md) |
+| 015 | [Undo/Redo Transaction Log and Merge Operation History](./proposed/015-undo-redo-transaction-log.md) |
+| 016 | [Editor Bridge Security and Contract](./proposed/016-editor-bridge-security-and-contract.md) |
+| 017 | [Error Taxonomy and Diagnostics UX](./proposed/017-error-taxonomy-diagnostics-ux.md) |
+| 018 | [Migration Compatibility and Parity Plan](./proposed/018-migration-compatibility-parity-plan.md) |
+| 019 | [Command Registry, Keyboard Shortcuts, Command Palette, and Accessibility](./proposed/019-command-shortcut-palette-accessibility.md) |
+| 020 | [Developer Architecture, CI, and Test Gates](./proposed/020-developer-architecture-ci-test-gates.md) |
+| 021 | [Document and Result Buffer Model](./proposed/021-document-and-result-buffer-model.md) |
+| 022 | [Directory Merge and Batch Operations](./proposed/022-directory-merge-and-batch-operations.md) |
+| 023 | [Atomic File Operations, Backup, and Restore](./proposed/023-atomic-file-operations-backup-restore.md) |
+| 024 | [Diff Visual Semantics and Decoration Contract](./proposed/024-diff-visual-semantics-decoration-contract.md) |
+| 025 | [Editor Adapter Prototype and Kill Switch](./proposed/025-editor-adapter-prototype-and-kill-switch.md) |
+| 026 | [Cross-Platform WebView and Linux Desktop Compatibility](./proposed/026-cross-platform-webview-and-linux-desktop-compatibility.md) |
+| 027 | [Report Export and Session Evidence](./proposed/027-report-export-and-session-evidence.md) |
+| 028 | [Preferences, Profiles, and Compare Options](./proposed/028-preferences-profiles-and-compare-options.md) |
+| 029 | [Integration with External Tools and Open With](./proposed/029-integration-with-external-tools-and-open-with.md) |
+| 030 | [User Documentation, Onboarding, and Help System](./proposed/030-user-documentation-onboarding-and-help-system.md) |
+| 031 | [Release Channel, Migration, and Data Compatibility](./proposed/031-release-channel-migration-and-data-compatibility.md) |
+| 032 | [Text Editing Operation Model and Editor Truth Boundary](./proposed/032-text-editing-operation-model-and-editor-truth-boundary.md) |
+| 033 | [Three-Way Merge Model](./proposed/033-three-way-merge-model.md) |
+| 034 | [Conflict Resolution Workspace](./proposed/034-conflict-resolution-workspace.md) |
+| 035 | [Scroll Sync, Line Mapping, and Diff Decoration Engine](./proposed/035-scroll-sync-line-mapping-and-diff-decoration-engine.md) |
+| 036 | [Live Reload, File Watcher, and External Modification Handling](./proposed/036-live-reload-file-watcher-and-external-modification-handling.md) |
+| 037 | [Scalable Directory Compare Index and Incremental Refresh](./proposed/037-scalable-directory-compare-index-and-incremental-refresh.md) |
+| 038 | [VCS Context Integration Boundary](./proposed/038-vcs-context-integration-boundary.md) |
+| 039 | [Patch Export, Apply, and Review Workflow](./proposed/039-patch-export-apply-and-review-workflow.md) |
+| 040 | [Editor Adapter Verification Harness and Golden Corpus](./proposed/040-editor-adapter-verification-harness-and-golden-corpus.md) |
+| 041 | [v1.0 Product Stabilization and RFC Governance](./proposed/041-v1-product-stabilization-and-rfc-governance.md) |
+| 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) |
+
+## Archive
+
+(empty)
+
+## Notes (non-RFC supporting material)
+
+Planning notes, risk registers, checklists, and roadmap refinements from the
+migration RFC packages v0.1–v0.4, plus the competitive feature analysis
+addendum. These are reference material, not RFCs.
+
+- [acceptance-test-corpus-plan](./notes/acceptance-test-corpus-plan.md)
+- [editor-adapter-risk-register](./notes/editor-adapter-risk-register.md)
+- [editor-risk-decision-record](./notes/editor-risk-decision-record.md)
+- [feature-completion-scope-control](./notes/feature-completion-scope-control.md)
+- [implementation-checklist](./notes/implementation-checklist.md)
+- [implementation-gate-checklist-v0.2](./notes/implementation-gate-checklist-v0.2.md)
+- [modern-diff-merge-tools-feature-candidates](./notes/modern-diff-merge-tools-feature-candidates.md)
+- [release-readiness-checklist-v0.3](./notes/release-readiness-checklist-v0.3.md)
+- [rfc-cross-reference-matrix](./notes/rfc-cross-reference-matrix.md)
+- [rfc-dependency-map-v0.2](./notes/rfc-dependency-map-v0.2.md)
+- [roadmap-v0.2-refinement](./notes/roadmap-v0.2-refinement.md)
+- [roadmap-v0.3-feature-completion](./notes/roadmap-v0.3-feature-completion.md)
+- [roadmap-v0.4-winmerge-class-hardening](./notes/roadmap-v0.4-winmerge-class-hardening.md)
+- [v0.4-implementation-gate-checklist](./notes/v0.4-implementation-gate-checklist.md)
+- [winmerge-parity-risk-matrix](./notes/winmerge-parity-risk-matrix.md)
