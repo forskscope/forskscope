@@ -32,8 +32,10 @@ pub fn Explorer() -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let left_dir  = use_signal(|| cwd.clone());
-    let right_dir = use_signal(|| cwd.clone());
+    let init_left  = store.settings.read().last_left_dir.clone().unwrap_or_else(|| cwd.clone());
+    let init_right = store.settings.read().last_right_dir.clone().unwrap_or_else(|| cwd.clone());
+    let left_dir  = use_signal(|| init_left);
+    let right_dir = use_signal(|| init_right);
     let left_listing:  Signal<Option<DirectoryListing>> = use_signal(|| None);
     let right_listing: Signal<Option<DirectoryListing>> = use_signal(|| None);
     let mut digests: Signal<HashMap<String, DigestState>> = use_signal(HashMap::new);
@@ -84,7 +86,12 @@ pub fn Explorer() -> Element {
                 other_dir: right_dir.read().clone(), is_left: true,
                 on_select: move |p: PathBuf| store.left_pick.set(Some(p)),
                 on_auto_compare: move |(l, r): (PathBuf, PathBuf)| open_compare(&mut store, l, r),
-                on_chdir: move |_| { refresh(left_dir, left_listing); digests.write().clear(); },
+                on_chdir: move |_| {
+                    refresh(left_dir, left_listing);
+                    digests.write().clear();
+                    store.settings.write().last_left_dir = Some(left_dir.read().clone());
+                    crate::ui::settings::persist(&store.settings.read());
+                },
             }
             DirPane {
                 label: t(lang, "Right / New"), dir: right_dir,
@@ -92,7 +99,12 @@ pub fn Explorer() -> Element {
                 other_dir: left_dir.read().clone(), is_left: false,
                 on_select: move |p: PathBuf| store.right_pick.set(Some(p)),
                 on_auto_compare: move |(l, r): (PathBuf, PathBuf)| open_compare(&mut store, l, r),
-                on_chdir: move |_| { refresh(right_dir, right_listing); digests.write().clear(); },
+                on_chdir: move |_| {
+                    refresh(right_dir, right_listing);
+                    digests.write().clear();
+                    store.settings.write().last_right_dir = Some(right_dir.read().clone());
+                    crate::ui::settings::persist(&store.settings.read());
+                },
             }
             div { class: "compare-bar",
                 if can_compare {

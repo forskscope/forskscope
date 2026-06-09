@@ -1,22 +1,20 @@
-//! Settings dialog and safety confirm dialog (RFC-009, RFC-007).
+//! Settings dialog and safety modals with accessibility attributes (RFC-009, RFC-046).
 
 use app_json_settings::ConfigManager;
 use dioxus::prelude::*;
 
 use crate::i18n::t;
-use crate::state::{AppSettings, Lang, Modal, Store, Theme, reload_tab};
-use crate::ui::diff::{save_as, save_tab};
+use crate::state::{AppSettings, Lang, Modal, Store, Theme, reload_tab, swap_sides};
+use crate::ui::diff::save_as;
 
-/// Persist current settings to the OS config directory.
 pub fn persist(settings: &AppSettings) {
-    let manager: ConfigManager<AppSettings> = ConfigManager::new().with_filename("settings.json");
-    let _ = manager.save(settings);
+    let m: ConfigManager<AppSettings> = ConfigManager::new().with_filename("settings.json");
+    let _ = m.save(settings);
 }
 
-/// Load persisted settings, or defaults on first run.
 pub fn load() -> AppSettings {
-    let manager: ConfigManager<AppSettings> = ConfigManager::new().with_filename("settings.json");
-    manager.load_or_default().unwrap_or_default()
+    let m: ConfigManager<AppSettings> = ConfigManager::new().with_filename("settings.json");
+    m.load_or_default().unwrap_or_default()
 }
 
 #[component]
@@ -24,32 +22,31 @@ pub fn ModalLayer() -> Element {
     let store = use_context::<Store>();
     let modal = store.modal.read().clone();
     match modal {
-        Modal::None => rsx! {},
-        Modal::Settings => rsx! { SettingsModal {} },
-        Modal::ConfirmOverwrite(index) => rsx! { OverwriteModal { index } },
-        Modal::SaveAs(index, path) => rsx! { SaveAsModal { index, initial_path: path } },
-        Modal::ConfirmReload(index) => rsx! { ReloadModal { index } },
+        Modal::None               => rsx! {},
+        Modal::Settings           => rsx! { SettingsModal {} },
+        Modal::ConfirmOverwrite(i) => rsx! { OverwriteModal   { index: i } },
+        Modal::SaveAs(i, path)    => rsx! { SaveAsModal      { index: i, initial_path: path } },
+        Modal::ConfirmReload(i)   => rsx! { ReloadModal      { index: i } },
+        Modal::ConfirmSwap(i)     => rsx! { SwapModal        { index: i } },
     }
 }
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
 
 #[component]
 fn SettingsModal() -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
-    let current = store.settings.read().clone();
-
+    let cur = store.settings.read().clone();
     rsx! {
-        div { class: "scrim",
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Settings",
             div { class: "modal",
-                h2 { {t(lang, "Settings")} }
+                h2 { id: "settings-title", "Settings" }
                 div { class: "field",
                     span { {t(lang, "Theme")} }
                     select {
-                        value: theme_value(current.theme),
-                        onchange: move |e| {
-                            store.settings.write().theme = theme_from(&e.value());
-                            persist(&store.settings.read());
-                        },
+                        value: tv(cur.theme),
+                        onchange: move |e| { store.settings.write().theme = tf(&e.value()); persist(&store.settings.read()); },
                         option { value: "dark", "Dark" }
                         option { value: "light", "Light" }
                         option { value: "night", "Night" }
@@ -58,11 +55,8 @@ fn SettingsModal() -> Element {
                 div { class: "field",
                     span { {t(lang, "Language")} }
                     select {
-                        value: lang_value(current.language),
-                        onchange: move |e| {
-                            store.settings.write().language = lang_from(&e.value());
-                            persist(&store.settings.read());
-                        },
+                        value: lv(cur.language),
+                        onchange: move |e| { store.settings.write().language = lf(&e.value()); persist(&store.settings.read()); },
                         option { value: "en", "English" }
                         option { value: "ja", "日本語" }
                     }
@@ -71,7 +65,7 @@ fn SettingsModal() -> Element {
                     span { {t(lang, "Diff font size")} }
                     input {
                         r#type: "number", min: "8", max: "32",
-                        value: "{current.diff_font_size}",
+                        value: "{cur.diff_font_size}",
                         onchange: move |e| {
                             if let Ok(n) = e.value().parse::<u32>() {
                                 store.settings.write().diff_font_size = n.clamp(8, 32);
@@ -80,77 +74,64 @@ fn SettingsModal() -> Element {
                         }
                     }
                 }
+                div { class: "field",
+                    span { "Context lines" }
+                    select {
+                        value: "{cur.context_lines}",
+                        onchange: move |e| {
+                            if let Ok(n) = e.value().parse::<usize>() {
+                                store.settings.write().context_lines = n;
+                                persist(&store.settings.read());
+                            }
+                        },
+                        option { value: "0",  "0 (show all)" }
+                        option { value: "3",  "3 (default)"  }
+                        option { value: "5",  "5"            }
+                        option { value: "10", "10"           }
+                    }
+                }
                 div { class: "actions",
-                    button { onclick: move |_| store.modal.set(Modal::None), {t(lang, "Close")} }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Close")} }
                 }
             }
         }
     }
 }
+
+// ─── Safety modals ────────────────────────────────────────────────────────────
 
 #[component]
 fn OverwriteModal(index: usize) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     rsx! {
-        div { class: "scrim",
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "File changed on disk",
             div { class: "modal",
                 h2 { {t(lang, "File changed on disk")} }
                 p { "The target file was modified after it was loaded. Overwrite anyway?" }
                 div { class: "actions",
-                    button { onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
-                    button {
-                        onclick: move |_| save_tab(&mut store, index, true),
-                        {t(lang, "Overwrite")}
-                    }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { onclick: move |_| { save_tab_force(&mut store, index); }, {t(lang, "Overwrite")} }
                 }
             }
         }
     }
 }
 
-fn theme_value(t: Theme) -> &'static str {
-    match t {
-        Theme::Dark => "dark",
-        Theme::Light => "light",
-        Theme::Night => "night",
-    }
-}
-fn theme_from(s: &str) -> Theme {
-    match s {
-        "light" => Theme::Light,
-        "night" => Theme::Night,
-        _ => Theme::Dark,
-    }
-}
-fn lang_value(l: Lang) -> &'static str {
-    match l {
-        Lang::En => "en",
-        Lang::Ja => "ja",
-    }
-}
-fn lang_from(s: &str) -> Lang {
-    match s {
-        "ja" => Lang::Ja,
-        _ => Lang::En,
-    }
-}
-
-/// Save the merge result to an explicit path chosen by the user.
 #[component]
 fn SaveAsModal(index: usize, initial_path: String) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     let mut path = use_signal(|| initial_path);
     rsx! {
-        div { class: "scrim",
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Save As",
             div { class: "modal",
                 h2 { "Save As" }
                 div { class: "field",
                     span { "Path" }
                     input {
-                        value: "{path}",
-                        oninput: move |e| path.set(e.value()),
+                        autofocus: true,
+                        value: "{path}", oninput: move |e| path.set(e.value()),
                         style: "width:100%;",
                     }
                 }
@@ -167,23 +148,19 @@ fn SaveAsModal(index: usize, initial_path: String) -> Element {
     }
 }
 
-/// Confirm reload when the merge session has unsaved changes.
 #[component]
 fn ReloadModal(index: usize) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     rsx! {
-        div { class: "scrim",
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Reload files",
             div { class: "modal",
                 h2 { "Reload files?" }
                 p { "Unsaved merge changes will be discarded." }
                 div { class: "actions",
-                    button { onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
                     button {
-                        onclick: move |_| {
-                            reload_tab(&mut store, index);
-                            store.modal.set(Modal::None);
-                        },
+                        onclick: move |_| { reload_tab(&mut store, index); store.modal.set(Modal::None); },
                         "Discard and Reload"
                     }
                 }
@@ -191,3 +168,36 @@ fn ReloadModal(index: usize) -> Element {
         }
     }
 }
+
+#[component]
+fn SwapModal(index: usize) -> Element {
+    let mut store = use_context::<Store>();
+    let lang = store.lang();
+    rsx! {
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Swap sides",
+            div { class: "modal",
+                h2 { "Swap sides?" }
+                p { "Unsaved merge changes will be discarded when sides are swapped." }
+                div { class: "actions",
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button {
+                        onclick: move |_| { swap_sides(&mut store, index); store.modal.set(Modal::None); },
+                        "Discard and Swap"
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+fn save_tab_force(store: &mut Store, index: usize) {
+    use crate::ui::diff::save_tab;
+    save_tab(store, index, true);
+}
+
+fn tv(t: Theme) -> &'static str { match t { Theme::Dark => "dark", Theme::Light => "light", Theme::Night => "night" } }
+fn tf(s: &str) -> Theme { match s { "light" => Theme::Light, "night" => Theme::Night, _ => Theme::Dark } }
+fn lv(l: Lang) -> &'static str { match l { Lang::En => "en", Lang::Ja => "ja" } }
+fn lf(s: &str) -> Lang { match s { "ja" => Lang::Ja, _ => Lang::En } }

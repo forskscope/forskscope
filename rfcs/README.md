@@ -2,7 +2,7 @@
 
 Lifecycle: [RFC 000 — RFC lifecycle policy](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 
-**Adoption note:** the migration RFC packages originally numbered the roadmap RFC as "RFC-000". At adoption it was renumbered to RFC-042. This is the only renumbering; none will follow.
+**Adoption note:** the migration RFC packages originally numbered the roadmap RFC as "RFC-000". At adoption it was renumbered to RFC-042. This is the only renumbering.
 
 ## Implemented
 
@@ -13,13 +13,13 @@ Lifecycle: [RFC 000 — RFC lifecycle policy](./done/000-rfc-lifecycle-policy.md
 | 002 | [Diff Engine Migration to `similar` v3 and Normalized Diff Model](./done/002-similar-v3-diff-engine.md) | Implemented (v0.23.0) |
 | 003 | [Dioxus Application Shell, State Runtime, and Workspace Model](./done/003-dioxus-application-shell.md) | Implemented (v0.23.0) |
 | 005 | [Explorer Workspace and Paired Directory Workflow](./done/005-explorer-workspace.md) | Implemented (v0.25.0) |
+| 006 | [Diff/Merge Workspace and Merge Transaction Model](./done/006-diff-merge-workspace.md) | Implemented (v0.26.0) |
 
 ## Proposed
 
 | ID | Title |
 |----|-------|
 | 004 | [Editor Adapter and CodeMirror Bridge](./proposed/004-editor-adapter-and-codemirror-bridge.md) |
-| 006 | [Diff/Merge Workspace and Merge Transaction Model](./proposed/006-diff-merge-workspace.md) |
 | 007 | [Save, Session, and File Safety Policy](./proposed/007-save-session-file-safety.md) |
 | 008 | [Directory Comparison and Background Job Model](./proposed/008-directory-comparison-background-jobs.md) |
 | 009 | [Settings, Theme, Localization, and Accessibility](./proposed/009-settings-theme-localization-accessibility.md) |

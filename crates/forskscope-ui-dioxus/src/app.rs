@@ -1,4 +1,4 @@
-//! Application root with global keyboard shortcuts (RFC-003, RFC-019).
+//! Application root with global keyboard shortcuts and accessibility (RFC-003, RFC-019, RFC-046).
 
 use std::path::PathBuf;
 
@@ -36,7 +36,6 @@ pub fn App() -> Element {
         style { {MAIN_CSS} }
         div {
             class: "app {theme_class}",
-            // Enable keyboard events on the root container.
             tabindex: "-1",
             onkeydown: move |e: Event<KeyboardData>| {
                 let Some(index) = *store.active.read() else { return };
@@ -48,6 +47,15 @@ pub fn App() -> Element {
                         match s.to_ascii_lowercase().as_str() {
                             "s" => save_tab(&mut store, index, false),
                             "z" => { let _ = store.tabs.write().get_mut(index).map(|t| t.merge.undo()); }
+                            // Ctrl+F: the search bar inside DiffWorkspace handles its own
+                            // context; we use document::eval to click the search button.
+                            "f" => {
+                                spawn(async move {
+                                    let _ = dioxus::document::eval(
+                                        "document.querySelector('.diff-wrap button[aria-label=\"Open search bar\"]')?.click();"
+                                    ).await;
+                                });
+                            }
                             _ => {}
                         }
                     }
@@ -67,6 +75,8 @@ pub fn App() -> Element {
             if let Some(message) = toast {
                 div {
                     class: "toast",
+                    role: "status",
+                    aria_live: "polite",
                     onclick: move |_| store.toast.set(None),
                     "{message}"
                 }

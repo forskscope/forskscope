@@ -5,6 +5,51 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.26.0] — 2026-06-09
+
+### Added
+
+- **Colour-independent diff markers** — every changed row now carries a
+  visible glyph (− for deletions, + for insertions, ~ for replacements) in
+  the gutter alongside the colour cue, satisfying the accessibility
+  requirement that colour must not be the sole indicator of change kind
+  (RFC-019 §19.3). Equal rows show no mark. All markers carry
+  `aria-hidden="true"` so screen readers are not flooded with symbols.
+
+- **Word-wrap toggle** — in the advanced toolbar section, "Wrap: on/off"
+  toggles word-wrapping for the active comparison. Off by default (code
+  files); on is useful for prose/markdown. Stored per comparison tab; not
+  persisted (tabs are created fresh).
+
+- **Search within diff** — press the 🔍 button or Ctrl+F to open a compact
+  search bar above the diff content. Matching rows are highlighted across both
+  panes. A live match count shows "N matches". Esc closes the bar and clears
+  the query.
+
+- **Swap sides** — "⇄ Swap sides" in the advanced toolbar exchanges left/right
+  documents, paths, and recomputes the diff. If the merge session has unsaved
+  changes, a confirmation modal asks before discarding.
+
+- **Context lines preference** — in Settings, a "Context lines" selector
+  (0 / 3 / 5 / 10) controls how many lines of equal context are shown around
+  each change before collapse. Persisted across launches.
+
+- **Remember last directories** — when a pane navigates to a new directory the
+  path is saved to `AppSettings` and loaded on the next launch. Stored
+  separately for the left and right panes.
+
+### Improved (accessibility — RFC-046)
+
+- Every safety modal now carries `role="dialog"`, `aria-modal="true"`, and
+  `aria-label`; the first button has `autofocus` so keyboard users land
+  immediately on the safe default choice.
+- Toast notifications carry `role="status"` and `aria-live="polite"`.
+- The diff workspace region has `role="region"` and `aria-label`.
+- Action buttons have explicit `aria-label` attributes where icon text is
+  insufficient.
+
+---
+
 ## [0.25.0] — 2026-06-09
 
 ### Added

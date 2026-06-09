@@ -1,6 +1,6 @@
 # RFC-006 — Diff/Merge Workspace and Merge Transaction Model
 
-**Status.** Proposed
+**Status.** Implemented (v0.26.0)
 
 ---toml
 project = "ForskScope"
@@ -221,3 +221,7 @@ User types in editable pane
 | Re-diff after each edit is expensive | Use stale marker and explicit refresh for large files. |
 | Undo history conflicts with editor native undo | Route editor undo through adapter/core where possible. |
 | Users misunderstand target side | Strong toolbar labels and side headers. |
+
+## Deferred work (v0.26.0)
+
+The editor-adapter surface (CodeMirror bridge, RFC-004) is deferred. Free-form manual editing within the diff pane is deferred. Patch export/import is deferred.

@@ -182,3 +182,41 @@ input, select {
 .dir-row.focused { background: var(--surface-3); outline: 1px solid var(--focus); }
 /* directory summary in compare bar */
 .compare-bar .summary { color: var(--muted); font-size: 12px; }
+
+/* ---- colour-independent diff marks (RFC-019) ---- */
+.diff-mark {
+  display: inline-block; width: 1.2ch; text-align: center;
+  font-size: 10px; font-weight: 700; flex: 0; color: var(--muted);
+  user-select: none;
+}
+.hunk-del .diff-mark, .hunk-del .cell { color: inherit; }
+.hunk-ins .diff-mark { color: var(--ins-mark); }
+.hunk-del .diff-mark { color: var(--del-mark); }
+.hunk-rep .diff-mark { color: var(--warn); }
+/* update grid to add mark columns */
+.row {
+  grid-template-columns: 4ch 1.2ch 1fr 5ch 4ch 1.2ch 1fr;
+}
+
+/* ---- word wrap ---- */
+.diff-scroll.wrap .cell { white-space: pre-wrap; word-break: break-word; }
+.diff-scroll:not(.wrap) .cell { white-space: pre; overflow-x: visible; }
+
+/* ---- search bar ---- */
+.search-bar {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .3rem .6rem; background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.search-input {
+  flex: 1; max-width: 22rem;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px; padding: .25rem .5rem;
+}
+.search-input:focus { border-color: var(--accent); outline: none; }
+.search-count { font-size: 12px; color: var(--muted); }
+.search-close { padding: 0 .4rem; color: var(--muted); }
+
+/* ---- search match highlight ---- */
+.row.match { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.row.match .cell { background: color-mix(in srgb, var(--accent) 12%, transparent); }
