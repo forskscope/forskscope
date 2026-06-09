@@ -6,6 +6,8 @@ pub mod dir_pane;
 pub mod explorer;
 pub mod header;
 pub mod hunk;
+pub mod keybindings;
+pub mod modals;
 pub mod search;
 pub mod settings;
 pub mod statusbar;

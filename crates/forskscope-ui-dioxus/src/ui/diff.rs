@@ -107,6 +107,7 @@ struct TabSnapshot {
     is_dirty: bool, can_undo: bool, can_redo: bool, font_size: u32,
     focused_id: Option<u64>, focused_change: usize, changes: usize,
     ignore_whitespace: bool, context_lines: usize,
+    algorithm: forskscope_core::DiffAlgorithm,
 }
 
 impl TabSnapshot {
@@ -121,6 +122,7 @@ impl TabSnapshot {
             focused_id: ids.get(tab.focused_change).copied(),
             focused_change: tab.focused_change, changes: ids.len(),
             ignore_whitespace: tab.diff_options.ignore_whitespace,
+            algorithm: tab.diff_options.algorithm,
             context_lines, hunks,
         }
     }
@@ -217,6 +219,25 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                         }
                     },
                     {format!("Ignore WS: {}", if snap.ignore_whitespace { "on" } else { "off" })}
+                }
+                select {
+                    title: "Diff algorithm",
+                    value: algo_val(snap.algorithm),
+                    onchange: move |e| {
+                        let mut tabs = store.tabs.write();
+                        if let Some(tab) = tabs.get_mut(index) {
+                            use forskscope_core::DiffAlgorithm;
+                            tab.diff_options.algorithm = match e.value().as_str() {
+                                "patience"  => DiffAlgorithm::Patience,
+                                "histogram" => DiffAlgorithm::Histogram,
+                                _           => DiffAlgorithm::Myers,
+                            };
+                            recompute_diff(tab);
+                        }
+                    },
+                    option { value: "myers",     "Myers"     }
+                    option { value: "patience",  "Patience"  }
+                    option { value: "histogram", "Histogram" }
                 }
             }
         }
@@ -332,4 +353,9 @@ fn trunc(s: &str) -> String {
         if parent.len() > 24 { return format!("…/{name}"); }
     }
     s.to_string()
+}
+
+fn algo_val(a: forskscope_core::DiffAlgorithm) -> &'static str {
+    use forskscope_core::DiffAlgorithm;
+    match a { DiffAlgorithm::Patience => "patience", DiffAlgorithm::Histogram => "histogram", _ => "myers" }
 }

@@ -98,6 +98,8 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                     onclick: move |_| filter.set(DeepFilter::All), "All" }
                 button { class: if f==DeepFilter::Equal {"filter-btn active"} else {"filter-btn"},
                     onclick: move |_| filter.set(DeepFilter::Equal), "Equal only" }
+                span { class: "spacer" }
+                BatchCopyButtons { entries, left_root: left_root.clone(), right_root: right_root.clone() }
             }
             if is_scan {
                 div { class: "deep-scanning", "Scanning…" }
@@ -165,4 +167,66 @@ fn fmt(n: u64) -> String {
     if n < 1024 { format!("{n}B") }
     else if n < 1_048_576 { format!("{:.1}KB", n as f64 / 1024.0) }
     else { format!("{:.1}MB", n as f64 / 1_048_576.0) }
+}
+
+// ─── Batch copy buttons ───────────────────────────────────────────────────────
+
+#[component]
+fn BatchCopyButtons(entries: Signal<Vec<RecEntry>>, left_root: PathBuf, right_root: PathBuf) -> Element {
+    let mut store = use_context::<Store>();
+    let snap = entries.read();
+    let has_changes = snap.iter().any(|e| !matches!(e.status, RecStatus::Equal | RecStatus::Computing));
+    if !has_changes { return rsx! {}; }
+
+    let lr = left_root.clone();
+    let rr = right_root.clone();
+    let lr2 = left_root;
+    let rr2 = right_root;
+
+    // "Copy all →" = copy left-only and changed files to the right tree
+    let to_right: Vec<(PathBuf, PathBuf)> = snap.iter()
+        .filter(|e| matches!(e.status, RecStatus::Changed | RecStatus::LeftOnly))
+        .map(|e| (lr.join(&e.rel_path), rr.join(&e.rel_path)))
+        .collect();
+    // "Copy all ←" = copy right-only and changed files to the left tree
+    let to_left: Vec<(PathBuf, PathBuf)> = snap.iter()
+        .filter(|e| matches!(e.status, RecStatus::Changed | RecStatus::RightOnly))
+        .map(|e| (rr2.join(&e.rel_path), lr2.join(&e.rel_path)))
+        .collect();
+    drop(snap);
+
+    let tr_count = to_right.len();
+    let tl_count = to_left.len();
+    rsx! {
+        if tr_count > 0 {
+            button {
+                class: "filter-btn",
+                title: "Copy {tr_count} changed/left-only files to the right directory",
+                onclick: move |_| {
+                    use crate::state::{BatchCopySpec, Modal};
+                    store.modal.set(Modal::ConfirmBatchCopy(BatchCopySpec {
+                        items: to_right.clone(),
+                        label: format!("Copy {tr_count} file{} to the right directory",
+                            if tr_count == 1 { "" } else { "s" }),
+                    }));
+                },
+                "Copy {tr_count} →"
+            }
+        }
+        if tl_count > 0 {
+            button {
+                class: "filter-btn",
+                title: "Copy {tl_count} changed/right-only files to the left directory",
+                onclick: move |_| {
+                    use crate::state::{BatchCopySpec, Modal};
+                    store.modal.set(Modal::ConfirmBatchCopy(BatchCopySpec {
+                        items: to_left.clone(),
+                        label: format!("Copy {tl_count} file{} to the left directory",
+                            if tl_count == 1 { "" } else { "s" }),
+                    }));
+                },
+                "← Copy {tl_count}"
+            }
+        }
+    }
 }

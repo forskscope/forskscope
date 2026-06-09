@@ -29,6 +29,9 @@ impl Theme {
 #[serde(rename_all = "kebab-case")]
 pub enum Lang { En, Ja }
 
+// Re-export for UI use without depending on the core type directly.
+pub use forskscope_core::DiffAlgorithm;
+
 /// A named preset for diff options — stored in settings, applied when
 /// opening new comparisons (RFC-009 compare profiles).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -36,13 +39,28 @@ pub struct DiffProfile {
     pub name: String,
     pub ignore_whitespace: bool,
     pub ignore_case: bool,
+    pub algorithm: DiffAlgorithmSetting,
+    /// Built-in profiles ship with the app and cannot be deleted.
+    #[serde(default)]
+    pub built_in: bool,
 }
+
+/// Serialisable wrapper around `DiffAlgorithm` for profile persistence.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DiffAlgorithmSetting { #[default] Myers, Patience, Histogram }
 
 impl DiffProfile {
     pub fn to_diff_options(&self) -> DiffOptions {
+        let algo = match self.algorithm {
+            DiffAlgorithmSetting::Myers     => DiffAlgorithm::Myers,
+            DiffAlgorithmSetting::Patience  => DiffAlgorithm::Patience,
+            DiffAlgorithmSetting::Histogram => DiffAlgorithm::Histogram,
+        };
         DiffOptions {
             ignore_whitespace: self.ignore_whitespace,
-            ignore_case: self.ignore_case,
+            ignore_case:       self.ignore_case,
+            algorithm:         algo,
             ..DiffOptions::default()
         }
     }
@@ -50,10 +68,32 @@ impl DiffProfile {
 
 fn default_profiles() -> Vec<DiffProfile> {
     vec![
-        DiffProfile { name: "Exact (default)".into(), ignore_whitespace: false, ignore_case: false },
-        DiffProfile { name: "Ignore whitespace".into(), ignore_whitespace: true, ignore_case: false },
-        DiffProfile { name: "Ignore case".into(), ignore_whitespace: false, ignore_case: true },
+        DiffProfile { name: "Exact (default)".into(),   ignore_whitespace: false, ignore_case: false, algorithm: DiffAlgorithmSetting::Myers,     built_in: true },
+        DiffProfile { name: "Ignore whitespace".into(), ignore_whitespace: true,  ignore_case: false, algorithm: DiffAlgorithmSetting::Myers,     built_in: true },
+        DiffProfile { name: "Ignore case".into(),       ignore_whitespace: false, ignore_case: true,  algorithm: DiffAlgorithmSetting::Myers,     built_in: true },
+        DiffProfile { name: "Histogram".into(),         ignore_whitespace: false, ignore_case: false, algorithm: DiffAlgorithmSetting::Histogram, built_in: true },
     ]
+}
+
+/// Add a user-defined profile and persist settings.
+pub fn add_profile(store: &mut Store, name: String, ignore_whitespace: bool, ignore_case: bool, algorithm: DiffAlgorithmSetting) {
+    store.settings.write().profiles.push(DiffProfile {
+        name, ignore_whitespace, ignore_case, algorithm, built_in: false,
+    });
+    crate::ui::settings::persist(&store.settings.read());
+}
+
+/// Remove the profile at `index` if it is not built-in.
+pub fn remove_profile(store: &mut Store, index: usize) {
+    let is_builtin = store.settings.read().profiles.get(index).map(|p| p.built_in).unwrap_or(true);
+    if is_builtin { return; }
+    let mut s = store.settings.write();
+    s.profiles.remove(index);
+    if s.active_profile >= s.profiles.len() {
+        s.active_profile = s.profiles.len().saturating_sub(1);
+    }
+    drop(s);
+    crate::ui::settings::persist(&store.settings.read());
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,13 +125,21 @@ impl Default for AppSettings {
     }
 }
 
+/// Specification for a batch file-copy operation (deep compare "Copy all").
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchCopySpec {
+    pub items: Vec<(PathBuf, PathBuf)>,   // (src, dst)
+    pub label: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Modal {
     None, Settings,
     ConfirmOverwrite(usize), SaveAs(usize, String),
     ConfirmReload(usize), ConfirmSwap(usize),
-    ConfirmDirOp(DirOp),
-    About,
+    ConfirmDirOp(DirOp), ConfirmClose(usize),
+    ConfirmBatchCopy(BatchCopySpec),
+    About, KeyboardRef,
 }
 
 /// A pending directory file operation awaiting user confirmation.
@@ -271,4 +319,19 @@ pub fn restore_session(store: &mut Store) {
             open_compare(store, lp, rp);
         }
     }
+}
+
+/// Close the tab at `index`, adjusting the active index so another tab
+/// (or the Explorer) remains visible.
+pub fn close_tab(store: &mut Store, index: usize) {
+    store.tabs.write().remove(index);
+    let len = store.tabs.read().len();
+    let new_active = if len == 0 {
+        None
+    } else {
+        Some(index.min(len - 1))
+    };
+    store.active.set(new_active);
+    // Persist the updated session immediately.
+    save_session(store);
 }

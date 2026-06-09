@@ -18,15 +18,9 @@ pub fn Header() -> Element {
                 onclick: move |_| store.active.set(None),
                 {t(lang, "Explorer")}
             }
-            button {
-                onclick: move |_| store.modal.set(Modal::Settings),
-                {t(lang, "Settings")}
-            }
-            button {
-                onclick: move |_| store.modal.set(Modal::About),
-                title: "About ForskScope",
-                "?"
-            }
+            button { onclick: move |_| store.modal.set(Modal::Settings), {t(lang, "Settings")} }
+            button { onclick: move |_| store.modal.set(Modal::About), title: "About ForskScope", "ℹ" }
+            button { onclick: move |_| store.modal.set(Modal::KeyboardRef), title: "Keyboard shortcuts (Ctrl+/)", "?" }
         }
     }
 }

@@ -42,6 +42,7 @@ pub fn Explorer() -> Element {
     let mut sort:    Signal<SortMode>       = use_signal(SortMode::default);
     let mut hidden:  Signal<bool>           = use_signal(|| false);
     let mut mode:    Signal<ExplorerMode>   = use_signal(ExplorerMode::default);
+    let mut name_filter: Signal<String>     = use_signal(String::new);
 
     // ── Initial directory load ────────────────────────────────────────────────
     use_effect(move || {
@@ -79,6 +80,7 @@ pub fn Explorer() -> Element {
     let right = store.right_pick.read().clone();
     let can_compare = left.is_some() && right.is_some();
     let f = *filter.read(); let s = *sort.read(); let h = *hidden.read();
+    let nf = name_filter.read().clone();
 
     rsx! {
         div { class: "explorer",
@@ -113,6 +115,13 @@ pub fn Explorer() -> Element {
                     input { r#type: "checkbox", checked: h, onchange: move |e| hidden.set(e.checked()) }
                     span { "Hidden" }
                 }
+                input {
+                    class: "name-filter-input",
+                    placeholder: "Filter names…",
+                    value: "{nf}",
+                    oninput: move |e| name_filter.set(e.value()),
+                    title: "Filter files by name substring",
+                }
                 // Mode toggle
                 button {
                     class: if *mode.read() == ExplorerMode::Deep { "filter-btn active" } else { "filter-btn" },
@@ -138,7 +147,7 @@ pub fn Explorer() -> Element {
                     label: t(lang, "Left / Old"), dir: left_dir,
                     listing: left_listing, other_names: right_names.clone(), digests,
                     other_dir: right_dir.read().clone(), is_left: true,
-                    filter: f, sort: s, show_hidden: h,
+                    filter: f, sort: s, show_hidden: h, name_filter: nf.clone(),
                     on_select: move |p: PathBuf| store.left_pick.set(Some(p)),
                     on_auto_compare: move |(l, r): (PathBuf, PathBuf)| open_compare(&mut store, l, r),
                     on_chdir: move |_| {
@@ -151,7 +160,7 @@ pub fn Explorer() -> Element {
                     label: t(lang, "Right / New"), dir: right_dir,
                     listing: right_listing, other_names: left_names.clone(), digests,
                     other_dir: left_dir.read().clone(), is_left: false,
-                    filter: f, sort: s, show_hidden: h,
+                    filter: f, sort: s, show_hidden: h, name_filter: nf.clone(),
                     on_select: move |p: PathBuf| store.right_pick.set(Some(p)),
                     on_auto_compare: move |(l, r): (PathBuf, PathBuf)| open_compare(&mut store, l, r),
                     on_chdir: move |_| {

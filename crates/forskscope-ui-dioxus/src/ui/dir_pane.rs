@@ -24,6 +24,7 @@ pub fn DirPane(
     filter: ExplorerFilter,
     sort: SortMode,
     show_hidden: bool,
+    name_filter: String,
     on_select: EventHandler<PathBuf>,
     on_auto_compare: EventHandler<(PathBuf, PathBuf)>,
     on_chdir: EventHandler<()>,
@@ -46,6 +47,7 @@ pub fn DirPane(
     let raw_files: Vec<FileEntry> = listing.read().as_ref()
         .map(|l| l.files.iter()
             .filter(|f| show_hidden || !f.name.starts_with('.'))
+            .filter(|f| name_filter.is_empty() || f.name.to_ascii_lowercase().contains(&name_filter.to_ascii_lowercase()))
             .filter(|f| match filter {
                 ExplorerFilter::All       => true,
                 ExplorerFilter::Different => !matches!(digests.read().get(&f.name), Some(DigestState::Equal)),

@@ -5,6 +5,60 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.30.0] — 2026-06-09
+
+### Added
+
+- **Tab close button** — every comparison tab now has a `×` button. If the
+  comparison has unsaved merge changes, a confirmation modal asks before
+  discarding. Closing the last tab returns to the Explorer workspace. The
+  session file is updated immediately after each close.
+
+- **Tab dirty indicator** — a `●` dot appears before the tab title whenever
+  the merge session has unsaved changes, giving an at-a-glance view of
+  which comparisons need saving.
+
+- **Custom compare profiles (RFC-009 complete)** — the Settings panel now
+  shows a clickable profile list instead of a dropdown. Clicking a profile
+  activates it. Built-in profiles (Exact, Ignore whitespace, Ignore case)
+  are read-only. An inline form at the bottom lets users create named
+  presets with their own combination of ignore-whitespace and ignore-case
+  options. Custom profiles can be deleted with `×`; they are persisted to
+  `settings.json`.
+
+---
+
+## [0.29.0] — 2026-06-09
+
+### Added
+
+- **Session persistence (RFC-035)** — open comparison tabs are saved to
+  `session.json` (via `app-json-settings`) whenever the tab list changes.
+  On the next launch with no explicit CLI arguments, tabs are restored
+  automatically. Tabs whose files are gone are skipped silently; tabs with
+  one missing side open gracefully with an empty document.
+
+- **About panel** — the `?` button in the header opens a modal showing the
+  version, build profile (debug/release), platform (OS + arch), UI framework,
+  and diff engine. A **Copy diagnostics** button copies the information to the
+  clipboard for easy bug reporting.
+
+- **Enter to apply focused hunk** — pressing Enter in the diff workspace
+  applies the currently focused change (left → right) and auto-advances to
+  the next pending change, enabling rapid single-key merge flow.
+
+- **Status bar diff stats** — the status bar now shows `+N / -N`
+  (insertions/deletions) for the active comparison, together with the file
+  names, encoding, and unsaved-changes marker.
+
+- **Deep compare incremental progress (RFC-040 partial)** — the deep
+  recursive compare now uses a two-phase approach: Phase 1 (fast file-system
+  walk) fills the table immediately with `Computing` placeholders; Phase 2
+  runs per-file `spawn_blocking` digest tasks and updates entries in-place.
+  A live `checking N/total…` counter shows progress.
+
+---
+
 ## [0.28.0] — 2026-06-09
 
 ### Added

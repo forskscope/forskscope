@@ -1,82 +1,68 @@
-//! Workspace tab bar (RFC-003 §4, RFC-016).
+//! Tab bar: close buttons, dirty-state indicator, active highlighting.
 
 use dioxus::prelude::*;
 
-use crate::i18n::t;
-use crate::state::Store;
+use crate::state::{Modal, Store, close_tab};
 
 #[component]
 pub fn TabBar() -> Element {
     let store = use_context::<Store>();
     let active = *store.active.read();
-    let lang = store.lang();
-
-    // Snapshot tab summaries to avoid holding the borrow across handlers.
-    let summaries: Vec<(usize, String, bool)> = store
-        .tabs
-        .read()
-        .iter()
-        .enumerate()
-        .map(|(i, tab)| (i, tab.title.clone(), tab.can_save && tab.merge.is_dirty()))
-        .collect();
+    let tab_count = store.tabs.read().len();
 
     rsx! {
-        div { class: "tabs",
-            ExplorerTab { active: active.is_none(), lang }
-            for (index, title, dirty) in summaries {
-                TabItem { index, title, dirty, active: active == Some(index) }
+        div { class: "tabbar",
+            for i in 0..tab_count {
+                TabItem {
+                    index: i,
+                    is_active: active == Some(i),
+                }
             }
         }
     }
 }
 
 #[component]
-fn ExplorerTab(active: bool, lang: crate::state::Lang) -> Element {
+fn TabItem(index: usize, is_active: bool) -> Element {
     let mut store = use_context::<Store>();
-    let class = if active { "tab active" } else { "tab" };
-    rsx! {
-        div { class: "{class}", onclick: move |_| store.active.set(None),
-            span { class: "name", {t(lang, "Explorer")} }
-        }
-    }
-}
 
-#[component]
-fn TabItem(index: usize, title: String, dirty: bool, active: bool) -> Element {
-    let mut store = use_context::<Store>();
-    let class = if active { "tab active" } else { "tab" };
+    let (title, is_dirty) = {
+        let tabs = store.tabs.read();
+        let Some(tab) = tabs.get(index) else { return rsx!{} };
+        let dirty = tab.can_save && tab.merge.is_dirty();
+        (tab.title.clone(), dirty)
+    };
+
+    let class = if is_active { "tab active" } else { "tab" };
+
     rsx! {
-        div { class: "{class}", onclick: move |_| store.active.set(Some(index)),
-            if dirty {
-                span { class: "dirty", "●" }
-            }
-            span { class: "name", "{title}" }
+        div { class: "{class}",
             span {
-                class: "close",
-                onclick: move |evt: Event<MouseData>| {
+                class: "tab-title",
+                onclick: move |_| store.active.set(Some(index)),
+                // Dirty indicator: a filled dot before the title.
+                if is_dirty {
+                    span { class: "dirty-dot", title: "Unsaved changes", "●" }
+                }
+                "{title}"
+            }
+            button {
+                class: "tab-close",
+                title: "Close comparison",
+                aria_label: "Close {title}",
+                onclick: move |evt| {
                     evt.stop_propagation();
-                    close_tab(&mut store, index);
+                    let dirty = store.tabs.read().get(index)
+                        .map(|t| t.can_save && t.merge.is_dirty())
+                        .unwrap_or(false);
+                    if dirty {
+                        store.modal.set(Modal::ConfirmClose(index));
+                    } else {
+                        close_tab(&mut store, index);
+                    }
                 },
-                "✕"
+                "×"
             }
         }
-    }
-}
-
-fn close_tab(store: &mut Store, index: usize) {
-    let mut tabs = store.tabs.write();
-    if index >= tabs.len() {
-        return;
-    }
-    tabs.remove(index);
-    let len = tabs.len();
-    drop(tabs);
-    let active = *store.active.read();
-    match active {
-        Some(a) if a == index => {
-            store.active.set(if len == 0 { None } else { Some(a.min(len - 1)) });
-        }
-        Some(a) if a > index => store.active.set(Some(a - 1)),
-        _ => {}
     }
 }

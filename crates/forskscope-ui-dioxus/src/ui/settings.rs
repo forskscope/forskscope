@@ -1,11 +1,13 @@
-//! Settings dialog and safety modals with accessibility attributes (RFC-009, RFC-046).
+//! Settings dialog, persist/load helpers, and the ModalLayer dispatcher (RFC-009, RFC-046).
 
 use app_json_settings::ConfigManager;
 use dioxus::prelude::*;
 
 use crate::i18n::t;
-use crate::state::{AppSettings, Lang, Modal, Store, Theme, reload_tab, swap_sides};
-use crate::ui::diff::save_as;
+use crate::state::{AppSettings, Lang, Modal, Store, Theme};
+use crate::ui::modals::{AboutModal, CloseTabModal, ConfirmDirOpModal, OverwriteModal,
+                         ReloadModal, SaveAsModal, SwapModal};
+use crate::ui::keybindings::KeyboardRefModal;
 
 pub fn persist(settings: &AppSettings) {
     let m: ConfigManager<AppSettings> = ConfigManager::new().with_filename("settings.json");
@@ -24,12 +26,15 @@ pub fn ModalLayer() -> Element {
     match modal {
         Modal::None               => rsx! {},
         Modal::Settings           => rsx! { SettingsModal {} },
-        Modal::ConfirmOverwrite(i) => rsx! { OverwriteModal   { index: i } },
-        Modal::SaveAs(i, path)    => rsx! { SaveAsModal      { index: i, initial_path: path } },
-        Modal::ConfirmReload(i)   => rsx! { ReloadModal      { index: i } },
-        Modal::ConfirmSwap(i)     => rsx! { SwapModal        { index: i } },
-        Modal::ConfirmDirOp(op)  => rsx! { DirOpModal       { op } },
-        Modal::About             => rsx! { AboutModal       {} },
+        Modal::ConfirmOverwrite(i) => rsx! { OverwriteModal      { index: i } },
+        Modal::SaveAs(i, path)    => rsx! { SaveAsModal         { index: i, initial_path: path } },
+        Modal::ConfirmReload(i)   => rsx! { ReloadModal         { index: i } },
+        Modal::ConfirmSwap(i)     => rsx! { SwapModal           { index: i } },
+        Modal::ConfirmDirOp(op)  => rsx! { ConfirmDirOpModal   { op } },
+        Modal::ConfirmClose(i)   => rsx! { CloseTabModal       { index: i } },
+        Modal::About             => rsx! { AboutModal          {} },
+        Modal::ConfirmBatchCopy(spec) => rsx! { crate::ui::modals::BatchCopyModal { spec } },
+        Modal::KeyboardRef        => rsx! { KeyboardRefModal {} },
     }
 }
 
@@ -93,19 +98,34 @@ fn SettingsModal() -> Element {
                     }
                 }
                 div { class: "field",
-                    span { "Compare profile" }
-                    select {
-                        value: "{cur.active_profile}",
-                        onchange: move |e| {
-                            if let Ok(i) = e.value().parse::<usize>() {
-                                store.settings.write().active_profile = i;
-                                persist(&store.settings.read());
-                            }
-                        },
+                    span { "Compare profiles" }
+                    div { class: "profile-list",
                         for (i, p) in cur.profiles.iter().enumerate() {
-                            option { value: "{i}", "{p.name}" }
+                            div { class: if cur.active_profile == i { "profile-row active" } else { "profile-row" },
+                                span {
+                                    class: "profile-name",
+                                    onclick: move |_| {
+                                        store.settings.write().active_profile = i;
+                                        persist(&store.settings.read());
+                                    },
+                                    if cur.active_profile == i { "▸ " } else { "  " }
+                                    "{p.name}"
+                                }
+                                if !p.built_in {
+                                    button {
+                                        class: "profile-delete",
+                                        title: "Delete profile",
+                                        onclick: move |_| crate::state::remove_profile(&mut store, i),
+                                        "×"
+                                    }
+                                }
+                            }
                         }
                     }
+                }
+                div { class: "field",
+                    span { "New profile" }
+                    AddProfileInline {}
                 }
                 div { class: "actions",
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Close")} }
@@ -115,205 +135,59 @@ fn SettingsModal() -> Element {
     }
 }
 
-// ─── Safety modals ────────────────────────────────────────────────────────────
-
+/// Inline "Add profile" sub-form inside the Settings modal.
 #[component]
-fn OverwriteModal(index: usize) -> Element {
+fn AddProfileInline() -> Element {
     let mut store = use_context::<Store>();
-    let lang = store.lang();
+    let mut name        = use_signal(String::new);
+    #[allow(unused_mut)] let mut ignore_ws   = use_signal(|| false);
+    #[allow(unused_mut)] let mut ignore_case = use_signal(|| false);
+    #[allow(unused_mut)] let mut algorithm:  Signal<crate::state::DiffAlgorithmSetting> = use_signal(Default::default);
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "File changed on disk",
-            div { class: "modal",
-                h2 { {t(lang, "File changed on disk")} }
-                p { "The target file was modified after it was loaded. Overwrite anyway?" }
-                div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
-                    button { onclick: move |_| { save_tab_force(&mut store, index); }, {t(lang, "Overwrite")} }
-                }
+        div { class: "add-profile-form",
+            input { placeholder: "Profile name", value: "{name}",
+                oninput: move |e| name.set(e.value()), style: "flex:1;" }
+            label { class: "profile-check",
+                input { r#type: "checkbox", checked: *ignore_ws.read(),
+                    onchange: move |e| ignore_ws.set(e.checked()) }
+                span { "Ignore WS" }
+            }
+            label { class: "profile-check",
+                input { r#type: "checkbox", checked: *ignore_case.read(),
+                    onchange: move |e| ignore_case.set(e.checked()) }
+                span { "Ignore case" }
+            }
+            select {
+                onchange: move |e| {
+                    algorithm.set(match e.value().as_str() {
+                        "patience"  => crate::state::DiffAlgorithmSetting::Patience,
+                        "histogram" => crate::state::DiffAlgorithmSetting::Histogram,
+                        _           => crate::state::DiffAlgorithmSetting::Myers,
+                    });
+                },
+                option { value: "myers",     "Myers"     }
+                option { value: "patience",  "Patience"  }
+                option { value: "histogram", "Histogram" }
+            }
+            button {
+                disabled: name.read().trim().is_empty(),
+                onclick: move |_| {
+                    let n = name.read().trim().to_string();
+                    if !n.is_empty() {
+                        crate::state::add_profile(&mut store, n, *ignore_ws.read(),
+                            *ignore_case.read(), *algorithm.read());
+                        name.set(String::new());
+                        ignore_ws.set(false); ignore_case.set(false);
+                        algorithm.set(Default::default());
+                    }
+                },
+                "Add"
             }
         }
     }
-}
-
-#[component]
-fn SaveAsModal(index: usize, initial_path: String) -> Element {
-    let mut store = use_context::<Store>();
-    let lang = store.lang();
-    let mut path = use_signal(|| initial_path);
-    rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Save As",
-            div { class: "modal",
-                h2 { "Save As" }
-                div { class: "field",
-                    span { "Path" }
-                    input {
-                        autofocus: true,
-                        value: "{path}", oninput: move |e| path.set(e.value()),
-                        style: "width:100%;",
-                    }
-                }
-                div { class: "actions",
-                    button { onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
-                    button {
-                        disabled: path.read().trim().is_empty(),
-                        onclick: move |_| save_as(&mut store, index, path.read().clone()),
-                        {t(lang, "Save")}
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[component]
-fn ReloadModal(index: usize) -> Element {
-    let mut store = use_context::<Store>();
-    let lang = store.lang();
-    rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Reload files",
-            div { class: "modal",
-                h2 { "Reload files?" }
-                p { "Unsaved merge changes will be discarded." }
-                div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
-                    button {
-                        onclick: move |_| { reload_tab(&mut store, index); store.modal.set(Modal::None); },
-                        "Discard and Reload"
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[component]
-fn SwapModal(index: usize) -> Element {
-    let mut store = use_context::<Store>();
-    let lang = store.lang();
-    rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Swap sides",
-            div { class: "modal",
-                h2 { "Swap sides?" }
-                p { "Unsaved merge changes will be discarded when sides are swapped." }
-                div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
-                    button {
-                        onclick: move |_| { swap_sides(&mut store, index); store.modal.set(Modal::None); },
-                        "Discard and Swap"
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-fn save_tab_force(store: &mut Store, index: usize) {
-    use crate::ui::diff::save_tab;
-    save_tab(store, index, true);
 }
 
 fn tv(t: Theme) -> &'static str { match t { Theme::Dark => "dark", Theme::Light => "light", Theme::Night => "night" } }
 fn tf(s: &str) -> Theme { match s { "light" => Theme::Light, "night" => Theme::Night, _ => Theme::Dark } }
-fn lv(l: Lang) -> &'static str { match l { Lang::En => "en", Lang::Ja => "ja" } }
-fn lf(s: &str) -> Lang { match s { "ja" => Lang::Ja, _ => Lang::En } }
-
-/// Confirm a directory file-copy operation (RFC-031 safety model for dir ops).
-#[component]
-fn DirOpModal(op: crate::state::DirOp) -> Element {
-    let mut store = use_context::<Store>();
-    let lang = store.lang();
-    let src  = op.src.display().to_string();
-    let dst  = op.dst.display().to_string();
-    rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Copy file",
-            div { class: "modal",
-                h2 { "Copy file?" }
-                p { "{op.label}" }
-                div { class: "field",
-                    span { "From" }
-                    code { class: "path-display", "{src}" }
-                }
-                div { class: "field",
-                    span { "To" }
-                    code { class: "path-display", "{dst}" }
-                }
-                if op.dst.exists() {
-                    p { class: "notice", "Destination exists. A .bak backup will be created." }
-                }
-                div { class: "actions",
-                    button {
-                        autofocus: true,
-                        onclick: move |_| store.modal.set(Modal::None),
-                        {t(lang, "Cancel")}
-                    }
-                    button {
-                        onclick: move |_| {
-                            match forskscope_core::dir::copy_file(
-                                &op.src, &op.dst, forskscope_core::BackupPolicy::SiblingBak
-                            ) {
-                                Ok(_)  => store.notify("Copied.".to_string()),
-                                Err(e) => store.notify(e.to_string()),
-                            }
-                            store.modal.set(Modal::None);
-                        },
-                        "Copy"
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// About / diagnostics panel (RFC-008).
-#[component]
-fn AboutModal() -> Element {
-    let mut store = use_context::<Store>();
-
-    const VERSION: &str = env!("CARGO_PKG_VERSION");
-    const BUILD_PROFILE: &str = if cfg!(debug_assertions) { "debug" } else { "release" };
-    let platform = format!("{} {}", std::env::consts::OS, std::env::consts::ARCH);
-    let diagnostics = format!(
-        "ForskScope {VERSION}\nBuild: {BUILD_PROFILE}\nPlatform: {platform}\nUI: Dioxus 0.7\nDiff engine: similar 3"
-    );
-    let diag_copy = diagnostics.clone();
-
-    rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "About ForskScope",
-            div { class: "modal",
-                h2 { "ForskScope v{VERSION}" }
-                div { class: "about-grid",
-                    span { class: "about-key", "Version" }
-                    span { "{VERSION}" }
-                    span { class: "about-key", "Build" }
-                    span { "{BUILD_PROFILE}" }
-                    span { class: "about-key", "Platform" }
-                    span { "{platform}" }
-                    span { class: "about-key", "UI" }
-                    span { "Dioxus 0.7" }
-                    span { class: "about-key", "Diff engine" }
-                    span { "similar 3" }
-                }
-                div { class: "actions",
-                    button {
-                        onclick: move |_| {
-                            let d = diag_copy.clone();
-                            spawn(async move {
-                                let _ = dioxus::document::eval(
-                                    &format!("navigator.clipboard?.writeText({:?})", d)
-                                ).await;
-                            });
-                        },
-                        "Copy diagnostics"
-                    }
-                    button {
-                        autofocus: true,
-                        onclick: move |_| store.modal.set(Modal::None),
-                        "Close"
-                    }
-                }
-            }
-        }
-    }
-}
+fn lv(l: Lang)  -> &'static str { match l { Lang::En => "en", Lang::Ja => "ja" } }
+fn lf(s: &str)  -> Lang { match s { "ja" => Lang::Ja, _ => Lang::En } }

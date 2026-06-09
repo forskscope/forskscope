@@ -1,83 +1,106 @@
 # ForskScope
 
-[![Releases Workflow](https://github.com/forskscope/forskscope/actions/workflows/release-executable.yaml/badge.svg)](https://github.com/forskscope/forskscope/actions/workflows/release-executable.yaml)
-[![License](https://img.shields.io/github/license/forskscope/forskscope)](https://github.com/forskscope/forskscope/blob/main/LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/forskscope/forskscope/actions/workflows/ci.yml/badge.svg)](https://github.com/forskscope/forskscope/actions/workflows/ci.yml)
 
-![logo](docs/src/assets/logo.png)
+**A cross-platform, local-first diff and merge tool for Unix/Linux developers and anyone who needs a WinMerge-class workstation outside Windows.**
 
-Diff through Exploring 🕵️‍♀️ GUI tool with cross-platform support 💻️ named after "*forske forskjell*" (research difference) 🤍
+```
+forskscope old/src/main.rs new/src/main.rs
+```
 
----
-
-## Overview
-
-ForskScope is a desktop diff and merge workstation for developers and operators who want a practical WinMerge-style experience on Unix/Linux, macOS, and Windows without being forced into an IDE or a Git GUI.
-
-It is built on a GUI-independent Rust core (`forskscope-core`) and a Dioxus desktop frontend, giving a fast, local, offline experience with a calm default layout.
+ForskScope opens two files (or two directories) side by side, highlights every change at line and character level, and lets you apply hunks from left to right with a single keystroke. Everything runs locally — no accounts, no uploads, no telemetry.
 
 ---
 
-## Why / When
+## Why ForskScope
 
-Use ForskScope when you need to:
+Most Unix/Linux workers reach for `vimdiff`, `git diff`, or a web-based paste tool when they need to compare files. These work but they don't give a persistent, navigable side-by-side view with merge support. WinMerge does — but only on Windows.
 
-- compare two text files or directories side by side before accepting a change;
-- selectively apply individual hunks from a left (old/source) file into a right (new/target) file and save safely;
-- inspect differences visually without a terminal, an IDE, or a remote service;
-- work primarily on Unix/Linux and want the WinMerge workflow on your platform.
-
-ForskScope is deliberately **not** a Git GUI, IDE, cloud diff service, or file synchronization suite — it has one job, and its scope is kept narrow so it stays trustworthy.
+ForskScope fills that gap: a desktop app built on [Dioxus](https://dioxuslabs.com/) and a pure-Rust diff engine ([similar v3](https://docs.rs/similar)), packaged for Linux, macOS, and Windows.
 
 ---
 
-## Quick Start
+## Quick start
 
-**Requirements:** a Rust toolchain (≥ 1.85) and the GTK 3 / WebKitGTK 4.1 runtime libraries on Linux.
+### Build from source
 
 ```sh
-# Linux — install runtime libraries (Debian/Ubuntu)
-sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev
+# Prerequisites: Rust 1.80+, WebKitGTK 4.1 (Linux only)
+# Ubuntu / Debian:
+sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev pkg-config
 
-# Build from source
-git clone https://github.com/forskscope/forskscope
-cd forskscope
-cargo build --release
+cargo build --release -p forskscope-ui-dioxus
 ./target/release/forskscope
 ```
 
-**Open two files directly:**
+### Compare two files
 
 ```sh
-forskscope path/to/old.rs path/to/new.rs
+forskscope old.rs new.rs
 ```
 
-**Workflow at a glance:**
+### Use with Git
 
-1. Launch the app — the Explorer workspace opens.
-2. Navigate the left and right directory panes; select a file on each side, then click **Compare**.
-3. Use **◀ ▶** to move between differences.
-4. Click **▶** in the action column of a changed hunk to apply it from left to right.
-5. Click **Save** — the merge result is written with conflict detection and an automatic `.bak` backup.
+```sh
+# .gitconfig
+[diff]
+  tool = forskscope
+[difftool "forskscope"]
+  cmd = forskscope "$LOCAL" "$REMOTE"
+[merge]
+  tool = forskscope
+[mergetool "forskscope"]
+  cmd = forskscope "$LOCAL" "$REMOTE" "$MERGED"
 
----
-
-## Design Notes
-
-**One job, done well.** The scope is intentionally narrow: local two-pane text diff and merge. Binary and Excel files can be compared (read-only) but not merged; three-way merge and directory synchronization are future work.
-
-**Less is more.** The default layout shows only what the current workflow step needs. Navigation, apply, and save are always visible when they apply. Advanced controls (inline character diff, redo, future compare profiles) are one click away behind a disclosure, not front-loaded.
-
-**Model-backed merge.** Every merge action goes through a transaction log in the Rust core. The UI never recomputes merge results from rendered content. Undo, redo, dirty state, and save safety are derived from the core model, not from the DOM.
-
-**Local-first and private.** No accounts, no telemetry, no cloud upload. Files compared on your machine stay on your machine.
+# Then:
+git difftool HEAD -- src/main.rs
+git mergetool
+```
 
 ---
 
-## More Detail
+## Features
 
-Full documentation is in [`docs/`](docs/src/SUMMARY.md), structured as an mdbook.
+- **Side-by-side diff** with line-level and character-level highlighting
+- **Merge** — apply changes from left to right one hunk at a time; undo / redo
+- **Enter to apply** the focused hunk; F7/F8 to navigate; Ctrl+S to save
+- **Explorer** — browse two directories, see digest equality indicators, compare same-name files with one click
+- **Deep compare** — recursive directory scan with live progress; batch copy changed files between trees
+- **Git difftool / mergetool** compatible (`forskscope old new` or `old remote merged`)
+- **Compare profiles** — named presets for ignore-whitespace, ignore-case, and algorithm (Myers / Patience / Histogram)
+- **Session persistence** — open tabs are restored on next launch
+- **Safe saves** — atomic write, `.bak` backup, external-change detection
+- **Search within diff** — Ctrl+F highlights matching rows across both panes
+- **Navigation history** — back/forward per explorer pane
+- **Filter and sort** in the explorer — All / Different / Equal; sort by name, status, or size; name substring filter
+- **Dark, Light, and Night themes**
+- **English and Japanese UI** (i18n)
+- **GitHub Actions CI/CD** — Linux x86_64, macOS aarch64, Windows x64 release builds on tag push
 
-- [Features and tutorials](docs/src/users/features.md) — for new users.
-- [Architecture overview](docs/src/maintainers/architecture.md) — for contributors.
-- [RFC directory](rfcs/README.md) — design decisions and rationale.
-- [Changelog](CHANGELOG.md)
+---
+
+## Keyboard shortcuts
+
+| Key | Action |
+|-----|--------|
+| F7 / F8 | Previous / next change |
+| Enter | Apply focused change |
+| Ctrl+Z | Undo |
+| Ctrl+S | Save |
+| Ctrl+F | Search within diff |
+| Ctrl+/ | Keyboard shortcut reference |
+
+Press **?** in the header or **Ctrl+/** for the full reference.
+
+---
+
+## Documentation
+
+Full documentation (built with mdbook): [`docs/src/`](docs/src/SUMMARY.md)
+
+---
+
+## License
+
+Apache-2.0 — see [LICENSE](LICENSE). Author: **nabbisen**.

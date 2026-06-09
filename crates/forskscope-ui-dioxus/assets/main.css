@@ -277,3 +277,40 @@ code.path-display {
 
 /* ── Deep compare progress ── */
 .deep-progress { color: var(--muted); }
+
+/* ── Tab close button and dirty indicator ── */
+.tab { display: flex; align-items: center; gap: 0; }
+.tab-title { padding: .35rem .5rem .35rem .6rem; cursor: pointer; user-select: none; display: flex; align-items: center; gap: .25rem; }
+.tab-close { padding: .15rem .35rem; font-size: 14px; opacity: 0; border-radius: 4px; transition: opacity .1s; }
+.tab:hover .tab-close, .tab.active .tab-close { opacity: .6; }
+.tab:hover .tab-close:hover { opacity: 1; background: var(--danger-bg); }
+.dirty-dot { color: var(--warn); font-size: 10px; line-height: 1; }
+
+/* ── Profile list in settings ── */
+.profile-list { display: flex; flex-direction: column; gap: .2rem; margin: .25rem 0; }
+.profile-row  { display: flex; align-items: center; gap: .3rem; padding: .2rem .35rem; border-radius: 5px; cursor: pointer; }
+.profile-row:hover { background: var(--surface-3); }
+.profile-row.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.profile-name { flex: 1; font-size: 13px; font-family: ui-monospace, monospace; white-space: pre; }
+.profile-delete { opacity: .4; padding: 0 .3rem; font-size: 12px; }
+.profile-delete:hover { opacity: 1; }
+.add-profile-form { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-top: .25rem; }
+.profile-check { display: flex; align-items: center; gap: .2rem; font-size: 12px; color: var(--muted); cursor: pointer; }
+
+/* ── Name filter input ── */
+.name-filter-input {
+  flex: 0 1 12rem; padding: .2rem .4rem; font-size: 12px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+}
+.name-filter-input:focus { border-color: var(--accent); outline: none; }
+
+/* ── Keyboard reference modal ── */
+.modal-wide { min-width: min(540px, 90vw); }
+.kb-section { margin-bottom: .75rem; }
+.kb-section h3 { font-size: 13px; color: var(--muted); margin: .3rem 0; }
+.kb-table { display: grid; grid-template-columns: max-content 1fr; gap: .2rem .75rem; }
+.kb-row { display: contents; }
+kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 4px; padding: .1rem .3rem; white-space: nowrap; }
+.kb-desc { font-size: 13px; }

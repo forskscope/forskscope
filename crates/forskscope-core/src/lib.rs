@@ -23,7 +23,7 @@ pub mod save;
 pub mod xlsx;
 
 pub use diff::{
-    DiffDocument, DiffHunk, DiffOptions, DiffRow, DiffWarning, HunkKind, InlineKind, InlineSpan,
+    DiffAlgorithm, DiffDocument, DiffHunk, DiffOptions, DiffRow, DiffWarning, HunkKind, InlineKind, InlineSpan,
     compute_diff,
 };
 pub use document::{FileFingerprint, FileId, LoadOptions, LoadedDocument, TextDocument, load_path};

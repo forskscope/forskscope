@@ -1,6 +1,6 @@
 # ForskScope RFCs
 
-Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused. Roadmap RFC originally "RFC-000" → renumbered RFC-042 at adoption.
+Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 
 ## Implemented
 
@@ -59,7 +59,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused. 
 
 (empty)
 
-## Notes (non-RFC supporting material)
+## Notes
 
 - [acceptance-test-corpus-plan](./notes/acceptance-test-corpus-plan.md)
 - [editor-adapter-risk-register](./notes/editor-adapter-risk-register.md)
