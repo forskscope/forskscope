@@ -16,7 +16,8 @@ path = "src/main.rs"
 forskscope-core = { workspace = true }
 dioxus = { workspace = true }
 dioxus-swdir-tree = { workspace = true }
+rfd = { workspace = true }
+tokio = { workspace = true }
 app-json-settings = { workspace = true }
 serde = { workspace = true }
 
-tokio = { version = "1", features = ["rt"] }

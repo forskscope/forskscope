@@ -5,7 +5,62 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.36.0] — 2026-06-09
+## [0.37.0] — 2026-06-09
+
+Explorer polish and diff alignment bug-fix.
+
+### Fixed
+
+- **Diff row vertical misalignment (sr-only grid bug)** — on Delete, Insert,
+  and Replace hunks the row contained an extra `span.sr-only` (the
+  screen-reader change label) as a raw grid child. With no `.sr-only {
+  position: absolute }` rule, the span occupied the first grid column and
+  shifted every subsequent cell in changed rows by one column, visually
+  misaligning the two halves. Added the standard `.sr-only` rule so the span
+  is removed from grid flow while remaining accessible.
+
+### Added
+
+- **Back and Forward navigation buttons restored** — the ← and → buttons return
+  to the previous or next directory in per-pane history, matching the design
+  from RFC-021 that was lost in the v0.36.0 rewrite.
+
+- **Home button** — navigates the active pane to the user's home directory
+  (`$HOME` / `%USERPROFILE%`).
+
+- **Folder picker button** — the 📁 button opens a native folder-picker dialog
+  (via `rfd::FileDialog::pick_folder`) so users can locate a directory without
+  typing.
+
+- **Editable path input** — clicking the ✎ button (or the current segment of
+  the breadcrumb) switches the path bar to a text field. Press Enter to navigate
+  if the typed path is a valid directory; press Escape or lose focus to revert.
+  Invalid paths are shown with a red border before reverting.
+
+- **All breadcrumb segments shown, each label capped at 18 chars** — instead of
+  truncating the middle of the path, every ancestor segment is always shown, and
+  long directory names are individually trimmed with "…". Users can always see
+  the full depth of the path.
+
+- **Digest status icons in tree rows** — each file node in the tree shows a
+  status icon once its background digest comparison finishes: ✓ (equal), ⚠
+  (different), · (exists only in this pane). A spinning ⟳ is shown while the
+  comparison is running. No extension to `dioxus-swdir-tree` is needed;
+  icons are added to the custom row rendering already in use.
+
+- **Tab bar max height** — the tabbar is capped at `3rem`; individual tabs are
+  capped at `2.2rem` height with overflow hidden so the toolbar cannot grow
+  taller than one tab row.
+
+- **Deep compare renamed to "Directory Report"** — the mode-toggle in the
+  explorer footer is replaced by a two-button selector at the top of the
+  explorer: "Browse" and "Directory Report". Both have title-attribute
+  descriptions. This makes the purpose of each mode clear without requiring
+  the user to click to find out.
+
+---
+
+
 
 Explorer redesign and ignore-pattern feature. Implements RFCs 054–057.
 

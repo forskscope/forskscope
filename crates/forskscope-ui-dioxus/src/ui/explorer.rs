@@ -18,7 +18,6 @@ pub fn Explorer() -> Element {
     let lang = store.lang();
     let mut mode: Signal<ExplorerMode> = use_signal(ExplorerMode::default);
 
-    // Derive ignore rules from settings for both panes.
     let ignore = store.settings.read().ignore_rules();
 
     let left_pick  = store.left_pick.read().clone();
@@ -29,7 +28,6 @@ pub fn Explorer() -> Element {
         open_compare(&mut store, l, r);
     };
 
-    // For the deep compare view, we need the current roots (from settings).
     let left_root  = store.settings.read().last_left_dir.clone()
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/")));
     let right_root = store.settings.read().last_right_dir.clone()
@@ -37,7 +35,23 @@ pub fn Explorer() -> Element {
 
     rsx! {
         div { class: "explorer",
-            // ── Panes ──────────────────────────────────────────────
+            // Mode selector toolbar (explains what each mode does).
+            div { class: "explorer-modes",
+                button {
+                    class: if *mode.read() == ExplorerMode::Browse { "mode-btn active" } else { "mode-btn" },
+                    title: "Browse and navigate directories side by side",
+                    onclick: move |_| mode.set(ExplorerMode::Browse),
+                    "Browse"
+                }
+                button {
+                    class: if *mode.read() == ExplorerMode::Deep { "mode-btn active" } else { "mode-btn" },
+                    title: "Recursively compare all files in both directories and show a full status report",
+                    onclick: move |_| mode.set(ExplorerMode::Deep),
+                    "Directory Report"
+                }
+            }
+
+            // ── Active workspace ─────────────────────────────────────────────
             if *mode.read() == ExplorerMode::Browse {
                 div { class: "explorer-panes",
                     DirPane { is_left: true,  ignore: ignore.clone(), on_auto_compare }
@@ -46,36 +60,24 @@ pub fn Explorer() -> Element {
             } else {
                 DeepCompareView { left_root, right_root, lang }
             }
-            // ── Footer toolbar ─────────────────────────────────────
-            div { class: "explorer-footer",
-                button {
-                    disabled: !can_compare,
-                    onclick: move |_| {
-                        let l = store.left_pick.read().clone();
-                        let r = store.right_pick.read().clone();
-                        if let (Some(l), Some(r)) = (l, r) {
-                            open_compare(&mut store, l, r);
-                        }
-                    },
-                    {t(lang, "Compare")}
-                }
-                // Show selected pair label.
-                if let (Some(l), Some(r)) = (&left_pick, &right_pick) {
-                    span { class: "compare-label",
-                        {format!("{} ↔ {}", short_name(l), short_name(r))}
+
+            // ── Footer (Browse mode only) ────────────────────────────────────
+            if *mode.read() == ExplorerMode::Browse {
+                div { class: "explorer-footer",
+                    button {
+                        disabled: !can_compare,
+                        onclick: move |_| {
+                            let l = store.left_pick.read().clone();
+                            let r = store.right_pick.read().clone();
+                            if let (Some(l), Some(r)) = (l, r) { open_compare(&mut store, l, r); }
+                        },
+                        {t(lang, "Compare")}
                     }
-                }
-                span { class: "spacer" }
-                button {
-                    onclick: move |_| {
-                        let next = if *mode.read() == ExplorerMode::Browse {
-                            ExplorerMode::Deep
-                        } else {
-                            ExplorerMode::Browse
-                        };
-                        mode.set(next);
-                    },
-                    if *mode.read() == ExplorerMode::Browse { "⟳ Deep compare" } else { "← Browse" }
+                    if let (Some(l), Some(r)) = (&left_pick, &right_pick) {
+                        span { class: "compare-label",
+                            {format!("{} ↔ {}", short_name(l), short_name(r))}
+                        }
+                    }
                 }
             }
         }
@@ -83,7 +85,5 @@ pub fn Explorer() -> Element {
 }
 
 fn short_name(p: &Path) -> String {
-    p.file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| p.display().to_string())
+    p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string())
 }
