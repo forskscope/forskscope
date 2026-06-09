@@ -70,3 +70,80 @@ fn external_modification_is_detected_as_conflict() {
     // The external content must be preserved on conflict.
     assert_eq!(fs::read_to_string(&target).unwrap(), "v2-external-edit\n");
 }
+
+// ── New tests for v0.32.0 ─────────────────────────────────────────────────────
+
+#[test]
+fn save_creates_nested_parent_dirs() {
+    let dir = temp_dir("save-nested");
+    let target = dir.join("a").join("b").join("output.txt");
+    let req = crate::save::SaveRequest {
+        target:           target.clone(),
+        content:          "nested\n".to_string(),
+        encoding_label:   "UTF-8".to_string(),
+        expected_fingerprint: None,
+        backup:           crate::save::BackupPolicy::None,
+    };
+    crate::save::save_text(&req).unwrap();
+    assert_eq!(std::fs::read_to_string(&target).unwrap(), "nested\n");
+}
+
+#[test]
+fn save_without_backup_does_not_create_bak_file() {
+    let dir = temp_dir("save-nobak");
+    let target = dir.join("file.txt");
+    std::fs::write(&target, "original").unwrap();
+    let req = crate::save::SaveRequest {
+        target:           target.clone(),
+        content:          "overwritten\n".to_string(),
+        encoding_label:   "UTF-8".to_string(),
+        expected_fingerprint: None,
+        backup:           crate::save::BackupPolicy::None,
+    };
+    crate::save::save_text(&req).unwrap();
+    let bak = dir.join("file.txt.bak");
+    assert!(!bak.exists(), "no backup should be created when policy is None");
+    assert_eq!(std::fs::read_to_string(&target).unwrap(), "overwritten\n");
+}
+
+#[test]
+fn conflict_error_contains_path_info() {
+    let dir = temp_dir("conflict-path");
+    let target = dir.join("file.txt");
+    std::fs::write(&target, "v1").unwrap();
+
+    // Capture a fingerprint before writing.
+    let fp = crate::document::FileFingerprint::capture(&target, None).unwrap();
+
+    // Modify the file to simulate external change.
+    std::fs::write(&target, "v2-external").unwrap();
+
+    let req = crate::save::SaveRequest {
+        target:           target.clone(),
+        content:          "v3-ours\n".to_string(),
+        encoding_label:   "UTF-8".to_string(),
+        expected_fingerprint: Some(fp),
+        backup:           crate::save::BackupPolicy::None,
+    };
+    let err = crate::save::save_text(&req).unwrap_err();
+    // The error should be a Conflict variant.
+    assert!(matches!(err, crate::CoreError::Conflict { .. }),
+        "should report Conflict when file was externally changed");
+}
+
+#[test]
+fn save_with_none_fingerprint_always_succeeds() {
+    let dir = temp_dir("save-any");
+    let target = dir.join("f.txt");
+    std::fs::write(&target, "old").unwrap();
+    let req = crate::save::SaveRequest {
+        target: target.clone(),
+        content: "new\n".to_string(),
+        encoding_label: "UTF-8".to_string(),
+        expected_fingerprint: None,
+        backup: crate::save::BackupPolicy::None,
+    };
+    // No expected fingerprint → never a conflict.
+    crate::save::save_text(&req).unwrap();
+    assert_eq!(std::fs::read_to_string(&target).unwrap(), "new\n");
+}

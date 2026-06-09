@@ -70,6 +70,7 @@ pub fn App() -> Element {
                         match s.to_ascii_lowercase().as_str() {
                             "s" => save_tab(&mut store, index, false),
                             "z" => { let _ = store.tabs.write().get_mut(index).map(|t| t.merge.undo()); }
+                            "y" => { let _ = store.tabs.write().get_mut(index).map(|t| t.merge.redo()); }
                             "/" => store.modal.set(crate::state::Modal::KeyboardRef),
                             // Ctrl+F: the search bar inside DiffWorkspace handles its own
                             // context; we use document::eval to click the search button.

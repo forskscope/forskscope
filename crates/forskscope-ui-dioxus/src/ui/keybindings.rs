@@ -17,6 +17,7 @@ pub fn KeyboardRefModal() -> Element {
                         KbRow { keys: "F7 / F8",       desc: "Previous / next change" }
                         KbRow { keys: "Enter",          desc: "Apply focused change (left → right)" }
                         KbRow { keys: "Ctrl + Z",       desc: "Undo last merge" }
+                        KbRow { keys: "Ctrl + Y",       desc: "Redo last undone merge" }
                         KbRow { keys: "Ctrl + S",       desc: "Save merge result" }
                         KbRow { keys: "Ctrl + F",       desc: "Open / close inline search" }
                     }

@@ -5,6 +5,88 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.32.0] — 2026-06-09
+
+### Changed
+
+- **`diff.rs` split** — the 330-ELOC file was split into `diff.rs`
+  (Dioxus components: DiffWorkspace, DiffHeader, Toolbar, TabSnapshot: 238 ELOC)
+  and the new `ui/diff_actions.rs` (pure action functions: apply_focused_hunk,
+  move_focus, save_tab, save_as, build_request, handle_result, trunc, algo_val:
+  108 ELOC). `diff.rs` re-exports the public action functions for external callers.
+
+- **`save_text` creates parent directories** — "Save As" to a path in a
+  directory that doesn't yet exist now succeeds. Previously the atomic
+  temp-file write would fail with ENOENT on the missing parent.
+
+### Added
+
+- **Ctrl+Y redo shortcut** — `Ctrl+Y` re-applies the most recently undone
+  merge. `Ctrl+Z` / `Ctrl+Y` are now a symmetric pair (Redo also available via
+  the More ▼ toolbar). Keyboard reference updated.
+
+- **Ignore-case toggle in diff toolbar** — "Ignore case: off/on" button in the
+  advanced toolbar toggles the per-tab `ignore_case` option and immediately
+  recomputes the diff, matching how the ignore-whitespace toggle works.
+
+- **63 core tests** (up from 35) — 28 new tests covering:
+  - `ignore_case` option: case-only change collapses; combined with `ignore_whitespace`
+  - All three diff algorithms (Myers / Patience / Histogram) for equivalence
+  - Empty files, no-trailing-newline, single-character diffs, multi-block changes
+  - Diff stats accuracy (lines_inserted, lines_deleted, hunks_changed)
+  - Inline span detection via `refine_pair`
+  - `result_text()` before and after apply, partial apply correctness
+  - Full undo/redo round-trips, multiple-hunk sessions
+  - Save to nested parent directories
+  - Conflict detection and fingerprint stability
+  - `FileFingerprint` stability and change detection
+  - `allow_missing` for absent file paths
+
+- **Documentation** — three new user-guide chapters:
+  - `comparing-files.md` — opening comparisons, reading the diff view, search, options
+  - `merging.md` — apply/undo/redo model, save workflow, keyboard-first merge pattern
+  - `directory-compare.md` — browse mode, filters/sort, deep recursive compare, batch copy
+
+---
+
+## [0.31.0] — 2026-06-09
+
+### Changed
+
+- **`settings.rs` split** — the 375-ELOC file was split into `settings.rs`
+  (SettingsModal, persist/load, profile form: ~130 ELOC) and the new
+  `ui/modals.rs` (all safety/action modals: ~200 ELOC), both well under the
+  300-ELOC guideline.
+
+### Added
+
+- **Algorithm selector** — a dropdown in the diff toolbar advanced section
+  (Myers / Patience / Histogram) recomputes the diff immediately on change.
+  `DiffProfile` also carries an `algorithm` field so profiles can encode a
+  preferred algorithm. A fourth built-in profile "Histogram" is now included.
+  `DiffAlgorithm` is re-exported from `forskscope_core` for UI use.
+
+- **Explorer name filter** — a text input in the filter bar filters both panes
+  by filename substring (case-insensitive). Typing `rs` shows only `.rs` files;
+  typing `Cargo` shows only files whose names contain "Cargo". Clears instantly.
+
+- **Batch copy in deep compare** — when the deep compare table has changed or
+  one-side-only files, two "Copy N →" / "← Copy N" buttons appear in the
+  toolbar. Clicking opens a confirmation modal that lists the count and warns
+  that existing files receive `.bak` backups. All copy operations run with the
+  same `BackupPolicy::SiblingBak` safety model as single-file copy.
+
+- **Keyboard reference modal** — a `?` button in the header (or Ctrl+/) opens
+  a formatted shortcut table covering the diff view, explorer navigation, and
+  app-level commands. The `ℹ` button retains the About panel separately. A new
+  `ui/keybindings.rs` module holds the component.
+
+- **README overhaul** — `README.md` rewritten with badges, a clear product
+  statement, quick-start commands, git integration snippet, feature list,
+  keyboard table, and doc links.
+
+---
+
 ## [0.30.0] — 2026-06-09
 
 ### Added

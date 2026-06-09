@@ -19,6 +19,9 @@
 ## Intermediate Users
 
 - [File type support](./intermediate/file-types.md)
+- [Comparing files](./users/comparing-files.md)
+- [Merging](./users/merging.md)
+- [Directory comparison](./users/directory-compare.md)
 - [Diff options](./intermediate/diff-options.md)
 - [Keyboard reference](./intermediate/keyboard.md)
 - [CLI usage](./intermediate/cli.md)

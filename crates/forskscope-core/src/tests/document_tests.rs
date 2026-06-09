@@ -84,3 +84,45 @@ fn hex_preview_has_offset_and_ascii_columns() {
     assert!(preview.starts_with("00000000  "));
     assert!(preview.trim_end().ends_with("AB"));
 }
+
+// ── New tests for v0.32.0 ─────────────────────────────────────────────────────
+
+#[test]
+fn empty_file_loads_as_empty_text_document() {
+    let dir = temp_dir("doc-empty");
+    let path = dir.join("empty.txt");
+    std::fs::write(&path, "").unwrap();
+    let doc = crate::document::load_path(&path, crate::document::LoadOptions { allow_missing: false }).unwrap();
+    assert!(doc.kind.is_mergeable_text(), "empty .txt should be text");
+    assert_eq!(doc.diff_text(), "", "empty file has empty diff text");
+}
+
+#[test]
+fn fingerprint_changes_after_file_modification() {
+    let dir = temp_dir("fingerprint");
+    let path = dir.join("file.txt");
+    std::fs::write(&path, "v1").unwrap();
+    let fp1 = crate::document::FileFingerprint::capture(&path, None).unwrap();
+    std::fs::write(&path, "v2-different").unwrap();
+    let fp2 = crate::document::FileFingerprint::capture(&path, None).unwrap();
+    assert_ne!(fp1, fp2, "fingerprint must change when file content changes");
+}
+
+#[test]
+fn fingerprint_is_stable_for_unchanged_file() {
+    let dir = temp_dir("fp-stable");
+    let path = dir.join("stable.txt");
+    std::fs::write(&path, "constant content").unwrap();
+    let fp1 = crate::document::FileFingerprint::capture(&path, None).unwrap();
+    let fp2 = crate::document::FileFingerprint::capture(&path, None).unwrap();
+    assert_eq!(fp1, fp2, "fingerprint must be stable for an unchanged file");
+}
+
+#[test]
+fn allow_missing_loads_empty_document_for_absent_path() {
+    use std::path::PathBuf;
+    let absent = PathBuf::from("/tmp/this_file_definitely_does_not_exist_12345.txt");
+    let doc = crate::document::load_path(&absent,
+        crate::document::LoadOptions { allow_missing: true }).unwrap();
+    assert!(doc.diff_text().is_empty(), "missing file with allow_missing yields empty document");
+}

@@ -100,3 +100,110 @@ fn large_file_policy_disables_inline_and_warns() {
     let doc = compute_diff(&big, &"y\n".repeat(10), opts);
     assert!(doc.warnings.contains(&DiffWarning::LargeFilePolicyApplied));
 }
+
+// ── New tests for v0.32.0 ─────────────────────────────────────────────────────
+
+#[test]
+fn ignore_case_collapses_case_only_change() {
+    let opts = DiffOptions { ignore_case: true, ..DiffOptions::default() };
+    let doc = compute_diff("Hello World\n", "hello world\n", opts);
+    assert!(doc.is_identical(),
+        "case-only change should be invisible when ignore_case is set");
+    assert_eq!(doc.stats.hunks_changed, 0);
+}
+
+#[test]
+fn ignore_case_does_not_hide_content_change() {
+    let opts = DiffOptions { ignore_case: true, ..DiffOptions::default() };
+    let doc = compute_diff("Hello World\n", "hello Rust\n", opts);
+    assert!(!doc.is_identical(), "'World' vs 'Rust' differs even case-insensitively");
+}
+
+#[test]
+fn histogram_algorithm_finds_same_change_as_myers() {
+    use crate::diff::DiffAlgorithm;
+    let left  = "a\nb\nc\nd\n";
+    let right = "a\nB\nc\nd\n";
+    let myers_doc  = compute_diff(left, right, DiffOptions { algorithm: DiffAlgorithm::Myers,     ..DiffOptions::default() });
+    let hist_doc   = compute_diff(left, right, DiffOptions { algorithm: DiffAlgorithm::Histogram, ..DiffOptions::default() });
+    assert_eq!(myers_doc.stats.hunks_changed, hist_doc.stats.hunks_changed,
+        "both algorithms should detect the same number of changed hunks");
+    assert_eq!(myers_doc.stats.lines_deleted, hist_doc.stats.lines_deleted);
+    assert_eq!(myers_doc.stats.lines_inserted, hist_doc.stats.lines_inserted);
+}
+
+#[test]
+fn patience_algorithm_finds_same_change_as_myers() {
+    use crate::diff::DiffAlgorithm;
+    let left  = "fn foo() {\n    42\n}\n";
+    let right = "fn foo() {\n    99\n}\n";
+    let myers   = compute_diff(left, right, DiffOptions { algorithm: DiffAlgorithm::Myers,   ..DiffOptions::default() });
+    let patience = compute_diff(left, right, DiffOptions { algorithm: DiffAlgorithm::Patience, ..DiffOptions::default() });
+    assert_eq!(myers.stats.hunks_changed, patience.stats.hunks_changed);
+}
+
+#[test]
+fn both_empty_files_are_identical() {
+    let doc = compute_diff("", "", DiffOptions::default());
+    assert!(doc.is_identical());
+    assert_eq!(doc.stats.hunks_changed, 0);
+    assert_eq!(doc.stats.lines_inserted, 0);
+    assert_eq!(doc.stats.lines_deleted, 0);
+}
+
+#[test]
+fn left_empty_right_non_empty_is_pure_insert() {
+    let doc = compute_diff("", "line1\nline2\n", DiffOptions::default());
+    assert!(!doc.is_identical());
+    assert_eq!(doc.stats.lines_deleted, 0, "nothing deleted from empty left");
+    assert_eq!(doc.stats.lines_inserted, 2);
+}
+
+#[test]
+fn right_empty_left_non_empty_is_pure_delete() {
+    let doc = compute_diff("line1\nline2\n", "", DiffOptions::default());
+    assert!(!doc.is_identical());
+    assert_eq!(doc.stats.lines_inserted, 0, "nothing inserted into empty right");
+    assert_eq!(doc.stats.lines_deleted, 2);
+}
+
+#[test]
+fn diff_stats_count_changed_lines_correctly() {
+    // 3 lines: keep, replace, keep → 1 deleted + 1 inserted.
+    let doc = compute_diff("keep\nold\nkeep\n", "keep\nnew\nkeep\n", DiffOptions::default());
+    assert_eq!(doc.stats.hunks_changed, 1);
+    assert_eq!(doc.stats.lines_deleted,  1);
+    assert_eq!(doc.stats.lines_inserted, 1);
+}
+
+#[test]
+fn multi_block_changes_are_each_counted() {
+    let left  = "a\nX\nb\nY\nc\n";
+    let right = "a\nX2\nb\nY2\nc\n";
+    let doc = compute_diff(left, right, DiffOptions::default());
+    assert_eq!(doc.stats.hunks_changed, 2, "two separate changed blocks");
+}
+
+
+
+#[test]
+fn ignore_whitespace_plus_ignore_case_both_apply() {
+    let opts = DiffOptions { ignore_whitespace: true, ignore_case: true, ..DiffOptions::default() };
+    // Only difference is case + trailing space — should be invisible.
+    let doc = compute_diff("Hello  \n", "hello\n", opts);
+    assert!(doc.is_identical());
+}
+
+#[test]
+fn no_trailing_newline_handled_gracefully() {
+    // Files without trailing newline should still diff correctly.
+    let doc = compute_diff("line1\nline2", "line1\nline2", DiffOptions::default());
+    assert!(doc.is_identical());
+}
+
+#[test]
+fn single_line_no_newline_change() {
+    let doc = compute_diff("hello", "world", DiffOptions::default());
+    assert!(!doc.is_identical());
+    assert_eq!(doc.stats.hunks_changed, 1);
+}
