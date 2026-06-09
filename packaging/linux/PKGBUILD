@@ -1,0 +1,28 @@
+# Arch Linux PKGBUILD for ForskScope.
+# Place the release source archive in the same directory before running makepkg.
+
+pkgname=forskscope
+pkgver=0.25.0
+pkgrel=1
+pkgdesc="Local-first cross-platform diff and merge tool"
+arch=('x86_64')
+url="https://github.com/forskscope/forskscope"
+license=('Apache-2.0')
+depends=('webkit2gtk-4.1' 'gtk3')
+makedepends=('cargo' 'pkg-config' 'openssl')
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "$pkgname-$pkgver"
+    cargo build --release --locked
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    install -Dm755 "target/release/forskscope" "$pkgdir/usr/bin/forskscope"
+    install -Dm644 "packaging/linux/forskscope.desktop" \
+        "$pkgdir/usr/share/applications/forskscope.desktop"
+    install -Dm644 "LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 "NOTICE" "$pkgdir/usr/share/licenses/$pkgname/NOTICE"
+}

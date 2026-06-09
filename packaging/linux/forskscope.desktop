@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ForskScope
+Comment=Local-first diff and merge tool
+Exec=forskscope %F
+Icon=forskscope
+Categories=Development;Utility;
+MimeType=text/plain;
+Keywords=diff;merge;compare;
+StartupNotify=true

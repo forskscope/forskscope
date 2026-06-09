@@ -15,7 +15,6 @@ use forskscope_core::document::{LoadOptions, LoadedDocument, load_path};
 use forskscope_core::file_kind::FileKind;
 use forskscope_core::{DiffOptions, MergeSession, compute_diff};
 
-/// UI theme.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Theme {
@@ -23,7 +22,6 @@ pub enum Theme {
     Light,
     Night,
 }
-
 impl Theme {
     pub fn css_class(self) -> &'static str {
         match self {
@@ -34,7 +32,6 @@ impl Theme {
     }
 }
 
-/// UI language (RFC-009 localization).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Lang {
@@ -42,48 +39,39 @@ pub enum Lang {
     Ja,
 }
 
-/// Persisted user settings (RFC-009, RFC-011). Stored as JSON via
-/// `app-json-settings` under the OS config directory for `forskscope`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub theme: Theme,
     pub language: Lang,
     pub diff_font_size: u32,
 }
-
 impl Default for AppSettings {
     fn default() -> Self {
-        Self {
-            theme: Theme::Dark,
-            language: Lang::En,
-            diff_font_size: 14,
-        }
+        Self { theme: Theme::Dark, language: Lang::En, diff_font_size: 14 }
     }
 }
 
-/// Modal overlay state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Modal {
     None,
     Settings,
-    /// External-modification conflict awaiting the user's choice.
     ConfirmOverwrite(usize),
+    SaveAs(usize, String),
+    /// Dirty tab — confirm discard before reloading.
+    ConfirmReload(usize),
 }
 
-/// One open comparison tab. Holds the canonical core objects for the pair.
+/// One open comparison tab.
 #[derive(Clone)]
 pub struct CompareTab {
     pub title: String,
     pub left_path: Option<PathBuf>,
     pub right_path: Option<PathBuf>,
-    /// Retained for reload / swap-sides workflows (RFC-006); the live diff
-    /// and merge sessions are what drive rendering.
-    #[allow(dead_code)]
     pub left_doc: LoadedDocument,
     pub right_doc: LoadedDocument,
     pub diff: DiffDocument,
     pub merge: MergeSession,
-    /// Both sides are real, mergeable text — only then may we save.
+    pub diff_options: DiffOptions,
     pub can_save: bool,
     pub char_mode: bool,
     pub focused_change: usize,
@@ -91,22 +79,61 @@ pub struct CompareTab {
 
 impl CompareTab {
     pub fn right_label(&self) -> String {
-        side_label(&self.right_doc)
+        self.right_doc
+            .text
+            .as_ref()
+            .map(|t| t.encoding.label.clone())
+            .unwrap_or_else(|| "—".into())
     }
 }
 
-fn side_label(doc: &LoadedDocument) -> String {
-    doc.text
-        .as_ref()
-        .map(|t| t.encoding.label.clone())
-        .unwrap_or_else(|| "—".into())
+/// Recompute the diff and reset the merge session using the stored options.
+pub fn recompute_diff(tab: &mut CompareTab) {
+    let diff =
+        compute_diff(tab.left_doc.diff_text(), tab.right_doc.diff_text(), tab.diff_options);
+    tab.merge = MergeSession::from_diff(&diff);
+    tab.diff = diff;
+    tab.focused_change = 0;
+    tab.char_mode = false;
 }
 
-/// Shared, copyable handle to all UI signals.
+/// Reload both files from disk and recompute the diff.
+/// Call only after the caller has confirmed discarding any unsaved merge.
+pub fn reload_tab(store: &mut Store, index: usize) {
+    let (left_path, right_path) = {
+        let tabs = store.tabs.read();
+        let Some(tab) = tabs.get(index) else { return };
+        (tab.left_path.clone(), tab.right_path.clone())
+    };
+    let options = LoadOptions { allow_missing: true };
+    let mut left_doc = match left_path.as_deref().map(|p| load_path(p, options)) {
+        Some(Ok(d)) => d,
+        Some(Err(e)) => return store.notify(format!("Reload left: {e}")),
+        None => LoadedDocument::empty(),
+    };
+    let mut right_doc = match right_path.as_deref().map(|p| load_path(p, options)) {
+        Some(Ok(d)) => d,
+        Some(Err(e)) => return store.notify(format!("Reload right: {e}")),
+        None => LoadedDocument::empty(),
+    };
+    if left_doc.kind == FileKind::ExcelXlsx && right_doc.kind == FileKind::ExcelXlsx {
+        if let (Some(lp), Some(rp)) = (&left_path, &right_path) {
+            let (lt, rt) = forskscope_core::xlsx::derive_pair_text(lp, rp);
+            left_doc.text = Some(lt);
+            right_doc.text = Some(rt);
+        }
+    }
+    let mut tabs = store.tabs.write();
+    let Some(tab) = tabs.get_mut(index) else { return };
+    tab.left_doc = left_doc;
+    tab.right_doc = right_doc;
+    tab.can_save = tab.left_doc.kind.is_mergeable_text() && tab.right_doc.kind.is_mergeable_text();
+    recompute_diff(tab);
+}
+
 #[derive(Clone, Copy)]
 pub struct Store {
     pub tabs: Signal<Vec<CompareTab>>,
-    /// `None` = explorer workspace active; `Some(i)` = diff tab `i`.
     pub active: Signal<Option<usize>>,
     pub settings: Signal<AppSettings>,
     pub left_pick: Signal<Option<PathBuf>>,
@@ -127,21 +154,16 @@ impl Store {
             toast: Signal::new(None),
         }
     }
-
     pub fn lang(&self) -> Lang {
         self.settings.read().language
     }
-
     pub fn notify(&mut self, message: impl Into<String>) {
         self.toast.set(Some(message.into()));
     }
 }
 
-/// Build a comparison and push it as a new active tab.
 pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
-    let options = LoadOptions {
-        allow_missing: true,
-    };
+    let options = LoadOptions { allow_missing: true };
     let mut left_doc = match load_path(&left, options) {
         Ok(d) => d,
         Err(e) => return store.notify(format!("Left: {e}")),
@@ -150,18 +172,17 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
         Ok(d) => d,
         Err(e) => return store.notify(format!("Right: {e}")),
     };
-
     if left_doc.kind == FileKind::ExcelXlsx && right_doc.kind == FileKind::ExcelXlsx {
         let (lt, rt) = forskscope_core::xlsx::derive_pair_text(&left, &right);
         left_doc.text = Some(lt);
         right_doc.text = Some(rt);
     }
-
-    let diff = compute_diff(left_doc.diff_text(), right_doc.diff_text(), DiffOptions::default());
+    let diff_options = DiffOptions::default();
+    let diff = compute_diff(left_doc.diff_text(), right_doc.diff_text(), diff_options);
     let merge = MergeSession::from_diff(&diff);
     let can_save = left_doc.kind.is_mergeable_text() && right_doc.kind.is_mergeable_text();
-
-    let title = tab_title(&left, &right);    let tab = CompareTab {
+    let title = tab_title(&left, &right);
+    let tab = CompareTab {
         title,
         left_path: Some(left),
         right_path: Some(right),
@@ -169,6 +190,7 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
         right_doc,
         diff,
         merge,
+        diff_options,
         can_save,
         char_mode: false,
         focused_change: 0,

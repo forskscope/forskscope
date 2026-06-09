@@ -18,3 +18,5 @@ dioxus = { workspace = true }
 dioxus-swdir-tree = { workspace = true }
 app-json-settings = { workspace = true }
 serde = { workspace = true }
+
+tokio = { version = "1", features = ["rt"] }

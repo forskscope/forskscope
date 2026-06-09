@@ -1,6 +1,6 @@
 # RFC-005 — Explorer Workspace and Paired Directory Workflow
 
-**Status.** Proposed
+**Status.** Implemented (v0.25.0)
 
 ---toml
 project = "ForskScope"
@@ -200,3 +200,7 @@ RFC-008 defines the full background job model.
 | Pairing logic becomes confusing for one-sided directories | Explicit pair states and status text. |
 | Explorer becomes a file manager clone | Keep scope limited to compare workflows. |
 | Large directories overwhelm view | Add incremental loading/filtering later. |
+
+## Deferred work (v0.25.0)
+
+History navigation (back/forward) and digest caching for large directories are deferred. The deep tree-navigation mode (dioxus-swdir-tree integration) is planned as a progressive-disclosure feature in a later release.

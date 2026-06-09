@@ -4,8 +4,8 @@ use app_json_settings::ConfigManager;
 use dioxus::prelude::*;
 
 use crate::i18n::t;
-use crate::state::{AppSettings, Lang, Modal, Store, Theme};
-use crate::ui::diff::save_tab;
+use crate::state::{AppSettings, Lang, Modal, Store, Theme, reload_tab};
+use crate::ui::diff::{save_as, save_tab};
 
 /// Persist current settings to the OS config directory.
 pub fn persist(settings: &AppSettings) {
@@ -27,6 +27,8 @@ pub fn ModalLayer() -> Element {
         Modal::None => rsx! {},
         Modal::Settings => rsx! { SettingsModal {} },
         Modal::ConfirmOverwrite(index) => rsx! { OverwriteModal { index } },
+        Modal::SaveAs(index, path) => rsx! { SaveAsModal { index, initial_path: path } },
+        Modal::ConfirmReload(index) => rsx! { ReloadModal { index } },
     }
 }
 
@@ -131,5 +133,61 @@ fn lang_from(s: &str) -> Lang {
     match s {
         "ja" => Lang::Ja,
         _ => Lang::En,
+    }
+}
+
+/// Save the merge result to an explicit path chosen by the user.
+#[component]
+fn SaveAsModal(index: usize, initial_path: String) -> Element {
+    let mut store = use_context::<Store>();
+    let lang = store.lang();
+    let mut path = use_signal(|| initial_path);
+    rsx! {
+        div { class: "scrim",
+            div { class: "modal",
+                h2 { "Save As" }
+                div { class: "field",
+                    span { "Path" }
+                    input {
+                        value: "{path}",
+                        oninput: move |e| path.set(e.value()),
+                        style: "width:100%;",
+                    }
+                }
+                div { class: "actions",
+                    button { onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button {
+                        disabled: path.read().trim().is_empty(),
+                        onclick: move |_| save_as(&mut store, index, path.read().clone()),
+                        {t(lang, "Save")}
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Confirm reload when the merge session has unsaved changes.
+#[component]
+fn ReloadModal(index: usize) -> Element {
+    let mut store = use_context::<Store>();
+    let lang = store.lang();
+    rsx! {
+        div { class: "scrim",
+            div { class: "modal",
+                h2 { "Reload files?" }
+                p { "Unsaved merge changes will be discarded." }
+                div { class: "actions",
+                    button { onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button {
+                        onclick: move |_| {
+                            reload_tab(&mut store, index);
+                            store.modal.set(Modal::None);
+                        },
+                        "Discard and Reload"
+                    }
+                }
+            }
+        }
     }
 }

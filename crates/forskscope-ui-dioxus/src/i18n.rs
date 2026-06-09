@@ -41,6 +41,7 @@ fn ja(key: &str) -> Option<&'static str> {
         "Diff font size" => "差分フォントサイズ",
         "Close" => "閉じる",
         "Saved." => "保存しました。",
+        "Reloaded." => "再読み込みしました。",
         "File changed on disk" => "ファイルがディスク上で変更されました",
         "Overwrite" => "上書き",
         "Cancel" => "キャンセル",

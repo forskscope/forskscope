@@ -134,3 +134,51 @@ input, select {
 
 /* advanced (progressively-disclosed) toolbar row stays visually secondary */
 .diff-toolbar.advanced { background: var(--surface); border-bottom-style: dashed; }
+
+/* ---- diff file header ---- */
+.diff-file-header {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .3rem .6rem; background: var(--surface-2);
+  border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted);
+}
+.diff-file-header .arrow { flex: 0; }
+.diff-file-header .path-old, .diff-file-header .path-new { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diff-file-header .path-new { text-align: right; }
+
+/* ---- context collapse divider ---- */
+.collapse-divider {
+  padding: .2rem .6rem; text-align: center; font-size: 11px;
+  color: var(--muted); background: var(--surface-2);
+  border: 1px dashed var(--border); border-radius: 4px;
+  cursor: pointer; margin: .2rem 0; user-select: none;
+}
+.collapse-divider:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ---- explorer flat listing (v0.24.0) ---- */
+.dir-table { flex: 1; overflow: auto; padding: .3rem 0; }
+.dir-row {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .2rem .6rem; cursor: pointer; font-size: 13px;
+}
+.dir-row:hover { background: var(--surface-3); }
+.dir-row.folder { color: var(--accent); }
+.dir-row.file { color: var(--text); }
+.dir-icon { flex: 0; }
+.dir-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dir-size  { flex: 0; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.dir-status { flex: 0; min-width: 1.4ch; text-align: center; font-size: 12px; font-weight: 700; }
+.dir-loading { padding: .5rem .6rem; color: var(--muted); font-size: 13px; }
+.status-equal   { color: var(--ok); }
+.status-changed { color: var(--warn); }
+.status-only    { color: var(--muted); }
+.status-cmp     { color: var(--muted); opacity: .6; }
+.status-err     { color: var(--err); }
+.compare-bar .hint { color: var(--muted); font-size: 12px; }
+
+/* ---- diff wrap ---- */
+.diff-wrap { display: flex; flex-direction: column; height: 100%; }
+
+/* focused row in explorer (keyboard navigation) */
+.dir-row.focused { background: var(--surface-3); outline: 1px solid var(--focus); }
+/* directory summary in compare bar */
+.compare-bar .summary { color: var(--muted); font-size: 12px; }

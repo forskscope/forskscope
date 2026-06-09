@@ -1,7 +1,7 @@
 # ForskScope
 
-[![Releases Workflow](https://github.com/nabbisen/forskscope/actions/workflows/release-executable.yaml/badge.svg)](https://github.com/nabbisen/forskscope/actions/workflows/release-executable.yaml)
-[![License](https://img.shields.io/github/license/nabbisen/forskscope)](https://github.com/nabbisen/forskscope/blob/main/LICENSE)
+[![Releases Workflow](https://github.com/forskscope/forskscope/actions/workflows/release-executable.yaml/badge.svg)](https://github.com/forskscope/forskscope/actions/workflows/release-executable.yaml)
+[![License](https://img.shields.io/github/license/forskscope/forskscope)](https://github.com/forskscope/forskscope/blob/main/LICENSE)
 
 ![logo](docs/src/assets/logo.png)
 
