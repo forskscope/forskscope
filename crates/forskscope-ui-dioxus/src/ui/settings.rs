@@ -28,6 +28,7 @@ pub fn ModalLayer() -> Element {
         Modal::SaveAs(i, path)    => rsx! { SaveAsModal      { index: i, initial_path: path } },
         Modal::ConfirmReload(i)   => rsx! { ReloadModal      { index: i } },
         Modal::ConfirmSwap(i)     => rsx! { SwapModal        { index: i } },
+        Modal::ConfirmDirOp(op)  => rsx! { DirOpModal       { op } },
     }
 }
 
@@ -201,3 +202,50 @@ fn tv(t: Theme) -> &'static str { match t { Theme::Dark => "dark", Theme::Light 
 fn tf(s: &str) -> Theme { match s { "light" => Theme::Light, "night" => Theme::Night, _ => Theme::Dark } }
 fn lv(l: Lang) -> &'static str { match l { Lang::En => "en", Lang::Ja => "ja" } }
 fn lf(s: &str) -> Lang { match s { "ja" => Lang::Ja, _ => Lang::En } }
+
+/// Confirm a directory file-copy operation (RFC-031 safety model for dir ops).
+#[component]
+fn DirOpModal(op: crate::state::DirOp) -> Element {
+    let mut store = use_context::<Store>();
+    let lang = store.lang();
+    let src  = op.src.display().to_string();
+    let dst  = op.dst.display().to_string();
+    rsx! {
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Copy file",
+            div { class: "modal",
+                h2 { "Copy file?" }
+                p { "{op.label}" }
+                div { class: "field",
+                    span { "From" }
+                    code { class: "path-display", "{src}" }
+                }
+                div { class: "field",
+                    span { "To" }
+                    code { class: "path-display", "{dst}" }
+                }
+                if op.dst.exists() {
+                    p { class: "notice", "Destination exists. A .bak backup will be created." }
+                }
+                div { class: "actions",
+                    button {
+                        autofocus: true,
+                        onclick: move |_| store.modal.set(Modal::None),
+                        {t(lang, "Cancel")}
+                    }
+                    button {
+                        onclick: move |_| {
+                            match forskscope_core::dir::copy_file(
+                                &op.src, &op.dst, forskscope_core::BackupPolicy::SiblingBak
+                            ) {
+                                Ok(_)  => store.notify("Copied.".to_string()),
+                                Err(e) => store.notify(e.to_string()),
+                            }
+                            store.modal.set(Modal::None);
+                        },
+                        "Copy"
+                    }
+                }
+            }
+        }
+    }
+}

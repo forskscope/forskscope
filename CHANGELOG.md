@@ -5,6 +5,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.27.0] — 2026-06-09
+
+### Added
+
+- **Directory file operations** — each file row in the explorer now carries a
+  copy button (→ for the left pane, ← for the right pane) that appears on
+  hover and focus. Clicking opens a confirmation modal that shows the exact
+  source and destination paths, warns when the destination already exists, and
+  creates a `.bak` sibling backup before overwriting — the same safety model as
+  the text-merge save flow. The operation calls `forskscope_core::dir::copy_file`
+  with the standard `BackupPolicy::SiblingBak`; no file is modified without
+  explicit user confirmation (D-005, D-006).
+
+- **Git mergetool mode** — `forskscope <local> <remote> <merged>` (3-arg
+  invocation) opens a comparison of `<local>` vs `<remote>` and redirects
+  **Save** to write the result to `<merged>`. The tab title carries a "(merge)"
+  suffix. Compatible with standard `git mergetool` configuration; see
+  `docs/src/intermediate/git-integration.md` for setup instructions.
+
+- **Git integration documentation** — `docs/src/intermediate/git-integration.md`
+  covers `git difftool`, `git mergetool`, and JJ/Jujutsu configuration.
+
+- **GitHub Actions CI/CD** — `.github/workflows/ci.yml` runs `cargo test`,
+  `cargo clippy -D warnings`, and a UI compile check on every push and PR.
+  `.github/workflows/release.yml` builds Linux x86_64, macOS aarch64, and
+  Windows x64 release binaries plus a source archive when a `vX.Y.Z` tag is
+  pushed, and creates a draft GitHub release with all assets.
+
+- **`copy_file` core function** — `forskscope_core::dir::copy_file` (with
+  backup) is the safe file-copy primitive. It creates destination parent
+  directories automatically and is covered by two new core tests (33 total).
+
+---
+
 ## [0.26.0] — 2026-06-09
 
 ### Added

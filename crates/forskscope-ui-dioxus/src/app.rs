@@ -17,6 +17,10 @@ const MAIN_CSS: &str = include_str!("../assets/main.css");
 
 pub static STARTUP_PAIR: std::sync::OnceLock<Option<(PathBuf, PathBuf)>> =
     std::sync::OnceLock::new();
+/// If set, the active tab's save target is overridden to this path after
+/// the initial comparison opens (git mergetool mode).
+pub static STARTUP_MERGED: std::sync::OnceLock<Option<PathBuf>> =
+    std::sync::OnceLock::new();
 
 #[component]
 pub fn App() -> Element {
@@ -25,6 +29,15 @@ pub fn App() -> Element {
     use_hook(|| {
         if let Some(Some((left, right))) = STARTUP_PAIR.get() {
             open_compare(&mut store, left.clone(), right.clone());
+            // git mergetool mode: redirect save target to the merged path.
+            if let Some(Some(merged)) = STARTUP_MERGED.get() {
+                let idx = store.tabs.read().len().saturating_sub(1);
+                if let Some(tab) = store.tabs.write().get_mut(idx) {
+                    tab.right_path = Some(merged.clone());
+                    tab.right_doc.fingerprint_at_load = None;
+                    tab.title = format!("{} (merge)", tab.title);
+                }
+            }
         }
     });
 

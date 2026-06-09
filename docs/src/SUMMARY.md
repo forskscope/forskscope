@@ -22,6 +22,7 @@
 - [Diff options](./intermediate/diff-options.md)
 - [Keyboard reference](./intermediate/keyboard.md)
 - [CLI usage](./intermediate/cli.md)
+- [Git integration](./intermediate/git-integration.md)
 
 ---
 

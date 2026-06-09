@@ -1,6 +1,6 @@
 # RFC-007 — Save, Session, and File Safety Policy
 
-**Status.** Proposed
+**Status.** Implemented (v0.27.0)
 
 ---toml
 project = "ForskScope"
@@ -218,3 +218,7 @@ The implementation must document platform differences.
 | Encoding preservation is imperfect | Warn and require explicit conversion on uncertainty. |
 | Too many dialogs slow workflow | Remember safe defaults but never hide destructive choices. |
 | Backup files clutter directories | Make backup policy configurable. |
+
+## Deferred work (v0.27.0)
+
+Directory-level recursive sync and batch copy operations are deferred. Three-way merge is deferred (FUTURE-RFC-001). Session persistence across restarts is deferred.

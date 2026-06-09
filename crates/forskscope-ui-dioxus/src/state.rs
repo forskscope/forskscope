@@ -57,6 +57,15 @@ pub enum Modal {
     None, Settings,
     ConfirmOverwrite(usize), SaveAs(usize, String),
     ConfirmReload(usize), ConfirmSwap(usize),
+    ConfirmDirOp(DirOp),
+}
+
+/// A pending directory file operation awaiting user confirmation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirOp {
+    pub src: std::path::PathBuf,
+    pub dst: std::path::PathBuf,
+    pub label: String,          // human-readable description for the modal
 }
 
 #[derive(Clone)]

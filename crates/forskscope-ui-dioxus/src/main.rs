@@ -1,4 +1,13 @@
 //! ForskScope desktop entry point.
+//!
+//! Startup modes:
+//!
+//! ```
+//! forskscope                       # Explorer workspace
+//! forskscope <left> <right>        # Two-file diff (git difftool compatible)
+//! forskscope <local> <remote> <merged>  # git mergetool: diff local vs remote,
+//!                                       # save result to <merged>
+//! ```
 
 mod app;
 mod i18n;
@@ -10,16 +19,25 @@ use std::path::PathBuf;
 use dioxus::desktop::tao::dpi::LogicalSize;
 use dioxus::desktop::{Config, WindowBuilder};
 
-use app::{App, STARTUP_PAIR};
+use app::{App, STARTUP_MERGED, STARTUP_PAIR};
 
 fn main() {
-    // `forskscope <left> <right>` opens a comparison at startup (RFC-034).
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let pair = match args.as_slice() {
-        [left, right] => Some((PathBuf::from(left), PathBuf::from(right))),
-        _ => None,
-    };
-    let _ = STARTUP_PAIR.set(pair);
+
+    match args.as_slice() {
+        [left, right] => {
+            let _ = STARTUP_PAIR.set(Some((PathBuf::from(left), PathBuf::from(right))));
+            let _ = STARTUP_MERGED.set(None);
+        }
+        [local, remote, merged] => {
+            let _ = STARTUP_PAIR.set(Some((PathBuf::from(local), PathBuf::from(remote))));
+            let _ = STARTUP_MERGED.set(Some(PathBuf::from(merged)));
+        }
+        _ => {
+            let _ = STARTUP_PAIR.set(None);
+            let _ = STARTUP_MERGED.set(None);
+        }
+    }
 
     let window = WindowBuilder::new()
         .with_title("ForskScope")
