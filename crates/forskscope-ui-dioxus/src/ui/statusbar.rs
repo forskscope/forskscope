@@ -1,8 +1,4 @@
-//! Status bar (RFC-003). Calm, single line; passive metadata only.
-//!
-//! "Less is more": the status bar carries the quiet context (which files,
-//! which encoding) and a single local-only trust marker. Action counts and
-//! save state live next to the diff and on the tab, not duplicated here.
+//! Status bar: passive context — file names, encoding, diff stats, local-only marker.
 
 use dioxus::prelude::*;
 
@@ -18,21 +14,27 @@ pub fn StatusBar() -> Element {
     let context = active.and_then(|i| {
         let tabs = store.tabs.read();
         tabs.get(i).map(|tab| {
-            let left = file_name(&tab.left_path);
+            let left  = file_name(&tab.left_path);
             let right = file_name(&tab.right_path);
+            let enc   = tab.right_label();
             let dirty = tab.can_save && tab.merge.is_dirty();
-            (format!("{left} ↔ {right}"), tab.right_label(), dirty)
+            let stats = &tab.diff.stats;
+            let stat_str = if stats.lines_inserted > 0 || stats.lines_deleted > 0 {
+                format!("+{} / -{}", stats.lines_inserted, stats.lines_deleted)
+            } else {
+                String::new()
+            };
+            (format!("{left} ↔ {right}"), enc, stat_str, dirty)
         })
     });
 
     rsx! {
-        div { class: "statusbar",
-            if let Some((pair, enc, dirty)) = context {
+        div { class: "statusbar", role: "status",
+            if let Some((pair, enc, stats, dirty)) = context {
                 span { "{pair}" }
-                span { "{enc}" }
-                if dirty {
-                    span { class: "dirty", {t(lang, "unsaved")} }
-                }
+                if !enc.is_empty() { span { "{enc}" } }
+                if !stats.is_empty() { span { class: "stats", "{stats}" } }
+                if dirty { span { class: "dirty", {t(lang, "unsaved")} } }
             }
             span { class: "spacer" }
             span { "Local only" }

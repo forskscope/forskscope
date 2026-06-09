@@ -22,6 +22,11 @@ pub fn Header() -> Element {
                 onclick: move |_| store.modal.set(Modal::Settings),
                 {t(lang, "Settings")}
             }
+            button {
+                onclick: move |_| store.modal.set(Modal::About),
+                title: "About ForskScope",
+                "?"
+            }
         }
     }
 }

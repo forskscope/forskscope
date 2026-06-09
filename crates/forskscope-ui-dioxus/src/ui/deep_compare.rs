@@ -1,122 +1,144 @@
-//! Recursive directory comparison view (RFC-037, RFC-038).
+//! Recursive directory comparison with incremental digest progress (RFC-037, RFC-038, RFC-040).
 //!
-//! Triggered from the Explorer workspace; shows a flat, sorted list of
-//! every file that differs across the two directory trees. The scan runs
-//! in `spawn_blocking` so the UI stays responsive. Clicking any row opens
-//! a file comparison.
+//! Phase 1 (fast): `list_recursive_for_display` walks both trees; common files
+//! get `RecStatus::Computing`.  Phase 2: per-file digest tasks update entries
+//! in-place so the table refreshes as results arrive.
 
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
 
-use forskscope_core::dir::{RecEntry, RecStatus, recursive_diff};
+use forskscope_core::dir::{RecEntry, RecStatus, file_digest_equal, list_recursive_for_display};
 
 use crate::i18n::t;
 use crate::state::{Lang, Store, open_compare};
 
-/// Filter applied to the deep-compare results table.
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
-pub enum DeepFilter {
-    #[default]
-    Different,   // changed + left-only + right-only (default: show what's interesting)
-    All,
-    Equal,
-}
+pub enum DeepFilter { #[default] Different, All, Equal }
 
 #[component]
 pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> Element {
-    let results: Signal<Option<Vec<RecEntry>>> = use_signal(|| None);
-    let mut filter: Signal<DeepFilter> = use_signal(DeepFilter::default);
+    // Clone once outside all closures so the props aren't moved piecemeal.
+    let lr = left_root.clone();
+    let rr = right_root.clone();
 
-    // Launch the background scan once on mount.
+    let entries:      Signal<Vec<RecEntry>> = use_signal(Vec::new);
+    #[allow(unused_mut)] let mut scanning:     Signal<bool>          = use_signal(|| true);
+    #[allow(unused_mut)] let mut computed:     Signal<usize>         = use_signal(|| 0);
+    #[allow(unused_mut)] let mut total_common: Signal<usize>         = use_signal(|| 0);
+    let mut filter: Signal<DeepFilter>  = use_signal(DeepFilter::default);
+
     use_effect(move || {
-        let lr = left_root.clone();
-        let rr = right_root.clone();
-        let mut res = results;
+        // Phase 1: fast listing (no I/O-heavy digests).
+        let lr1 = lr.clone();
+        let rr1 = rr.clone();
+        let lr2 = lr.clone();   // for phase-2 absolute-path construction
+        let rr2 = rr.clone();
+        let mut ent = entries;
+        let mut scan = scanning;
+        let mut tc = total_common;
+        let comp = computed;
+
         spawn(async move {
-            let entries = tokio::task::spawn_blocking(move || recursive_diff(&lr, &rr))
-                .await
-                .unwrap_or_default();
-            res.set(Some(entries));
+            let initial = tokio::task::spawn_blocking(move || list_recursive_for_display(&lr1, &rr1))
+                .await.unwrap_or_default();
+
+            // Build the list of (rel, abs_left, abs_right) for common pairs.
+            let pairs: Vec<(PathBuf, PathBuf, PathBuf)> = initial.iter()
+                .filter(|e| e.status == RecStatus::Computing)
+                .map(|e| (e.rel_path.clone(), lr2.join(&e.rel_path), rr2.join(&e.rel_path)))
+                .collect();
+
+            tc.set(pairs.len());
+            ent.set(initial);
+            scan.set(false);
+
+            // Phase 2: one digest task per common pair.
+            for (rel, lp, rp) in pairs {
+                let mut e2 = ent;
+                let mut cp2 = comp;
+                spawn(async move {
+                    let equal = tokio::task::spawn_blocking(move || file_digest_equal(&lp, &rp))
+                        .await.ok().and_then(|r| r.ok()).unwrap_or(false);
+                    let status = if equal { RecStatus::Equal } else { RecStatus::Changed };
+                    if let Some(entry) = e2.write().iter_mut().find(|e| e.rel_path == rel) {
+                        entry.status = status;
+                    }
+                    let next = *cp2.read() + 1;
+                    cp2.set(next);
+                });
+            }
         });
     });
 
     let f = *filter.read();
+    let snap = entries.read();
+    let total     = snap.len();
+    let diff_cnt  = snap.iter().filter(|e| !matches!(e.status, RecStatus::Equal | RecStatus::Computing)).count();
+    let done      = *computed.read();
+    let tc        = *total_common.read();
+    let is_scan   = *scanning.read();
+    let in_flight = !is_scan && tc > 0 && done < tc;
+    let visible: Vec<RecEntry> = snap.iter()
+        .filter(|e| match f {
+            DeepFilter::Different => e.status != RecStatus::Equal,
+            DeepFilter::All       => true,
+            DeepFilter::Equal     => e.status == RecStatus::Equal,
+        })
+        .cloned().collect();
+    drop(snap);
+
     rsx! {
         div { class: "deep-compare",
             div { class: "deep-compare-toolbar",
                 span { class: "deep-label", "Deep compare" }
-                button {
-                    class: if f == DeepFilter::Different { "filter-btn active" } else { "filter-btn" },
-                    onclick: move |_| filter.set(DeepFilter::Different),
-                    "Different"
-                }
-                button {
-                    class: if f == DeepFilter::All { "filter-btn active" } else { "filter-btn" },
-                    onclick: move |_| filter.set(DeepFilter::All),
-                    "All"
-                }
-                button {
-                    class: if f == DeepFilter::Equal { "filter-btn active" } else { "filter-btn" },
-                    onclick: move |_| filter.set(DeepFilter::Equal),
-                    "Equal only"
-                }
+                button { class: if f==DeepFilter::Different {"filter-btn active"} else {"filter-btn"},
+                    onclick: move |_| filter.set(DeepFilter::Different), "Different" }
+                button { class: if f==DeepFilter::All {"filter-btn active"} else {"filter-btn"},
+                    onclick: move |_| filter.set(DeepFilter::All), "All" }
+                button { class: if f==DeepFilter::Equal {"filter-btn active"} else {"filter-btn"},
+                    onclick: move |_| filter.set(DeepFilter::Equal), "Equal only" }
             }
-            match results.read().as_ref() {
-                None => rsx! { div { class: "deep-scanning", "Scanning…" } },
-                Some(entries) => {
-                    let visible: Vec<RecEntry> = entries.iter()
-                        .filter(|e| match f {
-                            DeepFilter::Different => e.status != RecStatus::Equal,
-                            DeepFilter::All       => true,
-                            DeepFilter::Equal     => e.status == RecStatus::Equal,
-                        })
-                        .cloned()
-                        .collect();
-                    let total_diff = entries.iter().filter(|e| e.status != RecStatus::Equal).count();
-                    rsx! {
-                        div { class: "deep-stats",
-                            {format!("{} different · {} equal · {} total",
-                                total_diff,
-                                entries.len() - total_diff,
-                                entries.len()
-                            )}
-                        }
-                        div { class: "deep-table",
-                            for entry in visible {
-                                DeepRow { entry: entry.clone(), lang }
-                            }
-                        }
+            if is_scan {
+                div { class: "deep-scanning", "Scanning…" }
+            } else {
+                div { class: "deep-stats",
+                    "{diff_cnt} different · {total_common_eq(total, diff_cnt)} equal · {total} total"
+                    if in_flight {
+                        span { class: "deep-progress", " · checking {done}/{tc}…" }
                     }
+                }
+                div { class: "deep-table",
+                    for entry in visible { DeepRow { entry, lang } }
                 }
             }
         }
     }
 }
 
+fn total_common_eq(total: usize, diff: usize) -> usize { total.saturating_sub(diff) }
+
 #[component]
 fn DeepRow(entry: RecEntry, lang: Lang) -> Element {
     let mut store = use_context::<Store>();
-    let (icon, icon_class) = match entry.status {
-        RecStatus::Changed  => ("⚠", "status-changed"),
+    let (icon, cls) = match entry.status {
+        RecStatus::Changed   => ("⚠", "status-changed"),
         RecStatus::LeftOnly  => ("←", "status-only"),
         RecStatus::RightOnly => ("→", "status-only"),
         RecStatus::Equal     => ("✓", "status-equal"),
+        RecStatus::Computing => ("⊙", "status-cmp"),
     };
-    let path_str = entry.rel_path.display().to_string();
-    let can_compare = matches!(entry.status, RecStatus::Changed | RecStatus::LeftOnly | RecStatus::RightOnly);
+    let path_str   = entry.rel_path.display().to_string();
+    let can_cmp    = !matches!(entry.status, RecStatus::Equal | RecStatus::Computing);
     let e2 = entry.clone();
     rsx! {
         div { class: "deep-row",
-            span { class: "dir-status {icon_class}", "{icon}" }
+            span { class: "dir-status {cls}", "{icon}" }
             span { class: "deep-path", "{path_str}" }
             span { class: "dir-size", {size_label(&entry)} }
-            if can_compare {
-                button {
-                    class: "deep-compare-btn",
+            if can_cmp {
+                button { class: "deep-compare-btn",
                     onclick: move |_| {
-                        // Construct full paths from the stored left/right roots
-                        // via the store's settings (last_left_dir / last_right_dir).
                         let s = store.settings.read();
                         if let (Some(lr), Some(rr)) = (&s.last_left_dir, &s.last_right_dir) {
                             let lp = lr.join(&e2.rel_path);
@@ -134,16 +156,13 @@ fn DeepRow(entry: RecEntry, lang: Lang) -> Element {
 
 fn size_label(e: &RecEntry) -> String {
     match (e.left_size, e.right_size) {
-        (Some(l), Some(r)) if l != r => format!("{l} → {r}"),
-        (Some(l), Some(_)) => fmt_size(l),
-        (Some(l), None) => fmt_size(l),
-        (None, Some(r)) => fmt_size(r),
-        _ => String::new(),
+        (Some(l), Some(r)) if l != r => format!("{} → {}", fmt(l), fmt(r)),
+        (Some(s), _) | (_, Some(s))  => fmt(s),
+        _                             => String::new(),
     }
 }
-
-fn fmt_size(n: u64) -> String {
-    if n < 1024 { format!("{n} B") }
-    else if n < 1024 * 1024 { format!("{:.1} KB", n as f64 / 1024.0) }
-    else { format!("{:.1} MB", n as f64 / (1024.0 * 1024.0)) }
+fn fmt(n: u64) -> String {
+    if n < 1024 { format!("{n}B") }
+    else if n < 1_048_576 { format!("{:.1}KB", n as f64 / 1024.0) }
+    else { format!("{:.1}MB", n as f64 / 1_048_576.0) }
 }

@@ -20,6 +20,9 @@ pub enum RecStatus {
     Changed,
     LeftOnly,
     RightOnly,
+    /// Exists on both sides; digest comparison not yet complete.
+    /// Used by the incremental UI; never returned by `recursive_diff`.
+    Computing,
 }
 
 /// One entry in the recursive comparison report.
@@ -95,6 +98,52 @@ fn walk_and_merge(
                 map.insert(rel.clone(), RecEntry {
                     rel_path: rel, status: RecStatus::RightOnly,
                     left_size: None, right_size: Some(right_size),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Fast first-pass listing without digest comparisons.
+///
+/// Common files receive `RecStatus::Computing`; the caller should then
+/// run per-file digests to upgrade each entry to `Equal` or `Changed`.
+/// This enables the UI to show partial results immediately rather than
+/// waiting for a full blocking scan.
+pub fn list_recursive_for_display(left_root: &Path, right_root: &Path) -> Vec<RecEntry> {
+    let mut map: std::collections::BTreeMap<PathBuf, RecEntry> = Default::default();
+    // Seed from the left tree.
+    let _ = walk(left_root, left_root, &mut map, |rel, meta| RecEntry {
+        rel_path: rel.clone(), status: RecStatus::LeftOnly,
+        left_size: Some(meta.len()), right_size: None,
+    });
+    // Merge the right tree — common files become Computing.
+    let _ = walk_and_merge_fast(right_root, right_root, &mut map);
+    map.into_values().collect()
+}
+
+fn walk_and_merge_fast(
+    right_root: &Path, dir: &Path,
+    map: &mut std::collections::BTreeMap<PathBuf, RecEntry>,
+) -> super::super::error::Result<()> {
+    use std::fs;
+    let rd = fs::read_dir(dir)
+        .map_err(|e| super::super::error::CoreError::io(dir, super::super::error::IoOperation::ListDir, &e))?;
+    for entry in rd.flatten() {
+        let meta = match entry.metadata() { Ok(m) => m, Err(_) => continue };
+        let rel = entry.path().strip_prefix(right_root).unwrap_or(&entry.path()).to_path_buf();
+        if meta.is_dir() {
+            let _ = walk_and_merge_fast(right_root, &entry.path(), map);
+        } else if meta.is_file() {
+            let rs = meta.len();
+            if let Some(existing) = map.get_mut(&rel) {
+                existing.status     = RecStatus::Computing;
+                existing.right_size = Some(rs);
+            } else {
+                map.insert(rel.clone(), RecEntry {
+                    rel_path: rel, status: RecStatus::RightOnly,
+                    left_size: None, right_size: Some(rs),
                 });
             }
         }

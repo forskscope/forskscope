@@ -29,6 +29,7 @@ pub fn ModalLayer() -> Element {
         Modal::ConfirmReload(i)   => rsx! { ReloadModal      { index: i } },
         Modal::ConfirmSwap(i)     => rsx! { SwapModal        { index: i } },
         Modal::ConfirmDirOp(op)  => rsx! { DirOpModal       { op } },
+        Modal::About             => rsx! { AboutModal       {} },
     }
 }
 
@@ -258,6 +259,58 @@ fn DirOpModal(op: crate::state::DirOp) -> Element {
                             store.modal.set(Modal::None);
                         },
                         "Copy"
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// About / diagnostics panel (RFC-008).
+#[component]
+fn AboutModal() -> Element {
+    let mut store = use_context::<Store>();
+
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    const BUILD_PROFILE: &str = if cfg!(debug_assertions) { "debug" } else { "release" };
+    let platform = format!("{} {}", std::env::consts::OS, std::env::consts::ARCH);
+    let diagnostics = format!(
+        "ForskScope {VERSION}\nBuild: {BUILD_PROFILE}\nPlatform: {platform}\nUI: Dioxus 0.7\nDiff engine: similar 3"
+    );
+    let diag_copy = diagnostics.clone();
+
+    rsx! {
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "About ForskScope",
+            div { class: "modal",
+                h2 { "ForskScope v{VERSION}" }
+                div { class: "about-grid",
+                    span { class: "about-key", "Version" }
+                    span { "{VERSION}" }
+                    span { class: "about-key", "Build" }
+                    span { "{BUILD_PROFILE}" }
+                    span { class: "about-key", "Platform" }
+                    span { "{platform}" }
+                    span { class: "about-key", "UI" }
+                    span { "Dioxus 0.7" }
+                    span { class: "about-key", "Diff engine" }
+                    span { "similar 3" }
+                }
+                div { class: "actions",
+                    button {
+                        onclick: move |_| {
+                            let d = diag_copy.clone();
+                            spawn(async move {
+                                let _ = dioxus::document::eval(
+                                    &format!("navigator.clipboard?.writeText({:?})", d)
+                                ).await;
+                            });
+                        },
+                        "Copy diagnostics"
+                    }
+                    button {
+                        autofocus: true,
+                        onclick: move |_| store.modal.set(Modal::None),
+                        "Close"
                     }
                 }
             }

@@ -263,3 +263,17 @@ code.path-display {
 .deep-compare-btn { padding: .15rem .4rem; font-size: 11px; opacity: .7; border-radius: 4px; }
 .deep-row:hover .deep-compare-btn { opacity: 1; }
 .deep-scanning { padding: 1.5rem; text-align: center; color: var(--muted); }
+
+/* ── About modal grid ── */
+.about-grid {
+  display: grid; grid-template-columns: max-content 1fr;
+  gap: .25rem .75rem; margin: .5rem 0 .75rem;
+  font-size: 13px;
+}
+.about-key { color: var(--muted); }
+
+/* ── Status bar stats ── */
+.statusbar .stats { color: var(--ok); font-size: 11px; }
+
+/* ── Deep compare progress ── */
+.deep-progress { color: var(--muted); }

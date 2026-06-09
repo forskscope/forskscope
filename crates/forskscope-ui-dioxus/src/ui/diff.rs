@@ -225,6 +225,26 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
 
 // ─── Public action functions ──────────────────────────────────────────────────
 
+/// Apply the focused changed hunk and auto-advance to the next one.
+pub fn apply_focused_hunk(store: &mut Store, index: usize) {
+    let hunk_id = {
+        let tabs = store.tabs.read();
+        let Some(tab) = tabs.get(index) else { return };
+        if !tab.can_save { return }
+        let ids: Vec<u64> = tab.merge.hunks().iter()
+            .filter(|h| h.is_pending_change())
+            .map(|h| h.hunk_id)
+            .collect();
+        ids.get(tab.focused_change).copied()
+    };
+    if let Some(id) = hunk_id {
+        let _ = store.tabs.write()
+            .get_mut(index).map(|t| t.merge.apply_left_to_right(id));
+        // Advance to the next pending change so the user can keep pressing Enter.
+        move_focus(store, index, 1);
+    }
+}
+
 pub fn move_focus(store: &mut Store, index: usize, delta: i32) {
     let hunk_id = {
         let mut tabs = store.tabs.write();

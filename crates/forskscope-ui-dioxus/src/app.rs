@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
 
-use crate::state::{Store, open_compare};
-use crate::ui::diff::{DiffWorkspace, move_focus, save_tab};
+use crate::state::{Store, open_compare, restore_session, save_session};
+use crate::ui::diff::{DiffWorkspace, apply_focused_hunk, move_focus, save_tab};
 use crate::ui::explorer::Explorer;
 use crate::ui::header::Header;
 use crate::ui::settings::{ModalLayer, load};
@@ -38,7 +38,16 @@ pub fn App() -> Element {
                     tab.title = format!("{} (merge)", tab.title);
                 }
             }
+        } else {
+            // No explicit startup pair — restore the previous session (RFC-035).
+            restore_session(&mut store);
         }
+    });
+
+    // Persist the session whenever the tab list changes.
+    use_effect(move || {
+        let _tabs = store.tabs.read(); // subscribe to the tabs signal
+        save_session(&store);
     });
 
     let theme_class = store.settings.read().theme.css_class();
@@ -56,6 +65,7 @@ pub fn App() -> Element {
                 match e.key() {
                     Key::F7 => move_focus(&mut store, index, -1),
                     Key::F8 => move_focus(&mut store, index,  1),
+                    Key::Enter => apply_focused_hunk(&mut store, index),
                     Key::Character(ref s) if mods.contains(Modifiers::CONTROL) => {
                         match s.to_ascii_lowercase().as_str() {
                             "s" => save_tab(&mut store, index, false),
