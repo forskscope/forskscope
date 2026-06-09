@@ -1,4 +1,4 @@
-//! Settings dialog, persist/load helpers, and the ModalLayer dispatcher (RFC-009, RFC-046).
+//! Settings dialog, persist/load helpers, and the ModalLayer dispatcher (RFC-009, RFC-046, RFC-057).
 
 use app_json_settings::ConfigManager;
 use dioxus::prelude::*;
@@ -38,23 +38,37 @@ pub fn ModalLayer() -> Element {
     }
 }
 
-// ─── Settings ─────────────────────────────────────────────────────────────────
+// ── Settings modal ────────────────────────────────────────────────────────────
 
 #[component]
 fn SettingsModal() -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
-    let cur = store.settings.read().clone();
+    let cur  = store.settings.read().clone();
+    // Progressive disclosure state for New Profile form (RFC-057).
+    let mut show_new_profile = use_signal(|| false);
+
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Settings",
             div { class: "modal",
-                h2 { id: "settings-title", "Settings" }
+                // Header row: title + About button (RFC-057).
+                div { class: "modal-header-row",
+                    h2 { id: "settings-title", "Settings" }
+                    button {
+                        class: "about-btn",
+                        title: "About ForskScope",
+                        onclick: move |_| store.modal.set(Modal::About),
+                        "ℹ"
+                    }
+                }
+
+                // ── Appearance ────────────────────────────────────
                 div { class: "field",
                     span { {t(lang, "Theme")} }
                     select {
                         value: tv(cur.theme),
                         onchange: move |e| { store.settings.write().theme = tf(&e.value()); persist(&store.settings.read()); },
-                        option { value: "dark", "Dark" }
+                        option { value: "dark",  "Dark"  }
                         option { value: "light", "Light" }
                         option { value: "night", "Night" }
                     }
@@ -65,7 +79,7 @@ fn SettingsModal() -> Element {
                         value: lv(cur.language),
                         onchange: move |e| { store.settings.write().language = lf(&e.value()); persist(&store.settings.read()); },
                         option { value: "en", "English" }
-                        option { value: "ja", "日本語" }
+                        option { value: "ja", "日本語"   }
                     }
                 }
                 div { class: "field",
@@ -97,6 +111,34 @@ fn SettingsModal() -> Element {
                         option { value: "10", "10"           }
                     }
                 }
+
+                // ── Ignore patterns (RFC-056) ─────────────────────
+                div { class: "field",
+                    span { "Ignore file extensions" }
+                    input {
+                        r#type: "text",
+                        placeholder: "o, class, tmp  (comma separated, no dot needed)",
+                        value: "{cur.ignore_extensions}",
+                        oninput: move |e| {
+                            store.settings.write().ignore_extensions = e.value();
+                            persist(&store.settings.read());
+                        }
+                    }
+                }
+                div { class: "field",
+                    span { "Ignore directory names" }
+                    input {
+                        r#type: "text",
+                        placeholder: "target, node_modules, *.cache  (* wildcard allowed)",
+                        value: "{cur.ignore_dirs}",
+                        oninput: move |e| {
+                            store.settings.write().ignore_dirs = e.value();
+                            persist(&store.settings.read());
+                        }
+                    }
+                }
+
+                // ── Compare profiles ──────────────────────────────
                 div { class: "field",
                     span { "Compare profiles" }
                     div { class: "profile-list",
@@ -121,32 +163,52 @@ fn SettingsModal() -> Element {
                                 }
                             }
                         }
+                        // New profile: disclosed on demand (RFC-057).
+                        if !*show_new_profile.read() {
+                            button {
+                                class: "new-profile-btn",
+                                onclick: move |_| show_new_profile.set(true),
+                                "+ New profile"
+                            }
+                        } else {
+                            AddProfileInline {
+                                on_done: move |_| show_new_profile.set(false),
+                            }
+                        }
                     }
                 }
-                div { class: "field",
-                    span { "New profile" }
-                    AddProfileInline {}
-                }
+
                 div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Close")} }
+                    button {
+                        autofocus: true,
+                        onclick: move |_| store.modal.set(Modal::None),
+                        {t(lang, "Close")}
+                    }
                 }
             }
         }
     }
 }
 
-/// Inline "Add profile" sub-form inside the Settings modal.
+// ── Add-profile inline form (RFC-057: hidden by default) ──────────────────────
+
 #[component]
-fn AddProfileInline() -> Element {
+fn AddProfileInline(on_done: EventHandler<()>) -> Element {
     let mut store = use_context::<Store>();
     let mut name        = use_signal(String::new);
     #[allow(unused_mut)] let mut ignore_ws   = use_signal(|| false);
     #[allow(unused_mut)] let mut ignore_case = use_signal(|| false);
-    #[allow(unused_mut)] let mut algorithm:  Signal<crate::state::DiffAlgorithmSetting> = use_signal(Default::default);
+    #[allow(unused_mut)] let mut algorithm: Signal<crate::state::DiffAlgorithmSetting> =
+        use_signal(Default::default);
+
     rsx! {
         div { class: "add-profile-form",
-            input { placeholder: "Profile name", value: "{name}",
-                oninput: move |e| name.set(e.value()), style: "flex:1;" }
+            input {
+                placeholder: "Profile name",
+                value: "{name}",
+                oninput: move |e| name.set(e.value()),
+                style: "flex:1;"
+            }
             label { class: "profile-check",
                 input { r#type: "checkbox", checked: *ignore_ws.read(),
                     onchange: move |e| ignore_ws.set(e.checked()) }
@@ -176,12 +238,14 @@ fn AddProfileInline() -> Element {
                     if !n.is_empty() {
                         crate::state::add_profile(&mut store, n, *ignore_ws.read(),
                             *ignore_case.read(), *algorithm.read());
-                        name.set(String::new());
-                        ignore_ws.set(false); ignore_case.set(false);
-                        algorithm.set(Default::default());
+                        on_done.call(());
                     }
                 },
                 "Add"
+            }
+            button {
+                onclick: move |_| on_done.call(()),
+                "Cancel"
             }
         }
     }

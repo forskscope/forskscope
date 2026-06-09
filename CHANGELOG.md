@@ -5,7 +5,60 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.35.0] — 2026-06-09
+## [0.36.0] — 2026-06-09
+
+Explorer redesign and ignore-pattern feature. Implements RFCs 054–057.
+
+### Added
+
+- **Explorer tree view (RFC-054)** — each pane now renders an expandable
+  directory tree via `dioxus-swdir-tree`. Directories expand/collapse in-place;
+  the full tree is navigable by keyboard (↑/↓/←/→/Home/End/Enter/Space).
+
+- **Single-click select, double-click compare (RFC-054)** — single-clicking a
+  file in either pane sets it as the pick for that side and shows its name beside
+  the Compare button. Double-clicking a file auto-compares it with the
+  same-named file picked in the opposite pane. Double-clicking a directory
+  navigates into it.
+
+- **Permanent Explorer tab in the tab bar (RFC-054 defect fix)** — the Explorer
+  was previously only reachable via a header button that didn't reliably indicate
+  the active workspace. The tab bar now shows a permanent Explorer tab as its
+  first entry, styled as active when the explorer workspace is open, matching
+  the comparison tabs in behaviour. The header Explorer button is removed.
+
+- **Breadcrumb path navigation (RFC-055)** — the "up to parent directory" button
+  is removed. In its place, each directory segment in the path bar is a
+  clickable link that re-roots the pane at that ancestor (Nautilus-style).
+  Deep paths are truncated with `…` to preserve the root and last two segments.
+  `Alt+↑` continues to work as the keyboard shortcut for "go up one level".
+
+- **Ignore patterns for files and directories (RFC-056)** — two new fields in
+  Settings: *Ignore file extensions* (e.g. `o, class, tmp`) and *Ignore
+  directory names* (e.g. `target, node_modules, *.cache`). Extensions are
+  matched case-insensitively; directory names support a single `*` wildcard
+  (prefix `tmp*`, suffix `*.cache`, infix `*backup*`). Ignored entries are
+  stripped from tree scans before they enter the tree state machine, so they
+  never appear in either pane. Settings are persisted to disk immediately.
+
+- **About button moved to Settings header (RFC-057)** — the `ℹ` button is
+  removed from the global header and added to the Settings dialog header row,
+  where it is more discoverable next to the relevant "app information" context.
+
+- **New profile form hidden by default (RFC-057)** — the always-visible profile
+  creation form is replaced by a `+ New profile` button that reveals the form on
+  demand (progressive disclosure). The form collapses after a profile is added or
+  the action is cancelled.
+
+### Core
+
+- `IgnoreRules` struct in `forskscope-core` (`src/ignore.rs`) — `from_settings`,
+  `is_file_ignored`, `is_dir_ignored`, `is_empty`. Public re-export from crate
+  root. 10 new tests.
+
+---
+
+
 
 Hardening release from a full codebase audit. No new user-facing features; three
 correctness/consistency findings fixed.

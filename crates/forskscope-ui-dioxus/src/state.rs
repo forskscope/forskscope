@@ -111,6 +111,12 @@ pub struct AppSettings {
     pub profiles: Vec<DiffProfile>,
     #[serde(default)]
     pub active_profile: usize,
+    /// Comma-separated file extensions to ignore (e.g. `"o, class, tmp"`).
+    #[serde(default)]
+    pub ignore_extensions: String,
+    /// Comma-separated directory-name patterns to ignore (e.g. `"target, node_modules, *.cache"`).
+    #[serde(default)]
+    pub ignore_dirs: String,
 }
 
 fn default_ctx() -> usize { 3 }
@@ -121,7 +127,15 @@ impl Default for AppSettings {
             theme: Theme::Dark, language: Lang::En, diff_font_size: 14,
             context_lines: 3, last_left_dir: None, last_right_dir: None,
             profiles: default_profiles(), active_profile: 0,
+            ignore_extensions: String::new(), ignore_dirs: String::new(),
         }
+    }
+}
+
+impl AppSettings {
+    /// Build an [`IgnoreRules`] snapshot from the current settings.
+    pub fn ignore_rules(&self) -> forskscope_core::IgnoreRules {
+        forskscope_core::IgnoreRules::from_settings(&self.ignore_extensions, &self.ignore_dirs)
     }
 }
 
@@ -137,7 +151,7 @@ pub enum Modal {
     None, Settings,
     ConfirmOverwrite(usize), SaveAs(usize, String),
     ConfirmReload(usize), ConfirmSwap(usize),
-    ConfirmDirOp(DirOp), ConfirmClose(usize),
+    #[allow(dead_code)] ConfirmDirOp(DirOp), ConfirmClose(usize),
     ConfirmBatchCopy(BatchCopySpec),
     About, KeyboardRef,
 }

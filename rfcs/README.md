@@ -2,18 +2,27 @@
 
 Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 
+> Numbering note: RFCs 043–053 are reserved for the packaging, accessibility,
+> documentation, and product-boundary themes sketched in the migration roadmap
+> (RFC 042) and the non-goals addendum. New feature work introduced after the
+> v0.34 audit is numbered from RFC 054 onward.
+
 ## Implemented
 
 | ID | Title | Shipped in |
 |----|-------|------------|
 | 000 | [RFC lifecycle policy](./done/000-rfc-lifecycle-policy.md) | Implemented |
-| 001 | [Core Extraction and Canonical Domain Model](./done/001-core-extraction-and-domain-model.md) | Implemented (v0.23.0) |
-| 002 | [Diff Engine Migration to `similar` v3 and Normalized Diff Model](./done/002-similar-v3-diff-engine.md) | Implemented (v0.23.0) |
-| 003 | [Dioxus Application Shell, State Runtime, and Workspace Model](./done/003-dioxus-application-shell.md) | Implemented (v0.23.0) |
-| 005 | [Explorer Workspace and Paired Directory Workflow](./done/005-explorer-workspace.md) | Implemented (v0.25.0) |
-| 006 | [Diff/Merge Workspace and Merge Transaction Model](./done/006-diff-merge-workspace.md) | Implemented (v0.26.0) |
-| 007 | [Save, Session, and File Safety Policy](./done/007-save-session-file-safety.md) | Implemented (v0.27.0) |
-| 021 | [Document and Result Buffer Model](./done/021-document-and-result-buffer-model.md) | Implemented (v0.28.0) |
+| 001 | [Core Extraction and Canonical Domain Model](./done/001-core-extraction-and-domain-model.md) | v0.23.0 |
+| 002 | [Diff Engine Migration to `similar` v3 and Normalized Diff Model](./done/002-similar-v3-diff-engine.md) | v0.23.0 |
+| 003 | [Dioxus Application Shell, State Runtime, and Workspace Model](./done/003-dioxus-application-shell.md) | v0.23.0 |
+| 005 | [Explorer Workspace and Paired Directory Workflow](./done/005-explorer-workspace.md) | v0.25.0 |
+| 006 | [Diff/Merge Workspace and Merge Transaction Model](./done/006-diff-merge-workspace.md) | v0.26.0 |
+| 007 | [Save, Session, and File Safety Policy](./done/007-save-session-file-safety.md) | v0.27.0 |
+| 021 | [Document and Result Buffer Model](./done/021-document-and-result-buffer-model.md) | v0.28.0 |
+| 054 | [Explorer Tree-View and Interaction Model](./done/054-explorer-tree-view-and-interaction-model.md) | v0.36.0 |
+| 055 | [Breadcrumb Path Navigation](./done/055-breadcrumb-path-navigation.md) | v0.36.0 |
+| 056 | [Ignore Patterns for Files and Directories](./done/056-ignore-patterns-for-files-and-directories.md) | v0.36.0 |
+| 057 | [Settings Dialog Layout Refinements](./done/057-settings-dialog-layout-refinements.md) | v0.36.0 |
 
 ## Proposed
 

@@ -7,5 +7,6 @@ mod diff_tests;
 mod dir_tests;
 mod document_tests;
 mod encoding_tests;
+mod ignore_tests;
 mod merge_tests;
 mod save_tests;

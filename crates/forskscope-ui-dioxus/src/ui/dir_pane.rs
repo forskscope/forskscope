@@ -1,274 +1,309 @@
-//! Directory pane: navigation history, filter, sort, copy buttons (RFC-005, RFC-021).
-
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+//! Explorer pane: directory tree view with breadcrumb navigation (RFC-054, RFC-055).
+use std::ffi::OsStr;
+use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
 
 use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
+use dioxus_swdir_tree::{DirectoryTreeEvent, SelectionMode, ThreadExecutor, use_scan_driver};
+use dioxus_swdir_tree::{DirectoryTree, LoadPayload, ScanExecutor, ScanFuture, ScanJob};
 
-use forskscope_core::dir::FileEntry;
+use forskscope_core::IgnoreRules;
+use crate::state::Store;
 
-use crate::state::{DirOp, Modal, Store};
-use crate::ui::explorer::{DigestState, ExplorerFilter, SortMode, refresh};
+// ── Filtering executor ────────────────────────────────────────────────────────
 
-#[allow(clippy::too_many_arguments)]
+struct FilteringExecutor { rules: IgnoreRules }
+unsafe impl Send for FilteringExecutor {}
+unsafe impl Sync for FilteringExecutor {}
+
+impl ScanExecutor for FilteringExecutor {
+    fn spawn_blocking(&self, job: ScanJob) -> ScanFuture {
+        let rules = self.rules.clone();
+        let filtered: ScanJob = Box::new(move || {
+            let mut payload: LoadPayload = job();
+            if !rules.is_empty() {
+                if let Ok(ref mut entries) = payload.result {
+                    entries.retain(|e| {
+                        let name = e.file_name().to_str().unwrap_or("");
+                        if e.is_dir { !rules.is_dir_ignored(name) }
+                        else        { !rules.is_file_ignored(name) }
+                    });
+                }
+            }
+            payload
+        });
+        ThreadExecutor.spawn_blocking(filtered)
+    }
+}
+
+// ── Public component ──────────────────────────────────────────────────────────
+
 #[component]
 pub fn DirPane(
-    label: String,
-    dir: Signal<PathBuf>,
-    listing: Signal<Option<forskscope_core::dir::DirectoryListing>>,
-    other_names: HashSet<String>,
-    digests: Signal<HashMap<String, DigestState>>,
-    other_dir: PathBuf,
     is_left: bool,
-    filter: ExplorerFilter,
-    sort: SortMode,
-    show_hidden: bool,
-    name_filter: String,
-    on_select: EventHandler<PathBuf>,
+    ignore: IgnoreRules,
     on_auto_compare: EventHandler<(PathBuf, PathBuf)>,
-    on_chdir: EventHandler<()>,
-) -> Element {
-    let mut path_input = use_signal(|| dir.read().display().to_string());
-    let mut focused_row: Signal<i32> = use_signal(|| -1);
-    // Navigation history: a stack of directories.
-    let history: Signal<Vec<PathBuf>> = use_signal(|| vec![dir.read().clone()]);
-    // hist_pos.set() is called directly in onclick closures where the signal is captured
-    // by Copy; `mut` is required for the &mut self method even though clippy disagrees.
-    #[allow(unused_mut)]
-    let mut hist_pos: Signal<usize> = use_signal(|| 0);
-
-    // ── Build row data (apply filter, sort, show-hidden) ─────────────────────
-    let raw_dirs: Vec<String> = listing.read().as_ref()
-        .map(|l| l.dirs.iter()
-            .filter(|d| show_hidden || !d.starts_with('.'))
-            .cloned().collect())
-        .unwrap_or_default();
-    let raw_files: Vec<FileEntry> = listing.read().as_ref()
-        .map(|l| l.files.iter()
-            .filter(|f| show_hidden || !f.name.starts_with('.'))
-            .filter(|f| name_filter.is_empty() || f.name.to_ascii_lowercase().contains(&name_filter.to_ascii_lowercase()))
-            .filter(|f| match filter {
-                ExplorerFilter::All       => true,
-                ExplorerFilter::Different => !matches!(digests.read().get(&f.name), Some(DigestState::Equal)),
-                ExplorerFilter::Equal     => matches!(digests.read().get(&f.name), Some(DigestState::Equal)),
-            })
-            .cloned().collect())
-        .unwrap_or_default();
-    let mut sorted_files = raw_files.clone();
-    sorted_files.sort_by(|a, b| match sort {
-        SortMode::ByName   => a.name.cmp(&b.name),
-        SortMode::BySize   => a.len.cmp(&b.len),
-        SortMode::ByStatus => {
-            let ord = |f: &FileEntry| match digests.read().get(&f.name) {
-                Some(DigestState::Changed) => 0, Some(DigestState::Err) => 1,
-                None | Some(DigestState::Computing) => 2, Some(DigestState::Equal) => 3,
-            };
-            ord(a).cmp(&ord(b)).then(a.name.cmp(&b.name))
-        }
-    });
-    let dir_rows: Vec<(usize, String)> = raw_dirs.iter().enumerate().map(|(i, d)| (i, d.clone())).collect();
-    let dir_count = dir_rows.len();
-    let file_rows: Vec<(usize, FileEntry)> = sorted_files.iter().enumerate()
-        .map(|(i, f)| (dir_count + i, f.clone())).collect();
-    let row_count = (dir_rows.len() + file_rows.len()) as i32;
-    let fr = *focused_row.read();
-    let kbrows: Vec<(bool, String)> = dir_rows.iter().map(|(_, d)| (true, d.clone()))
-        .chain(file_rows.iter().map(|(_, f)| (false, f.name.clone()))).collect();
-    let can_back    = *hist_pos.read() > 0;
-    let can_forward = *hist_pos.read() + 1 < history.read().len();
-
-    rsx! {
-        div { class: "pane",
-            h3 { "{label}" }
-            div { class: "pathbar",
-                button {
-                    title: "Back",
-                    disabled: !can_back,
-                    onclick: move |_| {
-                        let pos = hist_pos.read().saturating_sub(1);
-                        hist_pos.set(pos);
-                        let p = history.read()[pos].clone();
-                        path_input.set(p.display().to_string());
-                        dir.set(p.clone()); refresh(dir, listing); on_chdir.call(());
-                    },
-                    "◀"
-                }
-                button {
-                    title: "Forward",
-                    disabled: !can_forward,
-                    onclick: move |_| {
-                        let pos = *hist_pos.read() + 1;
-                        hist_pos.set(pos);
-                        let p = history.read()[pos].clone();
-                        path_input.set(p.display().to_string());
-                        dir.set(p.clone()); refresh(dir, listing); on_chdir.call(());
-                    },
-                    "▶"
-                }
-                input {
-                    value: "{path_input}",
-                    oninput: move |e| path_input.set(e.value()),
-                    onkeydown: move |e| {
-                        if e.key() == Key::Enter {
-                            nav(PathBuf::from(path_input.read().clone()), dir, listing,
-                                history, hist_pos, on_chdir);
-                        }
-                    },
-                }
-                button { title: "Go",
-                    onclick: move |_| nav(PathBuf::from(path_input.read().clone()), dir,
-                        listing, history, hist_pos, on_chdir),
-                    "→"
-                }
-                button { title: "Up",
-                    onclick: move |_| {
-                        let parent = dir.read().parent().map(|p| p.to_path_buf());
-                        if let Some(p) = parent {
-                            path_input.set(p.display().to_string());
-                            nav(p, dir, listing, history, hist_pos, on_chdir);
-                        }
-                    },
-                    "↑"
-                }
-            }
-            div {
-                class: "dir-table", tabindex: "0",
-                onkeydown: move |e| {
-                    let mods = e.modifiers();
-                    match e.key() {
-                        Key::ArrowDown => { let n = fr; focused_row.set((n+1).min(row_count-1)); }
-                        Key::ArrowUp if mods.contains(Modifiers::ALT) => {
-                            // Alt+↑: go up one directory level.
-                            let parent = dir.read().parent().map(|p| p.to_path_buf());
-                            if let Some(p) = parent {
-                                path_input.set(p.display().to_string());
-                                nav(p, dir, listing, history, hist_pos, on_chdir);
-                            }
-                        }
-                        Key::ArrowUp => { let n = fr; focused_row.set((n-1).max(0)); }
-                        Key::Enter => {
-                            if let Some((is_dir, name)) = kbrows.get(fr as usize) {
-                                if *is_dir {
-                                    let next = dir.read().join(name);
-                                    path_input.set(next.display().to_string());
-                                    nav(next, dir, listing, history, hist_pos, on_chdir);
-                                } else {
-                                    activate_file(name, dir.read().clone(), &other_dir,
-                                        &other_names, is_left, on_select, on_auto_compare);
-                                }
-                            }
-                        }
-                        Key::Character(ref s) if s == " " => {
-                            // Space: pick the focused file as the left/right comparison candidate.
-                            if let Some((is_dir, name)) = kbrows.get(fr as usize) {
-                                if !is_dir {
-                                    on_select.call(dir.read().join(name));
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                },
-                if listing.read().is_none() {
-                    div { class: "dir-loading", "…" }
-                } else {
-                    for (row_idx, d) in dir_rows {
-                        div {
-                            class: if fr == row_idx as i32 { "dir-row folder focused" } else { "dir-row folder" },
-                            onclick: move |_| {
-                                let next = dir.read().join(&d);
-                                path_input.set(next.display().to_string());
-                                nav(next, dir, listing, history, hist_pos, on_chdir);
-                            },
-                            span { class: "dir-icon", "📁" }
-                            span { class: "dir-name", "{d}" }
-                        }
-                    }
-                    for (row_idx, file) in file_rows {
-                        FileRow {
-                            file: file.clone(), other_names: other_names.clone(),
-                            digest: digests.read().get(&file.name).cloned(),
-                            is_left, focused: fr == row_idx as i32,
-                            base_dir: dir.read().clone(), other_dir: other_dir.clone(),
-                            on_select, on_auto_compare,
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[component]
-fn FileRow(
-    file: FileEntry, other_names: HashSet<String>, digest: Option<DigestState>,
-    is_left: bool, focused: bool, base_dir: PathBuf, other_dir: PathBuf,
-    on_select: EventHandler<PathBuf>, on_auto_compare: EventHandler<(PathBuf, PathBuf)>,
 ) -> Element {
     let mut store = use_context::<Store>();
-    let in_both = other_names.contains(&file.name);
-    let (sc, icon) = match (in_both, &digest) {
-        (false, _) => ("status-only", if is_left { "←" } else { "→" }),
-        (true, Some(DigestState::Equal)) => ("status-equal", "✓"),
-        (true, Some(DigestState::Changed)) => ("status-changed", "⚠"),
-        (true, Some(DigestState::Err)) => ("status-err", "!"),
-        _ => ("status-cmp", "⊙"),
+
+    let initial_root = {
+        let s = store.settings.read();
+        if is_left { s.last_left_dir.clone() } else { s.last_right_dir.clone() }
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/")))
     };
-    let row_class = if focused { "dir-row file focused" } else { "dir-row file" };
-    let name = file.name.clone();
-    let copy_label = if is_left { format!("Copy {} → right ({})", file.name, other_dir.display()) }
-                     else        { format!("Copy {} ← left ({})", file.name, other_dir.display()) };
-    let op = DirOp { src: base_dir.join(&file.name), dst: other_dir.join(&file.name), label: copy_label };
+
+    let mut current_dir: Signal<PathBuf> = use_signal(|| initial_root.clone());
+    let executor = Arc::new(FilteringExecutor { rules: ignore });
+    let mut tree: Signal<DirectoryTree> = use_signal(|| DirectoryTree::new(initial_root.clone()));
+    let scans = use_scan_driver(tree, executor);
+
+    // Re-build tree whenever current_dir changes.
+    use_effect(move || {
+        let root = current_dir.read().clone();
+        let mut new_tree = DirectoryTree::new(root.clone());
+        if let Some(req) = new_tree.on_toggled(&root) {
+            tree.set(new_tree);
+            scans.send(req);
+        } else {
+            tree.set(new_tree);
+        }
+    });
+
+    let mut pick: Signal<Option<PathBuf>> = if is_left { store.left_pick } else { store.right_pick };
+
+    let other_pick: Option<PathBuf> = if is_left {
+        store.right_pick.read().clone()
+    } else {
+        store.left_pick.read().clone()
+    };
+
+    let rows: Vec<(PathBuf, bool, bool, bool, u32)> = {
+        let t = tree.read();
+        t.visible_rows()
+            .into_iter()
+            .map(|(n, d)| (n.path.clone(), n.is_dir, n.is_expanded, n.is_selected, d))
+            .collect()
+    };
+
+    let side_label = if is_left { "Left / Old" } else { "Right / New" };
+
     rsx! {
-        div { class: "{row_class}",
-            onclick: move |_| activate_file(&name, base_dir.clone(), &other_dir,
-                                             &other_names, is_left, on_select, on_auto_compare),
-            span { class: "dir-status {sc}", title: icon, "{icon}" }
-            span { class: "dir-name", "{file.name}" }
-            span { class: "dir-size", "{file.human_size}" }
-            if !file.last_modified.is_empty() {
-                span { class: "dir-mtime", title: "Last modified", "{file.last_modified}" }
+        div { class: "dir-pane", aria_label: "{side_label}",
+
+            // ── Breadcrumb (RFC-055) ────────────────────────────────
+            BreadcrumbBar {
+                path: current_dir.read().clone(),
+                on_navigate: move |new_root: PathBuf| {
+                    // Persist root and rebuild tree.
+                    {
+                        let mut s = store.settings.write();
+                        if is_left { s.last_left_dir = Some(new_root.clone()); }
+                        else       { s.last_right_dir = Some(new_root.clone()); }
+                    }
+                    current_dir.set(new_root);
+                },
             }
-            if !matches!(digest, Some(DigestState::Equal)) {
-                button {
-                    class: "dir-copy-btn", title: "{op.label}", aria_label: "{op.label}",
-                    onclick: move |evt| { evt.stop_propagation(); store.modal.set(Modal::ConfirmDirOp(op.clone())); },
-                    if is_left { "→" } else { "←" }
+
+            // ── Tree ────────────────────────────────────────────────
+            div {
+                class: "dir-tree", tabindex: "0",
+                onkeydown: move |e| tree_keydown(e, tree, scans, current_dir, is_left, store),
+                for (path, is_dir, is_expanded, is_selected, depth) in rows.iter() {
+                    {
+                        let p_toggle = path.clone();
+                        let p_select = path.clone();
+                        let p_dbl    = path.clone();
+                        let p_nav    = path.clone();
+                        let is_dir   = *is_dir;
+                        let other    = other_pick.clone();
+                        rsx! {
+                            TreeRow {
+                                path:        path.clone(),
+                                is_dir,
+                                is_expanded: *is_expanded,
+                                is_selected: *is_selected,
+                                depth:       *depth,
+                                on_toggle: move |_| {
+                                    if let Some(req) = tree.write().on_toggled(&p_toggle) {
+                                        scans.send(req);
+                                    }
+                                },
+                                on_select: move |_| {
+                                    tree.write().on_selected(&p_select, is_dir, SelectionMode::Replace);
+                                    if !is_dir { pick.set(Some(p_select.clone())); }
+                                },
+                                on_dblclick: move |_| {
+                                    if is_dir {
+                                        // Double-click directory → navigate into it.
+                                        {
+                                            let mut s = store.settings.write();
+                                            if is_left { s.last_left_dir = Some(p_nav.clone()); }
+                                            else       { s.last_right_dir = Some(p_nav.clone()); }
+                                        }
+                                        current_dir.set(p_nav.clone());
+                                    } else if let Some(cp) = counterpart(&p_dbl, &other) {
+                                        let pair = if is_left { (p_dbl.clone(), cp) } else { (cp, p_dbl.clone()) };
+                                        on_auto_compare.call(pair);
+                                    }
+                                },
+                            }
+                        }
+                    }
+                }
+                if rows.is_empty() { div { class: "dir-empty", "…" } }
+            }
+
+            // ── Footer ──────────────────────────────────────────────
+            div { class: "dir-pane-footer",
+                if let Some(ref p) = *pick.read() {
+                    span { class: "pick-label", title: "{p.display()}", {short_name(p)} }
+                } else {
+                    span { class: "pick-hint", "click · dblclick to compare" }
                 }
             }
         }
     }
 }
 
-// ─── Navigation helpers ───────────────────────────────────────────────────────
+// ── Breadcrumb bar (RFC-055) ──────────────────────────────────────────────────
 
-fn nav(
-    path: PathBuf, mut dir: Signal<PathBuf>,
-    listing: Signal<Option<forskscope_core::dir::DirectoryListing>>,
-    mut history: Signal<Vec<PathBuf>>, mut hist_pos: Signal<usize>,
-    on_chdir: EventHandler<()>,
-) {
-    if path.is_dir() {
-        let pos = *hist_pos.read();
-        history.write().truncate(pos + 1);
-        history.write().push(path.clone());
-        hist_pos.set(pos + 1);
-        dir.set(path); refresh(dir, listing); on_chdir.call(());
+#[component]
+fn BreadcrumbBar(path: PathBuf, on_navigate: EventHandler<PathBuf>) -> Element {
+    let segs = path_segs(&path);
+    let n = segs.len();
+    let visible: Vec<(PathBuf, String, bool)> = if n <= 4 {
+        segs.iter().enumerate().map(|(i, (p, l))| (p.clone(), l.clone(), i == n-1)).collect()
+    } else {
+        let mut v = vec![
+            (segs[0].0.clone(), segs[0].1.clone(), false),
+            (PathBuf::new(), "…".into(), false),
+        ];
+        for (i, seg) in segs.iter().enumerate().skip(n - 2) {
+            v.push((seg.0.clone(), seg.1.clone(), i == n-1));
+        }
+        v
+    };
+
+    rsx! {
+        nav { class: "breadcrumb", aria_label: "Current directory",
+            for (idx, (seg_path, label, is_cur)) in visible.iter().enumerate() {
+                if idx > 0 { span { class: "bc-sep", " / " } }
+                if label == "…" {
+                    span { class: "bc-ellipsis", "…" }
+                } else if *is_cur {
+                    span { class: "bc-current", "{label}" }
+                } else {
+                    { let t = seg_path.clone();
+                      rsx! { button { class: "bc-seg",
+                          onclick: move |_| on_navigate.call(t.clone()),
+                          "{label}" } } }
+                }
+            }
+        }
     }
 }
 
-pub fn activate_file(
-    name: &str, base_dir: PathBuf, other_dir: &std::path::Path,
-    other_names: &HashSet<String>, is_left: bool,
-    on_select: EventHandler<PathBuf>,
-    on_auto_compare: EventHandler<(PathBuf, PathBuf)>,
-) {
-    let path = base_dir.join(name);
-    if other_names.contains(name) {
-        let (l, r) = if is_left { (path, other_dir.join(name)) }
-                     else { (other_dir.join(name), path) };
-        on_auto_compare.call((l, r));
-    } else { on_select.call(path); }
+fn path_segs(path: &Path) -> Vec<(PathBuf, String)> {
+    let mut acc = PathBuf::new();
+    path.components().map(|c| {
+        acc.push(c);
+        let label = match &c {
+            Component::RootDir      => "/".into(),
+            Component::Prefix(p)    => p.as_os_str().to_string_lossy().into_owned(),
+            Component::Normal(name) => name.to_string_lossy().into_owned(),
+            Component::CurDir       => ".".into(),
+            Component::ParentDir    => "..".into(),
+        };
+        (acc.clone(), label)
+    }).collect()
 }
 
+// ── Tree row ──────────────────────────────────────────────────────────────────
+
+#[component]
+fn TreeRow(
+    path: PathBuf, is_dir: bool, is_expanded: bool, is_selected: bool, depth: u32,
+    on_toggle: EventHandler<()>, on_select: EventHandler<()>, on_dblclick: EventHandler<()>,
+) -> Element {
+    let indent = depth * 16;
+    let caret  = if !is_dir { "\u{00A0}" } else if is_expanded { "▾" } else { "▸" };
+    let icon   = if is_dir { "📁" } else { "📄" };
+    let name   = path.file_name().unwrap_or(OsStr::new("")).to_string_lossy().into_owned();
+    let row_class = if is_selected { "tree-row selected" } else { "tree-row" };
+    rsx! {
+        div {
+            class: "{row_class}", role: "row", style: "padding-left: {indent}px",
+            onclick:    move |_| on_select.call(()),
+            ondoubleclick: move |_| on_dblclick.call(()),
+            span {
+                class: "tree-caret",
+                onclick: move |e| { e.stop_propagation(); on_toggle.call(()); },
+                "{caret}"
+            }
+            span { class: "tree-icon",  "{icon}" }
+            span { class: "tree-label", "{name}" }
+        }
+    }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+fn counterpart(path: &Path, other_pick: &Option<PathBuf>) -> Option<PathBuf> {
+    other_pick.as_ref().filter(|op| op.file_name() == path.file_name()).cloned()
+}
+
+fn short_name(p: &Path) -> String {
+    p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string())
+}
+
+fn tree_keydown(
+    e: Event<KeyboardData>,
+    mut tree: Signal<DirectoryTree>,
+    scans: Coroutine<dioxus_swdir_tree::ScanRequest>,
+    mut current_dir: Signal<PathBuf>,
+    is_left: bool,
+    mut store: Store,
+) {
+    use dioxus_swdir_tree::keyboard::{Modifiers as CoreMods, TreeKey, handle_key};
+
+    if e.modifiers().contains(Modifiers::ALT) && e.key() == Key::ArrowUp {
+        // Alt+↑: navigate to parent directory.
+        let parent = current_dir.read().parent().map(|p| p.to_path_buf());
+        if let Some(p) = parent {
+            { let mut s = store.settings.write();
+              if is_left { s.last_left_dir = Some(p.clone()); }
+              else       { s.last_right_dir = Some(p.clone()); } }
+            current_dir.set(p);
+        }
+        return;
+    }
+
+    let key = match e.key() {
+        Key::ArrowUp    => TreeKey::Up,
+        Key::ArrowDown  => TreeKey::Down,
+        Key::ArrowLeft  => TreeKey::Left,
+        Key::ArrowRight => TreeKey::Right,
+        Key::Enter      => TreeKey::Enter,
+        Key::Home       => TreeKey::Home,
+        Key::End        => TreeKey::End,
+        Key::Escape     => TreeKey::Escape,
+        Key::Character(ref s) if s == " " => TreeKey::Space,
+        _ => return,
+    };
+    let mods = CoreMods { shift: e.modifiers().shift(), ctrl: e.modifiers().ctrl() };
+    // Drop the read guard before any potential write.
+    let ev = handle_key(&tree.read(), key, mods);
+    if let Some(ev) = ev {
+        e.prevent_default();
+        match ev {
+            DirectoryTreeEvent::Toggled(p) => {
+                if let Some(r) = tree.write().on_toggled(&p) { scans.send(r); }
+            }
+            DirectoryTreeEvent::Selected { path, is_dir, mode } => {
+                tree.write().on_selected(&path, is_dir, mode);
+            }
+            DirectoryTreeEvent::Drag(_) => {}
+        }
+    }
+}

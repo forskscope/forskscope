@@ -17,6 +17,7 @@ pub mod document;
 pub mod encoding;
 pub mod error;
 pub mod file_kind;
+pub mod ignore;
 pub mod merge;
 pub mod path;
 pub mod save;
@@ -30,6 +31,7 @@ pub use document::{FileFingerprint, FileId, LoadOptions, LoadedDocument, TextDoc
 pub use encoding::{NewlineStyle, TextEncoding};
 pub use error::{CoreError, IoOperation, Result};
 pub use file_kind::FileKind;
+pub use ignore::IgnoreRules;
 pub use merge::{HunkState, MergeHunk, MergeSession};
 pub use save::{BackupPolicy, SaveOutcome, SaveRequest, save_text};
 

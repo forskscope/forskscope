@@ -1,22 +1,33 @@
-//! Tab bar: close buttons, dirty-state indicator, active highlighting.
+//! Tab bar: Explorer tab + comparison tabs with close/dirty indicators.
 
 use dioxus::prelude::*;
 
+use crate::i18n::t;
 use crate::state::{Modal, Store, close_tab};
 
 #[component]
 pub fn TabBar() -> Element {
-    let store = use_context::<Store>();
+    let mut store = use_context::<Store>();
+    let lang = store.lang();
     let active = *store.active.read();
     let tab_count = store.tabs.read().len();
 
     rsx! {
         div { class: "tabbar",
-            for i in 0..tab_count {
-                TabItem {
-                    index: i,
-                    is_active: active == Some(i),
+            // Permanent Explorer tab (RFC-054: always visible first entry).
+            {
+                let explorer_class = if active.is_none() { "tab active" } else { "tab" };
+                rsx! {
+                    div {
+                        class: "{explorer_class}",
+                        onclick: move |_| store.active.set(None),
+                        span { class: "tab-title", {t(lang, "Explorer")} }
+                    }
                 }
+            }
+            // Comparison tabs.
+            for i in 0..tab_count {
+                TabItem { index: i, is_active: active == Some(i) }
             }
         }
     }
@@ -40,26 +51,19 @@ fn TabItem(index: usize, is_active: bool) -> Element {
             span {
                 class: "tab-title",
                 onclick: move |_| store.active.set(Some(index)),
-                // Dirty indicator: a filled dot before the title.
-                if is_dirty {
-                    span { class: "dirty-dot", title: "Unsaved changes", "●" }
-                }
+                if is_dirty { span { class: "dirty-dot", "●" } }
                 "{title}"
             }
             button {
                 class: "tab-close",
-                title: "Close comparison",
+                title: "Close tab",
                 aria_label: "Close {title}",
-                onclick: move |evt| {
-                    evt.stop_propagation();
+                onclick: move |_| {
                     let dirty = store.tabs.read().get(index)
                         .map(|t| t.can_save && t.merge.is_dirty())
                         .unwrap_or(false);
-                    if dirty {
-                        store.modal.set(Modal::ConfirmClose(index));
-                    } else {
-                        close_tab(&mut store, index);
-                    }
+                    if dirty { store.modal.set(Modal::ConfirmClose(index)); }
+                    else     { close_tab(&mut store, index); }
                 },
                 "×"
             }
