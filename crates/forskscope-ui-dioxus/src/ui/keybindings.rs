@@ -27,6 +27,8 @@ pub fn KeyboardRefModal() -> Element {
                     div { class: "kb-table",
                         KbRow { keys: "↑ / ↓",         desc: "Move focus in explorer list" }
                         KbRow { keys: "Enter",          desc: "Open directory / compare same-name file" }
+                        KbRow { keys: "Space",          desc: "Select file as comparison candidate" }
+                        KbRow { keys: "Alt + ↑",        desc: "Go up one directory" }
                         KbRow { keys: "Alt + ↑",        desc: "Go up one directory" }
                         KbRow { keys: "◀ / ▶ buttons",  desc: "Back / forward directory history" }
                     }
@@ -34,6 +36,7 @@ pub fn KeyboardRefModal() -> Element {
                 div { class: "kb-section",
                     h3 { "App" }
                     div { class: "kb-table",
+                        KbRow { keys: "Ctrl + W",       desc: "Close the active comparison tab" }
                         KbRow { keys: "Ctrl + /",       desc: "This keyboard reference" }
                         KbRow { keys: "Escape",         desc: "Close modal / search bar" }
                     }

@@ -8,6 +8,7 @@ take effect when a comparison tab is active.
 | Shortcut | Action |
 |----------|--------|
 | **Ctrl+/**   | Open this keyboard reference |
+| **Ctrl+W**   | Close the active comparison tab |
 | **Escape**   | Close open modal, search bar, or menu |
 
 ## Diff view
@@ -38,8 +39,10 @@ take effect when a comparison tab is active.
 
 | Shortcut | Action |
 |----------|--------|
-| **↑ / ↓**   | Move focus between rows |
-| **Enter**   | Open directory / compare same-name file |
+| **↑ / ↓**     | Move focus between rows |
+| **Enter**     | Open directory / compare same-name file |
+| **Space**     | Select focused file as left or right comparison candidate |
+| **Alt+↑**     | Go up one directory level |
 
 ## Modals and dialogs
 

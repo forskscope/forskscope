@@ -124,3 +124,40 @@ fn recursive_diff_descends_into_subdirectories() {
     assert!(entries.iter().any(|e| e.rel_path == std::path::Path::new("sub/a.rs")
         && e.status == crate::dir::RecStatus::Changed));
 }
+
+// ── v0.34.0 additions ─────────────────────────────────────────────────────────
+
+#[test]
+fn list_dir_on_empty_directory_returns_no_entries() {
+    let dir = temp_dir("empty-list");
+    let listing = crate::dir::list_dir(Some(&dir)).unwrap();
+    assert!(listing.files.is_empty(), "empty directory must have no file entries");
+    assert!(listing.dirs.is_empty(),  "empty directory must have no dir entries");
+}
+
+#[test]
+fn list_dir_reports_last_modified_for_files() {
+    let dir = temp_dir("mtime");
+    let f = dir.join("check.txt");
+    fs::write(&f, "hello").unwrap();
+    let listing = crate::dir::list_dir(Some(&dir)).unwrap();
+    let entry = listing.files.iter().find(|e| e.name == "check.txt").expect("file must appear");
+    // last_modified is a formatted string; just verify it's non-empty.
+    assert!(!entry.last_modified.is_empty(), "last_modified must be populated for real files");
+}
+
+#[test]
+fn list_dir_uses_current_dir_when_path_is_none() {
+    // When no path is given, listing should return without panicking.
+    let result = crate::dir::list_dir(None);
+    assert!(result.is_ok(), "list_dir(None) must succeed");
+}
+
+#[test]
+fn recursive_diff_returns_empty_for_two_empty_directories() {
+    let root = temp_dir("rec-empty");
+    let left  = root.join("l"); let right = root.join("r");
+    fs::create_dir_all(&left).unwrap(); fs::create_dir_all(&right).unwrap();
+    let entries = crate::dir::recursive_diff(&left, &right);
+    assert!(entries.is_empty(), "two empty directories have no diff entries");
+}

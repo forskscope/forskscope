@@ -5,6 +5,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.34.0] — 2026-06-09
+
+### Fixed
+
+- **`Alt+↑` and `Space` now work in the explorer** — these shortcuts were
+  documented but not implemented. `Space` selects the focused file as a
+  comparison candidate (equivalent to a single-click). `Alt+↑` navigates up
+  one directory level from the keyboard. Both required adding `Modifiers::ALT`
+  detection to `dir_pane.rs`'s `onkeydown` handler.
+
+### Added
+
+- **`Ctrl+W` closes the active tab** — standard tab-close shortcut, with the
+  same dirty-state guard as the `×` button: if the merge session has unsaved
+  changes, a confirmation modal appears before discarding.
+
+- **`aria-pressed` on toolbar toggle buttons** — the five diff-toolbar toggles
+  (Inline, Wrap, Ignore WS, Ignore case, algorithm) now carry `aria-pressed`
+  attributes reflecting their current state. Combined with the existing
+  `aria-label` attributes, these buttons are now fully navigable by assistive
+  technology.
+
+- **Modification time in explorer rows** — each file row shows the
+  `last_modified` timestamp (already stored in `FileEntry`) in a
+  `.dir-mtime` column. The column is suppressed on narrow viewports
+  (< 540 px) via CSS `@media` to avoid crowding small windows.
+
+- **Keyboard reference updated** — both `keyboard.md` and the in-app `?`
+  modal now include `Alt+↑`, `Space`, and `Ctrl+W`.
+
+- **13 new core tests** — total 76 (up from 63):
+  - Diff: insertion/deletion counts for multi-insert, replace, and complete
+    rewrites; ignore-whitespace false-positive guard; large-file warning
+    absence for small files; hunk-ID uniqueness across successive calls.
+  - Merge: `pending_changes()` tracking after apply, undo, and from identical diff.
+  - Dir: empty directory listing; `last_modified` populated; `list_dir(None)`;
+    recursive diff on two empty trees.
+
+---
+
 ## [0.33.0] — 2026-06-09
 
 ### Added

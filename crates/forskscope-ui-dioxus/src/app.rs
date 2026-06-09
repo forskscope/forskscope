@@ -86,6 +86,17 @@ pub fn App() -> Element {
                             "s" => save_tab(&mut store, index, false),
                             "z" => { let _ = store.tabs.write().get_mut(index).map(|t| t.merge.undo()); }
                             "y" => { let _ = store.tabs.write().get_mut(index).map(|t| t.merge.redo()); }
+                            "w" => {
+                                // Ctrl+W: close the active tab, with dirty-state guard.
+                                let dirty = store.tabs.read().get(index)
+                                    .map(|t| t.can_save && t.merge.is_dirty())
+                                    .unwrap_or(false);
+                                if dirty {
+                                    store.modal.set(crate::state::Modal::ConfirmClose(index));
+                                } else {
+                                    crate::state::close_tab(&mut store, index);
+                                }
+                            }
                             "/" => store.modal.set(crate::state::Modal::KeyboardRef),
                             // Ctrl+F: the search bar inside DiffWorkspace handles its own
                             // context; we use document::eval to click the search button.

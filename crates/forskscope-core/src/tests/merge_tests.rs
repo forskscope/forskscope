@@ -177,3 +177,32 @@ fn multiple_independent_hunks_can_each_be_undone() {
     s.undo().unwrap();
     assert_eq!(s.result_text(), right, "fully undone result must equal original right side");
 }
+
+// ── v0.34.0 additions ─────────────────────────────────────────────────────────
+
+#[test]
+fn pending_changes_count_decreases_after_apply() {
+    let mut s = replace_session();
+    assert_eq!(s.pending_changes(), 1);
+    let id = s.hunks().iter().find(|h| h.is_pending_change()).map(|h| h.hunk_id).unwrap();
+    s.apply_left_to_right(id).unwrap();
+    assert_eq!(s.pending_changes(), 0, "pending count must drop after applying all hunks");
+}
+
+#[test]
+fn pending_changes_restored_after_undo() {
+    let mut s = replace_session();
+    let id = s.hunks().iter().find(|h| h.is_pending_change()).map(|h| h.hunk_id).unwrap();
+    s.apply_left_to_right(id).unwrap();
+    s.undo().unwrap();
+    assert_eq!(s.pending_changes(), 1, "undo must restore the pending-change count");
+}
+
+#[test]
+fn session_from_identical_diff_has_zero_pending_changes() {
+    use crate::{DiffOptions, MergeSession, compute_diff};
+    let diff = compute_diff("same\n", "same\n", DiffOptions::default());
+    let s = MergeSession::from_diff(&diff);
+    assert_eq!(s.pending_changes(), 0);
+    assert!(!s.is_dirty());
+}

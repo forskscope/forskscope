@@ -217,10 +217,14 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
         if *advanced.read() && snap.can_save {
             div { class: "diff-toolbar advanced",
                 button {
+                    aria_pressed: if snap.char_mode { "true" } else { "false" },
+                    aria_label: "Toggle character-level inline diff",
                     onclick: move |_| { store.tabs.write()[index].char_mode ^= true; },
                     {format!("Inline: {}", if snap.char_mode { "on" } else { "off" })}
                 }
                 button {
+                    aria_pressed: if snap.word_wrap { "true" } else { "false" },
+                    aria_label: "Toggle word wrap",
                     onclick: move |_| { store.tabs.write()[index].word_wrap ^= true; },
                     {format!("Wrap: {}", if snap.word_wrap { "on" } else { "off" })}
                 }
@@ -238,6 +242,8 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     "⇄ Swap sides"
                 }
                 button {
+                    aria_pressed: if snap.ignore_whitespace { "true" } else { "false" },
+                    aria_label: "Toggle ignore whitespace",
                     onclick: move |_| {
                         let mut tabs = store.tabs.write();
                         if let Some(tab) = tabs.get_mut(index) {
@@ -248,6 +254,8 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     {format!("Ignore WS: {}", if snap.ignore_whitespace { "on" } else { "off" })}
                 }
                 button {
+                    aria_pressed: if snap.ignore_case { "true" } else { "false" },
+                    aria_label: "Toggle ignore case",
                     onclick: move |_| {
                         let mut tabs = store.tabs.write();
                         if let Some(tab) = tabs.get_mut(index) {

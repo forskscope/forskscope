@@ -207,3 +207,62 @@ fn single_line_no_newline_change() {
     assert!(!doc.is_identical());
     assert_eq!(doc.stats.hunks_changed, 1);
 }
+
+// ── v0.34.0 additions ─────────────────────────────────────────────────────────
+
+#[test]
+fn many_insertions_are_counted_correctly() {
+    // Insert 5 lines after a single equal line.
+    let right = "keep\na\nb\nc\nd\ne\n";
+    let doc = compute_diff("keep\n", right, DiffOptions::default());
+    assert_eq!(doc.stats.lines_inserted, 5);
+    assert_eq!(doc.stats.lines_deleted, 0);
+}
+
+#[test]
+fn replace_counts_both_a_deletion_and_an_insertion() {
+    // One old line replaced by two new lines → 1 deleted, 2 inserted.
+    let doc = compute_diff("one\n", "two\nthree\n", DiffOptions::default());
+    assert_eq!(doc.stats.lines_deleted,  1);
+    assert_eq!(doc.stats.lines_inserted, 2);
+}
+
+#[test]
+fn completely_different_files_have_full_counts() {
+    let left  = "a\nb\nc\n";
+    let right = "x\ny\nz\n";
+    let doc = compute_diff(left, right, DiffOptions::default());
+    // All three lines replaced → 3 deleted, 3 inserted.
+    assert_eq!(doc.stats.lines_deleted,  3);
+    assert_eq!(doc.stats.lines_inserted, 3);
+}
+
+#[test]
+fn ignore_whitespace_does_not_hide_non_whitespace_change() {
+    let opts = DiffOptions { ignore_whitespace: true, ..DiffOptions::default() };
+    let doc = compute_diff("  hello\n", "  world\n", opts);
+    assert!(!doc.is_identical(), "non-whitespace content change must still be visible");
+}
+
+#[test]
+fn context_lines_warning_absent_for_small_file() {
+    use crate::diff::DiffWarning;
+    let left  = "line1\nline2\nline3\n";
+    let right = "line1\nLINE2\nline3\n";
+    let doc = compute_diff(left, right, DiffOptions::default());
+    assert!(!doc.warnings.iter().any(|w| *w == DiffWarning::LargeFilePolicyApplied),
+        "small file must not trigger the large-file policy warning");
+}
+
+#[test]
+fn diff_hunk_ids_survive_a_second_diff_call() {
+    // Two successive diffs on the same content should produce different IDs
+    // (IDs encode a generation counter, not content hash).
+    let left = "a\nb\n"; let right = "a\nc\n";
+    let d1 = compute_diff(left, right, DiffOptions::default());
+    let d2 = compute_diff(left, right, DiffOptions::default());
+    let ids1: Vec<_> = d1.hunks.iter().map(|h| h.hunk_id).collect();
+    let ids2: Vec<_> = d2.hunks.iter().map(|h| h.hunk_id).collect();
+    // Different diff calls → different IDs (no global ID collision).
+    assert_ne!(ids1, ids2, "successive diff calls must produce fresh hunk IDs");
+}

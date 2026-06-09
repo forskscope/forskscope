@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-use dioxus::html::input_data::keyboard_types::Key;
+use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
 
 use forskscope_core::dir::FileEntry;
@@ -135,10 +135,19 @@ pub fn DirPane(
             div {
                 class: "dir-table", tabindex: "0",
                 onkeydown: move |e| {
+                    let mods = e.modifiers();
                     match e.key() {
                         Key::ArrowDown => { let n = fr; focused_row.set((n+1).min(row_count-1)); }
-                        Key::ArrowUp   => { let n = fr; focused_row.set((n-1).max(0)); }
-                        Key::Enter     => {
+                        Key::ArrowUp if mods.contains(Modifiers::ALT) => {
+                            // Alt+↑: go up one directory level.
+                            let parent = dir.read().parent().map(|p| p.to_path_buf());
+                            if let Some(p) = parent {
+                                path_input.set(p.display().to_string());
+                                nav(p, dir, listing, history, hist_pos, on_chdir);
+                            }
+                        }
+                        Key::ArrowUp => { let n = fr; focused_row.set((n-1).max(0)); }
+                        Key::Enter => {
                             if let Some((is_dir, name)) = kbrows.get(fr as usize) {
                                 if *is_dir {
                                     let next = dir.read().join(name);
@@ -147,6 +156,14 @@ pub fn DirPane(
                                 } else {
                                     activate_file(name, dir.read().clone(), &other_dir,
                                         &other_names, is_left, on_select, on_auto_compare);
+                                }
+                            }
+                        }
+                        Key::Character(ref s) if s == " " => {
+                            // Space: pick the focused file as the left/right comparison candidate.
+                            if let Some((is_dir, name)) = kbrows.get(fr as usize) {
+                                if !is_dir {
+                                    on_select.call(dir.read().join(name));
                                 }
                             }
                         }
@@ -210,6 +227,9 @@ fn FileRow(
             span { class: "dir-status {sc}", title: icon, "{icon}" }
             span { class: "dir-name", "{file.name}" }
             span { class: "dir-size", "{file.human_size}" }
+            if !file.last_modified.is_empty() {
+                span { class: "dir-mtime", title: "Last modified", "{file.last_modified}" }
+            }
             if !matches!(digest, Some(DigestState::Equal)) {
                 button {
                     class: "dir-copy-btn", title: "{op.label}", aria_label: "{op.label}",
