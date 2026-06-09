@@ -50,6 +50,21 @@ pub fn App() -> Element {
         save_session(&store);
     });
 
+    // Update the OS window title to reflect the active comparison.
+    use_effect(move || {
+        let title = match *store.active.read() {
+            Some(i) => store.tabs.read().get(i)
+                .map(|t| format!("ForskScope — {}", t.title))
+                .unwrap_or_else(|| "ForskScope".into()),
+            None => "ForskScope".into(),
+        };
+        spawn(async move {
+            let _ = dioxus::document::eval(
+                &format!("document.title = {:?}", title)
+            ).await;
+        });
+    });
+
     let theme_class = store.settings.read().theme.css_class();
     let active = *store.active.read();
     let toast = store.toast.read().clone();

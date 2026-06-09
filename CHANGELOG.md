@@ -5,6 +5,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.33.0] — 2026-06-09
+
+### Added
+
+- **Diff warning banner** — when the diff engine applies the large-file policy
+  or the deadline expires, a yellow `⚠` banner now appears below the toolbar
+  with a human-readable explanation. Three warning types are surfaced:
+  `LargeFilePolicyApplied`, `DeadlineExpired`, and `InlineSkippedHunkTooLarge`.
+  Previously these were silently discarded; users had no way to know that a
+  result might be approximate.
+
+- **Kind-aware read-only notices** — the generic "Merge/save unavailable for
+  this file type" message is replaced with specific notices: "Binary file —
+  read-only comparison (hex preview)", "Spreadsheet — read-only comparison",
+  "One side is missing — read-only", and "File type not supported for merge —
+  read-only." The correct message is chosen from `tab.left_doc.kind` and
+  `tab.right_doc.kind` in `TabSnapshot::from_tab`.
+
+- **ARIA on diff rows** — every diff row now carries `role="row"`. Changed rows
+  (Delete, Insert, Replace) prepend a visually-hidden `.sr-only` span
+  ("Deleted:", "Inserted:", "Changed:") so screen readers can announce the
+  nature of each change without relying on colour or glyph alone. The
+  `.sr-only` utility class follows the standard `position:absolute; clip:rect`
+  pattern.
+
+- **Dynamic window title** — a `use_effect` in `app.rs` subscribes to the
+  active tab signal and updates the OS window title via `document.title`.
+  The title reads "ForskScope — filename" when a comparison is active and
+  "ForskScope" when the Explorer is shown.
+
+- **Five documentation chapters** — five thin stub files replaced with full
+  content:
+  - `intermediate/keyboard.md` — all shortcuts, organised by context
+  - `intermediate/cli.md` — all startup modes, git difftool/mergetool config,
+    JJ integration, exit codes
+  - `intermediate/diff-options.md` — all three algorithms with characteristics,
+    ignore-whitespace/ignore-case, context lines, inline diff, compare profiles
+  - `users/faq.md` — eight common questions with concrete answers
+  - `users/settings.md` — every settings panel option with type, default, and
+    description
+
+---
+
 ## [0.32.0] — 2026-06-09
 
 ### Changed

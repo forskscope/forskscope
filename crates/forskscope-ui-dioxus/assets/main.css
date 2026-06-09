@@ -314,3 +314,18 @@ code.path-display {
 kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: var(--surface-2);
   border: 1px solid var(--border); border-radius: 4px; padding: .1rem .3rem; white-space: nowrap; }
 .kb-desc { font-size: 13px; }
+
+/* ── Diff warning banner ── */
+.diff-warning-banner {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .35rem .7rem; background: color-mix(in srgb, var(--warn) 14%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  font-size: 12px; color: var(--text);
+}
+
+/* ── Screen-reader-only utility ── */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}

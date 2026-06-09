@@ -52,8 +52,11 @@ pub fn DiffWorkspace(index: usize) -> Element {
             DiffHeader { index }
             Toolbar { index, snap: snap.clone(), lang }
             SearchBar { match_count }
+            for w in snap.warnings.iter() {
+                div { class: "diff-warning-banner", role: "alert", "⚠ {w}" }
+            }
             if !snap.can_save {
-                div { class: "notice", {t(lang, "Merge/save unavailable for this file type.")} }
+                div { class: "notice", "{snap.readonly_notice}" }
             }
             if snap.identical {
                 div { class: "identical", {t(lang, "Files are identical")} }
@@ -107,12 +110,36 @@ pub(crate) struct TabSnapshot {
     focused_id: Option<u64>, focused_change: usize, changes: usize,
     ignore_whitespace: bool, ignore_case: bool, context_lines: usize,
     algorithm: forskscope_core::DiffAlgorithm,
+    /// Human-readable messages from the diff engine (large file, deadline, …).
+    warnings: Vec<String>,
+    /// Shown instead of the generic "unavailable" text when `!can_save`.
+    readonly_notice: String,
 }
 
 impl TabSnapshot {
     fn from_tab(tab: &crate::state::CompareTab, font_size: u32, context_lines: usize) -> Self {
+        use forskscope_core::diff::DiffWarning;
+        use forskscope_core::file_kind::FileKind;
         let hunks = tab.merge.hunks().to_vec();
         let ids: Vec<u64> = hunks.iter().filter(|h| h.kind.is_change()).map(|h| h.hunk_id).collect();
+        let warnings = tab.diff.warnings.iter().map(|w| match w {
+            DiffWarning::LargeFilePolicyApplied => "Large file — inline diff disabled and deadline shortened.",
+            DiffWarning::DeadlineExpired        => "Diff timed out — result may be approximate.",
+            DiffWarning::InlineSkippedHunkTooLarge => "Some hunks were too large for character-level diff.",
+        }).map(str::to_string).collect();
+        let readonly_notice = if tab.can_save { String::new() } else {
+            match (&tab.left_doc.kind, &tab.right_doc.kind) {
+                (FileKind::Binary, _) | (_, FileKind::Binary) =>
+                    "Binary file — read-only comparison (hex preview).".into(),
+                (FileKind::ExcelXlsx, _) | (_, FileKind::ExcelXlsx) =>
+                    "Spreadsheet — read-only comparison.".into(),
+                (FileKind::Missing, _) | (_, FileKind::Missing) =>
+                    "One side is missing — read-only.".into(),
+                (FileKind::Unsupported { .. }, _) | (_, FileKind::Unsupported { .. }) =>
+                    "File type not supported for merge — read-only.".into(),
+                _ => "Merge/save unavailable for this file type.".into(),
+            }
+        };
         Self {
             identical: tab.diff.is_identical(), char_mode: tab.char_mode,
             word_wrap: tab.word_wrap, can_save: tab.can_save,
@@ -123,7 +150,7 @@ impl TabSnapshot {
             ignore_whitespace: tab.diff_options.ignore_whitespace,
             ignore_case:       tab.diff_options.ignore_case,
             algorithm: tab.diff_options.algorithm,
-            context_lines, hunks,
+            context_lines, hunks, warnings, readonly_notice,
         }
     }
 }

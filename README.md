@@ -1,9 +1,12 @@
 # ForskScope
 
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/forskscope/forskscope/actions/workflows/ci.yml/badge.svg)](https://github.com/forskscope/forskscope/actions/workflows/ci.yml)
+[![Release](https://github.com/forskscope/forskscope/actions/workflows/release.yml/badge.svg)](https://github.com/forskscope/forskscope/actions/workflows/release.yml)
+[![License](https://img.shields.io/github/license/forskscope/forskscope)](https://github.com/forskscope/forskscope/blob/main/LICENSE)
 
-**A cross-platform, local-first diff and merge tool for Unix/Linux developers and anyone who needs a WinMerge-class workstation outside Windows.**
+![logo](docs/src/assets/logo.png)
+
+Diff and merge through Exploring 🕵️‍♀️ GUI tool, local-first, with cross-platform support 💻️ named after "*forske forskjell*" (research difference) 🤍
 
 ```
 forskscope old/src/main.rs new/src/main.rs

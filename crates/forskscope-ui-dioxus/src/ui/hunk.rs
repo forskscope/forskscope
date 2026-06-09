@@ -118,8 +118,19 @@ fn Row(
 
     let row_class = if is_match { "row match" } else { "row" };
 
+    // Screen-reader label: describe the change kind for non-equal rows.
+    let sr_label = match kind {
+        HunkKind::Delete  => Some("Deleted"),
+        HunkKind::Insert  => Some("Inserted"),
+        HunkKind::Replace => Some("Changed"),
+        HunkKind::Equal   => None,
+    };
+
     rsx! {
-        div { class: "{row_class}",
+        div { class: "{row_class}", role: "row",
+            if let Some(lbl) = sr_label {
+                span { class: "sr-only", "{lbl}: " }
+            }
             div { class: "{lg}",
                 {left_no.map(|n| n.to_string()).unwrap_or_default()}
             }
