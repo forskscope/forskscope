@@ -234,3 +234,32 @@ code.path-display {
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 4px; font-size: 12px; word-break: break-all;
 }
+
+/* ── Explorer toolbar (filter / sort / mode) ── */
+.explorer-toolbar {
+  display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+  padding: .3rem .6rem; background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  grid-column: 1 / -1;
+}
+.filter-btn {
+  padding: .2rem .5rem; border-radius: 6px; font-size: 12px;
+  background: var(--surface-3); border: 1px solid var(--border); cursor: pointer;
+}
+.filter-btn.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.sort-label { font-size: 12px; color: var(--muted); }
+.hidden-toggle { display: flex; align-items: center; gap: .25rem; font-size: 12px; color: var(--muted); cursor: pointer; }
+.explorer { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr auto; gap: .5rem; padding: .6rem; height: 100%; }
+
+/* ── Deep compare view ── */
+.deep-compare { grid-column: 1 / -1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.deep-compare-toolbar { display: flex; align-items: center; gap: .4rem; padding: .35rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); }
+.deep-label { font-size: 12px; color: var(--muted); margin-right: .5rem; }
+.deep-stats { padding: .25rem .6rem; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
+.deep-table { flex: 1; overflow: auto; }
+.deep-row { display: flex; align-items: center; gap: .5rem; padding: .2rem .6rem; cursor: pointer; font-size: 13px; }
+.deep-row:hover { background: var(--surface-3); }
+.deep-path { flex: 1; font-family: ui-monospace, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deep-compare-btn { padding: .15rem .4rem; font-size: 11px; opacity: .7; border-radius: 4px; }
+.deep-row:hover .deep-compare-btn { opacity: 1; }
+.deep-scanning { padding: 1.5rem; text-align: center; color: var(--muted); }

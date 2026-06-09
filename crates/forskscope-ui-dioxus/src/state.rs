@@ -28,6 +28,33 @@ impl Theme {
 #[serde(rename_all = "kebab-case")]
 pub enum Lang { En, Ja }
 
+/// A named preset for diff options — stored in settings, applied when
+/// opening new comparisons (RFC-009 compare profiles).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DiffProfile {
+    pub name: String,
+    pub ignore_whitespace: bool,
+    pub ignore_case: bool,
+}
+
+impl DiffProfile {
+    pub fn to_diff_options(&self) -> DiffOptions {
+        DiffOptions {
+            ignore_whitespace: self.ignore_whitespace,
+            ignore_case: self.ignore_case,
+            ..DiffOptions::default()
+        }
+    }
+}
+
+fn default_profiles() -> Vec<DiffProfile> {
+    vec![
+        DiffProfile { name: "Exact (default)".into(), ignore_whitespace: false, ignore_case: false },
+        DiffProfile { name: "Ignore whitespace".into(), ignore_whitespace: true, ignore_case: false },
+        DiffProfile { name: "Ignore case".into(), ignore_whitespace: false, ignore_case: true },
+    ]
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub theme: Theme,
@@ -39,6 +66,10 @@ pub struct AppSettings {
     pub last_left_dir: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_right_dir: Option<PathBuf>,
+    #[serde(default = "default_profiles")]
+    pub profiles: Vec<DiffProfile>,
+    #[serde(default)]
+    pub active_profile: usize,
 }
 
 fn default_ctx() -> usize { 3 }
@@ -48,6 +79,7 @@ impl Default for AppSettings {
         Self {
             theme: Theme::Dark, language: Lang::En, diff_font_size: 14,
             context_lines: 3, last_left_dir: None, last_right_dir: None,
+            profiles: default_profiles(), active_profile: 0,
         }
     }
 }
@@ -169,7 +201,13 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
         let (lt, rt) = forskscope_core::xlsx::derive_pair_text(&left, &right);
         ld.text = Some(lt); rd.text = Some(rt);
     }
-    let opts = DiffOptions::default();
+    // Use the active compare profile's options (RFC-009).
+    let settings = store.settings.read();
+    let opts = settings.profiles
+        .get(settings.active_profile)
+        .map(|p| p.to_diff_options())
+        .unwrap_or_default();
+    drop(settings);
     let diff = compute_diff(ld.diff_text(), rd.diff_text(), opts);
     let merge = MergeSession::from_diff(&diff);
     let can_save = ld.kind.is_mergeable_text() && rd.kind.is_mergeable_text();

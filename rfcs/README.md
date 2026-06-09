@@ -13,6 +13,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused. 
 | 005 | [Explorer Workspace and Paired Directory Workflow](./done/005-explorer-workspace.md) | Implemented (v0.25.0) |
 | 006 | [Diff/Merge Workspace and Merge Transaction Model](./done/006-diff-merge-workspace.md) | Implemented (v0.26.0) |
 | 007 | [Save, Session, and File Safety Policy](./done/007-save-session-file-safety.md) | Implemented (v0.27.0) |
+| 021 | [Document and Result Buffer Model](./done/021-document-and-result-buffer-model.md) | Implemented (v0.28.0) |
 
 ## Proposed
 
@@ -32,7 +33,6 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused. 
 | 018 | [Migration Compatibility and Parity Plan](./proposed/018-migration-compatibility-parity-plan.md) |
 | 019 | [Command Registry, Keyboard Shortcuts, Command Palette, and Accessibility](./proposed/019-command-shortcut-palette-accessibility.md) |
 | 020 | [Developer Architecture, CI, and Test Gates](./proposed/020-developer-architecture-ci-test-gates.md) |
-| 021 | [Document and Result Buffer Model](./proposed/021-document-and-result-buffer-model.md) |
 | 022 | [Directory Merge and Batch Operations](./proposed/022-directory-merge-and-batch-operations.md) |
 | 023 | [Atomic File Operations, Backup, and Restore](./proposed/023-atomic-file-operations-backup-restore.md) |
 | 024 | [Diff Visual Semantics and Decoration Contract](./proposed/024-diff-visual-semantics-decoration-contract.md) |

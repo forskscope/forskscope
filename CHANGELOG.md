@@ -5,6 +5,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.28.0] — 2026-06-09
+
+### Added
+
+- **Navigation history (RFC-021)** — each directory pane now keeps a per-pane
+  back/forward history stack. ◀ and ▶ buttons navigate between previously
+  visited directories, restoring the exact path. The stack is managed by the
+  `nav()` helper that pushes on every `go` call and truncates the forward
+  history on a new navigation, matching standard file-manager behaviour.
+
+- **Explorer filter bar** — a compact toolbar above the directory panes lets
+  the user choose: **All** (default), **Different** (changed + unique-to-one-side
+  files only), or **Equal** (same on both sides). Filters apply to both panes
+  simultaneously so the view stays aligned. Most useful in large directories:
+  "Different only" hides hundreds of equal files and shows only what needs attention.
+
+- **Sort by Name / Status / Size** — a dropdown in the filter bar. "Status" sort
+  puts changed (⚠) files first, then computing (⊙), then equal (✓), then the rest.
+
+- **Show/Hide hidden files** — a checkbox in the filter bar toggles files and
+  folders whose names start with `.`.
+
+- **Deep recursive compare (RFC-037, RFC-038)** — the `⟳ Deep compare` button
+  switches the explorer into a recursive-scan mode. Both directory trees are
+  walked in a `spawn_blocking` background task; the result is a flat, sorted
+  table of every file with its status (⚠ changed, ← left-only, → right-only,
+  ✓ equal). The same All/Different/Equal filter applies. A summary line shows
+  total counts. Clicking **Compare** on any row opens a file comparison. This
+  is the WinMerge-class "compare entire project tree" workflow.
+
+- **Compare profiles (RFC-009)** — three built-in profiles in Settings:
+  "Exact (default)", "Ignore whitespace", "Ignore case". The active profile
+  is applied when opening a new comparison. Users can switch profiles mid-session
+  from Settings without losing their open tabs.
+
+- **`recursive_diff` core function** — `forskscope_core::dir::recursive_diff`
+  returns a sorted `Vec<RecEntry>` covering every file in either tree. Covered
+  by two new core tests (35 total; all pass).
+
+---
+
 ## [0.27.0] — 2026-06-09
 
 ### Added

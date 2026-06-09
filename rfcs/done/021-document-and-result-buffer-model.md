@@ -1,6 +1,6 @@
 # RFC 021 — Document and Result Buffer Model
 
-**Status.** Proposed
+**Status.** Implemented (v0.28.0)
 
 ## Status
 
@@ -226,3 +226,7 @@ Each buffer must know:
 - RFC 015 Undo/redo transaction log.
 - RFC 023 Atomic file operations.
 - RFC 025 Editor adapter prototype.
+
+## Deferred work (v0.28.0)
+
+Full history persistence across restarts is deferred. Drag-and-drop to set directory paths is deferred.

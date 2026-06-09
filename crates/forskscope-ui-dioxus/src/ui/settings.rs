@@ -91,6 +91,21 @@ fn SettingsModal() -> Element {
                         option { value: "10", "10"           }
                     }
                 }
+                div { class: "field",
+                    span { "Compare profile" }
+                    select {
+                        value: "{cur.active_profile}",
+                        onchange: move |e| {
+                            if let Ok(i) = e.value().parse::<usize>() {
+                                store.settings.write().active_profile = i;
+                                persist(&store.settings.read());
+                            }
+                        },
+                        for (i, p) in cur.profiles.iter().enumerate() {
+                            option { value: "{i}", "{p.name}" }
+                        }
+                    }
+                }
                 div { class: "actions",
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Close")} }
                 }

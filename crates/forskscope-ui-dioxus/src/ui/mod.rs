@@ -1,5 +1,6 @@
 //! Dioxus UI components (RFC-003 component hierarchy).
 
+pub mod deep_compare;
 pub mod diff;
 pub mod dir_pane;
 pub mod explorer;
