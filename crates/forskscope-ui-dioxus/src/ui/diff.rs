@@ -53,10 +53,10 @@ pub fn DiffWorkspace(index: usize) -> Element {
             Toolbar { index, snap: snap.clone(), lang }
             SearchBar { match_count }
             for w in snap.warnings.iter() {
-                div { class: "diff-warning-banner", role: "alert", "⚠ {w}" }
+                div { class: "diff-warning-banner", role: "alert", "⚠ {t(lang, w)}" }
             }
             if !snap.can_save {
-                div { class: "notice", "{snap.readonly_notice}" }
+                div { class: "notice", {t(lang, &snap.readonly_notice)} }
             }
             if snap.identical {
                 div { class: "identical", {t(lang, "Files are identical")} }
@@ -171,7 +171,7 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
             if snap.can_save {
                 button {
                     disabled: !snap.can_undo,
-                    onclick: move |_| { let _ = store.tabs.write()[index].merge.undo(); },
+                    onclick: move |_| { if let Some(tab) = store.tabs.write().get_mut(index) { let _ = tab.merge.undo(); } },
                     aria_label: "Undo last merge action (Ctrl+Z)",
                     "Undo"
                 }
@@ -219,18 +219,18 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 button {
                     aria_pressed: if snap.char_mode { "true" } else { "false" },
                     aria_label: "Toggle character-level inline diff",
-                    onclick: move |_| { store.tabs.write()[index].char_mode ^= true; },
+                    onclick: move |_| { if let Some(tab) = store.tabs.write().get_mut(index) { tab.char_mode ^= true; } },
                     {format!("Inline: {}", if snap.char_mode { "on" } else { "off" })}
                 }
                 button {
                     aria_pressed: if snap.word_wrap { "true" } else { "false" },
                     aria_label: "Toggle word wrap",
-                    onclick: move |_| { store.tabs.write()[index].word_wrap ^= true; },
+                    onclick: move |_| { if let Some(tab) = store.tabs.write().get_mut(index) { tab.word_wrap ^= true; } },
                     {format!("Wrap: {}", if snap.word_wrap { "on" } else { "off" })}
                 }
                 button {
                     disabled: !snap.can_redo,
-                    onclick: move |_| { let _ = store.tabs.write()[index].merge.redo(); },
+                    onclick: move |_| { if let Some(tab) = store.tabs.write().get_mut(index) { let _ = tab.merge.redo(); } },
                     "Redo"
                 }
                 button {

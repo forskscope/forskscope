@@ -5,6 +5,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.35.0] — 2026-06-09
+
+Hardening release from a full codebase audit. No new user-facing features; three
+correctness/consistency findings fixed.
+
+### Fixed
+
+- **Panic risk from unchecked tab indexing** — five event handlers used
+  `store.tabs.write()[index]`, which panics if `index` is out of bounds. After a
+  tab is closed (Ctrl+W or ×) the remaining tabs shift indices, so a stale event
+  fired for a closed component's captured index could panic. All five sites
+  (`hunk.rs` apply, `diff.rs` undo/redo/char-mode/word-wrap) now use the safe
+  `.get_mut(index)` pattern already used elsewhere in the codebase.
+
+- **i18n gap in diff warnings and read-only notices** — eight strings added in
+  v0.33.0 (three diff warnings, five kind-aware read-only notices) bypassed the
+  `t(lang, …)` translation system and stayed English in Japanese mode. They now
+  route through `t()` and have Japanese translations in `i18n.rs`.
+
+- **CSS drift in the tab bar** — the tab container's class was renamed to
+  `.tabbar` in v0.30.0 but no `.tabbar` rule existed, so the bar lost its
+  `display:flex` and padding (tabs would stack vertically). Renamed the rule and
+  removed four orphaned dead rules (`.tabs`, `.tab .close`, `.tab .dirty`,
+  `.tab .name`) left over from the pre-v0.30.0 tab structure.
+
+### Audit notes (no change required)
+
+- `DiffAlgorithm::Lcs` is defined in core but intentionally not exposed in the UI
+  selector; the enum must exhaustively map `similar`'s algorithms while the UI
+  curates Myers/Patience/Histogram. The `DiffAlgorithmSetting → DiffAlgorithm`
+  conversion is consistent.
+- No production `.unwrap()`/`.expect()`/`panic!`/`todo!` calls outside tests.
+- No `TODO`/`FIXME`/`HACK` markers in source.
+- ELOC under the 300 soft limit across all files (`state.rs` 284 is the largest).
+
+---
+
 ## [0.34.0] — 2026-06-09
 
 ### Fixed

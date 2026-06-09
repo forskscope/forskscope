@@ -80,7 +80,7 @@ pub fn HunkBlock(
                         kind: hunk.kind, char_mode,
                         show_action: i == 0 && hunk.is_pending_change() && can_save,
                         applied: i == 0 && applied,
-                        on_apply: move |_| { let _ = store.tabs.write()[index].merge.apply_left_to_right(hunk_id); },
+                        on_apply: move |_| { if let Some(tab) = store.tabs.write().get_mut(index) { let _ = tab.merge.apply_left_to_right(hunk_id); } },
                     }
                 }
             }

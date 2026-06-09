@@ -46,6 +46,13 @@ fn ja(key: &str) -> Option<&'static str> {
         "Overwrite" => "上書き",
         "Cancel" => "キャンセル",
         "Merge/save unavailable for this file type." => "このファイル形式では結合・保存できません。",
+        "Large file — inline diff disabled and deadline shortened." => "大きなファイル — インライン差分を無効化し、処理時間を短縮しました。",
+        "Diff timed out — result may be approximate." => "差分処理がタイムアウトしました — 結果は概算の可能性があります。",
+        "Some hunks were too large for character-level diff." => "一部のハンクが大きすぎるため、文字単位の差分を省略しました。",
+        "Binary file — read-only comparison (hex preview)." => "バイナリファイル — 読み取り専用比較（16進プレビュー）。",
+        "Spreadsheet — read-only comparison." => "スプレッドシート — 読み取り専用比較。",
+        "One side is missing — read-only." => "片方が存在しません — 読み取り専用。",
+        "File type not supported for merge — read-only." => "このファイル形式は結合に対応していません — 読み取り専用。",
         _ => return None,
     };
     Some(v)
