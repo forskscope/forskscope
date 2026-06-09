@@ -5,7 +5,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.37.0] — 2026-06-09
+## [0.38.0] — 2026-06-09
+
+Explorer row alignment and path bar polish.
+
+### Added
+
+- **Aligned two-pane row view** — same-name files and directories now share
+  the same horizontal row across the left and right panes. Entries that exist
+  only on one side produce a spacer row on the opposite side.  Directories
+  appear before files within each level; both groups are sorted alphabetically.
+  The tree expansion state of either pane drives the merged row list: expanding
+  `src/` on the left inserts its child rows (with spacers on the right for any
+  right-side entries that are not expanded or not present). Both tree states are
+  managed at the Explorer level so the alignment is computed from a single
+  consistent snapshot.
+
+- **Directory diff status** — directories now show a status icon in the tree
+  row: ✓ when the same-name directory exists on the other side, · when it
+  exists only on this side. (Deep byte-for-byte recursive equality is shown in
+  the Directory Report; the tree view shows existence status.)
+
+### Fixed
+
+- **Path bar single-line, leading part shortened** — the path bar no longer
+  wraps to multiple lines on long paths. The breadcrumb uses `direction: rtl`
+  in CSS so that when the path is too long for the available width, the
+  leading ancestors overflow invisibly to the LEFT while the current
+  directory stays visible on the right. No segment is ever truncated from
+  the right end.
+
+- **Compare: mobile vertical line broken** — the diff rows had no `min-width`
+  constraint and the `.diff-scroll` container had no `overflow-x: auto`.
+  On narrow viewports this caused the grid columns to collapse and the
+  centre divider line to disappear. The diff view is now horizontally
+  scrollable (`overflow-x: auto`) with a `min-width: 55ch` on each row to
+  preserve the two-pane layout.
+
+---
+
+
 
 Explorer polish and diff alignment bug-fix.
 
