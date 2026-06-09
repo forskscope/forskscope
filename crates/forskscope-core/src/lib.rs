@@ -33,7 +33,10 @@ pub use encoding::{NewlineStyle, TextEncoding};
 pub use error::{CoreError, IoOperation, Result};
 pub use file_kind::FileKind;
 pub use ignore::IgnoreRules;
-pub use merge::{HunkState, MergeHunk, MergeSession};
+pub use merge::{
+    ConflictId, ConflictStatus, HunkState, MergeConflict, MergeHunk, MergeSession,
+    ThreeWayMergeSession, ThreeWayStats,
+};
 pub use patch::{
     LineOrigin, PatchDocument, PatchFileChange, PatchFormat, PatchHunk, PatchLine, PatchOptions,
     PatchSummary, patch_from_directories, patch_from_file_diff, to_unified,

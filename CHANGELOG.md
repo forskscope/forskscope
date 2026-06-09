@@ -5,6 +5,54 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.40.0] — 2026-06-09
+
+Three-way merge model (RFC-033 core slice).
+
+### Added
+
+- **`forskscope-core::merge::ThreeWayMergeSession` — base-aware merge**
+  (RFC-033)
+
+  A new three-way merge model sits alongside the existing two-way
+  `MergeSession`, which is unchanged and remains the default. Given base,
+  left, and right texts, the session reconciles them with a conservative
+  line-oriented diff3 engine and exposes:
+
+  - **Automatic merge of non-conflicting changes** — a region changed on
+    only one side takes that side; a region changed identically on both
+    sides deduplicates; non-overlapping edits on different lines all apply.
+
+  - **Structured conflict records** — divergent two-sided edits become
+    `MergeConflict` entries carrying the base/left/right line content, a
+    durable `ConflictId` (stable across resolution operations), and a
+    `ConflictStatus`. Conflicts are metadata; conflict markers are never
+    written into the result silently.
+
+  - **Resolution operations** — `resolve_left`, `resolve_right`,
+    `resolve_both` (left then right), `resolve_manual` (custom text),
+    `ignore` (take base), and `reset`. Every operation is reversible
+    through `undo` / `redo`, consistent with the two-way transaction model.
+
+  - **Result reconstruction** — `result_text()` rebuilds the merged output
+    with original line terminators preserved (LF / CRLF / CR / none).
+    Unresolved conflicts contribute nothing until resolved.
+
+  - **Save policy** — `can_save()` returns `false` while any conflict is
+    unresolved, implementing the RFC-033 rule that unresolved conflicts
+    block a direct save.
+
+  The conflict-resolution *workspace* UI (RFC-034), editor-driven manual
+  conflict edits (RFC-032), and marker-based conflict-file export are
+  deferred to follow-up releases.
+
+- **19 unit tests** covering one-sided changes, identical two-sided
+  changes, non-overlapping edits, true conflicts, every resolution path,
+  undo/redo, dirty/save-baseline tracking, CRLF preservation, and stale-id
+  rejection. Total core test count: 116 (plus 2 integration tests).
+
+---
+
 ## [0.39.0] — 2026-06-09
 
 Patch export (RFC-039 export slice).

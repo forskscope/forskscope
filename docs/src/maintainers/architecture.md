@@ -24,7 +24,8 @@ touching core.
 | `encoding` | Decode with chardetng + encoding_rs; encode for save. |
 | `document` | Load a path into a `LoadedDocument` with fingerprint. |
 | `diff` | `similar` v3 diff engine; normalized model (hunks, stable IDs, inline spans). |
-| `merge` | `MergeSession` with transaction log, undo/redo, dirty state, `result_text()`. |
+| `merge` | `MergeSession` (two-way) with transaction log, undo/redo, dirty state, `result_text()`; `ThreeWayMergeSession` (base-aware diff3, structured conflicts, resolution + undo/redo). |
+| `patch` | Unified-diff patch export from file and directory comparisons (RFC-039). |
 | `save` | Conflict detection, backup, atomic write. |
 | `dir` | Directory listing and recursive digest equality. |
 | `xlsx` | Excel adapter: derive comparable text via `sheets-diff`. |

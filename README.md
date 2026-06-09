@@ -67,6 +67,7 @@ git mergetool
 
 - **Side-by-side diff** with line-level and character-level highlighting
 - **Merge** — apply changes from left to right one hunk at a time; undo / redo
+- **Three-way merge model** — base-aware diff3 with automatic merge of non-conflicting changes and structured conflict resolution (core model shipped; conflict workspace UI in progress)
 - **Enter to apply** the focused hunk; F7/F8 to navigate; Ctrl+S to save
 - **Explorer** — browse two directories, see digest equality indicators, compare same-name files with one click
 - **Deep compare** — recursive directory scan with live progress; batch copy changed files between trees

@@ -6,7 +6,12 @@
 //! and the canonical result text used by the save layer.
 
 mod session;
+mod three_way;
 mod transaction;
 
 pub use session::{HunkState, MergeHunk, MergeSession};
+pub use three_way::{
+    ConflictId, ConflictStatus, MergeConflict, MergeLine, MergeRegion, RegionKind,
+    ThreeWayMergeSession, ThreeWayStats, diff3, render_lines, split_lines,
+};
 pub use transaction::MergeTransaction;

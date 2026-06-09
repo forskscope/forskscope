@@ -1,9 +1,20 @@
 # RFC 033: Three-Way Merge Model
 
-**Status.** Proposed
+**Status.** Implemented (v0.40.0) — core model; conflict workspace deferred
 
 ## Status
-Proposed. (Originally proposed in RFC package v0.4.)
+Implemented (v0.40.0). The GUI-independent three-way merge *model* shipped
+in v0.40.0 as `forskscope-core::merge::ThreeWayMergeSession`: a conservative
+line-oriented diff3 engine, structured `MergeConflict` records with durable
+`ConflictId`s and `ConflictStatus`, resolution operations (left / right /
+both / manual / ignore) with undo/redo, merged result reconstruction with
+line-ending preservation, and the `can_save()` save-block predicate. The
+two-way `MergeSession` is unchanged and remains the default path.
+
+Deferred to follow-up releases: the conflict-resolution *workspace* UI
+(RFC-034), editor-driven manual conflict edits (RFC-032 operation model),
+and marker-based conflict-file export. The four-pane base/left/right/result
+layout is a UI concern built on this model.
 
 ## Summary
 

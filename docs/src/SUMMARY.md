@@ -32,6 +32,7 @@
 ## Maintainers & Contributors
 
 - [Architecture](./maintainers/architecture.md)
+- [Three-way merge model](./maintainers/three-way-merge.md)
 - [Design principles](./maintainers/design-principles.md)
 - [RFC directory](../../rfcs/README.md)
 - [Local development](./maintainers/local-dev.md)
