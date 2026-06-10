@@ -16,4 +16,5 @@ mod merge_tests;
 mod patch_tests;
 mod save_tests;
 mod three_way_tests;
+mod transaction_log_tests;
 mod xlsx_tests;

@@ -37,7 +37,8 @@ pub use file_kind::FileKind;
 pub use ignore::IgnoreRules;
 pub use merge::{
     ConflictId, ConflictStatus, HunkState, MergeConflict, MergeHunk, MergeSession,
-    ThreeWayMergeSession, ThreeWayStats,
+    SessionRevision, ThreeWayMergeSession, ThreeWayStats, TransactionEntry,
+    TransactionKind, TransactionLog, UnixTimestamp,
 };
 pub use patch::{
     LineOrigin, PatchDocument, PatchFileChange, PatchFormat, PatchHunk, PatchLine, PatchOptions,

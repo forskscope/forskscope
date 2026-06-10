@@ -5,10 +5,14 @@
 //! owns the working state, the transaction log, undo/redo, dirty state,
 //! and the canonical result text used by the save layer.
 
+mod log;
 mod session;
 mod three_way;
 mod transaction;
 
+pub use log::{
+    SessionRevision, TransactionEntry, TransactionKind, TransactionLog, UnixTimestamp,
+};
 pub use session::{HunkState, MergeHunk, MergeSession};
 pub use three_way::{
     ConflictId, ConflictStatus, MergeConflict, MergeLine, MergeRegion, RegionKind,

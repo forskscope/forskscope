@@ -5,6 +5,53 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.47.0] — 2026-06-10
+
+Transaction log and unified merge operation history (RFC-015).
+
+### Added
+
+- **`TransactionLog`** in `forskscope-core::merge` (RFC-015) — a companion
+  struct that can be attached to either `MergeSession` (two-way) or
+  `ThreeWayMergeSession` to provide enriched, queryable operation history.
+  The existing session undo/redo stacks are unchanged; `TransactionLog` is
+  the *metadata layer* RFC-015 calls for.
+
+  Key API:
+  - `push(TransactionKind)` — record a new operation; clears the redo branch.
+  - `record_undo()` / `record_redo()` — sync with the session stack.
+  - `mark_saved()` — set clean baseline.
+  - `is_dirty()`, `can_undo()`, `can_redo()` — state queries.
+  - `active_entries()`, `undone_entries()`, `all_entries()` — for the
+    history panel: all entries are kept (including undone) so the panel can
+    show the full session history.
+  - `active_ops_since_save()` — count of dirty operations.
+
+- **`TransactionKind`** — typed enum with variants for every current merge
+  operation, each carrying its `HunkId` or `ConflictId`. `kind.label()`
+  returns a human-readable English description for the history panel.
+
+- **`SessionRevision`** — a typed `u64` newtype replacing the raw `usize`
+  save-baseline offset. `INITIAL` is revision 0; each `push()` increments.
+  Revisions are `Ord`, making dirty-state a direct comparison.
+
+- **`TransactionEntry`** — one log record: `revision`, `kind`, `label`,
+  `timestamp` (`UnixTimestamp`), and `active` (false when undone). Undone
+  entries stay in the log for the history panel.
+
+- **23 new tests** covering all RFC-015 §13 requirements: push/undo/redo
+  semantics, revision tracking, dirty state and baseline, redo-branch
+  discard on new push, entry visibility splits, labels, and integration
+  with both session types. Total core test count: 200.
+
+### RFC
+
+- RFC-015 moved from `proposed/` to `done/`. The history panel UI (§10),
+  persistent crash-recovery journal (deferred in RFC-015 §4), and
+  editor-local vs core undo precedence (§9) remain open.
+
+---
+
 ## [0.46.0] — 2026-06-10
 
 Error severity/recovery model (RFC-017 slice) + job progress model and threshold policy (RFC-013 slice).

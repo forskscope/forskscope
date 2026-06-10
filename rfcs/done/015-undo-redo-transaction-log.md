@@ -1,10 +1,35 @@
 # RFC-015 — Undo/Redo Transaction Log and Merge Operation History
 
-**Status.** Proposed
+**Status.** Implemented (v0.47.0) — transaction log model; history panel UI and crash recovery open
 
-## 1. Summary
+## Status
+Implemented (v0.47.0). The `TransactionLog` companion type and supporting
+types ship in `forskscope-core::merge`:
 
-This RFC defines a transaction-based undo/redo model for merge operations and text edits.
+- **`TransactionKind`** — typed enum covering all current merge operations:
+  `ApplyHunkLeftToRight`, `RevertHunk`, `ApplyAllLeftToRight`, conflict
+  resolution variants (Left/Right/Both/Manual/Ignore/Reopen), plus
+  `ManualTextEdit` and `ApplyExternalPatch` for future paths. Each variant
+  carries its `HunkId` or `ConflictId` for hunk-level navigation.
+  `kind.label()` produces a human-readable English description.
+- **`SessionRevision`** — a typed monotonic revision counter replacing the
+  raw `usize` offset. `INITIAL` is revision 0; each `push()` call
+  increments by one. Revisions are `Ord` so dirty-state is `current > saved`.
+- **`TransactionEntry`** — one log record: revision, kind, label, timestamp
+  (`UnixTimestamp`), and an `active` flag (false when the entry has been
+  undone) so the history panel can show the full session history with
+  greyed-out undone entries.
+- **`TransactionLog`** — a companion struct (attach to either session type):
+  `push(kind)` records an operation; `record_undo()` / `record_redo()` sync
+  with the session stack; `mark_saved()` sets the clean baseline;
+  `is_dirty()`, `can_undo()`, `can_redo()`, `active_entries()`,
+  `undone_entries()`, `active_ops_since_save()`. New push after undo
+  discards the redo branch correctly (RFC-015 §8 rule 1).
+- **23 tests** covering all RFC-015 §13 requirements.
+
+Remaining open: the history panel UI (RFC-015 §10), persistent crash-recovery
+journal (deferred in §4), and editor-local vs core undo precedence (RFC-015
+§9, depends on RFC-004 editor adapter).
 
 The current application has preliminary merge history behavior around diff indices. The migration must replace this with a canonical transaction log owned by the core model.
 

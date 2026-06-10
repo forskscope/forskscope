@@ -26,6 +26,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 039 | [Patch Export, Apply, and Review Workflow](./done/039-patch-export-apply-and-review-workflow.md) | v0.39.0 (export; apply deferred) |
 | 033 | [Three-Way Merge Model](./done/033-three-way-merge-model.md) | v0.40.0 (core model; workspace deferred) |
 | 058 | [Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract](./done/058-spreadsheet-xlsx-structural-diff.md) | v0.45.0 (structured adapter; aligned view deferred) |
+| 015 | [Undo/Redo Transaction Log and Merge Operation History](./done/015-undo-redo-transaction-log.md) | v0.47.0 (TransactionLog; history panel UI and crash recovery open) |
 
 ## Proposed
 
@@ -39,7 +40,6 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 012 | [Text Encoding, Newline, and Binary Policy](./proposed/012-text-encoding-newline-binary-policy.md) |
 | 013 | [Large File, Performance, and Virtualization Strategy](./proposed/013-large-file-performance-virtualization.md) |
 | 014 | [Search, Filter, and Navigation](./proposed/014-search-filter-navigation.md) |
-| 015 | [Undo/Redo Transaction Log and Merge Operation History](./proposed/015-undo-redo-transaction-log.md) |
 | 016 | [Editor Bridge Security and Contract](./proposed/016-editor-bridge-security-and-contract.md) |
 | 017 | [Error Taxonomy and Diagnostics UX](./proposed/017-error-taxonomy-diagnostics-ux.md) |
 | 019 | [Command Registry, Keyboard Shortcuts, Command Palette, and Accessibility](./proposed/019-command-shortcut-palette-accessibility.md) |
