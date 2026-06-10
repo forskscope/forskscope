@@ -1,8 +1,27 @@
 # RFC-017 — Error Taxonomy and Diagnostics UX
 
-**Status.** Proposed
+**Status.** Proposed — error severity and recovery hints slice implemented (v0.46.0); diagnostics panel and AppError wrapper open
 
-## 1. Summary
+## Status
+Partially implemented in v0.46.0:
+
+- **`ErrorSeverity`** (Info / Warning / Recoverable / Blocking) — an `Ord`
+  enum, exported from `forskscope-core`. The `CoreError::severity()` method
+  returns the appropriate level for each variant: Conflict → Recoverable,
+  read/listdir I/O → Recoverable, write/rename I/O → Blocking, Decode →
+  Warning, InternalInvariant → Blocking.
+- **`RecoveryHint`** — a predefined action the UI should offer alongside the
+  error: ChooseAnotherFile, Reload, SaveAs, OverwriteAnyway,
+  CheckPermissions, Dismiss, ReportBug. `CoreError::recovery_hint()` maps
+  each variant.
+- **`CoreError::is_user_recoverable()`** — convenience predicate for the
+  common UI branch-on-severity case.
+- **21 tests** covering every variant's severity and hint mapping, the
+  `Ord` ordering, and `is_user_recoverable`.
+
+Remaining open: the `AppError` wrapper with structured user message +
+technical detail (UI-layer concern), the diagnostics panel/copy-diagnostics
+surface, and full localization of error messages (RFC-009).
 
 This RFC defines a unified error taxonomy and diagnostics user experience for the Dioxus migration.
 

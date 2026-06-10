@@ -5,6 +5,54 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.46.0] — 2026-06-10
+
+Error severity/recovery model (RFC-017 slice) + job progress model and threshold policy (RFC-013 slice).
+
+### Added
+
+- **`ErrorSeverity`** and **`RecoveryHint`** in `forskscope-core::error`
+  (RFC-017 §"Error Severity", §"Recovery Actions").
+
+  Every `CoreError` now answers two questions without string parsing:
+  - `severity()` → `Info | Warning | Recoverable | Blocking` — lets the UI
+    choose a toast, inline warning, or blocking modal automatically.
+  - `recovery_hint()` → `ChooseAnotherFile | Reload | SaveAs |
+    OverwriteAnyway | CheckPermissions | Dismiss | ReportBug` — the primary
+    recovery action to offer.
+  - `is_user_recoverable()` — convenience predicate: `true` when severity
+    is ≤ `Recoverable`.
+
+  Severity mapping highlights: Conflict → Recoverable (Reload); read/listdir
+  I/O → Recoverable (ChooseAnotherFile); write/rename I/O → Blocking (SaveAs);
+  InternalInvariant → Blocking (ReportBug). `ErrorSeverity` implements `Ord`
+  so the UI can compare levels directly.
+
+- **Threshold policy constants** in `forskscope-core::job` (RFC-013
+  §"Thresholds") — the single source of truth for large-file behaviour:
+
+  | Constant | Value | Governs |
+  |---|---|---|
+  | `LARGE_FILE_INLINE_DIFF_BYTES` | 512 KB | disable inline diff auto-compute |
+  | `VERY_LARGE_FILE_BYTES` | 10 MB | further constrain diff deadline |
+  | `LARGE_HUNK_AUTO_EXPAND_LINES` | 10 000 | suppress auto-expand for collapsed hunks |
+  | `LARGE_DIRECTORY_VIRTUAL_THRESHOLD` | 5 000 | switch explorer to windowed rendering |
+  | `DIGEST_CONCURRENCY_LIMIT` | 32 | back-pressure on in-flight digest tasks |
+
+- **`JobKind`**, **`JobProgress`**, **`JobHandle`** in `forskscope-core::job`
+  (RFC-013 §"Background Job Model", RFC-008).
+
+  `JobProgress { job_id, kind, phase, completed_units, total_units,
+  cancellable }` is the snapshot the UI renders for progress bars.
+  `fraction()` returns `Option<f32>` (0.0–1.0, clamped); `is_complete()`
+  is true when `completed_units ≥ total_units`. `JobHandle::new(id)` pairs
+  a `JobId` with a `CancellationToken` — caller holds the handle, worker
+  holds the token clone.
+
+- **35 new tests** (21 error, 14 job). Total core test count: 177.
+
+---
+
 ## [0.45.0] — 2026-06-10
 
 Spreadsheet structural diff adapter and test corpus (RFC-058).

@@ -1,10 +1,26 @@
 # RFC-013 — Large File, Performance, and Virtualization Strategy
 
-**Status.** Proposed
+**Status.** Proposed — threshold policy and job model slice implemented (v0.46.0); virtualization open
 
-## 1. Summary
+## Status
+Partially implemented in v0.46.0:
 
-This RFC defines performance policies for large files, large directories, expensive inline diffs, and editor rendering in the Dioxus migration.
+- **Threshold policy constants** in `forskscope-core::job`: `LARGE_FILE_INLINE_DIFF_BYTES`
+  (512 KB), `VERY_LARGE_FILE_BYTES` (10 MB), `LARGE_HUNK_AUTO_EXPAND_LINES`
+  (10 000), `LARGE_DIRECTORY_VIRTUAL_THRESHOLD` (5 000),
+  `DIGEST_CONCURRENCY_LIMIT` (32). These constants are now the single source
+  of truth for large-file behaviour, replacing the previously ad-hoc values
+  in `DiffOptions` defaults.
+- **`JobKind`**, **`JobProgress`**, **`JobHandle`** in `forskscope-core::job`:
+  the types the UI needs to show progress bars and cancellation buttons for
+  background operations. `JobProgress::fraction()` and `is_complete()` are
+  tested. `JobHandle::new()` pairs a `JobId` with a `CancellationToken`.
+- **14 tests** covering fraction computation edge cases, `is_complete`,
+  `JobKind::label`, and `JobHandle` cancel propagation.
+
+Remaining open: row virtualization for large directories (§7.2) and the
+editor-view decoration batching (§7.1, blocked on the editor adapter track,
+RFC-004).
 
 A diff/merge app must remain responsive even when users open large files or directory trees. The current application performs useful operations, but the Dioxus migration must make expensive work cancellable, bounded, and observable.
 

@@ -1,8 +1,14 @@
-//! Error model (RFC-001 §6.5).
+//! Error model (RFC-001 §6.5, RFC-017 §"Error Severity and Recovery").
 //!
 //! No core operation panics for normal user-facing failures. Every error
 //! carries enough context (operation, path) for the UI to render a
 //! human-readable message without string parsing.
+//!
+//! `CoreError` exposes two query methods — [`severity`](CoreError::severity)
+//! and [`recovery_hint`](CoreError::recovery_hint) — so the UI can decide
+//! whether to show a toast, an inline warning, or a blocking modal, and
+//! which recovery actions to offer, without pattern-matching on message
+//! strings.
 
 use std::fmt;
 use std::path::PathBuf;
@@ -37,6 +43,53 @@ impl fmt::Display for IoOperation {
     }
 }
 
+// ── RFC-017 §"Error Severity" ─────────────────────────────────────────────────
+
+/// How severe an error is, used by the UI to choose the appropriate surface
+/// (RFC-017 §"Error Severity").
+///
+/// Ordered from least to most severe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ErrorSeverity {
+    /// The operation completed but with a note the user should see.
+    /// Surface: status bar or toast.
+    Info,
+    /// The operation can continue but the user should be aware.
+    /// Surface: toast or inline warning banner.
+    Warning,
+    /// A user action can resolve this. The operation cannot proceed.
+    /// Surface: dialog with labelled action buttons.
+    Recoverable,
+    /// The operation cannot proceed and no simple recovery is available.
+    /// Surface: blocking modal or error tab.
+    Blocking,
+}
+
+// ── RFC-017 §"Recovery Actions" ───────────────────────────────────────────────
+
+/// A predefined recovery action the UI can offer when this error occurs
+/// (RFC-017 §"Recovery Actions"). The UI decides which actions to show
+/// based on context; not all hints are applicable in every call site.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecoveryHint {
+    /// Ask the user to choose a different file or directory.
+    ChooseAnotherFile,
+    /// Offer to reload the file from disk (e.g. after external change).
+    Reload,
+    /// Offer a Save As dialog rather than overwriting.
+    SaveAs,
+    /// Offer to overwrite despite the conflict (after explicit confirmation).
+    OverwriteAnyway,
+    /// Suggest the user check filesystem permissions.
+    CheckPermissions,
+    /// No specific action — inform and close.
+    Dismiss,
+    /// Report a bug; the error should not have occurred.
+    ReportBug,
+}
+
+// ── Canonical core error taxonomy ────────────────────────────────────────────
+
 /// Canonical core error taxonomy.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CoreError {
@@ -69,6 +122,52 @@ impl CoreError {
             message: err.to_string(),
         }
     }
+
+    /// The severity level of this error (RFC-017 §"Error Severity").
+    /// The UI uses this to choose a toast, inline warning, or blocking modal.
+    pub fn severity(&self) -> ErrorSeverity {
+        match self {
+            Self::Conflict { .. } => ErrorSeverity::Recoverable,
+            Self::Io { operation, .. } => match operation {
+                IoOperation::Read | IoOperation::ListDir | IoOperation::Metadata => {
+                    ErrorSeverity::Recoverable
+                }
+                IoOperation::Write
+                | IoOperation::Rename
+                | IoOperation::Copy
+                | IoOperation::CreateBackup => ErrorSeverity::Blocking,
+            },
+            Self::InvalidPath { .. } => ErrorSeverity::Recoverable,
+            Self::Decode { .. } => ErrorSeverity::Warning,
+            Self::Unsupported { .. } => ErrorSeverity::Warning,
+            Self::InternalInvariant { .. } => ErrorSeverity::Blocking,
+        }
+    }
+
+    /// A suggested recovery action for this error (RFC-017 §"Recovery Actions").
+    /// The UI may offer additional context-specific actions alongside this hint.
+    pub fn recovery_hint(&self) -> RecoveryHint {
+        match self {
+            Self::Conflict { .. } => RecoveryHint::Reload,
+            Self::Io { operation, .. } => match operation {
+                IoOperation::Read | IoOperation::Metadata => RecoveryHint::ChooseAnotherFile,
+                IoOperation::ListDir => RecoveryHint::ChooseAnotherFile,
+                IoOperation::Write | IoOperation::Rename => RecoveryHint::SaveAs,
+                IoOperation::Copy => RecoveryHint::CheckPermissions,
+                IoOperation::CreateBackup => RecoveryHint::CheckPermissions,
+            },
+            Self::InvalidPath { .. } => RecoveryHint::ChooseAnotherFile,
+            Self::Decode { .. } => RecoveryHint::Dismiss,
+            Self::Unsupported { .. } => RecoveryHint::ChooseAnotherFile,
+            Self::InternalInvariant { .. } => RecoveryHint::ReportBug,
+        }
+    }
+
+    /// `true` when this error indicates a user-recoverable situation rather
+    /// than an internal fault. Convenience for branch-free UI decisions.
+    pub fn is_user_recoverable(&self) -> bool {
+        self.severity() <= ErrorSeverity::Recoverable
+    }
 }
 
 impl fmt::Display for CoreError {
@@ -95,3 +194,4 @@ impl fmt::Display for CoreError {
 }
 
 impl std::error::Error for CoreError {}
+

@@ -19,6 +19,7 @@ pub mod encoding;
 pub mod error;
 pub mod file_kind;
 pub mod ignore;
+pub mod job;
 pub mod merge;
 pub mod patch;
 pub mod path;
@@ -31,7 +32,7 @@ pub use diff::{
 };
 pub use document::{FileFingerprint, FileId, LoadOptions, LoadedDocument, TextDocument, load_path};
 pub use encoding::{NewlineStyle, TextEncoding};
-pub use error::{CoreError, IoOperation, Result};
+pub use error::{CoreError, ErrorSeverity, IoOperation, RecoveryHint, Result};
 pub use file_kind::FileKind;
 pub use ignore::IgnoreRules;
 pub use merge::{
@@ -58,5 +59,11 @@ pub(crate) fn fnv1a64(bytes: &[u8]) -> u64 {
     hash
 }
 pub use cancel::CancellationToken;
+pub use job::{
+    DIGEST_CONCURRENCY_LIMIT, LARGE_DIRECTORY_VIRTUAL_THRESHOLD,
+    LARGE_FILE_INLINE_DIFF_BYTES, LARGE_HUNK_AUTO_EXPAND_LINES,
+    VERY_LARGE_FILE_BYTES,
+    JobHandle, JobId, JobKind, JobProgress,
+};
 pub use dir::batch_copy;
 pub use dir::copy_file;
