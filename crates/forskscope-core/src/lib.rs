@@ -30,11 +30,19 @@ pub mod xlsx;
 pub use diff::{
     DiffAlgorithm, DiffDocument, DiffHunk, DiffOptions, DiffRow, DiffWarning, HunkKind, InlineKind, InlineSpan,
     compute_diff,
+    // RFC-028
+    CaseSensitivity, CompareProfile, NewlineCompareMode, WhitespaceMode,
 };
 pub use document::{FileFingerprint, FileId, LoadOptions, LoadedDocument, TextDocument, load_path};
-pub use encoding::{NewlineStyle, TextEncoding};
+pub use encoding::{NewlineStyle, TextEncoding,
+    // RFC-012
+    NewlinePolicy,
+};
 pub use error::{CoreError, ErrorSeverity, IoOperation, RecoveryHint, Result};
-pub use file_kind::FileKind;
+pub use file_kind::{FileKind,
+    // RFC-012
+    EditabilityClass,
+};
 pub use ignore::IgnoreRules;
 pub use merge::{
     ConflictId, ConflictStatus, HunkState, MergeConflict, MergeHunk, MergeSession,

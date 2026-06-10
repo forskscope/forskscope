@@ -15,4 +15,8 @@ pub use model::{
     DiffDocument, DiffHunk, DiffId, DiffRow, DiffStats, DiffWarning, HunkId, HunkKind, InlineDiff,
     InlineKind, InlineSpan, LineRange, NewlineMarker, SideLine,
 };
-pub use options::{DiffAlgorithm, DiffOptions, InlineMode};
+pub use options::{
+    DiffAlgorithm, DiffOptions, InlineMode,
+    // RFC-028
+    CaseSensitivity, CompareProfile, NewlineCompareMode, WhitespaceMode,
+};

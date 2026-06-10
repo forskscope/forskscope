@@ -1,10 +1,15 @@
 # RFC 028 — Preferences, Profiles, and Compare Options
 
-**Status.** Proposed
+**Status.** Proposed — compare option types and named profiles slice implemented (v0.50.0); profile persistence and UI selector open
 
 ## Status
 
-Proposed.
+Partially implemented in v0.50.0:
+
+- **`WhitespaceMode`**, **`NewlineCompareMode`**, **`CaseSensitivity`** — typed enums replacing bare booleans at the profile layer. All default to the "significant / sensitive" value consistent with existing `DiffOptions` defaults.
+- **`CompareProfile`** — named preset (`name`, whitespace, newlines, case, inline_mode, algorithm) with four built-in presets: `default_profile`, `code_review` (Histogram algorithm), `loose_text` (ignore trailing WS + newline diff), `large_file_safe` (inline disabled). `all_presets()` returns them in display order. `to_diff_options()` bridges to the engine layer. 14 tests.
+
+Remaining open: profile persistence (serialization, RFC-011 dependency), toolbar profile selector UI, user-defined custom profiles, and `NewlineCompareMode::IgnoreDifference` wired into the diff engine.
 
 ## Summary
 

@@ -5,6 +5,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.50.0] — 2026-06-10
+
+Editability classification, newline save policy (RFC-012 slice) and compare profiles (RFC-028 slice).
+
+### Added
+
+- **`EditabilityClass`** in `forskscope-core::file_kind` (RFC-012 §8).
+
+  Ordered by capability (`Unsupported < ReadOnly < ReadWriteWithGuard <
+  ReadWrite`). `FileKind::editability(had_decode_errors, encoding_label)`
+  derives the class at load time. Predicates: `is_editable()`,
+  `is_saveable()`, `requires_save_guard()`.
+
+  Mapping: `Text` + UTF-8 + no errors → `ReadWrite`; `Text` + non-UTF-8
+  or decode errors → `ReadWriteWithGuard` (warn before save); `Binary`,
+  `ExcelXlsx`, `Missing` → `ReadOnly`; `Unsupported` → `Unsupported`.
+
+- **`NewlinePolicy`** in `forskscope-core::encoding` (RFC-012 §6).
+
+  `Preserve` (default) / `ForceLf` / `ForceCrlf`. `resolve(detected_style)
+  → Option<&str>` returns the newline string to use when writing. `Preserve`
+  on `Mixed` or `None` returns `None` — the caller preserves per-line endings
+  rather than normalizing (RFC-012 rule 2: "preserve exact line endings where
+  possible for mixed-newline files").
+
+- **`WhitespaceMode`**, **`NewlineCompareMode`**, **`CaseSensitivity`** in
+  `forskscope-core::diff` (RFC-028 §"Compare option types"). Typed enums
+  replacing the bare booleans in `DiffOptions` at the profile layer. All
+  default to the "significant / sensitive" value matching existing behaviour.
+
+- **`CompareProfile`** in `forskscope-core::diff` (RFC-028 §"Default
+  profiles"). A named preset carrying whitespace, newlines, case,
+  inline_mode, and algorithm. Four built-in presets via associated functions:
+  `default_profile`, `code_review` (Histogram algorithm — better hunk
+  alignment for code), `loose_text` (ignore trailing whitespace and newline
+  differences), `large_file_safe` (inline diff disabled). `all_presets()`
+  returns them in display order. `to_diff_options()` converts to the engine
+  type. `Default` is `default_profile`.
+
+- **35 new tests** (21 editability, 14 compare profile). Total: 255 core.
+
+---
+
 ## [0.49.0] — 2026-06-10
 
 Report export: Markdown and JSON comparison reports (RFC-027).

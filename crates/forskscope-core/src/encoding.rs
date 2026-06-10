@@ -99,3 +99,41 @@ pub fn detect_newline_style(text: &str) -> NewlineStyle {
         _ => NewlineStyle::Mixed,
     }
 }
+
+// ── RFC-012 §6: Newline save policy ──────────────────────────────────────────
+
+/// How newline endings are handled when saving a merged result (RFC-012 §6).
+///
+/// The default (`Preserve`) keeps whatever style was detected on load.
+/// Conversion to a specific style is an explicit user choice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NewlinePolicy {
+    /// Keep the newline style that was detected at load time. Default.
+    #[default]
+    Preserve,
+    /// Always write LF (`\n`), regardless of what was loaded.
+    ForceLf,
+    /// Always write CRLF (`\r\n`), regardless of what was loaded.
+    ForceCrlf,
+}
+
+impl NewlinePolicy {
+    /// Apply this policy: return the newline string to use when saving.
+    ///
+    /// `detected` is the style that was found in the loaded file.
+    /// Returns `None` when the loaded style is mixed or unknown and
+    /// `Preserve` is requested — the caller should keep original line
+    /// endings rather than normalizing.
+    pub fn resolve(self, detected: NewlineStyle) -> Option<&'static str> {
+        match self {
+            Self::ForceLf   => Some("\n"),
+            Self::ForceCrlf => Some("\r\n"),
+            Self::Preserve  => match detected {
+                NewlineStyle::Lf   => Some("\n"),
+                NewlineStyle::CrLf => Some("\r\n"),
+                NewlineStyle::Cr   => Some("\r"),
+                NewlineStyle::Mixed | NewlineStyle::None => None,
+            },
+        }
+    }
+}

@@ -1,8 +1,15 @@
 # RFC-012 — Text Encoding, Newline, and Binary Policy
 
-**Status.** Proposed
+**Status.** Proposed — editability classification and newline policy slice implemented (v0.50.0); encoding warning UI open
 
-## 1. Summary
+## Status
+Partially implemented in v0.50.0:
+
+- **`EditabilityClass`** (`Unsupported < ReadOnly < ReadWriteWithGuard <
+  ReadWrite`, `Ord`) added to `file_kind.rs`. `FileKind::editability(had_decode_errors, encoding_label)` derives the class. Predicates: `is_editable()`, `is_saveable()`, `requires_save_guard()`. 21 tests.
+- **`NewlinePolicy`** (`Preserve` default / `ForceLf` / `ForceCrlf`) added to `encoding.rs`. `resolve(detected_style) -> Option<&str>` returns the newline string to use when saving. `Preserve` on mixed/None returns `None` (caller keeps original endings). 14 tests.
+
+Remaining open: the Charset + Newline metadata display (§9.1, pane footer), the encoding-warning save dialog (§9.2, UI), BOM preservation policy (§7.2 bullet 5), and the explicit editable vs read-only save guard wired in the `save_text` path.
 
 This RFC defines the policy for reading, comparing, editing, and saving text and non-text files in the Dioxus migration.
 

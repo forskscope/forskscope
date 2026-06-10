@@ -29,6 +29,72 @@ impl FileKind {
     pub fn is_mergeable_text(&self) -> bool {
         matches!(self, Self::Text)
     }
+
+    /// Derive the editability class from the kind and load-time observations
+    /// (RFC-012 §8). Call after loading to decide which UI actions to offer.
+    pub fn editability(&self, had_decode_errors: bool, encoding_label: &str) -> EditabilityClass {
+        EditabilityClass::from_kind(self, had_decode_errors, encoding_label)
+    }
+}
+
+/// What the application may do with a loaded file (RFC-012 §8).
+///
+/// Derived from [`FileKind`] plus load-time observations (decode errors,
+/// encoding label). Recomputed on each load; never persisted independently.
+///
+/// Ordered ascending by capability: `Unsupported < ReadOnly <
+/// ReadWriteWithGuard < ReadWrite`. `EditabilityClass::ReadWrite` is the
+/// most capable (highest ordinal).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum EditabilityClass {
+    /// Cannot be loaded as any useful representation.
+    Unsupported,
+    /// View only; no user edits accepted (binary, Excel, unsupported, missing).
+    ReadOnly,
+    /// View and edit, but save requires an encoding guard (warn on lossy chars).
+    ReadWriteWithGuard,
+    /// Full round-trip: view, edit, save. Encoding is lossless.
+    ReadWrite,
+}
+
+impl EditabilityClass {
+    /// `true` when the user may make text edits.
+    pub fn is_editable(self) -> bool {
+        matches!(self, Self::ReadWrite | Self::ReadWriteWithGuard)
+    }
+
+    /// `true` when a save operation is permitted at all.
+    pub fn is_saveable(self) -> bool {
+        matches!(self, Self::ReadWrite | Self::ReadWriteWithGuard)
+    }
+
+    /// `true` when saving requires a user-visible encoding warning.
+    pub fn requires_save_guard(self) -> bool {
+        self == Self::ReadWriteWithGuard
+    }
+
+    /// Derive from a `FileKind` and load observations.
+    pub fn from_kind(kind: &FileKind, had_decode_errors: bool, encoding_label: &str) -> Self {
+        match kind {
+            FileKind::Binary => Self::ReadOnly,
+            FileKind::ExcelXlsx => Self::ReadOnly,
+            FileKind::Missing => Self::ReadOnly,
+            FileKind::Unsupported { .. } => Self::Unsupported,
+            FileKind::Text => {
+                if had_decode_errors {
+                    // Decode errors mean some bytes were replaced; saving
+                    // would silently corrupt the file without a guard.
+                    Self::ReadWriteWithGuard
+                } else if encoding_label == "UTF-8" || encoding_label.is_empty() {
+                    Self::ReadWrite
+                } else {
+                    // Non-UTF-8 encoding: saving may be lossy if the user
+                    // adds characters outside the charset.
+                    Self::ReadWriteWithGuard
+                }
+            }
+        }
+    }
 }
 
 /// Number of leading bytes sampled for binary detection.
