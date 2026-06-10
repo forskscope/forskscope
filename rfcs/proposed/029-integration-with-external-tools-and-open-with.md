@@ -1,10 +1,36 @@
 # RFC 029 — Integration with External Tools and Open With
 
-**Status.** Proposed
+**Status.** Proposed — external tool command model and safe argument expansion slice implemented (v0.55.0); file manager launch and UI open
 
 ## Status
+Partially implemented in v0.55.0. `forskscope-core::external_tool` ships:
 
-Proposed.
+- **`ExternalToolCommand`** — `id: ToolId`, `name`, `executable: PathBuf`,
+  `args: Vec<ExternalToolArg>`.
+- **`ExternalToolArg`** — `Literal(String)` or `Placeholder(ExternalToolPlaceholder)`.
+- **`ExternalToolPlaceholder`** — `Path | LeftPath | RightPath | Line | Column`.
+  `token()` returns the `{token}` string; `from_token()` parses it;
+  `all()` returns the display-order list.
+- **`ExpandContext`** — `path`, `left_path`, `right_path`, `line`, `column`,
+  all `Option`. Missing values cause the corresponding argument to be **omitted**,
+  not replaced with `"None"`.
+- **`expand_args(cmd, ctx) → Vec<String>`** — expands the argument template
+  into a concrete array. No shell string expansion. Callers pass the result
+  directly to `std::process::Command::args`.
+- **`parse_arg(s) → Result<ExternalToolArg, UnknownTokenError>`** — used by
+  the settings UI to validate user-supplied argument strings. Rejects
+  apparent `{token}` strings that are not in the supported set (protects
+  against typos like `{pat}` silently becoming a literal).
+- **20 tests** covering: literal pass-through, all five placeholders,
+  mixed literal+placeholder, the security contract (spaces, semicolons,
+  `$HOME`, backticks all arrive as single intact arguments), missing-context
+  omission, `parse_arg` acceptance/rejection, token round-trips.
+
+Remaining open: the file manager reveal command (`open_with_file_manager` in
+the UI already handles this via `opener`; RFC-029 needs it wired to a
+configurable `ExternalToolCommand` entry), the settings UI for custom editor
+commands, and the external-change reload flow when a file is opened
+externally.
 
 ## Summary
 

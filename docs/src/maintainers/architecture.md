@@ -37,6 +37,7 @@ touching core.
 | `persist` | `VersionedEnvelope` + `MigrationPolicy` — schema-versioned JSON wrapper for all persisted data (RFC-031). |
 | `report` | `FileComparisonReport` + `DirComparisonReport` — Markdown and JSON report export (RFC-027). |
 | `vcs` | `VcsProvider` trait + `GitProvider` — read-only VCS context (status, file at revision, merge base). `detect(path)` entry point (RFC-038). |
+| `external_tool` | `ExternalToolCommand` + safe `expand_args` — argument-array expansion for editor/file-manager integration, no shell execution (RFC-029). |
 | `xlsx` | Excel adapter: `SpreadsheetDiff` structured model + panic-guarded `diff_xlsx` (RFC-058). |
 
 ## UI modules

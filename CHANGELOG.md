@@ -5,6 +5,58 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.55.0] — 2026-06-10
+
+External tool command model and safe argument expansion (RFC-029 slice).
+endringer evaluation note recorded in `rfcs/notes/`.
+
+### Added
+
+- **`forskscope-core::external_tool`** — external tool command model and
+  safe argument expansion (RFC-029 §"API sketch", §"Security policy").
+
+  **`ExternalToolCommand`** — id, name, executable path, argument template
+  (`Vec<ExternalToolArg>`).
+
+  **`ExternalToolArg`** — `Literal(String)` or `Placeholder(...)`. The split
+  means literal flags like `"--goto"` and typed placeholders like `{path}`
+  are represented distinctly, making the template inspectable and serialisable.
+
+  **`ExternalToolPlaceholder`** — five variants: `Path`, `LeftPath`,
+  `RightPath`, `Line`, `Column`. `token()` returns the `{token}` string used
+  in the settings UI. `from_token()` parses it. `all()` returns them in
+  display order.
+
+  **`expand_args(cmd, ctx) → Vec<String>`** — the core function. Expands a
+  command template against an `ExpandContext`. The result is a plain
+  `Vec<String>` ready for `std::process::Command::args` — **no shell string
+  is ever constructed**. Missing context values (e.g. no line number when
+  revealing in file manager) silently omit the argument rather than producing
+  a literal `"None"` string or panicking.
+
+  **`parse_arg(s)`** — used by the settings validator. Accepts known tokens
+  and plain strings; rejects apparent `{token}` strings that are not in the
+  supported set, protecting users from typos like `{pat}` silently becoming
+  a literal argument.
+
+  **`UnknownTokenError`** — structured error from `parse_arg`, carrying the
+  rejected token and listing valid alternatives in its `Display`.
+
+- **20 new tests** in `tests/external_tool_tests.rs` covering:
+  literal pass-through, all five placeholder variants, mixed templates,
+  the security contract (paths containing spaces, `;`, `$HOME`, and
+  backticks each arrive as a single intact argument — no shell splitting),
+  missing-context omission (not `"None"` string), `parse_arg` acceptance,
+  typo rejection, token round-trips. Total core test count: 337.
+
+### Notes
+
+- **`rfcs/notes/endringer-evaluation-v0.22.0.md`** — evaluation note
+  recording endringer v0.22.0 as the preferred path for a future RFC-038
+  backend upgrade. No code change now. See note for the migration plan.
+
+---
+
 ## [0.54.0] — 2026-06-10
 
 VCS context integration — GitProvider and VcsProvider trait (RFC-038).

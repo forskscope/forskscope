@@ -17,6 +17,7 @@ pub mod dir;
 pub mod document;
 pub mod encoding;
 pub mod error;
+pub mod external_tool;
 pub mod file_kind;
 pub mod ignore;
 pub mod job;

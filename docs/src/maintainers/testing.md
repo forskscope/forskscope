@@ -31,6 +31,7 @@ the written code. Each test references the behaviour promised by an RFC.
 | `persist_tests` | `VersionedEnvelope` round-trip, `MigrationPolicy` decisions, schema names. | RFC-031 |
 | `report_tests` | `FileComparisonReport` and `DirComparisonReport` Markdown + JSON, path privacy. | RFC-027 |
 | `vcs_tests` | `GitProvider` detect/status/read/merge_base; degrade outside repo. | RFC-038 |
+| `external_tool_tests` | `expand_args` placeholder expansion; security contract (no shell, spaces/semicolons/$HOME/backticks intact); `parse_arg` acceptance/rejection. | RFC-029 |
 | `patch_tests` | `patch_from_file_diff`, `to_unified`; GNU `patch` round-trip integration. | RFC-039 |
 | `xlsx_tests` | `diff_xlsx` structured model; panic isolation on corrupt files. | RFC-058 |
 
