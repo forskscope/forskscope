@@ -26,6 +26,7 @@ pub mod path;
 pub mod persist;
 pub mod report;
 pub mod save;
+pub mod vcs;
 pub mod xlsx;
 
 pub use diff::{

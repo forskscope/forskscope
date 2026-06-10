@@ -21,17 +21,23 @@ touching core.
 
 | Module | Responsibility |
 |---|---|
-| `error` | Error taxonomy; no panics for user-facing failures. |
+| `error` | Error taxonomy; `ErrorSeverity`, `RecoveryHint`; no panics for user-facing failures. |
 | `path` | Lenient canonicalization; platform-safe display helpers. |
-| `file_kind` | File classification: Text, Binary, ExcelXlsx, Missing. |
-| `encoding` | Decode with chardetng + encoding_rs; encode for save. |
-| `document` | Load a path into a `LoadedDocument` with fingerprint. |
-| `diff` | `similar` v3 diff engine; normalized model (hunks, stable IDs, inline spans). |
-| `merge` | `MergeSession` (two-way) with transaction log, undo/redo, dirty state, `result_text()`; `ThreeWayMergeSession` (base-aware diff3, structured conflicts, resolution + undo/redo). |
+| `file_kind` | File classification: Text, Binary, ExcelXlsx, Missing. `EditabilityClass` (RFC-012). |
+| `encoding` | Decode with chardetng + encoding_rs; encode for save. `NewlinePolicy` (RFC-012). |
+| `document` | Load a path into a `LoadedDocument` with fingerprint. `ExternalFileState` / `check_external_state` (RFC-036). |
+| `diff` | `similar` v3 diff engine; normalized model (hunks, stable IDs, inline spans). `CompareProfile` + `WhitespaceMode` (RFC-028). |
+| `merge` | `MergeSession` (two-way) with transaction log, undo/redo, dirty state, `result_text()`; `ThreeWayMergeSession` (base-aware diff3, structured conflicts, resolution + undo/redo). `TransactionLog` / `SessionRevision` / `TransactionKind` (RFC-015). |
 | `patch` | Unified-diff patch export from file and directory comparisons (RFC-039). |
 | `save` | Conflict detection, backup, atomic write. |
-| `dir` | Directory listing and recursive digest equality. |
-| `xlsx` | Excel adapter: derive comparable text via `sheets-diff`. |
+| `dir` | Directory listing, recursive digest equality. `batch_copy` + `BatchManifest` (RFC-023). `recursive_diff_with_cancel` (RFC-037). `plan_operations` + `execute_plan` / `OperationPlan` (RFC-022). |
+| `cancel` | `CancellationToken` — lightweight `Arc<AtomicBool>` for cancellable background jobs (RFC-037). |
+| `ignore` | `IgnoreRules` — extension and directory-pattern filtering. |
+| `job` | `JobProgress`, `JobHandle`, large-file threshold policy constants (RFC-013). |
+| `persist` | `VersionedEnvelope` + `MigrationPolicy` — schema-versioned JSON wrapper for all persisted data (RFC-031). |
+| `report` | `FileComparisonReport` + `DirComparisonReport` — Markdown and JSON report export (RFC-027). |
+| `vcs` | `VcsProvider` trait + `GitProvider` — read-only VCS context (status, file at revision, merge base). `detect(path)` entry point (RFC-038). |
+| `xlsx` | Excel adapter: `SpreadsheetDiff` structured model + panic-guarded `diff_xlsx` (RFC-058). |
 
 ## UI modules
 

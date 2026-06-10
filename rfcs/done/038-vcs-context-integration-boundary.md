@@ -1,9 +1,34 @@
 # RFC 038: VCS Context Integration Boundary
 
-**Status.** Proposed
+**Status.** Implemented (v0.54.0) — VcsProvider trait + GitProvider; UI panel and JJ provider open
 
 ## Status
-Proposed. (Originally proposed in RFC package v0.4.)
+Implemented (v0.54.0). `forskscope-core::vcs` ships:
+
+- **`VcsProvider`** trait — `root()`, `system_name()`, `status()`,
+  `read_revision_file(rev, path)`, `merge_base(left, right)`. All methods
+  are read-only; no write operations are exposed.
+- **`GitProvider`** — detects a git repo by walking up from a given path
+  looking for `.git`. Implements all four trait methods via bounded, explicit
+  `git` subprocess calls (no shell expansion; paths as separate arguments).
+  `status()` parses `git status --porcelain -u`. `read_revision_file` uses
+  `git show <rev>:<path>`. `merge_base` uses `git merge-base`.
+- **`VcsFileChange`** — `Modified | Added | Deleted | Renamed { from } |
+  Conflicted | Other(String)`.
+- **`VcsRevision`** — opaque string wrapper; `head()` / `working_tree()`
+  convenience constructors.
+- **`detect(path)`** — entry point that returns `Box<dyn VcsProvider>` for
+  the first supported VCS found above `path`, or `None`. ForskScope works
+  fully without VCS.
+- **13 tests** against real git repositories in temp directories: detect
+  inside/outside/from-subdir repo, root path, clean status, untracked/
+  modified/deleted file status, read HEAD content, read nonexistent path,
+  merge-base of HEAD, detection outside repo, revision display.
+
+Remaining open: the VCS Changes Panel UI (RFC-038 §"VCS Changes Panel"),
+JJ provider (reserved), conflicted-path detection surfaced in the three-way
+merge workflow, and wiring `read_revision_file` to create `LoadedDocument`
+instances for the "Compare with HEAD" action.
 
 ## Summary
 

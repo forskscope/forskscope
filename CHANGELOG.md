@@ -5,6 +5,53 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.54.0] — 2026-06-10
+
+VCS context integration — GitProvider and VcsProvider trait (RFC-038).
+
+### Added
+
+- **`forskscope-core::vcs`** — VCS context integration boundary (RFC-038).
+
+  **`VcsProvider` trait** — read-only interface implemented by all providers:
+  `root()`, `system_name()`, `status() → Vec<VcsFileStatus>`,
+  `read_revision_file(rev, path) → Vec<u8>`, `merge_base(left, right)
+  → Option<VcsRevision>`. No write operations are in scope.
+
+  **`GitProvider`** — detects a repository by walking upward from a given
+  path looking for `.git`. Implements all four trait methods via bounded,
+  explicit `git` subprocesses (argument arrays, no shell string expansion).
+  Status parsing covers Modified, Added, Deleted, Renamed, and Conflicted
+  from `git status --porcelain -u`. File contents are read via `git show
+  <rev>:<path>` and returned as raw bytes for the caller to decode through
+  `load_path`. Merge base via `git merge-base`.
+
+  **`VcsFileChange`** — `Modified | Added | Deleted | Renamed { from } |
+  Conflicted | Other(String)`.
+
+  **`VcsRevision`** — opaque string wrapper. `head()` → `"HEAD"`,
+  `working_tree()` → `"WORKING"`.
+
+  **`detect(path) → Option<Box<dyn VcsProvider>>`** — top-level entry
+  point. Returns `None` outside any supported VCS; ForskScope works fully
+  without VCS context.
+
+- **13 new tests** in `tests/vcs_tests.rs` using real git repos in temp
+  directories: detect inside/outside/from-subdirectory a repo; `root()` is
+  the repo root; clean working tree has empty status; untracked file →
+  `Added`; modified file → `Modified`; deleted file → `Deleted`; HEAD file
+  content; nonexistent path → `Err`; merge-base of HEAD with itself;
+  `GitProvider::detect` outside repo → `None`; revision `Display`.
+  Total core test count: 317.
+
+### RFC
+
+- RFC-038 moved from `proposed/` to `done/`. Remaining open: VCS Changes
+  Panel UI, JJ provider, conflicted-path surfacing in the three-way merge
+  flow, and wiring `read_revision_file` to the "Compare with HEAD" action.
+
+---
+
 ## [0.53.0] — 2026-06-10
 
 External file state detection (RFC-036 slice).
