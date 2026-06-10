@@ -1,62 +1,137 @@
-//! Inline search within a diff comparison (RFC-006 §D-003).
+//! Inline search within a diff comparison (RFC-014 §"Text Search", RFC-059 §M4).
 //!
-//! `SearchCtx` is provided as a Dioxus context at the `DiffWorkspace`
-//! level; both the toolbar's `SearchBar` and the individual `Row`
-//! components read it so matches are highlighted without prop-drilling.
+//! `SearchCtx` is provided as a Dioxus context at the `DiffWorkspace` level.
+//! The toolbar's `SearchBar` owns the query input and Prev/Next navigation;
+//! the individual `Row` components read the context to apply match highlights;
+//! `diff.rs` rebuilds the index on query change and triggers scroll-into-view.
 
+use dioxus::html::input_data::keyboard_types::Key;
 use dioxus::prelude::*;
 
+use crate::ui::search_index::MatchIndex;
 
-/// Shared search state provided by `DiffWorkspace`.
-#[derive(Clone, PartialEq, Default)]
+// ── SearchCtx ─────────────────────────────────────────────────────────────────
+
+/// Shared search state provided as a Dioxus context by `DiffWorkspace`.
+#[derive(Clone, Default)]
 pub struct SearchCtx {
     pub query:  String,
     pub active: bool,
+    /// Ordered match positions rebuilt by `DiffWorkspace` on every query change.
+    pub index:  MatchIndex,
 }
 
-/// Compact search bar rendered inside the diff toolbar when activated.
+impl PartialEq for SearchCtx {
+    fn eq(&self, other: &Self) -> bool {
+        self.query == other.query && self.active == other.active
+        // index is excluded from equality so signal updates aren't suppressed
+        // when only the focused match changes.
+    }
+}
+
+// ── SearchBar component ───────────────────────────────────────────────────────
+
+/// Compact search bar with Prev / Next match navigation.
 ///
 /// The parent must have called `use_context_provider` to provide
 /// `Signal<SearchCtx>` before mounting this component.
 #[component]
-pub fn SearchBar(match_count: usize) -> Element {
+pub fn SearchBar() -> Element {
     let mut ctx: Signal<SearchCtx> = use_context::<Signal<SearchCtx>>();
     let active = ctx.read().active;
     if !active {
         return rsx! {};
     }
-    let count_label = if ctx.read().query.is_empty() {
-        String::new()
+
+    let total   = ctx.read().index.len();
+    let focused = ctx.read().index.focused_number();
+    let query_empty = ctx.read().query.is_empty();
+
+    let count_label = if query_empty || total == 0 {
+        if !query_empty { "No matches".to_string() } else { String::new() }
     } else {
-        format!("{match_count} match{}", if match_count == 1 { "" } else { "es" })
+        match focused {
+            Some(n) => format!("{n} / {total}"),
+            None    => format!("{total} match{}", if total == 1 { "" } else { "es" }),
+        }
     };
+
     rsx! {
         div { class: "search-bar",
             input {
                 class: "search-input",
+                r#type: "text",
                 placeholder: "Search…",
                 autofocus: true,
                 value: "{ctx.read().query}",
+                "aria-label": "Search within diff",
                 oninput: move |e| {
                     ctx.write().query = e.value();
+                    // Index rebuilt by DiffWorkspace on the next render cycle
+                    // (it reads `ctx.read().query` in its snapshot computation).
                 },
                 onkeydown: move |e| {
-                    if e.key() == dioxus::html::input_data::keyboard_types::Key::Escape {
-                        let mut c = ctx.write();
-                        c.active = false;
-                        c.query.clear();
+                    match e.key() {
+                        Key::Escape => {
+                            let mut c = ctx.write();
+                            c.active = false;
+                            c.query.clear();
+                            c.index = MatchIndex::default();
+                        }
+                        Key::Enter => {
+                            if e.modifiers().shift() {
+                                ctx.write().index.prev();
+                            } else {
+                                ctx.write().index.next();
+                            }
+                            scroll_to_focused(&ctx.read());
+                        }
+                        _ => {}
                     }
                 },
             }
-            if !count_label.is_empty() {
-                span { class: "search-count", "{count_label}" }
+
+            // Prev / Next buttons
+            button {
+                class: "search-nav",
+                disabled: total == 0,
+                title: "Previous match (Shift+Enter)",
+                "aria-label": "Previous match",
+                onclick: move |_| {
+                    ctx.write().index.prev();
+                    scroll_to_focused(&ctx.read());
+                },
+                "▲"
             }
             button {
+                class: "search-nav",
+                disabled: total == 0,
+                title: "Next match (Enter / F3)",
+                "aria-label": "Next match",
+                onclick: move |_| {
+                    ctx.write().index.next();
+                    scroll_to_focused(&ctx.read());
+                },
+                "▼"
+            }
+
+            if !count_label.is_empty() {
+                span {
+                    class: if total == 0 && !query_empty { "search-count no-matches" }
+                           else { "search-count" },
+                    "aria-live": "polite",
+                    "{count_label}"
+                }
+            }
+
+            button {
                 class: "search-close",
+                "aria-label": "Close search bar",
                 onclick: move |_| {
                     let mut c = ctx.write();
                     c.active = false;
                     c.query.clear();
+                    c.index = MatchIndex::default();
                 },
                 "×"
             }
@@ -64,12 +139,23 @@ pub fn SearchBar(match_count: usize) -> Element {
     }
 }
 
-/// Whether the given line content matches the current active search query.
-/// Case-insensitive. Returns `false` when search is inactive or query is empty.
-pub fn line_matches(ctx: &SearchCtx, content: &str) -> bool {
-    if !ctx.active || ctx.query.is_empty() {
-        return false;
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Scroll the focused match's hunk element into view via document.eval.
+pub fn scroll_to_focused(ctx: &SearchCtx) {
+    if let Some(pos) = ctx.index.focused() {
+        let id = pos.hunk_elem_id.clone();
+        spawn(async move {
+            let _ = dioxus::document::eval(
+                &format!("document.getElementById({id:?})?.scrollIntoView({{block:'nearest',behavior:'smooth'}});")
+            ).await;
+        });
     }
-    let q = ctx.query.to_ascii_lowercase();
-    content.to_ascii_lowercase().contains(&q)
+}
+
+/// Whether a line's content matches the current active query.
+/// Case-insensitive substring match. `false` when inactive or query is empty.
+pub fn line_matches(ctx: &SearchCtx, content: &str) -> bool {
+    if !ctx.active || ctx.query.is_empty() { return false; }
+    content.to_ascii_lowercase().contains(&ctx.query.to_ascii_lowercase())
 }

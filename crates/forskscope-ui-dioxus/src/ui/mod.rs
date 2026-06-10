@@ -11,6 +11,7 @@ pub mod hunk;
 pub mod keybindings;
 pub mod modals;
 pub mod search;
+pub mod search_index;
 pub mod settings;
 pub mod statusbar;
 pub mod tabs;

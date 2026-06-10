@@ -1,8 +1,28 @@
 # RFC-014 — Search, Filter, and Navigation
 
-**Status.** Proposed
+**Status.** Proposed — search next/prev traversal slice implemented (v0.43.0); explorer filter and command palette open
 
-## 1. Summary
+## Status
+Partially implemented in v0.43.0. In-diff text search upgraded from a
+static match counter to a full navigable index:
+
+- **`MatchIndex`** in `forskscope-explorer-align` crate — a pure data engine
+  (no Dioxus dependency) that builds an ordered list of `(hunk_id,
+  row_index, side)` match positions from a hunk snapshot and a query, then
+  supports `next()` / `prev()` traversal with wrapping, `reset_focus()`,
+  `matching_hunk_ids()`, and `is_focused()`. 13 unit tests.
+- **`SearchBar`** updated — Prev (▲) / Next (▼) buttons with keyboard
+  equivalents (Enter / Shift+Enter), focused-match counter ("3 / 12"),
+  "No matches" label, `aria-live` count region.
+- **Auto-expand** — hunks containing matches are auto-expanded so results
+  are visible without manual expand interaction.
+- **Scroll-to-match** — `scrollIntoView` fires on next/prev/first-match via
+  `dioxus::document::eval`.
+- **F3** keyboard shortcut wired in `app.rs` alongside existing F7/F8.
+
+Remaining open: Explorer file/directory filter UI, command palette
+integration (RFC-019), whole-word and regex modes (behind disclosure,
+deferred), and cross-tab project-wide search.
 
 This RFC defines search, filter, and navigation behavior for the Dioxus migration.
 

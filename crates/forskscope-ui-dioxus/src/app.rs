@@ -80,6 +80,14 @@ pub fn App() -> Element {
                 match e.key() {
                     Key::F7 => move_focus(&mut store, index, -1),
                     Key::F8 => move_focus(&mut store, index,  1),
+                    // F3 / Shift+F3: next / previous search match
+                    Key::F3 => {
+                        spawn(async move {
+                            let _ = dioxus::document::eval(
+                                "document.querySelector('.search-input') && (() => {                                     const btn = document.querySelector('.search-nav[title*=\'Next\']');                                     btn?.click();                                 })();"
+                            ).await;
+                        });
+                    }
                     Key::Enter => apply_focused_hunk(&mut store, index),
                     Key::Character(ref s) if mods.contains(Modifiers::CONTROL) => {
                         match s.to_ascii_lowercase().as_str() {

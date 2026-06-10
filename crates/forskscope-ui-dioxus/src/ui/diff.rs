@@ -10,7 +10,8 @@ use crate::state::{Lang, Modal, Store, recompute_diff, reload_tab, swap_sides};
 pub use crate::ui::diff_actions::{apply_focused_hunk, move_focus, save_as, save_tab};
 use crate::ui::diff_actions::{algo_val, trunc};
 use crate::ui::hunk::HunkBlock;
-use crate::ui::search::{SearchBar, SearchCtx, line_matches};
+use crate::ui::search::{SearchBar, SearchCtx, line_matches, scroll_to_focused};
+use crate::ui::search_index::MatchIndex;
 
 #[component]
 pub fn DiffWorkspace(index: usize) -> Element {
@@ -28,19 +29,44 @@ pub fn DiffWorkspace(index: usize) -> Element {
     };
 
     // Search context — scoped to this workspace instance.
-    let search_ctx: Signal<SearchCtx> = use_context_provider(|| Signal::new(SearchCtx::default()));
+    let mut search_ctx: Signal<SearchCtx> = use_context_provider(|| Signal::new(SearchCtx::default()));
     let mut expanded: Signal<HashSet<u64>> = use_signal(HashSet::new);
 
-    // Count matching hunks for the search bar label.
-    let match_count: usize = if search_ctx.read().active && !search_ctx.read().query.is_empty() {
-        snap.hunks.iter().map(|h| {
-            h.rows.iter().filter(|r| {
-                let ctx = search_ctx.read();
-                r.left.as_ref().map(|l| line_matches(&ctx, &l.content)).unwrap_or(false)
-                    || r.right.as_ref().map(|r| line_matches(&ctx, &r.content)).unwrap_or(false)
-            }).count()
-        }).sum()
-    } else { 0 };
+    // Rebuild the match index whenever the query changes, then auto-expand
+    // hunks that contain matches so they are visible without manual expand.
+    {
+        let query = search_ctx.read().query.clone();
+        let active = search_ctx.read().active;
+        if active && !query.is_empty() {
+            let hunk_rows: Vec<(u64, Vec<(Option<&str>, Option<&str>)>)> = snap.hunks.iter()
+                .map(|h| {
+                    let rows = h.rows.iter()
+                        .map(|r| (
+                            r.left.as_ref().map(|l| l.content.as_str()),
+                            r.right.as_ref().map(|r| r.content.as_str()),
+                        ))
+                        .collect();
+                    (h.hunk_id, rows)
+                })
+                .collect();
+            let new_index = MatchIndex::build(
+                hunk_rows.iter().map(|(id, rows)| (*id, rows.as_slice())),
+                &query,
+            );
+            // Auto-expand hunks containing matches.
+            for id in new_index.matching_hunk_ids() { expanded.write().insert(id); }
+            // Scroll to first match when the index is freshly built.
+            let prev_len = search_ctx.read().index.len();
+            if new_index.len() != prev_len || search_ctx.read().index.focused_number() == Some(1) {
+                let ctx_snap = search_ctx.read();
+                scroll_to_focused(&ctx_snap);
+                drop(ctx_snap);
+            }
+            search_ctx.write().index = new_index;
+        } else if !active {
+            search_ctx.write().index = MatchIndex::default();
+        }
+    }
 
     let wrap_class = if snap.word_wrap { "diff-scroll wrap" } else { "diff-scroll" };
 
@@ -51,7 +77,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
             aria_label: "File comparison",
             DiffHeader { index }
             Toolbar { index, snap: snap.clone(), lang }
-            SearchBar { match_count }
+            SearchBar {}
             for w in snap.warnings.iter() {
                 div { class: "diff-warning-banner", role: "alert", "⚠ {t(lang, w)}" }
             }

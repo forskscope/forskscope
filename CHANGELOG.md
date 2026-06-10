@@ -5,6 +5,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.43.0] — 2026-06-10
+
+Search next/prev traversal and match navigation (RFC-014 slice).
+
+### Added
+
+- **`MatchIndex`** in `forskscope-explorer-align` (`search_index` module,
+  RFC-014 §"Text Search") — a pure data engine with no Dioxus or GTK
+  dependency. Builds an ordered list of `(hunk_id, row_index, MatchSide)`
+  positions from a hunk snapshot and a query string, then exposes:
+  `next()` / `prev()` (both wrapping), `reset_focus()`, `focused()` /
+  `focused_number()`, `matching_hunk_ids()` (for auto-expand), and
+  `is_focused()`. Case-insensitive substring matching; `MatchSide::Both`
+  when a row matches on both sides. 13 unit tests.
+
+- **`SearchBar` Prev/Next navigation** — the search bar now shows ▲ / ▼
+  buttons (keyboard: Shift+Enter / Enter), a focused-match counter
+  ("3 / 12"), and a "No matches" label with `aria-live` so screen-reader
+  users are informed without polling.
+
+- **Auto-expand on search** — hunks containing matches are automatically
+  added to the expanded set so results are visible without manual expand.
+
+- **Scroll-to-match** — `scrollIntoView` fires on first match, on Prev/Next,
+  and on Enter/Shift+Enter in the search input.
+
+- **F3 shortcut** — wired in the global `onkeydown` handler alongside F7/F8.
+
+### Changed
+
+- `forskscope-explorer-align` crate expanded into a two-module pure-logic
+  crate: `align` (the existing aligned-row computation) and `search_index`
+  (the new match index). Re-exports at the crate root keep existing
+  `use` statements in the UI crate unchanged.
+
+---
+
 ## [0.42.0] — 2026-06-10
 
 Cancellable directory comparison and explicit symlink handling (RFC-037 slice).
