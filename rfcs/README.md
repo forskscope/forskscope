@@ -28,6 +28,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 058 | [Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract](./done/058-spreadsheet-xlsx-structural-diff.md) | v0.45.0 (structured adapter; aligned view deferred) |
 | 015 | [Undo/Redo Transaction Log and Merge Operation History](./done/015-undo-redo-transaction-log.md) | v0.47.0 (TransactionLog; history panel UI and crash recovery open) |
 | 027 | [Report Export and Session Evidence](./done/027-report-export-and-session-evidence.md) | v0.49.0 (Markdown + JSON core; HTML and export dialog open) |
+| 031 | [Release Channel, Migration, and Data Compatibility](./done/031-release-channel-migration-and-data-compatibility.md) | v0.51.0 (versioned envelope + migration policy; execution and serialization open) |
 
 ## Proposed
 
@@ -53,7 +54,6 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 028 | [Preferences, Profiles, and Compare Options](./proposed/028-preferences-profiles-and-compare-options.md) |
 | 029 | [Integration with External Tools and Open With](./proposed/029-integration-with-external-tools-and-open-with.md) |
 | 030 | [User Documentation, Onboarding, and Help System](./proposed/030-user-documentation-onboarding-and-help-system.md) |
-| 031 | [Release Channel, Migration, and Data Compatibility](./proposed/031-release-channel-migration-and-data-compatibility.md) |
 | 032 | [Text Editing Operation Model and Editor Truth Boundary](./proposed/032-text-editing-operation-model-and-editor-truth-boundary.md) |
 | 034 | [Conflict Resolution Workspace](./proposed/034-conflict-resolution-workspace.md) |
 | 035 | [Scroll Sync, Line Mapping, and Diff Decoration Engine](./proposed/035-scroll-sync-line-mapping-and-diff-decoration-engine.md) |

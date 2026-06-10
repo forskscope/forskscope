@@ -5,6 +5,54 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.51.0] — 2026-06-10
+
+Versioned schema envelope and migration policy for all persisted data (RFC-031).
+
+### Added
+
+- **`forskscope-core::persist`** — versioned data envelope and schema
+  migration policy (RFC-031 §"Versioned app data", §"Migration policy").
+
+  Every persisted file (settings, profiles, sessions, manifests, reports)
+  is wrapped in a `VersionedEnvelope` containing: `schema_name`, `schema_version`,
+  `app_version`, `created_unix`, `updated_unix`, and a pre-serialized JSON
+  payload. The envelope is independent of `serde` — serialization is
+  hand-written via `std::fmt::Write`, consistent with the project pattern.
+
+  **`SchemaName`** — `Settings | Profiles | Session | BatchManifest | Report
+  | Unknown(String)`. `as_str()` / `from_str_pub()` round-trip through
+  their canonical names.
+
+  **`VersionedEnvelope::parse(json)`** — a minimal hand-written parser
+  that extracts the envelope metadata and the raw payload JSON as a
+  substring. Handles nested objects `{...}` and arrays `[...]` as payload
+  via balanced-delimiter counting (no full JSON grammar needed for the
+  envelope shape).
+
+  **`MigrationPolicy`** — the four RFC-031 decisions:
+  - `CompatibleRead` — version matches; use directly.
+  - `ForwardMigration { from_version }` — older file; app may migrate.
+  - `NewerSchema { file_version, app_version }` — newer file; do not
+    overwrite, ask user to upgrade.
+  - `UnknownSchema { schema_name }` — unrecognised schema; preserve untouched.
+
+  Predicates: `is_compatible()`, `can_write()`.
+
+- **19 new tests** covering: schema name round-trips, envelope JSON
+  structure, payload embedding, nested-object and array payload parse,
+  round-trip of all envelope fields, missing-field error cases, all four
+  migration policy branches, and all policy predicates.
+  Total core test count: 274.
+
+### RFC
+
+- RFC-031 moved from `proposed/` to `done/`. Remaining open: per-schema
+  migration execution functions, settings/profile/session serialization
+  driving this envelope, and crash-recovery journal integration.
+
+---
+
 ## [0.50.0] — 2026-06-10
 
 Editability classification, newline save policy (RFC-012 slice) and compare profiles (RFC-028 slice).

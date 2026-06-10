@@ -16,6 +16,7 @@ mod ignore_tests;
 mod job_tests;
 mod merge_tests;
 mod patch_tests;
+mod persist_tests;
 mod report_tests;
 mod save_tests;
 mod three_way_tests;

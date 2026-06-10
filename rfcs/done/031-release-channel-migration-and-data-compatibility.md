@@ -1,10 +1,28 @@
 # RFC 031 — Release Channel, Migration, and Data Compatibility
 
-**Status.** Proposed
+**Status.** Implemented (v0.51.0) — versioned envelope and migration policy; migration execution and settings serialization open
 
 ## Status
+Implemented (v0.51.0). `forskscope-core::persist` ships:
 
-Proposed.
+- **`SchemaName`** — all data categories (`Settings`, `Profiles`, `Session`,
+  `BatchManifest`, `Report`, `Unknown(String)`) with `as_str()` round-trip.
+- **`VersionedEnvelope`** — metadata wrapper for all persisted files: schema
+  name and version, app version, created/updated timestamps, pre-serialized
+  payload JSON. `to_json()` produces deterministic output; `parse()` round-
+  trips it via a minimal hand-written parser that handles nested objects and
+  arrays.
+- **`ParsedEnvelope`** — the parsed form, with `migration_policy(current_version)`
+  returning one of four decisions.
+- **`MigrationPolicy`** — `CompatibleRead` / `ForwardMigration { from_version }`
+  / `NewerSchema { file_version, app_version }` / `UnknownSchema { schema_name }`.
+  Predicates: `is_compatible()`, `can_write()`.
+- **19 tests** covering all RFC-031 acceptance criteria.
+
+Remaining open: actual migration execution logic (per-schema version upgrade
+functions), settings/profile/session serialization driving this envelope
+(RFC-011, RFC-028 persistence), and crash-recovery journal integration
+(RFC-015 §4).
 
 ## Summary
 
