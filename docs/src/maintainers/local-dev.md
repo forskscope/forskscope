@@ -20,7 +20,7 @@ cargo clippy --workspace -- -D warnings
 ## Run
 
 ```sh
-cargo run -p forskscope-ui-dioxus
+cargo run -p forskscope-ui
 # or, after a release build:
 ./target/release/forskscope old.txt new.txt
 ```

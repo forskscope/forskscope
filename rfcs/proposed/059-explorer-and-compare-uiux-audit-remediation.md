@@ -10,7 +10,7 @@ Partially implemented in v0.41.0. The core-testable items shipped:
 - **M2** — Typed `DigestKey` enum replaces the stringly-typed `r:` prefix
   in `explorer.rs`.
 - **M5** — `compute_aligned_rows` / `merge_level` extracted into a new
-  `forskscope-explorer-align` crate (no GUI dependency); 9 unit tests added
+  `forskscope-ui-logic` crate (formerly `forskscope-explorer-align`) (no GUI dependency); 9 unit tests added
   covering pairing, one-sided rows, ordering, and recursive expansion;
   `explorer.rs` reduced from 426 ELOC to 354.
 - **L5** — Unjustified `unsafe impl Send/Sync` removed from
@@ -212,3 +212,69 @@ offenders found.
   logic and core-testable, but it is also UI-presentation-specific
   (visible-row merging). Recommendation: keep it in the UI crate as a
   testable submodule, not core.
+
+---
+
+## Open issue: Explorer tree ordering — child appears above parent (v0.48.0)
+
+**Reported:** v0.48.0  
+**Priority:** Non-urgent; deferred for investigation on a live UI.
+
+### Symptom
+
+When a directory named `b` is expanded and it contains a child directory
+named `a`, the child `a` is rendered above the parent `b` in the explorer
+pane.
+
+### Hypothesis
+
+`compute_aligned_rows` (in `forskscope-ui-logic::explore::align`) groups
+entries by `rel.parent()` into `by_parent` buckets and recurses via
+`merge_level`. Within each bucket the sort is by `(is_dir DESC, name ASC)`,
+which is correct *within a level*. If entries are grouped and recursed
+correctly, a child can never appear above its parent.
+
+Two possible root causes to investigate on a live machine:
+
+1. **`DirectoryTree::visible_rows()` ordering.** If `dioxus-swdir-tree`
+   returns rows in a flat alphabetically-sorted order where the relative
+   path of the child (`b/a`) sorts before the parent (`b`) because `b/a <
+   b/` lexicographically — the `strip_prefix` + `rel.parent()` logic would
+   then place `b/a` in the `b/` bucket and `b` in the `""` bucket, which
+   is correct, and recursion should still render them in the right order.
+   Verify the `by_parent` map is being populated with the correct buckets.
+
+2. **`visible_rows()` path format.** If `visible_rows()` returns paths
+   that are already relative (not absolute), `strip_prefix(root)` may fail
+   silently (the `if let Ok(rel)` arm is skipped), and entries fall into
+   no bucket and disappear entirely — causing a different symptom. Check
+   that `abs` paths are truly absolute before `strip_prefix`.
+
+3. **Single flat bucket.** If all paths land in the root `""` bucket (e.g.
+   because `strip_prefix` produces only the bare filename), the root-level
+   sort would process both `b` (depth 0) and `a` (child of b) as siblings,
+   and alphabetical sort would place `a` before `b`. Add a temporary
+   `eprintln!` after the bucket-building loop to inspect bucket contents.
+
+### Investigation steps
+
+```rust
+// Temporary diagnostic in compute_aligned_rows, after the bucket loop:
+for (parent, rows) in &l_by_parent {
+    eprintln!("L bucket {:?}: {:?}", parent,
+        rows.iter().map(|r| &r.rel_path).collect::<Vec<_>>());
+}
+```
+
+### Resolution path
+
+If root cause is #3 (flat bucket), the fix is in `compute_aligned_rows`:
+verify that `abs.strip_prefix(root)` for a path like `/root/b/a` against
+root `/root` produces `b/a`, not just `a`. If `visible_rows()` returns
+paths differently, adjust the strip logic or document the expected input
+contract.
+
+If root cause is a genuine `dioxus-swdir-tree` API contract difference,
+the fix may belong in the `Explorer` component's feed into
+`compute_aligned_rows` (normalizing paths before passing them in), not in
+`align.rs` itself.

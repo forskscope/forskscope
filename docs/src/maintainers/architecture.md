@@ -5,13 +5,16 @@
 ```
 forskscope/
   crates/
-    forskscope-core/      GUI-independent product logic
-    forskscope-ui-dioxus/ Dioxus 0.7 desktop frontend
+    forskscope-core/      GUI-independent product logic (diff/merge/save/dir/…)
+    forskscope-ui-logic/  framework-independent presentation logic (view-model)
+    forskscope-ui/        Dioxus 0.7 desktop frontend (shell, workspaces, dialogs)
 ```
 
 The core crate has no dependency on Dioxus, Tauri, or any UI framework.  It is
 the canonical owner of product truth; the UI reads from it and dispatches
-commands to it.  A future Iced frontend could be added as a third crate without
+commands to it.  `forskscope-ui-logic` holds pure presentation logic (row
+alignment, search-match indexing) that is testable without a display server.
+A future alternative frontend could be added as a fourth crate without
 touching core.
 
 ## Core modules

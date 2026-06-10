@@ -148,7 +148,7 @@ cargo fmt
 cargo clippy
 cargo test -p forskscope-core
 cargo test -p forskscope-editor-adapter
-cargo test -p forskscope-ui-dioxus --no-run
+cargo test -p forskscope-ui --no-run
 fixture regression tests
 packaging dry-run per platform where practical
 ```

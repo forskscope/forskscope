@@ -223,7 +223,7 @@ the truth; UI signals hold only transient view state).
 
 ```text
 forskscope-core (truth)        ThreeWayMergeSession (per tab)
-forskscope-ui-dioxus (view)    ThreeWayTab + transient UI signals
+forskscope-ui (view)    ThreeWayTab + transient UI signals
 ```
 
 Proposed additions to `state.rs`:

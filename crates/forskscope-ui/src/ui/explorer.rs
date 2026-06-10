@@ -3,7 +3,8 @@
 //! Both trees are managed here so their visible rows can be merged into an
 //! aligned structure where same-name entries share the same horizontal row.
 
-use std::path::{Path, PathBuf};
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
@@ -15,7 +16,7 @@ use forskscope_core::dir::file_digest_equal;
 use crate::i18n::t;
 use crate::state::{Store, open_compare};
 use crate::ui::deep_compare::DeepCompareView;
-use crate::ui::explorer_align::{AlignedRow, RowData, compute_aligned_rows};
+use crate::ui::explorer_align::compute_aligned_rows;
 // ── Digest map key ────────────────────────────────────────────────────────────
 
 /// Typed key for the shared digest map (RFC-059 §M2).
@@ -109,7 +110,7 @@ pub fn Explorer() -> Element {
             if is_dir {
                 // Directory: existence check only (deep comparison is in Directory Report).
                 let state = if cp.is_dir() { DigestState::Equal } else { DigestState::Unique };
-                digest_map.write().insert(rel, state);
+                digest_map.write().insert(DigestKey::Common(rel), state);
             } else {
                 // File: background byte comparison.
                 if !cp.is_file() { digest_map.write().insert(DigestKey::Common(rel.clone()), DigestState::Unique); continue; }

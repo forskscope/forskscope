@@ -20,5 +20,5 @@ Run: `cargo test -p forskscope-core`
 
 ## UI build verification
 
-`cargo build -p forskscope-ui-dioxus` is the current UI gate.  Integration and
+`cargo build -p forskscope-ui` is the current UI gate.  Integration and
 screenshot tests are planned in RFC-020 and RFC-040.

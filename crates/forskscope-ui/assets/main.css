@@ -186,6 +186,7 @@ input, select {
 .status-changed { color: var(--warn); }
 .status-only    { color: var(--muted); }
 .status-cmp     { color: var(--muted); opacity: .6; }
+.status-symlink { color: var(--muted); font-style: italic; }
 .status-err     { color: var(--err); }
 .compare-bar .hint { color: var(--muted); font-size: 12px; }
 

@@ -6,7 +6,7 @@
 Partially implemented in v0.43.0. In-diff text search upgraded from a
 static match counter to a full navigable index:
 
-- **`MatchIndex`** in `forskscope-explorer-align` crate — a pure data engine
+- **`MatchIndex`** in `forskscope-ui-logic` crate (formerly `forskscope-explorer-align`) — a pure data engine
   (no Dioxus dependency) that builds an ordered list of `(hunk_id,
   row_index, side)` match positions from a hunk snapshot and a query, then
   supports `next()` / `prev()` traversal with wrapping, `reset_focus()`,

@@ -33,7 +33,7 @@ ForskScope fills that gap: a desktop app built on [Dioxus](https://dioxuslabs.co
 # Ubuntu / Debian:
 sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev pkg-config
 
-cargo build --release -p forskscope-ui-dioxus
+cargo build --release -p forskscope-ui
 ./target/release/forskscope
 ```
 

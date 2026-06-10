@@ -5,6 +5,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.48.0] — 2026-06-10
+
+Crate architecture: classify by function, not framework (RFC-020 §5a).
+
+### Changed
+
+- **`forskscope-explorer-align` → `forskscope-ui-logic`.** The crate had
+  outgrown its name (it held alignment *and* search-index logic). It is now
+  scoped to *all* framework-independent presentation logic — the view-model
+  layer — and remains fully testable without a display server. Feature areas
+  are now modules:
+  - `explore::align` (was `align`)
+  - `compare::search_index` (was `search_index`)
+  - `settings` reserved for when pure settings logic emerges.
+
+- **`forskscope-ui-dioxus` → `forskscope-ui`.** The `-dioxus` suffix
+  documented an implementation choice the project already committed to
+  (Dioxus is *the* UI target per RFC-042) and conveyed nothing about the
+  crate's role. The library target is renamed `forskscope_ui`; the
+  `forskscope` binary name is unchanged.
+
+- Crate dependencies, workspace members, the two UI re-export shims
+  (`ui/explorer_align.rs`, `ui/search_index.rs`), README, and maintainer
+  docs updated to the new names. The shim pattern meant the rename touched
+  only two lines of actual UI component code.
+
+### RFC
+
+- RFC-020 §5a records the settled three-crate architecture
+  (`forskscope-core` / `forskscope-ui-logic` / `forskscope-ui`), the
+  function-over-framework naming rationale, the module-vs-crate boundary
+  policy (feature areas are modules until a concrete need — chiefly
+  GTK-free testability — justifies a crate), and why per-widget crates are
+  not adopted at current scale. The original §5 sketch (which named
+  `forskscope-dioxus`) is retained but marked superseded.
+
+### Notes
+
+- Crate counts unchanged (3). Test counts unchanged (200 core + 2 patch
+  integration + 22 ui-logic). No behavioral change; this is a structural
+  and naming release.
+
+---
+
 ## [0.47.0] — 2026-06-10
 
 Transaction log and unified merge operation history (RFC-015).

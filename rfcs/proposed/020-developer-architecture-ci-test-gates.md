@@ -1,6 +1,11 @@
 # RFC-020 — Developer Architecture, CI, and Test Gates
 
-**Status.** Proposed
+**Status.** Proposed — crate-naming and -boundary decision settled (v0.48.0); CI/gate sections still proposed
+
+> **v0.48.0 amendment.** The crate layout and naming are now settled (see
+> §5a below). The original §5 sketch used `forskscope-dioxus`; that name is
+> superseded — naming is by *function*, not framework. The CI-stage and
+> release-gate sections remain proposed.
 
 ## 1. Summary
 
@@ -27,7 +32,79 @@ The project is moving from a Tauri/Svelte architecture to a Dioxus architecture.
 - This RFC does not define paid code signing.
 - This RFC does not require exhaustive GUI automation in the first milestone.
 
-## 5. Target Repository Shape
+## 5a. Settled crate architecture (v0.48.0)
+
+The workspace is organized **by function, not by framework**, on a single
+load-bearing axis: *what can be compiled and tested without a GUI runtime*
+(WebKitGTK/GTK3). Three crates:
+
+```text
+forskscope/
+  crates/
+    forskscope-core/        # domain truth; no UI, no framework
+    forskscope-ui-logic/    # pure presentation logic; framework-independent
+    forskscope-ui/          # Dioxus app, shell, components, dialogs
+```
+
+| Crate | Role | Depends on | Testable without GTK |
+|---|---|---|---|
+| `forskscope-core` | diff/merge/save/dir/patch/xlsx/error/job — product truth | (leaf) | yes |
+| `forskscope-ui-logic` | view-model logic derived from core: row alignment, search index, future per-feature pure logic | core (optional) | yes |
+| `forskscope-ui` | Dioxus desktop UI: shell, tabs, explorer, compare, settings, dialogs, the `forskscope` binary | core, ui-logic, dioxus | no (needs WebKitGTK) |
+
+### Naming rationale
+
+- **Function over framework.** `-dioxus` documented an implementation choice
+  the project already committed to (Dioxus is *the* UI target per RFC-042);
+  the suffix conveyed nothing about role. The crate is now `forskscope-ui`.
+- **No localized names.** The former `forskscope-explorer-align` held both
+  alignment *and* search-index logic; "explorer" covered only half. It is
+  now `forskscope-ui-logic`, scoped to *all* framework-independent
+  presentation logic.
+
+### Feature-area organization is by **module**, not crate
+
+Inside `forskscope-ui-logic`, feature areas are modules:
+
+```text
+forskscope-ui-logic/src/
+  lib.rs
+  explore/        # explorer-pane logic
+    align.rs      #   aligned-row merging
+  compare/        # diff/compare logic
+    search_index.rs  #  in-diff search match index
+  # settings/     # reserved — added when pure settings logic exists
+```
+
+The same applies inside `forskscope-ui` (its `ui/` module tree holds
+`explorer`, `diff`, `settings`, `dialogs`, etc. as modules).
+
+### Crate-boundary policy
+
+A feature area is promoted from a module to its own crate **only** when a
+concrete need justifies the boundary cost (manifest, dependency-graph
+friction, re-export shims):
+
+- **independent testing** without a GUI runtime — the primary trigger;
+- **enforced layering** that is actively being violated;
+- **compile-time isolation** that is measurably hurting iteration.
+
+Per-widget crates (`explore`, `compare`, `settings` as separate crates) are
+**not** adopted at current scale: all would depend on `dioxus`, so none
+would gain GTK-free testability — the boundary cost would buy nothing. When
+a widget's *pure* logic grows enough to warrant its own test surface, that
+logic moves into `forskscope-ui-logic` as a sibling module (or, if it
+genuinely earns it, a crate), keeping the testability axis sharp.
+
+### Directory layout
+
+Crate directories match crate names (`crates/forskscope-ui-logic/`,
+`crates/forskscope-ui/`) per standard Rust convention, rather than nesting
+under `crates/ui/`. Cargo workspaces are flat; the `forskscope-ui` /
+`forskscope-ui-logic` name prefix conveys the grouping without implying a
+hierarchy Cargo does not enforce.
+
+## 5. Target Repository Shape (original sketch — superseded by §5a)
 
 ```text
 forskscope/
@@ -71,20 +148,21 @@ The exact directory names may change, but the boundary intent must remain.
 
 ## 6. Dependency Rules
 
+(Updated for the §5a settled architecture.)
+
 ```text
 forskscope-core
   must not depend on Dioxus, WebView, CodeMirror, or platform UI crates
 
-forskscope-editor-bridge
-  may depend on protocol types and editor integration support
-  must not own merge/save truth
+forskscope-ui-logic
+  pure presentation logic; std-only (may depend on core for shared types)
+  must not depend on Dioxus or any GUI/platform crate
+  must remain testable without a GUI runtime
 
-forskscope-dioxus
-  may depend on core and editor bridge
+forskscope-ui
+  may depend on core and ui-logic
   must not implement duplicate diff/merge logic
-
-forskscope-cli
-  may depend on core for parity and diagnostics commands
+  owns the `forskscope` binary
 ```
 
 ## 7. Test Layers

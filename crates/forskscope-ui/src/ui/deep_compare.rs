@@ -129,9 +129,10 @@ fn DeepRow(entry: RecEntry, lang: Lang) -> Element {
         RecStatus::RightOnly => ("→", "status-only"),
         RecStatus::Equal     => ("✓", "status-equal"),
         RecStatus::Computing => ("⊙", "status-cmp"),
+        RecStatus::Symlink   => ("↗", "status-symlink"),
     };
     let path_str   = entry.rel_path.display().to_string();
-    let can_cmp    = !matches!(entry.status, RecStatus::Equal | RecStatus::Computing);
+    let can_cmp    = !matches!(entry.status, RecStatus::Equal | RecStatus::Computing | RecStatus::Symlink);
     let e2 = entry.clone();
     rsx! {
         div { class: "deep-row",

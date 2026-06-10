@@ -37,7 +37,7 @@ forskscope-core
   save and safety policy
   directory comparison jobs
 
-forskscope-ui-dioxus
+forskscope-ui
   desktop shell
   workspaces
   dialogs

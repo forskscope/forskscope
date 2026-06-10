@@ -1,6 +1,6 @@
 [package]
-name = "forskscope-ui-dioxus"
-description = "ForskScope desktop UI (Dioxus): explorer, diff/merge workspace, settings."
+name = "forskscope-ui"
+description = "ForskScope desktop UI: app shell, explorer, compare/diff-merge workspace, settings, dialogs."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,12 +13,12 @@ name = "forskscope"
 path = "src/main.rs"
 
 [lib]
-name = "forskscope_ui_dioxus"
+name = "forskscope_ui"
 path = "src/lib.rs"
 
 [dependencies]
 forskscope-core = { workspace = true }
-forskscope-explorer-align = { workspace = true }
+forskscope-ui-logic = { workspace = true }
 dioxus = { workspace = true }
 dioxus-swdir-tree = { workspace = true }
 rfd = { workspace = true }
