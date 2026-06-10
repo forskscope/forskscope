@@ -27,6 +27,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 033 | [Three-Way Merge Model](./done/033-three-way-merge-model.md) | v0.40.0 (core model; workspace deferred) |
 | 058 | [Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract](./done/058-spreadsheet-xlsx-structural-diff.md) | v0.45.0 (structured adapter; aligned view deferred) |
 | 015 | [Undo/Redo Transaction Log and Merge Operation History](./done/015-undo-redo-transaction-log.md) | v0.47.0 (TransactionLog; history panel UI and crash recovery open) |
+| 027 | [Report Export and Session Evidence](./done/027-report-export-and-session-evidence.md) | v0.49.0 (Markdown + JSON core; HTML and export dialog open) |
 
 ## Proposed
 
@@ -49,7 +50,6 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 024 | [Diff Visual Semantics and Decoration Contract](./proposed/024-diff-visual-semantics-decoration-contract.md) |
 | 025 | [Editor Adapter Prototype and Kill Switch](./proposed/025-editor-adapter-prototype-and-kill-switch.md) |
 | 026 | [Cross-Platform WebView and Linux Desktop Compatibility](./proposed/026-cross-platform-webview-and-linux-desktop-compatibility.md) |
-| 027 | [Report Export and Session Evidence](./proposed/027-report-export-and-session-evidence.md) |
 | 028 | [Preferences, Profiles, and Compare Options](./proposed/028-preferences-profiles-and-compare-options.md) |
 | 029 | [Integration with External Tools and Open With](./proposed/029-integration-with-external-tools-and-open-with.md) |
 | 030 | [User Documentation, Onboarding, and Help System](./proposed/030-user-documentation-onboarding-and-help-system.md) |

@@ -1,10 +1,27 @@
 # RFC 027 — Report Export and Session Evidence
 
-**Status.** Proposed
+**Status.** Implemented (v0.49.0) — Markdown and JSON report core; HTML and export dialog open
 
 ## Status
+Implemented (v0.49.0). The `forskscope-core::report` module ships:
 
-Proposed.
+- **`FileComparisonReport::from_diff`** — builds from a `DiffDocument` +
+  optional `TransactionLog` + optional file paths; renders to
+  `to_markdown()` and `to_json()`.
+- **`DirComparisonReport::from_entries`** — builds from `Vec<RecEntry>` +
+  optional `BatchManifest` + optional roots; renders to `to_markdown()` and
+  `to_json()`.
+- **`ReportPathMode`** (NameOnly / Relative / Absolute) — privacy-safe path
+  display. Default is `NameOnly` (basename only, no directory prefix).
+- **`ReportOptions`** — include_hunks, include_history, include_options,
+  include_warnings, include_sizes, path_mode.
+- **JSON schema version 1** with `schema_version`, `app_version`, `kind`,
+  `summary`, `options`, `warnings`, `hunks`, `history` / `files` fields.
+- **20 tests** covering all RFC-027 acceptance criteria.
+
+Remaining open: HTML report format (deferred per RFC-027 §"Future formats"),
+the export dialog UI, CSV directory summary, and PDF (both deferred to post-v1
+per RFC-027 §"Non-goals").
 
 ## Summary
 

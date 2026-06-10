@@ -5,6 +5,52 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.49.0] — 2026-06-10
+
+Report export: Markdown and JSON comparison reports (RFC-027).
+
+### Added
+
+- **`forskscope-core::report`** — comparison report engine (RFC-027).
+
+  **`FileComparisonReport`**: built from a `DiffDocument` with optional
+  `TransactionLog` (for operation history) and optional path display.
+  `to_markdown()` produces a structured Markdown document with Summary,
+  Compare Options, Warnings, Changed Hunks, and Operation History sections.
+  `to_json()` produces a JSON object with schema version 1.
+
+  **`DirComparisonReport`**: built from `Vec<RecEntry>` with optional
+  `BatchManifest` (for batch operation summary) and optional root paths.
+  `to_markdown()` and `to_json()` follow the same section structure.
+
+  **`ReportPathMode`** — `NameOnly` (default, safe to share) / `Relative` /
+  `Absolute`. The default deliberately omits directory paths so reports can
+  be shared without leaking project layout.
+
+  **`ReportOptions`** — `include_hunks`, `include_history`,
+  `include_options`, `include_warnings`, `include_sizes`, `path_mode`. All
+  sections are on by default; callers opt out by field.
+
+  **JSON schema v1**: `schema_version`, `app_version`, `kind`
+  (`"file_comparison"` or `"directory_comparison"`), `summary`, `options`,
+  `warnings`, `hunks` / `files`. No `serde` dependency — serialization is
+  hand-written with `std::fmt::Write`, consistent with the project pattern
+  in `BatchManifest::to_json()`.
+
+- **20 new tests** in `tests/report_tests.rs`: Markdown title and section
+  presence, identical vs different status, hunk table, options section, JSON
+  object structure, schema version, kind field, identical flag, privacy
+  (name-only strips absolute paths, absolute mode shows them), directory
+  summary counts, equal files excluded from changed-files table, sizes in
+  default mode, directory JSON files array. Total core test count: 220.
+
+### RFC
+
+- RFC-027 moved from `proposed/` to `done/`. HTML format, the export dialog
+  UI, and CSV/PDF remain open (see RFC-027 §"Future formats" and §"Non-goals").
+
+---
+
 ## [0.48.0] — 2026-06-10
 
 Crate architecture: classify by function, not framework (RFC-020 §5a).

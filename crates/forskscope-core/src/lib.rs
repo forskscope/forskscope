@@ -23,6 +23,7 @@ pub mod job;
 pub mod merge;
 pub mod patch;
 pub mod path;
+pub mod report;
 pub mod save;
 pub mod xlsx;
 
