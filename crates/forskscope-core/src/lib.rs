@@ -58,4 +58,5 @@ pub(crate) fn fnv1a64(bytes: &[u8]) -> u64 {
     hash
 }
 pub use cancel::CancellationToken;
+pub use dir::batch_copy;
 pub use dir::copy_file;

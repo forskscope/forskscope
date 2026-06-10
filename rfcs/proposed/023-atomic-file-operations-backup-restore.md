@@ -1,10 +1,28 @@
 # RFC 023 — Atomic File Operations, Backup, and Restore
 
-**Status.** Proposed
+**Status.** Proposed — batch manifest slice implemented (v0.44.0); restore UI open
 
 ## Status
+Partially implemented in v0.44.0. The `save_text` atomic write + sibling
+backup + fingerprint conflict detection shipped in v0.27.0 (RFC-007). The
+batch manifest layer ships in v0.44.0:
 
-Proposed.
+- **`BatchManifest`** — operation ID, app version, timestamp, per-entry
+  `EntryOutcome` (Copied with backup path, Skipped, Failed). Serializes to
+  deterministic JSON via `to_json()` / `write_to_dir()`.
+- **`batch_copy`** — runs a `Vec<BatchItem>` with `BackupPolicy` and
+  `BatchFailurePolicy` (StopOnFirst or ContinueOnFailure). Records every
+  outcome; skips remaining entries on stop-on-first failure; returns the
+  completed manifest.
+- **`restore_from_manifest`** — copies each `.bak` backup back to its
+  original destination path; skips entries without backups (new files).
+- **`OperationId`** — `op-<unix_secs>-<pid>` format, used as the manifest
+  filename anchor.
+- **9 tests** covering all RFC-023 acceptance criteria.
+
+Remaining open: the restore-from-manifest *UI* (the restore picker dialog
+from RFC-023 §"Restore UI"), per-entry pre-confirmation (RFC-022 §preview),
+and the digest-cache lifetime policy (RFC-037 open item).
 
 ## Summary
 

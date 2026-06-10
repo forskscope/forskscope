@@ -5,6 +5,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.44.0] — 2026-06-10
+
+Batch copy with restore manifest (RFC-023 §"Batch operation manifest").
+
+### Added
+
+- **`batch_copy`** in `forskscope-core::dir` (RFC-023) — runs a slice of
+  `BatchItem` (src/dst path pairs) with configurable `BackupPolicy` and
+  `BatchFailurePolicy`. Each successful copy creates a `.bak` sibling of
+  the destination (same policy as single-file save). Returns a
+  `BatchManifest` recording every outcome.
+
+- **`BatchManifest`** — carries an `OperationId` (`op-<unix_secs>-<pid>`),
+  app version, timestamp, and a `Vec<ManifestEntry>` where each entry holds
+  `(src, dst, EntryOutcome)`. `EntryOutcome` is `Copied { bytes, backup_path }`,
+  `Skipped { reason }`, or `Failed { error }`. Convenience methods:
+  `succeeded()`, `failed()`, `attempted()`, `backup_paths()`.
+
+- **`BatchManifest::to_json()`** — deterministic JSON serialization using
+  `std::fmt::Write` (no `serde` dependency added to core). Combined with
+  `write_to_dir(dir)` which writes `<op-id>.json` to the provided directory
+  and records the path in `manifest_path`.
+
+- **`BatchFailurePolicy`** — `StopOnFirst` (default) marks remaining items
+  as `Skipped` and stops; `ContinueOnFailure` attempts all items and
+  collects all failures.
+
+- **`restore_from_manifest`** — copies each `.bak` backup back to its
+  original destination. Skips entries without a backup (newly created files
+  have no prior state to restore). Returns the count of restored files.
+
+- **9 new tests** in `tests/batch_tests.rs` validating: all-success path,
+  backup creation on overwrite, stop-on-first skips remainder, continue
+  collects all outcomes, manifest written to directory, manifest JSON
+  structure, operation ID format, restore recovers files, restore skips
+  entries without backup. Total core test count: 133.
+
+---
+
 ## [0.43.0] — 2026-06-10
 
 Search next/prev traversal and match navigation (RFC-014 slice).
