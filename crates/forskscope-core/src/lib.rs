@@ -34,7 +34,11 @@ pub use diff::{
     // RFC-028
     CaseSensitivity, CompareProfile, NewlineCompareMode, WhitespaceMode,
 };
-pub use document::{FileFingerprint, FileId, LoadOptions, LoadedDocument, TextDocument, load_path};
+pub use document::{
+    FileFingerprint, FileId, LoadOptions, LoadedDocument, TextDocument, load_path,
+    // RFC-036
+    ExternalFileState, check_external_state,
+};
 pub use encoding::{NewlineStyle, TextEncoding,
     // RFC-012
     NewlinePolicy,

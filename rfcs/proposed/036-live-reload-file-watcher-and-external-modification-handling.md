@@ -1,9 +1,28 @@
 # RFC 036: Live Reload, File Watcher, and External Modification Handling
 
-**Status.** Proposed
+**Status.** Proposed — external file state detection slice implemented (v0.53.0); file watcher and reconciliation UI open
 
 ## Status
-Proposed. (Originally proposed in RFC package v0.4.)
+Partially implemented in v0.53.0:
+
+- **`ExternalFileState`** in `forskscope-core::document` — the six-state
+  enum RFC-036 specifies: `Clean`, `DirtyInSession`, `ChangedOnDisk`,
+  `DeletedOnDisk`, `ReplacedOnDisk`, `Unknown`. Predicates:
+  `blocks_save()` (true for Changed/Deleted/Replaced) and
+  `file_accessible()` (true for Clean/DirtyInSession/ChangedOnDisk).
+- **`check_external_state(path, snapshot, is_session_dirty)`** — compares
+  a live `fs::metadata` call against the `FileFingerprint` captured at load
+  time. Detects: missing file (DeletedOnDisk), non-file replacement
+  (ReplacedOnDisk), size change (ChangedOnDisk), mtime change
+  (ChangedOnDisk where mtime resolution is sufficient). Never panics —
+  metadata errors return `Unknown`. Called by the UI's save interlock.
+- **15 tests** covering all RFC-036 acceptance criteria.
+
+Remaining open: the `FileChangeMonitor` trait and platform file-watcher
+backend (optimization layer; save safety must never rely solely on watcher
+events per RFC-036 §"Watcher Boundary"), the reconciliation dialog UI
+(Compare/Reload/Save As/Cancel), and the `ReplacedOnDisk` detection on
+Windows (rename/replace sequences differ — needs platform CI).
 
 ## Summary
 

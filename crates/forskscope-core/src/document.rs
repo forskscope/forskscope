@@ -216,3 +216,101 @@ pub fn hex_preview(bytes: &[u8]) -> String {
     }
     out
 }
+
+// ── RFC-036: External file state detection ────────────────────────────────────
+
+/// The state of a file relative to the session snapshot (RFC-036 §"File State").
+///
+/// Computed by [`check_external_state`]. The UI uses this to decide whether
+/// a save should be blocked, and which reconciliation actions to offer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExternalFileState {
+    /// The file on disk matches the snapshot taken at load time.
+    /// The session has no unsaved edits.
+    Clean,
+    /// The session has unsaved edits; the file on disk still matches the
+    /// load-time snapshot (no external change).
+    DirtyInSession,
+    /// The file on disk has changed since it was loaded.
+    /// Saving would silently overwrite the external change.
+    ChangedOnDisk,
+    /// The file no longer exists at the path it was loaded from.
+    DeletedOnDisk,
+    /// The path now points to a different inode / content type (e.g. a file
+    /// was replaced by a directory). ForskScope will not overwrite this.
+    ReplacedOnDisk,
+    /// The state cannot be determined (e.g. metadata unavailable).
+    Unknown,
+}
+
+impl ExternalFileState {
+    /// `true` when saving should be blocked without explicit user reconciliation.
+    pub fn blocks_save(self) -> bool {
+        matches!(
+            self,
+            Self::ChangedOnDisk | Self::DeletedOnDisk | Self::ReplacedOnDisk
+        )
+    }
+
+    /// `true` when the file exists on disk in a form we can work with.
+    pub fn file_accessible(self) -> bool {
+        matches!(self, Self::Clean | Self::DirtyInSession | Self::ChangedOnDisk)
+    }
+}
+
+/// Compare the current on-disk state of `path` against the fingerprint
+/// captured at load time to determine the [`ExternalFileState`].
+///
+/// `is_session_dirty` should be `true` when the session has unsaved edits
+/// (e.g. from `MergeSession::is_dirty()` or `ThreeWayMergeSession::can_save()`).
+///
+/// Returns [`ExternalFileState::Unknown`] when metadata cannot be read,
+/// never `Err` — a monitoring failure must not crash the save path.
+pub fn check_external_state(
+    path:              &Path,
+    snapshot:          &FileFingerprint,
+    is_session_dirty:  bool,
+) -> ExternalFileState {
+    use std::fs;
+
+    let meta = match fs::metadata(path) {
+        Ok(m) => m,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return ExternalFileState::DeletedOnDisk;
+        }
+        Err(_) => return ExternalFileState::Unknown,
+    };
+
+    // If the path now points to a non-file, treat as replaced.
+    if !meta.is_file() {
+        return ExternalFileState::ReplacedOnDisk;
+    }
+
+    // Fast path: size changed → definitely changed.
+    if meta.len() != snapshot.len {
+        return ExternalFileState::ChangedOnDisk;
+    }
+
+    // mtime comparison (nanosecond precision where available).
+    let current_mtime: Option<i128> = meta.modified().ok().and_then(|t| {
+        t.duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .map(|d| i128::from(d.as_nanos() as u64))
+    });
+
+    let mtime_differs = match (current_mtime, snapshot.modified_unix_nanos) {
+        (Some(cur), Some(snap)) => cur != snap,
+        _ => false,   // if either mtime is unavailable, don't conclude changed
+    };
+
+    if mtime_differs {
+        return ExternalFileState::ChangedOnDisk;
+    }
+
+    // Size and mtime match — treat as unchanged.
+    if is_session_dirty {
+        ExternalFileState::DirtyInSession
+    } else {
+        ExternalFileState::Clean
+    }
+}

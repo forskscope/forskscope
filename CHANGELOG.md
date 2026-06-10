@@ -5,6 +5,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.53.0] — 2026-06-10
+
+External file state detection (RFC-036 slice).
+
+### Added
+
+- **`ExternalFileState`** in `forskscope-core::document` (RFC-036 §"File State").
+
+  Six variants ordered by severity of action required:
+  - `Clean` — file matches load-time snapshot, no session edits.
+  - `DirtyInSession` — file matches snapshot, session has unsaved edits.
+  - `ChangedOnDisk` — file differs from snapshot (size or mtime changed).
+    Saving would overwrite the external change.
+  - `DeletedOnDisk` — path no longer exists.
+  - `ReplacedOnDisk` — path exists but is no longer a regular file (e.g.
+    replaced by a directory).
+  - `Unknown` — metadata unavailable; state indeterminate.
+
+  Predicates:
+  - `blocks_save()` — `true` for Changed, Deleted, Replaced. The UI uses
+    this to gate the save button and trigger the reconciliation dialog.
+  - `file_accessible()` — `true` for Clean, DirtyInSession, ChangedOnDisk
+    (the file is reachable, whatever its content). `false` for Deleted,
+    Replaced, Unknown.
+
+- **`check_external_state(path, snapshot, is_session_dirty) → ExternalFileState`**
+  — compares the live filesystem metadata against the `FileFingerprint`
+  captured at load time. Detection order: missing → `DeletedOnDisk`;
+  non-file → `ReplacedOnDisk`; size differs → `ChangedOnDisk`; mtime
+  differs → `ChangedOnDisk`; same → `DirtyInSession` or `Clean`. Never
+  returns `Err` — metadata failures return `Unknown`. This is the
+  pre-save interlock specified in RFC-036 §"Save Interlock".
+
+- **15 new tests** in `tests/external_state_tests.rs`:
+  clean/dirty-in-session states, size change, mtime change (with note on
+  coarse-grained filesystem clocks), deleted file, replaced-by-directory,
+  never-panic guarantee, all predicate states. Total core test count: 304.
+
+---
+
 ## [0.52.0] — 2026-06-10
 
 Directory merge action planner and operation plan model (RFC-022 slice).

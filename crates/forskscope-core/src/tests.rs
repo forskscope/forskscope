@@ -12,6 +12,7 @@ mod document_tests;
 mod editability_tests;
 mod encoding_tests;
 mod error_tests;
+mod external_state_tests;
 mod ignore_tests;
 mod job_tests;
 mod merge_plan_tests;
