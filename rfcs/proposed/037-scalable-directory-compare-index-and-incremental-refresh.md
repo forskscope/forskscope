@@ -1,9 +1,27 @@
 # RFC 037: Scalable Directory Compare Index and Incremental Refresh
 
-**Status.** Proposed
+**Status.** Proposed — cancellation + symlink slice implemented (v0.42.0); index/cache open
 
 ## Status
-Proposed. (Originally proposed in RFC package v0.4.)
+Partially implemented in v0.42.0:
+
+- **`CancellationToken`** added to `forskscope-core` — a lightweight
+  `Arc<AtomicBool>` wrapper. Callers keep the handle; clones are passed into
+  blocking tasks and polled with `is_cancelled()`.
+- **`recursive_diff_with_cancel`** and
+  **`list_recursive_for_display_with_cancel`** — cancellable variants of the
+  two main directory-scan entry points. Cancellation is checked before the
+  scan starts and between each directory entry; partial results are returned
+  without panic. The original non-cancellable functions are preserved as
+  thin wrappers.
+- **`RecStatus::Symlink`** — symlinks are now explicitly reported rather
+  than silently skipped. Patch export treats them as BinaryNotice (optional);
+  the deep-compare UI shows them as their own category.
+
+Remaining open (requires UI work or a separate release): a persistent
+directory-compare index for repeated scans without re-walking, true
+incremental refresh on file-watcher events (RFC-036 dependency), and a
+batch-operation preview with per-item confirmation (RFC-022 dependency).
 
 ## Summary
 

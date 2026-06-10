@@ -5,6 +5,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.42.0] — 2026-06-10
+
+Cancellable directory comparison and explicit symlink handling (RFC-037 slice).
+
+### Added
+
+- **`CancellationToken`** in `forskscope-core` (RFC-037 §"Cancellation") —
+  a lightweight `Arc<AtomicBool>` wrapper usable from any blocking task.
+  `cancel()` is observed by all clones; `is_cancelled()` is a cheap atomic
+  read. No async machinery; the UI layer wires it to a tokio task or a
+  thread-local handle as appropriate.
+
+- **`recursive_diff_with_cancel`** and
+  **`list_recursive_for_display_with_cancel`** — cancellable variants of the
+  two recursive directory-scan functions. Cancellation is checked before the
+  scan starts and at each directory entry; partial results are returned
+  without blocking or panic. The original non-cancellable entry points are
+  preserved as thin wrappers over the new variants so call sites are
+  unchanged.
+
+- **`RecStatus::Symlink`** — symlinks encountered during a recursive scan
+  are now explicitly reported with this status rather than silently skipped
+  by `.flatten()`. The patch-directory builder emits a `BinaryNotice` for
+  symlinks when `include_binary_notices` is set.
+
+- **8 new tests** in `tests/dir_cancel_tests.rs`:
+  token unit tests (starts uncancelled, cancel propagates to all clones,
+  clone cancel propagates back); pre-cancelled token returns no digest
+  results; mid-scan cancel produces partial results without panic;
+  uncancelled result matches the non-cancellable API; symlink reported as
+  `RecStatus::Symlink` in both full-diff and fast-listing paths (Unix).
+  Total core test count: 124 (plus 2 integration, 9 alignment).
+
+---
+
 ## [0.41.0] — 2026-06-10
 
 RFC triage + Explorer/Compare audit remediation (RFC-059 core slice).

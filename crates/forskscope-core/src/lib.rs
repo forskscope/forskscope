@@ -11,6 +11,7 @@
 //! they must never become an independent source of truth (see RFC-042,
 //! "Core First").
 
+pub mod cancel;
 pub mod diff;
 pub mod dir;
 pub mod document;
@@ -56,4 +57,5 @@ pub(crate) fn fnv1a64(bytes: &[u8]) -> u64 {
     }
     hash
 }
+pub use cancel::CancellationToken;
 pub use dir::copy_file;

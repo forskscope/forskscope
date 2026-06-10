@@ -4,6 +4,7 @@
 //! into submodules under `src/tests/` per the project testing guidelines.
 
 mod diff_tests;
+mod dir_cancel_tests;
 mod dir_tests;
 mod document_tests;
 mod encoding_tests;

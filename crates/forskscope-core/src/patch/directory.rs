@@ -36,6 +36,12 @@ pub fn patch_from_directories(
         let rel = entry.rel_path;
         match entry.status {
             RecStatus::Equal | RecStatus::Computing => {}
+            RecStatus::Symlink => {
+                // Symlinks are not text-diffable; emit a notice if requested.
+                if patch_options.include_binary_notices {
+                    files.push(PatchFileChange::BinaryNotice { path: rel.to_path_buf() });
+                }
+            }
             RecStatus::Changed => {
                 let left = left_root.join(&rel);
                 let right = right_root.join(&rel);
