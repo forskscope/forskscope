@@ -27,6 +27,7 @@ pub mod path;
 pub mod persist;
 pub mod report;
 pub mod save;
+pub mod session;
 pub mod vcs;
 pub mod xlsx;
 

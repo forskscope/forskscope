@@ -1,8 +1,34 @@
 # RFC-011 — Workspace Session Persistence
 
-**Status.** Proposed
+**Status.** Proposed — session model and JSON persistence slice implemented (v0.56.0); session restore UI and crash recovery open
 
-## 1. Summary
+## Status
+Partially implemented in v0.56.0. `forskscope-core::session` ships:
+
+- **`WorkspaceSession`** — `session_id`, `created_at`, `updated_at`, `root`,
+  `tabs`, `active_tab_id`. Constructors: `empty()`, `from_file_pair()`,
+  `from_directory_pair()`. Tab operations: `open_tab`, `close_tab` (returns
+  `CloseResult`), `force_close_tab`, `mark_tab_dirty`, `mark_tab_clean`.
+  Queries: `any_dirty()`, `dirty_tabs()`, `active_tab()`.
+- **`WorkspaceRoot`** — `Empty | FilePair(FilePairRoot) | DirectoryPair(DirectoryPairRoot)`.
+- **`WorkspaceTab`** — `Diff(DiffTabSession) | Binary | Excel | Error`. Each
+  tab carries a stable `TabId`. `DiffTabSession` has `is_dirty`; all other
+  variants are always clean.
+- **`CloseResult`** — `Closed | BlockedDirty | NotFound`. `BlockedDirty`
+  signals the UI to show the RFC-011 §5.4 unsaved-changes dialog.
+- **`RecentSessionEntry`** — metadata only (paths, title, kind, timestamp);
+  never stores file contents.
+- **`WorkspaceSession::to_json` / `from_json`** — wraps in `VersionedEnvelope`
+  with `SchemaName::Session` and `SESSION_SCHEMA_VERSION = 1`. `from_json`
+  checks the migration policy: `TooNew` error when the file was written by a
+  newer ForskScope, preventing silent data loss.
+- **21 tests** covering all 10 RFC-011 §13 testing requirements and all
+  §14 acceptance criteria.
+
+Remaining open: tab list restore from JSON (tabs are currently not persisted
+in the session JSON — deferred to schema v2 to keep the first iteration
+simple), the session-restore picker UI, crash recovery journal, and
+`WorkspaceSession` ownership in the Dioxus app runtime (RFC-011 §12).
 
 This RFC defines how ForskScope should represent, persist, restore, and close comparison workspace sessions in the Dioxus migration.
 

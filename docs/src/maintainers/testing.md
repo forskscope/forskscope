@@ -29,6 +29,7 @@ the written code. Each test references the behaviour promised by an RFC.
 | `error_tests` | `ErrorSeverity` mapping, `RecoveryHint`, `is_user_recoverable`. | RFC-017 |
 | `job_tests` | `JobProgress::fraction`, `JobHandle` cancel propagation, threshold constants. | RFC-013 |
 | `persist_tests` | `VersionedEnvelope` round-trip, `MigrationPolicy` decisions, schema names. | RFC-031 |
+| `session_tests` | `WorkspaceSession` constructors, tab lifecycle, dirty-state, `CloseResult`, JSON round-trip, schema-version guard. | RFC-011 |
 | `report_tests` | `FileComparisonReport` and `DirComparisonReport` Markdown + JSON, path privacy. | RFC-027 |
 | `vcs_tests` | `GitProvider` detect/status/read/merge_base; degrade outside repo. | RFC-038 |
 | `external_tool_tests` | `expand_args` placeholder expansion; security contract (no shell, spaces/semicolons/$HOME/backticks intact); `parse_arg` acceptance/rejection. | RFC-029 |

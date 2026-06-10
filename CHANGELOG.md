@@ -5,6 +5,53 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.56.0] — 2026-06-10
+
+Workspace session model and JSON persistence (RFC-011 slice).
+
+### Added
+
+- **`forskscope-core::session`** — workspace session model (RFC-011).
+
+  **`WorkspaceSession`**: canonical session record outside any Dioxus
+  component state. Constructors: `empty()` (empty startup), `from_file_pair`
+  (two-file startup args), `from_directory_pair` (two-directory args). Tab
+  operations: `open_tab`, `close_tab` → `CloseResult`, `force_close_tab`,
+  `mark_tab_dirty`, `mark_tab_clean`. Queries: `any_dirty()`, `dirty_tabs()`,
+  `active_tab()`. `SessionId` and `TabId` are stable across redraws
+  (RFC-011 §12).
+
+  **`WorkspaceRoot`**: `Empty | FilePair(FilePairRoot) |
+  DirectoryPair(DirectoryPairRoot)` — the top-level context for the workspace.
+
+  **`WorkspaceTab`**: `Diff(DiffTabSession) | Binary(BinaryTabSession) |
+  Excel(ExcelTabSession) | Error(ErrorTabSession)`. Only `DiffTabSession` has
+  an `is_dirty` flag; all other tab kinds are always clean.
+
+  **`CloseResult`**: `Closed | BlockedDirty | NotFound`. `BlockedDirty` is
+  the signal for the UI to show the unsaved-changes dialog (RFC-011 §5.4).
+  `force_close_tab` bypasses the check after user confirmation.
+
+  **`RecentSessionEntry`**: metadata-only (title, paths, kind, timestamp).
+  `paths_available()` checks whether both paths still exist on disk; missing
+  paths are visible but marked unavailable (RFC-011 §9).
+
+  **`WorkspaceSession::to_json` / `from_json`**: wraps in a
+  `VersionedEnvelope` with `SchemaName::Session` and
+  `SESSION_SCHEMA_VERSION = 1`. `from_json` enforces the migration policy:
+  returns `SessionParseError::TooNew` when the file was written by a newer
+  ForskScope (prevents silent overwrite of future-format data).
+
+- **21 new tests** in `tests/session_tests.rs` covering all 10 RFC-011 §13
+  testing requirements and all §14 acceptance criteria: empty/file-pair/
+  directory-pair constructors, open multiple tabs, close clean tab, dirty-tab
+  block, mark-clean-then-close, recent entries with existing/missing paths,
+  JSON round-trip for all root kinds, newer-schema error, stable session
+  identity, dirty-tab visibility, structural no-content guarantee.
+  Total core test count: 358.
+
+---
+
 ## [0.55.0] — 2026-06-10
 
 External tool command model and safe argument expansion (RFC-029 slice).
