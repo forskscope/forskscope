@@ -14,6 +14,7 @@ mod encoding_tests;
 mod error_tests;
 mod ignore_tests;
 mod job_tests;
+mod merge_plan_tests;
 mod merge_tests;
 mod patch_tests;
 mod persist_tests;

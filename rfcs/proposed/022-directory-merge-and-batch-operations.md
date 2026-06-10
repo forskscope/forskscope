@@ -1,10 +1,19 @@
 # RFC 022 — Directory Merge and Batch Operations
 
-**Status.** Proposed
+**Status.** Proposed — operation planner and execute_plan slice implemented (v0.52.0); batch preview dialog and deletion actions open
 
 ## Status
+Partially implemented in v0.52.0. `forskscope-core::dir::merge_plan` ships:
 
-Proposed.
+- **`DirectoryMergeAction`** (`CopyLeftToRight | CopyRightToLeft | Skip`)
+- **`CopyDirection`**, **`EntrySelection`** (AllNonEqual / ChangedOnly / SourceOnlyEntries)
+- **`OperationPreflight`** — per-file pre-execution checks: `target_exists`, `target_writable`, `backup_required`, `estimated_bytes`
+- **`RiskSummary`** — `total_files`, `new_files`, `overwrites`, `estimated_bytes`, `permission_blocks`; used for the batch preview dialog
+- **`OperationPlan`** — `plan_operations(entries, left, right, direction, selection)` builds a previewable plan from `Vec<RecEntry>`; `is_safe_to_execute()` predicate
+- **`execute_plan(plan, backup, failure_policy)`** — executes via `batch_copy`, returns `PlanExecutionReport` with `succeeded`, `failed`, `skipped`, per-file `FileOutcome`
+- **15 tests** covering all RFC-022 acceptance criteria.
+
+Remaining open: the batch preview dialog UI, deletion actions (require elevated confirmation, deferred), TypeMismatch and PermissionDifferent status variants from RFC-022 §"Directory comparison states" (await richer scan metadata), and the operation plan export to JSON/Markdown (RFC-027 integration).
 
 ## Summary
 

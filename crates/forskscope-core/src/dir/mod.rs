@@ -4,6 +4,7 @@ mod batch;
 mod copy;
 mod digest;
 mod listing;
+mod merge_plan;
 mod recursive;
 
 pub use batch::{
@@ -13,6 +14,11 @@ pub use batch::{
 pub use copy::{CopyOutcome, copy_file};
 pub use digest::{dir_digest_equal, file_digest_equal};
 pub use listing::{DirectoryListing, FileEntry, list_dir};
+pub use merge_plan::{
+    CopyDirection, DirectoryMergeAction, EntrySelection, FileOutcome, OperationPlan,
+    OperationPlanId, OperationPreflight, PlanExecutionReport, PlannedFileOperation,
+    RiskSummary, execute_plan, plan_operations,
+};
 pub use recursive::{
     RecEntry, RecStatus,
     list_recursive_for_display, list_recursive_for_display_with_cancel,

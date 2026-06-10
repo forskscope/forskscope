@@ -5,6 +5,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.52.0] — 2026-06-10
+
+Directory merge action planner and operation plan model (RFC-022 slice).
+
+### Added
+
+- **`forskscope-core::dir::merge_plan`** (RFC-022) — turns a directory
+  comparison result into a previewable, executable operation plan.
+
+  **`plan_operations(entries, left_root, right_root, direction, selection)
+  → OperationPlan`** — accepts `Vec<RecEntry>` from `recursive_diff`,
+  applies a `CopyDirection` (L→R or R→L) and an `EntrySelection` filter
+  (AllNonEqual / ChangedOnly / SourceOnlyEntries), computes source/target
+  paths for each entry, runs preflight checks, and returns a plan with a
+  `RiskSummary`. Equal and Computing entries are excluded automatically.
+  Entries that are on the wrong side for the chosen direction become
+  `DirectoryMergeAction::Skip`.
+
+  **`OperationPreflight`** — per-file pre-execution checks captured at plan
+  time: `target_exists`, `target_writable` (best-effort), `backup_required`
+  (true when target exists), `estimated_bytes`.
+
+  **`RiskSummary`** — `total_files`, `new_files`, `overwrites`,
+  `estimated_bytes`, `permission_blocks`. Drives the batch preview dialog:
+  `OperationPlan::is_safe_to_execute()` is `true` when `permission_blocks
+  == 0`.
+
+  **`execute_plan(plan, BackupPolicy, BatchFailurePolicy) → PlanExecutionReport`**
+  — creates missing parent directories, delegates to `batch_copy`, and
+  returns per-file `FileOutcome` (Copied / Skipped / Failed) with backup
+  presence reported.
+
+- **15 new tests** covering: L→R / R→L direction, all `RecStatus` variants,
+  `EntrySelection` filters, risk summary accuracy, preflight target detection,
+  execute round-trip, backup creation on overwrite, skip count reporting, and
+  empty entry list. Total core test count: 289.
+
+---
+
 ## [0.51.0] — 2026-06-10
 
 Versioned schema envelope and migration policy for all persisted data (RFC-031).
