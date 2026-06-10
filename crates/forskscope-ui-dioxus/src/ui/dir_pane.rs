@@ -45,8 +45,7 @@ impl NavHistory {
 // ── Filtering executor ────────────────────────────────────────────────────────
 
 pub struct FilteringExecutor { pub rules: IgnoreRules }
-unsafe impl Send for FilteringExecutor {}
-unsafe impl Sync for FilteringExecutor {}
+// IgnoreRules is plain Vec<String>; Send + Sync derive automatically.
 
 impl ScanExecutor for FilteringExecutor {
     fn spawn_blocking(&self, job: ScanJob) -> ScanFuture {

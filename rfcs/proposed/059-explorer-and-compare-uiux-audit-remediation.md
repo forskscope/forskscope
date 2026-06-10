@@ -1,10 +1,25 @@
 # RFC 059: Explorer and Compare UI/UX Audit Remediation
 
-**Status.** Proposed
+**Status.** Proposed — core-testable slice implemented (v0.41.0); UI/keyboard slice open
 
 ## Status
-Proposed. Authored from the v0.40.0 UI/UX audit of the Explorer and
-Compare (diff) workspaces. This RFC consolidates the audit findings into a
+Partially implemented in v0.41.0. The core-testable items shipped:
+
+- **H1** — CSS de-duplicated: three conflicting `.explorer` rules collapsed
+  to one; dead 5-column `.row` rule removed. One rule of each remains.
+- **M2** — Typed `DigestKey` enum replaces the stringly-typed `r:` prefix
+  in `explorer.rs`.
+- **M5** — `compute_aligned_rows` / `merge_level` extracted into a new
+  `forskscope-explorer-align` crate (no GUI dependency); 9 unit tests added
+  covering pairing, one-sided rows, ordering, and recursive expansion;
+  `explorer.rs` reduced from 426 ELOC to 354.
+- **L5** — Unjustified `unsafe impl Send/Sync` removed from
+  `FilteringExecutor`; `IgnoreRules` is `Send + Sync` by auto-impl.
+
+Remaining open items (all require UI testing): H2 + H3 (Explorer keyboard
+completeness → RFC-019), M1 (digest cache lifetime → RFC-023), M3 + L3
+(diff nav feedback → RFC-024), M4 (search traversal → RFC-014), L1
+(i18n coverage → RFC-009), L2 (nav button aria-labels → RFC-019). This RFC consolidates the audit findings into a
 single tracked remediation, cross-referencing the existing RFCs that own
 each affected area so nothing is renumbered or duplicated.
 

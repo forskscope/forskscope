@@ -41,7 +41,6 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 015 | [Undo/Redo Transaction Log and Merge Operation History](./proposed/015-undo-redo-transaction-log.md) |
 | 016 | [Editor Bridge Security and Contract](./proposed/016-editor-bridge-security-and-contract.md) |
 | 017 | [Error Taxonomy and Diagnostics UX](./proposed/017-error-taxonomy-diagnostics-ux.md) |
-| 018 | [Migration Compatibility and Parity Plan](./proposed/018-migration-compatibility-parity-plan.md) |
 | 019 | [Command Registry, Keyboard Shortcuts, Command Palette, and Accessibility](./proposed/019-command-shortcut-palette-accessibility.md) |
 | 020 | [Developer Architecture, CI, and Test Gates](./proposed/020-developer-architecture-ci-test-gates.md) |
 | 022 | [Directory Merge and Batch Operations](./proposed/022-directory-merge-and-batch-operations.md) |
@@ -66,7 +65,11 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 058 | [Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract](./proposed/058-spreadsheet-xlsx-structural-diff.md) |
 | 059 | [Explorer and Compare UI/UX Audit Remediation](./proposed/059-explorer-and-compare-uiux-audit-remediation.md) |
 
-## Archive (empty)
+## Archive
+
+| ID | Title | Reason |
+|----|-------|--------|
+| 018 | [Migration Compatibility and Parity Plan](./archive/018-migration-compatibility-parity-plan.md) | Withdrawn — migration complete; superseded by delivered implementation |
 
 ## Notes
 

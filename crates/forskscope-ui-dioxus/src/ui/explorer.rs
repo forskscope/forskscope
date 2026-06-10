@@ -3,8 +3,6 @@
 //! Both trees are managed here so their visible rows can be merged into an
 //! aligned structure where same-name entries share the same horizontal row.
 
-use std::collections::HashMap;
-use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -17,99 +15,26 @@ use forskscope_core::dir::file_digest_equal;
 use crate::i18n::t;
 use crate::state::{Store, open_compare};
 use crate::ui::deep_compare::DeepCompareView;
+use crate::ui::explorer_align::{AlignedRow, RowData, compute_aligned_rows};
+// ── Digest map key ────────────────────────────────────────────────────────────
+
+/// Typed key for the shared digest map (RFC-059 §M2).
+///
+/// Using an enum removes the stringly-typed `PathBuf::from("r:").join(rel)`
+/// namespace hack and eliminates the aliasing risk it created.
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum DigestKey {
+    /// A path present on both sides (keyed by relative path).
+    Common(PathBuf),
+    /// A path present on the right side only (keyed by relative path).
+    RightOnly(PathBuf),
+}
 use crate::ui::dir_pane::{
     DigestState, FilteringExecutor, NavHistory, PathBar, TreeRow,
     navigate_to, short_name,
 };
 
-// ── Aligned-row types ─────────────────────────────────────────────────────────
-
-#[derive(Clone)]
-struct RowData {
-    abs_path:    PathBuf,
-    rel_path:    PathBuf,   // relative to pane root
-    is_dir:      bool,
-    is_expanded: bool,
-    is_selected: bool,
-    depth:       u32,
-}
-
-type AlignedRow = (Option<RowData>, Option<RowData>);
-
-/// Merge two flat visible-row lists into an aligned sequence.
-///
-/// Same-name entries share the same `AlignedRow`; entries only on one side
-/// produce a row where the other half is `None` (renders as a spacer).
-/// Order: directories first, then files, alphabetical within each group.
-fn compute_aligned_rows(
-    left_rows:  &[(PathBuf, bool, bool, bool, u32)],
-    right_rows: &[(PathBuf, bool, bool, bool, u32)],
-    left_root:  &Path,
-    right_root: &Path,
-) -> Vec<AlignedRow> {
-    let mut l_by_parent: HashMap<PathBuf, Vec<RowData>> = HashMap::new();
-    let mut r_by_parent: HashMap<PathBuf, Vec<RowData>> = HashMap::new();
-
-    for (rows, by_parent, root) in [
-        (left_rows,  &mut l_by_parent, left_root),
-        (right_rows, &mut r_by_parent, right_root),
-    ] {
-        for (abs, is_dir, expanded, selected, depth) in rows.iter() {
-            if let Ok(rel) = abs.strip_prefix(root) {
-                let parent = rel.parent().unwrap_or(Path::new("")).to_path_buf();
-                by_parent.entry(parent).or_default().push(RowData {
-                    abs_path:    abs.clone(),
-                    rel_path:    rel.to_path_buf(),
-                    is_dir:      *is_dir,
-                    is_expanded: *expanded,
-                    is_selected: *selected,
-                    depth:       *depth,
-                });
-            }
-        }
-    }
-
-    merge_level(Path::new(""), &l_by_parent, &r_by_parent)
-}
-
-fn merge_level(
-    parent:      &Path,
-    l_by_parent: &HashMap<PathBuf, Vec<RowData>>,
-    r_by_parent: &HashMap<PathBuf, Vec<RowData>>,
-) -> Vec<AlignedRow> {
-    let empty = vec![];
-    let l_kids = l_by_parent.get(parent).unwrap_or(&empty);
-    let r_kids = r_by_parent.get(parent).unwrap_or(&empty);
-
-    // Collect unique names from both sides.
-    let mut name_is_dir: HashMap<OsString, bool> = HashMap::new();
-    for row in l_kids.iter().chain(r_kids.iter()) {
-        if let Some(name) = row.abs_path.file_name() {
-            name_is_dir.insert(name.to_os_string(), row.is_dir);
-        }
-    }
-
-    // Sort: directories first, then alphabetical.
-    let mut sorted: Vec<(OsString, bool)> = name_is_dir.into_iter().collect();
-    sorted.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
-
-    let mut result = Vec::new();
-    for (name, _) in &sorted {
-        let l = l_kids.iter().find(|r| r.abs_path.file_name().map(|n| n.to_os_string()) == Some(name.clone()));
-        let r = r_kids.iter().find(|r| r.abs_path.file_name().map(|n| n.to_os_string()) == Some(name.clone()));
-
-        result.push((l.cloned(), r.cloned()));
-
-        // Recurse into any expanded subdirectory.
-        let l_exp = l.map(|r| r.is_dir && r.is_expanded).unwrap_or(false);
-        let r_exp = r.map(|r| r.is_dir && r.is_expanded).unwrap_or(false);
-        if l_exp || r_exp {
-            let child_parent = parent.join(name);
-            result.extend(merge_level(&child_parent, l_by_parent, r_by_parent));
-        }
-    }
-    result
-}
+// ── Aligned-row types: see explorer_align.rs (RFC-059 §M5) ──────────────────
 
 // ── Explorer mode ─────────────────────────────────────────────────────────────
 
@@ -163,7 +88,7 @@ pub fn Explorer() -> Element {
     });
 
     // ── Shared digest map ────────────────────────────────────────────────────
-    let mut digest_map: Signal<HashMap<PathBuf, DigestState>> = use_signal(HashMap::new);
+    let mut digest_map: Signal<HashMap<DigestKey, DigestState>> = use_signal(HashMap::new);
 
     // Compute digest status for entries visible in both panes.
     use_effect(move || {
@@ -179,7 +104,7 @@ pub fn Explorer() -> Element {
             .collect();
 
         for (rel, is_dir) in left_entries {
-            if digest_map.read().contains_key(&rel) { continue; }
+            if digest_map.read().contains_key(&DigestKey::Common(rel.clone())) { continue; }
             let cp = r_root.join(&rel);
             if is_dir {
                 // Directory: existence check only (deep comparison is in Directory Report).
@@ -187,17 +112,17 @@ pub fn Explorer() -> Element {
                 digest_map.write().insert(rel, state);
             } else {
                 // File: background byte comparison.
-                if !cp.is_file() { digest_map.write().insert(rel, DigestState::Unique); continue; }
+                if !cp.is_file() { digest_map.write().insert(DigestKey::Common(rel.clone()), DigestState::Unique); continue; }
                 let lp = l_root.join(&rel);
                 let rp = cp;
                 let key = rel.clone();
                 let mut dmap = digest_map;
-                dmap.write().insert(key.clone(), DigestState::Computing);
+                dmap.write().insert(DigestKey::Common(key.clone()), DigestState::Computing);
                 spawn(async move {
                     let eq = tokio::task::spawn_blocking(move || {
                         file_digest_equal(&lp, &rp).unwrap_or(false)
                     }).await.unwrap_or(false);
-                    dmap.write().insert(key, if eq { DigestState::Equal } else { DigestState::Different });
+                    dmap.write().insert(DigestKey::Common(key), if eq { DigestState::Equal } else { DigestState::Different });
                 });
             }
         }
@@ -209,7 +134,7 @@ pub fn Explorer() -> Element {
             .collect();
         for rel in right_entries {
             // Key is the right-side relative path; check if left counterpart exists.
-            let right_key = PathBuf::from("r:").join(&rel); // namespace right-only keys
+            let right_key = DigestKey::RightOnly(rel.clone());
             if digest_map.read().contains_key(&right_key) { continue; }
             if !l_root2.join(&rel).exists() {
                 digest_map.write().insert(right_key, DigestState::Unique);
@@ -318,7 +243,7 @@ pub fn Explorer() -> Element {
                                         div { class: "pane-half",
                                             if let Some(ref row) = lr {
                                                 {
-                                                    let status = digest_map.read().get(&row.rel_path).cloned();
+                                                    let status = digest_map.read().get(&DigestKey::Common(row.rel_path.clone())).cloned();
                                                     let p_tgl = row.abs_path.clone();
                                                     let p_sel = row.abs_path.clone();
                                                     let p_dbl = row.abs_path.clone();
@@ -356,11 +281,14 @@ pub fn Explorer() -> Element {
                                         div { class: "pane-half",
                                             if let Some(ref row) = rr {
                                                 {
-                                                    // For right-side status: look up using right-side key
-                                                    let right_key = PathBuf::from("r:").join(&row.rel_path);
-                                                    let status = digest_map.read().get(&row.rel_path)
+                                                    // For right-side status: try Common first (present on both sides),
+                                                    // then RightOnly (present on right side only).
+                                                    let status = digest_map.read()
+                                                        .get(&DigestKey::Common(row.rel_path.clone()))
                                                         .cloned()
-                                                        .or_else(|| digest_map.read().get(&right_key).cloned());
+                                                        .or_else(|| digest_map.read()
+                                                            .get(&DigestKey::RightOnly(row.rel_path.clone()))
+                                                            .cloned());
                                                     let p_tgl = row.abs_path.clone();
                                                     let p_sel = row.abs_path.clone();
                                                     let p_dbl = row.abs_path.clone();

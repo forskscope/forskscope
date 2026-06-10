@@ -5,6 +5,55 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.41.0] — 2026-06-10
+
+RFC triage + Explorer/Compare audit remediation (RFC-059 core slice).
+
+### Changed
+
+- **RFC-018 archived.** Migration Compatibility and Parity Plan withdrawn —
+  the Dioxus migration is complete through v0.40.0 and parity was proven by
+  the shipped feature set. The file moves to `rfcs/archive/` per RFC-000.
+
+- **RFC-042 refreshed.** Roadmap and RFC Execution Plan updated to reflect
+  shipped milestone reality (M0–M7 delivered at different versions than
+  projected) and to add a forward roadmap for v0.41+.
+
+### Added
+
+- **`forskscope-explorer-align` crate** (RFC-059 §M5) — the pure
+  aligned-row merge logic (`compute_aligned_rows`, `merge_level`, `RowData`,
+  `AlignedRow`) extracted from `explorer.rs` into a standalone crate with no
+  Dioxus or GTK dependency. Comes with 9 unit tests covering same-name
+  pairing, one-sided rows (spacers), directories-before-files ordering,
+  alphabetical ordering within type, recursive expansion, and correct
+  relative-path computation.
+
+### Fixed
+
+- **CSS de-duplication** (RFC-059 H1) — `main.css` had three conflicting
+  `.explorer` rules (two `flex-column`, one two-column `grid`) and two
+  `.row` rules (5-column then 7-column). The orphaned grid rule and the
+  superseded 5-column row rule are removed; one definition of each remains.
+  The `deep-compare { grid-column: 1/-1 }` layout dependency now resolves
+  correctly.
+
+- **Typed `DigestKey` enum** (RFC-059 M2) — the stringly-typed
+  `PathBuf::from("r:").join(rel)` namespace hack in `explorer.rs` is
+  replaced with `DigestKey::Common(rel)` / `DigestKey::RightOnly(rel)`,
+  removing the aliasing footgun for files literally named `r:` and making
+  the left/right lookup unambiguous.
+
+- **Removed unjustified `unsafe`** (RFC-059 L5) — `unsafe impl Send` and
+  `unsafe impl Sync` on `FilteringExecutor` in `dir_pane.rs` are deleted.
+  `IgnoreRules` is `Vec<String>` and is `Send + Sync` by the standard-library
+  auto-impl; the manual assertions were unnecessary.
+
+- **`explorer.rs` ELOC reduced** from 426 to 354 by the alignment extraction
+  (RFC-059 §M5).
+
+---
+
 ## [0.40.0] — 2026-06-09
 
 Three-way merge model (RFC-033 core slice).

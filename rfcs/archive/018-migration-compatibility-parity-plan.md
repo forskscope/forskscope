@@ -1,8 +1,21 @@
 # RFC-018 — Migration Compatibility and Parity Plan
 
-**Status.** Proposed
+**Status.** Withdrawn — migration complete; superseded by delivered implementation
 
 ## 1. Summary
+
+**This RFC is archived.** The Dioxus migration is complete through v0.40.0.
+Parity with the v0.22 baseline has been demonstrated by the shipped feature
+set (RFC-001–007, RFC-021, RFC-033, RFC-039, RFC-054–057). The formal
+parity-proof approach described below was not needed; incremental vertical
+slices and test coverage proved correctness more practically. Archived per
+RFC-000 §"Granularity of transitions".
+
+---
+
+*Original content preserved below for historical reference.*
+
+---
 
 This RFC defines how the project should prove that the Dioxus migration preserves intended behavior from the current Tauri/Svelte application while allowing intentional improvements.
 

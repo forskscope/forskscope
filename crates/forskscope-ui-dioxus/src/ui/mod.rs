@@ -5,6 +5,7 @@ pub mod diff;
 pub mod diff_actions;
 pub mod dir_pane;
 pub mod explorer;
+pub mod explorer_align;
 pub mod header;
 pub mod hunk;
 pub mod keybindings;

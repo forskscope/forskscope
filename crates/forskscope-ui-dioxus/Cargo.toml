@@ -12,8 +12,13 @@ repository.workspace = true
 name = "forskscope"
 path = "src/main.rs"
 
+[lib]
+name = "forskscope_ui_dioxus"
+path = "src/lib.rs"
+
 [dependencies]
 forskscope-core = { workspace = true }
+forskscope-explorer-align = { workspace = true }
 dioxus = { workspace = true }
 dioxus-swdir-tree = { workspace = true }
 rfd = { workspace = true }

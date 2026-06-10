@@ -110,8 +110,7 @@ input, select {
 .diff-scroll { font-family: ui-monospace, monospace; font-size: var(--diff-fs, 14px);
   overflow-x: auto; }
 .diff-scroll .row { min-width: 55ch; }
-.row { display: grid; grid-template-columns: 4ch 1fr 5ch 4ch 1fr;
-  align-items: stretch; border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
+
 .gutter { background: var(--surface); color: var(--muted); text-align: right;
   padding: 0 .4rem; user-select: none; line-height: var(--line-h); }
 .cell { padding: 0 .4rem; white-space: pre-wrap; word-break: break-word; line-height: var(--line-h); }
@@ -208,7 +207,6 @@ input, select {
 .hunk-ins .diff-mark { color: var(--ins-mark); }
 .hunk-del .diff-mark { color: var(--del-mark); }
 .hunk-rep .diff-mark { color: var(--warn); }
-/* update grid to add mark columns */
 .row {
   grid-template-columns: 4ch 1.2ch 1fr 5ch 4ch 1.2ch 1fr;
 }
@@ -264,7 +262,6 @@ code.path-display {
 .filter-btn.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .sort-label { font-size: 12px; color: var(--muted); }
 .hidden-toggle { display: flex; align-items: center; gap: .25rem; font-size: 12px; color: var(--muted); cursor: pointer; }
-.explorer { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr auto; gap: .5rem; padding: .6rem; height: 100%; }
 
 /* ── Deep compare view ── */
 .deep-compare { grid-column: 1 / -1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
@@ -354,7 +351,6 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
 @media (min-width: 540px) { .dir-mtime { display: block; } }
 
 /* ── Explorer panes layout ── */
-.explorer { display: flex; flex-direction: column; height: 100%; }
 .explorer-panes { display: flex; flex: 1; gap: 0; overflow: hidden; }
 .explorer-footer { display: flex; align-items: center; gap: .5rem; padding: .4rem .6rem;
   border-top: 1px solid var(--border); background: var(--surface-2); }

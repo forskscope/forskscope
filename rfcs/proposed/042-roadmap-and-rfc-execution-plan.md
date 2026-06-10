@@ -1,6 +1,14 @@
 # RFC-042 — Roadmap and RFC Execution Plan
 
-**Status.** Proposed
+**Status.** Proposed — living document; updated for v0.40.0 reality
+
+> **v0.40.0 update (2026-06-10).** The migration described in §4 is
+> substantially complete. The original M0–M10 milestone sequence executed
+> in a different order and at different version numbers than projected, but
+> all core and shell milestones are shipped. §4a below records actual
+> delivery; §4b gives the forward roadmap from v0.40 onward. The editor
+> adapter track (M4, RFC-004) remains the one major unstarted milestone.
+
 > Adoption note: originally drafted as "RFC-000" in the migration RFC package.
 > Renumbered to RFC-042 at repository adoption because RFC-000 is the RFC
 > lifecycle policy (`../done/000-rfc-lifecycle-policy.md`). Inbound
@@ -83,7 +91,60 @@ The app must never overwrite a file without an explicit model-backed save decisi
 
 The current user-visible behaviors should be preserved where they are useful: two-sided explorer, tabbed diff views, text/binary/Excel handling, theme settings, and left/right comparison vocabulary. However, unsafe or incomplete behaviors should be redesigned rather than ported directly.
 
+### 3.5 Compatibility Before Enhancement
+
+The current user-visible behaviors should be preserved where they are useful: two-sided explorer, tabbed diff views, text/binary/Excel handling, theme settings, and left/right comparison vocabulary. However, unsafe or incomplete behaviors should be redesigned rather than ported directly.
+
 ## 4. Milestone Roadmap
+
+### 4a. Delivered milestones (as of v0.40.0)
+
+The sequence executed in a different order than §4-original projected, but
+all core and shell slices shipped:
+
+| Planned | Shipped in | RFC | What landed |
+|---------|-----------|-----|-------------|
+| M0 Planning | — | RFC-042 | This RFC |
+| M1 Core extraction | v0.23.0 | RFC-001 | `forskscope-core` crate, domain model |
+| M2 Diff engine | v0.23.0 | RFC-002 | `similar` v3, normalized diff/inline model |
+| M3 Dioxus shell | v0.23.0 | RFC-003 | App shell, tabs, state runtime |
+| M5 Explorer | v0.25.0 | RFC-005 | Two-pane explorer, digest status |
+| M6 Diff/Merge | v0.26.0 | RFC-006 | Hunk nav, merge transactions, undo/redo |
+| M7 Save safety | v0.27.0 | RFC-007 | Atomic write, backup, dirty-close, fingerprint |
+| — Document buffer | v0.28.0 | RFC-021 | Loaded document + result buffer model |
+| — Explorer tree | v0.36.0 | RFC-054 | Tree view, breadcrumb nav, ignore patterns |
+| — Settings layout | v0.36.0 | RFC-055–057 | Settings dialog, path nav, ignore UI |
+| — Patch export | v0.39.0 | RFC-039 | Unified-diff export from file/directory diffs |
+| — Three-way merge | v0.40.0 | RFC-033 | `ThreeWayMergeSession` diff3 engine + resolution |
+
+M4 (editor adapter, RFC-004) is the one major planned milestone not yet
+started. M8–M10 (directory jobs, settings/a11y, packaging/QA) are partially
+delivered but not complete.
+
+### 4b. Forward roadmap from v0.41.0
+
+Priorities derived from the v0.40 backlog write-up
+(`rfcs/notes/proposed-rfc-backlog-writeup-v0.40.md`) and RFC-059 audit:
+
+| Priority | RFC(s) | What |
+|----------|--------|------|
+| 1 | RFC-034 | Conflict resolution workspace UI (three-way) |
+| 2 | RFC-059 + RFC-019 | Explorer keyboard completeness, CSS fixes, align-module tests |
+| 3 | RFC-037 | Scalable dir-compare: cancellation, incremental refresh |
+| 4 | RFC-014 | Search next/prev traversal + scroll-to-match |
+| 5 | RFC-023 | Digest-cache lifetime + directory-batch atomicity |
+| 6 | RFC-058 | Spreadsheet structured diff adapter + test corpus |
+| 7 | RFC-009 + RFC-019 | Full i18n coverage + command registry |
+| 8 | RFC-004 → RFC-025 gate | Editor adapter — prototype first, then RFC-016/040/032/035 |
+| 9 | RFC-010 + RFC-026 | Packaging QA matrix, cross-platform smoke tests |
+| 10 | RFC-041 | v1.0 stabilization + governance |
+
+The **editor adapter track** (RFC-004 and its dependents: RFC-016, 025, 032,
+035, 040) remains the highest-risk open track. The RFC-025 kill-switch gate
+must be the first step. The rest of the v0.41+ roadmap does not block on it
+and can proceed independently.
+
+## 4-original. Original milestone table (preserved for reference)
 
 | Milestone | Main Purpose | Primary RFCs | Gate |
 |---|---|---|---|
