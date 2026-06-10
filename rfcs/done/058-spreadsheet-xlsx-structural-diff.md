@@ -1,9 +1,31 @@
 # RFC 058: Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract
 
-**Status.** Proposed
+**Status.** Implemented (v0.45.0) — structured adapter and test corpus; aligned cell view deferred
 
 ## Status
-Proposed. First written for the v0.40+ feature line. No prior RFC owns
+Implemented (v0.45.0). The core-layer deliverables from RFC-058 are shipped:
+
+- **App-owned `SpreadsheetDiff` model** — no `sheets-diff` types in the
+  public API: `SpreadsheetDiff { sheets, cells, stats }`, `SheetChange`
+  (Added/Removed), `SheetCellChanges`, `CellChange { addr, row, col, kind,
+  old, new }`, `CellChangeKind` (Value/Formula), `SpreadsheetDiffStats`.
+- **`diff_xlsx(old, new) -> Result<SpreadsheetDiff>`** — wraps `Diff::new`
+  in `std::panic::catch_unwind`; maps caught panics to `CoreError::Unsupported`
+  (the upstream `.expect()` panic risk is now isolated, not silently risked).
+- **`derive_pair_text_from_diff`** — drives the existing derived-text view
+  from the structured model; user-visible output format is equivalent to
+  before but now grounded in cell coordinates.
+- **Test corpus** (9 tests) generated at test time via the `zip` dev-dep:
+  identical workbooks → empty diff, value change → correct `addr`/old/new,
+  empty→non-empty cell → `old: None`, sheet add/remove → `SheetChange`,
+  malformed file → `Err` (not panic), malformed second file → `Err`,
+  multiple changed cells, `derive_pair_text_from_diff` non-empty for changes,
+  empty for identical.
+
+Deferred (per graduation criteria in RFC-058): the aligned cell-grid UI
+workspace (requires a UI RFC), performance bounds for very large workbooks,
+and formula-diff fixtures (the structured model supports them; `sheets-diff`
+emits `CellChangeKind::Formula` which is now preserved in `CellChange`). No prior RFC owns
 spreadsheet comparison as a first-class concern; `.xlsx` has so far been
 handled incidentally (RFC-001 §6.2 classification, RFC-012 as a generic
 content kind, and the never-written "RFC-013 Spreadsheet Input Adapter

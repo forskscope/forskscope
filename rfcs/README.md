@@ -25,6 +25,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 057 | [Settings Dialog Layout Refinements](./done/057-settings-dialog-layout-refinements.md) | v0.36.0 |
 | 039 | [Patch Export, Apply, and Review Workflow](./done/039-patch-export-apply-and-review-workflow.md) | v0.39.0 (export; apply deferred) |
 | 033 | [Three-Way Merge Model](./done/033-three-way-merge-model.md) | v0.40.0 (core model; workspace deferred) |
+| 058 | [Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract](./done/058-spreadsheet-xlsx-structural-diff.md) | v0.45.0 (structured adapter; aligned view deferred) |
 
 ## Proposed
 
@@ -62,7 +63,6 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 040 | [Editor Adapter Verification Harness and Golden Corpus](./proposed/040-editor-adapter-verification-harness-and-golden-corpus.md) |
 | 041 | [v1.0 Product Stabilization and RFC Governance](./proposed/041-v1-product-stabilization-and-rfc-governance.md) |
 | 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) |
-| 058 | [Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract](./proposed/058-spreadsheet-xlsx-structural-diff.md) |
 | 059 | [Explorer and Compare UI/UX Audit Remediation](./proposed/059-explorer-and-compare-uiux-audit-remediation.md) |
 
 ## Archive

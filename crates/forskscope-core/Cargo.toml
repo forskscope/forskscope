@@ -14,3 +14,6 @@ encoding_rs = { workspace = true }
 chardetng = { workspace = true }
 chrono = { workspace = true }
 sheets-diff = { workspace = true }
+
+[dev-dependencies]
+zip = "7"

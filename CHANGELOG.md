@@ -5,6 +5,54 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.45.0] — 2026-06-10
+
+Spreadsheet structural diff adapter and test corpus (RFC-058).
+
+### Added
+
+- **`SpreadsheetDiff` model** in `forskscope-core::xlsx` (RFC-058) —
+  app-owned, no `sheets-diff` types in the public API:
+  `SpreadsheetDiff { sheets, cells, stats }`, `SheetChange`
+  (Added/Removed), `SheetCellChanges`, `CellChange { addr, row, col, kind,
+  old, new }`, `CellChangeKind` (Value/Formula), `SpreadsheetDiffStats`.
+
+- **`diff_xlsx(old, new) -> Result<SpreadsheetDiff>`** — the
+  `sheets-diff::Diff::new` call is wrapped in `std::panic::catch_unwind`.
+  The upstream crate uses `.expect()` internally, which panics on any
+  unreadable or corrupt workbook. The wrap converts a caught panic to
+  `CoreError::Unsupported` so the core's no-panic contract is honoured.
+
+- **`derive_pair_text_from_diff`** — replaces the previous approach of
+  flattening `sheets-diff`'s own unified-text renderer. The derived text is
+  now built from `SpreadsheetDiff`, preserving the user-visible format while
+  making the structured data available to future UI layers.
+
+- **Test corpus** (9 tests, fixtures generated at test time with the `zip`
+  dev-dep — no opaque binary blobs committed):
+  identical workbooks produce empty diff;
+  changed cell reports correct `addr`, `row`, `col`, `old`, `new`;
+  empty-to-value cell has `old: None`;
+  sheet name difference produces `SheetChange`;
+  malformed first or second file returns `Err`, not a panic;
+  multiple changed cells all appear in the model;
+  `derive_pair_text_from_diff` non-empty for changes, empty for identical.
+
+### Changed
+
+- `xlsx.rs` entirely rewritten. `load_placeholder` and `derive_pair_text`
+  (the existing entry points used by the document loader) are preserved with
+  identical signatures; `derive_pair_text` now delegates to the structured
+  model path.
+
+### RFC
+
+- RFC-058 moved from `proposed/` to `done/`. The aligned cell-grid UI
+  workspace and performance bounds for very large workbooks remain deferred
+  (see RFC-058 §"Graduation Criteria").
+
+---
+
 ## [0.44.0] — 2026-06-10
 
 Batch copy with restore manifest (RFC-023 §"Batch operation manifest").
