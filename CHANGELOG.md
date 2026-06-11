@@ -5,6 +5,57 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.57.0] — 2026-06-10
+
+sheets-diff v2.2.1 migration — structured result, no catch_unwind,
+formula text, cancellation, richer sheet changes (RFC-058).
+
+### Changed
+
+- **`forskscope-core`: sheets-diff upgraded `1.1` → `2.2.1`** (RFC-058
+  re-implementation). The adapter boundary held perfectly: no `sheets-diff`
+  types escaped `xlsx.rs`; no other file changed.
+
+  **`xlsx.rs` rewritten for v2:**
+
+  - **`catch_unwind` removed.** `compare_paths_with_options` returns
+    `Result<WorkbookDiff, SheetsDiffError>`; the v1 panic risk is gone.
+
+  - **One `CellChange` per address.** Value and formula changes on the same
+    cell are now facets of one entry (Q1 resolution). Previously they could
+    produce two separate rows (v1 artifact). `CellChangeKind` enum removed;
+    replaced by `value_changed: bool` + `formula_changed: bool`.
+
+  - **`CellChange` carries `old_formula`/`new_formula`** (`Option<String>`).
+    Formula text is now surfaced at the adapter boundary without dropping
+    into the upstream model (v2.2.1 `CellChangeRow::old_formula/new_formula`,
+    FR2 addition).
+
+  - **`SheetChange` extended.** New variants: `Modified(String)`,
+    `Renamed { old_name, new_name }`, `Moved(String)` alongside existing
+    `Added`/`Removed`. `derive_pair_text` renders `~` prefix for renames.
+
+  - **`SpreadsheetDiffStats` from `wb.summary`.** `values_changed`,
+    `formulas_changed`, `sheets_renamed`, `sheets_moved` now populated
+    directly from `WorkbookDiff.summary` instead of manual counting.
+    `sheets_modified` added.
+
+  - **`CancellationToken` wired.** `diff_xlsx(old, new, cancel: Option<&CancellationToken>)`
+    — token maps to v2's `Cancellation` trait via `move || tok.is_cancelled()`.
+    Granularity is per-sheet (sub-sheet cancellation planned in sheets-diff;
+    documented in FR2 reply). Pass `None` for existing callers.
+
+  - **`drop(wb)` explicit after conversion.** All `cell_diffs` released
+    immediately; only owned `SpreadsheetDiff` survives.
+
+- **`xlsx_tests.rs`**: 9 existing tests updated for new API; 2 new tests
+  added (`stats_are_driven_from_workbook_summary`, `cancellation_token_does_not_affect_small_workbook`).
+  Sheet-structural test updated to accept `Renamed` (v2's heuristic sheet
+  matching correctly classifies `Sheet1 → NewSheet` as a rename, not
+  Added+Removed). Total core test count: 360.
+
+---
+
 ## [0.56.0] — 2026-06-10
 
 Workspace session model and JSON persistence (RFC-011 slice).

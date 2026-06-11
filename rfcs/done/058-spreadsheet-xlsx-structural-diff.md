@@ -1,6 +1,6 @@
 # RFC 058: Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract
 
-**Status.** Implemented (v0.45.0) — structured adapter and test corpus; aligned cell view deferred
+**Status.** Implemented (v0.57.0) — migrated to sheets-diff v2.2.1; structured result, no catch_unwind, cancellation wired
 
 ## Status
 Implemented (v0.45.0). The core-layer deliverables from RFC-058 are shipped:
