@@ -1,5 +1,11 @@
 # Proposed RFC Backlog — Consolidated Write-Up (as of v0.40.0)
 
+> **Note — v0.114.0 (2026-06-12).** This document was written at v0.40.0 to
+> audit the proposed RFC backlog against shipped reality at that point. Many
+> items labelled "Partly shipped" or "Open" here have since been fully
+> shipped. For current RFC state see `rfcs/README.md` and the individual RFC
+> files. This document is preserved as a historical planning record.
+
 **Purpose.** A single view of every RFC still in `rfcs/proposed/`, written
 up against what has actually shipped through v0.40.0. For each RFC: its
 intent, its **status vs. shipped reality** (much of the early backlog was

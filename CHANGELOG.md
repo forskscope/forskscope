@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.114.0] — 2026-06-12
+
+final note-file housekeeping.
+
+### Changed
+
+- **`rfcs/notes/core-completion-summary-v0.72.md`** — version header updated
+  to v0.114.0; ui-logic unit test count corrected (189 → **228**, reflecting
+  the full coverage pass completed in v0.109.0); version note updated.
+
+- **`rfcs/notes/proposed-rfc-backlog-writeup-v0.40.md`** — staleness notice
+  added at the top, explaining that "Partly shipped" / "Open" labels from
+  v0.40.0 have since been fully shipped, and directing readers to
+  `rfcs/README.md` for current state.
+
+- **`rfcs/notes/acceptance-test-corpus-plan.md`** — note added explaining
+  that the planned `text/basic/` / `text/newline/` path structure was not
+  used; actual paths are `tests/fixtures/text/`, `tests/fixtures/newlines/`,
+  `tests/fixtures/merge/`; see `tests/fixtures/README.md`.
+
+---
+
 ## [0.113.0] — 2026-06-12
 
 Governance accuracy pass: RFC README, RFC-041/042 updated; FAQ cross-reference

@@ -1,5 +1,12 @@
 # Acceptance Test Corpus Plan
 
+> **Note — v0.114.0 (2026-06-12).** The corpus planned here uses paths like
+> `text/basic/`, `text/newline/` etc. The actual shipped corpus uses a flatter
+> structure: `tests/fixtures/text/`, `tests/fixtures/newlines/`,
+> `tests/fixtures/merge/`. The fixture files are documented in
+> `tests/fixtures/README.md`. This planning document is preserved as a
+> historical record.
+
 ## 1. Purpose
 
 ForskScope needs a repeatable test corpus because diff/merge correctness is highly sensitive to edge cases. Manual visual testing is not enough.
