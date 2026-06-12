@@ -124,7 +124,7 @@ fn SettingsModal() -> Element {
                     span { {t(lang, "Ignore file extensions")} }
                     input {
                         r#type: "text",
-                        placeholder: "o, class, tmp  (comma separated, no dot needed)",
+                        placeholder: t(lang, "o, class, tmp  (comma separated, no dot needed)"),
                         value: "{cur.ignore_extensions}",
                         oninput: move |e| {
                             store.settings.write().ignore_extensions = e.value();
@@ -136,7 +136,7 @@ fn SettingsModal() -> Element {
                     span { {t(lang, "Ignore directory names")} }
                     input {
                         r#type: "text",
-                        placeholder: "target, node_modules, *.cache  (* wildcard allowed)",
+                        placeholder: t(lang, "target, node_modules, *.cache  (* wildcard allowed)"),
                         value: "{cur.ignore_dirs}",
                         oninput: move |e| {
                             store.settings.write().ignore_dirs = e.value();

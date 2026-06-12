@@ -91,3 +91,71 @@ only one side is gone the tab opens with that side showing an empty document.
 1. Open the **About** panel (ℹ button in the header).
 2. Click **Copy diagnostics** to copy version and platform info.
 3. Open an issue on the project repository and paste the diagnostics.
+
+---
+
+## How do I export a patch file?
+
+Open a comparison with changes, then click **More ▼** in the toolbar to expand
+the advanced options. Click **Export patch**. A save dialog will open — choose
+a location and filename (it defaults to `<filename>.patch`). The output is a
+standard unified-diff patch that can be applied with `patch -p1` or
+`git apply`.
+
+If the two files are identical, the Export patch button does nothing; there
+are no changes to export.
+
+---
+
+## Why does Linux require GTK/WebKitGTK?
+
+ForskScope's UI is built with Dioxus Desktop, which renders its interface
+using a WebView. On Linux, WebView is provided by WebKitGTK 4.1 — a GTK
+library. This means GTK3 and WebKitGTK runtime libraries must be installed
+for the app to launch.
+
+Install on Debian/Ubuntu:
+```sh
+sudo apt-get install libwebkit2gtk-4.1-0 libgtk-3-0
+```
+
+On Fedora/RHEL:
+```sh
+sudo dnf install webkit2gtk4.1 gtk3
+```
+
+If you see a "missing shared library" error at startup, the WebKitGTK package
+for your distribution is likely version 4.0 instead of 4.1. Check with
+`apt-cache search webkit2gtk` or equivalent.
+
+---
+
+## Can I compare PDF or Word documents?
+
+Not in the current release. ForskScope compares text files, Excel `.xlsx`
+workbooks (read-only), and shows a hex preview for binary files. PDF, Word
+(`.docx`), PowerPoint, and similar document formats are not supported.
+
+For Word documents, consider exporting to plain text first, then comparing
+the text files. For PDF, the same approach (extract text with a CLI tool)
+can work.
+
+See [File type support](../intermediate/file-types.md) for the complete list.
+
+---
+
+## What do the ✓ and ⚠ icons in the Explorer mean?
+
+These are **digest comparison** indicators shown when the same filename exists
+in both the left and right panes:
+
+| Icon | Meaning |
+|------|---------|
+| **✓** | Identical — the file content is byte-for-byte the same on both sides |
+| **⚠** | Different — the file content differs |
+| *(no icon)* | File exists only on one side, or the digest has not yet been computed |
+| **⊙** | Comparison is still running in the background |
+
+Digest comparison runs in the background; on large directories the icons
+appear progressively as files are scanned. Double-click any file showing **⚠**
+to open an immediate comparison.

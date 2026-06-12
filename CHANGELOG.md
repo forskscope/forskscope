@@ -5,6 +5,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.101.0] — 2026-06-12
+
+i18n completeness pass; FAQ expanded with four common questions.
+
+### Fixed
+
+- **`"Compare"` missing from Japanese translations** (`i18n.rs`) — the key
+  was used throughout the Explorer and diff toolbar but had no entry in
+  `ja()`. Fixed: `"Compare"` → `"比較"`.
+
+- **Three placeholder strings bypassed `t()`** (`search.rs`, `settings.rs`):
+  - `"Search…"` placeholder in `SearchBar` → `t(lang, "Search…")`.
+  - `"o, class, tmp  (comma separated, no dot needed)"` in the ignore
+    extensions field → `t(lang, ...)`.
+  - `"target, node_modules, *.cache  (* wildcard allowed)"` in the ignore
+    dirs field → `t(lang, ...)`.
+  - `SearchBar` now reads `store.lang()` from context; `"Search…"` added to
+    `ja()` as `"検索…"`.
+  - Two placeholder translations added to `ja()`.
+
+### Changed
+
+- **`docs/src/users/faq.md`** (93 → 161 lines) — four new entries:
+  - *How do I export a patch file?* — More ▼ → Export patch; file dialog;
+    unified-diff output; identical-files note.
+  - *Why does Linux require GTK/WebKitGTK?* — Dioxus Desktop WebView
+    dependency explained; install commands for Debian/Ubuntu and Fedora/RHEL;
+    4.0 vs 4.1 version troubleshooting.
+  - *Can I compare PDF or Word documents?* — unsupported; text export
+    workaround; link to file types reference.
+  - *What do the ✓ and ⚠ icons in the Explorer mean?* — four-row icon table
+    (✓ identical, ⚠ different, none, ⊙ scanning); double-click ⚠ tip.
+
+---
+
 ## [0.100.0] — 2026-06-12
 
 PlatformInfo wired to About panel; patch export UI added; i18n completed.
