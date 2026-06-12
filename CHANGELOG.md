@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.73.0] — 2026-06-12
+
+ROADMAP.md; RFC-020 promoted to done; RFC-042 updated.
+
+### Added
+
+- **`ROADMAP.md`** at the project root — the primary orientation document
+  for the UI implementation phase. Contains:
+  - Delivered milestones table (v0.23–v0.72)
+  - 8 UI implementation slices with core types consumed and acceptance
+    criteria for each
+  - Remaining proposed RFC table with "when" column
+  - Non-goals reference
+
+### RFC promotion
+
+- **RFC-020** (`Developer Architecture, CI, and Test Gates`) → `done/`.
+  Crate architecture (three crates, dependency rules) settled in v0.48.0.
+  CI gate documentation complete. Packaging smoke tests deferred to RFC-010.
+
+### Updates
+
+- RFC-042 status updated: "v0.73.0 — core layer complete, UI phase begins"
+- RFC-041 checklist accurate at v0.72.0
+
+**Done count: 39** (was 38). **Proposed: 9** — editor-adapter track (4),
+platform/packaging (2), documentation (1), governance (2).
+
+---
+
 ## [0.72.0] — 2026-06-12
 
 Final core-layer promotion pass. RFC done count: 38. Core layer complete.

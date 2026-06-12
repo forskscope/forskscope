@@ -1,6 +1,6 @@
 # RFC-020 — Developer Architecture, CI, and Test Gates
 
-**Status.** Proposed — crate-naming and -boundary decision settled (v0.48.0); CI/gate sections still proposed
+**Status.** Implemented (v0.48.0 + v0.73.0) — crate architecture settled; CI gates documented; packaging smoke tests deferred to RFC-010
 
 > **v0.48.0 amendment.** The crate layout and naming are now settled (see
 > §5a below). The original §5 sketch used `forskscope-dioxus`; that name is

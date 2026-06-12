@@ -46,7 +46,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 016 | [Editor Bridge Security and Contract](./proposed/016-editor-bridge-security-and-contract.md) |
 | 017 | [Error Taxonomy and Diagnostics UX](./done/017-error-taxonomy-diagnostics-ux.md) |
 | 019 | [Command Registry, Keyboard Shortcuts, Command Palette, and Accessibility](./done/019-command-shortcut-palette-accessibility.md) |
-| 020 | [Developer Architecture, CI, and Test Gates](./proposed/020-developer-architecture-ci-test-gates.md) |
+| 020 | [Developer Architecture, CI, and Test Gates](./done/020-developer-architecture-ci-test-gates.md) |
 | 022 | [Directory Merge and Batch Operations](./done/022-directory-merge-and-batch-operations.md) |
 | 023 | [Atomic File Operations, Backup, and Restore](./done/023-atomic-file-operations-backup-restore.md) |
 | 024 | [Diff Visual Semantics and Decoration Contract](./done/024-diff-visual-semantics-decoration-contract.md) |

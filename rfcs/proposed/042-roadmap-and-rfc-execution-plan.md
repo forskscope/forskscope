@@ -1,6 +1,11 @@
 # RFC-042 — Roadmap and RFC Execution Plan
 
-**Status.** Proposed — living document; updated for v0.40.0 reality
+**Status.** Proposed — living document; updated for v0.73.0 reality (core layer complete, UI phase begins)
+
+> **v0.73.0 update (2026-06-12).** The core data layer is complete. 39 of 48
+> RFCs are implemented. 629 tests pass. `ROADMAP.md` at the project root is
+> now the primary orientation document for the UI implementation phase.
+> RFC-042 remains open as a living governance document.
 
 > **v0.40.0 update (2026-06-10).** The migration described in §4 is
 > substantially complete. The original M0–M10 milestone sequence executed
