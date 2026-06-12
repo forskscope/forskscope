@@ -35,6 +35,7 @@ pub mod save;
 pub mod session;
 pub mod settings;
 pub mod vcs;
+pub mod watcher;
 pub mod xlsx;
 
 pub use diff::{

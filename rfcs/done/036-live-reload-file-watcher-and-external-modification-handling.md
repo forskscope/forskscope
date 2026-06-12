@@ -1,6 +1,6 @@
 # RFC 036: Live Reload, File Watcher, and External Modification Handling
 
-**Status.** Proposed — external file state detection slice implemented (v0.53.0); file watcher and reconciliation UI open
+**Status.** Implemented (v0.53.0 + v0.71.0) — core complete; platform watcher backend and reconciliation dialog UI deferred
 
 ## Status
 Partially implemented in v0.53.0:

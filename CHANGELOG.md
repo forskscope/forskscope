@@ -5,6 +5,51 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.71.0] — 2026-06-12
+
+FileChangeMonitor trait boundary and MockFileChangeMonitor (RFC-036);
+RFC-036 promoted to done.
+
+### Added
+
+- **`forskscope-core::watcher`** — file change monitor trait boundary
+  (RFC-036 §"Watcher Boundary").
+
+  **`FileChangeMonitor`** trait: `watch(path) → Result<WatchToken, WatchError>`,
+  `poll_events() → Vec<FileChangeEvent>`, `unwatch(token)`, `is_active()`.
+  The trait is `Send`; real platform backends implement it. The watcher is
+  an optimization layer only — save safety always validates via
+  `check_external_state`, never relies solely on watcher events.
+
+  **`FileChangeEvent { token, path, kind }`** — one change event.
+  `FileChangeKind`: `Modified | Deleted | Created | Renamed | Unknown`.
+
+  **`WatchToken(u64)`** — opaque handle from `watch`, passed back to `unwatch`.
+
+  **`WatchError`** — `PathNotFound | BackendUnavailable | AlreadyWatched | Other`.
+  All variants have non-empty `Display`.
+
+  **`MockFileChangeMonitor`** — test-only implementation. `inject_event`
+  queues synthetic events; `poll_events` drains the queue; `set_active(false)`
+  simulates backend failure. Includes a rustdoc example.
+
+- **15 new tests** in `tests/watcher_tests.rs` + 1 new doctest:
+  active state, distinct tokens, empty poll, inject+drain, multiple events,
+  unwatch removes path, unwatch unknown is no-op, inactive monitor error,
+  `FileChangeEvent` fields, `FileChangeKind` distinctness, `WatchError`
+  display, advisory-not-authoritative safety-rule test.
+  Total: 599 core + 6 doctest.
+
+### RFC promotion
+
+- **RFC-036** (`Live Reload, File Watcher, External Modification Handling`)
+  → `done/`. Core complete: `ExternalFileState` + `check_external_state`
+  (v0.53.0) + `FileChangeMonitor` trait + `MockFileChangeMonitor` (v0.71.0).
+  Deferred: `notify`-backed platform watcher implementation, reconciliation
+  dialog UI. **Done count: 35** (was 34).
+
+---
+
 ## [0.70.0] — 2026-06-12
 
 External tool built-in presets (RFC-029); five RFC promotions.
