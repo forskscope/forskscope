@@ -12,6 +12,7 @@ pub mod explorer_align;
 pub mod explore_status;
 pub mod header;
 pub mod hunk;
+pub mod hunk_decorations;
 pub mod keybindings;
 pub mod modals;
 pub mod search;

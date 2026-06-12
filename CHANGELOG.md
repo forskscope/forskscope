@@ -5,6 +5,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.81.0] — 2026-06-12
+
+Bug fix in `hunk_decorations` tests; `hunk_decorations` shim added to UI crate.
+
+### Fixed
+
+- **`compare::hunk_decorations::tests::identical_texts_produce_empty_index`**
+  was asserting `idx.is_empty()` for identical texts. `DecorationIndex::is_empty()`
+  means "no rows at all", but identical texts produce one Equal hunk whose
+  single row gets an `Unchanged` decoration — so `is_empty()` correctly
+  returns `false`. The test's intent was "no changed decorations"; the fix
+  replaces it with `identical_texts_produce_only_unchanged_decorations`,
+  which checks that every row in the index has `LineDecorationKind::Unchanged`.
+  The `empty_diff_get_returns_unchanged` test (checking `idx.get(0, …).kind`)
+  is kept as a complementary spot-check.
+
+### Added
+
+- **`ui/hunk_decorations.rs`** shim in `forskscope-ui` — re-exports
+  `DecorationIndex`, `DiffSide`, `RowDecoration` from `ui-logic` following
+  the established shim pattern. `hunk.rs` can now switch from its inline
+  `match hunk.kind { ... => "hunk-del" }` CSS logic to
+  `DecorationIndex::get(row_index, side)` when the GTK build environment
+  is available.
+
+### Test count
+
+708 total (599 core + 100 ui-logic + 2 core-integration + 6 doctest + 1
+ui-logic-integration). The ui-logic count increased from 85 to 100: the
+`hunk_decorations` module's 15 tests were already present in the crate
+but the `0.80.0` release note undercounted them; the correct baseline count
+going forward is 100.
+
+---
+
 ## [0.80.0] — 2026-06-12
 
 UI crate: shim re-exports for all `ui-logic` modules; GTK-free test template.

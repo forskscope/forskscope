@@ -23,6 +23,7 @@ pub use compare::command_bar::{
     ToolbarItem, ToolbarSection, build_toolbar, enabled_count, find_item,
 };
 pub use compare::search_index::{MatchIndex, MatchPosition, MatchSide};
+pub use compare::hunk_decorations::{DecorationIndex, DiffSide, RowDecoration};
 pub use compare::summary::{CompareStatusSummary, DiffNavigationState};
 pub use compare::tab_state::{TabStateSnapshot, context_from_snapshot};
 pub use explore::align::{AlignedRow, FlatRow, RowData, compute_aligned_rows};
