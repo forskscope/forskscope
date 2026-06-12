@@ -2,14 +2,23 @@
 
 use dioxus::prelude::*;
 
+use crate::i18n::t;
 use crate::state::{Modal, Store};
 
 #[component]
 pub fn KeyboardRefModal() -> Element {
     let mut store = use_context::<Store>();
+    let lang = store.lang();
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Keyboard shortcuts",
-            div { class: "modal modal-wide",
+            tabindex: "-1",
+            onclick: move |_| store.modal.set(Modal::None),
+            onkeydown: move |e: Event<KeyboardData>| {
+                if e.key() == dioxus::html::input_data::keyboard_types::Key::Escape {
+                    store.modal.set(Modal::None);
+                }
+            },
+            div { class: "modal modal-wide", onclick: move |e| e.stop_propagation(),
                 h2 { "Keyboard shortcuts" }
                 div { class: "kb-section",
                     h3 { "Diff view" }
@@ -42,7 +51,7 @@ pub fn KeyboardRefModal() -> Element {
                     }
                 }
                 div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), "Close" }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Close")} }
                 }
             }
         }

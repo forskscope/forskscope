@@ -87,6 +87,11 @@ pub fn DiffWorkspace(index: usize) -> Element {
             if snap.identical {
                 div { class: "identical", {t(lang, "Files are identical")} }
             } else {
+                div { class: "diff-pane-labels", aria_hidden: "true",
+                    span { class: "pane-label-left",  {t(lang, "Left / Old")} }
+                    span { class: "pane-label-act" }
+                    span { class: "pane-label-right", {t(lang, "Right / New")} }
+                }
                 div {
                     class: "{wrap_class}",
                     style: "--diff-fs:{snap.font_size}px;",
@@ -199,7 +204,7 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     disabled: !snap.can_undo,
                     onclick: move |_| { if let Some(tab) = store.tabs.write().get_mut(index) { let _ = tab.merge.undo(); } },
                     aria_label: "Undo last merge action (Ctrl+Z)",
-                    "Undo"
+                    {t(lang, "Undo")}
                 }
                 button {
                     disabled: !snap.is_dirty,
@@ -214,7 +219,7 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                             .map(|p| p.display().to_string()).unwrap_or_default();
                         store.modal.set(Modal::SaveAs(index, path));
                     },
-                    "Save As"
+                    {t(lang, "Save As")}
                 }
             }
             button {
@@ -236,7 +241,7 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
             if snap.can_save {
                 button {
                     onclick: move |_| { let v = *advanced.read(); advanced.set(!v); },
-                    if *advanced.read() { "Less ▲" } else { "More ▼" }
+                    if *advanced.read() { {t(lang, "Less ▲")} } else { {t(lang, "More ▼")} }
                 }
             }
         }
@@ -246,18 +251,18 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     aria_pressed: if snap.char_mode { "true" } else { "false" },
                     aria_label: "Toggle character-level inline diff",
                     onclick: move |_| { if let Some(tab) = store.tabs.write().get_mut(index) { tab.char_mode ^= true; } },
-                    {format!("Inline: {}", if snap.char_mode { "on" } else { "off" })}
+                    {format!("{}: {}", t(lang, "Inline diff"), t(lang, if snap.char_mode { "on" } else { "off" }))}
                 }
                 button {
                     aria_pressed: if snap.word_wrap { "true" } else { "false" },
                     aria_label: "Toggle word wrap",
                     onclick: move |_| { if let Some(tab) = store.tabs.write().get_mut(index) { tab.word_wrap ^= true; } },
-                    {format!("Wrap: {}", if snap.word_wrap { "on" } else { "off" })}
+                    {format!("{}: {}", t(lang, "Wrap"), t(lang, if snap.word_wrap { "on" } else { "off" }))}
                 }
                 button {
                     disabled: !snap.can_redo,
                     onclick: move |_| { if let Some(tab) = store.tabs.write().get_mut(index) { let _ = tab.merge.redo(); } },
-                    "Redo"
+                    {t(lang, "Redo")}
                 }
                 button {
                     onclick: move |_| {
@@ -265,7 +270,7 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                         if dirty { store.modal.set(Modal::ConfirmSwap(index)); }
                         else { swap_sides(&mut store, index); }
                     },
-                    "⇄ Swap sides"
+                    {format!("⇄ {}", t(lang, "Swap sides"))}
                 }
                 button {
                     aria_pressed: if snap.ignore_whitespace { "true" } else { "false" },
@@ -277,7 +282,7 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                             recompute_diff(tab);
                         }
                     },
-                    {format!("Ignore WS: {}", if snap.ignore_whitespace { "on" } else { "off" })}
+                    {format!("{}: {}", t(lang, "Ignore WS"), t(lang, if snap.ignore_whitespace { "on" } else { "off" }))}
                 }
                 button {
                     aria_pressed: if snap.ignore_case { "true" } else { "false" },
@@ -289,7 +294,7 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                             recompute_diff(tab);
                         }
                     },
-                    {format!("Ignore case: {}", if snap.ignore_case { "on" } else { "off" })}
+                    {format!("{}: {}", t(lang, "Ignore case"), t(lang, if snap.ignore_case { "on" } else { "off" }))}
                 }
                 select {
                     title: "Diff algorithm",

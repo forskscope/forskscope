@@ -5,6 +5,183 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.92.0] — 2026-06-12
+
+Four UI bug fixes: two-pane split, theme select colours, ESC closes modals,
+i18n dictionary completed.
+
+### Fixed
+
+**1. Compare view two-pane split** (`hunk.rs`, `diff.rs`, `main.css`)
+
+Root cause: `1fr` columns in a single shared grid adapt to the container
+width, so a long line in one half pulls space from the other half — the
+split point shifts, and with `white-space: pre` neither pane stays fixed.
+
+Final fix: replaced the shared 7-column grid with a flex-row layout where
+each pane is a truly independent element:
+
+```
+.diff-row (display:flex)
+  .diff-pane.left  (flex:1 1 0, min-width:0, overflow-x:auto)
+    .pane-gutter | .diff-mark | .cell
+  .diff-act        (flex:0 0 5ch)
+  .diff-pane.right (flex:1 1 0, min-width:0, overflow-x:auto)
+    .pane-gutter | .diff-mark | .cell
+```
+
+`flex: 1 1 0` on both panes gives them exactly equal width regardless of
+content. `min-width: 0` allows flex to shrink below content size. Each pane
+has its own `overflow-x: auto` — long lines scroll within their pane without
+affecting the other. `.diff-pane-labels` uses the same flex layout so the
+"Left / Old" / "Right / New" headings align with the panes below.
+
+Changes: `hunk.rs` Row component rewritten to produce `.diff-row` /
+`.diff-pane.left` / `.diff-act` / `.diff-pane.right`; CSS diff section
+fully rewritten; `diff.rs` pane-label spans updated.
+
+**2. Dark/Night theme select text colour** (`main.css`)
+
+Root cause: `color-scheme` selectors used `.dark-theme`, `.light-theme`,
+`.night-theme` but the theme CSS classes on `.app` are `theme-dark`,
+`theme-light`, `theme-night` (checked in `state.rs` `css_class()`). The
+selectors never matched any element.
+
+Fixed by correcting to `.theme-dark select, .theme-night select { color-scheme: dark; }`
+and `.theme-light select { color-scheme: light; }`. Also retained
+`select option { background: var(--surface); color: var(--text); }` for
+Chromium-based WebViews that honour CSS on option elements directly.
+
+**3. ESC key closes Settings and Help dialogs** (`app.rs`, `settings.rs`,
+`keybindings.rs`)
+
+Root cause: the global `onkeydown` guard `let Some(index) = active else { return }`
+fired before the Escape branch, dropping the key when no diff tab was open.
+
+Fixed by moving Escape handling before the guard. Also added `tabindex: "-1"`
+to scrim divs so they can receive key events when focus is on the inner modal.
+
+**4. i18n dictionary completed** (`i18n.rs`, `settings.rs`, `keybindings.rs`)
+
+Remaining hardcoded English strings wired through `t()` and Japanese
+translations added for: `"Ignore file extensions"`, `"Ignore directory names"`,
+`"Delete profile"`, `"Settings"` heading, `"0 (show all)"`, `"3 (default)"`,
+plus all toolbar labels (`"Undo"`, `"Redo"`, `"Save As"`, `"More ▼"`,
+`"Less ▲"`, `"Wrap"`, `"on"`, `"off"`, `"Swap sides"`, `"Ignore WS"`,
+`"Ignore case"`, `"Context lines"`, `"Compare profiles"`, `"+ New profile"`,
+`"Profile name"`, `"Add"`).
+
+---
+
+## [0.92.0] — 2026-06-12
+
+Four UI bug fixes: two-pane split, theme select colours, ESC closes modals,
+i18n dictionary completed.
+
+### Fixed
+
+**1. Compare view two-pane split** (`main.css`, `diff.rs`)
+
+Root cause: `.row` had `grid-template-columns` set but was missing
+`display: grid`, so every row rendered as a block and all seven columns
+collapsed into a single vertical stack. Fixed by adding `display: grid`
+to `.row`. Also added:
+- `border-left` / `border-right` on `.act` for a visible vertical divider.
+- `.diff-pane-labels` header bar with "Left / Old" / "Right / New" labels
+  using identical grid column spans, so headings align with content below.
+
+**2. Dark/Night theme select text colour** (`main.css`)
+
+Root cause: WebKit (GTK WebView) renders `<option>` elements in native OS
+chrome which ignores CSS `color` on child elements. Fixed by:
+- `color-scheme: dark` on `.dark-theme select` and `.night-theme select`,
+  which tells WebKit to render the native picker in dark mode.
+- `color-scheme: light` on `.light-theme select` for explicit light mode.
+- `select option { background: var(--surface); color: var(--text); }` for
+  Chromium-based WebViews that do honour the rule.
+
+**3. ESC key closes Settings and Help dialogs** (`app.rs`, `settings.rs`,
+`keybindings.rs`)
+
+Root cause: the global `onkeydown` in `app.rs` had an early-return guard
+`let Some(index) = *store.active.read() else { return }` *before* the
+Escape branch, so Escape was silently dropped whenever no diff tab was open.
+Fixed by moving the Escape handler before the guard. Also:
+- Added `tabindex: "-1"` to scrim divs so they can receive keyboard events
+  when focus is on the inner modal (autofocused Close button).
+- Both the app-level handler and the per-scrim `onkeydown` now close the
+  modal, covering all focus scenarios.
+
+**4. i18n dictionary completed** (`i18n.rs`, `settings.rs`)
+
+Remaining hardcoded English strings wired through `t()` and Japanese
+translations added:
+- `"Ignore file extensions"` → 除外ファイル拡張子
+- `"Ignore directory names"` → 除外ディレクトリ名
+- `"Delete profile"` (tooltip) → プロファイルを削除
+- `"Settings"` (modal heading) → 設定
+- `"0 (show all)"` → 0（全表示）
+- `"3 (default)"` → 3（デフォルト）
+
+---
+
+## [0.92.0] — 2026-06-12
+
+Four UI bug fixes: two-pane split, theme select colours, ESC closes modals,
+i18n dictionary expanded.
+
+### Fixed
+
+**1. Compare view two-pane split** (`main.css`, `diff.rs`)
+
+The diff rows already used a 7-column grid (`4ch 1.2ch 1fr 5ch 4ch 1.2ch
+1fr`) but had no visual separation between the left and right panes. Fixed:
+
+- Added `border-left` and `border-right` to `.act` (the action column) to
+  create a visible vertical divider between panes.
+- Added `.diff-pane-labels` bar above the scroll area with "Left / Old" and
+  "Right / New" headings, using the same grid column spans so they align
+  exactly with the pane content below.
+- Pane label text goes through `t()` so it appears in Japanese as 左/旧 and
+  右/新 when the language is set to Japanese.
+
+**2. Dark/Night theme `select` text colour** (`main.css`)
+
+`select option` elements inherit native system colours on some platforms,
+overriding `color: var(--text)` set on the parent `select`. Added an explicit
+`select option { background: var(--surface); color: var(--text); }` rule to
+force the correct colours in all three themes.
+
+**3. ESC key closes Settings and Help dialogs** (`app.rs`, `settings.rs`,
+`keybindings.rs`)
+
+- Added `Key::Escape` branch to the global `onkeydown` handler in `app.rs`
+  that closes any open modal immediately.
+- Added `onkeydown` on each `scrim` div (Settings and KeyboardRef) that closes
+  when Escape is pressed — catches the case where focus is inside the modal
+  and the global handler doesn't fire.
+- Added `onclick` on each `scrim` div so clicking the backdrop also closes the
+  modal (standard UX pattern). The inner `div.modal` has `onclick:
+  stop_propagation()` to prevent clicks inside the dialog from bubbling.
+
+**4. i18n dictionary expanded** (`i18n.rs`, `diff.rs`, `settings.rs`,
+`keybindings.rs`)
+
+Previously many toolbar and dialog strings bypassed `t()` entirely. All are
+now wired through the translation function. New keys added to `ja()`:
+
+`Save As` → 名前を付けて保存, `More ▼` → 詳細 ▼, `Less ▲` → 簡略 ▲,
+`Wrap` → 折り返し, `on` → オン, `off` → オフ, `Swap sides` → 左右入替,
+`Ignore WS` → 空白無視, `Ignore case` → 大小文字無視,
+`Context lines` → コンテキスト行数, `Compare profiles` → 比較プロファイル,
+`+ New profile` → + 新規プロファイル, `Profile name` → プロファイル名,
+`Add` → 追加.
+
+Previously wired but missing from `ja()` (removed the fallthrough): `Undo`,
+`Redo`, `Save As`.
+
+---
+
 ## [0.91.0] — 2026-06-12
 
 Diff acceptance corpus — 26 fixture files and 16 corpus integration tests.

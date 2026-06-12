@@ -75,11 +75,20 @@ pub fn App() -> Element {
             class: "app {theme_class}",
             tabindex: "-1",
             onkeydown: move |e: Event<KeyboardData>| {
+                // Escape closes any open modal regardless of whether a tab is active.
+                if e.key() == Key::Escape {
+                    let modal = store.modal.read().clone();
+                    if !matches!(modal, crate::state::Modal::None) {
+                        store.modal.set(crate::state::Modal::None);
+                        return;
+                    }
+                }
                 let Some(index) = *store.active.read() else { return };
                 let mods = e.modifiers();
                 match e.key() {
                     Key::F7 => move_focus(&mut store, index, -1),
                     Key::F8 => move_focus(&mut store, index,  1),
+                    Key::Escape => {} // already handled above
                     // F3 / Shift+F3: next / previous search match
                     Key::F3 => {
                         spawn(async move {

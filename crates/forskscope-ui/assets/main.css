@@ -61,6 +61,16 @@ input, select {
   background: var(--surface); color: var(--text);
   border: 1px solid var(--border); border-radius: 6px; padding: .25rem .4rem;
 }
+/* Override system/browser chrome so option text is visible in dark/night themes.
+   WebKit ignores CSS on <option> inside the native picker; color-scheme tells it
+   whether to render in light or dark native style. */
+.theme-dark  select, .theme-night select { color-scheme: dark; }
+.theme-light select { color-scheme: light; }
+/* Chromium-based WebView: option inherits explicitly set colours */
+select option {
+  background: var(--surface);
+  color: var(--text);
+}
 
 /* ---- tabs ---- */
 .tabbar { display: flex; align-items: flex-end; gap: .25rem; padding: .3rem .6rem 0;
@@ -110,21 +120,92 @@ input, select {
 .diff-toolbar { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap;
   padding: .35rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); }
 .diff-toolbar .info { color: var(--muted); font-size: 12px; }
-.diff-scroll { font-family: ui-monospace, monospace; font-size: var(--diff-fs, 14px);
-  overflow-x: auto; }
-.diff-scroll .row { min-width: 55ch; }
 
-.gutter { background: var(--surface); color: var(--muted); text-align: right;
-  padding: 0 .4rem; user-select: none; line-height: var(--line-h); }
-.cell { padding: 0 .4rem; white-space: pre-wrap; word-break: break-word; line-height: var(--line-h); }
-.act { display: flex; align-items: center; justify-content: center; background: var(--surface); }
-.act button { padding: 0 .35rem; font-size: 11px; }
-.hunk-del .cell, .gutter.del { background: var(--del-bg); }
-.hunk-ins .cell, .gutter.ins { background: var(--ins-bg); }
-.hunk-rep .cell { background: var(--rep-bg); }
-.mark { color: var(--muted); padding: 0 .25rem; }
-.mark.del { color: var(--del-mark); }
-.mark.ins { color: var(--ins-mark); }
+/* .diff-scroll: the outer container. Rows fill the full height and each
+   pane manages its own horizontal overflow. No horizontal scroll here. */
+.diff-scroll {
+  font-family: ui-monospace, monospace;
+  font-size: var(--diff-fs, 14px);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Each row is a flex container: left-pane | act | right-pane.
+   Both panes have equal width (flex:1) and clip at their own edge. */
+.diff-row {
+  display: flex;
+  align-items: stretch;
+  min-height: var(--line-h);
+}
+
+/* Independent-scroll pane: fixed half-width, clips long lines internally. */
+.diff-pane {
+  display: flex;
+  flex: 1 1 0;          /* equal halves, never grow/shrink asymmetrically */
+  min-width: 0;         /* let flex shrink below content size */
+  overflow-x: auto;     /* each pane scrolls its own long lines */
+  overflow-y: visible;
+  align-items: baseline;
+}
+.diff-pane.left  { border-right: 1px solid var(--border); }
+
+/* Fixed-width act column between the two panes */
+.diff-act {
+  flex: 0 0 5ch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+.diff-act button { padding: 0 .35rem; font-size: 11px; }
+
+/* Gutter (line numbers) inside each pane */
+.pane-gutter {
+  flex: 0 0 4ch;
+  background: var(--surface);
+  color: var(--muted);
+  text-align: right;
+  padding: 0 .4rem;
+  user-select: none;
+  line-height: var(--line-h);
+  white-space: nowrap;
+}
+.pane-gutter.del { background: var(--del-bg); }
+.pane-gutter.ins { background: var(--ins-bg); }
+
+/* Cell: the line content. Fills remaining pane width. */
+.diff-pane .cell {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 .4rem;
+  line-height: var(--line-h);
+  white-space: pre;           /* no wrap: long lines scroll within the pane */
+  overflow-x: visible;        /* content extends, pane clips and scrolls */
+}
+
+/* Hunk-kind background on cells and gutters */
+.hunk-del .diff-pane .cell, .pane-gutter.del { background: var(--del-bg); }
+.hunk-ins .diff-pane .cell, .pane-gutter.ins { background: var(--ins-bg); }
+.hunk-rep .diff-pane .cell { background: var(--rep-bg); }
+
+/* Diff marks (−/+/~) */
+.diff-mark {
+  flex: 0 0 1.2ch;
+  display: inline-block;
+  width: 1.2ch;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  user-select: none;
+  line-height: var(--line-h);
+}
+.hunk-del .diff-mark { color: var(--del-mark); }
+.hunk-ins .diff-mark { color: var(--ins-mark); }
+.hunk-rep .diff-mark { color: var(--warn); }
+
 .hunk.focused { outline: 2px solid var(--focus); outline-offset: -2px; }
 .in-del { background: color-mix(in srgb, var(--del-mark) 30%, transparent); text-decoration: line-through; }
 .in-ins { background: color-mix(in srgb, var(--ins-mark) 30%, transparent); }
@@ -132,17 +213,55 @@ input, select {
 .applied { padding: 0 .35rem; color: var(--ok); font-size: 11px; }
 .notice { padding: .5rem .6rem; color: var(--warn); font-size: 12px; }
 
+/* Pane header labels */
+.diff-pane-labels {
+  display: flex;
+  background: var(--surface-2);
+  border-bottom: 2px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  user-select: none;
+}
+.diff-pane-labels .pane-label-left {
+  flex: 1;
+  padding: .2rem .4rem;
+  border-right: 1px solid var(--border);
+}
+.diff-pane-labels .pane-label-act {
+  flex: 0 0 5ch;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+.diff-pane-labels .pane-label-right {
+  flex: 1;
+  padding: .2rem .4rem;
+}
+
+/* Search match highlight */
+.diff-row.match .diff-pane { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.diff-row.match .diff-pane .cell { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* Word-wrap mode override: wrap within each pane instead of scrolling */
+.diff-scroll.wrap .diff-pane .cell {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: visible;
+}
+
 /* ---- DiffDecorationSet CSS class contract (RFC-024) ---- */
 /* These classes are produced by LineDecorationKind::css_class() and        */
 /* InlineDecorationKind::css_class() in forskscope-core. Any change here    */
 /* must stay in sync with the core constants.                                */
 .fs-line-unchanged {}
-.fs-line-added       .cell { background: var(--ins-bg); }
-.fs-line-deleted     .cell { background: var(--del-bg); }
-.fs-line-modified    .cell { background: var(--rep-bg); }
-.fs-line-empty-counterpart .cell { background: var(--surface); opacity: .4; }
-.fs-line-conflict    .cell { background: color-mix(in srgb, var(--warn) 18%, var(--surface)); }
-.fs-line-merge-applied .cell { background: color-mix(in srgb, var(--ok) 12%, var(--surface)); }
+.fs-line-added       .diff-pane .cell { background: var(--ins-bg); }
+.fs-line-deleted     .diff-pane .cell { background: var(--del-bg); }
+.fs-line-modified    .diff-pane .cell { background: var(--rep-bg); }
+.fs-line-empty-counterpart .diff-pane .cell { background: var(--surface); opacity: .4; }
+.fs-line-conflict    .diff-pane .cell { background: color-mix(in srgb, var(--warn) 18%, var(--surface)); }
+.fs-line-merge-applied .diff-pane .cell { background: color-mix(in srgb, var(--ok) 12%, var(--surface)); }
 
 /* Inline character-level diff spans (RFC-024 §"Inline contract") */
 .fs-inline-inserted  { background: color-mix(in srgb, var(--ins-mark) 30%, transparent); }
@@ -228,25 +347,8 @@ input, select {
 /* directory summary in compare bar */
 .compare-bar .summary { color: var(--muted); font-size: 12px; }
 
-/* ---- colour-independent diff marks (RFC-019) ---- */
-.diff-mark {
-  display: inline-block; width: 1.2ch; text-align: center;
-  font-size: 10px; font-weight: 700; flex: 0; color: var(--muted);
-  user-select: none;
-}
-.hunk-del .diff-mark, .hunk-del .cell { color: inherit; }
-.hunk-ins .diff-mark { color: var(--ins-mark); }
-.hunk-del .diff-mark { color: var(--del-mark); }
-.hunk-rep .diff-mark { color: var(--warn); }
-.row {
-  grid-template-columns: 4ch 1.2ch 1fr 5ch 4ch 1.2ch 1fr;
-}
-
-/* ---- word wrap ---- */
-.diff-scroll.wrap .cell { white-space: pre-wrap; word-break: break-word; }
-.diff-scroll:not(.wrap) .cell { white-space: pre; overflow-x: visible; }
-
-/* ---- search bar ---- */
+/* ---- colour-independent diff marks — colours set above with .diff-mark rules ---- */
+.hunk-del .diff-pane .cell { color: inherit; }
 .search-bar {
   display: flex; align-items: center; gap: .4rem;
   padding: .3rem .6rem; background: var(--surface-2);

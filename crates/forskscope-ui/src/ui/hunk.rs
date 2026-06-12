@@ -2,6 +2,11 @@
 //!
 //! Every changed row carries a visible glyph (− + ~) in addition to the
 //! colour cue so that colour is never the sole indicator of change kind.
+//!
+//! Layout: each Row renders as a flex row with two independent scroll panes
+//! (.diff-pane.left and .diff-pane.right) separated by a fixed .diff-act
+//! column. Each pane overflows and scrolls independently so a long line in
+//! one pane never shrinks or shifts the other pane.
 
 use dioxus::prelude::*;
 
@@ -35,7 +40,6 @@ pub fn HunkBlock(
         && context_lines > 0 && rows.len() > 2 * context_lines + 1;
     let hidden = if collapse { rows.len() - 2 * context_lines } else { 0 };
 
-    // Precompute row data outside rsx! to avoid let-binding issues.
     let head_rows: Vec<(usize, _)> = if collapse { rows[..context_lines].iter().enumerate().collect() } else { vec![] };
     let tail_rows: Vec<(usize, _)> = if collapse { rows[rows.len() - context_lines..].iter().enumerate().collect() } else { vec![] };
     let all_rows:  Vec<(usize, _)> = if !collapse { rows.iter().enumerate().collect() } else { vec![] };
@@ -110,15 +114,12 @@ fn Row(
     let left_mark  = match kind { HunkKind::Delete | HunkKind::Replace => "−", _ => " " };
     let right_mark = match kind { HunkKind::Insert | HunkKind::Replace => "+", _ => " " };
 
-    let (lg, rg) = match kind {
-        HunkKind::Delete => ("gutter del", "gutter"),
-        HunkKind::Insert => ("gutter",     "gutter ins"),
-        _                => ("gutter",     "gutter"),
-    };
+    let left_gutter_class  = match kind { HunkKind::Delete  => "pane-gutter del", _ => "pane-gutter" };
+    let right_gutter_class = match kind { HunkKind::Insert  => "pane-gutter ins", _ => "pane-gutter" };
 
-    let row_class = if is_match { "row match" } else { "row" };
+    let row_class = if is_match { "diff-row match" } else { "diff-row" };
 
-    // Screen-reader label: describe the change kind for non-equal rows.
+    // Screen-reader label for non-equal rows.
     let sr_label = match kind {
         HunkKind::Delete  => Some("Deleted"),
         HunkKind::Insert  => Some("Inserted"),
@@ -131,25 +132,37 @@ fn Row(
             if let Some(lbl) = sr_label {
                 span { class: "sr-only", "{lbl}: " }
             }
-            div { class: "{lg}",
-                {left_no.map(|n| n.to_string()).unwrap_or_default()}
+
+            // ── Left pane (independent scroll) ───────────────────
+            div { class: "diff-pane left",
+                div { class: "{left_gutter_class}",
+                    {left_no.map(|n| n.to_string()).unwrap_or_default()}
+                }
+                span { class: "diff-mark", aria_hidden: "true", "{left_mark}" }
+                div { class: "cell",
+                    if let Some(ref spans) = inline {
+                        for s in spans.left_spans.iter() { span { class: icls(s.kind), "{s.text}" } }
+                    } else if let Some(ref l) = left { "{l}" }
+                }
             }
-            span { class: "diff-mark", aria_hidden: "true", "{left_mark}" }
-            div { class: "cell",
-                if let Some(ref spans) = inline {
-                    for s in spans.left_spans.iter() { span { class: icls(s.kind), "{s.text}" } }
-                } else if let Some(ref l) = left { "{l}" }
-            }
-            div { class: "act",
+
+            // ── Act column (fixed, centred) ───────────────────────
+            div { class: "diff-act",
                 if show_action  { button { onclick: move |_| on_apply.call(()), aria_label: "Apply change left to right", "▶" } }
                 else if applied { span { class: "applied", aria_label: "Applied", "✓" } }
             }
-            div { class: "{rg}", {right_no.map(|n| n.to_string()).unwrap_or_default()} }
-            span { class: "diff-mark", aria_hidden: "true", "{right_mark}" }
-            div { class: "cell",
-                if let Some(ref spans) = inline {
-                    for s in spans.right_spans.iter() { span { class: icls(s.kind), "{s.text}" } }
-                } else if let Some(ref r) = right { "{r}" }
+
+            // ── Right pane (independent scroll) ──────────────────
+            div { class: "diff-pane right",
+                div { class: "{right_gutter_class}",
+                    {right_no.map(|n| n.to_string()).unwrap_or_default()}
+                }
+                span { class: "diff-mark", aria_hidden: "true", "{right_mark}" }
+                div { class: "cell",
+                    if let Some(ref spans) = inline {
+                        for s in spans.right_spans.iter() { span { class: icls(s.kind), "{s.text}" } }
+                    } else if let Some(ref r) = right { "{r}" }
+                }
             }
         }
     }

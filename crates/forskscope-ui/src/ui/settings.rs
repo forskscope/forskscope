@@ -50,10 +50,17 @@ fn SettingsModal() -> Element {
 
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Settings",
-            div { class: "modal",
+            tabindex: "-1",
+            onclick: move |_| store.modal.set(Modal::None),
+            onkeydown: move |e: Event<KeyboardData>| {
+                if e.key() == dioxus::html::input_data::keyboard_types::Key::Escape {
+                    store.modal.set(Modal::None);
+                }
+            },
+            div { class: "modal", onclick: move |e| e.stop_propagation(),
                 // Header row: title + About button (RFC-057).
                 div { class: "modal-header-row",
-                    h2 { id: "settings-title", "Settings" }
+                    h2 { id: "settings-title", {t(lang, "Settings")} }
                     button {
                         class: "about-btn",
                         title: "About ForskScope",
@@ -96,7 +103,7 @@ fn SettingsModal() -> Element {
                     }
                 }
                 div { class: "field",
-                    span { "Context lines" }
+                    span { {t(lang, "Context lines")} }
                     select {
                         value: "{cur.context_lines}",
                         onchange: move |e| {
@@ -105,8 +112,8 @@ fn SettingsModal() -> Element {
                                 persist(&store.settings.read());
                             }
                         },
-                        option { value: "0",  "0 (show all)" }
-                        option { value: "3",  "3 (default)"  }
+                        option { value: "0",  {t(lang, "0 (show all)")} }
+                        option { value: "3",  {t(lang, "3 (default)")} }
                         option { value: "5",  "5"            }
                         option { value: "10", "10"           }
                     }
@@ -114,7 +121,7 @@ fn SettingsModal() -> Element {
 
                 // ── Ignore patterns (RFC-056) ─────────────────────
                 div { class: "field",
-                    span { "Ignore file extensions" }
+                    span { {t(lang, "Ignore file extensions")} }
                     input {
                         r#type: "text",
                         placeholder: "o, class, tmp  (comma separated, no dot needed)",
@@ -126,7 +133,7 @@ fn SettingsModal() -> Element {
                     }
                 }
                 div { class: "field",
-                    span { "Ignore directory names" }
+                    span { {t(lang, "Ignore directory names")} }
                     input {
                         r#type: "text",
                         placeholder: "target, node_modules, *.cache  (* wildcard allowed)",
@@ -140,7 +147,7 @@ fn SettingsModal() -> Element {
 
                 // ── Compare profiles ──────────────────────────────
                 div { class: "field",
-                    span { "Compare profiles" }
+                    span { {t(lang, "Compare profiles")} }
                     div { class: "profile-list",
                         for (i, p) in cur.profiles.iter().enumerate() {
                             div { class: if cur.active_profile == i { "profile-row active" } else { "profile-row" },
@@ -156,7 +163,7 @@ fn SettingsModal() -> Element {
                                 if !p.built_in {
                                     button {
                                         class: "profile-delete",
-                                        title: "Delete profile",
+                                        title: t(lang, "Delete profile"),
                                         onclick: move |_| crate::state::remove_profile(&mut store, i),
                                         "×"
                                     }
@@ -168,7 +175,7 @@ fn SettingsModal() -> Element {
                             button {
                                 class: "new-profile-btn",
                                 onclick: move |_| show_new_profile.set(true),
-                                "+ New profile"
+                                {t(lang, "+ New profile")}
                             }
                         } else {
                             AddProfileInline {
@@ -195,6 +202,7 @@ fn SettingsModal() -> Element {
 #[component]
 fn AddProfileInline(on_done: EventHandler<()>) -> Element {
     let mut store = use_context::<Store>();
+    let lang = store.lang();
     let mut name        = use_signal(String::new);
     #[allow(unused_mut)] let mut ignore_ws   = use_signal(|| false);
     #[allow(unused_mut)] let mut ignore_case = use_signal(|| false);
@@ -204,7 +212,7 @@ fn AddProfileInline(on_done: EventHandler<()>) -> Element {
     rsx! {
         div { class: "add-profile-form",
             input {
-                placeholder: "Profile name",
+                placeholder: t(lang, "Profile name"),
                 value: "{name}",
                 oninput: move |e| name.set(e.value()),
                 style: "flex:1;"
@@ -212,12 +220,12 @@ fn AddProfileInline(on_done: EventHandler<()>) -> Element {
             label { class: "profile-check",
                 input { r#type: "checkbox", checked: *ignore_ws.read(),
                     onchange: move |e| ignore_ws.set(e.checked()) }
-                span { "Ignore WS" }
+                span { {t(lang, "Ignore WS")} }
             }
             label { class: "profile-check",
                 input { r#type: "checkbox", checked: *ignore_case.read(),
                     onchange: move |e| ignore_case.set(e.checked()) }
-                span { "Ignore case" }
+                span { {t(lang, "Ignore case")} }
             }
             select {
                 onchange: move |e| {
@@ -241,11 +249,11 @@ fn AddProfileInline(on_done: EventHandler<()>) -> Element {
                         on_done.call(());
                     }
                 },
-                "Add"
+                {t(lang, "Add")}
             }
             button {
                 onclick: move |_| on_done.call(()),
-                "Cancel"
+                {t(lang, "Cancel")}
             }
         }
     }
