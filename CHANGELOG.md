@@ -5,6 +5,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.107.0] — 2026-06-12
+
+9 new tests across align.rs and palette_view.rs; 907 → 916 tests.
+
+### Added
+
+- **5 new tests in `crates/forskscope-ui-logic/src/explore/align.rs`**
+  (9 → 14 tests) — field propagation coverage:
+  - `is_selected_propagates_to_left_row_data` — `is_selected=true` in a
+    left `FlatRow` appears in the corresponding `RowData`; the selected
+    row is identified by `rel_path`.
+  - `is_selected_propagates_to_right_row_data` — same for right-side-only
+    rows.
+  - `depth_propagates_to_row_data` — non-zero depth values (0, 2) pass
+    through `compute_aligned_rows` unchanged.
+  - `rel_path_is_relative_and_abs_path_is_absolute` — `abs_path` is
+    absolute; `rel_path` is relative and equals `"file.txt"`.
+
+- **5 new tests in `crates/forskscope-ui-logic/src/compare/palette_view.rs`**
+  (11 → 16 tests) — `PaletteRow` field coverage:
+  - `save_row_has_ctrl_s_shortcut_hint` — `file.save` row has a non-empty
+    `shortcut_hint` containing `'s'` (Ctrl+S).
+  - `disabled_row_has_disabled_reason_some` — `disabled_reason` is `Some`
+    with non-empty text when a command is disabled.
+  - `enabled_row_has_disabled_reason_none` — `disabled_reason` is `None`
+    for the always-enabled `view.command_palette` command.
+  - `all_rows_have_non_empty_descriptions` — `description` field is
+    non-empty for every builtin command.
+  - `enabled_count_matches_enabled_rows_in_diff_context` — `enabled_count`
+    equals the manual count of enabled rows; at least one command enabled.
+
+### Changed
+
+- `docs/src/maintainers/testing.md` — 907 → **916**; align and
+  palette_view rows updated.
+- `rfcs/notes/core-completion-summary-v0.72.md` — 907 → 916;
+  ui-logic 205 → 214; version → v0.107.0.
+- `rfcs/proposed/041-…` — 916 total.
+
+---
+
 ## [0.106.0] — 2026-06-12
 
 9 new conflict_nav_view tests (focus, resolved glyphs, progress); 899 → 907 tests.

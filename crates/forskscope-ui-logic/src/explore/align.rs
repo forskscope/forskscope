@@ -274,4 +274,67 @@ mod tests {
         let rows = compute_aligned_rows(&lr, &rr, &lroot, &rroot);
         assert!(rows.is_empty());
     }
+
+    // ── Field propagation ─────────────────────────────────────────────────────
+
+    #[test]
+    fn is_selected_propagates_to_left_row_data() {
+        // flat() always uses is_selected=false, so we build the FlatRow manually.
+        let root = PathBuf::from("/root");
+        let left: Vec<FlatRow> = vec![
+            (root.join("sel.txt"),   false, false, true,  0), // selected
+            (root.join("other.txt"), false, false, false, 0), // not selected
+        ];
+        let rows = compute_aligned_rows(&left, &[], &root, &root);
+        let selected: Vec<_> = rows.iter()
+            .filter_map(|(l, _)| l.as_ref())
+            .filter(|d| d.is_selected)
+            .collect();
+        assert_eq!(selected.len(), 1,
+            "is_selected must propagate: exactly one row should be selected");
+        assert_eq!(selected[0].rel_path, PathBuf::from("sel.txt"));
+    }
+
+    #[test]
+    fn is_selected_propagates_to_right_row_data() {
+        let root = PathBuf::from("/root");
+        let right: Vec<FlatRow> = vec![
+            (root.join("x.txt"), false, false, true, 0),
+        ];
+        let rows = compute_aligned_rows(&[], &right, &root, &root);
+        let r_selected = rows.iter()
+            .filter_map(|(_, r)| r.as_ref())
+            .any(|d| d.is_selected);
+        assert!(r_selected,
+            "is_selected must propagate on right-side-only rows");
+    }
+
+    #[test]
+    fn depth_propagates_to_row_data() {
+        // Use two top-level entries with explicit depth values set directly
+        // in FlatRow tuples (depth=0 and depth=2 to verify non-default propagation).
+        let root = PathBuf::from("/root");
+        let left: Vec<FlatRow> = vec![
+            (root.join("a.txt"), false, false, false, 0),
+            (root.join("z.txt"), false, false, false, 2), // unusual depth — must pass through
+        ];
+        let rows = compute_aligned_rows(&left, &[], &root, &root);
+        let depths: Vec<u32> = rows.iter()
+            .filter_map(|(l, _)| l.as_ref())
+            .map(|d| d.depth)
+            .collect();
+        assert!(depths.contains(&0), "depth 0 must be preserved; got {:?}", depths);
+        assert!(depths.contains(&2), "depth 2 must be preserved; got {:?}", depths);
+    }
+
+    #[test]
+    fn rel_path_is_relative_and_abs_path_is_absolute() {
+        let (lr, lroot) = flat("/root", &[("file.txt", false, false)]);
+        let rows = compute_aligned_rows(&lr, &[], &lroot, &lroot);
+        assert_eq!(rows.len(), 1);
+        let data = rows[0].0.as_ref().unwrap();
+        assert!(data.abs_path.is_absolute(), "abs_path must be absolute");
+        assert!(!data.rel_path.is_absolute(), "rel_path must be relative");
+        assert_eq!(data.rel_path, PathBuf::from("file.txt"));
+    }
 }

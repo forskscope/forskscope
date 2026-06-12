@@ -20,7 +20,7 @@ The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
 be tested in environments without a display server. Core and ui-logic tests
 run anywhere Rust is installed.
 
-## Test counts (v0.106.0)
+## Test counts (v0.107.0)
 
 | Suite | Count |
 |-------|-------|
@@ -28,11 +28,11 @@ run anywhere Rust is installed.
 | `forskscope-core` integration (`diff_corpus`) | 25 |
 | `forskscope-core` integration (`merge_corpus`) | 16 |
 | `forskscope-core` integration (`patch_apply`) | 2 |
-| `forskscope-ui-logic` unit | 205 |
+| `forskscope-ui-logic` unit | 214 |
 | `forskscope-ui-logic` integration (`css_coverage`) | 5 |
 | Doctests | 7 |
 | `forskscope-ui-logic` integration | 1 |
-| **Total** | **907** |
+| **Total** | **916** |
 
 ## `forskscope-core` test modules
 
@@ -94,14 +94,14 @@ Integration tests live in `tests/css_coverage.rs`.
 
 | File | Covers | RFC |
 |---|---|---|
-| `explore/align` | `compute_aligned_rows`: pairing, ordering, one-sided entries, recursion depth, selection state. | RFC-059 |
+| `explore/align` | `compute_aligned_rows`: pairing, ordering, one-sided entries, recursion depth, selection state; field propagation (`is_selected` on left/right sides, `depth` pass-through, `abs_path` absolute + `rel_path` relative). | RFC-059 |
 | `explore/deep_filter` | `DeepFilter::matches` for all `RecStatus` variants, `DeepCompareSummary` counts, footer text, `is_fully_computed`, `apply_filter`. | RFC-037, RFC-038 |
 | `explore/status` | `RowStatusKind::from_evidence` for all 10 `EqualityEvidence` variants, CSS prefix, glyph distinctness, aria labels, `needs_action`, `StatusRow` constructors. | RFC-054 |
 | `compare/command_bar` | `build_toolbar` section structure, `Save` enabled/disabled, `Undo`/`Redo` asymmetry, `CommandPalette` always enabled, shortcut hint, `find_item`. | RFC-019 |
 | `compare/conflict_nav_view` | `ConflictNavView::from_navigator`: non-empty with conflicts, empty without, `display_num` ≥ 1, `!` glyph for unresolved, CSS prefix, progress text, `can_save` predicate, `len`; focus propagation (`focused_row` None/Some, `is_focused` set on exactly one row); resolved-state glyphs (`L`, `R`, `-`); `status_text` non-empty; progress text with partial resolution. | RFC-034 |
 | `compare/hunk_decorations` | `DecorationIndex::from_set`: added/deleted/modified kinds, gutter symbols, CSS prefix, aria labels, multi-hunk coverage, out-of-bounds safety, `RowDecoration` field invariants. | RFC-024, RFC-035 |
 | `compare/load_guard` | `guard_for_sizes` / `guard_for_sizes_with_limits`: all four `FileSizeClass` branches, worst-of-pair logic, boundary values (at-limit and one-over), message non-empty, distinct large/very-large labels, default-limit smoke tests. | RFC-013 |
-| `compare/palette_view` | `build_palette`: empty query returns all; query matches label; nonsense empty; case-insensitive; enabled before disabled; Save disabled in empty context; `enabled_count`; all labels non-empty. | RFC-019 |
+| `compare/palette_view` | `build_palette`: empty query returns all; query matches label; nonsense empty; case-insensitive; enabled before disabled; Save disabled in empty context; `enabled_count`; all labels/IDs/descriptions non-empty; `shortcut_hint` non-empty for Save; `disabled_reason` Some/None; `enabled_count` in diff context. | RFC-019 |
 | `compare/save_error` | `action_label` all variants non-empty; `SaveErrorView::from_error`: external-mod action set, primary ≠ Overwrite, `FileWriteFailed`/`InternalFault` actions; path passthrough; title/body non-empty; button labels non-empty; exactly one primary. | RFC-007, RFC-017 |
 | `compare/scroll_sync` | `ScrollSyncState`: at-top, pixel→anchor→pixel round-trip, mid-row fraction, negative clamping, `scroll_to_row`, past-end clamping, `max_scroll_px`, zero row-height guard. | RFC-035 |
 | `compare/search_index` | `MatchIndex` build/advance/retreat/wrap, `matching_hunk_ids`, empty index. | RFC-014 |

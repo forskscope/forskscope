@@ -226,4 +226,69 @@ mod tests {
             assert!(!row.command_id.is_empty());
         }
     }
+
+    // ── PaletteRow field coverage ─────────────────────────────────────────────
+
+    #[test]
+    fn save_row_has_ctrl_s_shortcut_hint() {
+        let reg = CommandRegistry::builtin();
+        // "save" query should find the save command.
+        let rows = build_palette(&reg, &empty_ctx(), "save");
+        let save = rows.iter().find(|r| r.command_id == "file.save");
+        assert!(save.is_some(), "save command must appear for 'save' query");
+        let hint = &save.unwrap().shortcut_hint;
+        assert!(!hint.is_empty(),
+            "file.save must have a non-empty shortcut_hint (Ctrl+S)");
+        assert!(hint.to_lowercase().contains('s'),
+            "file.save shortcut hint '{}' must reference 's'", hint);
+    }
+
+    #[test]
+    fn disabled_row_has_disabled_reason_some() {
+        // In an empty context, file.save is disabled.
+        let reg = CommandRegistry::builtin();
+        let rows = build_palette(&reg, &empty_ctx(), "save");
+        let save = rows.iter().find(|r| r.command_id == "file.save").unwrap();
+        assert!(!save.enabled,
+            "file.save must be disabled in empty context");
+        assert!(save.disabled_reason.is_some(),
+            "disabled_reason must be Some when the command is disabled");
+        assert!(!save.disabled_reason.unwrap().is_empty(),
+            "disabled_reason text must be non-empty");
+    }
+
+    #[test]
+    fn enabled_row_has_disabled_reason_none() {
+        // CommandPalette command is always enabled — its disabled_reason must be None.
+        let reg = CommandRegistry::builtin();
+        let rows = build_palette(&reg, &empty_ctx(), "palette");
+        let palette = rows.iter().find(|r| r.command_id == "view.command_palette");
+        assert!(palette.is_some(), "command_palette must appear for 'palette' query");
+        let row = palette.unwrap();
+        assert!(row.enabled, "view.command_palette must be enabled in any context");
+        assert!(row.disabled_reason.is_none(),
+            "disabled_reason must be None when the command is enabled");
+    }
+
+    #[test]
+    fn all_rows_have_non_empty_descriptions() {
+        let reg = CommandRegistry::builtin();
+        let rows = build_palette(&reg, &empty_ctx(), "");
+        for row in &rows {
+            assert!(!row.description.is_empty(),
+                "description must be non-empty for command '{}'", row.command_id);
+        }
+    }
+
+    #[test]
+    fn enabled_count_matches_enabled_rows_in_diff_context() {
+        let reg = CommandRegistry::builtin();
+        let ctx = diff_ctx();
+        let rows = build_palette(&reg, &ctx, "");
+        let manual = rows.iter().filter(|r| r.enabled).count();
+        assert_eq!(enabled_count(&rows), manual,
+            "enabled_count must match the number of enabled rows");
+        assert!(enabled_count(&rows) > 0,
+            "at least some commands must be enabled in diff context");
+    }
 }
