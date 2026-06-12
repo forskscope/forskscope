@@ -5,6 +5,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.104.0] — 2026-06-12
+
+RFC-042 fully audited: §4b priorities 1–7 all Done; §4a extended to v0.104.
+
+### Changed
+
+- **`rfcs/proposed/042-roadmap-and-rfc-execution-plan.md`** — comprehensive
+  audit pass:
+
+  **§4b priority table — all items audited against `rfcs/done/`:**
+  - Row 1 (RFC-034): was "Open — requires GTK"; corrected to **Done** (core
+    v0.64.0, `ConflictNavigator`); UI workspace still requires GTK noted.
+  - Row 2 (RFC-059 + RFC-019): was "Open — requires GTK"; corrected to
+    **Done** (RFC-059 v0.41.0 CSS/audit; RFC-019 core v0.63.0).
+  - Row 3 (RFC-037): was "Open — requires GTK"; corrected to **Done** (core
+    v0.42.0 + v0.58.0, cancellation + `DirectoryIndex`).
+  - Row 4 (RFC-014): was "Open — requires GTK"; corrected to **Done** (core
+    v0.43.0, `MatchIndex` + `SearchIndex`).
+  - Row 5 (RFC-023): was "Open — requires GTK"; corrected to **Done** (core
+    v0.44.0, `BatchManifest` + `batch_copy`).
+  - Row 6 (RFC-058): was "Open"; corrected to **Done** (v0.57.0, sheets-diff
+    v2.2.1 adapter). RFC-058 has been in `rfcs/done/` since v0.57.0.
+  - Summary paragraph rewritten: priorities 1–7 all done; remaining open =
+    editor adapter (RFC-004 track), packaging/QA (RFC-010/026), governance
+    (RFC-041).
+
+  **§4a delivered milestones** — extended from v0.40.0 stop to **v0.104.0**:
+  added 14 post-v0.40 rows covering RFC-059, RFC-037, RFC-014, RFC-023,
+  RFC-058, RFC-009, RFC-019, RFC-034, view-model layer, CSS contract,
+  platform diagnostics, and UI stabilisation.
+
+  **Header and update blocks** — status line updated; v0.104.0 update block
+  added summarising the audit findings.
+
+---
+
 ## [0.103.0] — 2026-06-12
 
 RFC-042 and governance notes updated to v0.102.0 reality.

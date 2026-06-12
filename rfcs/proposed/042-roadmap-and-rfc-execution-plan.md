@@ -1,6 +1,15 @@
 # RFC-042 — Roadmap and RFC Execution Plan
 
-**Status.** Proposed — living document; updated for v0.102.0 reality (891 tests, UI stabilisation phase, i18n complete)
+**Status.** Proposed — living document; updated for v0.104.0 (§4a extended through v0.104, §4b audited: priorities 1–7 all Done)
+
+> **v0.104.0 update (2026-06-12).** §4a extended through v0.104.0 with all
+> post-v0.40 deliveries (RFC-059 audit, dir-compare, search, atomic ops,
+> spreadsheet diff, settings, command registry, conflict nav, view-model
+> layer, CSS contract, platform diagnostics, UI stabilisation).
+> §4b priority table fully audited against `rfcs/done/`: priorities 1–7
+> are all shipped at core layer (verified). Only the editor adapter track
+> (RFC-004/016/025/040/032/035), packaging/QA (RFC-010/026), and the v1.0
+> governance gate (RFC-041) remain open.
 
 > **v0.102.0 update (2026-06-12).** UI stabilisation phase well advanced.
 > 891 tests pass (646 core unit + 43 core integration + 189 ui-logic + 14 other).
@@ -112,10 +121,10 @@ The current user-visible behaviors should be preserved where they are useful: tw
 
 ## 4. Milestone Roadmap
 
-### 4a. Delivered milestones (as of v0.40.0)
+### 4a. Delivered milestones (as of v0.104.0)
 
 The sequence executed in a different order than §4-original projected, but
-all core and shell slices shipped:
+all core and shell slices shipped. Extended below through v0.104.0.
 
 | Planned | Shipped in | RFC | What landed |
 |---------|-----------|-----|-------------|
@@ -131,37 +140,50 @@ all core and shell slices shipped:
 | — Settings layout | v0.36.0 | RFC-055–057 | Settings dialog, path nav, ignore UI |
 | — Patch export | v0.39.0 | RFC-039 | Unified-diff export from file/directory diffs |
 | — Three-way merge | v0.40.0 | RFC-033 | `ThreeWayMergeSession` diff3 engine + resolution |
+| — RFC-059 audit | v0.41.0 | RFC-059 | CSS fixes, Explorer accessibility audit |
+| — Dir-compare core | v0.42.0 + v0.58.0 | RFC-037 | Cancellation, `DirectoryIndex`, `EqualityEvidence` |
+| — Search core | v0.43.0 | RFC-014 | `MatchIndex`, `SearchIndex`, inline search |
+| — Atomic ops core | v0.44.0 | RFC-023 | `BatchManifest`, `batch_copy`, restore |
+| — Spreadsheet diff | v0.57.0 | RFC-058 | `SpreadsheetDiff`, sheets-diff v2.2.1 adapter |
+| — Settings core | v0.60.0 | RFC-009 | `UserSettings`, theme/font/density persistence |
+| — Command registry | v0.63.0 | RFC-019 | `CommandRegistry`, 25 `cmd::*` const IDs |
+| — Conflict nav | v0.64.0 | RFC-034 | `ConflictNavigator`, conflict workspace core |
+| — View-model layer | v0.74–v0.87 | — | 14 `ui-logic` modules, 189 tests |
+| — CSS contract | v0.88.0 | RFC-024 | `fs-line-*`, `fs-inline-*`, `fsk-conflict-*` |
+| — Platform diag | v0.93.0 | RFC-026 | `PlatformInfo::collect()`, `to_report()` |
+| — UI stabilisation | v0.92–v0.104 | RFC-030 | 4-bug UI fix, i18n complete, docs, merge corpus |
 
 M4 (editor adapter, RFC-004) is the one major planned milestone not yet
 started. M8–M10 (directory jobs, settings/a11y, packaging/QA) are partially
-delivered but not complete.
+delivered but not fully complete at UI layer.
 
 ### 4b. Forward roadmap from v0.41.0
 
 Priorities derived from the v0.40 backlog write-up
 (`rfcs/notes/proposed-rfc-backlog-writeup-v0.40.md`) and RFC-059 audit.
-Status updated at v0.102.0.
+Status updated at v0.104.0 — all items audited against `rfcs/done/`.
 
 | Priority | RFC(s) | What | Status |
 |----------|--------|------|--------|
-| 1 | RFC-034 | Conflict resolution workspace UI (three-way) | Open — requires GTK |
-| 2 | RFC-059 + RFC-019 | Explorer keyboard completeness, CSS fixes, align-module tests | Open — requires GTK |
-| 3 | RFC-037 | Scalable dir-compare: cancellation, incremental refresh | Open — requires GTK |
-| 4 | RFC-014 | Search next/prev traversal + scroll-to-match | Open — requires GTK |
-| 5 | RFC-023 | Digest-cache lifetime + directory-batch atomicity | Open — requires GTK |
-| 6 | RFC-058 | Spreadsheet structured diff adapter + test corpus | Open |
-| 7 | RFC-009 + RFC-019 | Full i18n coverage + command registry | **Done** — i18n complete v0.102.0; command registry shipped v0.63.0 |
-| 8 | RFC-004 → RFC-025 gate | Editor adapter — prototype first, then RFC-016/040/032/035 | Open — deferred |
-| 9 | RFC-010 + RFC-026 | Packaging QA matrix, cross-platform smoke tests | Open — deferred |
+| 1 | RFC-034 | Conflict resolution workspace UI (three-way) | **Done** (core v0.64.0); UI workspace requires GTK |
+| 2 | RFC-059 + RFC-019 | Explorer keyboard completeness, CSS fixes, align-module tests | **Done** (RFC-059 v0.41.0, RFC-019 core v0.63.0); remaining UI items require GTK |
+| 3 | RFC-037 | Scalable dir-compare: cancellation, incremental refresh | **Done** (core v0.42.0 + v0.58.0); persistent index cache deferred |
+| 4 | RFC-014 | Search next/prev traversal + scroll-to-match | **Done** (core v0.43.0); Explorer filter UI and regex mode deferred to UI layer |
+| 5 | RFC-023 | Digest-cache lifetime + directory-batch atomicity | **Done** (core v0.44.0); restore-picker UI deferred to UI layer |
+| 6 | RFC-058 | Spreadsheet structured diff adapter + test corpus | **Done** (v0.57.0, migrated to sheets-diff v2.2.1) |
+| 7 | RFC-009 + RFC-019 | Full i18n coverage + command registry | **Done** (RFC-009 core v0.60.0, RFC-019 core v0.63.0, i18n complete v0.102.0) |
+| 8 | RFC-004 → RFC-025 gate | Editor adapter — prototype first, then RFC-016/040/032/035 | Open — deferred; requires GTK + CodeMirror |
+| 9 | RFC-010 + RFC-026 | Packaging QA matrix, cross-platform smoke tests | Open — deferred; requires cross-platform CI |
 | 10 | RFC-041 | v1.0 stabilization + governance | Open — 12/16 checklist items done |
 
-The **editor adapter track** (RFC-004 and its dependents: RFC-016, 025, 032,
-035, 040) remains the highest-risk open track. The rest of the v0.41+ roadmap
-does not block on it and can proceed independently.
+**Summary:** Priorities 1–7 are all shipped at core layer. The remaining
+open work is entirely the **editor adapter track** (RFC-004 and dependents),
+**packaging/QA** (RFC-010, RFC-026), and the **v1.0 governance gate**
+(RFC-041). All three require either a GTK build environment or cross-platform
+CI infrastructure that is not yet set up.
 
-The **three immediate non-GTK work items** are RFC-058 (spreadsheet diff
-corpus/adapter — purely core work), and further test corpus expansion.
-All UI-facing items require a GTK build environment.
+The **three immediate non-GTK work items** identified at v0.103.0 have been
+resolved: RFC-058 was already done (v0.57.0), not open as previously stated.
 
 ## 4-original. Original milestone table (preserved for reference)
 
