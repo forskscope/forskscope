@@ -5,6 +5,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.106.0] — 2026-06-12
+
+9 new conflict_nav_view tests (focus, resolved glyphs, progress); 899 → 907 tests.
+
+### Added
+
+- **9 new tests in `crates/forskscope-ui-logic/src/compare/conflict_nav_view.rs`**
+  (10 → 19 tests):
+
+  *Focus propagation:*
+  - `focused_row_returns_none_when_no_focus_set` — `focused_row()` is `None`
+    when `ConflictNavigator::build` is called with `focused_id = None`.
+  - `focused_row_returns_some_when_focus_is_set` — `focused_row()` returns
+    `Some` with correct `conflict_id` when `focused_id` is provided.
+  - `is_focused_flag_set_only_on_focused_conflict` — exactly one row has
+    `is_focused = true` in a multi-conflict session; it matches the given id.
+
+  *Resolved-state glyphs:*
+  - `resolved_left_row_has_l_glyph` — `resolve_left` produces glyph `'L'`.
+  - `resolved_right_row_has_r_glyph` — `resolve_right` produces glyph `'R'`.
+  - `ignored_row_has_dash_glyph` — `ignore` produces glyph `'-'`.
+  - `all_glyph_status_texts_are_non_empty` — `status_text` is non-empty for
+    every conflict row.
+
+  *Progress text:*
+  - `progress_text_reflects_partial_resolution` — with 2 conflicts and 1
+    resolved, `progress_text` is non-empty and contains `'1'`.
+
+### Changed
+
+- `docs/src/maintainers/testing.md` — 899 → **907**; `conflict_nav_view`
+  row updated to describe focus/glyph/progress coverage.
+- `rfcs/notes/core-completion-summary-v0.72.md` — 899 → 907; ui-logic
+  197 → 205; version note updated to v0.106.0.
+- `rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md` —
+  907 total.
+
+---
+
 ## [0.105.0] — 2026-06-12
 
 9 new tab_state tests (conflict/redo/read-only scenarios); 891 → 899 tests.

@@ -217,4 +217,123 @@ mod tests {
         let view = ConflictNavView::from_navigator(&nav, sess.can_save());
         assert_eq!(view.len(), view.rows.len());
     }
+
+    // ── Focus propagation ─────────────────────────────────────────────────────
+
+    #[test]
+    fn focused_row_returns_none_when_no_focus_set() {
+        let sess = session_with_conflicts();
+        let nav  = nav_from_session(&sess);
+        let view = ConflictNavView::from_navigator(&nav, sess.can_save());
+        // ConflictNavigator::build with focused_id=None means no row is focused.
+        assert!(view.focused_row().is_none(),
+            "focused_row must be None when no focus_id was provided to build()");
+    }
+
+    #[test]
+    fn focused_row_returns_some_when_focus_is_set() {
+        let sess = session_with_conflicts();
+        let focused_id = sess.conflicts().iter().next().map(|c| c.id);
+        let nav = ConflictNavigator::build(&sess, focused_id, ConflictFilter::All);
+        let view = ConflictNavView::from_navigator(&nav, sess.can_save());
+        assert!(view.focused_row().is_some(),
+            "focused_row must be Some when a valid focus_id is provided");
+        assert_eq!(view.focused_row().unwrap().conflict_id, focused_id.unwrap());
+    }
+
+    #[test]
+    fn is_focused_flag_set_only_on_focused_conflict() {
+        let sess = session_with_conflicts();
+        // Build a session with multiple conflicts to verify only one is focused.
+        let multi = ThreeWayMergeSession::from_texts(
+            "a\nb\nc\n",
+            "A\nb\nC\n",
+            "aa\nb\ncc\n",
+        );
+        let focused_id = multi.conflicts().iter().next().map(|c| c.id);
+        let nav = ConflictNavigator::build(&multi, focused_id, ConflictFilter::All);
+        let view = ConflictNavView::from_navigator(&nav, multi.can_save());
+
+        let focused_count = view.rows.iter().filter(|r| r.is_focused).count();
+        assert_eq!(focused_count, 1, "exactly one row must be focused");
+        assert_eq!(
+            view.rows.iter().find(|r| r.is_focused).map(|r| r.conflict_id),
+            focused_id,
+            "focused row conflict_id must match the focus set on the navigator"
+        );
+    }
+
+    // ── Resolved-state glyphs ─────────────────────────────────────────────────
+
+    #[test]
+    fn resolved_left_row_has_l_glyph() {
+        let mut sess = session_with_conflicts();
+        let id = sess.conflicts().iter().next().unwrap().id;
+        sess.resolve_left(id).unwrap();
+        let nav  = nav_from_session(&sess);
+        let view = ConflictNavView::from_navigator(&nav, sess.can_save());
+        let row  = view.rows.iter().find(|r| r.conflict_id == id).unwrap();
+        assert_eq!(row.glyph, 'L',
+            "resolve_left must produce glyph 'L'; got '{}'", row.glyph);
+    }
+
+    #[test]
+    fn resolved_right_row_has_r_glyph() {
+        let mut sess = session_with_conflicts();
+        let id = sess.conflicts().iter().next().unwrap().id;
+        sess.resolve_right(id).unwrap();
+        let nav  = nav_from_session(&sess);
+        let view = ConflictNavView::from_navigator(&nav, sess.can_save());
+        let row  = view.rows.iter().find(|r| r.conflict_id == id).unwrap();
+        assert_eq!(row.glyph, 'R',
+            "resolve_right must produce glyph 'R'; got '{}'", row.glyph);
+    }
+
+    #[test]
+    fn ignored_row_has_dash_glyph() {
+        let mut sess = session_with_conflicts();
+        let id = sess.conflicts().iter().next().unwrap().id;
+        sess.ignore(id).unwrap();
+        let nav  = nav_from_session(&sess);
+        let view = ConflictNavView::from_navigator(&nav, sess.can_save());
+        let row  = view.rows.iter().find(|r| r.conflict_id == id).unwrap();
+        assert_eq!(row.glyph, '-',
+            "ignore must produce glyph '-'; got '{}'", row.glyph);
+    }
+
+    #[test]
+    fn all_glyph_status_texts_are_non_empty() {
+        let sess = session_with_conflicts();
+        let nav  = nav_from_session(&sess);
+        let view = ConflictNavView::from_navigator(&nav, sess.can_save());
+        for row in &view.rows {
+            assert!(!row.status_text.is_empty(),
+                "status_text must be non-empty for conflict {:?}", row.conflict_id);
+        }
+    }
+
+    // ── Progress text ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn progress_text_reflects_partial_resolution() {
+        // Build a session with two conflicts; resolve one.
+        // Use non-adjacent lines to ensure two separate divergent hunks.
+        let mut sess = ThreeWayMergeSession::from_texts(
+            "a\nstable\nb\n",
+            "A\nstable\nB\n",
+            "aa\nstable\nbb\n",
+        );
+        assert_eq!(sess.stats().conflicts_total, 2, "fixture must have 2 conflicts");
+        let id = sess.conflicts().iter().next().unwrap().id;
+        sess.resolve_left(id).unwrap();
+
+        let nav  = nav_from_session(&sess);
+        let view = ConflictNavView::from_navigator(&nav, sess.can_save());
+        // Progress text should mention resolution state (exact format may vary).
+        assert!(!view.progress_text.is_empty(),
+            "progress_text must not be empty with partial resolution");
+        // With 1 resolved out of 2, the text should contain '1' somewhere.
+        assert!(view.progress_text.contains('1'),
+            "progress_text '{}' must reference the resolved count", view.progress_text);
+    }
 }
