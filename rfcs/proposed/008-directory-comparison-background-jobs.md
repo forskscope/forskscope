@@ -1,6 +1,6 @@
 # RFC-008 — Directory Comparison and Background Job Model
 
-**Status.** Proposed
+**Status.** Proposed — EqualityEvidence and pair_entries slice implemented (v0.58.0); background job runner and UI open
 
 ---toml
 project = "ForskScope"

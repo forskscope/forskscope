@@ -7,6 +7,7 @@ mod batch_tests;
 mod compare_profile_tests;
 mod diff_tests;
 mod dir_cancel_tests;
+mod dir_index_tests;
 mod dir_tests;
 mod document_tests;
 mod editability_tests;

@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.58.0] — 2026-06-10
+
+Directory index model, equality evidence, and pair comparison (RFC-008 §5, RFC-037 §"Directory Index").
+
+### Added
+
+- **`forskscope-core::dir::index`** — directory index model and equality evidence (RFC-008 §5, RFC-037).
+
+  **`DirectoryIndex`**: snapshot of one directory tree. Fields: `root`, `revision: IndexRevision`, `entries: Vec<DirectoryEntryRecord>`, `ignored_count`, `is_complete`. Constructors: `empty(root)`, `from_records(root, entries, is_complete)`. Methods: `get(rel)`, `files()`, `directories()`.
+
+  **`DirectoryEntryRecord`**: one file in the index — `relative_path`, `entry_type: EntryType`, `size`, `modified`, `digest: Option<ContentDigest>`, `error`. Predicates: `has_error()`, `has_digest()`.
+
+  **`ContentDigest`**: algorithm + hex pair. `fnv1a64(hex)` constructor. `matches(other)` — requires same algorithm and same hex (different-algorithm digests are incomparable, never equal).
+
+  **`EqualityEvidence`** (RFC-008 §5): ten-variant enum encoding the comparison verdict for one path pair: `DigestEqual | MetadataEqual | MetadataOnly | LeftOnly | RightOnly | TypeMismatch | SizeDifferent | DigestDifferent | Error | Unknown`. Predicates: `is_equal()`, `is_different()`, `is_pending()`, `present_on_both_sides()`.
+
+  **`pair_entries(left, right) → PairedEntrySet`** — pairs two `DirectoryIndex` instances by relative path and computes `EqualityEvidence` for each path, following the RFC-008 §5 strategy in order: missing-side → `LeftOnly`/`RightOnly`; error → `Error`; type mismatch → `TypeMismatch`; size differs → `SizeDifferent` (skip digest); both digests present → `DigestEqual`/`DigestDifferent`; same mtime → `MetadataEqual`; else → `MetadataOnly`.
+
+  **`PairedEntrySet`**: `entries: Vec<PairedEntry>` with `equal_count()`, `different_count()`, `pending_count()`, `left_only_count()`, `right_only_count()`.
+
+  **`IndexRevision`**: newtype `u64` with `next()`. Incremented on each rescan.
+
+- **25 new tests** in `tests/dir_index_tests.rs`: empty index, `get`, `files`/`directories` iterators, `ContentDigest::matches` (same/different hex, different algorithm), all `EqualityEvidence` predicates, all 9 `pair_entries` comparison branches, `PairedEntrySet` counts, empty-both-sides, revision `next()`. Total core test count: 385.
+
+---
+
 ## [0.57.0] — 2026-06-10
 
 sheets-diff v2.2.1 migration — structured result, no catch_unwind,

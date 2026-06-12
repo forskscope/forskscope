@@ -1,6 +1,6 @@
 # RFC 037: Scalable Directory Compare Index and Incremental Refresh
 
-**Status.** Proposed — cancellation + symlink slice implemented (v0.42.0); index/cache open
+**Status.** Proposed — cancellation + symlink (v0.42.0); DirectoryIndex + EqualityEvidence + pair_entries (v0.58.0); incremental refresh and UI open
 
 ## Status
 Partially implemented in v0.42.0:
