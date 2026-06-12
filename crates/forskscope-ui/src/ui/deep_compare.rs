@@ -91,13 +91,13 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
     rsx! {
         div { class: "deep-compare",
             div { class: "deep-compare-toolbar",
-                span { class: "deep-label", "Deep compare" }
+                span { class: "deep-label", {t(lang, "Deep compare")} }
                 button { class: if f==DeepFilter::Different {"filter-btn active"} else {"filter-btn"},
-                    onclick: move |_| filter.set(DeepFilter::Different), "Different" }
+                    onclick: move |_| filter.set(DeepFilter::Different), {t(lang, "Different")} }
                 button { class: if f==DeepFilter::All {"filter-btn active"} else {"filter-btn"},
-                    onclick: move |_| filter.set(DeepFilter::All), "All" }
+                    onclick: move |_| filter.set(DeepFilter::All), {t(lang, "All")} }
                 button { class: if f==DeepFilter::Equal {"filter-btn active"} else {"filter-btn"},
-                    onclick: move |_| filter.set(DeepFilter::Equal), "Equal only" }
+                    onclick: move |_| filter.set(DeepFilter::Equal), {t(lang, "Equal only")} }
                 span { class: "spacer" }
                 BatchCopyButtons { entries, left_root: left_root.clone(), right_root: right_root.clone() }
             }

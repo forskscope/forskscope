@@ -3,11 +3,13 @@
 
 use dioxus::prelude::*;
 
+use crate::i18n::t;
 use crate::state::{Modal, Store};
 
 #[component]
 pub fn Header() -> Element {
     let mut store = use_context::<Store>();
+    let lang = store.lang();
 
     rsx! {
         div { class: "header",
@@ -15,7 +17,7 @@ pub fn Header() -> Element {
             span { class: "spacer" }
             button {
                 onclick: move |_| store.modal.set(Modal::Settings),
-                "Settings"
+                {t(lang, "Settings")}
             }
             button {
                 onclick: move |_| store.modal.set(Modal::KeyboardRef),

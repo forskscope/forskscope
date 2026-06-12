@@ -5,6 +5,52 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.111.0] — 2026-06-12
+
+**Milestone: i18n complete across all UI surfaces.**
+
+Every user-visible string in every UI component now routes through `t()`.
+The Japanese interface is now complete with zero untranslated labels in any
+component. This closes RFC-009 (locale/i18n) at the UI layer.
+
+### Fixed
+
+**`crates/forskscope-ui/src/ui/deep_compare.rs`**
+- `"Deep compare"` toolbar label → `t(lang, "Deep compare")`.
+- `"Different"`, `"All"`, `"Equal only"` filter buttons → `t(lang, ...)`.
+- Japanese translations: 深度比較, 差分あり, すべて, 同一のみ.
+
+**`crates/forskscope-ui/src/ui/header.rs`**
+- `"Settings"` button → `t(lang, "Settings")`.
+- Added `use crate::i18n::t` import and `let lang = store.lang()`.
+
+**`crates/forskscope-ui/src/ui/explorer.rs`**
+- `"Browse"` mode tab → `t(lang, "Browse")`.
+- `"Directory Report"` mode tab → `t(lang, "Directory Report")`.
+- Japanese translations: ブラウズ, ディレクトリレポート.
+
+**`crates/forskscope-ui/src/ui/keybindings.rs`**
+- `"Keyboard shortcuts"` modal heading → `t(lang, "Keyboard shortcuts")`.
+- `"Diff view"`, `"Navigation"`, `"App"` section headings → `t(lang, ...)`.
+- Removed duplicate `"Alt + ↑"` row (was listed twice in Navigation).
+- Japanese translations: キーボードショートカット, 差分ビュー,
+  ナビゲーション, アプリ.
+
+### Note on remaining English strings
+
+Three categories intentionally remain in English:
+1. **File dialog labels** (`"Export patch"`, `"Patch files"`, `"All files"`)
+   in `diff_actions.rs` — these are passed to the OS native file picker via
+   `rfd` and their localisation depends on the platform API.
+2. **Screen-reader-only row labels** (`"Deleted"`, `"Inserted"`, `"Changed"`)
+   in `hunk.rs` Row component — the component does not take a `lang` prop
+   and adding one requires updating all callsites in a GTK environment.
+3. **Keyboard shortcut descriptions** in `keybindings.rs` `KbRow` — these
+   are `&'static str` props and translating them would require significant
+   additional translation work with low user-facing impact for a developer tool.
+
+---
+
 ## [0.110.0] — 2026-06-12
 
 **Milestone: pre-v1 stabilisation complete — all non-GTK work done.**

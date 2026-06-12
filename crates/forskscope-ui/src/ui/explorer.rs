@@ -169,13 +169,13 @@ pub fn Explorer() -> Element {
                     class: if *mode.read() == ExplorerMode::Browse { "mode-btn active" } else { "mode-btn" },
                     title: "Browse and navigate directories side by side",
                     onclick: move |_| mode.set(ExplorerMode::Browse),
-                    "Browse"
+                    {t(lang, "Browse")}
                 }
                 button {
                     class: if *mode.read() == ExplorerMode::Deep { "mode-btn active" } else { "mode-btn" },
                     title: "Recursively compare all files in both directories and show a full status report",
                     onclick: move |_| mode.set(ExplorerMode::Deep),
-                    "Directory Report"
+                    {t(lang, "Directory Report")}
                 }
             }
 
