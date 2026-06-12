@@ -20,7 +20,7 @@ The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
 be tested in environments without a display server. Core and ui-logic tests
 run anywhere Rust is installed.
 
-## Test counts (v0.102.0)
+## Test counts (v0.105.0)
 
 | Suite | Count |
 |-------|-------|
@@ -28,11 +28,11 @@ run anywhere Rust is installed.
 | `forskscope-core` integration (`diff_corpus`) | 25 |
 | `forskscope-core` integration (`merge_corpus`) | 16 |
 | `forskscope-core` integration (`patch_apply`) | 2 |
-| `forskscope-ui-logic` unit | 189 |
+| `forskscope-ui-logic` unit | 197 |
 | `forskscope-ui-logic` integration (`css_coverage`) | 5 |
 | Doctests | 7 |
 | `forskscope-ui-logic` integration | 1 |
-| **Total** | **891** |
+| **Total** | **899** |
 
 ## `forskscope-core` test modules
 
@@ -106,7 +106,7 @@ Integration tests live in `tests/css_coverage.rs`.
 | `compare/scroll_sync` | `ScrollSyncState`: at-top, pixel→anchor→pixel round-trip, mid-row fraction, negative clamping, `scroll_to_row`, past-end clamping, `max_scroll_px`, zero row-height guard. | RFC-035 |
 | `compare/search_index` | `MatchIndex` build/advance/retreat/wrap, `matching_hunk_ids`, empty index. | RFC-014 |
 | `compare/summary` | `CompareStatusSummary` for identical/changed/whitespace-only/single-hunk, dirty marker, `DiffNavigationState` position labels and aria wrap cases. | RFC-006 |
-| `compare/tab_state` | `context_from_snapshot` field mapping, `AvailabilityRule` inverse verification, end-to-end `TabStateSnapshot → CommandContext → build_toolbar`. | RFC-003, RFC-019 |
+| `compare/tab_state` | `context_from_snapshot` field mapping, `AvailabilityRule` inverse verification, end-to-end `TabStateSnapshot → CommandContext → build_toolbar`; conflict flags (ActiveConflict, AnyConflictUnresolved), redo flag, read-only tab, focused-hunk guard, all-flags-true exhaustive check. | RFC-003, RFC-019 |
 | `settings/settings_view` | `theme_choices` round-trip via `ThemeId::from_id`; density/font round-trips; `profile_presets` count and name; font-size validation boundaries; `clamp_font_size` extremes; context-lines boundary; `find_active` hit/miss; no duplicate values. | RFC-009 |
 
 Doctest in `watcher.rs` (`MockFileChangeMonitor` usage example): 1 test.

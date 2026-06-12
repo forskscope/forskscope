@@ -142,4 +142,129 @@ mod tests {
         assert!(AvailabilityRule::CanUndo.evaluate(&ctx).is_available());
         assert!(!AvailabilityRule::CanRedo.evaluate(&ctx).is_available());
     }
+
+    #[test]
+    fn redo_flag_is_forwarded_to_context() {
+        let snap = TabStateSnapshot {
+            has_active_diff_tab: true,
+            can_undo: true,
+            can_redo: true,
+            ..Default::default()
+        };
+        let ctx = context_from_snapshot(&snap);
+        assert!(ctx.can_redo, "can_redo must be forwarded when set");
+        assert!(AvailabilityRule::CanRedo.evaluate(&ctx).is_available());
+    }
+
+    #[test]
+    fn redo_only_snapshot_enables_redo_toolbar_item() {
+        let snap = TabStateSnapshot {
+            has_active_diff_tab: true,
+            can_redo: true,
+            ..Default::default()
+        };
+        let ctx = context_from_snapshot(&snap);
+        let reg = CommandRegistry::builtin();
+        let sections = build_toolbar(&reg, &ctx);
+        assert!(find_item(&sections, "edit.redo").unwrap().enabled,
+            "redo must be enabled when can_redo is true");
+        assert!(!find_item(&sections, "edit.undo").unwrap().enabled,
+            "undo must be disabled when can_undo is false");
+    }
+
+    #[test]
+    fn conflict_flags_are_forwarded_to_context() {
+        let snap = TabStateSnapshot {
+            has_active_diff_tab:    true,
+            has_active_conflict:    true,
+            any_conflict_unresolved: true,
+            ..Default::default()
+        };
+        let ctx = context_from_snapshot(&snap);
+        assert!(ctx.has_active_conflict,     "has_active_conflict must be forwarded");
+        assert!(ctx.any_conflict_unresolved, "any_conflict_unresolved must be forwarded");
+        assert!(AvailabilityRule::ActiveConflict.evaluate(&ctx).is_available());
+        assert!(AvailabilityRule::AnyConflictUnresolved.evaluate(&ctx).is_available());
+    }
+
+    #[test]
+    fn no_conflict_context_is_unavailable_for_conflict_rules() {
+        let ctx = context_from_snapshot(&TabStateSnapshot::default());
+        assert!(!AvailabilityRule::ActiveConflict.evaluate(&ctx).is_available());
+        assert!(!AvailabilityRule::AnyConflictUnresolved.evaluate(&ctx).is_available());
+    }
+
+    #[test]
+    fn selected_path_flag_is_forwarded_to_context() {
+        let snap = TabStateSnapshot {
+            selected_path_exists: true,
+            ..Default::default()
+        };
+        let ctx = context_from_snapshot(&snap);
+        assert!(ctx.selected_path_exists, "selected_path_exists must be forwarded");
+        assert!(AvailabilityRule::SelectedPathExists.evaluate(&ctx).is_available());
+    }
+
+    #[test]
+    fn read_only_tab_disables_apply_hunk() {
+        // right_side_is_editable = false: applying hunks must be unavailable.
+        let snap = TabStateSnapshot {
+            has_active_diff_tab:    true,
+            has_active_compare_tab: true,
+            active_tab_has_hunks:   true,
+            active_hunk_exists:     true,
+            right_side_is_editable: false, // xlsx or binary — read-only
+            ..Default::default()
+        };
+        let ctx = context_from_snapshot(&snap);
+        assert!(!ctx.right_side_is_editable);
+        assert!(!AvailabilityRule::ActiveHunkEditable.evaluate(&ctx).is_available(),
+            "applying a hunk must be unavailable when right side is read-only");
+    }
+
+    #[test]
+    fn editable_tab_without_focused_hunk_disables_apply() {
+        let snap = TabStateSnapshot {
+            has_active_diff_tab:    true,
+            active_tab_has_hunks:   true,
+            right_side_is_editable: true,
+            active_hunk_exists:     false, // hunks exist but none focused
+            ..Default::default()
+        };
+        let ctx = context_from_snapshot(&snap);
+        assert!(!AvailabilityRule::ActiveHunkEditable.evaluate(&ctx).is_available(),
+            "apply must be unavailable when no hunk is focused");
+    }
+
+    #[test]
+    fn all_flags_true_snapshot_satisfies_all_rules() {
+        let snap = TabStateSnapshot {
+            has_active_diff_tab:     true,
+            has_active_compare_tab:  true,
+            active_tab_is_dirty:     true,
+            active_tab_is_saveable:  true,
+            active_tab_has_hunks:    true,
+            active_hunk_exists:      true,
+            right_side_is_editable:  true,
+            has_active_conflict:     true,
+            any_conflict_unresolved: true,
+            can_undo:                true,
+            can_redo:                true,
+            selected_path_exists:    true,
+        };
+        let ctx = context_from_snapshot(&snap);
+        for rule in [
+            AvailabilityRule::DirtyAndSaveable,
+            AvailabilityRule::HasHunks,
+            AvailabilityRule::ActiveHunkEditable,
+            AvailabilityRule::CanUndo,
+            AvailabilityRule::CanRedo,
+            AvailabilityRule::ActiveConflict,
+            AvailabilityRule::AnyConflictUnresolved,
+            AvailabilityRule::SelectedPathExists,
+        ] {
+            assert!(rule.evaluate(&ctx).is_available(),
+                "{rule:?} must be available when all flags are true");
+        }
+    }
 }

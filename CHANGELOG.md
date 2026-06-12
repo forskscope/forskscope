@@ -5,6 +5,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.105.0] — 2026-06-12
+
+9 new tab_state tests (conflict/redo/read-only scenarios); 891 → 899 tests.
+
+### Added
+
+- **9 new tests in `crates/forskscope-ui-logic/src/compare/tab_state.rs`**
+  (5 → 14 tests) covering previously untested `TabStateSnapshot` fields:
+
+  - `redo_flag_is_forwarded_to_context` — `can_redo` propagates to
+    `CommandContext` and satisfies `AvailabilityRule::CanRedo`.
+  - `redo_only_snapshot_enables_redo_toolbar_item` — toolbar has redo enabled,
+    undo disabled when only `can_redo` is set.
+  - `conflict_flags_are_forwarded_to_context` — `has_active_conflict` and
+    `any_conflict_unresolved` propagate; `ActiveConflict` and
+    `AnyConflictUnresolved` rules are satisfied.
+  - `no_conflict_context_is_unavailable_for_conflict_rules` — both conflict
+    rules unavailable on default snapshot.
+  - `selected_path_flag_is_forwarded_to_context` — `selected_path_exists`
+    propagates; `SelectedPathExists` rule satisfied.
+  - `read_only_tab_disables_apply_hunk` — `right_side_is_editable = false`
+    makes `ActiveHunkEditable` unavailable (xlsx/binary tabs).
+  - `editable_tab_without_focused_hunk_disables_apply` — hunks exist but none
+    focused: `ActiveHunkEditable` unavailable.
+  - `all_flags_true_snapshot_satisfies_all_rules` — exhaustive check: every
+    `AvailabilityRule` is satisfied when all snapshot flags are true.
+
+### Changed
+
+- `docs/src/maintainers/testing.md` — count 891 → **899**; tab_state row
+  updated with conflict/redo/read-only coverage description.
+- `rfcs/notes/core-completion-summary-v0.72.md` — title → v0.105.0;
+  ui-logic count 189 → 197; total 891 → 899; version note updated.
+- `rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md` —
+  core test total 891 → 899.
+
+---
+
 ## [0.104.0] — 2026-06-12
 
 RFC-042 fully audited: §4b priorities 1–7 all Done; §4a extended to v0.104.
