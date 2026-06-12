@@ -5,6 +5,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.74.0] — 2026-06-12
+
+Command bar view-model in `forskscope-ui-logic`.
+
+### Added
+
+- **`compare::command_bar`** in `forskscope-ui-logic` — toolbar item
+  view-model (RFC-019 §5, §6).
+
+  **`ToolbarItem`** — fully-resolved toolbar button snapshot: `command_id`,
+  `label`, `enabled`, `disabled_reason`, `shortcut_hint`. All fields are
+  owned so the Dioxus toolbar component can hold a snapshot without
+  lifetime issues.
+
+  **`ToolbarSection`** — labelled group of `ToolbarItem`s. Five sections
+  in display order: File | Navigate | Merge | Edit | View.
+
+  **`build_toolbar(registry, ctx) → Vec<ToolbarSection>`** — the main
+  entry point. Evaluates `AvailabilityRule` for every item against the
+  current `CommandContext` and returns a fully-resolved snapshot. Replaces
+  the ad-hoc `if can_save { ... }` guards currently in `ui/diff.rs`.
+
+  **`find_item(sections, id) → Option<&ToolbarItem>`** — look up by
+  command ID. **`enabled_count(sections) → usize`** — count enabled items.
+
+- **`forskscope-ui-logic` now depends on `forskscope-core`** (direct
+  path dependency). This is correct per RFC-020 §5a: `ui-logic` is the
+  view-model layer and needs core types; it still has no Dioxus or GTK
+  dependency.
+
+- **12 new tests** in `command_bar` inline test module: section count,
+  section labels, Save disabled/enabled by context, Next Difference
+  enabled when hunks exist, Copy Hunk enabled with editable active hunk,
+  Undo/Redo asymmetry, Command Palette always enabled, Ctrl+S shortcut
+  hint, `enabled_count` minimum in empty context, `find_item` miss,
+  all labels non-empty. Total ui-logic test count: 34.
+
+---
+
 ## [0.73.0] — 2026-06-12
 
 ROADMAP.md; RFC-020 promoted to done; RFC-042 updated.
