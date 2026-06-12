@@ -5,6 +5,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.91.0] — 2026-06-12
+
+Diff acceptance corpus — 26 fixture files and 16 corpus integration tests.
+
+### Added
+
+- **`tests/fixtures/`** — workspace-level test fixture corpus implementing
+  the acceptance test plan from `rfcs/notes/acceptance-test-corpus-plan.md`.
+
+  **26 fixture files** across three categories:
+  - `text/` — 14 files: identical pair, one-changed-line pair (charlie/CHARLIE),
+    insertions pair, deletions pair, reordered-blocks pair, single-line
+    function-edit pair, empty file, nonempty file.
+  - `newlines/` — 5 files: LF, CRLF, no-final-newline, CRLF-no-final-newline,
+    mixed newlines.
+  - `whitespace/` — 6 files: extra space, trailing spaces, tab indent, space
+    indent, and their respective counterparts.
+
+  `tests/fixtures/README.md` documents the fixture structure, what each
+  pair tests, and how to add new fixtures.
+
+- **`crates/forskscope-core/tests/diff_corpus.rs`** — 16 corpus integration
+  tests using the fixture files via `compute_diff`:
+  - Identical fixture → `is_identical()`.
+  - One-changed-line → single Replace hunk with correct line content.
+  - Insertions / deletions → correct hunk kinds and line counts.
+  - Both-empty → identical; empty vs nonempty → pure Insert.
+  - LF vs CRLF differs by default (newline-significant).
+  - No-final-newline vs with-newline differs.
+  - Extra space detected by default; hidden with `ignore_whitespace`.
+  - Trailing space detected by default.
+  - Case change detected by default; hidden with `ignore_case`.
+  - Tab vs space indent differs.
+  - Single-line function edit → exactly one changed hunk.
+
+### Test count: 856
+(637 core unit + 16 diff_corpus + 2 patch_apply + 189 ui-logic +
+ 5 css_coverage + 6 doctest + 1 ui-logic-integration)
+
+---
+
 ## [0.90.0] — 2026-06-12
 
 CancellationToken and FileKind tests close the last untested core areas.

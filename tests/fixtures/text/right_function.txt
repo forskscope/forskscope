@@ -1,0 +1,6 @@
+func foo() {
+    if x {
+        return a + 1
+    }
+    return b
+}
