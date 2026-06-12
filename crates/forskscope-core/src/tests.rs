@@ -31,6 +31,7 @@ mod merge_tests;
 mod patch_tests;
 mod persist_tests;
 mod path_tests;
+mod platform_tests;
 mod report_tests;
 mod save_tests;
 mod session_tests;

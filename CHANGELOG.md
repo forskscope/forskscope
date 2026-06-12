@@ -5,6 +5,58 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.93.0] — 2026-06-12
+
+Acceptance corpus extended; `platform` diagnostic module added; known UI
+issue recorded.
+
+### Added
+
+- **`tests/fixtures/` extended** — 10 new fixture files:
+  - `text/utf8_bom.txt`, `text/utf8_no_bom.txt` — UTF-8 BOM vs no-BOM pair.
+  - `text/left_unicode.txt`, `text/right_unicode.txt` — Japanese + ASCII
+    content; tests Unicode diff and `ignore_case` on non-ASCII.
+  - `text/binary_nul.bin` — 9-byte file with a NUL byte; classifies as
+    `FileKind::Binary`.
+  - `text/large_equal_left.txt`, `text/large_equal_right.txt` — 200
+    identical lines; tests the context-collapse path.
+  - `text/large_one_change_left.txt`, `text/large_one_change_right.txt` —
+    200-line file with one change at line 100.
+  - `whitespace/left_mixed_trailing.txt`, `whitespace/right_clean.txt` —
+    mixed trailing spaces and tabs.
+
+- **9 new corpus integration tests** in `diff_corpus.rs`:
+  - `unicode_content_diffed_correctly` — Japanese text with case change.
+  - `unicode_content_equal_with_ignore_case` — world/WORLD ignored.
+  - `utf8_bom_differs_from_no_bom` — BOM byte is a real difference.
+  - `mixed_trailing_whitespace_detected_by_default` / `hidden_with_ignore_ws`.
+  - `large_equal_files_are_identical` — 200-line identical files.
+  - `large_file_with_one_change_produces_one_hunk` — one replace hunk, two
+    changed lines.
+  - `binary_fixture_classifies_as_binary` — NUL byte → `FileKind::Binary`.
+  - `text_fixtures_classify_as_text` — three text fixtures → `FileKind::Text`.
+
+- **`crates/forskscope-core/src/platform.rs`** — `PlatformInfo` struct with
+  `collect()` and `to_report()` for the About / Diagnostics panel
+  (RFC-026 §"Diagnostics panel").
+
+  Fields: `app_version`, `rustc_version`, `target_triple`, `os`, `arch`,
+  `logical_cpus`, `home_redacted` (username stripped to `***`),
+  `config_dir_hint` (platform-appropriate config directory).
+
+  8 unit tests: non-panic, non-empty fields, report format, home redaction,
+  determinism, logical CPUs positive.
+
+- **`rfcs/notes/known-ui-issues.md`** — issue tracker for deferred UI bugs.
+  ISSUE-001: diff pane scroll bar per-line instead of per-pane (v0.92.0
+  deferral), with root cause analysis and two recommended fix approaches.
+
+### Test count: 875
+(646 core unit + 25 diff_corpus + 2 patch_apply + 189 ui-logic +
+ 5 css_coverage + 7 doctest + 1 ui-logic-integration)
+
+---
+
 ## [0.92.0] — 2026-06-12
 
 Four UI bug fixes: two-pane split, theme select colours, ESC closes modals,

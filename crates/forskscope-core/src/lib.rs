@@ -26,6 +26,7 @@ pub mod file_kind;
 pub mod ignore;
 pub mod job;
 pub mod line_map;
+pub mod platform;
 pub mod merge;
 pub mod patch;
 pub mod path;

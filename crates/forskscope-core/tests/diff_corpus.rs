@@ -213,3 +213,109 @@ fn function_return_value_change_produces_replace_hunk() {
     assert_eq!(doc.stats.hunks_changed, 1,
         "single-line function edit must produce exactly one changed hunk");
 }
+
+// ── Unicode content ───────────────────────────────────────────────────────────
+
+#[test]
+fn unicode_content_diffed_correctly() {
+    let left  = load("text/left_unicode.txt");
+    let right = load("text/right_unicode.txt");
+    let doc = compute_diff(&left, &right, opts_default());
+    // "world" vs "WORLD" — should detect a change
+    assert!(!doc.is_identical());
+    assert_eq!(doc.stats.hunks_changed, 1);
+}
+
+#[test]
+fn unicode_content_equal_with_ignore_case() {
+    let left  = load("text/left_unicode.txt");
+    let right = load("text/right_unicode.txt");
+    let doc = compute_diff(&left, &right, opts_ignore_case());
+    // こんにちは is identical both sides; world/WORLD differs only by case
+    assert!(doc.is_identical(), "world vs WORLD must be equal with ignore_case");
+}
+
+// ── UTF-8 BOM handling ────────────────────────────────────────────────────────
+
+#[test]
+fn utf8_bom_differs_from_no_bom() {
+    let bom    = load("text/utf8_bom.txt");
+    let no_bom = load("text/utf8_no_bom.txt");
+    // The BOM is U+FEFF at the start — byte-level difference
+    assert!(!doc_identical(&bom, &no_bom),
+        "UTF-8 BOM file must differ from no-BOM file at byte level");
+}
+
+// ── Mixed trailing whitespace ──────────────────────────────────────────────
+
+#[test]
+fn mixed_trailing_whitespace_detected_by_default() {
+    let left  = load("whitespace/left_mixed_trailing.txt");
+    let right = load("whitespace/right_clean.txt");
+    let doc = compute_diff(&left, &right, opts_default());
+    assert!(!doc.is_identical());
+}
+
+#[test]
+fn mixed_trailing_whitespace_hidden_with_ignore_ws() {
+    let left  = load("whitespace/left_mixed_trailing.txt");
+    let right = load("whitespace/right_clean.txt");
+    let doc = compute_diff(&left, &right, opts_ignore_ws());
+    assert!(doc.is_identical(),
+        "trailing spaces and tabs must be ignored with ignore_whitespace");
+}
+
+// ── Large files: context collapsing ──────────────────────────────────────────
+
+#[test]
+fn large_equal_files_are_identical() {
+    let left  = load("text/large_equal_left.txt");
+    let right = load("text/large_equal_right.txt");
+    let doc = compute_diff(&left, &right, opts_default());
+    assert!(doc.is_identical(), "200-line identical files must produce no changes");
+}
+
+#[test]
+fn large_file_with_one_change_produces_one_hunk() {
+    let left  = load("text/large_one_change_left.txt");
+    let right = load("text/large_one_change_right.txt");
+    let doc = compute_diff(&left, &right, opts_default());
+    assert!(!doc.is_identical());
+    assert_eq!(doc.stats.hunks_changed, 1,
+        "200-line file with one changed line must produce exactly one changed hunk");
+    // Equal context should surround the change but not be reported as changed
+    assert_eq!(doc.stats.lines_inserted + doc.stats.lines_deleted, 2,
+        "one replace = one deleted + one inserted");
+}
+
+// ── FileKind classification of corpus fixtures ────────────────────────────────
+
+#[test]
+fn binary_fixture_classifies_as_binary() {
+    use std::path::Path;
+    use forskscope_core::file_kind::{FileKind, classify};
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/text/binary_nul.bin");
+    let kind = classify(&path).expect("classify must not error");
+    assert_eq!(kind, FileKind::Binary,
+        "file with NUL byte must classify as Binary");
+}
+
+#[test]
+fn text_fixtures_classify_as_text() {
+    use std::path::Path;
+    use forskscope_core::file_kind::{FileKind, classify};
+    for name in &["left_identical.txt", "left_unicode.txt", "utf8_bom.txt"] {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/text")
+            .join(name);
+        let kind = classify(&path).expect("classify must succeed");
+        assert_eq!(kind, FileKind::Text,
+            "fixture {name} must classify as Text");
+    }
+}
+
+// Helper: compare without requiring ownership
+fn doc_identical(left: &str, right: &str) -> bool {
+    compute_diff(left, right, DiffOptions::default()).is_identical()
+}
