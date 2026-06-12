@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.113.0] — 2026-06-12
+
+Governance accuracy pass: RFC README, RFC-041/042 updated; FAQ cross-reference
+to troubleshooting guide; stale note files marked superseded.
+
+### Changed
+
+- **`rfcs/README.md`** — proposed section table expanded with Progress column:
+  RFC-026 and RFC-030 marked "Partially shipped" / "Substantially shipped";
+  blocked RFCs annotated with their blockers; RFC-042 noted as current through
+  v0.113.0.
+
+- **`rfcs/proposed/042-roadmap-and-rfc-execution-plan.md`** — §4a extended
+  through v0.112.0: added ui-logic coverage pass (v0.109.0), i18n completion
+  (v0.111.0), startup diagnostics + troubleshooting guide (v0.112.0).
+  Header updated to v0.113.0; v0.113.0 update block added.
+
+- **`rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md`** —
+  architecture/testing docs version updated (v0.110.0 → v0.113.0, noting
+  troubleshooting.md added).
+
+- **`docs/src/users/faq.md`** — GTK/WebKitGTK entry now links to the full
+  [Troubleshooting guide](troubleshooting.md) for blank-window, NVIDIA
+  DMA-BUF, and other platform issues.
+
+- **`rfcs/notes/implementation-gate-checklist-v0.2.md`** — "Superseded
+  v0.113.0" notice added (same pattern as implementation-checklist.md, which
+  was superseded in v0.102.0). All gate conditions were met in v0.23–v0.72.
+
+---
+
 ## [0.112.0] — 2026-06-12
 
 RFC-026 diagnostics CLI flag; RFC-030 troubleshooting guide; both RFCs advanced.

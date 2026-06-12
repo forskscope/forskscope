@@ -1,6 +1,11 @@
 # RFC-042 — Roadmap and RFC Execution Plan
 
-**Status.** Proposed — living document; updated for v0.104.0 (§4a extended through v0.104, §4b audited: priorities 1–7 all Done)
+**Status.** Proposed — living document; updated for v0.113.0 (§4a extended through v0.112.0)
+
+> **v0.113.0 update (2026-06-12).** §4a extended through v0.112.0: added
+> ui-logic coverage pass (v0.109.0, 228 unit tests), i18n completion
+> (v0.111.0, all UI strings through `t()`), and startup diagnostics +
+> troubleshooting guide (v0.112.0, RFC-026 `--diagnostics` flag).
 
 > **v0.104.0 update (2026-06-12).** §4a extended through v0.104.0 with all
 > post-v0.40 deliveries (RFC-059 audit, dir-compare, search, atomic ops,
@@ -152,6 +157,9 @@ all core and shell slices shipped. Extended below through v0.104.0.
 | — CSS contract | v0.88.0 | RFC-024 | `fs-line-*`, `fs-inline-*`, `fsk-conflict-*` |
 | — Platform diag | v0.93.0 | RFC-026 | `PlatformInfo::collect()`, `to_report()` |
 | — UI stabilisation | v0.92–v0.104 | RFC-030 | 4-bug UI fix, i18n complete, docs, merge corpus |
+| — ui-logic coverage | v0.109.0 | — | All 14 ui-logic modules have field-level test coverage (228 unit tests) |
+| — i18n complete | v0.111.0 | RFC-009 | Every UI string through `t()`; Japanese interface complete |
+| — Startup diag + troubleshooting | v0.112.0 | RFC-026 | `--diagnostics` CLI flag; `troubleshooting.md` for WebView/Linux |
 
 M4 (editor adapter, RFC-004) is the one major planned milestone not yet
 started. M8–M10 (directory jobs, settings/a11y, packaging/QA) are partially

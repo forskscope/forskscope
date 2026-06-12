@@ -1,5 +1,15 @@
 # Implementation Gate Checklist v0.2
 
+> **Superseded — v0.113.0 (2026-06-12).**
+> All gate conditions were met during v0.23–v0.72. This checklist is preserved
+> as a historical record. For current project state see:
+> - `ROADMAP.md` — current milestone table
+> - `rfcs/proposed/041-…` — v1.0 release readiness checklist (12/16 ticked)
+> - `rfcs/proposed/042-…` — forward roadmap
+
+---
+
+
 ## Gate A — Before Dioxus UI Work Expands
 
 - [ ] `forskscope-core` crate exists or equivalent core module boundary exists.

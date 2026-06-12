@@ -128,6 +128,10 @@ If you see a "missing shared library" error at startup, the WebKitGTK package
 for your distribution is likely version 4.0 instead of 4.1. Check with
 `apt-cache search webkit2gtk` or equivalent.
 
+For blank-window issues, NVIDIA DMA-BUF workarounds, Wayland/X11 fallback,
+and other platform-specific startup problems, see the full
+[Troubleshooting guide](troubleshooting.md).
+
 ---
 
 ## Can I compare PDF or Word documents?

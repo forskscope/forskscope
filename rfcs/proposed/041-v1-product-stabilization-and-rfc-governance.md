@@ -40,7 +40,7 @@ Engineering:
   [x] Session schema migration tests pass           (persist_tests, session_tests)
 
 Documentation:
-  [x] Architecture and testing docs current         (v0.110.0)
+  [x] Architecture and testing docs current         (v0.113.0; troubleshooting.md added)
   [x] User guide covers common workflows            (v0.96.0–v0.98.0)
   [x] Recovery/backup behavior documented           (docs/src/users/merging.md)
   [x] Known limitations documented                  (docs/src/users/known-limitations.md, v0.98.0)

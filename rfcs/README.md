@@ -54,18 +54,19 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 ## Proposed (9)
 
 All remaining proposed RFCs are editor-adapter track, platform/packaging, or governance/documentation.
+RFC-026 and RFC-030 are substantially implemented; their remaining items require GTK or are deferred.
 
-| ID | Title | Category |
-|----|-------|----------|
-| 004 | [Editor Adapter and CodeMirror Bridge](./proposed/004-editor-adapter-and-codemirror-bridge.md) | Editor adapter (requires GTK/WebView) |
-| 010 | [Packaging, Diagnostics, QA, and Release Gates](./proposed/010-packaging-diagnostics-qa.md) | Platform/packaging |
-| 016 | [Editor Bridge Security and Contract](./proposed/016-editor-bridge-security-and-contract.md) | Editor adapter |
-| 025 | [Editor Adapter Prototype and Kill Switch](./proposed/025-editor-adapter-prototype-and-kill-switch.md) | Editor adapter |
-| 026 | [Cross-Platform WebView and Linux Desktop Compatibility](./proposed/026-cross-platform-webview-and-linux-desktop-compatibility.md) | Platform/packaging |
-| 030 | [User Documentation, Onboarding, and Help System](./proposed/030-user-documentation-onboarding-and-help-system.md) | Documentation |
-| 040 | [Editor Adapter Verification Harness and Golden Corpus](./proposed/040-editor-adapter-verification-harness-and-golden-corpus.md) | Editor adapter |
-| 041 | [v1.0 Product Stabilization and RFC Governance](./proposed/041-v1-product-stabilization-and-rfc-governance.md) | Governance |
-| 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) | Governance |
+| ID | Title | Category | Progress |
+|----|-------|----------|----------|
+| 004 | [Editor Adapter and CodeMirror Bridge](./proposed/004-editor-adapter-and-codemirror-bridge.md) | Editor adapter | Not started — requires GTK/WebView |
+| 010 | [Packaging, Diagnostics, QA, and Release Gates](./proposed/010-packaging-diagnostics-qa.md) | Platform/packaging | Not started — requires cross-platform CI |
+| 016 | [Editor Bridge Security and Contract](./proposed/016-editor-bridge-security-and-contract.md) | Editor adapter | Blocked on RFC-004 |
+| 025 | [Editor Adapter Prototype and Kill Switch](./proposed/025-editor-adapter-prototype-and-kill-switch.md) | Editor adapter | Blocked on RFC-004 |
+| 026 | [Cross-Platform WebView and Linux Desktop Compatibility](./proposed/026-cross-platform-webview-and-linux-desktop-compatibility.md) | Platform/packaging | **Partially shipped** — PlatformInfo, --diagnostics, troubleshooting.md |
+| 030 | [User Documentation, Onboarding, and Help System](./proposed/030-user-documentation-onboarding-and-help-system.md) | Documentation | **Substantially shipped** — 18 doc files; in-app help panel deferred |
+| 040 | [Editor Adapter Verification Harness and Golden Corpus](./proposed/040-editor-adapter-verification-harness-and-golden-corpus.md) | Editor adapter | Blocked on RFC-004 |
+| 041 | [v1.0 Product Stabilization and RFC Governance](./proposed/041-v1-product-stabilization-and-rfc-governance.md) | Governance | 12/16 checklist items done; 4 require GTK or deferred |
+| 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) | Governance | Living document — current through v0.113.0 |
 
 ## Archive (1)
 
