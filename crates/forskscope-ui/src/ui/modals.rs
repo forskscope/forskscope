@@ -17,7 +17,7 @@ pub fn OverwriteModal(index: usize) -> Element {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "File changed on disk",
             div { class: "modal",
                 h2 { {t(lang, "File changed on disk")} }
-                p { "The target file was modified after it was loaded. Overwrite anyway?" }
+                p { {t(lang, "The target file was modified after it was loaded. Overwrite anyway?")} }
                 div { class: "actions",
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
                     button { onclick: move |_| { save_tab_force(&mut store, index); }, {t(lang, "Overwrite")} }
@@ -37,9 +37,9 @@ pub fn SaveAsModal(index: usize, initial_path: String) -> Element {
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Save As",
             div { class: "modal",
-                h2 { "Save As" }
+                h2 { {t(lang, "Save As")} }
                 div { class: "field",
-                    span { "Path" }
+                    span { {t(lang, "Path")} }
                     input { autofocus: true, value: "{path}", oninput: move |e| path.set(e.value()), style: "width:100%;" }
                 }
                 div { class: "actions",
@@ -64,11 +64,11 @@ pub fn ReloadModal(index: usize) -> Element {
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Reload files",
             div { class: "modal",
-                h2 { "Reload files?" }
-                p { "Unsaved merge changes will be discarded." }
+                h2 { {t(lang, "Reload files?")} }
+                p { {t(lang, "Unsaved merge changes will be discarded.")} }
                 div { class: "actions",
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
-                    button { onclick: move |_| { reload_tab(&mut store, index); store.modal.set(Modal::None); }, "Discard and Reload" }
+                    button { onclick: move |_| { reload_tab(&mut store, index); store.modal.set(Modal::None); }, {t(lang, "Discard and Reload")} }
                 }
             }
         }
@@ -84,11 +84,11 @@ pub fn SwapModal(index: usize) -> Element {
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Swap sides",
             div { class: "modal",
-                h2 { "Swap sides?" }
-                p { "Unsaved merge changes will be discarded when sides are swapped." }
+                h2 { {t(lang, "Swap sides?")} }
+                p { {t(lang, "Unsaved merge changes will be discarded when sides are swapped.")} }
                 div { class: "actions",
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
-                    button { onclick: move |_| { swap_sides(&mut store, index); store.modal.set(Modal::None); }, "Discard and Swap" }
+                    button { onclick: move |_| { swap_sides(&mut store, index); store.modal.set(Modal::None); }, {t(lang, "Discard and Swap")} }
                 }
             }
         }
@@ -105,11 +105,11 @@ pub fn CloseTabModal(index: usize) -> Element {
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Close comparison",
             div { class: "modal",
-                h2 { "Close comparison?" }
+                h2 { {t(lang, "Close comparison?")} }
                 p { "\"{title}\" has unsaved changes. Discard them and close?" }
                 div { class: "actions",
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
-                    button { onclick: move |_| { close_tab(&mut store, index); store.modal.set(Modal::None); }, "Discard and close" }
+                    button { onclick: move |_| { close_tab(&mut store, index); store.modal.set(Modal::None); }, {t(lang, "Discard and close")} }
                 }
             }
         }
@@ -127,7 +127,7 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Copy file",
             div { class: "modal",
-                h2 { "Copy file?" }
+                h2 { {t(lang, "Copy file?")} }
                 p { "{op.label}" }
                 div { class: "field", span { "From" } code { class: "path-display", "{src}" } }
                 div { class: "field", span { "To"   } code { class: "path-display", "{dst}" } }
@@ -139,12 +139,12 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
                     button {
                         onclick: move |_| {
                             match forskscope_core::dir::copy_file(&op.src, &op.dst, forskscope_core::BackupPolicy::SiblingBak) {
-                                Ok(_)  => store.notify("Copied."),
+                                Ok(_)  => store.notify(t(store.lang(), "Copied.")),
                                 Err(e) => store.notify(e.to_string()),
                             }
                             store.modal.set(Modal::None);
                         },
-                        "Copy"
+                        {t(lang, "Copy")}
                     }
                 }
             }
@@ -181,7 +181,7 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
                                 if err > 0 { format!(", {err} failed") } else { String::new() }));
                             store.modal.set(Modal::None);
                         },
-                        "Copy all"
+                        {t(lang, "Copy all")}
                     }
                 }
             }
@@ -194,6 +194,7 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
 #[component]
 pub fn AboutModal() -> Element {
     let mut store = use_context::<Store>();
+    let lang = store.lang();
     const VERSION: &str  = env!("CARGO_PKG_VERSION");
     const PROFILE: &str  = if cfg!(debug_assertions) { "debug" } else { "release" };
     let platform = format!("{} {}", std::env::consts::OS, std::env::consts::ARCH);
@@ -212,7 +213,7 @@ pub fn AboutModal() -> Element {
                 }
                 div { class: "actions",
                     button { onclick: move |_| { let d = d2.clone(); spawn(async move { let _ = dioxus::document::eval(&format!("navigator.clipboard?.writeText({:?})", d)).await; }); }, "Copy diagnostics" }
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), "Close" }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Close")} }
                 }
             }
         }

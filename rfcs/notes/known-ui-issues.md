@@ -9,7 +9,7 @@ recommended fix approach.
 ## ISSUE-001 — Compare pane: scroll bar operates per-line, not per-pane
 
 **Reported:** v0.92.0 (2026-06-12)  
-**Priority:** High — affects readability of any file with long lines  
+**Resolved:** v0.94.0 — Approach B implemented (shared single scroll bar).  
 **Component:** `crates/forskscope-ui/src/ui/hunk.rs`, `assets/main.css`
 
 ### Symptom

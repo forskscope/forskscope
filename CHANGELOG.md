@@ -5,6 +5,48 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.94.0] — 2026-06-12
+
+ISSUE-001 resolved (single shared scroll bar); modals i18n completed.
+
+### Fixed
+
+**ISSUE-001 — Compare pane: single scroll bar for both panes** (`main.css`)
+
+Resolved using Approach B from `known-ui-issues.md`:
+
+- Removed `overflow-x: auto` from `.diff-pane` — panes no longer own their
+  own scroll bars.
+- Set `overflow-x: auto` on `.diff-scroll` — one scroll bar at the bottom
+  of the diff view scrolls both panes together.
+- Added `min-width: max(100%, 110ch)` to both `.diff-row` and
+  `.diff-pane-labels` so narrow windows still show at least ~50ch per pane,
+  and the label bar stays aligned with content rows when scrolled.
+- `.diff-pane .cell` retains `white-space: pre` — long lines expand the row
+  naturally; `.diff-scroll` clips and provides the scroll affordance.
+
+Both panes always advance together horizontally, matching WinMerge default
+synchronized scroll behaviour. Approach A (independent pane scroll bars)
+remains the preferred long-term target but is deferred post-v1.
+
+**Modals i18n completed** (`modals.rs`, `i18n.rs`)
+
+All hardcoded English strings in every modal dialog wired through `t()`.
+16 strings converted; 15 Japanese translations added to `ja()`:
+
+`"The target file was modified…"`, `"Save As"`, `"Path"`,
+`"Reload files?"`, `"Unsaved merge changes will be discarded."`,
+`"Discard and Reload"`, `"Swap sides?"`,
+`"Unsaved merge changes will be discarded when sides are swapped."`,
+`"Discard and Swap"`, `"Close comparison?"`, `"Discard and close"`,
+`"Copy file?"`, `"Copied."`, `"Copy"`, `"Copy all"`.
+
+`AboutModal` was missing `let lang = store.lang();` — added.
+
+`known-ui-issues.md` ISSUE-001 status updated to **Resolved v0.94.0**.
+
+---
+
 ## [0.93.0] — 2026-06-12
 
 Acceptance corpus extended; `platform` diagnostic module added; known UI

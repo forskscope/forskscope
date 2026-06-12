@@ -121,29 +121,33 @@ select option {
   padding: .35rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); }
 .diff-toolbar .info { color: var(--muted); font-size: 12px; }
 
-/* .diff-scroll: the outer container. Rows fill the full height and each
-   pane manages its own horizontal overflow. No horizontal scroll here. */
+/* .diff-scroll: owns the single horizontal scrollbar for both panes.
+   Rows expand to their natural content width; this outer box clips and
+   scrolls them together (Approach B, ISSUE-001). */
 .diff-scroll {
   font-family: ui-monospace, monospace;
   font-size: var(--diff-fs, 14px);
-  overflow-x: hidden;
+  overflow-x: auto;   /* single shared scrollbar — both panes advance together */
   overflow-y: auto;
 }
 
 /* Each row is a flex container: left-pane | act | right-pane.
-   Both panes have equal width (flex:1) and clip at their own edge. */
+   min-width ensures each pane gets at least ~50ch even on narrow windows;
+   .diff-scroll scrolls the row when content exceeds the viewport. */
 .diff-row {
   display: flex;
   align-items: stretch;
   min-height: var(--line-h);
+  min-width: max(100%, 110ch); /* floor: ~50ch per pane + gutters + act */
 }
 
-/* Independent-scroll pane: fixed half-width, clips long lines internally. */
+/* Independent-scroll pane: fixed half-width. Does not clip horizontally —
+   content expands naturally and .diff-scroll clips the whole row. */
 .diff-pane {
   display: flex;
   flex: 1 1 0;          /* equal halves, never grow/shrink asymmetrically */
   min-width: 0;         /* let flex shrink below content size */
-  overflow-x: auto;     /* each pane scrolls its own long lines */
+  overflow-x: visible;  /* content expands; .diff-scroll owns the scrollbar */
   overflow-y: visible;
   align-items: baseline;
 }
@@ -175,14 +179,15 @@ select option {
 .pane-gutter.del { background: var(--del-bg); }
 .pane-gutter.ins { background: var(--ins-bg); }
 
-/* Cell: the line content. Fills remaining pane width. */
+/* Cell: the line content. Fills remaining pane width.
+   white-space:pre lets long lines expand .diff-row naturally; .diff-scroll clips. */
 .diff-pane .cell {
   flex: 1 1 0;
   min-width: 0;
   padding: 0 .4rem;
   line-height: var(--line-h);
-  white-space: pre;           /* no wrap: long lines scroll within the pane */
-  overflow-x: visible;        /* content extends, pane clips and scrolls */
+  white-space: pre;           /* no wrap: long lines push .diff-row wider */
+  overflow-x: visible;        /* content expands into the row's natural width */
 }
 
 /* Hunk-kind background on cells and gutters */
@@ -216,6 +221,7 @@ select option {
 /* Pane header labels */
 .diff-pane-labels {
   display: flex;
+  min-width: max(100%, 110ch); /* must match .diff-row so labels stay aligned */
   background: var(--surface-2);
   border-bottom: 2px solid var(--border);
   font-size: 11px;
