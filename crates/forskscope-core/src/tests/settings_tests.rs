@@ -31,13 +31,13 @@ fn default_settings_are_valid_first_run_state() {
 fn all_theme_ids_round_trip_through_as_str() {
     for theme in ThemeId::all() {
         let s = theme.as_str();
-        assert_eq!(ThemeId::from_str(s), Some(*theme), "{s} must round-trip");
+        assert_eq!(ThemeId::from_id(s), Some(*theme), "{s} must round-trip");
     }
 }
 
 #[test]
 fn theme_id_from_str_unknown_returns_none() {
-    assert_eq!(ThemeId::from_str("solarized"), None);
+    assert_eq!(ThemeId::from_id("solarized"), None);
 }
 
 #[test]
@@ -62,7 +62,7 @@ fn css_var_names_all_start_with_fsk_prefix() {
 #[test]
 fn all_density_values_round_trip() {
     for d in [Density::Comfortable, Density::Compact, Density::Spacious] {
-        assert_eq!(Density::from_str(d.as_str()), Some(d));
+        assert_eq!(Density::from_id(d.as_str()), Some(d));
     }
 }
 
@@ -75,7 +75,7 @@ fn all_font_family_settings_round_trip() {
         FontFamilySetting::SystemSans,
         FontFamilySetting::SystemSerif,
     ] {
-        assert_eq!(FontFamilySetting::from_str(f.as_str()), Some(f));
+        assert_eq!(FontFamilySetting::from_id(f.as_str()), Some(f));
     }
 }
 

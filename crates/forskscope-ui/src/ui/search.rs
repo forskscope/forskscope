@@ -80,9 +80,9 @@ pub fn SearchBar() -> Element {
                         }
                         Key::Enter => {
                             if e.modifiers().shift() {
-                                ctx.write().index.prev();
+                                ctx.write().index.retreat();
                             } else {
-                                ctx.write().index.next();
+                                ctx.write().index.advance();
                             }
                             scroll_to_focused(&ctx.read());
                         }
@@ -98,7 +98,7 @@ pub fn SearchBar() -> Element {
                 title: "Previous match (Shift+Enter)",
                 "aria-label": "Previous match",
                 onclick: move |_| {
-                    ctx.write().index.prev();
+                    ctx.write().index.retreat();
                     scroll_to_focused(&ctx.read());
                 },
                 "▲"
@@ -109,7 +109,7 @@ pub fn SearchBar() -> Element {
                 title: "Next match (Enter / F3)",
                 "aria-label": "Next match",
                 onclick: move |_| {
-                    ctx.write().index.next();
+                    ctx.write().index.advance();
                     scroll_to_focused(&ctx.read());
                 },
                 "▼"

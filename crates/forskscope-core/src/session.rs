@@ -344,7 +344,7 @@ impl WorkspaceSession {
             return Err(SessionParseError::TooNew { version: file_version });
         }
         let session = Self::from_payload_json(&envelope.payload_json)
-            .map_err(|e| SessionParseError::PayloadError(e))?;
+            .map_err(SessionParseError::PayloadError)?;
         Ok(ParsedSession { session, migration })
     }
 

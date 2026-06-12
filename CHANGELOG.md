@@ -5,6 +5,84 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.65.0] — 2026-06-10
+
+Clippy clean pass and documentation update.
+
+### Fixed
+
+Eight `cargo clippy -- -D warnings` errors resolved across four files:
+
+- **`dir/batch.rs`** — collapsed nested `if bp.exists() { if copy(...) }` into
+  `if bp.exists() && copy(...).is_ok()`.
+- **`patch/model.rs`** — replaced manual `Default` impl on `PatchFormat` with
+  `#[derive(Default)]` + `#[default]` on `Unified`; removed duplicate `#[derive]`
+  that caused conflicting trait impl errors.
+- **`session.rs`** — removed redundant closure: `.map_err(|e| PayloadError(e))`
+  → `.map_err(PayloadError)`.
+- **`settings.rs`** — renamed three `from_str` methods to `from_id` (avoids
+  confusion with `std::str::FromStr::from_str`); replaced manual `Default` impl
+  on `UserSettings` with `#[derive(Default)]`; replaced `.min(50).max(6)` with
+  `.clamp(6, 50)`.
+- **`ui-logic/search_index.rs`** — renamed `next()` → `advance()` and
+  `prev()` → `retreat()` (avoids confusion with `std::iter::Iterator::next`).
+  Updated all callers in `ui/search.rs`.
+
+`cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings` is now
+clean. All 536 core tests and 22 ui-logic tests continue to pass.
+
+### Docs
+
+- `docs/src/maintainers/architecture.md` — added 8 new core modules introduced
+  in v0.61.0–v0.64.0: `diff_decoration`, `line_map`, `edit_op`, `command`,
+  `conflict_nav`, `settings`, `session`; updated `xlsx` entry.
+- `docs/src/maintainers/testing.md` — added 8 new test module entries with RFC
+  column.
+- `rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md` — updated
+  release readiness checklist against v0.65.0 actual state (7/8 must-stabilise
+  targets ✓).
+
+---
+
+### Added
+
+- **`forskscope-core::conflict_nav`** — conflict navigator view-model
+  (RFC-034 §"Conflict navigator"). See previous entry for full details.
+  22 new tests. Total core test count: 536.
+
+### Fixed (clippy)
+
+Eight clippy lint errors fixed across four files:
+
+- `dir/batch.rs`: collapsed nested `if` into `if a && b`.
+- `patch/model.rs`: replaced manual `Default` impl on `PatchFormat` with
+  `#[derive(Default)]` + `#[default]` on the `Unified` variant; removed
+  duplicate `#[derive]` that caused conflicting trait impls.
+- `session.rs`: removed redundant closure `|e| SessionParseError::PayloadError(e)`
+  → `SessionParseError::PayloadError`.
+- `settings.rs`: renamed three `from_str` methods to `from_id` (avoids
+  confusion with `std::str::FromStr::from_str`); replaced manual
+  `Default` impl on `UserSettings` with `#[derive(Default)]`; replaced
+  `.min(50).max(6)` with `.clamp(6, 50)`.
+- `ui-logic/search_index.rs`: renamed `next()` → `advance()` and `prev()`
+  → `retreat()` (avoids confusion with `std::iter::Iterator::next`).
+  Updated all callers in `ui/search.rs`.
+
+All 536 core tests and 22 ui-logic tests pass after these changes.
+`cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings`
+is now clean.
+
+### Docs
+
+- `docs/src/maintainers/architecture.md` — added 8 new core modules
+  (`diff_decoration`, `line_map`, `edit_op`, `command`, `conflict_nav`,
+  `settings`, `session`, updated `xlsx`).
+- `docs/src/maintainers/testing.md` — added 8 new test module entries.
+- `rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md` —
+  updated release readiness checklist against v0.64.0 actual state.
+
+---
+
 ## [0.64.0] — 2026-06-10
 
 Conflict navigator view-model (RFC-034 slice).
@@ -17,24 +95,33 @@ Conflict navigator view-model (RFC-034 slice).
   **`ConflictStatusDisplay`** — glyph + text label for one `ConflictStatus`.
   `for_status(status)` maps each of the six variants to the RFC-034 table:
   `! unresolved`, `L left`, `R right`, `B both`, `~ manual`, `- ignored`.
-  Both glyph and text are always present; color is never the sole cue.
+  Both glyph and text are always present; color is never the sole cue
+  (RFC-009 §7 accessibility requirement).
 
   **`ConflictNavigatorEntry`** — one row in the navigator rail: `conflict_id`,
   `display_num` (1-based), `status`, `display`, `is_focused`. `css_class()`
-  returns a stable `fsk-conflict-*` token.
+  returns a stable `fsk-conflict-*` token for the status badge.
 
-  **`NavigatorSummary`** — `total`, `resolved`, `unresolved`, `auto_merged`.
-  `progress_fraction()` returns `resolved / total` (1.0 for empty session).
+  **`NavigatorSummary`** — `total`, `resolved`, `unresolved`, `auto_merged`
+  counts derived from `ThreeWayMergeSession::stats()`. `progress_fraction()`
+  returns `resolved / total` (1.0 for empty session).
 
-  **`ConflictFilter`** — `All` / `UnresolvedOnly`. `has_hidden_entries()`.
+  **`ConflictFilter`** — `All` (default) or `UnresolvedOnly`. Controls which
+  entries appear; `has_hidden_entries()` signals the UI to show a "show all"
+  toggle.
 
   **`ConflictNavigator::build(session, focused_id, filter)`** — constructs
   the full navigator from a `ThreeWayMergeSession`. Methods: `focused_entry()`,
   `next_id()` (wraps), `prev_id()` (wraps), `first_unresolved_id()`,
   `is_fully_resolved()`, `has_hidden_entries()`.
 
-- **22 new tests** in `tests/conflict_nav_tests.rs`.
-  Total core test count: 536.
+- **22 new tests** in `tests/conflict_nav_tests.rs`: all six status glyphs
+  distinct, all text labels non-empty, `!` for Unresolved, empty/one-conflict
+  sessions, summary count invariants, display nums sequential, all entries
+  initially unresolved, focused entry set/unset, next/prev wrap on one entry,
+  next/prev None on empty, filter hides/shows resolved, resolve updates
+  summary, first unresolved before/after resolve, CSS prefix, progress
+  fraction 0/1/empty. Total core test count: 536.
 
 ---
 

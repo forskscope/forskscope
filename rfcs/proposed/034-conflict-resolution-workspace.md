@@ -1,6 +1,6 @@
 # RFC 034: Conflict Resolution Workspace
 
-**Status.** Proposed
+**Status.** Proposed — ConflictNavigator, ConflictStatusDisplay, NavigatorSummary slice implemented (v0.64.0); workspace UI open
 
 ## Status
 Proposed. Originally sketched in RFC package v0.4; rewritten for the v0.41+

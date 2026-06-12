@@ -44,7 +44,7 @@ impl ThemeId {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_id(s: &str) -> Option<Self> {
         match s {
             "dark"  => Some(Self::Dark),
             "light" => Some(Self::Light),
@@ -131,7 +131,7 @@ impl Density {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_id(s: &str) -> Option<Self> {
         match s {
             "comfortable" => Some(Self::Comfortable),
             "compact"     => Some(Self::Compact),
@@ -159,7 +159,7 @@ impl FontFamilySetting {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_id(s: &str) -> Option<Self> {
         match s {
             "system-mono"  => Some(Self::SystemMono),
             "system-sans"  => Some(Self::SystemSans),
@@ -265,23 +265,12 @@ impl Default for LocaleSettings {
 ///
 /// Persisted via [`VersionedEnvelope`] as `SchemaName::Settings`.
 /// Defaults are the "first-run" values and must never produce invalid state.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct UserSettings {
     pub appearance: AppearanceSettings,
     pub diff:       DiffSettings,
     pub files:      FileSettings,
     pub locale:     LocaleSettings,
-}
-
-impl Default for UserSettings {
-    fn default() -> Self {
-        Self {
-            appearance: AppearanceSettings::default(),
-            diff:       DiffSettings::default(),
-            files:      FileSettings::default(),
-            locale:     LocaleSettings::default(),
-        }
-    }
 }
 
 impl UserSettings {
@@ -344,16 +333,16 @@ impl UserSettings {
 
     fn from_payload_json(json: &str) -> Result<Self, ()> {
         let theme = extract_nested_str(json, "appearance", "theme")
-            .and_then(|s| ThemeId::from_str(&s))
+            .and_then(|s| ThemeId::from_id(&s))
             .unwrap_or_default();
         let density = extract_nested_str(json, "appearance", "density")
-            .and_then(|s| Density::from_str(&s))
+            .and_then(|s| Density::from_id(&s))
             .unwrap_or_default();
         let font_family = extract_nested_str(json, "appearance", "font_family")
-            .and_then(|s| FontFamilySetting::from_str(&s))
+            .and_then(|s| FontFamilySetting::from_id(&s))
             .unwrap_or_default();
         let font_size = extract_nested_u64(json, "appearance", "font_size")
-            .map(|n| n.min(50).max(6) as u8)
+            .map(|n| (n.clamp(6, 50)) as u8)
             .unwrap_or(14);
 
         let profile_name = extract_nested_str(json, "diff", "compare_profile")

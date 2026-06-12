@@ -88,7 +88,7 @@ impl MatchIndex {
     }
 
     /// Advance to the next match (wrapping). Returns the new focused position.
-    pub fn next(&mut self) -> Option<&MatchPosition> {
+    pub fn advance(&mut self) -> Option<&MatchPosition> {
         if self.positions.is_empty() { return None; }
         self.focused_index = Some(match self.focused_index {
             None    => 0,
@@ -98,7 +98,7 @@ impl MatchIndex {
     }
 
     /// Move to the previous match (wrapping). Returns the new focused position.
-    pub fn prev(&mut self) -> Option<&MatchPosition> {
+    pub fn retreat(&mut self) -> Option<&MatchPosition> {
         if self.positions.is_empty() { return None; }
         self.focused_index = Some(match self.focused_index {
             None    => 0,
@@ -203,9 +203,9 @@ mod tests {
         let hunks = vec![(1u64, rows(&[("a match", "a match"), ("a match", "no")]))];
         let mut idx = index_for("match", &hunks);
         assert_eq!(idx.focused_number(), Some(1));
-        idx.next();
+        idx.advance();
         assert_eq!(idx.focused_number(), Some(2));
-        idx.next(); // wraps to 1
+        idx.advance(); // wraps to 1
         assert_eq!(idx.focused_number(), Some(1));
     }
 
@@ -214,7 +214,7 @@ mod tests {
         let hunks = vec![(1u64, rows(&[("needle", "needle"), ("needle", "needle")]))];
         let mut idx = index_for("needle", &hunks);
         // Focus starts at 1; going prev wraps to 4 (or len).
-        idx.prev();
+        idx.retreat();
         assert_eq!(idx.focused_number(), Some(idx.len()));
     }
 
@@ -222,7 +222,7 @@ mod tests {
     fn reset_focus_returns_to_first_match() {
         let hunks = vec![(1u64, rows(&[("x", "x"), ("x", "x")]))];
         let mut idx = index_for("x", &hunks);
-        idx.next(); idx.next();
+        idx.advance(); idx.advance();
         idx.reset_focus();
         assert_eq!(idx.focused_number(), Some(1));
     }

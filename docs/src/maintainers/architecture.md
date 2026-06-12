@@ -39,7 +39,14 @@ touching core.
 | `report` | `FileComparisonReport` + `DirComparisonReport` — Markdown and JSON report export (RFC-027). |
 | `vcs` | `VcsProvider` trait + `GitProvider` — read-only VCS context (status, file at revision, merge base). `detect(path)` entry point (RFC-038). |
 | `external_tool` | `ExternalToolCommand` + safe `expand_args` — argument-array expansion for editor/file-manager integration, no shell execution (RFC-029). |
-| `xlsx` | Excel adapter: `SpreadsheetDiff` structured model + panic-guarded `diff_xlsx` (RFC-058). |
+| `diff_decoration` | `DiffDecorationSet` derived from `DiffDocument` — semantic CSS class tokens, gutter symbols, inline spans, hunk navigator data (RFC-024). |
+| `line_map` | `LineMap` + `AlignedRow` + `ScrollAnchor` — aligned row sequence and scroll-sync model for synchronized panes. `build_mini_map` (RFC-035). |
+| `edit_op` | `TextEditOperation`, `RevisionId`, `TextRange`, `OperationAck/Reject`, `EditTransaction` — editor adapter boundary types (RFC-032). |
+| `command` | `CommandDefinition`, `CommandRegistry`, `AvailabilityRule`, `CommandContext` — all user-visible commands, IDs, shortcuts (RFC-019). |
+| `conflict_nav` | `ConflictNavigator`, `ConflictStatusDisplay`, `NavigatorSummary` — conflict rail view-model over `ThreeWayMergeSession` (RFC-034). |
+| `settings` | `UserSettings` + `ThemeId` + `CompareProfile` integration + JSON persistence (RFC-009). |
+| `session` | `WorkspaceSession` + `WorkspaceTab` + `CloseResult` + `RecentSessionEntry` — workspace session model and JSON persistence (RFC-011). |
+| `xlsx` | Excel adapter: `SpreadsheetDiff` structured model, sheets-diff v2.2.1, panic-free `Result`-based API, cancellation (RFC-058). |
 
 ## UI modules
 

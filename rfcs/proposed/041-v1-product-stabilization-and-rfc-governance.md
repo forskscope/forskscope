@@ -1,6 +1,49 @@
 # RFC 041: v1.0 Product Stabilization and RFC Governance
 
-**Status.** Proposed
+**Status.** Proposed — checklist assessment updated v0.64.0
+
+## Current state (v0.64.0)
+
+### Must-Stabilise targets — status
+
+| Target | Status |
+|---|---|
+| Session schema versioning | ✓ `VersionedEnvelope` + `SESSION_SCHEMA_VERSION=1` shipped (v0.51.0, v0.56.0) |
+| Document operation model | ✓ `TextEditOperation` + `RevisionId` + `EditTransaction` shipped (v0.62.0) |
+| Save and backup safety | ✓ Atomic write + `BackupPolicy` + `ExternalFileState` shipped (v0.27.0, v0.53.0) |
+| Dirty/external-change semantics | ✓ `ExternalFileState`, `check_external_state`, `blocks_save()` shipped (v0.53.0) |
+| Command IDs and shortcut registry | ✓ `CommandRegistry` + all `cmd::*` const IDs shipped (v0.63.0) |
+| Basic two-way text diff/merge workflow | ✓ Core shipped; UI wiring is the remaining work |
+| Directory comparison basics | ✓ `DirectoryIndex` + `EqualityEvidence` + `pair_entries` shipped (v0.58.0) |
+| Editor adapter safety boundary | ✓ `TextEditOperation` revision contract + `CommandRegistry` shipped; UI adapter is remaining work |
+
+### Release readiness checklist
+
+```text
+Product:
+  [ ] Two-way file compare works end to end (UI wiring remaining)
+  [x] Result buffer save works with backup policy
+  [ ] Directory compare works for practical project trees (UI wiring remaining)
+  [ ] Basic keyboard navigation is complete (UI wiring remaining)
+
+Safety:
+  [x] Save checks external modifications (check_external_state)
+  [x] Undo/redo covers merge operations (TransactionLog + ThreeWayMergeSession)
+  [x] Error messages are actionable (AppErrorKind + UserMessage + RecoveryAction)
+  [x] Large-file mode prevents UI lockups (FileSizeClass + PerformanceLimits)
+
+Engineering:
+  [x] Core tests pass (536 unit + 2 integration = 538 core tests, 0 failures)
+  [ ] Editor harness tests pass (RFC-040 not yet implemented)
+  [ ] Packaging smoke tests pass (RFC-010 not yet implemented)
+  [x] Session schema migration tests pass (persist_tests, session_tests)
+
+Documentation:
+  [x] Architecture and testing docs updated to v0.64.0
+  [ ] User guide covers common workflows (RFC-030 not yet implemented)
+  [ ] Recovery/backup behavior is documented
+  [ ] Known limitations are documented
+```
 
 ## Status
 Proposed. (Originally proposed in RFC package v0.4.)

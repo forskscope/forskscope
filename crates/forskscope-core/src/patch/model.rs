@@ -11,16 +11,12 @@ use std::path::PathBuf;
 /// Patch serialization format. Only unified diff is supported in the
 /// v0.39.0 export slice; the enum exists so the apply half (RFC-039) can
 /// extend it without a breaking change.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Patch format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PatchFormat {
     /// POSIX-style unified diff with `git`-compatible file headers.
+    #[default]
     Unified,
-}
-
-impl Default for PatchFormat {
-    fn default() -> Self {
-        Self::Unified
-    }
 }
 
 /// One change to one file in a patch.

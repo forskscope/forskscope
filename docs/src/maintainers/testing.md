@@ -33,6 +33,13 @@ the written code. Each test references the behaviour promised by an RFC.
 | `report_tests` | `FileComparisonReport` and `DirComparisonReport` Markdown + JSON, path privacy. | RFC-027 |
 | `vcs_tests` | `GitProvider` detect/status/read/merge_base; degrade outside repo. | RFC-038 |
 | `external_tool_tests` | `expand_args` placeholder expansion; security contract (no shell, spaces/semicolons/$HOME/backticks intact); `parse_arg` acceptance/rejection. | RFC-029 |
+| `diff_decoration_tests` | `DiffDecorationSet` from diff, CSS class uniqueness/prefix, gutter symbols, aria labels, focused hunk marking. | RFC-024 |
+| `line_map_tests` | `LineMap` row states, navigation, `ScrollAnchor` clamping, `build_mini_map` weight sum. | RFC-035 |
+| `edit_op_tests` | `TextEditOperation` variants, `RevisionId`, `TextRange`, revision compatibility, `EditTransaction`. | RFC-032 |
+| `command_tests` | `AvailabilityRule` evaluation, `CommandRegistry` uniqueness/search/shortcut lookup, `CommandDangerLevel`. | RFC-019 |
+| `conflict_nav_tests` | `ConflictNavigator` build/focus/prev/next/filter, `ConflictStatusDisplay` glyphs, summary counts, progress fraction. | RFC-034 |
+| `settings_tests` | `UserSettings` defaults, round-trip JSON, theme/density/font round-trips, CSS var count, newer-schema error, fallback. | RFC-009 |
+| `session_tests` | `WorkspaceSession` constructors, tab lifecycle, dirty-state, `CloseResult`, JSON round-trip, schema-version guard. | RFC-011 |
 | `patch_tests` | `patch_from_file_diff`, `to_unified`; GNU `patch` round-trip integration. | RFC-039 |
 | `xlsx_tests` | `diff_xlsx` structured model; panic isolation on corrupt files. | RFC-058 |
 
