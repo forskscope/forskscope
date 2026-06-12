@@ -1,8 +1,8 @@
 # RFC 041: v1.0 Product Stabilization and RFC Governance
 
-**Status.** Proposed — checklist updated v0.87.0
+**Status.** Proposed — checklist updated v0.99.0
 
-## Current state (v0.87.0)
+## Current state (v0.99.0)
 
 ### Must-Stabilise targets — all complete
 
@@ -12,19 +12,19 @@
 | Document operation model | ✓ `TextEditOperation` + `RevisionId` + `EditTransaction` (v0.62.0) |
 | Save and backup safety | ✓ Atomic write + `BackupPolicy` + `ExternalFileState` (v0.27.0, v0.53.0) |
 | Dirty/external-change semantics | ✓ `check_external_state` + `blocks_save()` (v0.53.0) |
-| Command IDs and shortcut registry | ✓ `CommandRegistry` + 25 `cmd::*` const IDs (v0.63.0) |
+| Command IDs and shortcut registry | ✓ `CommandRegistry` + all `cmd::*` const IDs (v0.63.0) |
 | Basic two-way text diff/merge | ✓ Core shipped; UI wiring is the remaining work |
 | Directory comparison basics | ✓ `DirectoryIndex` + `EqualityEvidence` + `pair_entries` (v0.58.0) |
 | Editor adapter safety boundary | ✓ `TextEditOperation` revision contract; UI adapter is remaining work |
 
-### Release readiness checklist (v0.87.0)
+### Release readiness checklist (v0.99.0)
 
 ```text
 Product:
-  [ ] Two-way file compare works end to end         (UI wiring remaining)
+  [ ] Two-way file compare works end to end         (UI wiring remaining — requires GTK)
   [x] Result buffer save works with backup policy
-  [ ] Directory compare works for practical trees   (UI wiring remaining)
-  [ ] Basic keyboard navigation is complete         (UI wiring remaining)
+  [ ] Directory compare works for practical trees   (UI wiring remaining — requires GTK)
+  [ ] Basic keyboard navigation is complete         (UI wiring remaining — requires GTK)
 
 Safety:
   [x] Save checks external modifications            (check_external_state)
@@ -33,78 +33,43 @@ Safety:
   [x] Large-file mode prevents UI lockups           (FileSizeClass + PerformanceLimits)
 
 Engineering:
-  [x] Core tests pass                               (599 unit + 2 integration + 6 doctest, 0 failures)
+  [x] Core tests pass                               (646 unit + 27 integration = 875 total, 0 failures)
   [x] ui-logic tests pass                           (189 unit tests, 14 modules, 0 failures)
   [ ] Editor harness tests pass                     (RFC-040 deferred)
   [ ] Packaging smoke tests pass                    (RFC-010 deferred)
   [x] Session schema migration tests pass           (persist_tests, session_tests)
 
 Documentation:
-  [x] Architecture and testing docs current
-  [ ] User guide covers common workflows            (RFC-030 deferred)
-  [ ] Recovery/backup behavior documented
-  [ ] Known limitations documented
+  [x] Architecture and testing docs current         (v0.95.0)
+  [x] User guide covers common workflows            (v0.96.0–v0.98.0)
+  [x] Recovery/backup behavior documented           (docs/src/users/merging.md)
+  [x] Known limitations documented                  (docs/src/users/known-limitations.md, v0.98.0)
 ```
 
-### RFC inventory at v0.78.0
+### RFC inventory at v0.99.0
 
-**Done: 38** — all core data-layer RFCs complete.
-**Proposed: 10** — editor adapter track (4), platform/packaging (2), process/governance (3), documentation (1).
+**Done: 39** — all core data-layer and view-model RFCs complete.
+**Proposed: 9** — editor adapter track (4), platform/packaging (2), governance (2), documentation (1).
 
-The remaining 10 proposed RFCs are all correctly scoped to the UI implementation phase or are process documents. No further core-only RFC work is needed before beginning UI implementation.
+Remaining proposed RFCs are all correctly scoped to the UI implementation phase,
+platform CI, or governance. No further core-only RFC work is needed.
 
-
-### Must-Stabilise targets — status
-
-| Target | Status |
-|---|---|
-| Session schema versioning | ✓ `VersionedEnvelope` + `SESSION_SCHEMA_VERSION=1` shipped (v0.51.0, v0.56.0) |
-| Document operation model | ✓ `TextEditOperation` + `RevisionId` + `EditTransaction` shipped (v0.62.0) |
-| Save and backup safety | ✓ Atomic write + `BackupPolicy` + `ExternalFileState` shipped (v0.27.0, v0.53.0) |
-| Dirty/external-change semantics | ✓ `ExternalFileState`, `check_external_state`, `blocks_save()` shipped (v0.53.0) |
-| Command IDs and shortcut registry | ✓ `CommandRegistry` + all `cmd::*` const IDs shipped (v0.63.0) |
-| Basic two-way text diff/merge workflow | ✓ Core shipped; UI wiring is the remaining work |
-| Directory comparison basics | ✓ `DirectoryIndex` + `EqualityEvidence` + `pair_entries` shipped (v0.58.0) |
-| Editor adapter safety boundary | ✓ `TextEditOperation` revision contract + `CommandRegistry` shipped; UI adapter is remaining work |
-
-### Release readiness checklist
-
-```text
-Product:
-  [ ] Two-way file compare works end to end (UI wiring remaining)
-  [x] Result buffer save works with backup policy
-  [ ] Directory compare works for practical project trees (UI wiring remaining)
-  [ ] Basic keyboard navigation is complete (UI wiring remaining)
-
-Safety:
-  [x] Save checks external modifications (check_external_state)
-  [x] Undo/redo covers merge operations (TransactionLog + ThreeWayMergeSession)
-  [x] Error messages are actionable (AppErrorKind + UserMessage + RecoveryAction)
-  [x] Large-file mode prevents UI lockups (FileSizeClass + PerformanceLimits)
-
-Engineering:
-  [x] Core tests pass (536 unit + 2 integration = 538 core tests, 0 failures)
-  [ ] Editor harness tests pass (RFC-040 not yet implemented)
-  [ ] Packaging smoke tests pass (RFC-010 not yet implemented)
-  [x] Session schema migration tests pass (persist_tests, session_tests)
-
-Documentation:
-  [x] Architecture and testing docs updated to v0.64.0
-  [ ] User guide covers common workflows (RFC-030 not yet implemented)
-  [ ] Recovery/backup behavior is documented
-  [ ] Known limitations are documented
-```
+---
 
 ## Status
+
 Proposed. (Originally proposed in RFC package v0.4.)
 
 ## Summary
 
-Define the stabilization policy for ForskScope v1.0 and the governance rules for accepting, deferring, or rejecting further RFCs.
+Define the stabilization policy for ForskScope v1.0 and the governance rules for
+accepting, deferring, or rejecting further RFCs.
 
 ## Motivation
 
-The migration scope has grown from a framework change into a serious product redesign. Without explicit stabilization rules, the project risks endless feature expansion before v1.0. This RFC protects product coherence and release readiness.
+The migration scope has grown from a framework change into a serious product
+redesign. Without explicit stabilization rules, the project risks endless feature
+expansion before v1.0. This RFC protects product coherence and release readiness.
 
 ## Goals
 
@@ -150,23 +115,12 @@ The migration scope has grown from a framework change into a serious product red
 ## RFC States
 
 ```text
-Draft
-  idea captured, not accepted
-
-Accepted
-  design direction approved, implementation may begin
-
-Implemented
-  merged and covered by tests
-
-Deferred
-  valuable but not needed for current milestone
-
-Rejected
-  intentionally out of scope or superseded
-
-Reopened
-  accepted/implemented RFC needs correction due to evidence
+Draft        — idea captured, not accepted
+Accepted     — design direction approved, implementation may begin
+Implemented  — merged and covered by tests
+Deferred     — valuable but not needed for current milestone
+Rejected     — intentionally out of scope or superseded
+Reopened     — accepted/implemented RFC needs correction due to evidence
 ```
 
 ## Acceptance Requirements
@@ -190,33 +144,6 @@ Each implementation RFC must include:
 3. VCS integration must remain optional and read-mostly before v1.0.
 4. Patch apply must not ship without preflight and backup policy.
 5. Any feature that can overwrite files requires a dedicated safety review.
-
-## Release Readiness Checklist
-
-```text
-Product:
-  [ ] Two-way file compare works end to end
-  [ ] Result buffer save works with backup policy
-  [ ] Directory compare works for practical project trees
-  [ ] Basic keyboard navigation is complete
-
-Safety:
-  [ ] Save checks external modifications
-  [ ] Undo/redo covers merge operations
-  [ ] Error messages are actionable
-  [ ] Large-file mode prevents UI lockups
-
-Engineering:
-  [ ] Core tests pass
-  [ ] Editor harness tests pass
-  [ ] Packaging smoke tests pass
-  [ ] Session schema migration tests pass
-
-Documentation:
-  [ ] User guide covers common workflows
-  [ ] Recovery/backup behavior is documented
-  [ ] Known limitations are documented
-```
 
 ## Iced Reconsideration Gate
 

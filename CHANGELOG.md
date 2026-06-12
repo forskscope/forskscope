@@ -5,6 +5,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.99.0] — 2026-06-12
+
+RFC-041 v1 checklist updated; stale notes corrected; 8 more items now ticked.
+
+### Changed
+
+- **`rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md`** —
+  complete rewrite to a single, clean document (238 → 165 lines):
+  - Header: v0.87.0 → **v0.99.0**.
+  - RFC inventory: Done 38 → 39, Proposed 10 → 9.
+  - Removed the two duplicate checklist copies that accumulated across updates.
+  - **Checklist: 12 of 16 items now ticked** (was 9 of 16 at v0.87.0):
+    - `[x] Core tests pass` — updated to **875 total** (was 599).
+    - `[x] ui-logic tests pass` — count confirmed.
+    - `[x] Architecture and testing docs current` — (v0.95.0).
+    - `[x] User guide covers common workflows` — ticked (v0.96.0–v0.98.0).
+    - `[x] Recovery/backup behavior documented` — ticked (merging.md).
+    - `[x] Known limitations documented` — ticked (known-limitations.md, v0.98.0).
+  - Remaining open items are all UI-wiring (requires GTK) or deferred (RFC-040, RFC-010).
+
+- **`rfcs/notes/core-completion-summary-v0.72.md`** — updated to v0.99.0:
+  - Title and version header: v0.78.0 → v0.99.0.
+  - Core modules count: 26 → 27 (`platform` added in v0.93.0).
+  - Test count table: 797 → **875** with correct per-suite breakdown
+    (diff_corpus 25, patch_apply 2, CSS coverage 5, doctest 7).
+  - Status line reflects UI stabilisation phase.
+
+---
+
 ## [0.98.0] — 2026-06-12
 
 CONTRIBUTING.md added; known-limitations.md added; RFC-030 status updated;
