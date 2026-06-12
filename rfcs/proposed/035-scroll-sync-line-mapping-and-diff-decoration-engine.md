@@ -1,6 +1,6 @@
 # RFC 035: Scroll Sync, Line Mapping, and Diff Decoration Engine
 
-**Status.** Proposed
+**Status.** Proposed — LineMap, AlignedRow, RowState, ScrollAnchor, MiniMapSegment slice implemented (v0.61.0); scroll-sync wiring open
 
 ## Status
 Proposed. (Originally proposed in RFC package v0.4.)

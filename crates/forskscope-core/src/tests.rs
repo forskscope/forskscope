@@ -6,6 +6,7 @@
 mod app_error_tests;
 mod batch_tests;
 mod compare_profile_tests;
+mod diff_decoration_tests;
 mod diff_tests;
 mod dir_cancel_tests;
 mod dir_index_tests;
@@ -19,6 +20,7 @@ mod external_tool_tests;
 mod file_size_tests;
 mod ignore_tests;
 mod job_tests;
+mod line_map_tests;
 mod merge_plan_tests;
 mod merge_tests;
 mod patch_tests;

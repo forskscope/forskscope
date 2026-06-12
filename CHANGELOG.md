@@ -5,6 +5,65 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.61.0] — 2026-06-10
+
+Diff decoration model (RFC-024) and line map / scroll sync model (RFC-035).
+
+### Added
+
+- **`forskscope-core::diff_decoration`** — semantic decoration set (RFC-024).
+
+  **`DiffDecorationSet::from_diff(doc, focused_hunk_id)`**: derives all
+  decorations from a `DiffDocument` in one pass. The Dioxus diff component
+  receives this and maps to CSS/gutter; no diff logic lives in the component.
+
+  **`LineDecorationKind`** — 7 variants: `Unchanged, Added, Deleted, Modified,
+  EmptyCounterpart, Conflict, MergeApplied`. Each has `css_class()` (stable
+  `fs-line-*` token), `gutter_symbol()` (`+/-/~/·/!/✓/ `), and `aria_label()`
+  for screen-reader accessibility (RFC-009 §7).
+
+  **`InlineDecorationKind`** — 4 variants: `InsertedChars, DeletedChars,
+  ReplacedChars, WhitespaceOnly`. Each has `css_class()` (`fs-inline-*`).
+
+  **`LineDecoration`** — `(side, row_index, kind, hunk_id)`.
+
+  **`InlineDecoration`** — `(side, row_index, start_col, end_col, kind)`;
+  byte-offset columns matching `InlineSpan`.
+
+  **`HunkDecoration`** — `(hunk_id, start_row_index, end_row_index, is_focused)`;
+  drives the hunk navigator and mini-map highlight.
+
+  **`DecorationWarning`** — wraps `DiffWarning` as a banner message with kind
+  (`LargeFile, DeadlineExpired, InlineSkipped`).
+
+- **`forskscope-core::line_map`** — aligned row sequence and scroll model (RFC-035).
+
+  **`LineMap::from_diff(doc)`**: builds the full aligned row sequence from a
+  `DiffDocument`. Each `AlignedRow` carries `(row_id, left, right, state, hunk_id)`.
+  Methods: `row(id)`, `changed_rows()`, `next_changed_row(from)`,
+  `prev_changed_row(from)`, `is_identical()`.
+
+  **`RowState`** — `Equal, Inserted, Deleted, Modified, Conflict, Collapsed,
+  Unknown`. `is_changed()` predicate. `gutter_symbol()` distinct for all 7.
+
+  **`AlignedRow::is_paired()`** — true when both left and right have a line.
+
+  **`ScrollAnchor`** — `(row_index, row_fraction)` shared by both panes for
+  synchronized scrolling. `at_top()`, `clamped(row, fraction)`.
+
+  **`build_mini_map(map) → Vec<MiniMapSegment>`** — collapses consecutive
+  same-state rows into segments with weights; total weight equals total row
+  count (invariant tested).
+
+- **31 new tests**: 18 in `diff_decoration_tests` (CSS class uniqueness and
+  prefix, gutter symbols, aria labels, identical/insert/delete/replace diffs,
+  focused hunk, unfocused default) and 13 in `line_map_tests` (RowState
+  predicates, gutter symbol uniqueness, identical/insert/delete/replace maps,
+  navigation, pairing, ScrollAnchor clamping, mini-map merging and weight sum).
+  Total core test count: 466.
+
+---
+
 ## [0.60.0] — 2026-06-10
 
 User settings model and JSON persistence (RFC-009 slice).

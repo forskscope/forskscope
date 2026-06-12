@@ -1,6 +1,6 @@
 # RFC 024 — Diff Visual Semantics and Decoration Contract
 
-**Status.** Proposed
+**Status.** Proposed — DiffDecorationSet, LineDecorationKind, InlineDecoration, HunkDecoration slice implemented (v0.61.0); renderer wiring open
 
 ## Status
 
