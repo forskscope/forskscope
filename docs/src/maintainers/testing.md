@@ -20,16 +20,18 @@ The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
 be tested in environments without a display server. Core and ui-logic tests
 run anywhere Rust is installed.
 
-## Test counts (v0.87.0)
+## Test counts (v0.95.0)
 
 | Suite | Count |
 |-------|-------|
-| `forskscope-core` unit | 599 |
-| `forskscope-core` integration | 2 |
-| `forskscope-ui-logic` | 189 |
-| Doctests | 6 |
+| `forskscope-core` unit | 646 |
+| `forskscope-core` integration (`diff_corpus`) | 25 |
+| `forskscope-core` integration (`patch_apply`) | 2 |
+| `forskscope-ui-logic` unit | 189 |
+| `forskscope-ui-logic` integration (`css_coverage`) | 5 |
+| Doctests | 7 |
 | `forskscope-ui-logic` integration | 1 |
-| **Total** | **797** |
+| **Total** | **875** |
 
 ## `forskscope-core` test modules
 
@@ -39,6 +41,7 @@ Tests live in `crates/forskscope-core/src/tests/` and are declared in `tests.rs`
 |---|---|---|
 | `app_error_tests` | `AppError::from_core`, `is_blocking`, `is_recoverable`, `ErrorId`, `TechnicalDetail`. | RFC-017 |
 | `batch_tests` | `batch_copy`, `restore_from_manifest`, `BatchManifest`. | RFC-023 |
+| `cancel_tests` | `CancellationToken::new`/`cancel`/idempotent; clone propagation (original→clone, clone→original, clone-of-clone); `Default`; `Debug`. | RFC-037, RFC-008 |
 | `command_tests` | `AvailabilityRule` evaluation, `CommandRegistry` uniqueness/search/shortcut lookup, `CommandDangerLevel`. | RFC-019 |
 | `compare_profile_tests` | `CompareProfile` presets, `to_diff_options`, `NewlineCompareMode` engine wiring. | RFC-028 |
 | `conflict_nav_tests` | `ConflictNavigator` build/focus/prev/next/filter, `ConflictStatusDisplay` glyphs, summary counts, progress fraction. | RFC-034 |
@@ -54,6 +57,7 @@ Tests live in `crates/forskscope-core/src/tests/` and are declared in `tests.rs`
 | `error_tests` | `CoreError` variants, `AppErrorKind::from_core`, `RecoveryAction` defaults. | RFC-017 |
 | `external_state_tests` | `check_external_state` with mocked fingerprints. | RFC-036 |
 | `external_tool_tests` | `expand_args` placeholder expansion; shell safety (spaces, semicolons, $HOME, backticks); built-in presets. | RFC-029 |
+| `file_kind_tests` | `FileKind::is_mergeable_text` all variants; `classify` via tempfiles (text/binary/xlsx/uppercase-xlsx/empty/directory). | RFC-001 |
 | `file_size_tests` | `FileSizeClass::classify` against `PerformanceLimits` thresholds. | RFC-013 |
 | `ignore_tests` | `IgnoreRules::from_settings`, extension and directory pattern matching. | RFC-056 |
 | `job_tests` | `JobStatus` lifecycle transitions, `JobStatusRecord`, `JobRegistry` register/get/active/prune. | RFC-008 |
@@ -61,7 +65,9 @@ Tests live in `crates/forskscope-core/src/tests/` and are declared in `tests.rs`
 | `merge_plan_tests` | `plan_operations`, `execute_plan`, `OperationPlan` safety. | RFC-022 |
 | `merge_tests` | `MergeSession` apply/undo/redo, dirty state, `result_text`, transaction log. | RFC-006 |
 | `patch_tests` | `patch_from_file_diff`, `to_unified`; GNU `patch` round-trip integration. | RFC-039 |
+| `path_tests` | `split_parent_name`, `has_extension` (case-insensitive, dotfile edge cases), `display`, `canonicalize_lenient` (nonexistent/absolute/edge inputs). | RFC-001 |
 | `persist_tests` | `VersionedEnvelope` round-trip, `MigrationPolicy`, newer-schema rejection. | RFC-031 |
+| `platform_tests` | `PlatformInfo::collect` non-panic; `os`/`arch`/`app_version` non-empty; `to_report` format; home redaction (`***`); determinism; `logical_cpus` positive. | RFC-026 |
 | `report_tests` | `FileComparisonReport`, `DirComparisonReport`, Markdown/JSON output. | RFC-027 |
 | `save_tests` | `save_text` with fingerprint match, `AtomicSaveStrategy`, `BackupPolicy`. | RFC-007 |
 | `session_tests` | `WorkspaceSession` tab lifecycle, dirty state, `CloseResult`, JSON round-trip, schema-version guard. | RFC-011 |
@@ -74,14 +80,15 @@ Tests live in `crates/forskscope-core/src/tests/` and are declared in `tests.rs`
 
 Integration tests in `tests/`:
 
-| File | Covers |
-|---|---|
-| `patch_round_trip` | Generates a unified-diff patch and verifies it applies correctly with GNU `patch`. |
+| File | Count | Covers |
+|---|---|---|
+| `diff_corpus` | 25 | Corpus-driven `compute_diff` correctness: identical, insertions, deletions, reordered, empty, LF vs CRLF, no-final-newline, whitespace/trailing/tabs, case, function edit, Unicode, UTF-8 BOM, large files (200 lines), binary classification. Fixtures in `tests/fixtures/`. |
+| `patch_apply` | 2 | Generates a unified-diff patch and verifies it applies with GNU `patch`. |
 
 ## `forskscope-ui-logic` test modules
 
 All tests are inline (`#[cfg(test)]` inside each module file).
-One integration test exists in `tests/` (patch round-trip via `hunk_decorations`).
+Integration tests live in `tests/css_coverage.rs`.
 
 | File | Covers | RFC |
 |---|---|---|

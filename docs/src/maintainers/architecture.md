@@ -39,6 +39,7 @@ could be added as a fourth crate without touching core.
 | `patch` | `PatchDocument`, unified-diff export from file and directory diffs (RFC-039). |
 | `path` | Lenient canonicalization; platform-safe display helpers. |
 | `persist` | `VersionedEnvelope` + `MigrationPolicy` — schema-versioned JSON wrapper for all persisted data (RFC-031). |
+| `platform` | `PlatformInfo::collect()` — runtime diagnostic snapshot (OS, arch, CPUs, app version, redacted home, config dir). `to_report()` for clipboard copy in the About panel (RFC-026). |
 | `report` | `FileComparisonReport` + `DirComparisonReport` — Markdown and JSON report export (RFC-027). |
 | `save` | `save_text`, `AtomicSaveStrategy`, `BackupPolicy`, `SaveRequest`, `SaveOutcome` — conflict detection, backup, atomic write (RFC-007). |
 | `session` | `WorkspaceSession`, `WorkspaceTab`, `CloseResult`, `RecentSessionEntry` — session model and JSON persistence (RFC-011). |

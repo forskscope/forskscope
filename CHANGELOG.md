@@ -5,6 +5,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.95.0] — 2026-06-12
+
+Documentation pass: testing.md, architecture.md, and local-dev.md updated
+to v0.95.0 reality (875 tests, 38 core test modules, platform module).
+
+### Changed
+
+- **`docs/src/maintainers/testing.md`** — major update:
+  - Test count table: v0.87.0 / 797 → **v0.95.0 / 875**, with per-suite
+    breakdown including `diff_corpus` (25) and `css_coverage` (5) rows.
+  - Core test module table: added `cancel_tests`, `file_kind_tests`,
+    `path_tests`, `platform_tests` (all added in v0.89.0–v0.93.0 but
+    never documented). Now 38 rows covering every test file.
+  - Integration tests section: new table listing `diff_corpus` (25 tests,
+    describes corpus fixture categories) and `patch_apply` (2 tests).
+  - ui-logic integration note: corrected from "patch round-trip via
+    hunk_decorations" (inaccurate) to `tests/css_coverage.rs`.
+
+- **`docs/src/maintainers/architecture.md`** — added `platform` module row
+  to the core modules table: `PlatformInfo::collect()`, `to_report()`,
+  RFC-026 reference.
+
+- **`docs/src/maintainers/local-dev.md`** — updated inline test counts
+  from `599 unit + 2 integration` / `85 unit, 7 modules` to current
+  `646 unit + 27 integration` / `189 unit + 5 integration + 1 doctest,
+  14 modules`.
+
+---
+
 ## [0.94.0] — 2026-06-12
 
 ISSUE-001 resolved (single shared scroll bar); modals i18n completed.
