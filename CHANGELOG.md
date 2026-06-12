@@ -5,6 +5,59 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.63.0] — 2026-06-10
+
+Command model and registry (RFC-019 slice).
+
+### Added
+
+- **`forskscope-core::command`** — command definition, registry, and
+  availability model (RFC-019 §5, §6, §7).
+
+  **`CommandId(&'static str)`** — stable dotted-namespace identifier, e.g.
+  `"file.save"`, `"merge.copy_left_to_right"`. RFC-041 requires these to
+  stabilise before v1; they are all `const` values in the `cmd` submodule.
+  25 built-in IDs covering File, Edit, Navigate, Compare, Merge, View,
+  Settings, and External categories.
+
+  **`CommandDefinition`** — `{ id, label, description, category,
+  default_shortcuts, availability, danger_level }`. `is_available(ctx)`
+  evaluates the rule against the current `CommandContext`.
+
+  **`AvailabilityRule`** — 11 variants: `Always`, `ActiveDiffTab`,
+  `DirtyAndSaveable`, `ActiveCompareTab`, `ActiveHunkEditable`, `HasHunks`,
+  `ActiveConflict`, `AnyConflictUnresolved`, `CanUndo`, `CanRedo`,
+  `SelectedPathExists`. `evaluate(ctx) → Availability` returns either
+  `Available` or `Unavailable(reason)` with a human-readable tooltip string.
+
+  **`CommandContext`** — minimal state snapshot (11 bool fields) populated
+  by the UI at render time. The toolbar, keyboard handler, and command
+  palette all derive enabled state from the same evaluation.
+
+  **`CommandDangerLevel`** — `Safe | MayDiscardWork | Destructive`. Ordered.
+  `requires_confirmation()`.
+
+  **`CommandCategory`** — 10 variants with `label()`. Used to group commands
+  in the palette and menu.
+
+  **`Shortcut { modifiers, key }`** and **`Modifiers`** — keyboard shortcut
+  descriptor. `Modifiers::CTRL`, `::ALT`, `::CTRL_SHIFT`, `::NONE` constants.
+
+  **`CommandRegistry`** — `builtin()` constructs all 20+ built-in commands.
+  Methods: `get(id)`, `all()`, `by_category(cat)`, `search(query)` (case-
+  insensitive label+description match), `find_by_shortcut(shortcut)`.
+
+- **25 new tests** in `tests/command_tests.rs`: availability rule evaluation
+  for all 11 rules, unavailable-reason non-emptiness for all rules, danger
+  level ordering and confirmation predicate, category labels, registry
+  non-empty + ID uniqueness + label non-empty, `get` success and miss,
+  `by_category` filtering, `search` case-insensitive + empty + no-match,
+  `find_by_shortcut` Ctrl+S → Save, unbound shortcut, `Modifiers::NONE.is_none()`,
+  save/undo context wiring.
+  Total core test count: 514.
+
+---
+
 ## [0.62.0] — 2026-06-10
 
 Text editing operation model — RFC-032 core types.

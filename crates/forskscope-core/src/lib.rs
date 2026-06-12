@@ -12,6 +12,7 @@
 //! "Core First").
 
 pub mod cancel;
+pub mod command;
 pub mod diff;
 pub mod diff_decoration;
 pub mod dir;

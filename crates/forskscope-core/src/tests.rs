@@ -5,6 +5,7 @@
 
 mod app_error_tests;
 mod batch_tests;
+mod command_tests;
 mod compare_profile_tests;
 mod diff_decoration_tests;
 mod diff_tests;
