@@ -1,7 +1,9 @@
-# Core Layer Completion Summary — v0.72.0
+# Core and View-Model Layer Completion Summary — v0.78.0
 
 **Date:** 2026-06-12
-**Status:** Core data layer complete. Ready for UI implementation phase.
+**Status:** Core data layer complete. `ui-logic` view-model layer complete. Ready for UI wiring.
+
+> Originally written at v0.72.0; updated at v0.78.0 to reflect ui-logic additions.
 
 ---
 
@@ -9,22 +11,21 @@
 
 | Done | Proposed |
 |------|---------|
-| 38   | 10      |
+| 39   | 9       |
 
-### Done RFCs (38)
+### Done RFCs (39)
 
 000, 001, 002, 003, 005, 006, 007, 008, 009, 011, 012, 013, 014, 015, 017,
-019, 021, 022, 023, 024, 025 (governance), 027, 028, 029, 031, 032, 033,
-034, 035, 036, 037, 038, 039, 054, 055, 056, 057, 058, 059
+019, 020, 021, 022, 023, 024, 027, 028, 029, 031, 032, 033, 034, 035, 036,
+037, 038, 039, 054, 055, 056, 057, 058, 059
 
-### Remaining proposed (10)
+### Remaining proposed (9)
 
 | RFC | Category | Reason still proposed |
 |-----|----------|-----------------------|
 | 004 | Editor adapter | Requires GTK/WebView + CodeMirror |
 | 010 | Packaging/QA | Requires cross-platform CI |
 | 016 | Editor bridge security | Requires editor adapter (RFC-004) |
-| 020 | CI/architecture gates | Process document, no code |
 | 025 | Editor adapter prototype | Requires editor adapter (RFC-004) |
 | 026 | Cross-platform WebView | Requires cross-platform CI |
 | 030 | User documentation | No code |
@@ -34,9 +35,7 @@
 
 ---
 
-## Core modules (v0.72.0)
-
-`forskscope-core` has **21 modules** covering the complete domain:
+## `forskscope-core` modules (26, v0.78.0)
 
 | Module | Domain |
 |--------|--------|
@@ -67,21 +66,29 @@
 | `watcher` | `FileChangeMonitor`, `MockFileChangeMonitor` |
 | `xlsx` | `SpreadsheetDiff`, sheets-diff v2 adapter |
 
-`forskscope-ui-logic` has **2 modules**:
-- `explore::align` — aligned row merging for explorer panes
-- `compare::search_index` — in-diff search match index (`advance`/`retreat`)
+## `forskscope-ui-logic` modules (7, v0.78.0)
+
+| Module | Purpose | Tests |
+|--------|---------|-------|
+| `explore::align` | Two-pane tree row alignment | ~22 |
+| `explore::deep_filter` | Deep compare filter + `DeepCompareSummary` | 15 |
+| `explore::status` | `EqualityEvidence` → status badge | 18 |
+| `compare::command_bar` | Toolbar items from `CommandRegistry` + ctx | 12 |
+| `compare::search_index` | In-diff match navigation (advance/retreat) | ~8 |
+| `compare::summary` | Status bar text + `DiffNavigationState` | 15 |
+| `compare::tab_state` | `TabStateSnapshot` → `CommandContext` bridge | 10 |
 
 ---
 
-## Test count at v0.72.0
+## Test count at v0.78.0
 
 | Suite | Count |
 |-------|-------|
 | `forskscope-core` unit | 599 |
 | `forskscope-core` integration | 2 |
-| `forskscope-ui-logic` | 22 |
+| `forskscope-ui-logic` | 85 |
 | Doctests | 6 |
-| **Total** | **629** |
+| **Total** | **692** |
 
 All pass. `cargo clippy -- -D warnings` clean.
 
@@ -89,17 +96,15 @@ All pass. `cargo clippy -- -D warnings` clean.
 
 ## What the UI implementation phase needs
 
-The Dioxus UI layer (`forskscope-ui`) consumes the complete core model.
-The primary remaining UI work, in priority order:
+The Dioxus UI layer (`forskscope-ui`) can now wire to complete view-models.
+Priority order per `ROADMAP.md`:
 
-1. **Diff/merge workspace** — `DiffDecorationSet` → renderer; `LineMap` →
-   scroll-sync; `CommandRegistry` → toolbar/keyboard; merge transactions → UI.
-2. **Explorer workspace** — `DirectoryIndex` + `EqualityEvidence` → digest
-   icons; `JobRegistry` → progress indicator; `ExternalToolCommand` presets
-   → "reveal in file manager".
-3. **Settings dialog** — `UserSettings` JSON round-trip → settings form.
-4. **Three-way merge workspace** — `ConflictNavigator` → navigator rail;
-   `ThreeWayMergeSession` → four-region layout.
-5. **Error dialogs** — `AppError` + `RecoveryAction` → dialog buttons.
-6. **Editor adapter** (RFC-004, gated) — `TextEditOperation` → CodeMirror
-   bridge; `DiffDecorationSet` → editor decorations.
+1. **Diff view** — `DiffDecorationSet` → renderer; `LineMap` → scroll-sync;
+   `build_toolbar(reg, ctx_from_snapshot(snap))` → toolbar; `DiffNavigationState` → nav buttons
+2. **Merge** — `TextEditOperation` → core; `TransactionLog` → undo/redo
+3. **Save** — `save_text` + `check_external_state` + `AppError` → dialogs
+4. **Explorer** — `StatusRow::from_evidence` → tree badges; `DeepFilter`/`DeepCompareSummary` → deep compare
+5. **Settings** — `UserSettings::to_json`/`from_json` → settings form
+6. **Three-way merge** — `ConflictNavigator::build` → navigator rail
+7. **Command palette** — `CommandRegistry::search` + `CommandContext` → palette
+8. **Editor adapter** (gated, RFC-004) — `TextEditOperation` → CodeMirror bridge

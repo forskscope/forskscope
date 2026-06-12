@@ -5,6 +5,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.78.0] — 2026-06-12
+
+Documentation audit and corrections pass.
+
+### Fixed
+
+**`rfcs/README.md` — structural correction.** The README had 20 done RFCs
+listed under the "Proposed" section (with correct `done/` link paths but
+wrong section placement). Rebuilt with three clean sections: Implemented
+(39), Proposed (9), Archive (1). Each entry has the correct path and a
+concise "Shipped in / deferred" note.
+
+**`rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md`** —
+checklist updated from v0.72.0 to v0.78.0:
+- RFC inventory: 39 done, 9 proposed (was 38/10)
+- Engineering gates: added `[x] ui-logic tests pass (85 tests, 7 modules)`
+- `[x] ROADMAP.md up to date` added to Documentation section
+
+**`ROADMAP.md`** — updated from v0.73.0 to v0.78.0:
+- Test count: 692 (was 629)
+- RFC count: 39 (was 38)
+- `ui-logic` description updated: 7 modules with 85 tests providing tested
+  view-models (was "component stubs not yet wired")
+
+**`rfcs/notes/core-completion-summary-v0.72.md`** — fully rewritten for
+v0.78.0: correct `ui-logic` module table (7 modules with test counts),
+correct total test count (692), updated RFC counts, full UI wiring priority
+list keyed to ROADMAP.md slice numbers.
+
+### Audit findings (no code changes needed)
+
+- All 39 done RFC status fields verified correct against actual code
+- All 9 proposed RFC status fields correctly say "Proposed"
+- RFC-018 correctly in `archive/` (Withdrawn)
+- RFC numbering gap 043–053 documented in README (reserved range)
+- No code-vs-RFC discrepancies found
+
+---
+
 ## [0.77.0] — 2026-06-12
 
 Deep compare filter and summary view-model in `forskscope-ui-logic`.
