@@ -14,6 +14,7 @@ pub mod header;
 pub mod hunk;
 pub mod hunk_decorations;
 pub mod keybindings;
+pub mod load_guard;
 pub mod modals;
 pub mod search;
 pub mod search_index;

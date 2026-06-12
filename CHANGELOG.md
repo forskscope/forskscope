@@ -5,6 +5,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.82.0] — 2026-06-12
+
+`compare::load_guard` — pre-diff file-size decision view-model (Slice 1).
+
+### Added
+
+- **`compare::load_guard`** in `forskscope-ui-logic` — pre-diff action
+  derived from `FileSizeClass` thresholds (RFC-013 §"Large file prompt").
+
+  **`LoadGuard`** — three variants:
+  - `Proceed` — both files small; diff immediately.
+  - `WarnBanner { message, suppress_inline }` — medium-sized file(s);
+    proceed but show a non-blocking yellow banner and suppress character-
+    level inline diff.
+  - `ConfirmPrompt { title, body, confirm_label, too_large }` — large or
+    very-large file(s); block and ask the user before diffing. `too_large`
+    distinguishes "diff anyway" (Large) from "metadata only" (VeryLarge).
+
+  **`guard_for_sizes(left_bytes, right_bytes) → LoadGuard`** — entry point
+  with default `PerformanceLimits`. Takes the *worst* `FileSizeClass` of the
+  two files; if one side is VeryLarge and the other is Small, the result is
+  a `ConfirmPrompt` with `too_large: true`.
+
+  **`guard_for_sizes_with_limits(…, limits) → LoadGuard`** — same but with
+  explicit thresholds; used in tests and for future settings integration.
+
+  Replaces the reactive-only `DiffWarning::LargeFilePolicyApplied` path
+  (which fires *after* the diff) with a *pre-diff* decision `open_compare`
+  and `DiffWorkspace` can act on before triggering the expensive computation.
+
+- **`ui/load_guard.rs`** shim — re-exports `LoadGuard`, `guard_for_sizes`,
+  `guard_for_sizes_with_limits` from `ui-logic`.
+
+- **19 new tests** covering: all four `FileSizeClass` branches (both files
+  small/medium/large/very-large), worst-of-pair logic, boundary values
+  (exactly at limit, one byte over each threshold), message/label
+  non-empty, distinct large vs very-large confirm labels, and default-limit
+  smoke tests. Total ui-logic count: 119.
+
+---
+
 ## [0.81.0] — 2026-06-12
 
 Bug fix in `hunk_decorations` tests; `hunk_decorations` shim added to UI crate.
