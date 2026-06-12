@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.68.0] — 2026-06-12
+
+Job lifecycle state machine (RFC-008 slice).
+
+### Added
+
+- **`JobStatus`** in `forskscope-core::job` (RFC-008 §6–§7).
+
+  `Queued | Running | Completed | Cancelled | Failed(String)` — the complete
+  forward-only lifecycle state machine for background jobs. Predicates:
+  `is_active()` (Queued or Running), `is_terminal()`, `is_success()`.
+
+- **`JobStatusRecord`** — binds a `JobId` to its current `JobStatus` and
+  last-known `JobProgress`. Constructed via `new(job_id, kind)` (starts
+  `Queued`). Transitions: `start()` (Queued → Running), `complete()`,
+  `cancel()`, `fail(message)` — all no-ops on already-terminal records,
+  preventing double-transition bugs.
+
+- **`JobRegistry`** — in-memory collection of all active and recently-
+  completed job records. Methods: `register(id, kind)`, `get(id)`,
+  `get_mut(id)`, `active()` (iterator over non-terminal records),
+  `prune_terminal()` (remove completed/failed/cancelled records after
+  display). Used by the UI progress indicator panel.
+
+- **16 new tests** in `job_tests.rs`: all five `JobStatus` predicates, all
+  lifecycle transitions (Queued→Running→Completed, →Cancelled, →Failed),
+  no-op on double-transition, `JobRegistry` register/get/active filter/
+  prune. Total core test count: 567.
+
+---
+
 ## [0.67.0] — 2026-06-12
 
 `AppError` structured error envelope (RFC-017); batch RFC promotion pass.

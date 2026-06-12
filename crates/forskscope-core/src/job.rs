@@ -221,3 +221,150 @@ impl Default for PerformanceLimits {
         }
     }
 }
+
+// ── Job lifecycle state machine (RFC-008 §6–§7) ───────────────────────────────
+
+/// The lifecycle state of a background job (RFC-008 §8 "Explorer Integration
+/// Flow").
+///
+/// Transitions are strictly forward (no state can go backward) except that
+/// `Running` may be cancelled to produce `Cancelled`.
+///
+/// ```text
+/// Queued → Running → Completed
+///               ↘ Cancelled
+///               ↘ Failed(message)
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum JobStatus {
+    /// The job is waiting for an available worker slot.
+    Queued,
+    /// The job is actively running.
+    Running,
+    /// The job completed successfully.
+    Completed,
+    /// The job was cancelled (user or navigation triggered).
+    Cancelled,
+    /// The job failed; carries a human-readable reason.
+    Failed(String),
+}
+
+impl JobStatus {
+    /// `true` when the job is still pending or active.
+    pub fn is_active(&self) -> bool {
+        matches!(self, Self::Queued | Self::Running)
+    }
+
+    /// `true` when the job has reached a terminal state.
+    pub fn is_terminal(&self) -> bool {
+        !self.is_active()
+    }
+
+    /// `true` when the job completed without error or cancellation.
+    pub fn is_success(&self) -> bool {
+        matches!(self, Self::Completed)
+    }
+}
+
+/// A record binding a `JobId` to its current [`JobStatus`] and last-known
+/// progress (RFC-008 §6 "Progress Reporting").
+#[derive(Debug, Clone)]
+pub struct JobStatusRecord {
+    pub job_id:   JobId,
+    pub kind:     JobKind,
+    pub status:   JobStatus,
+    pub progress: JobProgress,
+}
+
+impl JobStatusRecord {
+    pub fn new(job_id: JobId, kind: JobKind) -> Self {
+        let progress = JobProgress {
+            job_id,
+            kind,
+            phase:           String::new(),
+            completed_units: 0,
+            total_units:     None,
+            cancellable:     true,
+        };
+        Self {
+            job_id,
+            kind,
+            status:   JobStatus::Queued,
+            progress,
+        }
+    }
+
+    /// Advance to `Running`.  No-op when already in a terminal state.
+    pub fn start(&mut self) {
+        if self.status == JobStatus::Queued {
+            self.status = JobStatus::Running;
+        }
+    }
+
+    /// Update progress mid-run.
+    pub fn update_progress(&mut self, progress: JobProgress) {
+        self.progress = progress;
+    }
+
+    /// Mark as completed.  No-op when already terminal.
+    pub fn complete(&mut self) {
+        if !self.status.is_terminal() {
+            self.status = JobStatus::Completed;
+            self.progress.completed_units = self.progress.total_units.unwrap_or(1);
+        }
+    }
+
+    /// Mark as cancelled.  No-op when already terminal.
+    pub fn cancel(&mut self) {
+        if !self.status.is_terminal() {
+            self.status = JobStatus::Cancelled;
+        }
+    }
+
+    /// Mark as failed.  No-op when already terminal.
+    pub fn fail(&mut self, message: impl Into<String>) {
+        if !self.status.is_terminal() {
+            self.status = JobStatus::Failed(message.into());
+        }
+    }
+}
+
+/// A simple in-memory registry of all active and recently-completed job
+/// records, used by the UI to display the progress indicator panel.
+///
+/// Records for terminal jobs can be pruned by the UI after display.
+#[derive(Debug, Default)]
+pub struct JobRegistry {
+    records: Vec<JobStatusRecord>,
+}
+
+impl JobRegistry {
+    /// Register a new job and return a mutable reference.
+    pub fn register(&mut self, job_id: JobId, kind: JobKind) -> &mut JobStatusRecord {
+        self.records.push(JobStatusRecord::new(job_id, kind));
+        self.records.last_mut().unwrap()
+    }
+
+    /// Look up a job by ID.
+    pub fn get(&self, job_id: &JobId) -> Option<&JobStatusRecord> {
+        self.records.iter().find(|r| &r.job_id == job_id)
+    }
+
+    /// Look up a job mutably.
+    pub fn get_mut(&mut self, job_id: &JobId) -> Option<&mut JobStatusRecord> {
+        self.records.iter_mut().find(|r| &r.job_id == job_id)
+    }
+
+    /// All active (queued or running) jobs.
+    pub fn active(&self) -> impl Iterator<Item = &JobStatusRecord> {
+        self.records.iter().filter(|r| r.status.is_active())
+    }
+
+    /// Remove all terminal job records.
+    pub fn prune_terminal(&mut self) {
+        self.records.retain(|r| r.status.is_active());
+    }
+
+    pub fn len(&self) -> usize { self.records.len() }
+    pub fn is_empty(&self) -> bool { self.records.is_empty() }
+}
