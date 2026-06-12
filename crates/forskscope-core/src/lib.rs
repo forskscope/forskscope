@@ -13,6 +13,7 @@
 
 pub mod cancel;
 pub mod command;
+pub mod conflict_nav;
 pub mod diff;
 pub mod diff_decoration;
 pub mod dir;

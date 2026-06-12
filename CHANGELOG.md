@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.64.0] — 2026-06-10
+
+Conflict navigator view-model (RFC-034 slice).
+
+### Added
+
+- **`forskscope-core::conflict_nav`** — conflict navigator view-model
+  (RFC-034 §"Conflict navigator").
+
+  **`ConflictStatusDisplay`** — glyph + text label for one `ConflictStatus`.
+  `for_status(status)` maps each of the six variants to the RFC-034 table:
+  `! unresolved`, `L left`, `R right`, `B both`, `~ manual`, `- ignored`.
+  Both glyph and text are always present; color is never the sole cue.
+
+  **`ConflictNavigatorEntry`** — one row in the navigator rail: `conflict_id`,
+  `display_num` (1-based), `status`, `display`, `is_focused`. `css_class()`
+  returns a stable `fsk-conflict-*` token.
+
+  **`NavigatorSummary`** — `total`, `resolved`, `unresolved`, `auto_merged`.
+  `progress_fraction()` returns `resolved / total` (1.0 for empty session).
+
+  **`ConflictFilter`** — `All` / `UnresolvedOnly`. `has_hidden_entries()`.
+
+  **`ConflictNavigator::build(session, focused_id, filter)`** — constructs
+  the full navigator from a `ThreeWayMergeSession`. Methods: `focused_entry()`,
+  `next_id()` (wraps), `prev_id()` (wraps), `first_unresolved_id()`,
+  `is_fully_resolved()`, `has_hidden_entries()`.
+
+- **22 new tests** in `tests/conflict_nav_tests.rs`.
+  Total core test count: 536.
+
+---
+
 ## [0.63.0] — 2026-06-10
 
 Command model and registry (RFC-019 slice).

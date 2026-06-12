@@ -7,6 +7,7 @@ mod app_error_tests;
 mod batch_tests;
 mod command_tests;
 mod compare_profile_tests;
+mod conflict_nav_tests;
 mod diff_decoration_tests;
 mod diff_tests;
 mod dir_cancel_tests;
