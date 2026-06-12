@@ -5,6 +5,60 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.67.0] — 2026-06-12
+
+`AppError` structured error envelope (RFC-017); batch RFC promotion pass.
+
+### Added
+
+- **`AppError`** in `forskscope-core::error` (RFC-017 §5).
+
+  Complete structured error envelope: `error_id: ErrorId`, `kind:
+  AppErrorKind`, `severity: ErrorSeverity`, `message: UserMessage`,
+  `technical: TechnicalDetail`, `recovery: Vec<RecoveryAction>`.
+
+  **`AppError::from_core(err: &CoreError)`** — constructs from the
+  lower-level `CoreError` using the standard mappings from `AppErrorKind::
+  from_core`, `default_severity`, `for_kind`, `default_recovery_actions`.
+  `technical.detail` carries `err.to_string()`.
+
+  **`AppError::new(kind, technical_detail)`** — constructs from an
+  application-layer `AppErrorKind` directly (for errors that don't originate
+  in `CoreError`, e.g. `FileTooLarge` from the `FileSizeClass` check).
+
+  **`AppError::is_blocking()`** — `severity >= Blocking`.
+
+  **`AppError::is_recoverable()`** — `recovery` contains at least one
+  non-`Dismiss` action.
+
+  **`ErrorId`** — millisecond-timestamp + PID identifier for log correlation.
+
+  **`TechnicalDetail { code, detail }`** — machine-readable code string +
+  full diagnostic text; shown only in the copy-diagnostics panel.
+
+- **8 new tests** in `app_error_tests.rs`: `from_core` for IO-read and
+  Conflict, `new` with explicit kind, `is_blocking` true/false,
+  `is_recoverable`, `ErrorId` prefix, `TechnicalDetail` fields.
+  Total core test count: 551.
+
+### RFC promotions (7)
+
+Core scope of each RFC is complete; deferred items are UI components.
+
+| RFC | Title | Shipped in | Deferred |
+|---|---|---|---|
+| 009 | Settings, Theme, Localization, Accessibility | v0.60.0 | Settings dialog UI, LocaleBundle |
+| 017 | Error Taxonomy, Diagnostics, UX | v0.67.0 | Diagnostics panel UI, error toast |
+| 019 | Command, Shortcut, Palette, Accessibility | v0.63.0 | Command palette UI |
+| 024 | Diff Visual Semantics and Decoration Contract | v0.61.0 | Renderer wiring in Dioxus |
+| 032 | Text Editing Operation Model | v0.62.0 | EditBuffer dispatch in Dioxus |
+| 034 | Conflict Resolution Workspace | v0.64.0 | Four-region workspace UI |
+| 035 | Scroll Sync, Line Mapping, Decoration Engine | v0.61.0 | Scroll-sync wiring in Dioxus |
+
+RFC index (`rfcs/README.md`) updated. **Done count: 28** (was 21).
+
+---
+
 ## [0.66.0] — 2026-06-12
 
 `NewlineCompareMode::IgnoreDifference` wired into diff engine; RFC-028 and

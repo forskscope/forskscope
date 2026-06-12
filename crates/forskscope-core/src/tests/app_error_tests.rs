@@ -170,3 +170,68 @@ fn for_kind_produces_non_empty_short_for_all_variants() {
         assert!(!msg.short.is_empty(), "{kind:?} must have a non-empty short message");
     }
 }
+
+// ── AppError envelope (RFC-017 §5) ────────────────────────────────────────────
+
+#[test]
+fn app_error_from_core_io_read_has_expected_kind_and_recovery() {
+    let core_err = CoreError::Io {
+        path: Some(std::path::PathBuf::from("/some/file.rs")),
+        operation: IoOperation::Read,
+        message: "permission denied".into(),
+    };
+    let app_err = crate::error::AppError::from_core(&core_err);
+    assert_eq!(app_err.kind, AppErrorKind::FileReadFailed);
+    assert!(!app_err.message.short.is_empty());
+    assert!(!app_err.recovery.is_empty());
+    assert!(!app_err.technical.detail.is_empty());
+}
+
+#[test]
+fn app_error_from_core_conflict_has_external_modification_kind() {
+    let core_err = CoreError::Conflict { message: "file changed".into() };
+    let app_err  = crate::error::AppError::from_core(&core_err);
+    assert_eq!(app_err.kind, AppErrorKind::ExternalModificationDetected);
+    assert!(app_err.recovery.contains(&crate::error::RecoveryAction::Reload));
+}
+
+#[test]
+fn app_error_new_builds_from_kind_directly() {
+    let app_err = crate::error::AppError::new(AppErrorKind::FileTooLarge, "84 MB");
+    assert_eq!(app_err.kind, AppErrorKind::FileTooLarge);
+    assert!(app_err.technical.detail.contains("84 MB"));
+    assert!(app_err.recovery.contains(&crate::error::RecoveryAction::OpenLimitedDiff));
+}
+
+#[test]
+fn app_error_is_blocking_for_blocking_severity() {
+    let app_err = crate::error::AppError::new(AppErrorKind::InternalFault, "oops");
+    assert!(app_err.is_blocking());
+}
+
+#[test]
+fn app_error_is_not_blocking_for_recoverable_severity() {
+    let app_err = crate::error::AppError::new(AppErrorKind::PathNotFound, "missing");
+    assert!(!app_err.is_blocking());
+}
+
+#[test]
+fn app_error_is_recoverable_when_non_dismiss_actions_exist() {
+    let app_err = crate::error::AppError::new(AppErrorKind::SaveConflict, "changed");
+    assert!(app_err.is_recoverable(),
+        "SaveConflict must offer non-dismiss recovery actions");
+}
+
+#[test]
+fn error_id_is_non_empty() {
+    let id = crate::error::ErrorId::new();
+    assert!(!id.0.is_empty());
+    assert!(id.0.starts_with("err-"));
+}
+
+#[test]
+fn technical_detail_stores_code_and_detail() {
+    let td = crate::error::TechnicalDetail::new("io::read", "permission denied at /path");
+    assert_eq!(td.code, "io::read");
+    assert!(td.detail.contains("permission denied"));
+}

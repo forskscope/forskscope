@@ -1,6 +1,6 @@
 # RFC 024 — Diff Visual Semantics and Decoration Contract
 
-**Status.** Proposed — DiffDecorationSet, LineDecorationKind, InlineDecoration, HunkDecoration slice implemented (v0.61.0); renderer wiring open
+**Status.** Implemented (v0.61.0) — core complete; renderer wiring in Dioxus diff component deferred to UI layer
 
 ## Status
 

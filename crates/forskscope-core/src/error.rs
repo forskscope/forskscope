@@ -445,3 +445,110 @@ impl UserMessage {
         Self::new(short, detail)
     }
 }
+
+// ── AppError — structured error envelope (RFC-017 §5) ────────────────────────
+
+/// Technical detail for diagnostics (shown in the copy-diagnostics panel,
+/// never in the main dialog body).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TechnicalDetail {
+    /// Short machine-readable code, e.g. `"io::permission_denied"`.
+    pub code: String,
+    /// Full detail text including paths and OS messages.
+    pub detail: String,
+}
+
+impl TechnicalDetail {
+    pub fn new(code: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self { code: code.into(), detail: detail.into() }
+    }
+}
+
+/// Stable unique identifier for one error instance (for log correlation).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ErrorId(pub String);
+
+impl ErrorId {
+    pub fn new() -> Self {
+        // Millisecond timestamp + pid for reasonable uniqueness without uuid.
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        Self(format!("err-{ms}-{}", std::process::id()))
+    }
+}
+
+impl Default for ErrorId {
+    fn default() -> Self { Self::new() }
+}
+
+/// The complete structured error envelope presented to the UI (RFC-017 §5).
+///
+/// Constructed via [`AppError::from_core`] or [`AppError::new`].
+/// The UI reads `severity` to choose the surface (toast vs dialog vs banner),
+/// `recovery` to render action buttons, and `message` for the dialog copy.
+/// `technical` is only shown in the copy-diagnostics panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppError {
+    pub error_id:  ErrorId,
+    pub kind:      AppErrorKind,
+    pub severity:  ErrorSeverity,
+    pub message:   UserMessage,
+    pub technical: TechnicalDetail,
+    pub recovery:  Vec<RecoveryAction>,
+}
+
+impl AppError {
+    /// Build an `AppError` from a `CoreError` using the standard mappings.
+    pub fn from_core(err: &CoreError) -> Self {
+        let kind      = AppErrorKind::from_core(err);
+        let severity  = kind.default_severity();
+        let message   = UserMessage::for_kind(kind);
+        let recovery  = kind.default_recovery_actions().to_vec();
+        let technical = TechnicalDetail::new(
+            format!("{kind:?}").to_lowercase().replace(' ', "_"),
+            err.to_string(),
+        );
+        Self {
+            error_id: ErrorId::new(),
+            kind,
+            severity,
+            message,
+            technical,
+            recovery,
+        }
+    }
+
+    /// Build an `AppError` from explicit components when the kind is known
+    /// directly (e.g. from application-layer code that doesn't go through
+    /// `CoreError`).
+    pub fn new(kind: AppErrorKind, technical_detail: impl Into<String>) -> Self {
+        let severity  = kind.default_severity();
+        let message   = UserMessage::for_kind(kind);
+        let recovery  = kind.default_recovery_actions().to_vec();
+        Self {
+            error_id:  ErrorId::new(),
+            kind,
+            severity,
+            message,
+            technical: TechnicalDetail::new(
+                format!("{kind:?}").to_lowercase(),
+                technical_detail.into(),
+            ),
+            recovery,
+        }
+    }
+
+    /// `true` when this error should block the user from proceeding.
+    pub fn is_blocking(&self) -> bool {
+        self.severity >= ErrorSeverity::Blocking
+    }
+
+    /// `true` when the user can take an action to recover.
+    pub fn is_recoverable(&self) -> bool {
+        !self.recovery.is_empty()
+            && self.recovery.iter().any(|r| *r != RecoveryAction::Dismiss)
+    }
+}

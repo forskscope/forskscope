@@ -37,27 +37,27 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 |----|-------|
 | 004 | [Editor Adapter and CodeMirror Bridge](./proposed/004-editor-adapter-and-codemirror-bridge.md) |
 | 008 | [Directory Comparison and Background Job Model](./proposed/008-directory-comparison-background-jobs.md) |
-| 009 | [Settings, Theme, Localization, and Accessibility](./proposed/009-settings-theme-localization-accessibility.md) |
+| 009 | [Settings, Theme, Localization, and Accessibility](./done/009-settings-theme-localization-accessibility.md) |
 | 010 | [Packaging, Diagnostics, QA, and Release Gates](./proposed/010-packaging-diagnostics-qa.md) |
 | 011 | [Workspace Session Persistence](./done/011-workspace-session-persistence.md) | v0.56.0 (tab list restore deferred to schema v2; UI deferred) |
 | 012 | [Text Encoding, Newline, and Binary Policy](./proposed/012-text-encoding-newline-binary-policy.md) |
 | 013 | [Large File, Performance, and Virtualization Strategy](./proposed/013-large-file-performance-virtualization.md) |
 | 014 | [Search, Filter, and Navigation](./proposed/014-search-filter-navigation.md) |
 | 016 | [Editor Bridge Security and Contract](./proposed/016-editor-bridge-security-and-contract.md) |
-| 017 | [Error Taxonomy and Diagnostics UX](./proposed/017-error-taxonomy-diagnostics-ux.md) |
-| 019 | [Command Registry, Keyboard Shortcuts, Command Palette, and Accessibility](./proposed/019-command-shortcut-palette-accessibility.md) |
+| 017 | [Error Taxonomy and Diagnostics UX](./done/017-error-taxonomy-diagnostics-ux.md) |
+| 019 | [Command Registry, Keyboard Shortcuts, Command Palette, and Accessibility](./done/019-command-shortcut-palette-accessibility.md) |
 | 020 | [Developer Architecture, CI, and Test Gates](./proposed/020-developer-architecture-ci-test-gates.md) |
 | 022 | [Directory Merge and Batch Operations](./proposed/022-directory-merge-and-batch-operations.md) |
 | 023 | [Atomic File Operations, Backup, and Restore](./proposed/023-atomic-file-operations-backup-restore.md) |
-| 024 | [Diff Visual Semantics and Decoration Contract](./proposed/024-diff-visual-semantics-decoration-contract.md) |
+| 024 | [Diff Visual Semantics and Decoration Contract](./done/024-diff-visual-semantics-decoration-contract.md) |
 | 025 | [Editor Adapter Prototype and Kill Switch](./proposed/025-editor-adapter-prototype-and-kill-switch.md) |
 | 026 | [Cross-Platform WebView and Linux Desktop Compatibility](./proposed/026-cross-platform-webview-and-linux-desktop-compatibility.md) |
 | 028 | [Preferences, Profiles, and Compare Options](./done/028-preferences-profiles-and-compare-options.md) | v0.66.0 (core complete; toolbar selector UI deferred) |
 | 029 | [Integration with External Tools and Open With](./proposed/029-integration-with-external-tools-and-open-with.md) |
 | 030 | [User Documentation, Onboarding, and Help System](./proposed/030-user-documentation-onboarding-and-help-system.md) |
-| 032 | [Text Editing Operation Model and Editor Truth Boundary](./proposed/032-text-editing-operation-model-and-editor-truth-boundary.md) |
-| 034 | [Conflict Resolution Workspace](./proposed/034-conflict-resolution-workspace.md) |
-| 035 | [Scroll Sync, Line Mapping, and Diff Decoration Engine](./proposed/035-scroll-sync-line-mapping-and-diff-decoration-engine.md) |
+| 032 | [Text Editing Operation Model and Editor Truth Boundary](./done/032-text-editing-operation-model-and-editor-truth-boundary.md) |
+| 034 | [Conflict Resolution Workspace](./done/034-conflict-resolution-workspace.md) |
+| 035 | [Scroll Sync, Line Mapping, and Diff Decoration Engine](./done/035-scroll-sync-line-mapping-and-diff-decoration-engine.md) |
 | 036 | [Live Reload, File Watcher, and External Modification Handling](./proposed/036-live-reload-file-watcher-and-external-modification-handling.md) |
 | 037 | [Scalable Directory Compare Index and Incremental Refresh](./proposed/037-scalable-directory-compare-index-and-incremental-refresh.md) |
 | 040 | [Editor Adapter Verification Harness and Golden Corpus](./proposed/040-editor-adapter-verification-harness-and-golden-corpus.md) |

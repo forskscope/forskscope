@@ -1,6 +1,6 @@
 # RFC 034: Conflict Resolution Workspace
 
-**Status.** Proposed — ConflictNavigator, ConflictStatusDisplay, NavigatorSummary slice implemented (v0.64.0); workspace UI open
+**Status.** Implemented (v0.64.0) — core complete; four-region workspace UI, keyboard nav, action bar deferred to UI layer
 
 ## Status
 Proposed. Originally sketched in RFC package v0.4; rewritten for the v0.41+

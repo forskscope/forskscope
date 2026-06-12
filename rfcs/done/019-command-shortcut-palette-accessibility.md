@@ -1,6 +1,6 @@
 # RFC-019 — Command Registry, Keyboard Shortcuts, Command Palette, and Accessibility
 
-**Status.** Proposed — CommandDefinition, CommandRegistry, AvailabilityRule, Shortcut, CommandContext slice implemented (v0.63.0); command palette UI open
+**Status.** Implemented (v0.63.0) — core complete; command palette UI component, context-menu generation deferred to UI layer
 
 ## 1. Summary
 

@@ -1,6 +1,6 @@
 # RFC 032: Text Editing Operation Model and Editor Truth Boundary
 
-**Status.** Proposed — TextEditOperation, RevisionId, TextRange, OperationAck/Reject, EditTransaction slice implemented (v0.62.0); EditBuffer and operation dispatch open
+**Status.** Implemented (v0.62.0) — core complete; EditBuffer ownership and operation dispatch in Dioxus deferred to UI layer
 
 ## Status
 Proposed. (Originally proposed in RFC package v0.4.)
