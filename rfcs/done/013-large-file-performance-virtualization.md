@@ -1,6 +1,6 @@
 # RFC-013 — Large File, Performance, and Virtualization Strategy
 
-**Status.** Proposed — threshold constants + JobProgress (v0.46.0); FileSizeClass + PerformanceLimits (v0.59.0); virtualization open
+**Status.** Implemented (v0.46.0 + v0.59.0) — core complete; row virtualization for large directories and editor-view decoration batching deferred to UI layer (RFC-004 dependency)
 
 ## Status
 Partially implemented in v0.46.0:

@@ -5,6 +5,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.70.0] — 2026-06-12
+
+External tool built-in presets (RFC-029); five RFC promotions.
+
+### Added
+
+- **`ExternalToolCommand::file_manager_reveal()`** — built-in preset that
+  expands to `xdg-open {Path}` (Linux default). ID: `builtin.file_manager_reveal`.
+  Users can override in settings with a configurable `ExternalToolCommand`
+  for their specific file manager (e.g. `nautilus --select {Path}`).
+
+- **`ExternalToolCommand::vscode_open()`** — preset: `code --goto {Path}`.
+  ID: `builtin.vscode_open`.
+
+- **`ExternalToolCommand::system_open()`** — preset: `xdg-open {Path}` for
+  opening in the system default application. ID: `builtin.system_open`.
+
+- **`ExternalToolCommand::builtin_presets()`** — returns all three built-in
+  presets in display order.
+
+- **`ToolKind`** — `Editor | FileManager | Terminal | Custom` — functional
+  role classification for an external tool.
+
+- **7 new tests** in `external_tool_tests.rs`: preset IDs and args,
+  `file_manager_reveal` path expansion, VS Code `--goto` flag, system open
+  placeholder, preset uniqueness, non-empty names, `ToolKind` distinctness.
+  Total core test count: 586.
+
+### RFC promotions (5)
+
+Core scope of each RFC is complete; remaining items are UI components.
+
+| RFC | Title | Core shipped | Deferred |
+|---|---|---|---|
+| 013 | Large File, Performance, Virtualization | v0.59.0 | Row virtualization UI, decoration batching (RFC-004) |
+| 014 | Search, Filter, Navigation | v0.43.0 | Explorer filter UI, command palette integration |
+| 022 | Directory Merge and Batch Operations | v0.52.0 | Batch preview dialog, deletion confirmation |
+| 023 | Atomic File Operations, Backup, Restore | v0.44.0 | Restore picker dialog UI |
+| 029 | Integration with External Tools | v0.70.0 | Settings UI for custom commands |
+
+**Done count: 34** (was 29).
+
+---
+
 ## [0.69.0] — 2026-06-12
 
 BOM preservation policy (RFC-012 §7.2 bullet 5); RFC-012 promoted to done.

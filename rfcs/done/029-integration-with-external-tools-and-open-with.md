@@ -1,6 +1,6 @@
 # RFC 029 — Integration with External Tools and Open With
 
-**Status.** Proposed — external tool command model and safe argument expansion slice implemented (v0.55.0); file manager launch and UI open
+**Status.** Implemented (v0.55.0 + v0.70.0) — core complete; settings UI for custom editor commands and external-change reload flow deferred to UI layer
 
 ## Status
 Partially implemented in v0.55.0. `forskscope-core::external_tool` ships:

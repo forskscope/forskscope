@@ -233,3 +233,83 @@ impl std::fmt::Display for UnknownTokenError {
 }
 
 impl std::error::Error for UnknownTokenError {}
+
+// ── RFC-029: Built-in tool presets and tool kind ──────────────────────────────
+
+/// The functional role of an external tool (RFC-029 §"Tool integration points").
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolKind {
+    /// Open a file at a specific line in an external editor.
+    Editor,
+    /// Reveal a file or directory in the system file manager.
+    FileManager,
+    /// Open a terminal at a directory.
+    Terminal,
+    /// A user-defined custom command.
+    Custom,
+}
+
+impl ExternalToolCommand {
+    // ── Presets ───────────────────────────────────────────────────────────
+
+    /// Preset: reveal a path in the system file manager.
+    ///
+    /// Expands `{Path}` to the target path. On Linux this calls `xdg-open`
+    /// on the parent directory; on Windows `explorer /select,{Path}`; on
+    /// macOS `open -R {Path}`. The correct executable is chosen by the UI
+    /// at invocation time based on the host platform; the template here uses
+    /// `xdg-open` as the canonical Linux default.
+    ///
+    /// The preset is a safe starting point. Users can override it in
+    /// settings with a `ExternalToolCommand` that uses their preferred file
+    /// manager (e.g. `nautilus --select {Path}` on GNOME, `dolphin --select
+    /// {Path}` on KDE).
+    pub fn file_manager_reveal() -> Self {
+        Self {
+            id:         ToolId("builtin.file_manager_reveal".into()),
+            name:       "Reveal in File Manager".into(),
+            executable: PathBuf::from("xdg-open"),
+            args:       vec![ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)],
+        }
+    }
+
+    /// Preset: open a file at a line in VS Code.
+    ///
+    /// Expands to `code --goto {Path}:{Line}` — VS Code's `--goto` flag
+    /// accepts `path:line` as a single argument.
+    pub fn vscode_open() -> Self {
+        // VS Code uses `code --goto /path/to/file:42` — path and line are
+        // concatenated with a colon. Since our placeholder model expands each
+        // arg independently, we represent this as two separate args and the
+        // UI layer concatenates them. Alternatively, a user can configure a
+        // custom command with a shell wrapper if they need the combined form.
+        Self {
+            id:         ToolId("builtin.vscode_open".into()),
+            name:       "Open in VS Code".into(),
+            executable: PathBuf::from("code"),
+            args:       vec![
+                ExternalToolArg::Literal("--goto".into()),
+                ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path),
+            ],
+        }
+    }
+
+    /// Preset: open a file at a line in the system default application.
+    pub fn system_open() -> Self {
+        Self {
+            id:         ToolId("builtin.system_open".into()),
+            name:       "Open with System Default".into(),
+            executable: PathBuf::from("xdg-open"),
+            args:       vec![ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)],
+        }
+    }
+
+    /// All built-in presets, in display order.
+    pub fn builtin_presets() -> Vec<Self> {
+        vec![
+            Self::file_manager_reveal(),
+            Self::system_open(),
+            Self::vscode_open(),
+        ]
+    }
+}

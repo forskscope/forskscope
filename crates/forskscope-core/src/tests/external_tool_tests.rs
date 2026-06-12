@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use crate::external_tool::{
     ExpandContext, ExternalToolArg, ExternalToolCommand, ExternalToolPlaceholder,
-    ToolId, UnknownTokenError, expand_args, parse_arg,
+    ToolId, ToolKind, UnknownTokenError, expand_args, parse_arg,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -220,4 +220,65 @@ fn all_placeholder_tokens_round_trip() {
 fn from_token_returns_none_for_unknown() {
     assert_eq!(ExternalToolPlaceholder::from_token("{nope}"), None);
     assert_eq!(ExternalToolPlaceholder::from_token("path"), None); // no braces
+}
+
+// ── Built-in presets (RFC-029 §"Tool integration points") ────────────────────
+
+#[test]
+fn file_manager_reveal_preset_has_correct_id_and_path_placeholder() {
+    let cmd = ExternalToolCommand::file_manager_reveal();
+    assert_eq!(cmd.id.0, "builtin.file_manager_reveal");
+    assert!(!cmd.name.is_empty());
+    // Must have exactly one arg: the {Path} placeholder.
+    assert_eq!(cmd.args.len(), 1);
+    assert_eq!(cmd.args[0], ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path));
+}
+
+#[test]
+fn file_manager_reveal_expands_path_correctly() {
+    let cmd = ExternalToolCommand::file_manager_reveal();
+    let ctx = ExpandContext {
+        path: Some(std::path::PathBuf::from("/home/user/project/src/main.rs")),
+        ..ExpandContext::default()
+    };
+    let expanded = expand_args(&cmd, &ctx);
+    assert_eq!(expanded, vec!["/home/user/project/src/main.rs"]);
+}
+
+#[test]
+fn vscode_open_preset_has_goto_flag_and_path() {
+    let cmd = ExternalToolCommand::vscode_open();
+    assert_eq!(cmd.id.0, "builtin.vscode_open");
+    assert!(cmd.args.iter().any(|a| a == &ExternalToolArg::Literal("--goto".into())));
+    assert!(cmd.args.iter().any(|a| a == &ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)));
+}
+
+#[test]
+fn system_open_preset_has_path_placeholder() {
+    let cmd = ExternalToolCommand::system_open();
+    assert_eq!(cmd.id.0, "builtin.system_open");
+    assert!(cmd.args.iter().any(|a| a == &ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)));
+}
+
+#[test]
+fn builtin_presets_returns_three_commands_with_unique_ids() {
+    let presets = ExternalToolCommand::builtin_presets();
+    assert_eq!(presets.len(), 3);
+    let ids: std::collections::HashSet<&str> = presets.iter().map(|p| p.id.0.as_str()).collect();
+    assert_eq!(ids.len(), presets.len(), "all preset IDs must be unique");
+}
+
+#[test]
+fn all_builtin_preset_names_are_non_empty() {
+    for preset in ExternalToolCommand::builtin_presets() {
+        assert!(!preset.name.is_empty(), "preset {} must have a name", preset.id.0);
+    }
+}
+
+#[test]
+fn tool_kind_variants_are_distinct() {
+    // Structural check: ToolKind can be matched exhaustively.
+    let kinds = [ToolKind::Editor, ToolKind::FileManager, ToolKind::Terminal, ToolKind::Custom];
+    let unique: std::collections::HashSet<_> = kinds.iter().map(|k| format!("{k:?}")).collect();
+    assert_eq!(unique.len(), kinds.len());
 }

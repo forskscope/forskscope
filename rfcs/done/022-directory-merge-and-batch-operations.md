@@ -1,6 +1,6 @@
 # RFC 022 — Directory Merge and Batch Operations
 
-**Status.** Proposed — operation planner and execute_plan slice implemented (v0.52.0); batch preview dialog and deletion actions open
+**Status.** Implemented (v0.52.0) — core complete; batch preview dialog UI and deletion actions (elevated confirmation) deferred to UI layer
 
 ## Status
 Partially implemented in v0.52.0. `forskscope-core::dir::merge_plan` ships:

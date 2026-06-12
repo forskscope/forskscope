@@ -1,6 +1,6 @@
 # RFC 023 — Atomic File Operations, Backup, and Restore
 
-**Status.** Proposed — batch manifest slice implemented (v0.44.0); restore UI open
+**Status.** Implemented (v0.44.0) — core complete; restore-from-manifest UI (restore picker dialog) deferred to UI layer
 
 ## Status
 Partially implemented in v0.44.0. The `save_text` atomic write + sibling

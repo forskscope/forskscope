@@ -1,6 +1,6 @@
 # RFC-014 — Search, Filter, and Navigation
 
-**Status.** Proposed — search next/prev traversal slice implemented (v0.43.0); explorer filter and command palette open
+**Status.** Implemented (v0.43.0) — core complete; Explorer file/directory filter UI, command palette integration, and regex mode deferred to UI layer
 
 ## Status
 Partially implemented in v0.43.0. In-diff text search upgraded from a
