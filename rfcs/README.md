@@ -39,7 +39,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 008 | [Directory Comparison and Background Job Model](./proposed/008-directory-comparison-background-jobs.md) |
 | 009 | [Settings, Theme, Localization, and Accessibility](./proposed/009-settings-theme-localization-accessibility.md) |
 | 010 | [Packaging, Diagnostics, QA, and Release Gates](./proposed/010-packaging-diagnostics-qa.md) |
-| 011 | [Workspace Session Persistence](./proposed/011-workspace-session-persistence.md) |
+| 011 | [Workspace Session Persistence](./done/011-workspace-session-persistence.md) | v0.56.0 (tab list restore deferred to schema v2; UI deferred) |
 | 012 | [Text Encoding, Newline, and Binary Policy](./proposed/012-text-encoding-newline-binary-policy.md) |
 | 013 | [Large File, Performance, and Virtualization Strategy](./proposed/013-large-file-performance-virtualization.md) |
 | 014 | [Search, Filter, and Navigation](./proposed/014-search-filter-navigation.md) |
@@ -52,7 +52,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 024 | [Diff Visual Semantics and Decoration Contract](./proposed/024-diff-visual-semantics-decoration-contract.md) |
 | 025 | [Editor Adapter Prototype and Kill Switch](./proposed/025-editor-adapter-prototype-and-kill-switch.md) |
 | 026 | [Cross-Platform WebView and Linux Desktop Compatibility](./proposed/026-cross-platform-webview-and-linux-desktop-compatibility.md) |
-| 028 | [Preferences, Profiles, and Compare Options](./proposed/028-preferences-profiles-and-compare-options.md) |
+| 028 | [Preferences, Profiles, and Compare Options](./done/028-preferences-profiles-and-compare-options.md) | v0.66.0 (core complete; toolbar selector UI deferred) |
 | 029 | [Integration with External Tools and Open With](./proposed/029-integration-with-external-tools-and-open-with.md) |
 | 030 | [User Documentation, Onboarding, and Help System](./proposed/030-user-documentation-onboarding-and-help-system.md) |
 | 032 | [Text Editing Operation Model and Editor Truth Boundary](./proposed/032-text-editing-operation-model-and-editor-truth-boundary.md) |

@@ -69,7 +69,13 @@ fn split_lines(text: &str) -> Vec<SrcLine> {
 
 /// Comparison key for one line under the active ignore options.
 fn line_key(line: &SrcLine, options: &DiffOptions) -> String {
-    let mut key = format!("{}{}", line.content, line.newline.as_str());
+    // Start with content only (never the newline) when ignoring newline
+    // differences; otherwise include the newline so LF≠CRLF.
+    let mut key = if options.ignore_newlines {
+        line.content.clone()
+    } else {
+        format!("{}{}", line.content, line.newline.as_str())
+    };
     if options.ignore_whitespace {
         key.retain(|c| !c.is_whitespace());
     }

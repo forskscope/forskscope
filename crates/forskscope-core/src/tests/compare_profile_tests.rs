@@ -2,7 +2,7 @@
 //! (RFC-028 §"Default profiles", §"Compare option types").
 
 use crate::diff::{
-    CaseSensitivity, CompareProfile, DiffAlgorithm, InlineMode,
+    CaseSensitivity, CompareProfile, DiffAlgorithm, DiffOptions, InlineMode,
     NewlineCompareMode, WhitespaceMode,
 };
 
@@ -119,4 +119,75 @@ fn newline_compare_mode_default_is_significant() {
 #[test]
 fn case_sensitivity_default_is_sensitive() {
     assert_eq!(CaseSensitivity::default(), CaseSensitivity::Sensitive);
+}
+
+// ── NewlineCompareMode::IgnoreDifference wired into engine (RFC-028) ──────────
+
+#[test]
+fn ignore_newlines_option_false_by_default() {
+    assert!(!DiffOptions::default().ignore_newlines);
+}
+
+#[test]
+fn profile_with_ignore_newlines_sets_option() {
+    let mut profile = CompareProfile::default_profile();
+    profile.newlines = NewlineCompareMode::IgnoreDifference;
+    let opts = profile.to_diff_options();
+    assert!(opts.ignore_newlines,
+        "IgnoreDifference must set ignore_newlines on DiffOptions");
+}
+
+#[test]
+fn profile_with_significant_newlines_leaves_option_false() {
+    let profile = CompareProfile::default_profile();
+    // Default is Significant.
+    let opts = profile.to_diff_options();
+    assert!(!opts.ignore_newlines,
+        "Significant newlines must not set ignore_newlines");
+}
+
+#[test]
+fn lf_and_crlf_lines_are_equal_when_ignore_newlines_set() {
+    use crate::diff::compute_diff;
+    // Left uses LF, right uses CRLF for the same content.
+    let left  = "hello\nworld\n";
+    let right = "hello\r\nworld\r\n";
+
+    let opts_ignore = DiffOptions { ignore_newlines: true, ..DiffOptions::default() };
+    let doc = compute_diff(left, right, opts_ignore);
+    assert!(doc.is_identical(),
+        "LF vs CRLF must be treated as equal when ignore_newlines is set");
+}
+
+#[test]
+fn lf_and_crlf_lines_are_different_when_newlines_significant() {
+    use crate::diff::compute_diff;
+    let left  = "hello\nworld\n";
+    let right = "hello\r\nworld\r\n";
+
+    let opts = DiffOptions::default(); // ignore_newlines = false
+    let doc  = compute_diff(left, right, opts);
+    // With newlines significant, CRLF ≠ LF, so the lines differ.
+    assert!(!doc.is_identical(),
+        "LF vs CRLF must differ when newlines are significant");
+}
+
+#[test]
+fn ignore_newlines_does_not_suppress_genuine_content_diff() {
+    use crate::diff::compute_diff;
+    // Even with ignore_newlines, different content must still show as changed.
+    let left  = "hello\n";
+    let right = "world\r\n";
+
+    let opts = DiffOptions { ignore_newlines: true, ..DiffOptions::default() };
+    let doc  = compute_diff(left, right, opts);
+    assert!(!doc.is_identical(),
+        "Content differences must still be reported even when newlines are ignored");
+}
+
+#[test]
+fn code_review_profile_newlines_are_significant() {
+    // Code Review profile does NOT ignore newlines by default.
+    let opts = CompareProfile::code_review().to_diff_options();
+    assert!(!opts.ignore_newlines);
 }

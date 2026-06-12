@@ -29,6 +29,9 @@ pub enum InlineMode {
 pub struct DiffOptions {
     pub ignore_whitespace: bool,
     pub ignore_case: bool,
+    /// When `true`, newline-style differences (LF vs CRLF) are ignored during
+    /// line comparison (RFC-028 `NewlineCompareMode::IgnoreDifference`).
+    pub ignore_newlines: bool,
     pub inline_mode: InlineMode,
     pub algorithm: DiffAlgorithm,
     /// Hunks whose combined text exceeds this are skipped by inline diff.
@@ -46,6 +49,7 @@ impl Default for DiffOptions {
         Self {
             ignore_whitespace: false,
             ignore_case: false,
+            ignore_newlines: false,
             inline_mode: InlineMode::Lazy,
             algorithm: DiffAlgorithm::Myers,
             max_inline_chars_per_hunk: 16 * 1024,
@@ -178,6 +182,7 @@ impl CompareProfile {
         DiffOptions {
             ignore_whitespace: !matches!(self.whitespace, WhitespaceMode::Significant),
             ignore_case:       self.case == CaseSensitivity::Insensitive,
+            ignore_newlines:   self.newlines == NewlineCompareMode::IgnoreDifference,
             inline_mode:       self.inline_mode,
             algorithm:         self.algorithm,
             ..DiffOptions::default()

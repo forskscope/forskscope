@@ -1,6 +1,32 @@
 # RFC-011 — Workspace Session Persistence
 
-**Status.** Proposed — session model and JSON persistence slice implemented (v0.56.0); session restore UI and crash recovery open
+**Status.** Implemented (v0.56.0) — core fully complete; tab list JSON persistence deferred to schema v2
+
+## Status
+
+Core implementation complete in v0.56.0. `forskscope-core::session` ships:
+
+- **`WorkspaceSession`** — `session_id`, `created_at`, `updated_at`, `root`,
+  `tabs`, `active_tab_id`. Constructors: `empty()`, `from_file_pair()`,
+  `from_directory_pair()`. Tab operations: `open_tab`, `close_tab` →
+  `CloseResult`, `force_close_tab`, `mark_tab_dirty`, `mark_tab_clean`.
+  Queries: `any_dirty()`, `dirty_tabs()`, `active_tab()`.
+- **`WorkspaceRoot`** — `Empty | FilePair | DirectoryPair`.
+- **`WorkspaceTab`** — `Diff | Binary | Excel | Error`. `DiffTabSession` has
+  `is_dirty`; other variants are always clean.
+- **`CloseResult`** — `Closed | BlockedDirty | NotFound`.
+- **`RecentSessionEntry`** — metadata only; `paths_available()`.
+- **`to_json` / `from_json`** — `VersionedEnvelope` with
+  `SESSION_SCHEMA_VERSION = 1`. `TooNew` error when file is from a newer app.
+- **21 tests** covering all RFC-011 §13 requirements and §14 acceptance criteria.
+
+**Remaining (deferred to schema v2):** tab list persistence in JSON — tabs are
+restored as empty on load. Root paths (the most important thing to restore) are
+fully persisted. The deliberate deferral avoids encoding tab dirty/path state in
+schema v1; schema v2 will add tab persistence with a clean migration path.
+
+**Remaining (UI):** session restore picker dialog, crash recovery journal,
+`WorkspaceSession` ownership in the Dioxus runtime (RFC-011 §12).
 
 ## Status
 Partially implemented in v0.56.0. `forskscope-core::session` ships:

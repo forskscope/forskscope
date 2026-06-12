@@ -5,6 +5,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.66.0] — 2026-06-12
+
+`NewlineCompareMode::IgnoreDifference` wired into diff engine; RFC-028 and
+RFC-011 promoted to done.
+
+### Added
+
+- **`DiffOptions::ignore_newlines: bool`** — new field (default `false`).
+  When `true`, `line_key()` in the diff engine uses only the line's content
+  for comparison, excluding the newline suffix. LF (`\n`) and CRLF (`\r\n`)
+  lines with identical content then hash to the same key and are treated as
+  equal by the `similar` algorithm (RFC-028 §`NewlineCompareMode`).
+
+- **`CompareProfile::to_diff_options()`** — now maps
+  `NewlineCompareMode::IgnoreDifference` to `ignore_newlines: true`.
+  Previously `NewlineCompareMode` had no effect in the engine; this closes
+  the last open core item for RFC-028.
+
+- **7 new tests** in `compare_profile_tests.rs`:
+  `ignore_newlines` default is `false`; `IgnoreDifference` profile sets the
+  field; `Significant` profile leaves it unset; LF vs CRLF same-content lines
+  are equal when flag is set; LF vs CRLF differ when flag is unset; content
+  differences are still reported even when newlines are ignored; Code Review
+  profile does not ignore newlines.
+  Total core test count: 543.
+
+### RFC promotions
+
+- **RFC-028** (`Preferences, Profiles, and Compare Options`) → `done/`.
+  All core scope complete: compare option types (v0.50.0), profile
+  persistence via `UserSettings` (v0.60.0), `NewlineCompareMode` engine
+  wiring (v0.66.0). Deferred post-v1: toolbar profile selector UI.
+
+- **RFC-011** (`Workspace Session Persistence`) → `done/`.
+  All core scope complete: `WorkspaceSession` model, JSON persistence,
+  `CloseResult`, `RecentSessionEntry`, schema version guard, 21 tests
+  (v0.56.0). Deferred to schema v2: tab list JSON persistence.
+  Deferred UI: session restore picker, crash recovery journal.
+
+RFC index (`rfcs/README.md`) updated. Done count: 21 (was 19).
+
+---
+
 ## [0.65.0] — 2026-06-10
 
 Clippy clean pass and documentation update.
