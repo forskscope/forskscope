@@ -5,6 +5,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.96.0] — 2026-06-12
+
+User documentation expanded: four pages rewritten to reflect current UI.
+
+### Changed
+
+- **`docs/src/users/diff-workflow.md`** (20 → 94 lines) — complete reference:
+  colour table with non-colour accessibility indicators; navigation (◀▶, F7/F8,
+  scroll behaviour); inline character diff instructions; context collapse
+  explanation; gutter mark table (▶, ✓, −, +); per-tab diff options table
+  (Inline diff, Wrap, Ignore WS, Ignore case, Algorithm) and link to profiles.
+
+- **`docs/src/users/explorer.md`** (20 → 91 lines) — complete reference:
+  opening directories (path bar, CLI, drag); navigation (expand/collapse, Alt+↑,
+  history buttons); file selection (mouse and keyboard); same-name shortcut;
+  digest equality icons (✓/⚠/none with meanings); multiple tabs; sync panes.
+
+- **`docs/src/intermediate/file-types.md`** (12 → 91 lines) — complete reference:
+  classification rule order (Missing→Unsupported→ExcelXlsx→Binary→Text);
+  capability table; text encoding (UTF-8 → chardetng → encoding_rs, encoding
+  preservation, UTF-8 BOM round-trip); binary hex preview; Excel structured
+  diff; large-file class table with thresholds and behaviour changes;
+  unsupported-file behaviour.
+
+- **`docs/src/users/settings.md`** (84 → 125 lines) — updated to match the
+  actual Settings dialog: added **Language** section (was missing); added
+  **Ignore file extensions** and **Ignore directory names** sections (added in
+  v0.92.0 but not documented); corrected built-in profile names to match the
+  real `CompareProfile` presets (Default, Code Review, Loose Text, Large File
+  Safe — the old doc listed invented names); added Ctrl+/, Esc close
+  instructions; added Copy diagnostics description to About section.
+
+---
+
 ## [0.95.0] — 2026-06-12
 
 Documentation pass: testing.md, architecture.md, and local-dev.md updated
