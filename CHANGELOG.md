@@ -5,6 +5,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.79.0] — 2026-06-12
+
+Maintainer documentation rewrite — architecture and testing docs updated to
+reflect the complete v0.79.0 codebase.
+
+### Changed
+
+- **`docs/src/maintainers/architecture.md`** — complete rewrite:
+
+  **Core modules table** now covers all 26 modules (was ~18). Added:
+  `command`, `conflict_nav`, `diff_decoration`, `edit_op`, `line_map`,
+  `watcher`; updated `encoding` (added `BomPolicy`, `BomPresence`),
+  `error` (added `AppError`, `ErrorId`, `TechnicalDetail`), `job` (added
+  `JobStatus`, `JobStatusRecord`, `JobRegistry`), removed duplicate
+  `session` entry, corrected `diff` to mention `NewlineCompareMode`.
+
+  **`ui-logic` modules table** (new — was one sentence). Lists all 7
+  modules with purpose and RFC cross-reference.
+
+  **UI modules table** expanded from 9 to 13 rows: added `dir_pane`,
+  `deep_compare`, `search`, `keybindings`.
+
+  **Core ownership rule** updated to explicitly mention `ui-logic` and
+  `result_text()`/`apply_left_to_right()`/`undo()`.
+
+- **`docs/src/maintainers/testing.md`** — complete rewrite:
+
+  **Test count table** accurate at 692 (was not present).
+
+  **`forskscope-core` test module table** now covers all 34 test files
+  with module name, coverage description, and RFC column (was 8 entries).
+
+  **`forskscope-ui-logic` section** now lists all 7 modules with coverage
+  descriptions and RFC cross-references (was "two modules").
+
+  **Integration test** listed (patch round-trip with GNU `patch`).
+
+---
+
 ## [0.78.0] — 2026-06-12
 
 Documentation audit and corrections pass.

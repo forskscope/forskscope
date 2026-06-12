@@ -1,68 +1,94 @@
-# Testing Strategy
+# Testing
 
-Tests validate **design specifications** (RFC-001 §10, RFC-002 §11), not merely
-the written code.  Each test references the behaviour promised by an RFC.
+## Running tests
 
-## Core unit tests
+```sh
+# Core domain logic (no GTK required)
+cargo test -p forskscope-core
 
-Located in `crates/forskscope-core/src/tests/`.
-Tests validate **design specifications** (RFC-001 §10, RFC-002 §11), not merely
-the written code. Each test references the behaviour promised by an RFC.
+# View-model layer (no GTK required)
+cargo test -p forskscope-ui-logic
+
+# Both (the CI-equivalent command)
+cargo test -p forskscope-core -p forskscope-ui-logic
+
+# Clippy (must pass without warnings)
+cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
+```
+
+The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
+be tested in environments without a display server. Core and ui-logic tests
+run anywhere Rust is installed.
+
+## Test counts (v0.79.0)
+
+| Suite | Count |
+|-------|-------|
+| `forskscope-core` unit | 599 |
+| `forskscope-core` integration | 2 |
+| `forskscope-ui-logic` | 85 |
+| Doctests | 6 |
+| **Total** | **692** |
+
+## `forskscope-core` test modules
+
+Tests live in `crates/forskscope-core/src/tests/` and are declared in `tests.rs`.
 
 | File | Covers | RFC |
 |---|---|---|
-| `encoding_tests` | UTF-8 detection, legacy decoding, round-trip encode, newline styles. | RFC-002, RFC-012 |
-| `document_tests` | File kind classification, load, fingerprint, hex preview. | RFC-021 |
-| `editability_tests` | `EditabilityClass` derivation; `NewlinePolicy::resolve`. | RFC-012 |
-| `diff_tests` | Hunk kinds, ranges, stable IDs, newline markers, inline Unicode, large-file policy. | RFC-002 |
-| `compare_profile_tests` | `CompareProfile` presets, `to_diff_options` mapping, type defaults. | RFC-028 |
-| `merge_tests` | Apply, undo, redo, double-apply rejection, dirty state, mark_saved. | RFC-006 |
-| `three_way_tests` | `ThreeWayMergeSession`: diff3 engine, conflict resolution, undo/redo, `can_save`. | RFC-033 |
-| `transaction_log_tests` | `TransactionLog`: push/undo/redo, revision tracking, dirty state, redo-branch discard. | RFC-015 |
-| `save_tests` | Atomic write, `.bak` backup, conflict detection. | RFC-007 |
-| `external_state_tests` | `ExternalFileState`; `check_external_state` for clean/dirty/changed/deleted/replaced. | RFC-036 |
-| `dir_tests` | Listing sort, file digest equality, recursive directory equality. | RFC-005 |
-| `dir_cancel_tests` | `CancellationToken`; `recursive_diff_with_cancel`; symlink reporting. | RFC-037 |
-| `batch_tests` | `batch_copy` outcomes, `BatchManifest`, `restore_from_manifest`. | RFC-023 |
-| `merge_plan_tests` | `plan_operations`, `execute_plan`, `OperationPlan`, `RiskSummary`. | RFC-022 |
-| `ignore_tests` | `IgnoreRules` extension and directory-pattern matching. | RFC-056 |
-| `error_tests` | `ErrorSeverity` mapping, `RecoveryHint`, `is_user_recoverable`. | RFC-017 |
-| `job_tests` | `JobProgress::fraction`, `JobHandle` cancel propagation, threshold constants. | RFC-013 |
-| `persist_tests` | `VersionedEnvelope` round-trip, `MigrationPolicy` decisions, schema names. | RFC-031 |
-| `session_tests` | `WorkspaceSession` constructors, tab lifecycle, dirty-state, `CloseResult`, JSON round-trip, schema-version guard. | RFC-011 |
-| `report_tests` | `FileComparisonReport` and `DirComparisonReport` Markdown + JSON, path privacy. | RFC-027 |
-| `vcs_tests` | `GitProvider` detect/status/read/merge_base; degrade outside repo. | RFC-038 |
-| `external_tool_tests` | `expand_args` placeholder expansion; security contract (no shell, spaces/semicolons/$HOME/backticks intact); `parse_arg` acceptance/rejection. | RFC-029 |
-| `diff_decoration_tests` | `DiffDecorationSet` from diff, CSS class uniqueness/prefix, gutter symbols, aria labels, focused hunk marking. | RFC-024 |
-| `line_map_tests` | `LineMap` row states, navigation, `ScrollAnchor` clamping, `build_mini_map` weight sum. | RFC-035 |
-| `edit_op_tests` | `TextEditOperation` variants, `RevisionId`, `TextRange`, revision compatibility, `EditTransaction`. | RFC-032 |
+| `app_error_tests` | `AppError::from_core`, `is_blocking`, `is_recoverable`, `ErrorId`, `TechnicalDetail`. | RFC-017 |
+| `batch_tests` | `batch_copy`, `restore_from_manifest`, `BatchManifest`. | RFC-023 |
 | `command_tests` | `AvailabilityRule` evaluation, `CommandRegistry` uniqueness/search/shortcut lookup, `CommandDangerLevel`. | RFC-019 |
+| `compare_profile_tests` | `CompareProfile` presets, `to_diff_options`, `NewlineCompareMode` engine wiring. | RFC-028 |
 | `conflict_nav_tests` | `ConflictNavigator` build/focus/prev/next/filter, `ConflictStatusDisplay` glyphs, summary counts, progress fraction. | RFC-034 |
-| `settings_tests` | `UserSettings` defaults, round-trip JSON, theme/density/font round-trips, CSS var count, newer-schema error, fallback. | RFC-009 |
-| `session_tests` | `WorkspaceSession` constructors, tab lifecycle, dirty-state, `CloseResult`, JSON round-trip, schema-version guard. | RFC-011 |
+| `diff_decoration_tests` | `DiffDecorationSet` from diff, CSS class uniqueness/prefix, gutter symbols, aria labels, focused hunk marking. | RFC-024 |
+| `diff_tests` | `compute_diff`, hunk kinds, inline spans, equal/insert/delete/replace, whitespace/case modes. | RFC-002 |
+| `dir_cancel_tests` | `recursive_diff_with_cancel`, cancellation mid-scan. | RFC-037 |
+| `dir_index_tests` | `DirectoryIndex`, `EqualityEvidence`, `pair_entries`, one-sided entries. | RFC-037 |
+| `dir_tests` | Directory listing, recursive digest equality, `file_digest_equal`. | RFC-022 |
+| `document_tests` | `LoadedDocument`, `FileFingerprint`, `check_external_state`, `ExternalFileState`. | RFC-036 |
+| `edit_op_tests` | `TextEditOperation` variants, `RevisionId`, `TextRange`, revision compatibility, `EditTransaction`. | RFC-032 |
+| `editability_tests` | `EditabilityClass::from_kind`, `requires_save_guard`, `NewlinePolicy::resolve`. | RFC-012 |
+| `encoding_tests` | `decode_bytes`, `detect_newline_style`, `BomPresence`, `BomPolicy`, `detect_bom`. | RFC-012 |
+| `error_tests` | `CoreError` variants, `AppErrorKind::from_core`, `RecoveryAction` defaults. | RFC-017 |
+| `external_state_tests` | `check_external_state` with mocked fingerprints. | RFC-036 |
+| `external_tool_tests` | `expand_args` placeholder expansion; shell safety (spaces, semicolons, $HOME, backticks); built-in presets. | RFC-029 |
+| `file_size_tests` | `FileSizeClass::classify` against `PerformanceLimits` thresholds. | RFC-013 |
+| `ignore_tests` | `IgnoreRules::from_settings`, extension and directory pattern matching. | RFC-056 |
+| `job_tests` | `JobStatus` lifecycle transitions, `JobStatusRecord`, `JobRegistry` register/get/active/prune. | RFC-008 |
+| `line_map_tests` | `LineMap` row states, navigation, `ScrollAnchor` clamping, `build_mini_map` weight sum. | RFC-035 |
+| `merge_plan_tests` | `plan_operations`, `execute_plan`, `OperationPlan` safety. | RFC-022 |
+| `merge_tests` | `MergeSession` apply/undo/redo, dirty state, `result_text`, transaction log. | RFC-006 |
 | `patch_tests` | `patch_from_file_diff`, `to_unified`; GNU `patch` round-trip integration. | RFC-039 |
-| `xlsx_tests` | `diff_xlsx` structured model; panic isolation on corrupt files. | RFC-058 |
+| `persist_tests` | `VersionedEnvelope` round-trip, `MigrationPolicy`, newer-schema rejection. | RFC-031 |
+| `report_tests` | `FileComparisonReport`, `DirComparisonReport`, Markdown/JSON output. | RFC-027 |
+| `save_tests` | `save_text` with fingerprint match, `AtomicSaveStrategy`, `BackupPolicy`. | RFC-007 |
+| `session_tests` | `WorkspaceSession` tab lifecycle, dirty state, `CloseResult`, JSON round-trip, schema-version guard. | RFC-011 |
+| `settings_tests` | `UserSettings` defaults, round-trip JSON, theme/density/font round-trips, CSS var count, fallback. | RFC-009 |
+| `three_way_tests` | `ThreeWayMergeSession` conflicts, resolution, undo/redo, `can_save`, `result_text`. | RFC-033 |
+| `transaction_log_tests` | `TransactionLog` push/undo/redo/mark_saved, `is_dirty`. | RFC-015 |
+| `vcs_tests` | `GitProvider::detect`, `VcsProvider` trait contract. | RFC-038 |
+| `watcher_tests` | `MockFileChangeMonitor` watch/inject/poll/drain, `WatchError`, `FileChangeKind`. | RFC-036 |
+| `xlsx_tests` | `derive_pair_text`, structured diff output, sheets-diff v2 API. | RFC-058 |
 
-Run all: `cargo test -p forskscope-core`
-
-## UI build verification
-
-`cargo build -p forskscope-ui` is the current UI gate.  Integration and
-screenshot tests are planned in RFC-020 and RFC-040.
-
-## Coverage convention note
-
-Most test modules are named `<module>_tests` matching their source module.
-`file_kind.rs` is an exception: its `EditabilityClass` type is covered by
-`editability_tests` (named for the type, not the file). The convention check
-in `rfcs/notes/` documents this intentional divergence.
-
-## UI logic tests
-
-`cargo test -p forskscope-ui-logic` runs tests for the two GTK-free
-presentation-logic modules:
+Integration tests in `tests/`:
 
 | File | Covers |
 |---|---|
-| `explore/align` | `compute_aligned_rows`: pairing, ordering, recursion. |
-| `compare/search_index` | `MatchIndex`: build, next/prev, wrapping, `matching_hunk_ids`. |
+| `patch_round_trip` | Generates a unified-diff patch and verifies it applies correctly with GNU `patch`. |
+
+## `forskscope-ui-logic` test modules
+
+All tests are inline (`#[cfg(test)]` inside each module file) except where noted.
+
+| File | Covers | RFC |
+|---|---|---|
+| `explore/align` | `compute_aligned_rows`: pairing, ordering, one-sided entries, recursion depth, selection state. | RFC-059 |
+| `explore/deep_filter` | `DeepFilter::matches` for all `RecStatus` variants, `DeepCompareSummary` counts, footer text, `is_fully_computed`, `apply_filter`. | RFC-037, RFC-038 |
+| `explore/status` | `RowStatusKind::from_evidence` for all 10 `EqualityEvidence` variants, CSS prefix, glyph distinctness, aria labels, `needs_action`, `StatusRow` constructors. | RFC-054 |
+| `compare/command_bar` | `build_toolbar` section structure, `Save` enabled/disabled, `Undo`/`Redo` asymmetry, `CommandPalette` always enabled, shortcut hint, `find_item`. | RFC-019 |
+| `compare/search_index` | `MatchIndex` build/advance/retreat/wrap, `matching_hunk_ids`, empty index. | RFC-014 |
+| `compare/summary` | `CompareStatusSummary` for identical/changed/whitespace-only/single-hunk, dirty marker, `DiffNavigationState` position labels and aria wrap cases. | RFC-006 |
+| `compare/tab_state` | `context_from_snapshot` field mapping, `AvailabilityRule` inverse verification, end-to-end `TabStateSnapshot → CommandContext → build_toolbar`. | RFC-003, RFC-019 |
+
+Doctest in `watcher.rs` (`MockFileChangeMonitor` usage example): 1 test.
