@@ -5,6 +5,55 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.86.0] — 2026-06-12
+
+Settings form view-model; `ui-logic` now covers all 7 ROADMAP slices (Slice 5).
+
+### Added
+
+- **`settings::settings_view`** in `forskscope-ui-logic` — picker metadata and
+  validators for the settings dialog (RFC-009, Slice 5).
+
+  **`SelectChoice { value, label }`** — one `<option>` in a `<select>`.
+
+  **`theme_choices() → Vec<SelectChoice>`** — three entries (`dark`, `light`,
+  `night`), values matching `ThemeId::as_str()`.
+
+  **`density_choices() → Vec<SelectChoice>`** — three entries (`comfortable`,
+  `compact`, `spacious`), matching `Density::as_str()`.
+
+  **`font_family_choices() → Vec<SelectChoice>`** — three entries (`system-mono`,
+  `system-sans`, `system-serif`), matching `FontFamilySetting::as_str()`.
+
+  **`profile_presets() → Vec<ProfileChoice>`** — one entry per
+  `CompareProfile::all_presets()` preset. `ProfileChoice { name, profile }`
+  where `profile` provides `to_diff_options()`.
+
+  **`validate_font_size(u32) → Result<u8, (u32, u32)>`** — checks 6–50 pt.
+  **`clamp_font_size(u32) → u8`** — silent clamp. Both used by the font-size
+  input field's `oninput` handler.
+
+  **`validate_context_lines(usize) → Result<usize, (usize, usize)>`** — 0–20.
+
+  **`find_active<'a>(choices, value) → Option<&'a SelectChoice>`** — finds the
+  currently selected option by value string; component falls back to first
+  choice when `None`.
+
+- **`ui/settings_view.rs`** shim.
+
+- **21 new tests** — theme values round-trip through `ThemeId::from_id`;
+  density/font values round-trip; profile count matches `all_presets()`;
+  font-size validation boundaries (5 fails, 6/14/50 pass, 51 fails);
+  `clamp_font_size` extremes; context-lines boundary; `find_active` hit/miss;
+  no duplicate values in any choice list.
+  Total ui-logic count: 189.
+
+### Changed
+
+- `lib.rs` doc comment updated to reflect all 14 modules across 3 areas.
+
+---
+
 ## [0.85.0] — 2026-06-12
 
 Command palette and conflict navigator view-models (Slices 6 & 7).

@@ -23,6 +23,7 @@ pub mod scroll_sync;
 pub mod search;
 pub mod search_index;
 pub mod settings;
+pub mod settings_view;
 pub mod statusbar;
 pub mod tab_state;
 pub mod tabs;
