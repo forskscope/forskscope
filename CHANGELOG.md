@@ -5,6 +5,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.69.0] — 2026-06-12
+
+BOM preservation policy (RFC-012 §7.2 bullet 5); RFC-012 promoted to done.
+
+### Added
+
+- **`BomPresence`** in `forskscope-core::encoding` (RFC-012 §7.2).
+
+  `Absent | Utf8 | Utf16Le | Utf16Be` — records whether a Byte Order Mark
+  was detected at the start of a loaded file and which variant. Default:
+  `Absent`. `is_present()` predicate. `bytes()` returns the raw BOM byte
+  sequence for each variant (empty for `Absent`).
+
+- **`BomPolicy`** in `forskscope-core::encoding` (RFC-012 §7.2 bullet 5).
+
+  `Preserve | Strip | AddUtf8` — governs BOM handling on save. Default:
+  `Preserve` ("preserve BOM policy unless the user changes it"). `resolve_bytes(original)`
+  returns the bytes to prepend before file content: `Preserve` re-emits
+  the original BOM bytes (or nothing for `Absent`); `Strip` always returns
+  empty; `AddUtf8` always returns `[EF BB BF]`.
+
+- **`detect_bom(bytes: &[u8]) → (BomPresence, &[u8])`** — strips a leading
+  BOM from a byte slice and reports the kind found. Returns the remaining
+  bytes after the BOM (unchanged when absent). Used by the file-load path
+  to strip the BOM before text decoding and record it for save round-trip.
+
+- **16 new tests** in `encoding_tests.rs`: `detect_bom` absent/UTF-8/
+  UTF-16LE/UTF-16BE detection and stripping, `is_present` predicate,
+  `bytes()` sequences, `BomPolicy::Preserve` preserves/absent, `Strip`
+  always empty, `AddUtf8` always UTF-8 BOM, defaults. Total: 579 core tests.
+
+### RFC promotion
+
+- **RFC-012** (`Text Encoding, Newline, and Binary Policy`) → `done/`.
+  Core complete: `EditabilityClass` + `NewlinePolicy` (v0.50.0) +
+  `BomPresence` + `BomPolicy` + `detect_bom` (v0.69.0).
+  Deferred UI: charset/newline pane footer, encoding-warning dialog.
+  **Done count: 29** (was 28).
+
+---
+
 ## [0.68.0] — 2026-06-12
 
 Job lifecycle state machine (RFC-008 slice).

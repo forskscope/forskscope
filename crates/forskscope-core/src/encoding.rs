@@ -137,3 +137,84 @@ impl NewlinePolicy {
         }
     }
 }
+
+// ── RFC-012 §7.2 bullet 5: BOM preservation policy ───────────────────────────
+
+/// Whether a Byte Order Mark was present at the start of a loaded file.
+///
+/// The BOM (U+FEFF) is commonly used in UTF-8 and UTF-16 files from Windows
+/// tools. ForskScope detects and records its presence so the save path can
+/// preserve or strip it deliberately (RFC-012 §7.2 "Preserve BOM policy
+/// unless the user changes it").
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BomPresence {
+    /// No BOM was found at the start of the file.
+    #[default]
+    Absent,
+    /// A UTF-8 BOM (`EF BB BF`) was present and stripped during decode.
+    Utf8,
+    /// A UTF-16 LE BOM (`FF FE`) was present.
+    Utf16Le,
+    /// A UTF-16 BE BOM (`FE FF`) was present.
+    Utf16Be,
+}
+
+impl BomPresence {
+    /// `true` when any BOM was detected.
+    pub fn is_present(self) -> bool {
+        !matches!(self, Self::Absent)
+    }
+
+    /// The raw BOM bytes for this presence kind, if any.
+    pub fn bytes(self) -> &'static [u8] {
+        match self {
+            Self::Absent   => &[],
+            Self::Utf8     => &[0xEF, 0xBB, 0xBF],
+            Self::Utf16Le  => &[0xFF, 0xFE],
+            Self::Utf16Be  => &[0xFE, 0xFF],
+        }
+    }
+}
+
+/// Policy for BOM handling when saving a file (RFC-012 §7.2 bullet 5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BomPolicy {
+    /// Preserve whatever BOM was present (or absent) in the loaded file.
+    /// This is the safe default: a file that came in with a UTF-8 BOM
+    /// will be saved with one; a file that had none will continue to have none.
+    #[default]
+    Preserve,
+    /// Always strip the BOM on save, regardless of the loaded file.
+    Strip,
+    /// Always write a UTF-8 BOM (`EF BB BF`) before the content.
+    AddUtf8,
+}
+
+impl BomPolicy {
+    /// Resolve the BOM bytes to prepend when saving.
+    ///
+    /// `original` is what was detected in the loaded file.
+    /// Returns the bytes (possibly empty) to prepend before the content.
+    pub fn resolve_bytes(self, original: BomPresence) -> &'static [u8] {
+        match self {
+            Self::Preserve => original.bytes(),
+            Self::Strip    => &[],
+            Self::AddUtf8  => BomPresence::Utf8.bytes(),
+        }
+    }
+}
+
+/// Detect a BOM at the start of a byte slice and return the presence kind
+/// plus the remaining bytes (after the BOM has been stripped).
+pub fn detect_bom(bytes: &[u8]) -> (BomPresence, &[u8]) {
+    if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        return (BomPresence::Utf8, &bytes[3..]);
+    }
+    if bytes.starts_with(&[0xFF, 0xFE]) {
+        return (BomPresence::Utf16Le, &bytes[2..]);
+    }
+    if bytes.starts_with(&[0xFE, 0xFF]) {
+        return (BomPresence::Utf16Be, &bytes[2..]);
+    }
+    (BomPresence::Absent, bytes)
+}

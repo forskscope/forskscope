@@ -1,6 +1,15 @@
 # RFC-012 — Text Encoding, Newline, and Binary Policy
 
-**Status.** Proposed — editability classification and newline policy slice implemented (v0.50.0); encoding warning UI open
+**Status.** Implemented (v0.50.0 + v0.69.0) — core complete; charset/newline pane footer and encoding-warning dialog deferred to UI layer
+
+## Status
+
+Core implementation complete across two releases:
+
+- **v0.50.0**: `EditabilityClass` (`ReadOnly | ReadWriteWithGuard | ReadWrite | Unsupported`), `requires_save_guard()`, `NewlinePolicy` (`Preserve | ForceLf | ForceCrlf`), `NewlinePolicy::resolve(detected)`, `detect_newline_style()`. 15 tests.
+- **v0.69.0**: `BomPresence` (`Absent | Utf8 | Utf16Le | Utf16Be`), `BomPolicy` (`Preserve | Strip | AddUtf8`), `BomPolicy::resolve_bytes(original)`, `detect_bom(bytes)`. Defaults are `Preserve` / `Absent` per RFC-012 §7.2 bullet 5: "preserve BOM policy unless the user changes it." 16 tests.
+
+**Remaining (deferred to UI layer):** charset and newline display in the pane footer (§9.1), the encoding-warning save dialog (§9.2), and a settings toggle to change `BomPolicy` / `NewlinePolicy` per-session.
 
 ## Status
 Partially implemented in v0.50.0:
