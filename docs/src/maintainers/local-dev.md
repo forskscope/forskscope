@@ -10,12 +10,26 @@
 ## Build
 
 ```sh
-cargo build                            # debug build
+cargo build                            # debug build (requires GTK on Linux)
 cargo build --release                  # release (LTO, stripped)
-cargo test -p forskscope-core          # core tests only
-cargo test --workspace                 # all tests
-cargo clippy --workspace -- -D warnings
+
+# Tests that run WITHOUT GTK / display server:
+cargo test -p forskscope-core          # 599 unit + 2 integration tests
+cargo test -p forskscope-ui-logic      # 85 unit tests, 7 view-model modules
+cargo test -p forskscope-core -p forskscope-ui-logic  # CI equivalent
+
+# Full workspace (requires GTK):
+cargo test --workspace
+
+# Lint (run before every commit):
+cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
 ```
+
+> **Note:** `forskscope-ui` depends on `dioxus-desktop` which requires GTK3
+> at compile time (even for `cargo check` and `cargo test --lib`).  All
+> product-logic tests live in `forskscope-core` and `forskscope-ui-logic`
+> which have no GUI dependency.  UI-side `#[cfg(test)]` blocks in `state.rs`
+> are syntactically complete but require a GTK build environment to run.
 
 ## Run
 

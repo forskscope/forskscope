@@ -5,6 +5,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.80.0] — 2026-06-12
+
+UI crate: shim re-exports for all `ui-logic` modules; GTK-free test template.
+
+### Added
+
+- **5 new shim re-export modules** in `crates/forskscope-ui/src/ui/`:
+
+  All follow the pattern established by `explorer_align.rs` and
+  `search_index.rs`: a one-line `pub use forskscope_ui_logic::...` with
+  `#[allow(unused_imports)]` so components can migrate imports at their own
+  pace without unused-import warnings blocking the build.
+
+  | File | Re-exports |
+  |---|---|
+  | `explore_status.rs` | `RowStatusKind`, `StatusRow` |
+  | `deep_filter.rs` | `DeepCompareSummary`, `DeepFilter`, `apply_filter` |
+  | `command_bar.rs` | `ToolbarItem`, `ToolbarSection`, `build_toolbar`, `enabled_count`, `find_item` |
+  | `compare_summary.rs` | `CompareStatusSummary`, `DiffNavigationState` |
+  | `tab_state.rs` | `TabStateSnapshot`, `context_from_snapshot` |
+
+  All 5 registered in `ui/mod.rs`.
+
+- **GTK-free test template in `state.rs`** — 8 tests in a `#[cfg(test)]`
+  block covering `tab_title` (same/different/one-sided/missing/dotfile/nested
+  filenames) and `SessionState` serde round-trip (with tabs, empty). Tests
+  are syntactically correct but require a GTK build environment to execute
+  (the `dioxus-desktop` dependency pulls in GTK at compile time even for
+  `cargo test --lib`; documented in `local-dev.md` and `testing.md`).
+
+### Changed
+
+- `docs/src/maintainers/local-dev.md` — updated Build section to clearly
+  distinguish GTK-free tests (`-p forskscope-core -p forskscope-ui-logic`)
+  from workspace tests (requires GTK); noted the `state.rs` test situation.
+- `docs/src/maintainers/testing.md` — added `forskscope-ui` section
+  documenting the GTK-required test template.
+
+---
+
 ## [0.79.0] — 2026-06-12
 
 Maintainer documentation rewrite — architecture and testing docs updated to

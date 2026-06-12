@@ -92,3 +92,19 @@ All tests are inline (`#[cfg(test)]` inside each module file) except where noted
 | `compare/tab_state` | `context_from_snapshot` field mapping, `AvailabilityRule` inverse verification, end-to-end `TabStateSnapshot → CommandContext → build_toolbar`. | RFC-003, RFC-019 |
 
 Doctest in `watcher.rs` (`MockFileChangeMonitor` usage example): 1 test.
+
+## `forskscope-ui` tests (GTK-required)
+
+The UI crate exposes a `[lib]` target so `#[cfg(test)]` blocks can be
+written alongside component code. However, `dioxus-desktop` requires GTK3
+at compile time, so these tests can only run in a full build environment.
+
+Current GTK-free-in-theory, GTK-required-in-practice tests in `state.rs`:
+
+| Function | Tests |
+|---|---|
+| `tab_title` | same filename, different filenames, left-only, both missing, dotfile, deeply nested |
+| `SessionState` serde | round-trip with tabs, empty session |
+
+These serve as the template for future state-layer tests once the project
+has a GTK CI environment (RFC-010).

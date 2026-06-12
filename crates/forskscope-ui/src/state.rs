@@ -349,3 +349,96 @@ pub fn close_tab(store: &mut Store, index: usize) {
     // Persist the updated session immediately.
     save_session(store);
 }
+
+// ─── GTK-free unit tests ──────────────────────────────────────────────────────
+//
+// These tests run under `cargo test --lib -p forskscope-ui` without requiring
+// GTK or a display server (RFC-020 §7 "Unit Tests").  They cover pure
+// functions in this module that contain no Dioxus signal or component code.
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+    use super::tab_title;
+
+    // ── tab_title ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn same_filename_both_sides_shows_single_name() {
+        let title = tab_title(
+            Path::new("/old/src/main.rs"),
+            Path::new("/new/src/main.rs"),
+        );
+        assert_eq!(title, "main.rs");
+    }
+
+    #[test]
+    fn different_filenames_shows_both_with_arrow() {
+        let title = tab_title(
+            Path::new("/old/foo.txt"),
+            Path::new("/new/bar.txt"),
+        );
+        assert_eq!(title, "foo.txt ↔ bar.txt");
+    }
+
+    #[test]
+    fn left_only_filename_shows_left() {
+        // Right path has no filename component (e.g. directory root "/")
+        let title = tab_title(
+            Path::new("/project/README.md"),
+            Path::new("/"),
+        );
+        assert_eq!(title, "README.md");
+    }
+
+    #[test]
+    fn both_missing_filenames_shows_fallback() {
+        let title = tab_title(Path::new("/"), Path::new("/"));
+        assert_eq!(title, "comparison");
+    }
+
+    #[test]
+    fn hidden_dotfile_names_match_correctly() {
+        let title = tab_title(
+            Path::new("/a/.gitignore"),
+            Path::new("/b/.gitignore"),
+        );
+        assert_eq!(title, ".gitignore");
+    }
+
+    #[test]
+    fn deeply_nested_same_filename_shows_single_name() {
+        let title = tab_title(
+            Path::new("/home/alice/projectA/src/lib/core/mod.rs"),
+            Path::new("/home/bob/projectB/src/lib/core/mod.rs"),
+        );
+        assert_eq!(title, "mod.rs");
+    }
+
+    // ── SessionState round-trip (pure serde, no I/O) ──────────────────────────
+
+    #[test]
+    fn session_state_serialises_and_deserialises() {
+        use super::SessionState;
+        let state = SessionState {
+            tabs: vec![
+                ("/old/a.rs".into(), "/new/a.rs".into()),
+                ("/old/b.rs".into(), "/new/b.rs".into()),
+            ],
+        };
+        let json = serde_json::to_string(&state).expect("serialise");
+        let back: SessionState = serde_json::from_str(&json).expect("deserialise");
+        assert_eq!(back.tabs.len(), 2);
+        assert_eq!(back.tabs[0].0, "/old/a.rs");
+        assert_eq!(back.tabs[1].1, "/new/b.rs");
+    }
+
+    #[test]
+    fn empty_session_state_round_trips() {
+        use super::SessionState;
+        let state = SessionState::default();
+        let json = serde_json::to_string(&state).unwrap();
+        let back: SessionState = serde_json::from_str(&json).unwrap();
+        assert!(back.tabs.is_empty());
+    }
+}
