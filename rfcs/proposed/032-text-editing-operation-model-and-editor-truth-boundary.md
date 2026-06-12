@@ -1,6 +1,6 @@
 # RFC 032: Text Editing Operation Model and Editor Truth Boundary
 
-**Status.** Proposed
+**Status.** Proposed — TextEditOperation, RevisionId, TextRange, OperationAck/Reject, EditTransaction slice implemented (v0.62.0); EditBuffer and operation dispatch open
 
 ## Status
 Proposed. (Originally proposed in RFC package v0.4.)

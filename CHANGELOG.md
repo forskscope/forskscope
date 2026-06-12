@@ -5,6 +5,59 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.62.0] — 2026-06-10
+
+Text editing operation model — RFC-032 core types.
+
+### Added
+
+- **`forskscope-core::edit_op`** — text editing operation model (RFC-032).
+
+  **`DocumentId`** — stable document identity for the lifetime of a tab.
+
+  **`RevisionId(u64)`** — monotonically increasing document revision.
+  `initial()` starts at 0; `next()` increments; `is_initial()` tests.
+  Ordering is derived so `RevisionId(n) < RevisionId(n+1)`.
+
+  **`TextOffset(usize)`** — byte offset within document text.
+
+  **`TextRange { start, end }`** — byte range (start inclusive, end
+  exclusive). Methods: `len()`, `is_empty()`, `contains(offset)`,
+  `overlaps(other)`, `empty_at(offset)`.
+
+  **`TextEditOperation`** — `Insert { offset, text }` / `Delete { range }`
+  / `Replace { range, text }`, all tagged with `document` and
+  `base_revision`. Methods: `document_id()`, `base_revision()`,
+  `affected_range()`, `inserts_text()`, `deletes_text()`.
+
+  **`OperationAck`** — core's acceptance response: `new_revision`,
+  `affected_range`, `diff_invalidated` (signals UI to reschedule diff).
+
+  **`OperationReject`** — core's rejection response: `current_revision` and
+  `RejectReason` (`StaleRevision | OutOfBounds | DocumentNotEditable`).
+
+  **`is_revision_compatible(op_rev, current_rev) → bool`** — RFC-032 rule 2:
+  exact match required; no last-write-wins semantics.
+
+  **`TransactionId`**, **`TransactionLabel`** — transaction identity and
+  human-readable undo-menu label. Well-known labels:
+  `merge_hunk_left_to_right()`, `merge_hunk_right_to_left()`,
+  `manual_edit()`, `paste()`, `delete_selection()`.
+
+  **`EditTransaction`** — `{ id, label, operations, inverse, timestamp }`.
+  Merge commands and manual edits both become transactions. `is_empty()`,
+  `is_reversible()`.
+
+- **23 new tests** in `tests/edit_op_tests.rs`: `RevisionId` initial/next/
+  ordering, `TextRange` len/empty/contains/overlaps/adjacent, all three
+  `TextEditOperation` variants (document id, base revision, affected range,
+  inserts/deletes predicates, empty-text edge cases), revision compatibility
+  (same = ok, stale/future = reject), `OperationReject` fields,
+  `TransactionLabel` well-known labels, `EditTransaction` empty/reversible,
+  `TransactionId` equality. Total core test count: 489.
+
+---
+
 ## [0.61.0] — 2026-06-10
 
 Diff decoration model (RFC-024) and line map / scroll sync model (RFC-035).

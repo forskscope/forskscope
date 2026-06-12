@@ -16,6 +16,7 @@ pub mod diff;
 pub mod diff_decoration;
 pub mod dir;
 pub mod document;
+pub mod edit_op;
 pub mod encoding;
 pub mod error;
 pub mod external_tool;

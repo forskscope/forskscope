@@ -12,6 +12,7 @@ mod dir_cancel_tests;
 mod dir_index_tests;
 mod dir_tests;
 mod document_tests;
+mod edit_op_tests;
 mod editability_tests;
 mod encoding_tests;
 mod error_tests;
