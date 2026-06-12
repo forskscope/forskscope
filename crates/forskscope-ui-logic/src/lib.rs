@@ -4,10 +4,13 @@
 //! `forskscope-core` truth, with no Dioxus or GTK dependency, so it can be
 //! unit-tested without a display server. Feature areas are modules:
 //!
-//! - [`explore`] — explorer-pane logic (`align`: aligned-row merging).
+//! - [`explore`] — explorer-pane logic:
+//!   - `align`: aligned-row merging for the two-pane explorer.
+//!   - `status`: `RowStatusKind`/`StatusRow` from `EqualityEvidence`.
 //! - [`compare`] — diff/compare logic:
-//!   - `command_bar`: toolbar item list from `CommandRegistry` + `CommandContext`.
+//!   - `command_bar`: `ToolbarSection` list from `CommandRegistry` + `CommandContext`.
 //!   - `search_index`: in-diff match index (`advance`/`retreat`).
+//!   - `tab_state`: `TabStateSnapshot` → `CommandContext` bridge.
 //!
 //! Crate-root re-exports keep the common types one import away.
 
@@ -18,4 +21,6 @@ pub use compare::command_bar::{
     ToolbarItem, ToolbarSection, build_toolbar, enabled_count, find_item,
 };
 pub use compare::search_index::{MatchIndex, MatchPosition, MatchSide};
+pub use compare::tab_state::{TabStateSnapshot, context_from_snapshot};
 pub use explore::align::{AlignedRow, FlatRow, RowData, compute_aligned_rows};
+pub use explore::status::{RowStatusKind, StatusRow};

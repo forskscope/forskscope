@@ -5,6 +5,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.75.0] — 2026-06-12
+
+Explorer status view-model and tab state bridge in `forskscope-ui-logic`.
+
+### Added
+
+- **`explore::status`** — maps `EqualityEvidence` → display model for
+  explorer tree rows (RFC-054, RFC-037, RFC-059 §M5).
+
+  **`RowStatusKind`** — `Equal | Different | LeftOnly | RightOnly |
+  Computing | Error`. `from_evidence(ev)` covers all 10 `EqualityEvidence`
+  variants including `MetadataOnly` → `Computing` and `Unknown` → `Computing`.
+  Each kind has `glyph()` (distinct char), `css_class()` (`status-*` prefix),
+  `aria_label()` (non-empty), `needs_action()` predicate.
+
+  **`StatusRow`** — fully-resolved badge snapshot with all four fields owned.
+  `from_evidence(ev)` and `computing()` constructors. Replaces the ad-hoc
+  `DigestState` enum in `ui/dir_pane.rs`.
+
+- **`compare::tab_state`** — `TabStateSnapshot → CommandContext` bridge.
+
+  **`TabStateSnapshot`** — 12-bool snapshot of tab state (same fields as
+  `CommandContext`). `Default::default()` is all-false (no tab open).
+
+  **`context_from_snapshot(snap) → CommandContext`** — field-by-field
+  mapping so `build_toolbar(&reg, &ctx)` receives the correct flags from a
+  Dioxus `TabSnapshot` without the component needing to know about
+  `CommandContext` internals.
+
+- **21 new tests** across both modules:
+  - `status`: all 10 `EqualityEvidence` → `RowStatusKind` mappings, CSS
+    prefix, glyph distinctness, aria labels, `needs_action`, `StatusRow`
+    constructor correctness.
+  - `tab_state`: default context is all-false, dirty-tab context has correct
+    fields, end-to-end `TabStateSnapshot → CommandContext → build_toolbar →
+    item enabled/disabled`, `AvailabilityRule` inverse verification.
+  Total ui-logic count: 55.
+
+---
+
 ## [0.74.0] — 2026-06-12
 
 Command bar view-model in `forskscope-ui-logic`.
