@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.103.0] — 2026-06-12
+
+RFC-042 and governance notes updated to v0.102.0 reality.
+
+### Changed
+
+- **`rfcs/proposed/042-roadmap-and-rfc-execution-plan.md`** — updated as
+  living document to v0.102.0:
+  - Header status: v0.73.0 / 629 tests → **v0.102.0 / 891 tests**.
+  - Added v0.102.0 update block: i18n complete, merge corpus, patch export,
+    PlatformInfo wired, user docs complete, RFC-041 12/16 ticked.
+  - §4b priority table: added Status column; row 7 (i18n + command registry)
+    marked **Done**; remaining rows annotated with GTK requirement or
+    deferred status; added "three immediate non-GTK work items" note.
+
+- **`rfcs/notes/implementation-checklist.md`** — added "Superseded v0.102.0"
+  notice at the top with forward references to ROADMAP.md, RFC-041, and
+  RFC-042. Checklist body preserved as historical record.
+
+- **`rfcs/notes/core-completion-summary-v0.72.md`** — test count updated
+  875 → **891**; `merge_corpus` row added to test table; version note updated
+  to v0.103.0.
+
+- **`ROADMAP.md`** — last-updated header: v0.97.0 → v0.103.0; phase
+  description updated.
+
+---
+
 ## [0.102.0] — 2026-06-12
 
 Three-way merge corpus added (16 tests, 18 fixtures); i18n fix; 875 → 891 tests.

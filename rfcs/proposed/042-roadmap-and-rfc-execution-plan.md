@@ -1,6 +1,16 @@
 # RFC-042 — Roadmap and RFC Execution Plan
 
-**Status.** Proposed — living document; updated for v0.73.0 reality (core layer complete, UI phase begins)
+**Status.** Proposed — living document; updated for v0.102.0 reality (891 tests, UI stabilisation phase, i18n complete)
+
+> **v0.102.0 update (2026-06-12).** UI stabilisation phase well advanced.
+> 891 tests pass (646 core unit + 43 core integration + 189 ui-logic + 14 other).
+> i18n is complete: all `t()` callsites have Japanese translations.
+> Three-way merge corpus (16 tests, 6 fixture triples) added.
+> Patch export UI wired. PlatformInfo wired to About panel.
+> User documentation complete (17 doc files, CONTRIBUTING.md, known-limitations.md).
+> RFC-041 checklist: 12 of 16 items ticked; remaining 4 require GTK (3) or are deferred (2).
+> `ROADMAP.md` at the project root is the primary orientation document.
+> RFC-042 remains open as a living governance document.
 
 > **v0.73.0 update (2026-06-12).** The core data layer is complete. 39 of 48
 > RFCs are implemented. 629 tests pass. `ROADMAP.md` at the project root is
@@ -129,25 +139,29 @@ delivered but not complete.
 ### 4b. Forward roadmap from v0.41.0
 
 Priorities derived from the v0.40 backlog write-up
-(`rfcs/notes/proposed-rfc-backlog-writeup-v0.40.md`) and RFC-059 audit:
+(`rfcs/notes/proposed-rfc-backlog-writeup-v0.40.md`) and RFC-059 audit.
+Status updated at v0.102.0.
 
-| Priority | RFC(s) | What |
-|----------|--------|------|
-| 1 | RFC-034 | Conflict resolution workspace UI (three-way) |
-| 2 | RFC-059 + RFC-019 | Explorer keyboard completeness, CSS fixes, align-module tests |
-| 3 | RFC-037 | Scalable dir-compare: cancellation, incremental refresh |
-| 4 | RFC-014 | Search next/prev traversal + scroll-to-match |
-| 5 | RFC-023 | Digest-cache lifetime + directory-batch atomicity |
-| 6 | RFC-058 | Spreadsheet structured diff adapter + test corpus |
-| 7 | RFC-009 + RFC-019 | Full i18n coverage + command registry |
-| 8 | RFC-004 → RFC-025 gate | Editor adapter — prototype first, then RFC-016/040/032/035 |
-| 9 | RFC-010 + RFC-026 | Packaging QA matrix, cross-platform smoke tests |
-| 10 | RFC-041 | v1.0 stabilization + governance |
+| Priority | RFC(s) | What | Status |
+|----------|--------|------|--------|
+| 1 | RFC-034 | Conflict resolution workspace UI (three-way) | Open — requires GTK |
+| 2 | RFC-059 + RFC-019 | Explorer keyboard completeness, CSS fixes, align-module tests | Open — requires GTK |
+| 3 | RFC-037 | Scalable dir-compare: cancellation, incremental refresh | Open — requires GTK |
+| 4 | RFC-014 | Search next/prev traversal + scroll-to-match | Open — requires GTK |
+| 5 | RFC-023 | Digest-cache lifetime + directory-batch atomicity | Open — requires GTK |
+| 6 | RFC-058 | Spreadsheet structured diff adapter + test corpus | Open |
+| 7 | RFC-009 + RFC-019 | Full i18n coverage + command registry | **Done** — i18n complete v0.102.0; command registry shipped v0.63.0 |
+| 8 | RFC-004 → RFC-025 gate | Editor adapter — prototype first, then RFC-016/040/032/035 | Open — deferred |
+| 9 | RFC-010 + RFC-026 | Packaging QA matrix, cross-platform smoke tests | Open — deferred |
+| 10 | RFC-041 | v1.0 stabilization + governance | Open — 12/16 checklist items done |
 
 The **editor adapter track** (RFC-004 and its dependents: RFC-016, 025, 032,
-035, 040) remains the highest-risk open track. The RFC-025 kill-switch gate
-must be the first step. The rest of the v0.41+ roadmap does not block on it
-and can proceed independently.
+035, 040) remains the highest-risk open track. The rest of the v0.41+ roadmap
+does not block on it and can proceed independently.
+
+The **three immediate non-GTK work items** are RFC-058 (spreadsheet diff
+corpus/adapter — purely core work), and further test corpus expansion.
+All UI-facing items require a GTK build environment.
 
 ## 4-original. Original milestone table (preserved for reference)
 

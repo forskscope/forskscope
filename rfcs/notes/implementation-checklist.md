@@ -1,5 +1,16 @@
 # Implementation Checklist
 
+> **Superseded — v0.102.0 (2026-06-12).**
+> All items on this checklist were completed during the v0.23–v0.72 core
+> implementation phase. The checklist below is preserved as a historical
+> record. For current project state, see:
+> - `ROADMAP.md` — current milestone table and delivered features
+> - `rfcs/proposed/041-…` — v1.0 release readiness checklist
+> - `rfcs/proposed/042-…` — forward roadmap from v0.41.0
+
+---
+
+
 ## Before Coding
 
 - [ ] Approve RFC-042 roadmap (originally numbered RFC-000).

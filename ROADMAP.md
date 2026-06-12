@@ -1,7 +1,7 @@
 # ForskScope Roadmap
 
-**Last updated:** v0.97.0 (2026-06-12)
-**Current phase:** UI stabilisation — core complete, UI bug fixes and documentation shipping
+**Last updated:** v0.103.0 (2026-06-12)
+**Current phase:** UI stabilisation — core complete, UI features shipping, governance documents current
 
 ---
 
