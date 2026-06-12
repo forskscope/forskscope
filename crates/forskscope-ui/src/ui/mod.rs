@@ -2,6 +2,7 @@
 
 pub mod command_bar;
 pub mod compare_summary;
+pub mod conflict_nav;
 pub mod deep_compare;
 pub mod deep_filter;
 pub mod diff;
@@ -16,6 +17,7 @@ pub mod hunk_decorations;
 pub mod keybindings;
 pub mod load_guard;
 pub mod modals;
+pub mod palette_view;
 pub mod save_error;
 pub mod scroll_sync;
 pub mod search;

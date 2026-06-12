@@ -5,6 +5,54 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.85.0] — 2026-06-12
+
+Command palette and conflict navigator view-models (Slices 6 & 7).
+
+### Added
+
+- **`compare::palette_view`** — command palette search result view-model
+  (RFC-019 §"Command palette", Slice 7).
+
+  **`PaletteRow`** — one filtered result: `command_id`, `label`,
+  `description`, `shortcut_hint`, `enabled`, `disabled_reason`,
+  `is_dangerous`.
+
+  **`build_palette(registry, ctx, query) → Vec<PaletteRow>`** — filters the
+  registry by query (empty = all), evaluates `AvailabilityRule` for each
+  command, then stable-sorts: enabled commands first, disabled last.
+  Case-insensitive match on label and description.
+
+  **`palette_enabled_count(rows) → usize`** — convenience count.
+
+  Tests (15): empty query returns all; query matches label; nonsense returns
+  empty; case-insensitive; enabled before disabled; Save disabled in empty
+  context; Next Difference enabled in diff context; `enabled_count` matches;
+  all labels/IDs non-empty.
+
+- **`compare::conflict_nav_view`** — three-way merge navigator rail
+  view-model (RFC-034, Slice 6).
+
+  **`ConflictRailRow`** — one rail entry: `conflict_id`, `display_num`,
+  `glyph` (`!`/`L`/`R`/`B`/`~`/`-`), `status_text`, `css_class`
+  (`fsk-conflict-*`), `is_focused`.
+
+  **`ConflictNavView`** — complete rail snapshot: `rows`, `progress_text`
+  (`"2 of 5 resolved"` / `"All resolved"` / `"No conflicts"`), `can_save`,
+  `prev_id`, `next_id`, `summary`. `from_navigator(nav, can_save)`.
+  `len()`, `is_empty()`, `focused_row()`.
+
+  Tests (12): non-empty with conflicts; empty with no conflicts; display_num
+  ≥ 1; unresolved → `!` glyph; css_class starts with `fsk-`; progress_text
+  not "All resolved" when unresolved; "No conflicts" text; `can_save` false
+  when unresolved; true when no conflicts; `len == rows.len`.
+
+- **`ui/palette_view.rs`** and **`ui/conflict_nav.rs`** shims.
+
+  Total ui-logic count: 168 (was 147, +21).
+
+---
+
 ## [0.84.0] — 2026-06-12
 
 `compare::save_error` — save-error dialog view-model (Slice 3).

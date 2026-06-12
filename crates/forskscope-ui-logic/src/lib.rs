@@ -25,6 +25,8 @@ pub use compare::command_bar::{
 pub use compare::search_index::{MatchIndex, MatchPosition, MatchSide};
 pub use compare::hunk_decorations::{DecorationIndex, DiffSide, RowDecoration};
 pub use compare::load_guard::{LoadGuard, guard_for_sizes, guard_for_sizes_with_limits};
+pub use compare::conflict_nav_view::{ConflictNavView, ConflictRailRow};
+pub use compare::palette_view::{PaletteRow, build_palette, enabled_count as palette_enabled_count};
 pub use compare::save_error::{RecoveryButton, SaveErrorView, action_label};
 pub use compare::scroll_sync::ScrollSyncState;
 pub use compare::summary::{CompareStatusSummary, DiffNavigationState};
