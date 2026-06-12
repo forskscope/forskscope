@@ -16,4 +16,5 @@ chrono = { workspace = true }
 sheets-diff = { workspace = true }
 
 [dev-dependencies]
+tempfile = "3"
 zip = "7"

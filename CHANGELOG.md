@@ -5,6 +5,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.90.0] — 2026-06-12
+
+CancellationToken and FileKind tests close the last untested core areas.
+
+### Added
+
+- **`tests/cancel_tests.rs`** in `forskscope-core` — 11 tests for
+  `CancellationToken` (RFC-037, RFC-008):
+  - New token is not cancelled; `cancel()` sets it; `cancel()` is idempotent.
+  - Clone observes cancel from original; original observes cancel from clone.
+  - Multiple clones (including clone-of-clone) all observe cancel.
+  - Cancel from any clone propagates to all.
+  - `Default::default()` is not cancelled.
+  - `Debug` format does not panic (before and after cancel).
+
+  The doctest in `cancel.rs` was a compile-only check. These tests verify
+  the actual cross-clone propagation contract.
+
+- **`tests/file_kind_tests.rs`** in `forskscope-core` — 11 tests for
+  `FileKind` predicates and the `classify()` function (RFC-001 §6.2):
+  - `is_mergeable_text()`: Text → true; Binary/ExcelXlsx/Missing/Unsupported → false.
+  - `classify()` on missing path → `Missing`.
+  - `classify()` on UTF-8 text file → `Text`.
+  - `classify()` on file with NUL byte → `Binary`.
+  - `classify()` on `.xlsx`-extension file → `ExcelXlsx` (before content check).
+  - `classify()` on `.XLSX` (uppercase) → `ExcelXlsx` (case-insensitive).
+  - `classify()` on empty file → `Text`.
+  - `classify()` on Rust source → `Text`.
+  - `classify()` on a directory → `Unsupported`.
+
+  Added `tempfile = "3"` as a dev-dependency to `forskscope-core`.
+
+### Test count: 840
+(637 core + 189 ui-logic + 2 core-integration + 5 ui-logic-integration + 6 doctest + 1)
+
+---
+
 ## [0.89.0] — 2026-06-12
 
 CSS bug fix; CSS var coverage test; path.rs tests.

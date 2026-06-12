@@ -5,6 +5,7 @@
 
 mod app_error_tests;
 mod batch_tests;
+mod cancel_tests;
 mod command_tests;
 mod compare_profile_tests;
 mod conflict_nav_tests;
@@ -20,6 +21,7 @@ mod encoding_tests;
 mod error_tests;
 mod external_state_tests;
 mod external_tool_tests;
+mod file_kind_tests;
 mod file_size_tests;
 mod ignore_tests;
 mod job_tests;
