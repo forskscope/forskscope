@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.77.0] — 2026-06-12
+
+Deep compare filter and summary view-model in `forskscope-ui-logic`.
+
+### Added
+
+- **`explore::deep_filter`** — filter and summary for `DeepCompareView`
+  (RFC-037 §"Filter", RFC-038).
+
+  **`DeepFilter`** — `Different | All | Equal` (default: `Different`).
+  `matches(entry)` returns whether a `RecEntry` passes the filter.
+  `label()` for button text. `button_class(active)` → `"filter-btn active"`
+  or `"filter-btn"` for the filter-selector buttons. Replaces the inline
+  `DeepFilter` enum in `deep_compare.rs`.
+
+  **`DeepCompareSummary`** — derived counts: `total`, `different`
+  (`Changed | LeftOnly | RightOnly`), `equal`, `computing`, `visible`
+  (count matching the active filter). `from_entries(entries, filter)`.
+  `footer_text()` → `"3 different · 12 equal · 15 total"`.
+  `is_fully_computed()` → true when no `Computing` entries remain.
+  `is_empty()`. Replaces the inline arithmetic in `deep_compare.rs`.
+
+  **`apply_filter(entries, filter) → Vec<&RecEntry>`** — returns only
+  the entries that pass the filter.
+
+- **15 new tests** in `explore/deep_filter.rs`: `DeepFilter::matches` for
+  all statuses under all three filters, label non-empty, `button_class`
+  active/inactive, `DeepCompareSummary` all counts, `footer_text`,
+  `is_fully_computed` false/true, `is_empty`, `apply_filter` returns
+  correct entries. Total ui-logic count: 85.
+
+---
+
 ## [0.76.0] — 2026-06-12
 
 Compare summary and navigation state view-models in `forskscope-ui-logic`.
