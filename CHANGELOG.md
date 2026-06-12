@@ -5,6 +5,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.84.0] — 2026-06-12
+
+`compare::save_error` — save-error dialog view-model (Slice 3).
+
+### Added
+
+- **`compare::save_error`** in `forskscope-ui-logic` — maps `AppError` to
+  everything the save-error dialog needs (RFC-007, RFC-017).
+
+  **`action_label(action) → &'static str`** — human-readable button label
+  for each `RecoveryAction`. Covers all 12 variants; labels are 3 words or
+  fewer. `"Overwrite anyway"`, `"Reload"`, `"Save As…"`, etc.
+
+  **`RecoveryButton`** — one dialog button: `action`, `label`, `is_primary`.
+  `is_primary` is true for the first non-destructive action (`OverwriteAnyway`
+  and `ReportBug` are never primary).
+
+  **`SaveErrorView`** — complete dialog snapshot: `title`, `body`, optional
+  `path`, `Vec<RecoveryButton>`. `from_error(err, path)` builds from an
+  `AppError`; `has_action(action)` and `primary_button()` are convenience
+  accessors.
+
+  Replaces the ad-hoc `Err(CoreError::Conflict { .. }) =>
+  store.modal.set(Modal::ConfirmOverwrite(index))` pattern in
+  `diff_actions.rs` — every `AppErrorKind` now maps to a fully-rendered
+  dialog rather than requiring per-variant match arms in the Dioxus modal
+  layer.
+
+- **`ui/save_error.rs`** shim.
+
+- **14 new tests** — all `RecoveryAction` labels non-empty, `Dismiss` label
+  correct, `OverwriteAnyway` mentions overwrite; external-modification view
+  has correct action set, primary button is `Reload` not `Overwrite`;
+  `SaveConflict`/`FileWriteFailed`/`InternalFault` action sets; path
+  passthrough; title/body non-empty for all save error kinds; buttons
+  non-empty; each button has a label; exactly one primary button.
+  Total ui-logic count: 147.
+
+---
+
 ## [0.83.0] — 2026-06-12
 
 Scroll synchronisation view-model; release archive fix.

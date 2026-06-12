@@ -2,6 +2,7 @@
 pub mod command_bar;
 pub mod hunk_decorations;
 pub mod load_guard;
+pub mod save_error;
 pub mod scroll_sync;
 pub mod search_index;
 pub mod summary;

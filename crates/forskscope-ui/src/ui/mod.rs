@@ -16,6 +16,7 @@ pub mod hunk_decorations;
 pub mod keybindings;
 pub mod load_guard;
 pub mod modals;
+pub mod save_error;
 pub mod scroll_sync;
 pub mod search;
 pub mod search_index;
