@@ -1,6 +1,6 @@
 # RFC-013 — Large File, Performance, and Virtualization Strategy
 
-**Status.** Proposed — threshold policy and job model slice implemented (v0.46.0); virtualization open
+**Status.** Proposed — threshold constants + JobProgress (v0.46.0); FileSizeClass + PerformanceLimits (v0.59.0); virtualization open
 
 ## Status
 Partially implemented in v0.46.0:

@@ -46,7 +46,11 @@ pub use encoding::{NewlineStyle, TextEncoding,
     // RFC-012
     NewlinePolicy,
 };
-pub use error::{CoreError, ErrorSeverity, IoOperation, RecoveryHint, Result};
+pub use error::{
+    CoreError, ErrorSeverity, IoOperation, RecoveryHint, Result,
+    // RFC-017
+    AppErrorKind, RecoveryAction, UserMessage,
+};
 pub use file_kind::{FileKind,
     // RFC-012
     EditabilityClass,
@@ -82,6 +86,8 @@ pub use job::{
     LARGE_FILE_INLINE_DIFF_BYTES, LARGE_HUNK_AUTO_EXPAND_LINES,
     VERY_LARGE_FILE_BYTES,
     JobHandle, JobId, JobKind, JobProgress,
+    // RFC-013
+    FileSizeClass, PerformanceLimits,
 };
 pub use dir::batch_copy;
 pub use dir::copy_file;

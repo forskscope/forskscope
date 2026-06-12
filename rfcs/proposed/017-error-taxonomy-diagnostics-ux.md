@@ -1,6 +1,6 @@
 # RFC-017 — Error Taxonomy and Diagnostics UX
 
-**Status.** Proposed — error severity and recovery hints slice implemented (v0.46.0); diagnostics panel and AppError wrapper open
+**Status.** Proposed — AppErrorKind, RecoveryAction, UserMessage slice implemented (v0.59.0); error dialog UI open — error severity and recovery hints slice implemented (v0.46.0); diagnostics panel and AppError wrapper open
 
 ## Status
 Partially implemented in v0.46.0:

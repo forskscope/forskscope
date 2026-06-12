@@ -3,6 +3,7 @@
 //! Tests validate the design specifications, not merely the code. Organized
 //! into submodules under `src/tests/` per the project testing guidelines.
 
+mod app_error_tests;
 mod batch_tests;
 mod compare_profile_tests;
 mod diff_tests;
@@ -15,6 +16,7 @@ mod encoding_tests;
 mod error_tests;
 mod external_state_tests;
 mod external_tool_tests;
+mod file_size_tests;
 mod ignore_tests;
 mod job_tests;
 mod merge_plan_tests;

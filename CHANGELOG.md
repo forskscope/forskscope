@@ -5,6 +5,74 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.59.0] — 2026-06-10
+
+Application error taxonomy (RFC-017 slice) and file-size classification (RFC-013 slice).
+
+### Added
+
+- **`AppErrorKind`** in `forskscope-core::error` (RFC-017 §5).
+
+  25-variant enum covering the full taxonomy of user-facing situations:
+  path/filesystem errors, encoding, comparison, merge/save, background
+  jobs, session, VCS, spreadsheet, and internal faults.
+
+  **`default_severity(self) → ErrorSeverity`** — each kind's baseline
+  severity level (Info / Warning / Recoverable / Blocking).
+
+  **`default_recovery_actions(self) → &[RecoveryAction]`** — the typed
+  set of dialog buttons appropriate for each kind. The UI pattern-matches
+  the returned slice to render action buttons without hard-coding
+  per-error-code logic.
+
+  **`from_core(err: &CoreError) → AppErrorKind`** — best-effort mapping
+  from the lower-level `CoreError` taxonomy to the application-layer kind.
+  All `CoreError` variants are covered.
+
+- **`RecoveryAction`** in `forskscope-core::error` (RFC-017 §"Recovery Actions").
+
+  12-variant enum: `Dismiss`, `ChooseAnotherFile`, `Reload`, `SaveAs`,
+  `OverwriteAnyway`, `OpenLimitedDiff`, `OpenAsBinary`, `Retry`,
+  `RetryWithoutInline`, `Cancel`, `StartFresh`, `ReportBug`.
+
+  **`token(self) → &'static str`** — stable string for keybinding / i18n
+  lookup. All tokens are unique and non-empty.
+
+  **`is_destructive(self) → bool`** — true for `OverwriteAnyway` and
+  `StartFresh`; used by the UI to add an extra confirmation step.
+
+- **`UserMessage`** in `forskscope-core::error` (RFC-017 §"UserMessage").
+
+  `{ short: String, detail: String }` pair. `short` fits a toast or
+  dialog title; `detail` fits a dialog body.
+
+  **`for_kind(AppErrorKind) → UserMessage`** — standard copy for all 25
+  kinds. Non-empty `short` guaranteed for every variant (test-verified).
+
+- **`FileSizeClass`** in `forskscope-core::job` (RFC-013 §5).
+
+  `Small | Medium | Large | VeryLarge` — derives `PartialOrd/Ord`
+  ascending by severity.
+
+  **`classify(bytes, limits) → FileSizeClass`** — maps a byte count to
+  a class using `PerformanceLimits` thresholds.
+
+  Predicates: `inline_diff_eager()` (Small only), `requires_user_prompt()`
+  (Large + VeryLarge), `too_large_for_diff()` (VeryLarge only).
+
+- **`PerformanceLimits`** in `forskscope-core::job` (RFC-013 §5).
+
+  `Default`: Small ≤ 512 KiB, Medium ≤ 4 MiB, Large ≤ 64 MiB,
+  VeryLarge > 64 MiB. Also: `max_inline_diff_chars_per_hunk: 2_000`,
+  `max_directory_entries_eager: 500`, `max_eager_lines: 50_000`.
+
+- **35 new tests**: 20 in `app_error_tests` (severity, recovery actions,
+  `from_core` mapping, token uniqueness, destructive flag, `for_kind`
+  exhaustiveness) and 15 in `file_size_tests` (boundary conditions,
+  predicates, ordering, custom limits). Total: 420 core tests.
+
+---
+
 ## [0.58.0] — 2026-06-10
 
 Directory index model, equality evidence, and pair comparison (RFC-008 §5, RFC-037 §"Directory Index").
