@@ -5,6 +5,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.89.0] — 2026-06-12
+
+CSS bug fix; CSS var coverage test; path.rs tests.
+
+### Fixed
+
+- **`--danger-bg` CSS variable missing from all three themes.** The close
+  button hover background (`var(--danger-bg)`) was referenced in the tab
+  close button CSS rule but never defined, leaving it invisible/unstyled.
+  Added to all three theme blocks: `#5c1e1e` (dark), `#ffd5d5` (light),
+  `#4a1515` (night).
+
+### Added
+
+- **`all_css_vars_used_are_defined_in_main_css`** integration test in
+  `tests/css_coverage.rs` — scans every `var(--name)` usage in `main.css`
+  and asserts a corresponding `--name:` definition exists. This test
+  would have caught the `--danger-bg` bug immediately. Uses a careful
+  character-by-character extraction to avoid false positives from adjacent
+  CSS values.
+
+- **`tests/path_tests.rs`** in `forskscope-core` — 16 tests for `path.rs`
+  helper functions (RFC-001 §6.1):
+  - `split_parent_name`: typical path, root file, relative path, filename
+    only, dotfile.
+  - `has_extension`: exact match, case-insensitive ASCII, no match, no
+    extension, dotfile (no extension in Rust's Path model), xlsx match.
+  - `display`: non-empty output, contains filename.
+  - `canonicalize_lenient`: nonexistent absolute path returns input, existing
+    `/tmp` produces absolute result, never panics on edge cases (empty, `.`,
+    `..`, `/`, path with `..` components).
+
+  `path.rs` was the only core module without any test coverage.
+
+### Test count: 818
+(615 core + 189 ui-logic + 2 core-integration + 5 ui-logic-integration + 6 doctest + 1)
+
+---
+
 ## [0.88.0] — 2026-06-12
 
 CSS class contract established; 4 coverage integration tests.

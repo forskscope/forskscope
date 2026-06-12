@@ -113,3 +113,31 @@ fn row_state_gutter_symbols_are_distinct() {
     ].iter().map(|s| s.gutter_symbol()).collect();
     assert_eq!(symbols.len(), 6, "all RowState gutter symbols must be distinct");
 }
+
+#[test]
+fn all_css_vars_used_are_defined_in_main_css() {
+    // Collect all --name tokens from var(--name) usages.
+    // Use a simple scan: look for "var(--" then grab everything up to ")"
+    // but only keep the var name (no spaces, letters, digits, hyphens only).
+    let mut used = std::collections::HashSet::new();
+    let mut rest = MAIN_CSS;
+    while let Some(pos) = rest.find("var(--") {
+        rest = &rest[pos + 6..]; // skip "var(--"
+        // The var name ends at the first ')' or whitespace
+        let end = rest.find(|c: char| c == ')' || c.is_whitespace())
+            .unwrap_or(rest.len());
+        let var_name = &rest[..end];
+        // Only accept names matching CSS custom property syntax: [a-z0-9-]+
+        if !var_name.is_empty() && var_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+            used.insert(var_name);
+        }
+    }
+
+    for var in &used {
+        let definition = format!("--{var}:");
+        assert!(
+            MAIN_CSS.contains(&definition),
+            "CSS variable '--{var}' is used in main.css but never defined"
+        );
+    }
+}
