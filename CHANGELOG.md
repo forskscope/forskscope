@@ -5,6 +5,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.100.0] — 2026-06-12
+
+PlatformInfo wired to About panel; patch export UI added; i18n completed.
+
+### Added
+
+- **Patch export button** (`diff.rs`, `diff_actions.rs`) — "Export patch"
+  button in the advanced toolbar (More ▼). Calls `export_patch(store, index)`:
+  opens a native save-file dialog defaulting to `<filename>.patch`, generates
+  a unified-diff patch via `patch_from_file_diff` + `to_unified` from
+  `forskscope-core`, and writes the file. Does nothing silently if the two
+  files are identical (no hunks to export). Japanese: パッチをエクスポート.
+
+### Changed
+
+- **`AboutModal`** (`modals.rs`) — replaced hand-rolled diagnostic string with
+  `PlatformInfo::collect()` and `to_report()` from `forskscope-core::platform`
+  (added v0.93.0 but previously unused). The About panel now shows: Version,
+  Rust compiler version, OS, Arch, CPUs — all sourced from the tested
+  `PlatformInfo` module rather than ad-hoc `env!()` + `std::env::consts`
+  calls. "Copy diagnostics" button text now goes through `t()`.
+
+- **`i18n.rs`** — added `"Copy diagnostics"` → 診断情報をコピー and
+  `"Export patch"` → パッチをエクスポート.
+
+- **`ROADMAP.md`** — added v0.99–v1.0 milestone row to delivered table.
+
+---
+
 ## [0.99.0] — 2026-06-12
 
 RFC-041 v1 checklist updated; stale notes corrected; 8 more items now ticked.

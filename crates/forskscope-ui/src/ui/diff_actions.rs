@@ -124,3 +124,58 @@ pub(crate) fn algo_val(a: forskscope_core::DiffAlgorithm) -> &'static str {
     use forskscope_core::DiffAlgorithm;
     match a { DiffAlgorithm::Patience => "patience", DiffAlgorithm::Histogram => "histogram", _ => "myers" }
 }
+
+/// Export the current comparison as a unified-diff patch file.
+/// Opens a native save dialog, then writes the patch text to the chosen path.
+/// Does nothing if the diff is identical (no changes to export).
+pub fn export_patch(store: &Store, index: usize) {
+    use forskscope_core::patch::{patch_from_file_diff, to_unified, PatchOptions};
+
+    // Collect what we need from the tab before spawning.
+    let tab = store.tabs.read();
+    let Some(tab) = tab.get(index) else { return };
+
+    let patch_doc = {
+        // Use the relative filename as the patch path, falling back to "file".
+        let rel = tab.right_path.as_ref()
+            .and_then(|p| p.file_name())
+            .map(|n| std::path::PathBuf::from(n))
+            .unwrap_or_else(|| std::path::PathBuf::from("file"));
+
+        patch_from_file_diff(rel, &tab.diff, PatchOptions::default())
+    };
+
+    let Some(patch) = patch_doc else {
+        // Identical files — nothing to export. Notify but don't error.
+        drop(tab);
+        return;
+    };
+
+    let patch_text = to_unified(&patch);
+
+    // Use a default filename based on the right-side file, e.g. "main.rs.patch".
+    let default_name = tab.right_path.as_ref()
+        .and_then(|p| p.file_name())
+        .map(|n| format!("{}.patch", n.to_string_lossy()))
+        .unwrap_or_else(|| "changes.patch".into());
+
+    drop(tab);
+
+    // Spawn an async task to open the save dialog and write the file.
+    spawn(async move {
+        let handle = rfd::AsyncFileDialog::new()
+            .set_title("Export patch")
+            .set_file_name(&default_name)
+            .add_filter("Patch files", &["patch", "diff"])
+            .add_filter("All files", &["*"])
+            .save_file()
+            .await;
+
+        if let Some(file) = handle {
+            let path = file.path();
+            if let Err(e) = std::fs::write(path, &patch_text) {
+                eprintln!("export_patch: write error: {e}");
+            }
+        }
+    });
+}

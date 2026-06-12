@@ -3,6 +3,7 @@
 
 use dioxus::prelude::*;
 
+use forskscope_core::platform::PlatformInfo;
 use crate::i18n::t;
 use crate::state::{BatchCopySpec, DirOp, Modal, Store, close_tab, reload_tab, swap_sides};
 use crate::ui::diff::save_as;
@@ -195,24 +196,22 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
 pub fn AboutModal() -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
-    const VERSION: &str  = env!("CARGO_PKG_VERSION");
-    const PROFILE: &str  = if cfg!(debug_assertions) { "debug" } else { "release" };
-    let platform = format!("{} {}", std::env::consts::OS, std::env::consts::ARCH);
-    let diag = format!("ForskScope {VERSION}\nBuild: {PROFILE}\nPlatform: {platform}\nUI: Dioxus 0.7\nDiff engine: similar 3");
+    let info = PlatformInfo::collect();
+    let diag = info.to_report();
     let d2 = diag.clone();
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "About ForskScope",
             div { class: "modal",
-                h2 { "ForskScope v{VERSION}" }
+                h2 { "ForskScope v{info.app_version}" }
                 div { class: "about-grid",
-                    span { class: "about-key", "Version" }   span { "{VERSION}" }
-                    span { class: "about-key", "Build" }     span { "{PROFILE}" }
-                    span { class: "about-key", "Platform" }  span { "{platform}" }
-                    span { class: "about-key", "UI" }        span { "Dioxus 0.7" }
-                    span { class: "about-key", "Diff" }      span { "similar 3" }
+                    span { class: "about-key", "Version" }   span { "{info.app_version}" }
+                    span { class: "about-key", "Rust" }      span { "{info.rustc_version}" }
+                    span { class: "about-key", "OS" }        span { "{info.os}" }
+                    span { class: "about-key", "Arch" }      span { "{info.arch}" }
+                    span { class: "about-key", "CPUs" }      span { "{info.logical_cpus}" }
                 }
                 div { class: "actions",
-                    button { onclick: move |_| { let d = d2.clone(); spawn(async move { let _ = dioxus::document::eval(&format!("navigator.clipboard?.writeText({:?})", d)).await; }); }, "Copy diagnostics" }
+                    button { onclick: move |_| { let d = d2.clone(); spawn(async move { let _ = dioxus::document::eval(&format!("navigator.clipboard?.writeText({:?})", d)).await; }); }, {t(lang, "Copy diagnostics")} }
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Close")} }
                 }
             }

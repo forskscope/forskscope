@@ -315,6 +315,14 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     option { value: "patience",  "Patience"  }
                     option { value: "histogram", "Histogram" }
                 }
+                button {
+                    title: "Export unified-diff patch file",
+                    aria_label: "Export patch",
+                    onclick: move |_| {
+                        crate::ui::diff_actions::export_patch(&store, index);
+                    },
+                    {t(lang, "Export patch")}
+                }
             }
         }
     }
