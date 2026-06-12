@@ -1,6 +1,6 @@
 # RFC-008 — Directory Comparison and Background Job Model
 
-**Status.** Proposed — EqualityEvidence + pair_entries (v0.58.0); JobStatus + JobStatusRecord + JobRegistry (v0.68.0); background job runner and UI open
+**Status.** Implemented (v0.58.0 + v0.68.0) — core data model complete; async background job runner and UI progress panel deferred to UI layer
 
 ---toml
 project = "ForskScope"

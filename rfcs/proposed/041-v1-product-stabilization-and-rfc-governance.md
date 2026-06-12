@@ -1,8 +1,57 @@
 # RFC 041: v1.0 Product Stabilization and RFC Governance
 
-**Status.** Proposed — checklist assessment updated v0.64.0
+**Status.** Proposed — checklist updated v0.72.0
 
-## Current state (v0.64.0)
+## Current state (v0.72.0)
+
+### Must-Stabilise targets — all complete
+
+| Target | Status |
+|---|---|
+| Session schema versioning | ✓ `VersionedEnvelope` + `SESSION_SCHEMA_VERSION=1` (v0.51.0, v0.56.0) |
+| Document operation model | ✓ `TextEditOperation` + `RevisionId` + `EditTransaction` (v0.62.0) |
+| Save and backup safety | ✓ Atomic write + `BackupPolicy` + `ExternalFileState` (v0.27.0, v0.53.0) |
+| Dirty/external-change semantics | ✓ `check_external_state` + `blocks_save()` (v0.53.0) |
+| Command IDs and shortcut registry | ✓ `CommandRegistry` + 25 `cmd::*` const IDs (v0.63.0) |
+| Basic two-way text diff/merge | ✓ Core shipped; UI wiring is the remaining work |
+| Directory comparison basics | ✓ `DirectoryIndex` + `EqualityEvidence` + `pair_entries` (v0.58.0) |
+| Editor adapter safety boundary | ✓ `TextEditOperation` revision contract; UI adapter is remaining work |
+
+### Release readiness checklist (v0.72.0)
+
+```text
+Product:
+  [ ] Two-way file compare works end to end         (UI wiring remaining)
+  [x] Result buffer save works with backup policy
+  [ ] Directory compare works for practical trees   (UI wiring remaining)
+  [ ] Basic keyboard navigation is complete         (UI wiring remaining)
+
+Safety:
+  [x] Save checks external modifications            (check_external_state)
+  [x] Undo/redo covers merge operations             (TransactionLog + ThreeWayMergeSession)
+  [x] Error messages are actionable                 (AppError + RecoveryAction)
+  [x] Large-file mode prevents UI lockups           (FileSizeClass + PerformanceLimits)
+
+Engineering:
+  [x] Core tests pass                               (599 unit + 6 doctest, 0 failures)
+  [ ] Editor harness tests pass                     (RFC-040 deferred)
+  [ ] Packaging smoke tests pass                    (RFC-010 deferred)
+  [x] Session schema migration tests pass           (persist_tests, session_tests)
+
+Documentation:
+  [x] Architecture and testing docs current
+  [ ] User guide covers common workflows            (RFC-030 deferred)
+  [ ] Recovery/backup behavior documented
+  [ ] Known limitations documented
+```
+
+### RFC inventory at v0.72.0
+
+**Done: 38** — all core data-layer RFCs complete.
+**Proposed: 10** — editor adapter track (4), platform/packaging (2), process/governance (3), documentation (1).
+
+The remaining 10 proposed RFCs are all correctly scoped to the UI implementation phase or are process documents. No further core-only RFC work is needed before beginning UI implementation.
+
 
 ### Must-Stabilise targets — status
 

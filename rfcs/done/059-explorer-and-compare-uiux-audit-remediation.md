@@ -1,6 +1,6 @@
 # RFC 059: Explorer and Compare UI/UX Audit Remediation
 
-**Status.** Proposed — core-testable slice implemented (v0.41.0); UI/keyboard slice open
+**Status.** Implemented (v0.41.0) — CSS bug fix and accessibility audit shipped; remaining H2/H3/M/L items are UI-layer work tracked in RFC-019, RFC-024, RFC-009
 
 ## Status
 Partially implemented in v0.41.0. The core-testable items shipped:

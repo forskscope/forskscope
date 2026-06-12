@@ -1,6 +1,6 @@
 # RFC 037: Scalable Directory Compare Index and Incremental Refresh
 
-**Status.** Proposed — cancellation + symlink (v0.42.0); DirectoryIndex + EqualityEvidence + pair_entries (v0.58.0); incremental refresh and UI open
+**Status.** Implemented (v0.42.0 + v0.58.0) — core data model complete; persistent on-disk index cache and incremental refresh deferred (future release)
 
 ## Status
 Partially implemented in v0.42.0:

@@ -36,7 +36,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | ID | Title |
 |----|-------|
 | 004 | [Editor Adapter and CodeMirror Bridge](./proposed/004-editor-adapter-and-codemirror-bridge.md) |
-| 008 | [Directory Comparison and Background Job Model](./proposed/008-directory-comparison-background-jobs.md) |
+| 008 | [Directory Comparison and Background Job Model](./done/008-directory-comparison-background-jobs.md) |
 | 009 | [Settings, Theme, Localization, and Accessibility](./done/009-settings-theme-localization-accessibility.md) |
 | 010 | [Packaging, Diagnostics, QA, and Release Gates](./proposed/010-packaging-diagnostics-qa.md) |
 | 011 | [Workspace Session Persistence](./done/011-workspace-session-persistence.md) | v0.56.0 (tab list restore deferred to schema v2; UI deferred) |
@@ -59,11 +59,11 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 034 | [Conflict Resolution Workspace](./done/034-conflict-resolution-workspace.md) |
 | 035 | [Scroll Sync, Line Mapping, and Diff Decoration Engine](./done/035-scroll-sync-line-mapping-and-diff-decoration-engine.md) |
 | 036 | [Live Reload, File Watcher, and External Modification Handling](./done/036-live-reload-file-watcher-and-external-modification-handling.md) |
-| 037 | [Scalable Directory Compare Index and Incremental Refresh](./proposed/037-scalable-directory-compare-index-and-incremental-refresh.md) |
+| 037 | [Scalable Directory Compare Index and Incremental Refresh](./done/037-scalable-directory-compare-index-and-incremental-refresh.md) |
 | 040 | [Editor Adapter Verification Harness and Golden Corpus](./proposed/040-editor-adapter-verification-harness-and-golden-corpus.md) |
 | 041 | [v1.0 Product Stabilization and RFC Governance](./proposed/041-v1-product-stabilization-and-rfc-governance.md) |
 | 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) |
-| 059 | [Explorer and Compare UI/UX Audit Remediation](./proposed/059-explorer-and-compare-uiux-audit-remediation.md) |
+| 059 | [Explorer and Compare UI/UX Audit Remediation](./done/059-explorer-and-compare-uiux-audit-remediation.md) |
 
 ## Archive
 

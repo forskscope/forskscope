@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.72.0] — 2026-06-12
+
+Final core-layer promotion pass. RFC done count: 38. Core layer complete.
+
+### RFC promotions (3)
+
+| RFC | Title | Core shipped | Deferred |
+|---|---|---|---|
+| 008 | Directory Comparison and Background Job Model | v0.58.0 + v0.68.0 | Async background job runner, UI progress panel |
+| 037 | Scalable Directory Compare Index and Incremental Refresh | v0.42.0 + v0.58.0 | Persistent on-disk index cache, incremental refresh |
+| 059 | Explorer and Compare UI/UX Audit Remediation | v0.41.0 | H2/H3/M/L items cross-referenced in done RFCs |
+
+**Done count: 38** (was 35). **Proposed: 10** — all editor-adapter track,
+platform/packaging, process/governance, or documentation.
+
+### Documentation
+
+- `rfcs/notes/core-completion-summary-v0.72.md` — comprehensive state
+  document: all 38 done RFCs, all 10 remaining proposed, module inventory
+  (21 core modules, 2 ui-logic modules), test counts, and UI implementation
+  phase roadmap.
+- `rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md` —
+  checklist updated to v0.72.0: all 8 must-stabilise targets ✓,
+  engineering gates ✓ (599 core tests, 0 failures).
+
+---
+
 ## [0.71.0] — 2026-06-12
 
 FileChangeMonitor trait boundary and MockFileChangeMonitor (RFC-036);
