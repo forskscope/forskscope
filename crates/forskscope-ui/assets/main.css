@@ -129,6 +129,33 @@ input, select {
 .applied { padding: 0 .35rem; color: var(--ok); font-size: 11px; }
 .notice { padding: .5rem .6rem; color: var(--warn); font-size: 12px; }
 
+/* ---- DiffDecorationSet CSS class contract (RFC-024) ---- */
+/* These classes are produced by LineDecorationKind::css_class() and        */
+/* InlineDecorationKind::css_class() in forskscope-core. Any change here    */
+/* must stay in sync with the core constants.                                */
+.fs-line-unchanged {}
+.fs-line-added       .cell { background: var(--ins-bg); }
+.fs-line-deleted     .cell { background: var(--del-bg); }
+.fs-line-modified    .cell { background: var(--rep-bg); }
+.fs-line-empty-counterpart .cell { background: var(--surface); opacity: .4; }
+.fs-line-conflict    .cell { background: color-mix(in srgb, var(--warn) 18%, var(--surface)); }
+.fs-line-merge-applied .cell { background: color-mix(in srgb, var(--ok) 12%, var(--surface)); }
+
+/* Inline character-level diff spans (RFC-024 §"Inline contract") */
+.fs-inline-inserted  { background: color-mix(in srgb, var(--ins-mark) 30%, transparent); }
+.fs-inline-deleted   { background: color-mix(in srgb, var(--del-mark) 30%, transparent); text-decoration: line-through; }
+.fs-inline-replaced  { background: color-mix(in srgb, var(--warn) 25%, transparent); }
+.fs-inline-whitespace { outline: 1px dotted var(--muted); }
+
+/* ---- ConflictNavigator CSS class contract (RFC-034) ---- */
+/* Produced by ConflictNavigatorEntry::css_class().                          */
+.fsk-conflict-unresolved { color: var(--warn); font-weight: bold; }
+.fsk-conflict-left       { color: var(--ins-mark); }
+.fsk-conflict-right      { color: var(--ins-mark); }
+.fsk-conflict-both       { color: var(--ok); }
+.fsk-conflict-manual     { color: var(--accent); }
+.fsk-conflict-ignored    { color: var(--muted); opacity: .6; }
+
 /* ---- status bar ---- */
 .statusbar { display: flex; gap: 1rem; padding: .25rem .6rem; background: var(--surface-2);
   border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }

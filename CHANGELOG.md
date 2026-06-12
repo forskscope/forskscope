@@ -5,6 +5,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.88.0] — 2026-06-12
+
+CSS class contract established; 4 coverage integration tests.
+
+### Added
+
+- **`fs-line-*` and `fs-inline-*` CSS classes** in `main.css` — the class
+  tokens produced by `LineDecorationKind::css_class()` and
+  `InlineDecorationKind::css_class()` (from `DiffDecorationSet`, RFC-024).
+  Previously the stylesheet only had the older `.hunk-del` / `.hunk-ins` /
+  `.in-del` / `.in-ins` classes; the `fs-*` classes from core were absent,
+  meaning `DecorationIndex`-based rendering would produce unstyled rows.
+
+  Classes added: `fs-line-unchanged`, `fs-line-added`, `fs-line-deleted`,
+  `fs-line-modified`, `fs-line-empty-counterpart`, `fs-line-conflict`,
+  `fs-line-merge-applied`, `fs-inline-inserted`, `fs-inline-deleted`,
+  `fs-inline-replaced`, `fs-inline-whitespace`.
+
+- **`fsk-conflict-*` CSS classes** in `main.css` — the tokens produced by
+  `ConflictNavigatorEntry::css_class()` (RFC-034). Six variants covering
+  all `ConflictStatus` values: `fsk-conflict-unresolved`,
+  `fsk-conflict-left`, `fsk-conflict-right`, `fsk-conflict-both`,
+  `fsk-conflict-manual`, `fsk-conflict-ignored`.
+
+- **`tests/css_coverage.rs`** integration test in `forskscope-ui-logic` —
+  4 tests that read `main.css` at compile time via `include_str!` and
+  verify every CSS class token from core is present in the stylesheet:
+  - `line_decoration_css_classes_defined_in_main_css` — all 7 `LineDecorationKind` classes
+  - `inline_decoration_css_classes_defined_in_main_css` — all 4 `InlineDecorationKind` classes
+  - `conflict_navigator_css_classes_defined_in_main_css` — all 6 `fsk-conflict-*` classes
+  - `row_state_gutter_symbols_are_distinct` — glyph uniqueness smoke test
+
+  These tests catch contract drift at compile time. If a class is renamed in
+  core or missing from the CSS, the test fails immediately rather than
+  silently producing unstyled UI.
+
+- **`ROADMAP.md`** updated to v0.88.0: correct test counts (801), add CSS
+  contract milestone, reflect 14 view-model modules.
+
+### Total test count: 801
+(599 core + 189 ui-logic + 2 core-integration + 5 ui-logic-integration + 6 doctest)
+
+---
+
 ## [0.87.0] — 2026-06-12
 
 Documentation pass: maintainer docs updated to v0.87.0 reality.

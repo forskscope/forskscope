@@ -1,18 +1,21 @@
 # ForskScope Roadmap
 
-**Last updated:** v0.78.0 (2026-06-12)
-**Current phase:** UI implementation — core data layer complete
+**Last updated:** v0.88.0 (2026-06-12)
+**Current phase:** UI implementation — view-model layer complete, CSS contract established
 
 ---
 
 ## Current state
 
 The `forskscope-core` and `forskscope-ui-logic` crates are feature-complete
-for the v1 diff/merge workflow. 39 of 48 RFCs are implemented. 692 tests pass with zero failures (599 core + 85 ui-logic + 2 integration + 6 doctest).
-The `forskscope-ui-logic` crate has 7 view-model modules providing tested presentation logic for
-toolbar availability, explorer status badges, diff navigation, deep-compare filtering, and summary text.
-The UI crate (`forskscope-ui`) holds the Dioxus shell and working components; the view-model
-layer is ready for component wiring.
+for the v1 diff/merge workflow. 39 of 48 RFCs are implemented. 801 tests pass
+with zero failures (599 core + 189 ui-logic + 2 core-integration + 5 ui-logic-integration + 6 doctest).
+The `forskscope-ui-logic` crate has 14 view-model modules covering all 7 ROADMAP slices.
+The CSS contract (RFC-024, RFC-034) is established: `main.css` defines every
+CSS class token that `DiffDecorationSet` and `ConflictNavigator` produce,
+and 4 integration tests verify the contract at compile time.
+The UI crate (`forskscope-ui`) holds the Dioxus shell and working components;
+the next step is wiring components to the view-model layer (requires GTK).
 
 The next phase is connecting the UI to core through a series of vertical
 slices, each delivering a usable increment.
@@ -34,6 +37,8 @@ slices, each delivering a usable increment.
 | Explorer tree | v0.36 | Tree view, breadcrumb nav, ignore patterns |
 | Patch export | v0.39 | Unified-diff export from file/directory diffs |
 | Core data layer | v0.40–v0.72 | All RFC data types, 629 tests, clippy clean |
+| View-model layer | v0.74–v0.87 | 14 `ui-logic` modules, 189 tests, all 7 slices covered |
+| CSS contract | v0.88 | `fs-line-*`, `fs-inline-*`, `fsk-conflict-*` classes added; 4 coverage tests |
 
 ---
 
