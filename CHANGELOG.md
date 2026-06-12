@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.76.0] — 2026-06-12
+
+Compare summary and navigation state view-models in `forskscope-ui-logic`.
+
+### Added
+
+- **`compare::summary`** — status bar and navigation state view-models.
+
+  **`CompareStatusSummary`** — single tested snapshot for the status bar
+  and tab dirty indicator. Fields: `change_text` (`"+12 / -5"`,
+  `"Files are identical"`, or `"N change(s)"`), `encoding_label`,
+  `is_dirty`, `is_saveable`, `changed_hunks`, `is_identical`.
+  `from_fields(stats, is_dirty, is_saveable, encoding)` consolidates the
+  logic that was duplicated between `statusbar.rs` and `tabs.rs`.
+  `dirty_marker()` → `"●"` or `""`. `dirty_css_class()`.
+
+  **`DiffNavigationState`** — focused hunk position for the toolbar
+  navigation buttons. `new(focused_change, total_changes)`. `has_changes()`,
+  `prev_available()` / `next_available()` (both wrap, so always true when
+  changes exist). `position_label()` → `"3 of 7"` or `""`.
+  `prev_aria_label()` / `next_aria_label()` — ARIA labels mentioning
+  position and wrapping behavior.
+
+- **15 new tests** in `compare/summary.rs`: identical/changed/whitespace-
+  only/single-hunk texts, dirty flag, unsaveable tab, encoding passthrough,
+  no-changes nav state, first/middle/last position labels, prev/next ARIA
+  labels (position and wrap cases), single-change nav.
+  Total ui-logic count: 70.
+
+---
+
 ## [0.75.0] — 2026-06-12
 
 Explorer status view-model and tab state bridge in `forskscope-ui-logic`.
