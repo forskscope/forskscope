@@ -5,6 +5,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.83.0] — 2026-06-12
+
+Scroll synchronisation view-model; release archive fix.
+
+### Fixed
+
+- **Release archive contamination.** Since v0.81.0, archives included an
+  old `forskscope-0.80.0/` directory (with its `target/`) nested inside
+  the release tree, inflating archives to ~300 MiB. Root cause: `cp -r`
+  of the working tree did not strip sibling version directories that had
+  accumulated in the work root. Fixed by cleaning the work tree before
+  every `cp` and verifying no stray dirs remain. Archives are now ~3 MiB.
+
+### Added
+
+- **`compare::scroll_sync`** in `forskscope-ui-logic` — synchronized-scroll
+  view-model for the two-pane diff view (RFC-035).
+
+  **`ScrollSyncState`** — holds a shared `ScrollAnchor` (row index + row
+  fraction) and the uniform row height. Three construction paths:
+  - `at_top(row_height_px, total_rows)` — initial state.
+  - `from_scroll_top(px, row_height_px, total_rows)` — converts a raw
+    `scrollTop` value from one pane into an anchor; the other pane then
+    calls `scroll_top_px()` to get its matching position.
+  - `scroll_to_row(row_index)` — used by F7/F8 hunk navigation to jump
+    both panes to a specific hunk's first row.
+
+  `is_at_top()`, `max_scroll_px(visible_height_px)`, `scroll_top_px()`.
+  Zero `row_height_px` is guarded against (treated as 1.0).
+
+- **`ui/scroll_sync.rs`** shim — re-exports `ScrollSyncState`.
+
+- **19 new tests** — `at_top`, pixel→anchor→pixel round-trip, mid-row
+  fraction, negative input clamping, `scroll_to_row` correctness and
+  over-bounds clamping, past-end clamping, `max_scroll_px` normal and
+  content-fits cases, zero row-height guard. Total ui-logic count: 133.
+
+---
+
 ## [0.82.0] — 2026-06-12
 
 `compare::load_guard` — pre-diff file-size decision view-model (Slice 1).
