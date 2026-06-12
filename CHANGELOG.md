@@ -5,6 +5,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.98.0] — 2026-06-12
+
+CONTRIBUTING.md added; known-limitations.md added; RFC-030 status updated;
+local-dev.md expanded with corpus and MSRV guidance.
+
+### Added
+
+- **`CONTRIBUTING.md`** — complete contributor guide: prerequisites, project
+  layout (with the GTK constraint spelled out), pre-coding RFC guidance,
+  step-by-step change workflow (branch/test/lint/doc), corpus fixture
+  instructions, view-model module addition recipe, RFC governance note,
+  commit message format, PR etiquette, licence acknowledgement.
+
+- **`docs/src/users/known-limitations.md`** — 19 documented limitations across
+  diff view (shared scroll, no three-way UI, inline diff scope, large files),
+  explorer (no digest cache, no directory merge), file types (Excel is derived
+  text, no binary merge), and platform (Linux WebKitGTK version, macOS
+  unsigned binary, Windows long paths). Intentional non-goals section
+  distinguishes limitations from design decisions.
+
+- `known-limitations.md` registered in `docs/src/SUMMARY.md`.
+
+### Changed
+
+- **`rfcs/proposed/030-user-documentation-onboarding-and-help-system.md`** —
+  status updated to "substantially implemented v0.96.0–v0.98.0"; full shipped
+  list (17 doc files) and remaining items (in-app help, troubleshooting page).
+
+- **`docs/src/maintainers/local-dev.md`** — added: full directory layout with
+  `ui-logic` and `tests/fixtures/` entries; corpus test contribution
+  instructions (fixture pair + corpus test + README update); MSRV verification
+  command (`cargo +1.85 test`).
+
+---
+
 ## [0.97.0] — 2026-06-12
 
 ROADMAP, release process, and features documentation updated to v0.97.0.

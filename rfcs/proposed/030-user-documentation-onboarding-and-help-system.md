@@ -1,10 +1,34 @@
 # RFC 030 — User Documentation, Onboarding, and Help System
 
-**Status.** Proposed
+**Status.** Proposed — substantially implemented v0.96.0–v0.98.0; remaining items are in-app help and troubleshooting depth.
 
 ## Status
 
-Proposed.
+Substantially implemented. The documentation set defined below has shipped:
+
+**Shipped (v0.96.0–v0.98.0):**
+- `docs/src/users/quick-start.md` — install + first comparison workflow.
+- `docs/src/users/comparing-files.md` — opening methods, diff view, search.
+- `docs/src/users/diff-workflow.md` — pane layout, navigation, inline diff, options.
+- `docs/src/users/merging.md` — merge model, apply/undo/redo, save workflow.
+- `docs/src/users/explorer.md` — directory navigation, file selection, digest icons.
+- `docs/src/users/directory-compare.md` — directory comparison and filtering.
+- `docs/src/users/settings.md` — all settings fields documented.
+- `docs/src/users/features.md` — complete feature overview.
+- `docs/src/users/faq.md` — common questions.
+- `docs/src/users/known-limitations.md` — current limitations and workarounds.
+- `docs/src/intermediate/keyboard.md` — all keyboard shortcuts.
+- `docs/src/intermediate/diff-options.md` — compare options reference.
+- `docs/src/intermediate/file-types.md` — type classification, encoding, large files.
+- `docs/src/intermediate/git-integration.md` — git mergetool setup.
+- `docs/src/intermediate/patch-export.md` — unified diff export.
+- `docs/src/intermediate/cli.md` — command-line usage.
+- `CONTRIBUTING.md` — contributor guide.
+
+**Remaining (deferred):**
+- In-app help panel (first-run screen, contextual help links).
+- Troubleshooting page for WebView/Linux dependency issues.
+- Known-limitations page improvements (automated from issue tracker).
 
 ## Summary
 

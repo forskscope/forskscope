@@ -12,6 +12,7 @@
 - [Merging changes](./users/merging.md)
 - [Explorer panes](./users/explorer.md)
 - [Settings](./users/settings.md)
+- [Known limitations](./users/known-limitations.md)
 - [FAQ](./users/faq.md)
 
 ---
