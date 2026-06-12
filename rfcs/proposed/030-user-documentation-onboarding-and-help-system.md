@@ -6,7 +6,7 @@
 
 Substantially implemented. The documentation set defined below has shipped:
 
-**Shipped (v0.96.0–v0.98.0):**
+**Shipped (v0.96.0–v0.112.0):**
 - `docs/src/users/quick-start.md` — install + first comparison workflow.
 - `docs/src/users/comparing-files.md` — opening methods, diff view, search.
 - `docs/src/users/diff-workflow.md` — pane layout, navigation, inline diff, options.
@@ -15,8 +15,9 @@ Substantially implemented. The documentation set defined below has shipped:
 - `docs/src/users/directory-compare.md` — directory comparison and filtering.
 - `docs/src/users/settings.md` — all settings fields documented.
 - `docs/src/users/features.md` — complete feature overview.
-- `docs/src/users/faq.md` — common questions.
+- `docs/src/users/faq.md` — common questions (13 entries).
 - `docs/src/users/known-limitations.md` — current limitations and workarounds.
+- `docs/src/users/troubleshooting.md` — WebView/Linux, macOS Gatekeeper, Windows WebView2, session, `--diagnostics` flag (v0.112.0).
 - `docs/src/intermediate/keyboard.md` — all keyboard shortcuts.
 - `docs/src/intermediate/diff-options.md` — compare options reference.
 - `docs/src/intermediate/file-types.md` — type classification, encoding, large files.
@@ -27,8 +28,7 @@ Substantially implemented. The documentation set defined below has shipped:
 
 **Remaining (deferred):**
 - In-app help panel (first-run screen, contextual help links).
-- Troubleshooting page for WebView/Linux dependency issues.
-- Known-limitations page improvements (automated from issue tracker).
+- Known-limitations improvements (automated from issue tracker).
 
 ## Summary
 

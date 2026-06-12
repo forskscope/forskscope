@@ -7,6 +7,7 @@
 //! forskscope <left> <right>        # Two-file diff (git difftool compatible)
 //! forskscope <local> <remote> <merged>  # git mergetool: diff local vs remote,
 //!                                       # save result to <merged>
+//! forskscope --diagnostics         # Print platform diagnostics and exit
 //! ```
 
 mod app;
@@ -23,6 +24,14 @@ use app::{App, STARTUP_MERGED, STARTUP_PAIR};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+
+    // --diagnostics: print platform info and exit without launching the UI.
+    // Useful for debugging startup failures and filing bug reports.
+    if args.iter().any(|a| a == "--diagnostics") {
+        let info = forskscope_core::platform::PlatformInfo::collect();
+        println!("{}", info.to_report());
+        return;
+    }
 
     match args.as_slice() {
         [left, right] => {

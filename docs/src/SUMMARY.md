@@ -13,6 +13,7 @@
 - [Explorer panes](./users/explorer.md)
 - [Settings](./users/settings.md)
 - [Known limitations](./users/known-limitations.md)
+- [Troubleshooting](./users/troubleshooting.md)
 - [FAQ](./users/faq.md)
 
 ---

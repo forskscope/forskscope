@@ -5,6 +5,53 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.112.0] — 2026-06-12
+
+RFC-026 diagnostics CLI flag; RFC-030 troubleshooting guide; both RFCs advanced.
+
+### Added
+
+**`--diagnostics` CLI flag** (`main.rs`) — RFC-026 §"Startup diagnostics"
+
+`forskscope --diagnostics` prints `PlatformInfo::to_report()` and exits
+without launching the UI or requiring a display server. Output includes OS,
+arch, CPU count, app version, Rust version, home (redacted), and config
+directory. Designed for inclusion in bug reports and for diagnosing startup
+failures on headless or restricted systems.
+
+**`docs/src/users/troubleshooting.md`** (new, 141 lines) — RFC-030 §"Troubleshooting"
+
+Platform-specific troubleshooting guide covering:
+- `forskscope --diagnostics` usage and example output.
+- Linux: WebKitGTK 4.1 installation on Debian/Ubuntu, Fedora, Arch.
+- Linux: blank window (NVIDIA + Wayland DMA-BUF workaround, X11 fallback).
+- Linux: file picker dialog not opening (xdg-desktop-portal).
+- macOS: Gatekeeper unsigned binary warning and fix.
+- macOS: post-upgrade crash.
+- Windows: WebView2 runtime missing and fix.
+- Windows: long path support.
+- Session not restored (config directory permissions).
+- Bug report instructions (referencing `--diagnostics`).
+
+`troubleshooting.md` added to `docs/src/SUMMARY.md`.
+
+**`docs/src/intermediate/cli.md`** — added `--diagnostics` section with
+usage, example output, and home-redaction note.
+
+### Changed
+
+- **`rfcs/proposed/026-cross-platform-webview-and-linux-desktop-compatibility.md`**
+  — status updated from "Proposed" to "Partially implemented"; lists what
+  shipped (v0.93.0 PlatformInfo, v0.100.0 About panel wiring, v0.112.0
+  CLI flag + troubleshooting doc) and what remains (smoke tests, blank-window
+  detection, `--safe-editor`, compatibility settings UI).
+
+- **`rfcs/proposed/030-user-documentation-onboarding-and-help-system.md`**
+  — troubleshooting page added to shipped list; "Troubleshooting page for
+  WebView/Linux dependency issues" removed from remaining items.
+
+---
+
 ## [0.111.0] — 2026-06-12
 
 **Milestone: i18n complete across all UI surfaces.**
