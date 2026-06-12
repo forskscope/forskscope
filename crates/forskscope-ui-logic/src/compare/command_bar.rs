@@ -262,4 +262,50 @@ mod tests {
             }
         }
     }
+
+    // ── ToolbarItem field coverage ────────────────────────────────────────────
+
+    #[test]
+    fn disabled_item_has_disabled_reason_some() {
+        // In empty context, file.save is disabled.
+        let reg = CommandRegistry::builtin();
+        let sections = build_toolbar(&reg, &empty_ctx());
+        let save = find_item(&sections, "file.save").unwrap();
+        assert!(!save.enabled, "save must be disabled in empty context");
+        assert!(save.disabled_reason.is_some(),
+            "disabled_reason must be Some when item is disabled");
+        assert!(!save.disabled_reason.unwrap().is_empty(),
+            "disabled_reason must be non-empty text");
+    }
+
+    #[test]
+    fn enabled_item_has_disabled_reason_none() {
+        // command_palette is always enabled.
+        let reg = CommandRegistry::builtin();
+        let sections = build_toolbar(&reg, &empty_ctx());
+        let palette = find_item(&sections, "view.command_palette").unwrap();
+        assert!(palette.enabled);
+        assert!(palette.disabled_reason.is_none(),
+            "disabled_reason must be None when item is enabled");
+    }
+
+    #[test]
+    fn save_item_shortcut_hint_is_some() {
+        let reg = CommandRegistry::builtin();
+        let sections = build_toolbar(&reg, &empty_ctx());
+        let save = find_item(&sections, "file.save").unwrap();
+        assert!(save.shortcut_hint.is_some(),
+            "file.save must carry a shortcut_hint (Ctrl+S)");
+        let hint = save.shortcut_hint.as_ref().unwrap();
+        assert!(!hint.is_empty(), "shortcut_hint must not be empty");
+    }
+
+    #[test]
+    fn enabled_count_nonzero_in_diff_context() {
+        let reg = CommandRegistry::builtin();
+        let sections = build_toolbar(&reg, &diff_ctx());
+        let count = enabled_count(&sections);
+        assert!(count > 0,
+            "at least some items must be enabled in diff context; got 0");
+    }
 }

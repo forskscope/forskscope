@@ -33,7 +33,7 @@ Safety:
   [x] Large-file mode prevents UI lockups           (FileSizeClass + PerformanceLimits)
 
 Engineering:
-  [x] Core tests pass                               (646 unit + 43 integration = 924 total, 0 failures)
+  [x] Core tests pass                               (646 unit + 43 integration = 930 total, 0 failures)
   [x] ui-logic tests pass                           (189 unit tests, 14 modules, 0 failures)
   [ ] Editor harness tests pass                     (RFC-040 deferred)
   [ ] Packaging smoke tests pass                    (RFC-010 deferred)

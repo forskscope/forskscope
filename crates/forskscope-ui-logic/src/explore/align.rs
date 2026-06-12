@@ -337,4 +337,39 @@ mod tests {
         assert!(!data.rel_path.is_absolute(), "rel_path must be relative");
         assert_eq!(data.rel_path, PathBuf::from("file.txt"));
     }
+
+    #[test]
+    fn is_expanded_propagates_to_row_data() {
+        let root = PathBuf::from("/root");
+        let left: Vec<FlatRow> = vec![
+            (root.join("dirA"), true,  true,  false, 0), // dir, expanded
+            (root.join("dirB"), true,  false, false, 0), // dir, collapsed
+        ];
+        let rows = compute_aligned_rows(&left, &[], &root, &root);
+        let mut expanded_count = 0usize;
+        let mut collapsed_count = 0usize;
+        for (l, _) in &rows {
+            if let Some(d) = l {
+                if d.is_expanded { expanded_count += 1; }
+                else             { collapsed_count += 1; }
+            }
+        }
+        assert_eq!(expanded_count, 1,  "exactly one dir must be expanded");
+        assert_eq!(collapsed_count, 1, "exactly one dir must be collapsed");
+    }
+
+    #[test]
+    fn both_sides_selected_propagates_independently() {
+        let root = PathBuf::from("/root");
+        // Same rel path on both sides, each independently selected.
+        let left: Vec<FlatRow>  = vec![(root.join("f.txt"), false, false, true,  0)];
+        let right: Vec<FlatRow> = vec![(root.join("f.txt"), false, false, true,  0)];
+        let rows = compute_aligned_rows(&left, &right, &root, &root);
+        assert_eq!(rows.len(), 1, "same-name file must merge into one row");
+        let (l, r) = &rows[0];
+        assert!(l.as_ref().map(|d| d.is_selected).unwrap_or(false),
+            "left side must be selected");
+        assert!(r.as_ref().map(|d| d.is_selected).unwrap_or(false),
+            "right side must be selected");
+    }
 }

@@ -5,6 +5,69 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.109.0] — 2026-06-12
+
+**Milestone: ui-logic view-model test coverage pass complete.**
+
+All 14 `forskscope-ui-logic` modules now have comprehensive tests covering
+every public type, method, and field. Total tests: **930** (891 → 930, +39).
+No GTK required to run any of these tests.
+
+### Added
+
+Tests added across five modules to close the remaining coverage gaps:
+
+**`compare/tab_state.rs`** (5 → 14 tests)
+- Conflict flags (`has_active_conflict`, `any_conflict_unresolved`) propagate
+  to `CommandContext`; `ActiveConflict`/`AnyConflictUnresolved` rules satisfied.
+- `can_redo` flag propagates; `CanRedo` rule satisfied; toolbar redo enabled.
+- `selected_path_exists` propagates; `SelectedPathExists` rule satisfied.
+- Read-only tab (`right_side_is_editable=false`): `ActiveHunkEditable` unavailable.
+- Focused hunk guard: `ActiveHunkEditable` unavailable when no hunk is focused.
+- All-flags-true snapshot satisfies all 8 `AvailabilityRule` variants.
+
+**`compare/conflict_nav_view.rs`** (10 → 19 tests)
+- `focused_row()` returns `None` with no focus, `Some` with a valid focus id.
+- `is_focused` set on exactly one row in a multi-conflict session.
+- Resolved-state glyphs: `'L'` (left), `'R'` (right), `'-'` (ignore).
+- `status_text` non-empty for all conflict rows.
+- Progress text references resolved count with partial resolution.
+
+**`explore/align.rs`** (9 → 15 tests)
+- `is_selected` propagates on left-only and right-only rows.
+- Both-sides-selected: same-name files merge into one `AlignedRow`, both sides selected.
+- `depth` value passes through unchanged.
+- `abs_path` is absolute; `rel_path` is relative and correct.
+- `is_expanded` propagates: one expanded dir, one collapsed dir.
+
+**`compare/palette_view.rs`** (11 → 16 tests)
+- `shortcut_hint` is non-empty for `file.save`.
+- `disabled_reason` is `Some` when disabled, `None` when enabled.
+- `description` is non-empty for every builtin command.
+- `enabled_count` equals manual count and is positive in diff context.
+
+**`compare/search_index.rs`** (13 → 21 tests)
+- `len` and `is_empty` consistent for empty/non-empty index.
+- `focused().hunk_id` and `focused().row_index` match the correct match.
+- `focused_number()` is 1 at start, increments on advance.
+- `advance()` and `retreat()` return `None` without panicking on empty index.
+
+**`compare/command_bar.rs`** (13 → 17 tests)
+- `disabled_reason` is `Some` when item disabled, `None` when enabled.
+- `shortcut_hint` is `Some` and non-empty for `file.save`.
+- `enabled_count` is positive in diff context.
+
+### Changed
+
+- `docs/src/maintainers/testing.md` — version v0.109.0; total 930;
+  `tab_state`, `conflict_nav_view`, `align`, `palette_view`, `search_index`,
+  `command_bar` rows updated with new coverage descriptions.
+- `rfcs/notes/core-completion-summary-v0.72.md` — 930 tests; ui-logic 228;
+  version → v0.109.0.
+- `rfcs/proposed/041-…` — 930 total.
+
+---
+
 ## [0.108.0] — 2026-06-12
 
 8 new search_index tests (len, focused data, focused_number, empty-index safety); 916 → 924 tests.
