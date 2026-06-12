@@ -5,6 +5,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.102.0] — 2026-06-12
+
+Three-way merge corpus added (16 tests, 18 fixtures); i18n fix; 875 → 891 tests.
+
+### Added
+
+- **`crates/forskscope-core/tests/merge_corpus.rs`** — 16 corpus-driven
+  integration tests for `ThreeWayMergeSession` across 6 fixture triples:
+  - `noconflict` — non-overlapping changes auto-merge, no conflicts, can_save
+  - `conflict` — divergent single-line produces one conflict, blocks save,
+    resolve_left/resolve_right each produce correct result text
+  - `both_same` — identical changes on both sides deduplicate to auto-merge
+  - `left_insert` — one-sided insertion auto-merges
+  - `crlf` — CRLF line terminators preserved through merge result
+  - `multi` — three divergent lines produce three conflicts; resolving all
+    enables save; result matches left-side resolutions
+
+- **`tests/fixtures/merge/`** — 18 fixture files (6 base/left/right triples)
+  for the merge corpus.
+
+- **`tests/fixtures/README.md`** — `merge/` section documenting all 6 triples
+  with descriptions and contribution instructions.
+
+### Fixed
+
+- **`"Ignore file extensions"` missing from Japanese** (`i18n.rs`) —
+  `"Ignore directory names"` had a translation but its sibling key did not.
+  Fixed: `"Ignore file extensions"` → `"除外ファイル拡張子"`.
+
+### Changed
+
+- `docs/src/maintainers/testing.md` — count table updated (875 → **891**);
+  `merge_corpus` row added to integration tests table.
+- `docs/src/maintainers/local-dev.md` — core integration count updated
+  (27 → 43 tests).
+- `rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md` —
+  core test total updated (875 → 891).
+
+---
+
 ## [0.101.0] — 2026-06-12
 
 i18n completeness pass; FAQ expanded with four common questions.

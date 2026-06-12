@@ -53,3 +53,27 @@ When adding a new fixture pair:
 2. Add a test in `tests/diff_corpus.rs` that loads and exercises the pair.
 3. Update this README with a description of what edge case the pair covers.
 4. Prefer minimal files — the smallest input that demonstrates the case.
+
+---
+
+## `merge/` — Three-way merge corpus
+
+Each scenario is a base/left/right triple (`base_*.txt`, `left_*.txt`, `right_*.txt`).
+Loaded by `crates/forskscope-core/tests/merge_corpus.rs`.
+
+| Scenario | Description |
+|----------|-------------|
+| `noconflict` | Left and right change different lines — both auto-merge, no conflicts |
+| `conflict` | Left and right change the same line differently — one conflict produced |
+| `both_same` | Left and right make identical changes — auto-merges, no conflict |
+| `left_insert` | Left inserts a new line, right is unchanged — auto-merges |
+| `crlf` | Base/left/right all use CRLF line endings — terminators preserved in result |
+| `multi` | Left and right each change three lines (divergently) — three conflicts |
+
+### Adding a new merge fixture
+
+1. Create `base_<scenario>.txt`, `left_<scenario>.txt`, `right_<scenario>.txt`
+   in `tests/fixtures/merge/`.
+2. Add a `#[test]` in `crates/forskscope-core/tests/merge_corpus.rs` using
+   `session("<scenario>")` to load the triple.
+3. Add a row to the table above.

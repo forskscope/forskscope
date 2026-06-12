@@ -8,7 +8,6 @@
 use dioxus::html::input_data::keyboard_types::Key;
 use dioxus::prelude::*;
 
-use crate::i18n::t;
 use crate::ui::search_index::MatchIndex;
 
 // ── SearchCtx ─────────────────────────────────────────────────────────────────
@@ -16,10 +15,10 @@ use crate::ui::search_index::MatchIndex;
 /// Shared search state provided as a Dioxus context by `DiffWorkspace`.
 #[derive(Clone, Default)]
 pub struct SearchCtx {
-    pub query: String,
+    pub query:  String,
     pub active: bool,
     /// Ordered match positions rebuilt by `DiffWorkspace` on every query change.
-    pub index: MatchIndex,
+    pub index:  MatchIndex,
 }
 
 impl PartialEq for SearchCtx {
@@ -46,20 +45,16 @@ pub fn SearchBar() -> Element {
         return rsx! {};
     }
 
-    let total = ctx.read().index.len();
+    let total   = ctx.read().index.len();
     let focused = ctx.read().index.focused_number();
     let query_empty = ctx.read().query.is_empty();
 
     let count_label = if query_empty || total == 0 {
-        if !query_empty {
-            "No matches".to_string()
-        } else {
-            String::new()
-        }
+        if !query_empty { "No matches".to_string() } else { String::new() }
     } else {
         match focused {
             Some(n) => format!("{n} / {total}"),
-            None => format!("{total} match{}", if total == 1 { "" } else { "es" }),
+            None    => format!("{total} match{}", if total == 1 { "" } else { "es" }),
         }
     };
 
@@ -163,10 +158,6 @@ pub fn scroll_to_focused(ctx: &SearchCtx) {
 /// Whether a line's content matches the current active query.
 /// Case-insensitive substring match. `false` when inactive or query is empty.
 pub fn line_matches(ctx: &SearchCtx, content: &str) -> bool {
-    if !ctx.active || ctx.query.is_empty() {
-        return false;
-    }
-    content
-        .to_ascii_lowercase()
-        .contains(&ctx.query.to_ascii_lowercase())
+    if !ctx.active || ctx.query.is_empty() { return false; }
+    content.to_ascii_lowercase().contains(&ctx.query.to_ascii_lowercase())
 }

@@ -20,18 +20,19 @@ The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
 be tested in environments without a display server. Core and ui-logic tests
 run anywhere Rust is installed.
 
-## Test counts (v0.95.0)
+## Test counts (v0.102.0)
 
 | Suite | Count |
 |-------|-------|
 | `forskscope-core` unit | 646 |
 | `forskscope-core` integration (`diff_corpus`) | 25 |
+| `forskscope-core` integration (`merge_corpus`) | 16 |
 | `forskscope-core` integration (`patch_apply`) | 2 |
 | `forskscope-ui-logic` unit | 189 |
 | `forskscope-ui-logic` integration (`css_coverage`) | 5 |
 | Doctests | 7 |
 | `forskscope-ui-logic` integration | 1 |
-| **Total** | **875** |
+| **Total** | **891** |
 
 ## `forskscope-core` test modules
 
@@ -83,6 +84,7 @@ Integration tests in `tests/`:
 | File | Count | Covers |
 |---|---|---|
 | `diff_corpus` | 25 | Corpus-driven `compute_diff` correctness: identical, insertions, deletions, reordered, empty, LF vs CRLF, no-final-newline, whitespace/trailing/tabs, case, function edit, Unicode, UTF-8 BOM, large files (200 lines), binary classification. Fixtures in `tests/fixtures/`. |
+| `merge_corpus` | 16 | Corpus-driven `ThreeWayMergeSession` correctness across 6 fixture triples: no-conflict auto-merge, conflict detection and resolution (left/right), identical-both-sides dedup, one-sided insert, CRLF preservation, multiple conflicts. Fixtures in `tests/fixtures/merge/`. |
 | `patch_apply` | 2 | Generates a unified-diff patch and verifies it applies with GNU `patch`. |
 
 ## `forskscope-ui-logic` test modules
