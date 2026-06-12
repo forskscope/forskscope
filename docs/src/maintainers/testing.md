@@ -20,15 +20,16 @@ The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
 be tested in environments without a display server. Core and ui-logic tests
 run anywhere Rust is installed.
 
-## Test counts (v0.79.0)
+## Test counts (v0.87.0)
 
 | Suite | Count |
 |-------|-------|
 | `forskscope-core` unit | 599 |
 | `forskscope-core` integration | 2 |
-| `forskscope-ui-logic` | 85 |
+| `forskscope-ui-logic` | 189 |
 | Doctests | 6 |
-| **Total** | **692** |
+| `forskscope-ui-logic` integration | 1 |
+| **Total** | **797** |
 
 ## `forskscope-core` test modules
 
@@ -79,7 +80,8 @@ Integration tests in `tests/`:
 
 ## `forskscope-ui-logic` test modules
 
-All tests are inline (`#[cfg(test)]` inside each module file) except where noted.
+All tests are inline (`#[cfg(test)]` inside each module file).
+One integration test exists in `tests/` (patch round-trip via `hunk_decorations`).
 
 | File | Covers | RFC |
 |---|---|---|
@@ -87,11 +89,16 @@ All tests are inline (`#[cfg(test)]` inside each module file) except where noted
 | `explore/deep_filter` | `DeepFilter::matches` for all `RecStatus` variants, `DeepCompareSummary` counts, footer text, `is_fully_computed`, `apply_filter`. | RFC-037, RFC-038 |
 | `explore/status` | `RowStatusKind::from_evidence` for all 10 `EqualityEvidence` variants, CSS prefix, glyph distinctness, aria labels, `needs_action`, `StatusRow` constructors. | RFC-054 |
 | `compare/command_bar` | `build_toolbar` section structure, `Save` enabled/disabled, `Undo`/`Redo` asymmetry, `CommandPalette` always enabled, shortcut hint, `find_item`. | RFC-019 |
+| `compare/conflict_nav_view` | `ConflictNavView::from_navigator`: non-empty with conflicts, empty without, `display_num` ≥ 1, `!` glyph for unresolved, CSS prefix, progress text, `can_save` predicate, `len`. | RFC-034 |
 | `compare/hunk_decorations` | `DecorationIndex::from_set`: added/deleted/modified kinds, gutter symbols, CSS prefix, aria labels, multi-hunk coverage, out-of-bounds safety, `RowDecoration` field invariants. | RFC-024, RFC-035 |
 | `compare/load_guard` | `guard_for_sizes` / `guard_for_sizes_with_limits`: all four `FileSizeClass` branches, worst-of-pair logic, boundary values (at-limit and one-over), message non-empty, distinct large/very-large labels, default-limit smoke tests. | RFC-013 |
+| `compare/palette_view` | `build_palette`: empty query returns all; query matches label; nonsense empty; case-insensitive; enabled before disabled; Save disabled in empty context; `enabled_count`; all labels non-empty. | RFC-019 |
+| `compare/save_error` | `action_label` all variants non-empty; `SaveErrorView::from_error`: external-mod action set, primary ≠ Overwrite, `FileWriteFailed`/`InternalFault` actions; path passthrough; title/body non-empty; button labels non-empty; exactly one primary. | RFC-007, RFC-017 |
+| `compare/scroll_sync` | `ScrollSyncState`: at-top, pixel→anchor→pixel round-trip, mid-row fraction, negative clamping, `scroll_to_row`, past-end clamping, `max_scroll_px`, zero row-height guard. | RFC-035 |
 | `compare/search_index` | `MatchIndex` build/advance/retreat/wrap, `matching_hunk_ids`, empty index. | RFC-014 |
 | `compare/summary` | `CompareStatusSummary` for identical/changed/whitespace-only/single-hunk, dirty marker, `DiffNavigationState` position labels and aria wrap cases. | RFC-006 |
 | `compare/tab_state` | `context_from_snapshot` field mapping, `AvailabilityRule` inverse verification, end-to-end `TabStateSnapshot → CommandContext → build_toolbar`. | RFC-003, RFC-019 |
+| `settings/settings_view` | `theme_choices` round-trip via `ThemeId::from_id`; density/font round-trips; `profile_presets` count and name; font-size validation boundaries; `clamp_font_size` extremes; context-lines boundary; `find_active` hit/miss; no duplicate values. | RFC-009 |
 
 Doctest in `watcher.rs` (`MockFileChangeMonitor` usage example): 1 test.
 

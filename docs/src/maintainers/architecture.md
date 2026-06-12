@@ -47,7 +47,7 @@ could be added as a fourth crate without touching core.
 | `watcher` | `FileChangeMonitor` trait, `WatchToken`, `FileChangeEvent`, `WatchError`, `MockFileChangeMonitor` — file-watcher boundary (RFC-036). |
 | `xlsx` | `SpreadsheetDiff` structured model, sheets-diff v2 adapter, panic-free Result API, cancellation (RFC-058). |
 
-## `ui-logic` modules (9)
+## `ui-logic` modules (14)
 
 Framework-independent view-model logic. All modules are testable with
 `cargo test -p forskscope-ui-logic` — no GTK or display server required.
@@ -58,11 +58,16 @@ Framework-independent view-model logic. All modules are testable with
 | `explore::deep_filter` | `DeepFilter`, `DeepCompareSummary`, `apply_filter` — filter state and counts for recursive directory compare (RFC-037, RFC-038). |
 | `explore::status` | `RowStatusKind`, `StatusRow` — maps `EqualityEvidence` to CSS class, glyph, and aria label for tree row badges (RFC-054). |
 | `compare::command_bar` | `build_toolbar(registry, ctx)` → `Vec<ToolbarSection>` — evaluates `AvailabilityRule` for all commands; replaces ad-hoc `if can_save` guards (RFC-019). |
+| `compare::conflict_nav_view` | `ConflictNavView::from_navigator(nav, can_save)` — complete navigator rail snapshot: rows with glyphs/CSS, progress text, prev/next IDs (RFC-034, Slice 6). |
 | `compare::hunk_decorations` | `DecorationIndex::from_set(dec)` — O(1) `(row_index, side)` → `RowDecoration` lookup; replaces inline `match hunk.kind` CSS logic in `hunk.rs` (RFC-024, RFC-035). |
-| `compare::load_guard` | `guard_for_sizes(left, right)` → `LoadGuard` — pre-diff decision: Proceed / WarnBanner / ConfirmPrompt derived from `FileSizeClass` thresholds (RFC-013). |
+| `compare::load_guard` | `guard_for_sizes(left, right)` → `LoadGuard` — pre-diff decision: Proceed / WarnBanner / ConfirmPrompt derived from `FileSizeClass` thresholds (RFC-013, Slice 1). |
+| `compare::palette_view` | `build_palette(registry, ctx, query)` → `Vec<PaletteRow>` — filtered, availability-evaluated, sorted palette results (RFC-019, Slice 7). |
+| `compare::save_error` | `SaveErrorView::from_error(err, path)` — maps `AppError` to dialog title, body, and ordered `Vec<RecoveryButton>` (RFC-007, RFC-017, Slice 3). |
+| `compare::scroll_sync` | `ScrollSyncState` — `scrollTop` ↔ `ScrollAnchor` arithmetic for synchronized pane scrolling; `scroll_to_row` for hunk navigation (RFC-035, Slice 1). |
 | `compare::search_index` | `MatchIndex` — in-diff search match navigation with `advance()`/`retreat()` (RFC-014). |
 | `compare::summary` | `CompareStatusSummary`, `DiffNavigationState` — status bar content and hunk navigation position (RFC-006). |
 | `compare::tab_state` | `TabStateSnapshot`, `context_from_snapshot` — bridges `TabSnapshot` fields to `CommandContext` for toolbar evaluation (RFC-003, RFC-019). |
+| `settings::settings_view` | `theme_choices`, `density_choices`, `font_family_choices`, `profile_presets` — picker metadata and validators (`validate_font_size`, `validate_context_lines`, `find_active`) for the settings dialog (RFC-009, Slice 5). |
 
 ## UI modules
 
@@ -81,6 +86,7 @@ Framework-independent view-model logic. All modules are testable with
 | `ui/search` | Inline search bar, `SearchCtx`, scroll-to-focused. |
 | `ui/keybindings` | Keyboard reference modal. |
 | `i18n` | English passthrough + Japanese key map. |
+| **Shim re-exports** | `command_bar`, `compare_summary`, `conflict_nav`, `deep_filter`, `explore_status`, `explorer_align`, `hunk_decorations`, `load_guard`, `palette_view`, `save_error`, `scroll_sync`, `search_index`, `settings_view`, `tab_state` — one shim per `ui-logic` module providing a stable import path for future wiring. |
 
 ## Core ownership rule
 

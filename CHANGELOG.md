@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.87.0] — 2026-06-12
+
+Documentation pass: maintainer docs updated to v0.87.0 reality.
+
+### Changed
+
+- **`docs/src/maintainers/architecture.md`**:
+  - `ui-logic` modules table: **9 → 14 modules**. Added `conflict_nav_view`,
+    `load_guard`, `palette_view`, `save_error`, `scroll_sync`,
+    `settings::settings_view` with purpose and Slice/RFC cross-references.
+  - UI modules table: added shim re-export row listing all 14 shim files.
+
+- **`docs/src/maintainers/testing.md`**:
+  - Version header: v0.79.0 → v0.87.0.
+  - Test count table: 692 → **797** (189 ui-logic, +1 ui-logic integration).
+  - `ui-logic` test modules table: **9 → 14 rows**. Added `conflict_nav_view`,
+    `palette_view`, `save_error`, `scroll_sync`, `settings/settings_view` with
+    coverage descriptions and RFC columns.
+
+- **`rfcs/notes/core-completion-summary-v0.72.md`**: updated version,
+  module count (7 → 14), test count (85 → 189), status line.
+
+- **`rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md`**:
+  updated version (v0.78.0 → v0.87.0), ui-logic gate (85/7 → 189/14),
+  RFC inventory description.
+
+---
+
 ## [0.86.0] — 2026-06-12
 
 Settings form view-model; `ui-logic` now covers all 7 ROADMAP slices (Slice 5).

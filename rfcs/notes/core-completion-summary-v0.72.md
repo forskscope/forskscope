@@ -1,7 +1,7 @@
 # Core and View-Model Layer Completion Summary — v0.78.0
 
 **Date:** 2026-06-12
-**Status:** Core data layer complete. `ui-logic` view-model layer complete. Ready for UI wiring.
+**Status:** Core data layer complete. `ui-logic` view-model layer complete (14 modules, 189 tests). All 7 ROADMAP slices have view-model coverage. Ready for UI wiring.
 
 > Originally written at v0.72.0; updated at v0.78.0 to reflect ui-logic additions.
 
@@ -66,7 +66,7 @@
 | `watcher` | `FileChangeMonitor`, `MockFileChangeMonitor` |
 | `xlsx` | `SpreadsheetDiff`, sheets-diff v2 adapter |
 
-## `forskscope-ui-logic` modules (7, v0.78.0)
+## `forskscope-ui-logic` modules (14, v0.87.0)
 
 | Module | Purpose | Tests |
 |--------|---------|-------|

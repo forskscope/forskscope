@@ -1,8 +1,8 @@
 # RFC 041: v1.0 Product Stabilization and RFC Governance
 
-**Status.** Proposed — checklist updated v0.78.0
+**Status.** Proposed — checklist updated v0.87.0
 
-## Current state (v0.78.0)
+## Current state (v0.87.0)
 
 ### Must-Stabilise targets — all complete
 
@@ -17,7 +17,7 @@
 | Directory comparison basics | ✓ `DirectoryIndex` + `EqualityEvidence` + `pair_entries` (v0.58.0) |
 | Editor adapter safety boundary | ✓ `TextEditOperation` revision contract; UI adapter is remaining work |
 
-### Release readiness checklist (v0.78.0)
+### Release readiness checklist (v0.87.0)
 
 ```text
 Product:
@@ -34,7 +34,7 @@ Safety:
 
 Engineering:
   [x] Core tests pass                               (599 unit + 2 integration + 6 doctest, 0 failures)
-  [x] ui-logic tests pass                           (85 unit tests, 7 modules, 0 failures)
+  [x] ui-logic tests pass                           (189 unit tests, 14 modules, 0 failures)
   [ ] Editor harness tests pass                     (RFC-040 deferred)
   [ ] Packaging smoke tests pass                    (RFC-010 deferred)
   [x] Session schema migration tests pass           (persist_tests, session_tests)
