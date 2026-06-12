@@ -20,19 +20,19 @@ The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
 be tested in environments without a display server. Core and ui-logic tests
 run anywhere Rust is installed.
 
-## Test counts (v0.109.0)
+## Test counts (v0.110.0)
 
 | Suite | Count |
 |-------|-------|
-| `forskscope-core` unit | 646 |
-| `forskscope-core` integration (`diff_corpus`) | 25 |
+| `forskscope-core` unit | 650 |
+| `forskscope-core` integration (`diff_corpus`) | 27 |
 | `forskscope-core` integration (`merge_corpus`) | 16 |
 | `forskscope-core` integration (`patch_apply`) | 2 |
 | `forskscope-ui-logic` unit | 228 |
 | `forskscope-ui-logic` integration (`css_coverage`) | 5 |
 | Doctests | 7 |
 | `forskscope-ui-logic` integration | 1 |
-| **Total** | **930** |
+| **Total** | **936** |
 
 ## `forskscope-core` test modules
 

@@ -147,3 +147,82 @@ fn save_with_none_fingerprint_always_succeeds() {
     crate::save::save_text(&req).unwrap();
     assert_eq!(std::fs::read_to_string(&target).unwrap(), "new\n");
 }
+
+// ── SaveOutcome field coverage ────────────────────────────────────────────────
+
+#[test]
+fn backup_path_is_none_when_policy_is_none() {
+    let dir = temp_dir("bak-none");
+    let target = dir.join("file.txt");
+    let request = SaveRequest {
+        target: target.clone(),
+        content: "data\n".into(),
+        encoding_label: "UTF-8".into(),
+        expected_fingerprint: None,
+        backup: BackupPolicy::None,
+    };
+    let outcome = save_text(&request).unwrap();
+    assert!(outcome.backup_path.is_none(),
+        "backup_path must be None when BackupPolicy::None is used");
+}
+
+#[test]
+fn new_fingerprint_reflects_written_content() {
+    let dir = temp_dir("new-fp");
+    let target = dir.join("file.txt");
+    // Write an initial file, capture its fingerprint, then overwrite.
+    fs::write(&target, "original\n").unwrap();
+    let original_fp = FileFingerprint::capture(&target, None).unwrap();
+
+    let request = SaveRequest {
+        target: target.clone(),
+        content: "updated content here\n".into(),
+        encoding_label: "UTF-8".into(),
+        expected_fingerprint: None,
+        backup: BackupPolicy::None,
+    };
+    let outcome = save_text(&request).unwrap();
+    // The new fingerprint must differ from the original.
+    assert_ne!(outcome.new_fingerprint.len, original_fp.len,
+        "new_fingerprint must reflect the updated file size");
+    // Re-capturing should give the same fingerprint as the outcome.
+    let recaptured = FileFingerprint::capture(&target, None).unwrap();
+    assert_eq!(outcome.new_fingerprint.len, recaptured.len,
+        "new_fingerprint must match a fresh capture after write");
+}
+
+#[test]
+fn encoding_fallback_to_utf8_is_true_for_unknown_encoding() {
+    let dir = temp_dir("enc-fallback");
+    let target = dir.join("file.txt");
+    let request = SaveRequest {
+        target: target.clone(),
+        content: "hello world\n".into(),
+        encoding_label: "DEFINITELY-NOT-A-REAL-ENCODING-LABEL".into(),
+        expected_fingerprint: None,
+        backup: BackupPolicy::None,
+    };
+    let outcome = save_text(&request).unwrap();
+    // Unknown encoding → UTF-8 fallback used → flag is true.
+    assert!(outcome.encoding_fallback_to_utf8,
+        "encoding_fallback_to_utf8 must be true when the label is unknown");
+    // Content must still have been written (as UTF-8).
+    assert_eq!(fs::read_to_string(&target).unwrap(), "hello world\n");
+}
+
+#[test]
+fn written_bytes_matches_content_length() {
+    let dir = temp_dir("written-bytes");
+    let target = dir.join("file.txt");
+    let content = "line1\nline2\nline3\n";  // 18 bytes
+    let request = SaveRequest {
+        target: target.clone(),
+        content: content.into(),
+        encoding_label: "UTF-8".into(),
+        expected_fingerprint: None,
+        backup: BackupPolicy::None,
+    };
+    let outcome = save_text(&request).unwrap();
+    assert_eq!(outcome.written_bytes, 18,
+        "written_bytes must equal the byte length of the content");
+}

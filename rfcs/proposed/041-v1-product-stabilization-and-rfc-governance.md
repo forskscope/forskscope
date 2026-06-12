@@ -1,8 +1,8 @@
 # RFC 041: v1.0 Product Stabilization and RFC Governance
 
-**Status.** Proposed — checklist updated v0.99.0
+**Status.** Proposed — checklist updated v0.110.0
 
-## Current state (v0.99.0)
+## Current state (v0.110.0) — final pre-GTK state
 
 ### Must-Stabilise targets — all complete
 
@@ -17,7 +17,7 @@
 | Directory comparison basics | ✓ `DirectoryIndex` + `EqualityEvidence` + `pair_entries` (v0.58.0) |
 | Editor adapter safety boundary | ✓ `TextEditOperation` revision contract; UI adapter is remaining work |
 
-### Release readiness checklist (v0.99.0)
+### Release readiness checklist (v0.110.0 — final pre-GTK state)
 
 ```text
 Product:
@@ -33,20 +33,20 @@ Safety:
   [x] Large-file mode prevents UI lockups           (FileSizeClass + PerformanceLimits)
 
 Engineering:
-  [x] Core tests pass                               (646 unit + 43 integration = 930 total, 0 failures)
-  [x] ui-logic tests pass                           (189 unit tests, 14 modules, 0 failures)
+  [x] Core tests pass                               (650 unit + 45 integration = 936 total, 0 failures)
+  [x] ui-logic tests pass                           (228 unit tests, 14 modules, all fields covered)
   [ ] Editor harness tests pass                     (RFC-040 deferred)
   [ ] Packaging smoke tests pass                    (RFC-010 deferred)
   [x] Session schema migration tests pass           (persist_tests, session_tests)
 
 Documentation:
-  [x] Architecture and testing docs current         (v0.95.0)
+  [x] Architecture and testing docs current         (v0.110.0)
   [x] User guide covers common workflows            (v0.96.0–v0.98.0)
   [x] Recovery/backup behavior documented           (docs/src/users/merging.md)
   [x] Known limitations documented                  (docs/src/users/known-limitations.md, v0.98.0)
 ```
 
-### RFC inventory at v0.99.0
+### RFC inventory at v0.110.0
 
 **Done: 39** — all core data-layer and view-model RFCs complete.
 **Proposed: 9** — editor adapter track (4), platform/packaging (2), governance (2), documentation (1).

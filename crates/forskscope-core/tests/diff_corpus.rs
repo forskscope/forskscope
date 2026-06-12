@@ -319,3 +319,35 @@ fn text_fixtures_classify_as_text() {
 fn doc_identical(left: &str, right: &str) -> bool {
     compute_diff(left, right, DiffOptions::default()).is_identical()
 }
+
+// ── Additional corpus scenarios ───────────────────────────────────────────────
+
+#[test]
+fn mixed_crlf_lf_file_has_changes_detected() {
+    // One file with mixed CRLF/LF — the diff engine sees line-ending
+    // differences as content differences (consistent with default mode).
+    let left  = load("newlines/left_mixed_endings.txt");
+    let right = load("newlines/right_mixed_endings.txt");
+    let diff  = compute_diff(&left, &right, opts_default());
+    assert!(!doc_identical(&left, &right),
+        "mixed-ending files with one changed line must not be identical");
+    // Must produce at least one changed hunk.
+    use forskscope_core::diff::HunkKind;
+    let has_change = diff.hunks.iter().any(|h| h.kind != HunkKind::Equal);
+    assert!(has_change, "at least one non-equal hunk must be present");
+}
+
+#[test]
+fn very_long_single_line_produces_one_replace_hunk() {
+    // 2000-char single-line files — the diff engine must handle them
+    // without truncation or panic.
+    let left  = load("text/left_long_line.txt");
+    let right = load("text/right_long_line.txt");
+    assert!(!doc_identical(&left, &right));
+    let diff = compute_diff(&left, &right, opts_default());
+    assert!(!diff.hunks.is_empty(), "long single-line diff must not be empty");
+    // The hunk must not be Equal — the 2000-char content is different.
+    use forskscope_core::diff::HunkKind;
+    let has_change = diff.hunks.iter().any(|h| h.kind != HunkKind::Equal);
+    assert!(has_change, "a change hunk must exist for different long lines");
+}

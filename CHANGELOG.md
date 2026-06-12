@@ -5,6 +5,56 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.110.0] — 2026-06-12
+
+**Milestone: pre-v1 stabilisation complete — all non-GTK work done.**
+
+All work achievable without a GTK/display environment is complete. The
+project is ready for GTK integration testing to close the three remaining
+RFC-041 items. Total tests: **936** (930 → 936, +6).
+
+### Added
+
+**`save_tests.rs`** (7 → 11 tests) — `SaveOutcome` field coverage:
+- `backup_path_is_none_when_policy_is_none` — `backup_path` is `None`
+  when `BackupPolicy::None` is used.
+- `new_fingerprint_reflects_written_content` — `new_fingerprint` differs
+  from the original and matches a fresh `FileFingerprint::capture` after write.
+- `encoding_fallback_to_utf8_is_true_for_unknown_encoding` — an unknown
+  encoding label triggers fallback; `encoding_fallback_to_utf8 == true`;
+  content is still written correctly as UTF-8.
+- `written_bytes_matches_content_length` — `written_bytes` equals the exact
+  byte length of the written content.
+
+**`diff_corpus.rs`** (25 → 27 tests) — two new fixture scenarios:
+- `mixed_crlf_lf_file_has_changes_detected` — file with mixed CRLF and LF
+  line endings; a one-line change is detected correctly.
+- `very_long_single_line_produces_one_replace_hunk` — 2000-character
+  single-line files; diff engine handles them without truncation or panic.
+
+**`tests/fixtures/newlines/`** — `left_mixed_endings.txt`,
+`right_mixed_endings.txt` (mixed CRLF/LF fixture pair).
+
+**`tests/fixtures/text/`** — `left_long_line.txt`, `right_long_line.txt`
+(2000-character single-line fixture pair).
+
+### Changed
+
+- **`rfcs/proposed/041-v1-product-stabilisation-and-rfc-governance.md`** —
+  checklist updated to v0.110.0 (final pre-GTK state): core test count
+  936; ui-logic 228; Architecture docs current (v0.110.0). 12 of 16 items
+  ticked; remaining 4 are GTK-dependent or explicitly deferred.
+
+- `docs/src/maintainers/testing.md` — v0.110.0; total 936; diff_corpus
+  count 25 → 27.
+
+- `rfcs/notes/core-completion-summary-v0.72.md` — 936 tests; diff_corpus
+  25 → 27; core unit 646 → 650; version → v0.110.0.
+
+- `ROADMAP.md` — last-updated → v0.110.0.
+
+---
+
 ## [0.109.0] — 2026-06-12
 
 **Milestone: ui-logic view-model test coverage pass complete.**

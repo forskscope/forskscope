@@ -1,7 +1,7 @@
-# Core and View-Model Layer Completion Summary — v0.109.0
+# Core and View-Model Layer Completion Summary — v0.110.0
 
 **Date:** 2026-06-12
-**Status:** Core data layer complete. `ui-logic` view-model layer complete (14 modules, 189 tests). All 7 ROADMAP slices have view-model coverage. UI stabilisation ongoing; tests at 930, docs complete, RFC-041 checklist 12/16 items ticked.
+**Status:** Core data layer complete. `ui-logic` view-model layer complete (14 modules, 189 tests). All 7 ROADMAP slices have view-model coverage. UI stabilisation ongoing; tests at 936, docs complete, RFC-041 checklist 12/16 items ticked.
 
 > Originally written at v0.72.0; updated at v0.78.0, v0.87.0, v0.99.0.
 
@@ -35,7 +35,7 @@
 
 ---
 
-## `forskscope-core` modules (27, v0.109.0)
+## `forskscope-core` modules (27, v0.110.0)
 
 | Module | Domain |
 |--------|--------|
