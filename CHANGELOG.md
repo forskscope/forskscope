@@ -5,6 +5,52 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.60.0] — 2026-06-10
+
+User settings model and JSON persistence (RFC-009 slice).
+
+### Added
+
+- **`forskscope-core::settings`** — user settings model (RFC-009 §4, §6, §10).
+
+  **`UserSettings`**: top-level settings record with four sections.
+  Defaults represent a valid first-run state.
+
+  **`AppearanceSettings`**: `theme: ThemeId` (Dark/Light/Night, default Dark),
+  `density: Density` (Comfortable/Compact/Spacious), `font_family:
+  FontFamilySetting` (SystemMono/SystemSans/SystemSerif), `font_size: u8`
+  (clamped 6–50 on load, default 14).
+
+  **`DiffSettings`**: `compare_profile: CompareProfile` (default profile),
+  `show_line_numbers: bool` (true), `wrap_long_lines: bool` (false). Reuses
+  `CompareProfile` from RFC-028 — the profile name is serialised to JSON and
+  looked up in `all_presets()` on load; unknown names fall back to default.
+
+  **`FileSettings`**: `newline_policy: NewlinePolicy` (Preserve), `performance:
+  PerformanceLimits` (not persisted — always default; future RFC), `restore_session:
+  bool` (true), `recent_limit: usize` (20).
+
+  **`LocaleSettings`**: `locale: LocaleId`. Default is `"en"`.
+
+  **`ThemeTokens::css_var_names(ThemeId) → Vec<(&str, &str)>`**: returns the 12
+  CSS variable names (`--fsk-*`) for a theme. The Dioxus app injects these as
+  `:root` variables; core is not involved in rendering.
+
+  **`UserSettings::to_json` / `from_json`**: persist via `VersionedEnvelope`
+  with `SchemaName::Settings` and `SETTINGS_SCHEMA_VERSION = 1`. `from_json`
+  enforces the migration policy (error on `TooNew`). Per RFC-009 §10: unknown
+  or corrupt payload fields silently fall back to defaults rather than rejecting
+  the file — the envelope is the version gate, not the payload parser.
+
+- **15 new tests** in `tests/settings_tests.rs`: default values, all
+  `ThemeId`/`Density`/`FontFamilySetting` round-trips, CSS variable name
+  count and prefix, JSON round-trip for defaults and non-defaults, schema
+  version in output, newer-schema rejection, corrupt-payload fallback,
+  `LocaleId` helpers, font_size clamping on load.
+  Total core test count: 435.
+
+---
+
 ## [0.59.0] — 2026-06-10
 
 Application error taxonomy (RFC-017 slice) and file-size classification (RFC-013 slice).

@@ -1,6 +1,6 @@
 # RFC-009 — Settings, Theme, Localization, and Accessibility
 
-**Status.** Proposed
+**Status.** Proposed — UserSettings model and JSON persistence slice implemented (v0.60.0); settings dialog UI open
 
 ---toml
 project = "ForskScope"

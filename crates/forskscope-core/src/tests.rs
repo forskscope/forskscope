@@ -26,6 +26,7 @@ mod persist_tests;
 mod report_tests;
 mod save_tests;
 mod session_tests;
+mod settings_tests;
 mod three_way_tests;
 mod transaction_log_tests;
 mod vcs_tests;
