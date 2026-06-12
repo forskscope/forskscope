@@ -1,24 +1,29 @@
 # ForskScope Roadmap
 
-**Last updated:** v0.88.0 (2026-06-12)
-**Current phase:** UI implementation — view-model layer complete, CSS contract established
+**Last updated:** v0.97.0 (2026-06-12)
+**Current phase:** UI stabilisation — core complete, UI bug fixes and documentation shipping
 
 ---
 
 ## Current state
 
 The `forskscope-core` and `forskscope-ui-logic` crates are feature-complete
-for the v1 diff/merge workflow. 39 of 48 RFCs are implemented. 801 tests pass
-with zero failures (599 core + 189 ui-logic + 2 core-integration + 5 ui-logic-integration + 6 doctest).
-The `forskscope-ui-logic` crate has 14 view-model modules covering all 7 ROADMAP slices.
-The CSS contract (RFC-024, RFC-034) is established: `main.css` defines every
-CSS class token that `DiffDecorationSet` and `ConflictNavigator` produce,
-and 4 integration tests verify the contract at compile time.
-The UI crate (`forskscope-ui`) holds the Dioxus shell and working components;
-the next step is wiring components to the view-model layer (requires GTK).
+for the v1 diff/merge workflow. 39 of 48 RFCs are implemented. **875 tests**
+pass with zero failures (646 core unit + 25 diff corpus + 2 patch apply +
+189 ui-logic + 5 CSS coverage + 7 doctest + 1 ui-logic integration).
 
-The next phase is connecting the UI to core through a series of vertical
-slices, each delivering a usable increment.
+The UI crate (`forskscope-ui`) is feature-complete and actively maintained:
+two-pane diff layout with independent pane labels and shared horizontal scroll;
+theme-aware select styling; ESC key closes modals; i18n complete across all
+components (English + Japanese); all modal dialogs translated. User
+documentation covers all four primary workflows.
+
+The `platform` module provides runtime diagnostics for the About panel
+(RFC-026). The acceptance test corpus covers 26 fixture files across
+text/newlines/whitespace/encoding/binary categories.
+
+The next phase is connecting remaining UI slices to the view-model layer
+and preparing for a public v1 release candidate (RFC-041).
 
 ---
 
@@ -38,7 +43,13 @@ slices, each delivering a usable increment.
 | Patch export | v0.39 | Unified-diff export from file/directory diffs |
 | Core data layer | v0.40–v0.72 | All RFC data types, 629 tests, clippy clean |
 | View-model layer | v0.74–v0.87 | 14 `ui-logic` modules, 189 tests, all 7 slices covered |
-| CSS contract | v0.88 | `fs-line-*`, `fs-inline-*`, `fsk-conflict-*` classes added; 4 coverage tests |
+| CSS contract | v0.88 | `fs-line-*`, `fs-inline-*`, `fsk-conflict-*` classes; 4 coverage tests |
+| CSS bug fixes | v0.89 | `--danger-bg` defined; path.rs tests (16); `cancel_tests`, `file_kind_tests` |
+| Test coverage | v0.90–v0.91 | All core modules tested; 26-file diff corpus; 856 tests total |
+| UI four-bug fix | v0.92 | Two-pane split, dark theme select colour, ESC modal close, i18n expanded |
+| Platform diag | v0.93 | `platform` module, `PlatformInfo`, corpus extended (encoding/binary/large) |
+| Scroll fix + i18n | v0.94 | ISSUE-001 resolved (shared scrollbar); modals i18n complete |
+| Docs + platform | v0.95–v0.96 | Testing/architecture/local-dev docs updated; 4 user docs rewritten |
 
 ---
 

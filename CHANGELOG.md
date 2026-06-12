@@ -5,6 +5,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.97.0] — 2026-06-12
+
+ROADMAP, release process, and features documentation updated to v0.97.0.
+
+### Changed
+
+- **`ROADMAP.md`** — updated to v0.97.0:
+  - Header: v0.88.0 → v0.97.0, phase description updated.
+  - Current state: 801 → **875 tests**; describes UI completeness (two-pane
+    split, i18n, modal ESC, theme select), platform diagnostics, acceptance
+    corpus.
+  - Delivered milestones table: added CSS bug fixes (v0.89), test coverage
+    (v0.90–v0.91), UI four-bug fix (v0.92), platform diagnostics (v0.93),
+    scroll fix + modals i18n (v0.94), docs pass (v0.95–v0.96).
+
+- **`docs/src/maintainers/release.md`** (28 → 84 lines) — rewritten to match
+  the actual release process:
+  - Pre-release checklist (tests, clippy, CHANGELOG, version, RFCs, ROADMAP).
+  - Accurate `cp -r` + `rm -rf target` + `tar` archive recipe (the previous
+    doc used `git archive` which is not the process used).
+  - Archive naming table and verification command.
+  - Version scheme explanation (v0.x pre-release conventions).
+  - Post-archive steps (upload, git tag, AUR).
+  - MSRV check (`cargo +1.85 test`).
+
+- **`docs/src/users/features.md`** (40 → 105 lines) — added all capabilities
+  that shipped since the original stub:
+  - Two-pane layout with shared horizontal scroll bar.
+  - Full diff options table (Inline diff, Wrap, Ignore WS, Ignore case,
+    Algorithm).
+  - Compare profiles section (built-in: Default, Code Review, Loose Text,
+    Large File Safe; custom profiles).
+  - File types table updated (encoding detection, BOM round-trip).
+  - Three-way merge / git mergetool section.
+  - Localisation: English + Japanese explicitly stated.
+
+---
+
 ## [0.96.0] — 2026-06-12
 
 User documentation expanded: four pages rewritten to reflect current UI.
