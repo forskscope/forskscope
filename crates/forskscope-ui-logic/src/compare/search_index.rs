@@ -263,4 +263,94 @@ mod tests {
         let idx = index_for("target", &hunks);
         assert_eq!(idx.focused().unwrap().hunk_elem_id, "h-42");
     }
+
+    // ── len / is_empty ────────────────────────────────────────────────────────
+
+    #[test]
+    fn len_and_is_empty_consistent_for_empty_index() {
+        let idx = index_for("", &[(1u64, rows(&[("hello", "world")]))]);
+        assert!(idx.is_empty());
+        assert_eq!(idx.len(), 0);
+    }
+
+    #[test]
+    fn len_equals_match_count() {
+        // Three lines each containing the query: expect len == 3.
+        let hunks = vec![
+            (1u64, rows(&[("found", "found")])),
+            (2u64, rows(&[("found", "no")])),
+            (3u64, rows(&[("no", "found")])),
+        ];
+        let idx = index_for("found", &hunks);
+        // Each row with a match on Left, Right, or Both counts as one position.
+        // (1,Left/Right/Both), (2,Left), (3,Right) → at least 3 positions.
+        assert!(!idx.is_empty());
+        assert!(idx.len() >= 3,
+            "len {} should be ≥ 3 for three matching rows", idx.len());
+    }
+
+    // ── focused() returns correct MatchPosition data ──────────────────────────
+
+    #[test]
+    fn focused_returns_correct_hunk_id() {
+        let hunks = vec![(99u64, rows(&[("needle", "other")]))];
+        let idx = index_for("needle", &hunks);
+        let pos = idx.focused().expect("must have a focused position");
+        assert_eq!(pos.hunk_id, 99u64,
+            "focused position hunk_id must match the hunk that contained the match");
+    }
+
+    #[test]
+    fn focused_returns_correct_row_index() {
+        // Three rows, match only in the third.
+        let rows_data = vec![
+            (Some("no"), Some("no")),
+            (Some("no"), Some("no")),
+            (Some("needle"), Some("other")),
+        ];
+        let idx = MatchIndex::build(
+            std::iter::once((7u64, rows_data.as_slice())),
+            "needle",
+        );
+        let pos = idx.focused().expect("must have focused position");
+        assert_eq!(pos.row_index, 2,
+            "focused row_index must be 2 (third row, 0-based)");
+    }
+
+    // ── focused_number ────────────────────────────────────────────────────────
+
+    #[test]
+    fn focused_number_is_1_at_start() {
+        let hunks = vec![(1u64, rows(&[("x", "x"), ("x", "no")]))];
+        let idx = index_for("x", &hunks);
+        assert_eq!(idx.focused_number(), Some(1),
+            "focused_number must be 1 before any advance");
+    }
+
+    #[test]
+    fn focused_number_increments_on_advance() {
+        let hunks = vec![(1u64, rows(&[("x", "x"), ("x", "x")]))];
+        let mut idx = index_for("x", &hunks);
+        assert_eq!(idx.focused_number(), Some(1));
+        idx.advance();
+        assert_eq!(idx.focused_number(), Some(2),
+            "focused_number must be 2 after one advance");
+    }
+
+    // ── advance on empty index ────────────────────────────────────────────────
+
+    #[test]
+    fn advance_on_empty_index_returns_none() {
+        let mut idx = index_for("zzz", &[(1u64, rows(&[("no", "match")]))]);
+        assert!(idx.is_empty(), "fixture must produce an empty index");
+        assert!(idx.advance().is_none(),
+            "advance on empty index must return None, not panic");
+    }
+
+    #[test]
+    fn retreat_on_empty_index_returns_none() {
+        let mut idx = index_for("zzz", &[(1u64, rows(&[("no", "match")]))]);
+        assert!(idx.retreat().is_none(),
+            "retreat on empty index must return None, not panic");
+    }
 }

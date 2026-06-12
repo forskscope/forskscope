@@ -20,7 +20,7 @@ The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
 be tested in environments without a display server. Core and ui-logic tests
 run anywhere Rust is installed.
 
-## Test counts (v0.107.0)
+## Test counts (v0.108.0)
 
 | Suite | Count |
 |-------|-------|
@@ -28,11 +28,11 @@ run anywhere Rust is installed.
 | `forskscope-core` integration (`diff_corpus`) | 25 |
 | `forskscope-core` integration (`merge_corpus`) | 16 |
 | `forskscope-core` integration (`patch_apply`) | 2 |
-| `forskscope-ui-logic` unit | 214 |
+| `forskscope-ui-logic` unit | 222 |
 | `forskscope-ui-logic` integration (`css_coverage`) | 5 |
 | Doctests | 7 |
 | `forskscope-ui-logic` integration | 1 |
-| **Total** | **916** |
+| **Total** | **924** |
 
 ## `forskscope-core` test modules
 
@@ -104,7 +104,7 @@ Integration tests live in `tests/css_coverage.rs`.
 | `compare/palette_view` | `build_palette`: empty query returns all; query matches label; nonsense empty; case-insensitive; enabled before disabled; Save disabled in empty context; `enabled_count`; all labels/IDs/descriptions non-empty; `shortcut_hint` non-empty for Save; `disabled_reason` Some/None; `enabled_count` in diff context. | RFC-019 |
 | `compare/save_error` | `action_label` all variants non-empty; `SaveErrorView::from_error`: external-mod action set, primary ≠ Overwrite, `FileWriteFailed`/`InternalFault` actions; path passthrough; title/body non-empty; button labels non-empty; exactly one primary. | RFC-007, RFC-017 |
 | `compare/scroll_sync` | `ScrollSyncState`: at-top, pixel→anchor→pixel round-trip, mid-row fraction, negative clamping, `scroll_to_row`, past-end clamping, `max_scroll_px`, zero row-height guard. | RFC-035 |
-| `compare/search_index` | `MatchIndex` build/advance/retreat/wrap, `matching_hunk_ids`, empty index. | RFC-014 |
+| `compare/search_index` | `MatchIndex` build/advance/retreat/wrap, `matching_hunk_ids`, empty index; `len`/`is_empty` consistency; `focused()` returns correct `hunk_id` and `row_index`; `focused_number` at start and after advance; `advance`/`retreat` return `None` on empty index. | RFC-014 |
 | `compare/summary` | `CompareStatusSummary` for identical/changed/whitespace-only/single-hunk, dirty marker, `DiffNavigationState` position labels and aria wrap cases. | RFC-006 |
 | `compare/tab_state` | `context_from_snapshot` field mapping, `AvailabilityRule` inverse verification, end-to-end `TabStateSnapshot → CommandContext → build_toolbar`; conflict flags (ActiveConflict, AnyConflictUnresolved), redo flag, read-only tab, focused-hunk guard, all-flags-true exhaustive check. | RFC-003, RFC-019 |
 | `settings/settings_view` | `theme_choices` round-trip via `ThemeId::from_id`; density/font round-trips; `profile_presets` count and name; font-size validation boundaries; `clamp_font_size` extremes; context-lines boundary; `find_active` hit/miss; no duplicate values. | RFC-009 |

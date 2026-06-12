@@ -5,6 +5,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.108.0] — 2026-06-12
+
+8 new search_index tests (len, focused data, focused_number, empty-index safety); 916 → 924 tests.
+
+### Added
+
+- **8 new tests in `crates/forskscope-ui-logic/src/compare/search_index.rs`**
+  (13 → 21 tests):
+
+  *len / is_empty:*
+  - `len_and_is_empty_consistent_for_empty_index` — both `len()` and
+    `is_empty()` correctly reflect a zero-match index.
+  - `len_equals_match_count` — `len()` ≥ 3 for three rows each containing
+    the query.
+
+  *focused() MatchPosition fields:*
+  - `focused_returns_correct_hunk_id` — `focused().hunk_id` matches the
+    hunk that contained the match.
+  - `focused_returns_correct_row_index` — `focused().row_index` is 2 when
+    the match is in the third row (0-based).
+
+  *focused_number:*
+  - `focused_number_is_1_at_start` — `focused_number()` returns `Some(1)`
+    before any advance.
+  - `focused_number_increments_on_advance` — `focused_number()` returns
+    `Some(2)` after one `advance()`.
+
+  *advance / retreat on empty:*
+  - `advance_on_empty_index_returns_none` — `advance()` returns `None`
+    without panicking when the index is empty.
+  - `retreat_on_empty_index_returns_none` — `retreat()` returns `None`
+    without panicking when the index is empty.
+
+### Changed
+
+- `docs/src/maintainers/testing.md` — 916 → **924**; `search_index` row
+  updated with focused-data and empty-safety coverage.
+- `rfcs/notes/core-completion-summary-v0.72.md` — 916 → 924; ui-logic
+  214 → 222; version → v0.108.0.
+- `rfcs/proposed/041-…` — 924 total.
+
+---
+
 ## [0.107.0] — 2026-06-12
 
 9 new tests across align.rs and palette_view.rs; 907 → 916 tests.
