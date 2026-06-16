@@ -58,7 +58,7 @@ fn TabItem(index: usize, is_active: bool) -> Element {
             button {
                 class: "tab-close",
                 title: t(lang, "Close tab"),
-                aria_label: "Close {title}",
+                aria_label: format!("{} {title}", t(lang, "Close")),
                 onclick: move |_| {
                     let dirty = store.tabs.read().get(index)
                         .map(|t| t.can_save && t.merge.is_dirty())

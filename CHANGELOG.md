@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.126.0] — 2026-06-13
+
+i18n: last three hardcoded strings fixed; comprehensive scan confirms zero
+remaining English fallbacks anywhere in the UI. 134 active translation keys.
+
+### Fixed
+
+**`crates/forskscope-ui/src/ui/modals.rs`**
+- `BatchCopyModal` scrim `aria_label: "Batch copy"` → `t(lang, "Batch copy")`.
+- `BatchCopyModal` heading `"Copy {count} files?"` → `format!` with
+  `t(lang, "Copy")` and `t(lang, "files")` for correct word-order in Japanese.
+
+**`crates/forskscope-ui/src/ui/tabs.rs`**
+- Tab close button `aria_label: "Close {title}"` → `format!("{} {title}", t(lang, "Close"))`.
+  The filename `{title}` stays in its original language; only the verb is translated.
+
+**`crates/forskscope-ui/src/i18n.rs`** — 3 new entries: `"Batch copy"` →
+一括コピー, `"files"` → ファイル, `"Close"` → 閉じる.
+
+**Intentionally untranslated** (product names): `"ForskScope v{version}"` in
+`AboutModal`; `"About ForskScope"` tooltip in `settings.rs`.
+
+---
+
 ## [0.125.0] — 2026-06-12
 
 i18n: all remaining tooltip, aria-label, and visible-text strings now go

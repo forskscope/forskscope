@@ -165,9 +165,9 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
     let count = spec.items.len();
     let label = spec.label.clone();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Batch copy",
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Batch copy"),
             div { class: "modal",
-                h2 { "Copy {count} files?" }
+                h2 { {format!("{} {count} {}?", t(lang, "Copy"), t(lang, "files"))} }
                 p { "{label}" }
                 p { class: "notice", {t(lang, "Existing files will receive a .bak backup.")} }
                 div { class: "actions",
