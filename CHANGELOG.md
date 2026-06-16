@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.118.0] — 2026-06-12
+
+ELOC compliance: UI `state.rs` split; all files now at or below the project's
+300-line soft limit (except unavoidably dense single-concept modules).
+
+### Changed
+
+Pure refactor — no behaviour, public API, or test changes.
+
+**`crates/forskscope-ui/src/state.rs` (444 lines) → `state/mod.rs` + `state/settings.rs`**
+
+- `state/settings.rs` (141): UI-layer settings types — `Theme`, `Lang`,
+  `DiffAlgorithmSetting`, `DiffProfile`, profile management functions
+  (`add_profile`, `remove_profile`), `AppSettings`, `BatchCopySpec`, `DirOp`.
+- `state/mod.rs` (312): `Modal`, `CompareTab`, `Store`, session persistence
+  functions (`save_session`, `restore_session`), tab operations
+  (`open_compare`, `close_tab`, `reload_tab`, `swap_sides`,
+  `recompute_diff`), GTK-free unit tests.
+
+All types re-exported from `crate::state` unchanged; call sites require no
+modification.
+
+---
+
 ## [0.117.0] — 2026-06-12
 
 Documentation housekeeping following the v0.115–v0.116 ELOC split work.
