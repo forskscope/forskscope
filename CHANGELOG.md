@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.133.0] — 2026-06-13
+
+Error messages, fallback tab title, and git mergetool suffix translated;
+`tab_title()` signature extended with `lang`.
+
+### Fixed
+
+**`crates/forskscope-ui/src/state/mod.rs`**
+
+- `reload_tab` error toasts `"Reload L: {e}"` / `"Reload R: {e}"` →
+  `t(lang, "Left file read error")` / `t(lang, "Right file read error")`
+  prefixes with the Rust error appended.
+- `open_compare` error toasts `"L: {e}"` / `"R: {e}"` → same translated
+  prefixes.
+- `tab_title()` gains a `lang: Lang` parameter; the `"comparison"` fallback
+  (shown when both paths have no filename component) is now translated.
+  All six `tab_title` tests updated to pass `Lang::En`.
+
+**`crates/forskscope-ui/src/app.rs`** — git mergetool mode tab suffix
+`" (merge)"` → `format!(" ({})", t(store.lang(), "merge"))`.
+
+**`crates/forskscope-ui/src/i18n.rs`** — 4 new Japanese translations:
+`"Left file read error"` → 左ファイルの読み込みエラー,
+`"Right file read error"` → 右ファイルの読み込みエラー,
+`"comparison"` → 比較, `"merge"` → マージ.
+
+---
+
 ## [0.132.0] — 2026-06-13
 
 Per-file copy button wired in deep compare view; dead `#[allow(dead_code)]`

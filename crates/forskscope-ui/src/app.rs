@@ -35,7 +35,7 @@ pub fn App() -> Element {
                 if let Some(tab) = store.tabs.write().get_mut(idx) {
                     tab.right_path = Some(merged.clone());
                     tab.right_doc.fingerprint_at_load = None;
-                    tab.title = format!("{} (merge)", tab.title);
+                    tab.title = format!("{} ({})", tab.title, crate::i18n::t(store.lang(), "merge"));
                 }
             }
         } else {

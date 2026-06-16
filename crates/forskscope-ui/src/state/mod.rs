@@ -14,6 +14,7 @@ use forskscope_core::document::{LoadOptions, LoadedDocument, load_path};
 use forskscope_core::file_kind::FileKind;
 use forskscope_core::{DiffOptions, MergeSession, compute_diff};
 pub use forskscope_core::DiffAlgorithm;
+use crate::i18n::t;
 
 pub enum Modal {
     None, Settings,
@@ -72,11 +73,11 @@ pub fn reload_tab(store: &mut Store, index: usize) {
     };
     let opt = LoadOptions { allow_missing: true };
     let mut ld = match lp.as_deref().map(|p| load_path(p, opt)) {
-        Some(Ok(d)) => d, Some(Err(e)) => return store.notify(format!("Reload L: {e}")),
+        Some(Ok(d)) => d, Some(Err(e)) => return store.notify(format!("{}: {e}", t(store.lang(), "Left file read error"))),
         None => LoadedDocument::empty(),
     };
     let mut rd = match rp.as_deref().map(|p| load_path(p, opt)) {
-        Some(Ok(d)) => d, Some(Err(e)) => return store.notify(format!("Reload R: {e}")),
+        Some(Ok(d)) => d, Some(Err(e)) => return store.notify(format!("{}: {e}", t(store.lang(), "Right file read error"))),
         None => LoadedDocument::empty(),
     };
     if ld.kind == FileKind::ExcelXlsx && rd.kind == FileKind::ExcelXlsx {
@@ -127,8 +128,8 @@ impl Store {
 
 pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     let options = LoadOptions { allow_missing: true };
-    let mut ld = match load_path(&left,  options) { Ok(d) => d, Err(e) => return store.notify(format!("L: {e}")) };
-    let mut rd = match load_path(&right, options) { Ok(d) => d, Err(e) => return store.notify(format!("R: {e}")) };
+    let mut ld = match load_path(&left,  options) { Ok(d) => d, Err(e) => return store.notify(format!("{}: {e}", t(store.lang(), "Left file read error"))) };
+    let mut rd = match load_path(&right, options) { Ok(d) => d, Err(e) => return store.notify(format!("{}: {e}", t(store.lang(), "Right file read error"))) };
     if ld.kind == FileKind::ExcelXlsx && rd.kind == FileKind::ExcelXlsx {
         let (lt, rt) = forskscope_core::xlsx::derive_pair_text(&left, &right);
         ld.text = Some(lt); rd.text = Some(rt);
@@ -143,7 +144,7 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     let diff = compute_diff(ld.diff_text(), rd.diff_text(), opts);
     let merge = MergeSession::from_diff(&diff);
     let can_save = ld.kind.is_mergeable_text() && rd.kind.is_mergeable_text();
-    let title = tab_title(&left, &right);
+    let title = tab_title(&left, &right, store.lang());
     let tab = CompareTab {
         title, left_path: Some(left), right_path: Some(right),
         left_doc: ld, right_doc: rd, diff, merge, diff_options: opts,
@@ -154,14 +155,14 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     store.active.set(Some(idx));
 }
 
-fn tab_title(l: &std::path::Path, r: &std::path::Path) -> String {
+fn tab_title(l: &std::path::Path, r: &std::path::Path, lang: Lang) -> String {
     let ln = l.file_name().map(|n| n.to_string_lossy().into_owned());
     let rn = r.file_name().map(|n| n.to_string_lossy().into_owned());
     match (ln, rn) {
         (Some(a), Some(b)) if a == b => a,
         (Some(a), Some(b)) => format!("{a} ↔ {b}"),
         (Some(a), None) | (None, Some(a)) => a,
-        (None, None) => "comparison".into(),
+        (None, None) => t(lang, "comparison"),
     }
 }
 
@@ -236,6 +237,7 @@ mod tests {
         let title = tab_title(
             Path::new("/old/src/main.rs"),
             Path::new("/new/src/main.rs"),
+            super::Lang::En,
         );
         assert_eq!(title, "main.rs");
     }
@@ -245,6 +247,7 @@ mod tests {
         let title = tab_title(
             Path::new("/old/foo.txt"),
             Path::new("/new/bar.txt"),
+            super::Lang::En,
         );
         assert_eq!(title, "foo.txt ↔ bar.txt");
     }
@@ -255,13 +258,14 @@ mod tests {
         let title = tab_title(
             Path::new("/project/README.md"),
             Path::new("/"),
+            super::Lang::En,
         );
         assert_eq!(title, "README.md");
     }
 
     #[test]
     fn both_missing_filenames_shows_fallback() {
-        let title = tab_title(Path::new("/"), Path::new("/"));
+        let title = tab_title(Path::new("/"), Path::new("/"), super::Lang::En);
         assert_eq!(title, "comparison");
     }
 
@@ -270,6 +274,7 @@ mod tests {
         let title = tab_title(
             Path::new("/a/.gitignore"),
             Path::new("/b/.gitignore"),
+            super::Lang::En,
         );
         assert_eq!(title, ".gitignore");
     }
@@ -279,6 +284,7 @@ mod tests {
         let title = tab_title(
             Path::new("/home/alice/projectA/src/lib/core/mod.rs"),
             Path::new("/home/bob/projectB/src/lib/core/mod.rs"),
+            super::Lang::En,
         );
         assert_eq!(title, "mod.rs");
     }
