@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.137.0] — 2026-06-13
+
+Documentation accuracy pass: stale feature descriptions removed, missing
+features added, known-limitations updated to reflect per-file copy.
+
+### Fixed
+
+**`docs/src/users/known-limitations.md`** — "No directory merge operations"
+updated. Per-file copy (added v0.132.0) and batch copy are now available;
+the section was rewritten to describe what works and what remains
+unsupported (delete, full sync).
+
+**`docs/src/users/features.md`** — Added **Directory compare (Deep compare)**
+section covering Directory Report mode, two-phase scan, per-file and batch
+copy. The feature was not listed anywhere in the feature overview.
+
+**`docs/src/users/comparing-files.md`** — Two fixes:
+- Removed stale "By dragging files onto the window" paragraph — drag-and-drop
+  was in the old Tauri/Svelte app but is not implemented in the current
+  Dioxus explorer.
+- Added **F3** / **Shift+F3** to the inline search description.
+
+---
+
 ## [0.136.0] — 2026-06-13
 
 Documentation accuracy pass; duplicate CHANGELOG entry removed.

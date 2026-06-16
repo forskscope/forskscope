@@ -17,10 +17,6 @@ The app opens with the two files loaded side by side. The left pane shows the ol
 3. Double-click any file that appears on both sides to open a comparison instantly.  
    Or: click a file on the left, click a file on the right, then press **Compare**.
 
-**By dragging files onto the window:**
-
-Drop two files onto the app window. The first file becomes the left (old) side; the second becomes the right (new) side.
-
 ---
 
 ## Understanding the diff view
@@ -58,7 +54,7 @@ The status bar shows the total count of insertions and deletions: `+12 / -5`.
 
 ## Search within the diff
 
-Press **Ctrl+F** or click the 🔍 button to open the search bar. Type any substring; every matching row highlights in both panes simultaneously. The bar shows a live match count. Press **Esc** to close.
+Press **Ctrl+F** or click the 🔍 button to open the search bar. Type any substring; every matching row highlights in both panes simultaneously. The bar shows a live match count. Press **F3** / **Shift+F3** to step through matches, or **Esc** to close.
 
 ---
 

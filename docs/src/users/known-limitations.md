@@ -59,11 +59,15 @@ repeated navigation re-triggers the scan.
 
 ---
 
-### No directory merge operations
+### Directory merge operations are limited
 
-The Explorer shows equal/different/one-sided status for files and directories
-but does not yet offer copy, delete, or merge operations on directory entries.
-This is intentional for v1 (non-goal NG-004 in the product policy).
+The Explorer's **Directory Report** mode supports per-file copy (both directions)
+and batch copy via the **Copy N →** / **← Copy N** toolbar buttons. Each copy
+shows a confirmation with the source and destination path; existing files receive
+a `.bak` backup.
+
+Delete and full directory-sync operations are not supported and are not planned
+for v1 (non-goal NG-004 in the product policy).
 
 ---
 

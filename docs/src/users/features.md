@@ -33,6 +33,17 @@
 
 ---
 
+## Directory compare (Deep compare)
+
+- **Directory Report** mode recursively scans both directory trees.
+- Two-phase scan: fast listing first, then background digest comparison.
+- Status per file: ⚠ changed, ← left-only, → right-only, ✓ equal, ⊙ scanning.
+- Filter results: **Different** / **All** / **Equal**.
+- **Per-file copy** (single file with confirmation and `.bak` backup).
+- **Batch copy** (all changed/one-sided files in one confirmed operation).
+
+---
+
 ## Diff options (per-tab)
 
 Accessed via **More ▼** in the toolbar:
