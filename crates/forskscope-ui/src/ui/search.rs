@@ -96,6 +96,7 @@ pub fn SearchBar() -> Element {
 
             // Prev / Next buttons
             button {
+                id: "search-prev-btn",
                 class: "search-nav",
                 disabled: total == 0,
                 title: t(lang, "Previous match (Shift+Enter)"),

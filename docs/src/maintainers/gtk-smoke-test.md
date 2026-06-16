@@ -144,6 +144,8 @@ highlighted with gutter markers.
 | **Ctrl+Y** | Redo |
 | **Ctrl+S** | Save merge result |
 | **Ctrl+F** | Open / close inline search |
+| **F3** | Next search match |
+| **Shift+F3** | Previous search match |
 | **Ctrl+W** | Close active tab (with dirty-state guard) |
 | **Ctrl+/** | Open keyboard shortcut reference modal |
 | **Escape** | Close open modal or search bar |

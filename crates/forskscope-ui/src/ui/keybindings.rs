@@ -29,6 +29,7 @@ pub fn KeyboardRefModal() -> Element {
                         KbRow { keys: "Ctrl + Y",       desc: "Redo last undone merge" }
                         KbRow { keys: "Ctrl + S",       desc: "Save merge result" }
                         KbRow { keys: "Ctrl + F",       desc: "Open / close inline search" }
+                        KbRow { keys: "F3 / Shift+F3",  desc: "Next / previous search match" }
                     }
                 }
                 div { class: "kb-section",

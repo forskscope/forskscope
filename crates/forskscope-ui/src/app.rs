@@ -88,12 +88,13 @@ pub fn App() -> Element {
                 match e.key() {
                     Key::F7 => move_focus(&mut store, index, -1),
                     Key::F8 => move_focus(&mut store, index,  1),
-                    Key::Escape => {} // already handled above
                     // F3 / Shift+F3: next / previous search match
                     Key::F3 => {
+                        let shift = mods.contains(Modifiers::SHIFT);
                         spawn(async move {
+                            let id = if shift { "search-prev-btn" } else { "search-next-btn" };
                             let _ = dioxus::document::eval(
-                                "document.getElementById('search-next-btn')?.click();"
+                                &format!("document.getElementById('{id}')?.click();")
                             ).await;
                         });
                     }

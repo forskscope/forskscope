@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.128.0] — 2026-06-13
+
+Shift+F3 previous-search-match shortcut implemented; dead Escape arm removed;
+F3/Shift+F3 added to keyboard reference.
+
+### Added
+
+- **Shift+F3** now navigates to the **previous** search match, completing
+  the pair with F3 (next match). The F3 handler in `app.rs` checks
+  `mods.contains(Modifiers::SHIFT)` and clicks `#search-prev-btn` or
+  `#search-next-btn` accordingly.
+- `id: "search-prev-btn"` added to the Previous match button in `search.rs`
+  (mirrors the `search-next-btn` id added in v0.127.0).
+- `keybindings.rs` — `"F3 / Shift+F3"` row added under Diff view shortcuts.
+- `docs/src/maintainers/gtk-smoke-test.md` — F3 and Shift+F3 added to §1c
+  keyboard navigation checklist.
+
+### Fixed
+
+- **Dead `Key::Escape => {}`** arm in `app.rs`'s inner `match e.key()` block
+  removed. Escape was already handled by the early-return guard above the
+  match; the second arm was unreachable and misleading.
+
+---
+
 ## [0.127.0] — 2026-06-13
 
 Bug fix: F3 and Ctrl+F keyboard shortcuts broken for Japanese users after
