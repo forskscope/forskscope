@@ -495,3 +495,10 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
 .status-cmp     { color: var(--muted); opacity: .6; }
 .status-err     { color: var(--err); }
 .status-symlink { color: var(--muted); font-style: italic; }
+
+/* ── Deep compare filter buttons ── */
+.filter-btn {
+  padding: .2rem .5rem; border-radius: 6px; font-size: 12px;
+  background: var(--surface-3); border: 1px solid var(--border); cursor: pointer;
+}
+.filter-btn.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }

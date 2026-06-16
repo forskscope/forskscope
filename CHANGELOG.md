@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.138.0] — 2026-06-13
+
+Bug fix: `.filter-btn` CSS removed during dead-code cleanup (v0.131.0) was
+still used by deep compare filter buttons. Dead duplicate `ja()` match arms
+removed from `i18n.rs`.
+
+### Fixed
+
+**`crates/forskscope-ui/assets/main.css`** — `.filter-btn` and
+`.filter-btn.active` rules restored under `/* ── Deep compare filter
+buttons ── */`. These classes were removed in v0.131.0 as part of a dead CSS
+sweep targeting the old explorer toolbar, but `deep_compare.rs` uses them
+independently for the `Different` / `All` / `Equal only` filter buttons and
+the batch-copy button in the deep compare toolbar. Without the rules, these
+buttons rendered with no padding, border, or active-state indicator.
+CSS: 497 → 504 lines.
+
+**`crates/forskscope-ui/src/i18n.rs`** — 7 duplicate `match` arms removed.
+In a Rust `match`, only the first matching arm fires; subsequent arms with
+the same key are unreachable. The dead arms were: `"Save As"` (×2 extra),
+`"Swap sides"` (×1), `"Close"` (×1), `"File changed on disk"` (×1),
+`"Export patch"` (×1), `"Copy"` (×1). All dead arms had identical or
+inferior translations to the first occurrence. `ja()` reduced from 152
+entries to 145 unique keys.
+
+---
+
 ## [0.137.0] — 2026-06-13
 
 Documentation accuracy pass: stale feature descriptions removed, missing
