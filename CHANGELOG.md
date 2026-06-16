@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.143.0] — 2026-06-13
+
+Deep compare digest tasks now respect `DIGEST_CONCURRENCY_LIMIT` (32);
+previously unlimited spawning could overwhelm the thread pool on large trees.
+
+### Fixed
+
+**`crates/forskscope-ui/src/ui/deep_compare.rs`** — The phase-2 digest
+loop previously spawned one `tokio::task::spawn_blocking` per file pair
+with no concurrency limit. On a directory tree with hundreds or thousands
+of common files this could queue thousands of blocking tasks simultaneously.
+
+Now uses `Arc<tokio::sync::Semaphore>` with capacity
+`DIGEST_CONCURRENCY_LIMIT` (= 32, from `forskscope_core::job`) to cap
+concurrent in-flight digest operations. Tasks still spawn eagerly for low
+latency on small trees; the semaphore only throttles beyond 32 concurrent.
+
+**`Cargo.toml`** — `tokio` workspace dependency gains the `sync` feature
+(required for `tokio::sync::Semaphore`).
+
+**`docs/src/users/known-limitations.md`** — Updated the "Digest comparison
+does not cache across navigation" note to reflect the new 32-task limit.
+
+---
+
 ## [0.142.0] — 2026-06-13
 
 Two documentation accuracy fixes: patch-export.md rewrote to match actual

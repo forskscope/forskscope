@@ -53,11 +53,18 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
             ent.set(initial);
             scan.set(false);
 
-            // Phase 2: one digest task per common pair.
+            // Phase 2: digest tasks, limited to DIGEST_CONCURRENCY_LIMIT
+            // concurrent blocking operations to avoid overwhelming the
+            // thread pool on large directory trees.
+            let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(
+                forskscope_core::DIGEST_CONCURRENCY_LIMIT,
+            ));
             for (rel, lp, rp) in pairs {
                 let mut e2 = ent;
                 let mut cp2 = comp;
+                let sem2 = sem.clone();
                 spawn(async move {
+                    let _permit = sem2.acquire_owned().await;
                     let equal = tokio::task::spawn_blocking(move || file_digest_equal(&lp, &rp))
                         .await.ok().and_then(|r| r.ok()).unwrap_or(false);
                     let status = if equal { RecStatus::Equal } else { RecStatus::Changed };

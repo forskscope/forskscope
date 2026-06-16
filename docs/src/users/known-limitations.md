@@ -51,11 +51,12 @@ diff and uses Myers) for best results on large files.
 
 ## Explorer
 
-### Digest comparison does not yet cache across navigation
+### Digest comparison does not cache across navigation
 
 Background digest computation restarts when you navigate to a new directory.
 There is no persistent cache across sessions. For large directory trees,
-repeated navigation re-triggers the scan.
+repeated navigation re-triggers the scan. Concurrent digest tasks are limited
+to 32 at a time to avoid overwhelming the system on very large trees.
 
 ---
 
