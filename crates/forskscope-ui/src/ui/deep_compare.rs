@@ -140,17 +140,11 @@ fn DeepRow(entry: RecEntry, lang: Lang) -> Element {
     let copy_dir: Option<(bool, String)> = {
         let s = store.settings.read();
         match (&s.last_left_dir, &s.last_right_dir, &entry.status) {
-            (Some(lr), Some(rr), RecStatus::Changed | RecStatus::LeftOnly) => {
-                let src = lr.join(&entry.rel_path);
-                let dst = rr.join(&entry.rel_path);
-                let lbl = format!("{} →", t(lang, "Copy"));
-                Some((true, lbl))
+            (Some(_), Some(_), RecStatus::Changed | RecStatus::LeftOnly) => {
+                Some((true, format!("{} →", t(lang, "Copy"))))
             }
-            (Some(lr), Some(rr), RecStatus::RightOnly) => {
-                let src = rr.join(&entry.rel_path);
-                let dst = lr.join(&entry.rel_path);
-                let lbl = format!("← {}", t(lang, "Copy"));
-                Some((false, lbl))
+            (Some(_), Some(_), RecStatus::RightOnly) => {
+                Some((false, format!("← {}", t(lang, "Copy"))))
             }
             _ => None,
         }
@@ -191,11 +185,7 @@ fn DeepRow(entry: RecEntry, lang: Lang) -> Element {
                                 };
                                 drop(s);
                                 if let Some((src, dst)) = dirs {
-                                    let label = if to_right {
-                                        format!("{} → {}", src.display(), dst.display())
-                                    } else {
-                                        format!("{} → {}", src.display(), dst.display())
-                                    };
+                                    let label = format!("{} → {}", src.display(), dst.display());
                                     store.modal.set(Modal::ConfirmDirOp(DirOp { src, dst, label }));
                                 }
                             },

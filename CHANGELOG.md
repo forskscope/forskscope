@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.134.0] — 2026-06-13
+
+Code quality: dead variables in DeepRow fixed; duplicate CSS selectors
+removed and conflicting `.tab` definitions merged. CSS 517 → 497 lines.
+
+### Fixed
+
+**`crates/forskscope-ui/src/ui/deep_compare.rs`**
+
+- Dead `src`/`dst` variables in `copy_dir` computation removed — they were
+  computed in the match arms but never used; paths are re-derived inside the
+  `onclick` closure. (Introduced in v0.132.0.)
+- Dead `if to_right { ... } else { ... }` in the `onclick` label generation
+  removed — both branches produced identical `"{src} → {dst}"` strings.
+
+**`crates/forskscope-ui/assets/main.css`** — Duplicate CSS rules removed:
+
+- First (shorter, incomplete) `.search-bar` / `.search-input` /
+  `.search-count` / `.search-close` definitions removed; the second
+  (complete) set at the end of the file is authoritative.
+- Second `.sr-only` definition (without `position: absolute !important`)
+  removed; the first definition with `!important` is the correct one for
+  screen-reader-only elements.
+- `.tab { gap: 0 }` override removed; the original `gap: .4rem` from the
+  first `.tab` definition is correct — it provides the spacing between the
+  dirty-dot indicator and the tab title.
+- `.tab-title` definitions merged into one complete rule.
+
+---
+
 ## [0.133.0] — 2026-06-13
 
 Error messages, fallback tab title, and git mergetool suffix translated;

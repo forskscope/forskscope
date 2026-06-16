@@ -84,7 +84,8 @@ select option {
   height: 2.2rem; overflow: hidden;
 }
 .tab.active { background: var(--surface-3); border-color: var(--accent); }
-.tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
+  padding: .35rem .5rem .35rem .6rem; user-select: none; display: flex; align-items: center; gap: .25rem; }
 
 /* Accessible-only labels must not participate in grid or flex layout. */
 .sr-only {
@@ -326,19 +327,6 @@ select option {
 
 /* ---- colour-independent diff marks — colours set above with .diff-mark rules ---- */
 .hunk-del .diff-pane .cell { color: inherit; }
-.search-bar {
-  display: flex; align-items: center; gap: .4rem;
-  padding: .3rem .6rem; background: var(--surface-2);
-  border-bottom: 1px solid var(--border);
-}
-.search-input {
-  flex: 1; max-width: 22rem;
-  background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px; padding: .25rem .5rem;
-}
-.search-input:focus { border-color: var(--accent); outline: none; }
-.search-count { font-size: 12px; color: var(--muted); }
-.search-close { padding: 0 .4rem; color: var(--muted); }
 
 /* ---- search match highlight ---- */
 .row.match { background: color-mix(in srgb, var(--accent) 12%, transparent); }
@@ -382,8 +370,6 @@ code.path-display {
 .deep-progress { color: var(--muted); }
 
 /* ── Tab close button and dirty indicator ── */
-.tab { display: flex; align-items: center; gap: 0; }
-.tab-title { padding: .35rem .5rem .35rem .6rem; cursor: pointer; user-select: none; display: flex; align-items: center; gap: .25rem; }
 .tab-close { padding: .15rem .35rem; font-size: 14px; opacity: 0; border-radius: 4px; transition: opacity .1s; }
 .tab:hover .tab-close, .tab.active .tab-close { opacity: .6; }
 .tab:hover .tab-close:hover { opacity: 1; background: var(--danger-bg); }
@@ -419,12 +405,6 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
   font-size: 12px; color: var(--text);
 }
 
-/* ── Screen-reader-only utility ── */
-.sr-only {
-  position: absolute; width: 1px; height: 1px;
-  padding: 0; margin: -1px; overflow: hidden;
-  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
-}
 
 
 /* ── Explorer footer ── */
