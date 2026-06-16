@@ -1,29 +1,27 @@
 # ForskScope Roadmap
 
-**Last updated:** v0.117.0 (2026-06-12)
-**Current phase:** UI stabilisation — core complete, UI features shipping, governance documents current
+**Last updated:** v0.140.0 (2026-06-13)
+**Current phase:** Pre-GTK verification — code and docs complete, awaiting GTK smoke tests (RFC-041)
 
 ---
 
 ## Current state
 
 The `forskscope-core` and `forskscope-ui-logic` crates are feature-complete
-for the v1 diff/merge workflow. 39 of 48 RFCs are implemented. **875 tests**
-pass with zero failures (646 core unit + 25 diff corpus + 2 patch apply +
-189 ui-logic + 5 CSS coverage + 7 doctest + 1 ui-logic integration).
+for the v1 diff/merge workflow. 39 of 48 RFCs are implemented. **936 tests**
+pass with zero failures (650 core + 286 integration/ui-logic).
 
-The UI crate (`forskscope-ui`) is feature-complete and actively maintained:
-two-pane diff layout with independent pane labels and shared horizontal scroll;
-theme-aware select styling; ESC key closes modals; i18n complete across all
-components (English + Japanese); all modal dialogs translated. User
-documentation covers all four primary workflows.
+The UI crate (`forskscope-ui`) is feature-complete and thoroughly polished:
+two-pane diff with independent pane labels and shared horizontal scroll;
+full i18n (English + Japanese, 158 active translation keys, zero gaps);
+all modal dialogs, screen-reader labels, and keyboard reference translated;
+per-file and batch copy in the directory report view; F3/Shift+F3 search
+navigation; CSS reduced to 504 lines with no dead rules. User documentation
+covers all workflows and is current with the implemented UI.
 
-The `platform` module provides runtime diagnostics for the About panel
-(RFC-026). The acceptance test corpus covers 26 fixture files across
-text/newlines/whitespace/encoding/binary categories.
-
-The next phase is connecting remaining UI slices to the view-model layer
-and preparing for a public v1 release candidate (RFC-041).
+The remaining work before v1.0 is GTK smoke-test verification (RFC-041
+§release readiness checklist, 3 items requiring a display server) and
+packaging (RFC-010). Core, UI code, tests, and documentation are complete.
 
 ---
 
@@ -53,15 +51,16 @@ and preparing for a public v1 release candidate (RFC-041).
 | Docs + platform | v0.95–v0.96 | Testing/architecture/local-dev docs updated; 4 user docs rewritten |
 | CONTRIBUTING + limits | v0.97–v0.98 | ROADMAP/release/features updated; CONTRIBUTING.md; known-limitations.md |
 | RFC-041 + v0.100 | v0.99–v0.100 | RFC-041 checklist updated; PlatformInfo wired to About; patch export UI |
+| UI polish + i18n | v0.111–v0.139 | Full i18n (158 keys, 0 gaps); CSS cleanup (583→504 lines); keyboard shortcuts; per-file copy; bug fixes |
 
 ---
 
-## UI implementation slices
+## UI implementation slices — status at v0.140.0
 
 The remaining work is a series of UI slices that wire the Dioxus components
 to the core types. Each slice delivers a testable, usable increment.
 
-### Slice 1 — Diff view renders and navigates
+### ✓ Slice 1 — Diff view renders and navigates *(shipped)*
 
 **Goal:** A user can open two files, see the diff rendered with correct
 colour + gutter symbols, and navigate prev/next hunk with keyboard.
@@ -79,7 +78,7 @@ colour + gutter symbols, and navigate prev/next hunk with keyboard.
 
 ---
 
-### Slice 2 — Merge actions wire to core
+### ✓ Slice 2 — Merge actions wire to core *(shipped)*
 
 **Goal:** A user can apply hunks left-to-right, undo, and see the dirty-state
 marker in the tab title.
@@ -97,7 +96,7 @@ marker in the tab title.
 
 ---
 
-### Slice 3 — Save with safety checks
+### ✓ Slice 3 — Save with safety checks *(shipped)*
 
 **Goal:** A user can save a merge result; external modification is detected
 and the reconciliation dialog is shown.
@@ -116,7 +115,7 @@ and the reconciliation dialog is shown.
 
 ---
 
-### Slice 4 — Explorer wired to directory compare
+### ✓ Slice 4 — Explorer and directory compare *(shipped)*
 
 **Goal:** A user can browse two directories and see equal/modified/only-left
 /only-right status icons.
@@ -134,7 +133,7 @@ and the reconciliation dialog is shown.
 
 ---
 
-### Slice 5 — Settings dialog
+### ✓ Slice 5 — Settings dialog *(shipped)*
 
 **Goal:** A user can change theme, font size, compare profile, and newline
 policy from a settings dialog; changes persist across restarts.
@@ -152,7 +151,7 @@ policy from a settings dialog; changes persist across restarts.
 
 ---
 
-### Slice 6 — Three-way merge workspace
+### ○ Slice 6 — Three-way merge workspace *(core complete; UI deferred post-v1)*
 
 **Goal:** A user can open a three-way merge session, resolve conflicts with
 Use Left / Use Right / Edit, and save the merged result.
@@ -171,7 +170,7 @@ Use Left / Use Right / Edit, and save the merged result.
 
 ---
 
-### Slice 7 — Command palette
+### ○ Slice 7 — Command palette *(deferred post-v1)*
 
 **Goal:** A user can open the command palette (`Ctrl+Shift+P`), type to
 filter, and execute any available command.
@@ -188,7 +187,7 @@ filter, and execute any available command.
 
 ---
 
-### Slice 8 — Editor adapter prototype (gated, RFC-004)
+### ○ Slice 8 — Editor adapter prototype *(gated on RFC-004; post-v1)*
 
 **Goal:** Text editing is model-backed; edits flow through
 `TextEditOperation` and diff is recomputed on change.

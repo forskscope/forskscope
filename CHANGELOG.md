@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.140.0] — 2026-06-13
+
+README and ROADMAP updated to reflect current state: stale "Filter and sort"
+feature removed, F3/Shift+F3 added to shortcuts, ROADMAP brought current
+with delivered slices marked and test count corrected.
+
+### Fixed
+
+**`README.md`**
+- Removed stale "**Filter and sort** in the explorer — All / Different /
+  Equal; sort by name, status, or size; name substring filter" feature bullet.
+  The sort dropdown, hidden-file toggle, and name filter input were part of
+  the old explorer toolbar removed in v0.131.0; only the "All / Different /
+  Equal" filter in Directory Report mode remains.
+- Added the Directory Report filter as its own accurate bullet.
+- Added **F3 / Shift+F3** (next / previous search match) to the keyboard
+  shortcuts table. Implemented in v0.128.0; missing from the README since.
+
+**`ROADMAP.md`**
+- Updated header from v0.117.0 → v0.140.0.
+- Updated test count from 875 → 936.
+- Rewrote "Current state" paragraph to accurately describe the pre-GTK
+  verification phase (code and docs complete, awaiting display server tests).
+- Added "UI polish + i18n (v0.111–v0.139)" row to delivered milestones table.
+- Section renamed "UI implementation slices — status at v0.140.0".
+- Slices 1–5 marked ✓ *(shipped)*; Slices 6–8 marked ○ with correct
+  post-v1 deferral notes.
+
+---
+
 ## [0.139.0] — 2026-06-13
 
 i18n: keyboard reference modal descriptions and scrim aria_label translated.

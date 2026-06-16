@@ -71,6 +71,7 @@ git mergetool
 - **Enter to apply** the focused hunk; F7/F8 to navigate; Ctrl+S to save
 - **Explorer** — browse two directories, see digest equality indicators, compare same-name files with one click
 - **Deep compare** — recursive directory scan with live progress; batch copy changed files between trees
+- **Directory compare filter** — All / Different / Equal in the Directory Report view
 - **Git difftool / mergetool** compatible (`forskscope old new` or `old remote merged`)
 - **Compare profiles** — named presets for ignore-whitespace, ignore-case, and algorithm (Myers / Patience / Histogram)
 - **Session persistence** — open tabs are restored on next launch
@@ -78,7 +79,6 @@ git mergetool
 - **Safe saves** — atomic write, `.bak` backup, external-change detection
 - **Search within diff** — Ctrl+F highlights matching rows across both panes
 - **Navigation history** — back/forward per explorer pane
-- **Filter and sort** in the explorer — All / Different / Equal; sort by name, status, or size; name substring filter
 - **Dark, Light, and Night themes**
 - **English and Japanese UI** (i18n)
 - **GitHub Actions CI/CD** — Linux x86_64, macOS aarch64, Windows x64 release builds on tag push
@@ -94,6 +94,7 @@ git mergetool
 | Ctrl+Z | Undo |
 | Ctrl+S | Save |
 | Ctrl+F | Search within diff |
+| F3 / Shift+F3 | Next / previous search match |
 | Ctrl+/ | Keyboard shortcut reference |
 
 Press **?** in the header or **Ctrl+/** for the full reference.
