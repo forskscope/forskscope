@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.120.0] — 2026-06-12
+
+Dependency maintenance: transitive dependency patch updates.
+
+### Changed
+
+- **`Cargo.lock`** — updated four transitive dependencies to latest
+  Rust 1.85-compatible patch versions:
+  - `openssl` 0.10.80 → 0.10.81
+  - `openssl-sys` 0.9.116 → 0.9.117
+  - `zeroize` 1.8.2 → 1.9.0
+  - `zeroize_derive` 1.4.3 → 1.5.0
+
+  All 936 tests pass against the updated lockfile. 23 other transitive
+  dependencies are unchanged at their latest compatible versions.
+
+- **`docs/src/maintainers/testing.md`** — version header updated to
+  v0.120.0.
+
+---
+
 ## [0.119.0] — 2026-06-12
 
 GTK smoke test checklist; testing.md counts updated.
