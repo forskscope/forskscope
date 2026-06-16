@@ -36,6 +36,7 @@ pub fn TabBar() -> Element {
 #[component]
 fn TabItem(index: usize, is_active: bool) -> Element {
     let mut store = use_context::<Store>();
+    let lang = store.lang();
 
     let (title, is_dirty) = {
         let tabs = store.tabs.read();
@@ -56,7 +57,7 @@ fn TabItem(index: usize, is_active: bool) -> Element {
             }
             button {
                 class: "tab-close",
-                title: "Close tab",
+                title: t(lang, "Close tab"),
                 aria_label: "Close {title}",
                 onclick: move |_| {
                     let dirty = store.tabs.read().get(index)

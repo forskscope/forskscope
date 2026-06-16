@@ -24,7 +24,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
         let tabs = store.tabs.read();
         match tabs.get(index) {
             Some(tab) => TabSnapshot::from_tab(tab, font_size, context_lines, lang),
-            None => return rsx! { div { class: "notice", "No comparison." } },
+            None => return rsx! { div { class: "notice", {t(lang, "No comparison.")} } },
         }
     };
 

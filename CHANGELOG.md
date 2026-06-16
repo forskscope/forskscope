@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.123.0] — 2026-06-12
+
+i18n: two final hardcoded strings wired through `t()`; Japanese interface
+now complete with zero English fallbacks anywhere in the UI.
+
+### Fixed
+
+- **`crates/forskscope-ui/src/ui/tabs.rs`** — tab close button tooltip
+  `"Close tab"` wired through `t(lang, "Close tab")`; `lang` added to
+  `TabItem` component. Japanese: タブを閉じる.
+
+- **`crates/forskscope-ui/src/ui/diff.rs`** — defensive fallback notice
+  `"No comparison."` (shown when a tab index resolves to `None`) wired
+  through `t(lang, "No comparison.")`. Japanese: 比較がありません。
+
+**`ja()` map now has 90 entries**: 88 actively used keys plus `"on"` /
+`"off"` (used via inline conditional expressions). Zero English fallbacks
+remain in any user-facing component. The i18n pass that began at v0.121.0
+is complete.
+
+---
+
 ## [0.122.0] — 2026-06-12
 
 i18n: all remaining hardcoded English strings in modals, statusbar, and

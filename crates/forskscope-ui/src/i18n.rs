@@ -19,6 +19,8 @@ fn ja(key: &str) -> Option<&'static str> {
         "Explorer" => "エクスプローラー",
         "Settings" => "設定",
         "Compare" => "比較",
+        "Close tab" => "タブを閉じる",
+        "No comparison." => "比較がありません。",
         "has unsaved changes. Discard them and close?" => "未保存の変更があります。破棄して閉じますか？",
         "From" => "変更前",
         "To" => "変更後",
