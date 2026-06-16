@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.117.0] — 2026-06-12
+
+Documentation housekeeping following the v0.115–v0.116 ELOC split work.
+
+### Changed
+
+- **`ROADMAP.md`** — updated to v0.117.0; added ELOC compliance milestone
+  row (v0.115–v0.116: command, error, session, report, settings, job modules
+  split; zero files over 500 lines).
+
+- **`rfcs/notes/core-completion-summary-v0.72.md`** — updated to v0.117.0;
+  added note documenting the six-module ELOC split with the observation that
+  the public API is unchanged.
+
+---
+
 ## [0.116.0] — 2026-06-12
 
 ELOC compliance: settings and job modules split; no files remain over 500 lines.

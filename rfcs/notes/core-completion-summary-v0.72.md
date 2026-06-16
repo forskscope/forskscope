@@ -1,9 +1,11 @@
-# Core and View-Model Layer Completion Summary — v0.114.0
+# Core and View-Model Layer Completion Summary — v0.117.0
 
 **Date:** 2026-06-12
 **Status:** Core data layer complete. `ui-logic` view-model layer complete (14 modules, 228 tests). All 7 ROADMAP slices have view-model coverage. UI stabilisation ongoing; tests at 936, docs complete, RFC-041 checklist 12/16 items ticked.
 
-> Originally written at v0.72.0; updated at v0.78.0, v0.87.0, v0.99.0, v0.114.0.
+> Originally written at v0.72.0; updated at v0.78.0, v0.87.0, v0.99.0, v0.114.0, v0.117.0.
+> **v0.117.0 note.** Six core modules exceeding 500 ELOC were split into submodules (v0.115.0–v0.116.0): `command/`, `error/`, `session/`, `report/`, `settings/`, `job/`. Public API unchanged. Zero files remain over 500 lines.
+
 
 ---
 
