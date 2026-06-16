@@ -79,10 +79,10 @@ pub fn DiffWorkspace(index: usize) -> Element {
             Toolbar { index, snap: snap.clone(), lang }
             SearchBar {}
             for w in snap.warnings.iter() {
-                div { class: "diff-warning-banner", role: "alert", "⚠ {t(lang, w)}" }
+                div { class: "diff-warning-banner", role: "alert", "⚠ {w}" }
             }
             if !snap.can_save {
-                div { class: "notice", {t(lang, &snap.readonly_notice)} }
+                div { class: "notice", {&snap.readonly_notice} }
             }
             if snap.identical {
                 div { class: "identical", {t(lang, "Files are identical")} }

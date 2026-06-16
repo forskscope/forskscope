@@ -15,7 +15,7 @@ pub fn OverwriteModal(index: usize) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "File changed on disk",
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "File changed on disk"),
             div { class: "modal",
                 h2 { {t(lang, "File changed on disk")} }
                 p { {t(lang, "The target file was modified after it was loaded. Overwrite anyway?")} }
@@ -36,7 +36,7 @@ pub fn SaveAsModal(index: usize, initial_path: String) -> Element {
     let lang = store.lang();
     let mut path = use_signal(|| initial_path);
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Save As",
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Save As"),
             div { class: "modal",
                 h2 { {t(lang, "Save As")} }
                 div { class: "field",
@@ -63,7 +63,7 @@ pub fn ReloadModal(index: usize) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Reload files",
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Reload files"),
             div { class: "modal",
                 h2 { {t(lang, "Reload files?")} }
                 p { {t(lang, "Unsaved merge changes will be discarded.")} }
@@ -83,7 +83,7 @@ pub fn SwapModal(index: usize) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Swap sides",
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Swap sides"),
             div { class: "modal",
                 h2 { {t(lang, "Swap sides?")} }
                 p { {t(lang, "Unsaved merge changes will be discarded when sides are swapped.")} }
@@ -104,7 +104,7 @@ pub fn CloseTabModal(index: usize) -> Element {
     let lang = store.lang();
     let title = store.tabs.read().get(index).map(|t| t.title.clone()).unwrap_or_default();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Close comparison",
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Close comparison"),
             div { class: "modal",
                 h2 { {t(lang, "Close comparison?")} }
                 p { {format!("\"{}\" {}",
@@ -129,7 +129,7 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
     let src = op.src.display().to_string();
     let dst = op.dst.display().to_string();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Copy file",
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Copy file"),
             div { class: "modal",
                 h2 { {t(lang, "Copy file?")} }
                 p { "{op.label}" }
@@ -181,8 +181,13 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
                                     Err(_) => err += 1,
                                 }
                             }
-                            store.notify(format!("Copied {ok} file{}{}.", if ok==1{""} else {"s"},
-                                if err > 0 { format!(", {err} failed") } else { String::new() }));
+                            let lang = store.lang();
+                            let msg = if err > 0 {
+                                format!("{} {} {ok}, {} {err}.", t(lang, "Copied"), t(lang, "files"), t(lang, "failed"))
+                            } else {
+                                format!("{} {ok} {}.", t(lang, "Copied"), t(lang, "files"))
+                            };
+                            store.notify(msg);
                             store.modal.set(Modal::None);
                         },
                         {t(lang, "Copy all")}

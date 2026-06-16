@@ -49,7 +49,7 @@ fn SettingsModal() -> Element {
     let mut show_new_profile = use_signal(|| false);
 
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Settings",
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Settings"),
             tabindex: "-1",
             onclick: move |_| store.modal.set(Modal::None),
             onkeydown: move |e: Event<KeyboardData>| {

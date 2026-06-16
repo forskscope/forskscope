@@ -5,6 +5,65 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.129.0] — 2026-06-13
+
+Three bugs found through careful code reading: rendering bug in PathBar,
+double-translation in diff view, untranslated modal aria-labels.
+
+### Fixed
+
+**`dir_pane.rs`** — `PathBar` Back button had `title:` keyword missing; the
+expression `t(lang, "Back")` was a bare child of the button element instead
+of a `title:` attribute. The button rendered `"←Back"` text content with no
+tooltip. Fixed to `title: t(lang, "Back")`.
+
+**`diff.rs`** — Two double-translation bugs: `warnings` and `readonly_notice`
+in `TabSnapshot` are pre-translated strings (via `t()` in `from_tab()`), but
+the render code wrapped them in `t()` again. Since `t()` returns the key
+unchanged when not found, this was harmless in practice — but conceptually
+wrong and fragile. Fixed: render uses the already-translated `String` values
+directly (`"{w}"` and `{&snap.readonly_notice}`).
+
+**`modals.rs`** — 6 dialog scrim `aria_label` attributes wired through `t()`:
+`"File changed on disk"`, `"Save As"`, `"Reload files"`, `"Swap sides"`,
+`"Close comparison"`, `"Copy file"`. Batch-copy completion toast
+(`"Copied {n} files, {n} failed"`) wired through `t()` with `"Copied"`,
+`"files"`, `"failed"` keys.
+
+**`settings.rs`** — Settings dialog scrim `aria_label: "Settings"` wired
+through `t()`.
+
+**`i18n.rs`** — 9 new Japanese translations added: modal aria-labels (6),
+plus `"Copied"` → コピー完了, `"failed"` → 失敗.
+
+---
+
+## [0.129.0] — 2026-06-13
+
+Bug fix: Back button tooltip was rendered as button text; modal `aria_label`
+attributes and batch-copy toast translated.
+
+### Fixed
+
+**`dir_pane.rs`** — `PathBar` Back button had `title:` keyword missing; the
+expression `t(lang, "Back")` was a bare child of the button element instead
+of a `title:` attribute. The button rendered `"←Back"` text content with no
+tooltip. Fixed to `title: t(lang, "Back")`.
+
+**`modals.rs`** — 6 dialog scrim `aria_label` attributes wired through `t()`:
+`"File changed on disk"`, `"Save As"`, `"Reload files"`, `"Swap sides"`,
+`"Close comparison"`, `"Copy file"`. Batch-copy completion toast
+(`"Copied {n} files, {n} failed"`) wired through `t()` with `"Copied"`,
+`"files"`, `"failed"` keys.
+
+**`settings.rs`** — Settings dialog scrim `aria_label: "Settings"` wired
+through `t()`.
+
+**`i18n.rs`** — 9 new Japanese translations added: modal aria-labels (6),
+plus `"Copied"` → コピー完了, `"failed"` → 失敗.
+
+---
+
 ## [0.128.0] — 2026-06-13
 
 Shift+F3 previous-search-match shortcut implemented; dead Escape arm removed;

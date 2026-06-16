@@ -106,7 +106,7 @@ pub fn PathBar(
 
     rsx! {
         div { class: "path-bar",
-            button { class: "path-btn", t(lang, "Back"),    disabled: !can_back,    onclick: move |_| on_back.call(()),    "←" }
+            button { class: "path-btn", title: t(lang, "Back"),    disabled: !can_back,    onclick: move |_| on_back.call(()),    "←" }
             button { class: "path-btn", title: t(lang, "Forward"), disabled: !can_forward, onclick: move |_| on_forward.call(()), "→" }
             button { class: "path-btn", title: t(lang, "Home directory"),
                 onclick: move |_| on_navigate.call(home_dir()), "⌂" }
