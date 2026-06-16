@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.124.0] — 2026-06-12
+
+i18n: hunk view and search bar strings translated; screen-reader labels
+and tooltips now go through `t()`. 102 active translation keys, all in ja().
+
+### Fixed
+
+**`crates/forskscope-ui/src/ui/hunk.rs`**
+
+- `"··· {n} unchanged lines — click to expand ···"` collapse divider text
+  wired through `t()` with `{n}` substitution. `lang: Lang` added to `Row`
+  component and threaded from `HunkBlock`.
+- Screen-reader `sr_label` strings (`"Deleted"`, `"Inserted"`, `"Changed"`)
+  wired through `t()`.
+- Merge action button `aria_label: "Apply change left to right"` and
+  `aria_label: "Applied"` wired through `t()`.
+
+**`crates/forskscope-ui/src/ui/search.rs`**
+
+- `"Search within diff"` aria-label wired through `t()`.
+- `"Previous match (Shift+Enter)"` and `"Next match (Enter / F3)"` title
+  tooltips wired through `t()`.
+- `"Previous match"`, `"Next match"`, `"Close search bar"` aria-labels
+  wired through `t()`.
+- Plural match count `"N match/matches"` wired through `t()`.
+
+**`crates/forskscope-ui/src/i18n.rs`** — 13 new Japanese translations added.
+
+---
+
 ## [0.123.0] — 2026-06-12
 
 i18n: two final hardcoded strings wired through `t()`; Japanese interface

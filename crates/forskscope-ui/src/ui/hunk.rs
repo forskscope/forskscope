@@ -13,7 +13,8 @@ use dioxus::prelude::*;
 use forskscope_core::diff::{HunkKind, InlineKind, refine_pair};
 use forskscope_core::merge::{HunkState, MergeHunk};
 
-use crate::state::Store;
+use crate::i18n::t;
+use crate::state::{Lang, Store};
 use crate::ui::search::{SearchCtx, line_matches};
 
 #[component]
@@ -24,6 +25,7 @@ pub fn HunkBlock(
     is_expanded: bool, on_expand: EventHandler<u64>,
 ) -> Element {
     let mut store = use_context::<Store>();
+    let lang = store.lang();
     let kind_class = match hunk.kind {
         HunkKind::Equal   => "hunk",
         HunkKind::Delete  => "hunk hunk-del",
@@ -55,13 +57,13 @@ pub fn HunkBlock(
                         right_no: row.right.as_ref().and_then(|r| r.original_line_number),
                         kind: hunk.kind, char_mode: false,
                         show_action: false, applied: i == 0 && applied,
-                        on_apply: EventHandler::new(|_| {}),
+                        on_apply: EventHandler::new(|_| {}), lang,
                     }
                 }
                 div {
                     class: "collapse-divider",
                     onclick: move |_| on_expand.call(hunk_id),
-                    "··· {hidden} unchanged lines — click to expand ···"
+                    {t(lang, "··· {n} unchanged lines — click to expand ···").replace("{n}", &hidden.to_string())}
                 }
                 for (i, row) in tail_rows {
                     Row {
@@ -85,6 +87,7 @@ pub fn HunkBlock(
                         show_action: i == 0 && hunk.is_pending_change() && can_save,
                         applied: i == 0 && applied,
                         on_apply: move |_| { if let Some(tab) = store.tabs.write().get_mut(index) { let _ = tab.merge.apply_left_to_right(hunk_id); } },
+                        lang,
                     }
                 }
             }
@@ -99,6 +102,7 @@ fn Row(
     kind: HunkKind, char_mode: bool,
     show_action: bool, applied: bool,
     on_apply: EventHandler<()>,
+    lang: Lang,
 ) -> Element {
     let search: Signal<SearchCtx> = use_context::<Signal<SearchCtx>>();
     let ctx = search.read();
@@ -120,16 +124,16 @@ fn Row(
     let row_class = if is_match { "diff-row match" } else { "diff-row" };
 
     // Screen-reader label for non-equal rows.
-    let sr_label = match kind {
-        HunkKind::Delete  => Some("Deleted"),
-        HunkKind::Insert  => Some("Inserted"),
-        HunkKind::Replace => Some("Changed"),
+    let sr_label: Option<String> = match kind {
+        HunkKind::Delete  => Some(t(lang, "Deleted")),
+        HunkKind::Insert  => Some(t(lang, "Inserted")),
+        HunkKind::Replace => Some(t(lang, "Changed")),
         HunkKind::Equal   => None,
     };
 
     rsx! {
         div { class: "{row_class}", role: "row",
-            if let Some(lbl) = sr_label {
+            if let Some(ref lbl) = sr_label {
                 span { class: "sr-only", "{lbl}: " }
             }
 
@@ -148,8 +152,8 @@ fn Row(
 
             // ── Act column (fixed, centred) ───────────────────────
             div { class: "diff-act",
-                if show_action  { button { onclick: move |_| on_apply.call(()), aria_label: "Apply change left to right", "▶" } }
-                else if applied { span { class: "applied", aria_label: "Applied", "✓" } }
+                if show_action  { button { onclick: move |_| on_apply.call(()), aria_label: t(lang, "Apply change left to right"), "▶" } }
+                else if applied { span { class: "applied", aria_label: t(lang, "Applied"), "✓" } }
             }
 
             // ── Right pane (independent scroll) ──────────────────

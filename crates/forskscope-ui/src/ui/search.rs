@@ -8,6 +8,7 @@
 use dioxus::html::input_data::keyboard_types::Key;
 use dioxus::prelude::*;
 
+use crate::i18n::t;
 use crate::ui::search_index::MatchIndex;
 
 // ── SearchCtx ─────────────────────────────────────────────────────────────────
@@ -54,7 +55,7 @@ pub fn SearchBar() -> Element {
     } else {
         match focused {
             Some(n) => format!("{n} / {total}"),
-            None    => format!("{total} match{}", if total == 1 { "" } else { "es" }),
+            None    => if total == 1 { format!("{total} {}", t(lang, "match")) } else { format!("{total} {}", t(lang, "matches")) },
         }
     };
 
@@ -66,7 +67,7 @@ pub fn SearchBar() -> Element {
                 placeholder: t(lang, "Search…"),
                 autofocus: true,
                 value: "{ctx.read().query}",
-                "aria-label": "Search within diff",
+                "aria-label": t(lang, "Search within diff"),
                 oninput: move |e| {
                     ctx.write().query = e.value();
                     // Index rebuilt by DiffWorkspace on the next render cycle
@@ -97,8 +98,8 @@ pub fn SearchBar() -> Element {
             button {
                 class: "search-nav",
                 disabled: total == 0,
-                title: "Previous match (Shift+Enter)",
-                "aria-label": "Previous match",
+                title: t(lang, "Previous match (Shift+Enter)"),
+                "aria-label": t(lang, "Previous match"),
                 onclick: move |_| {
                     ctx.write().index.retreat();
                     scroll_to_focused(&ctx.read());
@@ -108,8 +109,8 @@ pub fn SearchBar() -> Element {
             button {
                 class: "search-nav",
                 disabled: total == 0,
-                title: "Next match (Enter / F3)",
-                "aria-label": "Next match",
+                title: t(lang, "Next match (Enter / F3)"),
+                "aria-label": t(lang, "Next match"),
                 onclick: move |_| {
                     ctx.write().index.advance();
                     scroll_to_focused(&ctx.read());
@@ -128,7 +129,7 @@ pub fn SearchBar() -> Element {
 
             button {
                 class: "search-close",
-                "aria-label": "Close search bar",
+                "aria-label": t(lang, "Close search bar"),
                 onclick: move |_| {
                     let mut c = ctx.write();
                     c.active = false;
