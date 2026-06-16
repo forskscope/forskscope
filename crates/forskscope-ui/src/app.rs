@@ -93,7 +93,7 @@ pub fn App() -> Element {
                     Key::F3 => {
                         spawn(async move {
                             let _ = dioxus::document::eval(
-                                "document.querySelector('.search-input') && (() => {                                     const btn = document.querySelector('.search-nav[title*=\'Next\']');                                     btn?.click();                                 })();"
+                                "document.getElementById('search-next-btn')?.click();"
                             ).await;
                         });
                     }
@@ -120,7 +120,7 @@ pub fn App() -> Element {
                             "f" => {
                                 spawn(async move {
                                     let _ = dioxus::document::eval(
-                                        "document.querySelector('.diff-wrap button[aria-label=\"Open search bar\"]')?.click();"
+                                        "document.getElementById('search-open-btn')?.click();"
                                     ).await;
                                 });
                             }

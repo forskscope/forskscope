@@ -234,6 +234,7 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 "↺"
             }
             button {
+                id: "search-open-btn",
                 title: t(lang, "Search within diff (Ctrl+F)"),
                 aria_label: t(lang, "Open search bar"),
                 onclick: move |_| { search_ctx.write().active ^= true; },

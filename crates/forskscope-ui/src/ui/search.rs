@@ -107,6 +107,7 @@ pub fn SearchBar() -> Element {
                 "▲"
             }
             button {
+                id: "search-next-btn",
                 class: "search-nav",
                 disabled: total == 0,
                 title: t(lang, "Next match (Enter / F3)"),

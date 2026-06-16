@@ -5,6 +5,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.127.0] — 2026-06-13
+
+Bug fix: F3 and Ctrl+F keyboard shortcuts broken for Japanese users after
+the i18n pass translated the button attributes they selected by.
+
+### Fixed
+
+**Regression introduced in v0.125.0**: `app.rs` used JavaScript
+`document.eval` to simulate button clicks for F3 (search next) and Ctrl+F
+(open search bar). These selectors targeted buttons by their `title` and
+`aria-label` attribute values, which became Japanese after the i18n pass:
+
+- `querySelector('.search-nav[title*=\'Next\']')` — failed when title was
+  `"次の一致 (Enter / F3)"`.
+- `querySelector('.diff-wrap button[aria-label="Open search bar"]')` —
+  failed when aria-label was `"検索バーを開く"`.
+
+**Fix**: stable `id` attributes added to both buttons; eval selectors updated
+to use `getElementById`:
+
+- `diff.rs` search open button: `id: "search-open-btn"` added.
+- `search.rs` Next match button: `id: "search-next-btn"` added.
+- `app.rs` F3 handler: `getElementById('search-next-btn')?.click()`.
+- `app.rs` Ctrl+F handler: `getElementById('search-open-btn')?.click()`.
+
+`id`-based selectors are stable across all languages.
+
+---
+
 ## [0.126.0] — 2026-06-13
 
 i18n: last three hardcoded strings fixed; comprehensive scan confirms zero
