@@ -74,7 +74,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
         div {
             class: "diff-wrap",
             role: "region",
-            aria_label: "File comparison",
+            aria_label: t(lang, "File comparison"),
             DiffHeader { index }
             Toolbar { index, snap: snap.clone(), lang }
             SearchBar {}
@@ -196,21 +196,21 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
               else { format!("{} / {}", snap.focused_change + 1, snap.changes) };
     rsx! {
         div { class: "diff-toolbar",
-            button { onclick: move |_| move_focus(&mut store, index, -1), title: "F7", "◀" }
-            button { onclick: move |_| move_focus(&mut store, index,  1), title: "F8", "▶" }
+            button { onclick: move |_| move_focus(&mut store, index, -1), title: t(lang, "F7 — Previous change"), "◀" }
+            button { onclick: move |_| move_focus(&mut store, index,  1), title: t(lang, "F8 — Next change"), "▶" }
             span { class: "info", "{pos}" }
             span { class: "spacer" }
             if snap.can_save {
                 button {
                     disabled: !snap.can_undo,
                     onclick: move |_| { if let Some(tab) = store.tabs.write().get_mut(index) { let _ = tab.merge.undo(); } },
-                    aria_label: "Undo last merge action (Ctrl+Z)",
+                    aria_label: t(lang, "Undo last merge action (Ctrl+Z)"),
                     {t(lang, "Undo")}
                 }
                 button {
                     disabled: !snap.is_dirty,
                     onclick: move |_| save_tab(&mut store, index, false),
-                    aria_label: "Save merge result (Ctrl+S)",
+                    aria_label: t(lang, "Save merge result (Ctrl+S)"),
                     {t(lang, "Save")}
                 }
                 button {
@@ -224,8 +224,8 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 }
             }
             button {
-                title: "Reload both files from disk",
-                aria_label: "Reload files from disk",
+                title: t(lang, "Reload both files from disk"),
+                aria_label: t(lang, "Reload files from disk"),
                 onclick: move |_| {
                     let dirty = store.tabs.read().get(index).map(|t| t.merge.is_dirty()).unwrap_or(false);
                     if dirty { store.modal.set(Modal::ConfirmReload(index)); }
@@ -234,8 +234,8 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 "↺"
             }
             button {
-                title: "Search within diff (Ctrl+F)",
-                aria_label: "Open search bar",
+                title: t(lang, "Search within diff (Ctrl+F)"),
+                aria_label: t(lang, "Open search bar"),
                 onclick: move |_| { search_ctx.write().active ^= true; },
                 "🔍"
             }
@@ -250,13 +250,13 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
             div { class: "diff-toolbar advanced",
                 button {
                     aria_pressed: if snap.char_mode { "true" } else { "false" },
-                    aria_label: "Toggle character-level inline diff",
+                    aria_label: t(lang, "Toggle character-level inline diff"),
                     onclick: move |_| { if let Some(tab) = store.tabs.write().get_mut(index) { tab.char_mode ^= true; } },
                     {format!("{}: {}", t(lang, "Inline diff"), t(lang, if snap.char_mode { "on" } else { "off" }))}
                 }
                 button {
                     aria_pressed: if snap.word_wrap { "true" } else { "false" },
-                    aria_label: "Toggle word wrap",
+                    aria_label: t(lang, "Toggle word wrap"),
                     onclick: move |_| { if let Some(tab) = store.tabs.write().get_mut(index) { tab.word_wrap ^= true; } },
                     {format!("{}: {}", t(lang, "Wrap"), t(lang, if snap.word_wrap { "on" } else { "off" }))}
                 }
@@ -275,7 +275,7 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 }
                 button {
                     aria_pressed: if snap.ignore_whitespace { "true" } else { "false" },
-                    aria_label: "Toggle ignore whitespace",
+                    aria_label: t(lang, "Toggle ignore whitespace"),
                     onclick: move |_| {
                         let mut tabs = store.tabs.write();
                         if let Some(tab) = tabs.get_mut(index) {
@@ -287,7 +287,7 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 }
                 button {
                     aria_pressed: if snap.ignore_case { "true" } else { "false" },
-                    aria_label: "Toggle ignore case",
+                    aria_label: t(lang, "Toggle ignore case"),
                     onclick: move |_| {
                         let mut tabs = store.tabs.write();
                         if let Some(tab) = tabs.get_mut(index) {
@@ -298,7 +298,7 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     {format!("{}: {}", t(lang, "Ignore case"), t(lang, if snap.ignore_case { "on" } else { "off" }))}
                 }
                 select {
-                    title: "Diff algorithm",
+                    title: t(lang, "Diff algorithm"),
                     value: algo_val(snap.algorithm),
                     onchange: move |e| {
                         let mut tabs = store.tabs.write();
@@ -317,8 +317,8 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     option { value: "histogram", "Histogram" }
                 }
                 button {
-                    title: "Export unified-diff patch file",
-                    aria_label: "Export patch",
+                    title: t(lang, "Export unified-diff patch file"),
+                    aria_label: t(lang, "Export patch"),
                     onclick: move |_| {
                         crate::ui::diff_actions::export_patch(&store, index);
                     },

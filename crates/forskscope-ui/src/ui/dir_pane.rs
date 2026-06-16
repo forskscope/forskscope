@@ -10,6 +10,9 @@ use std::path::{Component, Path, PathBuf};
 
 use dioxus::html::input_data::keyboard_types::Key;
 use dioxus::prelude::*;
+
+use crate::i18n::t;
+use crate::state::Lang;
 use dioxus_swdir_tree::{ThreadExecutor};
 use dioxus_swdir_tree::{LoadPayload, ScanExecutor, ScanFuture, ScanJob};
 
@@ -84,6 +87,7 @@ pub fn PathBar(
     on_back:    EventHandler<()>,
     on_forward: EventHandler<()>,
     on_navigate: EventHandler<PathBuf>,
+    lang: Lang,
 ) -> Element {
     // Pre-compute everything before closures consume values.
     let segs = path_segs(&path);
@@ -102,11 +106,11 @@ pub fn PathBar(
 
     rsx! {
         div { class: "path-bar",
-            button { class: "path-btn", title: "Back",    disabled: !can_back,    onclick: move |_| on_back.call(()),    "←" }
-            button { class: "path-btn", title: "Forward", disabled: !can_forward, onclick: move |_| on_forward.call(()), "→" }
-            button { class: "path-btn", title: "Home directory",
+            button { class: "path-btn", t(lang, "Back"),    disabled: !can_back,    onclick: move |_| on_back.call(()),    "←" }
+            button { class: "path-btn", title: t(lang, "Forward"), disabled: !can_forward, onclick: move |_| on_forward.call(()), "→" }
+            button { class: "path-btn", title: t(lang, "Home directory"),
                 onclick: move |_| on_navigate.call(home_dir()), "⌂" }
-            button { class: "path-btn", title: "Open folder…",
+            button { class: "path-btn", title: t(lang, "Open folder…"),
                 onclick: move |_| {
                     let nav = on_navigate;
                     spawn(async move {
@@ -153,7 +157,7 @@ pub fn PathBar(
                                   {trunc_label(&full, 20)} } } }
                         }
                     }
-                    button { class: "path-btn path-edit-btn", title: "Edit path",
+                    button { class: "path-btn path-edit-btn", title: t(lang, "Edit path"),
                         onclick: move |_| edit_mode.set(true), "✎" }
                 }
             }

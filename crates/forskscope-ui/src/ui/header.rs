@@ -21,7 +21,7 @@ pub fn Header() -> Element {
             }
             button {
                 onclick: move |_| store.modal.set(Modal::KeyboardRef),
-                title: "Keyboard shortcuts (Ctrl+/)", "?"
+                title: t(lang, "Keyboard shortcuts (Ctrl+/)"), "?"
             }
         }
     }

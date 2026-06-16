@@ -167,13 +167,13 @@ pub fn Explorer() -> Element {
             div { class: "explorer-modes",
                 button {
                     class: if *mode.read() == ExplorerMode::Browse { "mode-btn active" } else { "mode-btn" },
-                    title: "Browse and navigate directories side by side",
+                    title: t(lang, "Browse and navigate directories side by side"),
                     onclick: move |_| mode.set(ExplorerMode::Browse),
                     {t(lang, "Browse")}
                 }
                 button {
                     class: if *mode.read() == ExplorerMode::Deep { "mode-btn active" } else { "mode-btn" },
-                    title: "Recursively compare all files in both directories and show a full status report",
+                    title: t(lang, "Recursively compare all files in both directories and show a full status report"),
                     onclick: move |_| mode.set(ExplorerMode::Deep),
                     {t(lang, "Directory Report")}
                 }
@@ -190,6 +190,7 @@ pub fn Explorer() -> Element {
                             on_back:    move |_| { let p = left_hist.write().back();    if let Some(p) = p { navigate_to(p, true,  store, left_hist,  left_dir); } },
                             on_forward: move |_| { let p = left_hist.write().forward(); if let Some(p) = p { navigate_to(p, true,  store, left_hist,  left_dir); } },
                             on_navigate: move |p| navigate_to(p, true, store, left_hist, left_dir),
+                            lang,
                         }
                         PathBar {
                             path: right_dir.read().clone(),
@@ -198,6 +199,7 @@ pub fn Explorer() -> Element {
                             on_back:    move |_| { let p = right_hist.write().back();    if let Some(p) = p { navigate_to(p, false, store, right_hist, right_dir); } },
                             on_forward: move |_| { let p = right_hist.write().forward(); if let Some(p) = p { navigate_to(p, false, store, right_hist, right_dir); } },
                             on_navigate: move |p| navigate_to(p, false, store, right_hist, right_dir),
+                            lang,
                         }
                     }
 

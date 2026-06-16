@@ -5,6 +5,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.125.0] — 2026-06-12
+
+i18n: all remaining tooltip, aria-label, and visible-text strings now go
+through `t()`. 132 active translation keys, all present in `ja()`.
+
+### Fixed
+
+**`crates/forskscope-ui/src/ui/deep_compare.rs`** — 8 strings wired:
+`"Scanning…"`, stat line words (`"different"`, `"equal"`, `"total"`),
+`"checking"` progress word, `"Copy"` and direction labels for batch-copy
+buttons and `BatchCopySpec` label strings. `lang` added to `BatchCopyButtons`.
+
+**`crates/forskscope-ui/src/ui/dir_pane.rs`** — 5 `PathBar` button
+tooltips wired: `"Back"`, `"Forward"`, `"Home directory"`, `"Open folder…"`,
+`"Edit path"`. `lang: Lang` prop added to `PathBar`.
+
+**`crates/forskscope-ui/src/ui/explorer.rs`** — `lang` threaded to both
+`PathBar` callsites; mode-button tooltips `"Browse and navigate…"` and
+`"Recursively compare…"` wired through `t()`.
+
+**`crates/forskscope-ui/src/ui/header.rs`** — `"Keyboard shortcuts (Ctrl+/)"` 
+tooltip wired through `t()`.
+
+**`crates/forskscope-ui/src/ui/diff.rs`** — 16 toolbar aria-labels and
+tooltips wired: `"File comparison"`, `"F7 — Previous change"`, `"F8 — Next
+change"`, `"Undo last merge action (Ctrl+Z)"`, `"Save merge result (Ctrl+S)"`,
+`"Reload both files from disk"`, `"Reload files from disk"`, `"Search within
+diff (Ctrl+F)"`, `"Open search bar"`, toggle labels for inline diff, word wrap,
+ignore whitespace, ignore case, `"Diff algorithm"`, `"Export unified-diff patch
+file"`, `"Export patch"`.
+
+**`crates/forskscope-ui/src/i18n.rs`** — 32 new Japanese translations added.
+
+---
+
 ## [0.124.0] — 2026-06-12
 
 i18n: hunk view and search bar strings translated; screen-reader labels
