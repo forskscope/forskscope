@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.116.0] — 2026-06-12
+
+ELOC compliance: settings and job modules split; no files remain over 500 lines.
+
+### Changed
+
+Pure refactors — no behaviour, public API, or test changes.
+
+**`settings.rs` (466 lines) → `settings/mod.rs` + `settings/display.rs`**
+
+- `settings/display.rs` (161): display primitives — `ThemeId`, `ThemeTokens`,
+  `Density`, `FontFamilySetting`, `LocaleId`, `SETTINGS_SCHEMA_VERSION`.
+- `settings/mod.rs` (311): settings sections — `AppearanceSettings`,
+  `DiffSettings`, `FileSettings`, `BehaviourSettings`, `UserSettings` with
+  serialise/deserialise; parse helpers.
+
+**`job.rs` (370 lines) → `job/mod.rs` + `job/limits.rs`**
+
+- `job/limits.rs` (81): `FileSizeClass` and `PerformanceLimits` (RFC-013 §5).
+- `job/mod.rs` (294): threshold policy, `JobKind`, `JobProgress`, `JobHandle`,
+  job lifecycle state machine, `JobRegistry`.
+
+---
+
 ## [0.115.0] — 2026-06-12
 
 ELOC compliance: four core modules over 500 lines split into submodules.
