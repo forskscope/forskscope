@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.132.0] — 2026-06-13
+
+Per-file copy button wired in deep compare view; dead `#[allow(dead_code)]`
+annotation removed from `Modal::ConfirmDirOp`.
+
+### Added
+
+**`crates/forskscope-ui/src/ui/deep_compare.rs`** — Each `DeepRow` now shows
+a per-file copy button alongside the existing "Compare" button:
+
+- **Changed / LeftOnly** entries show `"Copy →"` — copies the left file to
+  the right directory, triggering `Modal::ConfirmDirOp` with src/dst paths.
+- **RightOnly** entries show `"← Copy"` — copies the right file to the left
+  directory.
+- **Equal / Computing / Symlink** entries show no copy button.
+
+The copy confirmation uses the existing `ConfirmDirOpModal` (modals.rs) which
+was already fully implemented but had no way to be triggered from the UI.
+
+### Fixed
+
+**`crates/forskscope-ui/src/state/mod.rs`** — Removed stale
+`#[allow(dead_code)]` annotation from `Modal::ConfirmDirOp(DirOp)`. The
+variant is now actively constructed by `DeepRow`.
+
+---
+
 ## [0.131.0] — 2026-06-13
 
 CSS housekeeping: 44 more dead lines removed; `main.css` 561 → 517 lines.

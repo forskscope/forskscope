@@ -11,7 +11,7 @@ use dioxus::prelude::*;
 use forskscope_core::dir::{RecEntry, RecStatus, file_digest_equal, list_recursive_for_display};
 
 use crate::i18n::t;
-use crate::state::{Lang, Store, open_compare};
+use crate::state::{DirOp, Lang, Modal, Store, open_compare};
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub enum DeepFilter { #[default] Different, All, Equal }
@@ -136,6 +136,25 @@ fn DeepRow(entry: RecEntry, lang: Lang) -> Element {
     };
     let path_str   = entry.rel_path.display().to_string();
     let can_cmp    = !matches!(entry.status, RecStatus::Equal | RecStatus::Computing | RecStatus::Symlink);
+    // Copy direction: LeftOnly/Changed → copy left→right; RightOnly → copy right→left.
+    let copy_dir: Option<(bool, String)> = {
+        let s = store.settings.read();
+        match (&s.last_left_dir, &s.last_right_dir, &entry.status) {
+            (Some(lr), Some(rr), RecStatus::Changed | RecStatus::LeftOnly) => {
+                let src = lr.join(&entry.rel_path);
+                let dst = rr.join(&entry.rel_path);
+                let lbl = format!("{} →", t(lang, "Copy"));
+                Some((true, lbl))
+            }
+            (Some(lr), Some(rr), RecStatus::RightOnly) => {
+                let src = rr.join(&entry.rel_path);
+                let dst = lr.join(&entry.rel_path);
+                let lbl = format!("← {}", t(lang, "Copy"));
+                Some((false, lbl))
+            }
+            _ => None,
+        }
+    };
     let e2 = entry.clone();
     rsx! {
         div { class: "deep-row",
@@ -154,6 +173,35 @@ fn DeepRow(entry: RecEntry, lang: Lang) -> Element {
                         }
                     },
                     {t(lang, "Compare")}
+                }
+            }
+            if let Some((to_right, lbl)) = copy_dir {
+                {
+                    let entry3 = entry.clone();
+                    rsx! {
+                        button { class: "deep-compare-btn",
+                            onclick: move |_| {
+                                let s = store.settings.read();
+                                let dirs = if to_right {
+                                    s.last_left_dir.as_ref().zip(s.last_right_dir.as_ref())
+                                        .map(|(l, r)| (l.join(&entry3.rel_path), r.join(&entry3.rel_path)))
+                                } else {
+                                    s.last_right_dir.as_ref().zip(s.last_left_dir.as_ref())
+                                        .map(|(r, l)| (r.join(&entry3.rel_path), l.join(&entry3.rel_path)))
+                                };
+                                drop(s);
+                                if let Some((src, dst)) = dirs {
+                                    let label = if to_right {
+                                        format!("{} → {}", src.display(), dst.display())
+                                    } else {
+                                        format!("{} → {}", src.display(), dst.display())
+                                    };
+                                    store.modal.set(Modal::ConfirmDirOp(DirOp { src, dst, label }));
+                                }
+                            },
+                            {lbl}
+                        }
+                    }
                 }
             }
         }

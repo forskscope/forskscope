@@ -19,7 +19,7 @@ pub enum Modal {
     None, Settings,
     ConfirmOverwrite(usize), SaveAs(usize, String),
     ConfirmReload(usize), ConfirmSwap(usize),
-    #[allow(dead_code)] ConfirmDirOp(DirOp), ConfirmClose(usize),
+    ConfirmDirOp(DirOp), ConfirmClose(usize),
     ConfirmBatchCopy(BatchCopySpec),
     About, KeyboardRef,
 }
