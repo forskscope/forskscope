@@ -1,8 +1,8 @@
 # RFC 041: v1.0 Product Stabilization and RFC Governance
 
-**Status.** Proposed — checklist updated v0.110.0
+**Status.** Proposed — checklist updated v0.135.0
 
-## Current state (v0.110.0) — final pre-GTK state
+## Current state (v0.135.0) — final pre-GTK state
 
 ### Must-Stabilise targets — all complete
 
@@ -17,7 +17,7 @@
 | Directory comparison basics | ✓ `DirectoryIndex` + `EqualityEvidence` + `pair_entries` (v0.58.0) |
 | Editor adapter safety boundary | ✓ `TextEditOperation` revision contract; UI adapter is remaining work |
 
-### Release readiness checklist (v0.110.0 — final pre-GTK state)
+### Release readiness checklist (v0.135.0 — final pre-GTK state)
 
 ```text
 Product:
@@ -33,7 +33,7 @@ Safety:
   [x] Large-file mode prevents UI lockups           (FileSizeClass + PerformanceLimits)
 
 Engineering:
-  [x] Core tests pass                               (650 unit + 45 integration = 936 total, 0 failures)
+  [x] Core tests pass                               (936 total: 650 unit + 286 integration, 0 failures)
   [x] ui-logic tests pass                           (228 unit tests, 14 modules, all fields covered)
   [ ] Editor harness tests pass                     (RFC-040 deferred)
   [ ] Packaging smoke tests pass                    (RFC-010 deferred)
@@ -46,7 +46,29 @@ Documentation:
   [x] Known limitations documented                  (docs/src/users/known-limitations.md, v0.98.0)
 ```
 
-### RFC inventory at v0.110.0
+### Progress since v0.110.0 (UI polish and correctness pass, v0.111.0–v0.135.0)
+
+- **i18n complete** (v0.111.0–v0.133.0): all 143 user-visible strings in the UI
+  go through `t()`; 152 Japanese translations in `ja()`, zero missing, zero dead.
+  Includes screen-reader `aria_label` attributes on all modals and buttons,
+  collapse-divider text, toast notifications, and error message prefixes.
+- **Keyboard shortcut fixes** (v0.127.0–v0.128.0): F3/Shift+F3 eval selectors
+  rewritten to use stable `id` attributes after i18n broke title-based selectors.
+  Shift+F3 (previous search match) implemented; F3/Shift+F3 added to the
+  keyboard reference modal.
+- **CSS cleanup** (v0.130.0–v0.134.0): `main.css` reduced from 583 to 497 lines.
+  Dead rules from four replaced UI patterns removed; duplicate selectors merged;
+  `.tab { gap: 0 }` override clobbering the intended `gap: .4rem` fixed.
+- **Bug fixes** (v0.129.0, v0.134.0): PathBar Back button was rendering
+  `t(lang, "Back")` as button text instead of a `title:` tooltip; double-
+  translation of pre-translated `warnings` and `readonly_notice` in `diff.rs`;
+  dead variables and dead `if/else` in `DeepRow`; missing `lang` prop in
+  `tail_rows` Row calls in `hunk.rs`.
+- **Feature: per-file copy** (v0.132.0): deep compare rows now show per-file
+  copy buttons wired to `Modal::ConfirmDirOp`, completing the single-file copy
+  flow that had a fully-implemented modal but no trigger.
+
+### RFC inventory at v0.135.0
 
 **Done: 39** — all core data-layer and view-model RFCs complete.
 **Proposed: 9** — editor adapter track (4), platform/packaging (2), governance (2), documentation (1).

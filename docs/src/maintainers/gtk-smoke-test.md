@@ -119,6 +119,15 @@ highlighted with gutter markers.
 - Click a "different" entry
 - Expected: diff tab opens for that file pair
 
+### 2f. Per-file copy
+
+- In Directory Report, find a "different" or left-only/right-only entry
+- Click the **Copy →** or **← Copy** button on the row
+- Expected: confirmation modal appears showing source and destination paths;
+  if destination exists, a `.bak` backup notice appears
+- Confirm the copy
+- Expected: file copied; toast notification confirms
+
 ---
 
 ## RFC-041 item 3 — Basic keyboard navigation is complete

@@ -73,7 +73,7 @@ pub fn HunkBlock(
                         right_no: row.right.as_ref().and_then(|r| r.original_line_number),
                         kind: hunk.kind, char_mode: false,
                         show_action: false, applied: i == 0 && applied,
-                        on_apply: EventHandler::new(|_| {}),
+                        on_apply: EventHandler::new(|_| {}), lang,
                     }
                 }
             } else {

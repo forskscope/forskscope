@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.135.0] — 2026-06-13
+
+Bug fix: missing `lang` prop in `tail_rows` Row calls in `hunk.rs`.
+RFC-041 checklist and GTK smoke test updated to v0.135.0.
+
+### Fixed
+
+**`crates/forskscope-ui/src/ui/hunk.rs`** — The `tail_rows` loop in
+`HunkBlock` was passing `Row` components without the `lang` prop, while both
+`head_rows` and `all_rows` passed it correctly. The context-collapse tail
+rows (the last `context_lines` rows below the "··· N unchanged ···" divider)
+were receiving the default/unset language instead of the active UI language,
+meaning screen-reader labels and action button aria-labels would have been
+wrong for Japanese users viewing collapsed equal hunks.
+
+### Changed
+
+**`rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md`** —
+Updated from v0.110.0 to v0.135.0. Added "Progress since v0.110.0" summary
+documenting the i18n pass, keyboard shortcut fixes, CSS cleanup, bug fixes,
+and per-file copy feature (v0.111.0–v0.135.0). Test count corrected to 936.
+
+**`docs/src/maintainers/gtk-smoke-test.md`** — Added §2f "Per-file copy"
+smoke test step covering the `Copy →` / `← Copy` button flow added in
+v0.132.0.
+
+---
+
 ## [0.134.0] — 2026-06-13
 
 Code quality: dead variables in DeepRow fixed; duplicate CSS selectors
