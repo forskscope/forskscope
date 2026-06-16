@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.122.0] — 2026-06-12
+
+i18n: all remaining hardcoded English strings in modals, statusbar, and
+search bar now route through `t()`. Japanese translation now covers the
+entire UI without exception.
+
+### Fixed
+
+**`crates/forskscope-ui/src/ui/modals.rs`** — 10 user-visible strings
+wired through `t()`:
+
+- `CloseTabModal`: body text `"… has unsaved changes. Discard them and close?"`
+- `ConfirmDirOpModal`: `"From"`, `"To"` field labels; `"Destination exists. A .bak backup will be created."` notice
+- `BatchCopyModal`: `"Existing files will receive a .bak backup."` notice
+- `AboutModal`: `"Version"`, `"Rust"`, `"OS"`, `"Arch"`, `"CPUs"` key labels
+
+**`crates/forskscope-ui/src/ui/statusbar.rs`** — `"Local only"` wired
+through `t()`.
+
+**`crates/forskscope-ui/src/ui/search.rs`** — `"No matches"` wired
+through `t()`.
+
+**`crates/forskscope-ui/src/i18n.rs`** — 12 new Japanese translations
+added for all of the above keys.
+
+After this fix: 86 keys in active use, all present in `ja()`, none dead.
+The Japanese interface is now complete with no English fallback strings in
+any user-facing component.
+
+---
+
 ## [0.121.0] — 2026-06-12
 
 i18n: warning and read-only notice strings in the diff view now translate

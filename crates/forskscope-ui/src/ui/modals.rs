@@ -107,7 +107,10 @@ pub fn CloseTabModal(index: usize) -> Element {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "Close comparison",
             div { class: "modal",
                 h2 { {t(lang, "Close comparison?")} }
-                p { "\"{title}\" has unsaved changes. Discard them and close?" }
+                p { {format!("\"{}\" {}",
+                    title,
+                    t(lang, "has unsaved changes. Discard them and close?")
+                )} }
                 div { class: "actions",
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
                     button { onclick: move |_| { close_tab(&mut store, index); store.modal.set(Modal::None); }, {t(lang, "Discard and close")} }
@@ -130,10 +133,10 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
             div { class: "modal",
                 h2 { {t(lang, "Copy file?")} }
                 p { "{op.label}" }
-                div { class: "field", span { "From" } code { class: "path-display", "{src}" } }
-                div { class: "field", span { "To"   } code { class: "path-display", "{dst}" } }
+                div { class: "field", span { {t(lang, "From")} } code { class: "path-display", "{src}" } }
+                div { class: "field", span { {t(lang, "To")} } code { class: "path-display", "{dst}" } }
                 if op.dst.exists() {
-                    p { class: "notice", "Destination exists. A .bak backup will be created." }
+                    p { class: "notice", {t(lang, "Destination exists. A .bak backup will be created.")} }
                 }
                 div { class: "actions",
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
@@ -166,7 +169,7 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
             div { class: "modal",
                 h2 { "Copy {count} files?" }
                 p { "{label}" }
-                p { class: "notice", "Existing files will receive a .bak backup." }
+                p { class: "notice", {t(lang, "Existing files will receive a .bak backup.")} }
                 div { class: "actions",
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
                     button {
@@ -204,11 +207,11 @@ pub fn AboutModal() -> Element {
             div { class: "modal",
                 h2 { "ForskScope v{info.app_version}" }
                 div { class: "about-grid",
-                    span { class: "about-key", "Version" }   span { "{info.app_version}" }
-                    span { class: "about-key", "Rust" }      span { "{info.rustc_version}" }
-                    span { class: "about-key", "OS" }        span { "{info.os}" }
-                    span { class: "about-key", "Arch" }      span { "{info.arch}" }
-                    span { class: "about-key", "CPUs" }      span { "{info.logical_cpus}" }
+                    span { class: "about-key", {t(lang, "Version")} }   span { "{info.app_version}" }
+                    span { class: "about-key", {t(lang, "Rust")} }      span { "{info.rustc_version}" }
+                    span { class: "about-key", {t(lang, "OS")} }        span { "{info.os}" }
+                    span { class: "about-key", {t(lang, "Arch")} }      span { "{info.arch}" }
+                    span { class: "about-key", {t(lang, "CPUs")} }      span { "{info.logical_cpus}" }
                 }
                 div { class: "actions",
                     button { onclick: move |_| { let d = d2.clone(); spawn(async move { let _ = dioxus::document::eval(&format!("navigator.clipboard?.writeText({:?})", d)).await; }); }, {t(lang, "Copy diagnostics")} }

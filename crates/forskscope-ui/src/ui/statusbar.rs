@@ -37,7 +37,7 @@ pub fn StatusBar() -> Element {
                 if dirty { span { class: "dirty", {t(lang, "unsaved")} } }
             }
             span { class: "spacer" }
-            span { "Local only" }
+            span { {t(lang, "Local only")} }
         }
     }
 }

@@ -50,7 +50,7 @@ pub fn SearchBar() -> Element {
     let query_empty = ctx.read().query.is_empty();
 
     let count_label = if query_empty || total == 0 {
-        if !query_empty { "No matches".to_string() } else { String::new() }
+        if !query_empty { t(lang, "No matches") } else { String::new() }
     } else {
         match focused {
             Some(n) => format!("{n} / {total}"),
