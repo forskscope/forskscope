@@ -5,6 +5,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.121.0] — 2026-06-12
+
+i18n: warning and read-only notice strings in the diff view now translate
+into Japanese; 9 dead translation entries removed.
+
+### Fixed
+
+**`crates/forskscope-ui/src/ui/diff.rs`** — `TabSnapshot::from_tab()` now
+accepts a `lang: Lang` parameter and wraps all user-visible strings through
+`t()`. Previously these strings were hardcoded `&'static str` values that
+had Japanese translations in `ja()` that could never be shown:
+
+- `DiffWarning::LargeFilePolicyApplied` → `t(lang, "Large file — inline diff disabled and deadline shortened.")`
+- `DiffWarning::DeadlineExpired` → `t(lang, "Diff timed out — result may be approximate.")`
+- `DiffWarning::InlineSkippedHunkTooLarge` → `t(lang, "Some hunks were too large for character-level diff.")`
+- `readonly_notice` for Binary, Excel, Missing, Unsupported, and default
+  cases — all five strings now go through `t()`.
+
+### Changed
+
+**`crates/forskscope-ui/src/i18n.rs`** — removed 9 dead `ja()` entries
+that had no corresponding `t()` call anywhere in the codebase: `"Apply ▶"`,
+`"List"`, `"Next change"`, `"Open Files"`, `"Previous change"`,
+`"Select left, then right, then Compare."`, `"Use as Left"`, `"Use as Right"`,
+`"changes"`. These were added speculatively and never wired. The `ja()` map
+now has 76 entries, all of which correspond to active `t()` call sites.
+
+---
+
 ## [0.120.0] — 2026-06-12
 
 Dependency maintenance: transitive dependency patch updates.

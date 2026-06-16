@@ -23,7 +23,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
     let snap = {
         let tabs = store.tabs.read();
         match tabs.get(index) {
-            Some(tab) => TabSnapshot::from_tab(tab, font_size, context_lines),
+            Some(tab) => TabSnapshot::from_tab(tab, font_size, context_lines, lang),
             None => return rsx! { div { class: "notice", "No comparison." } },
         }
     };
@@ -148,27 +148,28 @@ pub(crate) struct TabSnapshot {
 }
 
 impl TabSnapshot {
-    fn from_tab(tab: &crate::state::CompareTab, font_size: u32, context_lines: usize) -> Self {
+    fn from_tab(tab: &crate::state::CompareTab, font_size: u32, context_lines: usize, lang: crate::state::Lang) -> Self {
         use forskscope_core::diff::DiffWarning;
         use forskscope_core::file_kind::FileKind;
+        use crate::i18n::t;
         let hunks = tab.merge.hunks().to_vec();
         let ids: Vec<u64> = hunks.iter().filter(|h| h.kind.is_change()).map(|h| h.hunk_id).collect();
         let warnings = tab.diff.warnings.iter().map(|w| match w {
-            DiffWarning::LargeFilePolicyApplied => "Large file — inline diff disabled and deadline shortened.",
-            DiffWarning::DeadlineExpired        => "Diff timed out — result may be approximate.",
-            DiffWarning::InlineSkippedHunkTooLarge => "Some hunks were too large for character-level diff.",
-        }).map(str::to_string).collect();
+            DiffWarning::LargeFilePolicyApplied => t(lang, "Large file — inline diff disabled and deadline shortened."),
+            DiffWarning::DeadlineExpired        => t(lang, "Diff timed out — result may be approximate."),
+            DiffWarning::InlineSkippedHunkTooLarge => t(lang, "Some hunks were too large for character-level diff."),
+        }).collect();
         let readonly_notice = if tab.can_save { String::new() } else {
             match (&tab.left_doc.kind, &tab.right_doc.kind) {
                 (FileKind::Binary, _) | (_, FileKind::Binary) =>
-                    "Binary file — read-only comparison (hex preview).".into(),
+                    t(lang, "Binary file — read-only comparison (hex preview)."),
                 (FileKind::ExcelXlsx, _) | (_, FileKind::ExcelXlsx) =>
-                    "Spreadsheet — read-only comparison.".into(),
+                    t(lang, "Spreadsheet — read-only comparison."),
                 (FileKind::Missing, _) | (_, FileKind::Missing) =>
-                    "One side is missing — read-only.".into(),
+                    t(lang, "One side is missing — read-only."),
                 (FileKind::Unsupported { .. }, _) | (_, FileKind::Unsupported { .. }) =>
-                    "File type not supported for merge — read-only.".into(),
-                _ => "Merge/save unavailable for this file type.".into(),
+                    t(lang, "File type not supported for merge — read-only."),
+                _ => t(lang, "Merge/save unavailable for this file type."),
             }
         };
         Self {
