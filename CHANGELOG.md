@@ -5,9 +5,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.115.0] — 2026-06-12
+
+ELOC compliance: four core modules over 500 lines split into submodules.
+
+### Changed
+
+All changes are pure refactors — no behaviour, public API, or test changes.
+
+**`command.rs` (525 lines) → `command/mod.rs` + `command/registry.rs`**
+
+- `command/mod.rs` (314): identity types, `cmd` submodule of well-known IDs,
+  availability context, shortcut model, `CommandDefinition`.
+- `command/registry.rs` (224): `CommandRegistry` with `builtin()` factory and
+  all built-in command definitions.
+
+**`error.rs` (554 lines) → `error/mod.rs` + `error/app.rs`**
+
+- `error/mod.rs` (201): `CoreError`, `IoOperation`, `ErrorSeverity`.
+- `error/app.rs` (360): `AppErrorKind`, `RecoveryAction`, `AppError`,
+  `UserMessage`, `TechnicalDetail`, `ErrorId`.
+
+**`session.rs` (559 lines) → `session/mod.rs` + `session/tab.rs`**
+
+- `session/tab.rs` (179): per-tab session types — `SessionId`, `TabId`,
+  `Timestamp`, `FilePairRoot`, `DirectoryPairRoot`, `WorkspaceRoot`,
+  `WorkspaceTab`, `DiffTabSession`, `BinaryTabSession`, `ExcelTabSession`,
+  `ErrorTabSession`, `SESSION_SCHEMA_VERSION`.
+- `session/mod.rs` (406): `WorkspaceSession` with all operations and queries;
+  `RecentSessionEntry`; serialisation/deserialisation via `VersionedEnvelope`.
+
+**`report.rs` (506 lines) → `report/mod.rs` + `report/file.rs` + `report/dir.rs`**
+
+- `report/mod.rs` (51): re-exports + shared `pub(crate)` helpers
+  `display_path` and `hunk_kind_label`.
+- `report/file.rs` (262): `FileComparisonReport`, `HunkSummaryRow`,
+  `HistoryEntry`, `ReportOptions`, `ReportPathMode`.
+- `report/dir.rs` (208): `DirComparisonReport`, `DirFileRow`, `BatchSummary`;
+  private helper `fmt_size`.
+
+---
+
 ## [0.114.0] — 2026-06-12
 
-final note-file housekeeping.
+Final note-file housekeeping.
 
 ### Changed
 
