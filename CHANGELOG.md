@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.139.0] — 2026-06-13
+
+i18n: keyboard reference modal descriptions and scrim aria_label translated.
+All 11 shortcut description strings now go through `t()`; 158 active keys.
+
+### Fixed
+
+**`crates/forskscope-ui/src/ui/keybindings.rs`** — All `KbRow` description
+strings were hardcoded English `&'static str` literals passed directly to the
+component. `KbRow.desc` changed to `String`; all 11 descriptions now go
+through `t(lang, ...)`. Scrim `aria_label: "Keyboard shortcuts"` also wired
+through `t()`.
+
+**`crates/forskscope-ui/src/i18n.rs`** — 15 new Japanese translations: 11
+shortcut descriptions + `"Keyboard shortcuts"` scrim aria_label (already had
+the heading, now also has the dialog label). Zero missing, zero dead, zero
+duplicate keys.
+
+---
+
 ## [0.138.0] — 2026-06-13
 
 Bug fix: `.filter-btn` CSS removed during dead-code cleanup (v0.131.0) was
