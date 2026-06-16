@@ -39,4 +39,5 @@
 - [RFC directory](../../rfcs/README.md)
 - [Local development](./maintainers/local-dev.md)
 - [Testing strategy](./maintainers/testing.md)
+- [GTK smoke test checklist](./maintainers/gtk-smoke-test.md)
 - [Release process](./maintainers/release.md)

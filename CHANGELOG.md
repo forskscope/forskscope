@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.119.0] — 2026-06-12
+
+GTK smoke test checklist; testing.md counts updated.
+
+### Added
+
+- **`docs/src/maintainers/gtk-smoke-test.md`** — step-by-step manual
+  verification checklist for the three RFC-041 UI items that require a
+  running GTK display server: two-way file compare end-to-end (open, navigate
+  hunks, apply, undo, save, search), directory compare (explorer navigation,
+  digest indicators, same-name diff, deep compare), and keyboard navigation
+  completeness (all shortcuts from `keybindings.rs`). Includes build
+  instructions, pass criteria, and known GTK environment workarounds.
+  Added to `docs/src/SUMMARY.md`.
+
+### Changed
+
+- **`docs/src/maintainers/testing.md`** — test counts updated to v0.119.0:
+  `diff_corpus` 25 → 27; total 930 → 936; version header updated.
+
+---
+
 ## [0.118.0] — 2026-06-12
 
 ELOC compliance: UI `state.rs` split; all files now at or below the project's
