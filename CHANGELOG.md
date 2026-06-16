@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.136.0] — 2026-06-13
+
+Documentation accuracy pass; duplicate CHANGELOG entry removed.
+
+### Fixed
+
+**`CHANGELOG.md`** — Duplicate `## [0.129.0]` entry removed. The shorter,
+less complete copy (missing the `diff.rs` double-translation fix) was dropped.
+
+**`docs/src/intermediate/keyboard.md`** — `F3` (next search match) and
+`Shift+F3` (previous search match) added to the View shortcuts table.
+These were implemented in v0.128.0 but not reflected in this doc.
+
+**`docs/src/users/directory-compare.md`** — Two inaccuracies fixed:
+- "Filters and sorting" section described the old explorer toolbar
+  (sort dropdown, hidden toggle, filter-names input) that was removed in
+  v0.131.0. Replaced with a "Modes" table showing the actual `Browse` /
+  `Directory Report` buttons.
+- "Click **⟳ Deep compare**" changed to "Click **Directory Report**" to
+  match the actual button label.
+
+**`docs/src/users/explorer.md`** — Two stale sections removed:
+- "Dragging" paragraph describing folder drag-and-drop, which was in the
+  old `DirPane` but was not ported to the current aligned explorer.
+- "Sync panes" section describing a **⇄ Sync** button that no longer exists.
+
+**`docs/src/maintainers/testing.md`** — Version header updated from
+v0.120.0 to v0.135.0.
+
+---
+
 ## [0.135.0] — 2026-06-13
 
 Bug fix: missing `lang` prop in `tail_rows` Row calls in `hunk.rs`.
@@ -190,32 +221,6 @@ the render code wrapped them in `t()` again. Since `t()` returns the key
 unchanged when not found, this was harmless in practice — but conceptually
 wrong and fragile. Fixed: render uses the already-translated `String` values
 directly (`"{w}"` and `{&snap.readonly_notice}`).
-
-**`modals.rs`** — 6 dialog scrim `aria_label` attributes wired through `t()`:
-`"File changed on disk"`, `"Save As"`, `"Reload files"`, `"Swap sides"`,
-`"Close comparison"`, `"Copy file"`. Batch-copy completion toast
-(`"Copied {n} files, {n} failed"`) wired through `t()` with `"Copied"`,
-`"files"`, `"failed"` keys.
-
-**`settings.rs`** — Settings dialog scrim `aria_label: "Settings"` wired
-through `t()`.
-
-**`i18n.rs`** — 9 new Japanese translations added: modal aria-labels (6),
-plus `"Copied"` → コピー完了, `"failed"` → 失敗.
-
----
-
-## [0.129.0] — 2026-06-13
-
-Bug fix: Back button tooltip was rendered as button text; modal `aria_label`
-attributes and batch-copy toast translated.
-
-### Fixed
-
-**`dir_pane.rs`** — `PathBar` Back button had `title:` keyword missing; the
-expression `t(lang, "Back")` was a bare child of the button element instead
-of a `title:` attribute. The button rendered `"←Back"` text content with no
-tooltip. Fixed to `title: t(lang, "Back")`.
 
 **`modals.rs`** — 6 dialog scrim `aria_label` attributes wired through `t()`:
 `"File changed on disk"`, `"Save As"`, `"Reload files"`, `"Swap sides"`,

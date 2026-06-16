@@ -17,9 +17,6 @@ folder icon to open a directory picker dialog.
 forskscope /path/to/old-version/ /path/to/new-version/
 ```
 
-**Dragging:** drag a folder onto the window. If you drag one folder, it sets
-the active pane; if you drag two folders at once, they set left and right.
-
 ---
 
 ## Navigating
@@ -81,11 +78,3 @@ Close a tab with the **✕** button; if the comparison has unsaved merge changes
 you will be asked to confirm.
 
 The Explorer tab is always available and cannot be closed.
-
----
-
-## Sync panes
-
-Click the **⇄ Sync** button to copy the current pane's directory path to the
-opposite pane, making both panes point to the same directory. Useful when you
-want to quickly compare two files from the same location.

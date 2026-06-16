@@ -35,30 +35,26 @@ When you launch ForskScope without arguments, the Explorer workspace opens with 
 
 ---
 
-## Filters and sorting
+## Modes
 
-The toolbar above the panes provides:
+Two mode buttons in the toolbar switch between views:
 
-| Control | Purpose |
-|---------|---------|
-| **All / Different / Equal** | Show all files, only differing files, or only equal files |
-| **Sort** dropdown | Sort by name, status (changed first), or size |
-| **Hidden** checkbox | Show or hide dot-files |
-| **Filter names** input | Substring filter — type `rs` to show only `.rs` files |
-
-Filters apply to both panes simultaneously so the view stays aligned.
+| Button | Purpose |
+|--------|---------|
+| **Browse** | Side-by-side directory panes with digest status icons |
+| **Directory Report** | Recursive scan — flat report of every file across both trees |
 
 ---
 
 ## Copying files between sides
 
-Every file row that is not equal shows a copy button (`→` or `←`) on hover. Clicking opens a confirmation dialog showing the exact source and destination paths. If the destination already exists, a `.bak` backup is created before overwriting.
+Every row in Directory Report that is not equal shows a copy button (`Copy →` or `← Copy`). Clicking opens a confirmation dialog showing the exact source and destination paths. If the destination already exists, a `.bak` backup is created before overwriting.
 
 ---
 
 ## Deep compare mode
 
-Click **⟳ Deep compare** in the toolbar to switch to the recursive scan view.
+Click **Directory Report** in the mode toolbar to switch to the recursive scan view.
 
 ForskScope walks both directory trees in the background and builds a flat report. The scan runs in two phases:
 

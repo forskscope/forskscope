@@ -34,6 +34,8 @@ take effect when a comparison tab is active.
 | Shortcut | Action |
 |----------|--------|
 | **Ctrl+F** | Open / close inline search bar |
+| **F3** | Next search match |
+| **Shift+F3** | Previous search match |
 
 ## Explorer
 
