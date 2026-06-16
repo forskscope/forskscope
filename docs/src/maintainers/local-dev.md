@@ -14,9 +14,9 @@ cargo build                            # debug build (requires GTK on Linux)
 cargo build --release                  # release (LTO, stripped)
 
 # Tests that run WITHOUT GTK / display server:
-cargo test -p forskscope-core          # 646 unit + 43 integration tests (diff corpus + merge corpus + patch)
-cargo test -p forskscope-ui-logic      # 189 unit + 5 integration + 1 doctests, 14 view-model modules
-cargo test -p forskscope-core -p forskscope-ui-logic  # CI equivalent
+cargo test -p forskscope-core          # 695 tests: 650 unit + 27 diff corpus + 16 merge corpus + 2 patch apply
+cargo test -p forskscope-ui-logic      # 241 tests: 228 unit + 5 CSS coverage + 7 doctests + 1 integration
+cargo test -p forskscope-core -p forskscope-ui-logic  # CI equivalent (936 total)
 
 # Full workspace (requires GTK):
 cargo test --workspace

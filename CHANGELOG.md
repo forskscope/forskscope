@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.142.0] — 2026-06-13
+
+Two documentation accuracy fixes: patch-export.md rewrote to match actual
+implementation; local-dev.md test counts updated to v0.141.0 actuals.
+
+### Fixed
+
+**`docs/src/intermediate/patch-export.md`** — Rewrote to match the actual
+implementation. The previous version described a `--export-patch` CLI flag,
+a **File → Export Patch** menu item, and per-export options (include
+additions/deletions, include binary notices) that do not exist. The real
+workflow is: **More ▼** → **Export patch** button in the diff toolbar.
+The section on directory-level patch export was moved to a "planned" note.
+
+**`docs/src/maintainers/local-dev.md`** — Test counts updated:
+- `forskscope-core`: 695 tests (650 unit + 27 diff corpus + 16 merge corpus
+  + 2 patch apply), up from the stale "646 unit + 43 integration".
+- `forskscope-ui-logic`: 241 tests (228 unit + 5 CSS coverage + 7 doctests
+  + 1 integration), up from the stale "189 unit + 5 integration + 1 doctest".
+- CI equivalent command now shows the total (936).
+
+---
+
 ## [0.141.0] — 2026-06-13
 
 RFC and governance documents brought current: RFC-042 update note added,
