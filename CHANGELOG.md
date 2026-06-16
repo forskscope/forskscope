@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.141.0] — 2026-06-13
+
+RFC and governance documents brought current: RFC-042 update note added,
+RFC README Progress column updated, release-readiness checklist rewritten
+to reflect actual current status with all verifiable items marked complete.
+
+### Changed
+
+**`rfcs/proposed/042-roadmap-and-rfc-execution-plan.md`** — Added
+v0.141.0 update note summarising the entire UI polish and correctness pass
+(v0.111.0–v0.140.0): i18n completion (158 keys), CSS cleanup (504 lines),
+bug fixes, per-file copy, keyboard shortcut work, and ROADMAP/README updates.
+Status field updated to reflect pre-GTK verification phase.
+
+**`rfcs/README.md`** — RFC-042 Progress column updated from
+"current through v0.113.0" to "updated v0.141.0; pre-GTK verification phase".
+
+**`rfcs/notes/release-readiness-checklist-v0.3.md`** — Fully rewritten for
+v0.141.0. All 5 documentation items, 4 data safety items, and 7 functional/UX
+items that do not require GTK or are verifiable from code are now marked `[x]`.
+Remaining unchecked items are clearly labelled *(requires GTK)* or *(deferred)*.
+Clarifies that v1.0 RC gate is the 3 RFC-041 GTK smoke-test items.
+
+---
+
 ## [0.140.0] — 2026-06-13
 
 README and ROADMAP updated to reflect current state: stale "Filter and sort"

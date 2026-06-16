@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/forskscope-core", "crates/forskscope-ui-logic", "crates/forskscope-ui"]
 
 [workspace.package]
-version = "0.140.0"
+version = "0.141.0"
 edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0"
@@ -11,8 +11,8 @@ authors = ["nabbisen"]
 repository = "https://github.com/forskscope/forskscope"
 
 [workspace.dependencies]
-forskscope-core = { path = "crates/forskscope-core", version = "0.140.0" }
-forskscope-ui-logic = { path = "crates/forskscope-ui-logic", version = "0.140.0" }
+forskscope-core = { path = "crates/forskscope-core", version = "0.141.0" }
+forskscope-ui-logic = { path = "crates/forskscope-ui-logic", version = "0.141.0" }
 similar = "3.1"
 encoding_rs = "0.8"
 chardetng = "0.1"

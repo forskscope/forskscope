@@ -1,6 +1,17 @@
 # RFC-042 — Roadmap and RFC Execution Plan
 
-**Status.** Proposed — living document; updated for v0.113.0 (§4a extended through v0.112.0)
+**Status.** Proposed — living document; updated for v0.141.0 (§4a extended through v0.140.0)
+
+> **v0.141.0 update (2026-06-13).** UI polish and correctness pass complete
+> (v0.111.0–v0.140.0). i18n: 158 active translation keys, zero missing,
+> zero dead, zero duplicate arms. CSS: 504 lines (down from 583), no dead
+> rules, no duplicate selectors. All modal aria_labels translated. Keyboard
+> reference modal fully translated. `filter-btn` CSS regression fixed.
+> Per-file copy in Directory Report wired. F3/Shift+F3 search navigation
+> added. Keyboard shortcuts table updated in README, keyboard.md, and
+> keybindings.rs. ROADMAP.md updated to v0.140.0 with correct test count
+> (936) and delivered slices marked. RFC-041 checklist updated to v0.135.0.
+> Project is in pre-GTK verification phase: code, tests, and docs complete.
 
 > **v0.113.0 update (2026-06-12).** §4a extended through v0.112.0: added
 > ui-logic coverage pass (v0.109.0, 228 unit tests), i18n completion
