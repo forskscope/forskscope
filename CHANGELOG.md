@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.130.0] — 2026-06-13
+
+CSS housekeeping: 22 dead lines from the pre-v0.24.0 flat directory listing
+removed from `main.css`. Status colour classes used by `deep_compare.rs`
+preserved. 583 → 561 lines.
+
+### Changed
+
+**`crates/forskscope-ui/assets/main.css`** — Removed 16 dead CSS rules from
+the flat directory listing era (the `/* explorer flat listing (v0.24.0) */`
+comment block and its associated `.dir-table`, `.dir-row`, `.dir-icon`,
+`.dir-name`, `.dir-size`, `.dir-status`, `.dir-loading`, `.dir-row.folder`,
+`.dir-row.file`, `.dir-row.focused`, `.dir-copy-btn`, `.compare-bar .hint`,
+`.compare-bar .summary` rules). These classes are no longer emitted by any
+Rust component after the aligned two-pane tree replaced the flat listing.
+
+The six `.status-*` colour classes (`status-equal`, `status-changed`,
+`status-only`, `status-cmp`, `status-err`, `status-symlink`) were retained
+and moved to a `/* Deep compare row status colours */` section, since they
+are actively used by `deep_compare.rs`.
+
+---
+
 ## [0.129.0] — 2026-06-13
 
 Three bugs found through careful code reading: rendering bug in PathBar,
