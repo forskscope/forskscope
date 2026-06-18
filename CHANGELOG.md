@@ -5,6 +5,60 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.152.0] — 2026-06-16
+
+RFC-069: Explorer Compare action and targets label. RFC-070: Diff font family
+selector. Security audit and doc verification.
+
+### Fixed (security audit)
+
+**`binary_cache` stale on directory navigation:**
+The `binary_cache: Signal<HashMap<PathBuf, bool>>` that caches per-path NUL-byte
+sniff results was never cleared when the user navigated to a different directory.
+If a path appeared in multiple directories visited during a session, or if a file
+changed from text to binary externally, the cached result was served without
+re-reading the file. Fixed: the cache is now cleared in the `use_effect` hooks
+that fire on `left_dir` and `right_dir` changes.
+
+**Filter loop calling `classify()` without cache:**
+The RFC-067 "Hide binary" filter path called `classify()` directly (file I/O)
+on every visible row on every render frame, bypassing `binary_cache`. Fixed:
+the filter loop now performs the same cache-lookup-then-populate pattern as the
+tree row render path.
+
+### Added
+
+**Threat model document** (`docs/src/maintainers/threat-model.md`):
+ForskScope had no dedicated security documentation. The new document covers:
+all active data flows and their controls (async file load, binary sniff,
+manifest write, settings persist, external tool launch), the fundamental
+local-only / no-network guarantee, the known third-party risk from
+`sheets-diff` and its `catch_unwind` mitigation, and an audit history table
+from v0.145.x onward. Added to `SUMMARY.md`.
+
+### Changed (RFC-069, RFC-070 — unchanged from earlier in this release)
+
+**RFC-069 — Persistent targets label and Compare ▶ button** (see prior entry).
+
+**RFC-070 — Diff font family selector** (see prior entry).
+
+### Changed (doc verification)
+
+- `docs/src/users/settings.md` — added **Diff font family** preset table;
+  added **Enable binary comparison** and **Explorer layout** under Advanced.
+- `docs/src/users/explorer.md` — corrected focused-pane description (removed
+  stale `◀` marker reference; focus is now shown by outline/tint); added
+  sections for Binary files, Filter bar, Compact layout, Targets label,
+  and Async tab opening.
+- `docs/src/users/features.md` — corrected horizontal scroll description (now
+  per-pane); updated Explorer bullet list with binary policy, filter bar,
+  compact layout, targets label, async tabs; added diff font family to
+  Appearance section.
+- `docs/src/users/diff-workflow.md` and `known-limitations.md` — verified
+  correct from v0.147.0 update; no changes needed.
+
+---
+
 ## [0.151.0] — 2026-06-16
 
 RFC-068: Explorer unaligned (compact) view mode.

@@ -106,6 +106,35 @@ fn SettingsModal() -> Element {
                         }
                     }
                 }
+                div { class: "field",
+                    span { {t(lang, "Diff font family")} }
+                    select {
+                        value: match cur.diff_font_family {
+                            crate::state::DiffFontFamily::Monospace  => "monospace",
+                            crate::state::DiffFontFamily::SansSerif  => "sans-serif",
+                            crate::state::DiffFontFamily::Serif      => "serif",
+                            crate::state::DiffFontFamily::CourierNew => "courier-new",
+                            crate::state::DiffFontFamily::Consolas   => "consolas",
+                        },
+                        onchange: move |e| {
+                            use crate::state::DiffFontFamily;
+                            let ff = match e.value().as_str() {
+                                "sans-serif"  => DiffFontFamily::SansSerif,
+                                "serif"       => DiffFontFamily::Serif,
+                                "courier-new" => DiffFontFamily::CourierNew,
+                                "consolas"    => DiffFontFamily::Consolas,
+                                _             => DiffFontFamily::Monospace,
+                            };
+                            store.settings.write().diff_font_family = ff;
+                            persist(&store.settings.read());
+                        },
+                        option { value: "monospace",  {t(lang, "Monospace (default)")} }
+                        option { value: "sans-serif",  {t(lang, "Sans-serif")} }
+                        option { value: "serif",        {t(lang, "Serif")} }
+                        option { value: "courier-new", "Courier New" }
+                        option { value: "consolas",    "Consolas / Menlo" }
+                    }
+                }
                 // ── Advanced disclosure toggle ─────────────────────
                 button {
                     class: "advanced-toggle",

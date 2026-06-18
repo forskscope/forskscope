@@ -33,12 +33,13 @@ navigation within each pane.
 ## Focused pane
 
 The Explorer has a **focused pane** — the pane that receives keyboard input. The
-focused pane is indicated by a highlighted root header cell with a `◀` marker.
+focused pane is indicated by a highlighted root header cell (accent outline and
+tinted background).
 
 - Press **F6** to switch keyboard focus between the left and right panes.
 - Click a pane's root header cell to focus it with the mouse.
 
-When the Explorer first opens the left pane is focused. Use F6 after navigating
+When the Explorer first opens, the left pane is focused. Use F6 after navigating
 the left pane to switch to the right pane and select a file there.
 
 ---
@@ -90,6 +91,71 @@ file that appears on both sides:
 
 Digest computation runs in the background. Large directories may take a moment
 before all icons appear.
+
+---
+
+## Binary files
+
+Files detected as binary show a `bin` badge and cannot be compared by default.
+To enable binary comparison, go to **Settings → Advanced → Enable binary
+comparison**.
+
+When binary comparison is enabled, binary files are actionable and open a
+hex-dump comparison. The comparison runs in the background — the tab opens
+immediately and shows a spinner while loading.
+
+---
+
+## Filter bar
+
+Click the **⊞** toggle (between the path bars and the pane headers) to reveal
+the filter bar.
+
+| Control | Effect |
+|---|---|
+| **Name input** | Narrows visible rows live — case-insensitive substring match. A pair is shown if either side's filename matches. |
+| **Hide binary** checkbox | Hides rows where all present file sides are binary (only effective when binary comparison is off). |
+| **Hide identical** checkbox | Hides rows whose digest status is ✓ (byte-for-byte identical). |
+| **✕ Clear** | Resets all filters in one click (appears when any filter is active). |
+
+Filter state is not persisted — it resets when you restart the app.
+
+---
+
+## Compact layout
+
+By default, same-name entries are aligned across panes with spacer rows for
+entries that exist on only one side. Switch to **Compact** layout in
+**Settings → Advanced → Explorer layout** to remove the spacer rows and let each
+pane pack its entries independently.
+
+In compact mode, vertical scrolling is independent per pane. Same-name equality
+badges still appear but cross-pane row alignment is not guaranteed.
+
+---
+
+## Targets label and Compare button
+
+The footer always shows a **targets label** describing what the Compare action
+will open:
+
+| State | Label |
+|---|---|
+| No picks | *Choose a file or folder on each side to compare* |
+| Left pick only | `filename ↔ Choose a file or folder on the right` |
+| Right pick only | `Choose a file or folder on the left ↔ filename` |
+| Both picks ready | `left-name ↔ right-name` |
+
+The **Compare ▶** button is enabled only when both picks are set.
+
+---
+
+## Async tab opening
+
+When you open a comparison, the tab appears immediately with a ⟳ spinner in
+the tab title and a loading message in the workspace. File loading and diff
+computation run in the background. You can switch to other tabs while a
+comparison loads, or close the loading tab to cancel.
 
 ---
 

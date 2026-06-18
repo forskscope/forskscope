@@ -100,6 +100,7 @@ pub fn Explorer() -> Element {
     use_effect(move || {
         let root = left_dir.read().cloned();
         let mut nt = DirectoryTree::new(root.clone());
+        binary_cache.write().clear(); // stale results invalid when dir changes
         if let Some(req) = nt.on_toggled(&root) { tree_l.set(nt); scans_l.send(req); }
         else { tree_l.set(nt); }
     });
@@ -118,6 +119,7 @@ pub fn Explorer() -> Element {
     use_effect(move || {
         let root = right_dir.read().cloned();
         let mut nt = DirectoryTree::new(root.clone());
+        binary_cache.write().clear(); // stale results invalid when dir changes
         if let Some(req) = nt.on_toggled(&root) { tree_r.set(nt); scans_r.send(req); }
         else { tree_r.set(nt); }
     });
@@ -241,13 +243,28 @@ pub fn Explorer() -> Element {
         };
         // Hide-binary filter: hide when all present file sides are binary
         // (and binary comparison is off, so "bin" badge is shown).
+        // Uses binary_cache to avoid redundant file I/O on every render.
         let bin_ok = if h_bin && !bin_en {
-            let l_bin = lr.as_ref().map(|r| !r.is_dir &&
-                matches!(forskscope_core::file_kind::classify(&r.abs_path), Ok(forskscope_core::file_kind::FileKind::Binary)))
-                .unwrap_or(false);
-            let r_bin = rr.as_ref().map(|r| !r.is_dir &&
-                matches!(forskscope_core::file_kind::classify(&r.abs_path), Ok(forskscope_core::file_kind::FileKind::Binary)))
-                .unwrap_or(false);
+            let l_bin = lr.as_ref().map(|r| {
+                if r.is_dir { return false; }
+                let cached = binary_cache.read().get(&r.abs_path).copied();
+                cached.unwrap_or_else(|| {
+                    let b = matches!(forskscope_core::file_kind::classify(&r.abs_path),
+                        Ok(forskscope_core::file_kind::FileKind::Binary));
+                    binary_cache.write().insert(r.abs_path.clone(), b);
+                    b
+                })
+            }).unwrap_or(false);
+            let r_bin = rr.as_ref().map(|r| {
+                if r.is_dir { return false; }
+                let cached = binary_cache.read().get(&r.abs_path).copied();
+                cached.unwrap_or_else(|| {
+                    let b = matches!(forskscope_core::file_kind::classify(&r.abs_path),
+                        Ok(forskscope_core::file_kind::FileKind::Binary));
+                    binary_cache.write().insert(r.abs_path.clone(), b);
+                    b
+                })
+            }).unwrap_or(false);
             let l_present = lr.is_some();
             let r_present = rr.is_some();
             // Show if at least one present side is NOT binary.
@@ -739,11 +756,41 @@ pub fn Explorer() -> Element {
                         }
                     }
 
-                    // ── Footer ────────────────────────────────────────────────
+                    // ── Footer: targets label + compare action (RFC-069) ─────
                     div { class: "explorer-footer",
+                        div { class: "targets-label",
+                            {
+                                let lp = left_pick.read();
+                                let rp = right_pick.read();
+                                match (&*lp, &*rp) {
+                                    (None, None) => rsx! {
+                                        span { class: "targets-hint",
+                                            {t(lang, "Choose a file or folder on each side to compare")}
+                                        }
+                                    },
+                                    (Some(l), None) => rsx! {
+                                        span { class: "targets-pick", {short_name(l.path())} }
+                                        span { class: "targets-sep", " ↔ " }
+                                        span { class: "targets-hint", {t(lang, "Choose a file or folder on the right")} }
+                                    },
+                                    (None, Some(r)) => rsx! {
+                                        span { class: "targets-hint", {t(lang, "Choose a file or folder on the left")} }
+                                        span { class: "targets-sep", " ↔ " }
+                                        span { class: "targets-pick", {short_name(r.path())} }
+                                    },
+                                    (Some(l), Some(r)) => rsx! {
+                                        span { class: "targets-pick", {short_name(l.path())} }
+                                        span { class: "targets-sep", " ↔ " }
+                                        span { class: "targets-pick", {short_name(r.path())} }
+                                    },
+                                }
+                            }
+                        }
                         button {
+                            class: "compare-btn",
                             disabled: !can_compare,
                             title: compare_tooltip.clone(),
+                            aria_label: compare_tooltip.clone(),
                             onclick: move |_| {
                                 let lp = left_pick.read().clone();
                                 let rp = right_pick.read().clone();
@@ -753,12 +800,7 @@ pub fn Explorer() -> Element {
                                     CompareAction::None => {}
                                 }
                             },
-                            {t(lang, "Compare")}
-                        }
-                        if let (Some(lp), Some(rp)) = (left_pick.read().as_ref(), right_pick.read().as_ref()) {
-                            span { class: "compare-label",
-                                {format!("{} ↔ {}", short_name(lp.path()), short_name(rp.path()))}
-                            }
+                            {t(lang, "Compare")} " ▶"
                         }
                     }
             }

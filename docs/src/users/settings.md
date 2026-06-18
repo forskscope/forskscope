@@ -25,6 +25,20 @@ Point size for text in the diff panes. Range: 8–32 pt. Default: 14.
 
 The UI chrome (toolbar, tabs, status bar) scales proportionally.
 
+### Diff font family
+
+Font family used in the diff panes. Five presets:
+
+| Preset | Font stack |
+|---|---|
+| **Monospace (default)** | System default fixed-pitch (`ui-monospace, monospace`) |
+| **Sans-serif** | System default proportional (`system-ui, sans-serif`) |
+| **Serif** | System default serif (`Georgia, serif`) |
+| **Courier New** | Classic fixed-pitch (`Courier New, Courier, monospace`) |
+| **Consolas / Menlo** | Developer fixed-pitch (`Consolas, Menlo, monospace`) |
+
+Changes take effect immediately. The UI chrome is unaffected.
+
 ---
 
 ## Language
@@ -44,6 +58,25 @@ Click **▸ Advanced** at the bottom of the Settings dialog to reveal advanced
 options. Click **▾ Hide advanced** to collapse them again.
 
 The following settings are inside the Advanced section.
+
+### Enable binary comparison
+
+When **off** (default), binary files (detected by NUL-byte sniff) cannot be
+opened for comparison. They appear in the Explorer with a `bin` badge and are
+non-actionable.
+
+When **on**, binary files can be compared using a hex-dump preview. Because
+binary diffs are often voluminous and rarely meaningful, this is off by default.
+The comparison runs asynchronously so the app does not freeze on large binaries.
+
+### Explorer layout
+
+Controls how entries are displayed in the two-pane Explorer.
+
+| Value | Behaviour |
+|---|---|
+| **Aligned (default)** | Same-name entries share a row across panes; spacer rows fill gaps where one side is missing. Vertical scrolling implicitly keeps panes in sync. |
+| **Compact (independent panes)** | No spacer rows. Each pane packs its own entries and scrolls independently. Cross-pane row alignment is intentionally absent. Best for directories where many files exist only on one side. |
 
 ### Context lines
 

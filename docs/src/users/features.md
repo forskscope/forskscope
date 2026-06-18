@@ -3,8 +3,8 @@
 ## Core workflow
 
 - **Side-by-side two-pane comparison** — Left / Old and Right / New panes with
-  a fixed divider. Long lines scroll horizontally within the shared view;
-  a single scroll bar scrolls both panes together.
+  a fixed divider. Each pane has its own horizontal scroll bar so long lines
+  on one side do not force the other pane to scroll.
 - **Line-level diff** — insertions (green), deletions (red), and replacements
   (amber) with colour-independent `+`/`−`/`~` gutter marks.
 - **Hunk navigation** — ◀ ▶ buttons (F7/F8) jump between changes; a position
@@ -31,6 +31,16 @@
 - **Alt+↑** navigates the focused pane up one level.
 - Same-name file shortcut: double-click to compare immediately.
 - **Empty state** shown when no entries are visible, with a first-run orientation hint.
+- **Binary file policy** — binary files show a `bin` badge and are
+  non-actionable by default; enable in **Settings → Advanced**.
+- **Filter bar** — ⊞ toggle reveals a name-pattern input plus
+  "Hide binary" / "Hide identical" checkboxes (session-only, not persisted).
+- **Compact layout** option (Settings → Advanced) removes spacer rows so each
+  pane packs independently; cross-pane alignment is intentionally absent.
+- **Targets label** in the footer always shows the pending comparison pair
+  with progressive guidance when only one pick is set.
+- **Async tab opening** — tabs open immediately with a ⟳ spinner; loading and
+  diff run in the background so the app never freezes.
 - Multiple comparisons open as independent tabs; switch freely.
 
 ---
@@ -106,7 +116,9 @@ See [Git integration](../intermediate/git-integration.md) for full setup.
 ## Appearance and localisation
 
 - Three built-in themes: **Dark** (default), **Light**, **Night**.
-- Configurable diff font size (8–32 pt).
+- Configurable **diff font size** (8–32 pt).
+- Configurable **diff font family** — five presets: Monospace (default),
+  Sans-serif, Serif, Courier New, Consolas / Menlo.
 - **English** and **日本語** (Japanese) interfaces — all labels, dialogs,
   and status messages are translated.
 

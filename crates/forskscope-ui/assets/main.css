@@ -133,7 +133,7 @@ select option {
    Approach A (RFC-064): horizontal scroll is per-pane, not shared.
    This container handles vertical scroll only. */
 .diff-scroll {
-  font-family: ui-monospace, monospace;
+  font-family: var(--diff-ff, ui-monospace, monospace);
   font-size: var(--diff-fs, 14px);
   overflow-x: hidden;  /* Approach A: each pane owns its horizontal scroll */
   overflow-y: auto;
@@ -427,9 +427,28 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
 
 
 /* ── Explorer footer ── */
-.explorer-footer { display: flex; align-items: center; gap: .5rem; padding: .4rem .6rem;
-  border-top: 1px solid var(--border); background: var(--surface-2); }
-.compare-label { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; }
+.explorer-footer {
+  display: flex; align-items: center; gap: .5rem; padding: .4rem .6rem;
+  background: var(--surface-2); border-top: 1px solid var(--border);
+  flex-shrink: 0; min-height: var(--control-h);
+}
+/* Targets label: always visible, fills available space (RFC-069). */
+.targets-label {
+  flex: 1; display: flex; align-items: center; gap: .2rem;
+  overflow: hidden; min-width: 0; font-size: 12px;
+}
+.targets-pick { color: var(--text); font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 24ch; }
+.targets-sep  { color: var(--muted); flex-shrink: 0; }
+.targets-hint { color: var(--muted); font-style: italic;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Compare button: prominent, right-aligned (RFC-069). */
+.compare-btn {
+  flex-shrink: 0; font-weight: 600; padding: .25rem .8rem;
+  border-color: var(--accent); color: var(--accent);
+}
+.compare-btn:not(:disabled):hover { background: var(--accent); color: var(--surface); }
+.compare-btn:disabled { border-color: var(--border); color: var(--muted); }
 
 
 /* ── Tree rows ── */

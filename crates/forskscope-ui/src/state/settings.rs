@@ -40,7 +40,36 @@ pub struct DiffProfile {
     pub built_in: bool,
 }
 
-/// Serialisable wrapper around `DiffAlgorithm` for profile persistence.
+/// Font family preset for the diff panes (RFC-070).
+/// Presets use safe cross-platform CSS font stacks; no font enumeration needed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum DiffFontFamily {
+    /// `ui-monospace, monospace` — system default monospace (default).
+    #[default]
+    Monospace,
+    /// `system-ui, sans-serif` — system default proportional.
+    SansSerif,
+    /// `Georgia, serif` — system default serif.
+    Serif,
+    /// `Courier New, Courier, monospace` — classic fixed-pitch.
+    CourierNew,
+    /// `Consolas, Menlo, monospace` — developer-oriented fixed-pitch.
+    Consolas,
+}
+
+impl DiffFontFamily {
+    /// CSS `font-family` value for this preset.
+    pub fn css_value(self) -> &'static str {
+        match self {
+            Self::Monospace  => "ui-monospace, monospace",
+            Self::SansSerif  => "system-ui, sans-serif",
+            Self::Serif      => "Georgia, serif",
+            Self::CourierNew => "Courier New, Courier, monospace",
+            Self::Consolas   => "Consolas, Menlo, monospace",
+        }
+    }
+}
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DiffAlgorithmSetting { #[default] Myers, Patience, Histogram }
@@ -75,6 +104,9 @@ pub struct AppSettings {
     pub theme: Theme,
     pub language: Lang,
     pub diff_font_size: u32,
+    /// Font family used in the diff panes (RFC-070). Default: Monospace.
+    #[serde(default)]
+    pub diff_font_family: DiffFontFamily,
     #[serde(default = "default_ctx")]
     pub context_lines: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -107,6 +139,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             theme: Theme::Dark, language: Lang::En, diff_font_size: 14,
+            diff_font_family: DiffFontFamily::Monospace,
             context_lines: 3, last_left_dir: None, last_right_dir: None,
             profiles: default_profiles(), active_profile: 0,
             ignore_extensions: String::new(), ignore_dirs: String::new(),

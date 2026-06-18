@@ -1,6 +1,6 @@
 # RFC 070: Font Family Selector in Settings
 
-**Status.** Proposed
+**Status.** Implemented (v0.152.0)
 **Tracks.** A user setting to choose the font family used in the diff panes (and
 optionally the UI), beyond the current diff font *size* control.
 **Touches.** `crates/forskscope-ui/src/state/settings.rs` (new setting),

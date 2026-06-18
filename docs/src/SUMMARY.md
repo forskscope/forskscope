@@ -36,6 +36,7 @@
 - [Architecture](./maintainers/architecture.md)
 - [Three-way merge model](./maintainers/three-way-merge.md)
 - [Design principles](./maintainers/design-principles.md)
+- [Threat model and security notes](./maintainers/threat-model.md)
 - [RFC directory](../../rfcs/README.md)
 - [Local development](./maintainers/local-dev.md)
 - [Testing strategy](./maintainers/testing.md)

@@ -1,6 +1,6 @@
 # RFC 069: Explorer Layout — Compare Action, Targets Label, and Tab Header/Footer
 
-**Status.** Proposed
+**Status.** Implemented (v0.152.0)
 **Tracks.** Repositioning the Compare button and the label that shows its current
 targets; rethinking the Explorer tab's header and footer regions in light of the
 new filter bar (RFC-067) and view-mode control (RFC-068).

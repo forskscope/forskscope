@@ -2,7 +2,7 @@
 
 pub mod settings;
 pub use settings::{
-    AppSettings, BatchCopySpec, DiffAlgorithmSetting, Lang, Theme,
+    AppSettings, BatchCopySpec, DiffAlgorithmSetting, DiffFontFamily, Lang, Theme,
 };
 
 use std::path::PathBuf;

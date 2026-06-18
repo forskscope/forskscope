@@ -17,7 +17,8 @@ use crate::ui::search_index::MatchIndex;
 pub fn DiffWorkspace(index: usize) -> Element {
     let store = use_context::<Store>();
     let lang = store.lang();
-    let font_size = store.settings.read().diff_font_size;
+    let font_size    = store.settings.read().diff_font_size;
+    let font_family  = store.settings.read().diff_font_family.css_value();
     let context_lines = store.settings.read().context_lines;
 
     // Render Loading / Error states before building the full snapshot (RFC-065).
@@ -50,7 +51,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
     let snap = {
         let tabs = store.tabs.read();
         match tabs.get(index) {
-            Some(tab) => TabSnapshot::from_tab(tab, font_size, context_lines, lang),
+            Some(tab) => TabSnapshot::from_tab(tab, font_size, font_family, context_lines, lang),
             None => return rsx! { div { class: "notice", {t(lang, "No comparison.")} } },
         }
     };
@@ -121,7 +122,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
             }
             div {
                 class: "{wrap_class}",
-                style: "--diff-fs:{snap.font_size}px;",
+                style: "--diff-fs:{snap.font_size}px; --diff-ff:{snap.font_family};",
                 for hunk in snap.hunks.iter() {
                     HunkBlock {
                         index,
@@ -164,6 +165,7 @@ pub(crate) struct TabSnapshot {
     hunks: Vec<forskscope_core::merge::MergeHunk>,
     identical: bool, char_mode: bool, word_wrap: bool, can_save: bool,
     is_dirty: bool, can_undo: bool, can_redo: bool, font_size: u32,
+    font_family: &'static str,
     focused_id: Option<u64>, focused_change: usize, changes: usize,
     ignore_whitespace: bool, ignore_case: bool, context_lines: usize,
     algorithm: forskscope_core::DiffAlgorithm,
@@ -174,7 +176,7 @@ pub(crate) struct TabSnapshot {
 }
 
 impl TabSnapshot {
-    fn from_tab(tab: &crate::state::CompareTab, font_size: u32, context_lines: usize, lang: crate::state::Lang) -> Self {
+    fn from_tab(tab: &crate::state::CompareTab, font_size: u32, font_family: &'static str, context_lines: usize, lang: crate::state::Lang) -> Self {
         use forskscope_core::diff::DiffWarning;
         use forskscope_core::file_kind::FileKind;
         use crate::i18n::t;
@@ -207,7 +209,7 @@ impl TabSnapshot {
             identical: tab.diff.is_identical() && !both_missing, char_mode: tab.char_mode,
             word_wrap: tab.word_wrap, can_save: tab.can_save,
             is_dirty: tab.merge.is_dirty(), can_undo: tab.merge.can_undo(),
-            can_redo: tab.merge.can_redo(), font_size,
+            can_redo: tab.merge.can_redo(), font_size, font_family,
             focused_id: ids.get(tab.focused_change).copied(),
             focused_change: tab.focused_change, changes: ids.len(),
             ignore_whitespace: tab.diff_options.ignore_whitespace,
