@@ -13,7 +13,7 @@ use crate::state::Store;
 use crate::ui::component::notice::{Notice, NoticeKind};
 use crate::ui::view::diff_actions::trunc;
 pub use crate::ui::view::diff_actions::{apply_focused_hunk, move_focus, save_as, save_tab};
-use crate::ui::view::hunk::HunkBlock;
+use crate::ui::view::hunk::{HunkBlock, HunkCol};
 use crate::ui::view::search::{SearchBar, SearchCtx, scroll_to_focused};
 use forskscope_ui_logic::MatchIndex;
 use toolbar::Toolbar;
@@ -133,16 +133,42 @@ pub fn DiffWorkspace(index: usize) -> Element {
             div {
                 class: "{wrap_class}",
                 style: "--diff-fs:{snap.font_size}px; --diff-ff:{snap.font_family};",
-                for hunk in snap.hunks.iter() {
-                    HunkBlock {
-                        index,
-                        hunk: hunk.clone(),
-                        char_mode: snap.char_mode,
-                        context_lines: snap.context_lines,
-                        focused: snap.focused_id == Some(hunk.hunk_id),
-                        can_save: snap.can_save,
-                        is_expanded: expanded.read().contains(&hunk.hunk_id),
-                        on_expand: move |id: u64| { expanded.write().insert(id); },
+                // Three parallel column containers — each owns its horizontal scroll.
+                // Left and right columns scroll independently; act column is fixed.
+                div { class: "diff-col-left",
+                    for hunk in snap.hunks.iter() {
+                        HunkBlock {
+                            index, hunk: hunk.clone(), col: HunkCol::Left,
+                            char_mode: snap.char_mode, context_lines: snap.context_lines,
+                            focused: snap.focused_id == Some(hunk.hunk_id),
+                            can_save: snap.can_save,
+                            is_expanded: expanded.read().contains(&hunk.hunk_id),
+                            on_expand: move |id: u64| { expanded.write().insert(id); },
+                        }
+                    }
+                }
+                div { class: "diff-col-act",
+                    for hunk in snap.hunks.iter() {
+                        HunkBlock {
+                            index, hunk: hunk.clone(), col: HunkCol::Act,
+                            char_mode: snap.char_mode, context_lines: snap.context_lines,
+                            focused: snap.focused_id == Some(hunk.hunk_id),
+                            can_save: snap.can_save,
+                            is_expanded: expanded.read().contains(&hunk.hunk_id),
+                            on_expand: move |id: u64| { expanded.write().insert(id); },
+                        }
+                    }
+                }
+                div { class: "diff-col-right",
+                    for hunk in snap.hunks.iter() {
+                        HunkBlock {
+                            index, hunk: hunk.clone(), col: HunkCol::Right,
+                            char_mode: snap.char_mode, context_lines: snap.context_lines,
+                            focused: snap.focused_id == Some(hunk.hunk_id),
+                            can_save: snap.can_save,
+                            is_expanded: expanded.read().contains(&hunk.hunk_id),
+                            on_expand: move |id: u64| { expanded.write().insert(id); },
+                        }
                     }
                 }
             }

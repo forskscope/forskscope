@@ -5,6 +5,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.162.0] — 2026-06-18
+
+Fix: diff view horizontal scrollbar appears on each row instead of once per pane.
+
+### Fixed
+
+**Horizontal scrollbar per pane, not per row (RFC-064 Approach A corrected).**
+
+The previous implementation put `overflow-x: auto` on `.diff-pane` — a div
+inside each `.diff-row` — so every row independently showed a horizontal
+scrollbar. RFC-064 Approach A requires one scrollbar per pane (left and right),
+not one per row.
+
+**DOM change (`ui/view/diff.rs`, `ui/view/hunk.rs`):**
+The hunk list is now rendered into three parallel column containers inside
+`.diff-scroll`:
+
+```
+.diff-scroll (vertical scroll, flex row)
+  .diff-col-left  (overflow-x: auto — ONE scrollbar for all left rows)
+  .diff-col-act   (fixed 6ch, no horizontal scroll)
+  .diff-col-right (overflow-x: auto — ONE scrollbar for all right rows)
+```
+
+`HunkBlock` now accepts a `col: HunkCol` prop (`Left`, `Act`, `Right`). Each
+hunk is rendered three times, once per column. `RowLeft`, `RowRight`, and
+`ActCell` are new private components replacing the old unified `Row`.
+
+**CSS change (`assets/main.css`):**
+- `.diff-scroll` changed from `overflow-x: hidden` to `display: flex; flex-direction: row`.
+- `.diff-col-left`, `.diff-col-act`, `.diff-col-right` introduced.
+- `.diff-pane` reduced to `display: contents` (kept for any legacy references).
+- `.diff-row .cell` replaces `.diff-pane .cell` selectors.
+- Word-wrap mode updated to target `.diff-col-left`/`.diff-col-right`.
+- `.collapse-divider-spacer` added for height alignment in act/right columns
+  when a collapse divider appears in the left column.
+
+---
+
 ## [0.161.0] — 2026-06-18
 
 RFC-073 Phase 5: bridge minimisation. No behaviour changes.

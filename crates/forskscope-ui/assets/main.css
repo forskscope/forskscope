@@ -129,45 +129,67 @@ select option {
   padding: .35rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); }
 .diff-toolbar .info { color: var(--muted); font-size: 12px; }
 
-/* .diff-scroll: outer scroll container.
-   Approach A (RFC-064): horizontal scroll is per-pane, not shared.
-   This container handles vertical scroll only. */
+/* .diff-scroll: outer container — vertical scroll only.
+   Approach A (RFC-064): horizontal scroll is per pane (column), not per row.
+   Three flex columns inside: .diff-col-left, .diff-col-act, .diff-col-right. */
 .diff-scroll {
   font-family: var(--diff-ff, ui-monospace, monospace);
   font-size: var(--diff-fs, 14px);
-  overflow-x: hidden;  /* Approach A: each pane owns its horizontal scroll */
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  overflow-x: hidden;
   overflow-y: auto;
+  min-height: 0;
 }
 
-/* Each row is a flex container: left-pane | act | right-pane.
-   No min-width needed: each pane clips and scrolls independently. */
+/* Left column: owns horizontal scroll for all left-side rows. */
+.diff-col-left {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  border-right: 1px solid var(--border);
+}
+
+/* Act column: fixed width, no horizontal scroll. */
+.diff-col-act {
+  flex: 0 0 6ch;
+  overflow: visible;
+}
+
+/* Right column: owns horizontal scroll for all right-side rows. */
+.diff-col-right {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  border-left: 1px solid var(--border);
+}
+
+/* Each row is a flex row within its column: gutter | mark | cell. */
 .diff-row {
   display: flex;
   align-items: stretch;
   min-height: var(--line-h);
+  min-width: max-content;   /* row expands to content width; column clips+scrolls */
 }
 
-/* Approach A: each pane clips and scrolls its own content horizontally.
-   overflow-x:auto gives each pane its own scrollbar. */
+/* .diff-pane removed — columns replace the old per-row pane containers.
+   Keep the class for any legacy references but make it a no-op. */
 .diff-pane {
-  display: flex;
-  flex: 1 1 0;          /* equal halves */
-  min-width: 0;
-  overflow-x: auto;     /* Approach A: per-pane horizontal scrollbar (RFC-064) */
-  overflow-y: visible;
-  align-items: baseline;
+  display: contents;
 }
-.diff-pane.left  { border-right: 1px solid var(--border); }
 
-/* Fixed-width act column between the two panes */
+/* Fixed-width act column between the two pane columns.
+   Each .diff-act cell is one row's action slot inside .diff-col-act. */
 .diff-act {
-  flex: 0 0 6ch;
+  width: 6ch;
+  min-height: var(--line-h);
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--surface);
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
 }
 .diff-act button { padding: 0 .25rem; font-size: 11px; }
 .apply-btn { display: flex; align-items: center; gap: .15rem; }
@@ -187,22 +209,22 @@ select option {
 .pane-gutter.del { background: var(--del-bg); }
 .pane-gutter.ins { background: var(--ins-bg); }
 
-/* Cell: the line content. Fills remaining pane width.
-   white-space:pre lets long lines push the cell wider than the pane;
-   the pane clips and scrolls horizontally (Approach A, RFC-064). */
-.diff-pane .cell {
+/* Cell: the line content. Fills remaining row width.
+   white-space:pre lets long lines push the row wider than the column;
+   the column container clips and scrolls horizontally (Approach A, RFC-064). */
+.diff-row .cell {
   flex: 1 1 0;
   min-width: 0;
   padding: 0 .4rem;
   line-height: var(--line-h);
-  white-space: pre;           /* no wrap: long lines push cell wider than pane */
-  overflow-x: visible;        /* cell expands; .diff-pane clips and scrolls */
+  white-space: pre;           /* no wrap: long lines push row wider than column */
+  overflow-x: visible;        /* row expands; .diff-col-* clips and scrolls */
 }
 
 /* Hunk-kind background on cells and gutters */
-.hunk-del .diff-pane .cell, .pane-gutter.del { background: var(--del-bg); }
-.hunk-ins .diff-pane .cell, .pane-gutter.ins { background: var(--ins-bg); }
-.hunk-rep .diff-pane .cell { background: var(--rep-bg); }
+.hunk-del .diff-row .cell, .pane-gutter.del { background: var(--del-bg); }
+.hunk-ins .diff-row .cell, .pane-gutter.ins { background: var(--ins-bg); }
+.hunk-rep .diff-row .cell { background: var(--rep-bg); }
 
 /* Diff marks (−/+/~) */
 .diff-mark {
@@ -257,14 +279,15 @@ select option {
 }
 
 /* Search match highlight */
-.diff-row.match .diff-pane { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.diff-row.match .diff-pane .cell { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.diff-row.match { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.diff-row.match .cell { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
-/* Word-wrap mode: wrap within each pane; disable per-pane horizontal scroll */
-.diff-scroll.wrap .diff-pane {
+/* Word-wrap mode: wrap within each column; disable per-column horizontal scroll */
+.diff-scroll.wrap .diff-col-left,
+.diff-scroll.wrap .diff-col-right {
   overflow-x: hidden;
 }
-.diff-scroll.wrap .diff-pane .cell {
+.diff-scroll.wrap .diff-row .cell {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-x: visible;
@@ -340,7 +363,11 @@ select option {
   cursor: pointer; margin: .2rem 0; user-select: none;
 }
 .collapse-divider:hover { color: var(--accent); border-color: var(--accent); }
-
+/* Spacer shown in act/right columns to occupy the same height as a collapse-divider */
+.collapse-divider-spacer {
+  padding: .2rem .6rem; font-size: 11px; margin: .2rem 0;
+  visibility: hidden;
+}
 
 /* ---- diff wrap ---- */
 .diff-wrap { display: flex; flex-direction: column; height: 100%; }
