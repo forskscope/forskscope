@@ -84,7 +84,7 @@ pub fn Explorer() -> Element {
 
     // Cache of paths known to be binary; populated lazily at render time (RFC-066).
     // Cleared when either directory changes so stale results don't linger.
-    let binary_cache: Signal<std::collections::HashMap<PathBuf, bool>> = use_signal(Default::default);
+    let mut binary_cache: Signal<std::collections::HashMap<PathBuf, bool>> = use_signal(Default::default);
 
     // ── Left pane state ──────────────────────────────────────────────────────
     let init_l = store.settings.read().last_left_dir.clone()
@@ -641,26 +641,22 @@ pub fn Explorer() -> Element {
                         div { class: "compact-tree",
                             // Left pane
                             div { class: "compact-pane",
-                                for row in left_flat.iter().filter(|(p, is_dir, ..)| {
+                                for row in left_flat.iter().filter(|(p, _is_dir, ..)| {
                                     if filter_query.read().is_empty() { true } else {
                                         p.file_name().map(|n| n.to_string_lossy().to_lowercase()
                                             .contains(&*filter_query.read())).unwrap_or(false)
                                     }
                                 }) {
                                     {
+                                        // row is &(PathBuf, bool, bool, bool, u32) — clone gives owned values
                                         let (abs, is_dir, is_expanded, is_selected, depth) = row.clone();
                                         let rel = abs.strip_prefix(&l_root_snap).unwrap_or(&abs).to_path_buf();
-                                        let status = if *is_dir {
-                                            digest_map.read().get(&DigestKey::Common(rel.clone())).cloned()
-                                        } else {
-                                            digest_map.read().get(&DigestKey::Common(rel.clone()))
-                                                .or_else(|| digest_map.read().get(&DigestKey::LeftOnly(rel.clone())))
-                                                .cloned()
-                                        };
+                                        // Left-only files have no DigestKey entry; Common covers same-name pairs.
+                                        let status = digest_map.read().get(&DigestKey::Common(rel.clone())).cloned();
                                         let p_tgl = abs.clone(); let p_sel = abs.clone();
                                         let p_dbl = abs.clone(); let p_nav = abs.clone();
                                         let p_bin = abs.clone();
-                                        let is_binary = if *is_dir { false } else {
+                                        let is_binary = if is_dir { false } else {
                                             let cached = binary_cache.read().get(&abs).copied();
                                             cached.unwrap_or_else(|| {
                                                 let b = matches!(forskscope_core::file_kind::classify(&p_bin),
@@ -671,19 +667,19 @@ pub fn Explorer() -> Element {
                                         };
                                         rsx! {
                                             TreeRow {
-                                                path: abs.clone(), is_dir: *is_dir,
-                                                is_expanded: *is_expanded, is_selected: *is_selected,
-                                                depth: *depth, status, is_binary, binary_enabled,
+                                                path: abs.clone(), is_dir,
+                                                is_expanded, is_selected,
+                                                depth, status, is_binary, binary_enabled,
                                                 on_toggle: move |_| {
                                                     if let Some(r) = tree_l.write().on_toggled(&p_tgl) { scans_l.send(r); }
                                                     digest_map.write().clear();
                                                 },
                                                 on_select: move |_| {
-                                                    tree_l.write().on_selected(&p_sel, *is_dir, SelectionMode::Replace);
-                                                    left_pick.set(Some(if *is_dir { PickKind::Dir(p_sel.clone()) } else { PickKind::File(p_sel.clone()) }));
+                                                    tree_l.write().on_selected(&p_sel, is_dir, SelectionMode::Replace);
+                                                    left_pick.set(Some(if is_dir { PickKind::Dir(p_sel.clone()) } else { PickKind::File(p_sel.clone()) }));
                                                 },
                                                 on_dblclick: move |_| {
-                                                    if *is_dir { navigate_to(p_nav.clone(), true, store, left_hist, left_dir); }
+                                                    if is_dir { navigate_to(p_nav.clone(), true, store, left_hist, left_dir); }
                                                     else {
                                                         let rp = store.right_pick.read().cloned();
                                                         if let Some(cp) = rp.filter(|p| p.is_file()) {
@@ -698,7 +694,7 @@ pub fn Explorer() -> Element {
                             }
                             // Right pane
                             div { class: "compact-pane compact-pane-right",
-                                for row in right_flat.iter().filter(|(p, is_dir, ..)| {
+                                for row in right_flat.iter().filter(|(p, _is_dir, ..)| {
                                     if filter_query.read().is_empty() { true } else {
                                         p.file_name().map(|n| n.to_string_lossy().to_lowercase()
                                             .contains(&*filter_query.read())).unwrap_or(false)
@@ -707,17 +703,16 @@ pub fn Explorer() -> Element {
                                     {
                                         let (abs, is_dir, is_expanded, is_selected, depth) = row.clone();
                                         let rel = abs.strip_prefix(&r_root_snap).unwrap_or(&abs).to_path_buf();
-                                        let status = if *is_dir {
-                                            digest_map.read().get(&DigestKey::Common(rel.clone())).cloned()
-                                        } else {
-                                            digest_map.read().get(&DigestKey::Common(rel.clone()))
-                                                .or_else(|| digest_map.read().get(&DigestKey::RightOnly(rel.clone())))
-                                                .cloned()
+                                        // Two separate reads avoid holding two guards simultaneously (E0515).
+                                        let status = {
+                                            let common   = digest_map.read().get(&DigestKey::Common(rel.clone())).cloned();
+                                            let right_only = digest_map.read().get(&DigestKey::RightOnly(rel.clone())).cloned();
+                                            common.or(right_only)
                                         };
                                         let p_tgl = abs.clone(); let p_sel = abs.clone();
                                         let p_dbl = abs.clone(); let p_nav = abs.clone();
                                         let p_bin = abs.clone();
-                                        let is_binary = if *is_dir { false } else {
+                                        let is_binary = if is_dir { false } else {
                                             let cached = binary_cache.read().get(&abs).copied();
                                             cached.unwrap_or_else(|| {
                                                 let b = matches!(forskscope_core::file_kind::classify(&p_bin),
@@ -728,19 +723,19 @@ pub fn Explorer() -> Element {
                                         };
                                         rsx! {
                                             TreeRow {
-                                                path: abs.clone(), is_dir: *is_dir,
-                                                is_expanded: *is_expanded, is_selected: *is_selected,
-                                                depth: *depth, status, is_binary, binary_enabled,
+                                                path: abs.clone(), is_dir,
+                                                is_expanded, is_selected,
+                                                depth, status, is_binary, binary_enabled,
                                                 on_toggle: move |_| {
                                                     if let Some(r) = tree_r.write().on_toggled(&p_tgl) { scans_r.send(r); }
                                                     digest_map.write().clear();
                                                 },
                                                 on_select: move |_| {
-                                                    tree_r.write().on_selected(&p_sel, *is_dir, SelectionMode::Replace);
-                                                    right_pick.set(Some(if *is_dir { PickKind::Dir(p_sel.clone()) } else { PickKind::File(p_sel.clone()) }));
+                                                    tree_r.write().on_selected(&p_sel, is_dir, SelectionMode::Replace);
+                                                    right_pick.set(Some(if is_dir { PickKind::Dir(p_sel.clone()) } else { PickKind::File(p_sel.clone()) }));
                                                 },
                                                 on_dblclick: move |_| {
-                                                    if *is_dir { navigate_to(p_nav.clone(), false, store, right_hist, right_dir); }
+                                                    if is_dir { navigate_to(p_nav.clone(), false, store, right_hist, right_dir); }
                                                     else {
                                                         let lp = store.left_pick.read().cloned();
                                                         if let Some(cp) = lp.filter(|p| p.is_file()) {

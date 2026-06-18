@@ -6,12 +6,12 @@ use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
 
 use crate::state::{Store, open_compare, restore_session, save_session};
-use crate::ui::diff::{DiffWorkspace, apply_focused_hunk, move_focus, save_tab};
-use crate::ui::explorer::Explorer;
-use crate::ui::header::Header;
-use crate::ui::settings::{ModalLayer, load};
-use crate::ui::statusbar::StatusBar;
-use crate::ui::tabs::TabBar;
+use crate::ui::view::diff::{DiffWorkspace, apply_focused_hunk, move_focus, save_tab};
+use crate::ui::view::explorer::Explorer;
+use crate::ui::layout::header::Header;
+use crate::ui::view::settings::{ModalLayer, load};
+use crate::ui::layout::statusbar::StatusBar;
+use crate::ui::layout::tabs::TabBar;
 
 const MAIN_CSS: &str = include_str!("../assets/main.css");
 

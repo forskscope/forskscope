@@ -5,57 +5,72 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.152.0] — 2026-06-16
+## [0.152.0] — 2026-06-18
 
 RFC-069: Explorer Compare action and targets label. RFC-070: Diff font family
-selector. Security audit and doc verification.
+selector. Security audit, doc verification, and UI module restructuring (Phase 1).
 
 ### Fixed (security audit)
 
-**`binary_cache` stale on directory navigation:**
-The `binary_cache: Signal<HashMap<PathBuf, bool>>` that caches per-path NUL-byte
-sniff results was never cleared when the user navigated to a different directory.
-If a path appeared in multiple directories visited during a session, or if a file
-changed from text to binary externally, the cached result was served without
-re-reading the file. Fixed: the cache is now cleared in the `use_effect` hooks
-that fire on `left_dir` and `right_dir` changes.
+- **`binary_cache` not cleared on directory navigation** — stale sniff results
+  persisted across directory changes. Fixed by clearing in the `use_effect`
+  hooks for `left_dir` and `right_dir`.
+- **Filter loop calling `classify()` without cache** — the "Hide binary" filter
+  predicate bypassed `binary_cache` and called `classify()` on every render
+  frame. Fixed to use the cache.
+- **`binary_cache` not declared `mut`** — seven `.write()` call sites failed
+  E0596. Added `mut` to the declaration.
+- **E0515 double-borrow in compact right pane** — chained `digest_map.read()`
+  calls held two guards simultaneously. Split into two sequential reads.
+- **Unused variable warnings** — `is_dir` → `_is_dir` in compact-pane filter
+  closures.
 
-**Filter loop calling `classify()` without cache:**
-The RFC-067 "Hide binary" filter path called `classify()` directly (file I/O)
-on every visible row on every render frame, bypassing `binary_cache`. Fixed:
-the filter loop now performs the same cache-lookup-then-populate pattern as the
-tree row render path.
+### Changed (RFC-069)
 
-### Added
+**Persistent targets label and Compare ▶ button:**
+The Explorer footer now always shows a targets label guiding the user
+progressively: no picks → partial pick with guidance text → both picks ready
+with names. The Compare button is styled with accent colour when enabled.
 
-**Threat model document** (`docs/src/maintainers/threat-model.md`):
-ForskScope had no dedicated security documentation. The new document covers:
-all active data flows and their controls (async file load, binary sniff,
-manifest write, settings persist, external tool launch), the fundamental
-local-only / no-network guarantee, the known third-party risk from
-`sheets-diff` and its `catch_unwind` mitigation, and an audit history table
-from v0.145.x onward. Added to `SUMMARY.md`.
+### Changed (RFC-070)
 
-### Changed (RFC-069, RFC-070 — unchanged from earlier in this release)
+**Diff font family selector:**
+Five presets added to Settings → Appearance: Monospace (default), Sans-serif,
+Serif, Courier New, Consolas / Menlo. Applied via `--diff-ff` CSS variable.
 
-**RFC-069 — Persistent targets label and Compare ▶ button** (see prior entry).
+### Changed (UI module restructuring — Phase 1)
 
-**RFC-070 — Diff font family selector** (see prior entry).
+`crates/forskscope-ui/src/ui/` was a flat list of 27 files. Restructured into
+four named groups per the architect's review, using Rust 2024 sibling-file
+module style (no `mod.rs`):
 
-### Changed (doc verification)
+```
+ui.rs
+ui/
+  layout/    header.rs, tabs.rs, statusbar.rs
+  view/      explorer.rs, diff.rs, settings.rs, deep_compare.rs,
+             dir_pane.rs, diff_actions.rs, hunk.rs, search.rs
+  overlay/   modals.rs, keybindings.rs
+  bridge/    14 thin ui-logic re-export shims
+```
 
-- `docs/src/users/settings.md` — added **Diff font family** preset table;
-  added **Enable binary comparison** and **Explorer layout** under Advanced.
-- `docs/src/users/explorer.md` — corrected focused-pane description (removed
-  stale `◀` marker reference; focus is now shown by outline/tint); added
-  sections for Binary files, Filter bar, Compact layout, Targets label,
-  and Async tab opening.
-- `docs/src/users/features.md` — corrected horizontal scroll description (now
-  per-pane); updated Explorer bullet list with binary policy, filter bar,
-  compact layout, targets label, async tabs; added diff font family to
-  Appearance section.
-- `docs/src/users/diff-workflow.md` and `known-limitations.md` — verified
-  correct from v0.147.0 update; no changes needed.
+- `state/mod.rs` renamed to `state.rs` (Rust 2018 style; `state/settings.rs`
+  unchanged).
+- Backward-compatible `pub use` re-exports added to `ui.rs` so all existing
+  `crate::ui::X` import paths continue to resolve. Each re-export is marked
+  `TODO(v0.153): remove after import migration`.
+- No UI behaviour, CSS, string, or i18n changes in this PR.
+
+### Added (docs)
+
+- `docs/src/maintainers/threat-model.md` — first security documentation:
+  data flows, controls, no-network guarantee, audit history.
+- `docs/src/users/settings.md` — diff font family, binary comparison toggle,
+  Explorer layout option.
+- `docs/src/users/explorer.md` — binary files, filter bar, compact layout,
+  targets label, async tab opening; corrected stale focused-pane description.
+- `docs/src/users/features.md` — corrected horizontal scroll description;
+  updated Explorer and Appearance sections.
 
 ---
 
@@ -87,6 +102,8 @@ whitespace spacers.
 - Picks, binary badges, and navigation work the same way in both modes; the
   filter bar (RFC-067) applies independently per pane in compact mode.
 - `AppSettings::explorer_compact` (default: `false`, persisted) controls the mode.
+
+---
 
 ---
 
@@ -123,6 +140,8 @@ alongside their counterparts.
   resolution: name query and checkboxes reset on app restart.
 - The filter bar input stops key propagation so typing in the filter does not
   trigger global shortcuts.
+
+---
 
 ---
 
@@ -163,6 +182,8 @@ Explorer session rather than on every render.
 - CSS: `.tree-row.binary-blocked`, `.tree-status.st-binary`.
 - i18n keys (ja): `Enable binary comparison`, the tooltip string, and the
   "Binary comparison is off" notice.
+
+---
 
 ---
 
@@ -207,6 +228,8 @@ Sentinel constructors needed for the Loading placeholder; never rendered.
 
 ---
 
+---
+
 ## [0.147.0] — 2026-06-16
 
 RFC-064: Compare view bug fixes — per-pane horizontal scroll and all-different
@@ -245,6 +268,8 @@ the kind color and the focus ring are always present.
   per-pane scrollbars.
 - RFC-064 moved from `rfcs/proposed/` to `rfcs/done/` (Implemented v0.147.0).
   RFC index: Implemented 39 → 40, Proposed 20 → 19.
+
+---
 
 ---
 
@@ -290,6 +315,8 @@ RFC-060–063 refreshed to reflect v0.145.x delivery.
 
 ---
 
+---
+
 ## [0.145.3] — 2026-06-14
 
 RFC-062: Safe batch copy UX and restore manifest integration.
@@ -331,6 +358,8 @@ The label field is removed (modal already shows From/To paths).
 
 ---
 
+---
+
 ## [0.145.2] — 2026-06-14
 
 RFC-061: Explorer pane focus and keyboard completeness.
@@ -368,6 +397,8 @@ pointer on all pane-root-cells.
 
 - i18n keys (ja): `Left pane`, `Right pane`, `Switch focused pane (left ↔ right)`,
   `Go up one directory (focused pane)`.
+
+---
 
 ---
 
@@ -416,98 +447,82 @@ No code changes; audit result recorded.
 
 ---
 
+---
+
 ## [0.145.0] — 2026-06-14
 
-Sprint 0 safety patch — fixes from the UI/UX architect source review.
-These are verified defects (not design preferences); larger UX recommendations
-from the review are deferred to a dedicated milestone.
+Build warnings fixed; UX improved when both file paths are not found.
 
 ### Fixed
 
-**`app.rs` — Global shortcuts leaked through modals (review P0-1):**
-The root `onkeydown` handler closed modals on Escape but then continued to act
-on the active tab for every other key. A `Ctrl+S` behind an overwrite dialog,
-`Ctrl+W` behind Settings, or `Enter` behind any dialog could fire on the tab
-behind the modal. Now computes `modal_open` once; Escape closes the modal, and
-all other shortcuts early-return while any modal is open.
+**`crates/forskscope-ui/src/ui/diff_actions.rs`** — Two `drop(tab)` calls
+on a `&CompareTab` reference did nothing (you cannot drop a reference).
+Replaced with `let _ = tab` which correctly releases the borrow without
+emitting a warning.
 
-**`ui/search.rs` — Search Enter applied merge hunks (review P0-2):**
-The search input handled `Enter` (advance match) and `Escape` (close) but did
-not stop propagation, so the same keypress bubbled to the app root and applied
-the focused merge hunk. Added `e.stop_propagation()` to both arms. Searching a
-diff can no longer trigger an unintended merge.
+**`crates/forskscope-ui/src/state/mod.rs`** — Two unused imports removed:
+- `DiffProfile` from `pub use settings::{}` — not referenced outside
+  `settings.rs` itself.
+- `pub use forskscope_core::DiffAlgorithm` re-export — all callers use
+  `forskscope_core::DiffAlgorithm` directly.
 
-**`assets/main.css` — Incomplete selector corrupted following rule (review P0-6):**
-`.dir-row:hover .dir-copy-btn, .dir-row.focused` had no declaration block,
-causing the CSS parser to merge it with the following `code.path-display` rule.
-The `.dir-row`/`.dir-copy-btn` classes are unused (legacy); the broken selector
-is removed and `code.path-display` is now parsed correctly.
+**`crates/forskscope-ui/src/ui/diff.rs`** — Two UX fixes for missing files:
+- Added `(FileKind::Missing, FileKind::Missing)` arm before the existing
+  one-sided-missing arm; shows `"Both files not found — read-only."` instead
+  of the misleading `"One side is missing"` when neither file exists.
+- `identical` field is now `tab.diff.is_identical() && !both_missing` —
+  suppresses the `"Files are identical"` message when both sides are empty
+  only because neither path was found.
 
-**Packaging / release integrity (review §8):**
-- `.github/workflows/ci.yml`, `release.yml` — built nonexistent crate
-  `forskscope-ui-dioxus`; corrected to `forskscope-ui` (the real crate name).
-- `packaging/linux/PKGBUILD` — `pkgver` was `0.25.0`; updated to `0.144.0`
-  with a sync note.
-- `packaging/build-release.sh` — version extraction hardened to read the
-  `[workspace.package]` version explicitly via awk (was a fragile
-  `grep '^version' | head -1`).
-- `README.md` — prerequisite Rust version `1.80+` → `1.85+` to match
-  `rust-version = "1.85"` in the workspace manifest.
+**`crates/forskscope-ui/src/i18n.rs`** — `"Both files not found — read-only."`
+added in English and Japanese (両ファイルが見つかりません — 読み取り専用。).
 
-### Added — UX review remediation RFCs (drafted, Proposed)
-
-The deferred findings from the UI/UX architect review are now captured as four
-RFCs in `rfcs/proposed/`, numbered fresh from 060 (the review's suggested
-054–057 collided with existing RFCs of those numbers):
-
-- **RFC-060** — Global Keyboard Scope and Modal/Input Safety. Ratifies the
-  Sprint 0 modal/search fixes as policy; specifies remaining per-surface
-  propagation work and a pure decision function with regression tests.
-- **RFC-061** — Explorer Pane Focus and Keyboard Completeness. Defines the
-  left/right focused-pane model so the Explorer select-and-compare loop becomes
-  keyboard-completable (review P0-3). Resolves Alt+↑ to per-pane by default.
-- **RFC-062** — Safe Batch Copy UX and Restore Manifest Integration. Binds the
-  directory-copy UI to the core batch manifest/restore model and makes copy
-  direction explicit and symmetric (review P0-4, P0-5).
-- **RFC-063** — Trust, Clarity, and Calm UI Hardening. Consolidates the P1/P2
-  design cluster (empty/first-run states, control density, labeled write
-  actions, destructive-modal focus, severity-based toasts, plain-language
-  settings, "Local only" clarity), each with an explicit Adopt / Adopt-downscoped
-  / Reject disposition against ForskScope's own non-goals and "less is more"
-  constitution. Notably **rejects** the Review-mode gating and the
-  identical-files content-hiding reversal, with recorded rationale.
-
-`rfcs/README.md` index updated (Proposed 9 → 13).
-
-### Notes
-
-- Review findings P0-3 (Explorer right-pane keyboard), P0-4/P0-5 (batch-copy
-  manifest, destructive-modal focus), and all P1/P2 design recommendations are
-  now tracked in RFC-061/062/063 rather than left as loose notes.
+---
 
 ---
 
 ## [0.144.0] — 2026-06-14
 
-Explorer root node filtered from aligned tree; pane root bar added.
+Build errors fixed (confirmed by `cargo build --release` in a GTK environment);
+documentation accuracy pass; all `.read().clone()` → `.read().cloned()` across
+the UI crate to match the Dioxus 0.7 / generational-box 0.7.9 API contract.
 
 ### Fixed
 
-**`ui/explorer.rs` — Root node excluded from aligned tree:**
-`dioxus-swdir-tree` includes the root directory itself as the first entry in
-`visible_rows()` when expanded. This caused the root node to appear as an
-aligned row (e.g. `forskscope-files` on the left aligning with `bk/` on the
-right), which is wrong — the root is not a child entry, it IS the pane root.
+**Build errors** (GTK-environment only — invisible without system libs):
 
-Fixed by filtering `n.path == root` from the flat row lists before passing
-to `compute_aligned_rows`. Same filter applied to the digest computation
-visible_rows scans. The aligned area now shows only children of each root.
+- `state/settings.rs` — Added missing imports: `std::path::PathBuf`,
+  `forskscope_core::DiffOptions`. Used in `AppSettings`, `BatchCopySpec`,
+  and `DiffProfile::to_diff_options()` but not imported after module split.
+- `state/settings.rs` — Removed `add_profile` / `remove_profile` functions
+  that referenced `Store` (circular). Moved to `state/mod.rs` where `Store`
+  is in scope.
+- `state/mod.rs` — Removed `DirOp` from `pub use settings::{}` re-export;
+  `DirOp` is defined in `mod.rs`, not `settings.rs`.
+- `state/mod.rs` — Added `#[derive(Clone)]` to `Modal`. `GenerationalRef::cloned()`
+  requires `T: Clone`; `Modal` was not `Clone`.
+- `state/mod.rs` — Removed unused `use serde::{Deserialize, Serialize}`.
+- `ui/keybindings.rs` — Removed unused `Lang` import (warning).
+- `state/settings.rs` — Removed leftover `remove_profile` stub (regex removal
+  had only removed `add_profile` in the previous attempt).
+- `app.rs` — Borrow conflict: `store.tabs.write().get_mut()` held a mutable
+  borrow while `crate::i18n::t(store.lang(), …)` attempted an immutable borrow.
+  Fixed by computing `merge_label` before acquiring the write lock.
+- All UI files — All `.read().clone()` on signal guards changed to
+  `.read().cloned()` (23 call sites). Consistent with generational-box 0.7.9.
 
-**`ui/explorer.rs` — Pane root bar (non-scrolling, above aligned area):**
-`div.pane-root-bar` placed between the path navigation bar and the scrollable
-aligned tree, showing `📁 dirname` for each pane's current root independently.
-This gives each pane a clear fixed identity label that is not part of the
-alignment grid.
+**Documentation accuracy:**
+
+- `docs/src/intermediate/file-types.md` — Large-file thresholds corrected to
+  actual values: Small ≤ 512 KiB, Medium 512 KiB – 4 MiB, Large 4 – 64 MiB,
+  Very large > 64 MiB. Previous values (1 / 4 / 16 MiB) were wrong.
+- `docs/src/users/features.md`, `docs/src/users/settings.md` — Built-in
+  compare profile names corrected: "Exact (default)", "Ignore whitespace",
+  "Ignore case", "Histogram". Previous names did not match `default_profiles()`.
+- `docs/src/users/known-limitations.md` — "Large File Safe" profile reference
+  removed; threshold corrected to 64 MiB.
+
+---
 
 ---
 
@@ -536,6 +551,8 @@ does not cache across navigation" note to reflect the new 32-task limit.
 
 ---
 
+---
+
 ## [0.142.0] — 2026-06-13
 
 Two documentation accuracy fixes: patch-export.md rewrote to match actual
@@ -556,6 +573,8 @@ The section on directory-level patch export was moved to a "planned" note.
 - `forskscope-ui-logic`: 241 tests (228 unit + 5 CSS coverage + 7 doctests
   + 1 integration), up from the stale "189 unit + 5 integration + 1 doctest".
 - CI equivalent command now shows the total (936).
+
+---
 
 ---
 
@@ -581,6 +600,55 @@ v0.141.0. All 5 documentation items, 4 data safety items, and 7 functional/UX
 items that do not require GTK or are verifiable from code are now marked `[x]`.
 Remaining unchecked items are clearly labelled *(requires GTK)* or *(deferred)*.
 Clarifies that v1.0 RC gate is the 3 RFC-041 GTK smoke-test items.
+
+---
+
+---
+
+## [0.140] — 2026-06-13
+
+Six GTK build errors fixed; file size thresholds and compare profile names
+corrected in docs.
+
+### Fixed (build)
+
+**`crates/forskscope-ui/src/state/settings.rs`** — Orphaned
+`#[derive(Debug, Clone, PartialEq, Eq)]` attribute at end of file removed.
+The `DirOp` struct that belonged after this derive had been moved to
+`state/mod.rs`, leaving the attribute without a following item.
+
+**`crates/forskscope-ui/src/state/mod.rs`**
+- `add_profile` and `remove_profile` added to the `pub use settings::{}`
+  re-export. Both are defined in `settings.rs` but were not re-exported,
+  causing unresolved function errors in the settings UI.
+- Unused `use serde::{Deserialize, Serialize}` import removed.
+
+**`crates/forskscope-ui/src/app.rs`** and **`src/ui/settings.rs`** —
+`store.modal.read().clone()` → `.cloned()`. `Signal::read()` returns
+`GenerationalRef`; `.cloned()` copies the inner value, `.clone()` does not.
+
+**`crates/forskscope-ui/src/ui/diff.rs`** — `{&snap.readonly_notice}` →
+`{snap.readonly_notice.clone()}`. Dioxus RSX requires owned `String`,
+not `&String`, for `IntoDynNode`.
+
+### Fixed (docs)
+
+**`docs/src/intermediate/file-types.md`** — "Large files" table corrected
+with actual `PerformanceLimits::default()` values: Small ≤ 512 KiB,
+Medium 512 KiB – 4 MiB, Large 4 MiB – 64 MiB, Very large > 64 MiB.
+Previous values (1 MiB / 4 MiB / 16 MiB) were wrong.
+
+**`docs/src/users/features.md`** and **`docs/src/users/settings.md`** —
+Built-in compare profile names corrected to match `default_profiles()`:
+"Exact (default)", "Ignore whitespace", "Ignore case", "Histogram".
+Previous names ("Default", "Code Review", "Loose Text", "Large File Safe")
+do not exist.
+
+**`docs/src/users/known-limitations.md`** — Removed reference to the
+non-existent "Large File Safe" profile; corrected threshold from ~16 MiB
+to 64 MiB.
+
+---
 
 ---
 
@@ -614,6 +682,8 @@ with delivered slices marked and test count corrected.
 
 ---
 
+---
+
 ## [0.139.0] — 2026-06-13
 
 i18n: keyboard reference modal descriptions and scrim aria_label translated.
@@ -631,6 +701,8 @@ through `t()`.
 shortcut descriptions + `"Keyboard shortcuts"` scrim aria_label (already had
 the heading, now also has the dialog label). Zero missing, zero dead, zero
 duplicate keys.
+
+---
 
 ---
 
@@ -661,6 +733,8 @@ entries to 145 unique keys.
 
 ---
 
+---
+
 ## [0.137.0] — 2026-06-13
 
 Documentation accuracy pass: stale feature descriptions removed, missing
@@ -682,6 +756,8 @@ copy. The feature was not listed anywhere in the feature overview.
   was in the old Tauri/Svelte app but is not implemented in the current
   Dioxus explorer.
 - Added **F3** / **Shift+F3** to the inline search description.
+
+---
 
 ---
 
@@ -716,6 +792,8 @@ v0.120.0 to v0.135.0.
 
 ---
 
+---
+
 ## [0.135.0] — 2026-06-13
 
 Bug fix: missing `lang` prop in `tail_rows` Row calls in `hunk.rs`.
@@ -741,6 +819,8 @@ and per-file copy feature (v0.111.0–v0.135.0). Test count corrected to 936.
 **`docs/src/maintainers/gtk-smoke-test.md`** — Added §2f "Per-file copy"
 smoke test step covering the `Copy →` / `← Copy` button flow added in
 v0.132.0.
+
+---
 
 ---
 
@@ -774,6 +854,8 @@ removed and conflicting `.tab` definitions merged. CSS 517 → 497 lines.
 
 ---
 
+---
+
 ## [0.133.0] — 2026-06-13
 
 Error messages, fallback tab title, and git mergetool suffix translated;
@@ -802,6 +884,8 @@ Error messages, fallback tab title, and git mergetool suffix translated;
 
 ---
 
+---
+
 ## [0.132.0] — 2026-06-13
 
 Per-file copy button wired in deep compare view; dead `#[allow(dead_code)]`
@@ -826,6 +910,8 @@ was already fully implemented but had no way to be triggered from the UI.
 **`crates/forskscope-ui/src/state/mod.rs`** — Removed stale
 `#[allow(dead_code)]` annotation from `Modal::ConfirmDirOp(DirOp)`. The
 variant is now actively constructed by `DeepRow`.
+
+---
 
 ---
 
@@ -860,6 +946,8 @@ correctly identified as used and untouched.
 
 ---
 
+---
+
 ## [0.130.0] — 2026-06-13
 
 CSS housekeeping: 22 dead lines from the pre-v0.24.0 flat directory listing
@@ -880,6 +968,8 @@ The six `.status-*` colour classes (`status-equal`, `status-changed`,
 `status-only`, `status-cmp`, `status-err`, `status-symlink`) were retained
 and moved to a `/* Deep compare row status colours */` section, since they
 are actively used by `deep_compare.rs`.
+
+---
 
 ---
 
@@ -916,6 +1006,8 @@ plus `"Copied"` → コピー完了, `"failed"` → 失敗.
 
 ---
 
+---
+
 ## [0.128.0] — 2026-06-13
 
 Shift+F3 previous-search-match shortcut implemented; dead Escape arm removed;
@@ -938,6 +1030,8 @@ F3/Shift+F3 added to keyboard reference.
 - **Dead `Key::Escape => {}`** arm in `app.rs`'s inner `match e.key()` block
   removed. Escape was already handled by the early-return guard above the
   match; the second arm was unreachable and misleading.
+
+---
 
 ---
 
@@ -970,6 +1064,8 @@ to use `getElementById`:
 
 ---
 
+---
+
 ## [0.126.0] — 2026-06-13
 
 i18n: last three hardcoded strings fixed; comprehensive scan confirms zero
@@ -991,6 +1087,8 @@ remaining English fallbacks anywhere in the UI. 134 active translation keys.
 
 **Intentionally untranslated** (product names): `"ForskScope v{version}"` in
 `AboutModal`; `"About ForskScope"` tooltip in `settings.rs`.
+
+---
 
 ---
 
@@ -1029,6 +1127,8 @@ file"`, `"Export patch"`.
 
 ---
 
+---
+
 ## [0.124.0] — 2026-06-12
 
 i18n: hunk view and search bar strings translated; screen-reader labels
@@ -1059,6 +1159,8 @@ and tooltips now go through `t()`. 102 active translation keys, all in ja().
 
 ---
 
+---
+
 ## [0.123.0] — 2026-06-12
 
 i18n: two final hardcoded strings wired through `t()`; Japanese interface
@@ -1078,6 +1180,8 @@ now complete with zero English fallbacks anywhere in the UI.
 `"off"` (used via inline conditional expressions). Zero English fallbacks
 remain in any user-facing component. The i18n pass that began at v0.121.0
 is complete.
+
+---
 
 ---
 
@@ -1112,6 +1216,8 @@ any user-facing component.
 
 ---
 
+---
+
 ## [0.121.0] — 2026-06-12
 
 i18n: warning and read-only notice strings in the diff view now translate
@@ -1141,6 +1247,8 @@ now has 76 entries, all of which correspond to active `t()` call sites.
 
 ---
 
+---
+
 ## [0.120.0] — 2026-06-12
 
 Dependency maintenance: transitive dependency patch updates.
@@ -1159,6 +1267,8 @@ Dependency maintenance: transitive dependency patch updates.
 
 - **`docs/src/maintainers/testing.md`** — version header updated to
   v0.120.0.
+
+---
 
 ---
 
@@ -1181,6 +1291,8 @@ GTK smoke test checklist; testing.md counts updated.
 
 - **`docs/src/maintainers/testing.md`** — test counts updated to v0.119.0:
   `diff_corpus` 25 → 27; total 930 → 936; version header updated.
+
+---
 
 ---
 
@@ -1208,6 +1320,8 @@ modification.
 
 ---
 
+---
+
 ## [0.117.0] — 2026-06-12
 
 Documentation housekeeping following the v0.115–v0.116 ELOC split work.
@@ -1221,6 +1335,8 @@ Documentation housekeeping following the v0.115–v0.116 ELOC split work.
 - **`rfcs/notes/core-completion-summary-v0.72.md`** — updated to v0.117.0;
   added note documenting the six-module ELOC split with the observation that
   the public API is unchanged.
+
+---
 
 ---
 
@@ -1245,6 +1361,8 @@ Pure refactors — no behaviour, public API, or test changes.
 - `job/limits.rs` (81): `FileSizeClass` and `PerformanceLimits` (RFC-013 §5).
 - `job/mod.rs` (294): threshold policy, `JobKind`, `JobProgress`, `JobHandle`,
   job lifecycle state machine, `JobRegistry`.
+
+---
 
 ---
 
@@ -1289,6 +1407,8 @@ All changes are pure refactors — no behaviour, public API, or test changes.
 
 ---
 
+---
+
 ## [0.114.0] — 2026-06-12
 
 Final note-file housekeeping.
@@ -1308,6 +1428,8 @@ Final note-file housekeeping.
   that the planned `text/basic/` / `text/newline/` path structure was not
   used; actual paths are `tests/fixtures/text/`, `tests/fixtures/newlines/`,
   `tests/fixtures/merge/`; see `tests/fixtures/README.md`.
+
+---
 
 ---
 
@@ -1339,6 +1461,8 @@ to troubleshooting guide; stale note files marked superseded.
 - **`rfcs/notes/implementation-gate-checklist-v0.2.md`** — "Superseded
   v0.113.0" notice added (same pattern as implementation-checklist.md, which
   was superseded in v0.102.0). All gate conditions were met in v0.23–v0.72.
+
+---
 
 ---
 
@@ -1389,6 +1513,8 @@ usage, example output, and home-redaction note.
 
 ---
 
+---
+
 ## [0.111.0] — 2026-06-12
 
 **Milestone: i18n complete across all UI surfaces.**
@@ -1432,6 +1558,8 @@ Three categories intentionally remain in English:
 3. **Keyboard shortcut descriptions** in `keybindings.rs` `KbRow` — these
    are `&'static str` props and translating them would require significant
    additional translation work with low user-facing impact for a developer tool.
+
+---
 
 ---
 
@@ -1482,6 +1610,8 @@ RFC-041 items. Total tests: **936** (930 → 936, +6).
   25 → 27; core unit 646 → 650; version → v0.110.0.
 
 - `ROADMAP.md` — last-updated → v0.110.0.
+
+---
 
 ---
 
@@ -1548,6 +1678,8 @@ Tests added across five modules to close the remaining coverage gaps:
 
 ---
 
+---
+
 ## [0.108.0] — 2026-06-12
 
 8 new search_index tests (len, focused data, focused_number, empty-index safety); 916 → 924 tests.
@@ -1588,6 +1720,8 @@ Tests added across five modules to close the remaining coverage gaps:
 - `rfcs/notes/core-completion-summary-v0.72.md` — 916 → 924; ui-logic
   214 → 222; version → v0.108.0.
 - `rfcs/proposed/041-…` — 924 total.
+
+---
 
 ---
 
@@ -1632,6 +1766,8 @@ Tests added across five modules to close the remaining coverage gaps:
 
 ---
 
+---
+
 ## [0.106.0] — 2026-06-12
 
 9 new conflict_nav_view tests (focus, resolved glyphs, progress); 899 → 907 tests.
@@ -1668,6 +1804,8 @@ Tests added across five modules to close the remaining coverage gaps:
   197 → 205; version note updated to v0.106.0.
 - `rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md` —
   907 total.
+
+---
 
 ---
 
@@ -1709,6 +1847,8 @@ Tests added across five modules to close the remaining coverage gaps:
 
 ---
 
+---
+
 ## [0.104.0] — 2026-06-12
 
 RFC-042 fully audited: §4b priorities 1–7 all Done; §4a extended to v0.104.
@@ -1745,6 +1885,8 @@ RFC-042 fully audited: §4b priorities 1–7 all Done; §4a extended to v0.104.
 
 ---
 
+---
+
 ## [0.103.0] — 2026-06-12
 
 RFC-042 and governance notes updated to v0.102.0 reality.
@@ -1770,6 +1912,8 @@ RFC-042 and governance notes updated to v0.102.0 reality.
 
 - **`ROADMAP.md`** — last-updated header: v0.97.0 → v0.103.0; phase
   description updated.
+
+---
 
 ---
 
@@ -1813,6 +1957,8 @@ Three-way merge corpus added (16 tests, 18 fixtures); i18n fix; 875 → 891 test
 
 ---
 
+---
+
 ## [0.101.0] — 2026-06-12
 
 i18n completeness pass; FAQ expanded with four common questions.
@@ -1848,6 +1994,8 @@ i18n completeness pass; FAQ expanded with four common questions.
 
 ---
 
+---
+
 ## [0.100.0] — 2026-06-12
 
 PlatformInfo wired to About panel; patch export UI added; i18n completed.
@@ -1877,6 +2025,8 @@ PlatformInfo wired to About panel; patch export UI added; i18n completed.
 
 ---
 
+---
+
 ## [0.99.0] — 2026-06-12
 
 RFC-041 v1 checklist updated; stale notes corrected; 8 more items now ticked.
@@ -1903,6 +2053,8 @@ RFC-041 v1 checklist updated; stale notes corrected; 8 more items now ticked.
   - Test count table: 797 → **875** with correct per-suite breakdown
     (diff_corpus 25, patch_apply 2, CSS coverage 5, doctest 7).
   - Status line reflects UI stabilisation phase.
+
+---
 
 ---
 
@@ -1938,6 +2090,8 @@ local-dev.md expanded with corpus and MSRV guidance.
   `ui-logic` and `tests/fixtures/` entries; corpus test contribution
   instructions (fixture pair + corpus test + README update); MSRV verification
   command (`cargo +1.85 test`).
+
+---
 
 ---
 
@@ -1979,6 +2133,8 @@ ROADMAP, release process, and features documentation updated to v0.97.0.
 
 ---
 
+---
+
 ## [0.96.0] — 2026-06-12
 
 User documentation expanded: four pages rewritten to reflect current UI.
@@ -2013,6 +2169,8 @@ User documentation expanded: four pages rewritten to reflect current UI.
 
 ---
 
+---
+
 ## [0.95.0] — 2026-06-12
 
 Documentation pass: testing.md, architecture.md, and local-dev.md updated
@@ -2039,6 +2197,8 @@ to v0.95.0 reality (875 tests, 38 core test modules, platform module).
   from `599 unit + 2 integration` / `85 unit, 7 modules` to current
   `646 unit + 27 integration` / `189 unit + 5 integration + 1 doctest,
   14 modules`.
+
+---
 
 ---
 
@@ -2081,6 +2241,8 @@ All hardcoded English strings in every modal dialog wired through `t()`.
 `AboutModal` was missing `let lang = store.lang();` — added.
 
 `known-ui-issues.md` ISSUE-001 status updated to **Resolved v0.94.0**.
+
+---
 
 ---
 
@@ -2135,124 +2297,6 @@ issue recorded.
  5 css_coverage + 7 doctest + 1 ui-logic-integration)
 
 ---
-
-## [0.92.0] — 2026-06-12
-
-Four UI bug fixes: two-pane split, theme select colours, ESC closes modals,
-i18n dictionary completed.
-
-### Fixed
-
-**1. Compare view two-pane split** (`hunk.rs`, `diff.rs`, `main.css`)
-
-Root cause: `1fr` columns in a single shared grid adapt to the container
-width, so a long line in one half pulls space from the other half — the
-split point shifts, and with `white-space: pre` neither pane stays fixed.
-
-Final fix: replaced the shared 7-column grid with a flex-row layout where
-each pane is a truly independent element:
-
-```
-.diff-row (display:flex)
-  .diff-pane.left  (flex:1 1 0, min-width:0, overflow-x:auto)
-    .pane-gutter | .diff-mark | .cell
-  .diff-act        (flex:0 0 5ch)
-  .diff-pane.right (flex:1 1 0, min-width:0, overflow-x:auto)
-    .pane-gutter | .diff-mark | .cell
-```
-
-`flex: 1 1 0` on both panes gives them exactly equal width regardless of
-content. `min-width: 0` allows flex to shrink below content size. Each pane
-has its own `overflow-x: auto` — long lines scroll within their pane without
-affecting the other. `.diff-pane-labels` uses the same flex layout so the
-"Left / Old" / "Right / New" headings align with the panes below.
-
-Changes: `hunk.rs` Row component rewritten to produce `.diff-row` /
-`.diff-pane.left` / `.diff-act` / `.diff-pane.right`; CSS diff section
-fully rewritten; `diff.rs` pane-label spans updated.
-
-**2. Dark/Night theme select text colour** (`main.css`)
-
-Root cause: `color-scheme` selectors used `.dark-theme`, `.light-theme`,
-`.night-theme` but the theme CSS classes on `.app` are `theme-dark`,
-`theme-light`, `theme-night` (checked in `state.rs` `css_class()`). The
-selectors never matched any element.
-
-Fixed by correcting to `.theme-dark select, .theme-night select { color-scheme: dark; }`
-and `.theme-light select { color-scheme: light; }`. Also retained
-`select option { background: var(--surface); color: var(--text); }` for
-Chromium-based WebViews that honour CSS on option elements directly.
-
-**3. ESC key closes Settings and Help dialogs** (`app.rs`, `settings.rs`,
-`keybindings.rs`)
-
-Root cause: the global `onkeydown` guard `let Some(index) = active else { return }`
-fired before the Escape branch, dropping the key when no diff tab was open.
-
-Fixed by moving Escape handling before the guard. Also added `tabindex: "-1"`
-to scrim divs so they can receive key events when focus is on the inner modal.
-
-**4. i18n dictionary completed** (`i18n.rs`, `settings.rs`, `keybindings.rs`)
-
-Remaining hardcoded English strings wired through `t()` and Japanese
-translations added for: `"Ignore file extensions"`, `"Ignore directory names"`,
-`"Delete profile"`, `"Settings"` heading, `"0 (show all)"`, `"3 (default)"`,
-plus all toolbar labels (`"Undo"`, `"Redo"`, `"Save As"`, `"More ▼"`,
-`"Less ▲"`, `"Wrap"`, `"on"`, `"off"`, `"Swap sides"`, `"Ignore WS"`,
-`"Ignore case"`, `"Context lines"`, `"Compare profiles"`, `"+ New profile"`,
-`"Profile name"`, `"Add"`).
-
----
-
-## [0.92.0] — 2026-06-12
-
-Four UI bug fixes: two-pane split, theme select colours, ESC closes modals,
-i18n dictionary completed.
-
-### Fixed
-
-**1. Compare view two-pane split** (`main.css`, `diff.rs`)
-
-Root cause: `.row` had `grid-template-columns` set but was missing
-`display: grid`, so every row rendered as a block and all seven columns
-collapsed into a single vertical stack. Fixed by adding `display: grid`
-to `.row`. Also added:
-- `border-left` / `border-right` on `.act` for a visible vertical divider.
-- `.diff-pane-labels` header bar with "Left / Old" / "Right / New" labels
-  using identical grid column spans, so headings align with content below.
-
-**2. Dark/Night theme select text colour** (`main.css`)
-
-Root cause: WebKit (GTK WebView) renders `<option>` elements in native OS
-chrome which ignores CSS `color` on child elements. Fixed by:
-- `color-scheme: dark` on `.dark-theme select` and `.night-theme select`,
-  which tells WebKit to render the native picker in dark mode.
-- `color-scheme: light` on `.light-theme select` for explicit light mode.
-- `select option { background: var(--surface); color: var(--text); }` for
-  Chromium-based WebViews that do honour the rule.
-
-**3. ESC key closes Settings and Help dialogs** (`app.rs`, `settings.rs`,
-`keybindings.rs`)
-
-Root cause: the global `onkeydown` in `app.rs` had an early-return guard
-`let Some(index) = *store.active.read() else { return }` *before* the
-Escape branch, so Escape was silently dropped whenever no diff tab was open.
-Fixed by moving the Escape handler before the guard. Also:
-- Added `tabindex: "-1"` to scrim divs so they can receive keyboard events
-  when focus is on the inner modal (autofocused Close button).
-- Both the app-level handler and the per-scrim `onkeydown` now close the
-  modal, covering all focus scenarios.
-
-**4. i18n dictionary completed** (`i18n.rs`, `settings.rs`)
-
-Remaining hardcoded English strings wired through `t()` and Japanese
-translations added:
-- `"Ignore file extensions"` → 除外ファイル拡張子
-- `"Ignore directory names"` → 除外ディレクトリ名
-- `"Delete profile"` (tooltip) → プロファイルを削除
-- `"Settings"` (modal heading) → 設定
-- `"0 (show all)"` → 0（全表示）
-- `"3 (default)"` → 3（デフォルト）
 
 ---
 
@@ -2313,6 +2357,8 @@ Previously wired but missing from `ja()` (removed the fallthrough): `Undo`,
 
 ---
 
+---
+
 ## [0.91.0] — 2026-06-12
 
 Diff acceptance corpus — 26 fixture files and 16 corpus integration tests.
@@ -2354,6 +2400,8 @@ Diff acceptance corpus — 26 fixture files and 16 corpus integration tests.
 
 ---
 
+---
+
 ## [0.90.0] — 2026-06-12
 
 CancellationToken and FileKind tests close the last untested core areas.
@@ -2388,6 +2436,8 @@ CancellationToken and FileKind tests close the last untested core areas.
 
 ### Test count: 840
 (637 core + 189 ui-logic + 2 core-integration + 5 ui-logic-integration + 6 doctest + 1)
+
+---
 
 ---
 
@@ -2427,6 +2477,8 @@ CSS bug fix; CSS var coverage test; path.rs tests.
 
 ### Test count: 818
 (615 core + 189 ui-logic + 2 core-integration + 5 ui-logic-integration + 6 doctest + 1)
+
+---
 
 ---
 
@@ -2474,6 +2526,8 @@ CSS class contract established; 4 coverage integration tests.
 
 ---
 
+---
+
 ## [0.87.0] — 2026-06-12
 
 Documentation pass: maintainer docs updated to v0.87.0 reality.
@@ -2499,6 +2553,8 @@ Documentation pass: maintainer docs updated to v0.87.0 reality.
 - **`rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md`**:
   updated version (v0.78.0 → v0.87.0), ui-logic gate (85/7 → 189/14),
   RFC inventory description.
+
+---
 
 ---
 
@@ -2551,6 +2607,8 @@ Settings form view-model; `ui-logic` now covers all 7 ROADMAP slices (Slice 5).
 
 ---
 
+---
+
 ## [0.85.0] — 2026-06-12
 
 Command palette and conflict navigator view-models (Slices 6 & 7).
@@ -2599,6 +2657,8 @@ Command palette and conflict navigator view-models (Slices 6 & 7).
 
 ---
 
+---
+
 ## [0.84.0] — 2026-06-12
 
 `compare::save_error` — save-error dialog view-model (Slice 3).
@@ -2639,6 +2699,8 @@ Command palette and conflict navigator view-models (Slices 6 & 7).
 
 ---
 
+---
+
 ## [0.83.0] — 2026-06-12
 
 Scroll synchronisation view-model; release archive fix.
@@ -2675,6 +2737,8 @@ Scroll synchronisation view-model; release archive fix.
   fraction, negative input clamping, `scroll_to_row` correctness and
   over-bounds clamping, past-end clamping, `max_scroll_px` normal and
   content-fits cases, zero row-height guard. Total ui-logic count: 133.
+
+---
 
 ---
 
@@ -2719,6 +2783,8 @@ Scroll synchronisation view-model; release archive fix.
 
 ---
 
+---
+
 ## [0.81.0] — 2026-06-12
 
 Bug fix in `hunk_decorations` tests; `hunk_decorations` shim added to UI crate.
@@ -2751,6 +2817,8 @@ ui-logic-integration). The ui-logic count increased from 85 to 100: the
 `hunk_decorations` module's 15 tests were already present in the crate
 but the `0.80.0` release note undercounted them; the correct baseline count
 going forward is 100.
+
+---
 
 ---
 
@@ -2794,6 +2862,8 @@ UI crate: shim re-exports for all `ui-logic` modules; GTK-free test template.
 
 ---
 
+---
+
 ## [0.79.0] — 2026-06-12
 
 Maintainer documentation rewrite — architecture and testing docs updated to
@@ -2830,6 +2900,8 @@ reflect the complete v0.79.0 codebase.
   descriptions and RFC cross-references (was "two modules").
 
   **Integration test** listed (patch round-trip with GNU `patch`).
+
+---
 
 ---
 
@@ -2872,6 +2944,8 @@ list keyed to ROADMAP.md slice numbers.
 
 ---
 
+---
+
 ## [0.77.0] — 2026-06-12
 
 Deep compare filter and summary view-model in `forskscope-ui-logic`.
@@ -2905,6 +2979,8 @@ Deep compare filter and summary view-model in `forskscope-ui-logic`.
 
 ---
 
+---
+
 ## [0.76.0] — 2026-06-12
 
 Compare summary and navigation state view-models in `forskscope-ui-logic`.
@@ -2933,6 +3009,8 @@ Compare summary and navigation state view-models in `forskscope-ui-logic`.
   no-changes nav state, first/middle/last position labels, prev/next ARIA
   labels (position and wrap cases), single-change nav.
   Total ui-logic count: 70.
+
+---
 
 ---
 
@@ -2976,6 +3054,8 @@ Explorer status view-model and tab state bridge in `forskscope-ui-logic`.
 
 ---
 
+---
+
 ## [0.74.0] — 2026-06-12
 
 Command bar view-model in `forskscope-ui-logic`.
@@ -3015,6 +3095,8 @@ Command bar view-model in `forskscope-ui-logic`.
 
 ---
 
+---
+
 ## [0.73.0] — 2026-06-12
 
 ROADMAP.md; RFC-020 promoted to done; RFC-042 updated.
@@ -3045,6 +3127,8 @@ platform/packaging (2), documentation (1), governance (2).
 
 ---
 
+---
+
 ## [0.72.0] — 2026-06-12
 
 Final core-layer promotion pass. RFC done count: 38. Core layer complete.
@@ -3069,6 +3153,8 @@ platform/packaging, process/governance, or documentation.
 - `rfcs/proposed/041-v1-product-stabilization-and-rfc-governance.md` —
   checklist updated to v0.72.0: all 8 must-stabilise targets ✓,
   engineering gates ✓ (599 core tests, 0 failures).
+
+---
 
 ---
 
@@ -3117,6 +3203,8 @@ RFC-036 promoted to done.
 
 ---
 
+---
+
 ## [0.70.0] — 2026-06-12
 
 External tool built-in presets (RFC-029); five RFC promotions.
@@ -3161,6 +3249,8 @@ Core scope of each RFC is complete; remaining items are UI components.
 
 ---
 
+---
+
 ## [0.69.0] — 2026-06-12
 
 BOM preservation policy (RFC-012 §7.2 bullet 5); RFC-012 promoted to done.
@@ -3202,6 +3292,8 @@ BOM preservation policy (RFC-012 §7.2 bullet 5); RFC-012 promoted to done.
 
 ---
 
+---
+
 ## [0.68.0] — 2026-06-12
 
 Job lifecycle state machine (RFC-008 slice).
@@ -3230,6 +3322,8 @@ Job lifecycle state machine (RFC-008 slice).
   lifecycle transitions (Queued→Running→Completed, →Cancelled, →Failed),
   no-op on double-transition, `JobRegistry` register/get/active filter/
   prune. Total core test count: 567.
+
+---
 
 ---
 
@@ -3287,6 +3381,8 @@ RFC index (`rfcs/README.md`) updated. **Done count: 28** (was 21).
 
 ---
 
+---
+
 ## [0.66.0] — 2026-06-12
 
 `NewlineCompareMode::IgnoreDifference` wired into diff engine; RFC-028 and
@@ -3327,6 +3423,8 @@ RFC-011 promoted to done.
   Deferred UI: session restore picker, crash recovery journal.
 
 RFC index (`rfcs/README.md`) updated. Done count: 21 (was 19).
+
+---
 
 ---
 
@@ -3408,6 +3506,8 @@ is now clean.
 
 ---
 
+---
+
 ## [0.64.0] — 2026-06-10
 
 Conflict navigator view-model (RFC-034 slice).
@@ -3447,6 +3547,8 @@ Conflict navigator view-model (RFC-034 slice).
   next/prev None on empty, filter hides/shows resolved, resolve updates
   summary, first unresolved before/after resolve, CSS prefix, progress
   fraction 0/1/empty. Total core test count: 536.
+
+---
 
 ---
 
@@ -3503,6 +3605,8 @@ Command model and registry (RFC-019 slice).
 
 ---
 
+---
+
 ## [0.62.0] — 2026-06-10
 
 Text editing operation model — RFC-032 core types.
@@ -3553,6 +3657,8 @@ Text editing operation model — RFC-032 core types.
   (same = ok, stale/future = reject), `OperationReject` fields,
   `TransactionLabel` well-known labels, `EditTransaction` empty/reversible,
   `TransactionId` equality. Total core test count: 489.
+
+---
 
 ---
 
@@ -3615,6 +3721,8 @@ Diff decoration model (RFC-024) and line map / scroll sync model (RFC-035).
 
 ---
 
+---
+
 ## [0.60.0] — 2026-06-10
 
 User settings model and JSON persistence (RFC-009 slice).
@@ -3658,6 +3766,8 @@ User settings model and JSON persistence (RFC-009 slice).
   version in output, newer-schema rejection, corrupt-payload fallback,
   `LocaleId` helpers, font_size clamping on load.
   Total core test count: 435.
+
+---
 
 ---
 
@@ -3729,6 +3839,8 @@ Application error taxonomy (RFC-017 slice) and file-size classification (RFC-013
 
 ---
 
+---
+
 ## [0.58.0] — 2026-06-10
 
 Directory index model, equality evidence, and pair comparison (RFC-008 §5, RFC-037 §"Directory Index").
@@ -3752,6 +3864,8 @@ Directory index model, equality evidence, and pair comparison (RFC-008 §5, RFC-
   **`IndexRevision`**: newtype `u64` with `next()`. Incremented on each rescan.
 
 - **25 new tests** in `tests/dir_index_tests.rs`: empty index, `get`, `files`/`directories` iterators, `ContentDigest::matches` (same/different hex, different algorithm), all `EqualityEvidence` predicates, all 9 `pair_entries` comparison branches, `PairedEntrySet` counts, empty-both-sides, revision `next()`. Total core test count: 385.
+
+---
 
 ---
 
@@ -3806,6 +3920,8 @@ formula text, cancellation, richer sheet changes (RFC-058).
 
 ---
 
+---
+
 ## [0.56.0] — 2026-06-10
 
 Workspace session model and JSON persistence (RFC-011 slice).
@@ -3850,6 +3966,8 @@ Workspace session model and JSON persistence (RFC-011 slice).
   JSON round-trip for all root kinds, newer-schema error, stable session
   identity, dirty-tab visibility, structural no-content guarantee.
   Total core test count: 358.
+
+---
 
 ---
 
@@ -3905,6 +4023,8 @@ endringer evaluation note recorded in `rfcs/notes/`.
 
 ---
 
+---
+
 ## [0.54.0] — 2026-06-10
 
 VCS context integration — GitProvider and VcsProvider trait (RFC-038).
@@ -3952,6 +4072,8 @@ VCS context integration — GitProvider and VcsProvider trait (RFC-038).
 
 ---
 
+---
+
 ## [0.53.0] — 2026-06-10
 
 External file state detection (RFC-036 slice).
@@ -3992,6 +4114,8 @@ External file state detection (RFC-036 slice).
 
 ---
 
+---
+
 ## [0.52.0] — 2026-06-10
 
 Directory merge action planner and operation plan model (RFC-022 slice).
@@ -4028,6 +4152,8 @@ Directory merge action planner and operation plan model (RFC-022 slice).
   `EntrySelection` filters, risk summary accuracy, preflight target detection,
   execute round-trip, backup creation on overwrite, skip count reporting, and
   empty entry list. Total core test count: 289.
+
+---
 
 ---
 
@@ -4079,6 +4205,8 @@ Versioned schema envelope and migration policy for all persisted data (RFC-031).
 
 ---
 
+---
+
 ## [0.50.0] — 2026-06-10
 
 Editability classification, newline save policy (RFC-012 slice) and compare profiles (RFC-028 slice).
@@ -4119,6 +4247,8 @@ Editability classification, newline save policy (RFC-012 slice) and compare prof
   type. `Default` is `default_profile`.
 
 - **35 new tests** (21 editability, 14 compare profile). Total: 255 core.
+
+---
 
 ---
 
@@ -4168,6 +4298,8 @@ Report export: Markdown and JSON comparison reports (RFC-027).
 
 ---
 
+---
+
 ## [0.48.0] — 2026-06-10
 
 Crate architecture: classify by function, not framework (RFC-020 §5a).
@@ -4209,6 +4341,8 @@ Crate architecture: classify by function, not framework (RFC-020 §5a).
 - Crate counts unchanged (3). Test counts unchanged (200 core + 2 patch
   integration + 22 ui-logic). No behavioral change; this is a structural
   and naming release.
+
+---
 
 ---
 
@@ -4256,6 +4390,8 @@ Transaction log and unified merge operation history (RFC-015).
 - RFC-015 moved from `proposed/` to `done/`. The history panel UI (§10),
   persistent crash-recovery journal (deferred in RFC-015 §4), and
   editor-local vs core undo precedence (§9) remain open.
+
+---
 
 ---
 
@@ -4307,6 +4443,8 @@ Error severity/recovery model (RFC-017 slice) + job progress model and threshold
 
 ---
 
+---
+
 ## [0.45.0] — 2026-06-10
 
 Spreadsheet structural diff adapter and test corpus (RFC-058).
@@ -4355,6 +4493,8 @@ Spreadsheet structural diff adapter and test corpus (RFC-058).
 
 ---
 
+---
+
 ## [0.44.0] — 2026-06-10
 
 Batch copy with restore manifest (RFC-023 §"Batch operation manifest").
@@ -4391,6 +4531,8 @@ Batch copy with restore manifest (RFC-023 §"Batch operation manifest").
   collects all outcomes, manifest written to directory, manifest JSON
   structure, operation ID format, restore recovers files, restore skips
   entries without backup. Total core test count: 133.
+
+---
 
 ---
 
@@ -4431,6 +4573,8 @@ Search next/prev traversal and match navigation (RFC-014 slice).
 
 ---
 
+---
+
 ## [0.42.0] — 2026-06-10
 
 Cancellable directory comparison and explicit symlink handling (RFC-037 slice).
@@ -4463,6 +4607,8 @@ Cancellable directory comparison and explicit symlink handling (RFC-037 slice).
   uncancelled result matches the non-cancellable API; symlink reported as
   `RecStatus::Symlink` in both full-diff and fast-listing paths (Unix).
   Total core test count: 124 (plus 2 integration, 9 alignment).
+
+---
 
 ---
 
@@ -4515,6 +4661,8 @@ RFC triage + Explorer/Compare audit remediation (RFC-059 core slice).
 
 ---
 
+---
+
 ## [0.40.0] — 2026-06-09
 
 Three-way merge model (RFC-033 core slice).
@@ -4563,6 +4711,8 @@ Three-way merge model (RFC-033 core slice).
 
 ---
 
+---
+
 ## [0.39.0] — 2026-06-09
 
 Patch export (RFC-039 export slice).
@@ -4605,6 +4755,8 @@ Patch export (RFC-039 export slice).
   tests feed generated patches to the system `patch` tool and verify the
   patched files match the expected right-side content, confirming format
   correctness against a real consumer. Total core test count: 97.
+
+---
 
 ---
 
@@ -4792,6 +4944,8 @@ correctness/consistency findings fixed.
 
 ---
 
+---
+
 ## [0.34.0] — 2026-06-09
 
 ### Fixed
@@ -4829,6 +4983,8 @@ correctness/consistency findings fixed.
   - Merge: `pending_changes()` tracking after apply, undo, and from identical diff.
   - Dir: empty directory listing; `last_modified` populated; `list_dir(None)`;
     recursive diff on two empty trees.
+
+---
 
 ---
 
@@ -4872,6 +5028,8 @@ correctness/consistency findings fixed.
   - `users/faq.md` — eight common questions with concrete answers
   - `users/settings.md` — every settings panel option with type, default, and
     description
+
+---
 
 ---
 
@@ -4919,6 +5077,8 @@ correctness/consistency findings fixed.
 
 ---
 
+---
+
 ## [0.31.0] — 2026-06-09
 
 ### Changed
@@ -4957,6 +5117,8 @@ correctness/consistency findings fixed.
 
 ---
 
+---
+
 ## [0.30.0] — 2026-06-09
 
 ### Added
@@ -4977,6 +5139,8 @@ correctness/consistency findings fixed.
   presets with their own combination of ignore-whitespace and ignore-case
   options. Custom profiles can be deleted with `×`; they are persisted to
   `settings.json`.
+
+---
 
 ---
 
@@ -5008,6 +5172,8 @@ correctness/consistency findings fixed.
   walk) fills the table immediately with `Computing` placeholders; Phase 2
   runs per-file `spawn_blocking` digest tasks and updates entries in-place.
   A live `checking N/total…` counter shows progress.
+
+---
 
 ---
 
@@ -5052,6 +5218,8 @@ correctness/consistency findings fixed.
 
 ---
 
+---
+
 ## [0.27.0] — 2026-06-09
 
 ### Added
@@ -5083,6 +5251,8 @@ correctness/consistency findings fixed.
 - **`copy_file` core function** — `forskscope_core::dir::copy_file` (with
   backup) is the safe file-copy primitive. It creates destination parent
   directories automatically and is covered by two new core tests (33 total).
+
+---
 
 ---
 
@@ -5131,6 +5301,8 @@ correctness/consistency findings fixed.
 
 ---
 
+---
+
 ## [0.25.0] — 2026-06-09
 
 ### Added
@@ -5162,6 +5334,8 @@ correctness/consistency findings fixed.
   - Windows: `build-zip.sh` (requires `zip` or `7z`).
   - `build-release.sh` — top-level script that builds a release binary
     and the source archive for the current platform.
+
+---
 
 ---
 
@@ -5211,6 +5385,8 @@ correctness/consistency findings fixed.
 
 - `diff.rs` split into `diff.rs` (coordination, ~250 ELOC) + `hunk.rs`
   (rendering, ~125 ELOC) to stay within the 300-ELOC per-file guideline.
+
+---
 
 ---
 
@@ -5283,8 +5459,12 @@ GUI-independent Rust core and a Dioxus 0.7 desktop frontend.
 
 ---
 
+---
+
 ## [0.22.3] and earlier
 
 Tauri v2 + Svelte 5 + similar v2 baseline.
 See the [v0.22.x repository](https://github.com/forskscope/forskscope/tree/v0.22.3)
 for the previous changelog.
+
+---
