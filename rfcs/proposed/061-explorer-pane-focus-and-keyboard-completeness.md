@@ -1,6 +1,6 @@
 # RFC 061: Explorer Pane Focus and Keyboard Completeness
 
-**Status.** Proposed
+**Status.** Proposed — partially implemented in v0.145.2
 **Tracks.** Explorer keyboard accessibility; left/right pane focus model;
 making the stated keyboard-only path real for the Explorer's core
 select-and-compare loop.

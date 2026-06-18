@@ -54,6 +54,56 @@ var(--row-h)` on `.tree-row`; `height: var(--row-h)` on `.row-spacer`.
   files or folders`, `Choose a folder for each side…`, `Nothing leaves this
   computer.`, `Advanced`, `Hide advanced`, `left only`, `right only`, `Files
   stay on this computer. ForskScope does not upload them.`
+---
+
+## [0.145.2] — 2026-06-14
+
+**RFC-061 — Focus indicator on Explorer pane and Focused pane.**
+
+---
+
+## [0.145.1] — 2026-06-14
+
+UX hardening sprint — RFC-060, RFC-063 partial implementation.
+
+### Changed
+
+**RFC-060 W1 — Explicit `stop_propagation` on all text-entry surfaces:**
+The Sprint 0 safety fix already added `stop_propagation` to the search bar.
+Now added to the path-bar editor (`dir_pane.rs` Enter and Escape) and the
+settings scrim Escape handler. Coverage is now explicit per-surface rather
+than incidental to the modal-open guard.
+
+**RFC-063 C5 — Severity-based notice/toast policy:**
+Introduced `Notice` type with `NoticeSeverity` (Success / Info / Warning /
+Error). `Store::notify` (error, persistent) is joined by `notify_success` (3.5 s
+auto-dismiss), `notify_info` (5 s auto-dismiss), `notify_warning` (persistent).
+Success toasts: "Saved.", "Reloaded.", "Copied." Auto-dismiss via
+`tokio::time::sleep` in the render layer. CSS classes `toast-success`,
+`toast-info`, `toast-warning`, `toast-error` added with matching border colors.
+Binary/text mismatch guidance reclassified from error to warning.
+
+**RFC-063 C7 — "Local only" trust marker:**
+Status bar now shows `🔒 Local only` with tooltip "Files stay on this
+computer. ForskScope does not upload them." Japanese translation added.
+
+**RFC-063 C9 — Exact directory-report statistics:**
+Stats now computed per category: `changed · equal · left only · right only`
+instead of the previous `different · equal (= total − different) · total`.
+The old `equal = total − diff_cnt` formula incorrectly folded Computing entries
+into the equal count. `total_common_eq` helper removed. "Checking…" progress
+shown while any entry is still in Computing state.
+
+**RFC-063 C4 — Destructive-modal focus policy audit:**
+All six destructive modals (Overwrite, Reload, Swap, Close tab,
+Confirm dir-op, Batch copy) already correctly focus Cancel by default.
+No code changes; audit result recorded.
+
+### Added
+
+- `tokio "time"` feature added for toast auto-dismiss.
+- `left only` / `right only` i18n keys (ja).
+- `Files stay on this computer…` tooltip i18n key (ja).
 
 ---
 

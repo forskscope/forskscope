@@ -29,7 +29,17 @@ use crate::ui::dir_pane::{
     navigate_to, short_name,
 };
 
-// ── Pick kind ─────────────────────────────────────────────────────────────────
+// ── Focused pane (RFC-061) ────────────────────────────────────────────────────
+
+/// Which pane currently receives keyboard events in the Explorer.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FocusedPane { Left, Right }
+
+impl FocusedPane {
+    fn toggle(self) -> Self { match self { Self::Left => Self::Right, Self::Right => Self::Left } }
+    fn is_left(self)  -> bool { self == Self::Left }
+    fn is_right(self) -> bool { self == Self::Right }
+}
 
 #[derive(Clone, PartialEq, Eq)]
 enum PickKind { File(PathBuf), Dir(PathBuf) }
@@ -177,6 +187,10 @@ pub fn Explorer() -> Element {
     let mut left_pick:  Signal<Option<PickKind>> = use_signal(|| None);
     let mut right_pick: Signal<Option<PickKind>> = use_signal(|| None);
 
+    // ── Focused pane (RFC-061) ────────────────────────────────────────────────
+    // F6 switches focus; keyboard tree events dispatch to the focused tree.
+    let mut focused_pane: Signal<FocusedPane> = use_signal(|| FocusedPane::Left);
+
     // Also sync file picks into Store so dblclick priority logic can read them.
     use_effect(move || {
         let lp = left_pick.read();
@@ -237,18 +251,26 @@ pub fn Explorer() -> Element {
 
                     // ── Per-pane root labels (pinned between path bar and scroll area) ─
                     div { class: "pane-root-bar",
-                        div { class: "pane-root-cell",
+                        div {
+                            class: if focused_pane.read().is_left() { "pane-root-cell pane-focused" } else { "pane-root-cell" },
+                            role: "heading",
+                            aria_label: format!("{} — {}", t(lang, "Left pane"), short_name(&l_root_snap)),
+                            onclick: move |_| focused_pane.set(FocusedPane::Left),
                             span { class: "root-label", "📁 " }
-                            span { class: "root-name",
-                                title: "{l_root_snap.display()}",
-                                {short_name(&l_root_snap)}
+                            span { class: "root-name", title: "{l_root_snap.display()}", {short_name(&l_root_snap)} }
+                            if focused_pane.read().is_left() {
+                                span { class: "pane-focus-ring-label", " ◀" }
                             }
                         }
-                        div { class: "pane-root-cell",
+                        div {
+                            class: if focused_pane.read().is_right() { "pane-root-cell pane-focused" } else { "pane-root-cell" },
+                            role: "heading",
+                            aria_label: format!("{} — {}", t(lang, "Right pane"), short_name(&r_root_snap)),
+                            onclick: move |_| focused_pane.set(FocusedPane::Right),
                             span { class: "root-label", "📁 " }
-                            span { class: "root-name",
-                                title: "{r_root_snap.display()}",
-                                {short_name(&r_root_snap)}
+                            span { class: "root-name", title: "{r_root_snap.display()}", {short_name(&r_root_snap)} }
+                            if focused_pane.read().is_right() {
+                                span { class: "pane-focus-ring-label", " ◀" }
                             }
                         }
                     }
@@ -258,29 +280,88 @@ pub fn Explorer() -> Element {
                         tabindex: "0",
                         onkeydown: move |e: Event<KeyboardData>| {
                             use dioxus_swdir_tree::keyboard::{Modifiers as CM, TreeKey, handle_key};
-                            if e.modifiers().contains(Modifiers::ALT) && e.key() == Key::ArrowUp {
-                                let lp = left_dir.read().parent().map(|p| p.to_path_buf());
-                                if let Some(p) = lp { navigate_to(p, true, store, left_hist, left_dir); }
-                                let rp = right_dir.read().parent().map(|p| p.to_path_buf());
-                                if let Some(p) = rp { navigate_to(p, false, store, right_hist, right_dir); }
+
+                            // F6: switch focused pane (RFC-061).
+                            if e.key() == Key::F6 {
+                                e.prevent_default();
+                                let next = focused_pane.read().toggle();
+                                focused_pane.set(next);
                                 return;
                             }
-                            let tk = match e.key() {
-                                Key::ArrowUp => TreeKey::Up, Key::ArrowDown => TreeKey::Down,
-                                Key::ArrowLeft => TreeKey::Left, Key::ArrowRight => TreeKey::Right,
-                                Key::Enter => TreeKey::Enter, Key::Home => TreeKey::Home,
-                                Key::End => TreeKey::End, Key::Escape => TreeKey::Escape,
-                                Key::Character(ref s) if s == " " => TreeKey::Space,
+
+                            // Alt+↑: navigate the focused pane up (RFC-061 — per-pane, not both).
+                            if e.modifiers().contains(Modifiers::ALT) && e.key() == Key::ArrowUp {
+                                e.prevent_default();
+                                if focused_pane.read().is_left() {
+                                    if let Some(p) = left_dir.read().parent().map(|p| p.to_path_buf()) {
+                                        navigate_to(p, true, store, left_hist, left_dir);
+                                    }
+                                } else {
+                                    if let Some(p) = right_dir.read().parent().map(|p| p.to_path_buf()) {
+                                        navigate_to(p, false, store, right_hist, right_dir);
+                                    }
+                                }
+                                return;
+                            }
+
+                            let (tk, is_select_key) = match e.key() {
+                                Key::ArrowUp    => (TreeKey::Up,    false),
+                                Key::ArrowDown  => (TreeKey::Down,  false),
+                                Key::ArrowLeft  => (TreeKey::Left,  false),
+                                Key::ArrowRight => (TreeKey::Right, false),
+                                Key::Enter      => (TreeKey::Enter, true),
+                                Key::Home       => (TreeKey::Home,  false),
+                                Key::End        => (TreeKey::End,   false),
+                                Key::Escape     => (TreeKey::Escape,false),
+                                Key::Character(ref s) if s == " " => (TreeKey::Space, true),
                                 _ => return,
                             };
                             let mods = CM { shift: e.modifiers().shift(), ctrl: e.modifiers().ctrl() };
-                            let ev = handle_key(&tree_l.read(), tk, mods);
-                            if let Some(ev) = ev {
-                                e.prevent_default();
-                                match ev {
-                                    DirectoryTreeEvent::Toggled(p) => { if let Some(r) = tree_l.write().on_toggled(&p) { scans_l.send(r); } }
-                                    DirectoryTreeEvent::Selected { path, is_dir, mode } => { tree_l.write().on_selected(&path, is_dir, mode); }
-                                    DirectoryTreeEvent::Drag(_) => {}
+
+                            // Dispatch to the focused tree (RFC-061).
+                            if focused_pane.read().is_left() {
+                                let ev = handle_key(&tree_l.read(), tk, mods);
+                                if let Some(ev) = ev {
+                                    e.prevent_default();
+                                    match ev {
+                                        DirectoryTreeEvent::Toggled(p) => {
+                                            if let Some(r) = tree_l.write().on_toggled(&p) { scans_l.send(r); }
+                                        }
+                                        DirectoryTreeEvent::Selected { path, is_dir, mode } => {
+                                            tree_l.write().on_selected(&path, is_dir, mode);
+                                            // Space / Enter: set as left pick.
+                                            if is_select_key {
+                                                left_pick.set(Some(if is_dir {
+                                                    PickKind::Dir(path)
+                                                } else {
+                                                    PickKind::File(path)
+                                                }));
+                                            }
+                                        }
+                                        DirectoryTreeEvent::Drag(_) => {}
+                                    }
+                                }
+                            } else {
+                                let ev = handle_key(&tree_r.read(), tk, mods);
+                                if let Some(ev) = ev {
+                                    e.prevent_default();
+                                    match ev {
+                                        DirectoryTreeEvent::Toggled(p) => {
+                                            if let Some(r) = tree_r.write().on_toggled(&p) { scans_r.send(r); }
+                                        }
+                                        DirectoryTreeEvent::Selected { path, is_dir, mode } => {
+                                            tree_r.write().on_selected(&path, is_dir, mode);
+                                            // Space / Enter: set as right pick.
+                                            if is_select_key {
+                                                right_pick.set(Some(if is_dir {
+                                                    PickKind::Dir(path)
+                                                } else {
+                                                    PickKind::File(path)
+                                                }));
+                                            }
+                                        }
+                                        DirectoryTreeEvent::Drag(_) => {}
+                                    }
                                 }
                             }
                         },

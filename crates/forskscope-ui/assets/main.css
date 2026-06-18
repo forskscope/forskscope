@@ -679,3 +679,12 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
   cursor: pointer; font-size: 12px; padding: .3rem 0; text-align: left;
   width: 100%; border-top: 1px solid var(--border); margin-top: .5rem; }
 .advanced-toggle:hover { color: var(--accent); }
+
+/* ── Explorer pane focus indicator (RFC-061) ── */
+.pane-root-cell { cursor: pointer; }
+.pane-root-cell.pane-focused {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+}
+.pane-focus-ring-label { font-size: 10px; color: var(--accent); margin-left: .2rem; }

@@ -35,10 +35,11 @@ pub fn KeyboardRefModal() -> Element {
                 div { class: "kb-section",
                     h3 { {t(lang, "Navigation")} }
                     div { class: "kb-table",
+                        KbRow { keys: "F6",             desc: t(lang, "Switch focused pane (left ↔ right)") }
                         KbRow { keys: "↑ / ↓",         desc: t(lang, "Move focus in explorer list") }
                         KbRow { keys: "Enter",          desc: t(lang, "Open directory / compare same-name file") }
                         KbRow { keys: "Space",          desc: t(lang, "Select file as comparison candidate") }
-                        KbRow { keys: "Alt + ↑",        desc: t(lang, "Go up one directory") }
+                        KbRow { keys: "Alt + ↑",        desc: t(lang, "Go up one directory (focused pane)") }
                         KbRow { keys: "◀ / ▶ buttons",  desc: t(lang, "Back / forward directory history") }
                     }
                 }
