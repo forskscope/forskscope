@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.157.0] — 2026-06-18
+
+Split `state.rs` (427 ELOC). No behaviour changes.
+
+### Changed
+
+`state.rs` (427 ELOC) split into six files:
+
+| File | ELOC | Responsibility |
+|---|---|---|
+| `state.rs` | 75 | `Store`, `Modal`, `Notice`, `NoticeSeverity`, `pub use` re-exports |
+| `state/types.rs` | 18 | `BatchResultSpec`, `DirOp` |
+| `state/tab.rs` | 114 | `CompareTab`, `TabState`, `recompute_diff`, `swap_sides`, `tab_title` + tests |
+| `state/compare.rs` | 147 | `open_compare`, `reload_tab`, `load_and_diff`, dir tab functions |
+| `state/session.rs` | 64 | `SessionState`, `save_session`, `restore_session`, `close_tab` + serde tests |
+| `state/profile.rs` | 25 | `add_profile`, `remove_profile` |
+
+All `pub use` re-exports in `state.rs` preserve every existing `crate::state::X`
+import path — no callers required updating. Tests moved with the code they test.
+`state/settings.rs` (pre-existing submodule) is unchanged.
+
+---
+
 ## [0.156.0] — 2026-06-18
 
 Phase 2 complete: split `settings.rs` (310 ELOC). No behaviour changes.
