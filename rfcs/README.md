@@ -51,12 +51,13 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 058 | [Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract](./done/058-spreadsheet-xlsx-structural-diff.md) | v0.57.0 (aligned view deferred) |
 | 059 | [Explorer and Compare UI/UX Audit Remediation](./done/059-explorer-and-compare-uiux-audit-remediation.md) | v0.41.0 (UI keyboard items deferred) |
 
-## Proposed (13)
+## Proposed (20)
 
 RFC-004–040 are editor-adapter track, platform/packaging, or governance/documentation.
 RFC-026 and RFC-030 are substantially implemented; their remaining items require GTK or are deferred.
-RFC-060–063 are the UI/UX architect review remediation track (v0.145.0): keyboard
-safety, Explorer keyboard completeness, safe batch copy, and clarity hardening.
+RFC-060–063 are the UI/UX architect review remediation track (shipped across v0.145.0–v0.145.3).
+RFC-064–070 are the v0.146+ feature track: compare-view fixes, async comparison,
+binary policy, Explorer filters and layout, and font selection.
 
 | ID | Title | Category | Progress |
 |----|-------|----------|----------|
@@ -69,10 +70,17 @@ safety, Explorer keyboard completeness, safe batch copy, and clarity hardening.
 | 040 | [Editor Adapter Verification Harness and Golden Corpus](./proposed/040-editor-adapter-verification-harness-and-golden-corpus.md) | Editor adapter | Blocked on RFC-004 |
 | 041 | [v1.0 Product Stabilization and RFC Governance](./proposed/041-v1-product-stabilization-and-rfc-governance.md) | Governance | 12/16 checklist items done; 4 require GTK or deferred |
 | 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) | Governance | Living document — updated v0.141.0; pre-GTK verification phase |
-| 060 | [Global Keyboard Scope and Modal/Input Safety](./proposed/060-global-keyboard-scope-and-modal-input-safety.md) | UX review remediation | **Partially shipped** v0.145.0 — modal guard + search propagation; policy + tests remain |
-| 061 | [Explorer Pane Focus and Keyboard Completeness](./proposed/061-explorer-pane-focus-and-keyboard-completeness.md) | UX review remediation | Not started — Explorer right-pane keyboard path |
-| 062 | [Safe Batch Copy UX and Restore Manifest Integration](./proposed/062-safe-batch-copy-ux-and-restore-manifest.md) | UX review remediation | Not started — bind UI to core batch manifest |
-| 063 | [Trust, Clarity, and Calm UI Hardening](./proposed/063-trust-clarity-and-calm-ui-hardening.md) | UX review remediation | Not started — empty states, density, labels, toast policy |
+| 060 | [Global Keyboard Scope and Modal/Input Safety](./proposed/060-global-keyboard-scope-and-modal-input-safety.md) | UX review remediation | **Partially shipped** v0.145.0–.1 — modal guard + per-surface propagation; W2/W3 tests remain |
+| 061 | [Explorer Pane Focus and Keyboard Completeness](./proposed/061-explorer-pane-focus-and-keyboard-completeness.md) | UX review remediation | **Partially implemented** v0.145.2 — focused pane, F6, per-pane Alt+↑; row ARIA remains |
+| 062 | [Safe Batch Copy UX and Restore Manifest Integration](./proposed/062-safe-batch-copy-ux-and-restore-manifest.md) | UX review remediation | **Shipped** v0.145.3 — manifest routing, result modal, explicit directions |
+| 063 | [Trust, Clarity, and Calm UI Hardening](./proposed/063-trust-clarity-and-calm-ui-hardening.md) | UX review remediation | **Mostly shipped** v0.145.1–.3 — C1/C2/C3/C5/C6/C7/C9/C10 done; C4 audited; C8 rejected |
+| 064 | [Compare View — Per-Pane Scroll and All-Different Coloring](./proposed/064-compare-view-scroll-and-coloring-fixes.md) | Compare fixes | Not started — two defects; Approach A scroll reversal |
+| 065 | [Asynchronous Comparison and Loading-State Tabs](./proposed/065-async-comparison-and-loading-state-tabs.md) | Performance | Not started — off-thread load+diff, cancellable |
+| 066 | [Binary Comparison Policy — Off by Default](./proposed/066-binary-comparison-policy.md) | Settings/policy | Not started — opt-in toggle, Explorer row state |
+| 067 | [Explorer Name-Pattern Filter and Filter Checkboxes](./proposed/067-explorer-name-filter-and-checkboxes.md) | Explorer | Not started — name filter + hide binary/identical |
+| 068 | [Explorer Unaligned (Compact) View Mode](./proposed/068-explorer-unaligned-compact-view-mode.md) | Explorer | Not started — remove spacer rows; breaks row alignment by design |
+| 069 | [Explorer Layout — Compare Action and Header/Footer](./proposed/069-explorer-layout-compare-action-and-header-footer.md) | Explorer | Not started — sequenced after 067/068 |
+| 070 | [Font Family Selector in Settings](./proposed/070-font-family-selector.md) | Settings | Not started — diff font family selector |
 
 ## Archive (1)
 

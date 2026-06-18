@@ -5,6 +5,48 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.146.0] — 2026-06-16
+
+RFC drafting for the next feature track. No code changes — design only.
+
+### Added — feature-track RFCs (drafted, Proposed)
+
+Seven RFCs drafted for the post-v0.145 feature track, numbered fresh from 064:
+
+- **RFC-064** — Compare View: per-pane horizontal scrollbars (reverses the
+  intentional single-shared-scrollbar "Approach B" in favour of "Approach A",
+  per maintainer decision) and a fix for missing coloring when no lines match.
+- **RFC-065** — Asynchronous Comparison and Loading-State Tabs: open a tab
+  immediately in a Loading state, run load+diff off the UI thread, resolve to
+  Loaded/Error; cancellable. Prevents the app freezing on large/binary files.
+- **RFC-066** — Binary Comparison Policy: off by default, opt-in via Settings →
+  Advanced; binary files shown in the Explorer as visible-but-non-actionable
+  with a clear reason (honours NG-005 and D-015 simultaneously).
+- **RFC-067** — Explorer Name-Pattern Filter and Filter Checkboxes: live name
+  filter plus "hide binary" / "hide identical" checkboxes; minimal by default.
+- **RFC-068** — Explorer Unaligned (Compact) View Mode: optional mode that
+  removes spacer rows so panes pack independently. Recorded explicitly as a
+  view mode that breaks cross-pane row alignment and disables vertical
+  scroll-sync (maintainer-requested).
+- **RFC-069** — Explorer Layout: Compare action placement, a targets label
+  stating what Compare will open, and a header/footer rethink that accounts for
+  the new filter bar (067) and view-mode control (068). Sequenced after them.
+- **RFC-070** — Font Family Selector: a diff font family setting (preset list),
+  paralleling the existing font-size control.
+
+`rfcs/README.md` index updated (Proposed 13 → 20); statuses for the shipped
+RFC-060–063 refreshed to reflect v0.145.x delivery.
+
+### Notes
+
+- Proposed implementation order: 064 (bug fixes) → 065 (async) → 066 (binary
+  policy) → 067/068 (Explorer filters and view mode) → 069 (Explorer layout) →
+  070 (font selector). Each ships as its own release line per the cadence.
+- RFC-064 and RFC-068 record deliberate reversals/additions to previously
+  intentional design decisions (shared scrollbar; aligned-panes), with rationale.
+
+---
+
 ## [0.145.3] — 2026-06-14
 
 RFC-062: Safe batch copy UX and restore manifest integration.
