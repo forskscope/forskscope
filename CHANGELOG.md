@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.153.0] — 2026-06-18
+
+Import migration and `mod.rs` cleanup. No behaviour changes.
+
+### Changed
+
+**Import migration (v0.152.0 TODO resolved):**
+All `crate::ui::X` import paths updated to their explicit new locations
+established in v0.152.0. The backward-compatible re-exports that were marked
+`TODO(v0.153): remove after import migration` have been removed from `ui.rs`.
+`ui.rs` now declares only the four submodules (`bridge`, `layout`, `overlay`,
+`view`) with no re-exports.
+
+Updated files: `app.rs`, `state.rs`, `ui/overlay/modals.rs`,
+`ui/view/diff.rs`, `ui/view/explorer.rs`, `ui/view/hunk.rs`,
+`ui/view/search.rs`, `ui/view/settings.rs`.
+
+**`forskscope-ui-logic` `mod.rs` → sibling files:**
+Applied the same Rust 2018/2024 module style to `crates/forskscope-ui-logic`:
+
+- `compare/mod.rs` → `compare.rs`
+- `explore/mod.rs` → `explore.rs`
+- `settings/mod.rs` → `settings.rs`
+
+No `mod.rs` files remain in either `forskscope-ui` or `forskscope-ui-logic`.
+
+---
+
 ## [0.152.0] — 2026-06-18
 
 RFC-069: Explorer Compare action and targets label. RFC-070: Diff font family
@@ -71,6 +99,78 @@ ui/
   targets label, async tab opening; corrected stale focused-pane description.
 - `docs/src/users/features.md` — corrected horizontal scroll description;
   updated Explorer and Appearance sections.
+
+---
+
+## [0.152.1] — 2026-06-18
+
+Build fixes and module style correction.
+
+### Fixed
+
+- **`binary_cache` not declared `mut`** — seven call sites called `.write()` on
+  a `Signal` bound without `mut`, causing E0596. Added `mut` to the declaration.
+- **E0515 double-borrow in compact right pane** — `digest_map.read().get(...)`
+  was chained with `.or_else(|| digest_map.read().get(...))`, holding the first
+  read guard while acquiring a second. Split into two sequential reads.
+- **Unused variable warnings** — `is_dir` in the two compact-pane filter
+  closures renamed to `_is_dir`.
+
+### Changed
+
+- **`state/mod.rs` → `state.rs`** — Rust 2018 module style: the state module
+  now lives at `src/state.rs` with its `settings` submodule at
+  `src/state/settings.rs`. All `crate::state::` import paths are unchanged.
+
+---
+
+## [0.152.0] — 2026-06-16
+
+RFC-069: Explorer Compare action and targets label. RFC-070: Diff font family selector.
+
+### Changed
+
+**RFC-069 — Persistent targets label and Compare button redesign:**
+The Explorer footer now shows a **targets label** at all times, not only when
+both picks are set. The label guides the user progressively:
+
+- *No picks:* "Choose a file or folder on each side to compare" (muted hint)
+- *Left pick only:* `filename ↔ Choose a file or folder on the right`
+- *Right pick only:* `Choose a file or folder on the left ↔ filename`
+- *Both picks:* `left-name ↔ right-name` (ready — Compare button enabled)
+
+The Compare button sits to the right of the targets label, visually connected.
+It is styled with an accent border/colour when enabled (`.compare-btn`) and
+uses the new label `Compare ▶` to make the action direction clear. The button
+and label are the same visual unit; Compare is disabled with muted styling
+until both picks are ready.
+
+**RFC-070 — Diff font family selector:**
+A **Diff font family** selector is added to Settings → Appearance (alongside
+the existing diff font size control). Five presets using safe cross-platform
+CSS font stacks:
+
+| Preset | Font stack |
+|---|---|
+| Monospace (default) | `ui-monospace, monospace` |
+| Sans-serif | `system-ui, sans-serif` |
+| Serif | `Georgia, serif` |
+| Courier New | `Courier New, Courier, monospace` |
+| Consolas / Menlo | `Consolas, Menlo, monospace` |
+
+The selected family is injected as `--diff-ff` CSS variable on the
+`.diff-scroll` wrapper, parallel to the existing `--diff-fs` variable.
+Default is unchanged (monospace); existing users see no difference until they
+choose a different preset. Setting persists across launches.
+
+### Added
+
+- `DiffFontFamily` enum in `state/settings.rs` with `css_value()` helper.
+- `TabSnapshot::font_family` field; `from_tab` reads `settings.diff_font_family`.
+- i18n keys (ja): `Diff font family`, `Monospace (default)`, `Sans-serif`,
+  `Serif`, `Choose a file or folder on each side…`, and the partial-pick hints.
+
+---
 
 ---
 

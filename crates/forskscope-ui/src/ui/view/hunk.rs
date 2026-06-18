@@ -15,7 +15,7 @@ use forskscope_core::merge::{HunkState, MergeHunk};
 
 use crate::i18n::t;
 use crate::state::{Lang, Store};
-use crate::ui::search::{SearchCtx, line_matches};
+use crate::ui::view::search::{SearchCtx, line_matches};
 
 #[component]
 pub fn HunkBlock(

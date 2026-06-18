@@ -438,7 +438,7 @@ pub fn add_profile(store: &mut Store, name: String, ignore_whitespace: bool, ign
     store.settings.write().profiles.push(settings::DiffProfile {
         name, ignore_whitespace, ignore_case, algorithm, built_in: false,
     });
-    crate::ui::settings::persist(&store.settings.read());
+    crate::ui::view::settings::persist(&store.settings.read());
 }
 
 /// Remove the profile at `index` if it is not built-in.
@@ -451,7 +451,7 @@ pub fn remove_profile(store: &mut Store, index: usize) {
         s.active_profile = s.profiles.len().saturating_sub(1);
     }
     drop(s);
-    crate::ui::settings::persist(&store.settings.read());
+    crate::ui::view::settings::persist(&store.settings.read());
 }
 
 #[cfg(test)]

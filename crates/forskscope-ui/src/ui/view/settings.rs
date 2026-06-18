@@ -5,9 +5,9 @@ use dioxus::prelude::*;
 
 use crate::i18n::t;
 use crate::state::{AppSettings, Lang, Modal, Store, Theme};
-use crate::ui::modals::{AboutModal, BatchResultModal, CloseTabModal, ConfirmDirOpModal, OverwriteModal,
+use crate::ui::overlay::modals::{AboutModal, BatchResultModal, CloseTabModal, ConfirmDirOpModal, OverwriteModal,
                          ReloadModal, SaveAsModal, SwapModal};
-use crate::ui::keybindings::KeyboardRefModal;
+use crate::ui::overlay::keybindings::KeyboardRefModal;
 
 pub fn persist(settings: &AppSettings) {
     let m: ConfigManager<AppSettings> = ConfigManager::new().with_filename("settings.json");
@@ -33,7 +33,7 @@ pub fn ModalLayer() -> Element {
         Modal::ConfirmDirOp(op)  => rsx! { ConfirmDirOpModal   { op } },
         Modal::ConfirmClose(i)   => rsx! { CloseTabModal       { index: i } },
         Modal::About             => rsx! { AboutModal          {} },
-        Modal::ConfirmBatchCopy(spec) => rsx! { crate::ui::modals::BatchCopyModal { spec } },
+        Modal::ConfirmBatchCopy(spec) => rsx! { crate::ui::overlay::modals::BatchCopyModal { spec } },
         Modal::BatchResult(spec)      => rsx! { BatchResultModal { spec } },
         Modal::KeyboardRef        => rsx! { KeyboardRefModal {} },
     }

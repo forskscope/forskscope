@@ -153,7 +153,7 @@ pub fn App() -> Element {
                         if let Some((l, r)) = dir_tabs.get(dir_idx).cloned() {
                             let lang = store.lang();
                             drop(dir_tabs);
-                            rsx! { crate::ui::deep_compare::DeepCompareView { left_root: l, right_root: r, lang } }
+                            rsx! { crate::ui::view::deep_compare::DeepCompareView { left_root: l, right_root: r, lang } }
                         } else {
                             rsx! { Explorer {} }
                         }

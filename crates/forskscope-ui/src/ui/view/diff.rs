@@ -1,5 +1,5 @@
 //! Diff/merge workspace: coordination, toolbar, search, and actions.
-//! Hunk rendering lives in [`crate::ui::hunk`].
+//! Hunk rendering lives in [`crate::ui::view::hunk`].
 
 use std::collections::HashSet;
 
@@ -7,11 +7,11 @@ use dioxus::prelude::*;
 
 use crate::i18n::t;
 use crate::state::{Lang, Modal, Store, recompute_diff, reload_tab, swap_sides};
-pub use crate::ui::diff_actions::{apply_focused_hunk, move_focus, save_as, save_tab};
-use crate::ui::diff_actions::{algo_val, trunc};
-use crate::ui::hunk::HunkBlock;
-use crate::ui::search::{SearchBar, SearchCtx, scroll_to_focused};
-use crate::ui::search_index::MatchIndex;
+pub use crate::ui::view::diff_actions::{apply_focused_hunk, move_focus, save_as, save_tab};
+use crate::ui::view::diff_actions::{algo_val, trunc};
+use crate::ui::view::hunk::HunkBlock;
+use crate::ui::view::search::{SearchBar, SearchCtx, scroll_to_focused};
+use crate::ui::bridge::search_index::MatchIndex;
 
 #[component]
 pub fn DiffWorkspace(index: usize) -> Element {
@@ -354,7 +354,7 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     title: t(lang, "Export unified-diff patch file"),
                     aria_label: t(lang, "Export patch"),
                     onclick: move |_| {
-                        crate::ui::diff_actions::export_patch(&store, index);
+                        crate::ui::view::diff_actions::export_patch(&store, index);
                     },
                     {t(lang, "Export patch")}
                 }

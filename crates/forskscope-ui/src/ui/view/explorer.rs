@@ -15,7 +15,7 @@ use forskscope_core::dir::file_digest_equal;
 
 use crate::i18n::t;
 use crate::state::{Store, open_compare, open_dir_compare};
-use crate::ui::explorer_align::compute_aligned_rows;
+use crate::ui::bridge::explorer_align::compute_aligned_rows;
 // ── Digest map key ────────────────────────────────────────────────────────────
 
 /// Typed key for the shared digest map (RFC-059 §M2).
@@ -24,7 +24,7 @@ enum DigestKey {
     Common(PathBuf),
     RightOnly(PathBuf),
 }
-use crate::ui::dir_pane::{
+use crate::ui::view::dir_pane::{
     DigestState, FilteringExecutor, NavHistory, PathBar, TreeRow,
     navigate_to, short_name,
 };

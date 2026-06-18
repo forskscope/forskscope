@@ -6,7 +6,7 @@ use dioxus::prelude::*;
 use forskscope_core::platform::PlatformInfo;
 use crate::i18n::t;
 use crate::state::{BatchCopySpec, BatchResultSpec, DirOp, Modal, Store, close_tab, reload_tab, swap_sides};
-use crate::ui::diff::save_as;
+use crate::ui::view::diff::save_as;
 
 // ─── File overwrite ───────────────────────────────────────────────────────────
 
@@ -334,5 +334,5 @@ pub fn AboutModal() -> Element {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 fn save_tab_force(store: &mut Store, index: usize) {
-    crate::ui::diff::save_tab(store, index, true);
+    crate::ui::view::diff::save_tab(store, index, true);
 }
