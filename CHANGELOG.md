@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.154.0] — 2026-06-18
+
+Phase 2: split `explorer.rs` (704 ELOC). No behaviour changes.
+
+### Changed
+
+`ui/view/explorer.rs` (704 ELOC) split into five files:
+
+| File | ELOC | Responsibility |
+|---|---|---|
+| `explorer.rs` | 251 | Root component, signal setup, digest computation |
+| `explorer/tree.rs` | 242 | Aligned two-pane tree + keyboard navigation |
+| `explorer/compact.rs` | 141 | Compact (unaligned) view (RFC-068) |
+| `explorer/filter.rs` | 110 | Filter bar UI and filter predicate (RFC-067) |
+| `explorer/footer.rs` | 71 | Targets label and Compare button (RFC-069) |
+
+Shared types (`DigestKey`, `FocusedPane`, `PickKind`, `CompareAction`,
+`compare_action`) remain in `explorer.rs` and are accessed via `super::` from
+the submodules. No behaviour, CSS, string, or i18n changes.
+
+---
+
 ## [0.153.0] — 2026-06-18
 
 Import migration and `mod.rs` cleanup. No behaviour changes.
