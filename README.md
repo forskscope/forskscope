@@ -29,7 +29,7 @@ ForskScope fills that gap: a desktop app built on [Dioxus](https://dioxuslabs.co
 ### Build from source
 
 ```sh
-# Prerequisites: Rust 1.80+, WebKitGTK 4.1 (Linux only)
+# Prerequisites: Rust 1.85+, WebKitGTK 4.1 (Linux only)
 # Ubuntu / Debian:
 sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev pkg-config
 

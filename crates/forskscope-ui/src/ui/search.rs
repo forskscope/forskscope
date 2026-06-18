@@ -76,12 +76,17 @@ pub fn SearchBar() -> Element {
                 onkeydown: move |e| {
                     match e.key() {
                         Key::Escape => {
+                            // Prevent the app-root handler from also acting on this key (P0-2).
+                            e.stop_propagation();
                             let mut c = ctx.write();
                             c.active = false;
                             c.query.clear();
                             c.index = MatchIndex::default();
                         }
                         Key::Enter => {
+                            // Prevent Enter from bubbling to the app root, where it would
+                            // apply the focused merge hunk (P0-2).
+                            e.stop_propagation();
                             if e.modifiers().shift() {
                                 ctx.write().index.retreat();
                             } else {

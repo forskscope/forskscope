@@ -62,7 +62,7 @@ jobs:
           key: linux-release-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build release binary
-        run: cargo build --release --locked -p forskscope-ui-dioxus
+        run: cargo build --release --locked -p forskscope-ui
 
       - name: Package
         run: |
@@ -93,7 +93,7 @@ jobs:
           key: macos-release-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build release binary
-        run: cargo build --release --locked -p forskscope-ui-dioxus
+        run: cargo build --release --locked -p forskscope-ui
 
       - name: Package
         run: |
@@ -123,7 +123,7 @@ jobs:
           key: windows-release-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build release binary
-        run: cargo build --release --locked -p forskscope-ui-dioxus
+        run: cargo build --release --locked -p forskscope-ui
 
       - name: Package
         shell: bash

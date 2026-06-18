@@ -51,10 +51,12 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 058 | [Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract](./done/058-spreadsheet-xlsx-structural-diff.md) | v0.57.0 (aligned view deferred) |
 | 059 | [Explorer and Compare UI/UX Audit Remediation](./done/059-explorer-and-compare-uiux-audit-remediation.md) | v0.41.0 (UI keyboard items deferred) |
 
-## Proposed (9)
+## Proposed (13)
 
-All remaining proposed RFCs are editor-adapter track, platform/packaging, or governance/documentation.
+RFC-004–040 are editor-adapter track, platform/packaging, or governance/documentation.
 RFC-026 and RFC-030 are substantially implemented; their remaining items require GTK or are deferred.
+RFC-060–063 are the UI/UX architect review remediation track (v0.145.0): keyboard
+safety, Explorer keyboard completeness, safe batch copy, and clarity hardening.
 
 | ID | Title | Category | Progress |
 |----|-------|----------|----------|
@@ -67,6 +69,10 @@ RFC-026 and RFC-030 are substantially implemented; their remaining items require
 | 040 | [Editor Adapter Verification Harness and Golden Corpus](./proposed/040-editor-adapter-verification-harness-and-golden-corpus.md) | Editor adapter | Blocked on RFC-004 |
 | 041 | [v1.0 Product Stabilization and RFC Governance](./proposed/041-v1-product-stabilization-and-rfc-governance.md) | Governance | 12/16 checklist items done; 4 require GTK or deferred |
 | 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) | Governance | Living document — updated v0.141.0; pre-GTK verification phase |
+| 060 | [Global Keyboard Scope and Modal/Input Safety](./proposed/060-global-keyboard-scope-and-modal-input-safety.md) | UX review remediation | **Partially shipped** v0.145.0 — modal guard + search propagation; policy + tests remain |
+| 061 | [Explorer Pane Focus and Keyboard Completeness](./proposed/061-explorer-pane-focus-and-keyboard-completeness.md) | UX review remediation | Not started — Explorer right-pane keyboard path |
+| 062 | [Safe Batch Copy UX and Restore Manifest Integration](./proposed/062-safe-batch-copy-ux-and-restore-manifest.md) | UX review remediation | Not started — bind UI to core batch manifest |
+| 063 | [Trust, Clarity, and Calm UI Hardening](./proposed/063-trust-clarity-and-calm-ui-hardening.md) | UX review remediation | Not started — empty states, density, labels, toast policy |
 
 ## Archive (1)
 

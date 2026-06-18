@@ -5,7 +5,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VER="$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)"
+# Extract the version from the [workspace.package] section. Read only the first
+# `version = "..."` line that appears after the [workspace.package] header so the
+# value cannot be confused with a dependency version elsewhere in the file.
+VER="$(awk '/^\[workspace\.package\]/{f=1} f&&/^version[[:space:]]*=/{gsub(/[^0-9.]/,"",$0); print; exit}' Cargo.toml)"
+if [[ -z "$VER" ]]; then
+    echo "ERROR: could not determine version from [workspace.package] in Cargo.toml" >&2
+    exit 1
+fi
 echo "=== ForskScope v$VER release build ==="
 
 # ── System dependency check (Linux) ─────────────────────────────────────────

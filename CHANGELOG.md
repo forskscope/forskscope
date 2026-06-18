@@ -5,6 +5,77 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.145.0] — 2026-06-14
+
+Sprint 0 safety patch — fixes from the UI/UX architect source review.
+These are verified defects (not design preferences); larger UX recommendations
+from the review are deferred to a dedicated milestone.
+
+### Fixed
+
+**`app.rs` — Global shortcuts leaked through modals (review P0-1):**
+The root `onkeydown` handler closed modals on Escape but then continued to act
+on the active tab for every other key. A `Ctrl+S` behind an overwrite dialog,
+`Ctrl+W` behind Settings, or `Enter` behind any dialog could fire on the tab
+behind the modal. Now computes `modal_open` once; Escape closes the modal, and
+all other shortcuts early-return while any modal is open.
+
+**`ui/search.rs` — Search Enter applied merge hunks (review P0-2):**
+The search input handled `Enter` (advance match) and `Escape` (close) but did
+not stop propagation, so the same keypress bubbled to the app root and applied
+the focused merge hunk. Added `e.stop_propagation()` to both arms. Searching a
+diff can no longer trigger an unintended merge.
+
+**`assets/main.css` — Incomplete selector corrupted following rule (review P0-6):**
+`.dir-row:hover .dir-copy-btn, .dir-row.focused` had no declaration block,
+causing the CSS parser to merge it with the following `code.path-display` rule.
+The `.dir-row`/`.dir-copy-btn` classes are unused (legacy); the broken selector
+is removed and `code.path-display` is now parsed correctly.
+
+**Packaging / release integrity (review §8):**
+- `.github/workflows/ci.yml`, `release.yml` — built nonexistent crate
+  `forskscope-ui-dioxus`; corrected to `forskscope-ui` (the real crate name).
+- `packaging/linux/PKGBUILD` — `pkgver` was `0.25.0`; updated to `0.144.0`
+  with a sync note.
+- `packaging/build-release.sh` — version extraction hardened to read the
+  `[workspace.package]` version explicitly via awk (was a fragile
+  `grep '^version' | head -1`).
+- `README.md` — prerequisite Rust version `1.80+` → `1.85+` to match
+  `rust-version = "1.85"` in the workspace manifest.
+
+### Added — UX review remediation RFCs (drafted, Proposed)
+
+The deferred findings from the UI/UX architect review are now captured as four
+RFCs in `rfcs/proposed/`, numbered fresh from 060 (the review's suggested
+054–057 collided with existing RFCs of those numbers):
+
+- **RFC-060** — Global Keyboard Scope and Modal/Input Safety. Ratifies the
+  Sprint 0 modal/search fixes as policy; specifies remaining per-surface
+  propagation work and a pure decision function with regression tests.
+- **RFC-061** — Explorer Pane Focus and Keyboard Completeness. Defines the
+  left/right focused-pane model so the Explorer select-and-compare loop becomes
+  keyboard-completable (review P0-3). Resolves Alt+↑ to per-pane by default.
+- **RFC-062** — Safe Batch Copy UX and Restore Manifest Integration. Binds the
+  directory-copy UI to the core batch manifest/restore model and makes copy
+  direction explicit and symmetric (review P0-4, P0-5).
+- **RFC-063** — Trust, Clarity, and Calm UI Hardening. Consolidates the P1/P2
+  design cluster (empty/first-run states, control density, labeled write
+  actions, destructive-modal focus, severity-based toasts, plain-language
+  settings, "Local only" clarity), each with an explicit Adopt / Adopt-downscoped
+  / Reject disposition against ForskScope's own non-goals and "less is more"
+  constitution. Notably **rejects** the Review-mode gating and the
+  identical-files content-hiding reversal, with recorded rationale.
+
+`rfcs/README.md` index updated (Proposed 9 → 13).
+
+### Notes
+
+- Review findings P0-3 (Explorer right-pane keyboard), P0-4/P0-5 (batch-copy
+  manifest, destructive-modal focus), and all P1/P2 design recommendations are
+  now tracked in RFC-061/062/063 rather than left as loose notes.
+
+---
+
 ## [0.144.0] — 2026-06-14
 
 Explorer root node filtered from aligned tree; pane root bar added.

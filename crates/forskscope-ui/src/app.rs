@@ -84,14 +84,18 @@ pub fn App() -> Element {
                 });
             },
             onkeydown: move |e: Event<KeyboardData>| {
+                let modal_open = !matches!(*store.modal.read(), crate::state::Modal::None);
                 // Escape closes any open modal regardless of whether a tab is active.
                 if e.key() == Key::Escape {
-                    let modal = store.modal.read().cloned();
-                    if !matches!(modal, crate::state::Modal::None) {
+                    if modal_open {
                         store.modal.set(crate::state::Modal::None);
-                        return;
                     }
+                    return;
                 }
+                // While a modal is open, swallow all other global shortcuts so they
+                // cannot fire on the tab behind the modal (e.g. Ctrl+S writing the
+                // file behind an overwrite dialog, Enter applying a hunk). (P0-1)
+                if modal_open { return; }
                 let Some(index) = *store.active.read() else { return };
                 let mods = e.modifiers();
                 match e.key() {

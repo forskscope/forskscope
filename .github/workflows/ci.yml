@@ -49,4 +49,4 @@ jobs:
         run: cargo clippy --workspace -- -D warnings
 
       - name: cargo build (UI — ensures it compiles)
-        run: cargo build -p forskscope-ui-dioxus
+        run: cargo build -p forskscope-ui
