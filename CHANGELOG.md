@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.155.0] — 2026-06-18
+
+Phase 2: split `diff.rs` (339 ELOC). No behaviour changes.
+
+### Changed
+
+`ui/view/diff.rs` (339 ELOC) split into two files:
+
+| File | ELOC | Responsibility |
+|---|---|---|
+| `diff.rs` | 211 | `DiffWorkspace`, `DiffHeader`, `TabSnapshot` |
+| `diff/toolbar.rs` | 160 | Primary toolbar + advanced disclosure panel |
+
+`Toolbar` was a private component in `diff.rs` with its own `advanced` signal
+and 14 action buttons. Extracting it into `diff/toolbar.rs` gives it a clear
+boundary and keeps each file well under the 300 ELOC soft limit. `TabSnapshot`
+fields are now `pub(crate)` so `toolbar.rs` can read them via the `super::` path.
+
+---
+
 ## [0.154.0] — 2026-06-18
 
 Phase 2: split `explorer.rs` (704 ELOC). No behaviour changes.
