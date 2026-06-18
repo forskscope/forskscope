@@ -98,7 +98,7 @@ pub fn apply_filter(
 
         // Hide-binary filter (only meaningful when binary comparison is off).
         let bin_ok = if hide_bin && !binary_enabled {
-            let is_bin = |path: &PathBuf| -> bool {
+            let mut is_bin = |path: &PathBuf| -> bool {
                 let cached = binary_cache.read().get(path).copied();
                 cached.unwrap_or_else(|| {
                     let b = matches!(

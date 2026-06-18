@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
+use dioxus_core::spawn_forever;
 use forskscope_core::diff::DiffDocument;
 use forskscope_core::document::{LoadOptions, LoadedDocument, load_path};
 use forskscope_core::file_kind::FileKind;
@@ -27,7 +28,8 @@ pub fn reload_tab(store: &mut Store, index: usize) {
     let lang           = store.lang();
     let mut tabs_signal = store.tabs;
 
-    spawn(async move {
+    // spawn_forever: reload must survive any component remounting during load.
+    spawn_forever(async move {
         let left  = lp.unwrap_or_default();
         let right = rp.unwrap_or_default();
         let result = tokio::task::spawn_blocking(move || {
@@ -82,7 +84,9 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     let mut tabs_signal = store.tabs;
     let lang            = store.lang();
 
-    spawn(async move {
+    // spawn_forever: the task must survive the Explorer unmounting when the
+    // new tab opens and replaces it with DiffWorkspace (RFC-065).
+    spawn_forever(async move {
         let load_result = tokio::task::spawn_blocking(move || {
             load_and_diff(left, right, opts, lang, enable_binary)
         }).await;

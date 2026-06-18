@@ -5,6 +5,85 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.158.0] — 2026-06-18
+
+Split `overlay/modals.rs` (303 ELOC). PKGBUILD version corrected. Build errors
+and warnings fixed. Loading-state bug fixed. Test placement corrected.
+
+### Changed
+
+`ui/overlay/modals.rs` (303 ELOC) split into five files by modal category:
+
+| File | ELOC | Contents |
+|---|---|---|
+| `modals.rs` | 12 | Submodule declarations, `pub use` re-exports, `save_tab_force` helper |
+| `modals/file.rs` | 86 | `OverwriteModal`, `SaveAsModal`, `ReloadModal`, `SwapModal` |
+| `modals/tab.rs` | 27 | `CloseTabModal` |
+| `modals/copy.rs` | 166 | `ConfirmDirOpModal`, `BatchCopyModal`, `BatchResultModal` |
+| `modals/about.rs` | 44 | `AboutModal` |
+
+### Fixed
+
+- **Loading state never transitions to diff view** (regression from v0.154.0
+  explorer split). `open_compare` and `reload_tab` used `spawn(...)`, which
+  scopes the async task to the calling component. When the Compare button is
+  clicked, `ExplorerFooter` spawns the task then immediately unmounts (Explorer
+  is replaced by `DiffWorkspace`), and Dioxus cancels all tasks tied to the
+  unmounted scope. Fixed by switching both call sites in `state/compare.rs` to
+  `spawn_forever(...)`, which runs tasks at the root scope and survives
+  component unmounting. `dioxus-core` added as a direct workspace dependency
+  to expose `spawn_forever` (not re-exported by `dioxus::prelude`).
+
+- **"Copy value hoisted" runtime warning** from `spawn_forever` writing Store
+  signals owned by `App`'s scope from the root scope (`ScopeId(0)`). Fixed by
+  creating all `Store` signals at `ScopeId::ROOT` in `Store::new` via
+  `Signal::new_in_scope(value, ScopeId::ROOT)`. Signals owned at the root are
+  accessible from any scope without the hoisting warning.
+
+- `packaging/linux/PKGBUILD` `pkgver` corrected to `0.158.0` — it had been
+  stuck at `0.152.1` since v0.153.0 due to the `sed` pattern not matching the
+  intermediate patch version. PKGBUILD version check is now part of the
+  release archive verification step.
+
+- **24 build errors and 11 warnings** from the v0.154.0–v0.158.0 restructuring,
+  discovered on the real build environment:
+  - `state/tab.rs`, `state/session.rs`, `state/profile.rs` — missing
+    `use dioxus::prelude::*` for `Signal::read/write/set` traits (E0599).
+  - `explorer/compact.rs`, `explorer/footer.rs`, `explorer/tree.rs` — `Store`
+    passed as `#[component]` prop; `Signal<T>` does not implement `PartialEq`
+    (E0369). Fixed by removing `store` from props and calling
+    `use_context::<Store>()` inside each component.
+  - `explorer/tree.rs` — four `read` guard / `write` borrow conflicts (E0502);
+    fixed by dropping read guard before write. Two `l_root`/`r_root`
+    `PathBuf` moved into `FnMut` closures (E0507); fixed by cloning before
+    closure capture.
+  - `explorer/filter.rs` — `is_bin` closure needs `mut` (E0596).
+  - `explorer.rs` — `l_root_snap`/`r_root_snap` moved before pane-root label
+    borrows (E0382); fixed by cloning before `CompactTree` prop. Six `mut`
+    signals that didn't need `mut`.
+  - `diff.rs` — unused imports `Lang`, `algo_val`.
+  - `explorer.rs` — unused imports `SelectionMode`, `Lang`.
+  - `explorer/footer.rs` — unused import `PathBuf`.
+
+- **4 further warnings** from the real build environment:
+  - `TabSnapshot` was `pub(crate)` while used as a `pub` component prop in
+    `toolbar.rs` (`private_interfaces`). Promoted to `pub` along with all its
+    fields and `from_tab`.
+  - `SessionState` re-exported from `state.rs` but unused at that path;
+    removed from `pub use`.
+  - `Notice::warning` and `Store::notify_warning` marked `#[allow(dead_code)]`
+    — reserved API, not yet called.
+
+- **Test placement corrected** — tests now live in per-module `tests.rs` files
+  alongside the code they test, per the project guideline ("Separate test code
+  within `src/` into a `tests.rs` file"):
+  - `state/tab/tests.rs` — `tab_title` tests (declared by `state/tab.rs`)
+  - `state/session/tests.rs` — `SessionState` serde tests (declared by
+    `state/session.rs`)
+  The earlier monolithic `src/tests.rs` has been removed.
+
+---
+
 ## [0.157.0] — 2026-06-18
 
 Split `state.rs` (427 ELOC). No behaviour changes.

@@ -18,12 +18,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use dioxus::prelude::*;
-use dioxus_swdir_tree::{DirectoryTree, SelectionMode, use_scan_driver};
+use dioxus_swdir_tree::{DirectoryTree, use_scan_driver};
 
 use forskscope_core::dir::file_digest_equal;
 
 use crate::i18n::t;
-use crate::state::{Lang, Store};
+use crate::state::Store;
 use crate::ui::bridge::explorer_align::compute_aligned_rows;
 use crate::ui::view::dir_pane::{DigestState, FilteringExecutor, NavHistory, PathBar, short_name};
 
@@ -200,14 +200,14 @@ pub fn Explorer() -> Element {
     });
 
     // ── Filter state ──────────────────────────────────────────────────────────
-    let mut filter_open:    Signal<bool>   = use_signal(|| false);
-    let mut filter_query:   Signal<String> = use_signal(String::new);
-    let mut filter_hide_bin:Signal<bool>   = use_signal(|| false);
-    let mut filter_hide_eq: Signal<bool>   = use_signal(|| false);
+    let filter_open:    Signal<bool>   = use_signal(|| false);
+    let filter_query:   Signal<String> = use_signal(String::new);
+    let filter_hide_bin:Signal<bool>   = use_signal(|| false);
+    let filter_hide_eq: Signal<bool>   = use_signal(|| false);
 
     // ── Picks ─────────────────────────────────────────────────────────────────
-    let mut left_pick:  Signal<Option<PickKind>> = use_signal(|| None);
-    let mut right_pick: Signal<Option<PickKind>> = use_signal(|| None);
+    let left_pick:  Signal<Option<PickKind>> = use_signal(|| None);
+    let right_pick: Signal<Option<PickKind>> = use_signal(|| None);
 
     let mut focused_pane: Signal<FocusedPane> = use_signal(|| FocusedPane::Left);
 
@@ -294,7 +294,7 @@ pub fn Explorer() -> Element {
                 // ── Tree ──────────────────────────────────────────────────
                 if !compact_mode {
                     AlignedTree {
-                        lang, store, aligned,
+                        lang, aligned,
                         tree_l, tree_r, scans_l, scans_r,
                         left_dir, right_dir, left_hist, right_hist,
                         left_pick, right_pick, focused_pane,
@@ -302,9 +302,9 @@ pub fn Explorer() -> Element {
                     }
                 } else {
                     CompactTree {
-                        lang, store,
+                        lang,
                         left_flat, right_flat,
-                        l_root: l_root_snap, r_root: r_root_snap,
+                        l_root: l_root_snap.clone(), r_root: r_root_snap.clone(),
                         tree_l, tree_r, scans_l, scans_r,
                         left_dir, right_dir, left_hist, right_hist,
                         left_pick, right_pick,
@@ -314,7 +314,7 @@ pub fn Explorer() -> Element {
                 }
 
                 // ── Footer ────────────────────────────────────────────────
-                ExplorerFooter { lang, store, left_pick, right_pick }
+                ExplorerFooter { lang, left_pick, right_pick }
             }
         }
     }

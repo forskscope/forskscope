@@ -9,8 +9,8 @@ use std::collections::HashSet;
 use dioxus::prelude::*;
 
 use crate::i18n::t;
-use crate::state::{Lang, Store};
-use crate::ui::view::diff_actions::{algo_val, trunc};
+use crate::state::Store;
+use crate::ui::view::diff_actions::trunc;
 pub use crate::ui::view::diff_actions::{apply_focused_hunk, move_focus, save_as, save_tab};
 use crate::ui::view::hunk::HunkBlock;
 use crate::ui::view::search::{SearchBar, SearchCtx, scroll_to_focused};
@@ -28,12 +28,20 @@ pub fn DiffWorkspace(index: usize) -> Element {
     let context_lines = store.settings.read().context_lines;
 
     // Loading / Error states (RFC-065).
+    // Important: extract state and title *then drop the guard* before returning.
+    // Holding the read guard across the return boundary prevents Dioxus from
+    // registering this component as a subscriber, so the signal write from the
+    // background task never triggers a re-render.
     {
-        let tabs = store.tabs.read();
-        match tabs.get(index).map(|t| &t.state) {
+        let (state, title) = {
+            let tabs = store.tabs.read();
+            let state = tabs.get(index).map(|t| t.state.clone());
+            let title = tabs.get(index).map(|t| t.title.clone()).unwrap_or_default();
+            (state, title)
+        };
+        match state {
             None => return rsx! { div { class: "notice", {t(lang, "No comparison.")} } },
             Some(crate::state::TabState::Loading) => {
-                let title = tabs.get(index).map(|t| t.title.clone()).unwrap_or_default();
                 return rsx! {
                     div { class: "diff-loading",
                         span { class: "diff-loading-spinner", "⟳" }
@@ -42,7 +50,6 @@ pub fn DiffWorkspace(index: usize) -> Element {
                 };
             }
             Some(crate::state::TabState::Error(msg)) => {
-                let msg = msg.clone();
                 return rsx! {
                     div { class: "diff-error",
                         p { class: "notice", "⚠ " {msg} }
@@ -167,30 +174,30 @@ fn DiffHeader(index: usize) -> Element {
 // ── Tab snapshot ──────────────────────────────────────────────────────────────
 
 #[derive(Clone, PartialEq)]
-pub(crate) struct TabSnapshot {
-    pub(crate) hunks: Vec<forskscope_core::merge::MergeHunk>,
-    pub(crate) identical: bool,
-    pub(crate) char_mode: bool,
-    pub(crate) word_wrap: bool,
-    pub(crate) can_save: bool,
-    pub(crate) is_dirty: bool,
-    pub(crate) can_undo: bool,
-    pub(crate) can_redo: bool,
-    pub(crate) font_size: u32,
-    pub(crate) font_family: &'static str,
-    pub(crate) focused_id: Option<u64>,
-    pub(crate) focused_change: usize,
-    pub(crate) changes: usize,
-    pub(crate) ignore_whitespace: bool,
-    pub(crate) ignore_case: bool,
-    pub(crate) context_lines: usize,
-    pub(crate) algorithm: forskscope_core::DiffAlgorithm,
-    pub(crate) warnings: Vec<String>,
-    pub(crate) readonly_notice: String,
+pub struct TabSnapshot {
+    pub hunks: Vec<forskscope_core::merge::MergeHunk>,
+    pub identical: bool,
+    pub char_mode: bool,
+    pub word_wrap: bool,
+    pub can_save: bool,
+    pub is_dirty: bool,
+    pub can_undo: bool,
+    pub can_redo: bool,
+    pub font_size: u32,
+    pub font_family: &'static str,
+    pub focused_id: Option<u64>,
+    pub focused_change: usize,
+    pub changes: usize,
+    pub ignore_whitespace: bool,
+    pub ignore_case: bool,
+    pub context_lines: usize,
+    pub algorithm: forskscope_core::DiffAlgorithm,
+    pub warnings: Vec<String>,
+    pub readonly_notice: String,
 }
 
 impl TabSnapshot {
-    pub(crate) fn from_tab(
+    pub fn from_tab(
         tab: &crate::state::CompareTab,
         font_size: u32,
         font_family: &'static str,

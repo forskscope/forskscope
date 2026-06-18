@@ -20,6 +20,7 @@ path = "src/lib.rs"
 forskscope-core = { workspace = true }
 forskscope-ui-logic = { workspace = true }
 dioxus = { workspace = true }
+dioxus-core = { workspace = true }
 dioxus-swdir-tree = { workspace = true }
 rfd = { workspace = true }
 dirs-next    = { workspace = true }

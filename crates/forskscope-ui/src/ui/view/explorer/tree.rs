@@ -19,24 +19,24 @@ use super::{DigestKey, FocusedPane, PickKind};
 #[allow(clippy::too_many_arguments)]
 #[component]
 pub fn AlignedTree(
-    lang:           Lang,
-    mut store:      Store,
-    aligned:        Vec<AlignedRow>,
-    mut tree_l:     Signal<DirectoryTree>,
-    mut tree_r:     Signal<DirectoryTree>,
-    scans_l:        Coroutine<ScanRequest>,
-    scans_r:        Coroutine<ScanRequest>,
-    left_dir:       Signal<PathBuf>,
-    right_dir:      Signal<PathBuf>,
-    left_hist:      Signal<NavHistory>,
-    right_hist:     Signal<NavHistory>,
-    mut left_pick:  Signal<Option<PickKind>>,
-    mut right_pick: Signal<Option<PickKind>>,
+    lang:             Lang,
+    aligned:          Vec<AlignedRow>,
+    mut tree_l:       Signal<DirectoryTree>,
+    mut tree_r:       Signal<DirectoryTree>,
+    scans_l:          Coroutine<ScanRequest>,
+    scans_r:          Coroutine<ScanRequest>,
+    left_dir:         Signal<PathBuf>,
+    right_dir:        Signal<PathBuf>,
+    left_hist:        Signal<NavHistory>,
+    right_hist:       Signal<NavHistory>,
+    mut left_pick:    Signal<Option<PickKind>>,
+    mut right_pick:   Signal<Option<PickKind>>,
     mut focused_pane: Signal<FocusedPane>,
-    mut digest_map: Signal<HashMap<DigestKey, DigestState>>,
+    mut digest_map:   Signal<HashMap<DigestKey, DigestState>>,
     mut binary_cache: Signal<HashMap<PathBuf, bool>>,
-    binary_enabled: bool,
+    binary_enabled:   bool,
 ) -> Element {
+    let mut store = use_context::<Store>();
     let l_root = left_dir.read().cloned();
     let r_root = right_dir.read().cloned();
 
@@ -50,7 +50,9 @@ pub fn AlignedTree(
 
                 if e.key() == Key::F6 {
                     e.prevent_default();
-                    focused_pane.set(focused_pane.read().toggle());
+                    // Drop read guard before calling set (E0502).
+                    let next = focused_pane.read().toggle();
+                    focused_pane.set(next);
                     return;
                 }
                 if e.modifiers().contains(Modifiers::ALT) && e.key() == Key::ArrowUp {
@@ -78,7 +80,10 @@ pub fn AlignedTree(
                 };
                 let mods = CM { shift: e.modifiers().shift(), ctrl: e.modifiers().ctrl() };
                 if focused_pane.read().is_left() {
-                    if let Some(ev) = handle_key(&tree_l.read(), tk, mods) {
+                    // Evaluate the event while holding the read guard, then drop
+                    // before calling write (E0502).
+                    let ev = handle_key(&tree_l.read(), tk, mods);
+                    if let Some(ev) = ev {
                         e.prevent_default();
                         match ev {
                             DirectoryTreeEvent::Toggled(p) => {
@@ -93,19 +98,22 @@ pub fn AlignedTree(
                             DirectoryTreeEvent::Drag(_) => {}
                         }
                     }
-                } else if let Some(ev) = handle_key(&tree_r.read(), tk, mods) {
-                    e.prevent_default();
-                    match ev {
-                        DirectoryTreeEvent::Toggled(p) => {
-                            if let Some(r) = tree_r.write().on_toggled(&p) { scans_r.send(r); }
-                        }
-                        DirectoryTreeEvent::Selected { path, is_dir, mode } => {
-                            tree_r.write().on_selected(&path, is_dir, mode);
-                            if is_select_key {
-                                right_pick.set(Some(if is_dir { PickKind::Dir(path) } else { PickKind::File(path) }));
+                } else {
+                    let ev = handle_key(&tree_r.read(), tk, mods);
+                    if let Some(ev) = ev {
+                        e.prevent_default();
+                        match ev {
+                            DirectoryTreeEvent::Toggled(p) => {
+                                if let Some(r) = tree_r.write().on_toggled(&p) { scans_r.send(r); }
                             }
+                            DirectoryTreeEvent::Selected { path, is_dir, mode } => {
+                                tree_r.write().on_selected(&path, is_dir, mode);
+                                if is_select_key {
+                                    right_pick.set(Some(if is_dir { PickKind::Dir(path) } else { PickKind::File(path) }));
+                                }
+                            }
+                            DirectoryTreeEvent::Drag(_) => {}
                         }
-                        DirectoryTreeEvent::Drag(_) => {}
                     }
                 }
             },
@@ -127,6 +135,9 @@ pub fn AlignedTree(
                 {
                     let lr = left_row.clone();
                     let rr = right_row.clone();
+                    // Clone roots so closures can capture them repeatedly (E0507).
+                    let l_root_c = l_root.clone();
+                    let r_root_c = r_root.clone();
                     rsx! {
                         div { class: "aligned-row",
                             // ── Left half ────────────────────────────────
@@ -177,7 +188,7 @@ pub fn AlignedTree(
                                                             return;
                                                         }
                                                         let r_root = right_dir.read().cloned();
-                                                        if let Ok(rel) = p_dbl.strip_prefix(&l_root) {
+                                                        if let Ok(rel) = p_dbl.strip_prefix(&l_root_c) {
                                                             let cp = r_root.join(rel);
                                                             if cp.is_file() { open_compare(&mut store, p_dbl.clone(), cp); }
                                                         }
@@ -192,7 +203,7 @@ pub fn AlignedTree(
                             div { class: "pane-half",
                                 if let Some(ref row) = rr {
                                     {
-                                        let common    = digest_map.read().get(&DigestKey::Common(row.rel_path.clone())).cloned();
+                                        let common     = digest_map.read().get(&DigestKey::Common(row.rel_path.clone())).cloned();
                                         let right_only = digest_map.read().get(&DigestKey::RightOnly(row.rel_path.clone())).cloned();
                                         let status = common.or(right_only);
                                         let p_tgl = row.abs_path.clone();
@@ -236,7 +247,7 @@ pub fn AlignedTree(
                                                             return;
                                                         }
                                                         let l_root = left_dir.read().cloned();
-                                                        if let Ok(rel) = p_dbl.strip_prefix(&r_root) {
+                                                        if let Ok(rel) = p_dbl.strip_prefix(&r_root_c) {
                                                             let cp = l_root.join(rel);
                                                             if cp.is_file() { open_compare(&mut store, cp, p_dbl.clone()); }
                                                         }

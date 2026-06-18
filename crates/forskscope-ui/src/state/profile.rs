@@ -1,5 +1,7 @@
 //! Compare profile management: add and remove user-defined profiles (RFC-009).
 
+use dioxus::prelude::*;
+
 use crate::state::{Store, DiffAlgorithmSetting};
 
 pub fn add_profile(

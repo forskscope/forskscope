@@ -19,7 +19,7 @@ pub use settings::{AppSettings, BatchCopySpec, DiffAlgorithmSetting, DiffFontFam
 pub use types::{BatchResultSpec, DirOp};
 pub use tab::{CompareTab, TabState, recompute_diff, swap_sides};
 pub use compare::{open_compare, reload_tab, open_dir_compare, close_dir_tab};
-pub use session::{SessionState, save_session, restore_session, close_tab};
+pub use session::{save_session, restore_session, close_tab};
 pub use profile::{add_profile, remove_profile};
 
 use dioxus::prelude::*;
@@ -56,6 +56,7 @@ impl Notice {
     pub fn success(msg: impl Into<String>) -> Self { Self { message: msg.into(), severity: NoticeSeverity::Success } }
     #[allow(dead_code)]
     pub fn info(msg: impl Into<String>)    -> Self { Self { message: msg.into(), severity: NoticeSeverity::Info } }
+    #[allow(dead_code)]
     pub fn warning(msg: impl Into<String>) -> Self { Self { message: msg.into(), severity: NoticeSeverity::Warning } }
     pub fn error(msg: impl Into<String>)   -> Self { Self { message: msg.into(), severity: NoticeSeverity::Error } }
     pub fn auto_dismiss_ms(&self) -> Option<u64> {
@@ -85,13 +86,22 @@ pub struct Store {
 }
 
 impl Store {
+    /// Create a new `Store` with all signals owned at `ScopeId::ROOT`.
+    ///
+    /// Signals must be rooted at the application root scope so that tasks
+    /// spawned via `spawn_forever` (which runs at `ScopeId(0)`) can write to
+    /// them without triggering the "copy value hoisted" warning.
     pub fn new(settings: AppSettings) -> Self {
         Self {
-            tabs: Signal::new(Vec::new()), active: Signal::new(None),
-            dir_tabs: Signal::new(Vec::new()), active_dir: Signal::new(None),
-            settings: Signal::new(settings),
-            left_pick: Signal::new(None), right_pick: Signal::new(None),
-            modal: Signal::new(Modal::None), toast: Signal::new(None),
+            tabs:       Signal::new_in_scope(Vec::new(), ScopeId::ROOT),
+            active:     Signal::new_in_scope(None,       ScopeId::ROOT),
+            dir_tabs:   Signal::new_in_scope(Vec::new(), ScopeId::ROOT),
+            active_dir: Signal::new_in_scope(None,       ScopeId::ROOT),
+            settings:   Signal::new_in_scope(settings,   ScopeId::ROOT),
+            left_pick:  Signal::new_in_scope(None,       ScopeId::ROOT),
+            right_pick: Signal::new_in_scope(None,       ScopeId::ROOT),
+            modal:      Signal::new_in_scope(Modal::None, ScopeId::ROOT),
+            toast:      Signal::new_in_scope(None,        ScopeId::ROOT),
         }
     }
     pub fn lang(&self) -> Lang { self.settings.read().language }
@@ -99,5 +109,6 @@ impl Store {
     pub fn notify_success(&mut self, msg: impl Into<String>) { self.toast.set(Some(Notice::success(msg))); }
     #[allow(dead_code)]
     pub fn notify_info(&mut self, msg: impl Into<String>)    { self.toast.set(Some(Notice::info(msg))); }
+    #[allow(dead_code)]
     pub fn notify_warning(&mut self, msg: impl Into<String>) { self.toast.set(Some(Notice::warning(msg))); }
 }

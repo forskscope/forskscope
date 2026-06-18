@@ -1,8 +1,6 @@
 //! Explorer footer: targets label (progressive guidance) and Compare button
 //! (RFC-069).
 
-use std::path::PathBuf;
-
 use dioxus::prelude::*;
 
 use crate::i18n::t;
@@ -12,11 +10,11 @@ use crate::ui::view::dir_pane::short_name;
 
 #[component]
 pub fn ExplorerFooter(
-    lang:        Lang,
-    mut store:   Store,
-    left_pick:   Signal<Option<PickKind>>,
-    right_pick:  Signal<Option<PickKind>>,
+    lang:       Lang,
+    left_pick:  Signal<Option<PickKind>>,
+    right_pick: Signal<Option<PickKind>>,
 ) -> Element {
+    let mut store = use_context::<Store>();
     let lp = left_pick.read().clone();
     let rp = right_pick.read().clone();
     let action = compare_action(&lp, &rp);

@@ -17,7 +17,6 @@ type FlatRow = (PathBuf, bool, bool, bool, u32);
 #[component]
 pub fn CompactTree(
     lang:           Lang,
-    mut store:      Store,
     left_flat:      Vec<FlatRow>,
     right_flat:     Vec<FlatRow>,
     l_root:         PathBuf,
@@ -37,6 +36,7 @@ pub fn CompactTree(
     binary_enabled: bool,
     filter_query:   Signal<String>,
 ) -> Element {
+    let mut store = use_context::<Store>();
     rsx! {
         div { class: "compact-tree",
             // ── Left pane ────────────────────────────────────────────────────
