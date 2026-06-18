@@ -15,7 +15,7 @@ use crate::ui::view::diff_actions::trunc;
 pub use crate::ui::view::diff_actions::{apply_focused_hunk, move_focus, save_as, save_tab};
 use crate::ui::view::hunk::HunkBlock;
 use crate::ui::view::search::{SearchBar, SearchCtx, scroll_to_focused};
-use crate::ui::bridge::search_index::MatchIndex;
+use forskscope_ui_logic::MatchIndex;
 use toolbar::Toolbar;
 
 // ── Workspace component ───────────────────────────────────────────────────────

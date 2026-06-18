@@ -24,7 +24,7 @@ use forskscope_core::dir::file_digest_equal;
 
 use crate::i18n::t;
 use crate::state::Store;
-use crate::ui::bridge::explorer_align::compute_aligned_rows;
+use forskscope_ui_logic::compute_aligned_rows;
 use crate::ui::view::dir_pane::{DigestState, FilteringExecutor, NavHistory, PathBar, short_name};
 
 use compact::CompactTree;

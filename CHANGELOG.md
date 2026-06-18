@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.161.0] — 2026-06-18
+
+RFC-073 Phase 5: bridge minimisation. No behaviour changes.
+
+### Removed
+
+All 14 files under `ui/bridge/` and the `ui/bridge.rs` module declaration.
+`pub mod bridge` removed from `ui.rs`.
+
+12 files had zero usages. The 2 with active call sites were migrated:
+- `explorer_align` → `explorer.rs` now imports `compute_aligned_rows`
+  directly from `forskscope_ui_logic`.
+- `search_index` → `search.rs` and `diff.rs` now import `MatchIndex`
+  directly from `forskscope_ui_logic`.
+
+### Changed
+
+- `ui.rs` — updated doc comment; `bridge` layer removed from the four-layer
+  description. The layer is now: `component/`, `layout/`, `view/`, `overlay/`.
+- RFC-073 moved from `proposed/` to `done/`.
+- RFC README: Implemented 47 → 48; Proposed 15 → 14; RFC-073 description updated.
+
+---
+
 ## [0.160.0] — 2026-06-18
 
 RFC-072 Phase 4: component extraction. No behaviour changes.

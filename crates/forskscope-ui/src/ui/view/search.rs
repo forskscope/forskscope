@@ -9,7 +9,7 @@ use dioxus::html::input_data::keyboard_types::Key;
 use dioxus::prelude::*;
 
 use crate::i18n::t;
-use crate::ui::bridge::search_index::MatchIndex;
+use forskscope_ui_logic::MatchIndex;
 
 // ── SearchCtx ─────────────────────────────────────────────────────────────────
 
