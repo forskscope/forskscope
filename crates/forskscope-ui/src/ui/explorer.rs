@@ -47,7 +47,6 @@ enum PickKind { File(PathBuf), Dir(PathBuf) }
 impl PickKind {
     fn path(&self) -> &PathBuf { match self { Self::File(p) | Self::Dir(p) => p } }
     fn is_file(&self) -> bool { matches!(self, Self::File(_)) }
-    fn is_dir(&self)  -> bool { matches!(self, Self::Dir(_)) }
 }
 
 // ── Compare action derived from picks ────────────────────────────────────────
@@ -258,9 +257,6 @@ pub fn Explorer() -> Element {
                             onclick: move |_| focused_pane.set(FocusedPane::Left),
                             span { class: "root-label", "📁 " }
                             span { class: "root-name", title: "{l_root_snap.display()}", {short_name(&l_root_snap)} }
-                            if focused_pane.read().is_left() {
-                                span { class: "pane-focus-ring-label", " ◀" }
-                            }
                         }
                         div {
                             class: if focused_pane.read().is_right() { "pane-root-cell pane-focused" } else { "pane-root-cell" },
@@ -269,9 +265,6 @@ pub fn Explorer() -> Element {
                             onclick: move |_| focused_pane.set(FocusedPane::Right),
                             span { class: "root-label", "📁 " }
                             span { class: "root-name", title: "{r_root_snap.display()}", {short_name(&r_root_snap)} }
-                            if focused_pane.read().is_right() {
-                                span { class: "pane-focus-ring-label", " ◀" }
-                            }
                         }
                     }
                     div {

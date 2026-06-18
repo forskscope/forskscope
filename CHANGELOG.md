@@ -5,60 +5,84 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.145.1] — 2026-06-14
+## [0.145.3] — 2026-06-14
 
-UX hardening — RFC-060 W1; RFC-063 C1, C2, C3, C5, C6, C7, C9, C10.
+RFC-062: Safe batch copy UX and restore manifest integration.
 
 ### Changed
 
-**RFC-060 W1 — Explicit `stop_propagation` on all text-entry surfaces:**
-Path-bar editor Enter/Escape and settings modal Escape now call
-`stop_propagation` directly, making keyboard safety explicit rather than
-incidental to the modal-open guard. (Sprint 0 fix for search already in v0.145.0.)
+**RFC-062 B1 — All copies route through the core batch manifest:**
+Both `ConfirmDirOpModal` (single file) and `BatchCopyModal` (multiple files)
+now use `forskscope_core::dir::batch::batch_copy` with `ContinueOnFailure`
+policy instead of a direct `copy_file` loop. Every copy produces a
+`BatchManifest` and writes a JSON file to
+`$XDG_DATA_DIR/forskscope/manifests/<op-id>.json` for audit and recovery.
 
-**RFC-063 C3 — Labeled hunk apply button:**
-The `▶` apply button in the diff act column now shows `▶ Use` with a full
-`title`/`aria_label` "Use this change (apply left to right)". Act column
-widened from 5ch to 6ch to accommodate the text label. `pane-label-act` and
-responsive overrides updated to match.
+**RFC-062 B2 — Result summary instead of silent dismiss:**
+A new `BatchResultModal` shows after every copy operation. Displays
+succeeded/failed counts, the manifest path, and per-entry failure details
+(up to 5 shown). On success, a brief result modal appears; on failure, it
+stays open so the user sees what went wrong. Single-file success still
+shows only a toast (no result modal). `Modal::BatchResult(BatchResultSpec)`
+added to the modal enum.
 
-**RFC-063 C10 — Friendly error mapping:**
-File-read errors in `open_compare` and `reload_tab` now show action-oriented
-messages: `Could not open "filename" — <reason>. Check that the file exists
-and you have read permission.` Replaces the previous `Left/Right file read error: <raw-os-error>`.
+**RFC-062 B3 — Explicit, symmetric direction labels:**
+Per-row copy buttons in the Directory Report now show `Copy to right` and
+`Copy to left` in full text instead of `Copy →` / `← Copy`. Changed entries
+show **both** directions; LeftOnly shows only `Copy to right`; RightOnly only
+`Copy to left`. Batch copy toolbar buttons updated the same way.
 
-**RFC-063 C1 — Empty / first-run state in Explorer:**
-When the aligned tree has no entries (both panes empty, or first launch),
-shows a centered card: `📂 Compare files or folders` / instructional hint /
-`🔒 Nothing leaves this computer.` instead of a blank scroll area.
-
-**RFC-063 C6 — Progressive disclosure in Settings:**
-Context lines, Ignore patterns, and Compare profiles are now hidden under an
-`▸ Advanced` toggle (default collapsed). Appearance, Language, and Diff font
-size remain visible at the top level. Click `▾ Hide advanced` to collapse.
-
-**RFC-063 C2 — Density design tokens:**
-Added `--control-h` (36px), `--control-min-w` (44px), `--row-h` (32px),
-`--control-pad-x` (10px), `--focus-ring` (2px) to `:root`. Applied:
-`min-height: var(--control-h)` on all `button` elements; `min-height:
-var(--row-h)` on `.tree-row`; `height: var(--row-h)` on `.row-spacer`.
-`focus-visible` outline added to button, input, and select using
-`var(--focus-ring)` and `var(--focus)`.
-
-**RFC-063 C5 / C7 / C9** — (from v0.145.0, grouped under this milestone).
+**RFC-062 B4 — Confirmation modal wording clarified:**
+`ConfirmDirOpModal` title changed to "Copy this file?" (was "Copy file?").
+Backup notice changed to "The destination exists. A .bak backup will be
+created first." (was "Destination exists. A .bak backup will be created.").
+Backup notice uses `notice-ok` (green) as it is a reassurance, not a warning.
+The label field is removed (modal already shows From/To paths).
 
 ### Added
 
-- i18n keys (ja): `Use`, `Use this change (apply left to right)`, `Could not
-  open`, `Check that the file exists and you have read permission.`, `Compare
-  files or folders`, `Choose a folder for each side…`, `Nothing leaves this
-  computer.`, `Advanced`, `Hide advanced`, `left only`, `right only`, `Files
-  stay on this computer. ForskScope does not upload them.`
+- `dirs-next = "2"` dependency for XDG data directory resolution.
+- 10 new i18n keys (ja); 4 dead keys removed.
+
 ---
 
 ## [0.145.2] — 2026-06-14
 
-**RFC-061 — Focus indicator on Explorer pane and Focused pane.**
+RFC-061: Explorer pane focus and keyboard completeness.
+
+### Changed
+
+**RFC-061 — Explorer focused-pane model:**
+
+Added `FocusedPane { Left, Right }` signal to the Explorer component. All
+keyboard navigation in the aligned tree now dispatches to the focused pane's
+tree rather than always the left tree.
+
+- **F6** switches the focused pane (Left ↔ Right). The active pane's root
+  header cell shows a focus ring (2px accent outline + accent-tinted bg) and
+  a `◀` indicator. Clicking a pane-root-cell also focuses that pane.
+- **↑ / ↓ / ← / → / Enter / Space / Home / End** — operate on the focused
+  tree. Space and Enter also set the pick for the focused pane.
+- **Alt + ↑** — now navigates only the focused pane up (previously navigated
+  both panes simultaneously). "Go up one directory (focused pane)" in keyboard
+  reference.
+- ARIA: each pane-root-cell gets `role="heading"` and `aria-label` including
+  the pane name and current root directory name.
+
+A keyboard-only user can now complete the full select-and-compare flow:
+focus left pane (default) → navigate → Space to pick → F6 → navigate right
+pane → Space to pick → Tab to Compare button → Enter.
+
+**`ui/keybindings.rs`** — F6 added to Navigation section; Alt+↑ description
+clarified to "(focused pane)".
+
+**`assets/main.css`** — `.pane-root-cell.pane-focused` focus ring; cursor
+pointer on all pane-root-cells.
+
+### Added
+
+- i18n keys (ja): `Left pane`, `Right pane`, `Switch focused pane (left ↔ right)`,
+  `Go up one directory (focused pane)`.
 
 ---
 

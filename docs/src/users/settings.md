@@ -38,7 +38,14 @@ Changes take effect immediately across all open workspaces.
 
 ---
 
-## Context lines
+## Advanced settings
+
+Click **▸ Advanced** at the bottom of the Settings dialog to reveal advanced
+options. Click **▾ Hide advanced** to collapse them again.
+
+The following settings are inside the Advanced section.
+
+### Context lines
 
 Number of unchanged lines shown above and below each change before the rest
 collapses.
@@ -54,12 +61,12 @@ Click any `···` divider in the diff to expand a collapsed region.
 
 ---
 
-## Ignore patterns
+### Ignore patterns
 
 These filters apply to the Explorer tree — files and directories that match are
 hidden from the comparison panes.
 
-### Ignore file extensions
+#### Ignore file extensions
 
 A comma-separated list of extensions to hide (no leading dot required). Example:
 
@@ -69,7 +76,7 @@ o, class, tmp, pyc
 
 Matching is case-insensitive.
 
-### Ignore directory names
+#### Ignore directory names
 
 A comma-separated list of directory names or glob patterns (using `*` as a
 wildcard) to hide. Example:
@@ -80,7 +87,7 @@ target, node_modules, *.cache, __pycache__
 
 ---
 
-## Compare profiles
+### Compare profiles
 
 A profile stores a combination of diff options and an algorithm choice.
 Selecting a profile in Settings makes it the default for new comparisons.

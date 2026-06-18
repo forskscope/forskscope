@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
 
-use crate::state::{Store, open_compare, open_dir_compare, close_dir_tab, restore_session, save_session};
+use crate::state::{Store, open_compare, restore_session, save_session};
 use crate::ui::diff::{DiffWorkspace, apply_focused_hunk, move_focus, save_tab};
 use crate::ui::explorer::Explorer;
 use crate::ui::header::Header;

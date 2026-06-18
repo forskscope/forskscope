@@ -23,10 +23,31 @@ forskscope /path/to/old-version/ /path/to/new-version/
 
 Click a folder row to expand it and show its contents. Click again to collapse.
 
-Press **Alt + ↑** or click the **↑** button in the path bar to go up one level.
+Press **Alt + ↑** or click the **↑** button in the path bar to go up one level in the **focused pane**.
 
 The **◀** and **▶** history buttons step through your recent directory
 navigation within each pane.
+
+---
+
+## Focused pane
+
+The Explorer has a **focused pane** — the pane that receives keyboard input. The
+focused pane is indicated by a highlighted root header cell with a `◀` marker.
+
+- Press **F6** to switch keyboard focus between the left and right panes.
+- Click a pane's root header cell to focus it with the mouse.
+
+When the Explorer first opens the left pane is focused. Use F6 after navigating
+the left pane to switch to the right pane and select a file there.
+
+---
+
+## Empty state
+
+When both panes are at the same directory and no entries are visible, the
+Explorer shows a **Compare files or folders** card with a brief orientation
+hint and a `🔒 Nothing leaves this computer.` trust notice.
 
 ---
 
@@ -40,10 +61,11 @@ the right candidate. Click **Compare** to open a diff tab.
 
 | Key | Action |
 |-----|--------|
-| ↑ / ↓ | Move focus in the active pane |
+| **F6** | Switch keyboard focus between left and right pane |
+| ↑ / ↓ | Move focus within the active pane |
 | **Space** | Select the focused file as a comparison candidate |
 | **Enter** | Open a folder, or compare a same-name file if a matching file exists in the opposite pane |
-| **Alt + ↑** | Go up one directory level |
+| **Alt + ↑** | Go up one directory level (focused pane only) |
 
 ---
 

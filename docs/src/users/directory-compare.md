@@ -1,13 +1,13 @@
 # Comparing Directories
 
-ForskScope compares two directory trees at two levels of depth:
+ForskScope compares two directory trees at two levels:
 
-- **Browse mode** (default) — shows the current directory on each side with equality indicators for same-name files.
-- **Deep compare mode** — scans both trees recursively and produces a flat report of every differing file.
+- **Explorer panes** (default) — shows the current directory on each side with equality indicators for same-name files.
+- **Directory Report** — scans both directory trees recursively and produces a flat report of every differing file.
 
 ---
 
-## Browse mode
+## Explorer panes
 
 When you launch ForskScope without arguments, the Explorer workspace opens with two side-by-side directory panes.
 
@@ -35,26 +35,21 @@ When you launch ForskScope without arguments, the Explorer workspace opens with 
 
 ---
 
-## Modes
-
-Two mode buttons in the toolbar switch between views:
-
-| Button | Purpose |
-|--------|---------|
-| **Browse** | Side-by-side directory panes with digest status icons |
-| **Directory Report** | Recursive scan — flat report of every file across both trees |
-
----
-
 ## Copying files between sides
 
-Every row in Directory Report that is not equal shows a copy button (`Copy →` or `← Copy`). Clicking opens a confirmation dialog showing the exact source and destination paths. If the destination already exists, a `.bak` backup is created before overwriting.
+Every row in Directory Report that is not equal shows explicit direction buttons:
+
+- **Copy to right** — copies the left-side file to the right directory.
+- **Copy to left** — copies the right-side file to the left directory.
+- **Changed** entries show both buttons; one-sided entries show only the valid direction.
+
+Clicking a button opens a confirmation dialog showing the full source and destination paths. If the destination already exists, a green notice confirms that a `.bak` backup will be created first. **Cancel** is the default-focused button.
 
 ---
 
 ## Deep compare mode
 
-Click **Directory Report** in the mode toolbar to switch to the recursive scan view.
+Open a Directory Report tab by selecting two directories in the Explorer and clicking **Compare**, or by passing two directory paths on the command line.
 
 ForskScope walks both directory trees in the background and builds a flat report. The scan runs in two phases:
 
@@ -72,7 +67,9 @@ ForskScope walks both directory trees in the background and builds a flat report
 
 **Filtering results:** use the **Different / All / Equal** buttons (same as browse mode).
 
-**Batch copy:** when differing files exist, **Copy N →** and **← Copy N** buttons appear in the toolbar. Clicking shows a confirmation with the count; all copies use the same `.bak` backup policy as single-file copy.
+**Batch copy:** when differing files exist, **Copy to right N** and **Copy to left N** buttons appear in the toolbar. Clicking shows a confirmation with the file count and a note that a restore manifest will be saved.
+
+After a batch copy completes, a **result summary** shows the number of files succeeded and failed, and the path to the manifest JSON file written to `$XDG_DATA_DIR/forskscope/manifests/`. The manifest records every file copied, its backup path, and any errors — it can be used to audit or reverse the operation.
 
 ---
 

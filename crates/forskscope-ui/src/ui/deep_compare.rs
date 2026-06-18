@@ -89,9 +89,6 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
     let tc        = *total_common.read();
     let is_scan   = *scanning.read();
     let in_flight = !is_scan && tc > 0 && done < tc;
-    let tc        = *total_common.read();
-    let is_scan   = *scanning.read();
-    let in_flight = !is_scan && tc > 0 && done < tc;
     let visible: Vec<RecEntry> = snap.iter()
         .filter(|e| match f {
             DeepFilter::Different => e.status != RecStatus::Equal,
@@ -158,18 +155,11 @@ fn DeepRow(entry: RecEntry, lang: Lang) -> Element {
     let path_str   = entry.rel_path.display().to_string();
     let can_cmp    = !matches!(entry.status, RecStatus::Equal | RecStatus::Computing | RecStatus::Symlink);
     // Copy direction: LeftOnly/Changed → copy left→right; RightOnly → copy right→left.
-    let copy_dir: Option<(bool, String)> = {
-        let s = store.settings.read();
-        match (&s.last_left_dir, &s.last_right_dir, &entry.status) {
-            (Some(_), Some(_), RecStatus::Changed | RecStatus::LeftOnly) => {
-                Some((true, format!("{} →", t(lang, "Copy"))))
-            }
-            (Some(_), Some(_), RecStatus::RightOnly) => {
-                Some((false, format!("← {}", t(lang, "Copy"))))
-            }
-            _ => None,
-        }
-    };
+    // Changed entries show both directions (RFC-062 B3).
+    let copy_left_to_right: bool = matches!(entry.status, RecStatus::Changed | RecStatus::LeftOnly);
+    let copy_right_to_left: bool = matches!(entry.status, RecStatus::Changed | RecStatus::RightOnly);
+    let has_left_root  = store.settings.read().last_left_dir.is_some();
+    let has_right_root = store.settings.read().last_right_dir.is_some();
     let e2 = entry.clone();
     rsx! {
         div { class: "deep-row",
@@ -190,27 +180,44 @@ fn DeepRow(entry: RecEntry, lang: Lang) -> Element {
                     {t(lang, "Compare")}
                 }
             }
-            if let Some((to_right, lbl)) = copy_dir {
+            if has_left_root && has_right_root && copy_left_to_right {
                 {
                     let entry3 = entry.clone();
                     rsx! {
-                        button { class: "deep-compare-btn",
+                        button {
+                            class: "deep-compare-btn",
+                            title: t(lang, "Copy to right"),
                             onclick: move |_| {
                                 let s = store.settings.read();
-                                let dirs = if to_right {
-                                    s.last_left_dir.as_ref().zip(s.last_right_dir.as_ref())
-                                        .map(|(l, r)| (l.join(&entry3.rel_path), r.join(&entry3.rel_path)))
-                                } else {
-                                    s.last_right_dir.as_ref().zip(s.last_left_dir.as_ref())
-                                        .map(|(r, l)| (r.join(&entry3.rel_path), l.join(&entry3.rel_path)))
-                                };
-                                drop(s);
-                                if let Some((src, dst)) = dirs {
-                                    let label = format!("{} → {}", src.display(), dst.display());
-                                    store.modal.set(Modal::ConfirmDirOp(DirOp { src, dst, label }));
+                                if let (Some(l), Some(r)) = (&s.last_left_dir, &s.last_right_dir) {
+                                    let src = l.join(&entry3.rel_path);
+                                    let dst = r.join(&entry3.rel_path);
+                                    drop(s);
+                                    store.modal.set(Modal::ConfirmDirOp(DirOp { src, dst, label: String::new() }));
                                 }
                             },
-                            {lbl}
+                            {t(lang, "Copy to right")}
+                        }
+                    }
+                }
+            }
+            if has_left_root && has_right_root && copy_right_to_left {
+                {
+                    let entry4 = entry.clone();
+                    rsx! {
+                        button {
+                            class: "deep-compare-btn",
+                            title: t(lang, "Copy to left"),
+                            onclick: move |_| {
+                                let s = store.settings.read();
+                                if let (Some(l), Some(r)) = (&s.last_left_dir, &s.last_right_dir) {
+                                    let src = r.join(&entry4.rel_path);
+                                    let dst = l.join(&entry4.rel_path);
+                                    drop(s);
+                                    store.modal.set(Modal::ConfirmDirOp(DirOp { src, dst, label: String::new() }));
+                                }
+                            },
+                            {t(lang, "Copy to left")}
                         }
                     }
                 }
@@ -265,31 +272,29 @@ fn BatchCopyButtons(entries: Signal<Vec<RecEntry>>, left_root: PathBuf, right_ro
         if tr_count > 0 {
             button {
                 class: "filter-btn",
-                title: format!("{} {tr_count} {} →", t(lang, "Copy"), t(lang, "files to the right directory")),
+                title: format!("{} {tr_count} {}", t(lang, "Copy to right"), t(lang, "files")),
                 onclick: move |_| {
                     use crate::state::{BatchCopySpec, Modal};
                     store.modal.set(Modal::ConfirmBatchCopy(BatchCopySpec {
                         items: to_right.clone(),
-                        label: format!("{} {tr_count} {} →",
-                            t(lang, "Copy"), t(lang, "files to the right directory")),
+                        label: format!("{} {tr_count} {}", t(lang, "Copy to right"), t(lang, "files")),
                     }));
                 },
-                {format!("{} {tr_count} →", t(lang, "Copy"))}
+                {format!("{} {tr_count}", t(lang, "Copy to right"))}
             }
         }
         if tl_count > 0 {
             button {
                 class: "filter-btn",
-                title: format!("← {} {tl_count} {}", t(lang, "Copy"), t(lang, "files to the left directory")),
+                title: format!("{} {tl_count} {}", t(lang, "Copy to left"), t(lang, "files")),
                 onclick: move |_| {
                     use crate::state::{BatchCopySpec, Modal};
                     store.modal.set(Modal::ConfirmBatchCopy(BatchCopySpec {
                         items: to_left.clone(),
-                        label: format!("← {} {tl_count} {}",
-                            t(lang, "Copy"), t(lang, "files to the left directory")),
+                        label: format!("{} {tl_count} {}", t(lang, "Copy to left"), t(lang, "files")),
                     }));
                 },
-                {format!("← {} {tl_count}", t(lang, "Copy"))}
+                {format!("{} {tl_count}", t(lang, "Copy to left"))}
             }
         }
     }

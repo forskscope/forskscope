@@ -70,7 +70,7 @@ The number of context lines shown above and below each change is set in
 
 | Mark | Location | Meaning |
 |------|----------|---------|
-| **▶** | Centre action column | This hunk can be applied (merged left → right) |
+| **▶ Use** | Centre action column | This hunk can be applied (merged left → right) |
 | **✓** | Centre action column | This hunk has been applied in this session |
 | **−** | Left gutter | Line deleted or replaced on this side |
 | **+** | Right gutter | Line inserted or replaced on this side |

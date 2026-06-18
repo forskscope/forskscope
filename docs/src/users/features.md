@@ -27,8 +27,10 @@
 - Path bar, directory picker dialog, history ◀▶, and Alt+↑ to go up.
 - Digest equality icons: **✓** identical, **⚠** different, *(none)* one-sided.
 - Full keyboard navigation: arrows to move, Space to select, Enter to
-  open/compare.
+  open/compare, **F6** to switch focused pane.
+- **Alt+↑** navigates the focused pane up one level.
 - Same-name file shortcut: double-click to compare immediately.
+- **Empty state** shown when no entries are visible, with a first-run orientation hint.
 - Multiple comparisons open as independent tabs; switch freely.
 
 ---
@@ -39,8 +41,8 @@
 - Two-phase scan: fast listing first, then background digest comparison.
 - Status per file: ⚠ changed, ← left-only, → right-only, ✓ equal, ⊙ scanning.
 - Filter results: **Different** / **All** / **Equal**.
-- **Per-file copy** (single file with confirmation and `.bak` backup).
-- **Batch copy** (all changed/one-sided files in one confirmed operation).
+- **Per-file copy** — explicit `Copy to right` / `Copy to left` buttons; confirmation shows full source and destination paths; `.bak` backup created when destination exists.
+- **Batch copy** — explicit direction buttons (`Copy to right N` / `Copy to left N`); confirmation and result summary; restore manifest written to `$XDG_DATA_DIR/forskscope/manifests/`.
 
 ---
 

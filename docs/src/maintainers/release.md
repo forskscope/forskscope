@@ -17,8 +17,18 @@ The release is a `.tar.gz` of the Cargo workspace, excluding the `target/`
 directory. The archive unpacks to `forskscope-vX.Y.Z/` at the extraction root
 (no nested intermediate directory).
 
+Use the release script (handles version extraction and archive naming automatically):
+
 ```sh
-VER=0.97.0  # set to the release version
+bash packaging/build-release.sh
+```
+
+Or manually:
+
+```sh
+# Extract version from [workspace.package] — never grep '^' version directly
+# as that may match dependency entries
+VER=$(awk '/^\[workspace\.package\]/{f=1} f&&/^version[[:space:]]*=/{gsub(/[^0-9.]/,""); print; exit}' Cargo.toml)
 
 # 1. Copy the working tree (avoids polluting the source directory)
 cp -r . /tmp/forskscope-${VER}
@@ -68,7 +78,8 @@ pre-release phase:
 
 1. Upload the archive to the project release page.
 2. Tag the commit: `git tag -a v${VER} -m "Release v${VER}"`.
-3. Update the AUR `PKGBUILD` if a Linux package maintainer is involved.
+3. Update `pkgver` in `packaging/linux/PKGBUILD` to match the workspace version.
+   A comment in the file notes this requirement; failing to do so causes stale Arch packages.
 
 ---
 

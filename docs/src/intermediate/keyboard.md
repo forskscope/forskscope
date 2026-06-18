@@ -44,7 +44,8 @@ take effect when a comparison tab is active.
 | **↑ / ↓**     | Move focus between rows |
 | **Enter**     | Open directory / compare same-name file |
 | **Space**     | Select focused file as left or right comparison candidate |
-| **Alt+↑**     | Go up one directory level |
+| **F6**        | Switch focused pane (left ↔ right) |
+| **Alt+↑**     | Go up one directory level (focused pane only) |
 
 ## Modals and dialogs
 

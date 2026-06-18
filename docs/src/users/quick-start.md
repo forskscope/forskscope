@@ -41,7 +41,7 @@ Once a diff tab is open:
 |---|---|
 | Move to next change | **▶** button or `F8` |
 | Move to previous change | **◀** button or `F7` |
-| Apply a change | Click **▶** in the action column of a changed hunk |
+| Apply a change | Click **▶ Use** in the action column of a changed hunk |
 | Undo the last apply | **Undo** button |
 | Save the result | **Save** button |
 

@@ -77,9 +77,10 @@ to 32 at a time to avoid overwhelming the system on very large trees.
 ### Directory merge operations are limited
 
 The Explorer's **Directory Report** mode supports per-file copy (both directions)
-and batch copy via the **Copy N →** / **← Copy N** toolbar buttons. Each copy
-shows a confirmation with the source and destination path; existing files receive
-a `.bak` backup.
+and batch copy via the **Copy to right N** / **Copy to left N** toolbar buttons.
+Each copy shows a confirmation with the full source and destination path; existing
+files receive a `.bak` backup. A restore manifest is written to
+`$XDG_DATA_DIR/forskscope/manifests/` after every batch operation.
 
 Delete and full directory-sync operations are not supported and are not planned
 for v1 (non-goal NG-004 in the product policy).

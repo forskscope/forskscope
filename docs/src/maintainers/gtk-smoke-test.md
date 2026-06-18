@@ -122,11 +122,13 @@ highlighted with gutter markers.
 ### 2f. Per-file copy
 
 - In Directory Report, find a "different" or left-only/right-only entry
-- Click the **Copy →** or **← Copy** button on the row
-- Expected: confirmation modal appears showing source and destination paths;
-  if destination exists, a `.bak` backup notice appears
+- Click the **Copy to right** or **Copy to left** button on the row
+  (Changed entries show both; one-sided entries show only the valid direction)
+- Expected: confirmation modal appears showing full source and destination paths;
+  if destination exists, a green backup notice appears; **Cancel** is focused by default
 - Confirm the copy
-- Expected: file copied; toast notification confirms
+- Expected: file copied; for single-file success a toast confirms;
+  a manifest JSON is written to `$XDG_DATA_DIR/forskscope/manifests/`
 
 ---
 

@@ -21,7 +21,24 @@ pub enum Modal {
     ConfirmReload(usize), ConfirmSwap(usize),
     ConfirmDirOp(DirOp), ConfirmClose(usize),
     ConfirmBatchCopy(BatchCopySpec),
+    BatchResult(BatchResultSpec),
     About, KeyboardRef,
+}
+
+/// Summary of a completed batch copy operation, shown in the result modal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchResultSpec {
+    pub succeeded: usize,
+    pub failed:    usize,
+    pub skipped:   usize,
+    /// Path to the manifest JSON file, if written successfully.
+    pub manifest_path: Option<std::path::PathBuf>,
+    /// Human-readable description of failure entries (first few).
+    pub failure_details: Vec<String>,
+}
+
+impl BatchResultSpec {
+    pub fn all_succeeded(&self) -> bool { self.failed == 0 }
 }
 
 /// A pending directory file operation awaiting user confirmation.
@@ -113,9 +130,11 @@ pub fn swap_sides(store: &mut Store, index: usize) {
     recompute_diff(tab);
 }
 
-#[derive(Clone, Copy)]
 /// Severity of a user-facing notice / toast (RFC-063 C5).
-#[derive(Clone, PartialEq, Eq, Debug)]
+/// `Info` and its helpers are part of the intended API; call sites will be
+/// added as future notices are introduced. Suppress dead_code until then.
+#[allow(dead_code)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum NoticeSeverity {
     /// Positive confirmation — auto-dismisses after ~3 s.
     Success,
@@ -136,6 +155,7 @@ pub struct Notice {
 
 impl Notice {
     pub fn success(msg: impl Into<String>) -> Self { Self { message: msg.into(), severity: NoticeSeverity::Success } }
+    #[allow(dead_code)]
     pub fn info(msg: impl Into<String>)    -> Self { Self { message: msg.into(), severity: NoticeSeverity::Info } }
     pub fn warning(msg: impl Into<String>) -> Self { Self { message: msg.into(), severity: NoticeSeverity::Warning } }
     pub fn error(msg: impl Into<String>)   -> Self { Self { message: msg.into(), severity: NoticeSeverity::Error } }
@@ -149,6 +169,9 @@ impl Notice {
     }
 }
 
+/// Application-wide reactive state. All fields are `Signal<T>` which is `Copy + Clone`,
+/// so `Store` itself is `Clone + Copy` — required by `use_context::<Store>()`.
+#[derive(Clone, Copy)]
 pub struct Store {
     pub tabs:      Signal<Vec<CompareTab>>,
     pub active:    Signal<Option<usize>>,
@@ -177,6 +200,7 @@ impl Store {
     /// Show a success notice (auto-dismisses after ~3.5 s).
     pub fn notify_success(&mut self, msg: impl Into<String>) { self.toast.set(Some(Notice::success(msg))); }
     /// Show an info notice (auto-dismisses after ~5 s).
+    #[allow(dead_code)]
     pub fn notify_info(&mut self, msg: impl Into<String>) { self.toast.set(Some(Notice::info(msg))); }
     /// Show a warning notice (persistent).
     pub fn notify_warning(&mut self, msg: impl Into<String>) { self.toast.set(Some(Notice::warning(msg))); }

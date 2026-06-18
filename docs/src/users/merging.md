@@ -16,7 +16,7 @@ This means it is safe to experiment: apply hunks, undo them, reapply, and only c
 
 ## Applying a change
 
-Every changed hunk (Replace, Delete, Insert) shows a **▶** apply button in the centre gutter.
+Every changed hunk (Replace, Delete, Insert) shows a **▶ Use** button in the centre gutter.
 
 Clicking it copies the left-side content into the right-side result buffer for that hunk. The hunk turns grey with a ✓ to indicate it has been applied.
 
