@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.156.0] — 2026-06-18
+
+Phase 2 complete: split `settings.rs` (310 ELOC). No behaviour changes.
+
+### Changed
+
+`ui/view/settings.rs` (310 ELOC) split into three files:
+
+| File | ELOC | Responsibility |
+|---|---|---|
+| `settings.rs` | 46 | `persist`, `load`, `ModalLayer`, type helpers |
+| `settings/modal.rs` | 218 | `SettingsModal` dialog (appearance, advanced, profiles) |
+| `settings/profile.rs` | 64 | `AddProfileInline` form |
+
+All three Phase 2 targets are now under the 300 ELOC soft limit:
+`explorer.rs` (251), `diff.rs` (211), `settings.rs` (46). The largest
+remaining file is `state.rs` (427 ELOC) — a candidate for Phase 3 splitting.
+
+---
+
 ## [0.155.0] — 2026-06-18
 
 Phase 2: split `diff.rs` (339 ELOC). No behaviour changes.
