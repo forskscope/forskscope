@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.159.0] — 2026-06-18
+
+RFC housekeeping. No code changes.
+
+### Added
+
+- **RFC-071** (`rfcs/done/`) — records the completed UI module structural
+  redesign (v0.152.0–v0.158.0): four-layer hierarchy, ELOC splits, `mod.rs`
+  elimination, test placement, and the two bugs found during the work.
+- **RFC-072** (`rfcs/proposed/`) — Phase 4: UI component extraction.
+  Candidates: `notice`, `empty_state`, `path_label`, `icon_button`.
+- **RFC-073** (`rfcs/proposed/`) — Phase 5: bridge minimisation. Audits all
+  14 files under `ui/bridge/` for justification or removal.
+
+### Changed
+
+- `rfcs/README.md` updated: Implemented count 46 → 47 (RFC-071 added);
+  Proposed count 13 → 15 (RFC-072/073 added); section description refreshed.
+
+---
+
 ## [0.158.0] — 2026-06-18
 
 Split `overlay/modals.rs` (303 ELOC). PKGBUILD version corrected. Build errors

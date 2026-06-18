@@ -7,7 +7,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Implemented (46)
+## Implemented (47)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
@@ -57,14 +57,14 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 068 | [Explorer Unaligned (Compact) View Mode](./done/068-explorer-unaligned-compact-view-mode.md) | v0.151.0 |
 | 069 | [Explorer Layout — Compare Action and Header/Footer](./done/069-explorer-layout-compare-action-and-header-footer.md) | v0.152.0 |
 | 070 | [Font Family Selector in Settings](./done/070-font-family-selector.md) | v0.152.0 |
+| 071 | [UI Module Structural Redesign (Rust 2024 Hierarchy)](./done/071-ui-module-structural-redesign.md) | v0.152.0–v0.158.0 |
 
-## Proposed (13)
+## Proposed (15)
 
 RFC-004–040 are editor-adapter track, platform/packaging, or governance/documentation.
 RFC-026 and RFC-030 are substantially implemented; their remaining items require GTK or are deferred.
 RFC-060–063 are the UI/UX architect review remediation track (shipped across v0.145.0–v0.145.3).
-RFC-065–070 are the v0.147+ feature track: async comparison, binary policy,
-Explorer filters and layout, and font selection.
+RFC-072–073 are the remaining phases of the UI structural redesign (RFC-071).
 
 | ID | Title | Category | Progress |
 |----|-------|----------|----------|
@@ -76,13 +76,13 @@ Explorer filters and layout, and font selection.
 | 030 | [User Documentation, Onboarding, and Help System](./proposed/030-user-documentation-onboarding-and-help-system.md) | Documentation | **Substantially shipped** — 18 doc files; in-app help panel deferred |
 | 040 | [Editor Adapter Verification Harness and Golden Corpus](./proposed/040-editor-adapter-verification-harness-and-golden-corpus.md) | Editor adapter | Blocked on RFC-004 |
 | 041 | [v1.0 Product Stabilization and RFC Governance](./proposed/041-v1-product-stabilization-and-rfc-governance.md) | Governance | 12/16 checklist items done; 4 require GTK or deferred |
-| 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) | Governance | Living document — updated v0.141.0; pre-GTK verification phase |
+| 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) | Governance | Living document — pre-GTK verification phase |
 | 060 | [Global Keyboard Scope and Modal/Input Safety](./proposed/060-global-keyboard-scope-and-modal-input-safety.md) | UX review remediation | **Partially shipped** v0.145.0–.1 — modal guard + per-surface propagation; W2/W3 tests remain |
 | 061 | [Explorer Pane Focus and Keyboard Completeness](./proposed/061-explorer-pane-focus-and-keyboard-completeness.md) | UX review remediation | **Partially implemented** v0.145.2 — focused pane, F6, per-pane Alt+↑; row ARIA remains |
 | 062 | [Safe Batch Copy UX and Restore Manifest Integration](./proposed/062-safe-batch-copy-ux-and-restore-manifest.md) | UX review remediation | **Shipped** v0.145.3 — manifest routing, result modal, explicit directions |
 | 063 | [Trust, Clarity, and Calm UI Hardening](./proposed/063-trust-clarity-and-calm-ui-hardening.md) | UX review remediation | **Mostly shipped** v0.145.1–.3 — C1/C2/C3/C5/C6/C7/C9/C10 done; C4 audited; C8 rejected |
-
-
+| 072 | [UI Component Extraction (Phase 4)](./proposed/072-ui-component-extraction.md) | Structural | Not started — follows RFC-071 |
+| 073 | [Bridge Minimisation (Phase 5)](./proposed/073-bridge-minimisation.md) | Structural | Not started — follows RFC-072 |
 
 ## Archive (1)
 
