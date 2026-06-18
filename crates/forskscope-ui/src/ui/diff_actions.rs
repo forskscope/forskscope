@@ -147,7 +147,7 @@ pub fn export_patch(store: &Store, index: usize) {
 
     let Some(patch) = patch_doc else {
         // Identical files — nothing to export. Notify but don't error.
-        drop(tab);
+        let _ = tab;
         return;
     };
 
@@ -159,7 +159,7 @@ pub fn export_patch(store: &Store, index: usize) {
         .map(|n| format!("{}.patch", n.to_string_lossy()))
         .unwrap_or_else(|| "changes.patch".into());
 
-    drop(tab);
+    let _ = tab;
 
     // Spawn an async task to open the save dialog and write the file.
     spawn(async move {

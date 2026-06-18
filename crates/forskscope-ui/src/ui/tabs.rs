@@ -1,40 +1,51 @@
-//! Tab bar: Explorer tab + comparison tabs with close/dirty indicators.
+//! Tab bar: Explorer tab + file comparison tabs + directory compare tabs.
 
 use dioxus::prelude::*;
 
 use crate::i18n::t;
-use crate::state::{Modal, Store, close_tab};
+use crate::state::{Modal, Store, close_tab, close_dir_tab};
 
 #[component]
 pub fn TabBar() -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
-    let active = *store.active.read();
-    let tab_count = store.tabs.read().len();
+    let active_file = *store.active.read();
+    let active_dir  = *store.active_dir.read();
+    let file_count = store.tabs.read().len();
+    let dir_count  = store.dir_tabs.read().len();
+
+    let explorer_active = active_file.is_none() && active_dir.is_none();
 
     rsx! {
         div { class: "tabbar",
-            // Permanent Explorer tab (RFC-054: always visible first entry).
+            // Permanent Explorer tab.
             {
-                let explorer_class = if active.is_none() { "tab active" } else { "tab" };
+                let cls = if explorer_active { "tab active" } else { "tab" };
                 rsx! {
                     div {
-                        class: "{explorer_class}",
-                        onclick: move |_| store.active.set(None),
+                        class: "{cls}",
+                        onclick: move |_| {
+                            store.active.set(None);
+                            store.active_dir.set(None);
+                        },
                         span { class: "tab-title", {t(lang, "Explorer")} }
                     }
                 }
             }
-            // Comparison tabs.
-            for i in 0..tab_count {
-                TabItem { index: i, is_active: active == Some(i) }
+            // File comparison tabs.
+            for i in 0..file_count {
+                FileTabItem { index: i, is_active: active_file == Some(i) && active_dir.is_none() }
+            }
+            // Directory compare tabs.
+            for i in 0..dir_count {
+                DirTabItem { index: i, is_active: active_dir == Some(i) }
             }
         }
     }
 }
 
 #[component]
-fn TabItem(index: usize, is_active: bool) -> Element {
+fn FileTabItem(index: usize, is_active: bool) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
 
@@ -51,7 +62,10 @@ fn TabItem(index: usize, is_active: bool) -> Element {
         div { class: "{class}",
             span {
                 class: "tab-title",
-                onclick: move |_| store.active.set(Some(index)),
+                onclick: move |_| {
+                    store.active.set(Some(index));
+                    store.active_dir.set(None);
+                },
                 if is_dirty { span { class: "dirty-dot", "●" } }
                 "{title}"
             }
@@ -66,6 +80,42 @@ fn TabItem(index: usize, is_active: bool) -> Element {
                     if dirty { store.modal.set(Modal::ConfirmClose(index)); }
                     else     { close_tab(&mut store, index); }
                 },
+                "×"
+            }
+        }
+    }
+}
+
+#[component]
+fn DirTabItem(index: usize, is_active: bool) -> Element {
+    let mut store = use_context::<Store>();
+    let lang = store.lang();
+
+    let title = {
+        let tabs = store.dir_tabs.read();
+        let Some((l, r)) = tabs.get(index) else { return rsx!{} };
+        let ln = l.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let rn = r.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        if ln == rn { ln } else { format!("{ln} ↔ {rn}") }
+    };
+
+    let class = if is_active { "tab active" } else { "tab" };
+
+    rsx! {
+        div { class: "{class}",
+            span {
+                class: "tab-title",
+                onclick: move |_| {
+                    store.active.set(None);
+                    store.active_dir.set(Some(index));
+                },
+                "📁 {title}"
+            }
+            button {
+                class: "tab-close",
+                title: t(lang, "Close tab"),
+                aria_label: format!("{} {title}", t(lang, "Close")),
+                onclick: move |_| close_dir_tab(&mut store, index),
                 "×"
             }
         }

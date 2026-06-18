@@ -3,7 +3,7 @@
 use dioxus::prelude::*;
 
 use crate::i18n::t;
-use crate::state::{Lang, Modal, Store};
+use crate::state::{Modal, Store};
 
 #[component]
 pub fn KeyboardRefModal() -> Element {

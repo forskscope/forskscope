@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
 
-use crate::state::{Store, open_compare, restore_session, save_session};
+use crate::state::{Store, open_compare, open_dir_compare, close_dir_tab, restore_session, save_session};
 use crate::ui::diff::{DiffWorkspace, apply_focused_hunk, move_focus, save_tab};
 use crate::ui::explorer::Explorer;
 use crate::ui::header::Header;
@@ -32,10 +32,11 @@ pub fn App() -> Element {
             // git mergetool mode: redirect save target to the merged path.
             if let Some(Some(merged)) = STARTUP_MERGED.get() {
                 let idx = store.tabs.read().len().saturating_sub(1);
+                let merge_label = crate::i18n::t(store.lang(), "merge");
                 if let Some(tab) = store.tabs.write().get_mut(idx) {
                     tab.right_path = Some(merged.clone());
                     tab.right_doc.fingerprint_at_load = None;
-                    tab.title = format!("{} ({})", tab.title, crate::i18n::t(store.lang(), "merge"));
+                    tab.title = format!("{} ({})", tab.title, merge_label);
                 }
             }
         } else {
@@ -67,17 +68,25 @@ pub fn App() -> Element {
 
     let theme_class = store.settings.read().theme.css_class();
     let active = *store.active.read();
-    let toast = store.toast.read().clone();
+    let toast = store.toast.read().cloned();
 
     rsx! {
         style { {MAIN_CSS} }
         div {
             class: "app {theme_class}",
+            id: "app-root",
             tabindex: "-1",
+            onmounted: move |_| {
+                spawn(async move {
+                    let _ = dioxus::document::eval(
+                        "document.getElementById('app-root')?.focus();"
+                    ).await;
+                });
+            },
             onkeydown: move |e: Event<KeyboardData>| {
                 // Escape closes any open modal regardless of whether a tab is active.
                 if e.key() == Key::Escape {
-                    let modal = store.modal.read().clone();
+                    let modal = store.modal.read().cloned();
                     if !matches!(modal, crate::state::Modal::None) {
                         store.modal.set(crate::state::Modal::None);
                         return;
@@ -134,9 +143,19 @@ pub fn App() -> Element {
             Header {}
             TabBar {}
             div { class: "body",
-                match active {
-                    None        => rsx! { Explorer {} },
-                    Some(index) => rsx! { DiffWorkspace { index } },
+                match (active, *store.active_dir.read()) {
+                    (_, Some(dir_idx)) => {
+                        let dir_tabs = store.dir_tabs.read();
+                        if let Some((l, r)) = dir_tabs.get(dir_idx).cloned() {
+                            let lang = store.lang();
+                            drop(dir_tabs);
+                            rsx! { crate::ui::deep_compare::DeepCompareView { left_root: l, right_root: r, lang } }
+                        } else {
+                            rsx! { Explorer {} }
+                        }
+                    }
+                    (None, None)        => rsx! { Explorer {} },
+                    (Some(index), None) => rsx! { DiffWorkspace { index } },
                 }
             }
             StatusBar {}

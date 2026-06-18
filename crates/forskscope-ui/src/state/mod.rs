@@ -2,20 +2,19 @@
 
 pub mod settings;
 pub use settings::{
-    AppSettings, BatchCopySpec, DiffAlgorithmSetting, DiffProfile, DirOp, Lang, Theme,
+    AppSettings, BatchCopySpec, DiffAlgorithmSetting, Lang, Theme,
 };
 
 use std::path::PathBuf;
 use app_json_settings::ConfigManager;
 use dioxus::prelude::*;
-use serde::{Deserialize, Serialize};
 use forskscope_core::diff::DiffDocument;
 use forskscope_core::document::{LoadOptions, LoadedDocument, load_path};
 use forskscope_core::file_kind::FileKind;
 use forskscope_core::{DiffOptions, MergeSession, compute_diff};
-pub use forskscope_core::DiffAlgorithm;
 use crate::i18n::t;
 
+#[derive(Clone)]
 pub enum Modal {
     None, Settings,
     ConfirmOverwrite(usize), SaveAs(usize, String),
@@ -106,6 +105,8 @@ pub fn swap_sides(store: &mut Store, index: usize) {
 pub struct Store {
     pub tabs:      Signal<Vec<CompareTab>>,
     pub active:    Signal<Option<usize>>,
+    pub dir_tabs:  Signal<Vec<(PathBuf, PathBuf)>>,
+    pub active_dir: Signal<Option<usize>>,
     pub settings:  Signal<AppSettings>,
     pub left_pick:  Signal<Option<PathBuf>>,
     pub right_pick: Signal<Option<PathBuf>>,
@@ -117,6 +118,7 @@ impl Store {
     pub fn new(settings: AppSettings) -> Self {
         Self {
             tabs: Signal::new(Vec::new()), active: Signal::new(None),
+            dir_tabs: Signal::new(Vec::new()), active_dir: Signal::new(None),
             settings: Signal::new(settings),
             left_pick: Signal::new(None), right_pick: Signal::new(None),
             modal: Signal::new(Modal::None), toast: Signal::new(None),
@@ -130,6 +132,16 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     let options = LoadOptions { allow_missing: true };
     let mut ld = match load_path(&left,  options) { Ok(d) => d, Err(e) => return store.notify(format!("{}: {e}", t(store.lang(), "Left file read error"))) };
     let mut rd = match load_path(&right, options) { Ok(d) => d, Err(e) => return store.notify(format!("{}: {e}", t(store.lang(), "Right file read error"))) };
+
+    // Guard: warn when comparing text against binary (meaningless hex diff).
+    // Excel is always allowed (sheets-diff handles it). Missing files are allowed.
+    let l_bin = matches!(ld.kind, FileKind::Binary);
+    let r_bin = matches!(rd.kind, FileKind::Binary);
+    let l_text = matches!(ld.kind, FileKind::Text);
+    let r_text = matches!(rd.kind, FileKind::Text);
+    if (l_bin && r_text) || (l_text && r_bin) {
+        return store.notify(t(store.lang(), "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary."));
+    }
     if ld.kind == FileKind::ExcelXlsx && rd.kind == FileKind::ExcelXlsx {
         let (lt, rt) = forskscope_core::xlsx::derive_pair_text(&left, &right);
         ld.text = Some(lt); rd.text = Some(rt);
@@ -153,6 +165,28 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     let idx = store.tabs.read().len();
     store.tabs.write().push(tab);
     store.active.set(Some(idx));
+}
+
+/// Open a directory compare tab for `left` vs `right`.
+pub fn open_dir_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
+    store.dir_tabs.write().push((left, right));
+    let idx = store.dir_tabs.read().len() - 1;
+    store.active.set(None);
+    store.active_dir.set(Some(idx));
+}
+
+/// Close a directory compare tab at `index`.
+pub fn close_dir_tab(store: &mut Store, index: usize) {
+    store.dir_tabs.write().remove(index);
+    let len = store.dir_tabs.read().len();
+    let cur = *store.active_dir.read();
+    if len == 0 {
+        store.active_dir.set(None);
+    } else if cur == Some(index) {
+        store.active_dir.set(Some(index.saturating_sub(1).min(len - 1)));
+    } else if cur > Some(index) {
+        store.active_dir.set(cur.map(|i| i - 1));
+    }
 }
 
 fn tab_title(l: &std::path::Path, r: &std::path::Path, lang: Lang) -> String {
@@ -224,6 +258,27 @@ pub fn close_tab(store: &mut Store, index: usize) {
 // These tests run under `cargo test --lib -p forskscope-ui` without requiring
 // GTK or a display server (RFC-020 §7 "Unit Tests").  They cover pure
 // functions in this module that contain no Dioxus signal or component code.
+
+/// Add a user-defined diff profile and persist settings.
+pub fn add_profile(store: &mut Store, name: String, ignore_whitespace: bool, ignore_case: bool, algorithm: DiffAlgorithmSetting) {
+    store.settings.write().profiles.push(settings::DiffProfile {
+        name, ignore_whitespace, ignore_case, algorithm, built_in: false,
+    });
+    crate::ui::settings::persist(&store.settings.read());
+}
+
+/// Remove the profile at `index` if it is not built-in.
+pub fn remove_profile(store: &mut Store, index: usize) {
+    let is_builtin = store.settings.read().profiles.get(index).map(|p| p.built_in).unwrap_or(true);
+    if is_builtin { return; }
+    let mut s = store.settings.write();
+    s.profiles.remove(index);
+    if s.active_profile >= s.profiles.len() {
+        s.active_profile = s.profiles.len().saturating_sub(1);
+    }
+    drop(s);
+    crate::ui::settings::persist(&store.settings.read());
+}
 
 #[cfg(test)]
 mod tests {

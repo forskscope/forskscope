@@ -82,30 +82,29 @@ pub fn DiffWorkspace(index: usize) -> Element {
                 div { class: "diff-warning-banner", role: "alert", "⚠ {w}" }
             }
             if !snap.can_save {
-                div { class: "notice", {&snap.readonly_notice} }
+                div { class: "notice", {snap.readonly_notice.clone()} }
             }
             if snap.identical {
-                div { class: "identical", {t(lang, "Files are identical")} }
-            } else {
-                div { class: "diff-pane-labels", aria_hidden: "true",
-                    span { class: "pane-label-left",  {t(lang, "Left / Old")} }
-                    span { class: "pane-label-act" }
-                    span { class: "pane-label-right", {t(lang, "Right / New")} }
-                }
-                div {
-                    class: "{wrap_class}",
-                    style: "--diff-fs:{snap.font_size}px;",
-                    for hunk in snap.hunks.iter() {
-                        HunkBlock {
-                            index,
-                            hunk: hunk.clone(),
-                            char_mode: snap.char_mode,
-                            context_lines: snap.context_lines,
-                            focused: snap.focused_id == Some(hunk.hunk_id),
-                            can_save: snap.can_save,
-                            is_expanded: expanded.read().contains(&hunk.hunk_id),
-                            on_expand: move |id: u64| { expanded.write().insert(id); },
-                        }
+                div { class: "notice notice-ok", {t(lang, "Files are identical")} }
+            }
+            div { class: "diff-pane-labels", aria_hidden: "true",
+                span { class: "pane-label-left",  {t(lang, "Left / Old")} }
+                span { class: "pane-label-act" }
+                span { class: "pane-label-right", {t(lang, "Right / New")} }
+            }
+            div {
+                class: "{wrap_class}",
+                style: "--diff-fs:{snap.font_size}px;",
+                for hunk in snap.hunks.iter() {
+                    HunkBlock {
+                        index,
+                        hunk: hunk.clone(),
+                        char_mode: snap.char_mode,
+                        context_lines: snap.context_lines,
+                        focused: snap.focused_id == Some(hunk.hunk_id),
+                        can_save: snap.can_save,
+                        is_expanded: expanded.read().contains(&hunk.hunk_id),
+                        on_expand: move |id: u64| { expanded.write().insert(id); },
                     }
                 }
             }
@@ -159,8 +158,12 @@ impl TabSnapshot {
             DiffWarning::DeadlineExpired        => t(lang, "Diff timed out — result may be approximate."),
             DiffWarning::InlineSkippedHunkTooLarge => t(lang, "Some hunks were too large for character-level diff."),
         }).collect();
+        let both_missing = matches!(tab.left_doc.kind, FileKind::Missing)
+            && matches!(tab.right_doc.kind, FileKind::Missing);
         let readonly_notice = if tab.can_save { String::new() } else {
             match (&tab.left_doc.kind, &tab.right_doc.kind) {
+                (FileKind::Missing, FileKind::Missing) =>
+                    t(lang, "Both files not found — read-only."),
                 (FileKind::Binary, _) | (_, FileKind::Binary) =>
                     t(lang, "Binary file — read-only comparison (hex preview)."),
                 (FileKind::ExcelXlsx, _) | (_, FileKind::ExcelXlsx) =>
@@ -173,7 +176,8 @@ impl TabSnapshot {
             }
         };
         Self {
-            identical: tab.diff.is_identical(), char_mode: tab.char_mode,
+            // Don't show "Files are identical" when both paths were not found.
+            identical: tab.diff.is_identical() && !both_missing, char_mode: tab.char_mode,
             word_wrap: tab.word_wrap, can_save: tab.can_save,
             is_dirty: tab.merge.is_dirty(), can_undo: tab.merge.can_undo(),
             can_redo: tab.merge.can_redo(), font_size,

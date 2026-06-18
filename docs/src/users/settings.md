@@ -91,10 +91,10 @@ Open tabs are unaffected; change their options directly in the toolbar's
 
 | Profile | Algorithm | Ignore WS | Ignore case |
 |---------|-----------|-----------|-------------|
-| **Default** | Myers | — | — |
-| **Code Review** | Histogram | — | — |
-| **Loose Text** | Myers | ✓ | — |
-| **Large File Safe** | Myers | — | — |
+| **Exact (default)** | Myers | — | — |
+| **Ignore whitespace** | Myers | ✓ | — |
+| **Ignore case** | Myers | — | ✓ |
+| **Histogram** | Histogram | — | — |
 
 Built-in profiles cannot be deleted (no **×** button).
 

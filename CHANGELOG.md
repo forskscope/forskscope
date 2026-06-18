@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.144.0] — 2026-06-14
+
+Explorer root node filtered from aligned tree; pane root bar added.
+
+### Fixed
+
+**`ui/explorer.rs` — Root node excluded from aligned tree:**
+`dioxus-swdir-tree` includes the root directory itself as the first entry in
+`visible_rows()` when expanded. This caused the root node to appear as an
+aligned row (e.g. `forskscope-files` on the left aligning with `bk/` on the
+right), which is wrong — the root is not a child entry, it IS the pane root.
+
+Fixed by filtering `n.path == root` from the flat row lists before passing
+to `compute_aligned_rows`. Same filter applied to the digest computation
+visible_rows scans. The aligned area now shows only children of each root.
+
+**`ui/explorer.rs` — Pane root bar (non-scrolling, above aligned area):**
+`div.pane-root-bar` placed between the path navigation bar and the scrollable
+aligned tree, showing `📁 dirname` for each pane's current root independently.
+This gives each pane a clear fixed identity label that is not part of the
+alignment grid.
+
+---
+
 ## [0.143.0] — 2026-06-13
 
 Deep compare digest tasks now respect `DIGEST_CONCURRENCY_LIMIT` (32);

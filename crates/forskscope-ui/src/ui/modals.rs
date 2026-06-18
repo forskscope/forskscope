@@ -47,7 +47,7 @@ pub fn SaveAsModal(index: usize, initial_path: String) -> Element {
                     button { onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
                     button {
                         disabled: path.read().trim().is_empty(),
-                        onclick: move |_| save_as(&mut store, index, path.read().clone()),
+                        onclick: move |_| save_as(&mut store, index, path.read().cloned()),
                         {t(lang, "Save")}
                     }
                 }

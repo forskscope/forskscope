@@ -108,6 +108,11 @@ pub fn PathBar(
         div { class: "path-bar",
             button { class: "path-btn", title: t(lang, "Back"),    disabled: !can_back,    onclick: move |_| on_back.call(()),    "←" }
             button { class: "path-btn", title: t(lang, "Forward"), disabled: !can_forward, onclick: move |_| on_forward.call(()), "→" }
+            button { class: "path-btn", title: t(lang, "Go up one directory"),
+                onclick: move |_| {
+                    let p = path.parent().map(|p| p.to_path_buf());
+                    if let Some(p) = p { on_navigate.call(p); }
+                }, "↑" }
             button { class: "path-btn", title: t(lang, "Home directory"),
                 onclick: move |_| on_navigate.call(home_dir()), "⌂" }
             button { class: "path-btn", title: t(lang, "Open folder…"),
@@ -128,7 +133,7 @@ pub fn PathBar(
                         oninput:  move |e| { input_val.set(e.value()); input_err.set(false); },
                         onkeydown: move |e| {
                             if e.key() == Key::Enter {
-                                let v = PathBuf::from(input_val.read().clone());
+                                let v = PathBuf::from(input_val.read().cloned());
                                 if v.is_dir() { edit_mode.set(false); on_navigate.call(v); }
                                 else { input_err.set(true); }
                             }
@@ -138,12 +143,20 @@ pub fn PathBar(
                             }
                         },
                         onblur: move |_| {
-                            let v = PathBuf::from(input_val.read().clone());
+                            let v = PathBuf::from(input_val.read().cloned());
                             if v.is_dir() { edit_mode.set(false); on_navigate.call(v); }
                             else { input_val.set(path_str_blur.clone()); edit_mode.set(false); input_err.set(false); }
                         },
                     }
                 } else {
+                    // Root prefix icon — navigates to filesystem root on click.
+                    if path.has_root() {
+                        { let root = PathBuf::from("/");
+                          rsx! { button { class: "bc-root", title: "/",
+                              onclick: move |_| on_navigate.call(root.clone()),
+                              "/" } } }
+                        if n > 0 { span { class: "bc-sep", " " } }
+                    }
                     for (idx, (seg_path, label)) in segs.iter().enumerate() {
                         if idx > 0 { span { class: "bc-sep", " / " } }
                         if idx == n - 1 {
@@ -208,16 +221,16 @@ pub fn TreeRow(
 
 pub fn path_segs(path: &Path) -> Vec<(PathBuf, String)> {
     let mut acc = PathBuf::new();
-    path.components().map(|c| {
-        acc.push(c);
+    path.components().filter_map(|c| {
+        acc.push(&c);
         let lbl = match &c {
-            Component::RootDir      => "/".into(),
+            Component::RootDir      => return None,   // handled by root icon prefix
             Component::Prefix(p)    => p.as_os_str().to_string_lossy().into_owned(),
             Component::Normal(name) => name.to_string_lossy().into_owned(),
             Component::CurDir       => ".".into(),
             Component::ParentDir    => "..".into(),
         };
-        (acc.clone(), lbl)
+        Some((acc.clone(), lbl))
     }).collect()
 }
 
@@ -251,4 +264,10 @@ pub fn navigate_to(
     }
     history.write().push(path.clone());
     current_dir.set(path);
+    // Scroll the aligned tree to top after navigation.
+    spawn(async move {
+        let _ = dioxus::document::eval(
+            "var t = document.getElementById('aligned-tree'); if(t) t.scrollTop = 0;"
+        ).await;
+    });
 }

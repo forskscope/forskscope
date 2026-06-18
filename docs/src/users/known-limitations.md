@@ -41,17 +41,31 @@ against.
 
 ### Very large files may produce approximate diffs
 
-Files over ~16 MiB trigger a time-bounded diff with a shortened deadline.
+Files over 64 MiB trigger a time-bounded diff with a shortened deadline.
 The result is correct for the differences found but may miss some changes
 deep in a very large file. A warning is shown in the diff view when this
-occurs. Use the **Large File Safe** compare profile (which disables inline
-diff and uses Myers) for best results on large files.
+occurs. Files over 4 MiB disable inline character diff automatically.
 
 ---
 
 ## Explorer
 
-### Digest comparison does not cache across navigation
+### GTK clipboard warning on Linux
+
+On some Linux systems, pressing **Ctrl+C** in the diff view produces a GTK
+warning in the terminal:
+
+```
+Gdk-WARNING: Error writing selection data: Error writing to file descriptor: Broken pipe
+```
+
+This is a known GTK/WebKitGTK clipboard pipe issue and does not affect
+functionality. The copy operation itself may or may not succeed depending
+on the desktop environment and clipboard manager. If clipboard operations
+are unreliable, try installing or restarting a clipboard manager such as
+`xclip`, `xsel`, or `wl-clipboard` (Wayland).
+
+---
 
 Background digest computation restarts when you navigate to a new directory.
 There is no persistent cache across sessions. For large directory trees,

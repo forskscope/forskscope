@@ -73,13 +73,15 @@ Very large files trigger a pre-diff prompt asking whether to proceed. The
 thresholds (and what changes at each level) are:
 
 | Class | Default threshold | Behaviour change |
-|-------|------------------|--------------------|
-| Medium | > 1 MiB | Inline diff deadline shortened |
-| Large | > 4 MiB | Inline diff disabled, progress warning shown |
-| Very large | > 16 MiB | Diff deadline shortened; result may be approximate |
+|-------|------------------|-------------------|
+| Small | ≤ 512 KiB | Full diff + inline diff computed eagerly |
+| Medium | 512 KiB – 4 MiB | Full diff; inline diff on demand only |
+| Large | 4 MiB – 64 MiB | User prompted before diff; inline diff disabled |
+| Very large | > 64 MiB | User prompted; diff may be approximate |
 
 These thresholds are controlled by `PerformanceLimits` in the `job` module
 (see [Architecture](../maintainers/architecture.md)).
+
 
 ---
 

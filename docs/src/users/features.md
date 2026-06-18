@@ -61,8 +61,8 @@ Accessed via **More ▼** in the toolbar:
 ## Compare profiles
 
 Store a named combination of diff options as a profile. Built-in profiles:
-**Default**, **Code Review** (Histogram), **Loose Text** (ignore trailing WS),
-**Large File Safe** (no inline diff). Add custom profiles in Settings.
+**Exact (default)** (Myers), **Ignore whitespace**, **Ignore case**,
+**Histogram**. Add custom profiles in Settings.
 
 ---
 

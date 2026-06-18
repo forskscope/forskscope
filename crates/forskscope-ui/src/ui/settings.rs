@@ -22,7 +22,7 @@ pub fn load() -> AppSettings {
 #[component]
 pub fn ModalLayer() -> Element {
     let store = use_context::<Store>();
-    let modal = store.modal.read().clone();
+    let modal = store.modal.read().cloned();
     match modal {
         Modal::None               => rsx! {},
         Modal::Settings           => rsx! { SettingsModal {} },
@@ -44,7 +44,7 @@ pub fn ModalLayer() -> Element {
 fn SettingsModal() -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
-    let cur  = store.settings.read().clone();
+    let cur  = store.settings.read().cloned();
     // Progressive disclosure state for New Profile form (RFC-057).
     let mut show_new_profile = use_signal(|| false);
 

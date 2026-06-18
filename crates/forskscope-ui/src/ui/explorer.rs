@@ -14,20 +14,14 @@ use dioxus_swdir_tree::{DirectoryTree, DirectoryTreeEvent, SelectionMode, use_sc
 use forskscope_core::dir::file_digest_equal;
 
 use crate::i18n::t;
-use crate::state::{Store, open_compare};
-use crate::ui::deep_compare::DeepCompareView;
+use crate::state::{Store, open_compare, open_dir_compare};
 use crate::ui::explorer_align::compute_aligned_rows;
 // ── Digest map key ────────────────────────────────────────────────────────────
 
 /// Typed key for the shared digest map (RFC-059 §M2).
-///
-/// Using an enum removes the stringly-typed `PathBuf::from("r:").join(rel)`
-/// namespace hack and eliminates the aliasing risk it created.
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum DigestKey {
-    /// A path present on both sides (keyed by relative path).
     Common(PathBuf),
-    /// A path present on the right side only (keyed by relative path).
     RightOnly(PathBuf),
 }
 use crate::ui::dir_pane::{
@@ -35,12 +29,38 @@ use crate::ui::dir_pane::{
     navigate_to, short_name,
 };
 
-// ── Aligned-row types: see explorer_align.rs (RFC-059 §M5) ──────────────────
+// ── Pick kind ─────────────────────────────────────────────────────────────────
 
-// ── Explorer mode ─────────────────────────────────────────────────────────────
+#[derive(Clone, PartialEq, Eq)]
+enum PickKind { File(PathBuf), Dir(PathBuf) }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
-enum ExplorerMode { #[default] Browse, Deep }
+impl PickKind {
+    fn path(&self) -> &PathBuf { match self { Self::File(p) | Self::Dir(p) => p } }
+    fn is_file(&self) -> bool { matches!(self, Self::File(_)) }
+    fn is_dir(&self)  -> bool { matches!(self, Self::Dir(_)) }
+}
+
+// ── Compare action derived from picks ────────────────────────────────────────
+
+#[derive(Clone, PartialEq, Eq)]
+enum CompareAction {
+    /// Both picks are files — open a file diff tab.
+    Files(PathBuf, PathBuf),
+    /// Both picks are directories — open Directory Report.
+    Dirs(PathBuf, PathBuf),
+    /// Picks are mismatched or missing — disabled.
+    None,
+}
+
+fn compare_action(lp: &Option<PickKind>, rp: &Option<PickKind>) -> CompareAction {
+    match (lp, rp) {
+        (Some(PickKind::File(l)), Some(PickKind::File(r))) =>
+            CompareAction::Files(l.clone(), r.clone()),
+        (Some(PickKind::Dir(l)), Some(PickKind::Dir(r))) =>
+            CompareAction::Dirs(l.clone(), r.clone()),
+        _ => CompareAction::None,
+    }
+}
 
 // ── Explorer component ────────────────────────────────────────────────────────
 
@@ -48,7 +68,6 @@ enum ExplorerMode { #[default] Browse, Deep }
 pub fn Explorer() -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
-    let mut mode: Signal<ExplorerMode> = use_signal(ExplorerMode::default);
 
     let ignore = store.settings.read().ignore_rules();
 
@@ -64,7 +83,7 @@ pub fn Explorer() -> Element {
     let scans_l = use_scan_driver(tree_l, exec_l);
 
     use_effect(move || {
-        let root = left_dir.read().clone();
+        let root = left_dir.read().cloned();
         let mut nt = DirectoryTree::new(root.clone());
         if let Some(req) = nt.on_toggled(&root) { tree_l.set(nt); scans_l.send(req); }
         else { tree_l.set(nt); }
@@ -82,7 +101,7 @@ pub fn Explorer() -> Element {
     let scans_r = use_scan_driver(tree_r, exec_r);
 
     use_effect(move || {
-        let root = right_dir.read().clone();
+        let root = right_dir.read().cloned();
         let mut nt = DirectoryTree::new(root.clone());
         if let Some(req) = nt.on_toggled(&root) { tree_r.set(nt); scans_r.send(req); }
         else { tree_r.set(nt); }
@@ -90,17 +109,28 @@ pub fn Explorer() -> Element {
 
     // ── Shared digest map ────────────────────────────────────────────────────
     let mut digest_map: Signal<HashMap<DigestKey, DigestState>> = use_signal(HashMap::new);
+    let mut digest_roots: Signal<(PathBuf, PathBuf)> = use_signal(|| (PathBuf::new(), PathBuf::new()));
 
-    // Compute digest status for entries visible in both panes.
     use_effect(move || {
-        let l_root = left_dir.read().clone();
-        let r_root = right_dir.read().clone();
+        let l_root = left_dir.read().cloned();
+        let r_root = right_dir.read().cloned();
         if r_root.as_os_str().is_empty() || l_root.as_os_str().is_empty() { return; }
 
-        // Collect visible relative paths from the left tree.
+        {
+            let roots = digest_roots.read();
+            let changed = roots.0 != l_root || roots.1 != r_root;
+            drop(roots);
+            if changed {
+                digest_map.write().clear();
+                digest_roots.set((l_root.clone(), r_root.clone()));
+            }
+        }
+
         let left_entries: Vec<(PathBuf, bool)> = tree_l.read().visible_rows().into_iter()
             .filter_map(|(n, _)| {
-                n.path.strip_prefix(&l_root).ok().map(|rel| (rel.to_path_buf(), n.is_dir))
+                let rel = n.path.strip_prefix(&l_root).ok()?.to_path_buf();
+                if rel.as_os_str().is_empty() { return None; } // skip root itself
+                Some((rel, n.is_dir))
             })
             .collect();
 
@@ -108,11 +138,9 @@ pub fn Explorer() -> Element {
             if digest_map.read().contains_key(&DigestKey::Common(rel.clone())) { continue; }
             let cp = r_root.join(&rel);
             if is_dir {
-                // Directory: existence check only (deep comparison is in Directory Report).
                 let state = if cp.is_dir() { DigestState::Equal } else { DigestState::Unique };
                 digest_map.write().insert(DigestKey::Common(rel), state);
             } else {
-                // File: background byte comparison.
                 if !cp.is_file() { digest_map.write().insert(DigestKey::Common(rel.clone()), DigestState::Unique); continue; }
                 let lp = l_root.join(&rel);
                 let rp = cp;
@@ -127,14 +155,16 @@ pub fn Explorer() -> Element {
                 });
             }
         }
-        // Right-only entries visible in the right tree get Unique status too.
-        let r_root2 = right_dir.read().clone();
-        let l_root2 = left_dir.read().clone();
+        let r_root2 = right_dir.read().cloned();
+        let l_root2 = left_dir.read().cloned();
         let right_entries: Vec<PathBuf> = tree_r.read().visible_rows().into_iter()
-            .filter_map(|(n, _)| n.path.strip_prefix(&r_root2).ok().map(|r| r.to_path_buf()))
+            .filter_map(|(n, _)| {
+                let rel = n.path.strip_prefix(&r_root2).ok()?.to_path_buf();
+                if rel.as_os_str().is_empty() { return None; }
+                Some(rel)
+            })
             .collect();
         for rel in right_entries {
-            // Key is the right-side relative path; check if left counterpart exists.
             let right_key = DigestKey::RightOnly(rel.clone());
             if digest_map.read().contains_key(&right_key) { continue; }
             if !l_root2.join(&rel).exists() {
@@ -143,48 +173,50 @@ pub fn Explorer() -> Element {
         }
     });
 
-    // ── Picks ────────────────────────────────────────────────────────────────
-    let left_pick  = store.left_pick.read().clone();
-    let right_pick = store.right_pick.read().clone();
-    let can_compare = left_pick.is_some() && right_pick.is_some();
+    // ── Picks (file or directory) ─────────────────────────────────────────────
+    let mut left_pick:  Signal<Option<PickKind>> = use_signal(|| None);
+    let mut right_pick: Signal<Option<PickKind>> = use_signal(|| None);
 
-    // ── Deep compare roots ───────────────────────────────────────────────────
-    let deep_l = left_dir.read().clone();
-    let deep_r = right_dir.read().clone();
+    // Also sync file picks into Store so dblclick priority logic can read them.
+    use_effect(move || {
+        let lp = left_pick.read();
+        store.left_pick.set(lp.as_ref().filter(|p| p.is_file()).map(|p| p.path().clone()));
+    });
+    use_effect(move || {
+        let rp = right_pick.read();
+        store.right_pick.set(rp.as_ref().filter(|p| p.is_file()).map(|p| p.path().clone()));
+    });
 
     // ── Compute aligned rows ─────────────────────────────────────────────────
-    let l_root_snap = left_dir.read().clone();
-    let r_root_snap = right_dir.read().clone();
+    let l_root_snap = left_dir.read().cloned();
+    let r_root_snap = right_dir.read().cloned();
     let left_flat: Vec<(PathBuf, bool, bool, bool, u32)> = tree_l.read().visible_rows().into_iter()
+        .filter(|(n, _)| n.path != l_root_snap)   // skip the root node itself
         .map(|(n, d)| (n.path.clone(), n.is_dir, n.is_expanded, n.is_selected, d)).collect();
     let right_flat: Vec<(PathBuf, bool, bool, bool, u32)> = tree_r.read().visible_rows().into_iter()
+        .filter(|(n, _)| n.path != r_root_snap)   // skip the root node itself
         .map(|(n, d)| (n.path.clone(), n.is_dir, n.is_expanded, n.is_selected, d)).collect();
     let aligned = compute_aligned_rows(&left_flat, &right_flat, &l_root_snap, &r_root_snap);
 
+    // ── Compare button label and state ────────────────────────────────────────
+    let lp = left_pick.read().clone();
+    let rp = right_pick.read().clone();
+    let action = compare_action(&lp, &rp);
+    let can_compare = action != CompareAction::None;
+    let compare_tooltip = match &action {
+        CompareAction::Files(..) => t(lang, "Compare selected files"),
+        CompareAction::Dirs(..)  => t(lang, "Compare selected directories"),
+        CompareAction::None => t(lang, "Select a file or directory on each side to compare"),
+    };
+
     rsx! {
         div { class: "explorer",
-            // ── Mode selector ────────────────────────────────────────────────
-            div { class: "explorer-modes",
-                button {
-                    class: if *mode.read() == ExplorerMode::Browse { "mode-btn active" } else { "mode-btn" },
-                    title: t(lang, "Browse and navigate directories side by side"),
-                    onclick: move |_| mode.set(ExplorerMode::Browse),
-                    {t(lang, "Browse")}
-                }
-                button {
-                    class: if *mode.read() == ExplorerMode::Deep { "mode-btn active" } else { "mode-btn" },
-                    title: t(lang, "Recursively compare all files in both directories and show a full status report"),
-                    onclick: move |_| mode.set(ExplorerMode::Deep),
-                    {t(lang, "Directory Report")}
-                }
-            }
 
-            if *mode.read() == ExplorerMode::Browse {
-                div { class: "explorer-browse",
-                    // ── Path bars ────────────────────────────────────────────
+            // ── Browse view ───────────────────────────────────────────────
+            div { class: "explorer-browse",
                     div { class: "explorer-path-bars",
                         PathBar {
-                            path: left_dir.read().clone(),
+                            path: left_dir.read().cloned(),
                             can_back:    left_hist.read().can_back(),
                             can_forward: left_hist.read().can_forward(),
                             on_back:    move |_| { let p = left_hist.write().back();    if let Some(p) = p { navigate_to(p, true,  store, left_hist,  left_dir); } },
@@ -193,7 +225,7 @@ pub fn Explorer() -> Element {
                             lang,
                         }
                         PathBar {
-                            path: right_dir.read().clone(),
+                            path: right_dir.read().cloned(),
                             can_back:    right_hist.read().can_back(),
                             can_forward: right_hist.read().can_forward(),
                             on_back:    move |_| { let p = right_hist.write().back();    if let Some(p) = p { navigate_to(p, false, store, right_hist, right_dir); } },
@@ -203,8 +235,25 @@ pub fn Explorer() -> Element {
                         }
                     }
 
-                    // ── Aligned tree body ────────────────────────────────────
+                    // ── Per-pane root labels (pinned between path bar and scroll area) ─
+                    div { class: "pane-root-bar",
+                        div { class: "pane-root-cell",
+                            span { class: "root-label", "📁 " }
+                            span { class: "root-name",
+                                title: "{l_root_snap.display()}",
+                                {short_name(&l_root_snap)}
+                            }
+                        }
+                        div { class: "pane-root-cell",
+                            span { class: "root-label", "📁 " }
+                            span { class: "root-name",
+                                title: "{r_root_snap.display()}",
+                                {short_name(&r_root_snap)}
+                            }
+                        }
+                    }
                     div {
+                        id: "aligned-tree",
                         class: "aligned-tree",
                         tabindex: "0",
                         onkeydown: move |e: Event<KeyboardData>| {
@@ -216,7 +265,6 @@ pub fn Explorer() -> Element {
                                 if let Some(p) = rp { navigate_to(p, false, store, right_hist, right_dir); }
                                 return;
                             }
-                            // Keyboard nav delegates to the left tree for focus.
                             let tk = match e.key() {
                                 Key::ArrowUp => TreeKey::Up, Key::ArrowDown => TreeKey::Down,
                                 Key::ArrowLeft => TreeKey::Left, Key::ArrowRight => TreeKey::Right,
@@ -236,13 +284,13 @@ pub fn Explorer() -> Element {
                                 }
                             }
                         },
-                        for (left_row, right_row) in aligned.iter() {
+                    // ── Aligned entries (children of each root) ────────────────
+                    for (left_row, right_row) in aligned.iter() {
                             {
                                 let lr = left_row.clone();
                                 let rr = right_row.clone();
                                 rsx! {
                                     div { class: "aligned-row",
-                                        // ── Left half ───────────────────────
                                         div { class: "pane-half",
                                             if let Some(ref row) = lr {
                                                 {
@@ -252,8 +300,6 @@ pub fn Explorer() -> Element {
                                                     let p_dbl = row.abs_path.clone();
                                                     let p_nav = row.abs_path.clone();
                                                     let is_dir = row.is_dir;
-                                                    let other_pick = store.right_pick.read().clone();
-                                                    let mut lpick = store.left_pick;
                                                     rsx! {
                                                         TreeRow {
                                                             path: row.abs_path.clone(),
@@ -266,13 +312,29 @@ pub fn Explorer() -> Element {
                                                             },
                                                             on_select: move |_| {
                                                                 tree_l.write().on_selected(&p_sel, is_dir, SelectionMode::Replace);
-                                                                if !is_dir { lpick.set(Some(p_sel.clone())); }
+                                                                left_pick.set(Some(if is_dir {
+                                                                    PickKind::Dir(p_sel.clone())
+                                                                } else {
+                                                                    PickKind::File(p_sel.clone())
+                                                                }));
                                                             },
                                                             on_dblclick: move |_| {
                                                                 if is_dir {
                                                                     navigate_to(p_nav.clone(), true, store, left_hist, left_dir);
-                                                                } else if let Some(cp) = other_pick.as_ref().filter(|op| op.file_name() == p_dbl.file_name()) {
-                                                                    open_compare(&mut store, p_dbl.clone(), cp.clone());
+                                                                } else {
+                                                                    let rp = store.right_pick.read().cloned();
+                                                                    if let Some(cp) = rp.filter(|p| p.is_file()) {
+                                                                        open_compare(&mut store, p_dbl.clone(), cp);
+                                                                        return;
+                                                                    }
+                                                                    let l_root = left_dir.read().cloned();
+                                                                    let r_root = right_dir.read().cloned();
+                                                                    if let Ok(rel) = p_dbl.strip_prefix(&l_root) {
+                                                                        let cp = r_root.join(rel);
+                                                                        if cp.is_file() {
+                                                                            open_compare(&mut store, p_dbl.clone(), cp);
+                                                                        }
+                                                                    }
                                                                 }
                                                             },
                                                         }
@@ -280,12 +342,9 @@ pub fn Explorer() -> Element {
                                                 }
                                             } else { div { class: "row-spacer" } }
                                         }
-                                        // ── Right half ──────────────────────
                                         div { class: "pane-half",
                                             if let Some(ref row) = rr {
                                                 {
-                                                    // For right-side status: try Common first (present on both sides),
-                                                    // then RightOnly (present on right side only).
                                                     let status = digest_map.read()
                                                         .get(&DigestKey::Common(row.rel_path.clone()))
                                                         .cloned()
@@ -297,8 +356,6 @@ pub fn Explorer() -> Element {
                                                     let p_dbl = row.abs_path.clone();
                                                     let p_nav = row.abs_path.clone();
                                                     let is_dir = row.is_dir;
-                                                    let other_pick = store.left_pick.read().clone();
-                                                    let mut rpick = store.right_pick;
                                                     rsx! {
                                                         TreeRow {
                                                             path: row.abs_path.clone(),
@@ -311,13 +368,29 @@ pub fn Explorer() -> Element {
                                                             },
                                                             on_select: move |_| {
                                                                 tree_r.write().on_selected(&p_sel, is_dir, SelectionMode::Replace);
-                                                                if !is_dir { rpick.set(Some(p_sel.clone())); }
+                                                                right_pick.set(Some(if is_dir {
+                                                                    PickKind::Dir(p_sel.clone())
+                                                                } else {
+                                                                    PickKind::File(p_sel.clone())
+                                                                }));
                                                             },
                                                             on_dblclick: move |_| {
                                                                 if is_dir {
                                                                     navigate_to(p_nav.clone(), false, store, right_hist, right_dir);
-                                                                } else if let Some(cp) = other_pick.as_ref().filter(|op| op.file_name() == p_dbl.file_name()) {
-                                                                    open_compare(&mut store, cp.clone(), p_dbl.clone());
+                                                                } else {
+                                                                    let lp = store.left_pick.read().cloned();
+                                                                    if let Some(cp) = lp.filter(|p| p.is_file()) {
+                                                                        open_compare(&mut store, cp, p_dbl.clone());
+                                                                        return;
+                                                                    }
+                                                                    let l_root = left_dir.read().cloned();
+                                                                    let r_root = right_dir.read().cloned();
+                                                                    if let Ok(rel) = p_dbl.strip_prefix(&r_root) {
+                                                                        let cp = l_root.join(rel);
+                                                                        if cp.is_file() {
+                                                                            open_compare(&mut store, cp, p_dbl.clone());
+                                                                        }
+                                                                    }
                                                                 }
                                                             },
                                                         }
@@ -331,26 +404,28 @@ pub fn Explorer() -> Element {
                         }
                     }
 
-                    // ── Footer ───────────────────────────────────────────────
+                    // ── Footer ────────────────────────────────────────────────
                     div { class: "explorer-footer",
                         button {
                             disabled: !can_compare,
+                            title: compare_tooltip.clone(),
                             onclick: move |_| {
-                                let l = store.left_pick.read().clone();
-                                let r = store.right_pick.read().clone();
-                                if let (Some(l), Some(r)) = (l, r) { open_compare(&mut store, l, r); }
+                                let lp = left_pick.read().clone();
+                                let rp = right_pick.read().clone();
+                                match compare_action(&lp, &rp) {
+                                    CompareAction::Files(l, r) => open_compare(&mut store, l, r),
+                                    CompareAction::Dirs(l, r)  => open_dir_compare(&mut store, l, r),
+                                    CompareAction::None => {}
+                                }
                             },
                             {t(lang, "Compare")}
                         }
-                        if let (Some(l), Some(r)) = (&left_pick, &right_pick) {
+                        if let (Some(lp), Some(rp)) = (left_pick.read().as_ref(), right_pick.read().as_ref()) {
                             span { class: "compare-label",
-                                {format!("{} ↔ {}", short_name(l), short_name(r))}
+                                {format!("{} ↔ {}", short_name(lp.path()), short_name(rp.path()))}
                             }
                         }
                     }
-                }
-            } else {
-                DeepCompareView { left_root: deep_l, right_root: deep_r, lang }
             }
         }
     }

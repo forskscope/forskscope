@@ -214,6 +214,7 @@ select option {
 .identical { padding: 2rem; text-align: center; color: var(--ok); }
 .applied { padding: 0 .35rem; color: var(--ok); font-size: 11px; }
 .notice { padding: .5rem .6rem; color: var(--warn); font-size: 12px; }
+.notice.notice-ok { color: var(--ok); }
 
 /* Pane header labels */
 .diff-pane-labels {
@@ -429,6 +430,9 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
 .bc-seg { background: none; border: none; color: var(--accent); cursor: pointer;
   padding: .1rem .2rem; border-radius: 3px; font-size: 12px; }
 .bc-seg:hover { background: var(--surface-3); }
+.bc-root { background: none; border: none; color: var(--muted); cursor: pointer;
+  padding: .1rem .4rem; border-radius: 3px; font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
+.bc-root:hover { color: var(--accent); background: var(--surface-3); }
 .bc-sep { color: var(--muted); padding: 0 .05rem; }
 .bc-current { color: var(--text); font-weight: 600; padding: .1rem .2rem; }
 
@@ -450,9 +454,8 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
 .path-btn:disabled { color: var(--muted); cursor: default; }
 .path-edit-btn { margin-left: .15rem; color: var(--muted); }
 .path-segments { display: flex; align-items: center; flex: 1;
-  min-width: 0; overflow: hidden; white-space: nowrap;
-  direction: rtl; }  /* rtl: overflow hides from the LEFT, keeping current segment visible */
-.path-segments > * { direction: ltr; }  /* text inside each item reads left-to-right */
+  min-width: 0; overflow: hidden; white-space: nowrap; }
+.path-segments .bc-seg { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .path-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--border);
   background: var(--surface); color: var(--text); border-radius: 3px; font-size: 12px;
   min-width: 6ch; }
@@ -502,3 +505,146 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
   background: var(--surface-3); border: 1px solid var(--border); cursor: pointer;
 }
 .filter-btn.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+/* ── Deep compare root header ── */
+.deep-roots { display: flex; align-items: center; gap: .3rem; padding: .35rem .6rem;
+  font-size: 12px; background: var(--surface-2); border-bottom: 1px solid var(--border);
+  overflow: hidden; white-space: nowrap; }
+.deep-root-label { color: var(--muted); flex-shrink: 0; }
+.deep-root-path  { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.deep-root-sep   { color: var(--muted); flex-shrink: 0; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE LAYOUT — stacked vertical panes below 720 px
+   At ≥ 720px: side-by-side (default).
+   At  < 720px: top/bottom stacked for both explorer and diff.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 719px) {
+
+  /* ── Explorer: stack path bars and aligned rows vertically ── */
+  .explorer-path-bars {
+    grid-template-columns: 1fr;
+  }
+  .explorer-path-bars .path-bar:last-child {
+    border-top: 1px solid var(--border);
+  }
+  .aligned-row {
+    grid-template-columns: 1fr;
+  }
+  /* Add a top border so rows from the second pane are visually separated */
+  .aligned-row .pane-half:last-child {
+    border-right: none;
+    border-top: 1px solid var(--border);
+  }
+  .row-spacer { display: none; } /* spacers have no role in single-column mode */
+
+  /* ── Diff: stack left pane above right pane ── */
+
+  /* The shared horizontal scroll container switches to vertical stacking */
+  .diff-scroll {
+    overflow-x: hidden; /* no horizontal scroll in stacked mode */
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Rows stack: left pane on top, right pane below */
+  .diff-row {
+    flex-direction: column;
+    min-width: 100%; /* remove the 110ch floor */
+    border-bottom: 2px solid var(--border);
+  }
+
+  /* Each pane takes full width */
+  .diff-pane {
+    flex: none;
+    width: 100%;
+    overflow-x: auto; /* each pane scrolls independently */
+  }
+  .diff-pane.left {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Act column becomes a horizontal strip */
+  .diff-act {
+    flex: none;
+    width: 100%;
+    border-left: none;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    justify-content: flex-start;
+    padding: .1rem .4rem;
+    background: var(--surface-2);
+  }
+
+  /* Pane labels stack vertically */
+  .diff-pane-labels {
+    flex-direction: column;
+    min-width: 100%;
+  }
+  .diff-pane-labels .pane-label-left {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .diff-pane-labels .pane-label-act {
+    flex: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .diff-pane-labels .pane-label-right {
+    text-align: left;
+  }
+
+  /* File header: stack old/new paths */
+  .diff-file-header {
+    flex-wrap: wrap;
+  }
+  .diff-file-header .path-new {
+    text-align: left;
+  }
+
+  /* Deep compare root header: wrap paths */
+  .deep-roots {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  .deep-root-path {
+    text-overflow: clip;
+    white-space: normal;
+    word-break: break-all;
+  }
+
+  /* Tabs: allow wrapping on very narrow screens */
+  .tabbar {
+    flex-wrap: wrap;
+    max-height: none;
+  }
+
+  /* Modal: full width on narrow screens */
+  .modal, .modal-wide {
+    min-width: min(98vw, 20rem);
+    max-width: 98vw;
+    margin: .5rem;
+  }
+}
+
+/* ── Explorer Directory Report back bar ── */
+.explorer-deep-back {
+  display: flex; align-items: center;
+  padding: .3rem .6rem;
+  background: var(--surface-2); border-bottom: 1px solid var(--border);
+}
+
+/* ── Explorer pane root bar (between path bar and scroll, one per pane) ── */
+.pane-root-bar { display: grid; grid-template-columns: 1fr 1fr;
+  background: var(--surface-2); border-bottom: 2px solid var(--accent);
+  flex-shrink: 0; }
+.pane-root-cell { display: flex; align-items: center; gap: .2rem;
+  padding: .25rem .5rem; font-size: 12px; font-weight: 700; overflow: hidden; }
+.pane-root-cell:first-child { border-right: 1px solid var(--border); }
+.root-label { color: var(--muted); flex-shrink: 0; }
+.root-name  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text); }

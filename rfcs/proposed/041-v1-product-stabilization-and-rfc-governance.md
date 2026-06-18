@@ -1,6 +1,6 @@
 # RFC 041: v1.0 Product Stabilization and RFC Governance
 
-**Status.** Proposed — checklist updated v0.135.0
+**Status.** Proposed — checklist updated v0.144.0; §1a confirmed
 
 ## Current state (v0.135.0) — final pre-GTK state
 
@@ -21,7 +21,7 @@
 
 ```text
 Product:
-  [ ] Two-way file compare works end to end         (UI wiring remaining — requires GTK)
+  [x] Two-way file compare works end to end         (confirmed v0.144.0 smoke test §1a)
   [x] Result buffer save works with backup policy
   [ ] Directory compare works for practical trees   (UI wiring remaining — requires GTK)
   [ ] Basic keyboard navigation is complete         (UI wiring remaining — requires GTK)
