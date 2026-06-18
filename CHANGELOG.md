@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.151.0] — 2026-06-16
+
+RFC-068: Explorer unaligned (compact) view mode.
+
+### Added
+
+**Compact Explorer layout (RFC-068):**
+A new **Explorer layout** setting under Settings → Advanced. Two options:
+
+- **Aligned (default)** — the existing behaviour: same-name entries share a row
+  across panes; spacer rows fill gaps where one side is missing. Cross-pane
+  alignment is structural; vertical scroll syncs implicitly.
+- **Compact (independent panes)** — no spacer rows. Each pane renders its own
+  flat list and scrolls independently. Entries are sorted by name within each
+  pane but not forced to align across panes.
+
+Compact mode is useful in directories where many files exist only on one side
+(many left-only or right-only entries), where the aligned view produces mostly
+whitespace spacers.
+
+**Design decisions recorded in RFC-068:**
+- Cross-pane alignment is intentionally absent in compact mode — this is the
+  trade-off; row N on the left does not correspond to row N on the right.
+- Same-name equality badges (✓/⚠) still appear in compact mode via name-keyed
+  digest lookup.
+- Picks, binary badges, and navigation work the same way in both modes; the
+  filter bar (RFC-067) applies independently per pane in compact mode.
+- `AppSettings::explorer_compact` (default: `false`, persisted) controls the mode.
+
+---
+
 ## [0.150.0] — 2026-06-16
 
 RFC-067: Explorer name-pattern filter and filter checkboxes.

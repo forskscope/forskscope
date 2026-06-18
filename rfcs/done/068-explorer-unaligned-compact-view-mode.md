@@ -1,6 +1,6 @@
 # RFC 068: Explorer Unaligned (Compact) View Mode
 
-**Status.** Proposed
+**Status.** Implemented (v0.151.0)
 **Tracks.** An optional view mode that removes the empty spacer rows from the
 two-pane Explorer so each pane packs its entries independently, for users who
 prefer density over cross-pane row alignment. Bound to a user setting.

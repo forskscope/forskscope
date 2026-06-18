@@ -741,3 +741,15 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
   border: 1px solid var(--border);
 }
 .filter-clear:hover { color: var(--text); border-color: var(--accent); }
+
+/* ── Explorer compact (unaligned) view — RFC-068 ── */
+.compact-tree {
+  display: flex; flex: 1; min-height: 0; overflow: hidden;
+}
+.compact-pane {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: .2rem;
+}
+.compact-pane-right {
+  border-left: 1px solid var(--border);
+}

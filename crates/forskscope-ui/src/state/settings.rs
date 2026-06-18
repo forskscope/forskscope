@@ -91,6 +91,10 @@ pub struct AppSettings {
     /// Comma-separated directory-name patterns to ignore (e.g. `"target, node_modules, *.cache"`).
     #[serde(default)]
     pub ignore_dirs: String,
+    /// When `true`, the Explorer shows each pane independently (no spacer rows),
+    /// breaking cross-pane alignment. Default `false` (aligned mode) (RFC-068).
+    #[serde(default)]
+    pub explorer_compact: bool,
     /// When `false` (default), binary files cannot be compared and appear
     /// as non-actionable in the Explorer (RFC-066).
     #[serde(default)]
@@ -107,6 +111,7 @@ impl Default for AppSettings {
             profiles: default_profiles(), active_profile: 0,
             ignore_extensions: String::new(), ignore_dirs: String::new(),
             enable_binary_comparison: false,
+            explorer_compact: false,
         }
     }
 }

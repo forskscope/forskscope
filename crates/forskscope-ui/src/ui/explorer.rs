@@ -80,6 +80,7 @@ pub fn Explorer() -> Element {
 
     let ignore = store.settings.read().ignore_rules();
     let binary_enabled = store.settings.read().enable_binary_comparison;
+    let compact_mode   = store.settings.read().explorer_compact;
 
     // Cache of paths known to be binary; populated lazily at render time (RFC-066).
     // Cleared when either directory changes so stale results don't linger.
@@ -366,7 +367,9 @@ pub fn Explorer() -> Element {
                             span { class: "root-name", title: "{r_root_snap.display()}", {short_name(&r_root_snap)} }
                         }
                     }
-                    div {
+                    // ── Aligned OR compact tree ───────────────────────────────
+                    if !compact_mode {
+                        div {
                         id: "aligned-tree",
                         class: "aligned-tree",
                         tabindex: "0",
@@ -606,6 +609,129 @@ pub fn Explorer() -> Element {
                                                     }
                                                 }
                                             } else { div { class: "row-spacer" } }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    } // end if !compact_mode
+
+                    if compact_mode {
+                        // ── Compact (unaligned) view — RFC-068 ───────────────
+                        // Each pane scrolls independently; no spacer rows;
+                        // cross-pane row alignment is intentionally absent.
+                        div { class: "compact-tree",
+                            // Left pane
+                            div { class: "compact-pane",
+                                for row in left_flat.iter().filter(|(p, is_dir, ..)| {
+                                    if filter_query.read().is_empty() { true } else {
+                                        p.file_name().map(|n| n.to_string_lossy().to_lowercase()
+                                            .contains(&*filter_query.read())).unwrap_or(false)
+                                    }
+                                }) {
+                                    {
+                                        let (abs, is_dir, is_expanded, is_selected, depth) = row.clone();
+                                        let rel = abs.strip_prefix(&l_root_snap).unwrap_or(&abs).to_path_buf();
+                                        let status = if *is_dir {
+                                            digest_map.read().get(&DigestKey::Common(rel.clone())).cloned()
+                                        } else {
+                                            digest_map.read().get(&DigestKey::Common(rel.clone()))
+                                                .or_else(|| digest_map.read().get(&DigestKey::LeftOnly(rel.clone())))
+                                                .cloned()
+                                        };
+                                        let p_tgl = abs.clone(); let p_sel = abs.clone();
+                                        let p_dbl = abs.clone(); let p_nav = abs.clone();
+                                        let p_bin = abs.clone();
+                                        let is_binary = if *is_dir { false } else {
+                                            let cached = binary_cache.read().get(&abs).copied();
+                                            cached.unwrap_or_else(|| {
+                                                let b = matches!(forskscope_core::file_kind::classify(&p_bin),
+                                                    Ok(forskscope_core::file_kind::FileKind::Binary));
+                                                binary_cache.write().insert(p_bin, b);
+                                                b
+                                            })
+                                        };
+                                        rsx! {
+                                            TreeRow {
+                                                path: abs.clone(), is_dir: *is_dir,
+                                                is_expanded: *is_expanded, is_selected: *is_selected,
+                                                depth: *depth, status, is_binary, binary_enabled,
+                                                on_toggle: move |_| {
+                                                    if let Some(r) = tree_l.write().on_toggled(&p_tgl) { scans_l.send(r); }
+                                                    digest_map.write().clear();
+                                                },
+                                                on_select: move |_| {
+                                                    tree_l.write().on_selected(&p_sel, *is_dir, SelectionMode::Replace);
+                                                    left_pick.set(Some(if *is_dir { PickKind::Dir(p_sel.clone()) } else { PickKind::File(p_sel.clone()) }));
+                                                },
+                                                on_dblclick: move |_| {
+                                                    if *is_dir { navigate_to(p_nav.clone(), true, store, left_hist, left_dir); }
+                                                    else {
+                                                        let rp = store.right_pick.read().cloned();
+                                                        if let Some(cp) = rp.filter(|p| p.is_file()) {
+                                                            open_compare(&mut store, p_dbl.clone(), cp);
+                                                        }
+                                                    }
+                                                },
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            // Right pane
+                            div { class: "compact-pane compact-pane-right",
+                                for row in right_flat.iter().filter(|(p, is_dir, ..)| {
+                                    if filter_query.read().is_empty() { true } else {
+                                        p.file_name().map(|n| n.to_string_lossy().to_lowercase()
+                                            .contains(&*filter_query.read())).unwrap_or(false)
+                                    }
+                                }) {
+                                    {
+                                        let (abs, is_dir, is_expanded, is_selected, depth) = row.clone();
+                                        let rel = abs.strip_prefix(&r_root_snap).unwrap_or(&abs).to_path_buf();
+                                        let status = if *is_dir {
+                                            digest_map.read().get(&DigestKey::Common(rel.clone())).cloned()
+                                        } else {
+                                            digest_map.read().get(&DigestKey::Common(rel.clone()))
+                                                .or_else(|| digest_map.read().get(&DigestKey::RightOnly(rel.clone())))
+                                                .cloned()
+                                        };
+                                        let p_tgl = abs.clone(); let p_sel = abs.clone();
+                                        let p_dbl = abs.clone(); let p_nav = abs.clone();
+                                        let p_bin = abs.clone();
+                                        let is_binary = if *is_dir { false } else {
+                                            let cached = binary_cache.read().get(&abs).copied();
+                                            cached.unwrap_or_else(|| {
+                                                let b = matches!(forskscope_core::file_kind::classify(&p_bin),
+                                                    Ok(forskscope_core::file_kind::FileKind::Binary));
+                                                binary_cache.write().insert(p_bin, b);
+                                                b
+                                            })
+                                        };
+                                        rsx! {
+                                            TreeRow {
+                                                path: abs.clone(), is_dir: *is_dir,
+                                                is_expanded: *is_expanded, is_selected: *is_selected,
+                                                depth: *depth, status, is_binary, binary_enabled,
+                                                on_toggle: move |_| {
+                                                    if let Some(r) = tree_r.write().on_toggled(&p_tgl) { scans_r.send(r); }
+                                                    digest_map.write().clear();
+                                                },
+                                                on_select: move |_| {
+                                                    tree_r.write().on_selected(&p_sel, *is_dir, SelectionMode::Replace);
+                                                    right_pick.set(Some(if *is_dir { PickKind::Dir(p_sel.clone()) } else { PickKind::File(p_sel.clone()) }));
+                                                },
+                                                on_dblclick: move |_| {
+                                                    if *is_dir { navigate_to(p_nav.clone(), false, store, right_hist, right_dir); }
+                                                    else {
+                                                        let lp = store.left_pick.read().cloned();
+                                                        if let Some(cp) = lp.filter(|p| p.is_file()) {
+                                                            open_compare(&mut store, cp, p_dbl.clone());
+                                                        }
+                                                    }
+                                                },
+                                            }
                                         }
                                     }
                                 }

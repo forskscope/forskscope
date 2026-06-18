@@ -7,7 +7,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Implemented (43)
+## Implemented (44)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
@@ -54,8 +54,9 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 065 | [Asynchronous Comparison and Loading-State Tabs](./done/065-async-comparison-and-loading-state-tabs.md) | v0.148.0 |
 | 066 | [Binary Comparison Policy — Off by Default](./done/066-binary-comparison-policy.md) | v0.149.0 |
 | 067 | [Explorer Name-Pattern Filter and Filter Checkboxes](./done/067-explorer-name-filter-and-checkboxes.md) | v0.150.0 |
+| 068 | [Explorer Unaligned (Compact) View Mode](./done/068-explorer-unaligned-compact-view-mode.md) | v0.151.0 |
 
-## Proposed (16)
+## Proposed (15)
 
 RFC-004–040 are editor-adapter track, platform/packaging, or governance/documentation.
 RFC-026 and RFC-030 are substantially implemented; their remaining items require GTK or are deferred.
@@ -80,7 +81,6 @@ Explorer filters and layout, and font selection.
 | 063 | [Trust, Clarity, and Calm UI Hardening](./proposed/063-trust-clarity-and-calm-ui-hardening.md) | UX review remediation | **Mostly shipped** v0.145.1–.3 — C1/C2/C3/C5/C6/C7/C9/C10 done; C4 audited; C8 rejected |
 
 
-| 068 | [Explorer Unaligned (Compact) View Mode](./proposed/068-explorer-unaligned-compact-view-mode.md) | Explorer | Not started — remove spacer rows; breaks row alignment by design |
 | 069 | [Explorer Layout — Compare Action and Header/Footer](./proposed/069-explorer-layout-compare-action-and-header-footer.md) | Explorer | Not started — sequenced after 067/068 |
 | 070 | [Font Family Selector in Settings](./proposed/070-font-family-selector.md) | Settings | Not started — diff font family selector |
 

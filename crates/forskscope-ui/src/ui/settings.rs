@@ -134,6 +134,18 @@ fn SettingsModal() -> Element {
                     }
                 }
                 div { class: "field",
+                    span { {t(lang, "Explorer layout")} }
+                    select {
+                        value: if cur.explorer_compact { "compact" } else { "aligned" },
+                        onchange: move |e| {
+                            store.settings.write().explorer_compact = e.value() == "compact";
+                            persist(&store.settings.read());
+                        },
+                        option { value: "aligned", {t(lang, "Aligned (default)")} }
+                        option { value: "compact", {t(lang, "Compact (independent panes)")} }
+                    }
+                }
+                div { class: "field",
                     span { {t(lang, "Context lines")} }
                     select {
                         value: "{cur.context_lines}",
