@@ -30,9 +30,9 @@ to keep the focused change visible.
 
 ## Scrolling
 
-A single horizontal scroll bar at the bottom of the diff view scrolls both
-panes together. Vertical scrolling is independent — use the window scroll or
-your mouse wheel.
+Each pane has its own horizontal scroll bar, so a long line in the left file
+does not force the right pane to scroll unnecessarily. Vertical scrolling keeps
+both panes row-aligned — use the window scroll or your mouse wheel.
 
 ---
 

@@ -5,6 +5,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.147.0] — 2026-06-16
+
+RFC-064: Compare view bug fixes — per-pane horizontal scroll and all-different
+line coloring.
+
+### Fixed
+
+**Per-pane horizontal scrollbars (RFC-064, Approach A):**
+Switched from the previous single shared horizontal scrollbar ("Approach B",
+ISSUE-001) to per-pane scrollbars ("Approach A"). Each diff pane now owns its
+own `overflow-x: auto` scrollbar, so a long line in the left pane can be
+revealed independently of the right pane and vice versa. The old behaviour —
+where the shared scrollbar was clipped/unreachable when one pane overflowed —
+is resolved.
+
+CSS changes: `.diff-scroll` now sets `overflow-x: hidden` (no longer owns the
+horizontal bar); `.diff-pane` sets `overflow-x: auto`; `.diff-row` no longer
+needs `min-width: 110ch`; `.diff-pane-labels` no longer needs a matching
+`min-width`. Word-wrap mode (`diff-scroll.wrap`) explicitly sets
+`overflow-x: hidden` on panes to suppress the per-pane scrollbar while wrapping.
+Vertical scroll-sync is unaffected.
+
+**All-different file coloring (RFC-064):**
+When the focused hunk was a delete/insert/replace hunk, the CSS class was
+replaced with `"hunk focused"` — dropping `hunk-del`/`hunk-ins`/`hunk-rep`
+entirely. This meant that in files where all or most hunks are changed (e.g.
+two completely different files), focusing any hunk would strip its color. Fixed:
+the focused class is now appended (`format!("{kind_class} focused")`) so both
+the kind color and the focus ring are always present.
+
+### Changed
+
+- `docs/src/users/known-limitations.md` — removed the "Horizontal scroll is
+  shared between both panes" limitation (now fixed).
+- `docs/src/users/diff-workflow.md` — updated scrolling section to describe
+  per-pane scrollbars.
+- RFC-064 moved from `rfcs/proposed/` to `rfcs/done/` (Implemented v0.147.0).
+  RFC index: Implemented 39 → 40, Proposed 20 → 19.
+
+---
+
 ## [0.146.0] — 2026-06-16
 
 RFC drafting for the next feature track. No code changes — design only.

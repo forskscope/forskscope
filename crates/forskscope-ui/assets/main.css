@@ -129,33 +129,31 @@ select option {
   padding: .35rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); }
 .diff-toolbar .info { color: var(--muted); font-size: 12px; }
 
-/* .diff-scroll: owns the single horizontal scrollbar for both panes.
-   Rows expand to their natural content width; this outer box clips and
-   scrolls them together (Approach B, ISSUE-001). */
+/* .diff-scroll: outer scroll container.
+   Approach A (RFC-064): horizontal scroll is per-pane, not shared.
+   This container handles vertical scroll only. */
 .diff-scroll {
   font-family: ui-monospace, monospace;
   font-size: var(--diff-fs, 14px);
-  overflow-x: auto;   /* single shared scrollbar — both panes advance together */
+  overflow-x: hidden;  /* Approach A: each pane owns its horizontal scroll */
   overflow-y: auto;
 }
 
 /* Each row is a flex container: left-pane | act | right-pane.
-   min-width ensures each pane gets at least ~50ch even on narrow windows;
-   .diff-scroll scrolls the row when content exceeds the viewport. */
+   No min-width needed: each pane clips and scrolls independently. */
 .diff-row {
   display: flex;
   align-items: stretch;
   min-height: var(--line-h);
-  min-width: max(100%, 110ch); /* floor: ~50ch per pane + gutters + act */
 }
 
-/* Independent-scroll pane: fixed half-width. Does not clip horizontally —
-   content expands naturally and .diff-scroll clips the whole row. */
+/* Approach A: each pane clips and scrolls its own content horizontally.
+   overflow-x:auto gives each pane its own scrollbar. */
 .diff-pane {
   display: flex;
-  flex: 1 1 0;          /* equal halves, never grow/shrink asymmetrically */
-  min-width: 0;         /* let flex shrink below content size */
-  overflow-x: visible;  /* content expands; .diff-scroll owns the scrollbar */
+  flex: 1 1 0;          /* equal halves */
+  min-width: 0;
+  overflow-x: auto;     /* Approach A: per-pane horizontal scrollbar (RFC-064) */
   overflow-y: visible;
   align-items: baseline;
 }
@@ -190,14 +188,15 @@ select option {
 .pane-gutter.ins { background: var(--ins-bg); }
 
 /* Cell: the line content. Fills remaining pane width.
-   white-space:pre lets long lines expand .diff-row naturally; .diff-scroll clips. */
+   white-space:pre lets long lines push the cell wider than the pane;
+   the pane clips and scrolls horizontally (Approach A, RFC-064). */
 .diff-pane .cell {
   flex: 1 1 0;
   min-width: 0;
   padding: 0 .4rem;
   line-height: var(--line-h);
-  white-space: pre;           /* no wrap: long lines push .diff-row wider */
-  overflow-x: visible;        /* content expands into the row's natural width */
+  white-space: pre;           /* no wrap: long lines push cell wider than pane */
+  overflow-x: visible;        /* cell expands; .diff-pane clips and scrolls */
 }
 
 /* Hunk-kind background on cells and gutters */
@@ -229,10 +228,9 @@ select option {
 .notice { padding: .5rem .6rem; color: var(--warn); font-size: 12px; }
 .notice.notice-ok { color: var(--ok); }
 
-/* Pane header labels */
+/* Pane header labels — flex layout mirrors .diff-row */
 .diff-pane-labels {
   display: flex;
-  min-width: max(100%, 110ch); /* must match .diff-row so labels stay aligned */
   background: var(--surface-2);
   border-bottom: 2px solid var(--border);
   font-size: 11px;
@@ -241,6 +239,7 @@ select option {
   letter-spacing: .04em;
   text-transform: uppercase;
   user-select: none;
+  overflow: hidden;   /* Approach A: labels don't scroll, just clip */
 }
 .diff-pane-labels .pane-label-left {
   flex: 1;
@@ -261,7 +260,10 @@ select option {
 .diff-row.match .diff-pane { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .diff-row.match .diff-pane .cell { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
-/* Word-wrap mode override: wrap within each pane instead of scrolling */
+/* Word-wrap mode: wrap within each pane; disable per-pane horizontal scroll */
+.diff-scroll.wrap .diff-pane {
+  overflow-x: hidden;
+}
 .diff-scroll.wrap .diff-pane .cell {
   white-space: pre-wrap;
   word-break: break-word;

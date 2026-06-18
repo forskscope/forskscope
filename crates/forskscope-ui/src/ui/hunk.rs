@@ -32,7 +32,8 @@ pub fn HunkBlock(
         HunkKind::Insert  => "hunk hunk-ins",
         HunkKind::Replace => "hunk hunk-rep",
     };
-    let class = if focused { "hunk focused" } else { kind_class };
+    // Keep the kind class even when focused so colour is never lost (RFC-064).
+    let class = if focused { format!("{kind_class} focused") } else { kind_class.to_string() };
     let hunk_id = hunk.hunk_id;
     let applied = matches!(hunk.state, HunkState::AppliedLeftToRight);
     let rows = &hunk.rows;

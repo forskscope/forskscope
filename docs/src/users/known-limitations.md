@@ -7,18 +7,6 @@ the recommended workaround.
 
 ## Diff view
 
-### Horizontal scroll is shared between both panes
-
-Both panes scroll together horizontally. If the left file has a very long line
-in one area and the right file has long lines in a different area, you may
-need to scroll horizontally to see each side. Independent per-pane horizontal
-scroll is planned (ISSUE-001, Approach A) but not yet implemented.
-
-**Workaround:** Enable **Wrap** in the toolbar (More ▼ → Wrap: on) to wrap
-long lines within each pane instead of scrolling.
-
----
-
 ### Three-way merge workspace not yet available
 
 `ThreeWayMergeSession` and the conflict resolution model are fully implemented

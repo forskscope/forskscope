@@ -1,6 +1,6 @@
 # RFC 064: Compare View — Per-Pane Horizontal Scroll and All-Different Coloring
 
-**Status.** Proposed
+**Status.** Implemented (v0.147.0)
 **Tracks.** Two defects in the text diff workspace: (1) horizontal overflow on a
 pane cannot be revealed by the current single shared scrollbar; (2) when no lines
 match between the two files, no diff coloring is drawn.
