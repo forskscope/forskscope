@@ -164,13 +164,31 @@ pub fn App() -> Element {
             }
             StatusBar {}
             ModalLayer {}
-            if let Some(message) = toast {
-                div {
-                    class: "toast",
-                    role: "status",
-                    aria_live: "polite",
-                    onclick: move |_| store.toast.set(None),
-                    "{message}"
+            if let Some(notice) = toast {
+                {
+                    let severity_class = match notice.severity {
+                        crate::state::NoticeSeverity::Success => "toast toast-success",
+                        crate::state::NoticeSeverity::Info    => "toast toast-info",
+                        crate::state::NoticeSeverity::Warning => "toast toast-warning",
+                        crate::state::NoticeSeverity::Error   => "toast toast-error",
+                    };
+                    let message = notice.message.clone();
+                    // Auto-dismiss for Success and Info notices.
+                    if let Some(ms) = notice.auto_dismiss_ms() {
+                        spawn(async move {
+                            tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+                            store.toast.set(None);
+                        });
+                    }
+                    rsx! {
+                        div {
+                            class: "{severity_class}",
+                            role: "status",
+                            aria_live: "polite",
+                            onclick: move |_| store.toast.set(None),
+                            "{message}"
+                        }
+                    }
                 }
             }
         }

@@ -5,6 +5,58 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.145.1] — 2026-06-14
+
+UX hardening — RFC-060 W1; RFC-063 C1, C2, C3, C5, C6, C7, C9, C10.
+
+### Changed
+
+**RFC-060 W1 — Explicit `stop_propagation` on all text-entry surfaces:**
+Path-bar editor Enter/Escape and settings modal Escape now call
+`stop_propagation` directly, making keyboard safety explicit rather than
+incidental to the modal-open guard. (Sprint 0 fix for search already in v0.145.0.)
+
+**RFC-063 C3 — Labeled hunk apply button:**
+The `▶` apply button in the diff act column now shows `▶ Use` with a full
+`title`/`aria_label` "Use this change (apply left to right)". Act column
+widened from 5ch to 6ch to accommodate the text label. `pane-label-act` and
+responsive overrides updated to match.
+
+**RFC-063 C10 — Friendly error mapping:**
+File-read errors in `open_compare` and `reload_tab` now show action-oriented
+messages: `Could not open "filename" — <reason>. Check that the file exists
+and you have read permission.` Replaces the previous `Left/Right file read error: <raw-os-error>`.
+
+**RFC-063 C1 — Empty / first-run state in Explorer:**
+When the aligned tree has no entries (both panes empty, or first launch),
+shows a centered card: `📂 Compare files or folders` / instructional hint /
+`🔒 Nothing leaves this computer.` instead of a blank scroll area.
+
+**RFC-063 C6 — Progressive disclosure in Settings:**
+Context lines, Ignore patterns, and Compare profiles are now hidden under an
+`▸ Advanced` toggle (default collapsed). Appearance, Language, and Diff font
+size remain visible at the top level. Click `▾ Hide advanced` to collapse.
+
+**RFC-063 C2 — Density design tokens:**
+Added `--control-h` (36px), `--control-min-w` (44px), `--row-h` (32px),
+`--control-pad-x` (10px), `--focus-ring` (2px) to `:root`. Applied:
+`min-height: var(--control-h)` on all `button` elements; `min-height:
+var(--row-h)` on `.tree-row`; `height: var(--row-h)` on `.row-spacer`.
+`focus-visible` outline added to button, input, and select using
+`var(--focus-ring)` and `var(--focus)`.
+
+**RFC-063 C5 / C7 / C9** — (from v0.145.0, grouped under this milestone).
+
+### Added
+
+- i18n keys (ja): `Use`, `Use this change (apply left to right)`, `Could not
+  open`, `Check that the file exists and you have read permission.`, `Compare
+  files or folders`, `Choose a folder for each side…`, `Nothing leaves this
+  computer.`, `Advanced`, `Hide advanced`, `left only`, `right only`, `Files
+  stay on this computer. ForskScope does not upload them.`
+
+---
+
 ## [0.145.0] — 2026-06-14
 
 Sprint 0 safety patch — fixes from the UI/UX architect source review.

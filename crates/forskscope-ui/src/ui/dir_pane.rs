@@ -133,11 +133,13 @@ pub fn PathBar(
                         oninput:  move |e| { input_val.set(e.value()); input_err.set(false); },
                         onkeydown: move |e| {
                             if e.key() == Key::Enter {
+                                e.stop_propagation(); // prevent app-root from acting (RFC-060 W1)
                                 let v = PathBuf::from(input_val.read().cloned());
                                 if v.is_dir() { edit_mode.set(false); on_navigate.call(v); }
                                 else { input_err.set(true); }
                             }
                             if e.key() == Key::Escape {
+                                e.stop_propagation(); // prevent app-root from acting (RFC-060 W1)
                                 input_val.set(path_str_reset.clone());
                                 edit_mode.set(false); input_err.set(false);
                             }

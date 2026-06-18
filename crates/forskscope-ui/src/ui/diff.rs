@@ -233,7 +233,7 @@ fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 onclick: move |_| {
                     let dirty = store.tabs.read().get(index).map(|t| t.merge.is_dirty()).unwrap_or(false);
                     if dirty { store.modal.set(Modal::ConfirmReload(index)); }
-                    else { reload_tab(&mut store, index); store.notify(t(store.lang(), "Reloaded.")); }
+                    else { reload_tab(&mut store, index); store.notify_success(t(store.lang(), "Reloaded.")); }
                 },
                 "↺"
             }

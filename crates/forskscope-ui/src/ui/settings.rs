@@ -47,6 +47,8 @@ fn SettingsModal() -> Element {
     let cur  = store.settings.read().cloned();
     // Progressive disclosure state for New Profile form (RFC-057).
     let mut show_new_profile = use_signal(|| false);
+    // Progressive disclosure: Advanced settings hidden by default (RFC-063 C6).
+    let mut show_advanced = use_signal(|| false);
 
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Settings"),
@@ -54,6 +56,7 @@ fn SettingsModal() -> Element {
             onclick: move |_| store.modal.set(Modal::None),
             onkeydown: move |e: Event<KeyboardData>| {
                 if e.key() == dioxus::html::input_data::keyboard_types::Key::Escape {
+                    e.stop_propagation(); // RFC-060 W1: prevent bubbling to app root
                     store.modal.set(Modal::None);
                 }
             },
@@ -102,6 +105,21 @@ fn SettingsModal() -> Element {
                         }
                     }
                 }
+                // ── Advanced disclosure toggle ─────────────────────
+                button {
+                    class: "advanced-toggle",
+                    onclick: move |_| {
+                        let v = *show_advanced.read();
+                        show_advanced.set(!v);
+                    },
+                    if *show_advanced.read() {
+                        "▾ " {t(lang, "Hide advanced")}
+                    } else {
+                        "▸ " {t(lang, "Advanced")}
+                    }
+                }
+
+                if *show_advanced.read() {
                 div { class: "field",
                     span { {t(lang, "Context lines")} }
                     select {
@@ -184,6 +202,7 @@ fn SettingsModal() -> Element {
                         }
                     }
                 }
+                } // end show_advanced
 
                 div { class: "actions",
                     button {

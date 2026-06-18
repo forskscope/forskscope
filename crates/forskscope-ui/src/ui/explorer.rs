@@ -285,6 +285,18 @@ pub fn Explorer() -> Element {
                             }
                         },
                     // ── Aligned entries (children of each root) ────────────────
+                    if aligned.is_empty() {
+                        div { class: "explorer-empty",
+                            div { class: "explorer-empty-icon", "📂" }
+                            p { class: "explorer-empty-title", {t(lang, "Compare files or folders")} }
+                            p { class: "explorer-empty-hint",
+                                {t(lang, "Choose a folder for each side, then select items to compare.")}
+                            }
+                            p { class: "explorer-empty-local",
+                                "🔒 " {t(lang, "Nothing leaves this computer.")}
+                            }
+                        }
+                    }
                     for (left_row, right_row) in aligned.iter() {
                             {
                                 let lr = left_row.clone();

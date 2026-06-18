@@ -152,7 +152,16 @@ fn Row(
 
             // ── Act column (fixed, centred) ───────────────────────
             div { class: "diff-act",
-                if show_action  { button { onclick: move |_| on_apply.call(()), aria_label: t(lang, "Apply change left to right"), "▶" } }
+                if show_action {
+                    button {
+                        class: "apply-btn",
+                        onclick: move |_| on_apply.call(()),
+                        title: t(lang, "Use this change (apply left to right)"),
+                        aria_label: t(lang, "Use this change (apply left to right)"),
+                        "▶"
+                        span { class: "apply-btn-label", {t(lang, "Use")} }
+                    }
+                }
                 else if applied { span { class: "applied", aria_label: t(lang, "Applied"), "✓" } }
             }
 

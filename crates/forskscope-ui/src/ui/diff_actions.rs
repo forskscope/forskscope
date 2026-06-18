@@ -70,7 +70,7 @@ pub fn save_as(store: &mut Store, index: usize, path: String) {
             }
             drop(tabs);
             store.modal.set(Modal::None);
-            store.notify(t(store.lang(), "Saved."));
+            store.notify_success(t(store.lang(), "Saved."));
         }
         Err(e) => store.notify(e.to_string()),
     }
@@ -105,7 +105,7 @@ fn handle_result(store: &mut Store, index: usize, result: Result<forskscope_core
             }
             drop(tabs);
             store.modal.set(Modal::None);
-            store.notify(t(store.lang(), "Saved."));
+            store.notify_success(t(store.lang(), "Saved."));
         }
         Err(CoreError::Conflict { .. }) => store.modal.set(Modal::ConfirmOverwrite(index)),
         Err(e) => store.notify(e.to_string()),

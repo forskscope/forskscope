@@ -143,7 +143,7 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
                     button {
                         onclick: move |_| {
                             match forskscope_core::dir::copy_file(&op.src, &op.dst, forskscope_core::BackupPolicy::SiblingBak) {
-                                Ok(_)  => store.notify(t(store.lang(), "Copied.")),
+                                Ok(_)  => store.notify_success(t(store.lang(), "Copied.")),
                                 Err(e) => store.notify(e.to_string()),
                             }
                             store.modal.set(Modal::None);
@@ -187,7 +187,7 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
                             } else {
                                 format!("{} {ok} {}.", t(lang, "Copied"), t(lang, "files"))
                             };
-                            store.notify(msg);
+                            if err > 0 { store.notify(msg); } else { store.notify_success(msg); }
                             store.modal.set(Modal::None);
                         },
                         {t(lang, "Copy all")}

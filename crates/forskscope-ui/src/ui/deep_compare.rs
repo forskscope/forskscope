@@ -80,9 +80,15 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
 
     let f = *filter.read();
     let snap = entries.read();
-    let total     = snap.len();
-    let diff_cnt  = snap.iter().filter(|e| !matches!(e.status, RecStatus::Equal | RecStatus::Computing)).count();
+    let changed    = snap.iter().filter(|e| e.status == RecStatus::Changed).count();
+    let equal      = snap.iter().filter(|e| e.status == RecStatus::Equal).count();
+    let left_only  = snap.iter().filter(|e| e.status == RecStatus::LeftOnly).count();
+    let right_only = snap.iter().filter(|e| e.status == RecStatus::RightOnly).count();
+    let computing  = snap.iter().filter(|e| e.status == RecStatus::Computing).count();
     let done      = *computed.read();
+    let tc        = *total_common.read();
+    let is_scan   = *scanning.read();
+    let in_flight = !is_scan && tc > 0 && done < tc;
     let tc        = *total_common.read();
     let is_scan   = *scanning.read();
     let in_flight = !is_scan && tc > 0 && done < tc;
@@ -119,12 +125,15 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                 div { class: "deep-scanning", {t(lang, "Scanning…")} }
             } else {
                 div { class: "deep-stats",
-                    {format!("{} {} · {} {} · {} {}",
-                        diff_cnt, t(lang, "different"),
-                        total_common_eq(total, diff_cnt), t(lang, "equal"),
-                        total, t(lang, "total"))}
-                    if in_flight {
-                        span { class: "deep-progress", {format!(" · {} {}/{}…", t(lang, "checking"), done, tc)} }
+                    {format!("{} {} · {} {} · {} {} · {} {}",
+                        changed,    t(lang, "different"),
+                        equal,      t(lang, "equal"),
+                        left_only,  t(lang, "left only"),
+                        right_only, t(lang, "right only"))}
+                    if computing > 0 || in_flight {
+                        span { class: "deep-progress",
+                            {format!(" · {} {}/{}…", t(lang, "checking"), done, tc)}
+                        }
                     }
                 }
                 div { class: "deep-table",
@@ -134,8 +143,6 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
         }
     }
 }
-
-fn total_common_eq(total: usize, diff: usize) -> usize { total.saturating_sub(diff) }
 
 #[component]
 fn DeepRow(entry: RecEntry, lang: Lang) -> Element {

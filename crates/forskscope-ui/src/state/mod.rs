@@ -72,11 +72,23 @@ pub fn reload_tab(store: &mut Store, index: usize) {
     };
     let opt = LoadOptions { allow_missing: true };
     let mut ld = match lp.as_deref().map(|p| load_path(p, opt)) {
-        Some(Ok(d)) => d, Some(Err(e)) => return store.notify(format!("{}: {e}", t(store.lang(), "Left file read error"))),
+        Some(Ok(d)) => d,
+        Some(Err(e)) => return store.notify(format!(
+            "{} \"{}\" — {e}. {}",
+            t(store.lang(), "Could not open"),
+            lp.as_deref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+            t(store.lang(), "Check that the file exists and you have read permission.")
+        )),
         None => LoadedDocument::empty(),
     };
     let mut rd = match rp.as_deref().map(|p| load_path(p, opt)) {
-        Some(Ok(d)) => d, Some(Err(e)) => return store.notify(format!("{}: {e}", t(store.lang(), "Right file read error"))),
+        Some(Ok(d)) => d,
+        Some(Err(e)) => return store.notify(format!(
+            "{} \"{}\" — {e}. {}",
+            t(store.lang(), "Could not open"),
+            rp.as_deref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+            t(store.lang(), "Check that the file exists and you have read permission.")
+        )),
         None => LoadedDocument::empty(),
     };
     if ld.kind == FileKind::ExcelXlsx && rd.kind == FileKind::ExcelXlsx {
@@ -102,6 +114,41 @@ pub fn swap_sides(store: &mut Store, index: usize) {
 }
 
 #[derive(Clone, Copy)]
+/// Severity of a user-facing notice / toast (RFC-063 C5).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum NoticeSeverity {
+    /// Positive confirmation — auto-dismisses after ~3 s.
+    Success,
+    /// Neutral information — auto-dismisses after ~5 s.
+    Info,
+    /// Something unusual but non-fatal — persists until dismissed.
+    Warning,
+    /// Operation failed — persists until dismissed.
+    Error,
+}
+
+/// A user-facing notice shown as a toast.
+#[derive(Clone, PartialEq, Debug)]
+pub struct Notice {
+    pub message:  String,
+    pub severity: NoticeSeverity,
+}
+
+impl Notice {
+    pub fn success(msg: impl Into<String>) -> Self { Self { message: msg.into(), severity: NoticeSeverity::Success } }
+    pub fn info(msg: impl Into<String>)    -> Self { Self { message: msg.into(), severity: NoticeSeverity::Info } }
+    pub fn warning(msg: impl Into<String>) -> Self { Self { message: msg.into(), severity: NoticeSeverity::Warning } }
+    pub fn error(msg: impl Into<String>)   -> Self { Self { message: msg.into(), severity: NoticeSeverity::Error } }
+    /// Auto-dismiss delay in ms; `None` means persist until user dismisses.
+    pub fn auto_dismiss_ms(&self) -> Option<u64> {
+        match self.severity {
+            NoticeSeverity::Success => Some(3500),
+            NoticeSeverity::Info    => Some(5000),
+            NoticeSeverity::Warning | NoticeSeverity::Error => None,
+        }
+    }
+}
+
 pub struct Store {
     pub tabs:      Signal<Vec<CompareTab>>,
     pub active:    Signal<Option<usize>>,
@@ -111,7 +158,7 @@ pub struct Store {
     pub left_pick:  Signal<Option<PathBuf>>,
     pub right_pick: Signal<Option<PathBuf>>,
     pub modal: Signal<Modal>,
-    pub toast: Signal<Option<String>>,
+    pub toast: Signal<Option<Notice>>,
 }
 
 impl Store {
@@ -125,13 +172,36 @@ impl Store {
         }
     }
     pub fn lang(&self) -> Lang { self.settings.read().language }
-    pub fn notify(&mut self, msg: impl Into<String>) { self.toast.set(Some(msg.into())); }
+    /// Show a persistent error/warning notice (the common case for unexpected failures).
+    pub fn notify(&mut self, msg: impl Into<String>) { self.toast.set(Some(Notice::error(msg))); }
+    /// Show a success notice (auto-dismisses after ~3.5 s).
+    pub fn notify_success(&mut self, msg: impl Into<String>) { self.toast.set(Some(Notice::success(msg))); }
+    /// Show an info notice (auto-dismisses after ~5 s).
+    pub fn notify_info(&mut self, msg: impl Into<String>) { self.toast.set(Some(Notice::info(msg))); }
+    /// Show a warning notice (persistent).
+    pub fn notify_warning(&mut self, msg: impl Into<String>) { self.toast.set(Some(Notice::warning(msg))); }
 }
 
 pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     let options = LoadOptions { allow_missing: true };
-    let mut ld = match load_path(&left,  options) { Ok(d) => d, Err(e) => return store.notify(format!("{}: {e}", t(store.lang(), "Left file read error"))) };
-    let mut rd = match load_path(&right, options) { Ok(d) => d, Err(e) => return store.notify(format!("{}: {e}", t(store.lang(), "Right file read error"))) };
+    let mut ld = match load_path(&left, options) {
+        Ok(d)  => d,
+        Err(e) => return store.notify(format!(
+            "{} \"{}\" — {e}. {}",
+            t(store.lang(), "Could not open"),
+            left.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| left.display().to_string()),
+            t(store.lang(), "Check that the file exists and you have read permission.")
+        )),
+    };
+    let mut rd = match load_path(&right, options) {
+        Ok(d)  => d,
+        Err(e) => return store.notify(format!(
+            "{} \"{}\" — {e}. {}",
+            t(store.lang(), "Could not open"),
+            right.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| right.display().to_string()),
+            t(store.lang(), "Check that the file exists and you have read permission.")
+        )),
+    };
 
     // Guard: warn when comparing text against binary (meaningless hex diff).
     // Excel is always allowed (sheets-diff handles it). Missing files are allowed.
@@ -140,7 +210,7 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     let l_text = matches!(ld.kind, FileKind::Text);
     let r_text = matches!(rd.kind, FileKind::Text);
     if (l_bin && r_text) || (l_text && r_bin) {
-        return store.notify(t(store.lang(), "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary."));
+        return store.notify_warning(t(store.lang(), "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary."));
     }
     if ld.kind == FileKind::ExcelXlsx && rd.kind == FileKind::ExcelXlsx {
         let (lt, rt) = forskscope_core::xlsx::derive_pair_text(&left, &right);

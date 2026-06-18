@@ -37,7 +37,8 @@ pub fn StatusBar() -> Element {
                 if dirty { span { class: "dirty", {t(lang, "unsaved")} } }
             }
             span { class: "spacer" }
-            span { {t(lang, "Local only")} }
+            span { class: "local-only", title: t(lang, "Files stay on this computer. ForskScope does not upload them."),
+                "🔒 " {t(lang, "Local only")} }
         }
     }
 }
