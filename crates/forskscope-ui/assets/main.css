@@ -704,3 +704,12 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
   animation: spin 1.2s linear infinite;
 }
 .diff-error { padding: 1.5rem; }
+
+/* ── Binary-blocked row (RFC-066) ── */
+.tree-row.binary-blocked { opacity: .5; cursor: default; }
+.tree-status.st-binary {
+  font-size: 9px; font-weight: 700; letter-spacing: .04em;
+  color: var(--muted); background: var(--surface-3);
+  border: 1px solid var(--border); border-radius: 3px;
+  padding: 0 .3rem; margin-left: .3rem; cursor: help;
+}

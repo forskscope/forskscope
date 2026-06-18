@@ -1,6 +1,6 @@
 # RFC 066: Binary Comparison Policy — Off by Default with Explicit Opt-In
 
-**Status.** Proposed
+**Status.** Implemented (v0.149.0)
 **Tracks.** Treating binary comparison as an explicit, opt-in capability rather
 than a default; showing binary files in the Explorer as visibly non-actionable
 (not hidden) with a clear reason; a settings toggle to enable binary comparison.

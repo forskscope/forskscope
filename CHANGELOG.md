@@ -5,6 +5,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.149.0] — 2026-06-16
+
+RFC-066: Binary comparison policy — off by default, explicit opt-in.
+
+### Changed
+
+**Binary comparison disabled by default (RFC-066):**
+Binary files (NUL-byte sniff → `FileKind::Binary`) can no longer be compared
+unless **Enable binary comparison** is turned on in Settings → Advanced.
+
+- **Explorer rows:** binary files show a `bin` badge and are rendered muted
+  (`opacity: .5`, `cursor: default`). Clicking or double-clicking a binary row
+  does nothing while the setting is off. The row is visible (D-015: don't hide
+  unsupported cases); only the action is blocked.
+- **Attempting to compare:** `load_and_diff` (used by both `open_compare` and
+  `reload_tab`) returns a clear error — "Binary comparison is off. Enable it in
+  Settings → Advanced." — which the async tab lifecycle shows as `TabState::Error`.
+- **Setting on:** binary rows become fully actionable; the comparison runs via
+  the async lifecycle (RFC-065) so large binary hex diffs no longer freeze the app.
+
+**`FileEntry::is_binary` added to core `listing.rs`:**
+`list_dir` now classifies each file as binary using the same NUL-byte sniff
+as `classify()`. The field is propagated through the listing result so callers
+can use it without re-reading file content.
+
+**Binary detection cache in Explorer:**
+A `Signal<HashMap<PathBuf, bool>>` caches the classify result per path for the
+current directory, so the NUL-byte sniff runs at most once per unique path per
+Explorer session rather than on every render.
+
+### Added
+
+- `AppSettings::enable_binary_comparison` (default: `false`, persisted).
+- Settings → Advanced: **Enable binary comparison** checkbox with tooltip.
+- CSS: `.tree-row.binary-blocked`, `.tree-status.st-binary`.
+- i18n keys (ja): `Enable binary comparison`, the tooltip string, and the
+  "Binary comparison is off" notice.
+
+---
+
 ## [0.148.0] — 2026-06-16
 
 RFC-065: Asynchronous comparison — loading-state tabs, off-thread load+diff.

@@ -186,6 +186,12 @@ pub fn PathBar(
 pub fn TreeRow(
     path: PathBuf, is_dir: bool, is_expanded: bool, is_selected: bool, depth: u32,
     status: Option<DigestState>,
+    /// `true` when this file was sniffed as binary (RFC-066).
+    #[props(default = false)]
+    is_binary: bool,
+    /// `true` when binary comparison is enabled in Settings (RFC-066).
+    #[props(default = true)]
+    binary_enabled: bool,
     on_toggle:    EventHandler<()>,
     on_select:    EventHandler<()>,
     on_dblclick:  EventHandler<()>,
@@ -194,7 +200,12 @@ pub fn TreeRow(
     let caret  = if !is_dir { "\u{00A0}" } else if is_expanded { "▾" } else { "▸" };
     let icon   = if is_dir { "📁" } else { "📄" };
     let name   = path.file_name().unwrap_or(OsStr::new("")).to_string_lossy().into_owned();
-    let rc     = if is_selected { "tree-row selected" } else { "tree-row" };
+
+    // Binary badge / disabled treatment (RFC-066).
+    let binary_blocked = is_binary && !is_dir && !binary_enabled;
+    let rc = if binary_blocked {
+        if is_selected { "tree-row selected binary-blocked" } else { "tree-row binary-blocked" }
+    } else if is_selected { "tree-row selected" } else { "tree-row" };
 
     let (st_icon, st_cls) = match &status {
         None                         => ("",  ""),
@@ -206,13 +217,17 @@ pub fn TreeRow(
     rsx! {
         div {
             class: "{rc}", role: "row", style: "padding-left: {indent}px",
-            onclick:      move |_| on_select.call(()),
-            ondoubleclick: move |_| on_dblclick.call(()),
+            onclick:       move |_| { if !binary_blocked { on_select.call(()); } },
+            ondoubleclick: move |_| { if !binary_blocked { on_dblclick.call(()); } },
             span { class: "tree-caret",
                 onclick: move |e| { e.stop_propagation(); on_toggle.call(()); }, "{caret}" }
             span { class: "tree-icon",  "{icon}" }
             span { class: "tree-label", "{name}" }
-            if !st_icon.is_empty() {
+            if binary_blocked {
+                span { class: "tree-status st-binary", title: "Binary file. Binary comparison is off — enable it in Settings → Advanced.",
+                    "bin"
+                }
+            } else if !st_icon.is_empty() {
                 span { class: "tree-status {st_cls}", "{st_icon}" }
             }
         }

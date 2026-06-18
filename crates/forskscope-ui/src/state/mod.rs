@@ -104,6 +104,7 @@ pub fn reload_tab(store: &mut Store, index: usize) {
         let Some(tab) = tabs.get(index) else { return };
         (tab.left_path.clone(), tab.right_path.clone(), tab.diff_options)
     };
+    let enable_binary = store.settings.read().enable_binary_comparison;
 
     // Mark as loading immediately (RFC-065).
     if let Some(tab) = store.tabs.write().get_mut(index) {
@@ -117,7 +118,7 @@ pub fn reload_tab(store: &mut Store, index: usize) {
         let left  = lp.unwrap_or_default();
         let right = rp.unwrap_or_default();
         let result = tokio::task::spawn_blocking(move || {
-            load_and_diff(left, right, opts, lang)
+            load_and_diff(left, right, opts, lang, enable_binary)
         }).await;
 
         let mut tabs = tabs_signal.write();
@@ -228,12 +229,13 @@ impl Store {
 
 pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     // Use the active compare profile's options (RFC-009).
-    let opts = {
+    let (opts, enable_binary) = {
         let settings = store.settings.read();
-        settings.profiles
+        let opts = settings.profiles
             .get(settings.active_profile)
             .map(|p| p.to_diff_options())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        (opts, settings.enable_binary_comparison)
     };
 
     let title = tab_title(&left, &right, store.lang());
@@ -259,7 +261,7 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
 
     spawn(async move {
         let load_result = tokio::task::spawn_blocking(move || {
-            load_and_diff(left, right, opts, lang)
+            load_and_diff(left, right, opts, lang, enable_binary)
         }).await;
 
         // Guard: if the tab was closed while loading, index may be stale.
@@ -294,6 +296,7 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
 /// or a user-facing error string on failure.
 fn load_and_diff(
     left: PathBuf, right: PathBuf, opts: DiffOptions, lang: Lang,
+    enable_binary: bool,
 ) -> Result<(LoadedDocument, LoadedDocument, DiffDocument, MergeSession, bool), String> {
     let options = LoadOptions { allow_missing: true };
 
@@ -313,9 +316,14 @@ fn load_and_diff(
         t(lang, "Check that the file exists and you have read permission.")
     ))?;
 
-    // Guard: warn when comparing text against binary (meaningless hex diff).
+    // Guard: block binary comparison when the setting is off (RFC-066).
     let l_bin = matches!(ld.kind, FileKind::Binary);
     let r_bin = matches!(rd.kind, FileKind::Binary);
+    if (l_bin || r_bin) && !enable_binary {
+        return Err(t(lang, "Binary comparison is off. Enable it in Settings → Advanced.").into());
+    }
+
+    // Guard: warn when comparing text against binary (meaningless hex diff).
     let l_text = matches!(ld.kind, FileKind::Text);
     let r_text = matches!(rd.kind, FileKind::Text);
     if (l_bin && r_text) || (l_text && r_bin) {

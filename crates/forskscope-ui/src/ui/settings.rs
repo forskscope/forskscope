@@ -122,6 +122,18 @@ fn SettingsModal() -> Element {
 
                 if *show_advanced.read() {
                 div { class: "field",
+                    span { {t(lang, "Enable binary comparison")} }
+                    input {
+                        r#type: "checkbox",
+                        checked: cur.enable_binary_comparison,
+                        title: t(lang, "When off, binary files cannot be compared and are shown as non-actionable in the Explorer."),
+                        onchange: move |e| {
+                            store.settings.write().enable_binary_comparison = e.checked();
+                            persist(&store.settings.read());
+                        }
+                    }
+                }
+                div { class: "field",
                     span { {t(lang, "Context lines")} }
                     select {
                         value: "{cur.context_lines}",

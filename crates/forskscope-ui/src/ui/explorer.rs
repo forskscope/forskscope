@@ -79,6 +79,11 @@ pub fn Explorer() -> Element {
     let lang = store.lang();
 
     let ignore = store.settings.read().ignore_rules();
+    let binary_enabled = store.settings.read().enable_binary_comparison;
+
+    // Cache of paths known to be binary; populated lazily at render time (RFC-066).
+    // Cleared when either directory changes so stale results don't linger.
+    let binary_cache: Signal<std::collections::HashMap<PathBuf, bool>> = use_signal(Default::default);
 
     // ── Left pane state ──────────────────────────────────────────────────────
     let init_l = store.settings.read().last_left_dir.clone()
@@ -385,13 +390,25 @@ pub fn Explorer() -> Element {
                                                     let p_sel = row.abs_path.clone();
                                                     let p_dbl = row.abs_path.clone();
                                                     let p_nav = row.abs_path.clone();
+                                                    let p_bin = row.abs_path.clone();
                                                     let is_dir = row.is_dir;
+                                                    // Binary detection (RFC-066).
+                                                    let is_binary = if is_dir { false } else {
+                                                        let cached = binary_cache.read().get(&row.abs_path).copied();
+                                                        cached.unwrap_or_else(|| {
+                                                            let b = matches!(forskscope_core::file_kind::classify(&p_bin), Ok(forskscope_core::file_kind::FileKind::Binary));
+                                                            binary_cache.write().insert(p_bin, b);
+                                                            b
+                                                        })
+                                                    };
                                                     rsx! {
                                                         TreeRow {
                                                             path: row.abs_path.clone(),
                                                             is_dir: row.is_dir, is_expanded: row.is_expanded,
                                                             is_selected: row.is_selected, depth: row.depth,
                                                             status,
+                                                            is_binary,
+                                                            binary_enabled,
                                                             on_toggle: move |_| {
                                                                 if let Some(r) = tree_l.write().on_toggled(&p_tgl) { scans_l.send(r); }
                                                                 digest_map.write().clear();
@@ -441,13 +458,25 @@ pub fn Explorer() -> Element {
                                                     let p_sel = row.abs_path.clone();
                                                     let p_dbl = row.abs_path.clone();
                                                     let p_nav = row.abs_path.clone();
+                                                    let p_bin = row.abs_path.clone();
                                                     let is_dir = row.is_dir;
+                                                    // Binary detection (RFC-066).
+                                                    let is_binary = if is_dir { false } else {
+                                                        let cached = binary_cache.read().get(&row.abs_path).copied();
+                                                        cached.unwrap_or_else(|| {
+                                                            let b = matches!(forskscope_core::file_kind::classify(&p_bin), Ok(forskscope_core::file_kind::FileKind::Binary));
+                                                            binary_cache.write().insert(p_bin, b);
+                                                            b
+                                                        })
+                                                    };
                                                     rsx! {
                                                         TreeRow {
                                                             path: row.abs_path.clone(),
                                                             is_dir: row.is_dir, is_expanded: row.is_expanded,
                                                             is_selected: row.is_selected, depth: row.depth,
                                                             status,
+                                                            is_binary,
+                                                            binary_enabled,
                                                             on_toggle: move |_| {
                                                                 if let Some(r) = tree_r.write().on_toggled(&p_tgl) { scans_r.send(r); }
                                                                 digest_map.write().clear();

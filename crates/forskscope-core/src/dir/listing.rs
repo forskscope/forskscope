@@ -18,6 +18,8 @@ pub struct FileEntry {
     pub bytes_size: String,
     /// Local last-modified timestamp, or empty when unavailable.
     pub last_modified: String,
+    /// `true` when a NUL-byte sniff classifies this file as binary (RFC-066).
+    pub is_binary: bool,
 }
 
 /// A directory listing with directories and files separated.
@@ -51,12 +53,15 @@ pub fn list_dir(path: Option<&Path>) -> Result<DirectoryListing> {
         if meta.is_dir() {
             dirs.push(name);
         } else if meta.is_file() {
+            let path = entry.path();
+            let is_binary = matches!(crate::file_kind::classify(&path), Ok(crate::file_kind::FileKind::Binary));
             files.push(FileEntry {
                 name,
                 len: meta.len(),
                 human_size: human_size(meta.len()),
                 bytes_size: bytes_size(meta.len()),
                 last_modified: last_modified(&meta),
+                is_binary,
             });
         }
     }

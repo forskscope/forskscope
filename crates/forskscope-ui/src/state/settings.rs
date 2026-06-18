@@ -91,6 +91,10 @@ pub struct AppSettings {
     /// Comma-separated directory-name patterns to ignore (e.g. `"target, node_modules, *.cache"`).
     #[serde(default)]
     pub ignore_dirs: String,
+    /// When `false` (default), binary files cannot be compared and appear
+    /// as non-actionable in the Explorer (RFC-066).
+    #[serde(default)]
+    pub enable_binary_comparison: bool,
 }
 
 fn default_ctx() -> usize { 3 }
@@ -102,6 +106,7 @@ impl Default for AppSettings {
             context_lines: 3, last_left_dir: None, last_right_dir: None,
             profiles: default_profiles(), active_profile: 0,
             ignore_extensions: String::new(), ignore_dirs: String::new(),
+            enable_binary_comparison: false,
         }
     }
 }
