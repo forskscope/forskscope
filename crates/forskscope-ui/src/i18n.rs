@@ -95,6 +95,7 @@ fn ja(key: &str) -> Option<&'static str> {
         "files" => "ファイル",
         "Close" => "閉じる",
         "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary." => "比較できません: 一方がバイナリ、もう一方がテキストです。テキスト同士またはバイナリ同士で比較してください。",
+        "Loading" => "読み込み中",
         "Could not open" => "開けませんでした",
         "Check that the file exists and you have read permission." => "ファイルが存在し、読み取り権限があることを確認してください。",
         "comparison" => "比較",

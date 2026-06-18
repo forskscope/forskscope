@@ -688,3 +688,19 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
   outline-offset: -2px;
   background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
 }
+
+/* ── Async loading / error states (RFC-065) ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.diff-loading {
+  display: flex; align-items: center; gap: .75rem;
+  padding: 2rem 1.5rem; color: var(--muted); font-size: 14px;
+}
+.diff-loading-spinner {
+  display: inline-block; font-size: 18px; line-height: 1;
+  animation: spin 1.2s linear infinite;
+}
+.tab-loading-spinner {
+  display: inline-block; font-size: 10px;
+  animation: spin 1.2s linear infinite;
+}
+.diff-error { padding: 1.5rem; }

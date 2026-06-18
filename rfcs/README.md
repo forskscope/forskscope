@@ -7,7 +7,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Implemented (40)
+## Implemented (41)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
@@ -51,8 +51,9 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 058 | [Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract](./done/058-spreadsheet-xlsx-structural-diff.md) | v0.57.0 (aligned view deferred) |
 | 059 | [Explorer and Compare UI/UX Audit Remediation](./done/059-explorer-and-compare-uiux-audit-remediation.md) | v0.41.0 (UI keyboard items deferred) |
 | 064 | [Compare View — Per-Pane Scroll and All-Different Coloring](./done/064-compare-view-scroll-and-coloring-fixes.md) | v0.147.0 |
+| 065 | [Asynchronous Comparison and Loading-State Tabs](./done/065-async-comparison-and-loading-state-tabs.md) | v0.148.0 |
 
-## Proposed (19)
+## Proposed (18)
 
 RFC-004–040 are editor-adapter track, platform/packaging, or governance/documentation.
 RFC-026 and RFC-030 are substantially implemented; their remaining items require GTK or are deferred.
@@ -75,7 +76,7 @@ Explorer filters and layout, and font selection.
 | 061 | [Explorer Pane Focus and Keyboard Completeness](./proposed/061-explorer-pane-focus-and-keyboard-completeness.md) | UX review remediation | **Partially implemented** v0.145.2 — focused pane, F6, per-pane Alt+↑; row ARIA remains |
 | 062 | [Safe Batch Copy UX and Restore Manifest Integration](./proposed/062-safe-batch-copy-ux-and-restore-manifest.md) | UX review remediation | **Shipped** v0.145.3 — manifest routing, result modal, explicit directions |
 | 063 | [Trust, Clarity, and Calm UI Hardening](./proposed/063-trust-clarity-and-calm-ui-hardening.md) | UX review remediation | **Mostly shipped** v0.145.1–.3 — C1/C2/C3/C5/C6/C7/C9/C10 done; C4 audited; C8 rejected |
-| 065 | [Asynchronous Comparison and Loading-State Tabs](./proposed/065-async-comparison-and-loading-state-tabs.md) | Performance | Not started — off-thread load+diff, cancellable |
+
 | 066 | [Binary Comparison Policy — Off by Default](./proposed/066-binary-comparison-policy.md) | Settings/policy | Not started — opt-in toggle, Explorer row state |
 | 067 | [Explorer Name-Pattern Filter and Filter Checkboxes](./proposed/067-explorer-name-filter-and-checkboxes.md) | Explorer | Not started — name filter + hide binary/identical |
 | 068 | [Explorer Unaligned (Compact) View Mode](./proposed/068-explorer-unaligned-compact-view-mode.md) | Explorer | Not started — remove spacer rows; breaks row alignment by design |

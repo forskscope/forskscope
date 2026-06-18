@@ -49,11 +49,12 @@ fn FileTabItem(index: usize, is_active: bool) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
 
-    let (title, is_dirty) = {
+    let (title, is_dirty, is_loading) = {
         let tabs = store.tabs.read();
         let Some(tab) = tabs.get(index) else { return rsx!{} };
-        let dirty = tab.can_save && tab.merge.is_dirty();
-        (tab.title.clone(), dirty)
+        let dirty    = tab.can_save && tab.merge.is_dirty();
+        let loading  = tab.state == crate::state::TabState::Loading;
+        (tab.title.clone(), dirty, loading)
     };
 
     let class = if is_active { "tab active" } else { "tab" };
@@ -66,7 +67,8 @@ fn FileTabItem(index: usize, is_active: bool) -> Element {
                     store.active.set(Some(index));
                     store.active_dir.set(None);
                 },
-                if is_dirty { span { class: "dirty-dot", "●" } }
+                if is_loading { span { class: "tab-loading-spinner", "⟳ " } }
+                else if is_dirty { span { class: "dirty-dot", "●" } }
                 "{title}"
             }
             button {
@@ -74,6 +76,11 @@ fn FileTabItem(index: usize, is_active: bool) -> Element {
                 title: t(lang, "Close tab"),
                 aria_label: format!("{} {title}", t(lang, "Close")),
                 onclick: move |_| {
+                    // Loading tabs close without a dirty-check (RFC-065).
+                    if is_loading {
+                        crate::state::close_tab(&mut store, index);
+                        return;
+                    }
                     let dirty = store.tabs.read().get(index)
                         .map(|t| t.can_save && t.merge.is_dirty())
                         .unwrap_or(false);

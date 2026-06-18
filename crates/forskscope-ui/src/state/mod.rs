@@ -49,11 +49,28 @@ pub struct DirOp {
     pub label: String,          // human-readable description for the modal
 }
 
+/// Lifecycle state of a comparison tab (RFC-065).
+///
+/// A tab opens immediately in `Loading` (showing a spinner) while the
+/// file-load + diff runs in a background task. On completion it transitions
+/// to `Ready`; on failure it becomes `Error`.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum TabState {
+    /// Background load is in progress. Tab shows a spinner.
+    Loading,
+    /// Load and diff complete. Tab shows the diff view.
+    Ready,
+    /// Load or diff failed. Tab shows a recoverable error message.
+    Error(String),
+}
+
 #[derive(Clone)]
 pub struct CompareTab {
     pub title: String,
     pub left_path:  Option<PathBuf>,
     pub right_path: Option<PathBuf>,
+    /// Lifecycle state — Loading until the background task completes (RFC-065).
+    pub state: TabState,
     pub left_doc:  LoadedDocument,
     pub right_doc: LoadedDocument,
     pub diff:  DiffDocument,
@@ -82,43 +99,46 @@ pub fn recompute_diff(tab: &mut CompareTab) {
 }
 
 pub fn reload_tab(store: &mut Store, index: usize) {
-    let (lp, rp) = {
+    let (lp, rp, opts) = {
         let tabs = store.tabs.read();
         let Some(tab) = tabs.get(index) else { return };
-        (tab.left_path.clone(), tab.right_path.clone())
+        (tab.left_path.clone(), tab.right_path.clone(), tab.diff_options)
     };
-    let opt = LoadOptions { allow_missing: true };
-    let mut ld = match lp.as_deref().map(|p| load_path(p, opt)) {
-        Some(Ok(d)) => d,
-        Some(Err(e)) => return store.notify(format!(
-            "{} \"{}\" — {e}. {}",
-            t(store.lang(), "Could not open"),
-            lp.as_deref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
-            t(store.lang(), "Check that the file exists and you have read permission.")
-        )),
-        None => LoadedDocument::empty(),
-    };
-    let mut rd = match rp.as_deref().map(|p| load_path(p, opt)) {
-        Some(Ok(d)) => d,
-        Some(Err(e)) => return store.notify(format!(
-            "{} \"{}\" — {e}. {}",
-            t(store.lang(), "Could not open"),
-            rp.as_deref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
-            t(store.lang(), "Check that the file exists and you have read permission.")
-        )),
-        None => LoadedDocument::empty(),
-    };
-    if ld.kind == FileKind::ExcelXlsx && rd.kind == FileKind::ExcelXlsx {
-        if let (Some(l), Some(r)) = (&lp, &rp) {
-            let (lt, rt) = forskscope_core::xlsx::derive_pair_text(l, r);
-            ld.text = Some(lt); rd.text = Some(rt);
-        }
+
+    // Mark as loading immediately (RFC-065).
+    if let Some(tab) = store.tabs.write().get_mut(index) {
+        tab.state = TabState::Loading;
     }
-    let mut tabs = store.tabs.write();
-    let Some(tab) = tabs.get_mut(index) else { return };
-    tab.left_doc = ld; tab.right_doc = rd;
-    tab.can_save = tab.left_doc.kind.is_mergeable_text() && tab.right_doc.kind.is_mergeable_text();
-    recompute_diff(tab);
+
+    let lang = store.lang();
+    let mut tabs_signal = store.tabs;
+
+    spawn(async move {
+        let left  = lp.unwrap_or_default();
+        let right = rp.unwrap_or_default();
+        let result = tokio::task::spawn_blocking(move || {
+            load_and_diff(left, right, opts, lang)
+        }).await;
+
+        let mut tabs = tabs_signal.write();
+        let Some(tab) = tabs.get_mut(index) else { return; };
+        if tab.state != TabState::Loading { return; }
+
+        match result {
+            Ok(Ok((ld, rd, diff, merge, can_save))) => {
+                tab.state     = TabState::Ready;
+                tab.left_doc  = ld;
+                tab.right_doc = rd;
+                tab.diff      = diff;
+                tab.merge     = merge;
+                tab.can_save  = can_save;
+                tab.char_mode = false;
+                tab.focused_change = 0;
+            }
+            Ok(Err(msg)) => { tab.state = TabState::Error(msg); }
+            Err(_)       => { tab.state = TabState::Error(t(lang, "Could not open").into()); }
+        }
+    });
 }
 
 pub fn swap_sides(store: &mut Store, index: usize) {
@@ -207,58 +227,110 @@ impl Store {
 }
 
 pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
-    let options = LoadOptions { allow_missing: true };
-    let mut ld = match load_path(&left, options) {
-        Ok(d)  => d,
-        Err(e) => return store.notify(format!(
-            "{} \"{}\" — {e}. {}",
-            t(store.lang(), "Could not open"),
-            left.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| left.display().to_string()),
-            t(store.lang(), "Check that the file exists and you have read permission.")
-        )),
-    };
-    let mut rd = match load_path(&right, options) {
-        Ok(d)  => d,
-        Err(e) => return store.notify(format!(
-            "{} \"{}\" — {e}. {}",
-            t(store.lang(), "Could not open"),
-            right.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| right.display().to_string()),
-            t(store.lang(), "Check that the file exists and you have read permission.")
-        )),
+    // Use the active compare profile's options (RFC-009).
+    let opts = {
+        let settings = store.settings.read();
+        settings.profiles
+            .get(settings.active_profile)
+            .map(|p| p.to_diff_options())
+            .unwrap_or_default()
     };
 
+    let title = tab_title(&left, &right, store.lang());
+
+    // Create a loading tab immediately — the UI shows a spinner right away
+    // without blocking on file I/O or diff computation (RFC-065).
+    let tab = CompareTab {
+        title,
+        left_path: Some(left.clone()), right_path: Some(right.clone()),
+        state: TabState::Loading,
+        left_doc: LoadedDocument::empty(), right_doc: LoadedDocument::empty(),
+        diff: DiffDocument::empty(), merge: MergeSession::empty(),
+        diff_options: opts, can_save: false,
+        char_mode: false, word_wrap: false, focused_change: 0,
+    };
+    let idx = store.tabs.read().len();
+    store.tabs.write().push(tab);
+    store.active.set(Some(idx));
+
+    // Capture the tabs signal; the task writes the result back (RFC-065).
+    let mut tabs_signal = store.tabs;
+    let lang = store.lang();
+
+    spawn(async move {
+        let load_result = tokio::task::spawn_blocking(move || {
+            load_and_diff(left, right, opts, lang)
+        }).await;
+
+        // Guard: if the tab was closed while loading, index may be stale.
+        // We check by index; if the tab is gone or no longer Loading, skip.
+        let mut tabs = tabs_signal.write();
+        let Some(tab) = tabs.get_mut(idx) else { return; };
+        if tab.state != TabState::Loading { return; }
+
+        match load_result {
+            Ok(Ok((ld, rd, diff, merge, can_save))) => {
+                tab.state     = TabState::Ready;
+                tab.left_doc  = ld;
+                tab.right_doc = rd;
+                tab.diff      = diff;
+                tab.merge     = merge;
+                tab.can_save  = can_save;
+            }
+            Ok(Err(msg)) => {
+                tab.state = TabState::Error(msg);
+            }
+            Err(_join_err) => {
+                tab.state = TabState::Error(
+                    t(lang, "Could not open").into()
+                );
+            }
+        }
+    });
+}
+
+/// Load, classify, and diff two files. Runs in a blocking thread (RFC-065).
+/// Returns `(left_doc, right_doc, diff, merge, can_save)` on success,
+/// or a user-facing error string on failure.
+fn load_and_diff(
+    left: PathBuf, right: PathBuf, opts: DiffOptions, lang: Lang,
+) -> Result<(LoadedDocument, LoadedDocument, DiffDocument, MergeSession, bool), String> {
+    let options = LoadOptions { allow_missing: true };
+
+    let mut ld = load_path(&left, options).map_err(|e| format!(
+        "{} \"{}\" — {e}. {}",
+        t(lang, "Could not open"),
+        left.file_name().map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| left.display().to_string()),
+        t(lang, "Check that the file exists and you have read permission.")
+    ))?;
+
+    let mut rd = load_path(&right, options).map_err(|e| format!(
+        "{} \"{}\" — {e}. {}",
+        t(lang, "Could not open"),
+        right.file_name().map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| right.display().to_string()),
+        t(lang, "Check that the file exists and you have read permission.")
+    ))?;
+
     // Guard: warn when comparing text against binary (meaningless hex diff).
-    // Excel is always allowed (sheets-diff handles it). Missing files are allowed.
     let l_bin = matches!(ld.kind, FileKind::Binary);
     let r_bin = matches!(rd.kind, FileKind::Binary);
     let l_text = matches!(ld.kind, FileKind::Text);
     let r_text = matches!(rd.kind, FileKind::Text);
     if (l_bin && r_text) || (l_text && r_bin) {
-        return store.notify_warning(t(store.lang(), "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary."));
+        return Err(t(lang, "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary.").into());
     }
+
     if ld.kind == FileKind::ExcelXlsx && rd.kind == FileKind::ExcelXlsx {
         let (lt, rt) = forskscope_core::xlsx::derive_pair_text(&left, &right);
         ld.text = Some(lt); rd.text = Some(rt);
     }
-    // Use the active compare profile's options (RFC-009).
-    let settings = store.settings.read();
-    let opts = settings.profiles
-        .get(settings.active_profile)
-        .map(|p| p.to_diff_options())
-        .unwrap_or_default();
-    drop(settings);
-    let diff = compute_diff(ld.diff_text(), rd.diff_text(), opts);
-    let merge = MergeSession::from_diff(&diff);
+
+    let diff    = compute_diff(ld.diff_text(), rd.diff_text(), opts);
+    let merge   = MergeSession::from_diff(&diff);
     let can_save = ld.kind.is_mergeable_text() && rd.kind.is_mergeable_text();
-    let title = tab_title(&left, &right, store.lang());
-    let tab = CompareTab {
-        title, left_path: Some(left), right_path: Some(right),
-        left_doc: ld, right_doc: rd, diff, merge, diff_options: opts,
-        can_save, char_mode: false, word_wrap: false, focused_change: 0,
-    };
-    let idx = store.tabs.read().len();
-    store.tabs.write().push(tab);
-    store.active.set(Some(idx));
+    Ok((ld, rd, diff, merge, can_save))
 }
 
 /// Open a directory compare tab for `left` vs `right`.

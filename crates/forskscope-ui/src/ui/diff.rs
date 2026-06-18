@@ -20,6 +20,33 @@ pub fn DiffWorkspace(index: usize) -> Element {
     let font_size = store.settings.read().diff_font_size;
     let context_lines = store.settings.read().context_lines;
 
+    // Render Loading / Error states before building the full snapshot (RFC-065).
+    {
+        let tabs = store.tabs.read();
+        match tabs.get(index).map(|t| &t.state) {
+            None => return rsx! { div { class: "notice", {t(lang, "No comparison.")} } },
+            Some(crate::state::TabState::Loading) => {
+                let title = tabs.get(index).map(|t| t.title.clone()).unwrap_or_default();
+                return rsx! {
+                    div { class: "diff-loading",
+                        span { class: "diff-loading-spinner", "⟳" }
+                        span { {t(lang, "Loading")} " " {title} "…" }
+                    }
+                };
+            }
+            Some(crate::state::TabState::Error(msg)) => {
+                let msg = msg.clone();
+                return rsx! {
+                    div { class: "diff-error",
+                        p { class: "notice", "⚠ " {msg} }
+                        p { class: "notice", {t(lang, "Check that the file exists and you have read permission.")} }
+                    }
+                };
+            }
+            Some(crate::state::TabState::Ready) => { /* fall through to normal render */ }
+        }
+    }
+
     let snap = {
         let tabs = store.tabs.read();
         match tabs.get(index) {

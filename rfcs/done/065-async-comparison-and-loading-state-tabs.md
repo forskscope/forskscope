@@ -1,6 +1,6 @@
 # RFC 065: Asynchronous Comparison and Loading-State Tabs
 
-**Status.** Proposed
+**Status.** Implemented (v0.148.0)
 **Tracks.** Preventing UI freeze when loading and diffing large or binary files;
 a tab lifecycle that opens immediately in a loading state and resolves to a
 result (or error) when the background computation completes.

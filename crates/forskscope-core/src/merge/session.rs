@@ -44,6 +44,17 @@ pub struct MergeSession {
 }
 
 impl MergeSession {
+    /// An empty placeholder used while a tab is in the Loading state (RFC-065).
+    pub fn empty() -> Self {
+        Self {
+            diff_id: 0,
+            hunks: Vec::new(),
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            saved_baseline: 0,
+        }
+    }
+
     /// Build a working session from a freshly computed diff.
     pub fn from_diff(diff: &DiffDocument) -> Self {
         let hunks = diff

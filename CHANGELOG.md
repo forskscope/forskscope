@@ -5,6 +5,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.148.0] — 2026-06-16
+
+RFC-065: Asynchronous comparison — loading-state tabs, off-thread load+diff.
+
+### Changed
+
+**Opening a comparison no longer blocks the UI (RFC-065):**
+`open_compare` and `reload_tab` previously ran file load, decode, and diff
+computation synchronously on the UI thread. Large files — especially large
+binary files rendered as hex — would freeze the app for the duration. This was
+the reported "app stacked" symptom.
+
+Both functions are now asynchronous:
+
+1. A tab is created **immediately** in `TabState::Loading` and made active —
+   the user sees the tab open right away with a spinning `⟳` indicator in the
+   tab title and the diff area.
+2. File I/O and diff computation run in a **tokio blocking thread**
+   (`spawn_blocking`) off the UI thread, so the rest of the app remains
+   responsive.
+3. When the task completes, it writes the result back via the `Signal<Vec<CompareTab>>`
+   directly (a guard checks that the tab is still present and still loading before
+   writing). The tab transitions to `TabState::Ready` (showing the diff) or
+   `TabState::Error` (showing a recoverable message).
+
+**`TabState` enum added to `CompareTab` (RFC-065):**
+- `TabState::Loading` — spinner shown, tab not dirty, close skips dirty-check.
+- `TabState::Ready` — normal diff view, all existing behaviour unchanged.
+- `TabState::Error(String)` — friendly error message with the path and cause.
+
+**`DiffDocument::empty()` and `MergeSession::empty()` added to core:**
+Sentinel constructors needed for the Loading placeholder; never rendered.
+
+### Added
+
+- i18n key (ja): `Loading`.
+- CSS: `.diff-loading`, `.diff-loading-spinner`, `.tab-loading-spinner`,
+  `.diff-error`; `@keyframes spin` for the spinner rotation.
+
+---
+
 ## [0.147.0] — 2026-06-16
 
 RFC-064: Compare view bug fixes — per-pane horizontal scroll and all-different

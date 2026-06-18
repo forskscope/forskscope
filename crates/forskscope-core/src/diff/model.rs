@@ -142,6 +142,17 @@ pub struct DiffDocument {
 }
 
 impl DiffDocument {
+    /// An empty placeholder used while a tab is in the Loading state (RFC-065).
+    pub fn empty() -> Self {
+        Self {
+            diff_id: 0,
+            options: DiffOptions::default(),
+            hunks: Vec::new(),
+            stats: DiffStats::default(),
+            warnings: Vec::new(),
+        }
+    }
+
     pub fn hunk(&self, hunk_id: HunkId) -> Option<&DiffHunk> {
         self.hunks.iter().find(|h| h.hunk_id == hunk_id)
     }
