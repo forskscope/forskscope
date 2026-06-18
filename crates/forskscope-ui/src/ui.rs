@@ -9,6 +9,7 @@
 //! - `bridge/`  — thin re-export adapters from `forskscope-ui-logic`
 
 pub mod bridge;
+pub mod component;
 pub mod layout;
 pub mod overlay;
 pub mod view;

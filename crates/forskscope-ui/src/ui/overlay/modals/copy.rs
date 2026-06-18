@@ -4,6 +4,7 @@ use dioxus::prelude::*;
 
 use crate::i18n::t;
 use crate::state::{BatchCopySpec, BatchResultSpec, DirOp, Modal, Store};
+use crate::ui::component::notice::{Notice, NoticeKind};
 
 #[component]
 pub fn ConfirmDirOpModal(op: DirOp) -> Element {
@@ -18,7 +19,7 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
                 div { class: "field", span { {t(lang, "From")} } code { class: "path-display", "{src}" } }
                 div { class: "field", span { {t(lang, "To")} }   code { class: "path-display", "{dst}" } }
                 if op.dst.exists() {
-                    p { class: "notice notice-ok",
+                    Notice { kind: NoticeKind::Ok,
                         {t(lang, "The destination exists. A .bak backup will be created first.")}
                     }
                 }
@@ -82,8 +83,8 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
             div { class: "modal",
                 h2 { {format!("{} {count} {}?", t(lang, "Copy"), t(lang, "files"))} }
                 p { "{label}" }
-                p { class: "notice", {t(lang, "Existing files will receive a .bak backup.")} }
-                p { class: "notice notice-ok",
+                Notice { kind: NoticeKind::Info, {t(lang, "Existing files will receive a .bak backup.")} }
+                Notice { kind: NoticeKind::Ok,
                     {t(lang, "A manifest will be saved so copies can be reviewed or reversed.")}
                 }
                 div { class: "actions",
@@ -150,11 +151,11 @@ pub fn BatchResultModal(spec: BatchResultSpec) -> Element {
             div { class: "modal",
                 h2 { "{title}" }
                 if let Some(ref mp) = spec.manifest_path {
-                    p { class: "notice notice-ok", {t(lang, "Manifest saved:")} }
+                    Notice { kind: NoticeKind::Ok, {t(lang, "Manifest saved:")} }
                     code { class: "path-display", {mp.display().to_string()} }
                 }
                 if !spec.failure_details.is_empty() {
-                    p { class: "notice", {t(lang, "Errors:")} }
+                    Notice { kind: NoticeKind::Error, {t(lang, "Errors:")} }
                     for detail in spec.failure_details.iter() {
                         code { class: "path-display", "{detail}" }
                     }

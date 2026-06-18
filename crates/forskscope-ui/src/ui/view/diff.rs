@@ -10,6 +10,7 @@ use dioxus::prelude::*;
 
 use crate::i18n::t;
 use crate::state::Store;
+use crate::ui::component::notice::{Notice, NoticeKind};
 use crate::ui::view::diff_actions::trunc;
 pub use crate::ui::view::diff_actions::{apply_focused_hunk, move_focus, save_as, save_tab};
 use crate::ui::view::hunk::HunkBlock;
@@ -40,7 +41,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
             (state, title)
         };
         match state {
-            None => return rsx! { div { class: "notice", {t(lang, "No comparison.")} } },
+            None => return rsx! { Notice { kind: NoticeKind::Info, {t(lang, "No comparison.")} } },
             Some(crate::state::TabState::Loading) => {
                 return rsx! {
                     div { class: "diff-loading",
@@ -52,8 +53,8 @@ pub fn DiffWorkspace(index: usize) -> Element {
             Some(crate::state::TabState::Error(msg)) => {
                 return rsx! {
                     div { class: "diff-error",
-                        p { class: "notice", "⚠ " {msg} }
-                        p { class: "notice", {t(lang, "Check that the file exists and you have read permission.")} }
+                        Notice { kind: NoticeKind::Error, "⚠ " {msg} }
+                        Notice { kind: NoticeKind::Info, {t(lang, "Check that the file exists and you have read permission.")} }
                     }
                 };
             }
@@ -65,7 +66,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
         let tabs = store.tabs.read();
         match tabs.get(index) {
             Some(tab) => TabSnapshot::from_tab(tab, font_size, font_family, context_lines, lang),
-            None => return rsx! { div { class: "notice", {t(lang, "No comparison.")} } },
+            None => return rsx! { Notice { kind: NoticeKind::Info, {t(lang, "No comparison.")} } },
         }
     };
 
@@ -116,13 +117,13 @@ pub fn DiffWorkspace(index: usize) -> Element {
             Toolbar { index, snap: snap.clone(), lang }
             SearchBar {}
             for w in snap.warnings.iter() {
-                div { class: "diff-warning-banner", role: "alert", "⚠ {w}" }
+                Notice { kind: NoticeKind::Warning, "⚠ {w}" }
             }
             if !snap.can_save {
-                div { class: "notice", {snap.readonly_notice.clone()} }
+                Notice { kind: NoticeKind::Info, {snap.readonly_notice.clone()} }
             }
             if snap.identical {
-                div { class: "notice notice-ok", {t(lang, "Files are identical")} }
+                Notice { kind: NoticeKind::Ok, {t(lang, "Files are identical")} }
             }
             div { class: "diff-pane-labels", aria_hidden: "true",
                 span { class: "pane-label-left",  {t(lang, "Left / Old")} }

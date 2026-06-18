@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.160.0] — 2026-06-18
+
+RFC-072 Phase 4: component extraction. No behaviour changes.
+
+### Added
+
+- `ui/component/notice.rs` — `Notice` component with `NoticeKind` enum
+  (`Info`, `Ok`, `Warning`, `Error`). Extracts the repeated
+  `p { class: "notice … }` pattern that appeared across `ui/view/diff.rs`
+  and `ui/overlay/modals/copy.rs`. Warning and error variants automatically
+  carry `role="alert"`.
+- `ui/component.rs` — declares the new `component` submodule.
+
+### Changed
+
+- `ui/view/diff.rs` — 4 inline notice patterns replaced with `Notice {}`.
+- `ui/overlay/modals/copy.rs` — 4 inline notice patterns replaced with
+  `Notice {}`.
+- RFC-072 updated: `EmptyState`, `PathLabel`, and `IconButton` deferred with
+  documented reasons; `Notice` shipped.
+
+---
+
 ## [0.159.0] — 2026-06-18
 
 RFC housekeeping. No code changes.

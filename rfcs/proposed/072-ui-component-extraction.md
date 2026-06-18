@@ -20,26 +20,30 @@ A component qualifies for extraction when:
 
 1. Used by **at least two views**, or **one view plus one overlay**.
 2. Props are UI-oriented and plain — no business logic, no signal writes.
-3. The extracted file does not import from `state/` directly.
+3. The extracted file does not import from `crate::state` directly.
 
 ---
 
-## Candidate components
+## Shipped in v0.160.0
 
-| File | Component(s) | Current locations |
-|---|---|---|
-| `component/notice.rs` | `Notice`, `WarningBanner` | `diff.rs`, `modals/file.rs`, `modals/copy.rs` |
-| `component/empty_state.rs` | `EmptyState` | `explorer/tree.rs`, future dir compare |
-| `component/path_label.rs` | `PathLabel` | `diff.rs` header, `explorer.rs` path bars |
-| `component/icon_button.rs` | `IconButton` | toolbar, path bars, modal actions |
+### `component/notice.rs` — `Notice` + `NoticeKind`
+
+Extracted from `ui/view/diff.rs` (4 uses) and `ui/overlay/modals/copy.rs`
+(4 uses). Normalises `notice`, `notice-ok`, `notice-warn`, and `notice-err`
+CSS classes into a typed `NoticeKind` enum. Warning and error variants
+automatically carry `role="alert"`.
 
 ---
 
-## Non-candidates (do not extract)
+## Deferred candidates
 
-- `HunkBlock` — too tightly coupled to diff merge model.
-- `TreeRow` — belongs with `dir_pane` tree logic.
-- `FilterBar` — single-use, specific to Explorer.
+| Candidate | Reason deferred |
+|---|---|
+| `EmptyState` | Single use (`explorer/tree.rs`) — does not meet threshold |
+| `PathLabel` | Inline `<code class="path-display">` — not a component boundary |
+| `IconButton` | Every toolbar button has a unique handler; wrapper adds indirection without reducing duplication |
+
+These may be revisited if usage grows.
 
 ---
 
@@ -48,16 +52,6 @@ A component qualifies for extraction when:
 ```
 ui/
   component/
-    empty_state.rs
-    icon_button.rs
     notice.rs
-    path_label.rs
   component.rs          ← pub mod declarations
 ```
-
----
-
-## Open questions
-
-None blocking start. Extraction is mechanical once candidates are confirmed
-against the acceptance criteria above.
