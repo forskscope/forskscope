@@ -187,6 +187,12 @@ pub fn Explorer() -> Element {
         }
     });
 
+    // ── Filter bar state (RFC-067) ────────────────────────────────────────────
+    let mut filter_open:    Signal<bool>   = use_signal(|| false);
+    let mut filter_query:   Signal<String> = use_signal(String::new);
+    let mut filter_hide_bin:Signal<bool>   = use_signal(|| false);
+    let mut filter_hide_eq: Signal<bool>   = use_signal(|| false);
+
     // ── Picks (file or directory) ─────────────────────────────────────────────
     let mut left_pick:  Signal<Option<PickKind>> = use_signal(|| None);
     let mut right_pick: Signal<Option<PickKind>> = use_signal(|| None);
@@ -215,6 +221,51 @@ pub fn Explorer() -> Element {
         .filter(|(n, _)| n.path != r_root_snap)   // skip the root node itself
         .map(|(n, d)| (n.path.clone(), n.is_dir, n.is_expanded, n.is_selected, d)).collect();
     let aligned = compute_aligned_rows(&left_flat, &right_flat, &l_root_snap, &r_root_snap);
+
+    // ── Apply filter bar (RFC-067) ────────────────────────────────────────────
+    let q      = filter_query.read().to_lowercase();
+    let h_bin  = *filter_hide_bin.read();
+    let h_eq   = *filter_hide_eq.read();
+    let bin_en = binary_enabled;
+    let aligned: Vec<_> = aligned.into_iter().filter(|(lr, rr)| {
+        // Name filter: match if either side's filename contains query.
+        let name_ok = if q.is_empty() { true } else {
+            let l_match = lr.as_ref().and_then(|r| r.rel_path.file_name())
+                .map(|n| n.to_string_lossy().to_lowercase().contains(&q))
+                .unwrap_or(false);
+            let r_match = rr.as_ref().and_then(|r| r.rel_path.file_name())
+                .map(|n| n.to_string_lossy().to_lowercase().contains(&q))
+                .unwrap_or(false);
+            l_match || r_match
+        };
+        // Hide-binary filter: hide when all present file sides are binary
+        // (and binary comparison is off, so "bin" badge is shown).
+        let bin_ok = if h_bin && !bin_en {
+            let l_bin = lr.as_ref().map(|r| !r.is_dir &&
+                matches!(forskscope_core::file_kind::classify(&r.abs_path), Ok(forskscope_core::file_kind::FileKind::Binary)))
+                .unwrap_or(false);
+            let r_bin = rr.as_ref().map(|r| !r.is_dir &&
+                matches!(forskscope_core::file_kind::classify(&r.abs_path), Ok(forskscope_core::file_kind::FileKind::Binary)))
+                .unwrap_or(false);
+            let l_present = lr.is_some();
+            let r_present = rr.is_some();
+            // Show if at least one present side is NOT binary.
+            match (l_present, r_present) {
+                (true,  true)  => !l_bin || !r_bin,
+                (true,  false) => !l_bin,
+                (false, true)  => !r_bin,
+                (false, false) => true,
+            }
+        } else { true };
+        // Hide-identical filter: hide when digest is Equal.
+        let eq_ok = if h_eq {
+            let rel = lr.as_ref().or(rr.as_ref()).map(|r| r.rel_path.clone());
+            if let Some(rel) = rel {
+                !matches!(digest_map.read().get(&DigestKey::Common(rel)), Some(DigestState::Equal))
+            } else { true }
+        } else { true };
+        name_ok && bin_ok && eq_ok
+    }).collect();
 
     // ── Compare button label and state ────────────────────────────────────────
     let lp = left_pick.read().clone();
@@ -250,6 +301,49 @@ pub fn Explorer() -> Element {
                             on_forward: move |_| { let p = right_hist.write().forward(); if let Some(p) = p { navigate_to(p, false, store, right_hist, right_dir); } },
                             on_navigate: move |p| navigate_to(p, false, store, right_hist, right_dir),
                             lang,
+                        }
+                    }
+
+                    // ── Filter bar (RFC-067) ──────────────────────────────────
+                    div { class: "filter-bar-row",
+                        button {
+                            class: if *filter_open.read() { "filter-toggle active" } else { "filter-toggle" },
+                            title: t(lang, "Filter items"),
+                            aria_label: t(lang, "Filter items"),
+                            onclick: move |_| { let v = *filter_open.read(); filter_open.set(!v); },
+                            "⊞"
+                        }
+                        if *filter_open.read() {
+                            input {
+                                class: "filter-input",
+                                r#type: "search",
+                                placeholder: t(lang, "Filter by name…"),
+                                value: "{filter_query}",
+                                oninput: move |e| filter_query.set(e.value()),
+                                onkeydown: move |e| { e.stop_propagation(); },
+                            }
+                            label { class: "filter-check",
+                                input { r#type: "checkbox", checked: *filter_hide_bin.read(),
+                                    onchange: move |e| filter_hide_bin.set(e.checked()) }
+                                span { {t(lang, "Hide binary")} }
+                            }
+                            label { class: "filter-check",
+                                input { r#type: "checkbox", checked: *filter_hide_eq.read(),
+                                    onchange: move |e| filter_hide_eq.set(e.checked()) }
+                                span { {t(lang, "Hide identical")} }
+                            }
+                            if !filter_query.read().is_empty() || *filter_hide_bin.read() || *filter_hide_eq.read() {
+                                button {
+                                    class: "filter-clear",
+                                    title: t(lang, "Clear filter"),
+                                    onclick: move |_| {
+                                        filter_query.set(String::new());
+                                        filter_hide_bin.set(false);
+                                        filter_hide_eq.set(false);
+                                    },
+                                    "✕"
+                                }
+                            }
                         }
                     }
 

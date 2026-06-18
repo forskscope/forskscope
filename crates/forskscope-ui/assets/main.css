@@ -713,3 +713,31 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
   border: 1px solid var(--border); border-radius: 3px;
   padding: 0 .3rem; margin-left: .3rem; cursor: help;
 }
+
+/* ── Explorer filter bar (RFC-067) ── */
+.filter-bar-row {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .2rem .4rem; background: var(--surface-2);
+  border-bottom: 1px solid var(--border); min-height: 32px;
+  flex-shrink: 0;
+}
+.filter-toggle {
+  flex: 0 0 auto; min-height: 24px; padding: 0 .35rem;
+  font-size: 13px; background: none; border: 1px solid transparent;
+}
+.filter-toggle.active { border-color: var(--accent); color: var(--accent); }
+.filter-input {
+  flex: 1; min-width: 0; font-size: 12px;
+  height: 24px; padding: 0 .4rem;
+}
+.filter-check {
+  display: flex; align-items: center; gap: .25rem;
+  font-size: 12px; color: var(--text); cursor: pointer;
+  white-space: nowrap; user-select: none;
+}
+.filter-clear {
+  flex: 0 0 auto; min-height: 24px; padding: 0 .35rem;
+  font-size: 11px; color: var(--muted); background: none;
+  border: 1px solid var(--border);
+}
+.filter-clear:hover { color: var(--text); border-color: var(--accent); }

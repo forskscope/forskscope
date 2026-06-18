@@ -5,6 +5,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.150.0] — 2026-06-16
+
+RFC-067: Explorer name-pattern filter and filter checkboxes.
+
+### Added
+
+**Filter bar in the Explorer (RFC-067):**
+A compact filter bar between the path bars and the pane-root labels, revealed
+by clicking the `⊞` toggle button. Empty and hidden by default (calm default,
+D-001 — no visual noise when not in use).
+
+**Filter controls:**
+
+- **Name filter** — a text input that narrows visible Explorer rows live,
+  case-insensitive substring match. A pair is shown if *either* side's filename
+  contains the query.
+- **Hide binary** checkbox — hides pairs where all present file sides are
+  binary (works with RFC-066; only meaningful when binary comparison is off).
+- **Hide identical** checkbox — hides pairs whose digest status is `Equal` (✓).
+- **Clear (✕) button** — appears when any filter is active; resets all three
+  to their defaults in one click.
+
+**Filter semantics preserve cross-pane alignment:** the aligned row list is
+filtered *after* `compute_aligned_rows`, so pairs that survive the filter
+remain correctly matched. Spacer rows for filtered-out entries are removed
+alongside their counterparts.
+
+### Notes
+
+- Filter state is session-only (not persisted) per RFC-067 open-question
+  resolution: name query and checkboxes reset on app restart.
+- The filter bar input stops key propagation so typing in the filter does not
+  trigger global shortcuts.
+
+---
+
 ## [0.149.0] — 2026-06-16
 
 RFC-066: Binary comparison policy — off by default, explicit opt-in.

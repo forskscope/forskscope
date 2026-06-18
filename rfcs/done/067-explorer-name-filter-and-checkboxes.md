@@ -1,6 +1,6 @@
 # RFC 067: Explorer Name-Pattern Filter and Filter Checkboxes
 
-**Status.** Proposed
+**Status.** Implemented (v0.150.0)
 **Tracks.** A view filter for the Explorer to cope with directories containing
 very many files: a name-pattern text filter plus a small set of high-value
 filter checkboxes (e.g. hide binary, hide identical).
