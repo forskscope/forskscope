@@ -159,7 +159,7 @@ fn manifest_json_contains_operation_id_and_entry_outcomes() {
 
 #[test]
 fn operation_id_is_unique_across_two_calls() {
-    use crate::dir::{BatchFailurePolicy, BatchItem, EntryOutcome, OperationId, batch_copy, restore_from_manifest};
+    use crate::dir::OperationId;
     let id1 = OperationId::new();
     std::thread::sleep(std::time::Duration::from_millis(1));
     let id2 = OperationId::new();

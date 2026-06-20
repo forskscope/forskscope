@@ -5,6 +5,111 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.163.0] — 2026-06-20
+
+Fix: Explorer Compare button gone, diff pane vertical scroll missing, short-line
+background fill, window blank region. CSS split into responsibility-based files
+with generated main.css and xtask verification.
+
+### Fixed
+
+**Explorer footer / Compare button clipped.**
+
+Root cause: `.body { overflow: hidden }` was added without `display: flex`.
+Without `display: flex` on `.body`, workspace children's `flex: 1 1 auto`
+declarations have no flex parent to resolve against; children are plain block
+elements that grow to content height and are clipped at the bottom, pushing
+the footer and Compare button out of view.
+
+Fix: `.body` now has `display: flex; flex-direction: column`. Additionally,
+`.explorer`, `.diff-wrap`, and `.deep-compare` each declare `flex: 1 1 auto;
+min-height: 0` on their **own CSS rule** (not only via a `.body > *` child
+selector). A child-selector rule alone is unreliable in WebKitGTK when the
+child also has its own `display: flex` declaration.
+
+**Diff pane vertical scroll missing.**
+
+Root cause: `.diff-columns { min-height: 100% }` inside `.diff-scroll` (a
+scroll container) resolves `100%` to `clientHeight`, not `scrollHeight`. The
+grid was always exactly the visible viewport height, so `scrollHeight ===
+clientHeight` and no scrollbar appeared.
+
+Fix: removed `min-height: 100%` from `.diff-columns` (leaves it as `auto`).
+`.diff-scroll` now correctly sees `scrollHeight > clientHeight` when the
+content is taller than the viewport.
+
+**Short-line background colour does not fill to the right edge.**
+
+Root cause: previous attempt used `min-width: 100%; width: max-content` which
+WebKit still collapses to content-sized in a grid-track context. The correct
+rule is the inverse: `width: 100%; min-width: max-content`. Short rows fill
+the visible column width; long rows expand past the column and trigger
+per-column horizontal scroll.
+
+The same contract is applied to `.hunk`. Background is painted at `.diff-row`
+level (not only `.cell`) so the colour extends through the trailing blank area.
+
+**Window blank region / bottom padding (Problems B and C).**
+
+`html`, `body`, `#main` now have `overflow: hidden` and a `background: #1e1f22`
+fallback. `.app` uses `height: 100vh; height: 100dvh` with `overflow: hidden`.
+`flex-shrink: 0` added to header, tabbar, statusbar, and all fixed toolbar
+rows so they cannot be squeezed by flex layout.
+
+**Stale `.diff-pane .cell` decoration selectors (RFC-024 contract).**
+
+`fs-line-*` selectors updated from `.diff-pane .cell` (no-op since `.diff-pane`
+is `display: contents`) to `.diff-row.fs-line-*` and `.diff-row.fs-line-* .cell`.
+
+**Narrow-mode responsive CSS updated for current column DOM.**
+
+`@media (max-width: 719px)` diff rules rewritten from removed `.diff-pane`
+references to `.diff-columns { flex-direction: column }`, `.diff-col-left`,
+`.diff-col-right`, `.diff-col-act`.
+
+### Changed
+
+**CSS split into responsibility-based files with generated `assets/main.css`.**
+
+`assets/main.css` (802 lines, all concerns mixed) split into ten focused source
+files under `assets/css/`. The runtime artifact `assets/main.css` is generated
+from these files and committed; both the application and the coverage test
+include the single generated artifact (same pattern as before the split).
+
+```
+assets/css/
+  ORDER.txt                      canonical file order (source of truth)
+  00-reset.css                   box model, root scroll containment, bg fallback
+  01-tokens.css                  theme tokens, density custom properties
+  02-layout-shell.css            .app, header, tabs, .body flex slot, status bar, toast
+  03-components.css              modals, notices, pane, breadcrumb, path bar, tree rows
+  10-view-explorer.css           Explorer workspace
+  11-view-diff.css               Compare workspace layout, rows, hunks, search
+  12-view-directory-report.css   Deep compare view
+  20-overlays.css                (reserved)
+  30-contract-diff-decorations.css  RFC-024 / RFC-034 CSS class contracts
+  90-responsive.css              @media (max-width: 719px) overrides
+```
+
+To add or remove a CSS file: edit `assets/css/ORDER.txt`, create or delete
+the file, then run `cargo xtask css` to regenerate `assets/main.css`.
+
+**`xtask` crate added.**
+
+New workspace member `xtask` provides build tasks:
+
+- `cargo xtask css` — regenerate `assets/main.css` from `ORDER.txt`
+- `cargo xtask css --check` — verify `main.css` is current (exits non-zero if stale)
+
+**`css_coverage` staleness test added.**
+
+A new test `generated_main_css_matches_split_sources` verifies at test time that
+`assets/main.css` exactly matches the concatenation of files listed in
+`ORDER.txt`. If a source file is edited without regenerating, the test fails with
+a message directing to `cargo xtask css`. Test count: 937 (was 936).
+
+---
+
 ## [0.162.0] — 2026-06-18
 
 Fix: diff view horizontal scrollbar appears on each row instead of once per pane.

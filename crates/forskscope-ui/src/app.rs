@@ -13,6 +13,8 @@ use crate::ui::view::settings::{ModalLayer, load};
 use crate::ui::layout::statusbar::StatusBar;
 use crate::ui::layout::tabs::TabBar;
 
+// Assembled at generation time from assets/css/ (see assets/css/ORDER.txt).
+// Regenerate with: cargo xtask css
 const MAIN_CSS: &str = include_str!("../assets/main.css");
 
 pub static STARTUP_PAIR: std::sync::OnceLock<Option<(PathBuf, PathBuf)>> =

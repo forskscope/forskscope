@@ -36,7 +36,7 @@ fn split_parent_name_filename_only() {
 
 #[test]
 fn split_parent_name_dotfile() {
-    let (parent, name) = split_parent_name(Path::new("/home/user/.gitignore"));
+    let (_parent, name) = split_parent_name(Path::new("/home/user/.gitignore"));
     assert_eq!(name, ".gitignore");
 }
 

@@ -7,7 +7,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.162.0"
+version = "0.163.0"
 edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0"
@@ -15,8 +15,8 @@ authors = ["nabbisen"]
 repository = "https://github.com/forskscope/forskscope"
 
 [workspace.dependencies]
-forskscope-core     = { version = "0.162.0", path = "crates/forskscope-core" }
-forskscope-ui-logic = { version = "0.162.0", path = "crates/forskscope-ui-logic" }
+forskscope-core     = { version = "0.163.0", path = "crates/forskscope-core" }
+forskscope-ui-logic = { version = "0.163.0", path = "crates/forskscope-ui-logic" }
 
 dioxus = { version = "0.7", features = ["desktop"] }
 dioxus-core = "0.7"

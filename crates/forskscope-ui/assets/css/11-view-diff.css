@@ -1,0 +1,235 @@
+/* ── 11-view-diff ───────────────────────────────────────────────────────────
+   Compare/diff workspace layout.
+
+   Scroll ownership inside the Compare view:
+     .diff-wrap      flex column, flex:1 1 auto — fills .body slot
+     .diff-scroll    flex:1 1 auto, overflow-y:auto — SOLE vertical scroll owner
+     .diff-columns   display:grid — column placement only, no scroll
+     .diff-col-left  overflow-x:auto — owns left horizontal scroll
+     .diff-col-act   fixed action column, no scroll
+     .diff-col-right overflow-x:auto — owns right horizontal scroll
+
+   Row width contract:
+     .hunk and .diff-row both use  width:100%; min-width:max-content
+     Meaning: short rows fill the visible column width (background covers the
+     full row), long rows expand past the column and trigger per-column h-scroll.
+
+   Key WebKitGTK notes:
+   - .diff-wrap must declare flex:1 1 auto on its OWN rule, not only via a
+     parent child-selector (.body > .diff-wrap), to reliably fill the slot.
+   - .diff-columns must NOT use min-height:100% inside a scroll container —
+     that resolves to clientHeight and prevents scrollHeight > clientHeight,
+     so the scrollbar never appears.  Use min-height:auto (the default).
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ---- diff-wrap: fills .body slot ---- */
+.diff-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;   /* fill .body flex slot — must be on own rule for WebKit */
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---- diff toolbar ---- */
+.diff-toolbar {
+  display: flex; gap: .4rem; align-items: center; flex-wrap: wrap;
+  padding: .35rem .6rem; background: var(--surface-2);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.diff-toolbar .info { color: var(--muted); font-size: 12px; }
+.diff-toolbar.advanced { background: var(--surface); border-bottom-style: dashed; }
+
+/* ---- diff file header ---- */
+.diff-file-header {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .3rem .6rem; background: var(--surface-2);
+  border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted);
+  flex-shrink: 0;
+}
+.diff-file-header .arrow { flex: 0; }
+.diff-file-header .path-old,
+.diff-file-header .path-new { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diff-file-header .path-new { text-align: right; }
+
+/* ---- pane header labels ---- */
+.diff-pane-labels {
+  display: flex;
+  background: var(--surface-2);
+  border-bottom: 2px solid var(--border);
+  font-size: 11px; color: var(--muted); font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase;
+  user-select: none;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.diff-pane-labels .pane-label-left  { flex: 1; padding: .2rem .4rem; border-right: 1px solid var(--border); }
+.diff-pane-labels .pane-label-act   { flex: 0 0 6ch; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+.diff-pane-labels .pane-label-right { flex: 1; padding: .2rem .4rem; }
+
+/* ---- diff-scroll: sole vertical scroll owner ---- */
+.diff-scroll {
+  font-family: var(--diff-ff, ui-monospace, monospace);
+  font-size: var(--diff-fs, 14px);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* ---- diff-columns: column placement grid ----
+   Sits inside .diff-scroll (the scroll owner).
+   MUST NOT set min-height:100% here: inside a scroll container that would
+   resolve to clientHeight and prevent scrollHeight > clientHeight, making
+   the vertical scrollbar invisible.  Let min-height be auto (the default). */
+.diff-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6ch minmax(0, 1fr);
+  align-items: start;
+}
+
+/* ---- columns ---- */
+/* Left column: owns horizontal scroll for all left rows.
+   overflow-x:auto on a grid cell whose content uses width:100% resolves
+   width relative to the grid track, so rows correctly fill and then overflow. */
+.diff-col-left {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  border-right: 1px solid var(--border);
+}
+
+.diff-col-act {
+  overflow: visible;
+}
+
+.diff-col-right {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  border-left: 1px solid var(--border);
+}
+
+/* Legacy no-op: .diff-pane was removed in v0.162.0. Keep as display:contents
+   so any stale references in markup don't break layout. */
+.diff-pane { display: contents; }
+
+/* ---- hunk container ----
+   width:100% fills the grid track (column width).
+   min-width:max-content expands for long lines → column h-scrolls. */
+.hunk {
+  width: 100%;
+  min-width: max-content;
+}
+
+/* ---- diff row ----
+   Same width contract as .hunk: fill for short lines, expand for long lines. */
+.diff-row {
+  display: flex;
+  align-items: stretch;
+  min-height: var(--line-h);
+  width: 100%;            /* short rows: fill column width → background covers full row */
+  min-width: max-content; /* long rows: expand past column → column h-scroll fires */
+}
+
+/* ---- act column cells ---- */
+.diff-act {
+  width: 6ch; min-height: var(--line-h);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface);
+}
+.diff-act button { padding: 0 .25rem; font-size: 11px; }
+.apply-btn { display: flex; align-items: center; gap: .15rem; }
+.apply-btn-label { font-size: 10px; font-weight: 600; letter-spacing: .02em; }
+
+/* ---- gutter ---- */
+.pane-gutter {
+  flex: 0 0 4ch;
+  background: var(--surface);
+  color: var(--muted);
+  text-align: right;
+  padding: 0 .4rem;
+  user-select: none;
+  line-height: var(--line-h);
+  white-space: nowrap;
+}
+.pane-gutter.del { background: var(--del-bg); }
+.pane-gutter.ins { background: var(--ins-bg); }
+
+/* ---- cell ----
+   flex:1 1 auto + min-width:max-content: expands to content width AND
+   stretches to fill any extra space from the row's width:100% stretch. */
+.diff-row .cell {
+  flex: 1 1 auto;
+  min-width: max-content;
+  padding: 0 .4rem;
+  line-height: var(--line-h);
+  white-space: pre;
+  overflow: visible;
+}
+
+/* ---- hunk backgrounds ----
+   Applied at .diff-row level so colour fills the full visible column width,
+   including the blank area to the right of short lines. */
+.hunk-del .diff-row { background: var(--del-bg); }
+.hunk-ins .diff-row { background: var(--ins-bg); }
+.hunk-rep .diff-row { background: var(--rep-bg); }
+
+/* ---- diff marks ---- */
+.diff-mark {
+  flex: 0 0 1.2ch; display: inline-block; width: 1.2ch;
+  text-align: center; font-size: 10px; font-weight: 700;
+  color: var(--muted); user-select: none; line-height: var(--line-h);
+}
+.hunk-del .diff-mark { color: var(--del-mark); }
+.hunk-ins .diff-mark { color: var(--ins-mark); }
+.hunk-rep .diff-mark { color: var(--warn); }
+
+.hunk.focused { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+/* Inline character-level spans */
+.in-del { background: color-mix(in srgb, var(--del-mark) 30%, transparent); text-decoration: line-through; }
+.in-ins { background: color-mix(in srgb, var(--ins-mark) 30%, transparent); }
+
+.applied { padding: 0 .35rem; color: var(--ok); font-size: 11px; }
+
+/* Search match highlight */
+.diff-row.match { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.diff-row.match .cell { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* Word-wrap mode */
+.diff-scroll.wrap .diff-col-left,
+.diff-scroll.wrap .diff-col-right { overflow-x: hidden; }
+.diff-scroll.wrap .diff-row .cell { white-space: pre-wrap; word-break: break-word; overflow: visible; }
+
+/* ---- context collapse divider ---- */
+.collapse-divider {
+  padding: .2rem .6rem; text-align: center; font-size: 11px;
+  color: var(--muted); background: var(--surface-2);
+  border: 1px dashed var(--border); border-radius: 4px;
+  cursor: pointer; margin: .2rem 0; user-select: none;
+}
+.collapse-divider:hover { color: var(--accent); border-color: var(--accent); }
+.collapse-divider-spacer { padding: .2rem .6rem; font-size: 11px; margin: .2rem 0; visibility: hidden; }
+
+/* ---- warning banner ---- */
+.diff-warning-banner {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .35rem .7rem;
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  font-size: 12px; color: var(--text); flex-shrink: 0;
+}
+
+/* ---- search bar ---- */
+.search-bar {
+  display: flex; align-items: center; gap: .3rem; padding: .25rem .6rem;
+  background: var(--surface-2); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.search-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--text); font-size: 13px; }
+.search-count { font-size: 12px; color: var(--muted); min-width: 6ch; text-align: center; }
+.search-count.no-matches { color: var(--warn); }
+.search-nav { padding: .1rem .35rem; font-size: 11px; cursor: pointer; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); }
+.search-nav:disabled { opacity: .4; cursor: default; }
+.search-close { padding: .1rem .4rem; font-size: 14px; cursor: pointer; }

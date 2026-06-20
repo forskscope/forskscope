@@ -243,7 +243,6 @@ mod tests {
 
     #[test]
     fn is_focused_flag_set_only_on_focused_conflict() {
-        let sess = session_with_conflicts();
         // Build a session with multiple conflicts to verify only one is focused.
         let multi = ThreeWayMergeSession::from_texts(
             "a\nb\nc\n",

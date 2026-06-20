@@ -12,7 +12,9 @@ use forskscope_core::{DiffOptions, compute_diff};
 use forskscope_core::diff::HunkKind;
 
 fn load(path: &str) -> String {
-    let full = Path::new(env!("CARGO_MANIFEST_DIR"))
+    let manifest = std::env::var("CARGO_MANIFEST_DIR")
+        .expect("CARGO_MANIFEST_DIR must be set by cargo test");
+    let full = Path::new(&manifest)
         .join("../../tests/fixtures")
         .join(path);
     fs::read_to_string(&full)
@@ -294,7 +296,9 @@ fn large_file_with_one_change_produces_one_hunk() {
 fn binary_fixture_classifies_as_binary() {
     use std::path::Path;
     use forskscope_core::file_kind::{FileKind, classify};
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+    let manifest = std::env::var("CARGO_MANIFEST_DIR")
+        .expect("CARGO_MANIFEST_DIR must be set by cargo test");
+    let path = Path::new(&manifest)
         .join("../../tests/fixtures/text/binary_nul.bin");
     let kind = classify(&path).expect("classify must not error");
     assert_eq!(kind, FileKind::Binary,
@@ -305,8 +309,10 @@ fn binary_fixture_classifies_as_binary() {
 fn text_fixtures_classify_as_text() {
     use std::path::Path;
     use forskscope_core::file_kind::{FileKind, classify};
+    let manifest = std::env::var("CARGO_MANIFEST_DIR")
+        .expect("CARGO_MANIFEST_DIR must be set by cargo test");
     for name in &["left_identical.txt", "left_unicode.txt", "utf8_bom.txt"] {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        let path = Path::new(&manifest)
             .join("../../tests/fixtures/text")
             .join(name);
         let kind = classify(&path).expect("classify must succeed");

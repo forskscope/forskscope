@@ -1,0 +1,107 @@
+/* ── 10-view-explorer ───────────────────────────────────────────────────────
+   Explorer workspace.
+
+   .explorer is a direct child of .body (display:flex column).
+   It must declare flex:1 1 auto and min-height:0 ON ITS OWN RULE so it fills
+   the body slot and constrains its internal scroll.  Relying only on a parent
+   child-selector rule (.body > .explorer) is unreliable in WebKitGTK when the
+   element also has its own display:flex declaration.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.explorer {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;      /* fill .body flex slot */
+  min-height: 0;       /* allow shrinking below content height */
+  overflow: hidden;    /* internal elements own their own scroll */
+}
+
+.explorer-modes {
+  display: flex; gap: .4rem; padding: .4rem .6rem;
+  background: var(--surface-2); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.mode-btn { padding: .2rem .7rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); cursor: pointer; font-size: 12px; }
+.mode-btn.active { background: color-mix(in srgb, var(--accent) 15%, var(--surface-3)); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+/* ── Aligned two-pane tree (RFC-054) ── */
+.explorer-browse { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.explorer-path-bars { display: grid; grid-template-columns: 1fr 1fr; flex-shrink: 0; }
+.aligned-tree { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.aligned-row { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid transparent; }
+.pane-half { min-width: 0; overflow: hidden; border-right: 1px solid var(--border); }
+.pane-half:last-child { border-right: none; }
+.row-spacer { height: var(--row-h); }
+
+/* ── Digest status icons ── */
+.tree-status { margin-left: auto; padding-right: .4rem; font-size: 11px; flex-shrink: 0; }
+.st-equal     { color: var(--ins-mark, #4a6); }
+.st-diff      { color: var(--warn, #c90); }
+.st-unique    { color: var(--muted); }
+.st-computing { color: var(--muted); animation: spin .8s linear infinite; }
+@keyframes spin {
+  from { display: inline-block; transform: rotate(0deg); }
+  to   { display: inline-block; transform: rotate(360deg); }
+}
+
+/* ── Binary-blocked row (RFC-066) ── */
+.tree-row.binary-blocked { opacity: .5; cursor: default; }
+.tree-status.st-binary {
+  font-size: 9px; font-weight: 700; letter-spacing: .04em;
+  color: var(--muted); background: var(--surface-3);
+  border: 1px solid var(--border); border-radius: 3px;
+  padding: 0 .3rem; margin-left: .3rem; cursor: help;
+}
+
+/* ── Explorer filter bar (RFC-067) ── */
+.filter-bar-row {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .2rem .4rem; background: var(--surface-2);
+  border-bottom: 1px solid var(--border); min-height: 32px; flex-shrink: 0;
+}
+.filter-toggle { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 13px; background: none; border: 1px solid transparent; }
+.filter-toggle.active { border-color: var(--accent); color: var(--accent); }
+.filter-input { flex: 1; min-width: 0; font-size: 12px; height: 24px; padding: 0 .4rem; }
+.filter-check { display: flex; align-items: center; gap: .25rem; font-size: 12px; color: var(--text); cursor: pointer; white-space: nowrap; user-select: none; }
+.filter-clear { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 11px; color: var(--muted); background: none; border: 1px solid var(--border); }
+.filter-clear:hover { color: var(--text); border-color: var(--accent); }
+
+/* ── Explorer compact view (RFC-068) ── */
+.compact-tree { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.compact-pane { flex: 1; overflow-y: auto; overflow-x: hidden; padding: .2rem; }
+.compact-pane-right { border-left: 1px solid var(--border); }
+
+/* ── Explorer footer ── */
+.explorer-footer {
+  display: flex; align-items: center; gap: .5rem; padding: .4rem .6rem;
+  background: var(--surface-2); border-top: 1px solid var(--border);
+  flex-shrink: 0; min-height: var(--control-h);
+}
+.targets-label { flex: 1; display: flex; align-items: center; gap: .2rem; overflow: hidden; min-width: 0; font-size: 12px; }
+.targets-pick { color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 24ch; }
+.targets-sep  { color: var(--muted); flex-shrink: 0; }
+.targets-hint { color: var(--muted); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.compare-btn { flex-shrink: 0; font-weight: 600; padding: .25rem .8rem; border-color: var(--accent); color: var(--accent); }
+.compare-btn:not(:disabled):hover { background: var(--accent); color: var(--surface); }
+.compare-btn:disabled { border-color: var(--border); color: var(--muted); }
+
+/* ── Empty state ── */
+.explorer-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 2rem 1.5rem; text-align: center; gap: .5rem; color: var(--muted); }
+.explorer-empty-icon  { font-size: 2.5rem; line-height: 1; }
+.explorer-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin: 0; }
+.explorer-empty-hint  { font-size: 13px; margin: 0; max-width: 36ch; }
+.explorer-empty-local { font-size: 12px; margin: 0; }
+
+/* ── Pane root bar ── */
+.pane-root-bar { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-bottom: 2px solid var(--accent); flex-shrink: 0; }
+.pane-root-cell { display: flex; align-items: center; gap: .2rem; padding: .25rem .5rem; font-size: 12px; font-weight: 700; overflow: hidden; cursor: pointer; }
+.pane-root-cell:first-child { border-right: 1px solid var(--border); }
+.root-label { color: var(--muted); flex-shrink: 0; }
+.root-name  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+
+/* ── Explorer pane focus indicator (RFC-061) ── */
+.pane-root-cell.pane-focused { outline: 2px solid var(--focus); outline-offset: -2px; background: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); }
+
+/* ── Directory report back bar ── */
+.explorer-deep-back { display: flex; align-items: center; padding: .3rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); flex-shrink: 0; }

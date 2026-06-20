@@ -2,7 +2,7 @@
 
 use crate::diff::{DiffOptions, compute_diff};
 use crate::line_map::{
-    LineMap, MiniMapSegment, RowState, ScrollAnchor, build_mini_map,
+    LineMap, RowState, ScrollAnchor, build_mini_map,
 };
 
 fn map(old: &str, new: &str) -> LineMap {

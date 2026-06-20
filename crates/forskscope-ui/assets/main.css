@@ -1,22 +1,46 @@
-:root {
-  --line-h: 1.5rem;
-  /* ── Density tokens (RFC-063 C2) — comfortable defaults ── */
-  --control-h: 36px;      /* min height for buttons and controls */
-  --control-min-w: 44px;  /* min width for icon-only controls */
-  --row-h: 32px;          /* tree row and table row height */
-  --control-pad-x: 10px;  /* horizontal padding for labeled buttons */
-  --focus-ring: 2px;      /* focus outline width */
-}
+/*
+* GENERATED FILE — DO NOT EDIT DIRECTLY.
+* Source files live under assets/css/.
+* Files are assembled in alphabetical order (numeric prefix = cascade order).
+* Regenerate with: cargo xtask css
+*/
+
+/* @source css/00-reset.css */
+/* ── 00-reset ───────────────────────────────────────────────────────────────
+   Box model and root scroll containment.
+   Background fallback #1e1f22 prevents white flash if any gap appears before
+   the themed .app surface paints.  Overflow:hidden keeps all scrolling inside
+   explicit in-app scroll owners; document-level scroll is never intended.
+   ─────────────────────────────────────────────────────────────────────────── */
 
 * { box-sizing: border-box; }
 
-#main, body, html {
+html,
+body,
+#main {
   margin: 0;
+  width: 100%;
   height: 100%;
+  overflow: hidden;
+  background: #1e1f22;   /* fallback; .app owns the themed surface */
   font-family: system-ui, sans-serif;
 }
 
-/* ---- theme tokens ---- */
+/* @source css/01-tokens.css */
+/* ── 01-tokens ──────────────────────────────────────────────────────────────
+   CSS custom properties: density tokens and per-theme colour tokens.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --line-h: 1.5rem;
+  /* ── Density tokens (RFC-063 C2) ── */
+  --control-h: 36px;
+  --control-min-w: 44px;
+  --row-h: 32px;
+  --control-pad-x: 10px;
+  --focus-ring: 2px;
+}
+
 .theme-dark {
   --surface: #1e1f22; --surface-2: #2b2d31; --surface-3: #36383d;
   --text: #e6e6e6; --muted: #9aa0a6; --border: #3a3d42; --accent: #4f8cff;
@@ -42,9 +66,28 @@
   --ok: #3fb950; --warn: #d29922; --err: #f85149; --focus: #58a6ff;
 }
 
+/* @source css/02-layout-shell.css */
+/* ── 02-layout-shell ────────────────────────────────────────────────────────
+   App chrome: the persistent frame that wraps every workspace.
+
+   Scroll ownership contract (top to bottom):
+     html/body/#main  overflow:hidden — document scroll disabled
+     .app             height:100dvh, overflow:hidden — owns the viewport
+     .body            display:flex column, overflow:hidden — workspace flex slot
+     .explorer /      flex:1 1 auto, min-height:0 — fill the slot,
+     .diff-wrap /       each owns its internal scroll via its own children
+     .deep-compare
+   ─────────────────────────────────────────────────────────────────────────── */
+
 .app {
-  display: flex; flex-direction: column; height: 100vh;
-  background: var(--surface); color: var(--text);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;     /* fallback for older WebKitGTK */
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text);
   font-size: 14px;
 }
 
@@ -53,6 +96,7 @@
   display: flex; align-items: center; gap: .5rem;
   padding: .35rem .6rem; background: var(--surface-2);
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .brand { font-weight: 700; letter-spacing: .02em; }
 .spacer { flex: 1; }
@@ -72,21 +116,17 @@ input, select {
 input:focus-visible, select:focus-visible {
   outline: var(--focus-ring) solid var(--focus); outline-offset: 2px;
 }
-/* Override system/browser chrome so option text is visible in dark/night themes.
-   WebKit ignores CSS on <option> inside the native picker; color-scheme tells it
-   whether to render in light or dark native style. */
 .theme-dark  select, .theme-night select { color-scheme: dark; }
 .theme-light select { color-scheme: light; }
-/* Chromium-based WebView: option inherits explicitly set colours */
-select option {
-  background: var(--surface);
-  color: var(--text);
-}
+select option { background: var(--surface); color: var(--text); }
 
 /* ---- tabs ---- */
-.tabbar { display: flex; align-items: flex-end; gap: .25rem; padding: .3rem .6rem 0;
+.tabbar {
+  display: flex; align-items: flex-end; gap: .25rem; padding: .3rem .6rem 0;
   background: var(--surface-2); border-bottom: 1px solid var(--border);
-  max-height: 3rem; overflow: hidden; }
+  max-height: 3rem; overflow: hidden;
+  flex-shrink: 0;
+}
 .tab {
   display: flex; align-items: center; gap: .4rem;
   padding: .3rem .7rem; border: 1px solid var(--border);
@@ -95,8 +135,38 @@ select option {
   height: 2.2rem; overflow: hidden;
 }
 .tab.active { background: var(--surface-3); border-color: var(--accent); }
-.tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
-  padding: .35rem .5rem .35rem .6rem; user-select: none; display: flex; align-items: center; gap: .25rem; }
+.tab-title {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
+  padding: .35rem .5rem .35rem .6rem; user-select: none;
+  display: flex; align-items: center; gap: .25rem;
+}
+.tab-close { padding: .15rem .35rem; font-size: 14px; opacity: 0; border-radius: 4px; transition: opacity .1s; }
+.tab:hover .tab-close, .tab.active .tab-close { opacity: .6; }
+.tab:hover .tab-close:hover { opacity: 1; background: var(--danger-bg); }
+.dirty-dot { color: var(--warn); font-size: 10px; line-height: 1; }
+.tab-loading-spinner { display: inline-block; font-size: 10px; animation: spin 1.2s linear infinite; }
+
+/* ---- body: active-workspace flex slot ----
+   MUST be display:flex so that flex:1 on workspace children takes effect.
+   Without display:flex the children are plain block elements and overflow:hidden
+   clips them from the bottom (footer disappears). */
+.body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---- status bar ---- */
+.statusbar {
+  display: flex; gap: 1rem; padding: .25rem .6rem; background: var(--surface-2);
+  border-top: 1px solid var(--border); font-size: 12px; color: var(--muted);
+  flex-shrink: 0;
+}
+.statusbar .dirty { color: var(--warn); }
+.statusbar .stats { color: var(--ok); font-size: 11px; }
+.local-only { cursor: default; user-select: none; }
 
 /* Accessible-only labels must not participate in grid or flex layout. */
 .sr-only {
@@ -105,325 +175,104 @@ select option {
   overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
 }
 
-/* ---- body ---- */
-.body { flex: 1; overflow: auto; }
-
-/* ---- explorer ---- */
-.explorer { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-.explorer-modes { display: flex; gap: .4rem; padding: .4rem .6rem;
-  background: var(--surface-2); border-bottom: 1px solid var(--border); }
-.mode-btn { padding: .2rem .7rem; border: 1px solid var(--border); border-radius: 4px;
-  background: var(--surface); cursor: pointer; font-size: 12px; }
-.mode-btn.active { background: color-mix(in srgb, var(--accent) 15%, var(--surface-3));
-  border-color: var(--accent); color: var(--accent); font-weight: 600; }
-.pane { display: flex; flex-direction: column; border: 1px solid var(--border);
-  border-radius: 8px; overflow: hidden; min-height: 0; }
-.pane h3 { margin: 0; padding: .4rem .6rem; background: var(--surface-2);
-  font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-.pane .pathbar { display: flex; gap: .35rem; padding: .4rem .6rem; border-bottom: 1px solid var(--border); }
-.pane .pathbar input { flex: 1; }
-.pane .tree { flex: 1; overflow: auto; padding: .3rem; }
-
-/* ---- diff ---- */
-.diff-toolbar { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap;
-  padding: .35rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); }
-.diff-toolbar .info { color: var(--muted); font-size: 12px; }
-
-/* .diff-scroll: outer container — vertical scroll only.
-   Approach A (RFC-064): horizontal scroll is per pane (column), not per row.
-   Three flex columns inside: .diff-col-left, .diff-col-act, .diff-col-right. */
-.diff-scroll {
-  font-family: var(--diff-ff, ui-monospace, monospace);
-  font-size: var(--diff-fs, 14px);
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  overflow-x: hidden;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-/* Left column: owns horizontal scroll for all left-side rows. */
-.diff-col-left {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: visible;
-  border-right: 1px solid var(--border);
-}
-
-/* Act column: fixed width, no horizontal scroll. */
-.diff-col-act {
-  flex: 0 0 6ch;
-  overflow: visible;
-}
-
-/* Right column: owns horizontal scroll for all right-side rows. */
-.diff-col-right {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: visible;
-  border-left: 1px solid var(--border);
-}
-
-/* Each row is a flex row within its column: gutter | mark | cell. */
-.diff-row {
-  display: flex;
-  align-items: stretch;
-  min-height: var(--line-h);
-  min-width: max-content;   /* row expands to content width; column clips+scrolls */
-}
-
-/* .diff-pane removed — columns replace the old per-row pane containers.
-   Keep the class for any legacy references but make it a no-op. */
-.diff-pane {
-  display: contents;
-}
-
-/* Fixed-width act column between the two pane columns.
-   Each .diff-act cell is one row's action slot inside .diff-col-act. */
-.diff-act {
-  width: 6ch;
-  min-height: var(--line-h);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface);
-}
-.diff-act button { padding: 0 .25rem; font-size: 11px; }
-.apply-btn { display: flex; align-items: center; gap: .15rem; }
-.apply-btn-label { font-size: 10px; font-weight: 600; letter-spacing: .02em; }
-
-/* Gutter (line numbers) inside each pane */
-.pane-gutter {
-  flex: 0 0 4ch;
-  background: var(--surface);
-  color: var(--muted);
-  text-align: right;
-  padding: 0 .4rem;
-  user-select: none;
-  line-height: var(--line-h);
-  white-space: nowrap;
-}
-.pane-gutter.del { background: var(--del-bg); }
-.pane-gutter.ins { background: var(--ins-bg); }
-
-/* Cell: the line content. Fills remaining row width.
-   white-space:pre lets long lines push the row wider than the column;
-   the column container clips and scrolls horizontally (Approach A, RFC-064). */
-.diff-row .cell {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 0 .4rem;
-  line-height: var(--line-h);
-  white-space: pre;           /* no wrap: long lines push row wider than column */
-  overflow-x: visible;        /* row expands; .diff-col-* clips and scrolls */
-}
-
-/* Hunk-kind background on cells and gutters */
-.hunk-del .diff-row .cell, .pane-gutter.del { background: var(--del-bg); }
-.hunk-ins .diff-row .cell, .pane-gutter.ins { background: var(--ins-bg); }
-.hunk-rep .diff-row .cell { background: var(--rep-bg); }
-
-/* Diff marks (−/+/~) */
-.diff-mark {
-  flex: 0 0 1.2ch;
-  display: inline-block;
-  width: 1.2ch;
-  text-align: center;
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--muted);
-  user-select: none;
-  line-height: var(--line-h);
-}
-.hunk-del .diff-mark { color: var(--del-mark); }
-.hunk-ins .diff-mark { color: var(--ins-mark); }
-.hunk-rep .diff-mark { color: var(--warn); }
-
-.hunk.focused { outline: 2px solid var(--focus); outline-offset: -2px; }
-.in-del { background: color-mix(in srgb, var(--del-mark) 30%, transparent); text-decoration: line-through; }
-.in-ins { background: color-mix(in srgb, var(--ins-mark) 30%, transparent); }
-.identical { padding: 2rem; text-align: center; color: var(--ok); }
-.applied { padding: 0 .35rem; color: var(--ok); font-size: 11px; }
-.notice { padding: .5rem .6rem; color: var(--warn); font-size: 12px; }
-.notice.notice-ok { color: var(--ok); }
-
-/* Pane header labels — flex layout mirrors .diff-row */
-.diff-pane-labels {
-  display: flex;
-  background: var(--surface-2);
-  border-bottom: 2px solid var(--border);
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 600;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  user-select: none;
-  overflow: hidden;   /* Approach A: labels don't scroll, just clip */
-}
-.diff-pane-labels .pane-label-left {
-  flex: 1;
-  padding: .2rem .4rem;
-  border-right: 1px solid var(--border);
-}
-.diff-pane-labels .pane-label-act {
-  flex: 0 0 6ch;
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-}
-.diff-pane-labels .pane-label-right {
-  flex: 1;
-  padding: .2rem .4rem;
-}
-
-/* Search match highlight */
-.diff-row.match { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.diff-row.match .cell { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-
-/* Word-wrap mode: wrap within each column; disable per-column horizontal scroll */
-.diff-scroll.wrap .diff-col-left,
-.diff-scroll.wrap .diff-col-right {
-  overflow-x: hidden;
-}
-.diff-scroll.wrap .diff-row .cell {
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-x: visible;
-}
-
-/* ---- DiffDecorationSet CSS class contract (RFC-024) ---- */
-/* These classes are produced by LineDecorationKind::css_class() and        */
-/* InlineDecorationKind::css_class() in forskscope-core. Any change here    */
-/* must stay in sync with the core constants.                                */
-.fs-line-unchanged {}
-.fs-line-added       .diff-pane .cell { background: var(--ins-bg); }
-.fs-line-deleted     .diff-pane .cell { background: var(--del-bg); }
-.fs-line-modified    .diff-pane .cell { background: var(--rep-bg); }
-.fs-line-empty-counterpart .diff-pane .cell { background: var(--surface); opacity: .4; }
-.fs-line-conflict    .diff-pane .cell { background: color-mix(in srgb, var(--warn) 18%, var(--surface)); }
-.fs-line-merge-applied .diff-pane .cell { background: color-mix(in srgb, var(--ok) 12%, var(--surface)); }
-
-/* Inline character-level diff spans (RFC-024 §"Inline contract") */
-.fs-inline-inserted  { background: color-mix(in srgb, var(--ins-mark) 30%, transparent); }
-.fs-inline-deleted   { background: color-mix(in srgb, var(--del-mark) 30%, transparent); text-decoration: line-through; }
-.fs-inline-replaced  { background: color-mix(in srgb, var(--warn) 25%, transparent); }
-.fs-inline-whitespace { outline: 1px dotted var(--muted); }
-
-/* ---- ConflictNavigator CSS class contract (RFC-034) ---- */
-/* Produced by ConflictNavigatorEntry::css_class().                          */
-.fsk-conflict-unresolved { color: var(--warn); font-weight: bold; }
-.fsk-conflict-left       { color: var(--ins-mark); }
-.fsk-conflict-right      { color: var(--ins-mark); }
-.fsk-conflict-both       { color: var(--ok); }
-.fsk-conflict-manual     { color: var(--accent); }
-.fsk-conflict-ignored    { color: var(--muted); opacity: .6; }
-
-/* ---- status bar ---- */
-.statusbar { display: flex; gap: 1rem; padding: .25rem .6rem; background: var(--surface-2);
-  border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
-.statusbar .dirty { color: var(--warn); }
-.local-only { cursor: default; user-select: none; }
-
-/* ---- modal / toast ---- */
-.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.45);
-  display: flex; align-items: center; justify-content: center; }
-.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-  min-width: 22rem; max-width: 30rem; padding: 1rem; }
-.modal h2 { margin: 0 0 .75rem; font-size: 1rem; }
-.modal .field { display: flex; justify-content: space-between; align-items: center; margin: .5rem 0; }
-.modal .actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
-.toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
+/* ---- toast ---- */
+.toast {
+  position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
   background: var(--surface-3); border: 1px solid var(--accent); color: var(--text);
-  padding: .5rem .9rem; border-radius: 8px; max-width: 80%; cursor: pointer; }
+  padding: .5rem .9rem; border-radius: 8px; max-width: 80%; cursor: pointer;
+}
 .toast-success { border-color: var(--ok); }
 .toast-info    { border-color: var(--accent); }
 .toast-warning { border-color: var(--warn); color: var(--warn); }
 .toast-error   { border-color: var(--err);  color: var(--err); }
 
-/* advanced (progressively-disclosed) toolbar row stays visually secondary */
-.diff-toolbar.advanced { background: var(--surface); border-bottom-style: dashed; }
+/* @source css/03-components.css */
+/* ── 03-components ──────────────────────────────────────────────────────────
+   Reusable components shared across multiple views.
+   ─────────────────────────────────────────────────────────────────────────── */
 
-/* ---- diff file header ---- */
-.diff-file-header {
-  display: flex; align-items: center; gap: .5rem;
-  padding: .3rem .6rem; background: var(--surface-2);
-  border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted);
+/* ---- modal / scrim ---- */
+.scrim {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
 }
-.diff-file-header .arrow { flex: 0; }
-.diff-file-header .path-old, .diff-file-header .path-new { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.diff-file-header .path-new { text-align: right; }
-
-/* ---- context collapse divider ---- */
-.collapse-divider {
-  padding: .2rem .6rem; text-align: center; font-size: 11px;
-  color: var(--muted); background: var(--surface-2);
-  border: 1px dashed var(--border); border-radius: 4px;
-  cursor: pointer; margin: .2rem 0; user-select: none;
+.modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  min-width: 22rem; max-width: 30rem; padding: 1rem;
 }
-.collapse-divider:hover { color: var(--accent); border-color: var(--accent); }
-/* Spacer shown in act/right columns to occupy the same height as a collapse-divider */
-.collapse-divider-spacer {
-  padding: .2rem .6rem; font-size: 11px; margin: .2rem 0;
-  visibility: hidden;
+.modal h2 { margin: 0 0 .75rem; font-size: 1rem; }
+.modal .field { display: flex; justify-content: space-between; align-items: center; margin: .5rem 0; }
+.modal .actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
+.modal-wide { min-width: min(540px, 90vw); }
+
+.modal-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
+.modal-header-row h2 { margin: 0; }
+.about-btn {
+  background: none; border: none; font-size: 18px; cursor: pointer;
+  color: var(--muted); padding: .1rem .35rem; border-radius: 4px;
 }
+.about-btn:hover { color: var(--text); background: var(--surface-3); }
+.new-profile-btn { margin-top: .5rem; font-size: 12px; }
 
-/* ---- diff wrap ---- */
-.diff-wrap { display: flex; flex-direction: column; height: 100%; }
+.about-grid {
+  display: grid; grid-template-columns: max-content 1fr;
+  gap: .25rem .75rem; margin: .5rem 0 .75rem; font-size: 13px;
+}
+.about-key { color: var(--muted); }
 
+.kb-section { margin-bottom: .75rem; }
+.kb-section h3 { font-size: 13px; color: var(--muted); margin: .3rem 0; }
+.kb-table { display: grid; grid-template-columns: max-content 1fr; gap: .2rem .75rem; }
+.kb-row { display: contents; }
+kbd.kb-key {
+  font-family: ui-monospace, monospace; font-size: 12px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 4px; padding: .1rem .3rem; white-space: nowrap;
+}
+.kb-desc { font-size: 13px; }
 
-/* ---- colour-independent diff marks — colours set above with .diff-mark rules ---- */
-.hunk-del .diff-pane .cell { color: inherit; }
-
-/* ---- search match highlight ---- */
-.row.match { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.row.match .cell { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-
-/* ---- path code display in modals ---- */
 code.path-display {
   display: block; margin: .2rem 0; padding: .25rem .4rem;
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 4px; font-size: 12px; word-break: break-all;
 }
 
+/* ---- notice ---- */
+.notice { padding: .5rem .6rem; color: var(--warn); font-size: 12px; }
+.notice.notice-ok { color: var(--ok); }
+.identical { padding: 2rem; text-align: center; color: var(--ok); }
 
-/* ── Deep compare view ── */
-.deep-compare { grid-column: 1 / -1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-.deep-compare-toolbar { display: flex; align-items: center; gap: .4rem; padding: .35rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); }
-.deep-label { font-size: 12px; color: var(--muted); margin-right: .5rem; }
-.deep-stats { padding: .25rem .6rem; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
-.deep-table { flex: 1; overflow: auto; }
-.deep-row { display: flex; align-items: center; gap: .5rem; padding: .2rem .6rem; cursor: pointer; font-size: 13px; }
-.deep-row:hover { background: var(--surface-3); }
-.deep-path { flex: 1; font-family: ui-monospace, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.deep-compare-btn { padding: .15rem .4rem; font-size: 11px; opacity: .7; border-radius: 4px; }
-.deep-row:hover .deep-compare-btn { opacity: 1; }
-.deep-scanning { padding: 1.5rem; text-align: center; color: var(--muted); }
-
-/* ── About modal grid ── */
-.about-grid {
-  display: grid; grid-template-columns: max-content 1fr;
-  gap: .25rem .75rem; margin: .5rem 0 .75rem;
-  font-size: 13px;
+/* ---- pane (generic bordered panel) ---- */
+.pane {
+  display: flex; flex-direction: column; border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden; min-height: 0;
 }
-.about-key { color: var(--muted); }
+.pane h3 {
+  margin: 0; padding: .4rem .6rem; background: var(--surface-2);
+  font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+}
+.pane .pathbar { display: flex; gap: .35rem; padding: .4rem .6rem; border-bottom: 1px solid var(--border); }
+.pane .pathbar input { flex: 1; }
+.pane .tree { flex: 1; overflow: auto; padding: .3rem; }
 
-/* ── Status bar stats ── */
-.statusbar .stats { color: var(--ok); font-size: 11px; }
+/* ---- async loading / error states (RFC-065) ---- */
+@keyframes spin { to { transform: rotate(360deg); } }
+.diff-loading {
+  display: flex; align-items: center; gap: .75rem;
+  padding: 2rem 1.5rem; color: var(--muted); font-size: 14px;
+}
+.diff-loading-spinner { display: inline-block; font-size: 18px; line-height: 1; animation: spin 1.2s linear infinite; }
+.diff-error { padding: 1.5rem; }
 
-/* ── Deep compare progress ── */
-.deep-progress { color: var(--muted); }
+/* ---- settings ---- */
+.advanced-toggle {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 12px; padding: .3rem 0; text-align: left; width: 100%;
+  border-top: 1px solid var(--border); margin-top: .5rem;
+}
+.advanced-toggle:hover { color: var(--accent); }
 
-/* ── Tab close button and dirty indicator ── */
-.tab-close { padding: .15rem .35rem; font-size: 14px; opacity: 0; border-radius: 4px; transition: opacity .1s; }
-.tab:hover .tab-close, .tab.active .tab-close { opacity: .6; }
-.tab:hover .tab-close:hover { opacity: 1; background: var(--danger-bg); }
-.dirty-dot { color: var(--warn); font-size: 10px; line-height: 1; }
-
-/* ── Profile list in settings ── */
 .profile-list { display: flex; flex-direction: column; gap: .2rem; margin: .25rem 0; }
-.profile-row  { display: flex; align-items: center; gap: .3rem; padding: .2rem .35rem; border-radius: 5px; cursor: pointer; }
+.profile-row { display: flex; align-items: center; gap: .3rem; padding: .2rem .35rem; border-radius: 5px; cursor: pointer; }
 .profile-row:hover { background: var(--surface-3); }
 .profile-row.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .profile-name { flex: 1; font-size: 13px; font-family: ui-monospace, monospace; white-space: pre; }
@@ -432,99 +281,77 @@ code.path-display {
 .add-profile-form { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-top: .25rem; }
 .profile-check { display: flex; align-items: center; gap: .2rem; font-size: 12px; color: var(--muted); cursor: pointer; }
 
-
-/* ── Keyboard reference modal ── */
-.modal-wide { min-width: min(540px, 90vw); }
-.kb-section { margin-bottom: .75rem; }
-.kb-section h3 { font-size: 13px; color: var(--muted); margin: .3rem 0; }
-.kb-table { display: grid; grid-template-columns: max-content 1fr; gap: .2rem .75rem; }
-.kb-row { display: contents; }
-kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: var(--surface-2);
-  border: 1px solid var(--border); border-radius: 4px; padding: .1rem .3rem; white-space: nowrap; }
-.kb-desc { font-size: 13px; }
-
-/* ── Diff warning banner ── */
-.diff-warning-banner {
-  display: flex; align-items: center; gap: .4rem;
-  padding: .35rem .7rem; background: color-mix(in srgb, var(--warn) 14%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
-  font-size: 12px; color: var(--text);
+/* ---- breadcrumb / path bar ---- */
+.breadcrumb {
+  display: flex; align-items: center; flex-wrap: wrap; gap: .1rem;
+  padding: .3rem .6rem; background: var(--surface-2);
+  border-bottom: 1px solid var(--border); font-size: 12px; min-height: 28px;
 }
+.bc-seg { background: none; border: none; color: var(--accent); cursor: pointer; padding: .1rem .2rem; border-radius: 3px; font-size: 12px; }
+.bc-seg:hover { background: var(--surface-3); }
+.bc-root { background: none; border: none; color: var(--muted); cursor: pointer; padding: .1rem .4rem; border-radius: 3px; font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
+.bc-root:hover { color: var(--accent); background: var(--surface-3); }
+.bc-sep { color: var(--muted); padding: 0 .05rem; }
+.bc-current { color: var(--text); font-weight: 600; padding: .1rem .2rem; }
 
-
-
-/* ── Explorer footer ── */
-.explorer-footer {
-  display: flex; align-items: center; gap: .5rem; padding: .4rem .6rem;
-  background: var(--surface-2); border-top: 1px solid var(--border);
-  flex-shrink: 0; min-height: var(--control-h);
+.path-bar {
+  display: flex; align-items: center; gap: .2rem; padding: .25rem .4rem;
+  background: var(--surface-2); border-bottom: 1px solid var(--border);
+  min-height: 32px; flex-wrap: nowrap; overflow: hidden; flex-shrink: 0;
 }
-/* Targets label: always visible, fills available space (RFC-069). */
-.targets-label {
-  flex: 1; display: flex; align-items: center; gap: .2rem;
-  overflow: hidden; min-width: 0; font-size: 12px;
-}
-.targets-pick { color: var(--text); font-weight: 500;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 24ch; }
-.targets-sep  { color: var(--muted); flex-shrink: 0; }
-.targets-hint { color: var(--muted); font-style: italic;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Compare button: prominent, right-aligned (RFC-069). */
-.compare-btn {
-  flex-shrink: 0; font-weight: 600; padding: .25rem .8rem;
-  border-color: var(--accent); color: var(--accent);
-}
-.compare-btn:not(:disabled):hover { background: var(--accent); color: var(--surface); }
-.compare-btn:disabled { border-color: var(--border); color: var(--muted); }
+.path-btn { background: none; border: 1px solid transparent; border-radius: 3px; padding: .1rem .35rem; cursor: pointer; color: var(--text); font-size: 13px; line-height: 1.2; }
+.path-btn:hover:not(:disabled) { background: var(--surface-3); border-color: var(--border); }
+.path-btn:disabled { color: var(--muted); cursor: default; }
+.path-edit-btn { margin-left: .15rem; color: var(--muted); }
+.path-segments { display: flex; align-items: center; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
+.path-segments .bc-seg { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.path-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 3px; font-size: 12px; min-width: 6ch; }
+.path-input.error { border-color: var(--del-mark, #e05); }
+.path-input:focus { outline: 2px solid var(--accent); }
 
-
-/* ── Tree rows ── */
-.tree-row { display: flex; align-items: center; gap: .3rem; padding: .15rem .4rem;
-  cursor: pointer; user-select: none; white-space: nowrap; min-height: var(--row-h); }
+/* ---- tree rows ---- */
+.tree-row { display: flex; align-items: center; gap: .3rem; padding: .15rem .4rem; cursor: pointer; user-select: none; white-space: nowrap; min-height: var(--row-h); }
 .tree-row:hover   { background: var(--surface-3); }
 .tree-row.selected { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .tree-caret { width: 1em; text-align: center; flex-shrink: 0; color: var(--muted); }
 .tree-icon  { flex-shrink: 0; font-size: 13px; }
 .tree-label { overflow: hidden; text-overflow: ellipsis; }
 
-/* ── Breadcrumb (RFC-055) ── */
-.breadcrumb { display: flex; align-items: center; flex-wrap: wrap; gap: .1rem;
-  padding: .3rem .6rem; background: var(--surface-2);
-  border-bottom: 1px solid var(--border); font-size: 12px; min-height: 28px; }
-.bc-seg { background: none; border: none; color: var(--accent); cursor: pointer;
-  padding: .1rem .2rem; border-radius: 3px; font-size: 12px; }
-.bc-seg:hover { background: var(--surface-3); }
-.bc-root { background: none; border: none; color: var(--muted); cursor: pointer;
-  padding: .1rem .4rem; border-radius: 3px; font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
-.bc-root:hover { color: var(--accent); background: var(--surface-3); }
-.bc-sep { color: var(--muted); padding: 0 .05rem; }
-.bc-current { color: var(--text); font-weight: 600; padding: .1rem .2rem; }
+/* @source css/10-view-explorer.css */
+/* ── 10-view-explorer ───────────────────────────────────────────────────────
+   Explorer workspace.
 
-/* ── Settings: modal header row, about btn, new-profile btn ── */
-.modal-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
-.modal-header-row h2 { margin: 0; }
-.about-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--muted);
-  padding: .1rem .35rem; border-radius: 4px; }
-.about-btn:hover { color: var(--text); background: var(--surface-3); }
-.new-profile-btn { margin-top: .5rem; font-size: 12px; }
+   .explorer is a direct child of .body (display:flex column).
+   It must declare flex:1 1 auto and min-height:0 ON ITS OWN RULE so it fills
+   the body slot and constrains its internal scroll.  Relying only on a parent
+   child-selector rule (.body > .explorer) is unreliable in WebKitGTK when the
+   element also has its own display:flex declaration.
+   ─────────────────────────────────────────────────────────────────────────── */
 
-/* ── Path bar (RFC-055 v2) ── */
-.path-bar { display: flex; align-items: center; gap: .2rem; padding: .25rem .4rem;
-  background: var(--surface-2); border-bottom: 1px solid var(--border); min-height: 32px;
-  flex-wrap: nowrap; overflow: hidden; }
-.path-btn { background: none; border: 1px solid transparent; border-radius: 3px;
-  padding: .1rem .35rem; cursor: pointer; color: var(--text); font-size: 13px; line-height: 1.2; }
-.path-btn:hover:not(:disabled) { background: var(--surface-3); border-color: var(--border); }
-.path-btn:disabled { color: var(--muted); cursor: default; }
-.path-edit-btn { margin-left: .15rem; color: var(--muted); }
-.path-segments { display: flex; align-items: center; flex: 1;
-  min-width: 0; overflow: hidden; white-space: nowrap; }
-.path-segments .bc-seg { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.path-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--border);
-  background: var(--surface); color: var(--text); border-radius: 3px; font-size: 12px;
-  min-width: 6ch; }
-.path-input.error { border-color: var(--del-mark, #e05); }
-.path-input:focus { outline: 2px solid var(--accent); }
+.explorer {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;      /* fill .body flex slot */
+  min-height: 0;       /* allow shrinking below content height */
+  overflow: hidden;    /* internal elements own their own scroll */
+}
+
+.explorer-modes {
+  display: flex; gap: .4rem; padding: .4rem .6rem;
+  background: var(--surface-2); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.mode-btn { padding: .2rem .7rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); cursor: pointer; font-size: 12px; }
+.mode-btn.active { background: color-mix(in srgb, var(--accent) 15%, var(--surface-3)); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+/* ── Aligned two-pane tree (RFC-054) ── */
+.explorer-browse { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.explorer-path-bars { display: grid; grid-template-columns: 1fr 1fr; flex-shrink: 0; }
+.aligned-tree { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.aligned-row { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid transparent; }
+.pane-half { min-width: 0; overflow: hidden; border-right: 1px solid var(--border); }
+.pane-half:last-child { border-right: none; }
+.row-spacer { height: var(--row-h); }
 
 /* ── Digest status icons ── */
 .tree-status { margin-left: auto; padding-right: .4rem; font-size: 11px; flex-shrink: 0; }
@@ -532,224 +359,10 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
 .st-diff      { color: var(--warn, #c90); }
 .st-unique    { color: var(--muted); }
 .st-computing { color: var(--muted); animation: spin .8s linear infinite; }
-@keyframes spin { from { display: inline-block; transform: rotate(0deg); }
-                   to   { display: inline-block; transform: rotate(360deg); } }
-
-/* ── Aligned two-pane tree (RFC-054 row alignment) ── */
-.explorer-browse { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-.explorer-path-bars { display: grid; grid-template-columns: 1fr 1fr; }
-.aligned-tree { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
-.aligned-row { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid transparent; }
-.pane-half { min-width: 0; overflow: hidden;
-  border-right: 1px solid var(--border); }
-.pane-half:last-child { border-right: none; }
-.row-spacer { height: var(--row-h); }   /* matches .tree-row height */
-
-.search-bar { display: flex; align-items: center; gap: .3rem; padding: .25rem .6rem;
-  background: var(--surface-2); border-bottom: 1px solid var(--border); }
-.search-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--border);
-  border-radius: 3px; background: var(--surface); color: var(--text); font-size: 13px; }
-.search-count { font-size: 12px; color: var(--muted); min-width: 6ch; text-align: center; }
-.search-count.no-matches { color: var(--warn); }
-.search-nav { padding: .1rem .35rem; font-size: 11px; cursor: pointer;
-  border: 1px solid var(--border); border-radius: 3px; background: var(--surface); }
-.search-nav:disabled { opacity: .4; cursor: default; }
-.search-close { padding: .1rem .4rem; font-size: 14px; cursor: pointer; }
-/* ── Deep compare row status colours ── */
-.status-equal   { color: var(--ok); }
-.status-changed { color: var(--warn); }
-.status-only    { color: var(--muted); }
-.status-cmp     { color: var(--muted); opacity: .6; }
-.status-err     { color: var(--err); }
-.status-symlink { color: var(--muted); font-style: italic; }
-
-/* ── Deep compare filter buttons ── */
-.filter-btn {
-  padding: .2rem .5rem; border-radius: 6px; font-size: 12px;
-  background: var(--surface-3); border: 1px solid var(--border); cursor: pointer;
+@keyframes spin {
+  from { display: inline-block; transform: rotate(0deg); }
+  to   { display: inline-block; transform: rotate(360deg); }
 }
-.filter-btn.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
-
-/* ── Deep compare root header ── */
-.deep-roots { display: flex; align-items: center; gap: .3rem; padding: .35rem .6rem;
-  font-size: 12px; background: var(--surface-2); border-bottom: 1px solid var(--border);
-  overflow: hidden; white-space: nowrap; }
-.deep-root-label { color: var(--muted); flex-shrink: 0; }
-.deep-root-path  { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
-.deep-root-sep   { color: var(--muted); flex-shrink: 0; }
-
-/* ══════════════════════════════════════════════════════════════════════════
-   RESPONSIVE LAYOUT — stacked vertical panes below 720 px
-   At ≥ 720px: side-by-side (default).
-   At  < 720px: top/bottom stacked for both explorer and diff.
-   ══════════════════════════════════════════════════════════════════════════ */
-
-@media (max-width: 719px) {
-
-  /* ── Explorer: stack path bars and aligned rows vertically ── */
-  .explorer-path-bars {
-    grid-template-columns: 1fr;
-  }
-  .explorer-path-bars .path-bar:last-child {
-    border-top: 1px solid var(--border);
-  }
-  .aligned-row {
-    grid-template-columns: 1fr;
-  }
-  /* Add a top border so rows from the second pane are visually separated */
-  .aligned-row .pane-half:last-child {
-    border-right: none;
-    border-top: 1px solid var(--border);
-  }
-  .row-spacer { display: none; } /* spacers have no role in single-column mode */
-
-  /* ── Diff: stack left pane above right pane ── */
-
-  /* The shared horizontal scroll container switches to vertical stacking */
-  .diff-scroll {
-    overflow-x: hidden; /* no horizontal scroll in stacked mode */
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* Rows stack: left pane on top, right pane below */
-  .diff-row {
-    flex-direction: column;
-    min-width: 100%; /* remove the 110ch floor */
-    border-bottom: 2px solid var(--border);
-  }
-
-  /* Each pane takes full width */
-  .diff-pane {
-    flex: none;
-    width: 100%;
-    overflow-x: auto; /* each pane scrolls independently */
-  }
-  .diff-pane.left {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-
-  /* Act column becomes a horizontal strip */
-  .diff-act {
-    flex: none;
-    width: 100%;
-    border-left: none;
-    border-right: none;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    justify-content: flex-start;
-    padding: .1rem .4rem;
-    background: var(--surface-2);
-  }
-
-  /* Pane labels stack vertically */
-  .diff-pane-labels {
-    flex-direction: column;
-    min-width: 100%;
-  }
-  .diff-pane-labels .pane-label-left {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-  .diff-pane-labels .pane-label-act {
-    flex: none;
-    border: none;
-    border-bottom: 1px solid var(--border);
-  }
-  .diff-pane-labels .pane-label-right {
-    text-align: left;
-  }
-
-  /* File header: stack old/new paths */
-  .diff-file-header {
-    flex-wrap: wrap;
-  }
-  .diff-file-header .path-new {
-    text-align: left;
-  }
-
-  /* Deep compare root header: wrap paths */
-  .deep-roots {
-    flex-wrap: wrap;
-    white-space: normal;
-  }
-  .deep-root-path {
-    text-overflow: clip;
-    white-space: normal;
-    word-break: break-all;
-  }
-
-  /* Tabs: allow wrapping on very narrow screens */
-  .tabbar {
-    flex-wrap: wrap;
-    max-height: none;
-  }
-
-  /* Modal: full width on narrow screens */
-  .modal, .modal-wide {
-    min-width: min(98vw, 20rem);
-    max-width: 98vw;
-    margin: .5rem;
-  }
-}
-
-/* ── Explorer Directory Report back bar ── */
-.explorer-deep-back {
-  display: flex; align-items: center;
-  padding: .3rem .6rem;
-  background: var(--surface-2); border-bottom: 1px solid var(--border);
-}
-
-/* ── Explorer pane root bar (between path bar and scroll, one per pane) ── */
-.pane-root-bar { display: grid; grid-template-columns: 1fr 1fr;
-  background: var(--surface-2); border-bottom: 2px solid var(--accent);
-  flex-shrink: 0; }
-.pane-root-cell { display: flex; align-items: center; gap: .2rem;
-  padding: .25rem .5rem; font-size: 12px; font-weight: 700; overflow: hidden; }
-.pane-root-cell:first-child { border-right: 1px solid var(--border); }
-.root-label { color: var(--muted); flex-shrink: 0; }
-.root-name  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: var(--text); }
-
-/* ── Explorer empty / first-run state ── */
-.explorer-empty { display: flex; flex-direction: column; align-items: center;
-  justify-content: center; flex: 1; padding: 2rem 1.5rem; text-align: center;
-  gap: .5rem; color: var(--muted); }
-.explorer-empty-icon  { font-size: 2.5rem; line-height: 1; }
-.explorer-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin: 0; }
-.explorer-empty-hint  { font-size: 13px; margin: 0; max-width: 36ch; }
-.explorer-empty-local { font-size: 12px; margin: 0; }
-
-/* ── Settings advanced toggle ── */
-.advanced-toggle { background: none; border: none; color: var(--muted);
-  cursor: pointer; font-size: 12px; padding: .3rem 0; text-align: left;
-  width: 100%; border-top: 1px solid var(--border); margin-top: .5rem; }
-.advanced-toggle:hover { color: var(--accent); }
-
-/* ── Explorer pane focus indicator (RFC-061) ── */
-.pane-root-cell { cursor: pointer; }
-.pane-root-cell.pane-focused {  outline: 2px solid var(--focus);
-  outline-offset: -2px;
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
-}
-
-/* ── Async loading / error states (RFC-065) ── */
-@keyframes spin { to { transform: rotate(360deg); } }
-.diff-loading {
-  display: flex; align-items: center; gap: .75rem;
-  padding: 2rem 1.5rem; color: var(--muted); font-size: 14px;
-}
-.diff-loading-spinner {
-  display: inline-block; font-size: 18px; line-height: 1;
-  animation: spin 1.2s linear infinite;
-}
-.tab-loading-spinner {
-  display: inline-block; font-size: 10px;
-  animation: spin 1.2s linear infinite;
-}
-.diff-error { padding: 1.5rem; }
 
 /* ── Binary-blocked row (RFC-066) ── */
 .tree-row.binary-blocked { opacity: .5; cursor: default; }
@@ -764,38 +377,450 @@ kbd.kb-key { font-family: ui-monospace, monospace; font-size: 12px; background: 
 .filter-bar-row {
   display: flex; align-items: center; gap: .4rem;
   padding: .2rem .4rem; background: var(--surface-2);
-  border-bottom: 1px solid var(--border); min-height: 32px;
-  flex-shrink: 0;
+  border-bottom: 1px solid var(--border); min-height: 32px; flex-shrink: 0;
 }
-.filter-toggle {
-  flex: 0 0 auto; min-height: 24px; padding: 0 .35rem;
-  font-size: 13px; background: none; border: 1px solid transparent;
-}
+.filter-toggle { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 13px; background: none; border: 1px solid transparent; }
 .filter-toggle.active { border-color: var(--accent); color: var(--accent); }
-.filter-input {
-  flex: 1; min-width: 0; font-size: 12px;
-  height: 24px; padding: 0 .4rem;
-}
-.filter-check {
-  display: flex; align-items: center; gap: .25rem;
-  font-size: 12px; color: var(--text); cursor: pointer;
-  white-space: nowrap; user-select: none;
-}
-.filter-clear {
-  flex: 0 0 auto; min-height: 24px; padding: 0 .35rem;
-  font-size: 11px; color: var(--muted); background: none;
-  border: 1px solid var(--border);
-}
+.filter-input { flex: 1; min-width: 0; font-size: 12px; height: 24px; padding: 0 .4rem; }
+.filter-check { display: flex; align-items: center; gap: .25rem; font-size: 12px; color: var(--text); cursor: pointer; white-space: nowrap; user-select: none; }
+.filter-clear { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 11px; color: var(--muted); background: none; border: 1px solid var(--border); }
 .filter-clear:hover { color: var(--text); border-color: var(--accent); }
 
-/* ── Explorer compact (unaligned) view — RFC-068 ── */
-.compact-tree {
-  display: flex; flex: 1; min-height: 0; overflow: hidden;
+/* ── Explorer compact view (RFC-068) ── */
+.compact-tree { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.compact-pane { flex: 1; overflow-y: auto; overflow-x: hidden; padding: .2rem; }
+.compact-pane-right { border-left: 1px solid var(--border); }
+
+/* ── Explorer footer ── */
+.explorer-footer {
+  display: flex; align-items: center; gap: .5rem; padding: .4rem .6rem;
+  background: var(--surface-2); border-top: 1px solid var(--border);
+  flex-shrink: 0; min-height: var(--control-h);
 }
-.compact-pane {
-  flex: 1; overflow-y: auto; overflow-x: hidden;
-  padding: .2rem;
+.targets-label { flex: 1; display: flex; align-items: center; gap: .2rem; overflow: hidden; min-width: 0; font-size: 12px; }
+.targets-pick { color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 24ch; }
+.targets-sep  { color: var(--muted); flex-shrink: 0; }
+.targets-hint { color: var(--muted); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.compare-btn { flex-shrink: 0; font-weight: 600; padding: .25rem .8rem; border-color: var(--accent); color: var(--accent); }
+.compare-btn:not(:disabled):hover { background: var(--accent); color: var(--surface); }
+.compare-btn:disabled { border-color: var(--border); color: var(--muted); }
+
+/* ── Empty state ── */
+.explorer-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 2rem 1.5rem; text-align: center; gap: .5rem; color: var(--muted); }
+.explorer-empty-icon  { font-size: 2.5rem; line-height: 1; }
+.explorer-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin: 0; }
+.explorer-empty-hint  { font-size: 13px; margin: 0; max-width: 36ch; }
+.explorer-empty-local { font-size: 12px; margin: 0; }
+
+/* ── Pane root bar ── */
+.pane-root-bar { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-bottom: 2px solid var(--accent); flex-shrink: 0; }
+.pane-root-cell { display: flex; align-items: center; gap: .2rem; padding: .25rem .5rem; font-size: 12px; font-weight: 700; overflow: hidden; cursor: pointer; }
+.pane-root-cell:first-child { border-right: 1px solid var(--border); }
+.root-label { color: var(--muted); flex-shrink: 0; }
+.root-name  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+
+/* ── Explorer pane focus indicator (RFC-061) ── */
+.pane-root-cell.pane-focused { outline: 2px solid var(--focus); outline-offset: -2px; background: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); }
+
+/* ── Directory report back bar ── */
+.explorer-deep-back { display: flex; align-items: center; padding: .3rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+
+/* @source css/11-view-diff.css */
+/* ── 11-view-diff ───────────────────────────────────────────────────────────
+   Compare/diff workspace layout.
+
+   Scroll ownership inside the Compare view:
+     .diff-wrap      flex column, flex:1 1 auto — fills .body slot
+     .diff-scroll    flex:1 1 auto, overflow-y:auto — SOLE vertical scroll owner
+     .diff-columns   display:grid — column placement only, no scroll
+     .diff-col-left  overflow-x:auto — owns left horizontal scroll
+     .diff-col-act   fixed action column, no scroll
+     .diff-col-right overflow-x:auto — owns right horizontal scroll
+
+   Row width contract:
+     .hunk and .diff-row both use  width:100%; min-width:max-content
+     Meaning: short rows fill the visible column width (background covers the
+     full row), long rows expand past the column and trigger per-column h-scroll.
+
+   Key WebKitGTK notes:
+   - .diff-wrap must declare flex:1 1 auto on its OWN rule, not only via a
+     parent child-selector (.body > .diff-wrap), to reliably fill the slot.
+   - .diff-columns must NOT use min-height:100% inside a scroll container —
+     that resolves to clientHeight and prevents scrollHeight > clientHeight,
+     so the scrollbar never appears.  Use min-height:auto (the default).
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ---- diff-wrap: fills .body slot ---- */
+.diff-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;   /* fill .body flex slot — must be on own rule for WebKit */
+  min-height: 0;
+  overflow: hidden;
 }
-.compact-pane-right {
+
+/* ---- diff toolbar ---- */
+.diff-toolbar {
+  display: flex; gap: .4rem; align-items: center; flex-wrap: wrap;
+  padding: .35rem .6rem; background: var(--surface-2);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.diff-toolbar .info { color: var(--muted); font-size: 12px; }
+.diff-toolbar.advanced { background: var(--surface); border-bottom-style: dashed; }
+
+/* ---- diff file header ---- */
+.diff-file-header {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .3rem .6rem; background: var(--surface-2);
+  border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted);
+  flex-shrink: 0;
+}
+.diff-file-header .arrow { flex: 0; }
+.diff-file-header .path-old,
+.diff-file-header .path-new { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diff-file-header .path-new { text-align: right; }
+
+/* ---- pane header labels ---- */
+.diff-pane-labels {
+  display: flex;
+  background: var(--surface-2);
+  border-bottom: 2px solid var(--border);
+  font-size: 11px; color: var(--muted); font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase;
+  user-select: none;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.diff-pane-labels .pane-label-left  { flex: 1; padding: .2rem .4rem; border-right: 1px solid var(--border); }
+.diff-pane-labels .pane-label-act   { flex: 0 0 6ch; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+.diff-pane-labels .pane-label-right { flex: 1; padding: .2rem .4rem; }
+
+/* ---- diff-scroll: sole vertical scroll owner ---- */
+.diff-scroll {
+  font-family: var(--diff-ff, ui-monospace, monospace);
+  font-size: var(--diff-fs, 14px);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* ---- diff-columns: column placement grid ----
+   Sits inside .diff-scroll (the scroll owner).
+   MUST NOT set min-height:100% here: inside a scroll container that would
+   resolve to clientHeight and prevent scrollHeight > clientHeight, making
+   the vertical scrollbar invisible.  Let min-height be auto (the default). */
+.diff-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6ch minmax(0, 1fr);
+  align-items: start;
+}
+
+/* ---- columns ---- */
+/* Left column: owns horizontal scroll for all left rows.
+   overflow-x:auto on a grid cell whose content uses width:100% resolves
+   width relative to the grid track, so rows correctly fill and then overflow. */
+.diff-col-left {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  border-right: 1px solid var(--border);
+}
+
+.diff-col-act {
+  overflow: visible;
+}
+
+.diff-col-right {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
   border-left: 1px solid var(--border);
 }
+
+/* Legacy no-op: .diff-pane was removed in v0.162.0. Keep as display:contents
+   so any stale references in markup don't break layout. */
+.diff-pane { display: contents; }
+
+/* ---- hunk container ----
+   width:100% fills the grid track (column width).
+   min-width:max-content expands for long lines → column h-scrolls. */
+.hunk {
+  width: 100%;
+  min-width: max-content;
+}
+
+/* ---- diff row ----
+   Same width contract as .hunk: fill for short lines, expand for long lines. */
+.diff-row {
+  display: flex;
+  align-items: stretch;
+  min-height: var(--line-h);
+  width: 100%;            /* short rows: fill column width → background covers full row */
+  min-width: max-content; /* long rows: expand past column → column h-scroll fires */
+}
+
+/* ---- act column cells ---- */
+.diff-act {
+  width: 6ch; min-height: var(--line-h);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface);
+}
+.diff-act button { padding: 0 .25rem; font-size: 11px; }
+.apply-btn { display: flex; align-items: center; gap: .15rem; }
+.apply-btn-label { font-size: 10px; font-weight: 600; letter-spacing: .02em; }
+
+/* ---- gutter ---- */
+.pane-gutter {
+  flex: 0 0 4ch;
+  background: var(--surface);
+  color: var(--muted);
+  text-align: right;
+  padding: 0 .4rem;
+  user-select: none;
+  line-height: var(--line-h);
+  white-space: nowrap;
+}
+.pane-gutter.del { background: var(--del-bg); }
+.pane-gutter.ins { background: var(--ins-bg); }
+
+/* ---- cell ----
+   flex:1 1 auto + min-width:max-content: expands to content width AND
+   stretches to fill any extra space from the row's width:100% stretch. */
+.diff-row .cell {
+  flex: 1 1 auto;
+  min-width: max-content;
+  padding: 0 .4rem;
+  line-height: var(--line-h);
+  white-space: pre;
+  overflow: visible;
+}
+
+/* ---- hunk backgrounds ----
+   Applied at .diff-row level so colour fills the full visible column width,
+   including the blank area to the right of short lines. */
+.hunk-del .diff-row { background: var(--del-bg); }
+.hunk-ins .diff-row { background: var(--ins-bg); }
+.hunk-rep .diff-row { background: var(--rep-bg); }
+
+/* ---- diff marks ---- */
+.diff-mark {
+  flex: 0 0 1.2ch; display: inline-block; width: 1.2ch;
+  text-align: center; font-size: 10px; font-weight: 700;
+  color: var(--muted); user-select: none; line-height: var(--line-h);
+}
+.hunk-del .diff-mark { color: var(--del-mark); }
+.hunk-ins .diff-mark { color: var(--ins-mark); }
+.hunk-rep .diff-mark { color: var(--warn); }
+
+.hunk.focused { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+/* Inline character-level spans */
+.in-del { background: color-mix(in srgb, var(--del-mark) 30%, transparent); text-decoration: line-through; }
+.in-ins { background: color-mix(in srgb, var(--ins-mark) 30%, transparent); }
+
+.applied { padding: 0 .35rem; color: var(--ok); font-size: 11px; }
+
+/* Search match highlight */
+.diff-row.match { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.diff-row.match .cell { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* Word-wrap mode */
+.diff-scroll.wrap .diff-col-left,
+.diff-scroll.wrap .diff-col-right { overflow-x: hidden; }
+.diff-scroll.wrap .diff-row .cell { white-space: pre-wrap; word-break: break-word; overflow: visible; }
+
+/* ---- context collapse divider ---- */
+.collapse-divider {
+  padding: .2rem .6rem; text-align: center; font-size: 11px;
+  color: var(--muted); background: var(--surface-2);
+  border: 1px dashed var(--border); border-radius: 4px;
+  cursor: pointer; margin: .2rem 0; user-select: none;
+}
+.collapse-divider:hover { color: var(--accent); border-color: var(--accent); }
+.collapse-divider-spacer { padding: .2rem .6rem; font-size: 11px; margin: .2rem 0; visibility: hidden; }
+
+/* ---- warning banner ---- */
+.diff-warning-banner {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .35rem .7rem;
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  font-size: 12px; color: var(--text); flex-shrink: 0;
+}
+
+/* ---- search bar ---- */
+.search-bar {
+  display: flex; align-items: center; gap: .3rem; padding: .25rem .6rem;
+  background: var(--surface-2); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.search-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--text); font-size: 13px; }
+.search-count { font-size: 12px; color: var(--muted); min-width: 6ch; text-align: center; }
+.search-count.no-matches { color: var(--warn); }
+.search-nav { padding: .1rem .35rem; font-size: 11px; cursor: pointer; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); }
+.search-nav:disabled { opacity: .4; cursor: default; }
+.search-close { padding: .1rem .4rem; font-size: 14px; cursor: pointer; }
+
+/* @source css/12-view-directory-report.css */
+/* ── 12-view-directory-report ───────────────────────────────────────────────
+   Deep compare / directory report view.
+   .deep-compare is a direct child of .body and must declare flex:1 1 auto
+   on its own rule (same reason as .explorer and .diff-wrap).
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.deep-compare {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;   /* fill .body flex slot */
+  min-height: 0;
+  overflow: hidden;
+}
+
+.deep-roots {
+  display: flex; align-items: center; gap: .3rem; padding: .35rem .6rem;
+  font-size: 12px; background: var(--surface-2); border-bottom: 1px solid var(--border);
+  overflow: hidden; white-space: nowrap; flex-shrink: 0;
+}
+.deep-root-label { color: var(--muted); flex-shrink: 0; }
+.deep-root-path  { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.deep-root-sep   { color: var(--muted); flex-shrink: 0; }
+
+.deep-compare-toolbar { display: flex; align-items: center; gap: .4rem; padding: .35rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.deep-label { font-size: 12px; color: var(--muted); margin-right: .5rem; }
+.deep-stats { padding: .25rem .6rem; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.deep-table { flex: 1; overflow: auto; min-height: 0; }
+.deep-row { display: flex; align-items: center; gap: .5rem; padding: .2rem .6rem; cursor: pointer; font-size: 13px; }
+.deep-row:hover { background: var(--surface-3); }
+.deep-path { flex: 1; font-family: ui-monospace, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deep-compare-btn { padding: .15rem .4rem; font-size: 11px; opacity: .7; border-radius: 4px; }
+.deep-row:hover .deep-compare-btn { opacity: 1; }
+.deep-scanning { padding: 1.5rem; text-align: center; color: var(--muted); }
+.deep-progress { color: var(--muted); }
+
+/* ── Status colours ── */
+.status-equal   { color: var(--ok); }
+.status-changed { color: var(--warn); }
+.status-only    { color: var(--muted); }
+.status-cmp     { color: var(--muted); opacity: .6; }
+.status-err     { color: var(--err); }
+.status-symlink { color: var(--muted); font-style: italic; }
+
+/* ── Filter buttons ── */
+.filter-btn { padding: .2rem .5rem; border-radius: 6px; font-size: 12px; background: var(--surface-3); border: 1px solid var(--border); cursor: pointer; }
+.filter-btn.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+/* @source css/20-overlays.css */
+/* ── 20-overlays ────────────────────────────────────────────────────────────
+   View-specific overlay content.
+   Base .scrim and .modal rules are in 03-components.css.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* @source css/30-contract-diff-decorations.css */
+/* ── 30-contract-diff-decorations ───────────────────────────────────────────
+   DiffDecorationSet CSS class contract (RFC-024).
+   These classes are produced by LineDecorationKind::css_class() and
+   InlineDecorationKind::css_class() in forskscope-core.
+   Any change here MUST stay in sync with the core constants.
+
+   Current DOM (v0.162.0+):
+     .diff-col-left / .diff-col-right
+       .hunk[.hunk-del/.hunk-ins/.hunk-rep]
+         .diff-row[.fs-line-*]
+           .pane-gutter
+           .diff-mark
+           .cell
+
+   The old selectors targeted ".diff-pane .cell" but .diff-pane is now
+   display:contents.  Selectors are placed on .diff-row directly.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.fs-line-unchanged {}
+
+.diff-row.fs-line-added            { background: var(--ins-bg); }
+.diff-row.fs-line-deleted          { background: var(--del-bg); }
+.diff-row.fs-line-modified         { background: var(--rep-bg); }
+.diff-row.fs-line-empty-counterpart { background: var(--surface); opacity: .4; }
+.diff-row.fs-line-conflict         { background: color-mix(in srgb, var(--warn) 18%, var(--surface)); }
+.diff-row.fs-line-merge-applied    { background: color-mix(in srgb, var(--ok) 12%, var(--surface)); }
+
+/* Cell-level backgrounds for inline diff layering */
+.diff-row.fs-line-added            .cell { background: var(--ins-bg); }
+.diff-row.fs-line-deleted          .cell { background: var(--del-bg); }
+.diff-row.fs-line-modified         .cell { background: var(--rep-bg); }
+.diff-row.fs-line-empty-counterpart .cell { background: var(--surface); opacity: .4; }
+.diff-row.fs-line-conflict         .cell { background: color-mix(in srgb, var(--warn) 18%, var(--surface)); }
+.diff-row.fs-line-merge-applied    .cell { background: color-mix(in srgb, var(--ok) 12%, var(--surface)); }
+
+/* Inline character-level diff spans (RFC-024 §Inline contract) */
+.fs-inline-inserted  { background: color-mix(in srgb, var(--ins-mark) 30%, transparent); }
+.fs-inline-deleted   { background: color-mix(in srgb, var(--del-mark) 30%, transparent); text-decoration: line-through; }
+.fs-inline-replaced  { background: color-mix(in srgb, var(--warn) 25%, transparent); }
+.fs-inline-whitespace { outline: 1px dotted var(--muted); }
+
+/* ── ConflictNavigator CSS class contract (RFC-034) ── */
+.fsk-conflict-unresolved { color: var(--warn); font-weight: bold; }
+.fsk-conflict-left       { color: var(--ins-mark); }
+.fsk-conflict-right      { color: var(--ins-mark); }
+.fsk-conflict-both       { color: var(--ok); }
+.fsk-conflict-manual     { color: var(--accent); }
+.fsk-conflict-ignored    { color: var(--muted); opacity: .6; }
+
+/* @source css/90-responsive.css */
+/* ── 90-responsive ──────────────────────────────────────────────────────────
+   Responsive overrides for viewports narrower than 720 px.
+   Diff rules target the column DOM introduced in v0.162.0.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 719px) {
+
+  /* ── Explorer: stack path bars vertically ── */
+  .explorer-path-bars { grid-template-columns: 1fr; }
+  .explorer-path-bars .path-bar:last-child { border-top: 1px solid var(--border); }
+  .aligned-row { grid-template-columns: 1fr; }
+  .aligned-row .pane-half:last-child { border-right: none; border-top: 1px solid var(--border); }
+  .row-spacer { display: none; }
+
+  /* ── Diff: stack columns vertically ── */
+  .diff-columns {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .diff-col-left,
+  .diff-col-right {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    border-left: none;
+    border-right: none;
+  }
+
+  .diff-col-left { border-bottom: 2px solid var(--border); }
+
+  .diff-col-act { flex: none; width: 100%; overflow: visible; }
+
+  /* ── Pane labels ── */
+  .diff-pane-labels { flex-direction: column; min-width: 100%; }
+  .diff-pane-labels .pane-label-left { border-right: none; border-bottom: 1px solid var(--border); }
+  .diff-pane-labels .pane-label-act  { flex: none; border: none; border-bottom: 1px solid var(--border); }
+  .diff-pane-labels .pane-label-right { text-align: left; }
+
+  /* ── File header ── */
+  .diff-file-header { flex-wrap: wrap; }
+  .diff-file-header .path-new { text-align: left; }
+
+  /* ── Deep compare root header ── */
+  .deep-roots { flex-wrap: wrap; white-space: normal; }
+  .deep-root-path { text-overflow: clip; white-space: normal; word-break: break-all; }
+
+  /* ── Tabs ── */
+  .tabbar { flex-wrap: wrap; max-height: none; }
+
+  /* ── Modals ── */
+  .modal, .modal-wide { min-width: min(98vw, 20rem); max-width: 98vw; margin: .5rem; }
+}
+

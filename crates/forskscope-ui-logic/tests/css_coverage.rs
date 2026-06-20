@@ -6,10 +6,9 @@
 //!
 //! This test runs without GTK — it reads the CSS file as a static string.
 
-/// The main stylesheet, included at compile time.
-///
-/// The path is relative to the workspace root; if the file moves this test
-/// will fail at compile time rather than silently at runtime.
+/// The runtime stylesheet, included at compile time.
+/// Generated from `assets/css/` via `cargo xtask css`.
+/// Both the runtime (app.rs) and this test include the same single artifact.
 const MAIN_CSS: &str = include_str!(
     "../../../crates/forskscope-ui/assets/main.css"
 );
@@ -140,4 +139,48 @@ fn all_css_vars_used_are_defined_in_main_css() {
             "CSS variable '--{var}' is used in main.css but never defined"
         );
     }
+}
+
+#[test]
+fn generated_main_css_matches_split_sources() {
+    // Verify that assets/main.css is current with respect to the split files.
+    // Files are assembled in alphabetical order (numeric prefix = cascade order).
+    // If this test fails, run `cargo xtask css` to regenerate.
+    let assets = std::path::PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR")
+            .expect("CARGO_MANIFEST_DIR must be set by cargo test")
+    )
+        .join("../../crates/forskscope-ui/assets");
+    let css_dir = assets.join("css");
+
+    // Collect *.css files in alphabetical order — must match xtask logic exactly.
+    let mut entries: Vec<std::path::PathBuf> = std::fs::read_dir(&css_dir)
+        .unwrap_or_else(|e| panic!("cannot read {}: {e}", css_dir.display()))
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("css"))
+        .collect();
+    entries.sort();
+
+    let header = "/*\n\
+        * GENERATED FILE — DO NOT EDIT DIRECTLY.\n\
+        * Source files live under assets/css/.\n\
+        * Files are assembled in alphabetical order (numeric prefix = cascade order).\n\
+        * Regenerate with: cargo xtask css\n\
+        */\n\n";
+    let mut expected = String::from(header);
+    for path in &entries {
+        let name = path.file_name().unwrap().to_string_lossy();
+        let content = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+        expected.push_str(&format!("/* @source css/{name} */\n"));
+        expected.push_str(&content);
+        if !expected.ends_with('\n') { expected.push('\n'); }
+        expected.push('\n');
+    }
+
+    assert_eq!(
+        MAIN_CSS, expected,
+        "assets/main.css is stale — run `cargo xtask css` to regenerate"
+    );
 }

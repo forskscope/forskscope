@@ -14,7 +14,9 @@ use forskscope_core::merge::ThreeWayMergeSession;
 use forskscope_core::ConflictId;
 
 fn load(path: &str) -> String {
-    let full = Path::new(env!("CARGO_MANIFEST_DIR"))
+    let manifest = std::env::var("CARGO_MANIFEST_DIR")
+        .expect("CARGO_MANIFEST_DIR must be set by cargo test");
+    let full = Path::new(&manifest)
         .join("../../tests/fixtures/merge")
         .join(path);
     fs::read_to_string(&full)

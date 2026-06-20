@@ -1,0 +1,48 @@
+/* ── 30-contract-diff-decorations ───────────────────────────────────────────
+   DiffDecorationSet CSS class contract (RFC-024).
+   These classes are produced by LineDecorationKind::css_class() and
+   InlineDecorationKind::css_class() in forskscope-core.
+   Any change here MUST stay in sync with the core constants.
+
+   Current DOM (v0.162.0+):
+     .diff-col-left / .diff-col-right
+       .hunk[.hunk-del/.hunk-ins/.hunk-rep]
+         .diff-row[.fs-line-*]
+           .pane-gutter
+           .diff-mark
+           .cell
+
+   The old selectors targeted ".diff-pane .cell" but .diff-pane is now
+   display:contents.  Selectors are placed on .diff-row directly.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.fs-line-unchanged {}
+
+.diff-row.fs-line-added            { background: var(--ins-bg); }
+.diff-row.fs-line-deleted          { background: var(--del-bg); }
+.diff-row.fs-line-modified         { background: var(--rep-bg); }
+.diff-row.fs-line-empty-counterpart { background: var(--surface); opacity: .4; }
+.diff-row.fs-line-conflict         { background: color-mix(in srgb, var(--warn) 18%, var(--surface)); }
+.diff-row.fs-line-merge-applied    { background: color-mix(in srgb, var(--ok) 12%, var(--surface)); }
+
+/* Cell-level backgrounds for inline diff layering */
+.diff-row.fs-line-added            .cell { background: var(--ins-bg); }
+.diff-row.fs-line-deleted          .cell { background: var(--del-bg); }
+.diff-row.fs-line-modified         .cell { background: var(--rep-bg); }
+.diff-row.fs-line-empty-counterpart .cell { background: var(--surface); opacity: .4; }
+.diff-row.fs-line-conflict         .cell { background: color-mix(in srgb, var(--warn) 18%, var(--surface)); }
+.diff-row.fs-line-merge-applied    .cell { background: color-mix(in srgb, var(--ok) 12%, var(--surface)); }
+
+/* Inline character-level diff spans (RFC-024 §Inline contract) */
+.fs-inline-inserted  { background: color-mix(in srgb, var(--ins-mark) 30%, transparent); }
+.fs-inline-deleted   { background: color-mix(in srgb, var(--del-mark) 30%, transparent); text-decoration: line-through; }
+.fs-inline-replaced  { background: color-mix(in srgb, var(--warn) 25%, transparent); }
+.fs-inline-whitespace { outline: 1px dotted var(--muted); }
+
+/* ── ConflictNavigator CSS class contract (RFC-034) ── */
+.fsk-conflict-unresolved { color: var(--warn); font-weight: bold; }
+.fsk-conflict-left       { color: var(--ins-mark); }
+.fsk-conflict-right      { color: var(--ins-mark); }
+.fsk-conflict-both       { color: var(--ok); }
+.fsk-conflict-manual     { color: var(--accent); }
+.fsk-conflict-ignored    { color: var(--muted); opacity: .6; }

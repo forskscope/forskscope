@@ -29,8 +29,8 @@ pub fn HunkBlock(
     focused: bool, can_save: bool,
     is_expanded: bool, on_expand: EventHandler<u64>,
 ) -> Element {
-    let mut store = use_context::<Store>();
-    let lang      = store.lang();
+    let store = use_context::<Store>();
+    let lang  = store.lang();
     let kind_class = match hunk.kind {
         HunkKind::Equal   => "hunk",
         HunkKind::Delete  => "hunk hunk-del",

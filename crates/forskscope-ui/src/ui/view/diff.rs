@@ -133,9 +133,11 @@ pub fn DiffWorkspace(index: usize) -> Element {
             div {
                 class: "{wrap_class}",
                 style: "--diff-fs:{snap.font_size}px; --diff-ff:{snap.font_family};",
-                // Three parallel column containers — each owns its horizontal scroll.
-                // Left and right columns scroll independently; act column is fixed.
-                div { class: "diff-col-left",
+                // .diff-columns: inner grid that places the three parallel columns.
+                // .diff-scroll owns vertical scrolling; .diff-columns sets column widths;
+                // left and right columns each own their own horizontal scroll.
+                div { class: "diff-columns",
+                    div { class: "diff-col-left",
                     for hunk in snap.hunks.iter() {
                         HunkBlock {
                             index, hunk: hunk.clone(), col: HunkCol::Left,
@@ -171,6 +173,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
                         }
                     }
                 }
+                } // .diff-columns
             }
         }
     }

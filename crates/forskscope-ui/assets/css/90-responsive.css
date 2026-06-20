@@ -1,0 +1,54 @@
+/* ── 90-responsive ──────────────────────────────────────────────────────────
+   Responsive overrides for viewports narrower than 720 px.
+   Diff rules target the column DOM introduced in v0.162.0.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 719px) {
+
+  /* ── Explorer: stack path bars vertically ── */
+  .explorer-path-bars { grid-template-columns: 1fr; }
+  .explorer-path-bars .path-bar:last-child { border-top: 1px solid var(--border); }
+  .aligned-row { grid-template-columns: 1fr; }
+  .aligned-row .pane-half:last-child { border-right: none; border-top: 1px solid var(--border); }
+  .row-spacer { display: none; }
+
+  /* ── Diff: stack columns vertically ── */
+  .diff-columns {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .diff-col-left,
+  .diff-col-right {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    border-left: none;
+    border-right: none;
+  }
+
+  .diff-col-left { border-bottom: 2px solid var(--border); }
+
+  .diff-col-act { flex: none; width: 100%; overflow: visible; }
+
+  /* ── Pane labels ── */
+  .diff-pane-labels { flex-direction: column; min-width: 100%; }
+  .diff-pane-labels .pane-label-left { border-right: none; border-bottom: 1px solid var(--border); }
+  .diff-pane-labels .pane-label-act  { flex: none; border: none; border-bottom: 1px solid var(--border); }
+  .diff-pane-labels .pane-label-right { text-align: left; }
+
+  /* ── File header ── */
+  .diff-file-header { flex-wrap: wrap; }
+  .diff-file-header .path-new { text-align: left; }
+
+  /* ── Deep compare root header ── */
+  .deep-roots { flex-wrap: wrap; white-space: normal; }
+  .deep-root-path { text-overflow: clip; white-space: normal; word-break: break-all; }
+
+  /* ── Tabs ── */
+  .tabbar { flex-wrap: wrap; max-height: none; }
+
+  /* ── Modals ── */
+  .modal, .modal-wide { min-width: min(98vw, 20rem); max-width: 98vw; margin: .5rem; }
+}

@@ -1,0 +1,38 @@
+/* ── 01-tokens ──────────────────────────────────────────────────────────────
+   CSS custom properties: density tokens and per-theme colour tokens.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --line-h: 1.5rem;
+  /* ── Density tokens (RFC-063 C2) ── */
+  --control-h: 36px;
+  --control-min-w: 44px;
+  --row-h: 32px;
+  --control-pad-x: 10px;
+  --focus-ring: 2px;
+}
+
+.theme-dark {
+  --surface: #1e1f22; --surface-2: #2b2d31; --surface-3: #36383d;
+  --text: #e6e6e6; --muted: #9aa0a6; --border: #3a3d42; --accent: #4f8cff;
+  --equal: transparent; --del-bg: #4a2326; --ins-bg: #1f3b29;
+  --del-mark: #ff6b6b; --ins-mark: #5fd28a; --rep-bg: #3a3320;
+  --danger-bg: #5c1e1e;
+  --ok: #5fd28a; --warn: #e0b341; --err: #ff6b6b; --focus: #4f8cff;
+}
+.theme-light {
+  --surface: #ffffff; --surface-2: #f3f4f6; --surface-3: #e8eaed;
+  --text: #1f2328; --muted: #5c636a; --border: #d0d7de; --accent: #0969da;
+  --equal: transparent; --del-bg: #ffd7d5; --ins-bg: #d3f5e0;
+  --del-mark: #cf222e; --ins-mark: #1a7f37; --rep-bg: #fff3cd;
+  --danger-bg: #ffd5d5;
+  --ok: #1a7f37; --warn: #9a6700; --err: #cf222e; --focus: #0969da;
+}
+.theme-night {
+  --surface: #0d1117; --surface-2: #161b22; --surface-3: #21262d;
+  --text: #c9d1d9; --muted: #8b949e; --border: #30363d; --accent: #58a6ff;
+  --equal: transparent; --del-bg: #3c1618; --ins-bg: #12321f;
+  --del-mark: #f85149; --ins-mark: #3fb950; --rep-bg: #2a2415;
+  --danger-bg: #4a1515;
+  --ok: #3fb950; --warn: #d29922; --err: #f85149; --focus: #58a6ff;
+}

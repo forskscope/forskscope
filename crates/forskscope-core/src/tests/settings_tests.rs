@@ -4,7 +4,7 @@ use crate::diff::CompareProfile;
 use crate::encoding::NewlinePolicy;
 use crate::persist::MigrationPolicy;
 use crate::settings::{
-    AppearanceSettings, Density, FontFamilySetting, LocaleId, LocaleSettings,
+    Density, FontFamilySetting, LocaleId,
     ThemeId, UserSettings, SETTINGS_SCHEMA_VERSION,
 };
 
