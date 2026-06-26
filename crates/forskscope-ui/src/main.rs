@@ -9,6 +9,7 @@
 //!                                       # save result to <merged>
 //! forskscope --diagnostics         # Print platform diagnostics and exit
 //! ```
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
 mod i18n;
