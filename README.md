@@ -1,8 +1,8 @@
 # ForskScope
 
+[![License](https://img.shields.io/github/license/forskscope/forskscope)](LICENSE)
 [![CI](https://github.com/forskscope/forskscope/actions/workflows/ci.yml/badge.svg)](https://github.com/forskscope/forskscope/actions/workflows/ci.yml)
 [![Release](https://github.com/forskscope/forskscope/actions/workflows/release.yml/badge.svg)](https://github.com/forskscope/forskscope/actions/workflows/release.yml)
-[![License](https://img.shields.io/github/license/forskscope/forskscope)](https://github.com/forskscope/forskscope/blob/main/LICENSE)
 
 ![logo](docs/src/assets/logo.png)
 

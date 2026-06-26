@@ -1,12 +1,14 @@
 [package]
-name = "forskscope-ui"
+name        = "forskscope-ui"
 description = "ForskScope desktop UI: app shell, explorer, compare/diff-merge workspace, settings, dialogs."
-version.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+readme      = "../../README.md"
+
+version.workspace       = true
+edition.workspace       = true
+rust-version.workspace  = true
+license.workspace       = true
+authors.workspace       = true
+repository.workspace    = true
 
 [[bin]]
 name = "forskscope"
@@ -17,15 +19,17 @@ name = "forskscope_ui"
 path = "src/lib.rs"
 
 [dependencies]
-forskscope-core = { workspace = true }
-forskscope-ui-logic = { workspace = true }
-dioxus = { workspace = true }
-dioxus-core = { workspace = true }
-dioxus-swdir-tree = { workspace = true }
-rfd = { workspace = true }
-dirs-next    = { workspace = true }
-tokio = { workspace = true }
-app-json-settings = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
+forskscope-core             = { workspace = true }
+forskscope-ui-logic         = { workspace = true }
 
+dioxus                      = { workspace = true }
+dioxus-core                 = { workspace = true }
+dioxus-swdir-tree           = { workspace = true }
+
+app-json-settings           = { workspace = true }
+dirs-next                   = { workspace = true }
+rfd                         = { workspace = true }
+
+serde                       = { workspace = true }
+serde_json                  = { workspace = true }
+tokio                       = { workspace = true }
