@@ -5,6 +5,93 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.164.0] — 2026-06-30
+
+Compare-view UI polish built on the published 0.163.0: full-width diff line
+backgrounds, exact merge-button alignment, synchronised horizontal scrolling,
+a home-directory default for the Explorer, and a setting to remember the
+Explorer's last directories.
+
+### Added
+
+**Synchronised horizontal scrolling between the diff panes.**
+
+The left and right panes are independent horizontal scroll containers; scrolling
+one now mirrors the other's `scrollLeft` so matched content stays horizontally
+aligned. Implemented via a one-time DOM binding (`install_hscroll_sync`) attached
+on mount, with a re-entrancy guard to prevent feedback loops, an idempotency
+marker to avoid double-binding on remount, and tab-scoped element IDs so multiple
+open tabs do not cross-wire.
+
+**Explorer starts at the user's home directory on first run.**
+
+Previously, with no saved settings the Explorer panes opened at the filesystem
+root. The fallback chain is now last-used directory → home directory → working
+directory → root. Home is preferred over the working directory because at launch
+the working directory is often `/` for a desktop launcher.
+
+**Setting: "Remember Explorer directories" (Settings → Advanced).**
+
+When on (default), each pane's last-visited directory is saved on navigation and
+restored at next launch; the location is now persisted to disk on every
+navigation. When off, both panes always start at home, and turning the setting
+off clears any stored locations. Includes Japanese translations for the new
+strings.
+
+### Packaging
+
+**Windows MSIX manifest and store assets added.**
+
+`packaging/windows/` now includes an `AppxManifest.xml` (package version
+`0.164.0.0`) and `Assets/` tile/logo images (Square44x44, Square150x150,
+Wide310x150, StoreLogo) alongside the existing `build-zip.sh`.
+
+### Fixed
+
+**Diff line background now spans the full line width.**
+
+Root cause: diff rows used flex/block layout with `width: 100%`, which resolves
+against the *visible* column width. Once any line was long enough to make a pane
+scroll horizontally, short rows' backgrounds ended at the old viewport edge,
+leaving the trailing area uncoloured.
+
+Fix: each pane's rows are laid out as a CSS table (`display: table` with
+`width: max-content; min-width: 100%`; hunks are `table-row-group`, rows are
+`table-row`, gutter/mark/cell are `table-cell`). Table rows always span the full
+table width — the widest line — so the hunk background fills the entire line
+regardless of text length, even when scrolled. A `.diff-col-table` wrapper was
+added inside each scrolling column.
+
+**Merge buttons misaligned with their diff lines.**
+
+Root cause (found by measuring the rendered layout, not by inspection): the
+merge button inherited `min-height: var(--control-h)` (36px) from the global
+`button` rule. Inside a 24px diff line that forced the button's act-column row
+to 36px while the left/right rows stayed 24px, so every act row below a button
+drifted progressively out of alignment.
+
+Fix: the act column now uses the same table layout as the left/right panes (one
+`table-row` per diff row at `height: var(--line-h)`), and `.apply-btn` is
+constrained with `min-height: 0; height: calc(var(--line-h) - 2px)` so it fits
+within the line. A second drift in collapsed regions — the collapse divider
+wrapped to multiple lines while its spacer stayed one line — was fixed by
+constraining both the divider and spacer to a single fixed height. Verified by
+browser measurement: every row aligns to the same baseline across all three
+columns.
+
+### Internal
+
+**`forskscope-core` fully converted to sibling-file module style (M-004).**
+
+All twelve old-style `mod.rs` files in `forskscope-core` were moved to
+sibling-file form (`foo/mod.rs` → `foo.rs`, submodules remaining under `foo/`):
+`command`, `diff`, `dir`, `error`, `job`, `merge`, `merge/three_way`, `patch`,
+`report`, `save`, `session`, and `settings`. `save/` had no submodules and was
+flattened to a single `save.rs`. The workspace now contains zero `mod.rs` files,
+clearing the module-style debt flagged in the v0.162.0 handoff.
+
+---
+
 ## [0.163.0] — 2026-06-20
 
 Fix: Explorer Compare button gone, diff pane vertical scroll missing, short-line

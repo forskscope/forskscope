@@ -143,6 +143,28 @@ pub fn SettingsModal() -> Element {
                         }
                     }
                     div { class: "field",
+                        span { {t(lang, "Remember Explorer directories")} }
+                        input {
+                            r#type: "checkbox",
+                            checked: cur.remember_explorer_dirs,
+                            title: t(lang, "When on, the Explorer reopens the last directory shown in each pane. When off, it always starts at your home directory."),
+                            onchange: move |e| {
+                                let on = e.checked();
+                                {
+                                    let mut s = store.settings.write();
+                                    s.remember_explorer_dirs = on;
+                                    // Turning the feature off clears any stored locations so
+                                    // they are not silently retained on disk.
+                                    if !on {
+                                        s.last_left_dir = None;
+                                        s.last_right_dir = None;
+                                    }
+                                }
+                                super::persist(&store.settings.read());
+                            }
+                        }
+                    }
+                    div { class: "field",
                         span { {t(lang, "Context lines")} }
                         select {
                             value: "{cur.context_lines}",

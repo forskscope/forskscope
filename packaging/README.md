@@ -55,6 +55,11 @@ cargo build --release --target x86_64-pc-windows-msvc
 bash packaging/windows/build-zip.sh
 ```
 
+For MSIX/Store packaging, `packaging/windows/` also provides an
+`AppxManifest.xml` (package version mirrors the release, e.g. `0.164.0.0`)
+and `Assets/` tile and logo images. Keep the manifest `Version` in sync with
+the workspace version on each release (four-part `X.Y.Z.0` form).
+
 ## Source archive
 
 The source archive is the primary release artifact:

@@ -135,9 +135,13 @@ pub fn DiffWorkspace(index: usize) -> Element {
                 style: "--diff-fs:{snap.font_size}px; --diff-ff:{snap.font_family};",
                 // .diff-columns: inner grid that places the three parallel columns.
                 // .diff-scroll owns vertical scrolling; .diff-columns sets column widths;
-                // left and right columns each own their own horizontal scroll.
-                div { class: "diff-columns",
-                    div { class: "diff-col-left",
+                // left and right columns each own their own horizontal scroll, kept
+                // in sync by install_hscroll_sync (mirrors scrollLeft between panes).
+                div {
+                    class: "diff-columns",
+                    onmounted: move |_| { install_hscroll_sync(index); },
+                    div { class: "diff-col-left", id: "diff-col-left-{index}",
+                    div { class: "diff-col-table",
                     for hunk in snap.hunks.iter() {
                         HunkBlock {
                             index, hunk: hunk.clone(), col: HunkCol::Left,
@@ -148,8 +152,10 @@ pub fn DiffWorkspace(index: usize) -> Element {
                             on_expand: move |id: u64| { expanded.write().insert(id); },
                         }
                     }
+                    } // .diff-col-table
                 }
                 div { class: "diff-col-act",
+                    div { class: "diff-col-table",
                     for hunk in snap.hunks.iter() {
                         HunkBlock {
                             index, hunk: hunk.clone(), col: HunkCol::Act,
@@ -160,8 +166,10 @@ pub fn DiffWorkspace(index: usize) -> Element {
                             on_expand: move |id: u64| { expanded.write().insert(id); },
                         }
                     }
+                    } // .diff-col-table
                 }
-                div { class: "diff-col-right",
+                div { class: "diff-col-right", id: "diff-col-right-{index}",
+                    div { class: "diff-col-table",
                     for hunk in snap.hunks.iter() {
                         HunkBlock {
                             index, hunk: hunk.clone(), col: HunkCol::Right,
@@ -172,11 +180,55 @@ pub fn DiffWorkspace(index: usize) -> Element {
                             on_expand: move |id: u64| { expanded.write().insert(id); },
                         }
                     }
+                    } // .diff-col-table
                 }
                 } // .diff-columns
             }
         }
     }
+}
+
+// ── Horizontal scroll synchronisation ────────────────────────────────────────
+
+/// Install a horizontal scroll-sync binding between the left and right diff
+/// panes for the tab at `index`.
+///
+/// The two panes (`#diff-col-left-{index}` and `#diff-col-right-{index}`) are
+/// independent horizontal scroll containers. This mirrors each pane's
+/// `scrollLeft` onto the other so matched content stays horizontally aligned.
+///
+/// Implementation notes:
+/// - A re-entrancy guard (`__fsLocked`) prevents the programmatic scroll of one
+///   pane from triggering a feedback loop back through the other's listener.
+/// - A `data-fs-hsync` marker makes the binding idempotent: if the component
+///   re-mounts and re-runs this, the listeners are not attached twice.
+/// - Only `scrollLeft` is synced; vertical scrolling is owned by the shared
+///   `.diff-scroll` container and needs no per-pane sync.
+fn install_hscroll_sync(index: usize) {
+    let js = format!(
+        r#"
+        (function() {{
+            var L = document.getElementById('diff-col-left-{index}');
+            var R = document.getElementById('diff-col-right-{index}');
+            if (!L || !R) return;
+            if (L.dataset.fsHsync === '1') return;   // already bound
+            L.dataset.fsHsync = '1';
+            R.dataset.fsHsync = '1';
+            var locked = false;
+            function mirror(src, dst) {{
+                if (locked) return;
+                locked = true;
+                dst.scrollLeft = src.scrollLeft;
+                locked = false;
+            }}
+            L.addEventListener('scroll', function() {{ mirror(L, R); }}, {{ passive: true }});
+            R.addEventListener('scroll', function() {{ mirror(R, L); }}, {{ passive: true }});
+        }})();
+        "#
+    );
+    spawn(async move {
+        let _ = dioxus::document::eval(&js).await;
+    });
 }
 
 // ── Diff file header ──────────────────────────────────────────────────────────

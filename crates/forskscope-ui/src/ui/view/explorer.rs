@@ -25,7 +25,7 @@ use forskscope_core::dir::file_digest_equal;
 use crate::i18n::t;
 use crate::state::Store;
 use forskscope_ui_logic::compute_aligned_rows;
-use crate::ui::view::dir_pane::{DigestState, FilteringExecutor, NavHistory, PathBar, short_name};
+use crate::ui::view::dir_pane::{DigestState, FilteringExecutor, NavHistory, PathBar, home_dir, short_name};
 
 use compact::CompactTree;
 use filter::{FilterBar, apply_filter};
@@ -33,6 +33,30 @@ use footer::ExplorerFooter;
 use tree::AlignedTree;
 
 // ── Shared types ──────────────────────────────────────────────────────────────
+
+/// Default directory for an explorer pane when no directory has been persisted
+/// (e.g. first boot with no saved settings).
+///
+/// Preference order:
+/// 1. the user's home directory (the most useful starting point), then
+/// 2. the process working directory, then
+/// 3. the filesystem root as a last resort.
+///
+/// Home is preferred over the working directory because at first launch the
+/// working directory is wherever the app was started from — often `/` for a
+/// desktop launcher — which is not a useful place to begin browsing.
+///
+/// Uses [`dir_pane::home_dir`] (HOME / USERPROFILE), already used elsewhere in
+/// the explorer, falling back to the working directory only if home cannot be
+/// resolved.
+fn default_explorer_dir() -> PathBuf {
+    let home = home_dir();
+    if home.as_os_str().is_empty() || home == std::path::Path::new("/") {
+        std::env::current_dir().unwrap_or(home)
+    } else {
+        home
+    }
+}
 
 /// Typed key for the digest map (RFC-059 §M2).
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -93,8 +117,12 @@ pub fn Explorer() -> Element {
     let mut binary_cache: Signal<HashMap<PathBuf, bool>> = use_signal(Default::default);
 
     // ── Left pane ─────────────────────────────────────────────────────────────
-    let init_l = store.settings.read().last_left_dir.clone()
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/")));
+    let remember = store.settings.read().remember_explorer_dirs;
+    let init_l = if remember {
+        store.settings.read().last_left_dir.clone().unwrap_or_else(default_explorer_dir)
+    } else {
+        default_explorer_dir()
+    };
     let left_dir:      Signal<PathBuf>    = use_signal(|| init_l.clone());
     let mut left_hist: Signal<NavHistory> = use_signal(NavHistory::default);
     use_hook(|| left_hist.write().push(init_l.clone()));
@@ -112,8 +140,11 @@ pub fn Explorer() -> Element {
     });
 
     // ── Right pane ────────────────────────────────────────────────────────────
-    let init_r = store.settings.read().last_right_dir.clone()
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/")));
+    let init_r = if remember {
+        store.settings.read().last_right_dir.clone().unwrap_or_else(default_explorer_dir)
+    } else {
+        default_explorer_dir()
+    };
     let right_dir:      Signal<PathBuf>    = use_signal(|| init_r.clone());
     let mut right_hist: Signal<NavHistory> = use_signal(NavHistory::default);
     use_hook(|| right_hist.write().push(init_r.clone()));

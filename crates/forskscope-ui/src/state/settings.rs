@@ -131,7 +131,14 @@ pub struct AppSettings {
     /// as non-actionable in the Explorer (RFC-066).
     #[serde(default)]
     pub enable_binary_comparison: bool,
+    /// When `true` (default), the Explorer remembers the last directory shown in
+    /// each pane and restores them on the next launch. When `false`, the Explorer
+    /// always starts at the user's home directory.
+    #[serde(default = "default_true")]
+    pub remember_explorer_dirs: bool,
 }
+
+fn default_true() -> bool { true }
 
 fn default_ctx() -> usize { 3 }
 
@@ -145,6 +152,7 @@ impl Default for AppSettings {
             ignore_extensions: String::new(), ignore_dirs: String::new(),
             enable_binary_comparison: false,
             explorer_compact: false,
+            remember_explorer_dirs: true,
         }
     }
 }

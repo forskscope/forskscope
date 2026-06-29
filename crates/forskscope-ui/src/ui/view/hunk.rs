@@ -214,22 +214,24 @@ fn ActCell(
 ) -> Element {
     let mut store = use_context::<Store>();
     rsx! {
-        div { class: "diff-act",
-            if i == 0 && pending && can_save {
-                button {
-                    class: "apply-btn",
-                    onclick: move |_| {
-                        if let Some(tab) = store.tabs.write().get_mut(index) {
-                            let _ = tab.merge.apply_left_to_right(hunk_id);
-                        }
-                    },
-                    title: t(lang, "Use this change (apply left to right)"),
-                    aria_label: t(lang, "Use this change (apply left to right)"),
-                    "▶"
-                    span { class: "apply-btn-label", {t(lang, "Use")} }
+        div { class: "diff-act-row",
+            div { class: "diff-act",
+                if i == 0 && pending && can_save {
+                    button {
+                        class: "apply-btn",
+                        onclick: move |_| {
+                            if let Some(tab) = store.tabs.write().get_mut(index) {
+                                let _ = tab.merge.apply_left_to_right(hunk_id);
+                            }
+                        },
+                        title: t(lang, "Use this change (apply left to right)"),
+                        aria_label: t(lang, "Use this change (apply left to right)"),
+                        "▶"
+                        span { class: "apply-btn-label", {t(lang, "Use")} }
+                    }
+                } else if i == 0 && applied {
+                    span { class: "applied", aria_label: t(lang, "Applied"), "✓" }
                 }
-            } else if i == 0 && applied {
-                span { class: "applied", aria_label: t(lang, "Applied"), "✓" }
             }
         }
     }

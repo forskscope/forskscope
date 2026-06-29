@@ -276,8 +276,17 @@ pub fn navigate_to(
 ) {
     {
         let mut s = store.settings.write();
-        if is_left { s.last_left_dir = Some(path.clone()); }
-        else       { s.last_right_dir = Some(path.clone()); }
+        // Only remember the location when the user opted in (RFC-009 explorer
+        // setting). When off, the panes always start at home next launch.
+        if s.remember_explorer_dirs {
+            if is_left { s.last_left_dir = Some(path.clone()); }
+            else       { s.last_right_dir = Some(path.clone()); }
+        }
+    }
+    // Persist so the remembered directory survives a restart. No-op effect on
+    // disk content when remember_explorer_dirs is off (last_* left unchanged).
+    if store.settings.read().remember_explorer_dirs {
+        crate::ui::view::settings::persist(&store.settings.read());
     }
     history.write().push(path.clone());
     current_dir.set(path);

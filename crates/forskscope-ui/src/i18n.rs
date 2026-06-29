@@ -172,6 +172,8 @@ fn ja(key: &str) -> Option<&'static str> {
         "Explorer layout" => "エクスプローラーレイアウト",
         "Aligned (default)" => "整列（デフォルト）",
         "Compact (independent panes)" => "コンパクト（独立ペイン）",
+        "Remember Explorer directories" => "エクスプローラーのディレクトリを記憶する",
+        "When on, the Explorer reopens the last directory shown in each pane. When off, it always starts at your home directory." => "オンの場合、エクスプローラーは各ペインで最後に表示したディレクトリを再度開きます。オフの場合は常にホームディレクトリから開始します。",
         "Enable binary comparison" => "バイナリ比較を有効にする",
         "When off, binary files cannot be compared and are shown as non-actionable in the Explorer." => "オフの場合、バイナリファイルは比較できず、エクスプローラーで操作不可として表示されます。",
         "Binary comparison is off. Enable it in Settings → Advanced." => "バイナリ比較はオフです。設定 → 詳細設定で有効にできます。",

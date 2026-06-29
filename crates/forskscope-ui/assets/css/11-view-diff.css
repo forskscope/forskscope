@@ -88,10 +88,18 @@
   align-items: start;
 }
 
-/* ---- columns ---- */
-/* Left column: owns horizontal scroll for all left rows.
-   overflow-x:auto on a grid cell whose content uses width:100% resolves
-   width relative to the grid track, so rows correctly fill and then overflow. */
+/* ---- columns ----
+   Each left/right column is a horizontal scroll container (overflow-x:auto,
+   stays within its grid track). Its inner .diff-col-table is laid out as a CSS
+   table sized to max-content, so it can grow wider than the column and scroll.
+
+   Table layout is the reliable way to make EVERY row span the full width of the
+   widest row (= the table's max-content width), including short rows. With
+   flex/block + width:100%, a short row only fills the visible viewport width;
+   once a long sibling line makes the column scroll horizontally, the short
+   row's background ends at the old viewport edge and leaves an uncoloured gap
+   to the right. CSS table rows always span the full table width, so the hunk
+   background fills the entire line regardless of text length. */
 .diff-col-left {
   min-width: 0;
   overflow-x: auto;
@@ -110,80 +118,126 @@
   border-left: 1px solid var(--border);
 }
 
-/* Legacy no-op: .diff-pane was removed in v0.162.0. Keep as display:contents
-   so any stale references in markup don't break layout. */
+/* The table inside each scrolling column. */
+.diff-col-table {
+  display: table;
+  width: max-content;   /* table grows to the widest row */
+  min-width: 100%;      /* …but is at least the column (viewport) width */
+}
+
+/* Legacy no-op: .diff-pane was removed in v0.162.0. */
 .diff-pane { display: contents; }
 
 /* ---- hunk container ----
-   width:100% fills the grid track (column width).
-   min-width:max-content expands for long lines → column h-scrolls. */
+   table-row-group keeps hunk grouping (and the .hunk-del / .hunk-ins /
+   .hunk-rep background hooks) without introducing its own width — rows still
+   span the full table width. */
 .hunk {
-  width: 100%;
-  min-width: max-content;
+  display: table-row-group;
 }
 
 /* ---- diff row ----
-   Same width contract as .hunk: fill for short lines, expand for long lines. */
+   table-row spans the full table (widest-row) width, so the hunk background
+   fills the entire line including trailing whitespace, even when scrolled. */
 .diff-row {
-  display: flex;
-  align-items: stretch;
-  min-height: var(--line-h);
-  width: 100%;            /* short rows: fill column width → background covers full row */
-  min-width: max-content; /* long rows: expand past column → column h-scroll fires */
+  display: table-row;
+  height: var(--line-h);
 }
 
-/* ---- act column cells ---- */
+/* The act (centre) column holds one row per diff row so the merge buttons
+   line up exactly with their lines. It uses the same table layout as the
+   left/right columns, with a fixed 6ch width (no horizontal scroll). */
+.diff-col-act {
+  overflow: visible;
+}
+.diff-col-act .diff-col-table {
+  width: 6ch;
+  min-width: 6ch;
+}
+
+/* One table-row per diff row — identical height to .diff-row so each merge
+   button aligns with the exact line it applies to. */
+.diff-act-row {
+  display: table-row;
+  height: var(--line-h);
+}
+
+/* ---- act cell (table-cell) ---- */
 .diff-act {
-  width: 6ch; min-height: var(--line-h);
-  display: flex; align-items: center; justify-content: center;
+  display: table-cell;
+  width: 6ch;
+  height: var(--line-h);
+  text-align: center;
+  vertical-align: middle;
   background: var(--surface);
+  white-space: nowrap;
 }
 .diff-act button { padding: 0 .25rem; font-size: 11px; }
-.apply-btn { display: flex; align-items: center; gap: .15rem; }
+/* The merge button sits inside a diff-line-height (24px) table row. The global
+   `button { min-height: var(--control-h) }` (36px) would force the act row
+   taller than the diff rows and break per-line alignment. Constrain the button
+   to the line height so every act row matches its left/right counterparts. */
+.apply-btn {
+  display: inline-flex; align-items: center; gap: .15rem;
+  min-height: 0;
+  height: calc(var(--line-h) - 2px);
+  line-height: 1;
+  padding: 0 .3rem;
+}
 .apply-btn-label { font-size: 10px; font-weight: 600; letter-spacing: .02em; }
+/* The "applied" check also lives in the act cell — keep it within line height. */
+.applied { padding: 0 .35rem; color: var(--ok); font-size: 11px; line-height: var(--line-h); }
 
-/* ---- gutter ---- */
+/* ---- gutter (table-cell) ---- */
 .pane-gutter {
-  flex: 0 0 4ch;
+  display: table-cell;
+  width: 4ch;
+  white-space: nowrap;
   background: var(--surface);
   color: var(--muted);
   text-align: right;
   padding: 0 .4rem;
   user-select: none;
   line-height: var(--line-h);
-  white-space: nowrap;
+  vertical-align: top;
 }
 .pane-gutter.del { background: var(--del-bg); }
 .pane-gutter.ins { background: var(--ins-bg); }
 
-/* ---- cell ----
-   flex:1 1 auto + min-width:max-content: expands to content width AND
-   stretches to fill any extra space from the row's width:100% stretch. */
-.diff-row .cell {
-  flex: 1 1 auto;
-  min-width: max-content;
-  padding: 0 .4rem;
-  line-height: var(--line-h);
-  white-space: pre;
-  overflow: visible;
-}
-
-/* ---- hunk backgrounds ----
-   Applied at .diff-row level so colour fills the full visible column width,
-   including the blank area to the right of short lines. */
-.hunk-del .diff-row { background: var(--del-bg); }
-.hunk-ins .diff-row { background: var(--ins-bg); }
-.hunk-rep .diff-row { background: var(--rep-bg); }
-
-/* ---- diff marks ---- */
+/* ---- diff mark (table-cell) ---- */
 .diff-mark {
-  flex: 0 0 1.2ch; display: inline-block; width: 1.2ch;
-  text-align: center; font-size: 10px; font-weight: 700;
-  color: var(--muted); user-select: none; line-height: var(--line-h);
+  display: table-cell;
+  width: 1.2ch;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  user-select: none;
+  line-height: var(--line-h);
+  vertical-align: top;
 }
 .hunk-del .diff-mark { color: var(--del-mark); }
 .hunk-ins .diff-mark { color: var(--ins-mark); }
 .hunk-rep .diff-mark { color: var(--warn); }
+
+/* ---- cell (table-cell) ----
+   width:100% makes the content cell absorb all remaining table width, so the
+   row (and its background) extends to the full table width = widest line. */
+.diff-row .cell {
+  display: table-cell;
+  width: 100%;
+  padding: 0 .4rem;
+  line-height: var(--line-h);
+  white-space: pre;
+  vertical-align: top;
+}
+
+/* ---- hunk backgrounds ----
+   Applied at .diff-row (table-row) level so the colour fills the full table
+   width — the entire line, including the area past short text. */
+.hunk-del .diff-row { background: var(--del-bg); }
+.hunk-ins .diff-row { background: var(--ins-bg); }
+.hunk-rep .diff-row { background: var(--rep-bg); }
 
 .hunk.focused { outline: 2px solid var(--focus); outline-offset: -2px; }
 
@@ -191,26 +245,53 @@
 .in-del { background: color-mix(in srgb, var(--del-mark) 30%, transparent); text-decoration: line-through; }
 .in-ins { background: color-mix(in srgb, var(--ins-mark) 30%, transparent); }
 
-.applied { padding: 0 .35rem; color: var(--ok); font-size: 11px; }
-
 /* Search match highlight */
 .diff-row.match { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .diff-row.match .cell { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
-/* Word-wrap mode */
+/* Word-wrap mode: table fills column width, cells wrap, no horizontal scroll */
 .diff-scroll.wrap .diff-col-left,
 .diff-scroll.wrap .diff-col-right { overflow-x: hidden; }
-.diff-scroll.wrap .diff-row .cell { white-space: pre-wrap; word-break: break-word; overflow: visible; }
+.diff-scroll.wrap .diff-col-table { width: 100%; }
+.diff-scroll.wrap .diff-row .cell { white-space: pre-wrap; word-break: break-word; }
 
-/* ---- context collapse divider ---- */
+/* ---- context collapse divider ----
+   Inside a table-row-group (.hunk), a block child is wrapped in an anonymous
+   table-row + table-cell, spanning the full column width.
+
+   The divider is constrained to a SINGLE line of fixed height. The left column
+   shows the divider while the act and right columns show a .collapse-divider-spacer
+   of identical height; if the divider were allowed to wrap to a variable number
+   of lines, the spacer could not match it and the columns would drift below the
+   collapsed region. nowrap + ellipsis + fixed height keeps all three columns
+   row-aligned. */
 .collapse-divider {
-  padding: .2rem .6rem; text-align: center; font-size: 11px;
+  display: block;
+  box-sizing: border-box;
+  height: calc(var(--line-h) + .4rem + 2px);  /* line + .2rem*2 padding + 1px*2 border */
+  line-height: var(--line-h);
+  padding: .2rem .6rem; margin: 0;
+  text-align: center; font-size: 11px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--muted); background: var(--surface-2);
   border: 1px dashed var(--border); border-radius: 4px;
-  cursor: pointer; margin: .2rem 0; user-select: none;
+  cursor: pointer; user-select: none;
 }
 .collapse-divider:hover { color: var(--accent); border-color: var(--accent); }
-.collapse-divider-spacer { padding: .2rem .6rem; font-size: 11px; margin: .2rem 0; visibility: hidden; }
+/* Spacer shown in the act and right columns where the left column shows a
+   .collapse-divider. Matches the divider's box model exactly (same height,
+   padding, margin, and a transparent 1px border in place of the dashed one)
+   so the three columns stay row-aligned through a collapsed region. */
+.collapse-divider-spacer {
+  display: block;
+  box-sizing: border-box;
+  height: calc(var(--line-h) + .4rem + 2px);
+  line-height: var(--line-h);
+  padding: .2rem .6rem; margin: 0;
+  font-size: 11px;
+  border: 1px solid transparent;
+  visibility: hidden;
+}
 
 /* ---- warning banner ---- */
 .diff-warning-banner {
