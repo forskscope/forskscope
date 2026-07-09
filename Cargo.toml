@@ -23,6 +23,10 @@ dioxus                      = { version = "0.7", default-features = false, featu
 dioxus-core                 = "0.7"
 dioxus-desktop              = { version = "0.7", default-features = false, features = ["tokio_runtime"] }
 dioxus-swdir-tree           = "0.7"
+# dioxus-desktop 0.7.9 calls wry devtools methods from release builds even
+# without dioxus-desktop/devtools. Enable only wry's method surface, not
+# dioxus-devtools.
+wry                         = { version = "0.53", default-features = false, features = ["devtools"] }
 
 app-json-settings           = "2"
 chardetng                   = "0.1"

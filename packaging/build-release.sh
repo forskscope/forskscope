@@ -17,9 +17,15 @@ echo "=== ForskScope v$VER release build ==="
 
 # ── System dependency check (Linux) ─────────────────────────────────────────
 if [[ "$(uname)" == "Linux" ]]; then
-    for pkg in libwebkit2gtk-4.1-dev libgtk-3-dev; do
-        dpkg -l "$pkg" &>/dev/null || {
-            echo "Missing: $pkg  (run: apt-get install $pkg)"
+    command -v pkg-config >/dev/null || {
+        echo "Missing: pkg-config"
+        exit 1
+    }
+    for pkg in webkit2gtk-4.1 gtk+-3.0; do
+        pkg-config --exists "$pkg" || {
+            echo "Missing: $pkg development files"
+            echo "Debian/Ubuntu: apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev"
+            echo "Arch Linux: pacman -S webkit2gtk-4.1 gtk3"
             exit 1
         }
     done

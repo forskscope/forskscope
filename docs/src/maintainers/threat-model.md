@@ -192,7 +192,11 @@ feature for network file access, telemetry, remote API calls, or user-visible
 sync.
 
 ForskScope disables Dioxus default features and depends on `dioxus-desktop`
-directly without its default `devtools` feature. The reviewed residual path is:
+directly without its default `devtools` feature. `wry/devtools` is enabled only
+to provide the WebView method surface required by `dioxus-desktop` release
+builds; `dioxus-devtools` remains inactive and ForskScope removes the default
+Dioxus menu bar so the framework devtools toggle is not exposed as product UI.
+The reviewed residual path is:
 
 ```text
 native-tls -> tungstenite -> dioxus-desktop -> forskscope-ui
@@ -238,4 +242,5 @@ exception or split the dependency before release.
 | v0.152.0 (this audit) | **Fix:** `binary_cache` cleared on dir change; filter loop uses cache | Eliminates stale binary detection and redundant file I/O per render frame |
 | v0.164.0 | XLSX parser path removed; `.xlsx` comparison fails closed | Removes runtime user-supplied workbook XML exposure to vulnerable `quick-xml` path |
 | v0.164.0 | Dioxus desktop dependency policy reviewed | Accepts loopback WebSocket IPC only; `cargo xtask audit-deps` enforces no devtools and reviewed network-capable paths |
+| v0.164.0 | Release UI build compatibility with `dioxus-desktop`/`wry` | Enables `wry/devtools` method surface without `dioxus-devtools`; removes default Dioxus menu bar |
 | v0.164.0 | Release archive and CI gates aligned | Archive layout, version sync, i18n coverage, audit policy, and dependency paths are enforced before release artifact creation |

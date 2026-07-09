@@ -56,6 +56,6 @@ fn main() {
     dioxus_desktop::launch::launch(
         App,
         Vec::new(),
-        vec![Box::new(Config::new().with_window(window))],
+        vec![Box::new(Config::new().with_window(window).with_menu(None))],
     );
 }

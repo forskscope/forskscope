@@ -26,6 +26,7 @@ dioxus                      = { workspace = true }
 dioxus-core                 = { workspace = true }
 dioxus-desktop              = { workspace = true }
 dioxus-swdir-tree           = { workspace = true }
+wry                         = { workspace = true }
 
 app-json-settings           = { workspace = true }
 dirs-next                   = { workspace = true }
