@@ -11,16 +11,16 @@ url="https://github.com/forskscope/forskscope"
 license=('Apache-2.0')
 depends=('webkit2gtk-4.1' 'gtk3')
 makedepends=('cargo' 'pkg-config' 'openssl')
-source=("$pkgname-$pkgver.tar.gz")
+source=("$pkgname-v$pkgver.tar.gz")
 sha256sums=('SKIP')
 
 build() {
-    cd "$pkgname-$pkgver"
+    cd "$srcdir"
     cargo build --release --locked
 }
 
 package() {
-    cd "$pkgname-$pkgver"
+    cd "$srcdir"
     install -Dm755 "target/release/forskscope" "$pkgdir/usr/bin/forskscope"
     install -Dm644 "packaging/linux/forskscope.desktop" \
         "$pkgdir/usr/share/applications/forskscope.desktop"

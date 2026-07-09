@@ -8,18 +8,19 @@
 4. Security audit passes under the checked-in policy: `cargo audit`
 5. Reviewed security dependency paths are enforced: `cargo xtask audit-deps`
 6. CSS generated artifact is current: `cargo xtask css --check`
-7. `CHANGELOG.md` updated with the new version and date.
-8. `version` bumped in the workspace `Cargo.toml` (`[workspace.package]`).
-9. Completed RFCs moved from `rfcs/proposed/` to `rfcs/done/`; `rfcs/README.md` updated.
-10. `ROADMAP.md` current state paragraph updated if the milestone is significant.
+7. Source archive layout is verified by `packaging/build-release.sh` or the release workflow.
+8. `CHANGELOG.md` updated with the new version and date.
+9. `version` bumped in the workspace `Cargo.toml` (`[workspace.package]`).
+10. Completed RFCs moved from `rfcs/proposed/` to `rfcs/done/`; `rfcs/README.md` updated.
+11. `ROADMAP.md` current state paragraph updated if the milestone is significant.
 
 ---
 
 ## Building the release archive
 
-The release is a `.tar.gz` of the Cargo workspace, excluding the `target/`
-directory. The archive unpacks to `forskscope-vX.Y.Z/` at the extraction root
-(no nested intermediate directory).
+The release is a `.tar.gz` of tracked Cargo workspace files. The source archive
+has no top-level parent directory; files unpack directly into the extraction
+destination.
 
 Use the release script (handles version extraction and archive naming automatically):
 
@@ -34,27 +35,17 @@ Or manually:
 # as that may match dependency entries
 VER=$(awk '/^\[workspace\.package\]/{f=1} f&&/^version[[:space:]]*=/{gsub(/[^0-9.]/,""); print; exit}' Cargo.toml)
 
-# 1. Copy the working tree (avoids polluting the source directory)
-cp -r . /tmp/forskscope-${VER}
-
-# 2. Remove the build artefacts immediately
-rm -rf /tmp/forskscope-${VER}/target
-
-# 3. Create the archive
-tar \
-  --exclude="/tmp/forskscope-${VER}/target" \
-  -czf "forskscope-v${VER}.tar.gz" \
-  -C /tmp \
-  "forskscope-${VER}" \
-  --transform "s|^forskscope-${VER}|forskscope-v${VER}|"
+git ls-files -z | tar --null -czf "target/forskscope-v${VER}.tar.gz" --files-from -
 ```
 
 Verify the archive unpacks correctly:
 
 ```sh
-tar -tzf "forskscope-v${VER}.tar.gz" | head -5
-# Expected: forskscope-vX.Y.Z/CHANGELOG.md, forskscope-vX.Y.Z/Cargo.toml, …
-# No intermediate directory between forskscope-vX.Y.Z/ and the files.
+tar -tzf "target/forskscope-v${VER}.tar.gz" | awk '{p=$0; sub(/^\.\//,"",p); print p}' | head -5
+# Expected includes Cargo.toml at archive root, not forskscope-vX.Y.Z/Cargo.toml.
+tar -tzf "target/forskscope-v${VER}.tar.gz" | awk '{p=$0; sub(/^\.\//,"",p); if (p=="Cargo.toml") found=1} END{exit found ? 0 : 1}'
+tar -tzf "target/forskscope-v${VER}.tar.gz" | awk -v prefix="forskscope-v${VER}" '{p=$0; sub(/^\.\//,"",p); if (p==prefix || index(p,prefix"/")==1) bad=1} END{exit bad ? 1 : 0}'
+tar -tzf "target/forskscope-v${VER}.tar.gz" | awk -v archive="forskscope-v${VER}.tar.gz" '{p=$0; sub(/^\.\//,"",p); if (p==archive || p==".git-exclude" || index(p,".git-exclude/")==1 || p==".git" || index(p,".git/")==1 || p=="target" || index(p,"target/")==1) bad=1} END{exit bad ? 1 : 0}'
 ```
 
 ---

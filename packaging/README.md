@@ -66,6 +66,6 @@ The source archive is the primary release artifact:
 
 ```sh
 # Produces target/forskscope-vX.Y.Z.tar.gz
-# Unpacks to: forskscope-vX.Y.Z/(files)
+# Unpacks files directly into the extraction directory
 bash packaging/build-release.sh
 ```

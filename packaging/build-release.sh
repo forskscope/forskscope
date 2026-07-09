@@ -32,12 +32,32 @@ echo "Binary: target/release/forskscope"
 
 # ── Source archive ───────────────────────────────────────────────────────────
 ARCHIVE="target/forskscope-v$VER.tar.gz"
-tar \
-    --exclude='./target' \
-    --exclude='./.git' \
-    -czf "$ARCHIVE" \
-    --transform "s|^\./|forskscope-v$VER/|" \
-    .
+git ls-files -z | tar --null -czf "$ARCHIVE" --files-from -
+if ! tar -tzf "$ARCHIVE" | awk '
+    { path = $0; sub(/^\.\//, "", path); if (path == "Cargo.toml") found = 1 }
+    END { exit found ? 0 : 1 }
+'; then
+    echo "ERROR: source archive does not contain Cargo.toml at archive root" >&2
+    exit 1
+fi
+if tar -tzf "$ARCHIVE" | awk -v prefix="forskscope-v$VER" '
+    { path = $0; sub(/^\.\//, "", path); if (path == prefix || index(path, prefix "/") == 1) bad = 1 }
+    END { exit bad ? 0 : 1 }
+'; then
+    echo "ERROR: source archive contains forbidden top-level forskscope-v$VER/ directory" >&2
+    exit 1
+fi
+if tar -tzf "$ARCHIVE" | awk -v archive_name="$(basename "$ARCHIVE")" '
+    {
+        path = $0
+        sub(/^\.\//, "", path)
+        if (path == archive_name || path == ".git-exclude" || index(path, ".git-exclude/") == 1 || path == ".git" || index(path, ".git/") == 1 || path == "target" || index(path, "target/") == 1) bad = 1
+    }
+    END { exit bad ? 0 : 1 }
+'; then
+    echo "ERROR: source archive contains generated, ignored, or local-only paths" >&2
+    exit 1
+fi
 echo "Source archive: $ARCHIVE"
 
 # ── Platform-specific binary archive ────────────────────────────────────────

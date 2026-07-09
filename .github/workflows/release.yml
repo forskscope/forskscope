@@ -27,14 +27,44 @@ jobs:
       - name: Create source archive
         run: |
           VER=${{ steps.ver.outputs.version }}
-          tar --exclude='./target' --exclude='./.git' \
-              -czf "forskscope-v${VER}.tar.gz" \
-              --transform "s|^\./|forskscope-v${VER}/|" .
+          git archive --format=tar.gz \
+              --output="${RUNNER_TEMP}/forskscope-v${VER}.tar.gz" \
+              HEAD
+
+      - name: Verify source archive layout
+        run: |
+          VER=${{ steps.ver.outputs.version }}
+          ARCHIVE="${RUNNER_TEMP}/forskscope-v${VER}.tar.gz"
+          if ! tar -tzf "$ARCHIVE" | awk '
+            { path = $0; sub(/^\.\//, "", path); if (path == "Cargo.toml") found = 1 }
+            END { exit found ? 0 : 1 }
+          '; then
+            echo "source archive does not contain Cargo.toml at archive root" >&2
+            exit 1
+          fi
+          if tar -tzf "$ARCHIVE" | awk -v prefix="forskscope-v${VER}" '
+            { path = $0; sub(/^\.\//, "", path); if (path == prefix || index(path, prefix "/") == 1) bad = 1 }
+            END { exit bad ? 0 : 1 }
+          '; then
+            echo "source archive contains forbidden top-level forskscope-v${VER}/ directory" >&2
+            exit 1
+          fi
+          if tar -tzf "$ARCHIVE" | awk -v archive_name="forskscope-v${VER}.tar.gz" '
+            {
+              path = $0
+              sub(/^\.\//, "", path)
+              if (path == archive_name || path == ".git-exclude" || index(path, ".git-exclude/") == 1 || path == ".git" || index(path, ".git/") == 1 || path == "target" || index(path, "target/") == 1) bad = 1
+            }
+            END { exit bad ? 0 : 1 }
+          '; then
+            echo "source archive contains generated, ignored, or local-only paths" >&2
+            exit 1
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
           name: source-archive
-          path: forskscope-v*.tar.gz
+          path: ${{ runner.temp }}/forskscope-v${{ steps.ver.outputs.version }}.tar.gz
 
   # ── Linux x86_64 ────────────────────────────────────────────────────────────
   linux:
