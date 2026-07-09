@@ -83,7 +83,7 @@ Store a named combination of diff options as a profile. Built-in profiles:
 | Type | Diff | Merge / Save |
 |------|------|--------------|
 | Text (any encoding) | Line + inline | ✓ |
-| Excel `.xlsx` | Derived text (read-only) | — |
+| Excel `.xlsx` | Temporarily disabled for security | — |
 | Binary | Hex preview | — |
 | Missing (one side) | One-sided diff | — |
 

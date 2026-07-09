@@ -14,9 +14,7 @@ repository.workspace    = true
 encoding_rs                 = { workspace = true }
 chardetng                   = { workspace = true }
 chrono                      = { workspace = true }
-sheets-diff                 = { workspace = true }
 similar                     = { workspace = true }
 
 [dev-dependencies]
 tempfile                    = { workspace = true }
-zip                         = { workspace = true }

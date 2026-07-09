@@ -77,11 +77,10 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
     };
 
     // Create parent directories for Save As to new nested paths.
-    if let Some(parent) = target.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)
-                .map_err(|e| CoreError::io(parent, IoOperation::Write, &e))?;
-        }
+    if let Some(parent) = target.parent()
+        && !parent.exists()
+    {
+        fs::create_dir_all(parent).map_err(|e| CoreError::io(parent, IoOperation::Write, &e))?;
     }
 
     let temp = temp_path_for(target);

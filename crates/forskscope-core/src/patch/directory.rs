@@ -158,5 +158,5 @@ fn delete_entry(
 }
 
 fn is_textual(kind: &FileKind) -> bool {
-    matches!(kind, FileKind::Text | FileKind::ExcelXlsx)
+    matches!(kind, FileKind::Text)
 }

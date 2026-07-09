@@ -4,10 +4,14 @@
 
 1. All tests pass: `cargo test -p forskscope-core -p forskscope-ui-logic`
 2. Clippy clean: `cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings`
-3. `CHANGELOG.md` updated with the new version and date.
-4. `version` bumped in the workspace `Cargo.toml` (`[workspace.package]`).
-5. Completed RFCs moved from `rfcs/proposed/` to `rfcs/done/`; `rfcs/README.md` updated.
-6. `ROADMAP.md` current state paragraph updated if the milestone is significant.
+3. Format clean: `cargo fmt --check`
+4. Security audit passes under the checked-in policy: `cargo audit`
+5. Reviewed security dependency paths are enforced: `cargo xtask audit-deps`
+6. CSS generated artifact is current: `cargo xtask css --check`
+7. `CHANGELOG.md` updated with the new version and date.
+8. `version` bumped in the workspace `Cargo.toml` (`[workspace.package]`).
+9. Completed RFCs moved from `rfcs/proposed/` to `rfcs/done/`; `rfcs/README.md` updated.
+10. `ROADMAP.md` current state paragraph updated if the milestone is significant.
 
 ---
 
@@ -85,11 +89,11 @@ pre-release phase:
 
 ## Checking the Rust edition and MSRV
 
-The workspace `Cargo.toml` declares `rust-version = "1.85"` (the minimum
+The workspace `Cargo.toml` declares `rust-version = "1.91"` (the minimum
 supported Rust version). Verify the build succeeds on the declared MSRV before
 releasing.
 
 ```sh
-rustup install 1.85
-cargo +1.85 test -p forskscope-core -p forskscope-ui-logic
+rustup install 1.91
+cargo +1.91 test -p forskscope-core -p forskscope-ui-logic
 ```

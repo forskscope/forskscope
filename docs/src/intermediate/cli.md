@@ -115,7 +115,7 @@ ForskScope 0.112.0
 OS:       linux
 Arch:     x86_64
 CPUs:     8
-Rust:     1.85.0
+Rust:     1.91.0
 Home:     ***
 Config:   /home/user/.config/forskscope
 ```

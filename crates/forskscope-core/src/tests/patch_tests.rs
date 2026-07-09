@@ -220,6 +220,55 @@ fn directory_patch_covers_modify_add_and_delete() {
 }
 
 #[test]
+fn directory_patch_treats_xlsx_entries_as_binary_notices() {
+    let base = temp_dir("dir-xlsx");
+    let left = base.join("left");
+    let right = base.join("right");
+    let _ = fs::remove_dir_all(&left);
+    let _ = fs::remove_dir_all(&right);
+    fs::create_dir_all(&left).unwrap();
+    fs::create_dir_all(&right).unwrap();
+
+    fs::write(left.join("changed.xlsx"), b"left workbook bytes").unwrap();
+    fs::write(right.join("changed.xlsx"), b"right workbook bytes").unwrap();
+    fs::write(left.join("only_left.xlsx"), b"deleted workbook bytes").unwrap();
+    fs::write(right.join("only_right.xlsx"), b"added workbook bytes").unwrap();
+
+    let options = PatchOptions {
+        include_binary_notices: true,
+        ..PatchOptions::default()
+    };
+    let patch = patch_from_directories(&left, &right, DiffOptions::default(), options).unwrap();
+
+    let mut binary_notice_paths: Vec<String> = patch
+        .files
+        .iter()
+        .filter_map(|f| match f {
+            PatchFileChange::BinaryNotice { path } => Some(path.to_string_lossy().into_owned()),
+            PatchFileChange::Modify { .. }
+            | PatchFileChange::Add { .. }
+            | PatchFileChange::Delete { .. } => None,
+        })
+        .collect();
+    binary_notice_paths.sort();
+
+    assert_eq!(
+        binary_notice_paths,
+        vec![
+            "changed.xlsx".to_string(),
+            "only_left.xlsx".to_string(),
+            "only_right.xlsx".to_string(),
+        ]
+    );
+    assert_eq!(patch.summary.binary_files, 3);
+    assert_eq!(patch.summary.files_changed, 0);
+    assert_eq!(patch.summary.files_added, 0);
+    assert_eq!(patch.summary.files_deleted, 0);
+
+    let _ = fs::remove_dir_all(&base);
+}
+
+#[test]
 fn creation_deletion_can_be_disabled() {
     let base = temp_dir("nocreate");
     let left = base.join("left");

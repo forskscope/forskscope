@@ -211,6 +211,9 @@ fn ja(key: &str) -> Option<&'static str> {
         "Binary comparison is off. Enable it in Settings → Advanced." => {
             "バイナリ比較はオフです。設定 → 詳細設定で有効にできます。"
         }
+        "Spreadsheet comparison is temporarily disabled for security." => {
+            "セキュリティ上の理由により、スプレッドシート比較は一時的に無効化されています。"
+        }
         "Advanced" => "詳細設定",
         "Hide advanced" => "詳細設定を隠す",
         "Compare profiles" => "比較プロファイル",
@@ -262,7 +265,6 @@ fn ja(key: &str) -> Option<&'static str> {
         "Binary file — read-only comparison (hex preview)." => {
             "バイナリファイル — 読み取り専用比較（16進プレビュー）。"
         }
-        "Spreadsheet — read-only comparison." => "スプレッドシート — 読み取り専用比較。",
         "Both files not found — read-only." => "両ファイルが見つかりません — 読み取り専用。",
         "One side is missing — read-only." => "片方が存在しません — 読み取り専用。",
         "File type not supported for merge — read-only." => {

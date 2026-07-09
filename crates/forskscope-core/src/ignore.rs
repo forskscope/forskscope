@@ -58,13 +58,13 @@ impl IgnoreRules {
             return false;
         }
         // Extension is everything after the last dot, lower-cased.
-        if let Some(ext) = name.rsplit('.').next() {
-            if name != ext {
-                // There was a dot — `name != ext` means the dot existed.
-                let ext_lc = ext.to_lowercase();
-                if self.file_extensions.iter().any(|e| e == &ext_lc) {
-                    return true;
-                }
+        if let Some(ext) = name.rsplit('.').next()
+            && name != ext
+        {
+            // There was a dot — `name != ext` means the dot existed.
+            let ext_lc = ext.to_lowercase();
+            if self.file_extensions.iter().any(|e| e == &ext_lc) {
+                return true;
             }
         }
         false

@@ -48,5 +48,8 @@ jobs:
       - name: cargo clippy
         run: cargo clippy --workspace -- -D warnings
 
+      - name: Security dependency path check
+        run: cargo xtask audit-deps
+
       - name: cargo build (UI — ensures it compiles)
         run: cargo build -p forskscope-ui

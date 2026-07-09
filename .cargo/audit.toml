@@ -1,0 +1,10 @@
+[advisories]
+# quick-xml 0.39 remains only through wayland-scanner, a proc-macro/codegen
+# dependency in the GTK/Dioxus Wayland stack. The runtime XLSX parser path
+# through sheets-diff/calamine has been removed, so user-supplied workbook XML
+# no longer reaches this vulnerable quick-xml version. `cargo xtask audit-deps`
+# enforces that this exception remains limited to the reviewed path.
+ignore = [
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+]

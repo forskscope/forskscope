@@ -14,7 +14,7 @@ are welcome; personal attacks are not.
 
 ## Setting up
 
-**Prerequisites:** Rust ≥ 1.85 via [rustup](https://rustup.rs/).
+**Prerequisites:** Rust ≥ 1.91 via [rustup](https://rustup.rs/).
 
 ```sh
 git clone https://github.com/forskscope/forskscope

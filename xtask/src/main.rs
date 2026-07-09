@@ -3,6 +3,7 @@
 //! Usage:
 //!   cargo xtask css           — regenerate assets/main.css from assets/css/*.css
 //!   cargo xtask css --check   — verify main.css is current (exits non-zero if stale)
+//!   cargo xtask audit-deps    — verify reviewed security dependency paths
 //!
 //! CSS source files under assets/css/ are assembled in alphabetical order.
 //! The numeric prefix on each filename (00-, 01-, …) encodes the cascade order.
@@ -11,7 +12,7 @@
 use std::{
     fs,
     path::PathBuf,
-    process,
+    process::{self, Command, Output},
 };
 
 fn main() {
@@ -21,16 +22,22 @@ fn main() {
             let check = args.iter().any(|a| a == "--check");
             run_css(check);
         }
+        Some("audit-deps") if args.len() == 1 => run_audit_deps(),
         Some(cmd) => {
             eprintln!("unknown command: {cmd}");
-            eprintln!("usage: cargo xtask css [--check]");
+            print_usage();
             process::exit(1);
         }
         None => {
-            eprintln!("usage: cargo xtask css [--check]");
+            print_usage();
             process::exit(1);
         }
     }
+}
+
+fn print_usage() {
+    eprintln!("usage: cargo xtask css [--check]");
+    eprintln!("       cargo xtask audit-deps");
 }
 
 fn workspace_root() -> PathBuf {
@@ -42,7 +49,7 @@ fn workspace_root() -> PathBuf {
 }
 
 fn run_css(check: bool) {
-    let root    = workspace_root();
+    let root = workspace_root();
     let css_dir = root.join("crates/forskscope-ui/assets/css");
     let out_file = root.join("crates/forskscope-ui/assets/main.css");
 
@@ -68,7 +75,7 @@ fn run_css(check: bool) {
          * Source files live under assets/css/.\n\
          * Files are assembled in alphabetical order (numeric prefix = cascade order).\n\
          * Regenerate with: cargo xtask css\n\
-         */\n\n"
+         */\n\n",
     );
 
     for path in &entries {
@@ -97,4 +104,82 @@ fn run_css(check: bool) {
             .unwrap_or_else(|e| panic!("cannot write {}: {e}", out_file.display()));
         println!("wrote {}", out_file.display());
     }
+}
+
+fn run_audit_deps() {
+    assert_package_absent("sheets-diff");
+    assert_package_absent("calamine");
+    assert_quick_xml_path_is_reviewed();
+    println!("security dependency path check passed.");
+}
+
+fn assert_package_absent(package: &str) {
+    let output = cargo_tree(&["tree", "-i", package]);
+    if output.status.success() {
+        eprintln!("unexpected dependency present: {package}");
+        eprintln!("{}", String::from_utf8_lossy(&output.stdout));
+        process::exit(1);
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !stderr.contains("did not match any packages") {
+        eprintln!("could not verify absence of {package}");
+        eprintln!("{stderr}");
+        process::exit(1);
+    }
+
+    println!("{package} is absent.");
+}
+
+fn assert_quick_xml_path_is_reviewed() {
+    let output = cargo_tree(&["tree", "--prefix", "depth", "-i", "quick-xml"]);
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("did not match any packages") {
+            println!("quick-xml is absent.");
+            return;
+        }
+
+        eprintln!("could not inspect quick-xml dependency path");
+        eprintln!("{stderr}");
+        process::exit(1);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let immediate_dependents: Vec<&str> = stdout
+        .lines()
+        .filter_map(depth_prefixed_package)
+        .filter_map(|(depth, package)| (depth == 1).then_some(package))
+        .collect();
+
+    if immediate_dependents.is_empty()
+        || immediate_dependents
+            .iter()
+            .any(|package| !package.starts_with("wayland-scanner "))
+    {
+        eprintln!("quick-xml has an unreviewed immediate dependency path:");
+        eprintln!("{stdout}");
+        process::exit(1);
+    }
+
+    println!("quick-xml path is limited to wayland-scanner.");
+}
+
+fn depth_prefixed_package(line: &str) -> Option<(usize, &str)> {
+    let prefix_len = line
+        .char_indices()
+        .find_map(|(idx, ch)| (!ch.is_ascii_digit()).then_some(idx))?;
+    if prefix_len == 0 {
+        return None;
+    }
+    let depth = line[..prefix_len].parse().ok()?;
+    Some((depth, &line[prefix_len..]))
+}
+
+fn cargo_tree(args: &[&str]) -> Output {
+    Command::new("cargo")
+        .args(args)
+        .current_dir(workspace_root())
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run cargo {}: {e}", args.join(" ")))
 }

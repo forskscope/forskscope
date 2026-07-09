@@ -2,7 +2,7 @@
 
 ## Install
 
-Build from source (Rust ≥ 1.85 required):
+Build from source (Rust ≥ 1.91 required):
 
 ```sh
 # Linux: install WebKitGTK and GTK3 runtime libraries

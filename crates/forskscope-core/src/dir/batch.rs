@@ -289,10 +289,10 @@ pub fn restore_from_manifest(manifest: &BatchManifest) -> usize {
             backup_path: Some(bp),
             ..
         } = &entry.outcome
+            && bp.exists()
+            && fs::copy(bp, &entry.dst).is_ok()
         {
-            if bp.exists() && fs::copy(bp, &entry.dst).is_ok() {
-                restored += 1;
-            }
+            restored += 1;
         }
     }
     restored

@@ -1,7 +1,8 @@
 //! Input classification (RFC-001 §6.2).
 //!
 //! A file is classified once at load time. Binary content is never silently
-//! treated as editable text; `.xlsx` goes through the spreadsheet adapter.
+//! treated as editable text; `.xlsx` is recognized but comparison is
+//! temporarily disabled for security.
 
 use std::fs;
 use std::path::Path;
@@ -16,7 +17,7 @@ pub enum FileKind {
     Text,
     /// Binary content; compared via hex preview, never merged as text.
     Binary,
-    /// Excel workbook; compared through the spreadsheet adapter (read-only).
+    /// Excel workbook; recognized but temporarily disabled for comparison.
     ExcelXlsx,
     /// The path does not exist. One missing side is a valid comparison input.
     Missing,

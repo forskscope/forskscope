@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Rust ≥ 1.85 via [rustup](https://rustup.rs/).
+- Rust ≥ 1.91 via [rustup](https://rustup.rs/).
 - On Linux: `libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev pkg-config libssl-dev`
 - On macOS: Xcode CLT.
 - On Windows: MSVC toolchain.
@@ -79,10 +79,10 @@ To add a new case:
 
 ## MSRV
 
-The declared minimum supported Rust version is `rust-version = "1.85"` (in `Cargo.toml`).
+The declared minimum supported Rust version is `rust-version = "1.91"` (in `Cargo.toml`).
 Verify on MSRV before releasing:
 
 ```sh
-rustup install 1.85
-cargo +1.85 test -p forskscope-core -p forskscope-ui-logic
+rustup install 1.91
+cargo +1.91 test -p forskscope-core -p forskscope-ui-logic
 ```

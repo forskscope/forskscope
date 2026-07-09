@@ -160,7 +160,7 @@ pub(super) fn load_and_diff(
         allow_missing: true,
     };
 
-    let mut ld = load_path(&left, options).map_err(|e| {
+    let ld = load_path(&left, options).map_err(|e| {
         format!(
             "{} \"{}\" — {e}. {}",
             t(lang, "Could not open"),
@@ -174,7 +174,7 @@ pub(super) fn load_and_diff(
         )
     })?;
 
-    let mut rd = load_path(&right, options).map_err(|e| {
+    let rd = load_path(&right, options).map_err(|e| {
         format!(
             "{} \"{}\" — {e}. {}",
             t(lang, "Could not open"),
@@ -205,10 +205,12 @@ pub(super) fn load_and_diff(
         return Err(t(lang, "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary.").into());
     }
 
-    if ld.kind == FileKind::ExcelXlsx && rd.kind == FileKind::ExcelXlsx {
-        let (lt, rt) = forskscope_core::xlsx::derive_pair_text(&left, &right);
-        ld.text = Some(lt);
-        rd.text = Some(rt);
+    if ld.kind == FileKind::ExcelXlsx || rd.kind == FileKind::ExcelXlsx {
+        return Err(t(
+            lang,
+            "Spreadsheet comparison is temporarily disabled for security.",
+        )
+        .into());
     }
 
     let diff = compute_diff(ld.diff_text(), rd.diff_text(), opts);

@@ -46,7 +46,7 @@ could be added as a fourth crate without touching core.
 | `settings` | `UserSettings`, `AppearanceSettings`, `DiffSettings`, `ThemeId`, `FontFamilySetting` — persisted user preferences (RFC-009). |
 | `vcs` | `VcsProvider` trait + `GitProvider` — read-only VCS context (status, file at revision, merge base). `detect(path)` (RFC-038). |
 | `watcher` | `FileChangeMonitor` trait, `WatchToken`, `FileChangeEvent`, `WatchError`, `MockFileChangeMonitor` — file-watcher boundary (RFC-036). |
-| `xlsx` | `SpreadsheetDiff` structured model, sheets-diff v2 adapter, panic-free Result API, cancellation (RFC-058). |
+| `xlsx` | Fail-closed spreadsheet comparison boundary; `.xlsx` parsing is temporarily disabled while the parser dependency path is remediated (RFC-058). |
 
 ## `ui-logic` modules (14)
 

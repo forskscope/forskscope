@@ -31,11 +31,10 @@ pub fn copy_file(src: &Path, dst: &Path, backup: BackupPolicy) -> Result<CopyOut
             reason: "source does not exist".into(),
         });
     }
-    if let Some(parent) = dst.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)
-                .map_err(|e| CoreError::io(parent, IoOperation::Write, &e))?;
-        }
+    if let Some(parent) = dst.parent()
+        && !parent.exists()
+    {
+        fs::create_dir_all(parent).map_err(|e| CoreError::io(parent, IoOperation::Write, &e))?;
     }
     let backup_path = if backup == BackupPolicy::SiblingBak && dst.exists() {
         let bak = bak_path(dst);

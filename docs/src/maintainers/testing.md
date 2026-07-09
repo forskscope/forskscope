@@ -14,6 +14,12 @@ cargo test -p forskscope-core -p forskscope-ui-logic
 
 # Clippy (must pass without warnings)
 cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
+
+# Security audit (uses .cargo/audit.toml for reviewed advisories)
+cargo audit
+
+# Enforce the reviewed dependency paths behind audit exceptions
+cargo xtask audit-deps
 ```
 
 The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
@@ -77,7 +83,7 @@ Tests live in `crates/forskscope-core/src/tests/` and are declared in `tests.rs`
 | `transaction_log_tests` | `TransactionLog` push/undo/redo/mark_saved, `is_dirty`. | RFC-015 |
 | `vcs_tests` | `GitProvider::detect`, `VcsProvider` trait contract. | RFC-038 |
 | `watcher_tests` | `MockFileChangeMonitor` watch/inject/poll/drain, `WatchError`, `FileChangeKind`. | RFC-036 |
-| `xlsx_tests` | `derive_pair_text`, structured diff output, sheets-diff v2 API. | RFC-058 |
+| `xlsx_tests` | Fail-closed spreadsheet comparison behavior while XLSX parsing is security-disabled. | RFC-058 |
 
 Integration tests in `tests/`:
 

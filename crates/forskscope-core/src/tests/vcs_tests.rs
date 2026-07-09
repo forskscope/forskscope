@@ -32,6 +32,7 @@ fn init_repo(dir: &std::path::Path) {
     git(dir, &["init", "-b", "main"]);
     git(dir, &["config", "user.email", "test@test.com"]);
     git(dir, &["config", "user.name", "Test"]);
+    git(dir, &["config", "commit.gpgsign", "false"]);
     fs::write(dir.join("README.md"), "# test\n").unwrap();
     git(dir, &["add", "."]);
     git(dir, &["commit", "-m", "initial"]);

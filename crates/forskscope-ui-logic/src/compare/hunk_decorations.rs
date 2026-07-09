@@ -99,17 +99,17 @@ impl DecorationIndex {
         let mut right = vec![RowDecoration::unchanged(); row_count];
 
         for d in &set.left {
-            if d.side == CoreDiffSide::Left {
-                if let Some(slot) = left.get_mut(d.row_index) {
-                    *slot = RowDecoration::from_kind(d.kind);
-                }
+            if d.side == CoreDiffSide::Left
+                && let Some(slot) = left.get_mut(d.row_index)
+            {
+                *slot = RowDecoration::from_kind(d.kind);
             }
         }
         for d in &set.right {
-            if d.side == CoreDiffSide::Right {
-                if let Some(slot) = right.get_mut(d.row_index) {
-                    *slot = RowDecoration::from_kind(d.kind);
-                }
+            if d.side == CoreDiffSide::Right
+                && let Some(slot) = right.get_mut(d.row_index)
+            {
+                *slot = RowDecoration::from_kind(d.kind);
             }
         }
 

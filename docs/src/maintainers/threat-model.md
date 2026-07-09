@@ -170,14 +170,24 @@ Key crates touching file I/O or process execution:
 | `dirs_next` | * | Platform dirs | Read-only path resolution |
 | `rfd` | 0.17 | File picker dialog | OS dialog; no custom code |
 | `dioxus` | 0.7.9 | UI framework | Desktop WebKit; no remote URLs loaded |
-| `sheets-diff` | 1.1.4 | XLSX diff | Known panic risk on malformed XLSX (RFC-058); mitigated by Result API wrapper |
+| `quick-xml` | 0.39.x | Wayland protocol code generation through GTK/Dioxus stack | Build-time/proc-macro path; not reachable from user-supplied files |
 
-### Known third-party risk: `sheets-diff` panic on malformed XLSX
+### Known third-party risk: XLSX parser dependency path disabled
 
-`sheets-diff` v1.1.4 can panic on certain malformed `.xlsx` inputs. ForskScope
-wraps the call in a `catch_unwind` boundary in `core::xlsx` (RFC-058). A
-malformed file will produce an `Err` result shown as a diff error, not a crash.
-This is a residual risk until the upstream crate is fixed or replaced.
+XLSX comparison previously depended on `sheets-diff -> calamine -> quick-xml`.
+`quick-xml 0.39` has active denial-of-service advisories for XML input, and
+`sheets-diff 2.2.3` cannot yet move to a fixed `calamine`/`quick-xml` path.
+ForskScope therefore removes the runtime XLSX parser dependency and fails
+closed for `.xlsx` comparison with a user-visible error. The remaining
+`quick-xml 0.39` path is through `wayland-scanner`, a GTK/Dioxus build-time
+protocol code-generation dependency, not workbook content parsing.
+
+The reviewed `quick-xml` advisory exceptions are recorded in
+`.cargo/audit.toml`. The release gate `cargo xtask audit-deps` asserts that
+`sheets-diff` and `calamine` remain absent and that `quick-xml` is reachable
+only through the reviewed `wayland-scanner` path. If a future dependency
+reintroduces `quick-xml 0.39` on a runtime user-input path, remove the
+exception or split the dependency before release.
 
 ---
 

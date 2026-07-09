@@ -25,7 +25,7 @@ Files are classified in this order:
 |------|-------------|-----------|-------------|--------------|
 | **Text** | No NUL byte in first 8 KB | ✓ | ✓ | ✓ |
 | **Binary** | NUL byte found | Hex preview | — | — |
-| **Excel `.xlsx`** | `.xlsx` / `.XLSX` extension | Derived text | — | — |
+| **Excel `.xlsx`** | `.xlsx` / `.XLSX` extension | Temporarily disabled | — | — |
 | **Missing** | Path not found | One-sided | — | — |
 | **Unsupported** | Not a regular file | — | — | — |
 
@@ -58,12 +58,13 @@ read-only; merge and save are not available for binary files.
 
 ## Excel `.xlsx` comparison
 
-Excel files are compared by converting the workbook to a text representation:
-sheet names, cell addresses, and cell values are rendered as a structured text
-diff. This is read-only and shows content differences only, not formatting.
+Excel files are recognized by extension, but workbook comparison is temporarily
+disabled for security while the XLSX parser dependency path is remediated.
+ForskScope fails closed with a user-visible error instead of parsing workbook
+XML from user-supplied `.xlsx` files.
 
-Requires that both files have the `.xlsx` extension (not `.xls`, `.csv`, or
-`.ods`).
+This applies to `.xlsx` / `.XLSX` only. `.xls`, `.csv`, and `.ods` are not
+spreadsheet-comparison inputs.
 
 ---
 

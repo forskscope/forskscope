@@ -284,10 +284,10 @@ pub fn execute_plan(
 
     // Ensure target parent directories exist before bulk copy.
     for op in &copy_ops {
-        if let Some(target) = &op.target {
-            if let Some(parent) = target.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
+        if let Some(target) = &op.target
+            && let Some(parent) = target.parent()
+        {
+            let _ = fs::create_dir_all(parent);
         }
     }
 

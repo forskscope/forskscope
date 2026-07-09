@@ -77,12 +77,11 @@ for v1 (non-goal NG-004 in the product policy).
 
 ## File types
 
-### Excel comparison is derived text, not semantic
+### Excel comparison is temporarily disabled
 
-`.xlsx` comparison converts the workbook to a text representation (sheet name
-+ cell address + cell value). It does not understand formulas, formatting,
-charts, or macros. Two cells with the same displayed value but different
-underlying formulas will show as equal.
+`.xlsx` files are recognized, but workbook comparison is temporarily disabled
+for security while the parser dependency path is remediated. The app shows a
+clear error instead of parsing workbook XML from user-supplied files.
 
 ---
 

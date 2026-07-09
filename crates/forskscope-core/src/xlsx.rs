@@ -1,32 +1,22 @@
-//! Spreadsheet (.xlsx) structural diff adapter (RFC-058).
+//! Spreadsheet (.xlsx) comparison boundary (RFC-058).
 //!
-//! This module owns the boundary between `sheets-diff` and ForskScope's
-//! app model. No `sheets-diff` types appear in the public API; the upstream
-//! crate can be upgraded without touching the UI or tests.
+//! XLSX structural comparison is currently disabled. The previous adapter
+//! depended on `sheets-diff -> calamine -> quick-xml`; `quick-xml 0.39`
+//! has active denial-of-service advisories for XML input. Because XLSX files
+//! are user-supplied local archives containing XML, ForskScope fails closed
+//! instead of parsing workbook content through that dependency chain.
 //!
 //! ## Two entry points
 //!
-//! - [`diff_xlsx`] — returns a structured [`SpreadsheetDiff`] from two paths.
-//! - [`derive_pair_text_from_diff`] — derives the per-side comparable text
-//!   used by the current diff view, driven from the structured model.
-//!
-//! ## v2 migration notes (sheets-diff v2.2.1)
-//!
-//! - `compare_paths` returns `Result` — `catch_unwind` is no longer needed.
-//! - One `CellChange` per address (value and formula are facets, not rows).
-//! - `CellChange` now carries `old_formula`/`new_formula` (from v2.2.1's
-//!   `CellChangeRow::old_formula`/`new_formula`).
-//! - Non-UTF-8 paths are safe: `compare_paths` passes `Path` raw to
-//!   `std::fs::read`; no internal `to_str().unwrap()`.
-//! - Cancellation is per-sheet granularity only (sub-sheet cancellation
-//!   is a planned enhancement in sheets-diff; see FR2 response).
+//! - [`diff_xlsx`] — returns `Unsupported` without parsing workbook XML.
+//! - [`derive_pair_text`] — returns empty read-only documents for callers that
+//!   still expect a pairwise text projection.
 //!
 //! `.xlsx` comparison is always read-only: `FileKind::ExcelXlsx` is never
 //! mergeable or saveable.
 
 use std::path::Path;
 
-use crate::cancel::CancellationToken;
 use crate::document::{FileFingerprint, FileId, LoadWarning, LoadedDocument, TextDocument};
 use crate::encoding::{NewlineStyle, TextEncoding};
 use crate::error::{CoreError, Result};
@@ -65,9 +55,9 @@ pub struct SheetCellChanges {
 pub struct CellChange {
     /// Spreadsheet address, e.g. `"B3"`.
     pub addr: String,
-    /// 1-based row (sheets-diff v2 coordinate system).
+    /// 1-based row coordinate.
     pub row: u32,
-    /// 1-based column (sheets-diff v2 coordinate system).
+    /// 1-based column coordinate.
     pub col: u32,
     /// Whether the cell value changed on this entry.
     pub value_changed: bool,
@@ -97,7 +87,7 @@ pub struct SpreadsheetDiffStats {
 }
 
 /// The complete, app-owned diff of two `.xlsx` workbooks.
-/// Holds no `sheets-diff` types.
+/// Kept as the app-owned model for a future fixed parser.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpreadsheetDiff {
     pub sheets: Vec<SheetChange>,
@@ -115,128 +105,23 @@ impl SpreadsheetDiff {
 
 /// Compute the structured diff of two `.xlsx` files.
 ///
-/// Uses `sheets_diff::compare_paths` which returns `Result` — no panic risk.
-/// An optional `CancellationToken` is wired at per-sheet granularity
-/// (sub-sheet cancellation is a planned enhancement in sheets-diff; large
-/// single-sheet workbooks are bounded via the default `max_cells_compared`
-/// limit, or callers may pass explicit `Limits`).
+/// Currently fails closed without parsing workbook XML. This protects users
+/// from the vulnerable `quick-xml` path formerly reached through the XLSX
+/// adapter while keeping the public boundary stable for a future fixed parser.
 pub fn diff_xlsx(
     old_path: &Path,
-    new_path: &Path,
-    cancel: Option<&CancellationToken>,
+    _new_path: &Path,
+    _cancel: Option<&crate::cancel::CancellationToken>,
 ) -> Result<SpreadsheetDiff> {
-    let opts = build_options(cancel);
-
-    let workbook_diff =
-        sheets_diff::compare_paths_with_options(old_path, new_path, opts).map_err(|e| {
-            CoreError::Unsupported {
-                message: format!("could not diff workbook '{}': {}", old_path.display(), e),
-            }
-        })?;
-
-    Ok(convert(workbook_diff))
+    Err(CoreError::Unsupported {
+        message: format!(
+            ".xlsx comparison is temporarily disabled for security; '{}' was not parsed",
+            old_path.display()
+        ),
+    })
 }
 
-fn build_options(cancel: Option<&CancellationToken>) -> sheets_diff::DiffOptions {
-    let mut builder = sheets_diff::DiffOptions::builder();
-    if let Some(token) = cancel {
-        let tok = token.clone();
-        builder = builder.cancellation(move || tok.is_cancelled());
-    }
-    // Ignore invalid-options error: the default option set is always valid.
-    builder.build().unwrap_or_default()
-}
-
-fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
-    use sheets_diff::model::SheetChange as UpSheetChange;
-    use sheets_diff::output::view::{DiffView, ViewFilter};
-
-    // Sheet-level structural changes.
-    let mut sheets = Vec::new();
-    for sd in &wb.sheets {
-        let name = |sr: &Option<sheets_diff::model::SheetRef>| {
-            sr.as_ref().map(|s| s.name.clone()).unwrap_or_default()
-        };
-        let entry = match &sd.change {
-            UpSheetChange::Added => SheetChange::Added(name(&sd.new_sheet)),
-            UpSheetChange::Removed => SheetChange::Removed(name(&sd.old_sheet)),
-            UpSheetChange::Modified => SheetChange::Modified(name(&sd.new_sheet)),
-            UpSheetChange::Moved => SheetChange::Moved(name(&sd.new_sheet)),
-            UpSheetChange::Renamed { .. } | UpSheetChange::RenamedAndMoved { .. } => {
-                SheetChange::Renamed {
-                    old_name: name(&sd.old_sheet),
-                    new_name: name(&sd.new_sheet),
-                }
-            }
-            UpSheetChange::Unchanged => continue,
-            #[allow(unreachable_patterns)]
-            _ => continue, // forward compat: new variants in future sheets-diff
-        };
-        sheets.push(entry);
-    }
-
-    // Cell-level changes via the view adapter (Q3: use to_owned_row to drop wb).
-    let view = DiffView::new(&wb);
-    let filter = ViewFilter::default();
-    let rows = view.rows(&filter);
-
-    // Group by sheet name (rows are already in sheet order).
-    let mut cells: Vec<SheetCellChanges> = Vec::new();
-    for row in &rows {
-        let cell = CellChange {
-            addr: row.address.a1.clone(),
-            row: row.address.row,
-            col: row.address.col,
-            value_changed: row.change_kind == sheets_diff::model::CellChangeKind::Modified
-                || !row.old_display.is_empty()
-                || !row.new_display.is_empty(),
-            formula_changed: row.formula_changed,
-            old_value: if row.old_display.is_empty() {
-                None
-            } else {
-                Some(row.old_display.clone())
-            },
-            new_value: if row.new_display.is_empty() {
-                None
-            } else {
-                Some(row.new_display.clone())
-            },
-            old_formula: row.old_formula.map(|s| s.to_owned()),
-            new_formula: row.new_formula.map(|s| s.to_owned()),
-        };
-        match cells.last_mut() {
-            Some(last) if last.sheet == row.sheet_name => last.cells.push(cell),
-            _ => cells.push(SheetCellChanges {
-                sheet: row.sheet_name.to_owned(),
-                cells: vec![cell],
-            }),
-        }
-    }
-    drop(rows); // release borrows before drop(wb)
-
-    // Stats — driven directly from wb.summary (no manual counting).
-    let s = &wb.summary;
-    let stats = SpreadsheetDiffStats {
-        sheets_added: s.sheets_added,
-        sheets_removed: s.sheets_removed,
-        sheets_modified: s.sheets_changed,
-        sheets_renamed: s.sheets_renamed,
-        sheets_moved: s.sheets_moved,
-        cells_changed: cells.iter().map(|sc| sc.cells.len()).sum(),
-        values_changed: s.values_changed,
-        formulas_changed: s.formulas_changed,
-    };
-
-    drop(wb); // all cell_diffs freed here; only owned SpreadsheetDiff survives
-
-    SpreadsheetDiff {
-        sheets,
-        cells,
-        stats,
-    }
-}
-
-// ── Per-side derived text (RFC-058 §"Presentation") ─────────────────────────
+// ── Per-side text projection (RFC-058 §"Presentation") ──────────────────────
 
 /// Derive the per-side comparable text for the diff view from the structured model.
 pub fn derive_pair_text_from_diff(diff: &SpreadsheetDiff) -> (TextDocument, TextDocument) {
@@ -318,10 +203,9 @@ fn excel_doc(content: String) -> TextDocument {
     }
 }
 
-// ── load_placeholder (unchanged) ─────────────────────────────────────────────
+// ── load_placeholder ─────────────────────────────────────────────────────────
 
-/// Load metadata for an `.xlsx` side. The comparable text is produced
-/// pairwise by [`derive_pair_text`]; this placeholder holds no content.
+/// Load metadata for an `.xlsx` side without parsing workbook XML.
 pub fn load_placeholder(path: &Path) -> Result<LoadedDocument> {
     let fingerprint = FileFingerprint::capture(path, None)?;
     Ok(LoadedDocument {
@@ -330,6 +214,6 @@ pub fn load_placeholder(path: &Path) -> Result<LoadedDocument> {
         kind: FileKind::ExcelXlsx,
         bytes_len: fingerprint.len,
         text: None,
-        warnings: vec![LoadWarning::ExcelRenderedAsDerivedText],
+        warnings: vec![LoadWarning::ExcelComparisonDisabled],
     })
 }

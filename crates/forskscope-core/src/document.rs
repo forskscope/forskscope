@@ -75,7 +75,7 @@ pub struct TextDocument {
 pub enum LoadWarning {
     DecodeReplacementsEmitted,
     BinaryRenderedAsHexPreview,
-    ExcelRenderedAsDerivedText,
+    ExcelComparisonDisabled,
 }
 
 /// Loading options.
@@ -94,7 +94,7 @@ pub struct LoadedDocument {
     pub kind: FileKind,
     pub bytes_len: u64,
     /// Present for `Text` (decoded), `Binary` (hex preview as comparable
-    /// text), and `ExcelXlsx` (adapter-derived text).
+    /// text), and `ExcelXlsx` (metadata only while parsing is disabled).
     pub text: Option<TextDocument>,
     pub warnings: Vec<LoadWarning>,
 }

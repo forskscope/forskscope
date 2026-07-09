@@ -10,7 +10,7 @@ members = [
 version = "0.164.0"
 
 edition         = "2024"
-rust-version    = "1.85"
+rust-version    = "1.91"
 license         = "Apache-2.0"
 authors         = ["nabbisen"]
 repository      = "https://github.com/forskscope/forskscope"
@@ -28,7 +28,6 @@ chardetng                   = "0.1"
 dirs-next                   = "2"
 encoding_rs                 = "0.8"
 rfd                         = { version = "0.17", default-features = true }
-sheets-diff                 = "2"
 similar                     = "3.1"
 
 chrono                      = "0.4"
@@ -38,7 +37,6 @@ tokio                       = { version = "1", features = ["rt", "rt-multi-threa
 
 # Testing
 tempfile                    = "3"
-zip                         = "7"
 
 [profile.release]
 lto = true
