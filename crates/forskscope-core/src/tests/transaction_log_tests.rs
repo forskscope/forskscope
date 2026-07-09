@@ -7,8 +7,8 @@
 
 use crate::diff::{DiffOptions, compute_diff};
 use crate::merge::{
-    ConflictStatus, MergeSession, SessionRevision, ThreeWayMergeSession,
-    TransactionKind, TransactionLog,
+    ConflictStatus, MergeSession, SessionRevision, ThreeWayMergeSession, TransactionKind,
+    TransactionLog,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -107,7 +107,10 @@ fn redo_back_to_save_clears_dirty() {
     log.record_undo();
     assert!(log.is_dirty());
     log.record_redo();
-    assert!(!log.is_dirty(), "redo back to save baseline should clear dirty");
+    assert!(
+        !log.is_dirty(),
+        "redo back to save baseline should clear dirty"
+    );
 }
 
 // ── Can undo / redo ───────────────────────────────────────────────────────────
@@ -159,8 +162,11 @@ fn all_entries_includes_undone() {
     let mut log = simple_log();
     push_apply(&mut log, 1);
     log.record_undo();
-    assert_eq!(log.all_entries().len(), 1,
-        "all_entries must still show undone entries for history panel");
+    assert_eq!(
+        log.all_entries().len(),
+        1,
+        "all_entries must still show undone entries for history panel"
+    );
 }
 
 #[test]
@@ -176,7 +182,10 @@ fn last_active_is_most_recent_push() {
     let mut log = simple_log();
     push_apply(&mut log, 42);
     let entry = log.last_active().unwrap();
-    assert!(matches!(entry.kind, TransactionKind::ApplyHunkLeftToRight { hunk_id: 42 }));
+    assert!(matches!(
+        entry.kind,
+        TransactionKind::ApplyHunkLeftToRight { hunk_id: 42 }
+    ));
 }
 
 // ── active_ops_since_save ─────────────────────────────────────────────────────
@@ -226,14 +235,16 @@ fn entry_stores_label_from_kind() {
 
 #[test]
 fn log_tracks_merge_session_apply_and_undo() {
-    let left  = "a\nB\nc\n";
+    let left = "a\nB\nc\n";
     let right = "a\nb\nc\n";
     let diff = compute_diff(left, right, DiffOptions::default());
     let mut session = MergeSession::from_diff(&diff);
     let mut log = TransactionLog::new();
 
     // Find the changed hunk and apply it.
-    let hunk_id = session.hunks().iter()
+    let hunk_id = session
+        .hunks()
+        .iter()
         .find(|h| h.is_pending_change())
         .map(|h| h.hunk_id)
         .expect("expected a pending change");
@@ -249,7 +260,10 @@ fn log_tracks_merge_session_apply_and_undo() {
     session.undo().unwrap();
     log.record_undo();
 
-    assert!(!session.is_dirty(), "session should not be dirty after undo");
+    assert!(
+        !session.is_dirty(),
+        "session should not be dirty after undo"
+    );
     assert!(!log.is_dirty(), "log should not be dirty after undo");
     assert_eq!(log.active_entries().len(), 0);
     assert!(log.can_redo());
@@ -257,11 +271,8 @@ fn log_tracks_merge_session_apply_and_undo() {
 
 #[test]
 fn log_tracks_three_way_resolve_and_undo() {
-    let mut session = ThreeWayMergeSession::from_texts(
-        "a\nb\nc\n",
-        "a\nLEFT\nc\n",
-        "a\nRIGHT\nc\n",
-    );
+    let mut session =
+        ThreeWayMergeSession::from_texts("a\nb\nc\n", "a\nLEFT\nc\n", "a\nRIGHT\nc\n");
     let mut log = TransactionLog::new();
 
     let conflict_id = session.conflicts()[0].id;
@@ -281,15 +292,18 @@ fn log_tracks_three_way_resolve_and_undo() {
 
 #[test]
 fn save_marks_clean_baseline_in_both_session_and_log() {
-    let left  = "a\nB\nc\n";
+    let left = "a\nB\nc\n";
     let right = "a\nb\nc\n";
     let diff = compute_diff(left, right, DiffOptions::default());
     let mut session = MergeSession::from_diff(&diff);
     let mut log = TransactionLog::new();
 
-    let hunk_id = session.hunks().iter()
+    let hunk_id = session
+        .hunks()
+        .iter()
         .find(|h| h.is_pending_change())
-        .map(|h| h.hunk_id).unwrap();
+        .map(|h| h.hunk_id)
+        .unwrap();
     session.apply_left_to_right(hunk_id).unwrap();
     log.push(TransactionKind::ApplyHunkLeftToRight { hunk_id });
 

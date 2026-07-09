@@ -43,9 +43,9 @@ pub enum RecStatus {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecEntry {
     /// Path relative to both roots.
-    pub rel_path:   PathBuf,
-    pub status:     RecStatus,
-    pub left_size:  Option<u64>,
+    pub rel_path: PathBuf,
+    pub status: RecStatus,
+    pub left_size: Option<u64>,
     pub right_size: Option<u64>,
 }
 
@@ -84,11 +84,13 @@ pub fn recursive_diff_with_cancel(
     token: &CancellationToken,
 ) -> Vec<RecEntry> {
     let mut map: BTreeMap<PathBuf, RecEntry> = BTreeMap::new();
-    let _ = walk(left_root, left_root, &mut map, token, false, |rel, meta| RecEntry {
-        rel_path:   rel.clone(),
-        status:     RecStatus::LeftOnly,
-        left_size:  Some(meta.len()),
-        right_size: None,
+    let _ = walk(left_root, left_root, &mut map, token, false, |rel, meta| {
+        RecEntry {
+            rel_path: rel.clone(),
+            status: RecStatus::LeftOnly,
+            left_size: Some(meta.len()),
+            right_size: None,
+        }
     });
     if !token.is_cancelled() {
         let _ = walk_and_merge(right_root, right_root, &mut map, left_root, token, false);
@@ -104,11 +106,13 @@ pub fn list_recursive_for_display_with_cancel(
     token: &CancellationToken,
 ) -> Vec<RecEntry> {
     let mut map: BTreeMap<PathBuf, RecEntry> = BTreeMap::new();
-    let _ = walk(left_root, left_root, &mut map, token, false, |rel, meta| RecEntry {
-        rel_path:   rel.clone(),
-        status:     RecStatus::LeftOnly,
-        left_size:  Some(meta.len()),
-        right_size: None,
+    let _ = walk(left_root, left_root, &mut map, token, false, |rel, meta| {
+        RecEntry {
+            rel_path: rel.clone(),
+            status: RecStatus::LeftOnly,
+            left_size: Some(meta.len()),
+            right_size: None,
+        }
     });
     if !token.is_cancelled() {
         let _ = walk_and_merge_fast(right_root, right_root, &mut map, token);
@@ -147,12 +151,15 @@ fn walk(
 
         if meta.is_symlink() {
             // Explicit: report the symlink rather than silently skip or follow.
-            map.insert(rel.clone(), RecEntry {
-                rel_path:   rel,
-                status:     RecStatus::Symlink,
-                left_size:  None,
-                right_size: None,
-            });
+            map.insert(
+                rel.clone(),
+                RecEntry {
+                    rel_path: rel,
+                    status: RecStatus::Symlink,
+                    left_size: None,
+                    right_size: None,
+                },
+            );
         } else if meta.is_dir() {
             let _ = walk(root, &path, map, token, _fast, make);
         } else if meta.is_file() {
@@ -180,14 +187,17 @@ fn walk_and_merge(
             break;
         }
         let path = entry.path();
-        let meta = match entry.metadata() { Ok(m) => m, Err(_) => continue };
+        let meta = match entry.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
         let rel = path.strip_prefix(right_root).unwrap_or(&path).to_path_buf();
 
         if meta.is_symlink() {
             map.entry(rel.clone()).or_insert(RecEntry {
-                rel_path:   rel,
-                status:     RecStatus::Symlink,
-                left_size:  None,
+                rel_path: rel,
+                status: RecStatus::Symlink,
+                left_size: None,
                 right_size: None,
             });
         } else if meta.is_dir() {
@@ -195,16 +205,25 @@ fn walk_and_merge(
         } else if meta.is_file() {
             let right_size = meta.len();
             if let Some(existing) = map.get_mut(&rel) {
-                let left_path  = left_root.join(&rel);
+                let left_path = left_root.join(&rel);
                 let right_path = path;
                 let equal = file_digest_equal(&left_path, &right_path).unwrap_or(false);
-                existing.status     = if equal { RecStatus::Equal } else { RecStatus::Changed };
+                existing.status = if equal {
+                    RecStatus::Equal
+                } else {
+                    RecStatus::Changed
+                };
                 existing.right_size = Some(right_size);
             } else {
-                map.insert(rel.clone(), RecEntry {
-                    rel_path: rel, status: RecStatus::RightOnly,
-                    left_size: None, right_size: Some(right_size),
-                });
+                map.insert(
+                    rel.clone(),
+                    RecEntry {
+                        rel_path: rel,
+                        status: RecStatus::RightOnly,
+                        left_size: None,
+                        right_size: Some(right_size),
+                    },
+                );
             }
         }
     }
@@ -226,14 +245,17 @@ fn walk_and_merge_fast(
             break;
         }
         let path = entry.path();
-        let meta = match entry.metadata() { Ok(m) => m, Err(_) => continue };
+        let meta = match entry.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
         let rel = path.strip_prefix(right_root).unwrap_or(&path).to_path_buf();
 
         if meta.is_symlink() {
             map.entry(rel.clone()).or_insert(RecEntry {
-                rel_path:   rel,
-                status:     RecStatus::Symlink,
-                left_size:  None,
+                rel_path: rel,
+                status: RecStatus::Symlink,
+                left_size: None,
                 right_size: None,
             });
         } else if meta.is_dir() {
@@ -241,13 +263,18 @@ fn walk_and_merge_fast(
         } else if meta.is_file() {
             let rs = meta.len();
             if let Some(existing) = map.get_mut(&rel) {
-                existing.status     = RecStatus::Computing;
+                existing.status = RecStatus::Computing;
                 existing.right_size = Some(rs);
             } else {
-                map.insert(rel.clone(), RecEntry {
-                    rel_path: rel, status: RecStatus::RightOnly,
-                    left_size: None, right_size: Some(rs),
-                });
+                map.insert(
+                    rel.clone(),
+                    RecEntry {
+                        rel_path: rel,
+                        status: RecStatus::RightOnly,
+                        left_size: None,
+                        right_size: Some(rs),
+                    },
+                );
             }
         }
     }

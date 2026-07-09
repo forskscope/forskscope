@@ -108,7 +108,10 @@ pub fn compute_diff(left_text: &str, right_text: &str, options: DiffOptions) -> 
     let left_lines = split_lines(left_text);
     let right_lines = split_lines(right_text);
     let left_keys: Vec<String> = left_lines.iter().map(|l| line_key(l, &effective)).collect();
-    let right_keys: Vec<String> = right_lines.iter().map(|l| line_key(l, &effective)).collect();
+    let right_keys: Vec<String> = right_lines
+        .iter()
+        .map(|l| line_key(l, &effective))
+        .collect();
     let left_refs: Vec<&str> = left_keys.iter().map(String::as_str).collect();
     let right_refs: Vec<&str> = right_keys.iter().map(String::as_str).collect();
 

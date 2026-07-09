@@ -6,12 +6,12 @@ use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
 
 use crate::state::{Store, open_compare, restore_session, save_session};
-use crate::ui::view::diff::{DiffWorkspace, apply_focused_hunk, move_focus, save_tab};
-use crate::ui::view::explorer::Explorer;
 use crate::ui::layout::header::Header;
-use crate::ui::view::settings::{ModalLayer, load};
 use crate::ui::layout::statusbar::StatusBar;
 use crate::ui::layout::tabs::TabBar;
+use crate::ui::view::diff::{DiffWorkspace, apply_focused_hunk, move_focus, save_tab};
+use crate::ui::view::explorer::Explorer;
+use crate::ui::view::settings::{ModalLayer, load};
 
 // Assembled at generation time from assets/css/ (see assets/css/ORDER.txt).
 // Regenerate with: cargo xtask css
@@ -21,8 +21,7 @@ pub static STARTUP_PAIR: std::sync::OnceLock<Option<(PathBuf, PathBuf)>> =
     std::sync::OnceLock::new();
 /// If set, the active tab's save target is overridden to this path after
 /// the initial comparison opens (git mergetool mode).
-pub static STARTUP_MERGED: std::sync::OnceLock<Option<PathBuf>> =
-    std::sync::OnceLock::new();
+pub static STARTUP_MERGED: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
 
 #[component]
 pub fn App() -> Element {
@@ -56,15 +55,16 @@ pub fn App() -> Element {
     // Update the OS window title to reflect the active comparison.
     use_effect(move || {
         let title = match *store.active.read() {
-            Some(i) => store.tabs.read().get(i)
+            Some(i) => store
+                .tabs
+                .read()
+                .get(i)
                 .map(|t| format!("ForskScope — {}", t.title))
                 .unwrap_or_else(|| "ForskScope".into()),
             None => "ForskScope".into(),
         };
         spawn(async move {
-            let _ = dioxus::document::eval(
-                &format!("document.title = {:?}", title)
-            ).await;
+            let _ = dioxus::document::eval(&format!("document.title = {:?}", title)).await;
         });
     });
 

@@ -39,7 +39,10 @@ impl IgnoreRules {
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .collect();
-        Self { file_extensions, dir_patterns }
+        Self {
+            file_extensions,
+            dir_patterns,
+        }
     }
 
     /// `true` when no rules are defined — used to skip filtering work.
@@ -108,9 +111,16 @@ fn glob_match(pattern: &str, name: &str) -> bool {
             let middle = &pattern[s1 + 1..s2];
             let suffix = &pattern[s2 + 1..];
             let min_len = prefix.len() + middle.len() + suffix.len();
-            if name.len() < min_len || !name.starts_with(prefix) { return false; }
-            let after_prefix = if suffix.is_empty() { name } else {
-                match name.strip_suffix(suffix) { Some(s) => s, None => return false }
+            if name.len() < min_len || !name.starts_with(prefix) {
+                return false;
+            }
+            let after_prefix = if suffix.is_empty() {
+                name
+            } else {
+                match name.strip_suffix(suffix) {
+                    Some(s) => s,
+                    None => return false,
+                }
             };
             let inner = &after_prefix[prefix.len()..];
             middle.is_empty() || inner.contains(middle)

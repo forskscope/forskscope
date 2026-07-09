@@ -19,7 +19,11 @@ fn insert_delete_replace_ranges_are_correct() {
     assert!(kinds.contains(&HunkKind::Replace));
     assert!(kinds.contains(&HunkKind::Insert));
 
-    let replace = doc.hunks.iter().find(|h| h.kind == HunkKind::Replace).unwrap();
+    let replace = doc
+        .hunks
+        .iter()
+        .find(|h| h.kind == HunkKind::Replace)
+        .unwrap();
     // "old" is line 2 on the left, "new" is line 2 on the right.
     assert_eq!(replace.left_range.start, 2);
     assert_eq!(replace.right_range.start, 2);
@@ -75,7 +79,11 @@ fn inline_spans_are_unicode_safe_for_multibyte_text() {
         ..DiffOptions::default()
     };
     let mut doc = compute_diff("あいう\n", "あXう\n", opts);
-    let hunk = doc.hunks.iter_mut().find(|h| h.kind == HunkKind::Replace).unwrap();
+    let hunk = doc
+        .hunks
+        .iter_mut()
+        .find(|h| h.kind == HunkKind::Replace)
+        .unwrap();
     inline_diff_rows(hunk, 4096);
     let inline = hunk.rows[0].inline.as_ref().unwrap();
     // The shared prefix/suffix must remain intact, proving char-boundary safety.
@@ -105,40 +113,84 @@ fn large_file_policy_disables_inline_and_warns() {
 
 #[test]
 fn ignore_case_collapses_case_only_change() {
-    let opts = DiffOptions { ignore_case: true, ..DiffOptions::default() };
+    let opts = DiffOptions {
+        ignore_case: true,
+        ..DiffOptions::default()
+    };
     let doc = compute_diff("Hello World\n", "hello world\n", opts);
-    assert!(doc.is_identical(),
-        "case-only change should be invisible when ignore_case is set");
+    assert!(
+        doc.is_identical(),
+        "case-only change should be invisible when ignore_case is set"
+    );
     assert_eq!(doc.stats.hunks_changed, 0);
 }
 
 #[test]
 fn ignore_case_does_not_hide_content_change() {
-    let opts = DiffOptions { ignore_case: true, ..DiffOptions::default() };
+    let opts = DiffOptions {
+        ignore_case: true,
+        ..DiffOptions::default()
+    };
     let doc = compute_diff("Hello World\n", "hello Rust\n", opts);
-    assert!(!doc.is_identical(), "'World' vs 'Rust' differs even case-insensitively");
+    assert!(
+        !doc.is_identical(),
+        "'World' vs 'Rust' differs even case-insensitively"
+    );
 }
 
 #[test]
 fn histogram_algorithm_finds_same_change_as_myers() {
     use crate::diff::DiffAlgorithm;
-    let left  = "a\nb\nc\nd\n";
+    let left = "a\nb\nc\nd\n";
     let right = "a\nB\nc\nd\n";
-    let myers_doc  = compute_diff(left, right, DiffOptions { algorithm: DiffAlgorithm::Myers,     ..DiffOptions::default() });
-    let hist_doc   = compute_diff(left, right, DiffOptions { algorithm: DiffAlgorithm::Histogram, ..DiffOptions::default() });
-    assert_eq!(myers_doc.stats.hunks_changed, hist_doc.stats.hunks_changed,
-        "both algorithms should detect the same number of changed hunks");
+    let myers_doc = compute_diff(
+        left,
+        right,
+        DiffOptions {
+            algorithm: DiffAlgorithm::Myers,
+            ..DiffOptions::default()
+        },
+    );
+    let hist_doc = compute_diff(
+        left,
+        right,
+        DiffOptions {
+            algorithm: DiffAlgorithm::Histogram,
+            ..DiffOptions::default()
+        },
+    );
+    assert_eq!(
+        myers_doc.stats.hunks_changed, hist_doc.stats.hunks_changed,
+        "both algorithms should detect the same number of changed hunks"
+    );
     assert_eq!(myers_doc.stats.lines_deleted, hist_doc.stats.lines_deleted);
-    assert_eq!(myers_doc.stats.lines_inserted, hist_doc.stats.lines_inserted);
+    assert_eq!(
+        myers_doc.stats.lines_inserted,
+        hist_doc.stats.lines_inserted
+    );
 }
 
 #[test]
 fn patience_algorithm_finds_same_change_as_myers() {
     use crate::diff::DiffAlgorithm;
-    let left  = "fn foo() {\n    42\n}\n";
+    let left = "fn foo() {\n    42\n}\n";
     let right = "fn foo() {\n    99\n}\n";
-    let myers   = compute_diff(left, right, DiffOptions { algorithm: DiffAlgorithm::Myers,   ..DiffOptions::default() });
-    let patience = compute_diff(left, right, DiffOptions { algorithm: DiffAlgorithm::Patience, ..DiffOptions::default() });
+    let myers = compute_diff(
+        left,
+        right,
+        DiffOptions {
+            algorithm: DiffAlgorithm::Myers,
+            ..DiffOptions::default()
+        },
+    );
+    let patience = compute_diff(
+        left,
+        right,
+        DiffOptions {
+            algorithm: DiffAlgorithm::Patience,
+            ..DiffOptions::default()
+        },
+    );
     assert_eq!(myers.stats.hunks_changed, patience.stats.hunks_changed);
 }
 
@@ -155,7 +207,10 @@ fn both_empty_files_are_identical() {
 fn left_empty_right_non_empty_is_pure_insert() {
     let doc = compute_diff("", "line1\nline2\n", DiffOptions::default());
     assert!(!doc.is_identical());
-    assert_eq!(doc.stats.lines_deleted, 0, "nothing deleted from empty left");
+    assert_eq!(
+        doc.stats.lines_deleted, 0,
+        "nothing deleted from empty left"
+    );
     assert_eq!(doc.stats.lines_inserted, 2);
 }
 
@@ -163,32 +218,41 @@ fn left_empty_right_non_empty_is_pure_insert() {
 fn right_empty_left_non_empty_is_pure_delete() {
     let doc = compute_diff("line1\nline2\n", "", DiffOptions::default());
     assert!(!doc.is_identical());
-    assert_eq!(doc.stats.lines_inserted, 0, "nothing inserted into empty right");
+    assert_eq!(
+        doc.stats.lines_inserted, 0,
+        "nothing inserted into empty right"
+    );
     assert_eq!(doc.stats.lines_deleted, 2);
 }
 
 #[test]
 fn diff_stats_count_changed_lines_correctly() {
     // 3 lines: keep, replace, keep → 1 deleted + 1 inserted.
-    let doc = compute_diff("keep\nold\nkeep\n", "keep\nnew\nkeep\n", DiffOptions::default());
+    let doc = compute_diff(
+        "keep\nold\nkeep\n",
+        "keep\nnew\nkeep\n",
+        DiffOptions::default(),
+    );
     assert_eq!(doc.stats.hunks_changed, 1);
-    assert_eq!(doc.stats.lines_deleted,  1);
+    assert_eq!(doc.stats.lines_deleted, 1);
     assert_eq!(doc.stats.lines_inserted, 1);
 }
 
 #[test]
 fn multi_block_changes_are_each_counted() {
-    let left  = "a\nX\nb\nY\nc\n";
+    let left = "a\nX\nb\nY\nc\n";
     let right = "a\nX2\nb\nY2\nc\n";
     let doc = compute_diff(left, right, DiffOptions::default());
     assert_eq!(doc.stats.hunks_changed, 2, "two separate changed blocks");
 }
 
-
-
 #[test]
 fn ignore_whitespace_plus_ignore_case_both_apply() {
-    let opts = DiffOptions { ignore_whitespace: true, ignore_case: true, ..DiffOptions::default() };
+    let opts = DiffOptions {
+        ignore_whitespace: true,
+        ignore_case: true,
+        ..DiffOptions::default()
+    };
     // Only difference is case + trailing space — should be invisible.
     let doc = compute_diff("Hello  \n", "hello\n", opts);
     assert!(doc.is_identical());
@@ -223,46 +287,60 @@ fn many_insertions_are_counted_correctly() {
 fn replace_counts_both_a_deletion_and_an_insertion() {
     // One old line replaced by two new lines → 1 deleted, 2 inserted.
     let doc = compute_diff("one\n", "two\nthree\n", DiffOptions::default());
-    assert_eq!(doc.stats.lines_deleted,  1);
+    assert_eq!(doc.stats.lines_deleted, 1);
     assert_eq!(doc.stats.lines_inserted, 2);
 }
 
 #[test]
 fn completely_different_files_have_full_counts() {
-    let left  = "a\nb\nc\n";
+    let left = "a\nb\nc\n";
     let right = "x\ny\nz\n";
     let doc = compute_diff(left, right, DiffOptions::default());
     // All three lines replaced → 3 deleted, 3 inserted.
-    assert_eq!(doc.stats.lines_deleted,  3);
+    assert_eq!(doc.stats.lines_deleted, 3);
     assert_eq!(doc.stats.lines_inserted, 3);
 }
 
 #[test]
 fn ignore_whitespace_does_not_hide_non_whitespace_change() {
-    let opts = DiffOptions { ignore_whitespace: true, ..DiffOptions::default() };
+    let opts = DiffOptions {
+        ignore_whitespace: true,
+        ..DiffOptions::default()
+    };
     let doc = compute_diff("  hello\n", "  world\n", opts);
-    assert!(!doc.is_identical(), "non-whitespace content change must still be visible");
+    assert!(
+        !doc.is_identical(),
+        "non-whitespace content change must still be visible"
+    );
 }
 
 #[test]
 fn context_lines_warning_absent_for_small_file() {
     use crate::diff::DiffWarning;
-    let left  = "line1\nline2\nline3\n";
+    let left = "line1\nline2\nline3\n";
     let right = "line1\nLINE2\nline3\n";
     let doc = compute_diff(left, right, DiffOptions::default());
-    assert!(!doc.warnings.iter().any(|w| *w == DiffWarning::LargeFilePolicyApplied),
-        "small file must not trigger the large-file policy warning");
+    assert!(
+        !doc.warnings
+            .iter()
+            .any(|w| *w == DiffWarning::LargeFilePolicyApplied),
+        "small file must not trigger the large-file policy warning"
+    );
 }
 
 #[test]
 fn diff_hunk_ids_survive_a_second_diff_call() {
     // Two successive diffs on the same content should produce different IDs
     // (IDs encode a generation counter, not content hash).
-    let left = "a\nb\n"; let right = "a\nc\n";
+    let left = "a\nb\n";
+    let right = "a\nc\n";
     let d1 = compute_diff(left, right, DiffOptions::default());
     let d2 = compute_diff(left, right, DiffOptions::default());
     let ids1: Vec<_> = d1.hunks.iter().map(|h| h.hunk_id).collect();
     let ids2: Vec<_> = d2.hunks.iter().map(|h| h.hunk_id).collect();
     // Different diff calls → different IDs (no global ID collision).
-    assert_ne!(ids1, ids2, "successive diff calls must produce fresh hunk IDs");
+    assert_ne!(
+        ids1, ids2,
+        "successive diff calls must produce fresh hunk IDs"
+    );
 }

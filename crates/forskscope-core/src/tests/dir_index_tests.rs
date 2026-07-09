@@ -8,8 +8,8 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::dir::{
-    ContentDigest, DirectoryEntryRecord, DirectoryIndex, EntryType,
-    EqualityEvidence, IndexRevision, pair_entries,
+    ContentDigest, DirectoryEntryRecord, DirectoryIndex, EntryType, EqualityEvidence,
+    IndexRevision, pair_entries,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -21,44 +21,44 @@ fn mtime(secs: u64) -> SystemTime {
 fn file_record(rel: &str, size: u64, mtime_secs: u64) -> DirectoryEntryRecord {
     DirectoryEntryRecord {
         relative_path: PathBuf::from(rel),
-        entry_type:    EntryType::File,
-        size:          Some(size),
-        modified:      Some(mtime(mtime_secs)),
-        digest:        None,
-        error:         None,
+        entry_type: EntryType::File,
+        size: Some(size),
+        modified: Some(mtime(mtime_secs)),
+        digest: None,
+        error: None,
     }
 }
 
 fn file_with_digest(rel: &str, size: u64, digest_hex: &str) -> DirectoryEntryRecord {
     DirectoryEntryRecord {
         relative_path: PathBuf::from(rel),
-        entry_type:    EntryType::File,
-        size:          Some(size),
-        modified:      None,
-        digest:        Some(ContentDigest::fnv1a64(digest_hex)),
-        error:         None,
+        entry_type: EntryType::File,
+        size: Some(size),
+        modified: None,
+        digest: Some(ContentDigest::fnv1a64(digest_hex)),
+        error: None,
     }
 }
 
 fn dir_record(rel: &str) -> DirectoryEntryRecord {
     DirectoryEntryRecord {
         relative_path: PathBuf::from(rel),
-        entry_type:    EntryType::Directory,
-        size:          None,
-        modified:      None,
-        digest:        None,
-        error:         None,
+        entry_type: EntryType::Directory,
+        size: None,
+        modified: None,
+        digest: None,
+        error: None,
     }
 }
 
 fn error_record(rel: &str) -> DirectoryEntryRecord {
     DirectoryEntryRecord {
         relative_path: PathBuf::from(rel),
-        entry_type:    EntryType::File,
-        size:          None,
-        modified:      None,
-        digest:        None,
-        error:         Some("permission denied".into()),
+        entry_type: EntryType::File,
+        size: None,
+        modified: None,
+        digest: None,
+        error: Some("permission denied".into()),
     }
 }
 
@@ -68,7 +68,8 @@ fn index(root: &str, records: Vec<DirectoryEntryRecord>) -> DirectoryIndex {
 
 fn evidence_for(left: &DirectoryIndex, right: &DirectoryIndex, rel: &str) -> EqualityEvidence {
     let set = pair_entries(left, right);
-    set.entries.into_iter()
+    set.entries
+        .into_iter()
         .find(|e| e.relative_path == PathBuf::from(rel))
         .map(|e| e.evidence)
         .unwrap_or(EqualityEvidence::Unknown)
@@ -92,10 +93,10 @@ fn from_records_sets_revision_1_and_complete() {
 
 #[test]
 fn get_finds_entry_by_relative_path() {
-    let idx = index("/root", vec![
-        file_record("src/main.rs", 200, 1000),
-        dir_record("src"),
-    ]);
+    let idx = index(
+        "/root",
+        vec![file_record("src/main.rs", 200, 1000), dir_record("src")],
+    );
     assert!(idx.get("src/main.rs".as_ref()).is_some());
     assert!(idx.get("src".as_ref()).is_some());
     assert!(idx.get("missing.rs".as_ref()).is_none());
@@ -103,11 +104,14 @@ fn get_finds_entry_by_relative_path() {
 
 #[test]
 fn files_iterator_excludes_directories() {
-    let idx = index("/root", vec![
-        file_record("a.rs", 100, 1000),
-        dir_record("src"),
-        file_record("b.rs", 200, 1000),
-    ]);
+    let idx = index(
+        "/root",
+        vec![
+            file_record("a.rs", 100, 1000),
+            dir_record("src"),
+            file_record("b.rs", 200, 1000),
+        ],
+    );
     assert_eq!(idx.files().count(), 2);
     assert_eq!(idx.directories().count(), 1);
 }
@@ -130,9 +134,18 @@ fn digest_does_not_match_different_hex() {
 
 #[test]
 fn digest_does_not_match_different_algorithm() {
-    let a = ContentDigest { algorithm: "fnv1a64".into(), hex: "aabb".into() };
-    let b = ContentDigest { algorithm: "sha256".into(),  hex: "aabb".into() };
-    assert!(!a.matches(&b), "same hex but different algorithm must not match");
+    let a = ContentDigest {
+        algorithm: "fnv1a64".into(),
+        hex: "aabb".into(),
+    };
+    let b = ContentDigest {
+        algorithm: "sha256".into(),
+        hex: "aabb".into(),
+    };
+    assert!(
+        !a.matches(&b),
+        "same hex but different algorithm must not match"
+    );
 }
 
 // ── EqualityEvidence predicates ───────────────────────────────────────────────
@@ -147,7 +160,10 @@ fn digest_equal_is_equal_and_present_on_both_sides() {
 
 #[test]
 fn size_different_is_different() {
-    let e = EqualityEvidence::SizeDifferent { left_size: 100, right_size: 200 };
+    let e = EqualityEvidence::SizeDifferent {
+        left_size: 100,
+        right_size: 200,
+    };
     assert!(e.is_different());
     assert!(!e.is_equal());
     assert!(!e.is_pending());
@@ -178,14 +194,20 @@ fn right_only_is_different_and_not_on_both_sides() {
 fn file_present_only_on_left_is_left_only() {
     let l = index("/l", vec![file_record("only_left.rs", 100, 1000)]);
     let r = index("/r", vec![]);
-    assert_eq!(evidence_for(&l, &r, "only_left.rs"), EqualityEvidence::LeftOnly);
+    assert_eq!(
+        evidence_for(&l, &r, "only_left.rs"),
+        EqualityEvidence::LeftOnly
+    );
 }
 
 #[test]
 fn file_present_only_on_right_is_right_only() {
     let l = index("/l", vec![]);
     let r = index("/r", vec![file_record("only_right.rs", 100, 1000)]);
-    assert_eq!(evidence_for(&l, &r, "only_right.rs"), EqualityEvidence::RightOnly);
+    assert_eq!(
+        evidence_for(&l, &r, "only_right.rs"),
+        EqualityEvidence::RightOnly
+    );
 }
 
 #[test]
@@ -195,7 +217,10 @@ fn different_sizes_yields_size_different_without_digest() {
     let r = index("/r", vec![file_record("f.rs", 200, 1000)]);
     assert!(matches!(
         evidence_for(&l, &r, "f.rs"),
-        EqualityEvidence::SizeDifferent { left_size: 100, right_size: 200 }
+        EqualityEvidence::SizeDifferent {
+            left_size: 100,
+            right_size: 200
+        }
     ));
 }
 
@@ -212,7 +237,10 @@ fn different_digests_yield_digest_different() {
     // RFC-008 §5 rule 4b: same size, digests differ.
     let l = index("/l", vec![file_with_digest("f.rs", 100, "aabbcc")]);
     let r = index("/r", vec![file_with_digest("f.rs", 100, "112233")]);
-    assert_eq!(evidence_for(&l, &r, "f.rs"), EqualityEvidence::DigestDifferent);
+    assert_eq!(
+        evidence_for(&l, &r, "f.rs"),
+        EqualityEvidence::DigestDifferent
+    );
 }
 
 #[test]
@@ -220,7 +248,10 @@ fn same_size_same_mtime_no_digest_is_metadata_equal() {
     // RFC-008 §5 rule 5: size equal, same mtime, no digest.
     let l = index("/l", vec![file_record("f.rs", 100, 1000)]);
     let r = index("/r", vec![file_record("f.rs", 100, 1000)]);
-    assert_eq!(evidence_for(&l, &r, "f.rs"), EqualityEvidence::MetadataEqual);
+    assert_eq!(
+        evidence_for(&l, &r, "f.rs"),
+        EqualityEvidence::MetadataEqual
+    );
 }
 
 #[test]
@@ -245,7 +276,10 @@ fn type_mismatch_file_vs_directory() {
 fn error_on_either_side_yields_error_evidence() {
     let l = index("/l", vec![error_record("f.rs")]);
     let r = index("/r", vec![file_record("f.rs", 100, 1000)]);
-    assert!(matches!(evidence_for(&l, &r, "f.rs"), EqualityEvidence::Error { .. }));
+    assert!(matches!(
+        evidence_for(&l, &r, "f.rs"),
+        EqualityEvidence::Error { .. }
+    ));
 }
 
 #[test]
@@ -259,22 +293,28 @@ fn directories_on_both_sides_are_metadata_equal() {
 
 #[test]
 fn paired_entry_set_counts_are_accurate() {
-    let l = index("/l", vec![
-        file_record("eq.rs",      100, 1000),   // same mtime → MetadataEqual
-        file_record("left.rs",    200, 1000),   // left only
-        file_with_digest("d.rs",  300, "aabb"), // digest equal
-    ]);
-    let r = index("/r", vec![
-        file_record("eq.rs",      100, 1000),   // MetadataEqual
-        file_record("right.rs",   200, 1000),   // right only
-        file_with_digest("d.rs",  300, "aabb"), // DigestEqual
-    ]);
+    let l = index(
+        "/l",
+        vec![
+            file_record("eq.rs", 100, 1000),       // same mtime → MetadataEqual
+            file_record("left.rs", 200, 1000),     // left only
+            file_with_digest("d.rs", 300, "aabb"), // digest equal
+        ],
+    );
+    let r = index(
+        "/r",
+        vec![
+            file_record("eq.rs", 100, 1000),       // MetadataEqual
+            file_record("right.rs", 200, 1000),    // right only
+            file_with_digest("d.rs", 300, "aabb"), // DigestEqual
+        ],
+    );
     let set = pair_entries(&l, &r);
-    assert_eq!(set.equal_count(),       2, "eq.rs + d.rs");
-    assert_eq!(set.left_only_count(),   1, "left.rs");
-    assert_eq!(set.right_only_count(),  1, "right.rs");
-    assert_eq!(set.different_count(),   2, "left.rs + right.rs");
-    assert_eq!(set.pending_count(),     0);
+    assert_eq!(set.equal_count(), 2, "eq.rs + d.rs");
+    assert_eq!(set.left_only_count(), 1, "left.rs");
+    assert_eq!(set.right_only_count(), 1, "right.rs");
+    assert_eq!(set.different_count(), 2, "left.rs + right.rs");
+    assert_eq!(set.pending_count(), 0);
 }
 
 #[test]

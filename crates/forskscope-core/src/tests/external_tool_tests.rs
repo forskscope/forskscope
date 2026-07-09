@@ -8,28 +8,31 @@
 use std::path::PathBuf;
 
 use crate::external_tool::{
-    ExpandContext, ExternalToolArg, ExternalToolCommand, ExternalToolPlaceholder,
-    ToolId, ToolKind, UnknownTokenError, expand_args, parse_arg,
+    ExpandContext, ExternalToolArg, ExternalToolCommand, ExternalToolPlaceholder, ToolId, ToolKind,
+    UnknownTokenError, expand_args, parse_arg,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn cmd(args: Vec<ExternalToolArg>) -> ExternalToolCommand {
     ExternalToolCommand {
-        id:         ToolId("test".into()),
-        name:       "Test Tool".into(),
+        id: ToolId("test".into()),
+        name: "Test Tool".into(),
         executable: PathBuf::from("tool"),
         args,
     }
 }
 
 fn ctx_path(p: &str) -> ExpandContext {
-    ExpandContext { path: Some(PathBuf::from(p)), ..Default::default() }
+    ExpandContext {
+        path: Some(PathBuf::from(p)),
+        ..Default::default()
+    }
 }
 
 fn ctx_lr(l: &str, r: &str) -> ExpandContext {
     ExpandContext {
-        left_path:  Some(PathBuf::from(l)),
+        left_path: Some(PathBuf::from(l)),
         right_path: Some(PathBuf::from(r)),
         ..Default::default()
     }
@@ -43,7 +46,10 @@ fn literal_args_pass_through_unchanged() {
         ExternalToolArg::Literal("--flag".into()),
         ExternalToolArg::Literal("value".into()),
     ]);
-    assert_eq!(expand_args(&c, &ExpandContext::default()), vec!["--flag", "value"]);
+    assert_eq!(
+        expand_args(&c, &ExpandContext::default()),
+        vec!["--flag", "value"]
+    );
 }
 
 #[test]
@@ -56,7 +62,9 @@ fn empty_arg_list_produces_empty_result() {
 
 #[test]
 fn path_placeholder_expands_to_path() {
-    let c = cmd(vec![ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)]);
+    let c = cmd(vec![ExternalToolArg::Placeholder(
+        ExternalToolPlaceholder::Path,
+    )]);
     let result = expand_args(&c, &ctx_path("/project/src/main.rs"));
     assert_eq!(result, vec!["/project/src/main.rs"]);
 }
@@ -77,7 +85,11 @@ fn line_column_placeholders_expand_as_decimal_strings() {
         ExternalToolArg::Placeholder(ExternalToolPlaceholder::Line),
         ExternalToolArg::Placeholder(ExternalToolPlaceholder::Column),
     ]);
-    let ctx = ExpandContext { line: Some(42), column: Some(7), ..Default::default() };
+    let ctx = ExpandContext {
+        line: Some(42),
+        column: Some(7),
+        ..Default::default()
+    };
     assert_eq!(expand_args(&c, &ctx), vec!["42", "7"]);
 }
 
@@ -97,15 +109,23 @@ fn mixed_literal_and_placeholder_in_order() {
 fn path_with_spaces_is_a_single_argument() {
     // Security: if this were shell-expanded, "/path/my file.rs" would become
     // two tokens. The argument array must keep it as one.
-    let c = cmd(vec![ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)]);
+    let c = cmd(vec![ExternalToolArg::Placeholder(
+        ExternalToolPlaceholder::Path,
+    )]);
     let result = expand_args(&c, &ctx_path("/path/my file.rs"));
-    assert_eq!(result.len(), 1, "path with spaces must be a single argument");
+    assert_eq!(
+        result.len(),
+        1,
+        "path with spaces must be a single argument"
+    );
     assert_eq!(result[0], "/path/my file.rs");
 }
 
 #[test]
 fn path_with_semicolons_is_not_split() {
-    let c = cmd(vec![ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)]);
+    let c = cmd(vec![ExternalToolArg::Placeholder(
+        ExternalToolPlaceholder::Path,
+    )]);
     let result = expand_args(&c, &ctx_path("/weird;path/file.rs"));
     assert_eq!(result.len(), 1);
     assert_eq!(result[0], "/weird;path/file.rs");
@@ -113,18 +133,26 @@ fn path_with_semicolons_is_not_split() {
 
 #[test]
 fn path_with_dollar_sign_is_not_interpolated() {
-    let c = cmd(vec![ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)]);
+    let c = cmd(vec![ExternalToolArg::Placeholder(
+        ExternalToolPlaceholder::Path,
+    )]);
     let result = expand_args(&c, &ctx_path("/path/$HOME/file.rs"));
-    assert_eq!(result[0], "/path/$HOME/file.rs",
-        "$HOME must not be interpolated — no shell expansion");
+    assert_eq!(
+        result[0], "/path/$HOME/file.rs",
+        "$HOME must not be interpolated — no shell expansion"
+    );
 }
 
 #[test]
 fn path_with_backticks_is_not_executed() {
-    let c = cmd(vec![ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)]);
+    let c = cmd(vec![ExternalToolArg::Placeholder(
+        ExternalToolPlaceholder::Path,
+    )]);
     let result = expand_args(&c, &ctx_path("/path/`whoami`/file.rs"));
-    assert_eq!(result[0], "/path/`whoami`/file.rs",
-        "backtick command substitution must not occur");
+    assert_eq!(
+        result[0], "/path/`whoami`/file.rs",
+        "backtick command substitution must not occur"
+    );
 }
 
 // ── Missing context values are omitted ───────────────────────────────────────
@@ -137,16 +165,23 @@ fn missing_path_omits_argument() {
     ]);
     // No path in context — both args should be present but Path is omitted.
     let result = expand_args(&c, &ExpandContext::default());
-    assert_eq!(result, vec!["--file"],
-        "absent placeholder must be omitted, not produce a 'None' string");
+    assert_eq!(
+        result,
+        vec!["--file"],
+        "absent placeholder must be omitted, not produce a 'None' string"
+    );
 }
 
 #[test]
 fn missing_line_omits_argument_not_produces_none_string() {
-    let c = cmd(vec![ExternalToolArg::Placeholder(ExternalToolPlaceholder::Line)]);
+    let c = cmd(vec![ExternalToolArg::Placeholder(
+        ExternalToolPlaceholder::Line,
+    )]);
     let result = expand_args(&c, &ExpandContext::default());
-    assert!(result.is_empty(),
-        "absent line must be omitted, not produce literal \"None\"");
+    assert!(
+        result.is_empty(),
+        "absent line must be omitted, not produce literal \"None\""
+    );
 }
 
 #[test]
@@ -167,8 +202,11 @@ fn parse_arg_recognises_all_placeholders() {
     for ph in ExternalToolPlaceholder::all() {
         let token = ph.token();
         let parsed = parse_arg(token).unwrap();
-        assert_eq!(parsed, ExternalToolArg::Placeholder(*ph),
-            "token {token} must parse as its placeholder variant");
+        assert_eq!(
+            parsed,
+            ExternalToolArg::Placeholder(*ph),
+            "token {token} must parse as its placeholder variant"
+        );
     }
 }
 
@@ -183,7 +221,12 @@ fn parse_arg_rejects_unknown_token() {
     let result = parse_arg("{pat}"); // typo of {path}
     assert!(result.is_err(), "unknown token must return Err");
     let err = result.unwrap_err();
-    assert_eq!(err, UnknownTokenError { token: "{pat}".into() });
+    assert_eq!(
+        err,
+        UnknownTokenError {
+            token: "{pat}".into()
+        }
+    );
     // Error message mentions the bad token and valid alternatives.
     let msg = err.to_string();
     assert!(msg.contains("{pat}"), "error must name the bad token");
@@ -193,16 +236,24 @@ fn parse_arg_rejects_unknown_token() {
 #[test]
 fn parse_arg_rejects_all_curly_brace_strings_not_in_set() {
     for bad in ["{unknown}", "{PATH}", "{LINE}", "{file}"] {
-        assert!(parse_arg(bad).is_err(),
-            "{bad} must be rejected as an unknown token");
+        assert!(
+            parse_arg(bad).is_err(),
+            "{bad} must be rejected as an unknown token"
+        );
     }
 }
 
 #[test]
 fn parse_arg_accepts_plain_string_without_braces() {
     // Strings that don't look like tokens are always literals.
-    assert_eq!(parse_arg("file.txt").unwrap(), ExternalToolArg::Literal("file.txt".into()));
-    assert_eq!(parse_arg("/abs/path").unwrap(), ExternalToolArg::Literal("/abs/path".into()));
+    assert_eq!(
+        parse_arg("file.txt").unwrap(),
+        ExternalToolArg::Literal("file.txt".into())
+    );
+    assert_eq!(
+        parse_arg("/abs/path").unwrap(),
+        ExternalToolArg::Literal("/abs/path".into())
+    );
 }
 
 // ── Placeholder token() and from_token() ─────────────────────────────────────
@@ -212,7 +263,11 @@ fn all_placeholder_tokens_round_trip() {
     for ph in ExternalToolPlaceholder::all() {
         let token = ph.token();
         let back = ExternalToolPlaceholder::from_token(token);
-        assert_eq!(back, Some(*ph), "token {token} must round-trip through from_token");
+        assert_eq!(
+            back,
+            Some(*ph),
+            "token {token} must round-trip through from_token"
+        );
     }
 }
 
@@ -231,7 +286,10 @@ fn file_manager_reveal_preset_has_correct_id_and_path_placeholder() {
     assert!(!cmd.name.is_empty());
     // Must have exactly one arg: the {Path} placeholder.
     assert_eq!(cmd.args.len(), 1);
-    assert_eq!(cmd.args[0], ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path));
+    assert_eq!(
+        cmd.args[0],
+        ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)
+    );
 }
 
 #[test]
@@ -249,15 +307,27 @@ fn file_manager_reveal_expands_path_correctly() {
 fn vscode_open_preset_has_goto_flag_and_path() {
     let cmd = ExternalToolCommand::vscode_open();
     assert_eq!(cmd.id.0, "builtin.vscode_open");
-    assert!(cmd.args.iter().any(|a| a == &ExternalToolArg::Literal("--goto".into())));
-    assert!(cmd.args.iter().any(|a| a == &ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)));
+    assert!(
+        cmd.args
+            .iter()
+            .any(|a| a == &ExternalToolArg::Literal("--goto".into()))
+    );
+    assert!(
+        cmd.args
+            .iter()
+            .any(|a| a == &ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path))
+    );
 }
 
 #[test]
 fn system_open_preset_has_path_placeholder() {
     let cmd = ExternalToolCommand::system_open();
     assert_eq!(cmd.id.0, "builtin.system_open");
-    assert!(cmd.args.iter().any(|a| a == &ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)));
+    assert!(
+        cmd.args
+            .iter()
+            .any(|a| a == &ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path))
+    );
 }
 
 #[test]
@@ -271,14 +341,23 @@ fn builtin_presets_returns_three_commands_with_unique_ids() {
 #[test]
 fn all_builtin_preset_names_are_non_empty() {
     for preset in ExternalToolCommand::builtin_presets() {
-        assert!(!preset.name.is_empty(), "preset {} must have a name", preset.id.0);
+        assert!(
+            !preset.name.is_empty(),
+            "preset {} must have a name",
+            preset.id.0
+        );
     }
 }
 
 #[test]
 fn tool_kind_variants_are_distinct() {
     // Structural check: ToolKind can be matched exhaustively.
-    let kinds = [ToolKind::Editor, ToolKind::FileManager, ToolKind::Terminal, ToolKind::Custom];
+    let kinds = [
+        ToolKind::Editor,
+        ToolKind::FileManager,
+        ToolKind::Terminal,
+        ToolKind::Custom,
+    ];
     let unique: std::collections::HashSet<_> = kinds.iter().map(|k| format!("{k:?}")).collect();
     assert_eq!(unique.len(), kinds.len());
 }

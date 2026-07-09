@@ -12,8 +12,8 @@ use std::fs;
 use std::io::Write as IoWrite;
 use std::path::{Path, PathBuf};
 
-use zip::write::SimpleFileOptions;
 use zip::CompressionMethod;
+use zip::write::SimpleFileOptions;
 
 use crate::xlsx::{SheetChange, derive_pair_text_from_diff, diff_xlsx};
 
@@ -92,17 +92,18 @@ fn col_letter(col: u32) -> String {
     if col <= 26 {
         format!("{}", (b'A' + (col - 1) as u8) as char)
     } else {
-        let first  = (b'A' + ((col - 1) / 26 - 1) as u8) as char;
+        let first = (b'A' + ((col - 1) / 26 - 1) as u8) as char;
         let second = (b'A' + ((col - 1) % 26) as u8) as char;
         format!("{first}{second}")
     }
 }
 fn xml_escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 fn tmp(tag: &str) -> PathBuf {
-    let d = std::env::temp_dir()
-        .join(format!("fsk-xlsx-{tag}-{}", std::process::id()));
+    let d = std::env::temp_dir().join(format!("fsk-xlsx-{tag}-{}", std::process::id()));
     let _ = fs::create_dir_all(&d);
     d
 }
@@ -118,7 +119,10 @@ fn identical_workbooks_produce_empty_diff() {
     make_xlsx(&new, "Sheet1", &[(1, 1, "hello"), (2, 1, "world")]);
 
     let diff = diff_xlsx(&old, &new, None).unwrap();
-    assert!(diff.is_empty(), "identical workbooks must produce empty diff");
+    assert!(
+        diff.is_empty(),
+        "identical workbooks must produce empty diff"
+    );
     assert_eq!(diff.stats.cells_changed, 0);
     let _ = fs::remove_dir_all(&dir);
 }
@@ -159,7 +163,10 @@ fn empty_to_non_empty_cell_has_none_on_old_side() {
     let diff = diff_xlsx(&old, &new, None).unwrap();
     assert_eq!(diff.stats.cells_changed, 1);
     let cell = &diff.cells[0].cells[0];
-    assert!(cell.old_value.is_none(), "old side must be None for newly added cell");
+    assert!(
+        cell.old_value.is_none(),
+        "old side must be None for newly added cell"
+    );
     assert_eq!(cell.new_value.as_deref(), Some("appeared"));
     let _ = fs::remove_dir_all(&dir);
 }
@@ -173,17 +180,25 @@ fn sheet_structural_change_is_reported() {
     let dir = tmp("added-sheet");
     let old = dir.join("old.xlsx");
     let new = dir.join("new.xlsx");
-    make_xlsx(&old, "Sheet1",   &[(1, 1, "a")]);
+    make_xlsx(&old, "Sheet1", &[(1, 1, "a")]);
     make_xlsx(&new, "NewSheet", &[(1, 1, "a")]);
 
     let diff = diff_xlsx(&old, &new, None).unwrap();
-    assert!(!diff.sheets.is_empty(), "sheet-level change must be reported");
-    let any_structural = diff.sheets.iter().any(|s| matches!(
-        s,
-        SheetChange::Added(_) | SheetChange::Removed(_) | SheetChange::Renamed { .. }
-    ));
-    assert!(any_structural,
-        "expected Added, Removed, or Renamed; got: {:?}", diff.sheets);
+    assert!(
+        !diff.sheets.is_empty(),
+        "sheet-level change must be reported"
+    );
+    let any_structural = diff.sheets.iter().any(|s| {
+        matches!(
+            s,
+            SheetChange::Added(_) | SheetChange::Removed(_) | SheetChange::Renamed { .. }
+        )
+    });
+    assert!(
+        any_structural,
+        "expected Added, Removed, or Renamed; got: {:?}",
+        diff.sheets
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -219,11 +234,14 @@ fn multiple_changed_cells_all_appear_in_model() {
     let dir = tmp("multicell");
     let old = dir.join("old.xlsx");
     let new = dir.join("new.xlsx");
-    make_xlsx(&old, "Sheet1", &[(1,1,"a"),(2,1,"b"),(3,1,"c")]);
-    make_xlsx(&new, "Sheet1", &[(1,1,"A"),(2,1,"B"),(3,1,"C")]);
+    make_xlsx(&old, "Sheet1", &[(1, 1, "a"), (2, 1, "b"), (3, 1, "c")]);
+    make_xlsx(&new, "Sheet1", &[(1, 1, "A"), (2, 1, "B"), (3, 1, "C")]);
 
     let diff = diff_xlsx(&old, &new, None).unwrap();
-    assert_eq!(diff.stats.cells_changed, 3, "all three cells must be reported");
+    assert_eq!(
+        diff.stats.cells_changed, 3,
+        "all three cells must be reported"
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -232,15 +250,27 @@ fn derive_pair_text_from_diff_is_non_empty_for_changed_workbook() {
     let dir = tmp("pairtext");
     let old = dir.join("old.xlsx");
     let new = dir.join("new.xlsx");
-    make_xlsx(&old, "Sheet1", &[(1,1,"old_value")]);
-    make_xlsx(&new, "Sheet1", &[(1,1,"new_value")]);
+    make_xlsx(&old, "Sheet1", &[(1, 1, "old_value")]);
+    make_xlsx(&new, "Sheet1", &[(1, 1, "new_value")]);
 
     let diff = diff_xlsx(&old, &new, None).unwrap();
     let (old_text, new_text) = derive_pair_text_from_diff(&diff);
-    assert!(!old_text.content.is_empty(), "old derived text must not be empty");
-    assert!(!new_text.content.is_empty(), "new derived text must not be empty");
-    assert!(old_text.content.contains("old_value"), "old side must contain old value");
-    assert!(new_text.content.contains("new_value"), "new side must contain new value");
+    assert!(
+        !old_text.content.is_empty(),
+        "old derived text must not be empty"
+    );
+    assert!(
+        !new_text.content.is_empty(),
+        "new derived text must not be empty"
+    );
+    assert!(
+        old_text.content.contains("old_value"),
+        "old side must contain old value"
+    );
+    assert!(
+        new_text.content.contains("new_value"),
+        "new side must contain new value"
+    );
     assert_eq!(old_text.encoding.label, "(Excel)");
     let _ = fs::remove_dir_all(&dir);
 }
@@ -250,12 +280,15 @@ fn derive_pair_text_from_diff_is_empty_for_identical_workbooks() {
     let dir = tmp("pairtext-identical");
     let old = dir.join("old.xlsx");
     let new = dir.join("new.xlsx");
-    make_xlsx(&old, "Sheet1", &[(1,1,"same")]);
-    make_xlsx(&new, "Sheet1", &[(1,1,"same")]);
+    make_xlsx(&old, "Sheet1", &[(1, 1, "same")]);
+    make_xlsx(&new, "Sheet1", &[(1, 1, "same")]);
 
     let diff = diff_xlsx(&old, &new, None).unwrap();
     let (old_text, new_text) = derive_pair_text_from_diff(&diff);
-    assert!(old_text.content.is_empty(), "identical workbooks produce empty text");
+    assert!(
+        old_text.content.is_empty(),
+        "identical workbooks produce empty text"
+    );
     assert!(new_text.content.is_empty());
     let _ = fs::remove_dir_all(&dir);
 }
@@ -268,16 +301,18 @@ fn stats_are_driven_from_workbook_summary_not_manual_count() {
     let dir = tmp("stats");
     let old = dir.join("old.xlsx");
     let new = dir.join("new.xlsx");
-    make_xlsx(&old, "Sheet1", &[(1,1,"x"),(2,1,"y")]);
-    make_xlsx(&new, "Sheet1", &[(1,1,"X"),(2,1,"Y")]);
+    make_xlsx(&old, "Sheet1", &[(1, 1, "x"), (2, 1, "y")]);
+    make_xlsx(&new, "Sheet1", &[(1, 1, "X"), (2, 1, "Y")]);
 
     let diff = diff_xlsx(&old, &new, None).unwrap();
     // values_changed from wb.summary (may be 0 if calamine reads as text and
     // sheets-diff classifies as text change — accept either; the important
     // thing is stats.cells_changed matches the cell list).
-    assert_eq!(diff.stats.cells_changed,
+    assert_eq!(
+        diff.stats.cells_changed,
         diff.cells.iter().map(|s| s.cells.len()).sum::<usize>(),
-        "stats.cells_changed must match the cell list length");
+        "stats.cells_changed must match the cell list length"
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -287,8 +322,8 @@ fn cancellation_token_does_not_affect_small_workbook() {
     let dir = tmp("cancel");
     let old = dir.join("old.xlsx");
     let new = dir.join("new.xlsx");
-    make_xlsx(&old, "Sheet1", &[(1,1,"a")]);
-    make_xlsx(&new, "Sheet1", &[(1,1,"b")]);
+    make_xlsx(&old, "Sheet1", &[(1, 1, "a")]);
+    make_xlsx(&new, "Sheet1", &[(1, 1, "b")]);
 
     let token = crate::cancel::CancellationToken::new();
     // Not cancelled — diff should succeed normally.

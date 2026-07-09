@@ -29,7 +29,11 @@ pub struct VcsError {
 }
 
 impl VcsError {
-    fn new(msg: impl Into<String>) -> Self { Self { message: msg.into() } }
+    fn new(msg: impl Into<String>) -> Self {
+        Self {
+            message: msg.into(),
+        }
+    }
 }
 
 impl std::fmt::Display for VcsError {
@@ -48,9 +52,13 @@ pub struct VcsRevision(pub String);
 
 impl VcsRevision {
     /// The working-tree pseudo-revision used in UI labels.
-    pub fn working_tree() -> Self { Self("WORKING".into()) }
+    pub fn working_tree() -> Self {
+        Self("WORKING".into())
+    }
     /// HEAD — the current commit.
-    pub fn head() -> Self { Self("HEAD".into()) }
+    pub fn head() -> Self {
+        Self("HEAD".into())
+    }
 }
 
 impl std::fmt::Display for VcsRevision {
@@ -82,7 +90,7 @@ pub enum VcsFileChange {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VcsFileStatus {
     /// Path relative to the repository root.
-    pub path:   PathBuf,
+    pub path: PathBuf,
     pub change: VcsFileChange,
 }
 
@@ -101,12 +109,14 @@ pub trait VcsProvider: Send + Sync {
 
     /// Read the content of `path` (relative to repo root) at `rev`.
     /// Returns raw bytes; the caller decodes them through `load_path`.
-    fn read_revision_file(&self, rev: &VcsRevision, path: &Path)
-        -> Result<Vec<u8>, VcsError>;
+    fn read_revision_file(&self, rev: &VcsRevision, path: &Path) -> Result<Vec<u8>, VcsError>;
 
     /// Find the common ancestor of `left` and `right`.
-    fn merge_base(&self, left: &VcsRevision, right: &VcsRevision)
-        -> Result<Option<VcsRevision>, VcsError>;
+    fn merge_base(
+        &self,
+        left: &VcsRevision,
+        right: &VcsRevision,
+    ) -> Result<Option<VcsRevision>, VcsError>;
 }
 
 // ── Git provider ──────────────────────────────────────────────────────────────
@@ -151,15 +161,21 @@ impl GitProvider {
 }
 
 impl VcsProvider for GitProvider {
-    fn root(&self) -> &Path { &self.root }
-    fn system_name(&self) -> &'static str { "git" }
+    fn root(&self) -> &Path {
+        &self.root
+    }
+    fn system_name(&self) -> &'static str {
+        "git"
+    }
 
     fn status(&self) -> Result<Vec<VcsFileStatus>, VcsError> {
         let output = self.git(&["status", "--porcelain", "-u"])?;
         let mut result = Vec::new();
         for line in output.lines() {
-            if line.len() < 3 { continue; }
-            let xy    = &line[..2];
+            if line.len() < 3 {
+                continue;
+            }
+            let xy = &line[..2];
             let path_part = &line[3..];
             let change = parse_porcelain_status(xy, path_part);
             let path = PathBuf::from(path_part.trim_matches('"'));
@@ -183,9 +199,11 @@ impl VcsProvider for GitProvider {
         }
     }
 
-    fn merge_base(&self, left: &VcsRevision, right: &VcsRevision)
-        -> Result<Option<VcsRevision>, VcsError>
-    {
+    fn merge_base(
+        &self,
+        left: &VcsRevision,
+        right: &VcsRevision,
+    ) -> Result<Option<VcsRevision>, VcsError> {
         match self.git(&["merge-base", &left.0, &right.0]) {
             Ok(out) => {
                 let hash = out.trim().to_string();
@@ -195,8 +213,9 @@ impl VcsProvider for GitProvider {
                     Ok(Some(VcsRevision(hash)))
                 }
             }
-            Err(e) if e.message.contains("not a valid object name")
-                   || e.message.contains("no merge base") =>
+            Err(e)
+                if e.message.contains("not a valid object name")
+                    || e.message.contains("no merge base") =>
             {
                 Ok(None)
             }
@@ -246,11 +265,11 @@ fn parse_porcelain_status(xy: &str, path: &str) -> VcsFileChange {
     // XY: X = index status, Y = working-tree status.
     // For conflict detection: 'U', 'A'/'A', 'D'/'D', etc.
     match xy {
-        "DD" | "AU" | "UD" | "UA" | "DU" | "AA" | "UU" =>
-            VcsFileChange::Conflicted,
+        "DD" | "AU" | "UD" | "UA" | "DU" | "AA" | "UU" => VcsFileChange::Conflicted,
         xy if xy.starts_with('R') || xy.ends_with('R') => {
             // Rename: path field is "new -> old" or just new.
-            let from = path.find(" -> ")
+            let from = path
+                .find(" -> ")
                 .map(|i| PathBuf::from(&path[i + 4..]))
                 .unwrap_or_default();
             VcsFileChange::Renamed { from }

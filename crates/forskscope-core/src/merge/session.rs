@@ -108,13 +108,13 @@ impl MergeSession {
     /// equal or already-applied hunk is a no-op error so the UI cannot
     /// silently double-apply.
     pub fn apply_left_to_right(&mut self, hunk_id: HunkId) -> Result<()> {
-        let hunk = self
-            .hunks
-            .iter_mut()
-            .find(|h| h.hunk_id == hunk_id)
-            .ok_or(CoreError::Conflict {
-                message: "unknown or stale hunk id".into(),
-            })?;
+        let hunk =
+            self.hunks
+                .iter_mut()
+                .find(|h| h.hunk_id == hunk_id)
+                .ok_or(CoreError::Conflict {
+                    message: "unknown or stale hunk id".into(),
+                })?;
         if !hunk.is_pending_change() {
             return Err(CoreError::Conflict {
                 message: "hunk has no pending change".into(),

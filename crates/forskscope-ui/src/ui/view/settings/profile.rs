@@ -10,11 +10,13 @@ use crate::state::Store;
 pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
-    let mut name        = use_signal(String::new);
-    #[allow(unused_mut)] let mut ignore_ws   = use_signal(|| false);
-    #[allow(unused_mut)] let mut ignore_case = use_signal(|| false);
-    #[allow(unused_mut)] let mut algorithm: Signal<crate::state::DiffAlgorithmSetting> =
-        use_signal(Default::default);
+    let mut name = use_signal(String::new);
+    #[allow(unused_mut)]
+    let mut ignore_ws = use_signal(|| false);
+    #[allow(unused_mut)]
+    let mut ignore_case = use_signal(|| false);
+    #[allow(unused_mut)]
+    let mut algorithm: Signal<crate::state::DiffAlgorithmSetting> = use_signal(Default::default);
 
     rsx! {
         div { class: "add-profile-form",

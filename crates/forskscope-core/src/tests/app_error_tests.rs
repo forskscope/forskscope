@@ -8,27 +8,42 @@ use crate::error::{
 
 #[test]
 fn path_not_found_is_recoverable() {
-    assert_eq!(AppErrorKind::PathNotFound.default_severity(), ErrorSeverity::Recoverable);
+    assert_eq!(
+        AppErrorKind::PathNotFound.default_severity(),
+        ErrorSeverity::Recoverable
+    );
 }
 
 #[test]
 fn file_write_failed_is_blocking() {
-    assert_eq!(AppErrorKind::FileWriteFailed.default_severity(), ErrorSeverity::Blocking);
+    assert_eq!(
+        AppErrorKind::FileWriteFailed.default_severity(),
+        ErrorSeverity::Blocking
+    );
 }
 
 #[test]
 fn decode_lossy_is_warning() {
-    assert_eq!(AppErrorKind::DecodeLossy.default_severity(), ErrorSeverity::Warning);
+    assert_eq!(
+        AppErrorKind::DecodeLossy.default_severity(),
+        ErrorSeverity::Warning
+    );
 }
 
 #[test]
 fn internal_fault_is_blocking() {
-    assert_eq!(AppErrorKind::InternalFault.default_severity(), ErrorSeverity::Blocking);
+    assert_eq!(
+        AppErrorKind::InternalFault.default_severity(),
+        ErrorSeverity::Blocking
+    );
 }
 
 #[test]
 fn background_job_cancelled_is_warning() {
-    assert_eq!(AppErrorKind::BackgroundJobCancelled.default_severity(), ErrorSeverity::Warning);
+    assert_eq!(
+        AppErrorKind::BackgroundJobCancelled.default_severity(),
+        ErrorSeverity::Warning
+    );
 }
 
 // ── AppErrorKind::default_recovery_actions ───────────────────────────────────
@@ -36,8 +51,10 @@ fn background_job_cancelled_is_warning() {
 #[test]
 fn path_not_found_offers_choose_another_file() {
     let actions = AppErrorKind::PathNotFound.default_recovery_actions();
-    assert!(actions.contains(&RecoveryAction::ChooseAnotherFile),
-        "PathNotFound must offer ChooseAnotherFile");
+    assert!(
+        actions.contains(&RecoveryAction::ChooseAnotherFile),
+        "PathNotFound must offer ChooseAnotherFile"
+    );
 }
 
 #[test]
@@ -76,31 +93,50 @@ fn session_too_new_offers_start_fresh() {
 
 #[test]
 fn io_read_maps_to_file_read_failed() {
-    let err = CoreError::Io { path: None, operation: IoOperation::Read, message: "err".into() };
+    let err = CoreError::Io {
+        path: None,
+        operation: IoOperation::Read,
+        message: "err".into(),
+    };
     assert_eq!(AppErrorKind::from_core(&err), AppErrorKind::FileReadFailed);
 }
 
 #[test]
 fn io_write_maps_to_file_write_failed() {
-    let err = CoreError::Io { path: None, operation: IoOperation::Write, message: "err".into() };
+    let err = CoreError::Io {
+        path: None,
+        operation: IoOperation::Write,
+        message: "err".into(),
+    };
     assert_eq!(AppErrorKind::from_core(&err), AppErrorKind::FileWriteFailed);
 }
 
 #[test]
 fn io_backup_maps_to_backup_failed() {
-    let err = CoreError::Io { path: None, operation: IoOperation::CreateBackup, message: "err".into() };
+    let err = CoreError::Io {
+        path: None,
+        operation: IoOperation::CreateBackup,
+        message: "err".into(),
+    };
     assert_eq!(AppErrorKind::from_core(&err), AppErrorKind::BackupFailed);
 }
 
 #[test]
 fn conflict_maps_to_external_modification_detected() {
-    let err = CoreError::Conflict { message: "changed".into() };
-    assert_eq!(AppErrorKind::from_core(&err), AppErrorKind::ExternalModificationDetected);
+    let err = CoreError::Conflict {
+        message: "changed".into(),
+    };
+    assert_eq!(
+        AppErrorKind::from_core(&err),
+        AppErrorKind::ExternalModificationDetected
+    );
 }
 
 #[test]
 fn internal_invariant_maps_to_internal_fault() {
-    let err = CoreError::InternalInvariant { message: "bug".into() };
+    let err = CoreError::InternalInvariant {
+        message: "bug".into(),
+    };
     assert_eq!(AppErrorKind::from_core(&err), AppErrorKind::InternalFault);
 }
 
@@ -110,15 +146,24 @@ fn internal_invariant_maps_to_internal_fault() {
 fn all_recovery_action_tokens_are_non_empty_and_unique() {
     use std::collections::HashSet;
     let actions = [
-        RecoveryAction::Dismiss, RecoveryAction::ChooseAnotherFile,
-        RecoveryAction::Reload, RecoveryAction::SaveAs,
-        RecoveryAction::OverwriteAnyway, RecoveryAction::OpenLimitedDiff,
-        RecoveryAction::OpenAsBinary, RecoveryAction::Retry,
-        RecoveryAction::RetryWithoutInline, RecoveryAction::Cancel,
-        RecoveryAction::StartFresh, RecoveryAction::ReportBug,
+        RecoveryAction::Dismiss,
+        RecoveryAction::ChooseAnotherFile,
+        RecoveryAction::Reload,
+        RecoveryAction::SaveAs,
+        RecoveryAction::OverwriteAnyway,
+        RecoveryAction::OpenLimitedDiff,
+        RecoveryAction::OpenAsBinary,
+        RecoveryAction::Retry,
+        RecoveryAction::RetryWithoutInline,
+        RecoveryAction::Cancel,
+        RecoveryAction::StartFresh,
+        RecoveryAction::ReportBug,
     ];
     let tokens: Vec<&str> = actions.iter().map(|a| a.token()).collect();
-    assert!(tokens.iter().all(|t| !t.is_empty()), "all tokens must be non-empty");
+    assert!(
+        tokens.iter().all(|t| !t.is_empty()),
+        "all tokens must be non-empty"
+    );
     let unique: HashSet<&&str> = tokens.iter().collect();
     assert_eq!(unique.len(), tokens.len(), "all tokens must be unique");
 }
@@ -151,23 +196,38 @@ fn user_message_short_only_has_empty_detail() {
 #[test]
 fn for_kind_produces_non_empty_short_for_all_variants() {
     let all = [
-        AppErrorKind::PathNotFound, AppErrorKind::PathNotFile,
-        AppErrorKind::PathNotDirectory, AppErrorKind::PermissionDenied,
-        AppErrorKind::SymlinkUnsupported, AppErrorKind::FileReadFailed,
-        AppErrorKind::FileWriteFailed, AppErrorKind::EncodingDetectionFailed,
-        AppErrorKind::DecodeLossy, AppErrorKind::BinaryNotComparable,
-        AppErrorKind::FileTooLarge, AppErrorKind::DiffFailed,
-        AppErrorKind::InlineDiffTooLarge, AppErrorKind::SaveConflict,
-        AppErrorKind::ExternalModificationDetected, AppErrorKind::BackupFailed,
-        AppErrorKind::BackgroundJobFailed, AppErrorKind::BackgroundJobCancelled,
-        AppErrorKind::SessionTooNew, AppErrorKind::SessionCorrupted,
-        AppErrorKind::VcsUnavailable, AppErrorKind::VcsCommandFailed,
-        AppErrorKind::SpreadsheetReadFailed, AppErrorKind::EncryptedWorkbook,
+        AppErrorKind::PathNotFound,
+        AppErrorKind::PathNotFile,
+        AppErrorKind::PathNotDirectory,
+        AppErrorKind::PermissionDenied,
+        AppErrorKind::SymlinkUnsupported,
+        AppErrorKind::FileReadFailed,
+        AppErrorKind::FileWriteFailed,
+        AppErrorKind::EncodingDetectionFailed,
+        AppErrorKind::DecodeLossy,
+        AppErrorKind::BinaryNotComparable,
+        AppErrorKind::FileTooLarge,
+        AppErrorKind::DiffFailed,
+        AppErrorKind::InlineDiffTooLarge,
+        AppErrorKind::SaveConflict,
+        AppErrorKind::ExternalModificationDetected,
+        AppErrorKind::BackupFailed,
+        AppErrorKind::BackgroundJobFailed,
+        AppErrorKind::BackgroundJobCancelled,
+        AppErrorKind::SessionTooNew,
+        AppErrorKind::SessionCorrupted,
+        AppErrorKind::VcsUnavailable,
+        AppErrorKind::VcsCommandFailed,
+        AppErrorKind::SpreadsheetReadFailed,
+        AppErrorKind::EncryptedWorkbook,
         AppErrorKind::InternalFault,
     ];
     for kind in all {
         let msg = UserMessage::for_kind(kind);
-        assert!(!msg.short.is_empty(), "{kind:?} must have a non-empty short message");
+        assert!(
+            !msg.short.is_empty(),
+            "{kind:?} must have a non-empty short message"
+        );
     }
 }
 
@@ -189,10 +249,16 @@ fn app_error_from_core_io_read_has_expected_kind_and_recovery() {
 
 #[test]
 fn app_error_from_core_conflict_has_external_modification_kind() {
-    let core_err = CoreError::Conflict { message: "file changed".into() };
-    let app_err  = crate::error::AppError::from_core(&core_err);
+    let core_err = CoreError::Conflict {
+        message: "file changed".into(),
+    };
+    let app_err = crate::error::AppError::from_core(&core_err);
     assert_eq!(app_err.kind, AppErrorKind::ExternalModificationDetected);
-    assert!(app_err.recovery.contains(&crate::error::RecoveryAction::Reload));
+    assert!(
+        app_err
+            .recovery
+            .contains(&crate::error::RecoveryAction::Reload)
+    );
 }
 
 #[test]
@@ -200,7 +266,11 @@ fn app_error_new_builds_from_kind_directly() {
     let app_err = crate::error::AppError::new(AppErrorKind::FileTooLarge, "84 MB");
     assert_eq!(app_err.kind, AppErrorKind::FileTooLarge);
     assert!(app_err.technical.detail.contains("84 MB"));
-    assert!(app_err.recovery.contains(&crate::error::RecoveryAction::OpenLimitedDiff));
+    assert!(
+        app_err
+            .recovery
+            .contains(&crate::error::RecoveryAction::OpenLimitedDiff)
+    );
 }
 
 #[test]
@@ -218,8 +288,10 @@ fn app_error_is_not_blocking_for_recoverable_severity() {
 #[test]
 fn app_error_is_recoverable_when_non_dismiss_actions_exist() {
     let app_err = crate::error::AppError::new(AppErrorKind::SaveConflict, "changed");
-    assert!(app_err.is_recoverable(),
-        "SaveConflict must offer non-dismiss recovery actions");
+    assert!(
+        app_err.is_recoverable(),
+        "SaveConflict must offer non-dismiss recovery actions"
+    );
 }
 
 #[test]

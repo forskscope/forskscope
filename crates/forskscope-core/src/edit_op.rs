@@ -36,8 +36,12 @@ use std::time::SystemTime;
 pub struct DocumentId(pub String);
 
 impl DocumentId {
-    pub fn new(id: impl Into<String>) -> Self { Self(id.into()) }
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 /// Monotonically increasing document revision.
@@ -47,9 +51,15 @@ impl DocumentId {
 pub struct RevisionId(pub u64);
 
 impl RevisionId {
-    pub fn initial() -> Self { Self(0) }
-    pub fn next(self) -> Self { Self(self.0 + 1) }
-    pub fn is_initial(self) -> bool { self.0 == 0 }
+    pub fn initial() -> Self {
+        Self(0)
+    }
+    pub fn next(self) -> Self {
+        Self(self.0 + 1)
+    }
+    pub fn is_initial(self) -> bool {
+        self.0 == 0
+    }
 }
 
 /// A unique identifier for one edit transaction.
@@ -57,7 +67,9 @@ impl RevisionId {
 pub struct TransactionId(pub String);
 
 impl TransactionId {
-    pub fn new(id: impl Into<String>) -> Self { Self(id.into()) }
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
 }
 
 // ── Position types ────────────────────────────────────────────────────────────
@@ -70,21 +82,28 @@ impl TransactionId {
 pub struct TextOffset(pub usize);
 
 impl TextOffset {
-    pub fn zero() -> Self { Self(0) }
-    pub fn as_usize(self) -> usize { self.0 }
+    pub fn zero() -> Self {
+        Self(0)
+    }
+    pub fn as_usize(self) -> usize {
+        self.0
+    }
 }
 
 /// A byte-range within a document (start inclusive, end exclusive).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextRange {
     pub start: TextOffset,
-    pub end:   TextOffset,
+    pub end: TextOffset,
 }
 
 impl TextRange {
     pub fn new(start: usize, end: usize) -> Self {
         debug_assert!(start <= end, "TextRange start must be ≤ end");
-        Self { start: TextOffset(start), end: TextOffset(end) }
+        Self {
+            start: TextOffset(start),
+            end: TextOffset(end),
+        }
     }
 
     pub fn empty_at(offset: usize) -> Self {
@@ -95,7 +114,9 @@ impl TextRange {
         self.end.0.saturating_sub(self.start.0)
     }
 
-    pub fn is_empty(self) -> bool { self.start == self.end }
+    pub fn is_empty(self) -> bool {
+        self.start == self.end
+    }
 
     /// `true` when `offset` falls within this range (start inclusive, end exclusive).
     pub fn contains(self, offset: TextOffset) -> bool {
@@ -118,39 +139,39 @@ impl TextRange {
 pub enum TextEditOperation {
     /// Insert `text` at `offset`.
     Insert {
-        document:      DocumentId,
+        document: DocumentId,
         base_revision: RevisionId,
-        offset:        TextOffset,
-        text:          String,
+        offset: TextOffset,
+        text: String,
     },
     /// Delete the text in `range`.
     Delete {
-        document:      DocumentId,
+        document: DocumentId,
         base_revision: RevisionId,
-        range:         TextRange,
+        range: TextRange,
     },
     /// Replace the text in `range` with `text`.
     Replace {
-        document:      DocumentId,
+        document: DocumentId,
         base_revision: RevisionId,
-        range:         TextRange,
-        text:          String,
+        range: TextRange,
+        text: String,
     },
 }
 
 impl TextEditOperation {
     pub fn document_id(&self) -> &DocumentId {
         match self {
-            Self::Insert { document, .. }  => document,
-            Self::Delete { document, .. }  => document,
+            Self::Insert { document, .. } => document,
+            Self::Delete { document, .. } => document,
             Self::Replace { document, .. } => document,
         }
     }
 
     pub fn base_revision(&self) -> RevisionId {
         match self {
-            Self::Insert { base_revision, .. }  => *base_revision,
-            Self::Delete { base_revision, .. }  => *base_revision,
+            Self::Insert { base_revision, .. } => *base_revision,
+            Self::Delete { base_revision, .. } => *base_revision,
             Self::Replace { base_revision, .. } => *base_revision,
         }
     }
@@ -159,7 +180,7 @@ impl TextEditOperation {
     pub fn affected_range(&self) -> TextRange {
         match self {
             Self::Insert { offset, .. } => TextRange::empty_at(offset.0),
-            Self::Delete { range, .. }  => *range,
+            Self::Delete { range, .. } => *range,
             Self::Replace { range, .. } => *range,
         }
     }
@@ -188,10 +209,10 @@ impl TextEditOperation {
 /// Core's acceptance response to a [`TextEditOperation`] (RFC-032 §"Operation Rules").
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OperationAck {
-    pub document:        DocumentId,
-    pub new_revision:    RevisionId,
+    pub document: DocumentId,
+    pub new_revision: RevisionId,
     /// The range that changed in the *post-edit* text.
-    pub affected_range:  TextRange,
+    pub affected_range: TextRange,
     /// `true` when the edit changes content that the current diff was computed
     /// from, so the UI should schedule a diff recomputation.
     pub diff_invalidated: bool,
@@ -200,10 +221,10 @@ pub struct OperationAck {
 /// Core's rejection response — the editor must reconcile with `current_revision`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OperationReject {
-    pub document:         DocumentId,
+    pub document: DocumentId,
     pub submitted_revision: RevisionId,
-    pub current_revision:   RevisionId,
-    pub reason:           RejectReason,
+    pub current_revision: RevisionId,
+    pub reason: RejectReason,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -227,15 +248,29 @@ pub type OperationResult = Result<OperationAck, OperationReject>;
 pub struct TransactionLabel(pub String);
 
 impl TransactionLabel {
-    pub fn new(label: impl Into<String>) -> Self { Self(label.into()) }
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn new(label: impl Into<String>) -> Self {
+        Self(label.into())
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 
     // ── Well-known labels ──────────────────────────────────────────────────
-    pub fn merge_hunk_left_to_right() -> Self { Self::new("Apply hunk left to right") }
-    pub fn merge_hunk_right_to_left() -> Self { Self::new("Apply hunk right to left") }
-    pub fn manual_edit() -> Self { Self::new("Edit") }
-    pub fn paste() -> Self { Self::new("Paste") }
-    pub fn delete_selection() -> Self { Self::new("Delete") }
+    pub fn merge_hunk_left_to_right() -> Self {
+        Self::new("Apply hunk left to right")
+    }
+    pub fn merge_hunk_right_to_left() -> Self {
+        Self::new("Apply hunk right to left")
+    }
+    pub fn manual_edit() -> Self {
+        Self::new("Edit")
+    }
+    pub fn paste() -> Self {
+        Self::new("Paste")
+    }
+    pub fn delete_selection() -> Self {
+        Self::new("Delete")
+    }
 }
 
 /// A group of operations that form a single undo unit (RFC-032 §"Transaction Model").
@@ -244,32 +279,39 @@ impl TransactionLabel {
 /// remains consistent across user text edits and merge actions.
 #[derive(Debug, Clone)]
 pub struct EditTransaction {
-    pub id:         TransactionId,
-    pub label:      TransactionLabel,
+    pub id: TransactionId,
+    pub label: TransactionLabel,
     pub operations: Vec<TextEditOperation>,
     /// The inverse operations that undo this transaction, in reverse order.
-    pub inverse:    Vec<TextEditOperation>,
-    pub timestamp:  SystemTime,
+    pub inverse: Vec<TextEditOperation>,
+    pub timestamp: SystemTime,
 }
 
 impl EditTransaction {
     pub fn new(
-        id:         TransactionId,
-        label:      TransactionLabel,
+        id: TransactionId,
+        label: TransactionLabel,
         operations: Vec<TextEditOperation>,
-        inverse:    Vec<TextEditOperation>,
+        inverse: Vec<TextEditOperation>,
     ) -> Self {
         Self {
-            id, label, operations, inverse,
+            id,
+            label,
+            operations,
+            inverse,
             timestamp: SystemTime::now(),
         }
     }
 
     /// `true` when this transaction contains at least one operation.
-    pub fn is_empty(&self) -> bool { self.operations.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.operations.is_empty()
+    }
 
     /// `true` when this transaction can be undone (has inverse operations).
-    pub fn is_reversible(&self) -> bool { !self.inverse.is_empty() }
+    pub fn is_reversible(&self) -> bool {
+        !self.inverse.is_empty()
+    }
 }
 
 // ── Revision compatibility check ──────────────────────────────────────────────

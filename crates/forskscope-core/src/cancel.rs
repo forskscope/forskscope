@@ -10,8 +10,8 @@
 //! blocking loops. Async cancellation (e.g. `tokio_util::CancellationToken`)
 //! is a UI-layer concern and is intentionally not introduced into core.
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// A cloneable cancellation signal for blocking operations.
 ///

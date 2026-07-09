@@ -21,7 +21,8 @@ fn session_manager() -> ConfigManager<SessionState> {
 /// Persist the current open tabs for restoration on next launch.
 pub fn save_session(store: &Store) {
     let tabs = store.tabs.read();
-    let saved: Vec<(String, String)> = tabs.iter()
+    let saved: Vec<(String, String)> = tabs
+        .iter()
         .filter_map(|tab| {
             let l = tab.left_path.as_ref()?.display().to_string();
             let r = tab.right_path.as_ref()?.display().to_string();
@@ -48,13 +49,15 @@ pub fn restore_session(store: &mut Store) {
 /// (or the Explorer) remains visible.
 pub fn close_tab(store: &mut Store, index: usize) {
     store.tabs.write().remove(index);
-    let len        = store.tabs.read().len();
-    let new_active = if len == 0 { None } else { Some(index.min(len - 1)) };
+    let len = store.tabs.read().len();
+    let new_active = if len == 0 {
+        None
+    } else {
+        Some(index.min(len - 1))
+    };
     store.active.set(new_active);
     save_session(store);
 }
-
-
 
 #[cfg(test)]
 mod tests;

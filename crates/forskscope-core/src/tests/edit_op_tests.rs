@@ -2,9 +2,8 @@
 //! §"Transaction Model", §"Core Types").
 
 use crate::edit_op::{
-    DocumentId, EditTransaction, OperationReject, RejectReason, RevisionId,
-    TextEditOperation, TextOffset, TextRange, TransactionId, TransactionLabel,
-    is_revision_compatible,
+    DocumentId, EditTransaction, OperationReject, RejectReason, RevisionId, TextEditOperation,
+    TextOffset, TextRange, TransactionId, TransactionLabel, is_revision_compatible,
 };
 
 // ── RevisionId ────────────────────────────────────────────────────────────────
@@ -44,8 +43,8 @@ fn text_range_is_empty_when_start_equals_end() {
 #[test]
 fn text_range_contains_start_but_not_end() {
     let r = TextRange::new(3, 7);
-    assert!( r.contains(TextOffset(3)));
-    assert!( r.contains(TextOffset(6)));
+    assert!(r.contains(TextOffset(3)));
+    assert!(r.contains(TextOffset(6)));
     assert!(!r.contains(TextOffset(7)), "end is exclusive");
     assert!(!r.contains(TextOffset(2)));
 }
@@ -67,16 +66,20 @@ fn text_range_does_not_overlap_adjacent_ranges() {
 
 // ── TextEditOperation ─────────────────────────────────────────────────────────
 
-fn doc() -> DocumentId { DocumentId::new("doc-1") }
-fn rev(n: u64) -> RevisionId { RevisionId(n) }
+fn doc() -> DocumentId {
+    DocumentId::new("doc-1")
+}
+fn rev(n: u64) -> RevisionId {
+    RevisionId(n)
+}
 
 #[test]
 fn insert_op_document_id_and_base_revision() {
     let op = TextEditOperation::Insert {
-        document:      doc(),
+        document: doc(),
         base_revision: rev(5),
-        offset:        TextOffset(10),
-        text:          "hello".into(),
+        offset: TextOffset(10),
+        text: "hello".into(),
     };
     assert_eq!(op.document_id(), &doc());
     assert_eq!(op.base_revision(), rev(5));
@@ -86,7 +89,7 @@ fn insert_op_document_id_and_base_revision() {
 fn delete_op_affected_range_matches_range() {
     let range = TextRange::new(4, 9);
     let op = TextEditOperation::Delete {
-        document:      doc(),
+        document: doc(),
         base_revision: rev(2),
         range,
     };
@@ -97,10 +100,10 @@ fn delete_op_affected_range_matches_range() {
 fn replace_op_affected_range_matches_range() {
     let range = TextRange::new(1, 6);
     let op = TextEditOperation::Replace {
-        document:      doc(),
+        document: doc(),
         base_revision: rev(0),
         range,
-        text:          "world".into(),
+        text: "world".into(),
     };
     assert_eq!(op.affected_range(), range);
 }
@@ -108,10 +111,10 @@ fn replace_op_affected_range_matches_range() {
 #[test]
 fn insert_op_affected_range_is_empty_at_offset() {
     let op = TextEditOperation::Insert {
-        document:      doc(),
+        document: doc(),
         base_revision: rev(1),
-        offset:        TextOffset(7),
-        text:          "x".into(),
+        offset: TextOffset(7),
+        text: "x".into(),
     };
     assert!(op.affected_range().is_empty());
     assert_eq!(op.affected_range().start.0, 7);
@@ -120,8 +123,10 @@ fn insert_op_affected_range_is_empty_at_offset() {
 #[test]
 fn insert_inserts_text_returns_true() {
     let op = TextEditOperation::Insert {
-        document: doc(), base_revision: rev(0),
-        offset: TextOffset(0), text: "a".into(),
+        document: doc(),
+        base_revision: rev(0),
+        offset: TextOffset(0),
+        text: "a".into(),
     };
     assert!(op.inserts_text());
     assert!(!op.deletes_text());
@@ -130,7 +135,8 @@ fn insert_inserts_text_returns_true() {
 #[test]
 fn delete_deletes_text_returns_true() {
     let op = TextEditOperation::Delete {
-        document: doc(), base_revision: rev(0),
+        document: doc(),
+        base_revision: rev(0),
         range: TextRange::new(0, 3),
     };
     assert!(op.deletes_text());
@@ -140,8 +146,10 @@ fn delete_deletes_text_returns_true() {
 #[test]
 fn replace_both_inserts_and_deletes() {
     let op = TextEditOperation::Replace {
-        document: doc(), base_revision: rev(0),
-        range: TextRange::new(0, 5), text: "new".into(),
+        document: doc(),
+        base_revision: rev(0),
+        range: TextRange::new(0, 5),
+        text: "new".into(),
     };
     assert!(op.inserts_text());
     assert!(op.deletes_text());
@@ -150,8 +158,10 @@ fn replace_both_inserts_and_deletes() {
 #[test]
 fn replace_with_empty_text_only_deletes() {
     let op = TextEditOperation::Replace {
-        document: doc(), base_revision: rev(0),
-        range: TextRange::new(0, 3), text: String::new(),
+        document: doc(),
+        base_revision: rev(0),
+        range: TextRange::new(0, 3),
+        text: String::new(),
     };
     assert!(!op.inserts_text());
     assert!(op.deletes_text());
@@ -176,10 +186,10 @@ fn stale_revision_is_not_compatible() {
 #[test]
 fn stale_revision_reject_has_correct_reason() {
     let reject = OperationReject {
-        document:           doc(),
+        document: doc(),
         submitted_revision: rev(3),
-        current_revision:   rev(5),
-        reason:             RejectReason::StaleRevision,
+        current_revision: rev(5),
+        reason: RejectReason::StaleRevision,
     };
     assert_eq!(reject.reason, RejectReason::StaleRevision);
     assert_eq!(reject.current_revision, rev(5));
@@ -217,11 +227,14 @@ fn empty_transaction_is_empty_and_not_reversible_without_inverse() {
 #[test]
 fn transaction_with_operations_and_inverse_is_reversible() {
     let op = TextEditOperation::Insert {
-        document: doc(), base_revision: rev(0),
-        offset: TextOffset(0), text: "hello".into(),
+        document: doc(),
+        base_revision: rev(0),
+        offset: TextOffset(0),
+        text: "hello".into(),
     };
     let inverse = TextEditOperation::Delete {
-        document: doc(), base_revision: rev(1),
+        document: doc(),
+        base_revision: rev(1),
         range: TextRange::new(0, 5),
     };
     let tx = EditTransaction::new(

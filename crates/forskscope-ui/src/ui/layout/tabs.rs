@@ -3,16 +3,16 @@
 use dioxus::prelude::*;
 
 use crate::i18n::t;
-use crate::state::{Modal, Store, close_tab, close_dir_tab};
+use crate::state::{Modal, Store, close_dir_tab, close_tab};
 
 #[component]
 pub fn TabBar() -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     let active_file = *store.active.read();
-    let active_dir  = *store.active_dir.read();
+    let active_dir = *store.active_dir.read();
     let file_count = store.tabs.read().len();
-    let dir_count  = store.dir_tabs.read().len();
+    let dir_count = store.dir_tabs.read().len();
 
     let explorer_active = active_file.is_none() && active_dir.is_none();
 
@@ -51,9 +51,11 @@ fn FileTabItem(index: usize, is_active: bool) -> Element {
 
     let (title, is_dirty, is_loading) = {
         let tabs = store.tabs.read();
-        let Some(tab) = tabs.get(index) else { return rsx!{} };
-        let dirty    = tab.can_save && tab.merge.is_dirty();
-        let loading  = tab.state == crate::state::TabState::Loading;
+        let Some(tab) = tabs.get(index) else {
+            return rsx! {};
+        };
+        let dirty = tab.can_save && tab.merge.is_dirty();
+        let loading = tab.state == crate::state::TabState::Loading;
         (tab.title.clone(), dirty, loading)
     };
 
@@ -100,10 +102,22 @@ fn DirTabItem(index: usize, is_active: bool) -> Element {
 
     let title = {
         let tabs = store.dir_tabs.read();
-        let Some((l, r)) = tabs.get(index) else { return rsx!{} };
-        let ln = l.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-        let rn = r.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-        if ln == rn { ln } else { format!("{ln} ↔ {rn}") }
+        let Some((l, r)) = tabs.get(index) else {
+            return rsx! {};
+        };
+        let ln = l
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let rn = r
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if ln == rn {
+            ln
+        } else {
+            format!("{ln} ↔ {rn}")
+        }
     };
 
     let class = if is_active { "tab active" } else { "tab" };

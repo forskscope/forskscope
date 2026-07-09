@@ -4,11 +4,13 @@
 use std::path::PathBuf;
 
 use crate::watcher::{
-    FileChangeEvent, FileChangeKind, FileChangeMonitor, MockFileChangeMonitor,
-    WatchError, WatchToken,
+    FileChangeEvent, FileChangeKind, FileChangeMonitor, MockFileChangeMonitor, WatchError,
+    WatchToken,
 };
 
-fn path(s: &str) -> PathBuf { PathBuf::from(s) }
+fn path(s: &str) -> PathBuf {
+    PathBuf::from(s)
+}
 
 // ── MockFileChangeMonitor basic operation ─────────────────────────────────────
 
@@ -51,7 +53,10 @@ fn poll_events_drains_the_queue() {
     let token = m.watch(&path("/f.rs")).unwrap();
     m.inject_event(token, path("/f.rs"), FileChangeKind::Modified);
     let _ = m.poll_events(); // drain
-    assert!(m.poll_events().is_empty(), "second poll must return empty after drain");
+    assert!(
+        m.poll_events().is_empty(),
+        "second poll must return empty after drain"
+    );
 }
 
 #[test]
@@ -79,7 +84,11 @@ fn unwatch_unknown_token_is_noop() {
     let mut m = MockFileChangeMonitor::new();
     let _ = m.watch(&path("/a.rs")).unwrap();
     m.unwatch(WatchToken(999)); // unknown token — must not panic
-    assert_eq!(m.watched_paths().len(), 1, "valid watch must not be removed");
+    assert_eq!(
+        m.watched_paths().len(),
+        1,
+        "valid watch must not be removed"
+    );
 }
 
 #[test]
@@ -96,11 +105,11 @@ fn watch_on_inactive_monitor_returns_error() {
 #[test]
 fn file_change_event_stores_all_fields() {
     let token = WatchToken(42);
-    let p     = path("/src/lib.rs");
+    let p = path("/src/lib.rs");
     let event = FileChangeEvent::new(token, p.clone(), FileChangeKind::Renamed);
     assert_eq!(event.token, token);
-    assert_eq!(event.path,  p);
-    assert_eq!(event.kind,  FileChangeKind::Renamed);
+    assert_eq!(event.path, p);
+    assert_eq!(event.kind, FileChangeKind::Renamed);
 }
 
 // ── FileChangeKind exhaustiveness ─────────────────────────────────────────────
@@ -130,7 +139,10 @@ fn watch_error_display_is_non_empty_for_all_variants() {
         WatchError::Other("unexpected".into()),
     ];
     for e in &errors {
-        assert!(!e.to_string().is_empty(), "{e:?} must have non-empty display");
+        assert!(
+            !e.to_string().is_empty(),
+            "{e:?} must have non-empty display"
+        );
     }
 }
 

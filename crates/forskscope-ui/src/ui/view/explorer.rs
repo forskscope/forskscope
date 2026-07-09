@@ -24,8 +24,10 @@ use forskscope_core::dir::file_digest_equal;
 
 use crate::i18n::t;
 use crate::state::Store;
+use crate::ui::view::dir_pane::{
+    DigestState, FilteringExecutor, NavHistory, PathBar, home_dir, short_name,
+};
 use forskscope_ui_logic::compute_aligned_rows;
-use crate::ui::view::dir_pane::{DigestState, FilteringExecutor, NavHistory, PathBar, home_dir, short_name};
 
 use compact::CompactTree;
 use filter::{FilterBar, apply_filter};
@@ -67,21 +69,42 @@ pub enum DigestKey {
 
 /// Which pane currently receives keyboard events (RFC-061).
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum FocusedPane { Left, Right }
+pub enum FocusedPane {
+    Left,
+    Right,
+}
 
 impl FocusedPane {
-    pub fn toggle(self) -> Self { match self { Self::Left => Self::Right, Self::Right => Self::Left } }
-    pub fn is_left(self)  -> bool { self == Self::Left }
-    pub fn is_right(self) -> bool { self == Self::Right }
+    pub fn toggle(self) -> Self {
+        match self {
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
+        }
+    }
+    pub fn is_left(self) -> bool {
+        self == Self::Left
+    }
+    pub fn is_right(self) -> bool {
+        self == Self::Right
+    }
 }
 
 /// A user's pending pick in one pane.
 #[derive(Clone, PartialEq, Eq)]
-pub enum PickKind { File(PathBuf), Dir(PathBuf) }
+pub enum PickKind {
+    File(PathBuf),
+    Dir(PathBuf),
+}
 
 impl PickKind {
-    pub fn path(&self) -> &PathBuf { match self { Self::File(p) | Self::Dir(p) => p } }
-    pub fn is_file(&self) -> bool { matches!(self, Self::File(_)) }
+    pub fn path(&self) -> &PathBuf {
+        match self {
+            Self::File(p) | Self::Dir(p) => p,
+        }
+    }
+    pub fn is_file(&self) -> bool {
+        matches!(self, Self::File(_))
+    }
 }
 
 /// Derived action from the current left + right picks.
@@ -94,10 +117,12 @@ pub enum CompareAction {
 
 pub fn compare_action(lp: &Option<PickKind>, rp: &Option<PickKind>) -> CompareAction {
     match (lp, rp) {
-        (Some(PickKind::File(l)), Some(PickKind::File(r))) =>
-            CompareAction::Files(l.clone(), r.clone()),
-        (Some(PickKind::Dir(l)), Some(PickKind::Dir(r))) =>
-            CompareAction::Dirs(l.clone(), r.clone()),
+        (Some(PickKind::File(l)), Some(PickKind::File(r))) => {
+            CompareAction::Files(l.clone(), r.clone())
+        }
+        (Some(PickKind::Dir(l)), Some(PickKind::Dir(r))) => {
+            CompareAction::Dirs(l.clone(), r.clone())
+        }
         _ => CompareAction::None,
     }
 }
@@ -109,9 +134,9 @@ pub fn Explorer() -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
 
-    let ignore         = store.settings.read().ignore_rules();
+    let ignore = store.settings.read().ignore_rules();
     let binary_enabled = store.settings.read().enable_binary_comparison;
-    let compact_mode   = store.settings.read().explorer_compact;
+    let compact_mode = store.settings.read().explorer_compact;
 
     // Binary sniff cache — cleared on directory change (RFC-066).
     let mut binary_cache: Signal<HashMap<PathBuf, bool>> = use_signal(Default::default);
@@ -119,15 +144,22 @@ pub fn Explorer() -> Element {
     // ── Left pane ─────────────────────────────────────────────────────────────
     let remember = store.settings.read().remember_explorer_dirs;
     let init_l = if remember {
-        store.settings.read().last_left_dir.clone().unwrap_or_else(default_explorer_dir)
+        store
+            .settings
+            .read()
+            .last_left_dir
+            .clone()
+            .unwrap_or_else(default_explorer_dir)
     } else {
         default_explorer_dir()
     };
-    let left_dir:      Signal<PathBuf>    = use_signal(|| init_l.clone());
+    let left_dir: Signal<PathBuf> = use_signal(|| init_l.clone());
     let mut left_hist: Signal<NavHistory> = use_signal(NavHistory::default);
     use_hook(|| left_hist.write().push(init_l.clone()));
 
-    let exec_l = Arc::new(FilteringExecutor { rules: ignore.clone() });
+    let exec_l = Arc::new(FilteringExecutor {
+        rules: ignore.clone(),
+    });
     let mut tree_l: Signal<DirectoryTree> = use_signal(|| DirectoryTree::new(init_l.clone()));
     let scans_l = use_scan_driver(tree_l, exec_l);
 
@@ -135,17 +167,26 @@ pub fn Explorer() -> Element {
         let root = left_dir.read().cloned();
         let mut nt = DirectoryTree::new(root.clone());
         binary_cache.write().clear();
-        if let Some(req) = nt.on_toggled(&root) { tree_l.set(nt); scans_l.send(req); }
-        else { tree_l.set(nt); }
+        if let Some(req) = nt.on_toggled(&root) {
+            tree_l.set(nt);
+            scans_l.send(req);
+        } else {
+            tree_l.set(nt);
+        }
     });
 
     // ── Right pane ────────────────────────────────────────────────────────────
     let init_r = if remember {
-        store.settings.read().last_right_dir.clone().unwrap_or_else(default_explorer_dir)
+        store
+            .settings
+            .read()
+            .last_right_dir
+            .clone()
+            .unwrap_or_else(default_explorer_dir)
     } else {
         default_explorer_dir()
     };
-    let right_dir:      Signal<PathBuf>    = use_signal(|| init_r.clone());
+    let right_dir: Signal<PathBuf> = use_signal(|| init_r.clone());
     let mut right_hist: Signal<NavHistory> = use_signal(NavHistory::default);
     use_hook(|| right_hist.write().push(init_r.clone()));
 
@@ -157,21 +198,28 @@ pub fn Explorer() -> Element {
         let root = right_dir.read().cloned();
         let mut nt = DirectoryTree::new(root.clone());
         binary_cache.write().clear();
-        if let Some(req) = nt.on_toggled(&root) { tree_r.set(nt); scans_r.send(req); }
-        else { tree_r.set(nt); }
+        if let Some(req) = nt.on_toggled(&root) {
+            tree_r.set(nt);
+            scans_r.send(req);
+        } else {
+            tree_r.set(nt);
+        }
     });
 
     // ── Digest map ────────────────────────────────────────────────────────────
-    let mut digest_map:   Signal<HashMap<DigestKey, DigestState>> = use_signal(HashMap::new);
-    let mut digest_roots: Signal<(PathBuf, PathBuf)> = use_signal(|| (PathBuf::new(), PathBuf::new()));
+    let mut digest_map: Signal<HashMap<DigestKey, DigestState>> = use_signal(HashMap::new);
+    let mut digest_roots: Signal<(PathBuf, PathBuf)> =
+        use_signal(|| (PathBuf::new(), PathBuf::new()));
 
     use_effect(move || {
         let l_root = left_dir.read().cloned();
         let r_root = right_dir.read().cloned();
-        if l_root.as_os_str().is_empty() || r_root.as_os_str().is_empty() { return; }
+        if l_root.as_os_str().is_empty() || r_root.as_os_str().is_empty() {
+            return;
+        }
 
         {
-            let roots   = digest_roots.read();
+            let roots = digest_roots.read();
             let changed = roots.0 != l_root || roots.1 != r_root;
             drop(roots);
             if changed {
@@ -180,50 +228,83 @@ pub fn Explorer() -> Element {
             }
         }
 
-        let left_entries: Vec<(PathBuf, bool)> = tree_l.read().visible_rows().into_iter()
+        let left_entries: Vec<(PathBuf, bool)> = tree_l
+            .read()
+            .visible_rows()
+            .into_iter()
             .filter_map(|(n, _)| {
                 let rel = n.path.strip_prefix(&l_root).ok()?.to_path_buf();
-                if rel.as_os_str().is_empty() { return None; }
+                if rel.as_os_str().is_empty() {
+                    return None;
+                }
                 Some((rel, n.is_dir))
             })
             .collect();
 
         for (rel, is_dir) in left_entries {
-            if digest_map.read().contains_key(&DigestKey::Common(rel.clone())) { continue; }
+            if digest_map
+                .read()
+                .contains_key(&DigestKey::Common(rel.clone()))
+            {
+                continue;
+            }
             let cp = r_root.join(&rel);
             if is_dir {
-                let state = if cp.is_dir() { DigestState::Equal } else { DigestState::Unique };
+                let state = if cp.is_dir() {
+                    DigestState::Equal
+                } else {
+                    DigestState::Unique
+                };
                 digest_map.write().insert(DigestKey::Common(rel), state);
             } else {
                 if !cp.is_file() {
-                    digest_map.write().insert(DigestKey::Common(rel.clone()), DigestState::Unique);
+                    digest_map
+                        .write()
+                        .insert(DigestKey::Common(rel.clone()), DigestState::Unique);
                     continue;
                 }
                 let lp = l_root.join(&rel);
                 let key = rel.clone();
                 let mut dmap = digest_map;
-                dmap.write().insert(DigestKey::Common(key.clone()), DigestState::Computing);
+                dmap.write()
+                    .insert(DigestKey::Common(key.clone()), DigestState::Computing);
                 spawn(async move {
                     let eq = tokio::task::spawn_blocking(move || {
                         file_digest_equal(&lp, &cp).unwrap_or(false)
-                    }).await.unwrap_or(false);
-                    dmap.write().insert(DigestKey::Common(key), if eq { DigestState::Equal } else { DigestState::Different });
+                    })
+                    .await
+                    .unwrap_or(false);
+                    dmap.write().insert(
+                        DigestKey::Common(key),
+                        if eq {
+                            DigestState::Equal
+                        } else {
+                            DigestState::Different
+                        },
+                    );
                 });
             }
         }
 
         let r_root2 = right_dir.read().cloned();
         let l_root2 = left_dir.read().cloned();
-        let right_entries: Vec<PathBuf> = tree_r.read().visible_rows().into_iter()
+        let right_entries: Vec<PathBuf> = tree_r
+            .read()
+            .visible_rows()
+            .into_iter()
             .filter_map(|(n, _)| {
                 let rel = n.path.strip_prefix(&r_root2).ok()?.to_path_buf();
-                if rel.as_os_str().is_empty() { return None; }
+                if rel.as_os_str().is_empty() {
+                    return None;
+                }
                 Some(rel)
             })
             .collect();
         for rel in right_entries {
             let key = DigestKey::RightOnly(rel.clone());
-            if digest_map.read().contains_key(&key) { continue; }
+            if digest_map.read().contains_key(&key) {
+                continue;
+            }
             if !l_root2.join(&rel).exists() {
                 digest_map.write().insert(key, DigestState::Unique);
             }
@@ -231,36 +312,52 @@ pub fn Explorer() -> Element {
     });
 
     // ── Filter state ──────────────────────────────────────────────────────────
-    let filter_open:    Signal<bool>   = use_signal(|| false);
-    let filter_query:   Signal<String> = use_signal(String::new);
-    let filter_hide_bin:Signal<bool>   = use_signal(|| false);
-    let filter_hide_eq: Signal<bool>   = use_signal(|| false);
+    let filter_open: Signal<bool> = use_signal(|| false);
+    let filter_query: Signal<String> = use_signal(String::new);
+    let filter_hide_bin: Signal<bool> = use_signal(|| false);
+    let filter_hide_eq: Signal<bool> = use_signal(|| false);
 
     // ── Picks ─────────────────────────────────────────────────────────────────
-    let left_pick:  Signal<Option<PickKind>> = use_signal(|| None);
+    let left_pick: Signal<Option<PickKind>> = use_signal(|| None);
     let right_pick: Signal<Option<PickKind>> = use_signal(|| None);
 
     let mut focused_pane: Signal<FocusedPane> = use_signal(|| FocusedPane::Left);
 
     use_effect(move || {
         let lp = left_pick.read();
-        store.left_pick.set(lp.as_ref().filter(|p| p.is_file()).map(|p| p.path().clone()));
+        store.left_pick.set(
+            lp.as_ref()
+                .filter(|p| p.is_file())
+                .map(|p| p.path().clone()),
+        );
     });
     use_effect(move || {
         let rp = right_pick.read();
-        store.right_pick.set(rp.as_ref().filter(|p| p.is_file()).map(|p| p.path().clone()));
+        store.right_pick.set(
+            rp.as_ref()
+                .filter(|p| p.is_file())
+                .map(|p| p.path().clone()),
+        );
     });
 
     // ── Compute rows ──────────────────────────────────────────────────────────
     let l_root_snap = left_dir.read().cloned();
     let r_root_snap = right_dir.read().cloned();
 
-    let left_flat: Vec<(PathBuf, bool, bool, bool, u32)> = tree_l.read().visible_rows()
-        .into_iter().filter(|(n, _)| n.path != l_root_snap)
-        .map(|(n, d)| (n.path.clone(), n.is_dir, n.is_expanded, n.is_selected, d)).collect();
-    let right_flat: Vec<(PathBuf, bool, bool, bool, u32)> = tree_r.read().visible_rows()
-        .into_iter().filter(|(n, _)| n.path != r_root_snap)
-        .map(|(n, d)| (n.path.clone(), n.is_dir, n.is_expanded, n.is_selected, d)).collect();
+    let left_flat: Vec<(PathBuf, bool, bool, bool, u32)> = tree_l
+        .read()
+        .visible_rows()
+        .into_iter()
+        .filter(|(n, _)| n.path != l_root_snap)
+        .map(|(n, d)| (n.path.clone(), n.is_dir, n.is_expanded, n.is_selected, d))
+        .collect();
+    let right_flat: Vec<(PathBuf, bool, bool, bool, u32)> = tree_r
+        .read()
+        .visible_rows()
+        .into_iter()
+        .filter(|(n, _)| n.path != r_root_snap)
+        .map(|(n, d)| (n.path.clone(), n.is_dir, n.is_expanded, n.is_selected, d))
+        .collect();
 
     let aligned = compute_aligned_rows(&left_flat, &right_flat, &l_root_snap, &r_root_snap);
     let aligned = apply_filter(

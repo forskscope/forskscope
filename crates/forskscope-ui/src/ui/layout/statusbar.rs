@@ -14,9 +14,9 @@ pub fn StatusBar() -> Element {
     let context = active.and_then(|i| {
         let tabs = store.tabs.read();
         tabs.get(i).map(|tab| {
-            let left  = file_name(&tab.left_path);
+            let left = file_name(&tab.left_path);
             let right = file_name(&tab.right_path);
-            let enc   = tab.right_label();
+            let enc = tab.right_label();
             let dirty = tab.can_save && tab.merge.is_dirty();
             let stats = &tab.diff.stats;
             let stat_str = if stats.lines_inserted > 0 || stats.lines_deleted > 0 {

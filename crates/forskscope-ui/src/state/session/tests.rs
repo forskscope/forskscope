@@ -18,7 +18,7 @@ fn session_state_serialises_and_deserialises() {
 #[test]
 fn empty_session_state_round_trips() {
     let state = SessionState::default();
-    let json  = serde_json::to_string(&state).unwrap();
+    let json = serde_json::to_string(&state).unwrap();
     let back: SessionState = serde_json::from_str(&json).unwrap();
     assert!(back.tabs.is_empty());
 }

@@ -83,11 +83,13 @@ pub(crate) fn whole_side_lines(diff: &DiffDocument, side: Side) -> Vec<PatchLine
     let flat = flatten(diff);
     flat.into_iter()
         .filter_map(|l| match (side, l.origin) {
-            (Side::Left, LineOrigin::Delete) | (Side::Left, LineOrigin::Context) => Some(PatchLine {
-                origin: side.whole_file_origin(),
-                content: l.content,
-                no_newline_at_eof: l.no_newline_at_eof,
-            }),
+            (Side::Left, LineOrigin::Delete) | (Side::Left, LineOrigin::Context) => {
+                Some(PatchLine {
+                    origin: side.whole_file_origin(),
+                    content: l.content,
+                    no_newline_at_eof: l.no_newline_at_eof,
+                })
+            }
             (Side::Right, LineOrigin::Insert) | (Side::Right, LineOrigin::Context) => {
                 Some(PatchLine {
                     origin: side.whole_file_origin(),

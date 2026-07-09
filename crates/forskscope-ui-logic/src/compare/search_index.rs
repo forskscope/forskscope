@@ -15,7 +15,11 @@ use std::collections::HashSet;
 
 /// Which side(s) of a row matched the query.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MatchSide { Left, Right, Both }
+pub enum MatchSide {
+    Left,
+    Right,
+    Both,
+}
 
 /// One search match: the DOM element id used for scroll-into-view, plus
 /// the hunk / row coordinates for highlight bookkeeping.
@@ -23,15 +27,15 @@ pub enum MatchSide { Left, Right, Both }
 pub struct MatchPosition {
     /// The CSS `id` of the hunk element containing this row: `"h-{hunk_id}"`.
     pub hunk_elem_id: String,
-    pub hunk_id:      u64,
-    pub row_index:    usize,
-    pub side:         MatchSide,
+    pub hunk_id: u64,
+    pub row_index: usize,
+    pub side: MatchSide,
 }
 
 /// The flat ordered list of all matches for the current query.
 #[derive(Debug, Clone, Default)]
 pub struct MatchIndex {
-    positions:     Vec<MatchPosition>,
+    positions: Vec<MatchPosition>,
     focused_index: Option<usize>,
 }
 
@@ -53,29 +57,44 @@ impl MatchIndex {
         for (hunk_id, rows) in hunks {
             let hunk_elem_id = format!("h-{hunk_id}");
             for (row_index, (left, right)) in rows.iter().enumerate() {
-                let lm = left.map(|c| c.to_ascii_lowercase().contains(&q)).unwrap_or(false);
-                let rm = right.map(|c| c.to_ascii_lowercase().contains(&q)).unwrap_or(false);
+                let lm = left
+                    .map(|c| c.to_ascii_lowercase().contains(&q))
+                    .unwrap_or(false);
+                let rm = right
+                    .map(|c| c.to_ascii_lowercase().contains(&q))
+                    .unwrap_or(false);
                 let side = match (lm, rm) {
-                    (true,  true)  => Some(MatchSide::Both),
-                    (true,  false) => Some(MatchSide::Left),
-                    (false, true)  => Some(MatchSide::Right),
+                    (true, true) => Some(MatchSide::Both),
+                    (true, false) => Some(MatchSide::Left),
+                    (false, true) => Some(MatchSide::Right),
                     (false, false) => None,
                 };
                 if let Some(side) = side {
-                    positions.push(MatchPosition { hunk_elem_id: hunk_elem_id.clone(),
-                        hunk_id, row_index, side });
+                    positions.push(MatchPosition {
+                        hunk_elem_id: hunk_elem_id.clone(),
+                        hunk_id,
+                        row_index,
+                        side,
+                    });
                 }
             }
         }
 
         // Focus the first match automatically.
         let focused_index = if positions.is_empty() { None } else { Some(0) };
-        Self { positions, focused_index }
+        Self {
+            positions,
+            focused_index,
+        }
     }
 
     /// Total number of matches.
-    pub fn len(&self) -> usize { self.positions.len() }
-    pub fn is_empty(&self) -> bool { self.positions.is_empty() }
+    pub fn len(&self) -> usize {
+        self.positions.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.positions.is_empty()
+    }
 
     /// 1-based focused match number for display ("3 / 12").
     pub fn focused_number(&self) -> Option<usize> {
@@ -89,9 +108,11 @@ impl MatchIndex {
 
     /// Advance to the next match (wrapping). Returns the new focused position.
     pub fn advance(&mut self) -> Option<&MatchPosition> {
-        if self.positions.is_empty() { return None; }
+        if self.positions.is_empty() {
+            return None;
+        }
         self.focused_index = Some(match self.focused_index {
-            None    => 0,
+            None => 0,
             Some(i) => (i + 1) % self.positions.len(),
         });
         self.focused()
@@ -99,9 +120,11 @@ impl MatchIndex {
 
     /// Move to the previous match (wrapping). Returns the new focused position.
     pub fn retreat(&mut self) -> Option<&MatchPosition> {
-        if self.positions.is_empty() { return None; }
+        if self.positions.is_empty() {
+            return None;
+        }
         self.focused_index = Some(match self.focused_index {
-            None    => 0,
+            None => 0,
             Some(0) => self.positions.len() - 1,
             Some(i) => i - 1,
         });
@@ -110,7 +133,11 @@ impl MatchIndex {
 
     /// Reset focus to the first match (e.g. after a query change).
     pub fn reset_focus(&mut self) {
-        self.focused_index = if self.positions.is_empty() { None } else { Some(0) };
+        self.focused_index = if self.positions.is_empty() {
+            None
+        } else {
+            Some(0)
+        };
     }
 
     /// Set of hunk IDs that contain at least one match — used by the
@@ -121,7 +148,8 @@ impl MatchIndex {
 
     /// `true` if `hunk_id` / `row_index` is the currently focused match.
     pub fn is_focused(&self, hunk_id: u64, row_index: usize) -> bool {
-        self.focused().map(|p| p.hunk_id == hunk_id && p.row_index == row_index)
+        self.focused()
+            .map(|p| p.hunk_id == hunk_id && p.row_index == row_index)
             .unwrap_or(false)
     }
 }
@@ -137,10 +165,7 @@ mod tests {
     }
 
     fn index_for(query: &str, hunks: &[(u64, Vec<(Option<&str>, Option<&str>)>)]) -> MatchIndex {
-        MatchIndex::build(
-            hunks.iter().map(|(id, rs)| (*id, rs.as_slice())),
-            query,
-        )
+        MatchIndex::build(hunks.iter().map(|(id, rs)| (*id, rs.as_slice())), query)
     }
 
     #[test]
@@ -188,7 +213,10 @@ mod tests {
     #[test]
     fn matches_span_multiple_hunks_in_order() {
         let hunks = vec![
-            (10u64, rows(&[("alpha line", "unchanged"), ("beta line", "unchanged")])),
+            (
+                10u64,
+                rows(&[("alpha line", "unchanged"), ("beta line", "unchanged")]),
+            ),
             (20u64, rows(&[("unchanged", "alpha here")])),
         ];
         let idx = index_for("alpha", &hunks);
@@ -222,7 +250,8 @@ mod tests {
     fn reset_focus_returns_to_first_match() {
         let hunks = vec![(1u64, rows(&[("x", "x"), ("x", "x")]))];
         let mut idx = index_for("x", &hunks);
-        idx.advance(); idx.advance();
+        idx.advance();
+        idx.advance();
         idx.reset_focus();
         assert_eq!(idx.focused_number(), Some(1));
     }
@@ -285,8 +314,11 @@ mod tests {
         // Each row with a match on Left, Right, or Both counts as one position.
         // (1,Left/Right/Both), (2,Left), (3,Right) → at least 3 positions.
         assert!(!idx.is_empty());
-        assert!(idx.len() >= 3,
-            "len {} should be ≥ 3 for three matching rows", idx.len());
+        assert!(
+            idx.len() >= 3,
+            "len {} should be ≥ 3 for three matching rows",
+            idx.len()
+        );
     }
 
     // ── focused() returns correct MatchPosition data ──────────────────────────
@@ -296,8 +328,10 @@ mod tests {
         let hunks = vec![(99u64, rows(&[("needle", "other")]))];
         let idx = index_for("needle", &hunks);
         let pos = idx.focused().expect("must have a focused position");
-        assert_eq!(pos.hunk_id, 99u64,
-            "focused position hunk_id must match the hunk that contained the match");
+        assert_eq!(
+            pos.hunk_id, 99u64,
+            "focused position hunk_id must match the hunk that contained the match"
+        );
     }
 
     #[test]
@@ -308,13 +342,12 @@ mod tests {
             (Some("no"), Some("no")),
             (Some("needle"), Some("other")),
         ];
-        let idx = MatchIndex::build(
-            std::iter::once((7u64, rows_data.as_slice())),
-            "needle",
-        );
+        let idx = MatchIndex::build(std::iter::once((7u64, rows_data.as_slice())), "needle");
         let pos = idx.focused().expect("must have focused position");
-        assert_eq!(pos.row_index, 2,
-            "focused row_index must be 2 (third row, 0-based)");
+        assert_eq!(
+            pos.row_index, 2,
+            "focused row_index must be 2 (third row, 0-based)"
+        );
     }
 
     // ── focused_number ────────────────────────────────────────────────────────
@@ -323,8 +356,11 @@ mod tests {
     fn focused_number_is_1_at_start() {
         let hunks = vec![(1u64, rows(&[("x", "x"), ("x", "no")]))];
         let idx = index_for("x", &hunks);
-        assert_eq!(idx.focused_number(), Some(1),
-            "focused_number must be 1 before any advance");
+        assert_eq!(
+            idx.focused_number(),
+            Some(1),
+            "focused_number must be 1 before any advance"
+        );
     }
 
     #[test]
@@ -333,8 +369,11 @@ mod tests {
         let mut idx = index_for("x", &hunks);
         assert_eq!(idx.focused_number(), Some(1));
         idx.advance();
-        assert_eq!(idx.focused_number(), Some(2),
-            "focused_number must be 2 after one advance");
+        assert_eq!(
+            idx.focused_number(),
+            Some(2),
+            "focused_number must be 2 after one advance"
+        );
     }
 
     // ── advance on empty index ────────────────────────────────────────────────
@@ -343,14 +382,18 @@ mod tests {
     fn advance_on_empty_index_returns_none() {
         let mut idx = index_for("zzz", &[(1u64, rows(&[("no", "match")]))]);
         assert!(idx.is_empty(), "fixture must produce an empty index");
-        assert!(idx.advance().is_none(),
-            "advance on empty index must return None, not panic");
+        assert!(
+            idx.advance().is_none(),
+            "advance on empty index must return None, not panic"
+        );
     }
 
     #[test]
     fn retreat_on_empty_index_returns_none() {
         let mut idx = index_for("zzz", &[(1u64, rows(&[("no", "match")]))]);
-        assert!(idx.retreat().is_none(),
-            "retreat on empty index must return None, not panic");
+        assert!(
+            idx.retreat().is_none(),
+            "retreat on empty index must return None, not panic"
+        );
     }
 }

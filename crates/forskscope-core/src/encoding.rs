@@ -126,12 +126,12 @@ impl NewlinePolicy {
     /// endings rather than normalizing.
     pub fn resolve(self, detected: NewlineStyle) -> Option<&'static str> {
         match self {
-            Self::ForceLf   => Some("\n"),
+            Self::ForceLf => Some("\n"),
             Self::ForceCrlf => Some("\r\n"),
-            Self::Preserve  => match detected {
-                NewlineStyle::Lf   => Some("\n"),
+            Self::Preserve => match detected {
+                NewlineStyle::Lf => Some("\n"),
                 NewlineStyle::CrLf => Some("\r\n"),
-                NewlineStyle::Cr   => Some("\r"),
+                NewlineStyle::Cr => Some("\r"),
                 NewlineStyle::Mixed | NewlineStyle::None => None,
             },
         }
@@ -168,10 +168,10 @@ impl BomPresence {
     /// The raw BOM bytes for this presence kind, if any.
     pub fn bytes(self) -> &'static [u8] {
         match self {
-            Self::Absent   => &[],
-            Self::Utf8     => &[0xEF, 0xBB, 0xBF],
-            Self::Utf16Le  => &[0xFF, 0xFE],
-            Self::Utf16Be  => &[0xFE, 0xFF],
+            Self::Absent => &[],
+            Self::Utf8 => &[0xEF, 0xBB, 0xBF],
+            Self::Utf16Le => &[0xFF, 0xFE],
+            Self::Utf16Be => &[0xFE, 0xFF],
         }
     }
 }
@@ -198,8 +198,8 @@ impl BomPolicy {
     pub fn resolve_bytes(self, original: BomPresence) -> &'static [u8] {
         match self {
             Self::Preserve => original.bytes(),
-            Self::Strip    => &[],
-            Self::AddUtf8  => BomPresence::Utf8.bytes(),
+            Self::Strip => &[],
+            Self::AddUtf8 => BomPresence::Utf8.bytes(),
         }
     }
 }

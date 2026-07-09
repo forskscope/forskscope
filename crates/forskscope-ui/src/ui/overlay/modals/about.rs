@@ -12,7 +12,7 @@ pub fn AboutModal() -> Element {
     let lang = store.lang();
     let info = PlatformInfo::collect();
     let diag = info.to_report();
-    let d2   = diag.clone();
+    let d2 = diag.clone();
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "About ForskScope",
             div { class: "modal",

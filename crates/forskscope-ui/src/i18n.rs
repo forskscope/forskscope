@@ -20,20 +20,30 @@ fn ja(key: &str) -> Option<&'static str> {
         "Settings" => "設定",
         "Compare selected files" => "選択したファイルを比較",
         "Compare selected directories" => "選択したディレクトリを比較",
-        "Select a file or directory on each side to compare" => "両側でファイルまたはディレクトリを選択してください",
+        "Select a file or directory on each side to compare" => {
+            "両側でファイルまたはディレクトリを選択してください"
+        }
         "Filter items" => "アイテムをフィルター",
         "Filter by name…" => "名前でフィルター…",
         "Hide binary" => "バイナリを非表示",
         "Hide identical" => "同一ファイルを非表示",
         "Clear filter" => "フィルターをクリア",
-        "Choose a file or folder on each side to compare" => "左右のファイルまたはフォルダーを選択して比較",
-        "Choose a file or folder on the right" => "右側のファイルまたはフォルダーを選択してください",
+        "Choose a file or folder on each side to compare" => {
+            "左右のファイルまたはフォルダーを選択して比較"
+        }
+        "Choose a file or folder on the right" => {
+            "右側のファイルまたはフォルダーを選択してください"
+        }
         "Choose a file or folder on the left" => "左側のファイルまたはフォルダーを選択してください",
         "Compare files or folders" => "ファイルまたはフォルダーを比較",
-        "Choose a folder for each side, then select items to compare." => "左右にフォルダーを選択し、比較するアイテムを選んでください。",
+        "Choose a folder for each side, then select items to compare." => {
+            "左右にフォルダーを選択し、比較するアイテムを選んでください。"
+        }
         "Nothing leaves this computer." => "ファイルはこのコンピューターの外に出ません。",
         "Compare" => "比較",
-        "··· {n} unchanged lines — click to expand ···" => "··· {n} 行変更なし — クリックして展開 ···",
+        "··· {n} unchanged lines — click to expand ···" => {
+            "··· {n} 行変更なし — クリックして展開 ···"
+        }
         "Deleted" => "削除",
         "Inserted" => "挿入",
         "Changed" => "変更",
@@ -56,8 +66,12 @@ fn ja(key: &str) -> Option<&'static str> {
         "Copy to right" => "右にコピー",
         "Copy to left" => "左にコピー",
         "Copy this file?" => "このファイルをコピーしますか？",
-        "The destination exists. A .bak backup will be created first." => "コピー先が存在します。先に .bak バックアップを作成します。",
-        "A manifest will be saved so copies can be reviewed or reversed." => "マニフェストを保存し、コピーの確認や元に戻す操作が可能になります。",
+        "The destination exists. A .bak backup will be created first." => {
+            "コピー先が存在します。先に .bak バックアップを作成します。"
+        }
+        "A manifest will be saved so copies can be reviewed or reversed." => {
+            "マニフェストを保存し、コピーの確認や元に戻す操作が可能になります。"
+        }
         "Copy result" => "コピー結果",
         "Copy finished" => "コピー完了",
         "succeeded" => "成功",
@@ -102,10 +116,14 @@ fn ja(key: &str) -> Option<&'static str> {
         "Batch copy" => "一括コピー",
         "files" => "ファイル",
         "Close" => "閉じる",
-        "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary." => "比較できません: 一方がバイナリ、もう一方がテキストです。テキスト同士またはバイナリ同士で比較してください。",
+        "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary." => {
+            "比較できません: 一方がバイナリ、もう一方がテキストです。テキスト同士またはバイナリ同士で比較してください。"
+        }
         "Loading" => "読み込み中",
         "Could not open" => "開けませんでした",
-        "Check that the file exists and you have read permission." => "ファイルが存在し、読み取り権限があることを確認してください。",
+        "Check that the file exists and you have read permission." => {
+            "ファイルが存在し、読み取り権限があることを確認してください。"
+        }
         "comparison" => "比較",
         "merge" => "マージ",
         "Previous / next change" => "前 / 次の変更",
@@ -127,16 +145,22 @@ fn ja(key: &str) -> Option<&'static str> {
         "Close modal / search bar" => "モーダル / 検索バーを閉じる",
         "Close tab" => "タブを閉じる",
         "No comparison." => "比較がありません。",
-        "has unsaved changes. Discard them and close?" => "未保存の変更があります。破棄して閉じますか？",
+        "has unsaved changes. Discard them and close?" => {
+            "未保存の変更があります。破棄して閉じますか？"
+        }
         "From" => "変更前",
         "To" => "変更後",
-        "Existing files will receive a .bak backup." => "既存ファイルは.bakバックアップが作成されます。",
+        "Existing files will receive a .bak backup." => {
+            "既存ファイルは.bakバックアップが作成されます。"
+        }
         "Version" => "バージョン",
         "Rust" => "Rust",
         "OS" => "OS",
         "Arch" => "アーキテクチャ",
         "CPUs" => "CPU数",
-        "Files stay on this computer. ForskScope does not upload them." => "ファイルはこのコンピューターに留まります。ForskScopeはアップロードしません。",
+        "Files stay on this computer. ForskScope does not upload them." => {
+            "ファイルはこのコンピューターに留まります。ForskScopeはアップロードしません。"
+        }
         "Local only" => "ローカルのみ",
         "No matches" => "一致なし",
         "Deep compare" => "深度比較",
@@ -148,8 +172,12 @@ fn ja(key: &str) -> Option<&'static str> {
         "Navigation" => "ナビゲーション",
         "App" => "アプリ",
         "Search…" => "検索…",
-        "o, class, tmp  (comma separated, no dot needed)" => "o, class, tmp（カンマ区切り、ドット不要）",
-        "target, node_modules, *.cache  (* wildcard allowed)" => "target, node_modules, *.cache（* ワイルドカード可）",
+        "o, class, tmp  (comma separated, no dot needed)" => {
+            "o, class, tmp（カンマ区切り、ドット不要）"
+        }
+        "target, node_modules, *.cache  (* wildcard allowed)" => {
+            "target, node_modules, *.cache（* ワイルドカード可）"
+        }
         "Ignore file extensions" => "除外ファイル拡張子",
         "Ignore directory names" => "除外ディレクトリ名",
         "Delete profile" => "プロファイルを削除",
@@ -173,10 +201,16 @@ fn ja(key: &str) -> Option<&'static str> {
         "Aligned (default)" => "整列（デフォルト）",
         "Compact (independent panes)" => "コンパクト（独立ペイン）",
         "Remember Explorer directories" => "エクスプローラーのディレクトリを記憶する",
-        "When on, the Explorer reopens the last directory shown in each pane. When off, it always starts at your home directory." => "オンの場合、エクスプローラーは各ペインで最後に表示したディレクトリを再度開きます。オフの場合は常にホームディレクトリから開始します。",
+        "When on, the Explorer reopens the last directory shown in each pane. When off, it always starts at your home directory." => {
+            "オンの場合、エクスプローラーは各ペインで最後に表示したディレクトリを再度開きます。オフの場合は常にホームディレクトリから開始します。"
+        }
         "Enable binary comparison" => "バイナリ比較を有効にする",
-        "When off, binary files cannot be compared and are shown as non-actionable in the Explorer." => "オフの場合、バイナリファイルは比較できず、エクスプローラーで操作不可として表示されます。",
-        "Binary comparison is off. Enable it in Settings → Advanced." => "バイナリ比較はオフです。設定 → 詳細設定で有効にできます。",
+        "When off, binary files cannot be compared and are shown as non-actionable in the Explorer." => {
+            "オフの場合、バイナリファイルは比較できず、エクスプローラーで操作不可として表示されます。"
+        }
+        "Binary comparison is off. Enable it in Settings → Advanced." => {
+            "バイナリ比較はオフです。設定 → 詳細設定で有効にできます。"
+        }
         "Advanced" => "詳細設定",
         "Hide advanced" => "詳細設定を隠す",
         "Compare profiles" => "比較プロファイル",
@@ -194,15 +228,17 @@ fn ja(key: &str) -> Option<&'static str> {
         "Diff font size" => "差分フォントサイズ",
         "Saved." => "保存しました。",
         "Reloaded." => "再読み込みしました。",
-        "The target file was modified after it was loaded. Overwrite anyway?" =>
-            "ファイルが読み込み後に変更されました。上書きしますか？",
+        "The target file was modified after it was loaded. Overwrite anyway?" => {
+            "ファイルが読み込み後に変更されました。上書きしますか？"
+        }
         "Path" => "パス",
         "Reload files?" => "ファイルを再読み込みしますか？",
         "Unsaved merge changes will be discarded." => "未保存のマージ変更は破棄されます。",
         "Discard and Reload" => "破棄して再読み込み",
         "Swap sides?" => "左右を入れ替えますか？",
-        "Unsaved merge changes will be discarded when sides are swapped." =>
-            "左右入替時に未保存のマージ変更は破棄されます。",
+        "Unsaved merge changes will be discarded when sides are swapped." => {
+            "左右入替時に未保存のマージ変更は破棄されます。"
+        }
         "Discard and Swap" => "破棄して入替",
         "Close comparison?" => "比較を閉じますか？",
         "Discard and close" => "破棄して閉じる",
@@ -211,15 +247,27 @@ fn ja(key: &str) -> Option<&'static str> {
         "Copy all" => "すべてコピー",
         "Overwrite" => "上書き",
         "Cancel" => "キャンセル",
-        "Merge/save unavailable for this file type." => "このファイル形式では結合・保存できません。",
-        "Large file — inline diff disabled and deadline shortened." => "大きなファイル — インライン差分を無効化し、処理時間を短縮しました。",
-        "Diff timed out — result may be approximate." => "差分処理がタイムアウトしました — 結果は概算の可能性があります。",
-        "Some hunks were too large for character-level diff." => "一部のハンクが大きすぎるため、文字単位の差分を省略しました。",
-        "Binary file — read-only comparison (hex preview)." => "バイナリファイル — 読み取り専用比較（16進プレビュー）。",
+        "Merge/save unavailable for this file type." => {
+            "このファイル形式では結合・保存できません。"
+        }
+        "Large file — inline diff disabled and deadline shortened." => {
+            "大きなファイル — インライン差分を無効化し、処理時間を短縮しました。"
+        }
+        "Diff timed out — result may be approximate." => {
+            "差分処理がタイムアウトしました — 結果は概算の可能性があります。"
+        }
+        "Some hunks were too large for character-level diff." => {
+            "一部のハンクが大きすぎるため、文字単位の差分を省略しました。"
+        }
+        "Binary file — read-only comparison (hex preview)." => {
+            "バイナリファイル — 読み取り専用比較（16進プレビュー）。"
+        }
         "Spreadsheet — read-only comparison." => "スプレッドシート — 読み取り専用比較。",
         "Both files not found — read-only." => "両ファイルが見つかりません — 読み取り専用。",
         "One side is missing — read-only." => "片方が存在しません — 読み取り専用。",
-        "File type not supported for merge — read-only." => "このファイル形式は結合に対応していません — 読み取り専用。",
+        "File type not supported for merge — read-only." => {
+            "このファイル形式は結合に対応していません — 読み取り専用。"
+        }
         _ => return None,
     };
     Some(v)

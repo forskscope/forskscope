@@ -104,11 +104,11 @@ pub enum CaseSensitivity {
 pub struct CompareProfile {
     /// Human-readable name shown in the UI toolbar.
     pub name: String,
-    pub whitespace:  WhitespaceMode,
-    pub newlines:    NewlineCompareMode,
-    pub case:        CaseSensitivity,
+    pub whitespace: WhitespaceMode,
+    pub newlines: NewlineCompareMode,
+    pub case: CaseSensitivity,
     pub inline_mode: InlineMode,
-    pub algorithm:   DiffAlgorithm,
+    pub algorithm: DiffAlgorithm,
 }
 
 impl CompareProfile {
@@ -117,48 +117,48 @@ impl CompareProfile {
     /// Default: all differences are significant, Myers algorithm.
     pub fn default_profile() -> Self {
         Self {
-            name:        "Default".into(),
-            whitespace:  WhitespaceMode::Significant,
-            newlines:    NewlineCompareMode::Significant,
-            case:        CaseSensitivity::Sensitive,
+            name: "Default".into(),
+            whitespace: WhitespaceMode::Significant,
+            newlines: NewlineCompareMode::Significant,
+            case: CaseSensitivity::Sensitive,
             inline_mode: InlineMode::Lazy,
-            algorithm:   DiffAlgorithm::Myers,
+            algorithm: DiffAlgorithm::Myers,
         }
     }
 
     /// Code Review: whitespace significant, newline preserved, inline on.
     pub fn code_review() -> Self {
         Self {
-            name:        "Code Review".into(),
-            whitespace:  WhitespaceMode::Significant,
-            newlines:    NewlineCompareMode::Significant,
-            case:        CaseSensitivity::Sensitive,
+            name: "Code Review".into(),
+            whitespace: WhitespaceMode::Significant,
+            newlines: NewlineCompareMode::Significant,
+            case: CaseSensitivity::Sensitive,
             inline_mode: InlineMode::Lazy,
-            algorithm:   DiffAlgorithm::Histogram,
+            algorithm: DiffAlgorithm::Histogram,
         }
     }
 
     /// Loose Text: ignore trailing whitespace and newline differences.
     pub fn loose_text() -> Self {
         Self {
-            name:        "Loose Text".into(),
-            whitespace:  WhitespaceMode::IgnoreTrailing,
-            newlines:    NewlineCompareMode::IgnoreDifference,
-            case:        CaseSensitivity::Sensitive,
+            name: "Loose Text".into(),
+            whitespace: WhitespaceMode::IgnoreTrailing,
+            newlines: NewlineCompareMode::IgnoreDifference,
+            case: CaseSensitivity::Sensitive,
             inline_mode: InlineMode::Lazy,
-            algorithm:   DiffAlgorithm::Myers,
+            algorithm: DiffAlgorithm::Myers,
         }
     }
 
     /// Large File Safe: line diff only, inline disabled.
     pub fn large_file_safe() -> Self {
         Self {
-            name:        "Large File Safe".into(),
-            whitespace:  WhitespaceMode::Significant,
-            newlines:    NewlineCompareMode::Significant,
-            case:        CaseSensitivity::Sensitive,
+            name: "Large File Safe".into(),
+            whitespace: WhitespaceMode::Significant,
+            newlines: NewlineCompareMode::Significant,
+            case: CaseSensitivity::Sensitive,
             inline_mode: InlineMode::None,
-            algorithm:   DiffAlgorithm::Myers,
+            algorithm: DiffAlgorithm::Myers,
         }
     }
 
@@ -181,10 +181,10 @@ impl CompareProfile {
     pub fn to_diff_options(&self) -> DiffOptions {
         DiffOptions {
             ignore_whitespace: !matches!(self.whitespace, WhitespaceMode::Significant),
-            ignore_case:       self.case == CaseSensitivity::Insensitive,
-            ignore_newlines:   self.newlines == NewlineCompareMode::IgnoreDifference,
-            inline_mode:       self.inline_mode,
-            algorithm:         self.algorithm,
+            ignore_case: self.case == CaseSensitivity::Insensitive,
+            ignore_newlines: self.newlines == NewlineCompareMode::IgnoreDifference,
+            inline_mode: self.inline_mode,
+            algorithm: self.algorithm,
             ..DiffOptions::default()
         }
     }

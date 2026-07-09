@@ -57,10 +57,10 @@ pub struct ToolId(pub String);
 /// are expanded at call time via [`expand_args`].
 #[derive(Debug, Clone)]
 pub struct ExternalToolCommand {
-    pub id:         ToolId,
-    pub name:       String,
+    pub id: ToolId,
+    pub name: String,
     pub executable: PathBuf,
-    pub args:       Vec<ExternalToolArg>,
+    pub args: Vec<ExternalToolArg>,
 }
 
 /// One element in an [`ExternalToolCommand`]'s argument list.
@@ -95,29 +95,35 @@ impl ExternalToolPlaceholder {
     /// The `{token}` string shown in the UI settings form.
     pub fn token(self) -> &'static str {
         match self {
-            Self::Path      => "{path}",
-            Self::LeftPath  => "{left}",
+            Self::Path => "{path}",
+            Self::LeftPath => "{left}",
             Self::RightPath => "{right}",
-            Self::Line      => "{line}",
-            Self::Column    => "{column}",
+            Self::Line => "{line}",
+            Self::Column => "{column}",
         }
     }
 
     /// Parse a `{token}` string from user input. Returns `None` for unknown tokens.
     pub fn from_token(s: &str) -> Option<Self> {
         match s {
-            "{path}"    => Some(Self::Path),
-            "{left}"    => Some(Self::LeftPath),
-            "{right}"   => Some(Self::RightPath),
-            "{line}"    => Some(Self::Line),
-            "{column}"  => Some(Self::Column),
-            _           => None,
+            "{path}" => Some(Self::Path),
+            "{left}" => Some(Self::LeftPath),
+            "{right}" => Some(Self::RightPath),
+            "{line}" => Some(Self::Line),
+            "{column}" => Some(Self::Column),
+            _ => None,
         }
     }
 
     /// All supported tokens, in the order shown in the UI.
     pub fn all() -> &'static [Self] {
-        &[Self::Path, Self::LeftPath, Self::RightPath, Self::Line, Self::Column]
+        &[
+            Self::Path,
+            Self::LeftPath,
+            Self::RightPath,
+            Self::Line,
+            Self::Column,
+        ]
     }
 }
 
@@ -131,15 +137,15 @@ impl ExternalToolPlaceholder {
 #[derive(Debug, Clone, Default)]
 pub struct ExpandContext {
     /// Single active file path. Used for `{path}`.
-    pub path:       Option<PathBuf>,
+    pub path: Option<PathBuf>,
     /// Left/old/source path. Used for `{left}`.
-    pub left_path:  Option<PathBuf>,
+    pub left_path: Option<PathBuf>,
     /// Right/new/result path. Used for `{right}`.
     pub right_path: Option<PathBuf>,
     /// Cursor line number (1-indexed). Used for `{line}`.
-    pub line:       Option<u32>,
+    pub line: Option<u32>,
     /// Cursor column number (1-indexed). Used for `{column}`.
-    pub column:     Option<u32>,
+    pub column: Option<u32>,
 }
 
 // ── Expansion ─────────────────────────────────────────────────────────────────
@@ -183,11 +189,15 @@ pub fn expand_args(cmd: &ExternalToolCommand, ctx: &ExpandContext) -> Vec<String
 /// required context value is absent.
 fn resolve_placeholder(ph: ExternalToolPlaceholder, ctx: &ExpandContext) -> Option<String> {
     match ph {
-        ExternalToolPlaceholder::Path      => ctx.path.as_ref().map(|p| p.display().to_string()),
-        ExternalToolPlaceholder::LeftPath  => ctx.left_path.as_ref().map(|p| p.display().to_string()),
-        ExternalToolPlaceholder::RightPath => ctx.right_path.as_ref().map(|p| p.display().to_string()),
-        ExternalToolPlaceholder::Line      => ctx.line.map(|n| n.to_string()),
-        ExternalToolPlaceholder::Column    => ctx.column.map(|n| n.to_string()),
+        ExternalToolPlaceholder::Path => ctx.path.as_ref().map(|p| p.display().to_string()),
+        ExternalToolPlaceholder::LeftPath => {
+            ctx.left_path.as_ref().map(|p| p.display().to_string())
+        }
+        ExternalToolPlaceholder::RightPath => {
+            ctx.right_path.as_ref().map(|p| p.display().to_string())
+        }
+        ExternalToolPlaceholder::Line => ctx.line.map(|n| n.to_string()),
+        ExternalToolPlaceholder::Column => ctx.column.map(|n| n.to_string()),
     }
 }
 
@@ -222,13 +232,16 @@ pub struct UnknownTokenError {
 
 impl std::fmt::Display for UnknownTokenError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unknown placeholder token {:?}; valid tokens are: {}",
+        write!(
+            f,
+            "unknown placeholder token {:?}; valid tokens are: {}",
             self.token,
             ExternalToolPlaceholder::all()
                 .iter()
                 .map(|p| p.token())
                 .collect::<Vec<_>>()
-                .join(", "))
+                .join(", ")
+        )
     }
 }
 
@@ -266,10 +279,10 @@ impl ExternalToolCommand {
     /// {Path}` on KDE).
     pub fn file_manager_reveal() -> Self {
         Self {
-            id:         ToolId("builtin.file_manager_reveal".into()),
-            name:       "Reveal in File Manager".into(),
+            id: ToolId("builtin.file_manager_reveal".into()),
+            name: "Reveal in File Manager".into(),
             executable: PathBuf::from("xdg-open"),
-            args:       vec![ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)],
+            args: vec![ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)],
         }
     }
 
@@ -284,10 +297,10 @@ impl ExternalToolCommand {
         // UI layer concatenates them. Alternatively, a user can configure a
         // custom command with a shell wrapper if they need the combined form.
         Self {
-            id:         ToolId("builtin.vscode_open".into()),
-            name:       "Open in VS Code".into(),
+            id: ToolId("builtin.vscode_open".into()),
+            name: "Open in VS Code".into(),
             executable: PathBuf::from("code"),
-            args:       vec![
+            args: vec![
                 ExternalToolArg::Literal("--goto".into()),
                 ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path),
             ],
@@ -297,10 +310,10 @@ impl ExternalToolCommand {
     /// Preset: open a file at a line in the system default application.
     pub fn system_open() -> Self {
         Self {
-            id:         ToolId("builtin.system_open".into()),
-            name:       "Open with System Default".into(),
+            id: ToolId("builtin.system_open".into()),
+            name: "Open with System Default".into(),
             executable: PathBuf::from("xdg-open"),
-            args:       vec![ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)],
+            args: vec![ExternalToolArg::Placeholder(ExternalToolPlaceholder::Path)],
         }
     }
 

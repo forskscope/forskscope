@@ -16,7 +16,12 @@ pub use model::{
     InlineKind, InlineSpan, LineRange, NewlineMarker, SideLine,
 };
 pub use options::{
-    DiffAlgorithm, DiffOptions, InlineMode,
     // RFC-028
-    CaseSensitivity, CompareProfile, NewlineCompareMode, WhitespaceMode,
+    CaseSensitivity,
+    CompareProfile,
+    DiffAlgorithm,
+    DiffOptions,
+    InlineMode,
+    NewlineCompareMode,
+    WhitespaceMode,
 };

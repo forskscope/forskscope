@@ -118,7 +118,11 @@ pub enum CoreError {
 }
 
 impl CoreError {
-    pub(crate) fn io(path: impl Into<PathBuf>, operation: IoOperation, err: &std::io::Error) -> Self {
+    pub(crate) fn io(
+        path: impl Into<PathBuf>,
+        operation: IoOperation,
+        err: &std::io::Error,
+    ) -> Self {
         Self::Io {
             path: Some(path.into()),
             operation,
@@ -197,5 +201,3 @@ impl fmt::Display for CoreError {
 }
 
 impl std::error::Error for CoreError {}
-
-

@@ -22,25 +22,27 @@ pub enum TabState {
 
 #[derive(Clone)]
 pub struct CompareTab {
-    pub title:      String,
-    pub left_path:  Option<PathBuf>,
+    pub title: String,
+    pub left_path: Option<PathBuf>,
     pub right_path: Option<PathBuf>,
     /// Lifecycle state — `Loading` until background task completes (RFC-065).
-    pub state:      TabState,
-    pub left_doc:   LoadedDocument,
-    pub right_doc:  LoadedDocument,
-    pub diff:       DiffDocument,
-    pub merge:      MergeSession,
+    pub state: TabState,
+    pub left_doc: LoadedDocument,
+    pub right_doc: LoadedDocument,
+    pub diff: DiffDocument,
+    pub merge: MergeSession,
     pub diff_options: DiffOptions,
-    pub can_save:   bool,
-    pub char_mode:  bool,
-    pub word_wrap:  bool,
+    pub can_save: bool,
+    pub char_mode: bool,
+    pub word_wrap: bool,
     pub focused_change: usize,
 }
 
 impl CompareTab {
     pub fn right_label(&self) -> String {
-        self.right_doc.text.as_ref()
+        self.right_doc
+            .text
+            .as_ref()
             .map(|t| t.encoding.label.clone())
             .unwrap_or_else(|| "—".into())
     }
@@ -48,21 +50,24 @@ impl CompareTab {
 
 pub fn recompute_diff(tab: &mut CompareTab) {
     let diff = compute_diff(
-        tab.left_doc.diff_text(), tab.right_doc.diff_text(), tab.diff_options,
+        tab.left_doc.diff_text(),
+        tab.right_doc.diff_text(),
+        tab.diff_options,
     );
-    tab.merge          = MergeSession::from_diff(&diff);
-    tab.diff           = diff;
+    tab.merge = MergeSession::from_diff(&diff);
+    tab.diff = diff;
     tab.focused_change = 0;
-    tab.char_mode      = false;
+    tab.char_mode = false;
 }
 
 pub fn swap_sides(store: &mut crate::state::Store, index: usize) {
     let mut tabs = store.tabs.write();
-    let Some(tab) = tabs.get_mut(index) else { return };
-    std::mem::swap(&mut tab.left_doc,  &mut tab.right_doc);
+    let Some(tab) = tabs.get_mut(index) else {
+        return;
+    };
+    std::mem::swap(&mut tab.left_doc, &mut tab.right_doc);
     std::mem::swap(&mut tab.left_path, &mut tab.right_path);
-    tab.can_save = tab.left_doc.kind.is_mergeable_text()
-        && tab.right_doc.kind.is_mergeable_text();
+    tab.can_save = tab.left_doc.kind.is_mergeable_text() && tab.right_doc.kind.is_mergeable_text();
     recompute_diff(tab);
 }
 
@@ -73,13 +78,11 @@ pub(crate) fn tab_title(l: &std::path::Path, r: &std::path::Path, lang: Lang) ->
     let rn = r.file_name().map(|n| n.to_string_lossy().into_owned());
     match (ln, rn) {
         (Some(a), Some(b)) if a == b => a,
-        (Some(a), Some(b))           => format!("{a} ↔ {b}"),
+        (Some(a), Some(b)) => format!("{a} ↔ {b}"),
         (Some(a), None) | (None, Some(a)) => a,
         (None, None) => t(lang, "comparison"),
     }
 }
-
-
 
 #[cfg(test)]
 mod tests;

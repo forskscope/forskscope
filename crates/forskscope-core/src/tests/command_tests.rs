@@ -1,20 +1,22 @@
 //! Command model and registry tests (RFC-019 §5, §6, §7).
 
 use crate::command::{
-    Availability, AvailabilityRule, CommandCategory, CommandContext,
-    CommandDangerLevel, CommandRegistry, Modifiers, Shortcut, cmd,
+    Availability, AvailabilityRule, CommandCategory, CommandContext, CommandDangerLevel,
+    CommandRegistry, Modifiers, Shortcut, cmd,
 };
 
 // ── AvailabilityRule::evaluate ────────────────────────────────────────────────
 
-fn ctx_empty() -> CommandContext { CommandContext::default() }
+fn ctx_empty() -> CommandContext {
+    CommandContext::default()
+}
 
 fn ctx_diff_open() -> CommandContext {
     CommandContext {
-        has_active_diff_tab:    true,
+        has_active_diff_tab: true,
         has_active_compare_tab: true,
-        active_tab_has_hunks:   true,
-        active_hunk_exists:     true,
+        active_tab_has_hunks: true,
+        active_hunk_exists: true,
         right_side_is_editable: true,
         ..Default::default()
     }
@@ -23,7 +25,7 @@ fn ctx_diff_open() -> CommandContext {
 fn ctx_dirty_saveable() -> CommandContext {
     CommandContext {
         has_active_compare_tab: true,
-        active_tab_is_dirty:    true,
+        active_tab_is_dirty: true,
         active_tab_is_saveable: true,
         ..Default::default()
     }
@@ -31,13 +33,25 @@ fn ctx_dirty_saveable() -> CommandContext {
 
 #[test]
 fn always_is_available_in_empty_context() {
-    assert!(AvailabilityRule::Always.evaluate(&ctx_empty()).is_available());
+    assert!(
+        AvailabilityRule::Always
+            .evaluate(&ctx_empty())
+            .is_available()
+    );
 }
 
 #[test]
 fn dirty_and_saveable_available_only_when_dirty_and_saveable() {
-    assert!(!AvailabilityRule::DirtyAndSaveable.evaluate(&ctx_empty()).is_available());
-    assert!( AvailabilityRule::DirtyAndSaveable.evaluate(&ctx_dirty_saveable()).is_available());
+    assert!(
+        !AvailabilityRule::DirtyAndSaveable
+            .evaluate(&ctx_empty())
+            .is_available()
+    );
+    assert!(
+        AvailabilityRule::DirtyAndSaveable
+            .evaluate(&ctx_dirty_saveable())
+            .is_available()
+    );
 }
 
 #[test]
@@ -45,34 +59,61 @@ fn active_diff_tab_unavailable_with_no_open_tab() {
     let r = AvailabilityRule::ActiveDiffTab.evaluate(&ctx_empty());
     assert!(!r.is_available());
     if let Availability::Unavailable(reason) = r {
-        assert!(!reason.as_str().is_empty(), "unavailable reason must be non-empty");
+        assert!(
+            !reason.as_str().is_empty(),
+            "unavailable reason must be non-empty"
+        );
     }
 }
 
 #[test]
 fn active_diff_tab_available_with_open_tab() {
-    assert!(AvailabilityRule::ActiveDiffTab.evaluate(&ctx_diff_open()).is_available());
+    assert!(
+        AvailabilityRule::ActiveDiffTab
+            .evaluate(&ctx_diff_open())
+            .is_available()
+    );
 }
 
 #[test]
 fn active_hunk_editable_requires_hunk_and_editable_side() {
     let ctx_no_hunk = CommandContext {
-        has_active_diff_tab:    true,
-        active_hunk_exists:     false,
+        has_active_diff_tab: true,
+        active_hunk_exists: false,
         right_side_is_editable: true,
         ..Default::default()
     };
-    assert!(!AvailabilityRule::ActiveHunkEditable.evaluate(&ctx_no_hunk).is_available());
-    assert!( AvailabilityRule::ActiveHunkEditable.evaluate(&ctx_diff_open()).is_available());
+    assert!(
+        !AvailabilityRule::ActiveHunkEditable
+            .evaluate(&ctx_no_hunk)
+            .is_available()
+    );
+    assert!(
+        AvailabilityRule::ActiveHunkEditable
+            .evaluate(&ctx_diff_open())
+            .is_available()
+    );
 }
 
 #[test]
 fn can_undo_and_redo_require_history() {
-    assert!(!AvailabilityRule::CanUndo.evaluate(&ctx_empty()).is_available());
-    assert!(!AvailabilityRule::CanRedo.evaluate(&ctx_empty()).is_available());
-    let ctx = CommandContext { can_undo: true, can_redo: true, ..Default::default() };
-    assert!( AvailabilityRule::CanUndo.evaluate(&ctx).is_available());
-    assert!( AvailabilityRule::CanRedo.evaluate(&ctx).is_available());
+    assert!(
+        !AvailabilityRule::CanUndo
+            .evaluate(&ctx_empty())
+            .is_available()
+    );
+    assert!(
+        !AvailabilityRule::CanRedo
+            .evaluate(&ctx_empty())
+            .is_available()
+    );
+    let ctx = CommandContext {
+        can_undo: true,
+        can_redo: true,
+        ..Default::default()
+    };
+    assert!(AvailabilityRule::CanUndo.evaluate(&ctx).is_available());
+    assert!(AvailabilityRule::CanRedo.evaluate(&ctx).is_available());
 }
 
 #[test]
@@ -91,7 +132,10 @@ fn all_unavailable_reasons_are_non_empty() {
     ];
     for rule in rules {
         if let Availability::Unavailable(reason) = rule.evaluate(&ctx_empty()) {
-            assert!(!reason.as_str().is_empty(), "{rule:?} must have non-empty reason");
+            assert!(
+                !reason.as_str().is_empty(),
+                "{rule:?} must have non-empty reason"
+            );
         } else {
             panic!("{rule:?} should be unavailable in empty context");
         }
@@ -122,9 +166,15 @@ fn danger_level_ordering_is_ascending() {
 #[test]
 fn all_categories_have_non_empty_label() {
     for cat in [
-        CommandCategory::File, CommandCategory::Edit, CommandCategory::View,
-        CommandCategory::Navigate, CommandCategory::Compare, CommandCategory::Merge,
-        CommandCategory::Search, CommandCategory::Settings, CommandCategory::External,
+        CommandCategory::File,
+        CommandCategory::Edit,
+        CommandCategory::View,
+        CommandCategory::Navigate,
+        CommandCategory::Compare,
+        CommandCategory::Merge,
+        CommandCategory::Search,
+        CommandCategory::Settings,
+        CommandCategory::External,
         CommandCategory::Diagnostics,
     ] {
         assert!(!cat.label().is_empty(), "{cat:?} must have non-empty label");
@@ -150,8 +200,10 @@ fn all_builtin_ids_are_unique() {
 #[test]
 fn all_builtin_labels_are_non_empty() {
     let reg = CommandRegistry::builtin();
-    assert!(reg.all().iter().all(|c| !c.label.is_empty()),
-        "all commands must have non-empty labels");
+    assert!(
+        reg.all().iter().all(|c| !c.label.is_empty()),
+        "all commands must have non-empty labels"
+    );
 }
 
 #[test]
@@ -174,7 +226,11 @@ fn by_category_returns_only_matching_commands() {
     let reg = CommandRegistry::builtin();
     let merge_cmds: Vec<_> = reg.by_category(CommandCategory::Merge).collect();
     assert!(!merge_cmds.is_empty());
-    assert!(merge_cmds.iter().all(|c| c.category == CommandCategory::Merge));
+    assert!(
+        merge_cmds
+            .iter()
+            .all(|c| c.category == CommandCategory::Merge)
+    );
 }
 
 #[test]
@@ -227,7 +283,7 @@ fn save_command_is_available_only_when_dirty_and_saveable() {
     let reg = CommandRegistry::builtin();
     let save_cmd = reg.get(&cmd::SAVE).unwrap();
     assert!(!save_cmd.is_available(&ctx_empty()));
-    assert!( save_cmd.is_available(&ctx_dirty_saveable()));
+    assert!(save_cmd.is_available(&ctx_dirty_saveable()));
 }
 
 #[test]
@@ -235,6 +291,9 @@ fn undo_command_is_available_only_when_can_undo() {
     let reg = CommandRegistry::builtin();
     let undo = reg.get(&cmd::UNDO).unwrap();
     assert!(!undo.is_available(&ctx_empty()));
-    let ctx = CommandContext { can_undo: true, ..Default::default() };
+    let ctx = CommandContext {
+        can_undo: true,
+        ..Default::default()
+    };
     assert!(undo.is_available(&ctx));
 }

@@ -13,7 +13,7 @@ use dioxus::prelude::*;
 
 use crate::i18n::t;
 use crate::state::Lang;
-use dioxus_swdir_tree::{ThreadExecutor};
+use dioxus_swdir_tree::ThreadExecutor;
 use dioxus_swdir_tree::{LoadPayload, ScanExecutor, ScanFuture, ScanJob};
 
 use forskscope_core::IgnoreRules;
@@ -22,32 +22,58 @@ use forskscope_core::IgnoreRules;
 
 /// Per-entry comparison status shown in tree rows.
 #[derive(Clone, PartialEq, Debug)]
-pub enum DigestState { Computing, Equal, Different, Unique }
+pub enum DigestState {
+    Computing,
+    Equal,
+    Different,
+    Unique,
+}
 
 /// Per-pane navigation history (back/forward).
 #[derive(Clone, Default)]
-pub struct NavHistory { pub entries: Vec<PathBuf>, pub idx: usize }
+pub struct NavHistory {
+    pub entries: Vec<PathBuf>,
+    pub idx: usize,
+}
 
 impl NavHistory {
     pub fn push(&mut self, path: PathBuf) {
-        if self.entries.last().map(|p| p == &path).unwrap_or(false) { return; }
+        if self.entries.last().map(|p| p == &path).unwrap_or(false) {
+            return;
+        }
         self.entries.truncate(self.idx + 1);
         self.entries.push(path);
         self.idx = self.entries.len() - 1;
     }
-    pub fn can_back(&self) -> bool { self.idx > 0 }
-    pub fn can_forward(&self) -> bool { self.idx + 1 < self.entries.len() }
+    pub fn can_back(&self) -> bool {
+        self.idx > 0
+    }
+    pub fn can_forward(&self) -> bool {
+        self.idx + 1 < self.entries.len()
+    }
     pub fn back(&mut self) -> Option<PathBuf> {
-        if self.can_back() { self.idx -= 1; Some(self.entries[self.idx].clone()) } else { None }
+        if self.can_back() {
+            self.idx -= 1;
+            Some(self.entries[self.idx].clone())
+        } else {
+            None
+        }
     }
     pub fn forward(&mut self) -> Option<PathBuf> {
-        if self.can_forward() { self.idx += 1; Some(self.entries[self.idx].clone()) } else { None }
+        if self.can_forward() {
+            self.idx += 1;
+            Some(self.entries[self.idx].clone())
+        } else {
+            None
+        }
     }
 }
 
 // ── Filtering executor ────────────────────────────────────────────────────────
 
-pub struct FilteringExecutor { pub rules: IgnoreRules }
+pub struct FilteringExecutor {
+    pub rules: IgnoreRules,
+}
 // IgnoreRules is plain Vec<String>; Send + Sync derive automatically.
 
 impl ScanExecutor for FilteringExecutor {
@@ -59,8 +85,11 @@ impl ScanExecutor for FilteringExecutor {
                 if let Ok(ref mut entries) = p.result {
                     entries.retain(|e| {
                         let name = e.file_name().to_str().unwrap_or("");
-                        if e.is_dir { !rules.is_dir_ignored(name) }
-                        else        { !rules.is_file_ignored(name) }
+                        if e.is_dir {
+                            !rules.is_dir_ignored(name)
+                        } else {
+                            !rules.is_file_ignored(name)
+                        }
                     });
                 }
             }
@@ -83,25 +112,28 @@ impl ScanExecutor for FilteringExecutor {
 #[component]
 pub fn PathBar(
     path: PathBuf,
-    can_back: bool, can_forward: bool,
-    on_back:    EventHandler<()>,
+    can_back: bool,
+    can_forward: bool,
+    on_back: EventHandler<()>,
     on_forward: EventHandler<()>,
     on_navigate: EventHandler<PathBuf>,
     lang: Lang,
 ) -> Element {
     // Pre-compute everything before closures consume values.
     let segs = path_segs(&path);
-    let n    = segs.len();
-    let path_str        = path.display().to_string();
-    let path_str_reset  = path_str.clone();
-    let path_str_blur   = path_str.clone();
+    let n = segs.len();
+    let path_str = path.display().to_string();
+    let path_str_reset = path_str.clone();
+    let path_str_blur = path_str.clone();
 
-    let mut edit_mode: Signal<bool>   = use_signal(|| false);
+    let mut edit_mode: Signal<bool> = use_signal(|| false);
     let mut input_val: Signal<String> = use_signal(|| path_str.clone());
-    let mut input_err: Signal<bool>   = use_signal(|| false);
+    let mut input_err: Signal<bool> = use_signal(|| false);
 
     use_effect(move || {
-        if !*edit_mode.read() { input_val.set(path_str.clone()); }
+        if !*edit_mode.read() {
+            input_val.set(path_str.clone());
+        }
     });
 
     rsx! {
@@ -184,7 +216,11 @@ pub fn PathBar(
 
 #[component]
 pub fn TreeRow(
-    path: PathBuf, is_dir: bool, is_expanded: bool, is_selected: bool, depth: u32,
+    path: PathBuf,
+    is_dir: bool,
+    is_expanded: bool,
+    is_selected: bool,
+    depth: u32,
     status: Option<DigestState>,
     /// `true` when this file was sniffed as binary (RFC-066).
     #[props(default = false)]
@@ -192,27 +228,45 @@ pub fn TreeRow(
     /// `true` when binary comparison is enabled in Settings (RFC-066).
     #[props(default = true)]
     binary_enabled: bool,
-    on_toggle:    EventHandler<()>,
-    on_select:    EventHandler<()>,
-    on_dblclick:  EventHandler<()>,
+    on_toggle: EventHandler<()>,
+    on_select: EventHandler<()>,
+    on_dblclick: EventHandler<()>,
 ) -> Element {
     let indent = depth * 16;
-    let caret  = if !is_dir { "\u{00A0}" } else if is_expanded { "▾" } else { "▸" };
-    let icon   = if is_dir { "📁" } else { "📄" };
-    let name   = path.file_name().unwrap_or(OsStr::new("")).to_string_lossy().into_owned();
+    let caret = if !is_dir {
+        "\u{00A0}"
+    } else if is_expanded {
+        "▾"
+    } else {
+        "▸"
+    };
+    let icon = if is_dir { "📁" } else { "📄" };
+    let name = path
+        .file_name()
+        .unwrap_or(OsStr::new(""))
+        .to_string_lossy()
+        .into_owned();
 
     // Binary badge / disabled treatment (RFC-066).
     let binary_blocked = is_binary && !is_dir && !binary_enabled;
     let rc = if binary_blocked {
-        if is_selected { "tree-row selected binary-blocked" } else { "tree-row binary-blocked" }
-    } else if is_selected { "tree-row selected" } else { "tree-row" };
+        if is_selected {
+            "tree-row selected binary-blocked"
+        } else {
+            "tree-row binary-blocked"
+        }
+    } else if is_selected {
+        "tree-row selected"
+    } else {
+        "tree-row"
+    };
 
     let (st_icon, st_cls) = match &status {
-        None                         => ("",  ""),
+        None => ("", ""),
         Some(DigestState::Computing) => ("⟳", "st-computing"),
-        Some(DigestState::Equal)     => ("✓", "st-equal"),
+        Some(DigestState::Equal) => ("✓", "st-equal"),
         Some(DigestState::Different) => ("⚠", "st-diff"),
-        Some(DigestState::Unique)    => ("·", "st-unique"),
+        Some(DigestState::Unique) => ("·", "st-unique"),
     };
     rsx! {
         div {
@@ -238,22 +292,27 @@ pub fn TreeRow(
 
 pub fn path_segs(path: &Path) -> Vec<(PathBuf, String)> {
     let mut acc = PathBuf::new();
-    path.components().filter_map(|c| {
-        acc.push(&c);
-        let lbl = match &c {
-            Component::RootDir      => return None,   // handled by root icon prefix
-            Component::Prefix(p)    => p.as_os_str().to_string_lossy().into_owned(),
-            Component::Normal(name) => name.to_string_lossy().into_owned(),
-            Component::CurDir       => ".".into(),
-            Component::ParentDir    => "..".into(),
-        };
-        Some((acc.clone(), lbl))
-    }).collect()
+    path.components()
+        .filter_map(|c| {
+            acc.push(&c);
+            let lbl = match &c {
+                Component::RootDir => return None, // handled by root icon prefix
+                Component::Prefix(p) => p.as_os_str().to_string_lossy().into_owned(),
+                Component::Normal(name) => name.to_string_lossy().into_owned(),
+                Component::CurDir => ".".into(),
+                Component::ParentDir => "..".into(),
+            };
+            Some((acc.clone(), lbl))
+        })
+        .collect()
 }
 
 pub fn trunc_label(s: &str, max: usize) -> String {
-    if s.chars().count() <= max { s.into() }
-    else { format!("{}…", s.chars().take(max - 1).collect::<String>()) }
+    if s.chars().count() <= max {
+        s.into()
+    } else {
+        format!("{}…", s.chars().take(max - 1).collect::<String>())
+    }
 }
 
 pub fn home_dir() -> PathBuf {
@@ -264,12 +323,15 @@ pub fn home_dir() -> PathBuf {
 }
 
 pub fn short_name(p: &Path) -> String {
-    p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string())
+    p.file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| p.display().to_string())
 }
 
 /// Persist the new root in settings, push history, and update current_dir.
 pub fn navigate_to(
-    path: PathBuf, is_left: bool,
+    path: PathBuf,
+    is_left: bool,
     mut store: crate::state::Store,
     mut history: Signal<NavHistory>,
     mut current_dir: Signal<PathBuf>,
@@ -279,8 +341,11 @@ pub fn navigate_to(
         // Only remember the location when the user opted in (RFC-009 explorer
         // setting). When off, the panes always start at home next launch.
         if s.remember_explorer_dirs {
-            if is_left { s.last_left_dir = Some(path.clone()); }
-            else       { s.last_right_dir = Some(path.clone()); }
+            if is_left {
+                s.last_left_dir = Some(path.clone());
+            } else {
+                s.last_right_dir = Some(path.clone());
+            }
         }
     }
     // Persist so the remembered directory survives a restart. No-op effect on
@@ -293,7 +358,8 @@ pub fn navigate_to(
     // Scroll the aligned tree to top after navigation.
     spawn(async move {
         let _ = dioxus::document::eval(
-            "var t = document.getElementById('aligned-tree'); if(t) t.scrollTop = 0;"
-        ).await;
+            "var t = document.getElementById('aligned-tree'); if(t) t.scrollTop = 0;",
+        )
+        .await;
     });
 }

@@ -3,20 +3,23 @@
 
 use dioxus::prelude::*;
 
+use super::TabSnapshot;
 use crate::i18n::t;
 use crate::state::{Lang, Modal, Store, recompute_diff, reload_tab, swap_sides};
 use crate::ui::view::diff_actions::{algo_val, export_patch, save_tab};
 use crate::ui::view::search::SearchCtx;
-use super::TabSnapshot;
 
 #[component]
 pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
-    let mut store    = use_context::<Store>();
+    let mut store = use_context::<Store>();
     let mut advanced = use_signal(|| false);
     let mut search_ctx: Signal<SearchCtx> = use_context::<Signal<SearchCtx>>();
 
-    let pos = if snap.changes == 0 { String::new() }
-              else { format!("{} / {}", snap.focused_change + 1, snap.changes) };
+    let pos = if snap.changes == 0 {
+        String::new()
+    } else {
+        format!("{} / {}", snap.focused_change + 1, snap.changes)
+    };
 
     rsx! {
         // ── Primary toolbar ───────────────────────────────────────────────────

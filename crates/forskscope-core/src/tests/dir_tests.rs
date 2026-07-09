@@ -20,7 +20,11 @@ fn listing_separates_dirs_and_files_sorted() {
     let listing = list_dir(Some(&dir)).unwrap();
     assert_eq!(listing.dirs, vec!["asub", "zsub"]);
     assert_eq!(
-        listing.files.iter().map(|f| f.name.as_str()).collect::<Vec<_>>(),
+        listing
+            .files
+            .iter()
+            .map(|f| f.name.as_str())
+            .collect::<Vec<_>>(),
         vec!["a.txt", "b.txt"]
     );
     let a = listing.files.iter().find(|f| f.name == "a.txt").unwrap();
@@ -85,44 +89,55 @@ fn copy_file_creates_destination_parent_dirs() {
 #[test]
 fn recursive_diff_classifies_equal_changed_left_only_right_only() {
     let root = temp_dir("rec");
-    let left  = root.join("left");
+    let left = root.join("left");
     let right = root.join("right");
-    for d in [&left, &right] { fs::create_dir_all(d).unwrap(); }
+    for d in [&left, &right] {
+        fs::create_dir_all(d).unwrap();
+    }
 
     // equal file
-    fs::write(left.join("same.txt"),    "x").unwrap();
-    fs::write(right.join("same.txt"),   "x").unwrap();
+    fs::write(left.join("same.txt"), "x").unwrap();
+    fs::write(right.join("same.txt"), "x").unwrap();
     // changed file
-    fs::write(left.join("diff.txt"),    "v1").unwrap();
-    fs::write(right.join("diff.txt"),   "v2").unwrap();
+    fs::write(left.join("diff.txt"), "v1").unwrap();
+    fs::write(right.join("diff.txt"), "v2").unwrap();
     // left-only
-    fs::write(left.join("left_only.txt"),  "l").unwrap();
+    fs::write(left.join("left_only.txt"), "l").unwrap();
     // right-only
     fs::write(right.join("right_only.txt"), "r").unwrap();
 
     let entries = crate::dir::recursive_diff(&left, &right);
-    let status = |name: &str| entries.iter().find(|e| e.rel_path.to_str() == Some(name))
-        .map(|e| e.status).unwrap();
+    let status = |name: &str| {
+        entries
+            .iter()
+            .find(|e| e.rel_path.to_str() == Some(name))
+            .map(|e| e.status)
+            .unwrap()
+    };
     use crate::dir::RecStatus;
-    assert_eq!(status("same.txt"),        RecStatus::Equal);
-    assert_eq!(status("diff.txt"),        RecStatus::Changed);
-    assert_eq!(status("left_only.txt"),   RecStatus::LeftOnly);
-    assert_eq!(status("right_only.txt"),  RecStatus::RightOnly);
+    assert_eq!(status("same.txt"), RecStatus::Equal);
+    assert_eq!(status("diff.txt"), RecStatus::Changed);
+    assert_eq!(status("left_only.txt"), RecStatus::LeftOnly);
+    assert_eq!(status("right_only.txt"), RecStatus::RightOnly);
 }
 
 #[test]
 fn recursive_diff_descends_into_subdirectories() {
-    let root  = temp_dir("rec-nested");
-    let left  = root.join("l");
+    let root = temp_dir("rec-nested");
+    let left = root.join("l");
     let right = root.join("r");
     fs::create_dir_all(left.join("sub")).unwrap();
     fs::create_dir_all(right.join("sub")).unwrap();
-    fs::write(left.join("sub").join("a.rs"),  "old").unwrap();
+    fs::write(left.join("sub").join("a.rs"), "old").unwrap();
     fs::write(right.join("sub").join("a.rs"), "new").unwrap();
 
     let entries = crate::dir::recursive_diff(&left, &right);
-    assert!(entries.iter().any(|e| e.rel_path == std::path::Path::new("sub/a.rs")
-        && e.status == crate::dir::RecStatus::Changed));
+    assert!(
+        entries
+            .iter()
+            .any(|e| e.rel_path == std::path::Path::new("sub/a.rs")
+                && e.status == crate::dir::RecStatus::Changed)
+    );
 }
 
 // ── v0.34.0 additions ─────────────────────────────────────────────────────────
@@ -131,8 +146,14 @@ fn recursive_diff_descends_into_subdirectories() {
 fn list_dir_on_empty_directory_returns_no_entries() {
     let dir = temp_dir("empty-list");
     let listing = crate::dir::list_dir(Some(&dir)).unwrap();
-    assert!(listing.files.is_empty(), "empty directory must have no file entries");
-    assert!(listing.dirs.is_empty(),  "empty directory must have no dir entries");
+    assert!(
+        listing.files.is_empty(),
+        "empty directory must have no file entries"
+    );
+    assert!(
+        listing.dirs.is_empty(),
+        "empty directory must have no dir entries"
+    );
 }
 
 #[test]
@@ -141,9 +162,16 @@ fn list_dir_reports_last_modified_for_files() {
     let f = dir.join("check.txt");
     fs::write(&f, "hello").unwrap();
     let listing = crate::dir::list_dir(Some(&dir)).unwrap();
-    let entry = listing.files.iter().find(|e| e.name == "check.txt").expect("file must appear");
+    let entry = listing
+        .files
+        .iter()
+        .find(|e| e.name == "check.txt")
+        .expect("file must appear");
     // last_modified is a formatted string; just verify it's non-empty.
-    assert!(!entry.last_modified.is_empty(), "last_modified must be populated for real files");
+    assert!(
+        !entry.last_modified.is_empty(),
+        "last_modified must be populated for real files"
+    );
 }
 
 #[test]
@@ -156,8 +184,13 @@ fn list_dir_uses_current_dir_when_path_is_none() {
 #[test]
 fn recursive_diff_returns_empty_for_two_empty_directories() {
     let root = temp_dir("rec-empty");
-    let left  = root.join("l"); let right = root.join("r");
-    fs::create_dir_all(&left).unwrap(); fs::create_dir_all(&right).unwrap();
+    let left = root.join("l");
+    let right = root.join("r");
+    fs::create_dir_all(&left).unwrap();
+    fs::create_dir_all(&right).unwrap();
     let entries = crate::dir::recursive_diff(&left, &right);
-    assert!(entries.is_empty(), "two empty directories have no diff entries");
+    assert!(
+        entries.is_empty(),
+        "two empty directories have no diff entries"
+    );
 }

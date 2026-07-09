@@ -33,7 +33,10 @@ fn clone_observes_cancel_from_original() {
     let worker = original.clone();
     assert!(!worker.is_cancelled(), "clone must start uncancelled");
     original.cancel();
-    assert!(worker.is_cancelled(), "clone must observe cancel from original");
+    assert!(
+        worker.is_cancelled(),
+        "clone must observe cancel from original"
+    );
 }
 
 #[test]
@@ -41,7 +44,10 @@ fn original_observes_cancel_from_clone() {
     let original = CancellationToken::new();
     let worker = original.clone();
     worker.cancel();
-    assert!(original.is_cancelled(), "original must observe cancel from clone");
+    assert!(
+        original.is_cancelled(),
+        "original must observe cancel from clone"
+    );
 }
 
 #[test]

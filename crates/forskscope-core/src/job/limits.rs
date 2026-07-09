@@ -52,30 +52,29 @@ impl FileSizeClass {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PerformanceLimits {
     /// Upper bound (inclusive) for `FileSizeClass::Small` (bytes).
-    pub max_eager_text_bytes:           u64,
+    pub max_eager_text_bytes: u64,
     /// Upper bound (inclusive) for `FileSizeClass::Medium` (bytes).
-    pub medium_text_threshold_bytes:    u64,
+    pub medium_text_threshold_bytes: u64,
     /// Upper bound (inclusive) for `FileSizeClass::Large` (bytes).
     /// Files above this are `VeryLarge`.
-    pub large_text_threshold_bytes:     u64,
+    pub large_text_threshold_bytes: u64,
     /// Maximum number of characters in a hunk for eager inline diff.
     pub max_inline_diff_chars_per_hunk: usize,
     /// Maximum directory entries to compare without backgrounding.
-    pub max_directory_entries_eager:    usize,
+    pub max_directory_entries_eager: usize,
     /// Maximum lines in a text document before disabling some UI features.
-    pub max_eager_lines:                usize,
+    pub max_eager_lines: usize,
 }
 
 impl Default for PerformanceLimits {
     fn default() -> Self {
         Self {
-            max_eager_text_bytes:           512 * 1024,      //  512 KiB
-            medium_text_threshold_bytes:    4 * 1024 * 1024, //    4 MiB
-            large_text_threshold_bytes:     64 * 1024 * 1024,//   64 MiB
+            max_eager_text_bytes: 512 * 1024,             //  512 KiB
+            medium_text_threshold_bytes: 4 * 1024 * 1024, //    4 MiB
+            large_text_threshold_bytes: 64 * 1024 * 1024, //   64 MiB
             max_inline_diff_chars_per_hunk: 2_000,
-            max_directory_entries_eager:    500,
-            max_eager_lines:                50_000,
+            max_directory_entries_eager: 500,
+            max_eager_lines: 50_000,
         }
     }
 }
-

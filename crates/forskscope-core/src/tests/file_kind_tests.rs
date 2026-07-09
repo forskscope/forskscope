@@ -28,7 +28,9 @@ fn missing_is_not_mergeable() {
 
 #[test]
 fn unsupported_is_not_mergeable() {
-    let k = FileKind::Unsupported { reason: "test".into() };
+    let k = FileKind::Unsupported {
+        reason: "test".into(),
+    };
     assert!(!k.is_mergeable_text());
 }
 
@@ -100,6 +102,8 @@ fn classify_rust_source_returns_text() {
 fn classify_directory_returns_unsupported() {
     let dir = tempfile::tempdir().expect("tempdir creation must succeed");
     let kind = classify(dir.path()).expect("classify must not error on directory");
-    assert!(matches!(kind, FileKind::Unsupported { .. }),
-        "directory must classify as Unsupported, got: {kind:?}");
+    assert!(
+        matches!(kind, FileKind::Unsupported { .. }),
+        "directory must classify as Unsupported, got: {kind:?}"
+    );
 }

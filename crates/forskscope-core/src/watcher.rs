@@ -62,10 +62,10 @@ pub enum WatchError {
 impl std::fmt::Display for WatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::PathNotFound(p)        => write!(f, "path not found: {}", p.display()),
-            Self::BackendUnavailable(m)  => write!(f, "watcher backend unavailable: {m}"),
-            Self::AlreadyWatched(p)      => write!(f, "already watching: {}", p.display()),
-            Self::Other(m)               => write!(f, "watch error: {m}"),
+            Self::PathNotFound(p) => write!(f, "path not found: {}", p.display()),
+            Self::BackendUnavailable(m) => write!(f, "watcher backend unavailable: {m}"),
+            Self::AlreadyWatched(p) => write!(f, "already watching: {}", p.display()),
+            Self::Other(m) => write!(f, "watch error: {m}"),
         }
     }
 }
@@ -93,8 +93,8 @@ pub enum FileChangeKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileChangeEvent {
     pub token: WatchToken,
-    pub path:  PathBuf,
-    pub kind:  FileChangeKind,
+    pub path: PathBuf,
+    pub kind: FileChangeKind,
 }
 
 impl FileChangeEvent {
@@ -155,14 +155,17 @@ pub trait FileChangeMonitor: Send {
 #[derive(Debug, Default)]
 pub struct MockFileChangeMonitor {
     next_token: u64,
-    watched:    Vec<(WatchToken, PathBuf)>,
-    pending:    Vec<FileChangeEvent>,
-    active:     bool,
+    watched: Vec<(WatchToken, PathBuf)>,
+    pending: Vec<FileChangeEvent>,
+    active: bool,
 }
 
 impl MockFileChangeMonitor {
     pub fn new() -> Self {
-        Self { active: true, ..Default::default() }
+        Self {
+            active: true,
+            ..Default::default()
+        }
     }
 
     /// Inject a synthetic event into the pending queue.

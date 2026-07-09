@@ -15,23 +15,34 @@ fn decoration(old: &str, new: &str) -> DiffDecorationSet {
 #[test]
 fn all_line_decoration_kinds_have_non_empty_css_class() {
     for kind in [
-        LineDecorationKind::Unchanged, LineDecorationKind::Added,
-        LineDecorationKind::Deleted,  LineDecorationKind::Modified,
-        LineDecorationKind::EmptyCounterpart, LineDecorationKind::Conflict,
+        LineDecorationKind::Unchanged,
+        LineDecorationKind::Added,
+        LineDecorationKind::Deleted,
+        LineDecorationKind::Modified,
+        LineDecorationKind::EmptyCounterpart,
+        LineDecorationKind::Conflict,
         LineDecorationKind::MergeApplied,
     ] {
-        assert!(!kind.css_class().is_empty(), "{kind:?} must have a CSS class");
-        assert!(kind.css_class().starts_with("fs-"),
-            "{kind:?} CSS class must start with fs-");
+        assert!(
+            !kind.css_class().is_empty(),
+            "{kind:?} must have a CSS class"
+        );
+        assert!(
+            kind.css_class().starts_with("fs-"),
+            "{kind:?} CSS class must start with fs-"
+        );
     }
 }
 
 #[test]
 fn all_line_decoration_kinds_have_unique_css_classes() {
     let kinds = [
-        LineDecorationKind::Unchanged, LineDecorationKind::Added,
-        LineDecorationKind::Deleted,  LineDecorationKind::Modified,
-        LineDecorationKind::EmptyCounterpart, LineDecorationKind::Conflict,
+        LineDecorationKind::Unchanged,
+        LineDecorationKind::Added,
+        LineDecorationKind::Deleted,
+        LineDecorationKind::Modified,
+        LineDecorationKind::EmptyCounterpart,
+        LineDecorationKind::Conflict,
         LineDecorationKind::MergeApplied,
     ];
     let classes: std::collections::HashSet<_> = kinds.iter().map(|k| k.css_class()).collect();
@@ -72,7 +83,10 @@ fn conflict_line_has_exclamation_gutter_symbol() {
 #[test]
 fn identical_docs_produce_empty_decoration_set() {
     let d = decoration("hello\nworld\n", "hello\nworld\n");
-    assert!(d.is_empty(), "identical docs must produce no changed decorations");
+    assert!(
+        d.is_empty(),
+        "identical docs must produce no changed decorations"
+    );
     assert_eq!(d.changed_hunk_count(), 0);
 }
 
@@ -81,9 +95,14 @@ fn identical_docs_produce_empty_decoration_set() {
 #[test]
 fn inserted_lines_get_added_decoration_on_right() {
     let d = decoration("a\n", "a\nb\n");
-    let right_added = d.right.iter()
+    let right_added = d
+        .right
+        .iter()
         .any(|ld| ld.kind == LineDecorationKind::Added && ld.side == DiffSide::Right);
-    assert!(right_added, "inserted line must have Added decoration on right side");
+    assert!(
+        right_added,
+        "inserted line must have Added decoration on right side"
+    );
 }
 
 #[test]
@@ -97,9 +116,14 @@ fn insert_hunk_appears_in_hunk_list() {
 #[test]
 fn deleted_lines_get_deleted_decoration_on_left() {
     let d = decoration("a\nb\n", "a\n");
-    let left_deleted = d.left.iter()
+    let left_deleted = d
+        .left
+        .iter()
         .any(|ld| ld.kind == LineDecorationKind::Deleted && ld.side == DiffSide::Left);
-    assert!(left_deleted, "deleted line must have Deleted decoration on left side");
+    assert!(
+        left_deleted,
+        "deleted line must have Deleted decoration on left side"
+    );
 }
 
 // ── from_diff for replace hunk ────────────────────────────────────────────────
@@ -107,9 +131,15 @@ fn deleted_lines_get_deleted_decoration_on_left() {
 #[test]
 fn replaced_lines_get_modified_decoration_on_both_sides() {
     let d = decoration("hello\n", "world\n");
-    let left_mod  = d.left.iter().any(|ld| ld.kind == LineDecorationKind::Modified);
-    let right_mod = d.right.iter().any(|ld| ld.kind == LineDecorationKind::Modified);
-    assert!(left_mod,  "replaced old line must be Modified on left");
+    let left_mod = d
+        .left
+        .iter()
+        .any(|ld| ld.kind == LineDecorationKind::Modified);
+    let right_mod = d
+        .right
+        .iter()
+        .any(|ld| ld.kind == LineDecorationKind::Modified);
+    assert!(left_mod, "replaced old line must be Modified on left");
     assert!(right_mod, "replaced new line must be Modified on right");
 }
 
@@ -118,7 +148,9 @@ fn replaced_lines_get_modified_decoration_on_both_sides() {
 #[test]
 fn focused_hunk_id_marks_the_correct_hunk_decoration() {
     let doc = compute_diff("a\n", "b\n", DiffOptions::default());
-    let hunk_id = doc.hunks.iter()
+    let hunk_id = doc
+        .hunks
+        .iter()
         .find(|h| h.kind.is_change())
         .map(|h| h.hunk_id)
         .expect("must have a changed hunk");
@@ -139,11 +171,17 @@ fn no_focused_hunk_means_all_hunks_are_unfocused() {
 #[test]
 fn all_line_decoration_kinds_have_non_empty_aria_labels() {
     for kind in [
-        LineDecorationKind::Unchanged, LineDecorationKind::Added,
-        LineDecorationKind::Deleted,  LineDecorationKind::Modified,
-        LineDecorationKind::EmptyCounterpart, LineDecorationKind::Conflict,
+        LineDecorationKind::Unchanged,
+        LineDecorationKind::Added,
+        LineDecorationKind::Deleted,
+        LineDecorationKind::Modified,
+        LineDecorationKind::EmptyCounterpart,
+        LineDecorationKind::Conflict,
         LineDecorationKind::MergeApplied,
     ] {
-        assert!(!kind.aria_label().is_empty(), "{kind:?} must have an aria label");
+        assert!(
+            !kind.aria_label().is_empty(),
+            "{kind:?} must have an aria label"
+        );
     }
 }

@@ -78,11 +78,11 @@ fn save_creates_nested_parent_dirs() {
     let dir = temp_dir("save-nested");
     let target = dir.join("a").join("b").join("output.txt");
     let req = crate::save::SaveRequest {
-        target:           target.clone(),
-        content:          "nested\n".to_string(),
-        encoding_label:   "UTF-8".to_string(),
+        target: target.clone(),
+        content: "nested\n".to_string(),
+        encoding_label: "UTF-8".to_string(),
         expected_fingerprint: None,
-        backup:           crate::save::BackupPolicy::None,
+        backup: crate::save::BackupPolicy::None,
     };
     crate::save::save_text(&req).unwrap();
     assert_eq!(std::fs::read_to_string(&target).unwrap(), "nested\n");
@@ -94,15 +94,18 @@ fn save_without_backup_does_not_create_bak_file() {
     let target = dir.join("file.txt");
     std::fs::write(&target, "original").unwrap();
     let req = crate::save::SaveRequest {
-        target:           target.clone(),
-        content:          "overwritten\n".to_string(),
-        encoding_label:   "UTF-8".to_string(),
+        target: target.clone(),
+        content: "overwritten\n".to_string(),
+        encoding_label: "UTF-8".to_string(),
         expected_fingerprint: None,
-        backup:           crate::save::BackupPolicy::None,
+        backup: crate::save::BackupPolicy::None,
     };
     crate::save::save_text(&req).unwrap();
     let bak = dir.join("file.txt.bak");
-    assert!(!bak.exists(), "no backup should be created when policy is None");
+    assert!(
+        !bak.exists(),
+        "no backup should be created when policy is None"
+    );
     assert_eq!(std::fs::read_to_string(&target).unwrap(), "overwritten\n");
 }
 
@@ -119,16 +122,18 @@ fn conflict_error_contains_path_info() {
     std::fs::write(&target, "v2-external").unwrap();
 
     let req = crate::save::SaveRequest {
-        target:           target.clone(),
-        content:          "v3-ours\n".to_string(),
-        encoding_label:   "UTF-8".to_string(),
+        target: target.clone(),
+        content: "v3-ours\n".to_string(),
+        encoding_label: "UTF-8".to_string(),
         expected_fingerprint: Some(fp),
-        backup:           crate::save::BackupPolicy::None,
+        backup: crate::save::BackupPolicy::None,
     };
     let err = crate::save::save_text(&req).unwrap_err();
     // The error should be a Conflict variant.
-    assert!(matches!(err, crate::CoreError::Conflict { .. }),
-        "should report Conflict when file was externally changed");
+    assert!(
+        matches!(err, crate::CoreError::Conflict { .. }),
+        "should report Conflict when file was externally changed"
+    );
 }
 
 #[test]
@@ -162,8 +167,10 @@ fn backup_path_is_none_when_policy_is_none() {
         backup: BackupPolicy::None,
     };
     let outcome = save_text(&request).unwrap();
-    assert!(outcome.backup_path.is_none(),
-        "backup_path must be None when BackupPolicy::None is used");
+    assert!(
+        outcome.backup_path.is_none(),
+        "backup_path must be None when BackupPolicy::None is used"
+    );
 }
 
 #[test]
@@ -183,12 +190,16 @@ fn new_fingerprint_reflects_written_content() {
     };
     let outcome = save_text(&request).unwrap();
     // The new fingerprint must differ from the original.
-    assert_ne!(outcome.new_fingerprint.len, original_fp.len,
-        "new_fingerprint must reflect the updated file size");
+    assert_ne!(
+        outcome.new_fingerprint.len, original_fp.len,
+        "new_fingerprint must reflect the updated file size"
+    );
     // Re-capturing should give the same fingerprint as the outcome.
     let recaptured = FileFingerprint::capture(&target, None).unwrap();
-    assert_eq!(outcome.new_fingerprint.len, recaptured.len,
-        "new_fingerprint must match a fresh capture after write");
+    assert_eq!(
+        outcome.new_fingerprint.len, recaptured.len,
+        "new_fingerprint must match a fresh capture after write"
+    );
 }
 
 #[test]
@@ -204,8 +215,10 @@ fn encoding_fallback_to_utf8_is_true_for_unknown_encoding() {
     };
     let outcome = save_text(&request).unwrap();
     // Unknown encoding → UTF-8 fallback used → flag is true.
-    assert!(outcome.encoding_fallback_to_utf8,
-        "encoding_fallback_to_utf8 must be true when the label is unknown");
+    assert!(
+        outcome.encoding_fallback_to_utf8,
+        "encoding_fallback_to_utf8 must be true when the label is unknown"
+    );
     // Content must still have been written (as UTF-8).
     assert_eq!(fs::read_to_string(&target).unwrap(), "hello world\n");
 }
@@ -214,7 +227,7 @@ fn encoding_fallback_to_utf8_is_true_for_unknown_encoding() {
 fn written_bytes_matches_content_length() {
     let dir = temp_dir("written-bytes");
     let target = dir.join("file.txt");
-    let content = "line1\nline2\nline3\n";  // 18 bytes
+    let content = "line1\nline2\nline3\n"; // 18 bytes
     let request = SaveRequest {
         target: target.clone(),
         content: content.into(),
@@ -223,6 +236,8 @@ fn written_bytes_matches_content_length() {
         backup: BackupPolicy::None,
     };
     let outcome = save_text(&request).unwrap();
-    assert_eq!(outcome.written_bytes, 18,
-        "written_bytes must equal the byte length of the content");
+    assert_eq!(
+        outcome.written_bytes, 18,
+        "written_bytes must equal the byte length of the content"
+    );
 }

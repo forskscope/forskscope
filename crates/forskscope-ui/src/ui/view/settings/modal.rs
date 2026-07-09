@@ -3,20 +3,20 @@
 
 use dioxus::prelude::*;
 
+use super::profile::AddProfileInline;
+use super::{lf, lv, tf, tv};
 use crate::i18n::t;
 use crate::state::{Modal, Store};
-use super::{lf, lv, tf, tv};
-use super::profile::AddProfileInline;
 
 #[component]
 pub fn SettingsModal() -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
-    let cur  = store.settings.read().cloned();
+    let cur = store.settings.read().cloned();
 
     let mut show_new_profile = use_signal(|| false);
     // Progressive disclosure: Advanced hidden by default (RFC-063 C6).
-    let mut show_advanced    = use_signal(|| false);
+    let mut show_advanced = use_signal(|| false);
 
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Settings"),

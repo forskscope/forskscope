@@ -9,12 +9,16 @@ use forskscope_core::DiffOptions;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum Theme { Dark, Light, Night }
+pub enum Theme {
+    Dark,
+    Light,
+    Night,
+}
 
 impl Theme {
     pub fn css_class(self) -> &'static str {
         match self {
-            Self::Dark  => "theme-dark",
+            Self::Dark => "theme-dark",
             Self::Light => "theme-light",
             Self::Night => "theme-night",
         }
@@ -23,7 +27,10 @@ impl Theme {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum Lang { En, Ja }
+pub enum Lang {
+    En,
+    Ja,
+}
 
 // Re-export for UI use without depending on the core type directly.
 
@@ -62,29 +69,34 @@ impl DiffFontFamily {
     /// CSS `font-family` value for this preset.
     pub fn css_value(self) -> &'static str {
         match self {
-            Self::Monospace  => "ui-monospace, monospace",
-            Self::SansSerif  => "system-ui, sans-serif",
-            Self::Serif      => "Georgia, serif",
+            Self::Monospace => "ui-monospace, monospace",
+            Self::SansSerif => "system-ui, sans-serif",
+            Self::Serif => "Georgia, serif",
             Self::CourierNew => "Courier New, Courier, monospace",
-            Self::Consolas   => "Consolas, Menlo, monospace",
+            Self::Consolas => "Consolas, Menlo, monospace",
         }
     }
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
-pub enum DiffAlgorithmSetting { #[default] Myers, Patience, Histogram }
+pub enum DiffAlgorithmSetting {
+    #[default]
+    Myers,
+    Patience,
+    Histogram,
+}
 
 impl DiffProfile {
     pub fn to_diff_options(&self) -> DiffOptions {
         let algo = match self.algorithm {
-            DiffAlgorithmSetting::Myers     => DiffAlgorithm::Myers,
-            DiffAlgorithmSetting::Patience  => DiffAlgorithm::Patience,
+            DiffAlgorithmSetting::Myers => DiffAlgorithm::Myers,
+            DiffAlgorithmSetting::Patience => DiffAlgorithm::Patience,
             DiffAlgorithmSetting::Histogram => DiffAlgorithm::Histogram,
         };
         DiffOptions {
             ignore_whitespace: self.ignore_whitespace,
-            ignore_case:       self.ignore_case,
-            algorithm:         algo,
+            ignore_case: self.ignore_case,
+            algorithm: algo,
             ..DiffOptions::default()
         }
     }
@@ -92,10 +104,34 @@ impl DiffProfile {
 
 fn default_profiles() -> Vec<DiffProfile> {
     vec![
-        DiffProfile { name: "Exact (default)".into(),   ignore_whitespace: false, ignore_case: false, algorithm: DiffAlgorithmSetting::Myers,     built_in: true },
-        DiffProfile { name: "Ignore whitespace".into(), ignore_whitespace: true,  ignore_case: false, algorithm: DiffAlgorithmSetting::Myers,     built_in: true },
-        DiffProfile { name: "Ignore case".into(),       ignore_whitespace: false, ignore_case: true,  algorithm: DiffAlgorithmSetting::Myers,     built_in: true },
-        DiffProfile { name: "Histogram".into(),         ignore_whitespace: false, ignore_case: false, algorithm: DiffAlgorithmSetting::Histogram, built_in: true },
+        DiffProfile {
+            name: "Exact (default)".into(),
+            ignore_whitespace: false,
+            ignore_case: false,
+            algorithm: DiffAlgorithmSetting::Myers,
+            built_in: true,
+        },
+        DiffProfile {
+            name: "Ignore whitespace".into(),
+            ignore_whitespace: true,
+            ignore_case: false,
+            algorithm: DiffAlgorithmSetting::Myers,
+            built_in: true,
+        },
+        DiffProfile {
+            name: "Ignore case".into(),
+            ignore_whitespace: false,
+            ignore_case: true,
+            algorithm: DiffAlgorithmSetting::Myers,
+            built_in: true,
+        },
+        DiffProfile {
+            name: "Histogram".into(),
+            ignore_whitespace: false,
+            ignore_case: false,
+            algorithm: DiffAlgorithmSetting::Histogram,
+            built_in: true,
+        },
     ]
 }
 
@@ -138,18 +174,28 @@ pub struct AppSettings {
     pub remember_explorer_dirs: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
-fn default_ctx() -> usize { 3 }
+fn default_ctx() -> usize {
+    3
+}
 
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            theme: Theme::Dark, language: Lang::En, diff_font_size: 14,
+            theme: Theme::Dark,
+            language: Lang::En,
+            diff_font_size: 14,
             diff_font_family: DiffFontFamily::Monospace,
-            context_lines: 3, last_left_dir: None, last_right_dir: None,
-            profiles: default_profiles(), active_profile: 0,
-            ignore_extensions: String::new(), ignore_dirs: String::new(),
+            context_lines: 3,
+            last_left_dir: None,
+            last_right_dir: None,
+            profiles: default_profiles(),
+            active_profile: 0,
+            ignore_extensions: String::new(),
+            ignore_dirs: String::new(),
             enable_binary_comparison: false,
             explorer_compact: false,
             remember_explorer_dirs: true,
@@ -167,6 +213,6 @@ impl AppSettings {
 /// Specification for a batch file-copy operation (deep compare "Copy all").
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchCopySpec {
-    pub items: Vec<(PathBuf, PathBuf)>,   // (src, dst)
+    pub items: Vec<(PathBuf, PathBuf)>, // (src, dst)
     pub label: String,
 }

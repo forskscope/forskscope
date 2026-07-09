@@ -7,20 +7,20 @@ use std::path::PathBuf;
 use dioxus::prelude::*;
 use forskscope_ui_logic::AlignedRow;
 
+use super::DigestKey;
 use crate::i18n::t;
 use crate::state::Lang;
 use crate::ui::view::dir_pane::DigestState;
-use super::{DigestKey};
 
 // ── Filter bar component ──────────────────────────────────────────────────────
 
 #[component]
 pub fn FilterBar(
-    lang:            Lang,
-    filter_open:     Signal<bool>,
-    filter_query:    Signal<String>,
+    lang: Lang,
+    filter_open: Signal<bool>,
+    filter_query: Signal<String>,
     filter_hide_bin: Signal<bool>,
-    filter_hide_eq:  Signal<bool>,
+    filter_hide_eq: Signal<bool>,
 ) -> Element {
     rsx! {
         div { class: "filter-bar-row",
@@ -76,58 +76,79 @@ pub fn FilterBar(
 /// - `hide_eq`: hide pairs whose digest is `DigestState::Equal`.
 /// - `binary_enabled`: when `true`, the binary gate is open; hide_bin has no effect.
 pub fn apply_filter(
-    rows:           Vec<AlignedRow>,
-    query:          &str,
-    hide_bin:       bool,
-    hide_eq:        bool,
+    rows: Vec<AlignedRow>,
+    query: &str,
+    hide_bin: bool,
+    hide_eq: bool,
     binary_enabled: bool,
-    digest_map:     &HashMap<DigestKey, DigestState>,
-    binary_cache:   &mut Signal<HashMap<PathBuf, bool>>,
+    digest_map: &HashMap<DigestKey, DigestState>,
+    binary_cache: &mut Signal<HashMap<PathBuf, bool>>,
 ) -> Vec<AlignedRow> {
-    rows.into_iter().filter(|(lr, rr)| {
-        // Name filter.
-        let name_ok = if query.is_empty() { true } else {
-            let l_match = lr.as_ref().and_then(|r| r.rel_path.file_name())
-                .map(|n| n.to_string_lossy().to_lowercase().contains(query))
-                .unwrap_or(false);
-            let r_match = rr.as_ref().and_then(|r| r.rel_path.file_name())
-                .map(|n| n.to_string_lossy().to_lowercase().contains(query))
-                .unwrap_or(false);
-            l_match || r_match
-        };
-
-        // Hide-binary filter (only meaningful when binary comparison is off).
-        let bin_ok = if hide_bin && !binary_enabled {
-            let mut is_bin = |path: &PathBuf| -> bool {
-                let cached = binary_cache.read().get(path).copied();
-                cached.unwrap_or_else(|| {
-                    let b = matches!(
-                        forskscope_core::file_kind::classify(path),
-                        Ok(forskscope_core::file_kind::FileKind::Binary)
-                    );
-                    binary_cache.write().insert(path.clone(), b);
-                    b
-                })
+    rows.into_iter()
+        .filter(|(lr, rr)| {
+            // Name filter.
+            let name_ok = if query.is_empty() {
+                true
+            } else {
+                let l_match = lr
+                    .as_ref()
+                    .and_then(|r| r.rel_path.file_name())
+                    .map(|n| n.to_string_lossy().to_lowercase().contains(query))
+                    .unwrap_or(false);
+                let r_match = rr
+                    .as_ref()
+                    .and_then(|r| r.rel_path.file_name())
+                    .map(|n| n.to_string_lossy().to_lowercase().contains(query))
+                    .unwrap_or(false);
+                l_match || r_match
             };
-            let l_bin = lr.as_ref().map(|r| !r.is_dir && is_bin(&r.abs_path)).unwrap_or(false);
-            let r_bin = rr.as_ref().map(|r| !r.is_dir && is_bin(&r.abs_path)).unwrap_or(false);
-            match (lr.is_some(), rr.is_some()) {
-                (true,  true)  => !l_bin || !r_bin,
-                (true,  false) => !l_bin,
-                (false, true)  => !r_bin,
-                (false, false) => true,
-            }
-        } else { true };
 
-        // Hide-identical filter.
-        let eq_ok = if hide_eq {
-            let rel = lr.as_ref().or(rr.as_ref()).map(|r| r.rel_path.clone());
-            rel.map(|rel| !matches!(
-                digest_map.get(&DigestKey::Common(rel)),
-                Some(DigestState::Equal)
-            )).unwrap_or(true)
-        } else { true };
+            // Hide-binary filter (only meaningful when binary comparison is off).
+            let bin_ok = if hide_bin && !binary_enabled {
+                let mut is_bin = |path: &PathBuf| -> bool {
+                    let cached = binary_cache.read().get(path).copied();
+                    cached.unwrap_or_else(|| {
+                        let b = matches!(
+                            forskscope_core::file_kind::classify(path),
+                            Ok(forskscope_core::file_kind::FileKind::Binary)
+                        );
+                        binary_cache.write().insert(path.clone(), b);
+                        b
+                    })
+                };
+                let l_bin = lr
+                    .as_ref()
+                    .map(|r| !r.is_dir && is_bin(&r.abs_path))
+                    .unwrap_or(false);
+                let r_bin = rr
+                    .as_ref()
+                    .map(|r| !r.is_dir && is_bin(&r.abs_path))
+                    .unwrap_or(false);
+                match (lr.is_some(), rr.is_some()) {
+                    (true, true) => !l_bin || !r_bin,
+                    (true, false) => !l_bin,
+                    (false, true) => !r_bin,
+                    (false, false) => true,
+                }
+            } else {
+                true
+            };
 
-        name_ok && bin_ok && eq_ok
-    }).collect()
+            // Hide-identical filter.
+            let eq_ok = if hide_eq {
+                let rel = lr.as_ref().or(rr.as_ref()).map(|r| r.rel_path.clone());
+                rel.map(|rel| {
+                    !matches!(
+                        digest_map.get(&DigestKey::Common(rel)),
+                        Some(DigestState::Equal)
+                    )
+                })
+                .unwrap_or(true)
+            } else {
+                true
+            };
+
+            name_ok && bin_ok && eq_ok
+        })
+        .collect()
 }

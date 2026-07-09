@@ -2,8 +2,8 @@
 //! (RFC-028 §"Default profiles", §"Compare option types").
 
 use crate::diff::{
-    CaseSensitivity, CompareProfile, DiffAlgorithm, DiffOptions, InlineMode,
-    NewlineCompareMode, WhitespaceMode,
+    CaseSensitivity, CompareProfile, DiffAlgorithm, DiffOptions, InlineMode, NewlineCompareMode,
+    WhitespaceMode,
 };
 
 // ── Default profile ───────────────────────────────────────────────────────────
@@ -12,11 +12,11 @@ use crate::diff::{
 fn default_profile_has_expected_settings() {
     let p = CompareProfile::default_profile();
     assert_eq!(p.name, "Default");
-    assert_eq!(p.whitespace,  WhitespaceMode::Significant);
-    assert_eq!(p.newlines,    NewlineCompareMode::Significant);
-    assert_eq!(p.case,        CaseSensitivity::Sensitive);
+    assert_eq!(p.whitespace, WhitespaceMode::Significant);
+    assert_eq!(p.newlines, NewlineCompareMode::Significant);
+    assert_eq!(p.case, CaseSensitivity::Sensitive);
     assert_eq!(p.inline_mode, InlineMode::Lazy);
-    assert_eq!(p.algorithm,   DiffAlgorithm::Myers);
+    assert_eq!(p.algorithm, DiffAlgorithm::Myers);
 }
 
 // ── Code Review profile ───────────────────────────────────────────────────────
@@ -24,8 +24,11 @@ fn default_profile_has_expected_settings() {
 #[test]
 fn code_review_profile_uses_histogram_algorithm() {
     let p = CompareProfile::code_review();
-    assert_eq!(p.algorithm, DiffAlgorithm::Histogram,
-        "Code Review should use histogram diff for better hunk alignment");
+    assert_eq!(
+        p.algorithm,
+        DiffAlgorithm::Histogram,
+        "Code Review should use histogram diff for better hunk alignment"
+    );
 }
 
 // ── Loose Text profile ────────────────────────────────────────────────────────
@@ -34,7 +37,7 @@ fn code_review_profile_uses_histogram_algorithm() {
 fn loose_text_ignores_trailing_whitespace_and_newlines() {
     let p = CompareProfile::loose_text();
     assert_eq!(p.whitespace, WhitespaceMode::IgnoreTrailing);
-    assert_eq!(p.newlines,   NewlineCompareMode::IgnoreDifference);
+    assert_eq!(p.newlines, NewlineCompareMode::IgnoreDifference);
 }
 
 // ── Large File Safe profile ───────────────────────────────────────────────────
@@ -42,8 +45,11 @@ fn loose_text_ignores_trailing_whitespace_and_newlines() {
 #[test]
 fn large_file_safe_disables_inline_diff() {
     let p = CompareProfile::large_file_safe();
-    assert_eq!(p.inline_mode, InlineMode::None,
-        "Large file safe must disable inline diff");
+    assert_eq!(
+        p.inline_mode,
+        InlineMode::None,
+        "Large file safe must disable inline diff"
+    );
 }
 
 // ── All presets ───────────────────────────────────────────────────────────────
@@ -57,7 +63,10 @@ fn all_presets_returns_four_profiles() {
 fn all_preset_names_are_non_empty_and_unique() {
     let presets = CompareProfile::all_presets();
     let names: Vec<&str> = presets.iter().map(|p| p.name.as_str()).collect();
-    assert!(names.iter().all(|n| !n.is_empty()), "all names must be non-empty");
+    assert!(
+        names.iter().all(|n| !n.is_empty()),
+        "all names must be non-empty"
+    );
     let unique: std::collections::HashSet<_> = names.iter().copied().collect();
     assert_eq!(unique.len(), names.len(), "all preset names must be unique");
 }
@@ -74,8 +83,11 @@ fn default_compare_profile_is_default_profile() {
 #[test]
 fn default_profile_to_diff_options_has_expected_flags() {
     let opts = CompareProfile::default_profile().to_diff_options();
-    assert!(!opts.ignore_whitespace, "default profile: whitespace significant");
-    assert!(!opts.ignore_case,       "default profile: case sensitive");
+    assert!(
+        !opts.ignore_whitespace,
+        "default profile: whitespace significant"
+    );
+    assert!(!opts.ignore_case, "default profile: case sensitive");
     assert_eq!(opts.algorithm, DiffAlgorithm::Myers);
 }
 
@@ -88,12 +100,12 @@ fn loose_text_to_diff_options_enables_ignore_whitespace() {
 #[test]
 fn case_insensitive_profile_maps_to_ignore_case() {
     let p = CompareProfile {
-        name:        "Custom".into(),
-        whitespace:  WhitespaceMode::Significant,
-        newlines:    NewlineCompareMode::Significant,
-        case:        CaseSensitivity::Insensitive,
+        name: "Custom".into(),
+        whitespace: WhitespaceMode::Significant,
+        newlines: NewlineCompareMode::Significant,
+        case: CaseSensitivity::Insensitive,
         inline_mode: InlineMode::Lazy,
-        algorithm:   DiffAlgorithm::Myers,
+        algorithm: DiffAlgorithm::Myers,
     };
     assert!(p.to_diff_options().ignore_case);
 }
@@ -113,7 +125,10 @@ fn whitespace_mode_default_is_significant() {
 
 #[test]
 fn newline_compare_mode_default_is_significant() {
-    assert_eq!(NewlineCompareMode::default(), NewlineCompareMode::Significant);
+    assert_eq!(
+        NewlineCompareMode::default(),
+        NewlineCompareMode::Significant
+    );
 }
 
 #[test]
@@ -133,8 +148,10 @@ fn profile_with_ignore_newlines_sets_option() {
     let mut profile = CompareProfile::default_profile();
     profile.newlines = NewlineCompareMode::IgnoreDifference;
     let opts = profile.to_diff_options();
-    assert!(opts.ignore_newlines,
-        "IgnoreDifference must set ignore_newlines on DiffOptions");
+    assert!(
+        opts.ignore_newlines,
+        "IgnoreDifference must set ignore_newlines on DiffOptions"
+    );
 }
 
 #[test]
@@ -142,47 +159,61 @@ fn profile_with_significant_newlines_leaves_option_false() {
     let profile = CompareProfile::default_profile();
     // Default is Significant.
     let opts = profile.to_diff_options();
-    assert!(!opts.ignore_newlines,
-        "Significant newlines must not set ignore_newlines");
+    assert!(
+        !opts.ignore_newlines,
+        "Significant newlines must not set ignore_newlines"
+    );
 }
 
 #[test]
 fn lf_and_crlf_lines_are_equal_when_ignore_newlines_set() {
     use crate::diff::compute_diff;
     // Left uses LF, right uses CRLF for the same content.
-    let left  = "hello\nworld\n";
+    let left = "hello\nworld\n";
     let right = "hello\r\nworld\r\n";
 
-    let opts_ignore = DiffOptions { ignore_newlines: true, ..DiffOptions::default() };
+    let opts_ignore = DiffOptions {
+        ignore_newlines: true,
+        ..DiffOptions::default()
+    };
     let doc = compute_diff(left, right, opts_ignore);
-    assert!(doc.is_identical(),
-        "LF vs CRLF must be treated as equal when ignore_newlines is set");
+    assert!(
+        doc.is_identical(),
+        "LF vs CRLF must be treated as equal when ignore_newlines is set"
+    );
 }
 
 #[test]
 fn lf_and_crlf_lines_are_different_when_newlines_significant() {
     use crate::diff::compute_diff;
-    let left  = "hello\nworld\n";
+    let left = "hello\nworld\n";
     let right = "hello\r\nworld\r\n";
 
     let opts = DiffOptions::default(); // ignore_newlines = false
-    let doc  = compute_diff(left, right, opts);
+    let doc = compute_diff(left, right, opts);
     // With newlines significant, CRLF ≠ LF, so the lines differ.
-    assert!(!doc.is_identical(),
-        "LF vs CRLF must differ when newlines are significant");
+    assert!(
+        !doc.is_identical(),
+        "LF vs CRLF must differ when newlines are significant"
+    );
 }
 
 #[test]
 fn ignore_newlines_does_not_suppress_genuine_content_diff() {
     use crate::diff::compute_diff;
     // Even with ignore_newlines, different content must still show as changed.
-    let left  = "hello\n";
+    let left = "hello\n";
     let right = "world\r\n";
 
-    let opts = DiffOptions { ignore_newlines: true, ..DiffOptions::default() };
-    let doc  = compute_diff(left, right, opts);
-    assert!(!doc.is_identical(),
-        "Content differences must still be reported even when newlines are ignored");
+    let opts = DiffOptions {
+        ignore_newlines: true,
+        ..DiffOptions::default()
+    };
+    let doc = compute_diff(left, right, opts);
+    assert!(
+        !doc.is_identical(),
+        "Content differences must still be reported even when newlines are ignored"
+    );
 }
 
 #[test]

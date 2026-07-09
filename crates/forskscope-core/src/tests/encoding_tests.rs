@@ -82,17 +82,17 @@ fn detect_bom_utf16be_strips_two_bytes() {
 #[test]
 fn bom_presence_is_present_only_for_non_absent() {
     assert!(!BomPresence::Absent.is_present());
-    assert!( BomPresence::Utf8.is_present());
-    assert!( BomPresence::Utf16Le.is_present());
-    assert!( BomPresence::Utf16Be.is_present());
+    assert!(BomPresence::Utf8.is_present());
+    assert!(BomPresence::Utf16Le.is_present());
+    assert!(BomPresence::Utf16Be.is_present());
 }
 
 #[test]
 fn bom_presence_bytes_match_known_bom_sequences() {
-    assert_eq!(BomPresence::Absent.bytes(),   &[] as &[u8]);
-    assert_eq!(BomPresence::Utf8.bytes(),     &[0xEF, 0xBB, 0xBF]);
-    assert_eq!(BomPresence::Utf16Le.bytes(),  &[0xFF, 0xFE]);
-    assert_eq!(BomPresence::Utf16Be.bytes(),  &[0xFE, 0xFF]);
+    assert_eq!(BomPresence::Absent.bytes(), &[] as &[u8]);
+    assert_eq!(BomPresence::Utf8.bytes(), &[0xEF, 0xBB, 0xBF]);
+    assert_eq!(BomPresence::Utf16Le.bytes(), &[0xFF, 0xFE]);
+    assert_eq!(BomPresence::Utf16Be.bytes(), &[0xFE, 0xFF]);
 }
 
 // ── BomPolicy (RFC-012 §7.2 bullet 5) ────────────────────────────────────────
@@ -132,10 +132,7 @@ fn bom_policy_strip_always_produces_empty() {
 
 #[test]
 fn bom_policy_add_utf8_always_produces_utf8_bom() {
-    for presence in [
-        BomPresence::Absent,
-        BomPresence::Utf16Le,
-    ] {
+    for presence in [BomPresence::Absent, BomPresence::Utf16Le] {
         assert_eq!(
             BomPolicy::AddUtf8.resolve_bytes(presence),
             &[0xEF, 0xBB, 0xBF],

@@ -8,33 +8,33 @@ use std::path::PathBuf;
 
 use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
-use dioxus_swdir_tree::{DirectoryTree, DirectoryTreeEvent, SelectionMode, ScanRequest};
+use dioxus_swdir_tree::{DirectoryTree, DirectoryTreeEvent, ScanRequest, SelectionMode};
 use forskscope_ui_logic::AlignedRow;
 
+use super::{DigestKey, FocusedPane, PickKind};
 use crate::i18n::t;
 use crate::state::{Lang, Store, open_compare};
 use crate::ui::view::dir_pane::{DigestState, NavHistory, TreeRow, navigate_to};
-use super::{DigestKey, FocusedPane, PickKind};
 
 #[allow(clippy::too_many_arguments)]
 #[component]
 pub fn AlignedTree(
-    lang:             Lang,
-    aligned:          Vec<AlignedRow>,
-    mut tree_l:       Signal<DirectoryTree>,
-    mut tree_r:       Signal<DirectoryTree>,
-    scans_l:          Coroutine<ScanRequest>,
-    scans_r:          Coroutine<ScanRequest>,
-    left_dir:         Signal<PathBuf>,
-    right_dir:        Signal<PathBuf>,
-    left_hist:        Signal<NavHistory>,
-    right_hist:       Signal<NavHistory>,
-    mut left_pick:    Signal<Option<PickKind>>,
-    mut right_pick:   Signal<Option<PickKind>>,
+    lang: Lang,
+    aligned: Vec<AlignedRow>,
+    mut tree_l: Signal<DirectoryTree>,
+    mut tree_r: Signal<DirectoryTree>,
+    scans_l: Coroutine<ScanRequest>,
+    scans_r: Coroutine<ScanRequest>,
+    left_dir: Signal<PathBuf>,
+    right_dir: Signal<PathBuf>,
+    left_hist: Signal<NavHistory>,
+    right_hist: Signal<NavHistory>,
+    mut left_pick: Signal<Option<PickKind>>,
+    mut right_pick: Signal<Option<PickKind>>,
     mut focused_pane: Signal<FocusedPane>,
-    mut digest_map:   Signal<HashMap<DigestKey, DigestState>>,
+    mut digest_map: Signal<HashMap<DigestKey, DigestState>>,
     mut binary_cache: Signal<HashMap<PathBuf, bool>>,
-    binary_enabled:   bool,
+    binary_enabled: bool,
 ) -> Element {
     let mut store = use_context::<Store>();
     let l_root = left_dir.read().cloned();

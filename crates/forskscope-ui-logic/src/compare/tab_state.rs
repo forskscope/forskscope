@@ -18,29 +18,29 @@ use forskscope_core::command::CommandContext;
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TabStateSnapshot {
     /// A diff or compare tab is currently active.
-    pub has_active_diff_tab:     bool,
+    pub has_active_diff_tab: bool,
     /// A compare tab is active (any kind — text, binary, xlsx).
-    pub has_active_compare_tab:  bool,
+    pub has_active_compare_tab: bool,
     /// The active tab has unsaved changes.
-    pub active_tab_is_dirty:     bool,
+    pub active_tab_is_dirty: bool,
     /// The active tab's content can be saved (editable, has a target path).
-    pub active_tab_is_saveable:  bool,
+    pub active_tab_is_saveable: bool,
     /// The active tab contains at least one changed hunk.
-    pub active_tab_has_hunks:    bool,
+    pub active_tab_has_hunks: bool,
     /// There is a currently focused/highlighted hunk.
-    pub active_hunk_exists:      bool,
+    pub active_hunk_exists: bool,
     /// The right side of the active tab is editable (not read-only).
-    pub right_side_is_editable:  bool,
+    pub right_side_is_editable: bool,
     /// There is a focused conflict in a three-way merge session.
-    pub has_active_conflict:     bool,
+    pub has_active_conflict: bool,
     /// At least one conflict in the session is unresolved.
     pub any_conflict_unresolved: bool,
     /// The undo stack has entries.
-    pub can_undo:                bool,
+    pub can_undo: bool,
     /// The redo stack has entries.
-    pub can_redo:                bool,
+    pub can_redo: bool,
     /// A path is selected in the explorer pane.
-    pub selected_path_exists:    bool,
+    pub selected_path_exists: bool,
 }
 
 /// Derive a `CommandContext` from a `TabStateSnapshot`.
@@ -50,18 +50,18 @@ pub struct TabStateSnapshot {
 /// availability flags.
 pub fn context_from_snapshot(snap: &TabStateSnapshot) -> CommandContext {
     CommandContext {
-        has_active_diff_tab:     snap.has_active_diff_tab,
-        has_active_compare_tab:  snap.has_active_compare_tab,
-        active_tab_is_dirty:     snap.active_tab_is_dirty,
-        active_tab_is_saveable:  snap.active_tab_is_saveable,
-        active_tab_has_hunks:    snap.active_tab_has_hunks,
-        active_hunk_exists:      snap.active_hunk_exists,
-        right_side_is_editable:  snap.right_side_is_editable,
-        has_active_conflict:     snap.has_active_conflict,
+        has_active_diff_tab: snap.has_active_diff_tab,
+        has_active_compare_tab: snap.has_active_compare_tab,
+        active_tab_is_dirty: snap.active_tab_is_dirty,
+        active_tab_is_saveable: snap.active_tab_is_saveable,
+        active_tab_has_hunks: snap.active_tab_has_hunks,
+        active_hunk_exists: snap.active_hunk_exists,
+        right_side_is_editable: snap.right_side_is_editable,
+        has_active_conflict: snap.has_active_conflict,
         any_conflict_unresolved: snap.any_conflict_unresolved,
-        can_undo:                snap.can_undo,
-        can_redo:                snap.can_redo,
-        selected_path_exists:    snap.selected_path_exists,
+        can_undo: snap.can_undo,
+        can_redo: snap.can_redo,
+        selected_path_exists: snap.selected_path_exists,
         ..CommandContext::default()
     }
 }
@@ -69,19 +69,19 @@ pub fn context_from_snapshot(snap: &TabStateSnapshot) -> CommandContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use forskscope_core::command::{AvailabilityRule, CommandRegistry};
     use crate::compare::command_bar::{build_toolbar, find_item};
+    use forskscope_core::command::{AvailabilityRule, CommandRegistry};
 
     fn dirty_tab() -> TabStateSnapshot {
         TabStateSnapshot {
-            has_active_diff_tab:    true,
+            has_active_diff_tab: true,
             has_active_compare_tab: true,
-            active_tab_is_dirty:    true,
+            active_tab_is_dirty: true,
             active_tab_is_saveable: true,
-            active_tab_has_hunks:   true,
+            active_tab_has_hunks: true,
             right_side_is_editable: true,
-            active_hunk_exists:     true,
-            can_undo:               true,
+            active_hunk_exists: true,
+            can_undo: true,
             ..Default::default()
         }
     }
@@ -109,18 +109,28 @@ mod tests {
     fn context_wires_through_to_toolbar_correctly() {
         // End-to-end: TabStateSnapshot → CommandContext → build_toolbar → item enabled.
         let snap = dirty_tab();
-        let ctx  = context_from_snapshot(&snap);
-        let reg  = CommandRegistry::builtin();
+        let ctx = context_from_snapshot(&snap);
+        let reg = CommandRegistry::builtin();
         let sections = build_toolbar(&reg, &ctx);
 
-        assert!(find_item(&sections, "file.save").unwrap().enabled,
-            "save must be enabled for dirty+saveable tab");
-        assert!(find_item(&sections, "edit.undo").unwrap().enabled,
-            "undo must be enabled when can_undo is true");
-        assert!(!find_item(&sections, "edit.redo").unwrap().enabled,
-            "redo must be disabled when can_redo is false");
-        assert!(find_item(&sections, "navigate.next_difference").unwrap().enabled,
-            "next_difference must be enabled when tab has hunks");
+        assert!(
+            find_item(&sections, "file.save").unwrap().enabled,
+            "save must be enabled for dirty+saveable tab"
+        );
+        assert!(
+            find_item(&sections, "edit.undo").unwrap().enabled,
+            "undo must be enabled when can_undo is true"
+        );
+        assert!(
+            !find_item(&sections, "edit.redo").unwrap().enabled,
+            "redo must be disabled when can_redo is false"
+        );
+        assert!(
+            find_item(&sections, "navigate.next_difference")
+                .unwrap()
+                .enabled,
+            "next_difference must be enabled when tab has hunks"
+        );
     }
 
     #[test]
@@ -135,10 +145,18 @@ mod tests {
     fn context_from_snapshot_is_inverse_of_availability_evaluate() {
         // Verify the context fields satisfy the AvailabilityRule contracts.
         let snap = dirty_tab();
-        let ctx  = context_from_snapshot(&snap);
-        assert!(AvailabilityRule::DirtyAndSaveable.evaluate(&ctx).is_available());
+        let ctx = context_from_snapshot(&snap);
+        assert!(
+            AvailabilityRule::DirtyAndSaveable
+                .evaluate(&ctx)
+                .is_available()
+        );
         assert!(AvailabilityRule::HasHunks.evaluate(&ctx).is_available());
-        assert!(AvailabilityRule::ActiveHunkEditable.evaluate(&ctx).is_available());
+        assert!(
+            AvailabilityRule::ActiveHunkEditable
+                .evaluate(&ctx)
+                .is_available()
+        );
         assert!(AvailabilityRule::CanUndo.evaluate(&ctx).is_available());
         assert!(!AvailabilityRule::CanRedo.evaluate(&ctx).is_available());
     }
@@ -166,32 +184,58 @@ mod tests {
         let ctx = context_from_snapshot(&snap);
         let reg = CommandRegistry::builtin();
         let sections = build_toolbar(&reg, &ctx);
-        assert!(find_item(&sections, "edit.redo").unwrap().enabled,
-            "redo must be enabled when can_redo is true");
-        assert!(!find_item(&sections, "edit.undo").unwrap().enabled,
-            "undo must be disabled when can_undo is false");
+        assert!(
+            find_item(&sections, "edit.redo").unwrap().enabled,
+            "redo must be enabled when can_redo is true"
+        );
+        assert!(
+            !find_item(&sections, "edit.undo").unwrap().enabled,
+            "undo must be disabled when can_undo is false"
+        );
     }
 
     #[test]
     fn conflict_flags_are_forwarded_to_context() {
         let snap = TabStateSnapshot {
-            has_active_diff_tab:    true,
-            has_active_conflict:    true,
+            has_active_diff_tab: true,
+            has_active_conflict: true,
             any_conflict_unresolved: true,
             ..Default::default()
         };
         let ctx = context_from_snapshot(&snap);
-        assert!(ctx.has_active_conflict,     "has_active_conflict must be forwarded");
-        assert!(ctx.any_conflict_unresolved, "any_conflict_unresolved must be forwarded");
-        assert!(AvailabilityRule::ActiveConflict.evaluate(&ctx).is_available());
-        assert!(AvailabilityRule::AnyConflictUnresolved.evaluate(&ctx).is_available());
+        assert!(
+            ctx.has_active_conflict,
+            "has_active_conflict must be forwarded"
+        );
+        assert!(
+            ctx.any_conflict_unresolved,
+            "any_conflict_unresolved must be forwarded"
+        );
+        assert!(
+            AvailabilityRule::ActiveConflict
+                .evaluate(&ctx)
+                .is_available()
+        );
+        assert!(
+            AvailabilityRule::AnyConflictUnresolved
+                .evaluate(&ctx)
+                .is_available()
+        );
     }
 
     #[test]
     fn no_conflict_context_is_unavailable_for_conflict_rules() {
         let ctx = context_from_snapshot(&TabStateSnapshot::default());
-        assert!(!AvailabilityRule::ActiveConflict.evaluate(&ctx).is_available());
-        assert!(!AvailabilityRule::AnyConflictUnresolved.evaluate(&ctx).is_available());
+        assert!(
+            !AvailabilityRule::ActiveConflict
+                .evaluate(&ctx)
+                .is_available()
+        );
+        assert!(
+            !AvailabilityRule::AnyConflictUnresolved
+                .evaluate(&ctx)
+                .is_available()
+        );
     }
 
     #[test]
@@ -201,56 +245,71 @@ mod tests {
             ..Default::default()
         };
         let ctx = context_from_snapshot(&snap);
-        assert!(ctx.selected_path_exists, "selected_path_exists must be forwarded");
-        assert!(AvailabilityRule::SelectedPathExists.evaluate(&ctx).is_available());
+        assert!(
+            ctx.selected_path_exists,
+            "selected_path_exists must be forwarded"
+        );
+        assert!(
+            AvailabilityRule::SelectedPathExists
+                .evaluate(&ctx)
+                .is_available()
+        );
     }
 
     #[test]
     fn read_only_tab_disables_apply_hunk() {
         // right_side_is_editable = false: applying hunks must be unavailable.
         let snap = TabStateSnapshot {
-            has_active_diff_tab:    true,
+            has_active_diff_tab: true,
             has_active_compare_tab: true,
-            active_tab_has_hunks:   true,
-            active_hunk_exists:     true,
+            active_tab_has_hunks: true,
+            active_hunk_exists: true,
             right_side_is_editable: false, // xlsx or binary — read-only
             ..Default::default()
         };
         let ctx = context_from_snapshot(&snap);
         assert!(!ctx.right_side_is_editable);
-        assert!(!AvailabilityRule::ActiveHunkEditable.evaluate(&ctx).is_available(),
-            "applying a hunk must be unavailable when right side is read-only");
+        assert!(
+            !AvailabilityRule::ActiveHunkEditable
+                .evaluate(&ctx)
+                .is_available(),
+            "applying a hunk must be unavailable when right side is read-only"
+        );
     }
 
     #[test]
     fn editable_tab_without_focused_hunk_disables_apply() {
         let snap = TabStateSnapshot {
-            has_active_diff_tab:    true,
-            active_tab_has_hunks:   true,
+            has_active_diff_tab: true,
+            active_tab_has_hunks: true,
             right_side_is_editable: true,
-            active_hunk_exists:     false, // hunks exist but none focused
+            active_hunk_exists: false, // hunks exist but none focused
             ..Default::default()
         };
         let ctx = context_from_snapshot(&snap);
-        assert!(!AvailabilityRule::ActiveHunkEditable.evaluate(&ctx).is_available(),
-            "apply must be unavailable when no hunk is focused");
+        assert!(
+            !AvailabilityRule::ActiveHunkEditable
+                .evaluate(&ctx)
+                .is_available(),
+            "apply must be unavailable when no hunk is focused"
+        );
     }
 
     #[test]
     fn all_flags_true_snapshot_satisfies_all_rules() {
         let snap = TabStateSnapshot {
-            has_active_diff_tab:     true,
-            has_active_compare_tab:  true,
-            active_tab_is_dirty:     true,
-            active_tab_is_saveable:  true,
-            active_tab_has_hunks:    true,
-            active_hunk_exists:      true,
-            right_side_is_editable:  true,
-            has_active_conflict:     true,
+            has_active_diff_tab: true,
+            has_active_compare_tab: true,
+            active_tab_is_dirty: true,
+            active_tab_is_saveable: true,
+            active_tab_has_hunks: true,
+            active_hunk_exists: true,
+            right_side_is_editable: true,
+            has_active_conflict: true,
             any_conflict_unresolved: true,
-            can_undo:                true,
-            can_redo:                true,
-            selected_path_exists:    true,
+            can_undo: true,
+            can_redo: true,
+            selected_path_exists: true,
         };
         let ctx = context_from_snapshot(&snap);
         for rule in [
@@ -263,8 +322,10 @@ mod tests {
             AvailabilityRule::AnyConflictUnresolved,
             AvailabilityRule::SelectedPathExists,
         ] {
-            assert!(rule.evaluate(&ctx).is_available(),
-                "{rule:?} must be available when all flags are true");
+            assert!(
+                rule.evaluate(&ctx).is_available(),
+                "{rule:?} must be available when all flags are true"
+            );
         }
     }
 }

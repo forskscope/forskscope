@@ -12,8 +12,7 @@ use crate::vcs::{GitProvider, VcsFileChange, VcsProvider, VcsRevision, detect};
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn tmp(tag: &str) -> PathBuf {
-    let d = std::env::temp_dir()
-        .join(format!("fsk-vcs-{tag}-{}", std::process::id()));
+    let d = std::env::temp_dir().join(format!("fsk-vcs-{tag}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&d);
     fs::create_dir_all(&d).unwrap();
     d
@@ -93,7 +92,10 @@ fn status_empty_for_clean_working_tree() {
     init_repo(&dir);
     let git = GitProvider::detect(&dir).unwrap();
     let status = git.status().unwrap();
-    assert!(status.is_empty(), "clean working tree should have no status entries");
+    assert!(
+        status.is_empty(),
+        "clean working tree should have no status entries"
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -106,8 +108,10 @@ fn status_reports_untracked_file_as_added() {
     let status = git.status().unwrap();
     let entry = status.iter().find(|s| s.path.ends_with("new.rs"));
     assert!(entry.is_some(), "new untracked file must appear in status");
-    assert!(matches!(entry.unwrap().change, VcsFileChange::Added),
-        "untracked file must be reported as Added");
+    assert!(
+        matches!(entry.unwrap().change, VcsFileChange::Added),
+        "untracked file must be reported as Added"
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -120,8 +124,10 @@ fn status_reports_modified_file() {
     let status = git.status().unwrap();
     let entry = status.iter().find(|s| s.path.ends_with("README.md"));
     assert!(entry.is_some(), "modified file must appear in status");
-    assert!(matches!(entry.unwrap().change, VcsFileChange::Modified),
-        "modified file must be reported as Modified");
+    assert!(
+        matches!(entry.unwrap().change, VcsFileChange::Modified),
+        "modified file must be reported as Modified"
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -134,8 +140,10 @@ fn status_reports_deleted_file() {
     let status = git.status().unwrap();
     let entry = status.iter().find(|s| s.path.ends_with("README.md"));
     assert!(entry.is_some(), "deleted file must appear in status");
-    assert!(matches!(entry.unwrap().change, VcsFileChange::Deleted),
-        "deleted file must be reported as Deleted");
+    assert!(
+        matches!(entry.unwrap().change, VcsFileChange::Deleted),
+        "deleted file must be reported as Deleted"
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -147,8 +155,13 @@ fn read_head_file_returns_content_at_head() {
     init_repo(&dir);
     // README.md was committed with "# test\n".
     let git = GitProvider::detect(&dir).unwrap();
-    let bytes = git.read_revision_file(&VcsRevision::head(), "README.md".as_ref()).unwrap();
-    assert_eq!(bytes, b"# test\n", "HEAD file content must match committed content");
+    let bytes = git
+        .read_revision_file(&VcsRevision::head(), "README.md".as_ref())
+        .unwrap();
+    assert_eq!(
+        bytes, b"# test\n",
+        "HEAD file content must match committed content"
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -181,7 +194,10 @@ fn merge_base_of_head_with_itself_returns_head_hash() {
 fn git_provider_detect_returns_none_outside_git_repo() {
     let dir = tmp("no-git");
     let result = GitProvider::detect(&dir);
-    assert!(result.is_none(), "GitProvider::detect must return None outside a repo");
+    assert!(
+        result.is_none(),
+        "GitProvider::detect must return None outside a repo"
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 

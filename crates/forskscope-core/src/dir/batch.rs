@@ -70,7 +70,7 @@ pub struct BatchItem {
 #[derive(Debug, Clone)]
 pub enum EntryOutcome {
     Copied {
-        bytes:       u64,
+        bytes: u64,
         backup_path: Option<PathBuf>,
     },
     Skipped {
@@ -90,20 +90,20 @@ impl EntryOutcome {
 /// Per-entry record in the manifest.
 #[derive(Debug, Clone)]
 pub struct ManifestEntry {
-    pub src:     PathBuf,
-    pub dst:     PathBuf,
+    pub src: PathBuf,
+    pub dst: PathBuf,
     pub outcome: EntryOutcome,
 }
 
 /// The restore manifest written to disk at the end of a batch.
 #[derive(Debug, Clone)]
 pub struct BatchManifest {
-    pub operation_id:     OperationId,
-    pub app_version:      String,
+    pub operation_id: OperationId,
+    pub app_version: String,
     pub created_unix_sec: u64,
-    pub entries:          Vec<ManifestEntry>,
+    pub entries: Vec<ManifestEntry>,
     /// Path where the manifest JSON was written, set after [`BatchResult::write_manifest`].
-    pub manifest_path:    Option<PathBuf>,
+    pub manifest_path: Option<PathBuf>,
 }
 
 impl BatchManifest {
@@ -129,7 +129,10 @@ impl BatchManifest {
     }
 
     pub fn succeeded(&self) -> usize {
-        self.entries.iter().filter(|e| e.outcome.is_success()).count()
+        self.entries
+            .iter()
+            .filter(|e| e.outcome.is_success())
+            .count()
     }
 
     pub fn failed(&self) -> usize {
@@ -144,7 +147,11 @@ impl BatchManifest {
         self.entries
             .iter()
             .filter_map(|e| {
-                if let EntryOutcome::Copied { backup_path: Some(bp), .. } = &e.outcome {
+                if let EntryOutcome::Copied {
+                    backup_path: Some(bp),
+                    ..
+                } = &e.outcome
+                {
                     Some(bp)
                 } else {
                     None
@@ -195,8 +202,7 @@ impl BatchManifest {
     /// Write the manifest JSON to `dir/<operation_id>.json`. Stores the
     /// resulting path in `self.manifest_path`.
     pub fn write_to_dir(&mut self, dir: &Path) -> Result<()> {
-        fs::create_dir_all(dir)
-            .map_err(|e| CoreError::io(dir, IoOperation::Write, &e))?;
+        fs::create_dir_all(dir).map_err(|e| CoreError::io(dir, IoOperation::Write, &e))?;
         let path = dir.join(format!("{}.json", self.operation_id.0));
         fs::write(&path, self.to_json())
             .map_err(|e| CoreError::io(&path, IoOperation::Write, &e))?;
@@ -217,10 +223,10 @@ impl BatchManifest {
 /// Returns the completed manifest. Check `manifest.failed()` to determine
 /// whether any entries failed.
 pub fn batch_copy(
-    items:         &[BatchItem],
-    backup:        BackupPolicy,
+    items: &[BatchItem],
+    backup: BackupPolicy,
     failure_policy: BatchFailurePolicy,
-    manifest_dir:  Option<&Path>,
+    manifest_dir: Option<&Path>,
 ) -> Result<BatchManifest> {
     let op_id = OperationId::new();
     let mut manifest = BatchManifest::new(op_id);
@@ -232,7 +238,7 @@ pub fn batch_copy(
                     src: item.src.clone(),
                     dst: item.dst.clone(),
                     outcome: EntryOutcome::Copied {
-                        bytes:       outcome.bytes_copied,
+                        bytes: outcome.bytes_copied,
                         backup_path: outcome.backup_path,
                     },
                 });
@@ -241,7 +247,9 @@ pub fn batch_copy(
                 manifest.entries.push(ManifestEntry {
                     src: item.src.clone(),
                     dst: item.dst.clone(),
-                    outcome: EntryOutcome::Failed { error: e.to_string() },
+                    outcome: EntryOutcome::Failed {
+                        error: e.to_string(),
+                    },
                 });
                 if failure_policy == BatchFailurePolicy::StopOnFirst {
                     // Mark remaining items as skipped.
@@ -277,7 +285,11 @@ pub fn batch_copy(
 pub fn restore_from_manifest(manifest: &BatchManifest) -> usize {
     let mut restored = 0;
     for entry in &manifest.entries {
-        if let EntryOutcome::Copied { backup_path: Some(bp), .. } = &entry.outcome {
+        if let EntryOutcome::Copied {
+            backup_path: Some(bp),
+            ..
+        } = &entry.outcome
+        {
             if bp.exists() && fs::copy(bp, &entry.dst).is_ok() {
                 restored += 1;
             }

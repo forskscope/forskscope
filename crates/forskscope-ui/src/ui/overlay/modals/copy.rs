@@ -75,7 +75,7 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
 #[component]
 pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
     let mut store = use_context::<Store>();
-    let lang  = store.lang();
+    let lang = store.lang();
     let count = spec.items.len();
     let label = spec.label.clone();
     rsx! {
@@ -137,14 +137,23 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
 #[component]
 pub fn BatchResultModal(spec: BatchResultSpec) -> Element {
     let mut store = use_context::<Store>();
-    let lang  = store.lang();
+    let lang = store.lang();
     let title = if spec.all_succeeded() {
-        format!("{} {} {}", t(lang, "Copied"), spec.succeeded, t(lang, "files"))
+        format!(
+            "{} {} {}",
+            t(lang, "Copied"),
+            spec.succeeded,
+            t(lang, "files")
+        )
     } else {
-        format!("{}: {} {}, {} {}",
+        format!(
+            "{}: {} {}, {} {}",
             t(lang, "Copy finished"),
-            spec.succeeded, t(lang, "succeeded"),
-            spec.failed,    t(lang, "failed"))
+            spec.succeeded,
+            t(lang, "succeeded"),
+            spec.failed,
+            t(lang, "failed")
+        )
     };
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Copy result"),

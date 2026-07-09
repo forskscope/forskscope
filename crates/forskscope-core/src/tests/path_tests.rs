@@ -9,28 +9,31 @@ use crate::path::{canonicalize_lenient, display, has_extension, split_parent_nam
 #[test]
 fn split_parent_name_typical_path() {
     let (parent, name) = split_parent_name(Path::new("/home/user/project/main.rs"));
-    assert_eq!(name,   "main.rs");
-    assert!(parent.ends_with("project"), "parent should end with 'project'");
+    assert_eq!(name, "main.rs");
+    assert!(
+        parent.ends_with("project"),
+        "parent should end with 'project'"
+    );
 }
 
 #[test]
 fn split_parent_name_root_file() {
     let (parent, name) = split_parent_name(Path::new("/file.txt"));
-    assert_eq!(name,   "file.txt");
+    assert_eq!(name, "file.txt");
     assert_eq!(parent, "/");
 }
 
 #[test]
 fn split_parent_name_relative_path() {
     let (parent, name) = split_parent_name(Path::new("src/lib.rs"));
-    assert_eq!(name,   "lib.rs");
+    assert_eq!(name, "lib.rs");
     assert_eq!(parent, "src");
 }
 
 #[test]
 fn split_parent_name_filename_only() {
     let (parent, name) = split_parent_name(Path::new("README.md"));
-    assert_eq!(name,   "README.md");
+    assert_eq!(name, "README.md");
     assert_eq!(parent, "");
 }
 
@@ -49,8 +52,10 @@ fn has_extension_matches_exact() {
 
 #[test]
 fn has_extension_case_insensitive() {
-    assert!(has_extension(Path::new("data.XLSX"), "xlsx"),
-        "extension check must be ASCII case-insensitive");
+    assert!(
+        has_extension(Path::new("data.XLSX"), "xlsx"),
+        "extension check must be ASCII case-insensitive"
+    );
     assert!(has_extension(Path::new("data.xlsx"), "XLSX"));
 }
 

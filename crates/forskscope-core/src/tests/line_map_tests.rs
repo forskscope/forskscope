@@ -1,9 +1,7 @@
 //! LineMap, AlignedRow, ScrollAnchor, and mini-map tests (RFC-035).
 
 use crate::diff::{DiffOptions, compute_diff};
-use crate::line_map::{
-    LineMap, RowState, ScrollAnchor, build_mini_map,
-};
+use crate::line_map::{LineMap, RowState, ScrollAnchor, build_mini_map};
 
 fn map(old: &str, new: &str) -> LineMap {
     let doc = compute_diff(old, new, DiffOptions::default());
@@ -15,22 +13,29 @@ fn map(old: &str, new: &str) -> LineMap {
 #[test]
 fn row_state_gutter_symbols_are_distinct() {
     let states = [
-        RowState::Equal, RowState::Inserted, RowState::Deleted,
-        RowState::Modified, RowState::Conflict, RowState::Collapsed,
+        RowState::Equal,
+        RowState::Inserted,
+        RowState::Deleted,
+        RowState::Modified,
+        RowState::Conflict,
+        RowState::Collapsed,
         RowState::Unknown,
     ];
-    let syms: std::collections::HashSet<char> =
-        states.iter().map(|s| s.gutter_symbol()).collect();
-    assert_eq!(syms.len(), states.len(), "all gutter symbols must be distinct");
+    let syms: std::collections::HashSet<char> = states.iter().map(|s| s.gutter_symbol()).collect();
+    assert_eq!(
+        syms.len(),
+        states.len(),
+        "all gutter symbols must be distinct"
+    );
 }
 
 #[test]
 fn is_changed_is_true_for_insert_delete_modified_conflict() {
     assert!(!RowState::Equal.is_changed());
-    assert!( RowState::Inserted.is_changed());
-    assert!( RowState::Deleted.is_changed());
-    assert!( RowState::Modified.is_changed());
-    assert!( RowState::Conflict.is_changed());
+    assert!(RowState::Inserted.is_changed());
+    assert!(RowState::Deleted.is_changed());
+    assert!(RowState::Modified.is_changed());
+    assert!(RowState::Conflict.is_changed());
     assert!(!RowState::Collapsed.is_changed());
     assert!(!RowState::Unknown.is_changed());
 }
@@ -58,9 +63,19 @@ fn insert_adds_right_only_row() {
 #[test]
 fn inserted_row_has_no_left_span() {
     let m = map("a\n", "a\nb\n");
-    let inserted_row = m.rows.iter().find(|r| r.state == RowState::Inserted).unwrap();
-    assert!(inserted_row.left.is_none(), "pure insert row must have no left span");
-    assert!(inserted_row.right.is_some(), "pure insert row must have right span");
+    let inserted_row = m
+        .rows
+        .iter()
+        .find(|r| r.state == RowState::Inserted)
+        .unwrap();
+    assert!(
+        inserted_row.left.is_none(),
+        "pure insert row must have no left span"
+    );
+    assert!(
+        inserted_row.right.is_some(),
+        "pure insert row must have right span"
+    );
 }
 
 // ── LineMap from delete ───────────────────────────────────────────────────────
@@ -70,8 +85,15 @@ fn delete_adds_left_only_row() {
     let m = map("a\nb\n", "a\n");
     let deleted = m.rows.iter().any(|r| r.state == RowState::Deleted);
     assert!(deleted);
-    let deleted_row = m.rows.iter().find(|r| r.state == RowState::Deleted).unwrap();
-    assert!(deleted_row.right.is_none(), "pure delete row must have no right span");
+    let deleted_row = m
+        .rows
+        .iter()
+        .find(|r| r.state == RowState::Deleted)
+        .unwrap();
+    assert!(
+        deleted_row.right.is_none(),
+        "pure delete row must have no right span"
+    );
 }
 
 // ── LineMap from replace ──────────────────────────────────────────────────────
@@ -79,8 +101,15 @@ fn delete_adds_left_only_row() {
 #[test]
 fn replace_produces_modified_rows() {
     let m = map("hello\n", "world\n");
-    let modified_count = m.rows.iter().filter(|r| r.state == RowState::Modified).count();
-    assert!(modified_count > 0, "replace hunk must produce Modified rows");
+    let modified_count = m
+        .rows
+        .iter()
+        .filter(|r| r.state == RowState::Modified)
+        .count();
+    assert!(
+        modified_count > 0,
+        "replace hunk must produce Modified rows"
+    );
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
@@ -98,8 +127,10 @@ fn prev_changed_row_returns_none_before_any_change() {
     let m = map("a\n", "a\nb\n");
     // Row 0 is Equal ("a\n"), change is at row 1.
     let row = m.prev_changed_row(1);
-    assert!(row.is_none() || !row.unwrap().state.is_changed(),
-        "prev from before first change must return None");
+    assert!(
+        row.is_none() || !row.unwrap().state.is_changed(),
+        "prev from before first change must return None"
+    );
 }
 
 #[test]
@@ -113,9 +144,15 @@ fn changed_rows_iterator_count_matches_changed_row_count() {
 #[test]
 fn equal_rows_are_paired() {
     let m = map("a\nb\n", "a\nc\n");
-    let equal_rows: Vec<_> = m.rows.iter().filter(|r| r.state == RowState::Equal).collect();
-    assert!(equal_rows.iter().all(|r| r.is_paired()),
-        "equal rows must have both left and right spans");
+    let equal_rows: Vec<_> = m
+        .rows
+        .iter()
+        .filter(|r| r.state == RowState::Equal)
+        .collect();
+    assert!(
+        equal_rows.iter().all(|r| r.is_paired()),
+        "equal rows must have both left and right spans"
+    );
 }
 
 // ── ScrollAnchor ──────────────────────────────────────────────────────────────
@@ -132,7 +169,10 @@ fn scroll_anchor_clamped_clamps_fraction() {
     let a = ScrollAnchor::clamped(5, 1.5);
     assert!(a.row_fraction < 1.0, "fraction must be clamped below 1.0");
     let b = ScrollAnchor::clamped(5, -0.5);
-    assert_eq!(b.row_fraction, 0.0, "negative fraction must be clamped to 0.0");
+    assert_eq!(
+        b.row_fraction, 0.0,
+        "negative fraction must be clamped to 0.0"
+    );
 }
 
 // ── Mini-map ──────────────────────────────────────────────────────────────────
@@ -150,8 +190,10 @@ fn build_mini_map_splits_on_state_change() {
     let m = map("a\n", "b\n");
     let segments = build_mini_map(&m);
     // A replace hunk with no surrounding context = just the Modified segment.
-    assert!(segments.iter().any(|s| s.state == RowState::Modified),
-        "replace hunk must appear as Modified segment in mini-map");
+    assert!(
+        segments.iter().any(|s| s.state == RowState::Modified),
+        "replace hunk must appear as Modified segment in mini-map"
+    );
 }
 
 #[test]
@@ -159,8 +201,11 @@ fn mini_map_weights_sum_to_total_row_count() {
     let m = map("a\nb\nc\n", "a\nB\nC\n");
     let segments = build_mini_map(&m);
     let total_weight: u32 = segments.iter().map(|s| s.weight).sum();
-    assert_eq!(total_weight as usize, m.rows.len(),
-        "segment weights must sum to total row count");
+    assert_eq!(
+        total_weight as usize,
+        m.rows.len(),
+        "segment weights must sum to total row count"
+    );
 }
 
 #[test]

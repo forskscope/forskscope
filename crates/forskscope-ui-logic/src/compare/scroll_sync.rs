@@ -39,11 +39,11 @@ use forskscope_core::line_map::ScrollAnchor;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ScrollSyncState {
     /// The current scroll anchor — shared across left and right panes.
-    pub anchor:         ScrollAnchor,
+    pub anchor: ScrollAnchor,
     /// Uniform row height in CSS pixels. Comes from `--diff-fs * line-height`.
-    pub row_height_px:  f32,
+    pub row_height_px: f32,
     /// Total number of aligned rows in the diff.
-    pub total_rows:     usize,
+    pub total_rows: usize,
 }
 
 impl ScrollSyncState {
@@ -84,10 +84,7 @@ impl ScrollSyncState {
     /// Move the anchor to point at `hunk_first_row` (used by hunk navigation).
     pub fn scroll_to_row(self, row_index: usize) -> Self {
         Self {
-            anchor: ScrollAnchor::clamped(
-                row_index.min(self.total_rows.saturating_sub(1)),
-                0.0,
-            ),
+            anchor: ScrollAnchor::clamped(row_index.min(self.total_rows.saturating_sub(1)), 0.0),
             ..self
         }
     }
@@ -108,7 +105,7 @@ impl ScrollSyncState {
 mod tests {
     use super::*;
 
-    const ROW_H: f32 = 20.0;  // 20 px per row — easy arithmetic
+    const ROW_H: f32 = 20.0; // 20 px per row — easy arithmetic
 
     fn state(total: usize) -> ScrollSyncState {
         ScrollSyncState::at_top(ROW_H, total)
@@ -163,8 +160,10 @@ mod tests {
         let input_px = 135.0_f32;
         let s = ScrollSyncState::from_scroll_top(input_px, ROW_H, 100);
         let back = s.scroll_top_px();
-        assert!((back - input_px).abs() < 0.5,
-            "round-trip: input={input_px} back={back}");
+        assert!(
+            (back - input_px).abs() < 0.5,
+            "round-trip: input={input_px} back={back}"
+        );
     }
 
     #[test]

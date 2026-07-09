@@ -59,5 +59,7 @@ fn bak_path(dst: &Path) -> PathBuf {
         .file_name()
         .map(|n| format!("{}.bak", n.to_string_lossy()))
         .unwrap_or_else(|| "backup.bak".into());
-    dst.parent().map(|p| p.join(&name)).unwrap_or_else(|| PathBuf::from(&name))
+    dst.parent()
+        .map(|p| p.join(&name))
+        .unwrap_or_else(|| PathBuf::from(&name))
 }

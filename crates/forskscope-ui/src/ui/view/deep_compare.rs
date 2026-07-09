@@ -14,7 +14,12 @@ use crate::i18n::t;
 use crate::state::{DirOp, Lang, Modal, Store, open_compare};
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
-pub enum DeepFilter { #[default] Different, All, Equal }
+pub enum DeepFilter {
+    #[default]
+    Different,
+    All,
+    Equal,
+}
 
 #[component]
 pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> Element {
@@ -22,17 +27,20 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
     let lr = left_root.clone();
     let rr = right_root.clone();
 
-    let entries:      Signal<Vec<RecEntry>> = use_signal(Vec::new);
-    #[allow(unused_mut)] let mut scanning:     Signal<bool>          = use_signal(|| true);
-    #[allow(unused_mut)] let mut computed:     Signal<usize>         = use_signal(|| 0);
-    #[allow(unused_mut)] let mut total_common: Signal<usize>         = use_signal(|| 0);
-    let mut filter: Signal<DeepFilter>  = use_signal(DeepFilter::default);
+    let entries: Signal<Vec<RecEntry>> = use_signal(Vec::new);
+    #[allow(unused_mut)]
+    let mut scanning: Signal<bool> = use_signal(|| true);
+    #[allow(unused_mut)]
+    let mut computed: Signal<usize> = use_signal(|| 0);
+    #[allow(unused_mut)]
+    let mut total_common: Signal<usize> = use_signal(|| 0);
+    let mut filter: Signal<DeepFilter> = use_signal(DeepFilter::default);
 
     use_effect(move || {
         // Phase 1: fast listing (no I/O-heavy digests).
         let lr1 = lr.clone();
         let rr1 = rr.clone();
-        let lr2 = lr.clone();   // for phase-2 absolute-path construction
+        let lr2 = lr.clone(); // for phase-2 absolute-path construction
         let rr2 = rr.clone();
         let mut ent = entries;
         let mut scan = scanning;
@@ -40,13 +48,22 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
         let comp = computed;
 
         spawn(async move {
-            let initial = tokio::task::spawn_blocking(move || list_recursive_for_display(&lr1, &rr1))
-                .await.unwrap_or_default();
+            let initial =
+                tokio::task::spawn_blocking(move || list_recursive_for_display(&lr1, &rr1))
+                    .await
+                    .unwrap_or_default();
 
             // Build the list of (rel, abs_left, abs_right) for common pairs.
-            let pairs: Vec<(PathBuf, PathBuf, PathBuf)> = initial.iter()
+            let pairs: Vec<(PathBuf, PathBuf, PathBuf)> = initial
+                .iter()
                 .filter(|e| e.status == RecStatus::Computing)
-                .map(|e| (e.rel_path.clone(), lr2.join(&e.rel_path), rr2.join(&e.rel_path)))
+                .map(|e| {
+                    (
+                        e.rel_path.clone(),
+                        lr2.join(&e.rel_path),
+                        rr2.join(&e.rel_path),
+                    )
+                })
                 .collect();
 
             tc.set(pairs.len());
@@ -66,8 +83,15 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                 spawn(async move {
                     let _permit = sem2.acquire_owned().await;
                     let equal = tokio::task::spawn_blocking(move || file_digest_equal(&lp, &rp))
-                        .await.ok().and_then(|r| r.ok()).unwrap_or(false);
-                    let status = if equal { RecStatus::Equal } else { RecStatus::Changed };
+                        .await
+                        .ok()
+                        .and_then(|r| r.ok())
+                        .unwrap_or(false);
+                    let status = if equal {
+                        RecStatus::Equal
+                    } else {
+                        RecStatus::Changed
+                    };
                     if let Some(entry) = e2.write().iter_mut().find(|e| e.rel_path == rel) {
                         entry.status = status;
                     }
@@ -80,22 +104,36 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
 
     let f = *filter.read();
     let snap = entries.read();
-    let changed    = snap.iter().filter(|e| e.status == RecStatus::Changed).count();
-    let equal      = snap.iter().filter(|e| e.status == RecStatus::Equal).count();
-    let left_only  = snap.iter().filter(|e| e.status == RecStatus::LeftOnly).count();
-    let right_only = snap.iter().filter(|e| e.status == RecStatus::RightOnly).count();
-    let computing  = snap.iter().filter(|e| e.status == RecStatus::Computing).count();
-    let done      = *computed.read();
-    let tc        = *total_common.read();
-    let is_scan   = *scanning.read();
+    let changed = snap
+        .iter()
+        .filter(|e| e.status == RecStatus::Changed)
+        .count();
+    let equal = snap.iter().filter(|e| e.status == RecStatus::Equal).count();
+    let left_only = snap
+        .iter()
+        .filter(|e| e.status == RecStatus::LeftOnly)
+        .count();
+    let right_only = snap
+        .iter()
+        .filter(|e| e.status == RecStatus::RightOnly)
+        .count();
+    let computing = snap
+        .iter()
+        .filter(|e| e.status == RecStatus::Computing)
+        .count();
+    let done = *computed.read();
+    let tc = *total_common.read();
+    let is_scan = *scanning.read();
     let in_flight = !is_scan && tc > 0 && done < tc;
-    let visible: Vec<RecEntry> = snap.iter()
+    let visible: Vec<RecEntry> = snap
+        .iter()
         .filter(|e| match f {
             DeepFilter::Different => e.status != RecStatus::Equal,
-            DeepFilter::All       => true,
-            DeepFilter::Equal     => e.status == RecStatus::Equal,
+            DeepFilter::All => true,
+            DeepFilter::Equal => e.status == RecStatus::Equal,
         })
-        .cloned().collect();
+        .cloned()
+        .collect();
     drop(snap);
 
     rsx! {
@@ -145,20 +183,24 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
 fn DeepRow(entry: RecEntry, lang: Lang) -> Element {
     let mut store = use_context::<Store>();
     let (icon, cls) = match entry.status {
-        RecStatus::Changed   => ("⚠", "status-changed"),
-        RecStatus::LeftOnly  => ("←", "status-only"),
+        RecStatus::Changed => ("⚠", "status-changed"),
+        RecStatus::LeftOnly => ("←", "status-only"),
         RecStatus::RightOnly => ("→", "status-only"),
-        RecStatus::Equal     => ("✓", "status-equal"),
+        RecStatus::Equal => ("✓", "status-equal"),
         RecStatus::Computing => ("⊙", "status-cmp"),
-        RecStatus::Symlink   => ("↗", "status-symlink"),
+        RecStatus::Symlink => ("↗", "status-symlink"),
     };
-    let path_str   = entry.rel_path.display().to_string();
-    let can_cmp    = !matches!(entry.status, RecStatus::Equal | RecStatus::Computing | RecStatus::Symlink);
+    let path_str = entry.rel_path.display().to_string();
+    let can_cmp = !matches!(
+        entry.status,
+        RecStatus::Equal | RecStatus::Computing | RecStatus::Symlink
+    );
     // Copy direction: LeftOnly/Changed → copy left→right; RightOnly → copy right→left.
     // Changed entries show both directions (RFC-062 B3).
     let copy_left_to_right: bool = matches!(entry.status, RecStatus::Changed | RecStatus::LeftOnly);
-    let copy_right_to_left: bool = matches!(entry.status, RecStatus::Changed | RecStatus::RightOnly);
-    let has_left_root  = store.settings.read().last_left_dir.is_some();
+    let copy_right_to_left: bool =
+        matches!(entry.status, RecStatus::Changed | RecStatus::RightOnly);
+    let has_left_root = store.settings.read().last_left_dir.is_some();
     let has_right_root = store.settings.read().last_right_dir.is_some();
     let e2 = entry.clone();
     rsx! {
@@ -229,25 +271,37 @@ fn DeepRow(entry: RecEntry, lang: Lang) -> Element {
 fn size_label(e: &RecEntry) -> String {
     match (e.left_size, e.right_size) {
         (Some(l), Some(r)) if l != r => format!("{} → {}", fmt(l), fmt(r)),
-        (Some(s), _) | (_, Some(s))  => fmt(s),
-        _                             => String::new(),
+        (Some(s), _) | (_, Some(s)) => fmt(s),
+        _ => String::new(),
     }
 }
 fn fmt(n: u64) -> String {
-    if n < 1024 { format!("{n}B") }
-    else if n < 1_048_576 { format!("{:.1}KB", n as f64 / 1024.0) }
-    else { format!("{:.1}MB", n as f64 / 1_048_576.0) }
+    if n < 1024 {
+        format!("{n}B")
+    } else if n < 1_048_576 {
+        format!("{:.1}KB", n as f64 / 1024.0)
+    } else {
+        format!("{:.1}MB", n as f64 / 1_048_576.0)
+    }
 }
 
 // ─── Batch copy buttons ───────────────────────────────────────────────────────
 
 #[component]
-fn BatchCopyButtons(entries: Signal<Vec<RecEntry>>, left_root: PathBuf, right_root: PathBuf) -> Element {
+fn BatchCopyButtons(
+    entries: Signal<Vec<RecEntry>>,
+    left_root: PathBuf,
+    right_root: PathBuf,
+) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     let snap = entries.read();
-    let has_changes = snap.iter().any(|e| !matches!(e.status, RecStatus::Equal | RecStatus::Computing));
-    if !has_changes { return rsx! {}; }
+    let has_changes = snap
+        .iter()
+        .any(|e| !matches!(e.status, RecStatus::Equal | RecStatus::Computing));
+    if !has_changes {
+        return rsx! {};
+    }
 
     let lr = left_root.clone();
     let rr = right_root.clone();
@@ -255,12 +309,14 @@ fn BatchCopyButtons(entries: Signal<Vec<RecEntry>>, left_root: PathBuf, right_ro
     let rr2 = right_root;
 
     // "Copy all →" = copy left-only and changed files to the right tree
-    let to_right: Vec<(PathBuf, PathBuf)> = snap.iter()
+    let to_right: Vec<(PathBuf, PathBuf)> = snap
+        .iter()
         .filter(|e| matches!(e.status, RecStatus::Changed | RecStatus::LeftOnly))
         .map(|e| (lr.join(&e.rel_path), rr.join(&e.rel_path)))
         .collect();
     // "Copy all ←" = copy right-only and changed files to the left tree
-    let to_left: Vec<(PathBuf, PathBuf)> = snap.iter()
+    let to_left: Vec<(PathBuf, PathBuf)> = snap
+        .iter()
         .filter(|e| matches!(e.status, RecStatus::Changed | RecStatus::RightOnly))
         .map(|e| (rr2.join(&e.rel_path), lr2.join(&e.rel_path)))
         .collect();

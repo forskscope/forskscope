@@ -29,8 +29,8 @@ use forskscope_core::settings::{Density, FontFamilySetting, ThemeId};
 /// visible text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectChoice {
-    pub value:  &'static str,
-    pub label:  &'static str,
+    pub value: &'static str,
+    pub label: &'static str,
 }
 
 // ── Theme choices ─────────────────────────────────────────────────────────────
@@ -38,9 +38,18 @@ pub struct SelectChoice {
 /// All available theme choices, in display order.
 pub fn theme_choices() -> Vec<SelectChoice> {
     vec![
-        SelectChoice { value: ThemeId::Dark .as_str(), label: "Dark"  },
-        SelectChoice { value: ThemeId::Light.as_str(), label: "Light" },
-        SelectChoice { value: ThemeId::Night.as_str(), label: "Night" },
+        SelectChoice {
+            value: ThemeId::Dark.as_str(),
+            label: "Dark",
+        },
+        SelectChoice {
+            value: ThemeId::Light.as_str(),
+            label: "Light",
+        },
+        SelectChoice {
+            value: ThemeId::Night.as_str(),
+            label: "Night",
+        },
     ]
 }
 
@@ -49,9 +58,18 @@ pub fn theme_choices() -> Vec<SelectChoice> {
 /// All available density choices, in display order.
 pub fn density_choices() -> Vec<SelectChoice> {
     vec![
-        SelectChoice { value: Density::Comfortable.as_str(), label: "Comfortable" },
-        SelectChoice { value: Density::Compact    .as_str(), label: "Compact"     },
-        SelectChoice { value: Density::Spacious   .as_str(), label: "Spacious"    },
+        SelectChoice {
+            value: Density::Comfortable.as_str(),
+            label: "Comfortable",
+        },
+        SelectChoice {
+            value: Density::Compact.as_str(),
+            label: "Compact",
+        },
+        SelectChoice {
+            value: Density::Spacious.as_str(),
+            label: "Spacious",
+        },
     ]
 }
 
@@ -60,9 +78,18 @@ pub fn density_choices() -> Vec<SelectChoice> {
 /// All available font family choices, in display order.
 pub fn font_family_choices() -> Vec<SelectChoice> {
     vec![
-        SelectChoice { value: FontFamilySetting::SystemMono .as_str(), label: "Monospace"   },
-        SelectChoice { value: FontFamilySetting::SystemSans .as_str(), label: "Sans-serif"  },
-        SelectChoice { value: FontFamilySetting::SystemSerif.as_str(), label: "Serif"       },
+        SelectChoice {
+            value: FontFamilySetting::SystemMono.as_str(),
+            label: "Monospace",
+        },
+        SelectChoice {
+            value: FontFamilySetting::SystemSans.as_str(),
+            label: "Sans-serif",
+        },
+        SelectChoice {
+            value: FontFamilySetting::SystemSerif.as_str(),
+            label: "Serif",
+        },
     ]
 }
 
@@ -72,7 +99,7 @@ pub fn font_family_choices() -> Vec<SelectChoice> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProfileChoice {
     /// Display name shown in the picker.
-    pub name:    String,
+    pub name: String,
     /// The full profile — passed to `to_diff_options()` when selected.
     pub profile: CompareProfile,
 }
@@ -82,10 +109,13 @@ pub struct ProfileChoice {
 /// These are the options shown in the profile picker. Custom profiles added by
 /// the user are appended after the presets in the component.
 pub fn profile_presets() -> Vec<ProfileChoice> {
-    CompareProfile::all_presets().into_iter().map(|p| {
-        let name = p.name.clone();
-        ProfileChoice { name, profile: p }
-    }).collect()
+    CompareProfile::all_presets()
+        .into_iter()
+        .map(|p| {
+            let name = p.name.clone();
+            ProfileChoice { name, profile: p }
+        })
+        .collect()
 }
 
 // ── Font size validation ──────────────────────────────────────────────────────
@@ -139,7 +169,7 @@ mod tests {
         let choices = theme_choices();
         assert_eq!(choices.len(), 3, "must have exactly three themes");
         let values: Vec<_> = choices.iter().map(|c| c.value).collect();
-        assert!(values.contains(&"dark"),  "must include dark");
+        assert!(values.contains(&"dark"), "must include dark");
         assert!(values.contains(&"light"), "must include light");
         assert!(values.contains(&"night"), "must include night");
     }
@@ -174,8 +204,7 @@ mod tests {
     #[test]
     fn density_choice_values_round_trip() {
         for choice in density_choices() {
-            let d = Density::from_id(choice.value)
-                .expect("every density value must parse");
+            let d = Density::from_id(choice.value).expect("every density value must parse");
             assert_eq!(d.as_str(), choice.value);
         }
     }
@@ -194,8 +223,7 @@ mod tests {
     #[test]
     fn font_family_choice_values_round_trip() {
         for choice in font_family_choices() {
-            let f = FontFamilySetting::from_id(choice.value)
-                .expect("every font value must parse");
+            let f = FontFamilySetting::from_id(choice.value).expect("every font value must parse");
             assert_eq!(f.as_str(), choice.value);
         }
     }
@@ -210,8 +238,10 @@ mod tests {
     #[test]
     fn profile_presets_names_match_profile_names() {
         for choice in profile_presets() {
-            assert_eq!(choice.name, choice.profile.name,
-                "ProfileChoice.name must equal profile.name");
+            assert_eq!(
+                choice.name, choice.profile.name,
+                "ProfileChoice.name must equal profile.name"
+            );
         }
     }
 
@@ -232,7 +262,7 @@ mod tests {
     #[test]
     fn valid_font_size_returns_ok() {
         assert_eq!(validate_font_size(14), Ok(14u8));
-        assert_eq!(validate_font_size(6),  Ok(6u8));
+        assert_eq!(validate_font_size(6), Ok(6u8));
         assert_eq!(validate_font_size(50), Ok(50u8));
     }
 
@@ -249,8 +279,8 @@ mod tests {
 
     #[test]
     fn clamp_font_size_stays_in_range() {
-        assert_eq!(clamp_font_size(0),   6u8);
-        assert_eq!(clamp_font_size(14),  14u8);
+        assert_eq!(clamp_font_size(0), 6u8);
+        assert_eq!(clamp_font_size(14), 14u8);
         assert_eq!(clamp_font_size(100), 50u8);
     }
 
@@ -291,15 +321,18 @@ mod tests {
     #[test]
     fn no_duplicate_values_in_any_choice_list() {
         for (name, choices) in [
-            ("theme",       theme_choices()),
-            ("density",     density_choices()),
+            ("theme", theme_choices()),
+            ("density", density_choices()),
             ("font_family", font_family_choices()),
         ] {
             let mut values: Vec<_> = choices.iter().map(|c| c.value).collect();
             let before = values.len();
             values.dedup();
-            assert_eq!(values.len(), before,
-                "{name} choices must have unique values");
+            assert_eq!(
+                values.len(),
+                before,
+                "{name} choices must have unique values"
+            );
         }
     }
 }

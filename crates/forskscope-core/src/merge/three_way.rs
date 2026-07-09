@@ -16,6 +16,4 @@ mod session;
 
 pub use engine::{MergeRegion, RegionKind, diff3};
 pub use line::{MergeLine, render_lines, split_lines};
-pub use session::{
-    ConflictId, ConflictStatus, MergeConflict, ThreeWayMergeSession, ThreeWayStats,
-};
+pub use session::{ConflictId, ConflictStatus, MergeConflict, ThreeWayMergeSession, ThreeWayStats};

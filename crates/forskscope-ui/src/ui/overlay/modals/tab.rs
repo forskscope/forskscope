@@ -8,8 +8,13 @@ use crate::state::{Modal, Store, close_tab};
 #[component]
 pub fn CloseTabModal(index: usize) -> Element {
     let mut store = use_context::<Store>();
-    let lang  = store.lang();
-    let title = store.tabs.read().get(index).map(|t| t.title.clone()).unwrap_or_default();
+    let lang = store.lang();
+    let title = store
+        .tabs
+        .read()
+        .get(index)
+        .map(|t| t.title.clone())
+        .unwrap_or_default();
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Close comparison"),
             div { class: "modal",

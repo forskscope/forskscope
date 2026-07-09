@@ -25,8 +25,7 @@ pub fn to_unified(patch: &PatchDocument) -> String {
 
 fn write_summary_header(out: &mut String, patch: &PatchDocument) {
     let s = &patch.summary;
-    let total_files =
-        s.files_changed + s.files_added + s.files_deleted + s.binary_files;
+    let total_files = s.files_changed + s.files_added + s.files_deleted + s.binary_files;
     let _ = writeln!(
         out,
         "# forskscope patch: {total_files} files, {} additions(+), {} deletions(-)",

@@ -55,7 +55,9 @@ fn missing_is_read_only() {
 
 #[test]
 fn unsupported_kind_is_unsupported_class() {
-    let kind = FileKind::Unsupported { reason: "not a file".into() };
+    let kind = FileKind::Unsupported {
+        reason: "not a file".into(),
+    };
     assert_eq!(
         EditabilityClass::from_kind(&kind, false, ""),
         EditabilityClass::Unsupported
@@ -107,43 +109,74 @@ fn editability_ordering_read_write_greater_than_read_only() {
 
 #[test]
 fn file_kind_editability_delegates_correctly() {
-    assert_eq!(FileKind::Text.editability(false, "UTF-8"), EditabilityClass::ReadWrite);
-    assert_eq!(FileKind::Binary.editability(false, ""), EditabilityClass::ReadOnly);
+    assert_eq!(
+        FileKind::Text.editability(false, "UTF-8"),
+        EditabilityClass::ReadWrite
+    );
+    assert_eq!(
+        FileKind::Binary.editability(false, ""),
+        EditabilityClass::ReadOnly
+    );
 }
 
 // ── NewlinePolicy ─────────────────────────────────────────────────────────────
 
 #[test]
 fn force_lf_always_returns_lf() {
-    for style in [NewlineStyle::Lf, NewlineStyle::CrLf, NewlineStyle::Cr,
-                  NewlineStyle::Mixed, NewlineStyle::None] {
-        assert_eq!(NewlinePolicy::ForceLf.resolve(style), Some("\n"),
-            "ForceLf must return \\n for any detected style");
+    for style in [
+        NewlineStyle::Lf,
+        NewlineStyle::CrLf,
+        NewlineStyle::Cr,
+        NewlineStyle::Mixed,
+        NewlineStyle::None,
+    ] {
+        assert_eq!(
+            NewlinePolicy::ForceLf.resolve(style),
+            Some("\n"),
+            "ForceLf must return \\n for any detected style"
+        );
     }
 }
 
 #[test]
 fn force_crlf_always_returns_crlf() {
-    for style in [NewlineStyle::Lf, NewlineStyle::CrLf, NewlineStyle::Cr,
-                  NewlineStyle::Mixed, NewlineStyle::None] {
-        assert_eq!(NewlinePolicy::ForceCrlf.resolve(style), Some("\r\n"),
-            "ForceCrlf must return \\r\\n for any detected style");
+    for style in [
+        NewlineStyle::Lf,
+        NewlineStyle::CrLf,
+        NewlineStyle::Cr,
+        NewlineStyle::Mixed,
+        NewlineStyle::None,
+    ] {
+        assert_eq!(
+            NewlinePolicy::ForceCrlf.resolve(style),
+            Some("\r\n"),
+            "ForceCrlf must return \\r\\n for any detected style"
+        );
     }
 }
 
 #[test]
 fn preserve_returns_detected_lf() {
-    assert_eq!(NewlinePolicy::Preserve.resolve(NewlineStyle::Lf), Some("\n"));
+    assert_eq!(
+        NewlinePolicy::Preserve.resolve(NewlineStyle::Lf),
+        Some("\n")
+    );
 }
 
 #[test]
 fn preserve_returns_detected_crlf() {
-    assert_eq!(NewlinePolicy::Preserve.resolve(NewlineStyle::CrLf), Some("\r\n"));
+    assert_eq!(
+        NewlinePolicy::Preserve.resolve(NewlineStyle::CrLf),
+        Some("\r\n")
+    );
 }
 
 #[test]
 fn preserve_returns_detected_cr() {
-    assert_eq!(NewlinePolicy::Preserve.resolve(NewlineStyle::Cr), Some("\r"));
+    assert_eq!(
+        NewlinePolicy::Preserve.resolve(NewlineStyle::Cr),
+        Some("\r")
+    );
 }
 
 #[test]

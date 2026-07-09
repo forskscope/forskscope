@@ -1,9 +1,7 @@
 //! ConflictNavigator tests (RFC-034 §"Conflict navigator",
 //! §"Conflict navigator table", §"Navigator footer").
 
-use crate::conflict_nav::{
-    ConflictFilter, ConflictNavigator, ConflictStatusDisplay,
-};
+use crate::conflict_nav::{ConflictFilter, ConflictNavigator, ConflictStatusDisplay};
 use crate::merge::{ConflictStatus, ThreeWayMergeSession};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -41,7 +39,10 @@ fn all_statuses_have_non_empty_glyph_and_text() {
         ConflictStatus::Ignored,
     ] {
         let d = ConflictStatusDisplay::for_status(status.clone());
-        assert!(!d.text.is_empty(), "{status:?} must have non-empty text label");
+        assert!(
+            !d.text.is_empty(),
+            "{status:?} must have non-empty text label"
+        );
     }
 }
 
@@ -55,10 +56,15 @@ fn all_status_glyphs_are_distinct() {
         ConflictStatus::ResolvedManual,
         ConflictStatus::Ignored,
     ];
-    let glyphs: std::collections::HashSet<char> = statuses.iter()
+    let glyphs: std::collections::HashSet<char> = statuses
+        .iter()
         .map(|s| ConflictStatusDisplay::for_status(s.clone()).glyph)
         .collect();
-    assert_eq!(glyphs.len(), statuses.len(), "all glyph characters must be distinct");
+    assert_eq!(
+        glyphs.len(),
+        statuses.len(),
+        "all glyph characters must be distinct"
+    );
 }
 
 #[test]
@@ -113,7 +119,11 @@ fn display_nums_are_one_based_and_sequential() {
 fn all_entries_initially_unresolved() {
     let session = one_conflict_session();
     let nav = ConflictNavigator::build(&session, None, ConflictFilter::All);
-    assert!(nav.entries.iter().all(|e| e.status == ConflictStatus::Unresolved));
+    assert!(
+        nav.entries
+            .iter()
+            .all(|e| e.status == ConflictStatus::Unresolved)
+    );
 }
 
 // ── Focused entry ─────────────────────────────────────────────────────────────
@@ -167,7 +177,7 @@ fn next_and_prev_return_none_for_empty_navigator() {
 #[test]
 fn unresolved_only_filter_hides_nothing_when_all_unresolved() {
     let session = one_conflict_session();
-    let nav_all      = ConflictNavigator::build(&session, None, ConflictFilter::All);
+    let nav_all = ConflictNavigator::build(&session, None, ConflictFilter::All);
     let nav_filtered = ConflictNavigator::build(&session, None, ConflictFilter::UnresolvedOnly);
     assert_eq!(nav_all.entries.len(), nav_filtered.entries.len());
     assert!(!nav_filtered.has_hidden_entries());
@@ -179,10 +189,14 @@ fn unresolved_only_filter_hides_resolved_entries() {
     let id = session.conflicts()[0].id;
     session.resolve_left(id).unwrap();
 
-    let nav_all      = ConflictNavigator::build(&session, None, ConflictFilter::All);
+    let nav_all = ConflictNavigator::build(&session, None, ConflictFilter::All);
     let nav_filtered = ConflictNavigator::build(&session, None, ConflictFilter::UnresolvedOnly);
     assert_eq!(nav_all.entries.len(), 1);
-    assert_eq!(nav_filtered.entries.len(), 0, "resolved entry must be hidden");
+    assert_eq!(
+        nav_filtered.entries.len(),
+        0,
+        "resolved entry must be hidden"
+    );
     assert!(nav_filtered.has_hidden_entries());
 }
 
@@ -195,7 +209,7 @@ fn resolving_conflict_updates_summary_counts() {
     session.resolve_left(id).unwrap();
 
     let nav = ConflictNavigator::build(&session, None, ConflictFilter::All);
-    assert_eq!(nav.summary.resolved,   1);
+    assert_eq!(nav.summary.resolved, 1);
     assert_eq!(nav.summary.unresolved, 0);
     assert!(nav.is_fully_resolved());
 }
@@ -226,8 +240,11 @@ fn all_css_classes_start_with_fsk_conflict_prefix() {
     let session = one_conflict_session();
     let nav = ConflictNavigator::build(&session, None, ConflictFilter::All);
     for entry in &nav.entries {
-        assert!(entry.css_class().starts_with("fsk-conflict-"),
-            "CSS class {} must start with fsk-conflict-", entry.css_class());
+        assert!(
+            entry.css_class().starts_with("fsk-conflict-"),
+            "CSS class {} must start with fsk-conflict-",
+            entry.css_class()
+        );
     }
 }
 

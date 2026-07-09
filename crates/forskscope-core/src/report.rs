@@ -4,19 +4,19 @@
 pub mod dir;
 pub mod file;
 
-pub use file::{
-    FileComparisonReport, HunkSummaryRow, HistoryEntry, ReportOptions, ReportPathMode,
-};
-pub use dir::{
-    BatchSummary, DirComparisonReport, DirFileRow,
-};
+pub use dir::{BatchSummary, DirComparisonReport, DirFileRow};
+pub use file::{FileComparisonReport, HistoryEntry, HunkSummaryRow, ReportOptions, ReportPathMode};
 
-use std::path::Path;
 use crate::diff::HunkKind;
+use std::path::Path;
 
 /// Format a path according to `mode`, optionally stripping a `root` prefix.
 /// Shared by both file and directory reports.
-pub(crate) fn display_path(path: Option<&Path>, mode: &file::ReportPathMode, root: Option<&Path>) -> String {
+pub(crate) fn display_path(
+    path: Option<&Path>,
+    mode: &file::ReportPathMode,
+    root: Option<&Path>,
+) -> String {
     match path {
         None => "(unknown)".into(),
         Some(p) => match mode {
@@ -43,9 +43,9 @@ pub(crate) fn display_path(path: Option<&Path>, mode: &file::ReportPathMode, roo
 /// Human-readable hunk kind label. Shared by both report types.
 pub(crate) fn hunk_kind_label(kind: HunkKind) -> String {
     match kind {
-        HunkKind::Equal   => "equal".into(),
-        HunkKind::Insert  => "insert".into(),
-        HunkKind::Delete  => "delete".into(),
+        HunkKind::Equal => "equal".into(),
+        HunkKind::Insert => "insert".into(),
+        HunkKind::Delete => "delete".into(),
         HunkKind::Replace => "replace".into(),
     }
 }

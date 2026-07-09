@@ -21,22 +21,20 @@
 
 pub mod tab;
 pub use tab::{
-    BinaryTabSession, DiffTabSession, ErrorTabSession, ExcelTabSession,
-    FilePairRoot, DirectoryPairRoot, TabId,
-    WorkspaceRoot, WorkspaceTab, SessionId, Timestamp,
-    SESSION_SCHEMA_VERSION,
+    BinaryTabSession, DiffTabSession, DirectoryPairRoot, ErrorTabSession, ExcelTabSession,
+    FilePairRoot, SESSION_SCHEMA_VERSION, SessionId, TabId, Timestamp, WorkspaceRoot, WorkspaceTab,
 };
 
+use crate::persist::{MigrationPolicy, SchemaName, VersionedEnvelope};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::persist::{MigrationPolicy, SchemaName, VersionedEnvelope};
 
 pub struct WorkspaceSession {
-    pub session_id:    SessionId,
-    pub created_at:    Timestamp,
-    pub updated_at:    Timestamp,
-    pub root:          WorkspaceRoot,
-    pub tabs:          Vec<WorkspaceTab>,
+    pub session_id: SessionId,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub root: WorkspaceRoot,
+    pub tabs: Vec<WorkspaceTab>,
     pub active_tab_id: Option<TabId>,
 }
 
@@ -47,11 +45,11 @@ impl WorkspaceSession {
     pub fn empty() -> Self {
         let now = Timestamp::now();
         Self {
-            session_id:    SessionId::new(),
-            created_at:    now,
-            updated_at:    now,
-            root:          WorkspaceRoot::Empty,
-            tabs:          vec![],
+            session_id: SessionId::new(),
+            created_at: now,
+            updated_at: now,
+            root: WorkspaceRoot::Empty,
+            tabs: vec![],
             active_tab_id: None,
         }
     }
@@ -59,19 +57,19 @@ impl WorkspaceSession {
     /// Session initialised from two file paths (RFC-011 §5.2).
     pub fn from_file_pair(left: PathBuf, right: PathBuf) -> Self {
         let tab = WorkspaceTab::Diff(DiffTabSession {
-            tab_id:     TabId::new(),
-            left_path:  left.clone(),
+            tab_id: TabId::new(),
+            left_path: left.clone(),
             right_path: right.clone(),
-            is_dirty:   false,
+            is_dirty: false,
         });
         let tab_id = tab.tab_id().clone();
         let now = Timestamp::now();
         Self {
-            session_id:    SessionId::new(),
-            created_at:    now,
-            updated_at:    now,
-            root:          WorkspaceRoot::FilePair(FilePairRoot { left, right }),
-            tabs:          vec![tab],
+            session_id: SessionId::new(),
+            created_at: now,
+            updated_at: now,
+            root: WorkspaceRoot::FilePair(FilePairRoot { left, right }),
+            tabs: vec![tab],
             active_tab_id: Some(tab_id),
         }
     }
@@ -80,11 +78,11 @@ impl WorkspaceSession {
     pub fn from_directory_pair(left: PathBuf, right: PathBuf) -> Self {
         let now = Timestamp::now();
         Self {
-            session_id:    SessionId::new(),
-            created_at:    now,
-            updated_at:    now,
-            root:          WorkspaceRoot::DirectoryPair(DirectoryPairRoot { left, right }),
-            tabs:          vec![],
+            session_id: SessionId::new(),
+            created_at: now,
+            updated_at: now,
+            root: WorkspaceRoot::DirectoryPair(DirectoryPairRoot { left, right }),
+            tabs: vec![],
             active_tab_id: None,
         }
     }
@@ -143,7 +141,9 @@ impl WorkspaceSession {
             t.mark_dirty();
             self.touch();
             true
-        } else { false }
+        } else {
+            false
+        }
     }
 
     /// Mark a tab clean after a successful save.
@@ -152,13 +152,17 @@ impl WorkspaceSession {
             t.mark_clean();
             self.touch();
             true
-        } else { false }
+        } else {
+            false
+        }
     }
 
     // ── Queries ───────────────────────────────────────────────────────────
 
     /// `true` when any tab has unsaved changes.
-    pub fn any_dirty(&self) -> bool { self.tabs.iter().any(|t| t.is_dirty()) }
+    pub fn any_dirty(&self) -> bool {
+        self.tabs.iter().any(|t| t.is_dirty())
+    }
 
     /// All dirty tabs.
     pub fn dirty_tabs(&self) -> Vec<&WorkspaceTab> {
@@ -167,8 +171,9 @@ impl WorkspaceSession {
 
     /// The active tab, if any.
     pub fn active_tab(&self) -> Option<&WorkspaceTab> {
-        self.active_tab_id.as_ref().and_then(|id|
-            self.tabs.iter().find(|t| t.tab_id() == id))
+        self.active_tab_id
+            .as_ref()
+            .and_then(|id| self.tabs.iter().find(|t| t.tab_id() == id))
     }
 
     // ── Serialisation ─────────────────────────────────────────────────────
@@ -177,8 +182,7 @@ impl WorkspaceSession {
     /// RFC-031 §"Schema versioning").
     pub fn to_json(&self) -> String {
         let payload = self.to_payload_json();
-        VersionedEnvelope::new(SchemaName::Session, SESSION_SCHEMA_VERSION, payload)
-            .to_json()
+        VersionedEnvelope::new(SchemaName::Session, SESSION_SCHEMA_VERSION, payload).to_json()
     }
 
     /// Parse from envelope JSON. Returns `Err` on any structural failure.
@@ -188,7 +192,9 @@ impl WorkspaceSession {
             .map_err(|e| SessionParseError::EnvelopeError(e.to_string()))?;
         let migration = envelope.migration_policy(SESSION_SCHEMA_VERSION);
         if let MigrationPolicy::NewerSchema { file_version, .. } = migration {
-            return Err(SessionParseError::TooNew { version: file_version });
+            return Err(SessionParseError::TooNew {
+                version: file_version,
+            });
         }
         let session = Self::from_payload_json(&envelope.payload_json)
             .map_err(SessionParseError::PayloadError)?;
@@ -201,24 +207,28 @@ impl WorkspaceSession {
         use std::fmt::Write;
         let mut s = String::new();
         let _ = writeln!(s, "{{");
-        let _ = writeln!(s, "  \"session_id\": {:?},",  self.session_id.0);
-        let _ = writeln!(s, "  \"created_at\": {},",    self.created_at.0);
-        let _ = writeln!(s, "  \"updated_at\": {},",    self.updated_at.0);
-        let _ = writeln!(s, "  \"root_kind\": {:?},",   root_kind_str(&self.root));
+        let _ = writeln!(s, "  \"session_id\": {:?},", self.session_id.0);
+        let _ = writeln!(s, "  \"created_at\": {},", self.created_at.0);
+        let _ = writeln!(s, "  \"updated_at\": {},", self.updated_at.0);
+        let _ = writeln!(s, "  \"root_kind\": {:?},", root_kind_str(&self.root));
         match &self.root {
             WorkspaceRoot::Empty => {}
             WorkspaceRoot::FilePair(p) => {
-                let _ = writeln!(s, "  \"left_root\": {:?},",  p.left.display().to_string());
+                let _ = writeln!(s, "  \"left_root\": {:?},", p.left.display().to_string());
                 let _ = writeln!(s, "  \"right_root\": {:?},", p.right.display().to_string());
             }
             WorkspaceRoot::DirectoryPair(p) => {
-                let _ = writeln!(s, "  \"left_root\": {:?},",  p.left.display().to_string());
+                let _ = writeln!(s, "  \"left_root\": {:?},", p.left.display().to_string());
                 let _ = writeln!(s, "  \"right_root\": {:?},", p.right.display().to_string());
             }
         }
-        let _ = writeln!(s, "  \"active_tab_id\": {},",
-            self.active_tab_id.as_ref().map_or("null".into(),
-                |id| format!("{:?}", id.0)));
+        let _ = writeln!(
+            s,
+            "  \"active_tab_id\": {},",
+            self.active_tab_id
+                .as_ref()
+                .map_or("null".into(), |id| format!("{:?}", id.0))
+        );
         let _ = writeln!(s, "  \"tabs\": [");
         for (i, tab) in self.tabs.iter().enumerate() {
             let comma = if i + 1 < self.tabs.len() { "," } else { "" };
@@ -230,25 +240,21 @@ impl WorkspaceSession {
     }
 
     fn from_payload_json(json: &str) -> Result<Self, String> {
-        let session_id = extract_str(json, "session_id")
-            .ok_or("missing session_id")?;
-        let created_at = extract_u64(json, "created_at")
-            .ok_or("missing created_at")?;
-        let updated_at = extract_u64(json, "updated_at")
-            .ok_or("missing updated_at")?;
-        let root_kind  = extract_str(json, "root_kind")
-            .ok_or("missing root_kind")?;
-        let left_root  = extract_str(json, "left_root");
+        let session_id = extract_str(json, "session_id").ok_or("missing session_id")?;
+        let created_at = extract_u64(json, "created_at").ok_or("missing created_at")?;
+        let updated_at = extract_u64(json, "updated_at").ok_or("missing updated_at")?;
+        let root_kind = extract_str(json, "root_kind").ok_or("missing root_kind")?;
+        let left_root = extract_str(json, "left_root");
         let right_root = extract_str(json, "right_root");
 
         let root = match root_kind.as_str() {
             "empty" => WorkspaceRoot::Empty,
             "file_pair" => WorkspaceRoot::FilePair(FilePairRoot {
-                left:  PathBuf::from(left_root.ok_or("missing left_root")?),
+                left: PathBuf::from(left_root.ok_or("missing left_root")?),
                 right: PathBuf::from(right_root.ok_or("missing right_root")?),
             }),
             "directory_pair" => WorkspaceRoot::DirectoryPair(DirectoryPairRoot {
-                left:  PathBuf::from(left_root.ok_or("missing left_root")?),
+                left: PathBuf::from(left_root.ok_or("missing left_root")?),
                 right: PathBuf::from(right_root.ok_or("missing right_root")?),
             }),
             other => return Err(format!("unknown root_kind: {other}")),
@@ -257,16 +263,18 @@ impl WorkspaceSession {
         let active_tab_id = extract_str(json, "active_tab_id").map(TabId);
 
         Ok(Self {
-            session_id:    SessionId(session_id),
-            created_at:    Timestamp(created_at),
-            updated_at:    Timestamp(updated_at),
+            session_id: SessionId(session_id),
+            created_at: Timestamp(created_at),
+            updated_at: Timestamp(updated_at),
             root,
-            tabs:          vec![], // tab list restoration is deferred to v2
+            tabs: vec![], // tab list restoration is deferred to v2
             active_tab_id,
         })
     }
 
-    fn touch(&mut self) { self.updated_at = Timestamp::now(); }
+    fn touch(&mut self) {
+        self.updated_at = Timestamp::now();
+    }
 }
 
 // ── CloseResult ───────────────────────────────────────────────────────────────
@@ -287,7 +295,7 @@ pub enum CloseResult {
 
 /// Result of [`WorkspaceSession::from_json`].
 pub struct ParsedSession {
-    pub session:   WorkspaceSession,
+    pub session: WorkspaceSession,
     pub migration: MigrationPolicy,
 }
 
@@ -298,16 +306,20 @@ pub enum SessionParseError {
     EnvelopeError(String),
     PayloadError(String),
     /// The file was written by a newer ForskScope; the app must not overwrite it.
-    TooNew { version: u32 },
+    TooNew {
+        version: u32,
+    },
 }
 
 impl std::fmt::Display for SessionParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EnvelopeError(e) => write!(f, "session envelope error: {e}"),
-            Self::PayloadError(e)  => write!(f, "session payload error: {e}"),
-            Self::TooNew { version } => write!(f,
-                "session was written by a newer ForskScope (schema v{version}); upgrade the app"),
+            Self::PayloadError(e) => write!(f, "session payload error: {e}"),
+            Self::TooNew { version } => write!(
+                f,
+                "session was written by a newer ForskScope (schema v{version}); upgrade the app"
+            ),
         }
     }
 }
@@ -321,17 +333,20 @@ impl std::error::Error for SessionParseError {}
 /// Stores only metadata and paths — never file contents.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecentSessionEntry {
-    pub session_id:     SessionId,
-    pub title:          String,
-    pub left_path:      PathBuf,
-    pub right_path:     PathBuf,
-    pub kind:           RecentKind,
+    pub session_id: SessionId,
+    pub title: String,
+    pub left_path: PathBuf,
+    pub right_path: PathBuf,
+    pub kind: RecentKind,
     pub last_opened_at: Timestamp,
 }
 
 /// Whether the recent entry was a file-pair or directory-pair session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RecentKind { FilePair, DirectoryPair }
+pub enum RecentKind {
+    FilePair,
+    DirectoryPair,
+}
 
 impl RecentSessionEntry {
     /// `true` when both paths still exist on disk.
@@ -351,8 +366,8 @@ pub(crate) fn unix_now() -> u64 {
 
 fn root_kind_str(root: &WorkspaceRoot) -> &'static str {
     match root {
-        WorkspaceRoot::Empty          => "empty",
-        WorkspaceRoot::FilePair(_)    => "file_pair",
+        WorkspaceRoot::Empty => "empty",
+        WorkspaceRoot::FilePair(_) => "file_pair",
         WorkspaceRoot::DirectoryPair(_) => "directory_pair",
     }
 }
@@ -390,8 +405,12 @@ fn extract_str(json: &str, field: &str) -> Option<String> {
     let key = format!("\"{}\":", field);
     let start = json.find(&key)? + key.len();
     let rest = json[start..].trim_start();
-    if rest.starts_with("null") { return None; }
-    if !rest.starts_with('"') { return None; }
+    if rest.starts_with("null") {
+        return None;
+    }
+    if !rest.starts_with('"') {
+        return None;
+    }
     let inner = &rest[1..];
     let end = inner.find('"')?;
     Some(inner[..end].into())
@@ -401,6 +420,8 @@ fn extract_u64(json: &str, field: &str) -> Option<u64> {
     let key = format!("\"{}\":", field);
     let start = json.find(&key)? + key.len();
     let rest = json[start..].trim_start();
-    let end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
+    let end = rest
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(rest.len());
     rest[..end].parse().ok()
 }

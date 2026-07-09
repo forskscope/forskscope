@@ -53,23 +53,23 @@ pub enum SchemaName {
 impl SchemaName {
     pub fn as_str(&self) -> &str {
         match self {
-            Self::Settings      => "settings",
-            Self::Profiles      => "profiles",
-            Self::Session       => "session",
+            Self::Settings => "settings",
+            Self::Profiles => "profiles",
+            Self::Session => "session",
             Self::BatchManifest => "batch_manifest",
-            Self::Report        => "report",
-            Self::Unknown(s)    => s.as_str(),
+            Self::Report => "report",
+            Self::Unknown(s) => s.as_str(),
         }
     }
 
     fn from_str(s: &str) -> Self {
         match s {
-            "settings"       => Self::Settings,
-            "profiles"       => Self::Profiles,
-            "session"        => Self::Session,
+            "settings" => Self::Settings,
+            "profiles" => Self::Profiles,
+            "session" => Self::Session,
             "batch_manifest" => Self::BatchManifest,
-            "report"         => Self::Report,
-            other            => Self::Unknown(other.into()),
+            "report" => Self::Report,
+            other => Self::Unknown(other.into()),
         }
     }
 
@@ -116,11 +116,11 @@ impl MigrationPolicy {
 /// A parsed, validated envelope read from disk.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedEnvelope {
-    pub schema_name:    SchemaName,
+    pub schema_name: SchemaName,
     pub schema_version: u32,
-    pub app_version:    String,
+    pub app_version: String,
     /// The raw JSON string of the inner payload, as written by the producer.
-    pub payload_json:   String,
+    pub payload_json: String,
 }
 
 impl ParsedEnvelope {
@@ -128,16 +128,18 @@ impl ParsedEnvelope {
     /// this application understands for this schema.
     pub fn migration_policy(&self, current_schema_version: u32) -> MigrationPolicy {
         if let SchemaName::Unknown(name) = &self.schema_name {
-            return MigrationPolicy::UnknownSchema { schema_name: name.clone() };
+            return MigrationPolicy::UnknownSchema {
+                schema_name: name.clone(),
+            };
         }
         match self.schema_version.cmp(&current_schema_version) {
             std::cmp::Ordering::Equal => MigrationPolicy::CompatibleRead,
-            std::cmp::Ordering::Less  => MigrationPolicy::ForwardMigration {
+            std::cmp::Ordering::Less => MigrationPolicy::ForwardMigration {
                 from_version: self.schema_version,
             },
             std::cmp::Ordering::Greater => MigrationPolicy::NewerSchema {
                 file_version: self.schema_version,
-                app_version:  current_schema_version,
+                app_version: current_schema_version,
             },
         }
     }
@@ -146,11 +148,11 @@ impl ParsedEnvelope {
 /// A versioned data envelope — the outer JSON wrapper for all persisted files.
 #[derive(Debug, Clone)]
 pub struct VersionedEnvelope {
-    pub schema_name:    SchemaName,
+    pub schema_name: SchemaName,
     pub schema_version: u32,
-    pub app_version:    String,
-    pub created_unix:   u64,
-    pub updated_unix:   u64,
+    pub app_version: String,
+    pub created_unix: u64,
+    pub updated_unix: u64,
     /// Pre-serialized JSON for the inner payload. Must be valid JSON.
     payload_json: String,
 }
@@ -158,9 +160,9 @@ pub struct VersionedEnvelope {
 impl VersionedEnvelope {
     /// Create a new envelope with the current app version and timestamp.
     pub fn new(
-        schema_name:    SchemaName,
+        schema_name: SchemaName,
         schema_version: u32,
-        payload_json:   impl Into<String>,
+        payload_json: impl Into<String>,
     ) -> Self {
         let now = unix_now();
         Self {
@@ -175,12 +177,12 @@ impl VersionedEnvelope {
 
     /// Create with explicit timestamps (for testing and migration).
     pub fn with_timestamps(
-        schema_name:    SchemaName,
+        schema_name: SchemaName,
         schema_version: u32,
-        app_version:    impl Into<String>,
-        created_unix:   u64,
-        updated_unix:   u64,
-        payload_json:   impl Into<String>,
+        app_version: impl Into<String>,
+        created_unix: u64,
+        updated_unix: u64,
+        payload_json: impl Into<String>,
     ) -> Self {
         Self {
             schema_name,
@@ -196,13 +198,13 @@ impl VersionedEnvelope {
     pub fn to_json(&self) -> String {
         let mut s = String::new();
         let _ = writeln!(s, "{{");
-        let _ = writeln!(s, "  \"schema_name\": {:?},",    self.schema_name.as_str());
-        let _ = writeln!(s, "  \"schema_version\": {},",   self.schema_version);
-        let _ = writeln!(s, "  \"app_version\": {:?},",    self.app_version);
-        let _ = writeln!(s, "  \"created_unix\": {},",     self.created_unix);
-        let _ = writeln!(s, "  \"updated_unix\": {},",     self.updated_unix);
-        let _ = writeln!(s, "  \"payload\": {}",           self.payload_json);
-        let _ = write!(s,   "}}");
+        let _ = writeln!(s, "  \"schema_name\": {:?},", self.schema_name.as_str());
+        let _ = writeln!(s, "  \"schema_version\": {},", self.schema_version);
+        let _ = writeln!(s, "  \"app_version\": {:?},", self.app_version);
+        let _ = writeln!(s, "  \"created_unix\": {},", self.created_unix);
+        let _ = writeln!(s, "  \"updated_unix\": {},", self.updated_unix);
+        let _ = writeln!(s, "  \"payload\": {}", self.payload_json);
+        let _ = write!(s, "}}");
         s
     }
 
@@ -220,11 +222,10 @@ impl VersionedEnvelope {
             .ok_or(EnvelopeError::MissingField("schema_version"))?;
         let app_version = extract_str_field(json, "app_version")
             .ok_or(EnvelopeError::MissingField("app_version"))?;
-        let payload_json = extract_payload(json)
-            .ok_or(EnvelopeError::MissingField("payload"))?;
+        let payload_json = extract_payload(json).ok_or(EnvelopeError::MissingField("payload"))?;
 
         Ok(ParsedEnvelope {
-            schema_name:    SchemaName::from_str(&schema_name),
+            schema_name: SchemaName::from_str(&schema_name),
             schema_version,
             app_version,
             payload_json,
@@ -244,7 +245,7 @@ impl std::fmt::Display for EnvelopeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::MissingField(name) => write!(f, "envelope missing field: {name}"),
-            Self::InvalidJson        => write!(f, "envelope JSON is not valid"),
+            Self::InvalidJson => write!(f, "envelope JSON is not valid"),
         }
     }
 }
@@ -267,7 +268,9 @@ fn extract_str_field(json: &str, field: &str) -> Option<String> {
     let key = format!("\"{}\":", field);
     let start = json.find(&key)? + key.len();
     let rest = json[start..].trim_start();
-    if !rest.starts_with('"') { return None; }
+    if !rest.starts_with('"') {
+        return None;
+    }
     let inner = &rest[1..];
     let end = inner.find('"')?;
     Some(inner[..end].into())
@@ -278,7 +281,9 @@ fn extract_u32_field(json: &str, field: &str) -> Option<u32> {
     let key = format!("\"{}\":", field);
     let start = json.find(&key)? + key.len();
     let rest = json[start..].trim_start();
-    let end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
+    let end = rest
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(rest.len());
     rest[..end].parse().ok()
 }
 
@@ -289,23 +294,46 @@ fn extract_payload(json: &str) -> Option<String> {
     let start = json.find(key)? + key.len();
     let rest = json[start..].trim_start();
     let open = rest.chars().next()?;
-    let close = match open { '{' => '}', '[' => ']', _ => return None };
+    let close = match open {
+        '{' => '}',
+        '[' => ']',
+        _ => return None,
+    };
     // Balance-count to find the closing delimiter.
     let mut depth = 0i32;
     let mut in_string = false;
     let mut escape_next = false;
     let mut end = 0usize;
     for (i, ch) in rest.char_indices() {
-        if escape_next { escape_next = false; continue; }
-        if in_string {
-            if ch == '\\' { escape_next = true; }
-            else if ch == '"' { in_string = false; }
+        if escape_next {
+            escape_next = false;
             continue;
         }
-        if ch == '"' { in_string = true; continue; }
-        if ch == open  { depth += 1; }
-        if ch == close { depth -= 1; if depth == 0 { end = i + ch.len_utf8(); break; } }
+        if in_string {
+            if ch == '\\' {
+                escape_next = true;
+            } else if ch == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        if ch == '"' {
+            in_string = true;
+            continue;
+        }
+        if ch == open {
+            depth += 1;
+        }
+        if ch == close {
+            depth -= 1;
+            if depth == 0 {
+                end = i + ch.len_utf8();
+                break;
+            }
+        }
     }
-    if depth != 0 { return None; }
+    if depth != 0 {
+        return None;
+    }
     Some(rest[..end].into())
 }

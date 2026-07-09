@@ -2,7 +2,7 @@
 
 use dioxus::prelude::*;
 
-use crate::state::{Store, DiffAlgorithmSetting};
+use crate::state::{DiffAlgorithmSetting, Store};
 
 pub fn add_profile(
     store: &mut Store,
@@ -11,16 +11,31 @@ pub fn add_profile(
     ignore_case: bool,
     algorithm: DiffAlgorithmSetting,
 ) {
-    store.settings.write().profiles.push(crate::state::settings::DiffProfile {
-        name, ignore_whitespace, ignore_case, algorithm, built_in: false,
-    });
+    store
+        .settings
+        .write()
+        .profiles
+        .push(crate::state::settings::DiffProfile {
+            name,
+            ignore_whitespace,
+            ignore_case,
+            algorithm,
+            built_in: false,
+        });
     crate::ui::view::settings::persist(&store.settings.read());
 }
 
 pub fn remove_profile(store: &mut Store, index: usize) {
-    let is_builtin = store.settings.read()
-        .profiles.get(index).map(|p| p.built_in).unwrap_or(true);
-    if is_builtin { return; }
+    let is_builtin = store
+        .settings
+        .read()
+        .profiles
+        .get(index)
+        .map(|p| p.built_in)
+        .unwrap_or(true);
+    if is_builtin {
+        return;
+    }
     let mut s = store.settings.write();
     s.profiles.remove(index);
     if s.active_profile >= s.profiles.len() {

@@ -52,7 +52,10 @@ pub struct ContentDigest {
 
 impl ContentDigest {
     pub fn fnv1a64(hex: impl Into<String>) -> Self {
-        Self { algorithm: "fnv1a64".into(), hex: hex.into() }
+        Self {
+            algorithm: "fnv1a64".into(),
+            hex: hex.into(),
+        }
     }
 
     /// `true` when both digests were produced by the same algorithm and the
@@ -70,23 +73,27 @@ impl ContentDigest {
 pub struct DirectoryEntryRecord {
     /// Path relative to the index root, using forward slashes.
     pub relative_path: PathBuf,
-    pub entry_type:    EntryType,
+    pub entry_type: EntryType,
     /// File size in bytes. `None` for directories or on read error.
-    pub size:          Option<u64>,
+    pub size: Option<u64>,
     /// Last-modified timestamp. `None` when unavailable.
-    pub modified:      Option<SystemTime>,
+    pub modified: Option<SystemTime>,
     /// Content digest, if computed. `None` when not yet hashed or on error.
-    pub digest:        Option<ContentDigest>,
+    pub digest: Option<ContentDigest>,
     /// Non-fatal per-entry error (permission denied, IO, etc.).
-    pub error:         Option<String>,
+    pub error: Option<String>,
 }
 
 impl DirectoryEntryRecord {
     /// `true` when this entry had a read or metadata error.
-    pub fn has_error(&self) -> bool { self.error.is_some() }
+    pub fn has_error(&self) -> bool {
+        self.error.is_some()
+    }
 
     /// `true` when a content digest is available.
-    pub fn has_digest(&self) -> bool { self.digest.is_some() }
+    pub fn has_digest(&self) -> bool {
+        self.digest.is_some()
+    }
 }
 
 // ── Index revision ────────────────────────────────────────────────────────────
@@ -97,7 +104,9 @@ impl DirectoryEntryRecord {
 pub struct IndexRevision(pub u64);
 
 impl IndexRevision {
-    pub fn next(self) -> Self { Self(self.0 + 1) }
+    pub fn next(self) -> Self {
+        Self(self.0 + 1)
+    }
 }
 
 // ── Directory index ───────────────────────────────────────────────────────────
@@ -108,9 +117,9 @@ impl IndexRevision {
 /// compare report renderer. Holds no file handles.
 #[derive(Debug, Clone)]
 pub struct DirectoryIndex {
-    pub root:     PathBuf,
+    pub root: PathBuf,
     pub revision: IndexRevision,
-    pub entries:  Vec<DirectoryEntryRecord>,
+    pub entries: Vec<DirectoryEntryRecord>,
     /// Number of entries skipped by the ignore policy.
     pub ignored_count: usize,
     /// `true` when the scan completed without being cancelled.
@@ -122,23 +131,23 @@ impl DirectoryIndex {
     pub fn empty(root: PathBuf) -> Self {
         Self {
             root,
-            revision:      IndexRevision::default(),
-            entries:       vec![],
+            revision: IndexRevision::default(),
+            entries: vec![],
             ignored_count: 0,
-            is_complete:   false,
+            is_complete: false,
         }
     }
 
     /// Build an index directly from a list of records (used in tests and
     /// for incremental merges).
     pub fn from_records(
-        root:        PathBuf,
-        entries:     Vec<DirectoryEntryRecord>,
+        root: PathBuf,
+        entries: Vec<DirectoryEntryRecord>,
         is_complete: bool,
     ) -> Self {
         Self {
             root,
-            revision:      IndexRevision(1),
+            revision: IndexRevision(1),
             entries,
             ignored_count: 0,
             is_complete,
@@ -152,12 +161,16 @@ impl DirectoryIndex {
 
     /// All file entries (not directories).
     pub fn files(&self) -> impl Iterator<Item = &DirectoryEntryRecord> {
-        self.entries.iter().filter(|e| e.entry_type == EntryType::File)
+        self.entries
+            .iter()
+            .filter(|e| e.entry_type == EntryType::File)
     }
 
     /// All directory entries.
     pub fn directories(&self) -> impl Iterator<Item = &DirectoryEntryRecord> {
-        self.entries.iter().filter(|e| e.entry_type == EntryType::Directory)
+        self.entries
+            .iter()
+            .filter(|e| e.entry_type == EntryType::Directory)
     }
 }
 
@@ -202,9 +215,14 @@ impl EqualityEvidence {
 
     /// `true` when the evidence conclusively shows a difference.
     pub fn is_different(&self) -> bool {
-        matches!(self,
-            Self::SizeDifferent { .. } | Self::DigestDifferent
-            | Self::TypeMismatch { .. } | Self::LeftOnly | Self::RightOnly)
+        matches!(
+            self,
+            Self::SizeDifferent { .. }
+                | Self::DigestDifferent
+                | Self::TypeMismatch { .. }
+                | Self::LeftOnly
+                | Self::RightOnly
+        )
     }
 
     /// `true` when no conclusion can be drawn yet.
@@ -224,14 +242,18 @@ impl EqualityEvidence {
 #[derive(Debug, Clone)]
 pub struct PairedEntry {
     pub relative_path: PathBuf,
-    pub evidence:      EqualityEvidence,
-    pub left:          Option<DirectoryEntryRecord>,
-    pub right:         Option<DirectoryEntryRecord>,
+    pub evidence: EqualityEvidence,
+    pub left: Option<DirectoryEntryRecord>,
+    pub right: Option<DirectoryEntryRecord>,
 }
 
 impl PairedEntry {
-    pub fn left_size(&self)  -> Option<u64> { self.left.as_ref().and_then(|e| e.size) }
-    pub fn right_size(&self) -> Option<u64> { self.right.as_ref().and_then(|e| e.size) }
+    pub fn left_size(&self) -> Option<u64> {
+        self.left.as_ref().and_then(|e| e.size)
+    }
+    pub fn right_size(&self) -> Option<u64> {
+        self.right.as_ref().and_then(|e| e.size)
+    }
 }
 
 /// The complete paired view of two directory indices.
@@ -241,14 +263,35 @@ pub struct PairedEntrySet {
 }
 
 impl PairedEntrySet {
-    pub fn equal_count(&self)     -> usize { self.entries.iter().filter(|e| e.evidence.is_equal()).count() }
-    pub fn different_count(&self) -> usize { self.entries.iter().filter(|e| e.evidence.is_different()).count() }
-    pub fn pending_count(&self)   -> usize { self.entries.iter().filter(|e| e.evidence.is_pending()).count() }
+    pub fn equal_count(&self) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| e.evidence.is_equal())
+            .count()
+    }
+    pub fn different_count(&self) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| e.evidence.is_different())
+            .count()
+    }
+    pub fn pending_count(&self) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| e.evidence.is_pending())
+            .count()
+    }
     pub fn left_only_count(&self) -> usize {
-        self.entries.iter().filter(|e| matches!(e.evidence, EqualityEvidence::LeftOnly)).count()
+        self.entries
+            .iter()
+            .filter(|e| matches!(e.evidence, EqualityEvidence::LeftOnly))
+            .count()
     }
     pub fn right_only_count(&self) -> usize {
-        self.entries.iter().filter(|e| matches!(e.evidence, EqualityEvidence::RightOnly)).count()
+        self.entries
+            .iter()
+            .filter(|e| matches!(e.evidence, EqualityEvidence::RightOnly))
+            .count()
     }
 }
 
@@ -268,10 +311,13 @@ pub fn pair_entries(left: &DirectoryIndex, right: &DirectoryIndex) -> PairedEntr
     use std::collections::BTreeMap;
 
     // Index both sides by relative path for O(log n) lookup.
-    let left_map:  BTreeMap<&PathBuf, &DirectoryEntryRecord> =
+    let left_map: BTreeMap<&PathBuf, &DirectoryEntryRecord> =
         left.entries.iter().map(|e| (&e.relative_path, e)).collect();
-    let right_map: BTreeMap<&PathBuf, &DirectoryEntryRecord> =
-        right.entries.iter().map(|e| (&e.relative_path, e)).collect();
+    let right_map: BTreeMap<&PathBuf, &DirectoryEntryRecord> = right
+        .entries
+        .iter()
+        .map(|e| (&e.relative_path, e))
+        .collect();
 
     // Union of all relative paths.
     let mut all_paths: std::collections::BTreeSet<&PathBuf> = Default::default();
@@ -289,7 +335,7 @@ pub fn pair_entries(left: &DirectoryIndex, right: &DirectoryIndex) -> PairedEntr
         entries.push(PairedEntry {
             relative_path: (*path).clone(),
             evidence,
-            left:  l.cloned(),
+            left: l.cloned(),
             right: r.cloned(),
         });
     }
@@ -308,7 +354,9 @@ fn compute_evidence(
         (Some(l), Some(r)) => {
             // Error on either side takes priority.
             if l.has_error() || r.has_error() {
-                let msg = l.error.as_deref()
+                let msg = l
+                    .error
+                    .as_deref()
                     .or(r.error.as_deref())
                     .unwrap_or("read error")
                     .to_string();
@@ -318,7 +366,7 @@ fn compute_evidence(
             // Type mismatch.
             if l.entry_type != r.entry_type {
                 return EqualityEvidence::TypeMismatch {
-                    left:  l.entry_type,
+                    left: l.entry_type,
                     right: r.entry_type,
                 };
             }
@@ -330,10 +378,12 @@ fn compute_evidence(
 
             // Size comparison.
             match (l.size, r.size) {
-                (Some(ls), Some(rs)) if ls != rs =>
+                (Some(ls), Some(rs)) if ls != rs => {
                     return EqualityEvidence::SizeDifferent {
-                        left_size: ls, right_size: rs,
-                    },
+                        left_size: ls,
+                        right_size: rs,
+                    };
+                }
                 _ => {}
             }
 
@@ -349,10 +399,8 @@ fn compute_evidence(
                 _ => {
                     // Same size, same mtime → likely equal.
                     match (l.modified, r.modified) {
-                        (Some(lm), Some(rm)) if lm == rm =>
-                            EqualityEvidence::MetadataEqual,
-                        _ =>
-                            EqualityEvidence::MetadataOnly,
+                        (Some(lm), Some(rm)) if lm == rm => EqualityEvidence::MetadataEqual,
+                        _ => EqualityEvidence::MetadataOnly,
                     }
                 }
             }

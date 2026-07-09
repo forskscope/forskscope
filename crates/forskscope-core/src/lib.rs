@@ -26,11 +26,11 @@ pub mod file_kind;
 pub mod ignore;
 pub mod job;
 pub mod line_map;
-pub mod platform;
 pub mod merge;
 pub mod patch;
 pub mod path;
 pub mod persist;
+pub mod platform;
 pub mod report;
 pub mod save;
 pub mod session;
@@ -40,34 +40,60 @@ pub mod watcher;
 pub mod xlsx;
 
 pub use diff::{
-    DiffAlgorithm, DiffDocument, DiffHunk, DiffOptions, DiffRow, DiffWarning, HunkKind, InlineKind, InlineSpan,
-    compute_diff,
     // RFC-028
-    CaseSensitivity, CompareProfile, NewlineCompareMode, WhitespaceMode,
+    CaseSensitivity,
+    CompareProfile,
+    DiffAlgorithm,
+    DiffDocument,
+    DiffHunk,
+    DiffOptions,
+    DiffRow,
+    DiffWarning,
+    HunkKind,
+    InlineKind,
+    InlineSpan,
+    NewlineCompareMode,
+    WhitespaceMode,
+    compute_diff,
 };
 pub use document::{
-    FileFingerprint, FileId, LoadOptions, LoadedDocument, TextDocument, load_path,
     // RFC-036
-    ExternalFileState, check_external_state,
+    ExternalFileState,
+    FileFingerprint,
+    FileId,
+    LoadOptions,
+    LoadedDocument,
+    TextDocument,
+    check_external_state,
+    load_path,
 };
-pub use encoding::{NewlineStyle, TextEncoding,
+pub use encoding::{
     // RFC-012
     NewlinePolicy,
+    NewlineStyle,
+    TextEncoding,
 };
 pub use error::{
-    CoreError, ErrorSeverity, IoOperation, RecoveryHint, Result,
     // RFC-017
-    AppErrorKind, RecoveryAction, UserMessage,
+    AppErrorKind,
+    CoreError,
+    ErrorSeverity,
+    IoOperation,
+    RecoveryAction,
+    RecoveryHint,
+    Result,
+    UserMessage,
 };
-pub use file_kind::{FileKind,
+pub use file_kind::{
     // RFC-012
     EditabilityClass,
+    FileKind,
 };
 pub use ignore::IgnoreRules;
 pub use merge::{
-    ConflictId, ConflictStatus, HunkState, MergeConflict, MergeHunk, MergeSession,
-    SessionRevision, ThreeWayMergeSession, ThreeWayStats, TransactionEntry,
-    TransactionKind, TransactionLog, UnixTimestamp,
+    ConflictId, ConflictStatus, HunkState, MergeConflict, MergeHunk, MergeSession, SessionRevision,
+    ThreeWayMergeSession, ThreeWayStats, TransactionEntry, TransactionKind, TransactionLog,
+    UnixTimestamp,
 };
 pub use patch::{
     LineOrigin, PatchDocument, PatchFileChange, PatchFormat, PatchHunk, PatchLine, PatchOptions,
@@ -89,13 +115,19 @@ pub(crate) fn fnv1a64(bytes: &[u8]) -> u64 {
     hash
 }
 pub use cancel::CancellationToken;
-pub use job::{
-    DIGEST_CONCURRENCY_LIMIT, LARGE_DIRECTORY_VIRTUAL_THRESHOLD,
-    LARGE_FILE_INLINE_DIFF_BYTES, LARGE_HUNK_AUTO_EXPAND_LINES,
-    VERY_LARGE_FILE_BYTES,
-    JobHandle, JobId, JobKind, JobProgress,
-    // RFC-013
-    FileSizeClass, PerformanceLimits,
-};
 pub use dir::batch_copy;
 pub use dir::copy_file;
+pub use job::{
+    DIGEST_CONCURRENCY_LIMIT,
+    // RFC-013
+    FileSizeClass,
+    JobHandle,
+    JobId,
+    JobKind,
+    JobProgress,
+    LARGE_DIRECTORY_VIRTUAL_THRESHOLD,
+    LARGE_FILE_INLINE_DIFF_BYTES,
+    LARGE_HUNK_AUTO_EXPAND_LINES,
+    PerformanceLimits,
+    VERY_LARGE_FILE_BYTES,
+};

@@ -63,13 +63,13 @@ impl JobKind {
     /// Human-readable label for progress UI.
     pub fn label(self) -> &'static str {
         match self {
-            Self::ReadFile       => "Reading file",
-            Self::DecodeFile     => "Decoding file",
-            Self::LineDiff       => "Computing diff",
-            Self::InlineDiff     => "Computing inline diff",
+            Self::ReadFile => "Reading file",
+            Self::DecodeFile => "Decoding file",
+            Self::LineDiff => "Computing diff",
+            Self::InlineDiff => "Computing inline diff",
             Self::DirectoryDigest => "Comparing directory",
-            Self::SavePreflight  => "Checking save conditions",
-            Self::BatchCopy      => "Copying files",
+            Self::SavePreflight => "Checking save conditions",
+            Self::BatchCopy => "Copying files",
         }
     }
 }
@@ -82,15 +82,15 @@ impl JobKind {
 /// (e.g. bytes for file I/O, file count for directory digest).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JobProgress {
-    pub job_id:          JobId,
-    pub kind:            JobKind,
+    pub job_id: JobId,
+    pub kind: JobKind,
     /// Short description of the current phase within the job.
-    pub phase:           String,
+    pub phase: String,
     pub completed_units: u64,
     /// `None` when the total is not yet known (e.g. during a directory walk).
-    pub total_units:     Option<u64>,
+    pub total_units: Option<u64>,
     /// Whether this job responds to `CancellationToken::cancel`.
-    pub cancellable:     bool,
+    pub cancellable: bool,
 }
 
 impl JobProgress {
@@ -121,13 +121,16 @@ impl JobProgress {
 #[derive(Debug, Clone)]
 pub struct JobHandle {
     pub job_id: JobId,
-    token:      CancellationToken,
+    token: CancellationToken,
 }
 
 impl JobHandle {
     pub fn new(job_id: JobId) -> (Self, CancellationToken) {
         let token = CancellationToken::new();
-        let handle = Self { job_id, token: token.clone() };
+        let handle = Self {
+            job_id,
+            token: token.clone(),
+        };
         (handle, token)
     }
 
@@ -194,9 +197,9 @@ impl JobStatus {
 /// progress (RFC-008 §6 "Progress Reporting").
 #[derive(Debug, Clone)]
 pub struct JobStatusRecord {
-    pub job_id:   JobId,
-    pub kind:     JobKind,
-    pub status:   JobStatus,
+    pub job_id: JobId,
+    pub kind: JobKind,
+    pub status: JobStatus,
     pub progress: JobProgress,
 }
 
@@ -205,15 +208,15 @@ impl JobStatusRecord {
         let progress = JobProgress {
             job_id,
             kind,
-            phase:           String::new(),
+            phase: String::new(),
             completed_units: 0,
-            total_units:     None,
-            cancellable:     true,
+            total_units: None,
+            cancellable: true,
         };
         Self {
             job_id,
             kind,
-            status:   JobStatus::Queued,
+            status: JobStatus::Queued,
             progress,
         }
     }
@@ -289,6 +292,10 @@ impl JobRegistry {
         self.records.retain(|r| r.status.is_active());
     }
 
-    pub fn len(&self) -> usize { self.records.len() }
-    pub fn is_empty(&self) -> bool { self.records.is_empty() }
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
 }

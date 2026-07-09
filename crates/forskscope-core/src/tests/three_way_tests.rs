@@ -126,7 +126,10 @@ fn undo_and_redo_restore_resolution_state() {
     assert!(s.is_fully_resolved());
 
     s.undo().unwrap();
-    assert!(!s.is_fully_resolved(), "undo should restore unresolved state");
+    assert!(
+        !s.is_fully_resolved(),
+        "undo should restore unresolved state"
+    );
     assert_eq!(s.conflict(id).unwrap().status, ConflictStatus::Unresolved);
 
     s.redo().unwrap();

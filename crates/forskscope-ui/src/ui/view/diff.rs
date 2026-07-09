@@ -24,8 +24,8 @@ use toolbar::Toolbar;
 pub fn DiffWorkspace(index: usize) -> Element {
     let store = use_context::<Store>();
     let lang = store.lang();
-    let font_size     = store.settings.read().diff_font_size;
-    let font_family   = store.settings.read().diff_font_family.css_value();
+    let font_size = store.settings.read().diff_font_size;
+    let font_family = store.settings.read().diff_font_family.css_value();
     let context_lines = store.settings.read().context_lines;
 
     // Loading / Error states (RFC-065).
@@ -70,21 +70,28 @@ pub fn DiffWorkspace(index: usize) -> Element {
         }
     };
 
-    let mut search_ctx: Signal<SearchCtx> = use_context_provider(|| Signal::new(SearchCtx::default()));
-    let mut expanded:   Signal<HashSet<u64>> = use_signal(HashSet::new);
+    let mut search_ctx: Signal<SearchCtx> =
+        use_context_provider(|| Signal::new(SearchCtx::default()));
+    let mut expanded: Signal<HashSet<u64>> = use_signal(HashSet::new);
 
     // Rebuild match index on query change; auto-expand hunks containing matches.
     {
-        let query  = search_ctx.read().query.clone();
+        let query = search_ctx.read().query.clone();
         let active = search_ctx.read().active;
         if active && !query.is_empty() {
-            let hunk_rows: Vec<(u64, Vec<(Option<&str>, Option<&str>)>)> = snap.hunks.iter()
+            let hunk_rows: Vec<(u64, Vec<(Option<&str>, Option<&str>)>)> = snap
+                .hunks
+                .iter()
                 .map(|h| {
-                    let rows = h.rows.iter()
-                        .map(|r| (
-                            r.left.as_ref().map(|l| l.content.as_str()),
-                            r.right.as_ref().map(|r| r.content.as_str()),
-                        ))
+                    let rows = h
+                        .rows
+                        .iter()
+                        .map(|r| {
+                            (
+                                r.left.as_ref().map(|l| l.content.as_str()),
+                                r.right.as_ref().map(|r| r.content.as_str()),
+                            )
+                        })
                         .collect();
                     (h.hunk_id, rows)
                 })
@@ -93,7 +100,9 @@ pub fn DiffWorkspace(index: usize) -> Element {
                 hunk_rows.iter().map(|(id, rows)| (*id, rows.as_slice())),
                 &query,
             );
-            for id in new_index.matching_hunk_ids() { expanded.write().insert(id); }
+            for id in new_index.matching_hunk_ids() {
+                expanded.write().insert(id);
+            }
             let prev_len = search_ctx.read().index.len();
             if new_index.len() != prev_len || search_ctx.read().index.focused_number() == Some(1) {
                 let ctx_snap = search_ctx.read();
@@ -106,7 +115,11 @@ pub fn DiffWorkspace(index: usize) -> Element {
         }
     }
 
-    let wrap_class = if snap.word_wrap { "diff-scroll wrap" } else { "diff-scroll" };
+    let wrap_class = if snap.word_wrap {
+        "diff-scroll wrap"
+    } else {
+        "diff-scroll"
+    };
 
     rsx! {
         div {
@@ -238,10 +251,19 @@ fn DiffHeader(index: usize) -> Element {
     let store = use_context::<Store>();
     let (left, right) = {
         let tabs = store.tabs.read();
-        let tab = match tabs.get(index) { Some(t) => t, None => return rsx!{} };
+        let tab = match tabs.get(index) {
+            Some(t) => t,
+            None => return rsx! {},
+        };
         (
-            tab.left_path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "—".into()),
-            tab.right_path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "—".into()),
+            tab.left_path
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "—".into()),
+            tab.right_path
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "—".into()),
         )
     };
     rsx! {
@@ -286,41 +308,77 @@ impl TabSnapshot {
         context_lines: usize,
         lang: crate::state::Lang,
     ) -> Self {
+        use crate::i18n::t;
         use forskscope_core::diff::DiffWarning;
         use forskscope_core::file_kind::FileKind;
-        use crate::i18n::t;
 
         let hunks = tab.merge.hunks().to_vec();
-        let ids: Vec<u64> = hunks.iter().filter(|h| h.kind.is_change()).map(|h| h.hunk_id).collect();
-        let warnings = tab.diff.warnings.iter().map(|w| match w {
-            DiffWarning::LargeFilePolicyApplied    => t(lang, "Large file — inline diff disabled and deadline shortened."),
-            DiffWarning::DeadlineExpired           => t(lang, "Diff timed out — result may be approximate."),
-            DiffWarning::InlineSkippedHunkTooLarge => t(lang, "Some hunks were too large for character-level diff."),
-        }).collect();
+        let ids: Vec<u64> = hunks
+            .iter()
+            .filter(|h| h.kind.is_change())
+            .map(|h| h.hunk_id)
+            .collect();
+        let warnings = tab
+            .diff
+            .warnings
+            .iter()
+            .map(|w| match w {
+                DiffWarning::LargeFilePolicyApplied => t(
+                    lang,
+                    "Large file — inline diff disabled and deadline shortened.",
+                ),
+                DiffWarning::DeadlineExpired => {
+                    t(lang, "Diff timed out — result may be approximate.")
+                }
+                DiffWarning::InlineSkippedHunkTooLarge => {
+                    t(lang, "Some hunks were too large for character-level diff.")
+                }
+            })
+            .collect();
         let both_missing = matches!(tab.left_doc.kind, FileKind::Missing)
             && matches!(tab.right_doc.kind, FileKind::Missing);
-        let readonly_notice = if tab.can_save { String::new() } else {
+        let readonly_notice = if tab.can_save {
+            String::new()
+        } else {
             match (&tab.left_doc.kind, &tab.right_doc.kind) {
-                (FileKind::Missing,  FileKind::Missing)  => t(lang, "Both files not found — read-only."),
-                (FileKind::Binary,   _) | (_, FileKind::Binary)   => t(lang, "Binary file — read-only comparison (hex preview)."),
-                (FileKind::ExcelXlsx,_) | (_, FileKind::ExcelXlsx)=> t(lang, "Spreadsheet — read-only comparison."),
-                (FileKind::Missing,  _) | (_, FileKind::Missing)  => t(lang, "One side is missing — read-only."),
-                (FileKind::Unsupported {..},_) | (_,FileKind::Unsupported {..}) =>
-                    t(lang, "File type not supported for merge — read-only."),
+                (FileKind::Missing, FileKind::Missing) => {
+                    t(lang, "Both files not found — read-only.")
+                }
+                (FileKind::Binary, _) | (_, FileKind::Binary) => {
+                    t(lang, "Binary file — read-only comparison (hex preview).")
+                }
+                (FileKind::ExcelXlsx, _) | (_, FileKind::ExcelXlsx) => {
+                    t(lang, "Spreadsheet — read-only comparison.")
+                }
+                (FileKind::Missing, _) | (_, FileKind::Missing) => {
+                    t(lang, "One side is missing — read-only.")
+                }
+                (FileKind::Unsupported { .. }, _) | (_, FileKind::Unsupported { .. }) => {
+                    t(lang, "File type not supported for merge — read-only.")
+                }
                 _ => t(lang, "Merge/save unavailable for this file type."),
             }
         };
         Self {
             identical: tab.diff.is_identical() && !both_missing,
-            char_mode: tab.char_mode, word_wrap: tab.word_wrap, can_save: tab.can_save,
-            is_dirty: tab.merge.is_dirty(), can_undo: tab.merge.can_undo(),
-            can_redo: tab.merge.can_redo(), font_size, font_family,
+            char_mode: tab.char_mode,
+            word_wrap: tab.word_wrap,
+            can_save: tab.can_save,
+            is_dirty: tab.merge.is_dirty(),
+            can_undo: tab.merge.can_undo(),
+            can_redo: tab.merge.can_redo(),
+            font_size,
+            font_family,
             focused_id: ids.get(tab.focused_change).copied(),
-            focused_change: tab.focused_change, changes: ids.len(),
+            focused_change: tab.focused_change,
+            changes: ids.len(),
             ignore_whitespace: tab.diff_options.ignore_whitespace,
-            ignore_case:       tab.diff_options.ignore_case,
+            ignore_case: tab.diff_options.ignore_case,
             algorithm: tab.diff_options.algorithm,
-            context_lines, hunks, warnings, readonly_notice,
+            context_lines,
+            hunks,
+            warnings,
+            readonly_notice,
         }
     }
 }

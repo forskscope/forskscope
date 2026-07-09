@@ -9,9 +9,7 @@
 /// The runtime stylesheet, included at compile time.
 /// Generated from `assets/css/` via `cargo xtask css`.
 /// Both the runtime (app.rs) and this test include the same single artifact.
-const MAIN_CSS: &str = include_str!(
-    "../../../crates/forskscope-ui/assets/main.css"
-);
+const MAIN_CSS: &str = include_str!("../../../crates/forskscope-ui/assets/main.css");
 
 fn css_contains_class(css: &str, class: &str) -> bool {
     // Strip leading dot to form the selector token, then look for it.
@@ -67,11 +65,7 @@ fn conflict_navigator_css_classes_defined_in_main_css() {
     use forskscope_core::merge::ThreeWayMergeSession;
 
     // Build a session with one conflict and inspect the resulting CSS classes.
-    let sess = ThreeWayMergeSession::from_texts(
-        "base\n",
-        "left\n",
-        "right\n",
-    );
+    let sess = ThreeWayMergeSession::from_texts("base\n", "left\n", "right\n");
     let nav = ConflictNavigator::build(&sess, None, ConflictFilter::All);
 
     // The navigator entries carry the css_class for the current status.
@@ -107,10 +101,21 @@ fn row_state_gutter_symbols_are_distinct() {
     // Smoke test: RowState::gutter_symbol must be unique across variants.
     use forskscope_core::line_map::RowState;
     let symbols: std::collections::HashSet<char> = [
-        RowState::Equal, RowState::Inserted, RowState::Deleted,
-        RowState::Modified, RowState::Conflict, RowState::Collapsed,
-    ].iter().map(|s| s.gutter_symbol()).collect();
-    assert_eq!(symbols.len(), 6, "all RowState gutter symbols must be distinct");
+        RowState::Equal,
+        RowState::Inserted,
+        RowState::Deleted,
+        RowState::Modified,
+        RowState::Conflict,
+        RowState::Collapsed,
+    ]
+    .iter()
+    .map(|s| s.gutter_symbol())
+    .collect();
+    assert_eq!(
+        symbols.len(),
+        6,
+        "all RowState gutter symbols must be distinct"
+    );
 }
 
 #[test]
@@ -123,11 +128,16 @@ fn all_css_vars_used_are_defined_in_main_css() {
     while let Some(pos) = rest.find("var(--") {
         rest = &rest[pos + 6..]; // skip "var(--"
         // The var name ends at the first ')' or whitespace
-        let end = rest.find(|c: char| c == ')' || c.is_whitespace())
+        let end = rest
+            .find(|c: char| c == ')' || c.is_whitespace())
             .unwrap_or(rest.len());
         let var_name = &rest[..end];
         // Only accept names matching CSS custom property syntax: [a-z0-9-]+
-        if !var_name.is_empty() && var_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        if !var_name.is_empty()
+            && var_name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-')
+        {
             used.insert(var_name);
         }
     }
@@ -147,10 +157,9 @@ fn generated_main_css_matches_split_sources() {
     // Files are assembled in alphabetical order (numeric prefix = cascade order).
     // If this test fails, run `cargo xtask css` to regenerate.
     let assets = std::path::PathBuf::from(
-        std::env::var("CARGO_MANIFEST_DIR")
-            .expect("CARGO_MANIFEST_DIR must be set by cargo test")
+        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set by cargo test"),
     )
-        .join("../../crates/forskscope-ui/assets");
+    .join("../../crates/forskscope-ui/assets");
     let css_dir = assets.join("css");
 
     // Collect *.css files in alphabetical order — must match xtask logic exactly.
@@ -175,7 +184,9 @@ fn generated_main_css_matches_split_sources() {
             .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
         expected.push_str(&format!("/* @source css/{name} */\n"));
         expected.push_str(&content);
-        if !expected.ends_with('\n') { expected.push('\n'); }
+        if !expected.ends_with('\n') {
+            expected.push('\n');
+        }
         expected.push('\n');
     }
 

@@ -46,7 +46,8 @@ pub struct FileFingerprint {
 impl FileFingerprint {
     /// Capture the current fingerprint of `path`, hashing `bytes` if given.
     pub fn capture(path: &Path, bytes: Option<&[u8]>) -> Result<Self> {
-        let meta = fs::metadata(path).map_err(|e| CoreError::io(path, IoOperation::Metadata, &e))?;
+        let meta =
+            fs::metadata(path).map_err(|e| CoreError::io(path, IoOperation::Metadata, &e))?;
         let modified_unix_nanos = meta.modified().ok().and_then(|t| {
             t.duration_since(UNIX_EPOCH)
                 .ok()
@@ -254,7 +255,10 @@ impl ExternalFileState {
 
     /// `true` when the file exists on disk in a form we can work with.
     pub fn file_accessible(self) -> bool {
-        matches!(self, Self::Clean | Self::DirtyInSession | Self::ChangedOnDisk)
+        matches!(
+            self,
+            Self::Clean | Self::DirtyInSession | Self::ChangedOnDisk
+        )
     }
 }
 
@@ -267,9 +271,9 @@ impl ExternalFileState {
 /// Returns [`ExternalFileState::Unknown`] when metadata cannot be read,
 /// never `Err` — a monitoring failure must not crash the save path.
 pub fn check_external_state(
-    path:              &Path,
-    snapshot:          &FileFingerprint,
-    is_session_dirty:  bool,
+    path: &Path,
+    snapshot: &FileFingerprint,
+    is_session_dirty: bool,
 ) -> ExternalFileState {
     use std::fs;
 
@@ -300,7 +304,7 @@ pub fn check_external_state(
 
     let mtime_differs = match (current_mtime, snapshot.modified_unix_nanos) {
         (Some(cur), Some(snap)) => cur != snap,
-        _ => false,   // if either mtime is unavailable, don't conclude changed
+        _ => false, // if either mtime is unavailable, don't conclude changed
     };
 
     if mtime_differs {

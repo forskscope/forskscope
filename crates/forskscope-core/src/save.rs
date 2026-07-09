@@ -57,7 +57,8 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
         && target.exists()
     {
         let current = FileFingerprint::capture(target, None)?;
-        if current.len != expected.len || current.modified_unix_nanos != expected.modified_unix_nanos
+        if current.len != expected.len
+            || current.modified_unix_nanos != expected.modified_unix_nanos
         {
             return Err(CoreError::Conflict {
                 message: "target changed on disk after it was loaded".into(),

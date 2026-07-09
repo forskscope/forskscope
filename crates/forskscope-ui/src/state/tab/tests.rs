@@ -1,11 +1,15 @@
-use std::path::Path;
-use crate::state::settings::Lang;
 use super::tab_title;
+use crate::state::settings::Lang;
+use std::path::Path;
 
 #[test]
 fn same_filename_both_sides_shows_single_name() {
     assert_eq!(
-        tab_title(Path::new("/old/src/main.rs"), Path::new("/new/src/main.rs"), Lang::En),
+        tab_title(
+            Path::new("/old/src/main.rs"),
+            Path::new("/new/src/main.rs"),
+            Lang::En
+        ),
         "main.rs"
     );
 }
@@ -13,7 +17,11 @@ fn same_filename_both_sides_shows_single_name() {
 #[test]
 fn different_filenames_shows_both_with_arrow() {
     assert_eq!(
-        tab_title(Path::new("/old/foo.txt"), Path::new("/new/bar.txt"), Lang::En),
+        tab_title(
+            Path::new("/old/foo.txt"),
+            Path::new("/new/bar.txt"),
+            Lang::En
+        ),
         "foo.txt ↔ bar.txt"
     );
 }
@@ -37,7 +45,11 @@ fn both_missing_filenames_shows_fallback() {
 #[test]
 fn hidden_dotfile_names_match_correctly() {
     assert_eq!(
-        tab_title(Path::new("/a/.gitignore"), Path::new("/b/.gitignore"), Lang::En),
+        tab_title(
+            Path::new("/a/.gitignore"),
+            Path::new("/b/.gitignore"),
+            Lang::En
+        ),
         ".gitignore"
     );
 }

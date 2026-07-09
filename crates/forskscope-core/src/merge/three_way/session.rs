@@ -236,13 +236,13 @@ impl ThreeWayMergeSession {
         status: ConflictStatus,
         manual: Option<Vec<MergeLine>>,
     ) -> crate::Result<()> {
-        let conflict = self
-            .conflicts
-            .iter_mut()
-            .find(|c| c.id == id)
-            .ok_or(crate::CoreError::Conflict {
-                message: "unknown conflict id".into(),
-            })?;
+        let conflict =
+            self.conflicts
+                .iter_mut()
+                .find(|c| c.id == id)
+                .ok_or(crate::CoreError::Conflict {
+                    message: "unknown conflict id".into(),
+                })?;
         let txn = ResolutionTransaction {
             conflict_id: id,
             previous_status: conflict.status.clone(),

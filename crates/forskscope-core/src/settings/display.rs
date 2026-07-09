@@ -1,6 +1,5 @@
 //! Display primitive settings: theme, density, font family, and locale (RFC-018).
 
-
 /// Schema version for the settings file.
 pub const SETTINGS_SCHEMA_VERSION: u32 = 1;
 
@@ -18,7 +17,7 @@ pub enum ThemeId {
 impl ThemeId {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Dark  => "dark",
+            Self::Dark => "dark",
             Self::Light => "light",
             Self::Night => "night",
         }
@@ -26,10 +25,10 @@ impl ThemeId {
 
     pub fn from_id(s: &str) -> Option<Self> {
         match s {
-            "dark"  => Some(Self::Dark),
+            "dark" => Some(Self::Dark),
             "light" => Some(Self::Light),
             "night" => Some(Self::Night),
-            _       => None,
+            _ => None,
         }
     }
 
@@ -45,18 +44,18 @@ impl ThemeId {
 /// `:root` level. Core does not render CSS; it only maps the token names.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ThemeTokens {
-    pub app_bg:          String,
-    pub panel_bg:        String,
-    pub text_primary:    String,
-    pub text_muted:      String,
-    pub border_subtle:   String,
-    pub diff_equal_bg:   String,
-    pub diff_insert_bg:  String,
-    pub diff_delete_bg:  String,
+    pub app_bg: String,
+    pub panel_bg: String,
+    pub text_primary: String,
+    pub text_muted: String,
+    pub border_subtle: String,
+    pub diff_equal_bg: String,
+    pub diff_insert_bg: String,
+    pub diff_delete_bg: String,
     pub diff_replace_bg: String,
-    pub focus_ring:      String,
-    pub warning:         String,
-    pub error:           String,
+    pub focus_ring: String,
+    pub warning: String,
+    pub error: String,
 }
 
 impl ThemeTokens {
@@ -67,23 +66,23 @@ impl ThemeTokens {
     /// completeness without depending on color values.
     pub fn css_var_names(theme: ThemeId) -> Vec<(&'static str, &'static str)> {
         let prefix = match theme {
-            ThemeId::Dark  => "dark",
+            ThemeId::Dark => "dark",
             ThemeId::Light => "light",
             ThemeId::Night => "night",
         };
         vec![
-            ("--fsk-app-bg",          prefix),
-            ("--fsk-panel-bg",        prefix),
-            ("--fsk-text-primary",    prefix),
-            ("--fsk-text-muted",      prefix),
-            ("--fsk-border-subtle",   prefix),
-            ("--fsk-diff-equal-bg",   prefix),
-            ("--fsk-diff-insert-bg",  prefix),
-            ("--fsk-diff-delete-bg",  prefix),
+            ("--fsk-app-bg", prefix),
+            ("--fsk-panel-bg", prefix),
+            ("--fsk-text-primary", prefix),
+            ("--fsk-text-muted", prefix),
+            ("--fsk-border-subtle", prefix),
+            ("--fsk-diff-equal-bg", prefix),
+            ("--fsk-diff-insert-bg", prefix),
+            ("--fsk-diff-delete-bg", prefix),
             ("--fsk-diff-replace-bg", prefix),
-            ("--fsk-focus-ring",      prefix),
-            ("--fsk-warning",         prefix),
-            ("--fsk-error",           prefix),
+            ("--fsk-focus-ring", prefix),
+            ("--fsk-warning", prefix),
+            ("--fsk-error", prefix),
         ]
     }
 }
@@ -106,17 +105,17 @@ impl Density {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Comfortable => "comfortable",
-            Self::Compact     => "compact",
-            Self::Spacious    => "spacious",
+            Self::Compact => "compact",
+            Self::Spacious => "spacious",
         }
     }
 
     pub fn from_id(s: &str) -> Option<Self> {
         match s {
             "comfortable" => Some(Self::Comfortable),
-            "compact"     => Some(Self::Compact),
-            "spacious"    => Some(Self::Spacious),
-            _             => None,
+            "compact" => Some(Self::Compact),
+            "spacious" => Some(Self::Spacious),
+            _ => None,
         }
     }
 }
@@ -133,18 +132,18 @@ pub enum FontFamilySetting {
 impl FontFamilySetting {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::SystemMono  => "system-mono",
-            Self::SystemSans  => "system-sans",
+            Self::SystemMono => "system-mono",
+            Self::SystemSans => "system-sans",
             Self::SystemSerif => "system-serif",
         }
     }
 
     pub fn from_id(s: &str) -> Option<Self> {
         match s {
-            "system-mono"  => Some(Self::SystemMono),
-            "system-sans"  => Some(Self::SystemSans),
+            "system-mono" => Some(Self::SystemMono),
+            "system-sans" => Some(Self::SystemSans),
             "system-serif" => Some(Self::SystemSerif),
-            _              => None,
+            _ => None,
         }
     }
 }
@@ -156,8 +155,13 @@ impl FontFamilySetting {
 pub struct LocaleId(pub String);
 
 impl LocaleId {
-    pub fn english()  -> Self { Self("en".into()) }
-    pub fn japanese() -> Self { Self("ja".into()) }
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn english() -> Self {
+        Self("en".into())
+    }
+    pub fn japanese() -> Self {
+        Self("ja".into())
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
-

@@ -51,7 +51,7 @@ pub use explore::status::{RowStatusKind, StatusRow};
 
 // settings
 pub use settings::settings_view::{
-    ProfileChoice, SelectChoice,
-    clamp_font_size, density_choices, find_active, font_family_choices,
-    profile_presets, theme_choices, validate_context_lines, validate_font_size,
+    ProfileChoice, SelectChoice, clamp_font_size, density_choices, find_active,
+    font_family_choices, profile_presets, theme_choices, validate_context_lines,
+    validate_font_size,
 };

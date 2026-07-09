@@ -24,14 +24,18 @@ pub struct RecoveryButton {
     /// Semantic action this button triggers.
     pub action: RecoveryAction,
     /// Short label shown on the button face.
-    pub label:  &'static str,
+    pub label: &'static str,
     /// If `true`, render as the visually prominent primary button.
     pub is_primary: bool,
 }
 
 impl RecoveryButton {
     fn new(action: RecoveryAction, label: &'static str, is_primary: bool) -> Self {
-        Self { action, label, is_primary }
+        Self {
+            action,
+            label,
+            is_primary,
+        }
     }
 }
 
@@ -40,18 +44,18 @@ impl RecoveryButton {
 /// Kept short enough for a dialog button — 3 words or fewer.
 pub fn action_label(action: RecoveryAction) -> &'static str {
     match action {
-        RecoveryAction::Dismiss            => "Dismiss",
-        RecoveryAction::ChooseAnotherFile  => "Choose another file",
-        RecoveryAction::Reload             => "Reload",
-        RecoveryAction::SaveAs             => "Save As…",
-        RecoveryAction::OverwriteAnyway    => "Overwrite anyway",
-        RecoveryAction::OpenLimitedDiff    => "Open with limits",
-        RecoveryAction::OpenAsBinary       => "Open as binary",
-        RecoveryAction::Retry              => "Retry",
+        RecoveryAction::Dismiss => "Dismiss",
+        RecoveryAction::ChooseAnotherFile => "Choose another file",
+        RecoveryAction::Reload => "Reload",
+        RecoveryAction::SaveAs => "Save As…",
+        RecoveryAction::OverwriteAnyway => "Overwrite anyway",
+        RecoveryAction::OpenLimitedDiff => "Open with limits",
+        RecoveryAction::OpenAsBinary => "Open as binary",
+        RecoveryAction::Retry => "Retry",
         RecoveryAction::RetryWithoutInline => "Retry without inline diff",
-        RecoveryAction::Cancel             => "Cancel",
-        RecoveryAction::StartFresh         => "Start fresh",
-        RecoveryAction::ReportBug          => "Report bug",
+        RecoveryAction::Cancel => "Cancel",
+        RecoveryAction::StartFresh => "Start fresh",
+        RecoveryAction::ReportBug => "Report bug",
     }
 }
 
@@ -61,34 +65,39 @@ pub fn action_label(action: RecoveryAction) -> &'static str {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SaveErrorView {
     /// Dialog title (short, fits the title bar).
-    pub title:    String,
+    pub title: String,
     /// Body text — one or two sentences explaining the problem.
-    pub body:     String,
+    pub body: String,
     /// Optional file path shown below the body (the affected file).
-    pub path:     Option<String>,
+    pub path: Option<String>,
     /// Ordered recovery buttons. The first `is_primary = true` button is
     /// the safe default; destructive actions (`OverwriteAnyway`) are never
     /// primary.
-    pub buttons:  Vec<RecoveryButton>,
+    pub buttons: Vec<RecoveryButton>,
 }
 
 impl SaveErrorView {
     /// Build a `SaveErrorView` from an [`AppError`], optionally annotating
     /// it with the file path involved.
     pub fn from_error(err: &AppError, path: Option<String>) -> Self {
-        let msg     = &err.message;
+        let msg = &err.message;
         let actions = err.kind.default_recovery_actions();
 
         // Mark the first non-destructive action as primary.
-        let buttons: Vec<RecoveryButton> = actions.iter().enumerate().map(|(i, &action)| {
-            let is_primary = i == 0 && action != RecoveryAction::OverwriteAnyway
-                && action != RecoveryAction::ReportBug;
-            RecoveryButton::new(action, action_label(action), is_primary)
-        }).collect();
+        let buttons: Vec<RecoveryButton> = actions
+            .iter()
+            .enumerate()
+            .map(|(i, &action)| {
+                let is_primary = i == 0
+                    && action != RecoveryAction::OverwriteAnyway
+                    && action != RecoveryAction::ReportBug;
+                RecoveryButton::new(action, action_label(action), is_primary)
+            })
+            .collect();
 
         Self {
-            title:   msg.short.clone(),
-            body:    msg.detail.clone(),
+            title: msg.short.clone(),
+            body: msg.detail.clone(),
             path,
             buttons,
         }
@@ -145,8 +154,10 @@ mod tests {
     #[test]
     fn overwrite_label_mentions_overwrite() {
         let label = action_label(RecoveryAction::OverwriteAnyway);
-        assert!(label.to_lowercase().contains("overwrite"),
-            "OverwriteAnyway label should mention overwrite: {label}");
+        assert!(
+            label.to_lowercase().contains("overwrite"),
+            "OverwriteAnyway label should mention overwrite: {label}"
+        );
     }
 
     // ── SaveErrorView::from_error ─────────────────────────────────────────────
@@ -165,8 +176,11 @@ mod tests {
         let e = err(AppErrorKind::ExternalModificationDetected);
         let v = SaveErrorView::from_error(&e, None);
         let primary = v.primary_button().expect("must have primary button");
-        assert_ne!(primary.action, RecoveryAction::OverwriteAnyway,
-            "OverwriteAnyway must not be primary");
+        assert_ne!(
+            primary.action,
+            RecoveryAction::OverwriteAnyway,
+            "OverwriteAnyway must not be primary"
+        );
         assert_eq!(primary.action, RecoveryAction::Reload);
     }
 
@@ -218,7 +232,7 @@ mod tests {
         ] {
             let v = SaveErrorView::from_error(&err(kind), None);
             assert!(!v.title.is_empty(), "{kind:?} must have non-empty title");
-            assert!(!v.body.is_empty(),  "{kind:?} must have non-empty body");
+            assert!(!v.body.is_empty(), "{kind:?} must have non-empty body");
         }
     }
 
@@ -231,7 +245,10 @@ mod tests {
             AppErrorKind::BackupFailed,
         ] {
             let v = SaveErrorView::from_error(&err(kind), None);
-            assert!(!v.buttons.is_empty(), "{kind:?} must produce at least one button");
+            assert!(
+                !v.buttons.is_empty(),
+                "{kind:?} must produce at least one button"
+            );
         }
     }
 
@@ -240,7 +257,11 @@ mod tests {
         let e = err(AppErrorKind::ExternalModificationDetected);
         let v = SaveErrorView::from_error(&e, None);
         for btn in &v.buttons {
-            assert!(!btn.label.is_empty(), "{:?} button must have label", btn.action);
+            assert!(
+                !btn.label.is_empty(),
+                "{:?} button must have label",
+                btn.action
+            );
         }
     }
 

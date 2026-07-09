@@ -75,28 +75,25 @@ impl TransactionKind {
     /// Localization maps these through the i18n layer.
     pub fn label(&self) -> String {
         match self {
-            Self::ApplyHunkLeftToRight { hunk_id } =>
-                format!("Apply hunk #{hunk_id}"),
-            Self::RevertHunk { hunk_id } =>
-                format!("Revert hunk #{hunk_id}"),
-            Self::ApplyAllLeftToRight =>
-                "Apply all changes".into(),
-            Self::ResolveConflictLeft { conflict_id } =>
-                format!("Resolve conflict #{conflict_id} — use left"),
-            Self::ResolveConflictRight { conflict_id } =>
-                format!("Resolve conflict #{conflict_id} — use right"),
-            Self::ResolveConflictBoth { conflict_id } =>
-                format!("Resolve conflict #{conflict_id} — use both"),
-            Self::ResolveConflictManual { conflict_id } =>
-                format!("Resolve conflict #{conflict_id} — manual edit"),
-            Self::IgnoreConflict { conflict_id } =>
-                format!("Ignore conflict #{conflict_id}"),
-            Self::ReopenConflict { conflict_id } =>
-                format!("Reopen conflict #{conflict_id}"),
-            Self::ManualTextEdit =>
-                "Manual edit".into(),
-            Self::ApplyExternalPatch =>
-                "Apply external patch".into(),
+            Self::ApplyHunkLeftToRight { hunk_id } => format!("Apply hunk #{hunk_id}"),
+            Self::RevertHunk { hunk_id } => format!("Revert hunk #{hunk_id}"),
+            Self::ApplyAllLeftToRight => "Apply all changes".into(),
+            Self::ResolveConflictLeft { conflict_id } => {
+                format!("Resolve conflict #{conflict_id} — use left")
+            }
+            Self::ResolveConflictRight { conflict_id } => {
+                format!("Resolve conflict #{conflict_id} — use right")
+            }
+            Self::ResolveConflictBoth { conflict_id } => {
+                format!("Resolve conflict #{conflict_id} — use both")
+            }
+            Self::ResolveConflictManual { conflict_id } => {
+                format!("Resolve conflict #{conflict_id} — manual edit")
+            }
+            Self::IgnoreConflict { conflict_id } => format!("Ignore conflict #{conflict_id}"),
+            Self::ReopenConflict { conflict_id } => format!("Reopen conflict #{conflict_id}"),
+            Self::ManualTextEdit => "Manual edit".into(),
+            Self::ApplyExternalPatch => "Apply external patch".into(),
         }
     }
 }
@@ -119,15 +116,15 @@ impl UnixTimestamp {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionEntry {
     /// The revision *after* this transaction was applied.
-    pub revision:  SessionRevision,
-    pub kind:      TransactionKind,
+    pub revision: SessionRevision,
+    pub kind: TransactionKind,
     /// Human-readable label (same as `kind.label()` unless overridden).
-    pub label:     String,
+    pub label: String,
     pub timestamp: UnixTimestamp,
     /// Whether this entry is currently on the undo stack (true) or was
     /// popped to the redo stack (false). The log keeps all entries even
     /// after undo so the history panel can show what was undone.
-    pub active:    bool,
+    pub active: bool,
 }
 
 // ── TransactionLog ────────────────────────────────────────────────────────────
@@ -151,9 +148,9 @@ pub struct TransactionEntry {
 /// either session type without modifying them.
 #[derive(Debug, Clone)]
 pub struct TransactionLog {
-    entries:       Vec<TransactionEntry>,
-    current_rev:   SessionRevision,
-    saved_rev:     SessionRevision,
+    entries: Vec<TransactionEntry>,
+    current_rev: SessionRevision,
+    saved_rev: SessionRevision,
     /// Pointer into `entries` for the "current" position (top of undo stack).
     /// Points past the last active entry; entries at or above this index have
     /// been undone (active == false).
@@ -169,9 +166,9 @@ impl Default for TransactionLog {
 impl TransactionLog {
     pub fn new() -> Self {
         Self {
-            entries:       Vec::new(),
-            current_rev:   SessionRevision::INITIAL,
-            saved_rev:     SessionRevision::INITIAL,
+            entries: Vec::new(),
+            current_rev: SessionRevision::INITIAL,
+            saved_rev: SessionRevision::INITIAL,
             active_cursor: 0,
         }
     }
@@ -187,11 +184,11 @@ impl TransactionLog {
         self.current_rev = self.current_rev.next();
         let label = kind.label();
         self.entries.push(TransactionEntry {
-            revision:  self.current_rev,
+            revision: self.current_rev,
             kind,
             label,
             timestamp: UnixTimestamp::now(),
-            active:    true,
+            active: true,
         });
         self.active_cursor = self.entries.len();
     }

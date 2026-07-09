@@ -26,8 +26,8 @@ impl DeepFilter {
     pub fn matches(&self, entry: &RecEntry) -> bool {
         match self {
             Self::Different => entry.status != RecStatus::Equal,
-            Self::All       => true,
-            Self::Equal     => entry.status == RecStatus::Equal,
+            Self::All => true,
+            Self::Equal => entry.status == RecStatus::Equal,
         }
     }
 
@@ -35,14 +35,18 @@ impl DeepFilter {
     pub fn label(self) -> &'static str {
         match self {
             Self::Different => "Different",
-            Self::All       => "All",
-            Self::Equal     => "Equal only",
+            Self::All => "All",
+            Self::Equal => "Equal only",
         }
     }
 
     /// CSS class for the filter button — `"filter-btn active"` when selected.
     pub fn button_class(self, active: DeepFilter) -> &'static str {
-        if self == active { "filter-btn active" } else { "filter-btn" }
+        if self == active {
+            "filter-btn active"
+        } else {
+            "filter-btn"
+        }
     }
 }
 
@@ -52,34 +56,49 @@ impl DeepFilter {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeepCompareSummary {
     /// Total entries (including Computing/Symlink).
-    pub total:        usize,
+    pub total: usize,
     /// Entries with `Changed | LeftOnly | RightOnly`.
-    pub different:    usize,
+    pub different: usize,
     /// Entries with `Equal`.
-    pub equal:        usize,
+    pub equal: usize,
     /// Entries still being hashed.
-    pub computing:    usize,
+    pub computing: usize,
     /// Number of visible entries under the current filter.
-    pub visible:      usize,
+    pub visible: usize,
     /// Active filter used to derive this summary.
-    pub filter:       DeepFilter,
+    pub filter: DeepFilter,
 }
 
 impl DeepCompareSummary {
     /// Build from a slice of entries and the current filter.
     pub fn from_entries(entries: &[RecEntry], filter: DeepFilter) -> Self {
-        let total     = entries.len();
+        let total = entries.len();
         let different = entries.iter().filter(|e| is_different(&e.status)).count();
-        let equal     = entries.iter().filter(|e| e.status == RecStatus::Equal).count();
-        let computing = entries.iter().filter(|e| e.status == RecStatus::Computing).count();
-        let visible   = entries.iter().filter(|e| filter.matches(e)).count();
-        Self { total, different, equal, computing, visible, filter }
+        let equal = entries
+            .iter()
+            .filter(|e| e.status == RecStatus::Equal)
+            .count();
+        let computing = entries
+            .iter()
+            .filter(|e| e.status == RecStatus::Computing)
+            .count();
+        let visible = entries.iter().filter(|e| filter.matches(e)).count();
+        Self {
+            total,
+            different,
+            equal,
+            computing,
+            visible,
+            filter,
+        }
     }
 
     /// Footer text, e.g. `"3 different · 12 equal · 15 total"`.
     pub fn footer_text(&self) -> String {
-        format!("{} different · {} equal · {} total",
-            self.different, self.equal, self.total)
+        format!(
+            "{} different · {} equal · {} total",
+            self.different, self.equal, self.total
+        )
     }
 
     /// `true` when all common entries have been hashed (no Computing entries).
@@ -99,7 +118,10 @@ pub fn apply_filter(entries: &[RecEntry], filter: DeepFilter) -> Vec<&RecEntry> 
 }
 
 fn is_different(status: &RecStatus) -> bool {
-    matches!(status, RecStatus::Changed | RecStatus::LeftOnly | RecStatus::RightOnly)
+    matches!(
+        status,
+        RecStatus::Changed | RecStatus::LeftOnly | RecStatus::RightOnly
+    )
 }
 
 #[cfg(test)]
@@ -108,7 +130,12 @@ mod tests {
     use std::path::PathBuf;
 
     fn entry(status: RecStatus) -> RecEntry {
-        RecEntry { rel_path: PathBuf::from("f.txt"), status, left_size: None, right_size: None }
+        RecEntry {
+            rel_path: PathBuf::from("f.txt"),
+            status,
+            left_size: None,
+            right_size: None,
+        }
     }
 
     fn entries() -> Vec<RecEntry> {
@@ -139,13 +166,17 @@ mod tests {
     #[test]
     fn all_filter_includes_everything() {
         for e in &entries() {
-            assert!(DeepFilter::All.matches(e), "{:?} must pass All filter", e.status);
+            assert!(
+                DeepFilter::All.matches(e),
+                "{:?} must pass All filter",
+                e.status
+            );
         }
     }
 
     #[test]
     fn equal_filter_includes_only_equal() {
-        assert!( DeepFilter::Equal.matches(&entry(RecStatus::Equal)));
+        assert!(DeepFilter::Equal.matches(&entry(RecStatus::Equal)));
         assert!(!DeepFilter::Equal.matches(&entry(RecStatus::Changed)));
         assert!(!DeepFilter::Equal.matches(&entry(RecStatus::LeftOnly)));
     }
@@ -161,8 +192,16 @@ mod tests {
 
     #[test]
     fn button_class_active_when_selected() {
-        assert!(DeepFilter::All.button_class(DeepFilter::All).contains("active"));
-        assert!(!DeepFilter::Different.button_class(DeepFilter::All).contains("active"));
+        assert!(
+            DeepFilter::All
+                .button_class(DeepFilter::All)
+                .contains("active")
+        );
+        assert!(
+            !DeepFilter::Different
+                .button_class(DeepFilter::All)
+                .contains("active")
+        );
     }
 
     // ── DeepCompareSummary ────────────────────────────────────────────────────
@@ -199,9 +238,18 @@ mod tests {
     fn footer_text_contains_counts() {
         let s = DeepCompareSummary::from_entries(&entries(), DeepFilter::All);
         let text = s.footer_text();
-        assert!(text.contains('3'), "footer must contain diff count 3: {text}");
-        assert!(text.contains('1'), "footer must contain equal count 1: {text}");
-        assert!(text.contains('6'), "footer must contain total count 6: {text}");
+        assert!(
+            text.contains('3'),
+            "footer must contain diff count 3: {text}"
+        );
+        assert!(
+            text.contains('1'),
+            "footer must contain equal count 1: {text}"
+        );
+        assert!(
+            text.contains('6'),
+            "footer must contain total count 6: {text}"
+        );
     }
 
     #[test]

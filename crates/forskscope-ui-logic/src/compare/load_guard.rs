@@ -32,34 +32,40 @@ pub enum LoadGuard {
     WarnBanner {
         /// Short message for the yellow banner, e.g. `"Large file — inline
         /// diff disabled."`.
-        message:        String,
+        message: String,
         /// Whether character-level inline diff should be suppressed.
         suppress_inline: bool,
     },
     /// At least one file is large or very large — block and ask the user.
     ConfirmPrompt {
         /// Title line for the confirmation dialog.
-        title:          String,
+        title: String,
         /// Body text explaining what will happen if the user confirms.
-        body:           String,
+        body: String,
         /// Label for the confirm button, e.g. `"Diff anyway"`.
-        confirm_label:  String,
+        confirm_label: String,
         /// Whether the file is so large that text diff is impossible.
-        too_large:      bool,
+        too_large: bool,
     },
 }
 
 impl LoadGuard {
     /// `true` when the component should proceed without showing any UI.
-    pub fn is_proceed(&self) -> bool { matches!(self, Self::Proceed) }
+    pub fn is_proceed(&self) -> bool {
+        matches!(self, Self::Proceed)
+    }
 
     /// `true` when the component needs user confirmation before diffing.
-    pub fn needs_confirm(&self) -> bool { matches!(self, Self::ConfirmPrompt { .. }) }
+    pub fn needs_confirm(&self) -> bool {
+        matches!(self, Self::ConfirmPrompt { .. })
+    }
 
     /// `true` when inline character diff should be suppressed for this pair.
     pub fn suppress_inline(&self) -> bool {
         match self {
-            Self::WarnBanner { suppress_inline, .. } => *suppress_inline,
+            Self::WarnBanner {
+                suppress_inline, ..
+            } => *suppress_inline,
             Self::ConfirmPrompt { .. } => true,
             Self::Proceed => false,
         }
@@ -78,42 +84,42 @@ pub fn guard_for_sizes(left_bytes: u64, right_bytes: u64) -> LoadGuard {
 
 /// Like [`guard_for_sizes`] but with explicit thresholds (for testing).
 pub fn guard_for_sizes_with_limits(
-    left_bytes:  u64,
+    left_bytes: u64,
     right_bytes: u64,
-    limits:      &PerformanceLimits,
+    limits: &PerformanceLimits,
 ) -> LoadGuard {
-    let left_class  = FileSizeClass::classify(left_bytes,  limits);
+    let left_class = FileSizeClass::classify(left_bytes, limits);
     let right_class = FileSizeClass::classify(right_bytes, limits);
-    let worst       = worst_class(left_class, right_class);
+    let worst = worst_class(left_class, right_class);
 
     match worst {
         FileSizeClass::Small => LoadGuard::Proceed,
 
         FileSizeClass::Medium => LoadGuard::WarnBanner {
-            message:         "Large file — inline diff disabled.".into(),
+            message: "Large file — inline diff disabled.".into(),
             suppress_inline: true,
         },
 
         FileSizeClass::Large => LoadGuard::ConfirmPrompt {
-            title:         "File is large".into(),
-            body:          format!(
+            title: "File is large".into(),
+            body: format!(
                 "One or both files exceed the recommended diff limit ({} MiB). \
                  Diffing may be slow or produce an approximate result.",
                 limits.medium_text_threshold_bytes / (1024 * 1024)
             ),
             confirm_label: "Diff anyway".into(),
-            too_large:     false,
+            too_large: false,
         },
 
         FileSizeClass::VeryLarge => LoadGuard::ConfirmPrompt {
-            title:         "File too large".into(),
-            body:          format!(
+            title: "File too large".into(),
+            body: format!(
                 "One or both files exceed {} MiB. Only metadata and binary \
                  summary will be shown; text diff is not available.",
                 limits.large_text_threshold_bytes / (1024 * 1024)
             ),
             confirm_label: "Show metadata".into(),
-            too_large:     true,
+            too_large: true,
         },
     }
 }
@@ -125,9 +131,9 @@ fn worst_class(a: FileSizeClass, b: FileSizeClass) -> FileSizeClass {
 
 fn severity(c: FileSizeClass) -> u8 {
     match c {
-        FileSizeClass::Small    => 0,
-        FileSizeClass::Medium   => 1,
-        FileSizeClass::Large    => 2,
+        FileSizeClass::Small => 0,
+        FileSizeClass::Medium => 1,
+        FileSizeClass::Large => 2,
         FileSizeClass::VeryLarge => 3,
     }
 }
@@ -139,12 +145,12 @@ mod tests {
     /// Limits with tight thresholds for easy testing.
     fn test_limits() -> PerformanceLimits {
         PerformanceLimits {
-            max_eager_text_bytes:           1_000,       // Small  ≤ 1 KB
-            medium_text_threshold_bytes:    10_000,      // Medium ≤ 10 KB
-            large_text_threshold_bytes:     100_000,     // Large  ≤ 100 KB
+            max_eager_text_bytes: 1_000,         // Small  ≤ 1 KB
+            medium_text_threshold_bytes: 10_000, // Medium ≤ 10 KB
+            large_text_threshold_bytes: 100_000, // Large  ≤ 100 KB
             max_inline_diff_chars_per_hunk: 200,
-            max_directory_entries_eager:    50,
-            max_eager_lines:                1_000,
+            max_directory_entries_eager: 50,
+            max_eager_lines: 1_000,
         }
     }
 
@@ -177,7 +183,13 @@ mod tests {
     #[test]
     fn large_file_produces_confirm_prompt() {
         let g = guard_for_sizes_with_limits(50_000, 100, &test_limits());
-        assert!(matches!(g, LoadGuard::ConfirmPrompt { too_large: false, .. }));
+        assert!(matches!(
+            g,
+            LoadGuard::ConfirmPrompt {
+                too_large: false,
+                ..
+            }
+        ));
         assert!(g.needs_confirm());
         assert!(g.suppress_inline());
     }
@@ -185,7 +197,13 @@ mod tests {
     #[test]
     fn very_large_file_produces_confirm_too_large() {
         let g = guard_for_sizes_with_limits(200_000, 100, &test_limits());
-        assert!(matches!(g, LoadGuard::ConfirmPrompt { too_large: true, .. }));
+        assert!(matches!(
+            g,
+            LoadGuard::ConfirmPrompt {
+                too_large: true,
+                ..
+            }
+        ));
     }
 
     // ── Worst-of-pair logic ────────────────────────────────────────────────────
@@ -194,7 +212,13 @@ mod tests {
     fn worst_class_is_taken_from_larger_file() {
         // Left is VeryLarge, right is Small — should use VeryLarge
         let g = guard_for_sizes_with_limits(200_000, 100, &test_limits());
-        assert!(matches!(g, LoadGuard::ConfirmPrompt { too_large: true, .. }));
+        assert!(matches!(
+            g,
+            LoadGuard::ConfirmPrompt {
+                too_large: true,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -206,7 +230,13 @@ mod tests {
     #[test]
     fn left_large_right_medium_takes_large() {
         let g = guard_for_sizes_with_limits(50_000, 5_000, &test_limits());
-        assert!(matches!(g, LoadGuard::ConfirmPrompt { too_large: false, .. }));
+        assert!(matches!(
+            g,
+            LoadGuard::ConfirmPrompt {
+                too_large: false,
+                ..
+            }
+        ));
     }
 
     // ── Default limits ─────────────────────────────────────────────────────────
@@ -220,7 +250,10 @@ mod tests {
     #[test]
     fn five_mib_file_uses_default_limits_confirm() {
         let g = guard_for_sizes(5 * 1024 * 1024, 1_024);
-        assert!(g.needs_confirm(), "5 MiB should require confirmation with defaults");
+        assert!(
+            g.needs_confirm(),
+            "5 MiB should require confirmation with defaults"
+        );
     }
 
     // ── Message content ────────────────────────────────────────────────────────
@@ -238,7 +271,13 @@ mod tests {
     #[test]
     fn confirm_prompt_has_non_empty_title_body_label() {
         let g = guard_for_sizes_with_limits(50_000, 100, &test_limits());
-        if let LoadGuard::ConfirmPrompt { title, body, confirm_label, .. } = g {
+        if let LoadGuard::ConfirmPrompt {
+            title,
+            body,
+            confirm_label,
+            ..
+        } = g
+        {
             assert!(!title.is_empty());
             assert!(!body.is_empty());
             assert!(!confirm_label.is_empty());
@@ -249,16 +288,22 @@ mod tests {
 
     #[test]
     fn very_large_prompt_has_different_confirm_label_than_large() {
-        let large      = guard_for_sizes_with_limits(50_000,  100, &test_limits());
+        let large = guard_for_sizes_with_limits(50_000, 100, &test_limits());
         let very_large = guard_for_sizes_with_limits(200_000, 100, &test_limits());
         let large_label = if let LoadGuard::ConfirmPrompt { confirm_label, .. } = large {
             confirm_label
-        } else { panic!() };
+        } else {
+            panic!()
+        };
         let very_label = if let LoadGuard::ConfirmPrompt { confirm_label, .. } = very_large {
             confirm_label
-        } else { panic!() };
-        assert_ne!(large_label, very_label,
-            "large and very-large should have distinct confirm labels");
+        } else {
+            panic!()
+        };
+        assert_ne!(
+            large_label, very_label,
+            "large and very-large should have distinct confirm labels"
+        );
     }
 
     // ── Boundary values ────────────────────────────────────────────────────────
@@ -284,18 +329,36 @@ mod tests {
     #[test]
     fn one_byte_over_medium_limit_is_confirm() {
         let g = guard_for_sizes_with_limits(10_001, 100, &test_limits());
-        assert!(matches!(g, LoadGuard::ConfirmPrompt { too_large: false, .. }));
+        assert!(matches!(
+            g,
+            LoadGuard::ConfirmPrompt {
+                too_large: false,
+                ..
+            }
+        ));
     }
 
     #[test]
     fn exactly_at_large_limit_is_confirm_not_too_large() {
         let g = guard_for_sizes_with_limits(100_000, 100, &test_limits());
-        assert!(matches!(g, LoadGuard::ConfirmPrompt { too_large: false, .. }));
+        assert!(matches!(
+            g,
+            LoadGuard::ConfirmPrompt {
+                too_large: false,
+                ..
+            }
+        ));
     }
 
     #[test]
     fn one_byte_over_large_limit_is_too_large() {
         let g = guard_for_sizes_with_limits(100_001, 100, &test_limits());
-        assert!(matches!(g, LoadGuard::ConfirmPrompt { too_large: true, .. }));
+        assert!(matches!(
+            g,
+            LoadGuard::ConfirmPrompt {
+                too_large: true,
+                ..
+            }
+        ));
     }
 }

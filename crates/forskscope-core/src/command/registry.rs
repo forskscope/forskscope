@@ -1,10 +1,10 @@
 //! Command registry and builtin command definitions (RFC-019).
 
-use super::{
-    AvailabilityRule, CommandCategory,
-    CommandDangerLevel, CommandDefinition, CommandId, Modifiers, Shortcut,
-};
 use super::cmd;
+use super::{
+    AvailabilityRule, CommandCategory, CommandDangerLevel, CommandDefinition, CommandId, Modifiers,
+    Shortcut,
+};
 
 // ── Command registry ──────────────────────────────────────────────────────────
 
@@ -22,7 +22,8 @@ impl CommandRegistry {
 
         // ── File ──────────────────────────────────────────────────────────
         r.add(CommandDefinition {
-            id: cmd::OPEN_FILE_PAIR, label: "Open File Pair…",
+            id: cmd::OPEN_FILE_PAIR,
+            label: "Open File Pair…",
             description: "Open two files for comparison",
             category: CommandCategory::File,
             default_shortcuts: vec![Shortcut::new(M::CTRL, "o")],
@@ -30,7 +31,8 @@ impl CommandRegistry {
             danger_level: CommandDangerLevel::Safe,
         });
         r.add(CommandDefinition {
-            id: cmd::SAVE, label: "Save",
+            id: cmd::SAVE,
+            label: "Save",
             description: "Save the merge result",
             category: CommandCategory::File,
             default_shortcuts: vec![Shortcut::new(M::CTRL, "s")],
@@ -38,7 +40,8 @@ impl CommandRegistry {
             danger_level: CommandDangerLevel::Safe,
         });
         r.add(CommandDefinition {
-            id: cmd::SAVE_AS, label: "Save As…",
+            id: cmd::SAVE_AS,
+            label: "Save As…",
             description: "Save the merge result to a new file",
             category: CommandCategory::File,
             default_shortcuts: vec![Shortcut::new(M::CTRL_SHIFT, "s")],
@@ -46,7 +49,8 @@ impl CommandRegistry {
             danger_level: CommandDangerLevel::Safe,
         });
         r.add(CommandDefinition {
-            id: cmd::CLOSE_TAB, label: "Close Tab",
+            id: cmd::CLOSE_TAB,
+            label: "Close Tab",
             description: "Close the active comparison tab",
             category: CommandCategory::File,
             default_shortcuts: vec![Shortcut::new(M::CTRL, "w")],
@@ -56,7 +60,8 @@ impl CommandRegistry {
 
         // ── Edit ──────────────────────────────────────────────────────────
         r.add(CommandDefinition {
-            id: cmd::UNDO, label: "Undo",
+            id: cmd::UNDO,
+            label: "Undo",
             description: "Undo the last merge action or edit",
             category: CommandCategory::Edit,
             default_shortcuts: vec![Shortcut::new(M::CTRL, "z")],
@@ -64,7 +69,8 @@ impl CommandRegistry {
             danger_level: CommandDangerLevel::Safe,
         });
         r.add(CommandDefinition {
-            id: cmd::REDO, label: "Redo",
+            id: cmd::REDO,
+            label: "Redo",
             description: "Redo the last undone action",
             category: CommandCategory::Edit,
             default_shortcuts: vec![Shortcut::new(M::CTRL_SHIFT, "z")],
@@ -72,7 +78,8 @@ impl CommandRegistry {
             danger_level: CommandDangerLevel::Safe,
         });
         r.add(CommandDefinition {
-            id: cmd::FIND, label: "Find…",
+            id: cmd::FIND,
+            label: "Find…",
             description: "Search within the active comparison",
             category: CommandCategory::Edit,
             default_shortcuts: vec![Shortcut::new(M::CTRL, "f")],
@@ -82,7 +89,8 @@ impl CommandRegistry {
 
         // ── Navigate ──────────────────────────────────────────────────────
         r.add(CommandDefinition {
-            id: cmd::NEXT_DIFFERENCE, label: "Next Difference",
+            id: cmd::NEXT_DIFFERENCE,
+            label: "Next Difference",
             description: "Move to the next changed hunk",
             category: CommandCategory::Navigate,
             default_shortcuts: vec![Shortcut::new(M::NONE, "F8")],
@@ -90,7 +98,8 @@ impl CommandRegistry {
             danger_level: CommandDangerLevel::Safe,
         });
         r.add(CommandDefinition {
-            id: cmd::PREV_DIFFERENCE, label: "Previous Difference",
+            id: cmd::PREV_DIFFERENCE,
+            label: "Previous Difference",
             description: "Move to the previous changed hunk",
             category: CommandCategory::Navigate,
             default_shortcuts: vec![Shortcut::new(M::NONE, "F7")],
@@ -98,7 +107,8 @@ impl CommandRegistry {
             danger_level: CommandDangerLevel::Safe,
         });
         r.add(CommandDefinition {
-            id: cmd::NEXT_CONFLICT, label: "Next Conflict",
+            id: cmd::NEXT_CONFLICT,
+            label: "Next Conflict",
             description: "Move to the next unresolved conflict",
             category: CommandCategory::Navigate,
             default_shortcuts: vec![],
@@ -106,7 +116,8 @@ impl CommandRegistry {
             danger_level: CommandDangerLevel::Safe,
         });
         r.add(CommandDefinition {
-            id: cmd::PREV_CONFLICT, label: "Previous Conflict",
+            id: cmd::PREV_CONFLICT,
+            label: "Previous Conflict",
             description: "Move to the previous unresolved conflict",
             category: CommandCategory::Navigate,
             default_shortcuts: vec![],
@@ -116,7 +127,8 @@ impl CommandRegistry {
 
         // ── Compare ───────────────────────────────────────────────────────
         r.add(CommandDefinition {
-            id: cmd::RELOAD_TAB, label: "Reload",
+            id: cmd::RELOAD_TAB,
+            label: "Reload",
             description: "Reload both files and recompute the diff",
             category: CommandCategory::Compare,
             default_shortcuts: vec![Shortcut::new(M::CTRL, "r")],
@@ -124,7 +136,8 @@ impl CommandRegistry {
             danger_level: CommandDangerLevel::MayDiscardWork,
         });
         r.add(CommandDefinition {
-            id: cmd::SWAP_SIDES, label: "Swap Sides",
+            id: cmd::SWAP_SIDES,
+            label: "Swap Sides",
             description: "Swap left and right files",
             category: CommandCategory::Compare,
             default_shortcuts: vec![],
@@ -134,7 +147,8 @@ impl CommandRegistry {
 
         // ── Merge ─────────────────────────────────────────────────────────
         r.add(CommandDefinition {
-            id: cmd::COPY_HUNK_LEFT_RIGHT, label: "Copy Hunk Left → Right",
+            id: cmd::COPY_HUNK_LEFT_RIGHT,
+            label: "Copy Hunk Left → Right",
             description: "Apply the focused hunk from left to right",
             category: CommandCategory::Merge,
             default_shortcuts: vec![Shortcut::new(M::ALT, "ArrowRight")],
@@ -142,7 +156,8 @@ impl CommandRegistry {
             danger_level: CommandDangerLevel::Safe,
         });
         r.add(CommandDefinition {
-            id: cmd::COPY_HUNK_RIGHT_LEFT, label: "Copy Hunk Right → Left",
+            id: cmd::COPY_HUNK_RIGHT_LEFT,
+            label: "Copy Hunk Right → Left",
             description: "Apply the focused hunk from right to left",
             category: CommandCategory::Merge,
             default_shortcuts: vec![Shortcut::new(M::ALT, "ArrowLeft")],
@@ -150,7 +165,8 @@ impl CommandRegistry {
             danger_level: CommandDangerLevel::Safe,
         });
         r.add(CommandDefinition {
-            id: cmd::USE_LEFT, label: "Use Left",
+            id: cmd::USE_LEFT,
+            label: "Use Left",
             description: "Resolve the active conflict using the left version",
             category: CommandCategory::Merge,
             default_shortcuts: vec![],
@@ -158,7 +174,8 @@ impl CommandRegistry {
             danger_level: CommandDangerLevel::Safe,
         });
         r.add(CommandDefinition {
-            id: cmd::USE_RIGHT, label: "Use Right",
+            id: cmd::USE_RIGHT,
+            label: "Use Right",
             description: "Resolve the active conflict using the right version",
             category: CommandCategory::Merge,
             default_shortcuts: vec![],
@@ -168,7 +185,8 @@ impl CommandRegistry {
 
         // ── View ──────────────────────────────────────────────────────────
         r.add(CommandDefinition {
-            id: cmd::COMMAND_PALETTE, label: "Command Palette…",
+            id: cmd::COMMAND_PALETTE,
+            label: "Command Palette…",
             description: "Open the command palette",
             category: CommandCategory::View,
             default_shortcuts: vec![Shortcut::new(M::CTRL_SHIFT, "p")],
@@ -176,7 +194,8 @@ impl CommandRegistry {
             danger_level: CommandDangerLevel::Safe,
         });
         r.add(CommandDefinition {
-            id: cmd::OPEN_SETTINGS, label: "Settings…",
+            id: cmd::OPEN_SETTINGS,
+            label: "Settings…",
             description: "Open the settings dialog",
             category: CommandCategory::Settings,
             default_shortcuts: vec![Shortcut::new(M::CTRL, ",")],
@@ -215,10 +234,15 @@ impl CommandRegistry {
 
     /// Find the command bound to a given shortcut (first match).
     pub fn find_by_shortcut(&self, s: &Shortcut) -> Option<&CommandDefinition> {
-        self.commands.iter()
+        self.commands
+            .iter()
             .find(|c| c.default_shortcuts.iter().any(|sc| sc == s))
     }
 
-    pub fn len(&self) -> usize { self.commands.len() }
-    pub fn is_empty(&self) -> bool { self.commands.is_empty() }
+    pub fn len(&self) -> usize {
+        self.commands.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
+    }
 }

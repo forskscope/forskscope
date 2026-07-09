@@ -10,17 +10,16 @@
 use std::fs;
 use std::path::Path;
 
-use forskscope_core::merge::ThreeWayMergeSession;
 use forskscope_core::ConflictId;
+use forskscope_core::merge::ThreeWayMergeSession;
 
 fn load(path: &str) -> String {
-    let manifest = std::env::var("CARGO_MANIFEST_DIR")
-        .expect("CARGO_MANIFEST_DIR must be set by cargo test");
+    let manifest =
+        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set by cargo test");
     let full = Path::new(&manifest)
         .join("../../tests/fixtures/merge")
         .join(path);
-    fs::read_to_string(&full)
-        .unwrap_or_else(|e| panic!("cannot read fixture {path}: {e}"))
+    fs::read_to_string(&full).unwrap_or_else(|e| panic!("cannot read fixture {path}: {e}"))
 }
 
 fn session(scenario: &str) -> ThreeWayMergeSession {
@@ -36,8 +35,11 @@ fn session(scenario: &str) -> ThreeWayMergeSession {
 #[test]
 fn noconflict_fixture_has_no_conflicts() {
     let s = session("noconflict");
-    assert_eq!(s.stats().conflicts_total, 0,
-        "non-overlapping changes must auto-merge without conflicts");
+    assert_eq!(
+        s.stats().conflicts_total,
+        0,
+        "non-overlapping changes must auto-merge without conflicts"
+    );
 }
 
 #[test]
@@ -45,14 +47,23 @@ fn noconflict_result_contains_both_changes() {
     let s = session("noconflict");
     // Left changed "alpha" → "ALPHA"; right changed "delta" → "DELTA"
     let result = s.result_text();
-    assert!(result.contains("ALPHA"), "result must contain left-side change ALPHA");
-    assert!(result.contains("DELTA"), "result must contain right-side change DELTA");
+    assert!(
+        result.contains("ALPHA"),
+        "result must contain left-side change ALPHA"
+    );
+    assert!(
+        result.contains("DELTA"),
+        "result must contain right-side change DELTA"
+    );
 }
 
 #[test]
 fn noconflict_can_save_immediately() {
     let s = session("noconflict");
-    assert!(s.can_save(), "no-conflict session must be saveable without resolution");
+    assert!(
+        s.can_save(),
+        "no-conflict session must be saveable without resolution"
+    );
 }
 
 // ── Conflict: both sides change the same line differently ─────────────────────
@@ -60,14 +71,20 @@ fn noconflict_can_save_immediately() {
 #[test]
 fn conflict_fixture_has_one_conflict() {
     let s = session("conflict");
-    assert_eq!(s.stats().conflicts_total, 1,
-        "divergent single-line change must produce exactly one conflict");
+    assert_eq!(
+        s.stats().conflicts_total,
+        1,
+        "divergent single-line change must produce exactly one conflict"
+    );
 }
 
 #[test]
 fn conflict_blocks_save_until_resolved() {
     let s = session("conflict");
-    assert!(!s.can_save(), "session with unresolved conflict must not be saveable");
+    assert!(
+        !s.can_save(),
+        "session with unresolved conflict must not be saveable"
+    );
 }
 
 #[test]
@@ -75,10 +92,19 @@ fn conflict_resolve_left_enables_save_and_uses_left_content() {
     let mut s = session("conflict");
     let id: ConflictId = s.conflicts().iter().next().unwrap().id;
     s.resolve_left(id).expect("resolve_left must succeed");
-    assert!(s.can_save(), "session must be saveable after resolving conflict");
+    assert!(
+        s.can_save(),
+        "session must be saveable after resolving conflict"
+    );
     let result = s.result_text();
-    assert!(result.contains("LEFT"), "result must contain left-side resolution");
-    assert!(!result.contains("RIGHT"), "result must not contain right-side after resolving left");
+    assert!(
+        result.contains("LEFT"),
+        "result must contain left-side resolution"
+    );
+    assert!(
+        !result.contains("RIGHT"),
+        "result must not contain right-side after resolving left"
+    );
 }
 
 #[test]
@@ -87,7 +113,10 @@ fn conflict_resolve_right_uses_right_content() {
     let id: ConflictId = s.conflicts().iter().next().unwrap().id;
     s.resolve_right(id).expect("resolve_right must succeed");
     let result = s.result_text();
-    assert!(result.contains("RIGHT"), "result must contain right-side resolution");
+    assert!(
+        result.contains("RIGHT"),
+        "result must contain right-side resolution"
+    );
 }
 
 // ── Both-same: identical changes on both sides auto-merge ─────────────────────
@@ -95,16 +124,21 @@ fn conflict_resolve_right_uses_right_content() {
 #[test]
 fn both_same_fixture_has_no_conflicts() {
     let s = session("both_same");
-    assert_eq!(s.stats().conflicts_total, 0,
-        "identical changes on both sides must auto-merge without conflict");
+    assert_eq!(
+        s.stats().conflicts_total,
+        0,
+        "identical changes on both sides must auto-merge without conflict"
+    );
 }
 
 #[test]
 fn both_same_result_contains_shared_change() {
     let s = session("both_same");
     let result = s.result_text();
-    assert!(result.contains("BRAVO"),
-        "result must contain the shared change (BRAVO)");
+    assert!(
+        result.contains("BRAVO"),
+        "result must contain the shared change (BRAVO)"
+    );
 }
 
 // ── Left insert: one side inserts, other unchanged ────────────────────────────
@@ -112,11 +146,16 @@ fn both_same_result_contains_shared_change() {
 #[test]
 fn left_insert_fixture_auto_merges() {
     let s = session("left_insert");
-    assert_eq!(s.stats().conflicts_total, 0,
-        "insert on one side only must auto-merge");
+    assert_eq!(
+        s.stats().conflicts_total,
+        0,
+        "insert on one side only must auto-merge"
+    );
     let result = s.result_text();
-    assert!(result.contains("bravo"),
-        "result must contain left-side insertion (bravo)");
+    assert!(
+        result.contains("bravo"),
+        "result must contain left-side insertion (bravo)"
+    );
 }
 
 // ── CRLF: line terminators preserved through merge ───────────────────────────
@@ -126,8 +165,10 @@ fn crlf_fixture_preserves_crlf_in_result() {
     let s = session("crlf");
     let result = s.result_text();
     // The base and right both use CRLF; result must preserve CRLF
-    assert!(result.contains("\r\n"),
-        "CRLF line endings must be preserved through merge");
+    assert!(
+        result.contains("\r\n"),
+        "CRLF line endings must be preserved through merge"
+    );
 }
 
 #[test]
@@ -135,8 +176,10 @@ fn crlf_fixture_contains_left_change() {
     let s = session("crlf");
     // Left changed "bravo\r\n" → "BRAVO\r\n"
     let result = s.result_text();
-    assert!(result.to_ascii_uppercase().contains("BRAVO"),
-        "CRLF fixture result must contain left-side change");
+    assert!(
+        result.to_ascii_uppercase().contains("BRAVO"),
+        "CRLF fixture result must contain left-side change"
+    );
 }
 
 // ── Multiple conflicts ────────────────────────────────────────────────────────
@@ -144,8 +187,11 @@ fn crlf_fixture_contains_left_change() {
 #[test]
 fn multi_fixture_has_three_conflicts() {
     let s = session("multi");
-    assert_eq!(s.stats().conflicts_total, 3,
-        "multi fixture has three divergent lines → three conflicts");
+    assert_eq!(
+        s.stats().conflicts_total,
+        3,
+        "multi fixture has three divergent lines → three conflicts"
+    );
 }
 
 #[test]

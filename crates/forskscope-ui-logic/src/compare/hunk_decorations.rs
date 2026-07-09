@@ -29,7 +29,10 @@ use forskscope_core::diff_decoration::{
 
 /// Which side of the diff a decoration applies to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DiffSide { Left, Right }
+pub enum DiffSide {
+    Left,
+    Right,
+}
 
 // ── Per-row decoration data ───────────────────────────────────────────────────
 
@@ -39,26 +42,28 @@ pub enum DiffSide { Left, Right }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RowDecoration {
     /// CSS class token from `LineDecorationKind::css_class()`, e.g. `"fs-line-added"`.
-    pub css_class:      &'static str,
+    pub css_class: &'static str,
     /// Single-character gutter symbol, e.g. `'+'`, `'-'`, `'~'`, `' '`.
-    pub gutter_symbol:  char,
+    pub gutter_symbol: char,
     /// ARIA label for screen-reader accessibility, e.g. `"added"`.
-    pub aria_label:     &'static str,
+    pub aria_label: &'static str,
     /// The underlying decoration kind.
-    pub kind:           LineDecorationKind,
+    pub kind: LineDecorationKind,
 }
 
 impl RowDecoration {
     fn from_kind(kind: LineDecorationKind) -> Self {
         Self {
-            css_class:     kind.css_class(),
+            css_class: kind.css_class(),
             gutter_symbol: kind.gutter_symbol(),
-            aria_label:    kind.aria_label(),
+            aria_label: kind.aria_label(),
             kind,
         }
     }
 
-    fn unchanged() -> Self { Self::from_kind(LineDecorationKind::Unchanged) }
+    fn unchanged() -> Self {
+        Self::from_kind(LineDecorationKind::Unchanged)
+    }
 }
 
 // ── Decoration index ──────────────────────────────────────────────────────────
@@ -73,7 +78,7 @@ impl RowDecoration {
 /// increment across hunk boundaries.
 #[derive(Debug, Clone)]
 pub struct DecorationIndex {
-    left:  Vec<RowDecoration>,
+    left: Vec<RowDecoration>,
     right: Vec<RowDecoration>,
 }
 
@@ -83,12 +88,14 @@ impl DecorationIndex {
     /// Rows with no decoration entry are treated as `Unchanged`.
     pub fn from_set(set: &DiffDecorationSet) -> Self {
         let row_count = set
-            .left.iter().map(|d| d.row_index + 1)
+            .left
+            .iter()
+            .map(|d| d.row_index + 1)
             .chain(set.right.iter().map(|d| d.row_index + 1))
             .max()
             .unwrap_or(0);
 
-        let mut left  = vec![RowDecoration::unchanged(); row_count];
+        let mut left = vec![RowDecoration::unchanged(); row_count];
         let mut right = vec![RowDecoration::unchanged(); row_count];
 
         for d in &set.left {
@@ -114,8 +121,13 @@ impl DecorationIndex {
     /// Returns `Unchanged` for any out-of-bounds row index rather than
     /// panicking — safe for untrusted row indices from the component.
     pub fn get(&self, row_index: usize, side: DiffSide) -> RowDecoration {
-        let vec = match side { DiffSide::Left => &self.left, DiffSide::Right => &self.right };
-        vec.get(row_index).cloned().unwrap_or_else(RowDecoration::unchanged)
+        let vec = match side {
+            DiffSide::Left => &self.left,
+            DiffSide::Right => &self.right,
+        };
+        vec.get(row_index)
+            .cloned()
+            .unwrap_or_else(RowDecoration::unchanged)
     }
 
     /// Total number of rows tracked (same as the length of the longer side).
@@ -124,7 +136,9 @@ impl DecorationIndex {
     }
 
     /// `true` when the decoration set was built from an empty (identical) diff.
-    pub fn is_empty(&self) -> bool { self.left.is_empty() && self.right.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.left.is_empty() && self.right.is_empty()
+    }
 }
 
 #[cfg(test)]
@@ -134,7 +148,7 @@ mod tests {
     use forskscope_core::diff_decoration::{DiffDecorationSet, LineDecorationKind};
 
     fn index_from_texts(left: &str, right: &str) -> DecorationIndex {
-        let doc  = compute_diff(left, right, DiffOptions::default());
+        let doc = compute_diff(left, right, DiffOptions::default());
         let decs = DiffDecorationSet::from_diff(&doc, None);
         DecorationIndex::from_set(&decs)
     }
@@ -147,10 +161,16 @@ mod tests {
         // Equal hunks produce Unchanged decorations on both sides,
         // so the index is not empty — but no row is Added/Deleted/Modified.
         for i in 0..idx.row_count() {
-            assert_eq!(idx.get(i, DiffSide::Left).kind,  LineDecorationKind::Unchanged,
-                "row {i} left must be Unchanged for identical texts");
-            assert_eq!(idx.get(i, DiffSide::Right).kind, LineDecorationKind::Unchanged,
-                "row {i} right must be Unchanged for identical texts");
+            assert_eq!(
+                idx.get(i, DiffSide::Left).kind,
+                LineDecorationKind::Unchanged,
+                "row {i} left must be Unchanged for identical texts"
+            );
+            assert_eq!(
+                idx.get(i, DiffSide::Right).kind,
+                LineDecorationKind::Unchanged,
+                "row {i} right must be Unchanged for identical texts"
+            );
         }
     }
 
@@ -181,7 +201,11 @@ mod tests {
     fn inserted_line_css_class_starts_with_fs_prefix() {
         let idx = index_from_texts("", "hello\n");
         let row = idx.get(0, DiffSide::Right);
-        assert!(row.css_class.starts_with("fs-"), "css class must have fs- prefix: {}", row.css_class);
+        assert!(
+            row.css_class.starts_with("fs-"),
+            "css class must have fs- prefix: {}",
+            row.css_class
+        );
     }
 
     #[test]
@@ -212,9 +236,9 @@ mod tests {
     #[test]
     fn replaced_line_both_sides_have_modified_kind() {
         let idx = index_from_texts("old\n", "new\n");
-        let left  = idx.get(0, DiffSide::Left);
+        let left = idx.get(0, DiffSide::Left);
         let right = idx.get(0, DiffSide::Right);
-        assert_eq!(left.kind,  LineDecorationKind::Modified);
+        assert_eq!(left.kind, LineDecorationKind::Modified);
         assert_eq!(right.kind, LineDecorationKind::Modified);
     }
 
@@ -229,7 +253,7 @@ mod tests {
 
     #[test]
     fn multi_hunk_row_count_covers_all_rows() {
-        let left  = "a\nb\nc\nd\ne\n";
+        let left = "a\nb\nc\nd\ne\n";
         let right = "a\nX\nc\nY\ne\n";
         let idx = index_from_texts(left, right);
         assert!(idx.row_count() >= 5, "must cover all 5 rows");
@@ -237,12 +261,18 @@ mod tests {
 
     #[test]
     fn unchanged_rows_in_multi_hunk_are_unchanged() {
-        let left  = "a\nb\nc\n";
+        let left = "a\nb\nc\n";
         let right = "a\nX\nc\n";
         let idx = index_from_texts(left, right);
         // Row 0 ("a") is unchanged on both sides
-        assert_eq!(idx.get(0, DiffSide::Left).kind,  LineDecorationKind::Unchanged);
-        assert_eq!(idx.get(0, DiffSide::Right).kind, LineDecorationKind::Unchanged);
+        assert_eq!(
+            idx.get(0, DiffSide::Left).kind,
+            LineDecorationKind::Unchanged
+        );
+        assert_eq!(
+            idx.get(0, DiffSide::Right).kind,
+            LineDecorationKind::Unchanged
+        );
     }
 
     // ── Out-of-bounds safety ───────────────────────────────────────────────────
@@ -275,9 +305,21 @@ mod tests {
             LineDecorationKind::MergeApplied,
         ] {
             let row = RowDecoration::from_kind(kind);
-            assert_eq!(row.css_class,     kind.css_class(),     "{kind:?} css_class mismatch");
-            assert_eq!(row.gutter_symbol, kind.gutter_symbol(), "{kind:?} gutter_symbol mismatch");
-            assert_eq!(row.aria_label,    kind.aria_label(),    "{kind:?} aria_label mismatch");
+            assert_eq!(
+                row.css_class,
+                kind.css_class(),
+                "{kind:?} css_class mismatch"
+            );
+            assert_eq!(
+                row.gutter_symbol,
+                kind.gutter_symbol(),
+                "{kind:?} gutter_symbol mismatch"
+            );
+            assert_eq!(
+                row.aria_label,
+                kind.aria_label(),
+                "{kind:?} aria_label mismatch"
+            );
         }
     }
 }

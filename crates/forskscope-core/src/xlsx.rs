@@ -42,7 +42,10 @@ pub enum SheetChange {
     /// Sheet exists on both sides with cell differences.
     Modified(String),
     /// Sheet was renamed (heuristically matched); may also have cell changes.
-    Renamed { old_name: String, new_name: String },
+    Renamed {
+        old_name: String,
+        new_name: String,
+    },
     /// Sheet moved to a different tab position; may also have cell changes.
     Moved(String),
 }
@@ -83,13 +86,13 @@ pub struct CellChange {
 /// Aggregate statistics for a spreadsheet diff.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct SpreadsheetDiffStats {
-    pub sheets_added:    usize,
-    pub sheets_removed:  usize,
+    pub sheets_added: usize,
+    pub sheets_removed: usize,
     pub sheets_modified: usize,
-    pub sheets_renamed:  usize,
-    pub sheets_moved:    usize,
-    pub cells_changed:   usize,
-    pub values_changed:  usize,
+    pub sheets_renamed: usize,
+    pub sheets_moved: usize,
+    pub cells_changed: usize,
+    pub values_changed: usize,
     pub formulas_changed: usize,
 }
 
@@ -98,14 +101,13 @@ pub struct SpreadsheetDiffStats {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpreadsheetDiff {
     pub sheets: Vec<SheetChange>,
-    pub cells:  Vec<SheetCellChanges>,
-    pub stats:  SpreadsheetDiffStats,
+    pub cells: Vec<SheetCellChanges>,
+    pub stats: SpreadsheetDiffStats,
 }
 
 impl SpreadsheetDiff {
     pub fn is_empty(&self) -> bool {
-        self.sheets.is_empty()
-            && self.cells.iter().all(|s| s.cells.is_empty())
+        self.sheets.is_empty() && self.cells.iter().all(|s| s.cells.is_empty())
     }
 }
 
@@ -119,18 +121,17 @@ impl SpreadsheetDiff {
 /// single-sheet workbooks are bounded via the default `max_cells_compared`
 /// limit, or callers may pass explicit `Limits`).
 pub fn diff_xlsx(
-    old_path:  &Path,
-    new_path:  &Path,
-    cancel:    Option<&CancellationToken>,
+    old_path: &Path,
+    new_path: &Path,
+    cancel: Option<&CancellationToken>,
 ) -> Result<SpreadsheetDiff> {
     let opts = build_options(cancel);
 
-    let workbook_diff = sheets_diff::compare_paths_with_options(old_path, new_path, opts)
-        .map_err(|e| CoreError::Unsupported {
-            message: format!(
-                "could not diff workbook '{}': {}",
-                old_path.display(), e
-            ),
+    let workbook_diff =
+        sheets_diff::compare_paths_with_options(old_path, new_path, opts).map_err(|e| {
+            CoreError::Unsupported {
+                message: format!("could not diff workbook '{}': {}", old_path.display(), e),
+            }
         })?;
 
     Ok(convert(workbook_diff))
@@ -157,43 +158,51 @@ fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
             sr.as_ref().map(|s| s.name.clone()).unwrap_or_default()
         };
         let entry = match &sd.change {
-            UpSheetChange::Added             => SheetChange::Added(name(&sd.new_sheet)),
-            UpSheetChange::Removed           => SheetChange::Removed(name(&sd.old_sheet)),
-            UpSheetChange::Modified          => SheetChange::Modified(name(&sd.new_sheet)),
-            UpSheetChange::Moved             => SheetChange::Moved(name(&sd.new_sheet)),
-            UpSheetChange::Renamed { .. }
-            | UpSheetChange::RenamedAndMoved { .. } => SheetChange::Renamed {
-                old_name: name(&sd.old_sheet),
-                new_name: name(&sd.new_sheet),
-            },
-            UpSheetChange::Unchanged         => continue,
+            UpSheetChange::Added => SheetChange::Added(name(&sd.new_sheet)),
+            UpSheetChange::Removed => SheetChange::Removed(name(&sd.old_sheet)),
+            UpSheetChange::Modified => SheetChange::Modified(name(&sd.new_sheet)),
+            UpSheetChange::Moved => SheetChange::Moved(name(&sd.new_sheet)),
+            UpSheetChange::Renamed { .. } | UpSheetChange::RenamedAndMoved { .. } => {
+                SheetChange::Renamed {
+                    old_name: name(&sd.old_sheet),
+                    new_name: name(&sd.new_sheet),
+                }
+            }
+            UpSheetChange::Unchanged => continue,
             #[allow(unreachable_patterns)]
-            _                                => continue, // forward compat: new variants in future sheets-diff
+            _ => continue, // forward compat: new variants in future sheets-diff
         };
         sheets.push(entry);
     }
 
     // Cell-level changes via the view adapter (Q3: use to_owned_row to drop wb).
-    let view   = DiffView::new(&wb);
+    let view = DiffView::new(&wb);
     let filter = ViewFilter::default();
-    let rows   = view.rows(&filter);
+    let rows = view.rows(&filter);
 
     // Group by sheet name (rows are already in sheet order).
     let mut cells: Vec<SheetCellChanges> = Vec::new();
     for row in &rows {
         let cell = CellChange {
-            addr:            row.address.a1.clone(),
-            row:             row.address.row,
-            col:             row.address.col,
-            value_changed:   row.change_kind == sheets_diff::model::CellChangeKind::Modified
-                             || !row.old_display.is_empty() || !row.new_display.is_empty(),
+            addr: row.address.a1.clone(),
+            row: row.address.row,
+            col: row.address.col,
+            value_changed: row.change_kind == sheets_diff::model::CellChangeKind::Modified
+                || !row.old_display.is_empty()
+                || !row.new_display.is_empty(),
             formula_changed: row.formula_changed,
-            old_value:       if row.old_display.is_empty() { None }
-                             else { Some(row.old_display.clone()) },
-            new_value:       if row.new_display.is_empty() { None }
-                             else { Some(row.new_display.clone()) },
-            old_formula:     row.old_formula.map(|s| s.to_owned()),
-            new_formula:     row.new_formula.map(|s| s.to_owned()),
+            old_value: if row.old_display.is_empty() {
+                None
+            } else {
+                Some(row.old_display.clone())
+            },
+            new_value: if row.new_display.is_empty() {
+                None
+            } else {
+                Some(row.new_display.clone())
+            },
+            old_formula: row.old_formula.map(|s| s.to_owned()),
+            new_formula: row.new_formula.map(|s| s.to_owned()),
         };
         match cells.last_mut() {
             Some(last) if last.sheet == row.sheet_name => last.cells.push(cell),
@@ -208,19 +217,23 @@ fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
     // Stats — driven directly from wb.summary (no manual counting).
     let s = &wb.summary;
     let stats = SpreadsheetDiffStats {
-        sheets_added:     s.sheets_added,
-        sheets_removed:   s.sheets_removed,
-        sheets_modified:  s.sheets_changed,
-        sheets_renamed:   s.sheets_renamed,
-        sheets_moved:     s.sheets_moved,
-        cells_changed:    cells.iter().map(|sc| sc.cells.len()).sum(),
-        values_changed:   s.values_changed,
+        sheets_added: s.sheets_added,
+        sheets_removed: s.sheets_removed,
+        sheets_modified: s.sheets_changed,
+        sheets_renamed: s.sheets_renamed,
+        sheets_moved: s.sheets_moved,
+        cells_changed: cells.iter().map(|sc| sc.cells.len()).sum(),
+        values_changed: s.values_changed,
         formulas_changed: s.formulas_changed,
     };
 
     drop(wb); // all cell_diffs freed here; only owned SpreadsheetDiff survives
 
-    SpreadsheetDiff { sheets, cells, stats }
+    SpreadsheetDiff {
+        sheets,
+        cells,
+        stats,
+    }
 }
 
 // ── Per-side derived text (RFC-058 §"Presentation") ─────────────────────────
@@ -236,22 +249,25 @@ pub fn derive_pair_text_from_diff(diff: &SpreadsheetDiff) -> (TextDocument, Text
 pub fn derive_pair_text(old_path: &Path, new_path: &Path) -> (TextDocument, TextDocument) {
     match diff_xlsx(old_path, new_path, None) {
         Ok(diff) => derive_pair_text_from_diff(&diff),
-        Err(_)   => (excel_doc(String::new()), excel_doc(String::new())),
+        Err(_) => (excel_doc(String::new()), excel_doc(String::new())),
     }
 }
 
 #[derive(Clone, Copy)]
-enum Side { Old, New }
+enum Side {
+    Old,
+    New,
+}
 
 fn build_side_text(diff: &SpreadsheetDiff, side: Side) -> String {
     let mut out = String::new();
 
     for sc in &diff.sheets {
         match (sc, side) {
-            (SheetChange::Added(name),   Side::New)   => out.push_str(&format!("+ Sheet: {name}\n")),
-            (SheetChange::Added(name),   Side::Old)   => out.push_str(&format!("  Sheet: {name}\n")),
-            (SheetChange::Removed(name), Side::Old)   => out.push_str(&format!("- Sheet: {name}\n")),
-            (SheetChange::Removed(name), Side::New)   => out.push_str(&format!("  Sheet: {name}\n")),
+            (SheetChange::Added(name), Side::New) => out.push_str(&format!("+ Sheet: {name}\n")),
+            (SheetChange::Added(name), Side::Old) => out.push_str(&format!("  Sheet: {name}\n")),
+            (SheetChange::Removed(name), Side::Old) => out.push_str(&format!("- Sheet: {name}\n")),
+            (SheetChange::Removed(name), Side::New) => out.push_str(&format!("  Sheet: {name}\n")),
             (SheetChange::Renamed { old_name, new_name }, _) => {
                 let label = match side {
                     Side::Old => old_name.as_str(),
@@ -259,10 +275,10 @@ fn build_side_text(diff: &SpreadsheetDiff, side: Side) -> String {
                 };
                 out.push_str(&format!("~ Sheet: {label}\n"));
             }
-            (SheetChange::Moved(name),    _)          => out.push_str(&format!("  Sheet: {name} (moved)\n")),
-            (SheetChange::Modified(name), _)          => out.push_str(&format!("  Sheet: {name}\n")),
+            (SheetChange::Moved(name), _) => out.push_str(&format!("  Sheet: {name} (moved)\n")),
+            (SheetChange::Modified(name), _) => out.push_str(&format!("  Sheet: {name}\n")),
             #[allow(unreachable_patterns)]
-            _                                         => {} // forward compat: new SheetChange variants
+            _ => {} // forward compat: new SheetChange variants
         }
     }
 
@@ -294,8 +310,10 @@ fn build_side_text(diff: &SpreadsheetDiff, side: Side) -> String {
 fn excel_doc(content: String) -> TextDocument {
     TextDocument {
         content,
-        encoding:          TextEncoding { label: "(Excel)".into() },
-        newline_style:     NewlineStyle::Lf,
+        encoding: TextEncoding {
+            label: "(Excel)".into(),
+        },
+        newline_style: NewlineStyle::Lf,
         had_decode_errors: false,
     }
 }
@@ -307,11 +325,11 @@ fn excel_doc(content: String) -> TextDocument {
 pub fn load_placeholder(path: &Path) -> Result<LoadedDocument> {
     let fingerprint = FileFingerprint::capture(path, None)?;
     Ok(LoadedDocument {
-        file_id:             Some(FileId::new(path)),
+        file_id: Some(FileId::new(path)),
         fingerprint_at_load: Some(fingerprint),
-        kind:                FileKind::ExcelXlsx,
-        bytes_len:           fingerprint.len,
-        text:                None,
-        warnings:            vec![LoadWarning::ExcelRenderedAsDerivedText],
+        kind: FileKind::ExcelXlsx,
+        bytes_len: fingerprint.len,
+        text: None,
+        warnings: vec![LoadWarning::ExcelRenderedAsDerivedText],
     })
 }

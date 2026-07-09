@@ -21,7 +21,7 @@ fn extension_input_with_leading_dot_normalizes() {
     let r = IgnoreRules::from_settings(".tmp, .log", "");
     assert!(r.is_file_ignored("file.tmp"));
     assert!(r.is_file_ignored("server.log"));
-    assert!(!r.is_file_ignored("tmp"));  // no extension = no match
+    assert!(!r.is_file_ignored("tmp")); // no extension = no match
 }
 
 #[test]

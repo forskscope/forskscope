@@ -2,10 +2,8 @@
 //! (RFC-013 §"Background Job Model", §"Thresholds").
 
 use crate::job::{
-    DIGEST_CONCURRENCY_LIMIT, LARGE_DIRECTORY_VIRTUAL_THRESHOLD,
-    LARGE_FILE_INLINE_DIFF_BYTES, LARGE_HUNK_AUTO_EXPAND_LINES,
-    VERY_LARGE_FILE_BYTES,
-    JobHandle, JobKind, JobProgress,
+    DIGEST_CONCURRENCY_LIMIT, JobHandle, JobKind, JobProgress, LARGE_DIRECTORY_VIRTUAL_THRESHOLD,
+    LARGE_FILE_INLINE_DIFF_BYTES, LARGE_HUNK_AUTO_EXPAND_LINES, VERY_LARGE_FILE_BYTES,
 };
 
 // ── Threshold policy ──────────────────────────────────────────────────────────
@@ -89,11 +87,18 @@ fn is_complete_true_when_reached_total() {
 #[test]
 fn job_kind_labels_are_non_empty() {
     for kind in [
-        JobKind::ReadFile, JobKind::DecodeFile, JobKind::LineDiff,
-        JobKind::InlineDiff, JobKind::DirectoryDigest,
-        JobKind::SavePreflight, JobKind::BatchCopy,
+        JobKind::ReadFile,
+        JobKind::DecodeFile,
+        JobKind::LineDiff,
+        JobKind::InlineDiff,
+        JobKind::DirectoryDigest,
+        JobKind::SavePreflight,
+        JobKind::BatchCopy,
     ] {
-        assert!(!kind.label().is_empty(), "label for {kind:?} must not be empty");
+        assert!(
+            !kind.label().is_empty(),
+            "label for {kind:?} must not be empty"
+        );
     }
 }
 
@@ -126,7 +131,7 @@ use crate::job::{JobRegistry, JobStatus, JobStatusRecord};
 
 #[test]
 fn job_status_queued_is_active_not_terminal() {
-    assert!( JobStatus::Queued.is_active());
+    assert!(JobStatus::Queued.is_active());
     assert!(!JobStatus::Queued.is_terminal());
     assert!(!JobStatus::Queued.is_success());
 }
@@ -140,25 +145,27 @@ fn job_status_running_is_active() {
 #[test]
 fn job_status_completed_is_terminal_and_success() {
     assert!(!JobStatus::Completed.is_active());
-    assert!( JobStatus::Completed.is_terminal());
-    assert!( JobStatus::Completed.is_success());
+    assert!(JobStatus::Completed.is_terminal());
+    assert!(JobStatus::Completed.is_success());
 }
 
 #[test]
 fn job_status_cancelled_is_terminal_not_success() {
-    assert!( JobStatus::Cancelled.is_terminal());
+    assert!(JobStatus::Cancelled.is_terminal());
     assert!(!JobStatus::Cancelled.is_success());
 }
 
 #[test]
 fn job_status_failed_is_terminal_not_success() {
-    assert!( JobStatus::Failed("err".into()).is_terminal());
+    assert!(JobStatus::Failed("err".into()).is_terminal());
     assert!(!JobStatus::Failed("err".into()).is_success());
 }
 
 // ── JobStatusRecord lifecycle transitions ──────────────────────────────────────
 
-fn record() -> JobStatusRecord { JobStatusRecord::new(1, JobKind::DirectoryDigest) }
+fn record() -> JobStatusRecord {
+    JobStatusRecord::new(1, JobKind::DirectoryDigest)
+}
 
 #[test]
 fn new_record_starts_queued() {

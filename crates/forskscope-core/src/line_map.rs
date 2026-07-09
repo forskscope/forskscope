@@ -48,38 +48,43 @@ impl RowState {
     /// The single-character gutter symbol for this row state.
     pub fn gutter_symbol(self) -> char {
         match self {
-            Self::Equal     => '=',
-            Self::Inserted  => '+',
-            Self::Deleted   => '-',
-            Self::Modified  => '~',
-            Self::Conflict  => '!',
+            Self::Equal => '=',
+            Self::Inserted => '+',
+            Self::Deleted => '-',
+            Self::Modified => '~',
+            Self::Conflict => '!',
             Self::Collapsed => '…',
-            Self::Unknown   => '?',
+            Self::Unknown => '?',
         }
     }
 
     /// `true` when this row represents a visible change.
     pub fn is_changed(self) -> bool {
-        matches!(self, Self::Inserted | Self::Deleted | Self::Modified | Self::Conflict)
+        matches!(
+            self,
+            Self::Inserted | Self::Deleted | Self::Modified | Self::Conflict
+        )
     }
 }
 
 /// One row in the aligned line map.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AlignedRow {
-    pub row_id:    RowId,
+    pub row_id: RowId,
     /// Left side line reference. `None` for insert-only rows.
-    pub left:      Option<LineSpan>,
+    pub left: Option<LineSpan>,
     /// Right side line reference. `None` for delete-only rows.
-    pub right:     Option<LineSpan>,
-    pub state:     RowState,
+    pub right: Option<LineSpan>,
+    pub state: RowState,
     /// The hunk this row belongs to.
-    pub hunk_id:   Option<HunkId>,
+    pub hunk_id: Option<HunkId>,
 }
 
 impl AlignedRow {
     /// `true` when both sides have a line (the row is full-width).
-    pub fn is_paired(&self) -> bool { self.left.is_some() && self.right.is_some() }
+    pub fn is_paired(&self) -> bool {
+        self.left.is_some() && self.right.is_some()
+    }
 }
 
 // ── LineMap ───────────────────────────────────────────────────────────────────
@@ -95,39 +100,47 @@ pub struct LineMap {
 impl LineMap {
     /// Derive a `LineMap` from a `DiffDocument`.
     pub fn from_diff(doc: &DiffDocument) -> Self {
-        let mut rows    = Vec::new();
+        let mut rows = Vec::new();
         let mut row_idx = 0u32;
         let mut changed = 0usize;
 
-        let mut left_line_num  = 1u32;
+        let mut left_line_num = 1u32;
         let mut right_line_num = 1u32;
 
         for hunk in &doc.hunks {
             let state = match hunk.kind {
-                HunkKind::Equal   => RowState::Equal,
-                HunkKind::Insert  => RowState::Inserted,
-                HunkKind::Delete  => RowState::Deleted,
+                HunkKind::Equal => RowState::Equal,
+                HunkKind::Insert => RowState::Inserted,
+                HunkKind::Delete => RowState::Deleted,
                 HunkKind::Replace => RowState::Modified,
             };
 
             for row in &hunk.rows {
                 let left_span = row.left.as_ref().map(|_| {
-                    let s = LineSpan { original_line: left_line_num, row_index: row_idx as usize };
+                    let s = LineSpan {
+                        original_line: left_line_num,
+                        row_index: row_idx as usize,
+                    };
                     left_line_num += 1;
                     s
                 });
                 let right_span = row.right.as_ref().map(|_| {
-                    let s = LineSpan { original_line: right_line_num, row_index: row_idx as usize };
+                    let s = LineSpan {
+                        original_line: right_line_num,
+                        row_index: row_idx as usize,
+                    };
                     right_line_num += 1;
                     s
                 });
 
-                if state.is_changed() { changed += 1; }
+                if state.is_changed() {
+                    changed += 1;
+                }
 
                 rows.push(AlignedRow {
-                    row_id:  RowId(row_idx),
-                    left:    left_span,
-                    right:   right_span,
+                    row_id: RowId(row_idx),
+                    left: left_span,
+                    right: right_span,
                     state,
                     hunk_id: Some(hunk.hunk_id),
                 });
@@ -135,7 +148,10 @@ impl LineMap {
             }
         }
 
-        Self { rows, changed_row_count: changed }
+        Self {
+            rows,
+            changed_row_count: changed,
+        }
     }
 
     /// Look up a row by its `RowId`.
@@ -150,21 +166,25 @@ impl LineMap {
 
     /// The first changed row at or after `row_index`.
     pub fn next_changed_row(&self, from_row_index: usize) -> Option<&AlignedRow> {
-        self.rows.iter()
+        self.rows
+            .iter()
             .skip(from_row_index)
             .find(|r| r.state.is_changed())
     }
 
     /// The last changed row before `row_index`.
     pub fn prev_changed_row(&self, from_row_index: usize) -> Option<&AlignedRow> {
-        self.rows.iter()
+        self.rows
+            .iter()
             .take(from_row_index)
             .rev()
             .find(|r| r.state.is_changed())
     }
 
     /// `true` when the document is identical (no changed rows).
-    pub fn is_identical(&self) -> bool { self.changed_row_count == 0 }
+    pub fn is_identical(&self) -> bool {
+        self.changed_row_count == 0
+    }
 }
 
 // ── Scroll anchor ─────────────────────────────────────────────────────────────
@@ -177,14 +197,17 @@ impl LineMap {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ScrollAnchor {
     /// 0-based aligned row index.
-    pub row_index:         usize,
+    pub row_index: usize,
     /// Fractional offset within the row `[0.0, 1.0)`.
-    pub row_fraction:      f32,
+    pub row_fraction: f32,
 }
 
 impl ScrollAnchor {
     pub fn at_top() -> Self {
-        Self { row_index: 0, row_fraction: 0.0 }
+        Self {
+            row_index: 0,
+            row_fraction: 0.0,
+        }
     }
 
     /// Clamp `row_fraction` to `[0.0, 1.0)`.
@@ -201,10 +224,10 @@ impl ScrollAnchor {
 /// One segment in the mini hunk map shown below the diff panes (RFC-035 §"Mini map").
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MiniMapSegment {
-    pub state:     RowState,
+    pub state: RowState,
     /// Proportion of total rows this segment occupies (`0.0..=1.0`).
-    pub weight:    u32,
-    pub hunk_id:   Option<HunkId>,
+    pub weight: u32,
+    pub hunk_id: Option<HunkId>,
 }
 
 /// Build the mini-map segment sequence from a `LineMap`.
@@ -215,14 +238,12 @@ pub fn build_mini_map(map: &LineMap) -> Vec<MiniMapSegment> {
     let mut segments: Vec<MiniMapSegment> = Vec::new();
     for row in &map.rows {
         match segments.last_mut() {
-            Some(last)
-                if last.state == row.state && last.hunk_id == row.hunk_id =>
-            {
+            Some(last) if last.state == row.state && last.hunk_id == row.hunk_id => {
                 last.weight += 1;
             }
             _ => segments.push(MiniMapSegment {
-                state:   row.state,
-                weight:  1,
+                state: row.state,
+                weight: 1,
                 hunk_id: row.hunk_id,
             }),
         }

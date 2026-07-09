@@ -17,9 +17,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::dir::RecStatus;
 use crate::dir::batch::{BatchFailurePolicy, BatchItem, batch_copy};
 use crate::dir::recursive::RecEntry;
-use crate::dir::RecStatus;
 use crate::save::BackupPolicy;
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -48,10 +48,10 @@ pub enum EntrySelection {
 /// A single planned file operation.
 #[derive(Debug, Clone)]
 pub struct PlannedFileOperation {
-    pub rel_path:  PathBuf,
-    pub action:    DirectoryMergeAction,
-    pub source:    Option<PathBuf>,
-    pub target:    Option<PathBuf>,
+    pub rel_path: PathBuf,
+    pub action: DirectoryMergeAction,
+    pub source: Option<PathBuf>,
+    pub target: Option<PathBuf>,
     pub preflight: OperationPreflight,
 }
 
@@ -59,7 +59,7 @@ pub struct PlannedFileOperation {
 #[derive(Debug, Clone)]
 pub struct OperationPreflight {
     /// The target path already exists and will be overwritten.
-    pub target_exists:   bool,
+    pub target_exists: bool,
     /// The target is not writable (best-effort check at plan time).
     pub target_writable: bool,
     /// A backup should be created before overwriting.
@@ -71,9 +71,9 @@ pub struct OperationPreflight {
 /// High-level risk summary shown in the batch review dialog.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RiskSummary {
-    pub total_files:   usize,
-    pub new_files:     usize,
-    pub overwrites:    usize,
+    pub total_files: usize,
+    pub new_files: usize,
+    pub overwrites: usize,
     pub estimated_bytes: u64,
     /// Number of files where the target is not writable at plan time.
     pub permission_blocks: usize,
@@ -96,11 +96,11 @@ impl OperationPlanId {
 /// A previewable, executable directory merge plan (RFC-022 §"Operation plan model").
 #[derive(Debug, Clone)]
 pub struct OperationPlan {
-    pub id:           OperationPlanId,
-    pub left_root:    PathBuf,
-    pub right_root:   PathBuf,
-    pub direction:    CopyDirection,
-    pub operations:   Vec<PlannedFileOperation>,
+    pub id: OperationPlanId,
+    pub left_root: PathBuf,
+    pub right_root: PathBuf,
+    pub direction: CopyDirection,
+    pub operations: Vec<PlannedFileOperation>,
     pub risk_summary: RiskSummary,
 }
 
@@ -122,11 +122,11 @@ pub enum FileOutcome {
 /// The result of running [`execute_plan`].
 #[derive(Debug, Clone)]
 pub struct PlanExecutionReport {
-    pub plan_id:    OperationPlanId,
-    pub succeeded:  usize,
-    pub failed:     usize,
-    pub skipped:    usize,
-    pub outcomes:   Vec<(PathBuf, FileOutcome)>,
+    pub plan_id: OperationPlanId,
+    pub succeeded: usize,
+    pub failed: usize,
+    pub skipped: usize,
+    pub outcomes: Vec<(PathBuf, FileOutcome)>,
 }
 
 // ── DirectoryMergeAction ──────────────────────────────────────────────────────
@@ -149,11 +149,11 @@ pub enum DirectoryMergeAction {
 /// Only copy operations are planned (no deletions — deletions require a
 /// stronger confirmation model that is UI-layer responsibility).
 pub fn plan_operations(
-    entries:    &[RecEntry],
-    left_root:  &Path,
+    entries: &[RecEntry],
+    left_root: &Path,
     right_root: &Path,
-    direction:  CopyDirection,
-    selection:  EntrySelection,
+    direction: CopyDirection,
+    selection: EntrySelection,
 ) -> OperationPlan {
     let id = OperationPlanId::new();
     let mut operations = Vec::new();
@@ -170,7 +170,9 @@ pub fn plan_operations(
             },
             (EntrySelection::AllNonEqual, _) => true,
         };
-        if !include { continue; }
+        if !include {
+            continue;
+        }
 
         // Determine source and target based on direction and status.
         let (source, target, action) = match (direction, entry.status) {
@@ -187,12 +189,12 @@ pub fn plan_operations(
             // Entry exists only on the non-source side: skip in this direction.
             _ => {
                 operations.push(PlannedFileOperation {
-                    rel_path:  entry.rel_path.clone(),
-                    action:    DirectoryMergeAction::Skip,
-                    source:    None,
-                    target:    None,
+                    rel_path: entry.rel_path.clone(),
+                    action: DirectoryMergeAction::Skip,
+                    source: None,
+                    target: None,
                     preflight: OperationPreflight {
-                        target_exists:   false,
+                        target_exists: false,
                         target_writable: true,
                         backup_required: false,
                         estimated_bytes: 0,
@@ -204,9 +206,14 @@ pub fn plan_operations(
 
         let preflight = compute_preflight(target.as_deref(), entry);
         risk.total_files += 1;
-        if preflight.target_exists  { risk.overwrites += 1; }
-        else                        { risk.new_files  += 1; }
-        if !preflight.target_writable { risk.permission_blocks += 1; }
+        if preflight.target_exists {
+            risk.overwrites += 1;
+        } else {
+            risk.new_files += 1;
+        }
+        if !preflight.target_writable {
+            risk.permission_blocks += 1;
+        }
         risk.estimated_bytes += preflight.estimated_bytes;
 
         operations.push(PlannedFileOperation {
@@ -220,7 +227,7 @@ pub fn plan_operations(
 
     OperationPlan {
         id,
-        left_root:  left_root.to_path_buf(),
+        left_root: left_root.to_path_buf(),
         right_root: right_root.to_path_buf(),
         direction,
         operations,
@@ -234,13 +241,15 @@ fn compute_preflight(target: Option<&Path>, entry: &RecEntry) -> OperationPrefli
         Some(p) => {
             let exists = p.exists();
             let writable = if exists {
-                p.metadata().map(|m| !m.permissions().readonly()).unwrap_or(false)
+                p.metadata()
+                    .map(|m| !m.permissions().readonly())
+                    .unwrap_or(false)
             } else {
                 // Check parent directory is writable.
                 p.parent()
                     .and_then(|par| par.metadata().ok())
                     .map(|m| !m.permissions().readonly())
-                    .unwrap_or(true)  // assume writable when parent doesn't exist yet
+                    .unwrap_or(true) // assume writable when parent doesn't exist yet
             };
             (exists, writable)
         }
@@ -261,11 +270,13 @@ fn compute_preflight(target: Option<&Path>, entry: &RecEntry) -> OperationPrefli
 /// Delegates to [`batch_copy`] for actual I/O. Returns a
 /// [`PlanExecutionReport`] regardless of partial failure.
 pub fn execute_plan(
-    plan:           &OperationPlan,
-    backup:         BackupPolicy,
+    plan: &OperationPlan,
+    backup: BackupPolicy,
     failure_policy: BatchFailurePolicy,
 ) -> PlanExecutionReport {
-    let copy_ops: Vec<PlannedFileOperation> = plan.operations.iter()
+    let copy_ops: Vec<PlannedFileOperation> = plan
+        .operations
+        .iter()
         .filter(|op| op.action != DirectoryMergeAction::Skip)
         .filter(|op| op.source.is_some() && op.target.is_some())
         .cloned()
@@ -280,7 +291,8 @@ pub fn execute_plan(
         }
     }
 
-    let items: Vec<BatchItem> = copy_ops.iter()
+    let items: Vec<BatchItem> = copy_ops
+        .iter()
         .filter_map(|op| {
             Some(BatchItem {
                 src: op.source.clone()?,
@@ -289,40 +301,46 @@ pub fn execute_plan(
         })
         .collect();
 
-    let skipped_count = plan.operations.iter()
+    let skipped_count = plan
+        .operations
+        .iter()
         .filter(|op| op.action == DirectoryMergeAction::Skip)
         .count();
 
-    let manifest = batch_copy(&items, backup, failure_policy, None)
-        .unwrap_or_else(|e| {
-            // batch_copy itself only errors on manifest write, which we're
-            // not doing (manifest_dir=None). This path should be unreachable,
-            // but we handle it defensively.
-            panic!("batch_copy returned Err with no manifest_dir: {e}")
-        });
+    let manifest = batch_copy(&items, backup, failure_policy, None).unwrap_or_else(|e| {
+        // batch_copy itself only errors on manifest write, which we're
+        // not doing (manifest_dir=None). This path should be unreachable,
+        // but we handle it defensively.
+        panic!("batch_copy returned Err with no manifest_dir: {e}")
+    });
 
-    let outcomes: Vec<(PathBuf, FileOutcome)> = copy_ops.iter().zip(manifest.entries.iter())
+    let outcomes: Vec<(PathBuf, FileOutcome)> = copy_ops
+        .iter()
+        .zip(manifest.entries.iter())
         .map(|(op, entry)| {
             let outcome = match &entry.outcome {
-                crate::dir::batch::EntryOutcome::Copied { bytes, backup_path } =>
+                crate::dir::batch::EntryOutcome::Copied { bytes, backup_path } => {
                     FileOutcome::Copied {
                         bytes: *bytes,
                         backup_created: backup_path.is_some(),
-                    },
-                crate::dir::batch::EntryOutcome::Skipped { reason } =>
-                    FileOutcome::Skipped { reason: reason.clone() },
-                crate::dir::batch::EntryOutcome::Failed { error } =>
-                    FileOutcome::Failed { error: error.clone() },
+                    }
+                }
+                crate::dir::batch::EntryOutcome::Skipped { reason } => FileOutcome::Skipped {
+                    reason: reason.clone(),
+                },
+                crate::dir::batch::EntryOutcome::Failed { error } => FileOutcome::Failed {
+                    error: error.clone(),
+                },
             };
             (op.rel_path.clone(), outcome)
         })
         .collect();
 
     PlanExecutionReport {
-        plan_id:   plan.id.clone(),
+        plan_id: plan.id.clone(),
         succeeded: manifest.succeeded(),
-        failed:    manifest.failed(),
-        skipped:   skipped_count,
+        failed: manifest.failed(),
+        skipped: skipped_count,
         outcomes,
     }
 }

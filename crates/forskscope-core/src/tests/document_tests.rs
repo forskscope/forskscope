@@ -92,7 +92,13 @@ fn empty_file_loads_as_empty_text_document() {
     let dir = temp_dir("doc-empty");
     let path = dir.join("empty.txt");
     std::fs::write(&path, "").unwrap();
-    let doc = crate::document::load_path(&path, crate::document::LoadOptions { allow_missing: false }).unwrap();
+    let doc = crate::document::load_path(
+        &path,
+        crate::document::LoadOptions {
+            allow_missing: false,
+        },
+    )
+    .unwrap();
     assert!(doc.kind.is_mergeable_text(), "empty .txt should be text");
     assert_eq!(doc.diff_text(), "", "empty file has empty diff text");
 }
@@ -105,7 +111,10 @@ fn fingerprint_changes_after_file_modification() {
     let fp1 = crate::document::FileFingerprint::capture(&path, None).unwrap();
     std::fs::write(&path, "v2-different").unwrap();
     let fp2 = crate::document::FileFingerprint::capture(&path, None).unwrap();
-    assert_ne!(fp1, fp2, "fingerprint must change when file content changes");
+    assert_ne!(
+        fp1, fp2,
+        "fingerprint must change when file content changes"
+    );
 }
 
 #[test]
@@ -122,7 +131,15 @@ fn fingerprint_is_stable_for_unchanged_file() {
 fn allow_missing_loads_empty_document_for_absent_path() {
     use std::path::PathBuf;
     let absent = PathBuf::from("/tmp/this_file_definitely_does_not_exist_12345.txt");
-    let doc = crate::document::load_path(&absent,
-        crate::document::LoadOptions { allow_missing: true }).unwrap();
-    assert!(doc.diff_text().is_empty(), "missing file with allow_missing yields empty document");
+    let doc = crate::document::load_path(
+        &absent,
+        crate::document::LoadOptions {
+            allow_missing: true,
+        },
+    )
+    .unwrap();
+    assert!(
+        doc.diff_text().is_empty(),
+        "missing file with allow_missing yields empty document"
+    );
 }

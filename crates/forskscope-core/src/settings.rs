@@ -16,35 +16,34 @@
 
 pub mod display;
 pub use display::{
-    Density, FontFamilySetting, LocaleId, ThemeId, ThemeTokens,
-    SETTINGS_SCHEMA_VERSION,
+    Density, FontFamilySetting, LocaleId, SETTINGS_SCHEMA_VERSION, ThemeId, ThemeTokens,
 };
 
-use std::fmt::Write as _;
 use crate::diff::CompareProfile;
 use crate::encoding::NewlinePolicy;
 use crate::job::PerformanceLimits;
 use crate::persist::{MigrationPolicy, SchemaName, VersionedEnvelope};
+use std::fmt::Write as _;
 
 // ── Settings sections ─────────────────────────────────────────────────────────
 
 /// Appearance settings (RFC-009 §4).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppearanceSettings {
-    pub theme:       ThemeId,
-    pub density:     Density,
+    pub theme: ThemeId,
+    pub density: Density,
     pub font_family: FontFamilySetting,
     /// Point size for the diff font (6–50, default 14).
-    pub font_size:   u8,
+    pub font_size: u8,
 }
 
 impl Default for AppearanceSettings {
     fn default() -> Self {
         Self {
-            theme:       ThemeId::Dark,
-            density:     Density::Comfortable,
+            theme: ThemeId::Dark,
+            density: Density::Comfortable,
             font_family: FontFamilySetting::SystemMono,
-            font_size:   14,
+            font_size: 14,
         }
     }
 }
@@ -63,9 +62,9 @@ pub struct DiffSettings {
 impl Default for DiffSettings {
     fn default() -> Self {
         Self {
-            compare_profile:   CompareProfile::default(),
+            compare_profile: CompareProfile::default(),
             show_line_numbers: true,
-            wrap_long_lines:   false,
+            wrap_long_lines: false,
         }
     }
 }
@@ -73,21 +72,21 @@ impl Default for DiffSettings {
 /// File handling settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileSettings {
-    pub newline_policy:    NewlinePolicy,
-    pub performance:       PerformanceLimits,
+    pub newline_policy: NewlinePolicy,
+    pub performance: PerformanceLimits,
     /// Re-open the last session on startup.
-    pub restore_session:   bool,
+    pub restore_session: bool,
     /// Remember recently opened file pairs.
-    pub recent_limit:      usize,
+    pub recent_limit: usize,
 }
 
 impl Default for FileSettings {
     fn default() -> Self {
         Self {
-            newline_policy:  NewlinePolicy::Preserve,
-            performance:     PerformanceLimits::default(),
+            newline_policy: NewlinePolicy::Preserve,
+            performance: PerformanceLimits::default(),
             restore_session: true,
-            recent_limit:    20,
+            recent_limit: 20,
         }
     }
 }
@@ -100,7 +99,9 @@ pub struct LocaleSettings {
 
 impl Default for LocaleSettings {
     fn default() -> Self {
-        Self { locale: LocaleId::english() }
+        Self {
+            locale: LocaleId::english(),
+        }
     }
 }
 
@@ -113,9 +114,9 @@ impl Default for LocaleSettings {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct UserSettings {
     pub appearance: AppearanceSettings,
-    pub diff:       DiffSettings,
-    pub files:      FileSettings,
-    pub locale:     LocaleSettings,
+    pub diff: DiffSettings,
+    pub files: FileSettings,
+    pub locale: LocaleSettings,
 }
 
 impl UserSettings {
@@ -124,26 +125,27 @@ impl UserSettings {
     /// Serialise to a `VersionedEnvelope` JSON string.
     pub fn to_json(&self) -> String {
         let payload = self.to_payload_json();
-        VersionedEnvelope::new(SchemaName::Settings, SETTINGS_SCHEMA_VERSION, payload)
-            .to_json()
+        VersionedEnvelope::new(SchemaName::Settings, SETTINGS_SCHEMA_VERSION, payload).to_json()
     }
 
     /// Parse from envelope JSON. Returns `Err(String)` on any failure.
     pub fn from_json(json: &str) -> Result<ParsedSettings, String> {
-        let envelope = VersionedEnvelope::parse(json)
-            .map_err(|e| format!("settings envelope: {e}"))?;
+        let envelope =
+            VersionedEnvelope::parse(json).map_err(|e| format!("settings envelope: {e}"))?;
         let migration = envelope.migration_policy(SETTINGS_SCHEMA_VERSION);
         if let MigrationPolicy::NewerSchema { file_version, .. } = migration {
             return Err(format!(
                 "settings were written by a newer ForskScope (schema v{file_version})"
             ));
         }
-        let settings = Self::from_payload_json(&envelope.payload_json)
-            .unwrap_or_else(|_| {
-                // RFC-009 §10: unknown/corrupt fields → fall back to defaults.
-                UserSettings::default()
-            });
-        Ok(ParsedSettings { settings, migration })
+        let settings = Self::from_payload_json(&envelope.payload_json).unwrap_or_else(|_| {
+            // RFC-009 §10: unknown/corrupt fields → fall back to defaults.
+            UserSettings::default()
+        });
+        Ok(ParsedSettings {
+            settings,
+            migration,
+        })
     }
 
     // ── Internal JSON helpers ──────────────────────────────────────────────
@@ -156,20 +158,24 @@ impl UserSettings {
         let mut s = String::new();
         let _ = writeln!(s, "{{");
         let _ = writeln!(s, "  \"appearance\": {{");
-        let _ = writeln!(s, "    \"theme\": {:?},",       a.theme.as_str());
-        let _ = writeln!(s, "    \"density\": {:?},",     a.density.as_str());
+        let _ = writeln!(s, "    \"theme\": {:?},", a.theme.as_str());
+        let _ = writeln!(s, "    \"density\": {:?},", a.density.as_str());
         let _ = writeln!(s, "    \"font_family\": {:?},", a.font_family.as_str());
-        let _ = writeln!(s, "    \"font_size\": {}",      a.font_size);
+        let _ = writeln!(s, "    \"font_size\": {}", a.font_size);
         let _ = writeln!(s, "  }},");
         let _ = writeln!(s, "  \"diff\": {{");
         let _ = writeln!(s, "    \"compare_profile\": {:?},", d.compare_profile.name);
         let _ = writeln!(s, "    \"show_line_numbers\": {},", d.show_line_numbers);
-        let _ = writeln!(s, "    \"wrap_long_lines\": {}",    d.wrap_long_lines);
+        let _ = writeln!(s, "    \"wrap_long_lines\": {}", d.wrap_long_lines);
         let _ = writeln!(s, "  }},");
         let _ = writeln!(s, "  \"files\": {{");
-        let _ = writeln!(s, "    \"newline_policy\": {:?},",  newline_policy_str(f.newline_policy));
-        let _ = writeln!(s, "    \"restore_session\": {},",   f.restore_session);
-        let _ = writeln!(s, "    \"recent_limit\": {}",       f.recent_limit);
+        let _ = writeln!(
+            s,
+            "    \"newline_policy\": {:?},",
+            newline_policy_str(f.newline_policy)
+        );
+        let _ = writeln!(s, "    \"restore_session\": {},", f.restore_session);
+        let _ = writeln!(s, "    \"recent_limit\": {}", f.recent_limit);
         let _ = writeln!(s, "  }},");
         let _ = writeln!(s, "  \"locale\": {:?}", l.locale.as_str());
         let _ = write!(s, "}}");
@@ -190,23 +196,21 @@ impl UserSettings {
             .map(|n| (n.clamp(6, 50)) as u8)
             .unwrap_or(14);
 
-        let profile_name = extract_nested_str(json, "diff", "compare_profile")
-            .unwrap_or_else(|| "Default".into());
+        let profile_name =
+            extract_nested_str(json, "diff", "compare_profile").unwrap_or_else(|| "Default".into());
         let compare_profile = CompareProfile::all_presets()
             .into_iter()
             .find(|p| p.name == profile_name)
             .unwrap_or_default();
-        let show_line_numbers = extract_nested_bool(json, "diff", "show_line_numbers")
-            .unwrap_or(true);
-        let wrap_long_lines = extract_nested_bool(json, "diff", "wrap_long_lines")
-            .unwrap_or(false);
+        let show_line_numbers =
+            extract_nested_bool(json, "diff", "show_line_numbers").unwrap_or(true);
+        let wrap_long_lines = extract_nested_bool(json, "diff", "wrap_long_lines").unwrap_or(false);
 
         let newline_policy = extract_nested_str(json, "files", "newline_policy")
             .as_deref()
             .and_then(newline_policy_from_str)
             .unwrap_or_default();
-        let restore_session = extract_nested_bool(json, "files", "restore_session")
-            .unwrap_or(true);
+        let restore_session = extract_nested_bool(json, "files", "restore_session").unwrap_or(true);
         let recent_limit = extract_nested_u64(json, "files", "recent_limit")
             .map(|n| n as usize)
             .unwrap_or(20);
@@ -214,22 +218,33 @@ impl UserSettings {
         let locale_str = extract_str(json, "locale").unwrap_or_else(|| "en".into());
 
         Ok(UserSettings {
-            appearance: AppearanceSettings { theme, density, font_family, font_size },
-            diff: DiffSettings { compare_profile, show_line_numbers, wrap_long_lines },
+            appearance: AppearanceSettings {
+                theme,
+                density,
+                font_family,
+                font_size,
+            },
+            diff: DiffSettings {
+                compare_profile,
+                show_line_numbers,
+                wrap_long_lines,
+            },
             files: FileSettings {
                 newline_policy,
                 performance: PerformanceLimits::default(),
                 restore_session,
                 recent_limit,
             },
-            locale: LocaleSettings { locale: LocaleId(locale_str) },
+            locale: LocaleSettings {
+                locale: LocaleId(locale_str),
+            },
         })
     }
 }
 
 /// Result of [`UserSettings::from_json`].
 pub struct ParsedSettings {
-    pub settings:  UserSettings,
+    pub settings: UserSettings,
     pub migration: MigrationPolicy,
 }
 
@@ -239,7 +254,9 @@ fn extract_str(json: &str, field: &str) -> Option<String> {
     let key = format!("\"{}\":", field);
     let start = json.find(&key)? + key.len();
     let rest = json[start..].trim_start();
-    if !rest.starts_with('"') { return None; }
+    if !rest.starts_with('"') {
+        return None;
+    }
     let inner = &rest[1..];
     let end = inner.find('"')?;
     Some(inner[..end].into())
@@ -249,7 +266,9 @@ fn extract_nested_str(json: &str, section: &str, field: &str) -> Option<String> 
     let sec_key = format!("\"{}\":", section);
     let sec_start = json.find(&sec_key)? + sec_key.len();
     let sec_rest = json[sec_start..].trim_start();
-    if !sec_rest.starts_with('{') { return None; }
+    if !sec_rest.starts_with('{') {
+        return None;
+    }
     let depth_end = find_close_brace(sec_rest)?;
     let section_json = &sec_rest[..depth_end + 1];
     extract_str(section_json, field)
@@ -259,13 +278,17 @@ fn extract_nested_u64(json: &str, section: &str, field: &str) -> Option<u64> {
     let sec_key = format!("\"{}\":", section);
     let sec_start = json.find(&sec_key)? + sec_key.len();
     let sec_rest = json[sec_start..].trim_start();
-    if !sec_rest.starts_with('{') { return None; }
+    if !sec_rest.starts_with('{') {
+        return None;
+    }
     let depth_end = find_close_brace(sec_rest)?;
     let section_json = &sec_rest[..depth_end + 1];
     let key = format!("\"{}\":", field);
     let start = section_json.find(&key)? + key.len();
     let rest = section_json[start..].trim_start();
-    let end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
+    let end = rest
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(rest.len());
     rest[..end].parse().ok()
 }
 
@@ -273,30 +296,43 @@ fn extract_nested_bool(json: &str, section: &str, field: &str) -> Option<bool> {
     let sec_key = format!("\"{}\":", section);
     let sec_start = json.find(&sec_key)? + sec_key.len();
     let sec_rest = json[sec_start..].trim_start();
-    if !sec_rest.starts_with('{') { return None; }
+    if !sec_rest.starts_with('{') {
+        return None;
+    }
     let depth_end = find_close_brace(sec_rest)?;
     let section_json = &sec_rest[..depth_end + 1];
     let key = format!("\"{}\":", field);
     let start = section_json.find(&key)? + key.len();
     let rest = section_json[start..].trim_start();
-    if rest.starts_with("true")  { return Some(true);  }
-    if rest.starts_with("false") { return Some(false); }
+    if rest.starts_with("true") {
+        return Some(true);
+    }
+    if rest.starts_with("false") {
+        return Some(false);
+    }
     None
 }
 
 fn find_close_brace(s: &str) -> Option<usize> {
     let mut depth = 0i32;
     for (i, ch) in s.char_indices() {
-        if ch == '{' { depth += 1; }
-        if ch == '}' { depth -= 1; if depth == 0 { return Some(i); } }
+        if ch == '{' {
+            depth += 1;
+        }
+        if ch == '}' {
+            depth -= 1;
+            if depth == 0 {
+                return Some(i);
+            }
+        }
     }
     None
 }
 
 fn newline_policy_str(p: NewlinePolicy) -> &'static str {
     match p {
-        NewlinePolicy::Preserve  => "preserve",
-        NewlinePolicy::ForceLf   => "lf",
+        NewlinePolicy::Preserve => "preserve",
+        NewlinePolicy::ForceLf => "lf",
         NewlinePolicy::ForceCrlf => "crlf",
     }
 }
@@ -304,8 +340,8 @@ fn newline_policy_str(p: NewlinePolicy) -> &'static str {
 fn newline_policy_from_str(s: &str) -> Option<NewlinePolicy> {
     match s {
         "preserve" => Some(NewlinePolicy::Preserve),
-        "lf"       => Some(NewlinePolicy::ForceLf),
-        "crlf"     => Some(NewlinePolicy::ForceCrlf),
-        _          => None,
+        "lf" => Some(NewlinePolicy::ForceLf),
+        "crlf" => Some(NewlinePolicy::ForceCrlf),
+        _ => None,
     }
 }

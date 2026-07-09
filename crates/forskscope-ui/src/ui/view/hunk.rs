@@ -19,40 +19,71 @@ use crate::ui::view::search::{SearchCtx, line_matches};
 
 /// Which column this `HunkBlock` should render.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum HunkCol { Left, Act, Right }
+pub enum HunkCol {
+    Left,
+    Act,
+    Right,
+}
 
 #[component]
 pub fn HunkBlock(
-    index: usize, hunk: MergeHunk,
+    index: usize,
+    hunk: MergeHunk,
     col: HunkCol,
-    char_mode: bool, context_lines: usize,
-    focused: bool, can_save: bool,
-    is_expanded: bool, on_expand: EventHandler<u64>,
+    char_mode: bool,
+    context_lines: usize,
+    focused: bool,
+    can_save: bool,
+    is_expanded: bool,
+    on_expand: EventHandler<u64>,
 ) -> Element {
     let store = use_context::<Store>();
-    let lang  = store.lang();
+    let lang = store.lang();
     let kind_class = match hunk.kind {
-        HunkKind::Equal   => "hunk",
-        HunkKind::Delete  => "hunk hunk-del",
-        HunkKind::Insert  => "hunk hunk-ins",
+        HunkKind::Equal => "hunk",
+        HunkKind::Delete => "hunk hunk-del",
+        HunkKind::Insert => "hunk hunk-ins",
         HunkKind::Replace => "hunk hunk-rep",
     };
-    let class   = if focused { format!("{kind_class} focused") } else { kind_class.to_string() };
+    let class = if focused {
+        format!("{kind_class} focused")
+    } else {
+        kind_class.to_string()
+    };
     let hunk_id = hunk.hunk_id;
     let applied = matches!(hunk.state, HunkState::AppliedLeftToRight);
     let pending = hunk.is_pending_change();
-    let rows    = &hunk.rows;
+    let rows = &hunk.rows;
 
-    let collapse = hunk.kind == HunkKind::Equal && !is_expanded
-        && context_lines > 0 && rows.len() > 2 * context_lines + 1;
-    let hidden = if collapse { rows.len() - 2 * context_lines } else { 0 };
+    let collapse = hunk.kind == HunkKind::Equal
+        && !is_expanded
+        && context_lines > 0
+        && rows.len() > 2 * context_lines + 1;
+    let hidden = if collapse {
+        rows.len() - 2 * context_lines
+    } else {
+        0
+    };
 
-    let head_rows: Vec<(usize, _)> = if collapse { rows[..context_lines].iter().enumerate().collect() } else { vec![] };
+    let head_rows: Vec<(usize, _)> = if collapse {
+        rows[..context_lines].iter().enumerate().collect()
+    } else {
+        vec![]
+    };
     let tail_rows: Vec<(usize, _)> = if collapse {
-        rows[rows.len() - context_lines..].iter().enumerate()
-            .map(|(i, r)| (context_lines + 1 + i, r)).collect()
-    } else { vec![] };
-    let all_rows: Vec<(usize, _)> = if !collapse { rows.iter().enumerate().collect() } else { vec![] };
+        rows[rows.len() - context_lines..]
+            .iter()
+            .enumerate()
+            .map(|(i, r)| (context_lines + 1 + i, r))
+            .collect()
+    } else {
+        vec![]
+    };
+    let all_rows: Vec<(usize, _)> = if !collapse {
+        rows.iter().enumerate().collect()
+    } else {
+        vec![]
+    };
 
     match col {
         HunkCol::Left => rsx! {
@@ -130,27 +161,51 @@ pub fn HunkBlock(
 #[component]
 fn RowLeft(
     left_no: Option<u32>,
-    left: Option<String>, right: Option<String>,
-    kind: HunkKind, char_mode: bool, lang: Lang,
+    left: Option<String>,
+    right: Option<String>,
+    kind: HunkKind,
+    char_mode: bool,
+    lang: Lang,
 ) -> Element {
     let search: Signal<SearchCtx> = use_context::<Signal<SearchCtx>>();
-    let ctx      = search.read();
-    let is_match = left.as_deref().map(|c| line_matches(&ctx, c)).unwrap_or(false)
-        || right.as_deref().map(|c| line_matches(&ctx, c)).unwrap_or(false);
+    let ctx = search.read();
+    let is_match = left
+        .as_deref()
+        .map(|c| line_matches(&ctx, c))
+        .unwrap_or(false)
+        || right
+            .as_deref()
+            .map(|c| line_matches(&ctx, c))
+            .unwrap_or(false);
     drop(ctx);
 
     let inline_left = if char_mode && kind == HunkKind::Replace {
-        match (&left, &right) { (Some(l), Some(r)) => Some(refine_pair(l, r).left_spans), _ => None }
-    } else { None };
-
-    let gutter_class = match kind { HunkKind::Delete | HunkKind::Replace => "pane-gutter del", _ => "pane-gutter" };
-    let mark         = match kind { HunkKind::Delete | HunkKind::Replace => "−", _ => " " };
-    let sr_label: Option<String> = match kind {
-        HunkKind::Delete  => Some(t(lang, "Deleted")),
-        HunkKind::Replace => Some(t(lang, "Changed")),
-        _                 => None,
+        match (&left, &right) {
+            (Some(l), Some(r)) => Some(refine_pair(l, r).left_spans),
+            _ => None,
+        }
+    } else {
+        None
     };
-    let row_class = if is_match { "diff-row match" } else { "diff-row" };
+
+    let gutter_class = match kind {
+        HunkKind::Delete | HunkKind::Replace => "pane-gutter del",
+        _ => "pane-gutter",
+    };
+    let mark = match kind {
+        HunkKind::Delete | HunkKind::Replace => "−",
+        _ => " ",
+    };
+    let sr_label: Option<String> = match kind {
+        HunkKind::Delete => Some(t(lang, "Deleted")),
+        HunkKind::Replace => Some(t(lang, "Changed")),
+        _ => None,
+    };
+    let row_class = if is_match {
+        "diff-row match"
+    } else {
+        "diff-row"
+    };
 
     rsx! {
         div { class: "{row_class}", role: "row",
@@ -169,27 +224,51 @@ fn RowLeft(
 #[component]
 fn RowRight(
     right_no: Option<u32>,
-    right: Option<String>, left: Option<String>,
-    kind: HunkKind, char_mode: bool, lang: Lang,
+    right: Option<String>,
+    left: Option<String>,
+    kind: HunkKind,
+    char_mode: bool,
+    lang: Lang,
 ) -> Element {
     let search: Signal<SearchCtx> = use_context::<Signal<SearchCtx>>();
-    let ctx      = search.read();
-    let is_match = left.as_deref().map(|c| line_matches(&ctx, c)).unwrap_or(false)
-        || right.as_deref().map(|c| line_matches(&ctx, c)).unwrap_or(false);
+    let ctx = search.read();
+    let is_match = left
+        .as_deref()
+        .map(|c| line_matches(&ctx, c))
+        .unwrap_or(false)
+        || right
+            .as_deref()
+            .map(|c| line_matches(&ctx, c))
+            .unwrap_or(false);
     drop(ctx);
 
     let inline_right = if char_mode && kind == HunkKind::Replace {
-        match (&left, &right) { (Some(l), Some(r)) => Some(refine_pair(l, r).right_spans), _ => None }
-    } else { None };
-
-    let gutter_class = match kind { HunkKind::Insert | HunkKind::Replace => "pane-gutter ins", _ => "pane-gutter" };
-    let mark         = match kind { HunkKind::Insert | HunkKind::Replace => "+", _ => " " };
-    let sr_label: Option<String> = match kind {
-        HunkKind::Insert  => Some(t(lang, "Inserted")),
-        HunkKind::Replace => Some(t(lang, "Changed")),
-        _                 => None,
+        match (&left, &right) {
+            (Some(l), Some(r)) => Some(refine_pair(l, r).right_spans),
+            _ => None,
+        }
+    } else {
+        None
     };
-    let row_class = if is_match { "diff-row match" } else { "diff-row" };
+
+    let gutter_class = match kind {
+        HunkKind::Insert | HunkKind::Replace => "pane-gutter ins",
+        _ => "pane-gutter",
+    };
+    let mark = match kind {
+        HunkKind::Insert | HunkKind::Replace => "+",
+        _ => " ",
+    };
+    let sr_label: Option<String> = match kind {
+        HunkKind::Insert => Some(t(lang, "Inserted")),
+        HunkKind::Replace => Some(t(lang, "Changed")),
+        _ => None,
+    };
+    let row_class = if is_match {
+        "diff-row match"
+    } else {
+        "diff-row"
+    };
 
     rsx! {
         div { class: "{row_class}", role: "row",
@@ -208,8 +287,12 @@ fn RowRight(
 /// Act cell — uses use_context for Store to avoid E0369 (Store is not PartialEq).
 #[component]
 fn ActCell(
-    i: usize, index: usize, hunk_id: u64,
-    applied: bool, can_save: bool, pending: bool,
+    i: usize,
+    index: usize,
+    hunk_id: u64,
+    applied: bool,
+    can_save: bool,
+    pending: bool,
     lang: Lang,
 ) -> Element {
     let mut store = use_context::<Store>();
@@ -238,5 +321,9 @@ fn ActCell(
 }
 
 fn icls(k: InlineKind) -> &'static str {
-    match k { InlineKind::Equal => "", InlineKind::Delete => "in-del", InlineKind::Insert => "in-ins" }
+    match k {
+        InlineKind::Equal => "",
+        InlineKind::Delete => "in-del",
+        InlineKind::Insert => "in-ins",
+    }
 }

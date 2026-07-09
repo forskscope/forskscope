@@ -12,8 +12,7 @@ use std::time::Duration;
 use crate::document::{ExternalFileState, FileFingerprint, check_external_state};
 
 fn tmp(tag: &str) -> PathBuf {
-    let d = std::env::temp_dir()
-        .join(format!("fsk-extstate-{tag}-{}", std::process::id()));
+    let d = std::env::temp_dir().join(format!("fsk-extstate-{tag}-{}", std::process::id()));
     fs::create_dir_all(&d).unwrap();
     d
 }
@@ -77,7 +76,10 @@ fn file_with_different_mtime_same_size_is_changed_on_disk() {
     // On filesystems with coarse mtime (1s), this may read as Clean.
     // Accept both: the important thing is it never returns DirtyInSession.
     assert!(
-        matches!(state, ExternalFileState::ChangedOnDisk | ExternalFileState::Clean),
+        matches!(
+            state,
+            ExternalFileState::ChangedOnDisk | ExternalFileState::Clean
+        ),
         "should not report DirtyInSession for externally modified file: {state:?}"
     );
     let _ = fs::remove_dir_all(&dir);
@@ -116,7 +118,7 @@ fn path_now_pointing_to_directory_is_replaced_on_disk() {
     fs::write(&path, "content").unwrap();
     let fp = FileFingerprint::capture(&path, None).unwrap();
     fs::remove_file(&path).unwrap();
-    fs::create_dir(&path).unwrap();   // same name, now a directory
+    fs::create_dir(&path).unwrap(); // same name, now a directory
     assert_eq!(
         check_external_state(&path, &fp, false),
         ExternalFileState::ReplacedOnDisk
@@ -168,8 +170,19 @@ fn file_not_accessible_for_missing_or_unknown() {
 #[test]
 fn nonexistent_snapshot_path_returns_deleted_not_panic() {
     // A path that never existed.
-    let fp = FileFingerprint { len: 0, modified_unix_nanos: None, digest: None };
-    let state = check_external_state("/tmp/fsk-definitely-does-not-exist-xyz-789".as_ref(), &fp, false);
-    assert_eq!(state, ExternalFileState::DeletedOnDisk,
-        "nonexistent path must be DeletedOnDisk, never Unknown or panic");
+    let fp = FileFingerprint {
+        len: 0,
+        modified_unix_nanos: None,
+        digest: None,
+    };
+    let state = check_external_state(
+        "/tmp/fsk-definitely-does-not-exist-xyz-789".as_ref(),
+        &fp,
+        false,
+    );
+    assert_eq!(
+        state,
+        ExternalFileState::DeletedOnDisk,
+        "nonexistent path must be DeletedOnDisk, never Unknown or panic"
+    );
 }

@@ -29,9 +29,12 @@ fn arch_is_non_empty() {
 fn to_report_contains_version_and_os() {
     let info = PlatformInfo::collect();
     let report = info.to_report();
-    assert!(report.contains("ForskScope"), "report must include app name");
-    assert!(report.contains("OS:"),        "report must include OS label");
-    assert!(report.contains("Arch:"),      "report must include arch label");
+    assert!(
+        report.contains("ForskScope"),
+        "report must include app name"
+    );
+    assert!(report.contains("OS:"), "report must include OS label");
+    assert!(report.contains("Arch:"), "report must include arch label");
 }
 
 #[test]
@@ -39,8 +42,11 @@ fn home_redacted_does_not_contain_username() {
     let info = PlatformInfo::collect();
     // The redacted home should end with *** or be "unknown"
     if info.home_redacted != "unknown" {
-        assert!(info.home_redacted.ends_with("***"),
-            "home field must be redacted: {:?}", info.home_redacted);
+        assert!(
+            info.home_redacted.ends_with("***"),
+            "home field must be redacted: {:?}",
+            info.home_redacted
+        );
     }
 }
 
@@ -56,7 +62,9 @@ fn to_report_is_stable_across_calls() {
 fn logical_cpus_is_positive_number_or_unknown() {
     let info = PlatformInfo::collect();
     if info.logical_cpus != "unknown" {
-        let n: usize = info.logical_cpus.parse()
+        let n: usize = info
+            .logical_cpus
+            .parse()
             .expect("logical_cpus must be a number or 'unknown'");
         assert!(n >= 1, "must have at least 1 logical CPU");
     }

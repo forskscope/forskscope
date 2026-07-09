@@ -22,8 +22,14 @@ pub fn inline_diff_rows(hunk: &mut DiffHunk, max_chars: usize) -> bool {
         .rows
         .iter()
         .map(|r| {
-            r.left.as_ref().map(|l| l.content.chars().count()).unwrap_or(0)
-                + r.right.as_ref().map(|l| l.content.chars().count()).unwrap_or(0)
+            r.left
+                .as_ref()
+                .map(|l| l.content.chars().count())
+                .unwrap_or(0)
+                + r.right
+                    .as_ref()
+                    .map(|l| l.content.chars().count())
+                    .unwrap_or(0)
         })
         .sum();
     if total > max_chars {

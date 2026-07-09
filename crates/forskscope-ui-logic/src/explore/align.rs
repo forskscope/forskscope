@@ -13,12 +13,12 @@ pub type FlatRow = (PathBuf, bool, bool, bool, u32);
 /// Per-row data extracted from a `FlatRow` and enriched with the relative path.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RowData {
-    pub abs_path:    PathBuf,
-    pub rel_path:    PathBuf,
-    pub is_dir:      bool,
+    pub abs_path: PathBuf,
+    pub rel_path: PathBuf,
+    pub is_dir: bool,
     pub is_expanded: bool,
     pub is_selected: bool,
-    pub depth:       u32,
+    pub depth: u32,
 }
 
 /// A paired left/right row. `None` on one side means the entry exists only
@@ -35,28 +35,28 @@ pub type AlignedRow = (Option<RowData>, Option<RowData>);
 /// Ordering: directories first, then files, each group alphabetical.
 /// Subdirectories are recursed into when *either* side has them expanded.
 pub fn compute_aligned_rows(
-    left_rows:  &[FlatRow],
+    left_rows: &[FlatRow],
     right_rows: &[FlatRow],
-    left_root:  &Path,
+    left_root: &Path,
     right_root: &Path,
 ) -> Vec<AlignedRow> {
     let mut l_by_parent: HashMap<PathBuf, Vec<RowData>> = HashMap::new();
     let mut r_by_parent: HashMap<PathBuf, Vec<RowData>> = HashMap::new();
 
     for (rows, by_parent, root) in [
-        (left_rows,  &mut l_by_parent, left_root),
+        (left_rows, &mut l_by_parent, left_root),
         (right_rows, &mut r_by_parent, right_root),
     ] {
         for (abs, is_dir, expanded, selected, depth) in rows.iter() {
             if let Ok(rel) = abs.strip_prefix(root) {
                 let parent = rel.parent().unwrap_or(Path::new("")).to_path_buf();
                 by_parent.entry(parent).or_default().push(RowData {
-                    abs_path:    abs.clone(),
-                    rel_path:    rel.to_path_buf(),
-                    is_dir:      *is_dir,
+                    abs_path: abs.clone(),
+                    rel_path: rel.to_path_buf(),
+                    is_dir: *is_dir,
                     is_expanded: *expanded,
                     is_selected: *selected,
-                    depth:       *depth,
+                    depth: *depth,
                 });
             }
         }
@@ -68,7 +68,7 @@ pub fn compute_aligned_rows(
 // ── Internal ──────────────────────────────────────────────────────────────────
 
 fn merge_level(
-    parent:      &Path,
+    parent: &Path,
     l_by_parent: &HashMap<PathBuf, Vec<RowData>>,
     r_by_parent: &HashMap<PathBuf, Vec<RowData>>,
 ) -> Vec<AlignedRow> {
@@ -101,8 +101,14 @@ fn merge_level(
         result.push((l.clone(), r.clone()));
 
         // Recurse into any expanded subdirectory on either side.
-        let l_exp = l.as_ref().map(|d| d.is_dir && d.is_expanded).unwrap_or(false);
-        let r_exp = r.as_ref().map(|d| d.is_dir && d.is_expanded).unwrap_or(false);
+        let l_exp = l
+            .as_ref()
+            .map(|d| d.is_dir && d.is_expanded)
+            .unwrap_or(false);
+        let r_exp = r
+            .as_ref()
+            .map(|d| d.is_dir && d.is_expanded)
+            .unwrap_or(false);
         if l_exp || r_exp {
             let child_parent = parent.join(name);
             result.extend(merge_level(&child_parent, l_by_parent, r_by_parent));
@@ -122,7 +128,13 @@ mod tests {
         let rows = entries
             .iter()
             .map(|(rel, is_dir, expanded)| {
-                (root.join(rel), *is_dir, *expanded, false, rel.matches('/').count() as u32)
+                (
+                    root.join(rel),
+                    *is_dir,
+                    *expanded,
+                    false,
+                    rel.matches('/').count() as u32,
+                )
             })
             .collect();
         (rows, root)
@@ -132,7 +144,8 @@ mod tests {
         rows.iter()
             .map(|(l, r)| {
                 let name = |d: &Option<RowData>| {
-                    d.as_ref().and_then(|d| d.abs_path.file_name())
+                    d.as_ref()
+                        .and_then(|d| d.abs_path.file_name())
                         .map(|n| n.to_string_lossy().into_owned())
                 };
                 (name(l), name(r))
@@ -175,33 +188,37 @@ mod tests {
 
     #[test]
     fn directories_sort_before_files() {
-        let (lr, lroot) = flat("/l", &[
-            ("aaa.txt", false, false),
-            ("src",     true,  false),
-        ]);
-        let (rr, rroot) = flat("/r", &[
-            ("aaa.txt", false, false),
-            ("src",     true,  false),
-        ]);
+        let (lr, lroot) = flat("/l", &[("aaa.txt", false, false), ("src", true, false)]);
+        let (rr, rroot) = flat("/r", &[("aaa.txt", false, false), ("src", true, false)]);
         let rows = compute_aligned_rows(&lr, &rr, &lroot, &rroot);
         assert_eq!(rows.len(), 2);
         let ns = names(&rows);
-        assert_eq!(ns[0].0.as_deref(), Some("src"),    "dir should come first");
-        assert_eq!(ns[1].0.as_deref(), Some("aaa.txt"), "file should come second");
+        assert_eq!(ns[0].0.as_deref(), Some("src"), "dir should come first");
+        assert_eq!(
+            ns[1].0.as_deref(),
+            Some("aaa.txt"),
+            "file should come second"
+        );
     }
 
     #[test]
     fn entries_within_same_type_are_alphabetical() {
-        let (lr, lroot) = flat("/l", &[
-            ("zebra.txt", false, false),
-            ("alpha.txt", false, false),
-            ("mango.txt", false, false),
-        ]);
-        let (rr, rroot) = flat("/r", &[
-            ("zebra.txt", false, false),
-            ("alpha.txt", false, false),
-            ("mango.txt", false, false),
-        ]);
+        let (lr, lroot) = flat(
+            "/l",
+            &[
+                ("zebra.txt", false, false),
+                ("alpha.txt", false, false),
+                ("mango.txt", false, false),
+            ],
+        );
+        let (rr, rroot) = flat(
+            "/r",
+            &[
+                ("zebra.txt", false, false),
+                ("alpha.txt", false, false),
+                ("mango.txt", false, false),
+            ],
+        );
         let rows = compute_aligned_rows(&lr, &rr, &lroot, &rroot);
         let ns = names(&rows);
         let left_names: Vec<_> = ns.iter().map(|(l, _)| l.clone().unwrap()).collect();
@@ -210,14 +227,8 @@ mod tests {
 
     #[test]
     fn expanded_directory_recurses_into_children() {
-        let (lr, lroot) = flat("/l", &[
-            ("src",         true,  true),
-            ("src/main.rs", false, false),
-        ]);
-        let (rr, rroot) = flat("/r", &[
-            ("src",         true,  false),
-            ("src/lib.rs",  false, false),
-        ]);
+        let (lr, lroot) = flat("/l", &[("src", true, true), ("src/main.rs", false, false)]);
+        let (rr, rroot) = flat("/r", &[("src", true, false), ("src/lib.rs", false, false)]);
         let rows = compute_aligned_rows(&lr, &rr, &lroot, &rroot);
         // Row 0: src/ (paired on both sides).
         // Rows 1+: children — main.rs (left-only) and lib.rs (right-only).
@@ -225,35 +236,46 @@ mod tests {
         let ns = names(&rows);
         assert_eq!(ns[0], (Some("src".into()), Some("src".into())));
         // Collect child names regardless of position.
-        let child_names: Vec<_> = ns[1..].iter()
+        let child_names: Vec<_> = ns[1..]
+            .iter()
             .map(|(l, r)| l.as_deref().or(r.as_deref()).unwrap().to_string())
             .collect();
-        assert!(child_names.contains(&"lib.rs".to_string()),  "lib.rs missing");
-        assert!(child_names.contains(&"main.rs".to_string()), "main.rs missing");
+        assert!(
+            child_names.contains(&"lib.rs".to_string()),
+            "lib.rs missing"
+        );
+        assert!(
+            child_names.contains(&"main.rs".to_string()),
+            "main.rs missing"
+        );
     }
 
     #[test]
     fn mixed_same_name_and_one_sided_entries() {
-        let (lr, lroot) = flat("/l", &[
-            ("common.rs",    false, false),
-            ("left_only.rs", false, false),
-        ]);
-        let (rr, rroot) = flat("/r", &[
-            ("common.rs",     false, false),
-            ("right_only.rs", false, false),
-        ]);
+        let (lr, lroot) = flat(
+            "/l",
+            &[("common.rs", false, false), ("left_only.rs", false, false)],
+        );
+        let (rr, rroot) = flat(
+            "/r",
+            &[("common.rs", false, false), ("right_only.rs", false, false)],
+        );
         let rows = compute_aligned_rows(&lr, &rr, &lroot, &rroot);
         assert_eq!(rows.len(), 3);
         // Every name accounted for.
         let ns = names(&rows);
-        let all_names: Vec<_> = ns.iter()
+        let all_names: Vec<_> = ns
+            .iter()
             .map(|(l, r)| l.as_deref().or(r.as_deref()).unwrap())
             .collect();
         assert!(all_names.contains(&"common.rs"));
         assert!(all_names.contains(&"left_only.rs"));
         assert!(all_names.contains(&"right_only.rs"));
         // common.rs is paired.
-        let common = ns.iter().find(|(l, _)| l.as_deref() == Some("common.rs")).unwrap();
+        let common = ns
+            .iter()
+            .find(|(l, _)| l.as_deref() == Some("common.rs"))
+            .unwrap();
         assert!(common.0.is_some() && common.1.is_some());
     }
 
@@ -282,31 +304,36 @@ mod tests {
         // flat() always uses is_selected=false, so we build the FlatRow manually.
         let root = PathBuf::from("/root");
         let left: Vec<FlatRow> = vec![
-            (root.join("sel.txt"),   false, false, true,  0), // selected
+            (root.join("sel.txt"), false, false, true, 0), // selected
             (root.join("other.txt"), false, false, false, 0), // not selected
         ];
         let rows = compute_aligned_rows(&left, &[], &root, &root);
-        let selected: Vec<_> = rows.iter()
+        let selected: Vec<_> = rows
+            .iter()
             .filter_map(|(l, _)| l.as_ref())
             .filter(|d| d.is_selected)
             .collect();
-        assert_eq!(selected.len(), 1,
-            "is_selected must propagate: exactly one row should be selected");
+        assert_eq!(
+            selected.len(),
+            1,
+            "is_selected must propagate: exactly one row should be selected"
+        );
         assert_eq!(selected[0].rel_path, PathBuf::from("sel.txt"));
     }
 
     #[test]
     fn is_selected_propagates_to_right_row_data() {
         let root = PathBuf::from("/root");
-        let right: Vec<FlatRow> = vec![
-            (root.join("x.txt"), false, false, true, 0),
-        ];
+        let right: Vec<FlatRow> = vec![(root.join("x.txt"), false, false, true, 0)];
         let rows = compute_aligned_rows(&[], &right, &root, &root);
-        let r_selected = rows.iter()
+        let r_selected = rows
+            .iter()
             .filter_map(|(_, r)| r.as_ref())
             .any(|d| d.is_selected);
-        assert!(r_selected,
-            "is_selected must propagate on right-side-only rows");
+        assert!(
+            r_selected,
+            "is_selected must propagate on right-side-only rows"
+        );
     }
 
     #[test]
@@ -319,12 +346,21 @@ mod tests {
             (root.join("z.txt"), false, false, false, 2), // unusual depth — must pass through
         ];
         let rows = compute_aligned_rows(&left, &[], &root, &root);
-        let depths: Vec<u32> = rows.iter()
+        let depths: Vec<u32> = rows
+            .iter()
             .filter_map(|(l, _)| l.as_ref())
             .map(|d| d.depth)
             .collect();
-        assert!(depths.contains(&0), "depth 0 must be preserved; got {:?}", depths);
-        assert!(depths.contains(&2), "depth 2 must be preserved; got {:?}", depths);
+        assert!(
+            depths.contains(&0),
+            "depth 0 must be preserved; got {:?}",
+            depths
+        );
+        assert!(
+            depths.contains(&2),
+            "depth 2 must be preserved; got {:?}",
+            depths
+        );
     }
 
     #[test]
@@ -342,19 +378,22 @@ mod tests {
     fn is_expanded_propagates_to_row_data() {
         let root = PathBuf::from("/root");
         let left: Vec<FlatRow> = vec![
-            (root.join("dirA"), true,  true,  false, 0), // dir, expanded
-            (root.join("dirB"), true,  false, false, 0), // dir, collapsed
+            (root.join("dirA"), true, true, false, 0),  // dir, expanded
+            (root.join("dirB"), true, false, false, 0), // dir, collapsed
         ];
         let rows = compute_aligned_rows(&left, &[], &root, &root);
         let mut expanded_count = 0usize;
         let mut collapsed_count = 0usize;
         for (l, _) in &rows {
             if let Some(d) = l {
-                if d.is_expanded { expanded_count += 1; }
-                else             { collapsed_count += 1; }
+                if d.is_expanded {
+                    expanded_count += 1;
+                } else {
+                    collapsed_count += 1;
+                }
             }
         }
-        assert_eq!(expanded_count, 1,  "exactly one dir must be expanded");
+        assert_eq!(expanded_count, 1, "exactly one dir must be expanded");
         assert_eq!(collapsed_count, 1, "exactly one dir must be collapsed");
     }
 
@@ -362,14 +401,18 @@ mod tests {
     fn both_sides_selected_propagates_independently() {
         let root = PathBuf::from("/root");
         // Same rel path on both sides, each independently selected.
-        let left: Vec<FlatRow>  = vec![(root.join("f.txt"), false, false, true,  0)];
-        let right: Vec<FlatRow> = vec![(root.join("f.txt"), false, false, true,  0)];
+        let left: Vec<FlatRow> = vec![(root.join("f.txt"), false, false, true, 0)];
+        let right: Vec<FlatRow> = vec![(root.join("f.txt"), false, false, true, 0)];
         let rows = compute_aligned_rows(&left, &right, &root, &root);
         assert_eq!(rows.len(), 1, "same-name file must merge into one row");
         let (l, r) = &rows[0];
-        assert!(l.as_ref().map(|d| d.is_selected).unwrap_or(false),
-            "left side must be selected");
-        assert!(r.as_ref().map(|d| d.is_selected).unwrap_or(false),
-            "right side must be selected");
+        assert!(
+            l.as_ref().map(|d| d.is_selected).unwrap_or(false),
+            "left side must be selected"
+        );
+        assert!(
+            r.as_ref().map(|d| d.is_selected).unwrap_or(false),
+            "right side must be selected"
+        );
     }
 }

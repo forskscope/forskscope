@@ -39,7 +39,9 @@ pub fn patch_from_directories(
             RecStatus::Symlink => {
                 // Symlinks are not text-diffable; emit a notice if requested.
                 if patch_options.include_binary_notices {
-                    files.push(PatchFileChange::BinaryNotice { path: rel.to_path_buf() });
+                    files.push(PatchFileChange::BinaryNotice {
+                        path: rel.to_path_buf(),
+                    });
                 }
             }
             RecStatus::Changed => {

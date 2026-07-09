@@ -35,14 +35,12 @@ pub struct DirectoryListing {
 pub fn list_dir(path: Option<&Path>) -> Result<DirectoryListing> {
     let dir: PathBuf = match path {
         Some(p) => p.to_path_buf(),
-        None => std::env::current_dir()
-            .map_err(|e| CoreError::io("", IoOperation::ListDir, &e))?,
+        None => std::env::current_dir().map_err(|e| CoreError::io("", IoOperation::ListDir, &e))?,
     };
 
     let mut dirs = Vec::new();
     let mut files = Vec::new();
-    let entries =
-        fs::read_dir(&dir).map_err(|e| CoreError::io(&dir, IoOperation::ListDir, &e))?;
+    let entries = fs::read_dir(&dir).map_err(|e| CoreError::io(&dir, IoOperation::ListDir, &e))?;
     for entry in entries {
         let entry = entry.map_err(|e| CoreError::io(&dir, IoOperation::ListDir, &e))?;
         let name = entry.file_name().to_string_lossy().into_owned();
@@ -54,7 +52,10 @@ pub fn list_dir(path: Option<&Path>) -> Result<DirectoryListing> {
             dirs.push(name);
         } else if meta.is_file() {
             let path = entry.path();
-            let is_binary = matches!(crate::file_kind::classify(&path), Ok(crate::file_kind::FileKind::Binary));
+            let is_binary = matches!(
+                crate::file_kind::classify(&path),
+                Ok(crate::file_kind::FileKind::Binary)
+            );
             files.push(FileEntry {
                 name,
                 len: meta.len(),

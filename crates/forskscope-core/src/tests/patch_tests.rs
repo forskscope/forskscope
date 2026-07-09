@@ -51,8 +51,16 @@ fn single_line_change_emits_one_hunk_with_context() {
     assert_eq!((h.new_start, h.new_len), (1, 5));
 
     // Exactly one delete and one insert.
-    let deletes = h.lines.iter().filter(|l| l.origin == LineOrigin::Delete).count();
-    let inserts = h.lines.iter().filter(|l| l.origin == LineOrigin::Insert).count();
+    let deletes = h
+        .lines
+        .iter()
+        .filter(|l| l.origin == LineOrigin::Delete)
+        .count();
+    let inserts = h
+        .lines
+        .iter()
+        .filter(|l| l.origin == LineOrigin::Insert)
+        .count();
     assert_eq!((deletes, inserts), (1, 1));
 }
 
@@ -76,14 +84,26 @@ fn unified_output_has_expected_headers_and_markers() {
     let patch = patch_from_file_diff("src/m.rs", &d, PatchOptions::default()).unwrap();
     let text = to_unified(&patch);
 
-    assert!(text.contains("--- a/src/m.rs"), "missing old header:\n{text}");
-    assert!(text.contains("+++ b/src/m.rs"), "missing new header:\n{text}");
-    assert!(text.contains("@@ -1,3 +1,3 @@"), "missing hunk header:\n{text}");
+    assert!(
+        text.contains("--- a/src/m.rs"),
+        "missing old header:\n{text}"
+    );
+    assert!(
+        text.contains("+++ b/src/m.rs"),
+        "missing new header:\n{text}"
+    );
+    assert!(
+        text.contains("@@ -1,3 +1,3 @@"),
+        "missing hunk header:\n{text}"
+    );
     assert!(text.contains("-beta"), "missing deletion:\n{text}");
     assert!(text.contains("+BETA"), "missing insertion:\n{text}");
     assert!(text.contains(" alpha"), "missing context:\n{text}");
     // Summary header is present.
-    assert!(text.starts_with("# forskscope patch:"), "missing summary:\n{text}");
+    assert!(
+        text.starts_with("# forskscope patch:"),
+        "missing summary:\n{text}"
+    );
 }
 
 #[test]
@@ -186,9 +206,15 @@ fn directory_patch_covers_modify_add_and_delete() {
 
     let text = to_unified(&patch);
     // Added file references /dev/null on the old side.
-    assert!(text.contains("--- /dev/null"), "add should use /dev/null:\n{text}");
+    assert!(
+        text.contains("--- /dev/null"),
+        "add should use /dev/null:\n{text}"
+    );
     // Deleted file references /dev/null on the new side.
-    assert!(text.contains("+++ /dev/null"), "delete should use /dev/null:\n{text}");
+    assert!(
+        text.contains("+++ /dev/null"),
+        "delete should use /dev/null:\n{text}"
+    );
 
     let _ = fs::remove_dir_all(&base);
 }
@@ -209,8 +235,7 @@ fn creation_deletion_can_be_disabled() {
         include_creation_deletion: false,
         ..PatchOptions::default()
     };
-    let patch =
-        patch_from_directories(&left, &right, DiffOptions::default(), options).unwrap();
+    let patch = patch_from_directories(&left, &right, DiffOptions::default(), options).unwrap();
     assert!(patch.is_empty(), "one-sided files should be skipped");
 
     let _ = fs::remove_dir_all(&base);

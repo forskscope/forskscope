@@ -3,15 +3,15 @@
 
 use dioxus::prelude::*;
 
+use super::{CompareAction, PickKind, compare_action};
 use crate::i18n::t;
 use crate::state::{Lang, Store, open_compare, open_dir_compare};
-use super::{CompareAction, PickKind, compare_action};
 use crate::ui::view::dir_pane::short_name;
 
 #[component]
 pub fn ExplorerFooter(
-    lang:       Lang,
-    left_pick:  Signal<Option<PickKind>>,
+    lang: Lang,
+    left_pick: Signal<Option<PickKind>>,
     right_pick: Signal<Option<PickKind>>,
 ) -> Element {
     let mut store = use_context::<Store>();
@@ -21,8 +21,8 @@ pub fn ExplorerFooter(
     let can_compare = action != CompareAction::None;
     let compare_tooltip = match &action {
         CompareAction::Files(..) => t(lang, "Compare selected files"),
-        CompareAction::Dirs(..)  => t(lang, "Compare selected directories"),
-        CompareAction::None      => t(lang, "Select a file or directory on each side to compare"),
+        CompareAction::Dirs(..) => t(lang, "Compare selected directories"),
+        CompareAction::None => t(lang, "Select a file or directory on each side to compare"),
     };
 
     rsx! {

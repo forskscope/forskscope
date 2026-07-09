@@ -27,10 +27,10 @@ pub enum NoticeKind {
 impl NoticeKind {
     fn css_class(self) -> &'static str {
         match self {
-            Self::Info    => "notice",
-            Self::Ok      => "notice notice-ok",
+            Self::Info => "notice",
+            Self::Ok => "notice notice-ok",
             Self::Warning => "notice notice-warn",
-            Self::Error   => "notice notice-err",
+            Self::Error => "notice notice-err",
         }
     }
 
@@ -54,6 +54,6 @@ pub fn Notice(kind: NoticeKind, children: Element) -> Element {
     let class = kind.css_class();
     match kind.role() {
         Some(role) => rsx! { p { class, role, {children} } },
-        None       => rsx! { p { class, {children} } },
+        None => rsx! { p { class, {children} } },
     }
 }
