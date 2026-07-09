@@ -17,6 +17,13 @@ cargo build --release -p forskscope-ui
 ./target/release/forskscope --diagnostics
 ```
 
+On Niri/Wayland, use the compositor-native message API for visual evidence:
+
+```sh
+niri msg -j windows
+niri msg action screenshot-window --id <WINDOW_ID> --path "$PWD/.git-exclude/runtime-smoke/linux-wayland-cli-open.png"
+```
+
 All 930 headless tests must pass before running UI smoke tests:
 
 ```sh
@@ -31,8 +38,8 @@ cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
 ### 1a. Open via CLI
 
 ```sh
-./target/release/forskscope tests/fixtures/text/left_function.rs \
-                             tests/fixtures/text/right_function.rs
+./target/release/forskscope tests/fixtures/text/left_function.txt \
+                             tests/fixtures/text/right_function.txt
 ```
 
 Expected: diff tab opens, left and right panes render, changed lines
