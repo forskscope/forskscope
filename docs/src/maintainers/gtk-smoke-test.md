@@ -17,7 +17,7 @@ cargo build --release -p forskscope-ui
 ./target/release/forskscope --diagnostics
 ```
 
-All 936 non-GTK tests must pass before running UI smoke tests:
+All 930 headless tests must pass before running UI smoke tests:
 
 ```sh
 cargo test -p forskscope-core -p forskscope-ui-logic

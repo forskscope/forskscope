@@ -1,6 +1,6 @@
 # Threat Model and Security Notes
 
-This document records the security posture of ForskScope at v0.152.0, the
+This document records the security posture of ForskScope at v0.164.0, the
 data flows that carry risk, the controls in place, and the known residual
 concerns. It is a living document; update it when a new data flow is added.
 
@@ -26,7 +26,7 @@ no persisted user secrets, and no user-account data.
 
 ---
 
-## Data flows and controls (v0.152.0)
+## Data flows and controls (v0.164.0)
 
 ### 1. File load and diff (`open_compare`, `reload_tab`)
 
@@ -48,6 +48,10 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
   hex diffs.
 - Text vs. binary cross-comparison (one side text, other binary) is blocked with
   a clear error message.
+- `.xlsx` files are recognized as spreadsheet inputs, but spreadsheet
+  comparison currently fails closed before parsing workbook XML. The runtime
+  parser dependency path was removed until `sheets-diff` can move away from the
+  vulnerable `calamine -> quick-xml` chain.
 - No user-supplied path is ever executed as a shell command or passed through
   `sh -c`. Paths are opened with `std::fs::File::open`, not via a shell.
 
@@ -232,3 +236,6 @@ exception or split the dependency before release.
 | v0.151.0 | Compact view mode | Tree rendering path only; no new data flows |
 | v0.152.0 | Targets label; font family | UI only; no new data flows |
 | v0.152.0 (this audit) | **Fix:** `binary_cache` cleared on dir change; filter loop uses cache | Eliminates stale binary detection and redundant file I/O per render frame |
+| v0.164.0 | XLSX parser path removed; `.xlsx` comparison fails closed | Removes runtime user-supplied workbook XML exposure to vulnerable `quick-xml` path |
+| v0.164.0 | Dioxus desktop dependency policy reviewed | Accepts loopback WebSocket IPC only; `cargo xtask audit-deps` enforces no devtools and reviewed network-capable paths |
+| v0.164.0 | Release archive and CI gates aligned | Archive layout, version sync, i18n coverage, audit policy, and dependency paths are enforced before release artifact creation |

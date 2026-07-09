@@ -9,11 +9,15 @@ cargo test -p forskscope-core
 # View-model layer (no GTK required)
 cargo test -p forskscope-ui-logic
 
-# Both (the CI-equivalent command)
+# Headless test gate
 cargo test -p forskscope-core -p forskscope-ui-logic
 
 # Clippy (must pass without warnings)
 cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
+
+# Full workspace gates used by CI when GTK/WebKitGTK dependencies are present
+cargo test --workspace
+cargo clippy --workspace -- -D warnings
 
 # Format and generated CSS gates
 cargo fmt --check
@@ -34,19 +38,21 @@ The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
 be tested in environments without a display server. Core and ui-logic tests
 run anywhere Rust is installed.
 
-## Test counts (v0.135.0)
+## Test counts (v0.164.0)
+
+Observed with `cargo test -p forskscope-core -p forskscope-ui-logic`.
 
 | Suite | Count |
 |-------|-------|
-| `forskscope-core` unit | 650 |
+| `forskscope-core` unit | 643 |
 | `forskscope-core` integration (`diff_corpus`) | 27 |
 | `forskscope-core` integration (`merge_corpus`) | 16 |
 | `forskscope-core` integration (`patch_apply`) | 2 |
 | `forskscope-ui-logic` unit | 228 |
-| `forskscope-ui-logic` integration (`css_coverage`) | 5 |
-| Doctests | 7 |
-| `forskscope-ui-logic` integration | 1 |
-| **Total** | **936** |
+| `forskscope-ui-logic` integration (`css_coverage`) | 6 |
+| `forskscope-core` doctests | 7 |
+| `forskscope-ui-logic` doctests | 1 |
+| **Total** | **930** |
 
 ## `forskscope-core` test modules
 

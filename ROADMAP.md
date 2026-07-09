@@ -1,27 +1,42 @@
 # ForskScope Roadmap
 
-**Last updated:** v0.140.0 (2026-06-13)
-**Current phase:** Pre-GTK verification — code and docs complete, awaiting GTK smoke tests (RFC-041)
+**Last updated:** v0.164.0 (2026-07-09)
+**Current phase:** Release-readiness verification — security, dependency, archive, CI, and docs gates aligned; runtime/platform verification remains.
 
 ---
 
 ## Current state
 
-The `forskscope-core` and `forskscope-ui-logic` crates are feature-complete
-for the v1 diff/merge workflow. 39 of 48 RFCs are implemented. **936 tests**
-pass with zero failures (650 core + 286 integration/ui-logic).
+The `forskscope-core` and `forskscope-ui-logic` crates are feature-complete for
+the v1 two-way diff/merge workflow. The current observed headless gate passes
+**930 tests** with zero failures: 643 core unit tests, 45 core integration
+tests, 228 ui-logic unit tests, 6 CSS integration tests, and 8 doctests.
 
-The UI crate (`forskscope-ui`) is feature-complete and thoroughly polished:
+The UI crate (`forskscope-ui`) has the v1 two-way workflow implemented:
 two-pane diff with independent pane labels and shared horizontal scroll;
-full i18n (English + Japanese, 158 active translation keys, zero gaps);
-all modal dialogs, screen-reader labels, and keyboard reference translated;
-per-file and batch copy in the directory report view; F3/Shift+F3 search
-navigation; CSS reduced to 504 lines with no dead rules. User documentation
-covers all workflows and is current with the implemented UI.
+English/Japanese translation-key coverage enforced by `cargo xtask i18n`
+(202 `t(...)` keys); per-file and batch copy in the directory report view;
+F3/Shift+F3 search navigation; compare profiles; session restore; patch export;
+and release-gate CSS freshness checks.
 
-The remaining work before v1.0 is GTK smoke-test verification (RFC-041
-§release readiness checklist, 3 items requiring a display server) and
-packaging (RFC-010). Core, UI code, tests, and documentation are complete.
+Release-readiness hardening completed after v0.140.0:
+
+- XLSX parsing was security-disabled: `.xlsx` files are recognized but
+  comparison fails closed until the `sheets-diff -> calamine -> quick-xml`
+  dependency path is remediated.
+- Dioxus desktop network-capable transitive dependencies were reviewed. Default
+  Dioxus features/devtools are disabled, and the accepted loopback WebSocket IPC
+  path is enforced by `cargo xtask audit-deps`.
+- Source archives now have a no-parent-directory contract, verified locally and
+  in the release workflow by `cargo xtask archive-layout`.
+- CI and release preflight now run the documented gates: format, CSS, audit,
+  dependency-path audit, version sync, i18n coverage, tests, and clippy. Release
+  tags are checked against the workspace version before artifacts are created.
+
+The remaining release work is runtime/platform verification: GTK smoke tests,
+WebKitGTK visual checks, and packaging verification on Linux, macOS, and
+Windows. Three-way merge conflict workspace UI, command palette, and editor
+adapter work remain post-v1.
 
 ---
 
@@ -52,10 +67,11 @@ packaging (RFC-010). Core, UI code, tests, and documentation are complete.
 | CONTRIBUTING + limits | v0.97–v0.98 | ROADMAP/release/features updated; CONTRIBUTING.md; known-limitations.md |
 | RFC-041 + v0.100 | v0.99–v0.100 | RFC-041 checklist updated; PlatformInfo wired to About; patch export UI |
 | UI polish + i18n | v0.111–v0.139 | Full i18n (158 keys, 0 gaps); CSS cleanup (583→504 lines); keyboard shortcuts; per-file copy; bug fixes |
+| Release readiness hardening | v0.164 | XLSX parser path disabled, dependency/network policy enforced, source archive contract fixed, CI/release gates aligned |
 
 ---
 
-## UI implementation slices — status at v0.140.0
+## UI implementation slices — status at v0.164.0
 
 The remaining work is a series of UI slices that wire the Dioxus components
 to the core types. Each slice delivers a testable, usable increment.
