@@ -18,8 +18,8 @@ mod ui;
 
 use std::path::PathBuf;
 
-use dioxus::desktop::tao::dpi::LogicalSize;
-use dioxus::desktop::{Config, WindowBuilder};
+use dioxus_desktop::tao::dpi::LogicalSize;
+use dioxus_desktop::{Config, WindowBuilder};
 
 use app::{App, STARTUP_MERGED, STARTUP_PAIR};
 
@@ -53,7 +53,9 @@ fn main() {
         .with_title("ForskScope")
         .with_inner_size(LogicalSize::new(1180.0, 760.0));
 
-    dioxus::LaunchBuilder::desktop()
-        .with_cfg(Config::new().with_window(window))
-        .launch(App);
+    dioxus_desktop::launch::launch(
+        App,
+        Vec::new(),
+        vec![Box::new(Config::new().with_window(window))],
+    );
 }

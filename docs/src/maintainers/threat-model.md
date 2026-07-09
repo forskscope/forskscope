@@ -6,19 +6,23 @@ concerns. It is a living document; update it when a new data flow is added.
 
 ---
 
-## Fundamental position: local-only, no network
+## Fundamental position: local-only, no external network service
 
-ForskScope has no network code. It does not phone home, load remote resources,
-or accept inbound connections. The threat surface is therefore limited to:
+ForskScope has no application-authored external network workflow. It does not
+phone home, load remote resources, upload files, or provide a remote API.
+Dioxus desktop uses a loopback WebSocket transport between the embedded WebView
+and the native host process; that framework transport is accepted and constrained
+below. The threat surface is therefore limited to:
 
 1. **Local file I/O** — reading files the user points it at.
 2. **Child process execution** — external tools launched by the user.
 3. **Settings persistence** — a single JSON file in the platform config dir.
 4. **Batch-copy manifest** — a JSON file in the platform data dir.
 5. **Background task safety** — async load+diff tasks writing back to UI state.
+6. **Local WebView transport** — Dioxus desktop loopback WebSocket IPC.
 
-There is no authentication surface, no session tokens, no cookies, no
-cryptographic material to protect, and no user-account data.
+There is no product/user authentication surface, no session tokens, no cookies,
+no persisted user secrets, and no user-account data.
 
 ---
 
@@ -139,11 +143,12 @@ external tool, which is outside ForskScope's control.
 
 ## What ForskScope deliberately does not do
 
-The following properties are guaranteed by the absence of code, not by
-defensive programming:
+The following properties are guaranteed by the absence of application code, not
+by defensive programming:
 
-- **No network requests** — no `reqwest`, `hyper`, `ureq`, or any async HTTP
-  crate in the dependency tree. Verified by `cargo tree`.
+- **No external network requests** — no `reqwest`, `hyper`, `ureq`, or app
+  feature opens remote HTTP endpoints. Dioxus desktop's loopback WebSocket
+  transport is the reviewed exception.
 - **No telemetry or analytics** — no beacon calls, no usage counters written
   to any remote endpoint.
 - **No code execution from diff content** — diffs are rendered as text with
@@ -169,8 +174,32 @@ Key crates touching file I/O or process execution:
 | `app_json_settings` | 2.0.3 | Settings persistence | Local JSON file only |
 | `dirs_next` | * | Platform dirs | Read-only path resolution |
 | `rfd` | 0.17 | File picker dialog | OS dialog; no custom code |
-| `dioxus` | 0.7.9 | UI framework | Desktop WebKit; no remote URLs loaded |
+| `dioxus` | 0.7.9 | UI framework | Default features disabled; no devtools |
+| `dioxus-desktop` | 0.7.9 | Desktop WebView host | Uses authenticated loopback WebSocket IPC between WebView and host |
+| `tungstenite` / `native-tls` | 0.28 / 0.2 | Dioxus desktop transport dependency | Accepted only via `dioxus-desktop`; no app-authored remote connections |
 | `quick-xml` | 0.39.x | Wayland protocol code generation through GTK/Dioxus stack | Build-time/proc-macro path; not reachable from user-supplied files |
+
+### Accepted local WebView transport
+
+Dioxus desktop depends on `tungstenite` and `native-tls` because its WebView
+runtime uses a loopback WebSocket channel for edit and event transport between
+the embedded WebView and the native host process. This is not an application
+feature for network file access, telemetry, remote API calls, or user-visible
+sync.
+
+ForskScope disables Dioxus default features and depends on `dioxus-desktop`
+directly without its default `devtools` feature. The reviewed residual path is:
+
+```text
+native-tls -> tungstenite -> dioxus-desktop -> forskscope-ui
+```
+
+The release gate `cargo xtask audit-deps` asserts that `dioxus-devtools` is not
+active, that `tungstenite`/`native-tls` remain limited to the reviewed
+`dioxus-desktop` path, and that common external HTTP client/server crates
+(`reqwest`, `hyper`, `ureq`) are absent. If a future dependency introduces
+another network-capable path, update this threat model under S-001 before
+release.
 
 ### Known third-party risk: XLSX parser dependency path disabled
 

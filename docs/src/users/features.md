@@ -126,5 +126,5 @@ See [Git integration](../intermediate/git-integration.md) for full setup.
 
 ## Privacy
 
-No accounts, no telemetry, no cloud upload, no network access. Everything stays
-on your machine.
+No accounts, no telemetry, no cloud upload, and no external network service.
+Everything stays on your machine.

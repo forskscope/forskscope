@@ -109,7 +109,10 @@ fn run_css(check: bool) {
 fn run_audit_deps() {
     assert_package_absent("sheets-diff");
     assert_package_absent("calamine");
+    assert_package_inactive("dioxus-devtools");
+    assert_external_network_crates_absent();
     assert_quick_xml_path_is_reviewed();
+    assert_network_paths_are_reviewed();
     println!("security dependency path check passed.");
 }
 
@@ -129,6 +132,32 @@ fn assert_package_absent(package: &str) {
     }
 
     println!("{package} is absent.");
+}
+
+fn assert_package_inactive(package: &str) {
+    let output = cargo_tree(&["tree", "-i", package]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    if !output.status.success() {
+        if stderr.contains("did not match any packages") {
+            println!("{package} is absent.");
+            return;
+        }
+
+        eprintln!("could not inspect {package}");
+        eprintln!("{stderr}");
+        process::exit(1);
+    }
+
+    if stdout.trim().is_empty() && stderr.contains("nothing to print") {
+        println!("{package} is inactive.");
+        return;
+    }
+
+    eprintln!("{package} is active in the dependency graph:");
+    eprintln!("{stdout}");
+    process::exit(1);
 }
 
 fn assert_quick_xml_path_is_reviewed() {
@@ -163,6 +192,46 @@ fn assert_quick_xml_path_is_reviewed() {
     }
 
     println!("quick-xml path is limited to wayland-scanner.");
+}
+
+fn assert_external_network_crates_absent() {
+    for package in ["reqwest", "hyper", "ureq"] {
+        assert_package_absent(package);
+    }
+}
+
+fn assert_network_paths_are_reviewed() {
+    assert_immediate_dependents("tungstenite", &["dioxus-desktop "]);
+    assert_immediate_dependents("native-tls", &["tungstenite "]);
+    println!("network-capable dependency paths are reviewed.");
+}
+
+fn assert_immediate_dependents(package: &str, accepted_prefixes: &[&str]) {
+    let output = cargo_tree(&["tree", "--prefix", "depth", "-i", package]);
+    if !output.status.success() {
+        eprintln!("could not inspect {package} dependency path");
+        eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+        process::exit(1);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let immediate_dependents: Vec<&str> = stdout
+        .lines()
+        .filter_map(depth_prefixed_package)
+        .filter_map(|(depth, package)| (depth == 1).then_some(package))
+        .collect();
+
+    if immediate_dependents.is_empty()
+        || immediate_dependents.iter().any(|package| {
+            !accepted_prefixes
+                .iter()
+                .any(|accepted| package.starts_with(accepted))
+        })
+    {
+        eprintln!("{package} has an unreviewed immediate dependency path:");
+        eprintln!("{stdout}");
+        process::exit(1);
+    }
 }
 
 fn depth_prefixed_package(line: &str) -> Option<(usize, &str)> {

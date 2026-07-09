@@ -24,6 +24,7 @@ forskscope-ui-logic         = { workspace = true }
 
 dioxus                      = { workspace = true }
 dioxus-core                 = { workspace = true }
+dioxus-desktop              = { workspace = true }
 dioxus-swdir-tree           = { workspace = true }
 
 app-json-settings           = { workspace = true }
