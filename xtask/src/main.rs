@@ -4,14 +4,18 @@
 //!   cargo xtask css           — regenerate assets/main.css from assets/css/*.css
 //!   cargo xtask css --check   — verify main.css is current (exits non-zero if stale)
 //!   cargo xtask audit-deps    — verify reviewed security dependency paths
+//!   cargo xtask i18n          — verify Japanese translations cover UI keys
+//!   cargo xtask version-sync [expected] — verify release/package version metadata is in sync
+//!   cargo xtask archive-layout [archive] — verify source archive layout
 //!
 //! CSS source files under assets/css/ are assembled in alphabetical order.
 //! The numeric prefix on each filename (00-, 01-, …) encodes the cascade order.
 //! To add a file: create it with the appropriate prefix; run `cargo xtask css`.
 
 use std::{
+    collections::BTreeSet,
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{self, Command, Output},
 };
 
@@ -23,6 +27,12 @@ fn main() {
             run_css(check);
         }
         Some("audit-deps") if args.len() == 1 => run_audit_deps(),
+        Some("i18n") if args.len() == 1 => run_i18n_audit(),
+        Some("version-sync") if args.len() <= 2 => run_version_sync(args.get(1).map(String::as_str)),
+        Some("archive-layout") if args.len() <= 2 => {
+            let archive = args.get(1).map(PathBuf::from);
+            run_archive_layout_check(archive.as_deref());
+        }
         Some(cmd) => {
             eprintln!("unknown command: {cmd}");
             print_usage();
@@ -38,6 +48,9 @@ fn main() {
 fn print_usage() {
     eprintln!("usage: cargo xtask css [--check]");
     eprintln!("       cargo xtask audit-deps");
+    eprintln!("       cargo xtask i18n");
+    eprintln!("       cargo xtask version-sync [expected]");
+    eprintln!("       cargo xtask archive-layout [archive]");
 }
 
 fn workspace_root() -> PathBuf {
@@ -114,6 +127,281 @@ fn run_audit_deps() {
     assert_quick_xml_path_is_reviewed();
     assert_network_paths_are_reviewed();
     println!("security dependency path check passed.");
+}
+
+fn run_i18n_audit() {
+    let root = workspace_root();
+    let i18n_file = root.join("crates/forskscope-ui/src/i18n.rs");
+    let i18n = fs::read_to_string(&i18n_file)
+        .unwrap_or_else(|e| panic!("cannot read {}: {e}", i18n_file.display()));
+    let translated = extract_ja_translation_keys(&i18n);
+
+    let ui_src = root.join("crates/forskscope-ui/src");
+    let mut used = BTreeSet::new();
+    collect_i18n_usage_keys(&ui_src, &mut used);
+
+    let missing: Vec<&String> = used
+        .iter()
+        .filter(|key| !translated.contains(*key))
+        .collect();
+    if !missing.is_empty() {
+        eprintln!("missing Japanese translations for UI keys:");
+        for key in missing {
+            eprintln!("  - {key}");
+        }
+        process::exit(1);
+    }
+
+    println!(
+        "i18n audit passed: {} UI keys are covered by Japanese translations.",
+        used.len()
+    );
+}
+
+fn extract_ja_translation_keys(source: &str) -> BTreeSet<String> {
+    source
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim_start();
+            trimmed
+                .strip_prefix('"')
+                .and_then(|rest| rest.find('"').map(|end| rest[..end].to_string()))
+        })
+        .collect()
+}
+
+fn collect_i18n_usage_keys(dir: &Path, keys: &mut BTreeSet<String>) {
+    for entry in fs::read_dir(dir).unwrap_or_else(|e| panic!("cannot read {}: {e}", dir.display()))
+    {
+        let path = entry
+            .unwrap_or_else(|e| panic!("cannot read entry in {}: {e}", dir.display()))
+            .path();
+        if path.is_dir() {
+            collect_i18n_usage_keys(&path, keys);
+        } else if path.extension().and_then(|s| s.to_str()) == Some("rs")
+            && path.file_name().and_then(|s| s.to_str()) != Some("i18n.rs")
+        {
+            let source = fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+            extract_t_invocation_strings(&source, keys);
+        }
+    }
+}
+
+fn extract_t_invocation_strings(source: &str, keys: &mut BTreeSet<String>) {
+    let bytes = source.as_bytes();
+    let mut i = 0;
+    while i + 2 <= bytes.len() {
+        if bytes[i] == b't'
+            && bytes.get(i + 1) == Some(&b'(')
+            && i.checked_sub(1)
+                .and_then(|prev| bytes.get(prev))
+                .is_none_or(|ch| !is_ident_byte(*ch))
+        {
+            let mut cursor = i + 2;
+            let mut depth = 1usize;
+            while cursor < bytes.len() && depth > 0 {
+                match bytes[cursor] {
+                    b'"' => {
+                        let (value, next) = parse_string_literal(source, cursor);
+                        keys.insert(value);
+                        cursor = next;
+                    }
+                    b'(' => {
+                        depth += 1;
+                        cursor += 1;
+                    }
+                    b')' => {
+                        depth -= 1;
+                        cursor += 1;
+                    }
+                    _ => cursor += 1,
+                }
+            }
+            i = cursor;
+        } else {
+            i += 1;
+        }
+    }
+}
+
+fn is_ident_byte(ch: u8) -> bool {
+    ch.is_ascii_alphanumeric() || ch == b'_'
+}
+
+fn parse_string_literal(source: &str, start: usize) -> (String, usize) {
+    let bytes = source.as_bytes();
+    let mut out = String::new();
+    let mut cursor = start + 1;
+    while cursor < bytes.len() {
+        match bytes[cursor] {
+            b'\\' => {
+                if let Some(next) = bytes.get(cursor + 1) {
+                    out.push(*next as char);
+                    cursor += 2;
+                } else {
+                    cursor += 1;
+                }
+            }
+            b'"' => return (out, cursor + 1),
+            byte => {
+                let ch = source[cursor..]
+                    .chars()
+                    .next()
+                    .unwrap_or_else(|| panic!("invalid UTF-8 boundary at byte {cursor}"));
+                out.push(ch);
+                cursor += ch.len_utf8().max((byte as char).len_utf8());
+            }
+        }
+    }
+    (out, cursor)
+}
+
+fn run_version_sync(expected_version: Option<&str>) {
+    let root = workspace_root();
+    let cargo_toml = read_file(&root.join("Cargo.toml"));
+    let version = extract_workspace_value(&cargo_toml, "version")
+        .unwrap_or_else(|| fail("could not find [workspace.package] version in Cargo.toml"));
+
+    if let Some(expected) = expected_version
+        && expected != version
+    {
+        fail(&format!(
+            "release version mismatch: expected {expected}, but [workspace.package] version is {version}"
+        ));
+    }
+
+    assert_contains(
+        &root.join("xtask/Cargo.toml"),
+        &format!("version = \"{version}\""),
+        "xtask package version",
+    );
+    assert_contains(
+        &root.join("packaging/linux/PKGBUILD"),
+        &format!("pkgver={version}"),
+        "Arch PKGBUILD pkgver",
+    );
+    assert_contains(
+        &root.join("packaging/windows/AppxManifest.xml"),
+        &format!("Version=\"{version}.0\""),
+        "Windows AppxManifest package version",
+    );
+    assert_contains(
+        &root.join("CHANGELOG.md"),
+        &format!("## [{version}]"),
+        "CHANGELOG release section",
+    );
+
+    let cargo_lock = read_file(&root.join("Cargo.lock"));
+    for package in [
+        "forskscope-core",
+        "forskscope-ui",
+        "forskscope-ui-logic",
+    ] {
+        let expected = format!("name = \"{package}\"\nversion = \"{version}\"");
+        if !cargo_lock.contains(&expected) {
+            fail(&format!("Cargo.lock package {package} is not version {version}"));
+        }
+    }
+
+    println!("version sync passed for v{version}.");
+}
+
+fn run_archive_layout_check(archive: Option<&Path>) {
+    let root = workspace_root();
+    let cargo_toml = read_file(&root.join("Cargo.toml"));
+    let version = extract_workspace_value(&cargo_toml, "version")
+        .unwrap_or_else(|| fail("could not find [workspace.package] version in Cargo.toml"));
+    let default_archive = root.join(format!("target/forskscope-v{version}.tar.gz"));
+    let archive = archive.unwrap_or(&default_archive);
+
+    let output = Command::new("tar")
+        .args(["-tzf"])
+        .arg(archive)
+        .output()
+        .unwrap_or_else(|e| panic!("failed to list {}: {e}", archive.display()));
+    if !output.status.success() {
+        eprintln!("could not list source archive {}", archive.display());
+        eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+        process::exit(1);
+    }
+
+    let archive_name = archive
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("source archive");
+    let parent_prefix = format!("forskscope-v{version}");
+    let mut has_root_cargo_toml = false;
+    let mut has_parent_dir = false;
+    let mut has_hygiene_violation = false;
+
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let path = line.strip_prefix("./").unwrap_or(line);
+        has_root_cargo_toml |= path == "Cargo.toml";
+        has_parent_dir |= path == parent_prefix || path.starts_with(&format!("{parent_prefix}/"));
+        has_hygiene_violation |= path == archive_name
+            || path == ".git-exclude"
+            || path.starts_with(".git-exclude/")
+            || path == ".git"
+            || path.starts_with(".git/")
+            || path == "target"
+            || path.starts_with("target/");
+    }
+
+    if !has_root_cargo_toml {
+        fail("source archive does not contain Cargo.toml at archive root");
+    }
+    if has_parent_dir {
+        fail(&format!(
+            "source archive contains forbidden top-level {parent_prefix}/ directory"
+        ));
+    }
+    if has_hygiene_violation {
+        fail("source archive contains generated, ignored, or local-only paths");
+    }
+
+    println!("source archive layout check passed for {}.", archive.display());
+}
+
+fn read_file(path: &Path) -> String {
+    fs::read_to_string(path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()))
+}
+
+fn assert_contains(path: &Path, needle: &str, label: &str) {
+    let content = read_file(path);
+    if !content.contains(needle) {
+        fail(&format!(
+            "{label} is not in sync; expected `{needle}` in {}",
+            path.display()
+        ));
+    }
+}
+
+fn extract_workspace_value(source: &str, key: &str) -> Option<String> {
+    let mut in_workspace_package = false;
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_workspace_package = trimmed == "[workspace.package]";
+            continue;
+        }
+        if in_workspace_package
+            && let Some(rest) = trimmed.strip_prefix(key)
+            && let Some(value) = rest.trim_start().strip_prefix('=')
+        {
+            return value
+                .trim()
+                .strip_prefix('"')
+                .and_then(|v| v.strip_suffix('"'))
+                .map(str::to_string);
+        }
+    }
+    None
+}
+
+fn fail(message: &str) -> ! {
+    eprintln!("{message}");
+    process::exit(1);
 }
 
 fn assert_package_absent(package: &str) {

@@ -12,14 +12,72 @@ permissions:
   contents: write
 
 jobs:
+  # ── Release gates ───────────────────────────────────────────────────────────
+  preflight:
+    name: Release gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            pkg-config libssl-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: release-gates-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: cargo fmt
+        run: cargo fmt --check
+
+      - name: cargo test
+        run: cargo test -p forskscope-core -p forskscope-ui-logic
+
+      - name: cargo clippy
+        run: cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
+
+      - name: CSS generated artifact check
+        run: cargo xtask css --check
+
+      - name: Security advisory audit
+        run: cargo audit
+
+      - name: Security dependency path check
+        run: cargo xtask audit-deps
+
+      - name: Version metadata sync check
+        run: cargo xtask version-sync "${GITHUB_REF_NAME#v}"
+
+      - name: i18n coverage check
+        run: cargo xtask i18n
+
   # ── Source archive ──────────────────────────────────────────────────────────
   source:
     name: Source archive
     runs-on: ubuntu-latest
+    needs: preflight
     outputs:
       version: ${{ steps.ver.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
 
       - id: ver
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
@@ -34,32 +92,7 @@ jobs:
       - name: Verify source archive layout
         run: |
           VER=${{ steps.ver.outputs.version }}
-          ARCHIVE="${RUNNER_TEMP}/forskscope-v${VER}.tar.gz"
-          if ! tar -tzf "$ARCHIVE" | awk '
-            { path = $0; sub(/^\.\//, "", path); if (path == "Cargo.toml") found = 1 }
-            END { exit found ? 0 : 1 }
-          '; then
-            echo "source archive does not contain Cargo.toml at archive root" >&2
-            exit 1
-          fi
-          if tar -tzf "$ARCHIVE" | awk -v prefix="forskscope-v${VER}" '
-            { path = $0; sub(/^\.\//, "", path); if (path == prefix || index(path, prefix "/") == 1) bad = 1 }
-            END { exit bad ? 0 : 1 }
-          '; then
-            echo "source archive contains forbidden top-level forskscope-v${VER}/ directory" >&2
-            exit 1
-          fi
-          if tar -tzf "$ARCHIVE" | awk -v archive_name="forskscope-v${VER}.tar.gz" '
-            {
-              path = $0
-              sub(/^\.\//, "", path)
-              if (path == archive_name || path == ".git-exclude" || index(path, ".git-exclude/") == 1 || path == ".git" || index(path, ".git/") == 1 || path == "target" || index(path, "target/") == 1) bad = 1
-            }
-            END { exit bad ? 0 : 1 }
-          '; then
-            echo "source archive contains generated, ignored, or local-only paths" >&2
-            exit 1
-          fi
+          cargo xtask archive-layout "${RUNNER_TEMP}/forskscope-v${VER}.tar.gz"
 
       - uses: actions/upload-artifact@v4
         with:

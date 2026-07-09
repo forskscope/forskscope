@@ -15,11 +15,19 @@ cargo test -p forskscope-core -p forskscope-ui-logic
 # Clippy (must pass without warnings)
 cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
 
+# Format and generated CSS gates
+cargo fmt --check
+cargo xtask css --check
+
 # Security audit (uses .cargo/audit.toml for reviewed advisories)
 cargo audit
 
 # Enforce the reviewed dependency paths behind audit exceptions
 cargo xtask audit-deps
+
+# Release metadata and localization gates
+cargo xtask version-sync
+cargo xtask i18n
 ```
 
 The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot

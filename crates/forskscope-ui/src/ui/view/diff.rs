@@ -18,6 +18,8 @@ use crate::ui::view::search::{SearchBar, SearchCtx, scroll_to_focused};
 use forskscope_ui_logic::MatchIndex;
 use toolbar::Toolbar;
 
+type HunkSearchRows<'a> = Vec<(u64, Vec<(Option<&'a str>, Option<&'a str>)>)>;
+
 // ── Workspace component ───────────────────────────────────────────────────────
 
 #[component]
@@ -79,7 +81,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
         let query = search_ctx.read().query.clone();
         let active = search_ctx.read().active;
         if active && !query.is_empty() {
-            let hunk_rows: Vec<(u64, Vec<(Option<&str>, Option<&str>)>)> = snap
+            let hunk_rows: HunkSearchRows<'_> = snap
                 .hunks
                 .iter()
                 .map(|h| {

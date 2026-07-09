@@ -26,7 +26,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
 
       - name: Cache cargo registry + build
         uses: actions/cache@v4
@@ -39,17 +39,38 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: cargo test (core)
-        run: cargo test -p forskscope-core
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: cargo fmt
+        run: cargo fmt --check
+
+      - name: CSS generated artifact check
+        run: cargo xtask css --check
+
+      - name: Version metadata sync check
+        run: cargo xtask version-sync
+
+      - name: i18n coverage check
+        run: cargo xtask i18n
+
+      - name: Security advisory audit
+        run: cargo audit
+
+      - name: Security dependency path check
+        run: cargo xtask audit-deps
+
+      - name: cargo test (headless release gate)
+        run: cargo test -p forskscope-core -p forskscope-ui-logic
+
+      - name: cargo clippy (headless release gate)
+        run: cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
 
       - name: cargo test (workspace)
         run: cargo test --workspace
 
-      - name: cargo clippy
+      - name: cargo clippy (workspace)
         run: cargo clippy --workspace -- -D warnings
-
-      - name: Security dependency path check
-        run: cargo xtask audit-deps
 
       - name: cargo build (UI — ensures it compiles)
         run: cargo build -p forskscope-ui

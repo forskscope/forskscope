@@ -64,7 +64,7 @@ pub fn reload_tab(store: &mut Store, index: usize) {
                 tab.state = TabState::Error(msg);
             }
             Err(_) => {
-                tab.state = TabState::Error(t(lang, "Could not open").into());
+                tab.state = TabState::Error(t(lang, "Could not open"));
             }
         }
     });
@@ -133,7 +133,7 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
                 tab.state = TabState::Error(msg);
             }
             Err(_join_err) => {
-                tab.state = TabState::Error(t(lang, "Could not open").into());
+                tab.state = TabState::Error(t(lang, "Could not open"));
             }
         }
     });
@@ -195,22 +195,23 @@ pub(super) fn load_and_diff(
         return Err(t(
             lang,
             "Binary comparison is off. Enable it in Settings → Advanced.",
-        )
-        .into());
+        ));
     }
 
     let l_text = matches!(ld.kind, FileKind::Text);
     let r_text = matches!(rd.kind, FileKind::Text);
     if (l_bin && r_text) || (l_text && r_bin) {
-        return Err(t(lang, "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary.").into());
+        return Err(t(
+            lang,
+            "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary.",
+        ));
     }
 
     if ld.kind == FileKind::ExcelXlsx || rd.kind == FileKind::ExcelXlsx {
         return Err(t(
             lang,
             "Spreadsheet comparison is temporarily disabled for security.",
-        )
-        .into());
+        ));
     }
 
     let diff = compute_diff(ld.diff_text(), rd.diff_text(), opts);

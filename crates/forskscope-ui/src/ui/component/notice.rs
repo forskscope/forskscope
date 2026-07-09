@@ -2,11 +2,11 @@
 //!
 //! Variants:
 //! - Default (`notice`)           — neutral/info; used for read-only labels and
-//!                                  short status lines.
+//!   short status lines.
 //! - Ok (`notice notice-ok`)      — positive; used for success or equality
-//!                                  confirmations.
+//!   confirmations.
 //! - Warning (`notice notice-warn`) — amber; used for alerts that don't block
-//!                                   work.
+//!   work.
 //! - Error (`notice notice-err`)  — red; used for failure messages.
 //!
 //! Call sites that previously wrote `p { class: "notice notice-ok", … }` inline

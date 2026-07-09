@@ -180,7 +180,7 @@ pub fn export_patch(store: &Store, index: usize) {
             .right_path
             .as_ref()
             .and_then(|p| p.file_name())
-            .map(|n| std::path::PathBuf::from(n))
+            .map(std::path::PathBuf::from)
             .unwrap_or_else(|| std::path::PathBuf::from("file"));
 
         patch_from_file_diff(rel, &tab.diff, PatchOptions::default())

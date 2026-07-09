@@ -8,11 +8,13 @@
 4. Security audit passes under the checked-in policy: `cargo audit`
 5. Reviewed security dependency paths are enforced: `cargo xtask audit-deps`
 6. CSS generated artifact is current: `cargo xtask css --check`
-7. Source archive layout is verified by `packaging/build-release.sh` or the release workflow.
-8. `CHANGELOG.md` updated with the new version and date.
-9. `version` bumped in the workspace `Cargo.toml` (`[workspace.package]`).
-10. Completed RFCs moved from `rfcs/proposed/` to `rfcs/done/`; `rfcs/README.md` updated.
-11. `ROADMAP.md` current state paragraph updated if the milestone is significant.
+7. Version metadata is synchronized: `cargo xtask version-sync`; release tag matches the workspace version: `cargo xtask version-sync "${GITHUB_REF_NAME#v}"`
+8. Japanese localization covers UI keys: `cargo xtask i18n`
+9. Source archive layout is verified: `cargo xtask archive-layout target/forskscope-vX.Y.Z.tar.gz`
+10. `CHANGELOG.md` updated with the new version and date.
+11. `version` bumped in the workspace `Cargo.toml` (`[workspace.package]`).
+12. Completed RFCs moved from `rfcs/proposed/` to `rfcs/done/`; `rfcs/README.md` updated.
+13. `ROADMAP.md` current state paragraph updated if the milestone is significant.
 
 ---
 
@@ -46,6 +48,7 @@ tar -tzf "target/forskscope-v${VER}.tar.gz" | awk '{p=$0; sub(/^\.\//,"",p); pri
 tar -tzf "target/forskscope-v${VER}.tar.gz" | awk '{p=$0; sub(/^\.\//,"",p); if (p=="Cargo.toml") found=1} END{exit found ? 0 : 1}'
 tar -tzf "target/forskscope-v${VER}.tar.gz" | awk -v prefix="forskscope-v${VER}" '{p=$0; sub(/^\.\//,"",p); if (p==prefix || index(p,prefix"/")==1) bad=1} END{exit bad ? 1 : 0}'
 tar -tzf "target/forskscope-v${VER}.tar.gz" | awk -v archive="forskscope-v${VER}.tar.gz" '{p=$0; sub(/^\.\//,"",p); if (p==archive || p==".git-exclude" || index(p,".git-exclude/")==1 || p==".git" || index(p,".git/")==1 || p=="target" || index(p,"target/")==1) bad=1} END{exit bad ? 1 : 0}'
+cargo xtask archive-layout "target/forskscope-v${VER}.tar.gz"
 ```
 
 ---

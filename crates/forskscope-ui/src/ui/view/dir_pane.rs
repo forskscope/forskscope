@@ -81,17 +81,17 @@ impl ScanExecutor for FilteringExecutor {
         let rules = self.rules.clone();
         let f: ScanJob = Box::new(move || {
             let mut p: LoadPayload = job();
-            if !rules.is_empty() {
-                if let Ok(ref mut entries) = p.result {
-                    entries.retain(|e| {
-                        let name = e.file_name().to_str().unwrap_or("");
-                        if e.is_dir {
-                            !rules.is_dir_ignored(name)
-                        } else {
-                            !rules.is_file_ignored(name)
-                        }
-                    });
-                }
+            if !rules.is_empty()
+                && let Ok(ref mut entries) = p.result
+            {
+                entries.retain(|e| {
+                    let name = e.file_name().to_str().unwrap_or("");
+                    if e.is_dir {
+                        !rules.is_dir_ignored(name)
+                    } else {
+                        !rules.is_file_ignored(name)
+                    }
+                });
             }
             p
         });
@@ -294,7 +294,7 @@ pub fn path_segs(path: &Path) -> Vec<(PathBuf, String)> {
     let mut acc = PathBuf::new();
     path.components()
         .filter_map(|c| {
-            acc.push(&c);
+            acc.push(c);
             let lbl = match &c {
                 Component::RootDir => return None, // handled by root icon prefix
                 Component::Prefix(p) => p.as_os_str().to_string_lossy().into_owned(),
