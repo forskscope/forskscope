@@ -24,7 +24,7 @@ cp README.md LICENSE NOTICE CHANGELOG.md "$STAGE/"
 if command -v zip &>/dev/null; then
     (cd target && zip -r "../$OUT" "$(basename "$STAGE")/")
 elif command -v 7z &>/dev/null; then
-    7z a "$OUT" "$STAGE/"
+    (cd target && 7z a "../$OUT" "$(basename "$STAGE")/")
 else
     echo "ERROR: neither zip nor 7z found. Install one to produce the archive."
     exit 1
