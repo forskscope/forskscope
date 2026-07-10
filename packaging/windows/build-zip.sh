@@ -6,10 +6,10 @@
 
 set -euo pipefail
 
-VER="$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)"
+VER="$(awk '/^\[workspace\.package\]/{f=1} f&&/^version[[:space:]]*=/{gsub(/[^0-9.]/,""); print; exit}' Cargo.toml)"
 BINARY="target/x86_64-pc-windows-msvc/release/forskscope.exe"
-OUT="target/forskscope-$VER-windows-x64.zip"
-STAGE="target/forskscope-$VER-windows-x64"
+OUT="target/forskscope-v$VER-windows-x64.zip"
+STAGE="target/forskscope-v$VER-windows-x64"
 
 if [[ ! -f "$BINARY" ]]; then
     echo "Build first: cargo build --release --target x86_64-pc-windows-msvc"

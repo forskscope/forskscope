@@ -6,11 +6,11 @@
 
 set -euo pipefail
 
-VER="$(grep '^version' Cargo.toml | head -1 | cut -d'"' -f2)"
+VER="$(awk '/^\[workspace\.package\]/{f=1} f&&/^version[[:space:]]*=/{gsub(/[^0-9.]/,""); print; exit}' Cargo.toml)"
 BINARY="target/aarch64-apple-darwin/release/forskscope"
 DMG_DIR="target/dmg"
 APP_DIR="$DMG_DIR/ForskScope.app/Contents/MacOS"
-OUT="target/forskscope-$VER-macos-aarch64.dmg"
+OUT="target/forskscope-v$VER-macos-aarch64.dmg"
 
 if [[ ! -f "$BINARY" ]]; then
     echo "Build first: cargo build --release --target aarch64-apple-darwin"
