@@ -36,6 +36,7 @@ cat > "$DMG_DIR/ForskScope.app/Contents/Info.plist" << 'PLIST'
 PLIST
 sed -i '' "s/VERSION/$VER/" "$DMG_DIR/ForskScope.app/Contents/Info.plist"
 
+rm -f "$OUT"
 create-dmg \
     --volname "ForskScope $VER" \
     --window-size 500 300 \
