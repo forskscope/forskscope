@@ -54,11 +54,14 @@ cargo xtask archive-layout "target/forskscope-v${VER}.tar.gz"
 
 ---
 
-## Archive naming
+## Release artifacts
 
 | File | Contents |
 |------|----------|
 | `forskscope-vX.Y.Z.tar.gz` | Source archive for the release |
+| `forskscope-vX.Y.Z-linux-x86_64.tar.gz` | Linux x86_64 release binary |
+| `forskscope-vX.Y.Z-macos-aarch64.dmg` | macOS aarch64 DMG |
+| `forskscope-vX.Y.Z-windows-x64.zip` | Windows x64 release zip with README, license, notice, changelog, and executable |
 
 ---
 
@@ -73,11 +76,13 @@ pre-release phase:
 
 ---
 
-## After the archive
+## After local artifact checks
 
-1. Upload the archive to the project release page.
-2. Tag the commit: `git tag -a v${VER} -m "Release v${VER}"`.
-3. Update `pkgver` in `packaging/linux/PKGBUILD` to match the workspace version.
+1. Tag the commit: `git tag -a v${VER} -m "Release v${VER}"`.
+2. Push the tag. The release workflow builds the source and platform artifacts
+   and creates a draft GitHub release.
+3. Inspect the draft release artifacts before publishing.
+4. Update `pkgver` in `packaging/linux/PKGBUILD` to match the workspace version.
    A comment in the file notes this requirement; failing to do so causes stale Arch packages.
 
 ---
