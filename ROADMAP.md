@@ -1,6 +1,6 @@
 # ForskScope Roadmap
 
-**Last updated:** v0.164.0 (2026-07-09)
+**Last updated:** v0.164.0 (2026-07-10)
 **Current phase:** Release-readiness verification — security, dependency, archive, CI, and docs gates aligned; runtime/platform verification remains.
 
 ---
@@ -15,7 +15,7 @@ tests, 228 ui-logic unit tests, 6 CSS integration tests, and 8 doctests.
 The UI crate (`forskscope-ui`) has the v1 two-way workflow implemented:
 two-pane diff with independent pane labels and shared horizontal scroll;
 English/Japanese translation-key coverage enforced by `cargo xtask i18n`
-(202 `t(...)` keys); per-file and batch copy in the directory report view;
+(203 `t(...)` keys); per-file and batch copy in the directory report view;
 F3/Shift+F3 search navigation; compare profiles; session restore; patch export;
 and release-gate CSS freshness checks.
 
