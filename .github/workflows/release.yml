@@ -192,7 +192,12 @@ jobs:
         shell: bash
         run: |
           VER=${{ needs.source.outputs.version }}
-          7z a "forskscope-v${VER}-windows-x64.zip" target/release/forskscope.exe
+          STAGE="target/forskscope-v${VER}-windows-x64"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE"
+          cp target/release/forskscope.exe "$STAGE/forskscope.exe"
+          cp README.md LICENSE NOTICE CHANGELOG.md "$STAGE/"
+          (cd target && 7z a "../forskscope-v${VER}-windows-x64.zip" "$(basename "$STAGE")/")
 
       - uses: actions/upload-artifact@v4
         with:
