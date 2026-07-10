@@ -216,6 +216,7 @@ pub fn PathBar(
 
 #[component]
 pub fn TreeRow(
+    lang: Lang,
     path: PathBuf,
     is_dir: bool,
     is_expanded: bool,
@@ -278,7 +279,7 @@ pub fn TreeRow(
             span { class: "tree-icon",  "{icon}" }
             span { class: "tree-label", "{name}" }
             if binary_blocked {
-                span { class: "tree-status st-binary", title: "Binary file. Binary comparison is off — enable it in Settings → Advanced.",
+                span { class: "tree-status st-binary", title: t(lang, "Binary file. Binary comparison is off — enable it in Settings → Advanced."),
                     "bin"
                 }
             } else if !st_icon.is_empty() {

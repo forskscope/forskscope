@@ -67,6 +67,7 @@ pub fn CompactTree(
                         };
                         rsx! {
                             TreeRow {
+                                lang,
                                 path: abs.clone(), is_dir, is_expanded, is_selected,
                                 depth, status, is_binary, binary_enabled,
                                 on_toggle: move |_| {
@@ -121,6 +122,7 @@ pub fn CompactTree(
                         };
                         rsx! {
                             TreeRow {
+                                lang,
                                 path: abs.clone(), is_dir, is_expanded, is_selected,
                                 depth, status, is_binary, binary_enabled,
                                 on_toggle: move |_| {

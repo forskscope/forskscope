@@ -166,6 +166,7 @@ pub fn AlignedTree(
                                         };
                                         rsx! {
                                             TreeRow {
+                                                lang,
                                                 path: row.abs_path.clone(),
                                                 is_dir, is_expanded: row.is_expanded,
                                                 is_selected: row.is_selected, depth: row.depth,
@@ -225,6 +226,7 @@ pub fn AlignedTree(
                                         };
                                         rsx! {
                                             TreeRow {
+                                                lang,
                                                 path: row.abs_path.clone(),
                                                 is_dir, is_expanded: row.is_expanded,
                                                 is_selected: row.is_selected, depth: row.depth,
