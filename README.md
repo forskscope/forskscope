@@ -20,7 +20,7 @@ ForskScope opens two files (or two directories) side by side, highlights every c
 
 Most Unix/Linux workers reach for `vimdiff`, `git diff`, or a web-based paste tool when they need to compare files. These work but they don't give a persistent, navigable side-by-side view with merge support. WinMerge does — but only on Windows.
 
-ForskScope fills that gap: a desktop app built on [Dioxus](https://dioxuslabs.com/) and a pure-Rust diff engine ([similar v3](https://docs.rs/similar)), targeting Linux, macOS, and Windows packaging.
+ForskScope fills that gap: a desktop app built on [Dioxus](https://dioxuslabs.com/) and a pure-Rust diff engine ([similar v3](https://docs.rs/similar)), with Linux, macOS, and Windows packaging under release-readiness verification.
 
 ---
 
