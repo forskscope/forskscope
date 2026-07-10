@@ -146,6 +146,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install packaging tools
+        run: brew install create-dmg
 
       - uses: actions/cache@v4
         with:
@@ -156,17 +161,15 @@ jobs:
           key: macos-release-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build release binary
-        run: cargo build --release --locked -p forskscope-ui
+        run: cargo build --release --locked --target aarch64-apple-darwin -p forskscope-ui
 
       - name: Package
-        run: |
-          VER=${{ needs.source.outputs.version }}
-          zip -j "forskscope-v${VER}-macos-aarch64.zip" target/release/forskscope
+        run: bash packaging/macos/build-dmg.sh
 
       - uses: actions/upload-artifact@v4
         with:
           name: macos-aarch64
-          path: forskscope-v*-macos-aarch64.zip
+          path: target/forskscope-v*-macos-aarch64.dmg
 
   # ── Windows x86_64 ──────────────────────────────────────────────────────────
   windows:
@@ -222,5 +225,5 @@ jobs:
           files: |
             forskscope-v*.tar.gz
             forskscope-v*-linux-x86_64.tar.gz
-            forskscope-v*-macos-aarch64.zip
+            forskscope-v*-macos-aarch64.dmg
             forskscope-v*-windows-x64.zip
