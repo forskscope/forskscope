@@ -13,6 +13,7 @@
 //!   - `conflict_nav_view`: `ConflictNavView` rail snapshot for three-way merge.
 //!   - `hunk_decorations`: `DecorationIndex` — O(1) row→CSS class lookup.
 //!   - `load_guard`: pre-diff `LoadGuard` from `FileSizeClass`.
+//!   - `load_identity`: runtime tab/load tokens and completion validation.
 //!   - `palette_view`: `PaletteRow` list for the command palette.
 //!   - `save_error`: `SaveErrorView` — `AppError` → dialog content.
 //!   - `scroll_sync`: `ScrollSyncState` for synchronized pane scrolling.
@@ -35,6 +36,10 @@ pub use compare::command_bar::{
 pub use compare::conflict_nav_view::{ConflictNavView, ConflictRailRow};
 pub use compare::hunk_decorations::{DecorationIndex, DiffSide, RowDecoration};
 pub use compare::load_guard::{LoadGuard, guard_for_sizes, guard_for_sizes_with_limits};
+pub use compare::load_identity::{
+    CompareTabId, CompletionDecision, LoadGeneration, LoadIdentityError, LoadIdentitySnapshot,
+    LoadToken, completion_decision,
+};
 pub use compare::palette_view::{
     PaletteRow, build_palette, enabled_count as palette_enabled_count,
 };
