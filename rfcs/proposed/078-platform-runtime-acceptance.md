@@ -1,0 +1,330 @@
+# RFC 078: Platform Runtime Acceptance and Release Evidence
+
+**Status.** Proposed
+**Tracks.** Release-stabilization audit finding B4.
+**Touches.** Release candidate artifacts, GTK/WebKitGTK smoke tests, Windows
+and macOS runtime tests, save semantics, evidence records, and v1 go/no-go.
+
+## Summary
+
+ForskScope will distinguish artifact construction from runtime acceptance.
+Before a v1 release, the exact release candidate must be executed on supported
+platforms using a committed matrix. Results are retained as reviewable Markdown
+records with artifact hashes, host/runtime versions, case results, failures,
+and time-bounded waivers.
+
+This RFC starts only after RFC-075–077 and the integrated release-core gate
+pass. A missing required platform result is a release blocker, not an assumed
+pass.
+
+## Goals
+
+- Verify the shipping artifact rather than a developer build where possible.
+- Exercise core Compare/Explorer/save/mergetool workflows on real runtimes.
+- Confirm WebKitGTK layout and keyboard behavior on a display server.
+- Verify platform-specific packaging and clean-install prerequisites.
+- Retain concise evidence sufficient for owner and architect audit.
+- Resolve platform minimum-version/documentation conflicts from evidence.
+
+## Non-goals
+
+- Automate every visual interaction in this RFC.
+- Claim support for platforms outside the published matrix.
+- Require signing/notarization if the owner explicitly defers it with accurate
+  user guidance; functional launch evidence is still required.
+- Store screenshots, user documents, secrets, certificates, or private host
+  identifiers in the repository.
+- Treat a waiver as a pass.
+
+## Preconditions
+
+- RFC-075–077 acceptance criteria are complete.
+- `cargo xtask version-sync` matches the release-candidate version/tag.
+- The integrated Gate C in RFC-074 passes.
+- Release artifacts are built by the release workflow or a documented
+  equivalent from the same commit.
+- Every artifact has a SHA-256 digest before testing begins.
+
+If a correctness fix lands during the matrix, rebuild all affected artifacts,
+record new hashes, and rerun affected cases. Evidence from an older hash cannot
+approve a newer artifact.
+
+## Durable evidence layout
+
+Add records under:
+
+```text
+docs/src/maintainers/release-evidence/
+  vX.Y.Z-rcN/
+    README.md
+    artifacts.md
+    linux-wayland.md
+    linux-x11.md
+    windows-11.md
+    windows-10.md
+    macos-aarch64.md
+    advisories.md
+```
+
+`README.md` summarizes verdict and links to every required record. Evidence
+files contain commands/results and sanitized environment facts, not raw logs
+with home paths. Large raw logs and screenshots may live in local review
+storage, but the committed record includes their checksum/reference only when
+the owner has a durable approved location.
+
+## Evidence record schema
+
+Every platform record contains:
+
+```text
+Artifact filename:
+SHA-256:
+Source commit:
+Test date (UTC):
+Tester:
+Host OS and version:
+Architecture:
+Display server / WebView runtime:
+Install source and prerequisites:
+Cases: ID, result (Pass/Fail/Waived/Blocked), evidence note
+Failures and issue/RFC links:
+Waivers: owner, reason, expiry, release impact
+```
+
+Do not include usernames, real home paths, signing identities, device serials,
+or customer data.
+
+## Required platform matrix
+
+| Target | Environment | Required level |
+|---|---|---|
+| Linux x86_64 | Current supported distribution, Wayland, WebKitGTK 4.1 | Full functional + visual matrix |
+| Linux x86_64 | X11 session, WebKitGTK 4.1 | Launch, compare, explorer, save, keyboard |
+| Windows x86_64 | Windows 11 with WebView2 | Full functional + packaging/save matrix |
+| Windows x86_64 | Windows 10 1903+ candidate | Launch/prerequisite/save matrix, or narrow published minimum with owner approval |
+| macOS aarch64 | Oldest claimed macOS version | Launch, compare, save, package/Gatekeeper matrix |
+| macOS aarch64 | Current macOS | Full functional matrix |
+
+One host may satisfy multiple rows only when it genuinely provides the named
+runtime/session. Virtual machines are acceptable if file-system and WebView
+behavior are representative and recorded.
+
+## Test corpus
+
+Use repository fixtures copied to an isolated temporary workspace. Never modify
+tracked fixtures in place.
+
+- text change: `tests/fixtures/text/left_function.txt` and
+  `right_function.txt`;
+- identical text;
+- CRLF/no-final-newline fixtures;
+- binary fixture with comparison disabled;
+- large-file fixture triggering the prompt;
+- two small temporary directory trees for equal/changed/one-sided states;
+- mergetool local/remote/merged temporary files.
+
+Record expected file hashes before destructive cases so backup and output can
+be verified objectively.
+
+## Functional cases
+
+### P01 — Install and cold launch
+
+- unpack/install the release artifact into a clean location;
+- confirm documented prerequisites are sufficient;
+- launch without a source checkout or developer environment;
+- Explorer renders without blank window or crash;
+- diagnostics reports the expected app version and redacts home data.
+
+### P02 — CLI file compare
+
+- launch the artifact with two fixture paths;
+- Loading transitions to Ready;
+- changed lines, labels, gutters, and non-color indicators render;
+- file contents do not leave the host.
+
+### P03 — Compare layout and scrolling
+
+- short-row backgrounds span the full widest-line area;
+- action rows align with left/right rows across multiple hunks;
+- vertical rows remain aligned;
+- horizontal scrolling mirrors between panes without feedback/jitter;
+- word wrap and narrow window modes remain usable.
+
+This is mandatory on WebKitGTK; repeat a basic layout observation on Windows
+WebView2 and macOS WebKit.
+
+### P04 — Merge, undo/redo, and safe save
+
+- copy fixtures before opening;
+- apply focused hunk with keyboard and mouse;
+- verify dirty marker, undo, redo;
+- save and verify output hash;
+- verify `.bak` bytes equal the pre-save target;
+- verify no temp sidecar remains after success.
+
+### P05 — External modification
+
+- open, then change target externally;
+- normal save is blocked and external bytes remain;
+- cancel preserves dirty session;
+- confirmed overwrite backs up the externally changed version;
+- Save As does not mutate the original target.
+
+### P06 — Async identity regressions
+
+- open at least two deliberately slow comparisons;
+- close a lower-index loading tab;
+- verify remaining tabs receive their own contents;
+- trigger reload twice and verify the latest request wins.
+
+Deterministic automated tests remain the primary proof; this case confirms
+runtime integration.
+
+### P07 — Explorer and directory report
+
+- navigation/history/focused pane keyboard behavior;
+- equal/different/one-sided statuses;
+- deep comparison progress and filters;
+- per-file and batch copy confirmation, backup, manifest, and result summary.
+
+### P08 — Persistence migration
+
+- start from sanitized legacy settings/session fixtures placed in the platform
+  config directory;
+- verify settings and eligible tabs migrate without loss;
+- verify backup and versioned envelope;
+- future-schema fixture produces visible incompatibility and is not overwritten;
+- corrupt fixture is preserved until explicit reset.
+
+### P09 — Mergetool
+
+- existing merged target saves without false conflict and creates backup;
+- missing merged target is created;
+- externally changed merged target blocks normal save;
+- UI continues to show remote input separately from result destination.
+
+### P10 — Binary/XLSX fail-closed policy
+
+- binary comparison disabled shows localized guidance;
+- enabling binary permits read-only preview but not merge/save;
+- XLSX shows the current security-disabled message and does not parse workbook
+  content.
+
+### P11 — Keyboard and modal safety
+
+- execute the maintained keyboard checklist;
+- modal focus starts on safe/cancel action for destructive operations;
+- global shortcuts do not affect the background view while a modal is open;
+- Escape behavior is consistent.
+
+### P12 — Session/settings restart
+
+- change theme/language/font and restart;
+- open tabs restore only without explicit CLI paths;
+- Japanese labels remain covered in practical workflows.
+
+## Platform-specific cases
+
+### Windows
+
+- test overwrite semantics on an existing destination;
+- verify backup and temp replacement behavior on NTFS;
+- verify long-path behavior according to documented support;
+- test Windows 10 without WebView2 or confirm installer/prerequisite messaging;
+- inspect zip root/layout and launch executable from the extracted package.
+
+If the current `rename` strategy cannot replace an existing destination on
+Windows, that is a release-blocking correctness failure requiring a save RFC
+amendment and implementation fix.
+
+### macOS
+
+- resolve the documentation conflict between macOS 12 and the package's
+  `LSMinimumSystemVersion` 13.0 from observed build/runtime support;
+- verify DMG opens, app bundle layout, executable launch, and Gatekeeper
+  guidance;
+- record signing/notarization as Pass, Deferred-with-warning, or Blocked.
+
+### Linux
+
+- run the maintained GTK checklist on real Wayland and X11 sessions;
+- record WebKitGTK/GTK versions;
+- verify no blank region, row drift, or missing scrollbars;
+- test the packaged binary outside the source tree.
+
+## Security advisory disposition
+
+The release evidence includes all current `cargo audit` warnings. For each
+unsoundness advisory, record:
+
+- dependency path;
+- whether affected APIs/runtime conditions are reachable;
+- upstream issue/version status;
+- owner and review date;
+- upgrade or removal trigger;
+- release decision.
+
+Unmaintained warnings may be grouped by dependency family when they share an
+upstream constraint, but unsoundness advisories require individual analysis.
+
+## Waiver policy
+
+A waiver is permitted only when:
+
+- the failed/missing case is not a correctness or user-data safety guarantee;
+- user-visible limitations are documented;
+- the owner names a responsible follow-up and expiry version/date;
+- the architect sees the waiver in the final package.
+
+No waiver may turn these into a release pass:
+
+- wrong-file/stale-load behavior;
+- silent settings/session loss;
+- unguarded overwrite of the actual save target;
+- inability to launch on a claimed supported platform;
+- missing runtime evidence for every claimed primary platform.
+
+## Automation
+
+Automate stable checks when practical:
+
+- artifact hash generation and record template creation;
+- archive structure and executable presence;
+- headless file-output/backup hash verification;
+- future-schema preservation;
+- mergetool preparation/save tests.
+
+Visual layout and accessibility observations may remain manual for v1, but the
+case IDs and results are mandatory.
+
+## Acceptance criteria
+
+- Every required matrix row has an evidence file tied to an exact artifact.
+- P01–P12 pass where applicable, or a permitted waiver is recorded.
+- Windows save/backup semantics are observed, not inferred from Linux tests.
+- WebKitGTK layout/scroll behavior passes on a display server.
+- macOS minimum version and signing posture are consistent across package and
+  docs.
+- Windows WebView2 prerequisite behavior is verified and documented.
+- Advisory dispositions are complete.
+- The final `README.md` evidence summary states Go/No-Go without interpreting
+  missing evidence as success.
+
+## Implementation and execution sequence
+
+1. Approve the matrix and evidence template during RFC review.
+2. Complete RFC-075–077 and integrated Gate C.
+3. Build/tag a release candidate; record source commit and hashes.
+4. Execute Linux Wayland/X11, then Windows and macOS in parallel where hosts
+   permit.
+5. Fix failures; rebuild and invalidate affected evidence.
+6. Complete advisory dispositions and documentation.
+7. Produce refreshed handoff and request independent architecture review.
+
+## Dependencies
+
+- Parent: RFC-074.
+- Requires RFC-075, RFC-076, RFC-077, and integrated Gate C.
+- Extends RFC-010 packaging/QA and RFC-041 release readiness.
+

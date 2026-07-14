@@ -1,7 +1,8 @@
 # ForskScope Roadmap
 
-**Last updated:** v0.164.0 (2026-07-10)
-**Current phase:** Release-readiness verification — security, dependency, archive, CI, and docs gates aligned; runtime/platform verification remains.
+**Last updated:** v0.164.0 development baseline (2026-07-15)
+**Current phase:** v1 release stabilization — correctness workstreams first,
+then runtime/platform acceptance and a new architecture go/no-go review.
 
 ---
 
@@ -33,10 +34,58 @@ Release-readiness hardening completed after v0.140.0:
   dependency-path audit, version sync, i18n coverage, tests, and clippy. Release
   tags are checked against the workspace version before artifacts are created.
 
-The remaining release work is runtime/platform verification: GTK smoke tests,
-WebKitGTK visual checks, and packaging verification on Linux, macOS, and
-Windows. Three-way merge conflict workspace UI, command palette, and editor
-adapter work remain post-v1.
+The 2026-07-15 architecture audit approved continued development but issued a
+v1/public-release No-Go. Three correctness workstreams now precede runtime QA:
+stable async tab/load identity, versioned production settings/session
+persistence, and a distinct Git-mergetool save-target model. GTK/WebKitGTK and
+cross-platform package verification follow only after those workstreams pass.
+Three-way merge conflict workspace UI, command palette, and editor adapter work
+remain post-v1.
+
+---
+
+## v1 release stabilization program
+
+[RFC-074](rfcs/proposed/074-v1-release-stabilization-program.md) is the
+authoritative program design. RFC-075 through RFC-078 define the detailed
+workstreams. Dates are a planning envelope assuming one primary Rust developer
+and timely owner review; milestone evidence, not elapsed time, determines
+completion.
+
+| Milestone | Target window | Scope | Exit gate |
+|---|---|---|---|
+| M0 — Design approval | Jul 15–17 | Review RFC-074–078 and compatibility decisions | Owner accepts detailed designs |
+| M1 — Async identity | Jul 20–24 | Stable tab IDs, load generations, deterministic race tests | RFC-075 acceptance complete |
+| M2 — Persistence convergence | Jul 27–Aug 7 | Canonical versioned settings/session path and legacy migration | RFC-076 acceptance complete |
+| M3 — Mergetool target safety | Aug 10–14 | Separate remote input and merged output identity/fingerprint | RFC-077 acceptance complete |
+| M4 — Integrated stabilization | Aug 17–21 | Full gates, docs/RFC reconciliation, advisory dispositions | Release-core candidate approved for QA |
+| M5 — Platform acceptance | Aug 24–Sep 11 | Linux Wayland/X11, Windows, macOS runtime matrix | RFC-078 evidence complete |
+| M6 — Handoff and go/no-go | Sep 14–18 | Refresh handoff and independent architecture review | Explicit v1 Go or continued No-Go |
+
+### Workstream dependencies
+
+```text
+RFC-074 program
+├── RFC-075 async identity ──────┐
+├── RFC-076 runtime persistence ├── integrated Gate C ── RFC-078 platform matrix
+└── RFC-077 mergetool target ───┘                         │
+         requires RFC-075                                 └── refreshed handoff + architect review
+```
+
+RFC-076 may run in parallel with RFC-075 only with separate ownership of
+overlapping UI-state files. The default single-developer sequence is
+RFC-075 → RFC-076 → RFC-077 → integrated gates → RFC-078.
+
+### Release-blocking outcomes
+
+- Obsolete async completions cannot mutate another/newer load.
+- Production settings/session files use core-owned versioned schemas and
+  migrate current plain JSON without silent loss.
+- Git mergetool fingerprints and guards the actual merged output.
+- Exact release artifacts pass the retained runtime/platform matrix.
+- A refreshed handoff receives an independent architecture Go verdict.
+
+Until all five outcomes are evidenced, v1 remains No-Go.
 
 ---
 
@@ -233,6 +282,11 @@ buffer can be write-only in v1), but is required for full manual-edit support.
 | 040 | Slice 8 | Editor adapter verification harness |
 | 041 | Post-v1 | v1.0 product stabilization |
 | 042 | Ongoing | Roadmap (this document) |
+| 074 | Pre-v1 stabilization | Umbrella schedule, milestones, gates, and final go/no-go package |
+| 075 | Milestone M1 | Stable async compare identity and load generations |
+| 076 | Milestone M2 | Versioned runtime settings/session persistence and legacy migration |
+| 077 | Milestone M3 | Git mergetool save-target identity and fingerprint safety |
+| 078 | Milestone M5 | Platform runtime acceptance and retained release evidence |
 
 ---
 
