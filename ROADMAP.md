@@ -54,10 +54,10 @@ completion.
 
 | Milestone | Target window | Scope | Exit gate |
 |---|---|---|---|
-| M0 — Design approval | Jul 15–17 | Review RFC-074–078 and compatibility decisions | Owner accepts detailed designs |
+| M0 — Design approval | Jul 15–17 | Review RFC-074–078 and compatibility decisions | Owner and architect accept detailed designs |
 | M1 — Async identity | Jul 20–24 | Stable tab IDs, load generations, deterministic race tests | RFC-075 acceptance complete |
-| M2 — Persistence convergence | Jul 27–Aug 7 | Canonical versioned settings/session path and legacy migration | RFC-076 acceptance complete |
-| M3 — Mergetool target safety | Aug 10–14 | Separate remote input and merged output identity/fingerprint | RFC-077 acceptance complete |
+| M2 — Persistence convergence | Jul 27–Aug 7 | Canonical schema v2 plus UI-v0/core-v1 migrations | RFC-076 acceptance complete |
+| M3 — Mergetool target safety | Aug 10–14 | Separate remote input/output identity and explicit match/absence preconditions | RFC-077 acceptance complete |
 | M4 — Integrated stabilization | Aug 17–21 | Full gates, docs/RFC reconciliation, advisory dispositions | Release-core candidate approved for QA |
 | M5 — Platform acceptance | Aug 24–Sep 11 | Linux Wayland/X11, Windows, macOS runtime matrix | RFC-078 evidence complete |
 | M6 — Handoff and go/no-go | Sep 14–18 | Refresh handoff and independent architecture review | Explicit v1 Go or continued No-Go |
@@ -80,8 +80,10 @@ RFC-075 → RFC-076 → RFC-077 → integrated gates → RFC-078.
 
 - Obsolete async completions cannot mutate another/newer load.
 - Production settings/session files use core-owned versioned schemas and
-  migrate current plain JSON without silent loss.
-- Git mergetool fingerprints and guards the actual merged output.
+  migrate current plain JSON and existing core-v1 envelopes without silent
+  loss or schema reinterpretation.
+- Git mergetool fingerprints and guards the actual merged output, including
+  no-clobber creation when the target was initially absent.
 - Exact release artifacts pass the retained runtime/platform matrix.
 - A refreshed handoff receives an independent architecture Go verdict.
 
@@ -212,7 +214,8 @@ policy from a settings dialog; changes persist across restarts.
 **Acceptance criteria:**
 - Settings persist to `~/.config/forskscope/settings.json`
 - Theme change applies immediately without restart
-- Unknown settings file fields are silently ignored (schema v1 forward-compat)
+- Current v0.164 plain-JSON settings ignore unknown fields; RFC-076 replaces
+  this runtime path with schema v2 and explicit future-version handling
 
 ---
 

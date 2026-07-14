@@ -87,8 +87,8 @@ architecture audit; they are release-blocking in dependency order.
 | 072 | [UI Component Extraction (Phase 4)](./proposed/072-ui-component-extraction.md) | Structural | **Partially shipped** v0.160.0 — `Notice` extracted; `EmptyState`/`PathLabel`/`IconButton` deferred |
 | 074 | [v1 Release Stabilization Program](./proposed/074-v1-release-stabilization-program.md) | Release stabilization | Program schedule, milestones, gates, and final go/no-go package |
 | 075 | [Async Compare Identity and Load Generations](./proposed/075-async-compare-identity-and-generation.md) | Correctness | Audit B1 — stable tab/load identity; first implementation workstream |
-| 076 | [Versioned Runtime Settings and Session Persistence](./proposed/076-versioned-runtime-persistence.md) | Compatibility | Audit B2 — canonical schemas and legacy migration |
-| 077 | [Git Mergetool Save-Target Model](./proposed/077-mergetool-save-target-model.md) | File safety | Audit B3 — distinct compared input and guarded output target; requires RFC-075 |
+| 076 | [Versioned Runtime Settings and Session Persistence](./proposed/076-versioned-runtime-persistence.md) | Compatibility | Audit B2 — schema v2 plus UI-v0/core-v1 migrations |
+| 077 | [Git Mergetool Save-Target Model](./proposed/077-mergetool-save-target-model.md) | File safety | Audit B3 — distinct input/output with match-or-absence guards; requires RFC-075 |
 | 078 | [Platform Runtime Acceptance and Release Evidence](./proposed/078-platform-runtime-acceptance.md) | Release QA | Audit B4 — exact-artifact runtime matrix after RFC-075–077 |
 
 ## Archive (1)

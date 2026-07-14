@@ -29,6 +29,7 @@ Expected evidence/documentation files:
 
 - `docs/src/maintainers/release-evidence/vX.Y.Z-rcN/README.md`
 - `artifacts.md` and one record per matrix environment
+- `matrix-plan.md` pinning exact versions, owner roles, access, and case scope
 - `advisories.md`
 - `docs/src/SUMMARY.md`
 - corrections to platform prerequisites/minimum versions
@@ -45,6 +46,8 @@ invalidate affected artifact evidence.
 - Sanitized Markdown summaries are durable; raw screenshots/logs remain outside
   the repo unless privacy-reviewed.
 - Rebuilt artifacts require affected cases to be rerun.
+- M5 does not start until every matrix row has an exact environment and
+  confirmed executor role; unavailable hosts rebaseline the schedule.
 
 ## 5. Tests and gates run
 
@@ -86,7 +89,7 @@ Record artifacts; do not commit binary packages into the source repository.
 
 ## 8. Recommended next step
 
-After Milestone M4, create the release-candidate evidence directory from the
-RFC-078 template, hash all artifacts, then execute Linux Wayland first to catch
-WebKitGTK regressions before parallel Windows/macOS testing.
-
+Before Milestone M5, commit and approve `matrix-plan.md`. Then create the
+release-candidate evidence directory, hash all artifacts, and execute Linux
+Wayland first to catch WebKitGTK regressions before parallel Windows/macOS
+testing.

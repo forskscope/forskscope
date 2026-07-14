@@ -10,8 +10,7 @@ next project handoff.
 ForskScope is approved for continued development but is not approved for a
 v1/public-release claim. This RFC converts the 2026-07-15 project-readiness
 architecture audit into one bounded stabilization program. The program fixes
-three correctness risks before asking maintainers to perform the platform
-acceptance matrix:
+three correctness risks, then closes the platform-evidence gap:
 
 1. stale asynchronous compare completions can target the wrong load;
 2. runtime settings/session persistence bypasses the versioned core contract;
@@ -83,10 +82,10 @@ workstreams pass their acceptance gates.
 
 | Milestone | Target window | Exit evidence | Release impact |
 |---|---|---|---|
-| M0 — Design approval | 2026-07-15 to 2026-07-17 | RFC-074–078 reviewed; scope and compatibility decisions accepted | Release remains No-Go |
+| M0 — Design approval | 2026-07-15 to 2026-07-17 | RFC-074–078 reviewed; owner and architect accept scope and compatibility decisions | Release remains No-Go |
 | M1 — Async identity | 2026-07-20 to 2026-07-24 | RFC-075 tests deterministically reject close/reindex and stale reload completions | B1 closed |
-| M2 — Persistence convergence | 2026-07-27 to 2026-08-07 | RFC-076 legacy import, envelope round-trip, future-schema rejection, and runtime-path tests pass | B2 closed |
-| M3 — Mergetool target safety | 2026-08-10 to 2026-08-14 | RFC-077 existing/missing/externally changed merge-target tests pass | B3 closed |
+| M2 — Persistence convergence | 2026-07-27 to 2026-08-07 | RFC-076 UI-v0 and core-v1 migrations, v2 round-trip, future-schema rejection, and runtime-path tests pass | B2 closed |
+| M3 — Mergetool target safety | 2026-08-10 to 2026-08-14 | RFC-077 existing/missing/appeared/deleted/changed merge-target tests and no-clobber creation pass | B3 closed |
 | M4 — Integrated stabilization gate | 2026-08-17 to 2026-08-21 | Full documented gates; docs/RFC status synchronized; advisory dispositions recorded | Code candidate eligible for runtime QA |
 | M5 — Platform acceptance | 2026-08-24 to 2026-09-11 | RFC-078 evidence matrix complete for Linux, Windows, and macOS; failures fixed or explicitly waived | B4 closed or release remains No-Go |
 | M6 — Handoff and go/no-go | 2026-09-14 to 2026-09-18 | Refreshed handoff, release candidate inventory, independent architect review | v1 decision may change |
@@ -101,6 +100,7 @@ to milestone IDs so they do not become competing schedules.
 Before implementation of each workstream:
 
 - its RFC is accepted by the project owner;
+- blocking architecture-review findings against its design are closed;
 - persistence/security/compatibility impact is explicit;
 - tests are specified before production edits;
 - non-goals prevent opportunistic feature work.
@@ -162,12 +162,17 @@ Only an explicit Go verdict may remove the v1 release block.
    same load generation that created it.
 2. Compared input identity and save-target identity are separate concepts.
 3. Save conflict detection compares against the snapshot of the actual target.
-4. Runtime persistence has one canonical schema owner and never silently
+4. A target expected to be absent is never replaced if an entry appears before
+   commit; force is an explicit confirmed operation.
+5. Runtime persistence has one canonical schema owner and never silently
    overwrites an unknown future schema.
-5. Existing plain JSON remains importable; migration failure preserves the
+6. Existing UI-v0 plain JSON and core-v1 envelopes remain importable; migration
+   failure preserves the
    original file.
-6. No new application-authored external network workflow is introduced.
-7. Runtime evidence must be reproducible from committed instructions.
+7. Runtime compare/load IDs are process-local and never restored from persisted
+   workspace IDs.
+8. No new application-authored external network workflow is introduced.
+9. Runtime evidence must be reproducible from committed instructions.
 
 ## Documentation and lifecycle updates
 

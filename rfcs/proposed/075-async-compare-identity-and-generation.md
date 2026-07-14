@@ -121,6 +121,13 @@ the generation and use the token path.
 
 Restored tabs receive new process-local IDs. Nothing persists the old identity.
 
+`CompareTabId` is specifically a runtime concurrency identity. It is not the
+legacy `forskscope_core::session::TabId`, which was designed as persisted
+workspace metadata. RFC-076 schema v2 does not persist either runtime tab IDs
+or load generations; its core-v1 migration consumes legacy IDs only to parse
+old envelopes. Keeping the names/types separate prevents a restored identifier
+from accidentally validating a task created by another process lifetime.
+
 ## Completion API
 
 Centralize result installation in one helper rather than duplicating guards in
@@ -175,7 +182,9 @@ timing-based GUI tests.
 ## Compatibility and migration
 
 IDs and generations are in-memory only, so settings/session schemas do not
-change. Public CLI behavior and restored path pairs remain unchanged.
+store them. RFC-076 independently advances the persistence envelope to schema
+v2 for model convergence, not because of these tokens. Public CLI behavior and
+restored path pairs remain unchanged.
 
 ## Security and safety impact
 
@@ -230,4 +239,3 @@ from measured scale evidence.
 - Parent: RFC-074.
 - Required before RFC-077.
 - Related: RFC-065 asynchronous loading, RFC-036 external changes.
-

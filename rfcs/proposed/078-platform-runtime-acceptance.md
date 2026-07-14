@@ -44,6 +44,9 @@ pass.
 - Release artifacts are built by the release workflow or a documented
   equivalent from the same commit.
 - Every artifact has a SHA-256 digest before testing begins.
+- A committed `matrix-plan.md` freezes the exact OS/distribution versions,
+  architecture, executor owner/role, host-access status, and applicable case
+  IDs for every row before M5 begins.
 
 If a correctness fix lands during the matrix, rebuild all affected artifacts,
 record new hashes, and rerun affected cases. Evidence from an older hash cannot
@@ -58,6 +61,7 @@ docs/src/maintainers/release-evidence/
   vX.Y.Z-rcN/
     README.md
     artifacts.md
+    matrix-plan.md
     linux-wayland.md
     linux-x11.md
     windows-11.md
@@ -81,7 +85,7 @@ Artifact filename:
 SHA-256:
 Source commit:
 Test date (UTC):
-Tester:
+Tester role or review handle:
 Host OS and version:
 Architecture:
 Display server / WebView runtime:
@@ -91,8 +95,9 @@ Failures and issue/RFC links:
 Waivers: owner, reason, expiry, release impact
 ```
 
-Do not include usernames, real home paths, signing identities, device serials,
-or customer data.
+Do not include operating-system usernames, real home paths, signing identities,
+device serials, or customer data. A project role or public review handle is
+sufficient for accountability.
 
 ## Required platform matrix
 
@@ -108,6 +113,12 @@ or customer data.
 One host may satisfy multiple rows only when it genuinely provides the named
 runtime/session. Virtual machines are acceptable if file-system and WebView
 behavior are representative and recorded.
+
+The descriptive names above are policy targets, not permission to choose hosts
+after seeing results. `matrix-plan.md` replaces “current” and “oldest claimed”
+with exact versions and records the owner-approved support minimum before the
+first artifact is exercised. Missing ownership or unavailable access blocks M5
+start and triggers schedule rebaselining; it does not narrow support silently.
 
 ## Test corpus
 
@@ -327,4 +338,3 @@ case IDs and results are mandatory.
 - Parent: RFC-074.
 - Requires RFC-075, RFC-076, RFC-077, and integrated Gate C.
 - Extends RFC-010 packaging/QA and RFC-041 release readiness.
-

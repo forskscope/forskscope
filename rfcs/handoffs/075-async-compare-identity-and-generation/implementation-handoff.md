@@ -44,6 +44,8 @@ Do not add files merely to match this list; keep the smallest cohesive patch.
 ## 4. Design decisions and assumptions
 
 - `(CompareTabId, LoadGeneration)` is the sole async completion identity.
+- `CompareTabId` is runtime-only and distinct from legacy persisted core
+  `session::TabId`; restored tabs always receive a fresh runtime ID.
 - IDs are never reused during one process; generations never wrap silently.
 - Completion locates the tab by ID and then validates generation/state.
 - Obsolete successes and failures are discarded without user notification.
@@ -57,7 +59,9 @@ Suggested reviewable patches:
 3. Open/reload migration and docs.
 
 Stop for owner/architect review if implementing the model requires persistent
-identity, a map-based store, or changes to save-target semantics.
+identity, a map-based store, or changes to save-target semantics. RFC-076's v2
+migration may parse legacy persisted IDs but must never install them as
+`CompareTabId` values.
 
 ## 5. Tests and gates run
 
@@ -96,4 +100,3 @@ Attach concise command output to the implementation review request.
 
 Review and accept RFC-075. Then implement patch 1 (identity types/tests) and
 request a design checkpoint before changing `CompareTab` and `Store`.
-

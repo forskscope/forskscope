@@ -12,7 +12,7 @@ them separately.
 
 Normal two-file mode compares left and right and saves to the right input. Git
 mergetool mode compares local and remote but saves to the merged output. The
-save target will carry its own load-time fingerprint, encoding decision, and
+save target will carry its own load-time precondition, encoding decision, and
 existence state. Async compare completion will install the compared documents
 and target snapshot as one token-validated result.
 
@@ -32,7 +32,8 @@ stable snapshot.
 - Use target encoding/policy deliberately in mergetool mode.
 - Preserve normal two-file behavior.
 - Detect external changes to `<merged>` between load and save.
-- Test existing, missing, changed, replaced, and unsupported targets.
+- Test existing, missing, appeared, deleted, changed, replaced, and unsupported
+  target transitions.
 - Keep Git/JJ integration local and wrapper-free.
 
 ## Non-goals
@@ -97,20 +98,43 @@ pub struct PreparedCompare {
 
 pub struct SaveTargetSnapshot {
     pub path: PathBuf,
-    pub fingerprint_at_prepare: Option<FileFingerprint>,
-    pub kind_at_prepare: SaveTargetKind,
-    pub encoding_label: String,
+    pub state: SaveTargetState,
 }
 
-pub enum SaveTargetKind {
-    ExistingText,
-    Missing,
-    Unsupported,
+pub enum SaveTargetState {
+    Writable {
+        expectation: TargetExpectation,
+        encoding_label: String,
+    },
+    Blocked {
+        reason: SaveTargetBlockReason,
+    },
+}
+
+pub enum TargetExpectation {
+    MustMatch(FileFingerprint),
+    MustBeAbsent,
 }
 ```
 
 Normal compare derives the snapshot from the loaded right document. Mergetool
-mode inspects `<merged>` independently.
+mode inspects `<merged>` independently. An `Option<FileFingerprint>` is not an
+adequate precondition because `None` conflates “the path must remain absent”
+with “skip conflict checking.”
+
+The core save request receives the same explicit contract:
+
+```rust
+pub enum TargetPrecondition {
+    MustMatch(FileFingerprint),
+    MustBeAbsent,
+    Force,
+}
+```
+
+`Force` is constructed only after an explicit overwrite confirmation. It is
+never stored as the tab's load-time snapshot and is not used automatically by
+Save As.
 
 ## Mergetool target preparation
 
@@ -123,10 +147,11 @@ mode inspects `<merged>` independently.
 
 ### Missing path
 
-- Record `Missing`, no expected fingerprint.
+- Record `Writable { expectation: MustBeAbsent, ... }`.
 - Use the remote input's encoding as the initial output encoding.
-- Saving creates the file and required parent directories through the safe save
-  path.
+- Saving creates the file and required parent directories through a
+  no-clobber commit path. If any filesystem entry appears after preparation,
+  normal save returns a conflict and preserves that entry.
 
 ### Binary, XLSX, directory, or unreadable target
 
@@ -170,31 +195,56 @@ post-spawn mutation race.
 `build_request` uses only `tab.save_target` for:
 
 - target path;
-- expected fingerprint;
+- expected target precondition;
 - output encoding.
 
 It never reads `right_doc.fingerprint_at_load` as an implicit save target.
 
 On success:
 
-- update `save_target.fingerprint_at_prepare` to the returned fingerprint;
-- set kind to `ExistingText`;
+- replace the expectation with `MustMatch(outcome.new_fingerprint)`;
 - mark the merge session saved;
 - retain compared right input identity for reload.
 
 On Save As:
 
-- validate/inspect the selected destination;
+- validate/inspect the selected destination and derive `MustBeAbsent` or
+  `MustMatch`; selecting an existing file does not imply force;
 - save with the same conflict/backup policy;
 - replace `save_target` only after success;
 - do not change the compared right input path.
 
 On confirmed overwrite:
 
-- refresh the current target fingerprint only as part of the deliberate force
-  request;
+- construct `TargetPrecondition::Force` only for that deliberate request;
 - create the configured backup;
 - do not mutate the stored snapshot before the save succeeds.
+
+## Core commit semantics
+
+The precondition is checked immediately before backup/write:
+
+- `MustMatch(fingerprint)` conflicts when the path is missing, is no longer a
+  regular text target, or its current fingerprint differs;
+- `MustBeAbsent` conflicts when any entry exists at the path;
+- `Force` follows only a user confirmation and still rejects unsupported
+  target kinds unless the user chose a different valid path.
+
+For `MustBeAbsent`, a check followed by an overwriting rename is still racy.
+The safe-file primitive therefore needs an atomic no-clobber commit on each
+supported platform. The planned first implementation is a same-directory
+`tempfile::NamedTempFile` written completely and committed with
+`persist_noclobber`; `tempfile` moves from core dev-dependencies to normal core
+dependencies. An already-existing error maps to `CoreError::Conflict`, and the
+temporary file is cleaned without touching the competing target. If that API
+cannot provide the required semantic on a supported platform, normal save
+fails rather than falling back to replacement. RFC-078 exercises this on every
+primary platform, and dependency gates run after the dependency-scope change.
+
+`MustMatch` retains the current best-effort fingerprint preflight contract;
+RFC-074 N1/N2 govern any stronger digest/durability claim. This RFC does not
+claim portable filesystem transactions beyond the explicit precondition and
+commit behavior above.
 
 ## Reload behavior
 
@@ -232,9 +282,23 @@ Use temporary paths and real file mutations; no GTK event loop or sleeps.
 
 ### Missing merged target
 
-- snapshot is Missing/None;
+- snapshot expectation is `MustBeAbsent`;
 - save creates merged and parent directories;
 - subsequent save uses the new fingerprint.
+
+### Target-state transition races
+
+- prepare a missing target, create it externally, then save: conflict; the
+  external bytes remain unchanged;
+- prepare an existing target, delete it externally, then save: conflict; the
+  path is not recreated;
+- prepare an existing target, replace it with another file of different
+  fingerprint, then save: conflict;
+- select an existing Save As destination: overwrite confirmation is required;
+  the selection itself never constructs `Force`;
+- exercise the no-clobber commit with a competing creator at the core safe-file
+  boundary without sleeps. A test-only before-commit seam creates the competing
+  file after preparation/temp write but before `persist_noclobber`.
 
 ### Externally modified merged target
 
@@ -294,7 +358,10 @@ no external network workflow is added.
 
 - Compared right input and save output cannot share one ambiguous field.
 - Mergetool preparation fingerprints the actual merged target.
-- Existing/missing/changed/replaced target integration tests pass.
+- Existing/missing/appeared/deleted/changed/replaced target integration tests
+  pass.
+- A path expected to be absent is committed with no-clobber semantics.
+- Save As never bypasses conflict checks merely because a path was selected.
 - Normal compare continues saving to the right input with its fingerprint.
 - Save As and reload preserve compared input identity.
 - Git/JJ documentation matches observed behavior.
@@ -324,4 +391,3 @@ Rejected: it violates the product's primary safe-save promise.
 - Parent: RFC-074.
 - Requires RFC-075.
 - Runtime migration and target save behavior are accepted under RFC-078.
-
