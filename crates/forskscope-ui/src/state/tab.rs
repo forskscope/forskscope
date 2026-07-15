@@ -6,6 +6,7 @@ use dioxus::prelude::*;
 use forskscope_core::diff::DiffDocument;
 use forskscope_core::document::LoadedDocument;
 use forskscope_core::{DiffOptions, MergeSession, compute_diff};
+use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
 use crate::state::settings::Lang;
 
@@ -22,6 +23,10 @@ pub enum TabState {
 
 #[derive(Clone)]
 pub struct CompareTab {
+    /// Process-local identity; never persisted or derived from vector position.
+    pub id: CompareTabId,
+    /// Identity of the current file-I/O load attempt for this tab.
+    pub load_generation: LoadGeneration,
     pub title: String,
     pub left_path: Option<PathBuf>,
     pub right_path: Option<PathBuf>,

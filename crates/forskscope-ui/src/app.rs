@@ -29,10 +29,14 @@ pub fn App() -> Element {
 
     use_hook(|| {
         if let Some(Some((left, right))) = STARTUP_PAIR.get() {
+            let previous_tab_count = store.tabs.read().len();
             open_compare(&mut store, left.clone(), right.clone());
             // git mergetool mode: redirect save target to the merged path.
-            if let Some(Some(merged)) = STARTUP_MERGED.get() {
-                let idx = store.tabs.read().len().saturating_sub(1);
+            let current_tab_count = store.tabs.read().len();
+            if current_tab_count > previous_tab_count
+                && let Some(Some(merged)) = STARTUP_MERGED.get()
+            {
+                let idx = current_tab_count - 1;
                 let merge_label = crate::i18n::t(store.lang(), "merge");
                 if let Some(tab) = store.tabs.write().get_mut(idx) {
                     tab.right_path = Some(merged.clone());

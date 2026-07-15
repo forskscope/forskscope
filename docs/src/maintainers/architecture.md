@@ -48,7 +48,7 @@ could be added as a fourth crate without touching core.
 | `watcher` | `FileChangeMonitor` trait, `WatchToken`, `FileChangeEvent`, `WatchError`, `MockFileChangeMonitor` — file-watcher boundary (RFC-036). |
 | `xlsx` | Fail-closed spreadsheet comparison boundary; `.xlsx` parsing is temporarily disabled while the parser dependency path is remediated (RFC-058). |
 
-## `ui-logic` modules (14)
+## `ui-logic` modules (15)
 
 Framework-independent view-model logic. All modules are testable with
 `cargo test -p forskscope-ui-logic` — no GTK or display server required.
@@ -62,6 +62,7 @@ Framework-independent view-model logic. All modules are testable with
 | `compare::conflict_nav_view` | `ConflictNavView::from_navigator(nav, can_save)` — complete navigator rail snapshot: rows with glyphs/CSS, progress text, prev/next IDs (RFC-034, Slice 6). |
 | `compare::hunk_decorations` | `DecorationIndex::from_set(dec)` — O(1) `(row_index, side)` → `RowDecoration` lookup; replaces inline `match hunk.kind` CSS logic in `hunk.rs` (RFC-024, RFC-035). |
 | `compare::load_guard` | `guard_for_sizes(left, right)` → `LoadGuard` — pre-diff decision: Proceed / WarnBanner / ConfirmPrompt derived from `FileSizeClass` thresholds (RFC-013, Slice 1). |
+| `compare::load_identity` | Process-local `CompareTabId` allocation, monotonic `LoadGeneration`, and pure async completion validation; runtime tokens are never persisted (RFC-075). |
 | `compare::palette_view` | `build_palette(registry, ctx, query)` → `Vec<PaletteRow>` — filtered, availability-evaluated, sorted palette results (RFC-019, Slice 7). |
 | `compare::save_error` | `SaveErrorView::from_error(err, path)` — maps `AppError` to dialog title, body, and ordered `Vec<RecoveryButton>` (RFC-007, RFC-017, Slice 3). |
 | `compare::scroll_sync` | `ScrollSyncState` — `scrollTop` ↔ `ScrollAnchor` arithmetic for synchronized pane scrolling; `scroll_to_row` for hunk navigation (RFC-035, Slice 1). |
@@ -74,7 +75,7 @@ Framework-independent view-model logic. All modules are testable with
 
 | Module | Responsibility |
 |---|---|
-| `state` | `Store` (shared Dioxus signals), `CompareTab`, `AppSettings`, `open_compare`, session persistence. |
+| `state` | `Store` (shared Dioxus signals and root-owned compare-tab ID allocator), `CompareTab`, token-guarded async open/reload completion, `AppSettings`, and session persistence. |
 | `app` | Root component; provides store context; CSS injection; startup pair; git mergetool mode. |
 | `ui/header` | Brand, Settings button, keyboard reference shortcut. |
 | `ui/tabs` | Tab bar with dirty-dot markers and close. |

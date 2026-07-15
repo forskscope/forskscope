@@ -23,6 +23,7 @@ pub use tab::{CompareTab, TabState, recompute_diff, swap_sides};
 pub use types::{BatchResultSpec, DirOp};
 
 use dioxus::prelude::*;
+use forskscope_ui_logic::{CompareTabId, CompareTabIdAllocator, LoadIdentityError};
 use std::path::PathBuf;
 
 // ── Modal variants ────────────────────────────────────────────────────────────
@@ -105,6 +106,7 @@ impl Notice {
 #[derive(Clone, Copy)]
 pub struct Store {
     pub tabs: Signal<Vec<CompareTab>>,
+    compare_tab_ids: Signal<CompareTabIdAllocator>,
     pub active: Signal<Option<usize>>,
     pub dir_tabs: Signal<Vec<(PathBuf, PathBuf)>>,
     pub active_dir: Signal<Option<usize>>,
@@ -124,6 +126,7 @@ impl Store {
     pub fn new(settings: AppSettings) -> Self {
         Self {
             tabs: Signal::new_in_scope(Vec::new(), ScopeId::ROOT),
+            compare_tab_ids: Signal::new_in_scope(CompareTabIdAllocator::new(), ScopeId::ROOT),
             active: Signal::new_in_scope(None, ScopeId::ROOT),
             dir_tabs: Signal::new_in_scope(Vec::new(), ScopeId::ROOT),
             active_dir: Signal::new_in_scope(None, ScopeId::ROOT),
@@ -136,6 +139,9 @@ impl Store {
     }
     pub fn lang(&self) -> Lang {
         self.settings.read().language
+    }
+    pub(crate) fn allocate_compare_tab_id(&mut self) -> Result<CompareTabId, LoadIdentityError> {
+        self.compare_tab_ids.write().allocate()
     }
     pub fn notify(&mut self, msg: impl Into<String>) {
         self.toast.set(Some(Notice::error(msg)));

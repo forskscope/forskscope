@@ -37,9 +37,11 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
 **Controls:**
 - File I/O runs in `tokio::task::spawn_blocking`, off the UI thread. The app
   remains responsive regardless of file size.
-- The write-back guard checks `tabs.get_mut(index)` (tab still present) **and**
-  `tab.state == TabState::Loading` (not already resolved or closed) before
-  writing. A stale task completing after a tab is closed is silently dropped.
+- Each load captures a process-local `(CompareTabId, LoadGeneration)` token.
+  Completion resolves the live tab by ID, then requires the exact generation
+  and `TabState::Loading` before writing either success or failure. Closing a
+  tab, replacing its vector position, or starting a newer reload invalidates an
+  obsolete task; its result is silently dropped.
 - `load_path` uses `allow_missing: true` — a missing file is a valid one-sided
   input, not an error.
 - Binary comparison is gated by `enable_binary_comparison` (default off). If

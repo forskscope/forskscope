@@ -8,26 +8,112 @@ use forskscope_core::diff::DiffDocument;
 use forskscope_core::document::{LoadOptions, LoadedDocument, load_path};
 use forskscope_core::file_kind::FileKind;
 use forskscope_core::{DiffOptions, MergeSession, compute_diff};
+use forskscope_ui_logic::{
+    CompletionDecision, LoadGeneration, LoadIdentitySnapshot, LoadToken, completion_decision,
+};
 
 use crate::i18n::t;
 use crate::state::tab::{CompareTab, TabState, tab_title};
 use crate::state::{Store, settings::Lang};
 
+struct LoadedComparison {
+    left_doc: LoadedDocument,
+    right_doc: LoadedDocument,
+    diff: DiffDocument,
+    merge: MergeSession,
+    can_save: bool,
+}
+
+enum LoadResult {
+    Ready(Box<LoadedComparison>),
+    Error(String),
+}
+
+/// Install a prepared load only when its complete runtime token is still live.
+fn commit_load_result(
+    tabs: &mut [CompareTab],
+    token: LoadToken,
+    result: LoadResult,
+) -> CompletionDecision {
+    let Some(tab) = tabs.iter_mut().find(|tab| tab.id == token.tab_id) else {
+        return completion_decision(token, None);
+    };
+    let snapshot = LoadIdentitySnapshot::new(
+        LoadToken::new(tab.id, tab.load_generation),
+        tab.state == TabState::Loading,
+    );
+    let decision = completion_decision(token, Some(snapshot));
+    if decision != CompletionDecision::Accept {
+        return decision;
+    }
+
+    match result {
+        LoadResult::Ready(loaded) => {
+            tab.state = TabState::Ready;
+            tab.left_doc = loaded.left_doc;
+            tab.right_doc = loaded.right_doc;
+            tab.diff = loaded.diff;
+            tab.merge = loaded.merge;
+            tab.can_save = loaded.can_save;
+            tab.char_mode = false;
+            tab.focused_change = 0;
+        }
+        LoadResult::Error(message) => {
+            tab.state = TabState::Error(message);
+        }
+    }
+    decision
+}
+
+fn prepared_result(
+    result: Result<
+        (
+            LoadedDocument,
+            LoadedDocument,
+            DiffDocument,
+            MergeSession,
+            bool,
+        ),
+        String,
+    >,
+) -> LoadResult {
+    match result {
+        Ok((left_doc, right_doc, diff, merge, can_save)) => {
+            LoadResult::Ready(Box::new(LoadedComparison {
+                left_doc,
+                right_doc,
+                diff,
+                merge,
+                can_save,
+            }))
+        }
+        Err(message) => LoadResult::Error(message),
+    }
+}
+
 pub fn reload_tab(store: &mut Store, index: usize) {
-    let (lp, rp, opts) = {
-        let tabs = store.tabs.read();
-        let Some(tab) = tabs.get(index) else { return };
+    let (lp, rp, opts, token) = {
+        let mut tabs = store.tabs.write();
+        let Some(tab) = tabs.get_mut(index) else {
+            return;
+        };
+        let generation = match tab.load_generation.next() {
+            Ok(generation) => generation,
+            Err(error) => {
+                tab.state = TabState::Error(error.to_string());
+                return;
+            }
+        };
+        tab.load_generation = generation;
+        tab.state = TabState::Loading;
         (
             tab.left_path.clone(),
             tab.right_path.clone(),
             tab.diff_options,
+            LoadToken::new(tab.id, generation),
         )
     };
     let enable_binary = store.settings.read().enable_binary_comparison;
-
-    if let Some(tab) = store.tabs.write().get_mut(index) {
-        tab.state = TabState::Loading;
-    }
 
     let lang = store.lang();
     let mut tabs_signal = store.tabs;
@@ -42,35 +128,22 @@ pub fn reload_tab(store: &mut Store, index: usize) {
         .await;
 
         let mut tabs = tabs_signal.write();
-        let Some(tab) = tabs.get_mut(index) else {
-            return;
+        let result = match result {
+            Ok(result) => prepared_result(result),
+            Err(_) => LoadResult::Error(t(lang, "Could not open")),
         };
-        if tab.state != TabState::Loading {
-            return;
-        }
-
-        match result {
-            Ok(Ok((ld, rd, diff, merge, can_save))) => {
-                tab.state = TabState::Ready;
-                tab.left_doc = ld;
-                tab.right_doc = rd;
-                tab.diff = diff;
-                tab.merge = merge;
-                tab.can_save = can_save;
-                tab.char_mode = false;
-                tab.focused_change = 0;
-            }
-            Ok(Err(msg)) => {
-                tab.state = TabState::Error(msg);
-            }
-            Err(_) => {
-                tab.state = TabState::Error(t(lang, "Could not open"));
-            }
-        }
+        commit_load_result(&mut tabs, token, result);
     });
 }
 
 pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
+    let id = match store.allocate_compare_tab_id() {
+        Ok(id) => id,
+        Err(error) => {
+            store.notify(error.to_string());
+            return;
+        }
+    };
     let (opts, enable_binary) = {
         let settings = store.settings.read();
         let opts = settings
@@ -82,7 +155,10 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     };
 
     let title = tab_title(&left, &right, store.lang());
+    let generation = LoadGeneration::INITIAL;
     let tab = CompareTab {
+        id,
+        load_generation: generation,
         title,
         left_path: Some(left.clone()),
         right_path: Some(right.clone()),
@@ -103,6 +179,7 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
 
     let mut tabs_signal = store.tabs;
     let lang = store.lang();
+    let token = LoadToken::new(id, generation);
 
     // spawn_forever: the task must survive the Explorer unmounting when the
     // new tab opens and replaces it with DiffWorkspace (RFC-065).
@@ -113,29 +190,11 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
         .await;
 
         let mut tabs = tabs_signal.write();
-        let Some(tab) = tabs.get_mut(idx) else {
-            return;
+        let result = match load_result {
+            Ok(result) => prepared_result(result),
+            Err(_join_err) => LoadResult::Error(t(lang, "Could not open")),
         };
-        if tab.state != TabState::Loading {
-            return;
-        }
-
-        match load_result {
-            Ok(Ok((ld, rd, diff, merge, can_save))) => {
-                tab.state = TabState::Ready;
-                tab.left_doc = ld;
-                tab.right_doc = rd;
-                tab.diff = diff;
-                tab.merge = merge;
-                tab.can_save = can_save;
-            }
-            Ok(Err(msg)) => {
-                tab.state = TabState::Error(msg);
-            }
-            Err(_join_err) => {
-                tab.state = TabState::Error(t(lang, "Could not open"));
-            }
-        }
+        commit_load_result(&mut tabs, token, result);
     });
 }
 
@@ -219,6 +278,9 @@ pub(super) fn load_and_diff(
     let can_save = ld.kind.is_mergeable_text() && rd.kind.is_mergeable_text();
     Ok((ld, rd, diff, merge, can_save))
 }
+
+#[cfg(test)]
+mod tests;
 
 pub fn open_dir_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     store.dir_tabs.write().push((left, right));
