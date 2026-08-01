@@ -10,8 +10,8 @@ then runtime/platform acceptance and a new architecture go/no-go review.
 
 The `forskscope-core` and `forskscope-ui-logic` crates are feature-complete for
 the v1 two-way diff/merge workflow. The current observed headless gate passes
-**930 tests** with zero failures: 643 core unit tests, 45 core integration
-tests, 228 ui-logic unit tests, 6 CSS integration tests, and 8 doctests.
+**943 tests** with zero failures: 643 core unit tests, 45 core integration
+tests, 241 ui-logic unit tests, 6 CSS integration tests, and 8 doctests.
 
 The UI crate (`forskscope-ui`) has the v1 two-way workflow implemented:
 two-pane diff with independent pane labels and shared horizontal scroll;
@@ -61,6 +61,11 @@ completion.
 | M4 — Integrated stabilization | Aug 17–21 | Full gates, docs/RFC reconciliation, advisory dispositions | Release-core candidate approved for QA |
 | M5 — Platform acceptance | Aug 24–Sep 11 | Linux Wayland/X11, Windows, macOS runtime matrix | RFC-078 evidence complete |
 | M6 — Handoff and go/no-go | Sep 14–18 | Refresh handoff and independent architecture review | Explicit v1 Go or continued No-Go |
+
+**Progress (2026-07-15):** M1 is complete and audit finding B1 is resolved.
+RFC-075 now guards asynchronous compare completion with stable tab IDs and
+per-load generations, backed by deterministic close/reindex and stale-reload
+tests. M2–M6 remain outstanding, so v1/public release remains **No-Go**.
 
 ### Workstream dependencies
 
@@ -286,7 +291,6 @@ buffer can be write-only in v1), but is required for full manual-edit support.
 | 041 | Post-v1 | v1.0 product stabilization |
 | 042 | Ongoing | Roadmap (this document) |
 | 074 | Pre-v1 stabilization | Umbrella schedule, milestones, gates, and final go/no-go package |
-| 075 | Milestone M1 | Stable async compare identity and load generations |
 | 076 | Milestone M2 | Versioned runtime settings/session persistence and legacy migration |
 | 077 | Milestone M3 | Git mergetool save-target identity and fingerprint safety |
 | 078 | Milestone M5 | Platform runtime acceptance and retained release evidence |

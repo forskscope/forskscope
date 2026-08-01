@@ -93,6 +93,15 @@ workstreams pass their acceptance gates.
 Dates are updated only in this RFC and `ROADMAP.md`; developer handoffs refer
 to milestone IDs so they do not become competing schedules.
 
+### Progress record
+
+- **2026-07-15 — M1/B1 complete.** RFC-075 moved to `done/` after two accepted
+  implementation checkpoints. Stable process-local tab IDs, per-load
+  generations, centralized token validation, and deterministic close/reindex
+  and stale-reload tests now guard both compare load paths.
+- B2–B4, Gate C, runtime/platform evidence, and the final architecture verdict
+  remain outstanding. The v1/public-release decision remains **No-Go**.
+
 ## Gate model
 
 ### Gate A — Child design approval

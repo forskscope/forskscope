@@ -1,6 +1,6 @@
 # RFC 075: Async Compare Identity and Load Generations
 
-**Status.** Proposed
+**Status.** Implemented (post-v0.164.0 stabilization)
 **Tracks.** Release-stabilization audit finding B1.
 **Touches.** `forskscope-ui-logic::compare`, UI tab/store state, comparison
 lifecycle, close/reload behavior, and deterministic race tests.
@@ -17,9 +17,10 @@ compaction and prevents an earlier reload from overwriting a later reload.
 
 ## Problem
 
-The current lifecycle captures a mutable `Vec` index. Closing a lower-index tab
-changes subsequent indices. Reloading reuses the same index and returns the tab
-to `Loading`. In both cases, an obsolete completion can pass the current guard.
+Before this RFC, the lifecycle captured a mutable `Vec` index. Closing a
+lower-index tab changed subsequent indices. Reloading reused the same index and
+returned the tab to `Loading`. In both cases, an obsolete completion could pass
+the old guard.
 
 The required property is:
 
@@ -80,9 +81,10 @@ pub id: CompareTabId,
 pub load_generation: LoadGeneration,
 ```
 
-`Store` gains a process-local allocator. The preferred representation is a
-root-owned `Signal<u64>` so test stores are deterministic. IDs start at 1 and
-are never reused after close. ID 0 is reserved for invalid/uninitialized data.
+`Store` gains a process-local allocator. The implemented representation is a
+root-owned `Signal<CompareTabIdAllocator>`, keeping deterministic ownership
+while encapsulating checked advancement. IDs start at 1 and are never reused
+after close. ID 0 is reserved for invalid/uninitialized data.
 
 ## State transitions
 
@@ -150,8 +152,13 @@ they do not show a user-facing error.
 - Join/load failures for the current token become the existing tab error state.
 - Failures for an obsolete token are discarded without changing the new load.
 - Debug logging may record the rejection reason without paths or file content.
-- ID/generation allocation failure becomes `TabState::Error` and blocks new
-  work rather than reusing an identifier.
+- Generation exhaustion belongs to an existing tab: reload changes that tab to
+  `TabState::Error` and spawns no work.
+- Tab-ID exhaustion occurs before a new tab exists: open emits the existing
+  error notice and appends/spawns nothing. Startup mergetool adjustment is
+  conditional on a successful append.
+- Both allocation failures block new work rather than wrapping or reusing an
+  identifier.
 
 ## Test design
 
@@ -212,11 +219,32 @@ new data flow, network capability, or persisted sensitive data.
 - The developer handoff under `rfcs/handoffs/075-.../` is completed with
   observed gate output.
 
+## Implementation outcome
+
+Implemented in two reviewed checkpoints:
+
+- `ad2e98e` added framework-independent runtime identity types, the pure
+  completion decision, and initial deterministic tests;
+- `be5d28e` added Store-owned allocation, `CompareTab` identity/generation,
+  centralized prepared-result commit, open/reload migration, collection-level
+  race tests, and architecture/threat-model updates.
+
+Reviews 028 and 029 accepted both checkpoints with no blocking findings. The
+shipping compare load paths now carry immutable `(CompareTabId,
+LoadGeneration)` tokens; completion resolves by ID and mutates only when the
+exact generation remains in `Loading`. Deterministic tests cover lower-tab
+close/reindex, overlapping reloads, replaced vector slots, current failure,
+and obsolete failure.
+
+This closes release-stabilization finding B1 and Milestone M1. It does not make
+the v1/public release Go: RFC-076–078, integrated gates, platform evidence, and
+the final architecture decision remain outstanding.
+
 ## Alternatives considered
 
 ### Index plus state guard
 
-Rejected: it is the current bug; neither value is stable identity.
+Rejected: it was the original bug; neither value is stable identity.
 
 ### Stable ID without generation
 

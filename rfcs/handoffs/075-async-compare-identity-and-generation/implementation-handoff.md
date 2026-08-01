@@ -2,14 +2,14 @@
 
 ## 1. Summary
 
-Implement stable process-local tab IDs and per-tab load generations so async
-compare/reload completions cannot write into a different or newer load. RFC-075
-is authoritative; this handoff provides the recommended patch sequence and
-review boundaries.
+RFC-075 is implemented. Stable process-local tab IDs and per-tab load
+generations now prevent async compare/reload completions from writing into a
+different or newer load. This handoff records the completed scope, accepted
+decisions, observed evidence, and remaining program dependencies.
 
 ## 2. Scope followed
 
-In scope:
+Completed:
 
 - framework-independent identity/token decision types;
 - `CompareTab` identity and generation;
@@ -27,19 +27,24 @@ Out of scope:
 
 ## 3. Files changed
 
-Expected files (confirm during implementation):
+Implemented files:
 
 - `crates/forskscope-ui-logic/src/compare.rs`
-- new `crates/forskscope-ui-logic/src/compare/load_identity.rs`
+- `crates/forskscope-ui-logic/src/compare/load_identity.rs`
+- `crates/forskscope-ui-logic/src/compare/load_identity/tests.rs`
 - `crates/forskscope-ui-logic/src/lib.rs`
 - `crates/forskscope-ui/src/state.rs`
 - `crates/forskscope-ui/src/state/tab.rs`
 - `crates/forskscope-ui/src/state/compare.rs`
-- state test files or a new GTK-free state-transition module
+- `crates/forskscope-ui/src/state/compare/tests.rs`
+- `crates/forskscope-ui/src/app.rs`
 - `docs/src/maintainers/threat-model.md`
 - `docs/src/maintainers/architecture.md`
-
-Do not add files merely to match this list; keep the smallest cohesive patch.
+- `rfcs/done/075-async-compare-identity-and-generation.md`
+- `rfcs/handoffs/075-async-compare-identity-and-generation/implementation-handoff.md`
+- `rfcs/proposed/074-v1-release-stabilization-program.md`
+- `rfcs/README.md`
+- `ROADMAP.md`
 
 ## 4. Design decisions and assumptions
 
@@ -51,52 +56,80 @@ Do not add files merely to match this list; keep the smallest cohesive patch.
 - Obsolete successes and failures are discarded without user notification.
 - Tests control completion order directly; no sleeps or scheduler luck.
 - Ordered `Vec<CompareTab>` remains the rendering collection.
-
-Suggested reviewable patches:
-
-1. Identity types and pure decision tests.
-2. Tab/store fields and centralized commit helper with state tests.
-3. Open/reload migration and docs.
-
-Stop for owner/architect review if implementing the model requires persistent
-identity, a map-based store, or changes to save-target semantics. RFC-076's v2
-migration may parse legacy persisted IDs but must never install them as
-`CompareTabId` values.
+- Store owns a root-scoped `Signal<CompareTabIdAllocator>`; the allocator has a
+  checked high-water mark and no release/reuse API.
+- Generation exhaustion changes the existing tab to `TabState::Error` and
+  spawns no reload. Tab-ID exhaustion occurs before a new tab exists, so open
+  emits an error notice and appends/spawns nothing.
+- Startup mergetool adjustment occurs only when open appended a new tab, so an
+  allocation failure cannot redirect an existing tab.
+- RFC-076 may parse legacy persisted IDs but must never install them as
+  `CompareTabId` values; restored path pairs receive freshly allocated IDs.
 
 ## 5. Tests and gates run
 
-No implementation gates have been run for this handoff because it is a design
-package. The developer must observe and record:
+Observed across the accepted implementation checkpoints and independent
+reviews:
 
-```sh
+```text
 cargo fmt --check
+  pass
 cargo test -p forskscope-ui-logic load_identity
+  13 passed; 0 failed
+cargo test -p forskscope-ui state::compare::tests
+  6 passed; 0 failed in each of the lib and bin targets
+cargo +1.91 test -p forskscope-ui-logic load_identity
+  13 passed; 0 failed
+cargo +1.91 test -p forskscope-ui state::compare::tests
+  6 passed; 0 failed in each of the lib and bin targets
 cargo test --workspace
+  pass
 cargo clippy --workspace -- -D warnings
+  pass
+git diff --check
+  pass
 ```
 
-Also run the stronger advisory command and ensure no new warnings are added:
+The stronger advisory
+`cargo clippy --workspace --all-targets -- -D warnings` still reports the nine
+pre-existing test-target lints recorded by the stabilization program. No
+diagnostic points to RFC-075 implementation files.
 
-```sh
-cargo clippy --workspace --all-targets -- -D warnings
-```
+Ignored workspace-local review evidence (not committed/public links):
 
-Existing warnings may remain only under the program's documented policy.
+- `.git-exclude/reviewed/028-rfc075-load-identity-types-checkpoint-review.md`
+  — Accept with notes; no blocking findings.
+- `.git-exclude/reviewed/029-rfc075-store-token-wiring-checkpoint-review.md`
+  — Accept with notes; no blocking findings; runtime integrity boundary
+  accepted.
+
+Implementation commits:
+
+- `ad2e98e` — pure identity model and tests.
+- `be5d28e` — Store/tab wiring, async migration, race tests, and docs.
 
 ## 6. Generated artifacts
 
-None expected. Do not generate a release archive for this workstream alone.
-Attach concise command output to the implementation review request.
+No release archive or binary artifact was generated for this workstream.
+Deterministic tests create only in-memory prepared results. Temporary workspace
+test directories used during validation were removed.
 
 ## 7. Known limitations
 
 - Obsolete `spawn_blocking` work may continue until completion; results are
   rejected. Cancellation is optional follow-up optimization.
-- Runtime GTK smoke testing is deferred to RFC-078, but deterministic state
-  tests are release-blocking here.
+- Direct Store-level `u64` exhaustion and startup-mergetool failure integration
+  tests are absent; allocator/value tests cover exhaustion, and the accepted
+  production branches fail closed by inspection.
+- Runtime GTK smoke testing remains deferred to RFC-078; RFC-075's required
+  integrity evidence is the deterministic prepared-result suite.
+- The all-target Clippy advisory retains nine pre-existing test lints.
 - RFC-077 will build its atomic prepared-result model on these tokens.
 
 ## 8. Recommended next step
 
-Review and accept RFC-075. Then implement patch 1 (identity types/tests) and
-request a design checkpoint before changing `CompareTab` and `Store`.
+Treat RFC-075 and audit finding B1 as complete. Begin RFC-076 as the next
+single-developer stabilization workstream; keep its persistence adapters from
+installing legacy persisted IDs as runtime identities. Do not claim overall v1
+Go until RFC-076–078, integrated gates, platform evidence, and the final
+architecture decision are complete.
