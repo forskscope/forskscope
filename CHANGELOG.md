@@ -5,6 +5,101 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.165.0] — 2026-08-01
+
+Release-stabilization baseline (RFC-074 milestone R0). Reconciles the version
+and release automation with 26 commits that had accumulated past the published
+`0.164.0` tag, closes RFC-075 (async compare identity, audit finding B1), and
+tightens the security and packaging posture. No user-facing diff/merge
+behaviour changed.
+
+### Security
+
+**MSRV raised to 1.91; `.xlsx` comparison disabled pending a safe parser path.**
+
+`sheets-diff -> calamine -> quick-xml` carried an unresolved denial-of-service
+advisory in `quick-xml 0.39`. The runtime XLSX parser dependency was removed;
+`.xlsx` files are still recognized but comparison now fails closed with a
+user-visible error instead of exposing the vulnerable parsing path. The
+remaining `quick-xml 0.39` reference is a GTK/Dioxus build-time protocol
+code-generation dependency (`wayland-scanner`), not a runtime input path. See
+`docs/src/maintainers/threat-model.md`.
+
+**Dioxus desktop network-capable dependency path constrained and enforced.**
+
+Dioxus desktop's loopback WebSocket transport (`tungstenite`/`native-tls`,
+used only for local WebView↔host IPC) is now an explicitly reviewed and
+accepted path rather than an unreviewed transitive dependency. Default Dioxus
+features and devtools remain disabled; the default menu bar was removed so the
+framework devtools toggle is not exposed as product UI. `cargo xtask
+audit-deps` enforces that `dioxus-devtools` stays inactive, that
+`tungstenite`/`native-tls` are reachable only through the reviewed
+`dioxus-desktop` path, and that no HTTP client/server crate (`reqwest`,
+`hyper`, `ureq`) is present.
+
+### Fixed
+
+**Stale asynchronous compare completions could target the wrong tab or load (RFC-075).**
+
+`open_compare`/`reload_tab` now allocate a process-local `CompareTabId` and a
+monotonic `LoadGeneration` per load. A background completion is written back
+only if it resolves the live tab by ID and matches the exact generation and
+`TabState::Loading` that started it; closing the tab, reindexing the tab list,
+or starting a newer reload silently invalidates the stale result instead of
+letting it overwrite newer state. Deterministic close/reindex and
+stale-reload regression tests were added in `forskscope-ui-logic` and
+`forskscope-ui`. This closes architecture-audit finding B1.
+
+### Packaging
+
+**Release archive layout, Windows, and macOS packaging hardened.**
+
+- Source and platform archives are verified against the no-parent-directory
+  layout contract (`cargo xtask archive-layout`) in both the local release
+  script and CI.
+- The Windows `.7z`/zip archive root was fixed so extracted files land at the
+  archive root instead of under a nested directory; release zip contents were
+  aligned to include the README, licence, notice, and changelog alongside the
+  executable.
+- macOS release DMGs are now built and published by the release workflow, with
+  build output cleaned before each build to avoid stale artifacts.
+- Release helper artifact names were aligned across platforms.
+
+### CI and release gates
+
+- `cargo-audit` is now pinned to a specific version in CI instead of floating
+  to latest, so an audit-tool update cannot silently change gate behaviour.
+- Release-artifact publishing actions and release-readiness gates were
+  aligned with the archive-layout and packaging changes above.
+- The release workflow's tag trigger was corrected from a `v`-prefixed pattern
+  (`v[0-9]+.[0-9]+.[0-9]+`) to the project's actual unprefixed tag convention
+  (`[0-9]+.[0-9]+.[0-9]+`); `${GITHUB_REF_NAME#v}` was replaced with
+  `${GITHUB_REF_NAME}` in both workflow uses. None of the project's published
+  tags ever matched the old pattern, so the release workflow had never fired
+  on a real tag; this release is the first to exercise it end to end.
+- `cargo xtask version-sync` now rejects a workspace version equal to an
+  already-published tag on a commit that is not that tag (skipped with an
+  explicit notice when no tags are available, e.g. a shallow checkout), so the
+  drift that made this release necessary cannot recur silently. CI now fetches
+  tags so the check runs for real instead of skipping.
+
+### Documentation
+
+Corrected several maintainer-facing documents to match observed/current
+behaviour rather than the state at the `0.164.0` tag: test-count tables in
+`docs/src/maintainers/testing.md`; removal of the `bridge/` shim re-export
+layer (deleted in RFC-073) from `docs/src/maintainers/architecture.md`; the
+settings-persistence section of `docs/src/maintainers/threat-model.md` now
+records the known gap tracked by audit finding B2 and RFC-076 instead of
+claiming no residual concern, and re-attributes security work landed after the
+`0.164.0` tag to this release instead of to `0.164.0`; `README.md`'s
+three-way-merge line now describes the conflict workspace UI as deferred
+post-v1 rather than "in progress", matching `ROADMAP.md` and RFC-074's
+non-goals; `docs/src/maintainers/release.md` now documents the unprefixed tag
+form and lists the `PKGBUILD` `pkgver` sync step before tagging, not after.
+
+---
+
 ## [0.164.0] — 2026-06-30
 
 Compare-view UI polish built on the published 0.163.0: full-width diff line

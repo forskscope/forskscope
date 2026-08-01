@@ -123,6 +123,7 @@ release remains No-Go.
 Handoffs inherit the lifecycle state of their matching RFC and do not override
 RFC design decisions.
 
+- [RFC-074 R0 stabilization-baseline handoff](./handoffs/074-v1-release-stabilization-program/r0-stabilization-baseline-handoff.md)
 - [RFC-075 implementation handoff](./handoffs/075-async-compare-identity-and-generation/implementation-handoff.md)
 - [RFC-076 implementation handoff](./handoffs/076-versioned-runtime-persistence/implementation-handoff.md)
 - [RFC-077 implementation handoff](./handoffs/077-mergetool-save-target-model/implementation-handoff.md)

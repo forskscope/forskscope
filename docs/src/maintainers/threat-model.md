@@ -1,6 +1,6 @@
 # Threat Model and Security Notes
 
-This document records the security posture of ForskScope at v0.164.0, the
+This document records the security posture of ForskScope at v0.165.0, the
 data flows that carry risk, the controls in place, and the known residual
 concerns. It is a living document; update it when a new data flow is added.
 
@@ -125,7 +125,17 @@ into the platform config directory (`dirs_next::config_dir()`) as `settings.json
 - The file is written synchronously from the settings dialog on every change.
   No background thread; no race with the UI signal reads.
 
-**Residual concerns:** none.
+**Residual concerns:** the running UI serializes its own `AppSettings` and
+`SessionState` structs directly through `app_json_settings::ConfigManager`
+rather than through the core's tested, schema-versioned `VersionedEnvelope`
+contract. Consequently, a settings or session file written by a future schema
+version, or one that is corrupted, is not distinguished from a missing file —
+`#[serde(default)]` causes it to silently deserialize to defaults rather than
+being preserved and reported to the user. This is tracked as architecture-audit
+finding B2 and is the subject of RFC-076 (Versioned Runtime Settings and
+Session Persistence), which makes the core the canonical schema owner, routes
+production load/save through it, and distinguishes first-run, legacy-migration,
+corruption, and future-version cases instead of collapsing them into defaults.
 
 ### 5. External tool launch (`core::external_tool`)
 
@@ -242,7 +252,7 @@ exception or split the dependency before release.
 | v0.151.0 | Compact view mode | Tree rendering path only; no new data flows |
 | v0.152.0 | Targets label; font family | UI only; no new data flows |
 | v0.152.0 (this audit) | **Fix:** `binary_cache` cleared on dir change; filter loop uses cache | Eliminates stale binary detection and redundant file I/O per render frame |
-| v0.164.0 | XLSX parser path removed; `.xlsx` comparison fails closed | Removes runtime user-supplied workbook XML exposure to vulnerable `quick-xml` path |
-| v0.164.0 | Dioxus desktop dependency policy reviewed | Accepts loopback WebSocket IPC only; `cargo xtask audit-deps` enforces no devtools and reviewed network-capable paths |
-| v0.164.0 | Release UI build compatibility with `dioxus-desktop`/`wry` | Enables `wry/devtools` method surface without `dioxus-devtools`; removes default Dioxus menu bar |
-| v0.164.0 | Release archive and CI gates aligned | Archive layout, version sync, i18n coverage, audit policy, and dependency paths are enforced before release artifact creation |
+| v0.165.0 | XLSX parser path removed; `.xlsx` comparison fails closed | Removes runtime user-supplied workbook XML exposure to vulnerable `quick-xml` path |
+| v0.165.0 | Dioxus desktop dependency policy reviewed | Accepts loopback WebSocket IPC only; `cargo xtask audit-deps` enforces no devtools and reviewed network-capable paths |
+| v0.165.0 | Release UI build compatibility with `dioxus-desktop`/`wry` | Enables `wry/devtools` method surface without `dioxus-devtools`; removes default Dioxus menu bar |
+| v0.165.0 | Release archive and CI gates aligned | Archive layout, version sync, i18n coverage, audit policy, and dependency paths are enforced before release artifact creation |

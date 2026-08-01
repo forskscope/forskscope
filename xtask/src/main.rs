@@ -5,7 +5,7 @@
 //!   cargo xtask css --check   — verify main.css is current (exits non-zero if stale)
 //!   cargo xtask audit-deps    — verify reviewed security dependency paths
 //!   cargo xtask i18n          — verify Japanese translations cover UI keys
-//!   cargo xtask version-sync [expected] — verify release/package version metadata is in sync
+//!   cargo xtask version-sync [expected] — verify version metadata is in sync (no-arg mode also rejects an already-published version)
 //!   cargo xtask archive-layout [archive] — verify source archive layout
 //!
 //! CSS source files under assets/css/ are assembled in alphabetical order.
@@ -270,6 +270,9 @@ fn run_version_sync(expected_version: Option<&str>) {
             "release version mismatch: expected {expected}, but [workspace.package] version is {version}"
         ));
     }
+    if expected_version.is_none() {
+        check_version_not_already_published(&root, &version);
+    }
 
     assert_contains(
         &root.join("xtask/Cargo.toml"),
@@ -305,6 +308,36 @@ fn run_version_sync(expected_version: Option<&str>) {
     }
 
     println!("version sync passed for v{version}.");
+}
+
+// No-arg mode only: fails if `version` is a tag that exists but not at HEAD.
+// Fails safe — any git/tag problem is a SKIPPED notice, never a silent pass.
+fn check_version_not_already_published(root: &Path, version: &str) {
+    let skip = |reason: &str| println!("version-sync: SKIPPED published-tag check — {reason}.");
+    let all = match git_lines(root, &["tag", "--list"]) {
+        Ok(lines) if !lines.is_empty() => lines,
+        Ok(_) => return skip("no tags found in this checkout (shallow clone?)"),
+        Err(reason) => return skip(&reason),
+    };
+    if !all.iter().any(|t| t == version) {
+        return;
+    }
+    match git_lines(root, &["tag", "--points-at", "HEAD"]) {
+        Ok(here) if here.iter().any(|t| t == version) => {}
+        Ok(_) => fail(&format!("version {version} already published; bump it")),
+        Err(reason) => skip(&reason),
+    }
+}
+
+// Runs a git command, returning trimmed non-empty stdout lines, or a reason it failed.
+fn git_lines(root: &Path, args: &[&str]) -> Result<Vec<String>, String> {
+    let out = Command::new("git").args(args).current_dir(root).output();
+    let out = out.map_err(|e| format!("git is unavailable: {e}"))?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    Ok(text.lines().map(str::to_string).collect())
 }
 
 fn run_archive_layout_check(archive: Option<&Path>) {

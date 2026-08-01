@@ -1,8 +1,12 @@
 # ForskScope Roadmap
 
-**Last updated:** v0.164.0 development baseline (2026-07-15)
-**Current phase:** v1 release stabilization — correctness workstreams first,
-then runtime/platform acceptance and a new architecture go/no-go review.
+**Last updated:** post-v0.164.0 stabilization baseline (2026-08-01)
+**Current phase:** v1 release stabilization — release-baseline reconciliation,
+then correctness workstreams, then runtime/platform acceptance and a new
+architecture go/no-go review.
+**Planning basis:** ordered tasks, dependencies, and exit gates. Milestones
+carry no calendar windows or effort estimates; a milestone completes when its
+gate evidence exists.
 
 ---
 
@@ -48,38 +52,93 @@ remain post-v1.
 
 [RFC-074](rfcs/proposed/074-v1-release-stabilization-program.md) is the
 authoritative program design. RFC-075 through RFC-078 define the detailed
-workstreams. Dates are a planning envelope assuming one primary Rust developer
-and timely owner review; milestone evidence, not elapsed time, determines
-completion.
+workstreams. Milestones are ordered by dependency and completed by gate
+evidence. No milestone carries a target date or effort estimate.
 
-| Milestone | Target window | Scope | Exit gate |
-|---|---|---|---|
-| M0 — Design approval | Jul 15–17 | Review RFC-074–078 and compatibility decisions | Owner and architect accept detailed designs |
-| M1 — Async identity | Jul 20–24 | Stable tab IDs, load generations, deterministic race tests | RFC-075 acceptance complete |
-| M2 — Persistence convergence | Jul 27–Aug 7 | Canonical schema v2 plus UI-v0/core-v1 migrations | RFC-076 acceptance complete |
-| M3 — Mergetool target safety | Aug 10–14 | Separate remote input/output identity and explicit match/absence preconditions | RFC-077 acceptance complete |
-| M4 — Integrated stabilization | Aug 17–21 | Full gates, docs/RFC reconciliation, advisory dispositions | Release-core candidate approved for QA |
-| M5 — Platform acceptance | Aug 24–Sep 11 | Linux Wayland/X11, Windows, macOS runtime matrix | RFC-078 evidence complete |
-| M6 — Handoff and go/no-go | Sep 14–18 | Refresh handoff and independent architecture review | Explicit v1 Go or continued No-Go |
+| # | Milestone | Scope | Depends on | Exit gate | Release |
+|---|---|---|---|---|---|
+| — | M0 — Design approval | RFC-074–078 designs and compatibility decisions | — | Owner and architect accept detailed designs | — |
+| — | M1 — Async identity | Stable tab IDs, load generations, deterministic race tests | M0 | RFC-075 acceptance complete | — |
+| 1 | R0 — Stabilization baseline | Version/CHANGELOG reconciliation for the unreleased delta; release-trigger reconciliation; documentation-truth fixes; version-sync tag check | M1 | Gate B plus an observed release-workflow run and owner release approval | 0.165.0 |
+| 2 | M2 — Persistence convergence | Canonical schema v2 plus UI-v0/core-v1 migrations | R0 | RFC-076 acceptance complete | 0.166.0 |
+| 3 | M3 — Mergetool target safety | Separate remote input/output identity and explicit match/absence preconditions | M1 (hard); sequenced after M2 | RFC-077 acceptance complete | 0.167.0 |
+| 4 | M4 — Integrated stabilization | Full gates, docs/RFC reconciliation, advisory dispositions, frozen `matrix-plan.md` | M2, M3 | Gate C — release-core candidate approved for QA | 0.168.0 candidate |
+| 5 | M5 — Platform acceptance | Linux Wayland/X11, Windows, macOS runtime matrix | M4 | Gate D — RFC-078 evidence complete | candidate re-cuts as needed |
+| 6 | M6 — Handoff and go/no-go | Refresh handoff and independent architecture review | M5 | Gate E — explicit v1 Go or continued No-Go | — |
 
-**Progress (2026-07-15):** M1 is complete and audit finding B1 is resolved.
-RFC-075 now guards asynchronous compare completion with stable tab IDs and
-per-load generations, backed by deterministic close/reindex and stale-reload
-tests. M2–M6 remain outstanding, so v1/public release remains **No-Go**.
+M3's only hard dependency is M1; it is sequenced after M2 because a single
+developer owns the overlapping UI state files. If ownership ever separates,
+M2 and M3 may run concurrently without changing any gate.
+
+**Progress (2026-08-01):** M0 and M1 are complete and audit finding B1 is
+resolved. RFC-075 guards asynchronous compare completion with stable tab IDs
+and per-load generations, backed by deterministic close/reindex and
+stale-reload tests; its documentation closure is committed. R0 is approved and
+is the active milestone. RFC-078 host access for Linux, Windows, and macOS is
+confirmed available, so M5 is schedulable once M4 completes. R0 and M2–M6
+remain outstanding, so v1/public release remains **No-Go**.
+
+### R0 rationale
+
+`0.164.0` is a published, immutable tag. The working tree has advanced well
+beyond it — including an MSRV change, the fail-closed XLSX decision, the
+Dioxus dependency-path constraint, release-archive and CI gate alignment, and
+the RFC-075 correctness fix — while `Cargo.toml` still declares `0.164.0`.
+
+A source build therefore reports a version whose published artifact behaves
+differently, and `PlatformInfo` propagates that version into `--diagnostics`
+and the About panel, so defect reports would be misattributed. `cargo xtask
+version-sync` does not detect this because it compares the workspace version
+against PKGBUILD and the MSIX manifest, not against published tags.
+
+R0 closes that gap before any further production change lands, and pulls the
+version/CHANGELOG reconciliation and the documentation-truth subset forward
+out of M4 so M4 is not a single large batch.
+
+R0 also repairs the release trigger. `.github/workflows/release.yml` fires on
+`v[0-9]+.[0-9]+.[0-9]+`, but this project tags without a `v` prefix and none of
+its published tags match that pattern. The workflow's gates and artifact jobs
+were aligned after the last tag was pushed, so the trigger has never been
+exercised. Until it is corrected, tagging a release runs no gates, builds no
+artifacts, and publishes nothing — so R0's own release evidence would not
+exist. The correction follows the documented tag rule rather than changing the
+convention.
 
 ### Workstream dependencies
 
 ```text
 RFC-074 program
-├── RFC-075 async identity ──────┐
-├── RFC-076 runtime persistence ├── integrated Gate C ── RFC-078 platform matrix
-└── RFC-077 mergetool target ───┘                         │
-         requires RFC-075                                 └── refreshed handoff + architect review
+└── RFC-075 async identity ......... done (M1)
+      └── R0 release baseline ...... 0.165.0
+            ├── RFC-076 runtime persistence ──┐
+            └── RFC-077 mergetool target ─────┤
+                      requires RFC-075        │
+                                              └── integrated Gate C
+                                                    └── RFC-078 platform matrix
+                                                          └── refreshed handoff
+                                                                └── architect Gate E
 ```
 
-RFC-076 may run in parallel with RFC-075 only with separate ownership of
-overlapping UI-state files. The default single-developer sequence is
-RFC-075 → RFC-076 → RFC-077 → integrated gates → RFC-078.
+RFC-075 is complete, so the remaining single-developer sequence is
+R0 → RFC-076 → RFC-077 → integrated gates → RFC-078 → refreshed handoff.
+
+### Release cycle
+
+The program releases one unit per resolved workstream rather than batching to
+a single pre-v1 cut. This matches the project's logical-breaking-point rule and
+keeps the CHANGELOG, version metadata, and packaging inputs continuously true.
+
+| Element | Policy |
+|---|---|
+| Release unit | One release per resolved workstream — an RFC disposition or a completed hardening theme |
+| Numbering | Continue `0.MINOR.0`; the patch level is reserved for corrections to an unpublished candidate |
+| Trigger | Workstream gate passes → bump all five version locations → CHANGELOG entry → source tarball delivered to the owner |
+| Version invariant | The workspace version must never equal an already-published tag. The first commit after a tag bumps the version |
+| Approval | Every release is approved by the project owner; no release is automatic |
+| v1.0.0 | Reserved. Gate E yields a Go/No-Go verdict only. Whether and when a Go becomes 1.0.0 is the project owner's decision alone |
+
+The version invariant is enforced by extending `cargo xtask version-sync` with
+a published-tag check during R0.
 
 ### Release-blocking outcomes
 
@@ -93,6 +152,34 @@ RFC-075 → RFC-076 → RFC-077 → integrated gates → RFC-078.
 - A refreshed handoff receives an independent architecture Go verdict.
 
 Until all five outcomes are evidenced, v1 remains No-Go.
+
+### Fix and improvement register
+
+Tracked non-blocking work, each assigned to the milestone that owns it. Items
+sourced from the 2026-07-15 architecture audit keep their audit finding ID.
+
+| ID | Item | Source | Milestone |
+|----|------|--------|-----------|
+| F1 | `docs/src/maintainers/testing.md` test counts stale (930/228 versus observed 943/241) | 2026-08-01 review | R0 |
+| F2 | `docs/src/maintainers/architecture.md` documents a shim re-export layer that no longer exists | 2026-08-01 review / audit N3 | R0 |
+| F3 | `docs/src/maintainers/threat-model.md` settings-persistence section claims no residual concerns, contradicting audit B2 | 2026-08-01 review | R0 |
+| F4 | Workspace version and CHANGELOG behind the published `0.164.0` tag | 2026-08-01 review | R0 |
+| F5 | `cargo xtask version-sync` cannot detect workspace version equal to a published tag | 2026-08-01 review | R0 |
+| F6 | `cargo clippy --workspace --all-targets` fails on test-target lints | audit N6 | M4 |
+| F7 | Allowed `cargo audit` warnings include unsoundness advisories needing individual disposition | audit N5 | M4 |
+| F8 | `FileFingerprint` digest is captured but unused at save time | audit N1 | M4 |
+| F9 | Atomic/power-loss durability wording exceeds what the implementation proves | audit N2 | M4/M5 |
+| F10 | VCS discovery tests assume the OS temp directory sits outside any repository | audit N7 | M4 |
+| F11 | RFC-058 status does not record the fail-closed security suspension | audit N4 | M4 |
+| F12 | RFC-062 is fully shipped but still filed under `proposed/` | RFC-074 | M4 |
+| F13 | Source files above the 300-ELOC soft threshold; `xtask/src/main.rs` is the largest | audit N6 | opportunistic, when touched |
+| F14 | Release workflow triggers on `v`-prefixed tags that this project never creates, so it has never run | 2026-08-01 review of 001 | R0 |
+| F15 | `README.md` describes the three-way conflict workspace UI as "in progress" although it is a deferred post-v1 slice and an explicit RFC-074 non-goal | 2026-08-01 review of 001 / review 001 finding B | R0 |
+| F16 | Public feature claims are not systematically audited for core-complete versus user-reachable status | review 001 finding B | M4 |
+
+Phase 3 candidates are recorded under "Remaining proposed RFCs" and the
+post-v1 slices below. They are deliberately unscheduled: post-v1 planning
+resumes as a joint discussion after the Gate E verdict.
 
 ---
 

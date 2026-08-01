@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+'
 
 env:
   CARGO_TERM_COLOR: always
@@ -62,7 +62,7 @@ jobs:
         run: cargo xtask audit-deps
 
       - name: Version metadata sync check
-        run: cargo xtask version-sync "${GITHUB_REF_NAME#v}"
+        run: cargo xtask version-sync "${GITHUB_REF_NAME}"
 
       - name: i18n coverage check
         run: cargo xtask i18n
@@ -80,7 +80,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - id: ver
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Create source archive
         run: |

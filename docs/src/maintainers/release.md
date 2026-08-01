@@ -9,7 +9,7 @@
 5. Reviewed security dependency paths are enforced: `cargo xtask audit-deps`
 6. CSS generated artifact is current: `cargo xtask css --check`
 7. Version metadata is synchronized: `cargo xtask version-sync`
-8. Release tag matches the workspace version: `cargo xtask version-sync "${GITHUB_REF_NAME#v}"`
+8. Release tag matches the workspace version: `cargo xtask version-sync "${GITHUB_REF_NAME}"`
 9. Japanese localization covers `t(...)` UI keys: `cargo xtask i18n`
 10. Source archive layout is verified: `cargo xtask archive-layout target/forskscope-vX.Y.Z.tar.gz`
 11. `CHANGELOG.md` updated with the new version and date.
@@ -78,12 +78,15 @@ pre-release phase:
 
 ## After local artifact checks
 
-1. Tag the commit: `git tag -a v${VER} -m "Release v${VER}"`.
-2. Push the tag. The release workflow builds the source and platform artifacts
+1. Update `pkgver` in `packaging/linux/PKGBUILD` to match the workspace version.
+   A comment in the file notes this requirement; failing to do so causes stale
+   Arch packages, and `cargo xtask version-sync` requires this to already match
+   before the release gates pass.
+2. Tag the commit: `git tag -a ${VER} -m "Release ${VER}"`. Tags are unprefixed
+   (`X.Y.Z`, no `v`) — the release workflow trigger only matches that form.
+3. Push the tag. The release workflow builds the source and platform artifacts
    and creates a draft GitHub release.
-3. Inspect the draft release artifacts before publishing.
-4. Update `pkgver` in `packaging/linux/PKGBUILD` to match the workspace version.
-   A comment in the file notes this requirement; failing to do so causes stale Arch packages.
+4. Inspect the draft release artifacts before publishing.
 
 ---
 

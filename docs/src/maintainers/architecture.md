@@ -88,7 +88,6 @@ Framework-independent view-model logic. All modules are testable with
 | `ui/search` | Inline search bar, `SearchCtx`, scroll-to-focused. |
 | `ui/keybindings` | Keyboard reference modal. |
 | `i18n` | English passthrough + Japanese key map. |
-| **Shim re-exports** | `command_bar`, `compare_summary`, `conflict_nav`, `deep_filter`, `explore_status`, `explorer_align`, `hunk_decorations`, `load_guard`, `palette_view`, `save_error`, `scroll_sync`, `search_index`, `settings_view`, `tab_state` — one shim per `ui-logic` module providing a stable import path for future wiring. |
 
 ## Core ownership rule
 

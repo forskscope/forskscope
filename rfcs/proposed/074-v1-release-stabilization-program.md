@@ -53,16 +53,20 @@ release-blocking program under that policy.
 
 ## Planning assumptions
 
-The calendar below is a planning envelope, not a promise. It assumes one
-primary Rust developer, owner review at each design/implementation gate, and
-access to Linux, Windows, and macOS test hosts by Milestone 5. If staffing or
-host access differs, preserve dependency order and rebaseline the dates in
-`ROADMAP.md`.
+The program is planned as an ordered sequence of tasks with explicit
+dependencies and gates. It carries no target dates and no effort estimates:
+the owner's decision of 2026-08-01 is that task content and task order are the
+schedule. A milestone is complete when its gate evidence exists, and not
+before.
 
 - Program start: 2026-07-15.
+- One primary Rust developer owns implementation; the architect owns design,
+  review, and gate evidence.
+- Linux, Windows, and macOS test hosts are confirmed available (owner,
+  2026-08-01), so Milestone 5 has no host-access precondition outstanding.
 - No feature work shares the files touched by RFC-075–RFC-077 until Milestone 4.
 - Each child RFC is reviewed before its implementation begins.
-- A milestone completes only from observed evidence, not elapsed time.
+- Ordering may change only by amending this RFC and `ROADMAP.md` together.
 
 ## Workstreams
 
@@ -78,19 +82,31 @@ own the overlapping UI state files. With one developer, the planned sequence
 is RFC-075, RFC-076, then RFC-077. RFC-078 starts only after all correctness
 workstreams pass their acceptance gates.
 
-## Milestones and schedule
+## Milestones and sequence
 
-| Milestone | Target window | Exit evidence | Release impact |
-|---|---|---|---|
-| M0 — Design approval | 2026-07-15 to 2026-07-17 | RFC-074–078 reviewed; owner and architect accept scope and compatibility decisions | Release remains No-Go |
-| M1 — Async identity | 2026-07-20 to 2026-07-24 | RFC-075 tests deterministically reject close/reindex and stale reload completions | B1 closed |
-| M2 — Persistence convergence | 2026-07-27 to 2026-08-07 | RFC-076 UI-v0 and core-v1 migrations, v2 round-trip, future-schema rejection, and runtime-path tests pass | B2 closed |
-| M3 — Mergetool target safety | 2026-08-10 to 2026-08-14 | RFC-077 existing/missing/appeared/deleted/changed merge-target tests and no-clobber creation pass | B3 closed |
-| M4 — Integrated stabilization gate | 2026-08-17 to 2026-08-21 | Full documented gates; docs/RFC status synchronized; advisory dispositions recorded | Code candidate eligible for runtime QA |
-| M5 — Platform acceptance | 2026-08-24 to 2026-09-11 | RFC-078 evidence matrix complete for Linux, Windows, and macOS; failures fixed or explicitly waived | B4 closed or release remains No-Go |
-| M6 — Handoff and go/no-go | 2026-09-14 to 2026-09-18 | Refreshed handoff, release candidate inventory, independent architect review | v1 decision may change |
+| Order | Milestone | Depends on | Exit evidence | Release impact |
+|---|---|---|---|---|
+| — | M0 — Design approval | — | RFC-074–078 reviewed; owner and architect accept scope and compatibility decisions | Release remains No-Go |
+| — | M1 — Async identity | M0 | RFC-075 tests deterministically reject close/reindex and stale reload completions | B1 closed |
+| 1 | R0 — Stabilization baseline | M1 | Version and CHANGELOG represent the unreleased delta; documentation-truth corrections landed; `version-sync` rejects an already-published version; release preflight passes; owner approves the release | No blocker closed; removes version-integrity drift |
+| 2 | M2 — Persistence convergence | R0 | RFC-076 UI-v0 and core-v1 migrations, v2 round-trip, future-schema rejection, and runtime-path tests pass | B2 closed |
+| 3 | M3 — Mergetool target safety | M1 (hard); sequenced after M2 | RFC-077 existing/missing/appeared/deleted/changed merge-target tests and no-clobber creation pass | B3 closed |
+| 4 | M4 — Integrated stabilization gate | M2, M3 | Full documented gates; docs/RFC status synchronized; advisory dispositions recorded; `matrix-plan.md` frozen | Code candidate eligible for runtime QA |
+| 5 | M5 — Platform acceptance | M4 | RFC-078 evidence matrix complete for Linux, Windows, and macOS; failures fixed or explicitly waived | B4 closed or release remains No-Go |
+| 6 | M6 — Handoff and go/no-go | M5 | Refreshed handoff, release candidate inventory, independent architect review | v1 decision may change |
 
-Dates are updated only in this RFC and `ROADMAP.md`; developer handoffs refer
+R0 is a release-baseline milestone, not a fifth correctness workstream. It
+closes no audit blocker. It exists because `0.164.0` is published and immutable
+while the working tree has advanced past it, so every later milestone would
+otherwise inherit a version number that misidentifies the code under test. R0
+pulls the version/CHANGELOG reconciliation and the documentation-truth subset
+forward out of M4 without adding scope.
+
+M3's only hard dependency is M1. It is sequenced after M2 because one developer
+owns the overlapping UI state files; separate ownership would permit
+concurrency without changing any gate.
+
+Sequence is updated only in this RFC and `ROADMAP.md`; developer handoffs refer
 to milestone IDs so they do not become competing schedules.
 
 ### Progress record
@@ -99,6 +115,27 @@ to milestone IDs so they do not become competing schedules.
   implementation checkpoints. Stable process-local tab IDs, per-load
   generations, centralized token validation, and deterministic close/reindex
   and stale-reload tests now guard both compare load paths.
+- **2026-08-01 — M1 closure committed; program rebaselined.** The RFC-075
+  documentation closure was accepted by rereview 031 and committed. Three
+  owner decisions were recorded: R0 is inserted as the next milestone and will
+  be released as `0.165.0`; the program drops calendar windows and effort
+  estimates in favour of task order and dependencies; RFC-078 host access for
+  Linux, Windows, and macOS is confirmed available, removing M5's outstanding
+  precondition. A new finding drove R0: the workspace version still declares
+  the published, immutable `0.164.0` while the tree carries an MSRV change, the
+  fail-closed XLSX decision, the dependency-path constraint, release/CI gate
+  alignment, and the RFC-075 fix.
+- **2026-08-01 — earlier review 001 re-examined.** The 2026-07-09 architecture
+  readiness review was re-checked against current evidence. Its five blocking
+  findings are closed except one: formatting passes, the four then-active
+  advisories are gone (`time` 0.3.47, `crossbeam-epoch` 0.9.20, and the
+  `sheets-diff -> calamine -> quick-xml` runtime path removed), the S-001
+  network claim is now an explicit reviewed acceptance, and the archive-layout
+  contract is enforced in both the script and PKGBUILD. Its finding 5 is only
+  partly closed: workflow content was aligned, but the release trigger has
+  never matched a real tag, so R0 gains the trigger repair. Its non-blocking
+  finding B is adopted as an M4 feature-claim reachability audit, with the
+  README three-way merge wording corrected at R0.
 - B2–B4, Gate C, runtime/platform evidence, and the final architecture verdict
   remain outstanding. The v1/public-release decision remains **No-Go**.
 
@@ -185,6 +222,22 @@ Only an explicit Go verdict may remove the v1 release block.
 
 ## Documentation and lifecycle updates
 
+At R0:
+
+- ensure the workspace version and CHANGELOG represent the unreleased delta;
+- correct the maintainer test-count table to observed values;
+- remove the architecture description of the shim re-export layer deleted by
+  RFC-073;
+- record the known settings-persistence gap in the threat model instead of
+  claiming no residual concern while B2 is open;
+- extend `cargo xtask version-sync` to reject a workspace version equal to an
+  already-published tag;
+- correct the release workflow trigger so it matches the project's unprefixed
+  `X.Y.Z` tag convention, and confirm from an observed run that gates and
+  artifact jobs actually execute;
+- correct the README three-way merge claim so it states the conflict workspace
+  UI is deferred post-v1 rather than in progress.
+
 At M4:
 
 - amend RFC-041's checklist and current counts;
@@ -192,7 +245,10 @@ At M4:
 - reconcile current architecture paths and persistence claims;
 - decide whether fully shipped RFC-062 moves to `done/`;
 - update save durability wording to match observed guarantees;
-- ensure the workspace version/changelog represent post-0.164.0 work.
+- audit every public feature claim in `README.md` and the user documentation
+  for core-complete versus user-reachable status, so a shipped domain model is
+  never presented as a usable feature;
+- freeze `matrix-plan.md` with exact OS versions before M5 begins.
 
 At M6, create a new handoff bundle. Do not amend the historical v0.164 bundle
 in place.
@@ -224,6 +280,10 @@ loss, unsoundness on a supported runtime, or a false public guarantee.
 | Platform QA begins before code stabilizes | RFC-078 depends on completion of RFC-075–077 and Gate C |
 | Schedule pressure turns waivers into silent omissions | Every skipped case has owner, reason, expiry, and release impact |
 | Historical RFCs conflict with current behavior | Amend status notes without deleting historical decisions |
+| Working tree carries a published version number, misidentifying binaries and defect reports | R0 reconciles the version and CHANGELOG; `version-sync` gains a published-tag check so the drift cannot recur silently |
+| RFC-076 rewrites the production persistence path | Design review after the schema/fixture patch, before any production load/save call is switched |
+| RFC-077 promotes `tempfile` from a dev-dependency to a normal dependency | Re-run `cargo xtask audit-deps` and `cargo audit` at that workstream gate |
+| Release automation is treated as evidence without ever having executed | R0 requires an observed workflow run, not workflow content review; any later gate added to release automation must be evidenced by a run before it counts |
 
 ## Acceptance criteria
 
@@ -240,8 +300,10 @@ loss, unsoundness on a supported runtime, or a false public guarantee.
 ## Recommended implementation sequence
 
 1. RFC-075: establish stable identity tokens before further async state work.
-2. RFC-076: converge persistence and migration while the release remains gated.
-3. RFC-077: build mergetool output identity on the stable tab/load model.
-4. Integrated gates and documentation reconciliation.
-5. RFC-078 platform matrix.
-6. Refreshed handoff and architecture review.
+2. R0: reconcile the release baseline so later milestones carry a version that
+   identifies the code under test.
+3. RFC-076: converge persistence and migration while the release remains gated.
+4. RFC-077: build mergetool output identity on the stable tab/load model.
+5. Integrated gates and documentation reconciliation.
+6. RFC-078 platform matrix.
+7. Refreshed handoff and architecture review.
