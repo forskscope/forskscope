@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.166.0] — Unreleased
+
 ## [0.165.0] — 2026-08-01
 
 Release-stabilization baseline (RFC-074 milestone R0). Reconciles the version
