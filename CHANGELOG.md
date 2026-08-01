@@ -13,14 +13,17 @@ and release automation with 26 commits that had accumulated past the published
 tightens the security and packaging posture. No user-facing diff/merge
 behaviour changed.
 
-**Windows artifact not included in this release.** The first real run of the
-now-corrected release workflow (this release is what exercised it) surfaced a
-pre-existing Windows build failure in `app-json-settings` (2.3.0, and 2.4.0
-the latest available): a `use std::os::windows::ffi::OsStrExt` is scoped to
-one function and does not cover a sibling function that also needs it. This
-is an upstream defect in `app-json-settings-rs`, not in ForskScope, and is not
-fixable from this repository. Tracked as F17. Linux, macOS, and the source
-archive are unaffected and included as usual.
+**Dependency fix: `app-json-settings` bumped to 2.4.1.** The first real run of
+the now-corrected release workflow (this release is what exercised it)
+surfaced a pre-existing Windows build failure in `app-json-settings` 2.3.0: a
+`use std::os::windows::ffi::OsStrExt` was scoped to one function and did not
+cover a sibling function that also needed it (also present in 2.4.0). This was
+an upstream defect in `app-json-settings-rs`, not in ForskScope. It was
+reported upstream and fixed same-day in 2.4.1, verified here by cross-compiling
+for a Windows target before and after the bump. No public API, dependency-set,
+or behaviour change on any platform; non-Windows builds were never affected.
+Tracked as F17 (resolved). All four release artifacts (source, Linux, macOS,
+Windows) are included in this release.
 
 ### Security
 

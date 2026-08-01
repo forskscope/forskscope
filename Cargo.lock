@@ -43,9 +43,9 @@ checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
 
 [[package]]
 name = "app-json-settings"
-version = "2.3.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "172cc6616cebecc06fa71d458cddfc6f36abec34559d3fd57d77a6e74a7d424b"
+checksum = "4046d3b77200ab250ad7174ea6cf8ab0ea96f519b6ae85229a99c0edadfb2843"
 dependencies = [
  "serde",
  "serde_json",
