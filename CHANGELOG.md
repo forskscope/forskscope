@@ -13,6 +13,15 @@ and release automation with 26 commits that had accumulated past the published
 tightens the security and packaging posture. No user-facing diff/merge
 behaviour changed.
 
+**Windows artifact not included in this release.** The first real run of the
+now-corrected release workflow (this release is what exercised it) surfaced a
+pre-existing Windows build failure in `app-json-settings` (2.3.0, and 2.4.0
+the latest available): a `use std::os::windows::ffi::OsStrExt` is scoped to
+one function and does not cover a sibling function that also needs it. This
+is an upstream defect in `app-json-settings-rs`, not in ForskScope, and is not
+fixable from this repository. Tracked as F17. Linux, macOS, and the source
+archive are unaffected and included as usual.
+
 ### Security
 
 **MSRV raised to 1.91; `.xlsx` comparison disabled pending a safe parser path.**
