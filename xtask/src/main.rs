@@ -324,12 +324,14 @@ fn check_version_not_already_published(root: &Path, version: &str) {
     }
     match git_lines(root, &["tag", "--points-at", "HEAD"]) {
         Ok(here) if here.iter().any(|t| t == version) => {}
-        Ok(_) => fail(&format!("version {version} already published; bump it")),
+        Ok(_) => fail(&format!("version {version} is already tagged; bump it")),
         Err(reason) => skip(&reason),
     }
 }
 
-// Runs a git command, returning trimmed non-empty stdout lines, or a reason it failed.
+// Runs a git command, returning its stdout split into lines (as `git tag`
+// emits them: one tag per line, no blank lines, no padding), or a reason it
+// failed.
 fn git_lines(root: &Path, args: &[&str]) -> Result<Vec<String>, String> {
     let out = Command::new("git").args(args).current_dir(root).output();
     let out = out.map_err(|e| format!("git is unavailable: {e}"))?;

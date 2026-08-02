@@ -88,12 +88,19 @@ workstreams pass their acceptance gates.
 |---|---|---|---|---|
 | — | M0 — Design approval | — | RFC-074–078 reviewed; owner and architect accept scope and compatibility decisions | Release remains No-Go |
 | — | M1 — Async identity | M0 | RFC-075 tests deterministically reject close/reindex and stale reload completions | B1 closed |
-| 1 | R0 — Stabilization baseline | M1 | Version and CHANGELOG represent the unreleased delta; documentation-truth corrections landed; `version-sync` rejects an already-published version; release preflight passes; owner approves the release | No blocker closed; removes version-integrity drift |
-| 2 | M2 — Persistence convergence | R0 | RFC-076 UI-v0 and core-v1 migrations, v2 round-trip, future-schema rejection, and runtime-path tests pass | B2 closed |
-| 3 | M3 — Mergetool target safety | M1 (hard); sequenced after M2 | RFC-077 existing/missing/appeared/deleted/changed merge-target tests and no-clobber creation pass | B3 closed |
-| 4 | M4 — Integrated stabilization gate | M2, M3 | Full documented gates; docs/RFC status synchronized; advisory dispositions recorded; `matrix-plan.md` frozen | Code candidate eligible for runtime QA |
-| 5 | M5 — Platform acceptance | M4 | RFC-078 evidence matrix complete for Linux, Windows, and macOS; failures fixed or explicitly waived | B4 closed or release remains No-Go |
-| 6 | M6 — Handoff and go/no-go | M5 | Refreshed handoff, release candidate inventory, independent architect review | v1 decision may change |
+| — | R0 — Stabilization baseline | M1 | Version and CHANGELOG represent the unreleased delta; documentation-truth corrections landed; `version-sync` rejects an already-published version; release preflight passes; owner approves the release | No blocker closed; removed version-integrity drift |
+| 1 | M2 — Release mechanics and persistence convergence | R0 | **M2-A:** CHANGELOG-sourced release notes, release policy documented, threat-model currency (F19–F22), verified at the next real cut. **M2-B:** RFC-076 UI-v0 and core-v1 migrations, v2 round-trip, future-schema rejection, and runtime-path tests pass | B2 closed |
+| 2 | M3 — Mergetool target safety | M1 (hard); sequenced after M2 | RFC-077 existing/missing/appeared/deleted/changed merge-target tests and no-clobber creation pass | B3 closed |
+| 3 | M4 — Integrated stabilization gate | M2, M3 | Full documented gates; docs/RFC status synchronized; advisory dispositions recorded; `matrix-plan.md` frozen | Code candidate eligible for runtime QA |
+| 4 | M5 — Platform acceptance | M4 | RFC-078 evidence matrix complete for Linux, Windows, and macOS; failures fixed or explicitly waived | B4 closed or release remains No-Go |
+| 5 | M6 — Handoff and go/no-go | M5 | Refreshed handoff, release candidate inventory, independent architect review | v1 decision may change |
+
+M2 carries two slices because three consecutive defects were found in release
+mechanics — an unfired trigger, a contradictory numbering rule, and inert notes
+generation — all sharing the shape of configuration credited as working without
+ever being exercised. M2-A treats the pipeline as one unit and lands before
+M2-B so that a release-mechanics change is not reviewed under the attention a
+production persistence rewrite demands.
 
 R0 is a release-baseline milestone, not a fifth correctness workstream. It
 closes no audit blocker. It exists because `0.164.0` is published and immutable
@@ -136,6 +143,40 @@ to milestone IDs so they do not become competing schedules.
   never matched a real tag, so R0 gains the trigger repair. Its non-blocking
   finding B is adopted as an M4 feature-claim reachability audit, with the
   README three-way merge wording corrected at R0.
+- **2026-08-01 — R0 complete; `0.165.0` released.** The version and CHANGELOG
+  were reconciled with the 26-commit delta past the published `0.164.0` tag,
+  the release-workflow trigger was corrected to the project's unprefixed tag
+  form, `cargo xtask version-sync` gained a published-tag check, and five
+  documentation-truth defects were fixed. Review 032 conditionally approved the
+  work with six documentation-currency follow-ups carried into `0.166.0`.
+
+  R0's defining outcome was procedural: requiring an *observed* release-workflow
+  run rather than a configuration review immediately exposed F17, a Windows
+  build failure in the `app-json-settings` dependency, which was reported
+  upstream, fixed in 2.4.1, and re-verified before tagging. Configuration
+  review could not have found it. Two rules follow for every future
+  release-bearing handoff, and neither was stated in R0's:
+
+  1. a red platform job in a release run is a stop-and-report condition, not an
+     occasion to complete the release by another route;
+  2. release actions divide into three, and only the last is manual: CI builds
+     the artifacts and creates the draft; CI composes the release notes from
+     the tag's CHANGELOG section; a human publishes the draft. Publishing stays
+     manual deliberately — draft state is the owner's approval gate and the
+     inspection window that made R0's red Windows job recoverable. Creating or
+     composing by hand bypasses evidence; publishing by hand is the control.
+
+- **2026-08-02 — `0.165.0` published; release-cycle numbering corrected.** The
+  release is out of draft. An owner challenge exposed that the program's
+  numbering rule (`0.MINOR.0` unconditionally) contradicted
+  `docs/src/maintainers/release.md`'s content-driven scheme, and that R0's
+  post-release bump had applied the former automatically — pre-committing the
+  next release to a minor level before its scope existed. `release.md` is
+  reaffirmed as authoritative: the post-release bump now defaults to the next
+  patch level, and promotion to minor happens at release time from observed
+  content with owner confirmation. The tree was re-bumped `0.166.0` → `0.165.1`
+  accordingly. Registered as F19–F21 against M2.
+
 - B2–B4, Gate C, runtime/platform evidence, and the final architecture verdict
   remain outstanding. The v1/public-release decision remains **No-Go**.
 

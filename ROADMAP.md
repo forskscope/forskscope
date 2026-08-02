@@ -1,6 +1,6 @@
 # ForskScope Roadmap
 
-**Last updated:** post-v0.164.0 stabilization baseline (2026-08-01)
+**Last updated:** 0.165.0 released; 0.166.0 in development (2026-08-01)
 **Current phase:** v1 release stabilization — release-baseline reconciliation,
 then correctness workstreams, then runtime/platform acceptance and a new
 architecture go/no-go review.
@@ -59,24 +59,42 @@ evidence. No milestone carries a target date or effort estimate.
 |---|---|---|---|---|---|
 | — | M0 — Design approval | RFC-074–078 designs and compatibility decisions | — | Owner and architect accept detailed designs | — |
 | — | M1 — Async identity | Stable tab IDs, load generations, deterministic race tests | M0 | RFC-075 acceptance complete | — |
-| 1 | R0 — Stabilization baseline | Version/CHANGELOG reconciliation for the unreleased delta; release-trigger reconciliation; documentation-truth fixes; version-sync tag check | M1 | Gate B plus an observed release-workflow run and owner release approval | 0.165.0 |
-| 2 | M2 — Persistence convergence | Canonical schema v2 plus UI-v0/core-v1 migrations | R0 | RFC-076 acceptance complete | 0.166.0 |
-| 3 | M3 — Mergetool target safety | Separate remote input/output identity and explicit match/absence preconditions | M1 (hard); sequenced after M2 | RFC-077 acceptance complete | 0.167.0 |
-| 4 | M4 — Integrated stabilization | Full gates, docs/RFC reconciliation, advisory dispositions, frozen `matrix-plan.md` | M2, M3 | Gate C — release-core candidate approved for QA | 0.168.0 candidate |
-| 5 | M5 — Platform acceptance | Linux Wayland/X11, Windows, macOS runtime matrix | M4 | Gate D — RFC-078 evidence complete | candidate re-cuts as needed |
-| 6 | M6 — Handoff and go/no-go | Refresh handoff and independent architecture review | M5 | Gate E — explicit v1 Go or continued No-Go | — |
+| — | R0 — Stabilization baseline | Version/CHANGELOG reconciliation for the unreleased delta; release-trigger reconciliation; documentation-truth fixes; version-sync tag check | M1 | Gate B plus an observed release-workflow run and owner release approval | 0.165.0 |
+| 1 | M2 — Release mechanics and persistence convergence | **M2-A:** release-notes composition, release policy documentation, threat-model currency (F19–F22). **M2-B:** canonical schema v2 plus UI-v0/core-v1 migrations | R0 | M2-A content review plus verification at the next real release cut; RFC-076 acceptance complete | level decided at release time |
+| 2 | M3 — Mergetool target safety | Separate remote input/output identity and explicit match/absence preconditions | M1 (hard); sequenced after M2 | RFC-077 acceptance complete | 0.167.0 |
+| 3 | M4 — Integrated stabilization | Full gates, docs/RFC reconciliation, advisory dispositions, frozen `matrix-plan.md` | M2, M3 | Gate C — release-core candidate approved for QA | 0.168.0 candidate |
+| 4 | M5 — Platform acceptance | Linux Wayland/X11, Windows, macOS runtime matrix | M4 | Gate D — RFC-078 evidence complete | candidate re-cuts as needed |
+| 5 | M6 — Handoff and go/no-go | Refresh handoff and independent architecture review | M5 | Gate E — explicit v1 Go or continued No-Go | — |
 
 M3's only hard dependency is M1; it is sequenced after M2 because a single
 developer owns the overlapping UI state files. If ownership ever separates,
 M2 and M3 may run concurrently without changing any gate.
 
-**Progress (2026-08-01):** M0 and M1 are complete and audit finding B1 is
-resolved. RFC-075 guards asynchronous compare completion with stable tab IDs
-and per-load generations, backed by deterministic close/reindex and
-stale-reload tests; its documentation closure is committed. R0 is approved and
-is the active milestone. RFC-078 host access for Linux, Windows, and macOS is
-confirmed available, so M5 is schedulable once M4 completes. R0 and M2–M6
-remain outstanding, so v1/public release remains **No-Go**.
+**Progress (2026-08-01):** M0, M1, and R0 are complete. RFC-075 guards
+asynchronous compare completion with stable tab IDs and per-load generations,
+resolving audit finding B1.
+
+R0 released `0.165.0`. It reconciled the version and CHANGELOG with the
+26-commit delta that had accumulated past the published `0.164.0` tag, repaired
+the release-workflow trigger, added a published-tag check to
+`cargo xtask version-sync`, and corrected five documentation-truth defects. The
+first real release-workflow run surfaced F17, a Windows build failure in the
+`app-json-settings` dependency that no amount of configuration review would
+have found; it was reported upstream, fixed in 2.4.1, and re-verified before
+the tag. All six release jobs are green and the four artifacts are digest-
+recorded. Reviewed and conditionally approved with six documentation-currency
+follow-ups carried into `0.166.0`.
+
+`0.165.0` is published (2026-08-02). The working tree is at `0.165.1` — the
+post-release patch default, not a claim that the next release is a patch. M2's
+content will decide its level; RFC-076's persistence schema change is expected
+to promote it to `0.166.0` at release time. The N1–N6 documentation-currency
+follow-ups from review 032 (registered as F19–F21) ride with M2 rather than
+shipping separately.
+
+RFC-078 host access for Linux, Windows, and macOS is confirmed available, so M5
+is schedulable once M4 completes. M2–M6 remain outstanding and R0 closed no
+audit blocker, so v1/public release remains **No-Go**.
 
 ### R0 rationale
 
@@ -131,14 +149,23 @@ keeps the CHANGELOG, version metadata, and packaging inputs continuously true.
 | Element | Policy |
 |---|---|
 | Release unit | One release per resolved workstream — an RFC disposition or a completed hardening theme |
-| Numbering | Continue `0.MINOR.0`; the patch level is reserved for corrections to an unpublished candidate |
-| Trigger | Workstream gate passes → bump all five version locations → CHANGELOG entry → source tarball delivered to the owner |
-| Version invariant | The workspace version must never equal an already-published tag. The first commit after a tag bumps the version |
-| Approval | Every release is approved by the project owner; no release is automatic |
+| Numbering | `docs/src/maintainers/release.md` is authoritative and content-driven: `PATCH` for bug fixes and documentation updates within a stable feature set, `MINOR` for new user-visible features or significant internal changes |
+| Post-release default | The commit after a release bumps to the next **patch** level. That satisfies the version invariant while claiming nothing about content |
+| Promotion | At release time, the accumulated content decides the level. Promoting patch → minor is a rename across the six enforced locations plus the CHANGELOG heading, confirmed by the owner with the content visible |
+| Trigger | Workstream gate passes → set the release version → CHANGELOG entry → source tarball delivered to the owner |
+| Version invariant | The workspace version must never equal an existing tag on any commit other than that tag's own |
+| Approval | Every release and its version level are confirmed by the project owner; no release is automatic |
 | v1.0.0 | Reserved. Gate E yields a Go/No-Go verdict only. Whether and when a Go becomes 1.0.0 is the project owner's decision alone |
 
-The version invariant is enforced by extending `cargo xtask version-sync` with
-a published-tag check during R0.
+The version invariant is enforced by `cargo xtask version-sync`'s published-tag
+check, added in R0.
+
+The post-release default and promotion rules exist because the level cannot be
+known before the content is. An earlier revision of this table specified
+`0.MINOR.0` unconditionally, which contradicted `release.md` and caused R0's
+post-release bump to pre-commit the next release to a minor level before its
+scope existed. Defaulting to patch keeps the number mechanical and the level a
+decision made from evidence.
 
 ### Release-blocking outcomes
 
@@ -176,6 +203,11 @@ sourced from the 2026-07-15 architecture audit keep their audit finding ID.
 | F14 | Release workflow triggers on `v`-prefixed tags that this project never creates, so it has never run | 2026-08-01 review of 001 | R0 |
 | F15 | `README.md` describes the three-way conflict workspace UI as "in progress" although it is a deferred post-v1 slice and an explicit RFC-074 non-goal | 2026-08-01 review of 001 / review 001 finding B | R0 |
 | F16 | Public feature claims are not systematically audited for core-complete versus user-reachable status | review 001 finding B | M4 |
+| F18 | `xtask` is outside `cargo fmt --check` (not a workspace member, DEC-005), so `xtask/src/main.rs` has drifted from current rustfmt output; the drift nearly pushed R0's addition over the 500-ELOC hard threshold | review 032 / R0 review question 3 | M4 |
+| F19 | `docs/src/maintainers/release.md` has no re-release or immutability policy, although that policy governed R0's tag re-cut; it exists only in the superseded v0.164.0 handoff bundle | review 032 (N2) | M2 |
+| F20 | Threat-model audit history omits the RFC-075 integrity fix and retains the superseded v0.148.0 stale-tab-guard claim; section heading still reads v0.164.0 | review 032 (N3, N4) | M2 |
+| F21 | `release.md` must record the corrected release-cycle rules: post-release patch default, promotion at release time, and the definition of "published" as a release out of draft state — aligned with the `version-sync` check, which keys on tag existence | 2026-08-02 owner decision | M2 |
+| F22 | Release notes are produced by `generate_release_notes: true`, which summarises pull requests; this project commits directly to `main`, so it emits only a compare link and ignores the CHANGELOG. Compose notes in CI from the tag's CHANGELOG section, failing closed when absent, and document the publish step as an explicit owner action | 2026-08-02 owner question | M2 |
 | F17 | **Resolved.** Windows release build failed: `app-json-settings` 2.3.0/2.4.0 had an out-of-scope `use std::os::windows::ffi::OsStrExt` in `replace_file`'s local scope that did not cover the sibling `wide_null_terminated` function, which also calls `.encode_wide()`. Discovered by R0's first real release-workflow run — this is why R0 required an observed run rather than a configuration review. Reported upstream to `github.com/nabbisen/app-json-settings-rs`; fixed same-day in 2.4.1. Bumped and re-verified (Windows cross-compile, full gate suite) before the 0.165.0 tag. | 2026-08-01 R0 release run | R0 |
 
 Phase 3 candidates are recorded under "Remaining proposed RFCs" and the
@@ -215,7 +247,7 @@ resumes as a joint discussion after the Gate E verdict.
 
 ---
 
-## UI implementation slices — status at v0.164.0
+## UI implementation slices — status at v0.165.0
 
 The remaining work is a series of UI slices that wire the Dioxus components
 to the core types. Each slice delivers a testable, usable increment.

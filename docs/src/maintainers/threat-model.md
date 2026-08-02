@@ -26,7 +26,7 @@ no persisted user secrets, and no user-account data.
 
 ---
 
-## Data flows and controls (v0.164.0)
+## Data flows and controls (v0.165.0)
 
 ### 1. File load and diff (`open_compare`, `reload_tab`)
 
@@ -252,6 +252,7 @@ exception or split the dependency before release.
 | v0.151.0 | Compact view mode | Tree rendering path only; no new data flows |
 | v0.152.0 | Targets label; font family | UI only; no new data flows |
 | v0.152.0 (this audit) | **Fix:** `binary_cache` cleared on dir change; filter loop uses cache | Eliminates stale binary detection and redundant file I/O per render frame |
+| v0.165.0 | Async compare load-token guard (RFC-075) — **supersedes the v0.148.0 row's claim**, which audit finding B1 established was insufficient | Stable `CompareTabId` + per-load `LoadGeneration` prevent integrity failures in which content from one user-selected path pair is displayed or saved under another tab identity; a stale-tab check alone did not guard against a newer reload on the same tab |
 | v0.165.0 | XLSX parser path removed; `.xlsx` comparison fails closed | Removes runtime user-supplied workbook XML exposure to vulnerable `quick-xml` path |
 | v0.165.0 | Dioxus desktop dependency policy reviewed | Accepts loopback WebSocket IPC only; `cargo xtask audit-deps` enforces no devtools and reviewed network-capable paths |
 | v0.165.0 | Release UI build compatibility with `dioxus-desktop`/`wry` | Enables `wry/devtools` method surface without `dioxus-devtools`; removes default Dioxus menu bar |

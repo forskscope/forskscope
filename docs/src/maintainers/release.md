@@ -74,6 +74,46 @@ pre-release phase:
 - `MINOR` bumps for new user-visible features or significant internal changes.
 - `MAJOR` will be 1 when the first stable public release ships (RFC-041).
 
+**Post-release bump default.** This document is the authoritative,
+content-driven source for version level — not a mechanical roadmap rule. The
+commit immediately after a release bumps the workspace version to the next
+**patch** level by default. That satisfies the version invariant (the
+workspace version must never equal an already-published tag) while claiming
+nothing about the next release's content. At release time, once the
+accumulated changes are visible, the owner confirms whether the level should
+be promoted from patch to minor (or major). The level cannot be known before
+the content is: an earlier roadmap rule that bumped to the next minor
+mechanically, on every post-release commit, pre-committed a release to a
+scope before that scope existed.
+
+---
+
+## Publication and immutability
+
+> A version is **published** once its GitHub Release leaves draft state.
+> Before that point the tag may be re-cut: delete the remote tag, re-tag the
+> corrected commit, and record the re-cut in that version's CHANGELOG entry.
+> After that point the version is immutable — supersede it with a new patch
+> version. Never re-cut a tag whose release has left draft, even to fix a
+> broken build.
+
+**Tagged versus published is not the same line, on purpose.**
+`cargo xtask version-sync`'s no-arg check keys on **tag existence** — the
+workspace version must never equal an already-pushed tag. This policy defines
+**published** as **out of draft**, a later and stricter line. That asymmetry
+is intentional: a pushed tag is the practical, earliest point where a version
+number can collide, so the automated check catches it there. Publication is
+the point of no return for the release itself. Do not read the two as
+contradictory or try to make `version-sync` key on draft state instead — the
+tag check needs to run before any release exists to check.
+
+**Caution:** `gh release delete --cleanup-tag` deletes the **remote tag** as
+well as the release. The flag name reads as scoped to the release; it is not.
+If cleaning up a mistakenly created release, delete the release only
+(`gh release delete <tag>`) unless you specifically intend to also remove the
+tag, and if the tag disappears unexpectedly, recover it from the local
+annotated tag object (`git tag -l <tag>`) and re-push.
+
 ---
 
 ## After local artifact checks
@@ -84,9 +124,17 @@ pre-release phase:
    before the release gates pass.
 2. Tag the commit: `git tag -a ${VER} -m "Release ${VER}"`. Tags are unprefixed
    (`X.Y.Z`, no `v`) — the release workflow trigger only matches that form.
-3. Push the tag. The release workflow builds the source and platform artifacts
-   and creates a draft GitHub release.
-4. Inspect the draft release artifacts before publishing.
+3. Push the tag. The release workflow builds the source and platform artifacts,
+   composes release notes from the tag's `CHANGELOG.md` section, and creates a
+   **draft** GitHub release. It does not publish anything by itself.
+4. **Publish is a separate, explicit owner action — this is the approval gate,
+   not a formality.** Inspect the draft release artifacts and composed notes,
+   then publish:
+   ```sh
+   gh release edit "${VER}" --draft=false
+   ```
+   Before that command runs, the version is only tagged. After it runs, the
+   version is published and immutable per the policy above.
 
 ---
 
