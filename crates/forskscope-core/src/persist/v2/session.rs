@@ -9,6 +9,7 @@
 //! it only produces path pairs for the caller to open.
 
 mod repository;
+pub mod runtime;
 
 pub use repository::SessionRepository;
 

@@ -44,6 +44,10 @@ mod repository;
 pub mod session;
 pub mod settings;
 
+/// Re-exported because it appears in [`settings::SettingsRepository::commit_migration`]
+/// and [`session::SessionRepository::commit_migration`]'s public signatures.
+pub use repository::PersistenceCommitError;
+
 /// The outcome of loading one persisted file, distinguishing every case RFC-076
 /// requires the caller to handle differently. Never collapses a distinguishable
 /// failure into a default.

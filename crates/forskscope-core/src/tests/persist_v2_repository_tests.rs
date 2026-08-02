@@ -1,22 +1,40 @@
-//! RFC-076 patch 2: explicit-path repository safe-write tests.
+//! RFC-076 patch 2/3: explicit-path repository safe-write tests.
 //!
 //! Covers the handoff's "Repository and safe-write tests" acceptance:
 //! `Missing` on an absent file, save/load round-trip, migration-commit
-//! backup semantics (created once, never overwritten by a retry), and that
-//! an ordinary save leaves no stray temp file behind. Every path here is a
-//! temporary explicit path — never the developer's real config directory.
+//! backup semantics (created once, never overwritten by a retry), that an
+//! ordinary save leaves no stray temp file behind, and (patch 3, review 037
+//! N1) that `commit_migration` refuses to proceed when the file changed
+//! since the caller's `load_with_raw`, plus a real failure-window case
+//! proving the backup survives a write that fails after it succeeds. Every
+//! path here is a temporary explicit path — never the developer's real
+//! config directory.
 
 use std::fs;
 use std::path::PathBuf;
 
-use crate::persist::v2::PersistenceLoad;
 use crate::persist::v2::session::{PersistedSessionV2, SessionRepository};
 use crate::persist::v2::settings::{PersistedSettingsV2, SettingsRepository};
+use crate::persist::v2::{PersistenceCommitError, PersistenceLoad};
 
 fn temp_path(tag: &str, file_name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("fsk-persist-v2-{tag}-{}", std::process::id()));
     let _ = fs::create_dir_all(&dir);
     dir.join(file_name)
+}
+
+fn backup_path_for(path: &std::path::Path) -> PathBuf {
+    path.with_file_name(format!(
+        "{}.pre-v2.bak",
+        path.file_name().unwrap().to_string_lossy()
+    ))
+}
+
+fn temp_write_path_for(path: &std::path::Path) -> PathBuf {
+    path.with_file_name(format!(
+        ".{}.fsk-tmp",
+        path.file_name().unwrap().to_string_lossy()
+    ))
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────
@@ -107,25 +125,104 @@ fn settings_commit_migration_creates_backup_and_v2_file() {
 
 #[test]
 fn settings_commit_migration_does_not_overwrite_existing_backup() {
+    // A backup already on disk (e.g. left by a prior attempt that crashed
+    // after the backup but before the replace — see
+    // `settings_commit_migration_survives_failure_between_backup_and_replace`
+    // below) must survive a subsequent successful commit untouched.
     let path = temp_path("settings-migrate-retry", "settings.json");
-    let first_original = b"first original bytes";
-    fs::write(&path, first_original).unwrap();
+    let original = b"current original bytes";
+    fs::write(&path, original).unwrap();
+    let backup_path = backup_path_for(&path);
+    let stale_backup = b"a backup already on disk from a prior attempt";
+    fs::write(&backup_path, stale_backup).unwrap();
 
     let repo = SettingsRepository::new(path.clone());
-    let first = repo
-        .commit_migration(&PersistedSettingsV2::default(), first_original)
-        .unwrap();
-    let backup_path = first.backup_path.unwrap();
+    let outcome = repo
+        .commit_migration(&PersistedSettingsV2::default(), original)
+        .expect("commit_migration must succeed");
 
-    // Simulate a retried commit with different "original" bytes (e.g. a
-    // second migration attempt on an already-migrated file, or a caller
-    // bug) — the first backup must survive untouched.
-    let second_original = b"different bytes from a retried attempt";
-    let second = repo
-        .commit_migration(&PersistedSettingsV2::default(), second_original)
-        .unwrap();
-    assert_eq!(second.backup_path.unwrap(), backup_path);
-    assert_eq!(fs::read(&backup_path).unwrap(), first_original);
+    assert_eq!(outcome.backup_path.as_deref(), Some(backup_path.as_path()));
+    assert_eq!(fs::read(&backup_path).unwrap(), stale_backup);
+}
+
+#[test]
+fn settings_commit_migration_rejects_stale_bytes_after_external_change() {
+    let path = temp_path("settings-migrate-conflict", "settings.json");
+    let original = br#"{"theme":"dark"}"#;
+    fs::write(&path, original).unwrap();
+    let repo = SettingsRepository::new(path.clone());
+
+    // Something touches the file after the caller's `load_with_raw` produced
+    // `original` but before `commit_migration` runs.
+    let changed = b"changed after load, before commit";
+    fs::write(&path, changed).unwrap();
+
+    let err = repo
+        .commit_migration(&PersistedSettingsV2::default(), original)
+        .expect_err("must reject stale original_bytes");
+    assert_eq!(err, PersistenceCommitError::Conflict);
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        changed,
+        "target must be untouched"
+    );
+    assert!(
+        !backup_path_for(&path).exists(),
+        "no backup should be created for a rejected commit"
+    );
+}
+
+#[test]
+fn settings_commit_migration_survives_failure_between_backup_and_replace() {
+    // Review 037 §4.4: exercise the actual failure window (backup succeeds,
+    // then the write fails) using only ordinary filesystem behaviour —
+    // obstruct the sibling temp path `atomic_replace` writes to, so its
+    // `fs::write` fails, without needing OS-level fault injection.
+    let path = temp_path("settings-migrate-failwindow", "settings.json");
+    let original = br#"{"theme":"dark"}"#;
+    fs::write(&path, original).unwrap();
+    fs::create_dir_all(temp_write_path_for(&path)).unwrap();
+
+    let repo = SettingsRepository::new(path.clone());
+    let result = repo.commit_migration(&PersistedSettingsV2::default(), original);
+    assert!(
+        result.is_err(),
+        "the write must fail because its temp path is a directory"
+    );
+
+    assert_eq!(
+        fs::read(backup_path_for(&path)).unwrap(),
+        original,
+        "backup must survive the failed write"
+    );
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        original,
+        "target must be untouched by the failed write"
+    );
+}
+
+#[test]
+fn settings_load_with_raw_pairs_bytes_with_the_loaded_value() {
+    let path = temp_path("settings-load-raw", "settings.json");
+    let repo = SettingsRepository::new(path.clone());
+    repo.save(&PersistedSettingsV2::default()).unwrap();
+
+    let (load, raw) = repo.load_with_raw();
+    match load {
+        PersistenceLoad::Current { value } => assert_eq!(value, PersistedSettingsV2::default()),
+        other => panic!("expected Current, got {other:?}"),
+    }
+    assert_eq!(raw.unwrap(), fs::read(&path).unwrap());
+}
+
+#[test]
+fn settings_load_with_raw_returns_no_bytes_when_missing() {
+    let path = temp_path("settings-load-raw-missing", "settings.json");
+    let _ = fs::remove_file(&path);
+    let repo = SettingsRepository::new(path);
+    let (_, raw) = repo.load_with_raw();
+    assert_eq!(raw, None);
 }
 
 fn created_unix_of(raw: &str) -> u64 {
@@ -177,4 +274,96 @@ fn session_commit_migration_creates_backup_and_v2_file() {
         PersistenceLoad::Current { value } => assert_eq!(value, PersistedSessionV2::default()),
         other => panic!("expected Current after migration commit, got {other:?}"),
     }
+}
+
+#[test]
+fn session_commit_migration_does_not_overwrite_existing_backup() {
+    let path = temp_path("session-migrate-retry", "session.json");
+    let original = br#"{"tabs":[]}"#;
+    fs::write(&path, original).unwrap();
+    let backup_path = backup_path_for(&path);
+    let stale_backup = b"a backup already on disk from a prior attempt";
+    fs::write(&backup_path, stale_backup).unwrap();
+
+    let repo = SessionRepository::new(path.clone());
+    let outcome = repo
+        .commit_migration(&PersistedSessionV2::default(), original)
+        .expect("commit_migration must succeed");
+
+    assert_eq!(outcome.backup_path.as_deref(), Some(backup_path.as_path()));
+    assert_eq!(fs::read(&backup_path).unwrap(), stale_backup);
+}
+
+#[test]
+fn session_commit_migration_rejects_stale_bytes_after_external_change() {
+    let path = temp_path("session-migrate-conflict", "session.json");
+    let original = br#"{"tabs":[]}"#;
+    fs::write(&path, original).unwrap();
+    let repo = SessionRepository::new(path.clone());
+
+    let changed = b"changed after load, before commit";
+    fs::write(&path, changed).unwrap();
+
+    let err = repo
+        .commit_migration(&PersistedSessionV2::default(), original)
+        .expect_err("must reject stale original_bytes");
+    assert_eq!(err, PersistenceCommitError::Conflict);
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        changed,
+        "target must be untouched"
+    );
+    assert!(
+        !backup_path_for(&path).exists(),
+        "no backup should be created for a rejected commit"
+    );
+}
+
+#[test]
+fn session_commit_migration_survives_failure_between_backup_and_replace() {
+    let path = temp_path("session-migrate-failwindow", "session.json");
+    let original = br#"{"tabs":[]}"#;
+    fs::write(&path, original).unwrap();
+    fs::create_dir_all(temp_write_path_for(&path)).unwrap();
+
+    let repo = SessionRepository::new(path.clone());
+    let result = repo.commit_migration(&PersistedSessionV2::default(), original);
+    assert!(
+        result.is_err(),
+        "the write must fail because its temp path is a directory"
+    );
+
+    assert_eq!(
+        fs::read(backup_path_for(&path)).unwrap(),
+        original,
+        "backup must survive the failed write"
+    );
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        original,
+        "target must be untouched by the failed write"
+    );
+}
+
+#[test]
+fn session_load_with_raw_pairs_bytes_with_the_loaded_value() {
+    let path = temp_path("session-load-raw", "session.json");
+    let repo = SessionRepository::new(path.clone());
+    repo.save(&PersistedSessionV2::default()).unwrap();
+
+    let (load, raw) = repo.load_with_raw();
+    match load {
+        PersistenceLoad::Current { value } => assert_eq!(value, PersistedSessionV2::default()),
+        other => panic!("expected Current, got {other:?}"),
+    }
+    assert_eq!(raw.unwrap(), fs::read(&path).unwrap());
+}
+
+#[test]
+fn session_load_with_raw_returns_no_bytes_when_missing() {
+    let path = temp_path("session-load-raw-missing", "session.json");
+    let _ = fs::remove_file(&path);
+    let repo = SessionRepository::new(path);
+    let (_, raw) = repo.load_with_raw();
+    assert_eq!(raw, None);
 }

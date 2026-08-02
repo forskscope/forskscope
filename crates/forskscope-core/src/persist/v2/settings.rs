@@ -10,6 +10,7 @@
 
 mod legacy;
 mod repository;
+pub mod runtime;
 
 pub use repository::SettingsRepository;
 

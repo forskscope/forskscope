@@ -1,0 +1,197 @@
+//! Session-persistence recovery view-model (RFC-076 §"User-facing
+//! behavior"). Mirrors [`crate::settings::persistence_recovery`]; see its
+//! module doc for the full rationale.
+
+use forskscope_core::persist::v2::session::runtime::{
+    SessionRuntimeOutcome, SessionRuntimeResolution,
+};
+
+/// A one-time notice that a migration was durably written. Only produced
+/// once the write actually landed — an uncommitted migration (review 037
+/// N1's race) says nothing, since it will simply be retried next run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MigrationNotice {
+    pub message: String,
+}
+
+/// Ordered actions for a blocking recovery dialog. `ChooseAnotherLocation`
+/// is not offered: RFC-076 lists it only "if that capability is later
+/// approved", and it is not implemented.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecoveryDialogAction {
+    Exit,
+    ContinueWithTemporaryDefaults,
+    ResetAndBackupOriginal,
+}
+
+/// A blocking dialog for a future-version or corrupt session file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecoveryDialogView {
+    pub title: String,
+    pub body: String,
+    pub actions: Vec<RecoveryDialogAction>,
+}
+
+/// Everything the session-recovery UI needs, derived from one
+/// [`SessionRuntimeResolution`]. At most one of `migration_notice`/`dialog`
+/// is ever set.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionRecoveryView {
+    pub migration_notice: Option<MigrationNotice>,
+    pub dialog: Option<RecoveryDialogView>,
+}
+
+impl SessionRecoveryView {
+    pub fn from_resolution(resolution: &SessionRuntimeResolution) -> Self {
+        match &resolution.outcome {
+            SessionRuntimeOutcome::Fresh | SessionRuntimeOutcome::Current => Self {
+                migration_notice: None,
+                dialog: None,
+            },
+            SessionRuntimeOutcome::Migrated { committed, .. } => Self {
+                migration_notice: committed.then(|| MigrationNotice {
+                    message: "Your session was upgraded to the current format.".into(),
+                }),
+                dialog: None,
+            },
+            SessionRuntimeOutcome::Incompatible { schema, version } => Self {
+                migration_notice: None,
+                dialog: Some(RecoveryDialogView {
+                    title: "Session file is from a newer version".into(),
+                    body: format!(
+                        "This session file uses \"{schema}\" schema version {version}, which this version of ForskScope does not understand. The file has not been modified."
+                    ),
+                    actions: vec![
+                        RecoveryDialogAction::Exit,
+                        RecoveryDialogAction::ContinueWithTemporaryDefaults,
+                    ],
+                }),
+            },
+            SessionRuntimeOutcome::CorruptPreserved { detail } => Self {
+                migration_notice: None,
+                dialog: Some(RecoveryDialogView {
+                    title: "Session file could not be read".into(),
+                    body: format!(
+                        "The session file is preserved but could not be parsed: {detail}."
+                    ),
+                    actions: vec![
+                        RecoveryDialogAction::ContinueWithTemporaryDefaults,
+                        RecoveryDialogAction::ResetAndBackupOriginal,
+                    ],
+                }),
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use forskscope_core::persist::v2::PersistenceError;
+    use forskscope_core::persist::v2::session::PersistedSessionV2;
+
+    fn resolution(
+        outcome: SessionRuntimeOutcome,
+        write_disabled: bool,
+    ) -> SessionRuntimeResolution {
+        SessionRuntimeResolution {
+            value: PersistedSessionV2::default(),
+            write_disabled,
+            outcome,
+        }
+    }
+
+    #[test]
+    fn fresh_has_no_notice_and_no_dialog() {
+        let view =
+            SessionRecoveryView::from_resolution(&resolution(SessionRuntimeOutcome::Fresh, false));
+        assert!(view.migration_notice.is_none());
+        assert!(view.dialog.is_none());
+    }
+
+    #[test]
+    fn current_has_no_notice_and_no_dialog() {
+        let view = SessionRecoveryView::from_resolution(&resolution(
+            SessionRuntimeOutcome::Current,
+            false,
+        ));
+        assert!(view.migration_notice.is_none());
+        assert!(view.dialog.is_none());
+    }
+
+    #[test]
+    fn committed_migration_shows_a_notice_and_no_dialog() {
+        let view = SessionRecoveryView::from_resolution(&resolution(
+            SessionRuntimeOutcome::Migrated {
+                backup_path: Some("/tmp/session.json.pre-v2.bak".into()),
+                committed: true,
+            },
+            false,
+        ));
+        assert!(view.migration_notice.is_some());
+        assert!(view.dialog.is_none());
+    }
+
+    #[test]
+    fn uncommitted_migration_shows_no_notice() {
+        let view = SessionRecoveryView::from_resolution(&resolution(
+            SessionRuntimeOutcome::Migrated {
+                backup_path: None,
+                committed: false,
+            },
+            false,
+        ));
+        assert!(
+            view.migration_notice.is_none(),
+            "an uncommitted migration will simply retry next run; nothing to tell the user yet"
+        );
+        assert!(view.dialog.is_none());
+    }
+
+    #[test]
+    fn incompatible_shows_exit_and_continue_but_not_reset() {
+        let view = SessionRecoveryView::from_resolution(&resolution(
+            SessionRuntimeOutcome::Incompatible {
+                schema: "session".into(),
+                version: 99,
+            },
+            true,
+        ));
+        let dialog = view.dialog.expect("must produce a dialog");
+        assert!(dialog.actions.contains(&RecoveryDialogAction::Exit));
+        assert!(
+            dialog
+                .actions
+                .contains(&RecoveryDialogAction::ContinueWithTemporaryDefaults)
+        );
+        assert!(
+            !dialog
+                .actions
+                .contains(&RecoveryDialogAction::ResetAndBackupOriginal),
+            "a future file must never be offered for reset — it may be valid to a newer build"
+        );
+        assert!(dialog.body.contains("99"));
+    }
+
+    #[test]
+    fn corrupt_shows_continue_and_reset_but_not_exit() {
+        let view = SessionRecoveryView::from_resolution(&resolution(
+            SessionRuntimeOutcome::CorruptPreserved {
+                detail: PersistenceError::MalformedJson,
+            },
+            true,
+        ));
+        let dialog = view.dialog.expect("must produce a dialog");
+        assert!(
+            dialog
+                .actions
+                .contains(&RecoveryDialogAction::ContinueWithTemporaryDefaults)
+        );
+        assert!(
+            dialog
+                .actions
+                .contains(&RecoveryDialogAction::ResetAndBackupOriginal)
+        );
+        assert!(!dialog.actions.contains(&RecoveryDialogAction::Exit));
+    }
+}

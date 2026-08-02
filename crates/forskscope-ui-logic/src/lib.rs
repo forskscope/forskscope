@@ -22,11 +22,17 @@
 //!   - `tab_state`: `TabStateSnapshot` → `CommandContext` bridge.
 //! - [`settings`] — settings form logic:
 //!   - `settings_view`: picker choices and validators for the settings dialog.
+//!   - `persistence_recovery`: `SettingsRecoveryView` — RFC-076 migration/
+//!     incompatibility/corruption dialog content.
+//! - [`session`] — session persistence logic:
+//!   - `persistence_recovery`: `SessionRecoveryView`, the session mirror of
+//!     `settings::persistence_recovery`.
 //!
 //! Crate-root re-exports keep the common types one import away.
 
 pub mod compare;
 pub mod explore;
+pub mod session;
 pub mod settings;
 
 // compare
@@ -54,7 +60,18 @@ pub use explore::align::{AlignedRow, FlatRow, RowData, compute_aligned_rows};
 pub use explore::deep_filter::{DeepCompareSummary, DeepFilter, apply_filter};
 pub use explore::status::{RowStatusKind, StatusRow};
 
+// session
+pub use session::persistence_recovery::{
+    MigrationNotice as SessionMigrationNotice, RecoveryDialogAction as SessionRecoveryDialogAction,
+    RecoveryDialogView as SessionRecoveryDialogView, SessionRecoveryView,
+};
+
 // settings
+pub use settings::persistence_recovery::{
+    MigrationNotice as SettingsMigrationNotice,
+    RecoveryDialogAction as SettingsRecoveryDialogAction,
+    RecoveryDialogView as SettingsRecoveryDialogView, SettingsRecoveryView,
+};
 pub use settings::settings_view::{
     ProfileChoice, SelectChoice, clamp_font_size, density_choices, find_active,
     font_family_choices, profile_presets, theme_choices, validate_context_lines,

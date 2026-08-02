@@ -37,6 +37,52 @@ impl std::fmt::Display for PersistenceIoError {
 
 impl std::error::Error for PersistenceIoError {}
 
+/// A failure to commit a migration. Distinct from [`PersistenceIoError`]
+/// because a stale-caller conflict is not an I/O failure — it is
+/// [`verify_unchanged`] refusing to guess which of two versions to keep.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PersistenceCommitError {
+    /// The file at the target path no longer matches the bytes the caller
+    /// read to produce the migrated value: it was modified or removed after
+    /// that `load()`. Proceeding would silently discard whatever changed it.
+    Conflict,
+    Io(String),
+}
+
+impl std::fmt::Display for PersistenceCommitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Conflict => write!(
+                f,
+                "file changed on disk since it was read; refusing to overwrite"
+            ),
+            Self::Io(message) => write!(f, "{message}"),
+        }
+    }
+}
+
+impl std::error::Error for PersistenceCommitError {}
+
+impl From<PersistenceIoError> for PersistenceCommitError {
+    fn from(e: PersistenceIoError) -> Self {
+        Self::Io(e.0)
+    }
+}
+
+/// Re-reads `path` and confirms its bytes still match `expected`, refusing to
+/// proceed if the file changed — or vanished — since the caller's `load()`
+/// produced `expected`. Review 037 N1: `commit_migration` must not trust a
+/// caller-supplied snapshot it has no way to verify; this costs one read and
+/// mirrors the project's existing S-006 external-modification posture.
+pub(super) fn verify_unchanged(path: &Path, expected: &[u8]) -> Result<(), PersistenceCommitError> {
+    match fs::read(path) {
+        Ok(actual) if actual == expected => Ok(()),
+        Ok(_) => Err(PersistenceCommitError::Conflict),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Err(PersistenceCommitError::Conflict),
+        Err(e) => Err(PersistenceCommitError::Io(e.to_string())),
+    }
+}
+
 /// Reads `path`, distinguishing "does not exist" from every other failure —
 /// the latter must not be silently treated as an absent file (see
 /// [`super::PersistenceError::Io`]).

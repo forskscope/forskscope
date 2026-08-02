@@ -3,8 +3,8 @@
 use std::path::PathBuf;
 
 use super::super::repository::{
-    PersistenceIoError, PersistenceSaveOutcome, atomic_write_envelope, build_envelope_json,
-    ensure_pre_v2_backup, read_to_string_or_missing,
+    PersistenceCommitError, PersistenceIoError, PersistenceSaveOutcome, atomic_write_envelope,
+    build_envelope_json, ensure_pre_v2_backup, read_to_string_or_missing, verify_unchanged,
 };
 use super::{PersistedSessionV2, SESSION_SCHEMA_NAME, SESSION_SCHEMA_VERSION_V2, load_session_v2};
 use crate::persist::v2::{PersistenceError, PersistenceLoad};
@@ -22,14 +22,31 @@ impl SessionRepository {
     }
 
     pub fn load(&self) -> PersistenceLoad<PersistedSessionV2> {
+        self.load_with_raw().0
+    }
+
+    /// Like [`Self::load`], but also returns the exact raw bytes that were
+    /// read (when a file was present). A caller that intends to call
+    /// [`Self::commit_migration`] needs this pairing: passing bytes from a
+    /// separate, later read would defeat [`verify_unchanged`]'s guarantee.
+    pub fn load_with_raw(&self) -> (PersistenceLoad<PersistedSessionV2>, Option<Vec<u8>>) {
         match read_to_string_or_missing(&self.path) {
-            Ok(Some(raw)) => load_session_v2(&raw),
-            Ok(None) => PersistenceLoad::Missing {
-                defaults: PersistedSessionV2::default(),
-            },
-            Err(e) => PersistenceLoad::Corrupt {
-                detail: PersistenceError::Io(e.0),
-            },
+            Ok(Some(raw)) => {
+                let bytes = raw.clone().into_bytes();
+                (load_session_v2(&raw), Some(bytes))
+            }
+            Ok(None) => (
+                PersistenceLoad::Missing {
+                    defaults: PersistedSessionV2::default(),
+                },
+                None,
+            ),
+            Err(e) => (
+                PersistenceLoad::Corrupt {
+                    detail: PersistenceError::Io(e.0),
+                },
+                None,
+            ),
         }
     }
 
@@ -46,16 +63,17 @@ impl SessionRepository {
     }
 
     /// Durably commits a migrated value (RFC-076 "On first durable
-    /// rewrite"): preserves `original_bytes` as a non-overwriting
-    /// `<name>.pre-v2.bak`, then atomically writes the v2 envelope.
-    /// `original_bytes` should be exactly what was read to produce `value`
-    /// via [`Self::load`] — the caller owns that pairing, since this method
-    /// has no way to verify it.
+    /// rewrite"): confirms the file still holds exactly `original_bytes`
+    /// (review 037 N1 — refuses to guess if it changed since [`Self::load`]),
+    /// preserves it as a non-overwriting `<name>.pre-v2.bak`, then atomically
+    /// writes the v2 envelope. `original_bytes` must come from the same
+    /// [`Self::load_with_raw`] call that produced `value`.
     pub fn commit_migration(
         &self,
         value: &PersistedSessionV2,
         original_bytes: &[u8],
-    ) -> Result<PersistenceSaveOutcome, PersistenceIoError> {
+    ) -> Result<PersistenceSaveOutcome, PersistenceCommitError> {
+        verify_unchanged(&self.path, original_bytes)?;
         let backup_path = ensure_pre_v2_backup(&self.path, original_bytes)?;
         self.save(value)?;
         Ok(PersistenceSaveOutcome {
