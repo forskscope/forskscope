@@ -84,12 +84,22 @@ awk -v ver="${GITHUB_REF_NAME}" '
 ' CHANGELOG.md > release-notes.md
 ```
 
-**Fail closed.** If the extraction is empty, the job must fail with a clear
-error rather than publish a draft with no notes:
+**Fail closed on content, not bytes.** If the extraction yields no actual
+content, the job must fail rather than publish a draft with empty notes:
 
 ```sh
-test -s release-notes.md || { echo "::error::no CHANGELOG section for ${GITHUB_REF_NAME}"; exit 1; }
+grep -q '[^[:space:]]' release-notes.md || { echo "::error::CHANGELOG section for ${GITHUB_REF_NAME} is missing or empty"; exit 1; }
 ```
+
+This wording is deliberate and supersedes an earlier revision of this handoff
+that specified `test -s`. A byte-length test is insufficient: a CHANGELOG
+section that exists as a heading with no body extracts to a single newline —
+one byte — which passes `test -s`. Because the compare link is appended after
+the guard, such a section composes to a blank line plus `**Full Changelog**: …`,
+which is exactly the bare compare link F22 exists to eliminate. The defect
+reproduces inside its own fix. The post-release bump opens an empty section by
+design and `version-sync` asserts only that the heading exists, so this is
+reachable in normal operation, not a contrived case.
 
 `version-sync` already asserts the CHANGELOG section exists during preflight, so
 this is a second, cheap guard at the point of use. Silent empty notes are the
@@ -203,10 +213,12 @@ Run the exact `awk` against the committed CHANGELOG and show that:
 - `ver=0.165.0` reproduces that section in full, stopping at the `0.164.0`
   heading and including neither heading;
 - `ver=0.165.1` yields the current in-development section;
-- a version with no section yields empty output, and the `test -s` guard exits
-  non-zero;
+- a version with no section yields empty output, and the guard exits non-zero;
 - a deliberately wildcard-shaped version such as `0X165X0` yields empty output,
-  proving the prefix match is literal rather than regex.
+  proving the prefix match is literal rather than regex;
+- a heading-only section — one that exists but has no body, such as a freshly
+  opened post-release section — also fails the guard. This is the case a
+  byte-length test lets through, so it must be demonstrated explicitly.
 
 Expect one pre-existing `git diff --check` hit on
 `packaging/windows/AppxManifest.xml` if that file is touched: it uses CRLF
