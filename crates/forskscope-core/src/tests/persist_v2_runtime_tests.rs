@@ -6,19 +6,22 @@
 //! fresh/current pass through unchanged, legacy and core-v1 files are
 //! migrated and durably committed, future/corrupt files resolve to
 //! temporary defaults with writes disabled and the original bytes
-//! untouched, and a commit that loses the review-037-N1 race reports
-//! `committed: false` without corrupting the on-disk file.
+//! untouched, and a commit that fails for a persistent reason (review 038
+//! C1/C2) is reported with its cause and disables writes rather than
+//! silently retrying forever.
 
 use std::fs;
 use std::path::PathBuf;
 
 use crate::persist::v2::PersistenceLoad;
 use crate::persist::v2::session::runtime::{
-    SessionRuntimeOutcome, resolve_and_commit as resolve_session,
+    MigrationCommitOutcome as SessionMigrationCommitOutcome, SessionRuntimeOutcome,
+    resolve_and_commit as resolve_session,
 };
 use crate::persist::v2::session::{PersistedSessionV2, SessionRepository};
 use crate::persist::v2::settings::runtime::{
-    SettingsRuntimeOutcome, resolve_and_commit as resolve_settings,
+    MigrationCommitOutcome as SettingsMigrationCommitOutcome, SettingsRuntimeOutcome,
+    resolve_and_commit as resolve_settings,
 };
 use crate::persist::v2::settings::{PersistedSettingsV2, SettingsRepository};
 
@@ -85,15 +88,13 @@ fn settings_resolve_migrates_legacy_v0_and_commits_durably() {
 
     let resolved = resolve_settings(&repo);
     match &resolved.outcome {
-        SettingsRuntimeOutcome::Migrated {
+        SettingsRuntimeOutcome::Migrated(SettingsMigrationCommitOutcome::Committed {
             backup_path,
-            committed,
-        } => {
-            assert!(*committed);
+        }) => {
             let backup_path = backup_path.as_ref().expect("backup path must be reported");
             assert_eq!(fs::read_to_string(backup_path).unwrap(), legacy_raw);
         }
-        other => panic!("expected Migrated, got {other:?}"),
+        other => panic!("expected Migrated(Committed), got {other:?}"),
     }
     assert!(!resolved.write_disabled);
 
@@ -111,10 +112,10 @@ fn settings_resolve_migrates_core_v1_envelope_and_commits_durably() {
     let repo = SettingsRepository::new(path.clone());
 
     let resolved = resolve_settings(&repo);
-    match &resolved.outcome {
-        SettingsRuntimeOutcome::Migrated { committed, .. } => assert!(*committed),
-        other => panic!("expected Migrated, got {other:?}"),
-    }
+    assert!(matches!(
+        resolved.outcome,
+        SettingsRuntimeOutcome::Migrated(SettingsMigrationCommitOutcome::Committed { .. })
+    ));
     match repo.load() {
         PersistenceLoad::Current { .. } => {}
         other => panic!("expected Current after durable commit, got {other:?}"),
@@ -170,11 +171,12 @@ fn settings_resolve_corrupt_disables_writes_and_preserves_bytes() {
 }
 
 #[test]
-fn settings_resolve_reports_uncommitted_migration_without_corrupting_the_file() {
+fn settings_resolve_surfaces_a_failed_commit_and_disables_writes() {
     // Obstructs the sibling temp path `atomic_replace` writes to (same
     // technique as the repository failure-window test), so the commit's
-    // final write fails after its backup already succeeded.
-    let path = temp_path("settings-migrate-uncommitted", "settings.json");
+    // final write fails after its backup already succeeded — a persistent
+    // failure (review 038 C1), not the benign N1 conflict race.
+    let path = temp_path("settings-migrate-failed", "settings.json");
     let legacy_raw = fixture("settings-v0.json");
     fs::write(&path, &legacy_raw).unwrap();
     fs::create_dir_all(temp_write_path_for(&path)).unwrap();
@@ -182,9 +184,15 @@ fn settings_resolve_reports_uncommitted_migration_without_corrupting_the_file() 
 
     let resolved = resolve_settings(&repo);
     match resolved.outcome {
-        SettingsRuntimeOutcome::Migrated { committed, .. } => assert!(!committed),
-        other => panic!("expected Migrated with committed: false, got {other:?}"),
+        SettingsRuntimeOutcome::Migrated(SettingsMigrationCommitOutcome::Failed { detail }) => {
+            assert!(!detail.is_empty());
+        }
+        other => panic!("expected Migrated(Failed), got {other:?}"),
     }
+    assert!(
+        resolved.write_disabled,
+        "a refused/failed migration commit must not leave the file writable (review 038 C2)"
+    );
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
         legacy_raw,
@@ -215,20 +223,44 @@ fn session_resolve_migrates_legacy_v0_and_commits_durably() {
 
     let resolved = resolve_session(&repo);
     match &resolved.outcome {
-        SessionRuntimeOutcome::Migrated {
+        SessionRuntimeOutcome::Migrated(SessionMigrationCommitOutcome::Committed {
             backup_path,
-            committed,
-        } => {
-            assert!(*committed);
+        }) => {
             let backup_path = backup_path.as_ref().expect("backup path must be reported");
             assert_eq!(fs::read_to_string(backup_path).unwrap(), legacy_raw);
         }
-        other => panic!("expected Migrated, got {other:?}"),
+        other => panic!("expected Migrated(Committed), got {other:?}"),
     }
     match repo.load() {
         PersistenceLoad::Current { value } => assert_eq!(value, resolved.value),
         other => panic!("expected Current after durable commit, got {other:?}"),
     }
+}
+
+#[test]
+fn session_resolve_surfaces_a_failed_commit_and_disables_writes() {
+    let path = temp_path("session-migrate-failed", "session.json");
+    let legacy_raw = fixture("session-v0.json");
+    fs::write(&path, &legacy_raw).unwrap();
+    fs::create_dir_all(temp_write_path_for(&path)).unwrap();
+    let repo = SessionRepository::new(path.clone());
+
+    let resolved = resolve_session(&repo);
+    match resolved.outcome {
+        SessionRuntimeOutcome::Migrated(SessionMigrationCommitOutcome::Failed { detail }) => {
+            assert!(!detail.is_empty());
+        }
+        other => panic!("expected Migrated(Failed), got {other:?}"),
+    }
+    assert!(
+        resolved.write_disabled,
+        "a refused/failed migration commit must not leave the file writable (review 038 C2)"
+    );
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        legacy_raw,
+        "the un-migrated file must be untouched by the failed commit"
+    );
 }
 
 #[test]

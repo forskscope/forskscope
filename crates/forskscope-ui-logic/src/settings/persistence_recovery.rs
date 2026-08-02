@@ -6,20 +6,20 @@
 //! [`SettingsRuntimeResolution`] — the decision about what value this run
 //! uses and whether a migration was durably committed — into what a
 //! settings-recovery dialog needs to render: a one-time migration notice, or
-//! a blocking incompatibility/corruption dialog with ordered recovery
-//! actions. Same "core decides, ui-logic renders" split as
+//! a blocking incompatibility/corruption/failed-migration dialog with
+//! ordered recovery actions. Same "core decides, ui-logic renders" split as
 //! [`crate::compare::save_error::SaveErrorView`].
 //!
 //! Patch 3 boundary: nothing here is called by `App` yet — `forskscope-ui`
 //! still calls `app_json_settings::ConfigManager` directly until patch 4.
 
 use forskscope_core::persist::v2::settings::runtime::{
-    SettingsRuntimeOutcome, SettingsRuntimeResolution,
+    MigrationCommitOutcome, SettingsRuntimeOutcome, SettingsRuntimeResolution,
 };
 
 /// A one-time notice that a migration was durably written. Only produced
-/// once the write actually landed — an uncommitted migration (review 037
-/// N1's race) says nothing, since it will simply be retried next run.
+/// once the write actually landed — a commit deferred by conflict (review
+/// 037 N1's race) says nothing, since it will simply be retried next run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MigrationNotice {
     pub message: String,
@@ -35,7 +35,8 @@ pub enum RecoveryDialogAction {
     ResetAndBackupOriginal,
 }
 
-/// A blocking dialog for a future-version or corrupt settings file.
+/// A blocking dialog for a future-version, corrupt, or unwritable settings
+/// file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecoveryDialogView {
     pub title: String,
@@ -59,11 +60,28 @@ impl SettingsRecoveryView {
                 migration_notice: None,
                 dialog: None,
             },
-            SettingsRuntimeOutcome::Migrated { committed, .. } => Self {
-                migration_notice: committed.then(|| MigrationNotice {
+            SettingsRuntimeOutcome::Migrated(MigrationCommitOutcome::Committed { .. }) => Self {
+                migration_notice: Some(MigrationNotice {
                     message: "Your settings were upgraded to the current format.".into(),
                 }),
                 dialog: None,
+            },
+            SettingsRuntimeOutcome::Migrated(MigrationCommitOutcome::DeferredByConflict) => Self {
+                migration_notice: None,
+                dialog: None,
+            },
+            SettingsRuntimeOutcome::Migrated(MigrationCommitOutcome::Failed { detail }) => Self {
+                migration_notice: None,
+                dialog: Some(RecoveryDialogView {
+                    title: "Settings could not be upgraded".into(),
+                    body: format!(
+                        "Your settings were read and are in use for this session, but they could not be saved in the new format ({detail}). Changes will not be saved until this is resolved."
+                    ),
+                    actions: vec![
+                        RecoveryDialogAction::Exit,
+                        RecoveryDialogAction::ContinueWithTemporaryDefaults,
+                    ],
+                }),
             },
             SettingsRuntimeOutcome::Incompatible { schema, version } => Self {
                 migration_notice: None,
@@ -135,10 +153,9 @@ mod tests {
     #[test]
     fn committed_migration_shows_a_notice_and_no_dialog() {
         let view = SettingsRecoveryView::from_resolution(&resolution(
-            SettingsRuntimeOutcome::Migrated {
+            SettingsRuntimeOutcome::Migrated(MigrationCommitOutcome::Committed {
                 backup_path: Some("/tmp/settings.json.pre-v2.bak".into()),
-                committed: true,
-            },
+            }),
             false,
         ));
         assert!(view.migration_notice.is_some());
@@ -146,19 +163,40 @@ mod tests {
     }
 
     #[test]
-    fn uncommitted_migration_shows_no_notice() {
+    fn deferred_by_conflict_shows_no_notice_and_no_dialog() {
         let view = SettingsRecoveryView::from_resolution(&resolution(
-            SettingsRuntimeOutcome::Migrated {
-                backup_path: None,
-                committed: false,
-            },
-            false,
+            SettingsRuntimeOutcome::Migrated(MigrationCommitOutcome::DeferredByConflict),
+            true,
         ));
         assert!(
             view.migration_notice.is_none(),
-            "an uncommitted migration will simply retry next run; nothing to tell the user yet"
+            "a conflict-deferred migration will simply retry next run; nothing to tell the user yet"
         );
         assert!(view.dialog.is_none());
+    }
+
+    #[test]
+    fn failed_migration_commit_shows_a_dialog_not_silence() {
+        let view = SettingsRecoveryView::from_resolution(&resolution(
+            SettingsRuntimeOutcome::Migrated(MigrationCommitOutcome::Failed {
+                detail: "permission denied".into(),
+            }),
+            true,
+        ));
+        assert!(
+            view.migration_notice.is_none(),
+            "a failed commit is not a success and must not produce a success-shaped notice"
+        );
+        let dialog = view.dialog.expect(
+            "a persistent commit failure recurs every launch and must be surfaced, not silent",
+        );
+        assert!(dialog.body.contains("permission denied"));
+        assert!(dialog.actions.contains(&RecoveryDialogAction::Exit));
+        assert!(
+            dialog
+                .actions
+                .contains(&RecoveryDialogAction::ContinueWithTemporaryDefaults)
+        );
     }
 
     #[test]

@@ -3,12 +3,12 @@
 //! module doc for the full rationale.
 
 use forskscope_core::persist::v2::session::runtime::{
-    SessionRuntimeOutcome, SessionRuntimeResolution,
+    MigrationCommitOutcome, SessionRuntimeOutcome, SessionRuntimeResolution,
 };
 
 /// A one-time notice that a migration was durably written. Only produced
-/// once the write actually landed — an uncommitted migration (review 037
-/// N1's race) says nothing, since it will simply be retried next run.
+/// once the write actually landed — a commit deferred by conflict (review
+/// 037 N1's race) says nothing, since it will simply be retried next run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MigrationNotice {
     pub message: String,
@@ -24,7 +24,8 @@ pub enum RecoveryDialogAction {
     ResetAndBackupOriginal,
 }
 
-/// A blocking dialog for a future-version or corrupt session file.
+/// A blocking dialog for a future-version, corrupt, or unwritable session
+/// file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecoveryDialogView {
     pub title: String,
@@ -48,11 +49,28 @@ impl SessionRecoveryView {
                 migration_notice: None,
                 dialog: None,
             },
-            SessionRuntimeOutcome::Migrated { committed, .. } => Self {
-                migration_notice: committed.then(|| MigrationNotice {
+            SessionRuntimeOutcome::Migrated(MigrationCommitOutcome::Committed { .. }) => Self {
+                migration_notice: Some(MigrationNotice {
                     message: "Your session was upgraded to the current format.".into(),
                 }),
                 dialog: None,
+            },
+            SessionRuntimeOutcome::Migrated(MigrationCommitOutcome::DeferredByConflict) => Self {
+                migration_notice: None,
+                dialog: None,
+            },
+            SessionRuntimeOutcome::Migrated(MigrationCommitOutcome::Failed { detail }) => Self {
+                migration_notice: None,
+                dialog: Some(RecoveryDialogView {
+                    title: "Session could not be upgraded".into(),
+                    body: format!(
+                        "Your session was read and is in use for this run, but it could not be saved in the new format ({detail}). Changes will not be saved until this is resolved."
+                    ),
+                    actions: vec![
+                        RecoveryDialogAction::Exit,
+                        RecoveryDialogAction::ContinueWithTemporaryDefaults,
+                    ],
+                }),
             },
             SessionRuntimeOutcome::Incompatible { schema, version } => Self {
                 migration_notice: None,
@@ -122,10 +140,9 @@ mod tests {
     #[test]
     fn committed_migration_shows_a_notice_and_no_dialog() {
         let view = SessionRecoveryView::from_resolution(&resolution(
-            SessionRuntimeOutcome::Migrated {
+            SessionRuntimeOutcome::Migrated(MigrationCommitOutcome::Committed {
                 backup_path: Some("/tmp/session.json.pre-v2.bak".into()),
-                committed: true,
-            },
+            }),
             false,
         ));
         assert!(view.migration_notice.is_some());
@@ -133,19 +150,40 @@ mod tests {
     }
 
     #[test]
-    fn uncommitted_migration_shows_no_notice() {
+    fn deferred_by_conflict_shows_no_notice_and_no_dialog() {
         let view = SessionRecoveryView::from_resolution(&resolution(
-            SessionRuntimeOutcome::Migrated {
-                backup_path: None,
-                committed: false,
-            },
-            false,
+            SessionRuntimeOutcome::Migrated(MigrationCommitOutcome::DeferredByConflict),
+            true,
         ));
         assert!(
             view.migration_notice.is_none(),
-            "an uncommitted migration will simply retry next run; nothing to tell the user yet"
+            "a conflict-deferred migration will simply retry next run; nothing to tell the user yet"
         );
         assert!(view.dialog.is_none());
+    }
+
+    #[test]
+    fn failed_migration_commit_shows_a_dialog_not_silence() {
+        let view = SessionRecoveryView::from_resolution(&resolution(
+            SessionRuntimeOutcome::Migrated(MigrationCommitOutcome::Failed {
+                detail: "permission denied".into(),
+            }),
+            true,
+        ));
+        assert!(
+            view.migration_notice.is_none(),
+            "a failed commit is not a success and must not produce a success-shaped notice"
+        );
+        let dialog = view.dialog.expect(
+            "a persistent commit failure recurs every launch and must be surfaced, not silent",
+        );
+        assert!(dialog.body.contains("permission denied"));
+        assert!(dialog.actions.contains(&RecoveryDialogAction::Exit));
+        assert!(
+            dialog
+                .actions
+                .contains(&RecoveryDialogAction::ContinueWithTemporaryDefaults)
+        );
     }
 
     #[test]
