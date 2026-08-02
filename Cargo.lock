@@ -1461,6 +1461,8 @@ dependencies = [
  "chardetng",
  "chrono",
  "encoding_rs",
+ "serde",
+ "serde_json",
  "similar",
  "tempfile",
 ]

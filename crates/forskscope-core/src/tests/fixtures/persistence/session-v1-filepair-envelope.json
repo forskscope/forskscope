@@ -1,0 +1,19 @@
+{
+  "schema_name": "session",
+  "schema_version": 1,
+  "app_version": "0.165.1",
+  "created_unix": 1700000000,
+  "updated_unix": 1700000100,
+  "payload": {
+  "session_id": "sess-fixture-1",
+  "created_at": 1700000000,
+  "updated_at": 1700000100,
+  "root_kind": "file_pair",
+  "left_root": "/tmp/fixtures/left.txt",
+  "right_root": "/tmp/fixtures/right.txt",
+  "active_tab_id": "tab-0",
+  "tabs": [
+    {"kind":"diff","tab_id":"tab-0","left":"/tmp/fixtures/left.txt","right":"/tmp/fixtures/right.txt","dirty":false}
+  ]
+}
+}

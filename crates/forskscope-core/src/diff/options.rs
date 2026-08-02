@@ -1,8 +1,11 @@
 //! Diff options (RFC-002 §7).
 
+use serde::{Deserialize, Serialize};
+
 /// Diff algorithm selection, mapped onto `similar` v3 algorithms inside the
 /// engine. UI layers must use this enum, never `similar::Algorithm`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum DiffAlgorithm {
     #[default]
     Myers,
@@ -13,7 +16,8 @@ pub enum DiffAlgorithm {
 }
 
 /// When inline (character-level) refinement is computed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum InlineMode {
     /// Never compute inline spans.
     None,
@@ -62,7 +66,8 @@ impl Default for DiffOptions {
 // ── RFC-028: Richer compare option types and named profiles ───────────────────
 
 /// How whitespace is treated during comparison (RFC-028).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum WhitespaceMode {
     /// Every whitespace character is significant. Default.
     #[default]
@@ -76,7 +81,8 @@ pub enum WhitespaceMode {
 }
 
 /// How newline style differences are treated during comparison (RFC-028).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum NewlineCompareMode {
     /// CRLF vs LF vs CR are considered different. Default.
     #[default]
@@ -86,7 +92,8 @@ pub enum NewlineCompareMode {
 }
 
 /// Case sensitivity for comparison (RFC-028).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum CaseSensitivity {
     /// Case differences are significant. Default.
     #[default]

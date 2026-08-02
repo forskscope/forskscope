@@ -1,0 +1,52 @@
+{
+  "theme": "light",
+  "language": "ja",
+  "diff_font_size": 16,
+  "diff_font_family": "consolas",
+  "context_lines": 5,
+  "last_left_dir": "/tmp/fixtures/left",
+  "last_right_dir": "/tmp/fixtures/right",
+  "profiles": [
+    {
+      "name": "Exact (default)",
+      "ignore_whitespace": false,
+      "ignore_case": false,
+      "algorithm": "myers",
+      "built_in": true
+    },
+    {
+      "name": "Ignore whitespace",
+      "ignore_whitespace": true,
+      "ignore_case": false,
+      "algorithm": "myers",
+      "built_in": true
+    },
+    {
+      "name": "Ignore case",
+      "ignore_whitespace": false,
+      "ignore_case": true,
+      "algorithm": "myers",
+      "built_in": true
+    },
+    {
+      "name": "Histogram",
+      "ignore_whitespace": false,
+      "ignore_case": false,
+      "algorithm": "histogram",
+      "built_in": true
+    },
+    {
+      "name": "My Custom Profile",
+      "ignore_whitespace": true,
+      "ignore_case": true,
+      "algorithm": "patience",
+      "built_in": false
+    }
+  ],
+  "active_profile": 4,
+  "ignore_extensions": "o, class, tmp",
+  "ignore_dirs": "target, node_modules",
+  "explorer_compact": true,
+  "enable_binary_comparison": true,
+  "remember_explorer_dirs": false
+}

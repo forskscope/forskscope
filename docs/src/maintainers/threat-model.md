@@ -186,8 +186,9 @@ Key crates touching file I/O or process execution:
 | `similar` | 3.1.1 | Diff computation | Pure computation; no I/O |
 | `encoding_rs` | * | Text decoding | No I/O; operates on in-memory bytes |
 | `chardetng` | * | Encoding detection | No I/O |
+| `serde` / `serde_json` | 1.0.228 / 1.0.150 | RFC-076 settings/session schema v2: envelope parsing and payload (de)serialization in `forskscope-core` | Local serialization only; parses/writes local settings and session JSON, never network input; introduces no data flow |
 | `tokio` | 1 | Async runtime + `spawn_blocking` | Standard; no network features enabled |
-| `app_json_settings` | 2.0.3 | Settings persistence | Local JSON file only |
+| `app_json_settings` | 2.4.1 | Settings persistence (production call sites being converged onto RFC-076 core repositories; see `persist::v2`) | Local JSON file only |
 | `dirs_next` | * | Platform dirs | Read-only path resolution |
 | `rfd` | 0.17 | File picker dialog | OS dialog; no custom code |
 | `dioxus` | 0.7.9 | UI framework | Default features disabled; no devtools |

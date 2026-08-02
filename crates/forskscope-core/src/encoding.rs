@@ -7,6 +7,7 @@
 
 use chardetng::EncodingDetector;
 use encoding_rs::{Encoding, UTF_8};
+use serde::{Deserialize, Serialize};
 
 /// Resolved text encoding of a loaded document.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,7 +107,8 @@ pub fn detect_newline_style(text: &str) -> NewlineStyle {
 ///
 /// The default (`Preserve`) keeps whatever style was detected on load.
 /// Conversion to a specific style is an explicit user choice.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum NewlinePolicy {
     /// Keep the newline style that was detected at load time. Default.
     #[default]

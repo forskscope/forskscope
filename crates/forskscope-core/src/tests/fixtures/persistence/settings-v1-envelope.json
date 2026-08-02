@@ -1,0 +1,26 @@
+{
+  "schema_name": "settings",
+  "schema_version": 1,
+  "app_version": "0.165.1",
+  "created_unix": 1700000000,
+  "updated_unix": 1700000100,
+  "payload": {
+  "appearance": {
+    "theme": "light",
+    "density": "compact",
+    "font_family": "system-serif",
+    "font_size": 18
+  },
+  "diff": {
+    "compare_profile": "Code Review",
+    "show_line_numbers": false,
+    "wrap_long_lines": true
+  },
+  "files": {
+    "newline_policy": "lf",
+    "restore_session": false,
+    "recent_limit": 7
+  },
+  "locale": "ja"
+}
+}

@@ -31,6 +31,11 @@
 
 use std::fmt::Write as _;
 
+// RFC-076: canonical settings/session schema v2, routing, and migration.
+// Independent of the hand-written envelope below — see `v2`'s module doc for
+// why it parses with `serde_json` instead of reusing `VersionedEnvelope::parse`.
+pub mod v2;
+
 // ── Schema names ──────────────────────────────────────────────────────────────
 
 /// All schema names used by ForskScope persisted data (RFC-031 §"Versioned app data").

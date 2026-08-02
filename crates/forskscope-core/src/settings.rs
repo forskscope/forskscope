@@ -182,7 +182,12 @@ impl UserSettings {
         s
     }
 
-    fn from_payload_json(json: &str) -> Result<Self, ()> {
+    /// Parse the v1 payload shape directly (no envelope). `pub(crate)` so the
+    /// RFC-076 v2 migration path can reuse this frozen v1 parser as a
+    /// migration-input reader without re-deriving the v1 JSON shape, which
+    /// has transforms (e.g. `compare_profile` serialized as a name lookup)
+    /// that a fresh `serde` derive would not reproduce.
+    pub(crate) fn from_payload_json(json: &str) -> Result<Self, ()> {
         let theme = extract_nested_str(json, "appearance", "theme")
             .and_then(|s| ThemeId::from_id(&s))
             .unwrap_or_default();

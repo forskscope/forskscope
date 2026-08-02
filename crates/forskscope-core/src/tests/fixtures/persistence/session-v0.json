@@ -1,0 +1,6 @@
+{
+  "tabs": [
+    ["/tmp/fixtures/left-a.txt", "/tmp/fixtures/right-a.txt"],
+    ["/tmp/fixtures/left-b.txt", "/tmp/fixtures/right-b.txt"]
+  ]
+}

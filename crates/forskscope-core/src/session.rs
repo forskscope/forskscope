@@ -239,7 +239,12 @@ impl WorkspaceSession {
         s
     }
 
-    fn from_payload_json(json: &str) -> Result<Self, String> {
+    /// Parse the v1 payload shape directly (no envelope). `pub(crate)` so the
+    /// RFC-076 v2 migration path can reuse this frozen v1 parser as a
+    /// migration-input reader. Note the existing limitation this carries
+    /// forward: `tabs` is always empty here (see the constructor below) —
+    /// v1 restoration was never wired to the full tab list.
+    pub(crate) fn from_payload_json(json: &str) -> Result<Self, String> {
         let session_id = extract_str(json, "session_id").ok_or("missing session_id")?;
         let created_at = extract_u64(json, "created_at").ok_or("missing created_at")?;
         let updated_at = extract_u64(json, "updated_at").ok_or("missing updated_at")?;

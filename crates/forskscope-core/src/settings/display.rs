@@ -1,12 +1,15 @@
 //! Display primitive settings: theme, density, font family, and locale (RFC-018).
 
+use serde::{Deserialize, Serialize};
+
 /// Schema version for the settings file.
 pub const SETTINGS_SCHEMA_VERSION: u32 = 1;
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 
 /// Named theme. Drives the CSS variable set injected by the Dioxus app.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum ThemeId {
     #[default]
     Dark,
@@ -90,7 +93,8 @@ impl ThemeTokens {
 // ── Density / display ─────────────────────────────────────────────────────────
 
 /// UI layout density (RFC-009 §4 `AppearanceSettings`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Density {
     /// Default spacing, comfortable for general use.
     #[default]
@@ -120,8 +124,10 @@ impl Density {
     }
 }
 
-/// Font family setting for UI and diff panes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+/// Font family setting for the application chrome (RFC-018 "appearance font").
+/// Distinct from [`DiffFontFamilySetting`], which governs the diff panes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum FontFamilySetting {
     #[default]
     SystemMono,
@@ -148,10 +154,50 @@ impl FontFamilySetting {
     }
 }
 
+/// Font family setting for the diff panes (RFC-070, RFC-076 §"Settings schema
+/// v2"). Distinct from [`FontFamilySetting`], which governs the app chrome.
+/// `CourierNew` and `Consolas` are exact, non-normalized choices — they must
+/// not collapse to `SystemMono` during migration from the shipping UI's
+/// five-way `DiffFontFamily` setting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DiffFontFamilySetting {
+    #[default]
+    SystemMono,
+    SystemSans,
+    SystemSerif,
+    CourierNew,
+    Consolas,
+}
+
+impl DiffFontFamilySetting {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::SystemMono => "system-mono",
+            Self::SystemSans => "system-sans",
+            Self::SystemSerif => "system-serif",
+            Self::CourierNew => "courier-new",
+            Self::Consolas => "consolas",
+        }
+    }
+
+    pub fn from_id(s: &str) -> Option<Self> {
+        match s {
+            "system-mono" => Some(Self::SystemMono),
+            "system-sans" => Some(Self::SystemSans),
+            "system-serif" => Some(Self::SystemSerif),
+            "courier-new" => Some(Self::CourierNew),
+            "consolas" => Some(Self::Consolas),
+            _ => None,
+        }
+    }
+}
+
 // ── Locale ────────────────────────────────────────────────────────────────────
 
 /// Language / locale identifier (RFC-009 §9 "Localization Model").
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct LocaleId(pub String);
 
 impl LocaleId {

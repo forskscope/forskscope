@@ -1,0 +1,18 @@
+{
+  "schema_name": "session",
+  "schema_version": 1,
+  "app_version": "0.165.1",
+  "created_unix": 1700000200,
+  "updated_unix": 1700000300,
+  "payload": {
+  "session_id": "sess-fixture-2",
+  "created_at": 1700000200,
+  "updated_at": 1700000300,
+  "root_kind": "directory_pair",
+  "left_root": "/tmp/fixtures/left-dir",
+  "right_root": "/tmp/fixtures/right-dir",
+  "active_tab_id": null,
+  "tabs": [
+  ]
+}
+}
