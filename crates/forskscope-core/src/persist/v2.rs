@@ -40,6 +40,7 @@
 //! of these fields, that change reintroduces the exact silent-reset
 //! behaviour this module exists to remove — reconsider before doing that.
 
+mod repository;
 pub mod session;
 pub mod settings;
 
@@ -91,6 +92,11 @@ pub enum PersistenceError {
     /// The `payload` field is missing, or does not deserialize as the DTO its
     /// declared schema version implies.
     MalformedPayload,
+    /// The file exists but could not be read (e.g. permission denied). Not
+    /// `Missing` — the file's existence is known, only its content is not;
+    /// treating this as `Missing` would mean writing over content that may
+    /// still be there and readable once the underlying problem is fixed.
+    Io(String),
 }
 
 impl std::fmt::Display for PersistenceError {
@@ -106,6 +112,7 @@ impl std::fmt::Display for PersistenceError {
             }
             Self::MalformedVersion => write!(f, "missing or invalid schema_version"),
             Self::MalformedPayload => write!(f, "payload does not match its declared schema"),
+            Self::Io(message) => write!(f, "could not read file: {message}"),
         }
     }
 }

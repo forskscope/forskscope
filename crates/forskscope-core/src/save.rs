@@ -83,12 +83,7 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
         fs::create_dir_all(parent).map_err(|e| CoreError::io(parent, IoOperation::Write, &e))?;
     }
 
-    let temp = temp_path_for(target);
-    fs::write(&temp, &bytes).map_err(|e| CoreError::io(&temp, IoOperation::Write, &e))?;
-    if let Err(e) = fs::rename(&temp, target) {
-        let _ = fs::remove_file(&temp);
-        return Err(CoreError::io(target, IoOperation::Rename, &e));
-    }
+    atomic_replace(target, &bytes)?;
 
     let new_fingerprint = FileFingerprint::capture(target, Some(&bytes))?;
     Ok(SaveOutcome {
@@ -97,6 +92,25 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
         backup_path,
         encoding_fallback_to_utf8: fallback,
     })
+}
+
+/// Writes `bytes` to a sibling temp file, then renames it onto `target`.
+/// Atomic on POSIX (`rename` within the same volume); on failure the temp
+/// file is removed and the original at `target` is left untouched.
+///
+/// `pub(crate)` so `persist::v2`'s repositories (RFC-076) can reuse this
+/// primitive for settings/session writes instead of hand-rolling their own
+/// temp-then-rename logic. This function carries no document-save-specific
+/// behavior (no fingerprint check, no `.bak` backup) — those stay in
+/// [`save_text`]; callers needing them apply their own policy.
+pub(crate) fn atomic_replace(target: &Path, bytes: &[u8]) -> Result<()> {
+    let temp = temp_path_for(target);
+    fs::write(&temp, bytes).map_err(|e| CoreError::io(&temp, IoOperation::Write, &e))?;
+    if let Err(e) = fs::rename(&temp, target) {
+        let _ = fs::remove_file(&temp);
+        return Err(CoreError::io(target, IoOperation::Rename, &e));
+    }
+    Ok(())
 }
 
 fn file_name_string(path: &Path) -> String {

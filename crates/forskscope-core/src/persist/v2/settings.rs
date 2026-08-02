@@ -9,6 +9,9 @@
 //! and `Consolas` are exact choices that must not normalize to `SystemMono`.
 
 mod legacy;
+mod repository;
+
+pub use repository::SettingsRepository;
 
 use std::path::PathBuf;
 
@@ -113,6 +116,40 @@ pub struct PersistedDiffProfileV2 {
     /// Built-in profiles ship with the app and cannot be deleted.
     #[serde(default)]
     pub built_in: bool,
+}
+
+/// First-run defaults, matching the shipping UI's `AppSettings::default()`
+/// for UI-owned fields and core's own defaults for core-owned fields —
+/// exactly what a repository returns for [`PersistenceLoad::Missing`] when
+/// no settings file exists yet.
+impl Default for PersistedSettingsV2 {
+    fn default() -> Self {
+        Self {
+            theme: ThemeId::default(),
+            language: LocaleId::english(),
+            diff_font_size: default_diff_font_size(),
+            diff_font_family: DiffFontFamilySetting::default(),
+            appearance_font_size: default_appearance_font_size(),
+            appearance_font_family: FontFamilySetting::default(),
+            density: Density::default(),
+            context_lines: legacy::legacy_default_context_lines(),
+            last_left_dir: None,
+            last_right_dir: None,
+            profiles: ui_builtin_profiles(),
+            active_profile: 0,
+            ignore_extensions: String::new(),
+            ignore_dirs: String::new(),
+            explorer_compact: false,
+            enable_binary_comparison: false,
+            remember_explorer_dirs: true,
+            show_line_numbers: true,
+            wrap_long_lines: false,
+            newline_policy: NewlinePolicy::default(),
+            restore_session: true,
+            recent_limit: default_recent_limit(),
+            performance: PerformanceLimits::default(),
+        }
+    }
 }
 
 fn default_true() -> bool {

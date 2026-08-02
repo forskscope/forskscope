@@ -8,6 +8,10 @@
 //! process lifetime. This module knows nothing about that runtime identity;
 //! it only produces path pairs for the caller to open.
 
+mod repository;
+
+pub use repository::SessionRepository;
+
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -20,7 +24,10 @@ pub const SESSION_SCHEMA_VERSION_V2: u32 = 2;
 
 // ── Canonical v2 payload ────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// `#[derive(Default)]` is exactly the "no session yet" state — empty tabs,
+/// no active tab, no explorer roots — which is what a repository returns for
+/// [`PersistenceLoad::Missing`] when no session file exists yet.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PersistedSessionV2 {
     pub tabs: Vec<PersistedComparePairV2>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

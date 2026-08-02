@@ -228,10 +228,10 @@ fn core_v1_envelope_fixture_migrates_every_represented_field() {
             assert_eq!(value.appearance_font_family, FontFamilySetting::SystemSerif);
             assert_eq!(value.density, Density::Compact);
             assert_eq!(value.language, LocaleId::japanese());
-            assert_eq!(value.show_line_numbers, false);
-            assert_eq!(value.wrap_long_lines, true);
+            assert!(!value.show_line_numbers);
+            assert!(value.wrap_long_lines);
             assert_eq!(value.newline_policy, NewlinePolicy::ForceLf);
-            assert_eq!(value.restore_session, false);
+            assert!(!value.restore_session);
             assert_eq!(value.recent_limit, 7);
             // The one selected core profile becomes profiles[0]...
             assert_eq!(value.profiles[0].name, "Code Review");
