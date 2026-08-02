@@ -211,14 +211,18 @@ Record observed counts rather than asserting they are unchanged.
 Run the exact `awk` against the committed CHANGELOG and show that:
 
 - `ver=0.165.0` reproduces that section in full, stopping at the `0.164.0`
-  heading and including neither heading;
-- `ver=0.165.1` yields the current in-development section;
-- a version with no section yields empty output, and the guard exits non-zero;
-- a deliberately wildcard-shaped version such as `0X165X0` yields empty output,
-  proving the prefix match is literal rather than regex;
+  heading and including neither heading, and passes the guard;
 - a heading-only section — one that exists but has no body, such as a freshly
-  opened post-release section — also fails the guard. This is the case a
-  byte-length test lets through, so it must be demonstrated explicitly.
+  opened post-release section — **fails** the guard. This is the case a
+  byte-length test lets through, so demonstrate it explicitly. In the current
+  tree `ver=0.165.1` is exactly this case;
+- a version with no section at all yields empty output and fails the guard;
+- a deliberately wildcard-shaped version such as `0X165X0` yields empty output,
+  proving the prefix match is literal rather than regex.
+
+Four invocations cover these; a heading-only section and the current
+in-development section are the same case whenever the post-release section has
+not yet accumulated entries.
 
 Expect one pre-existing `git diff --check` hit on
 `packaging/windows/AppxManifest.xml` if that file is touched: it uses CRLF
