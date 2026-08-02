@@ -1,0 +1,18 @@
+{
+  "schema_name": "session",
+  "schema_version": 2,
+  "app_version": "0.165.1",
+  "created_unix": 1700000000,
+  "updated_unix": 1700000100,
+  "payload": {
+    "tabs": [
+      { "left": "/tmp/fixtures/left.txt", "right": "/tmp/fixtures/right.txt" },
+      { "left": "/tmp/fixtures/left-b.txt", "right": "/tmp/fixtures/right-b.txt" }
+    ],
+    "active_tab": 1,
+    "explorer_roots": {
+      "left": "/tmp/fixtures/left-dir",
+      "right": "/tmp/fixtures/right-dir"
+    }
+  }
+}

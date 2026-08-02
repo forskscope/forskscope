@@ -51,6 +51,9 @@ impl FileSizeClass {
 /// Configurable thresholds governing large-file and large-directory
 /// behaviour (RFC-013 §5 "Threshold Policy"). All byte values are inclusive
 /// upper bounds for the named class.
+///
+/// Part of the settings v2 on-disk schema (RFC-076); a field rename is a
+/// schema change, not just a Rust-level rename.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PerformanceLimits {
     /// Upper bound (inclusive) for `FileSizeClass::Small` (bytes).

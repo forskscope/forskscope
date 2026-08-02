@@ -244,6 +244,12 @@ impl WorkspaceSession {
     /// migration-input reader. Note the existing limitation this carries
     /// forward: `tabs` is always empty here (see the constructor below) —
     /// v1 restoration was never wired to the full tab list.
+    ///
+    /// This is a frozen migration input, not a parser to evolve: RFC-076
+    /// treats the v1 shape as immutable, and any future change to this
+    /// function's behaviour is a change to what v1 files are read as, not
+    /// just an internal refactor. `pub(crate)` alone does not communicate
+    /// that — this comment is the actual boundary.
     pub(crate) fn from_payload_json(json: &str) -> Result<Self, String> {
         let session_id = extract_str(json, "session_id").ok_or("missing session_id")?;
         let created_at = extract_u64(json, "created_at").ok_or("missing created_at")?;

@@ -8,6 +8,10 @@ pub const SETTINGS_SCHEMA_VERSION: u32 = 1;
 // ── Theme ─────────────────────────────────────────────────────────────────────
 
 /// Named theme. Drives the CSS variable set injected by the Dioxus app.
+///
+/// Part of the settings v2 on-disk schema (RFC-076): renaming a variant or
+/// changing its serde representation is a schema change and requires a
+/// version bump, not just a Rust-level rename.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ThemeId {
@@ -93,6 +97,9 @@ impl ThemeTokens {
 // ── Density / display ─────────────────────────────────────────────────────────
 
 /// UI layout density (RFC-009 §4 `AppearanceSettings`).
+///
+/// Part of the settings v2 on-disk schema (RFC-076); a variant rename is a
+/// schema change, not just a Rust-level rename.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Density {
@@ -126,6 +133,9 @@ impl Density {
 
 /// Font family setting for the application chrome (RFC-018 "appearance font").
 /// Distinct from [`DiffFontFamilySetting`], which governs the diff panes.
+///
+/// Part of the settings v2 on-disk schema (RFC-076); a variant rename is a
+/// schema change, not just a Rust-level rename.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum FontFamilySetting {
@@ -158,7 +168,8 @@ impl FontFamilySetting {
 /// v2"). Distinct from [`FontFamilySetting`], which governs the app chrome.
 /// `CourierNew` and `Consolas` are exact, non-normalized choices — they must
 /// not collapse to `SystemMono` during migration from the shipping UI's
-/// five-way `DiffFontFamily` setting.
+/// five-way `DiffFontFamily` setting. A variant rename here is a schema
+/// change, not just a Rust-level rename.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum DiffFontFamilySetting {
@@ -196,6 +207,8 @@ impl DiffFontFamilySetting {
 // ── Locale ────────────────────────────────────────────────────────────────────
 
 /// Language / locale identifier (RFC-009 §9 "Localization Model").
+///
+/// Part of the settings v2 on-disk schema (RFC-076).
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct LocaleId(pub String);

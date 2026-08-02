@@ -26,6 +26,19 @@
 //! are pure functions from a JSON string to a [`PersistenceLoad`]; the
 //! explicit-path repositories that read and write files are patch 2.
 //! Production `forskscope-ui` call sites are unchanged until patch 4.
+//!
+//! ## Why several fields have no `#[serde(default)]`
+//!
+//! `PersistedSettingsV2`'s `theme`, `language`, `diff_font_size`,
+//! `context_lines`, `profiles`, and `active_profile`, and
+//! `PersistedSessionV2`'s `tabs`, are required: a v2 payload missing one of
+//! them is [`PersistenceError::MalformedPayload`], not silently defaulted.
+//! This is deliberate, not an oversight — B2 exists because the running
+//! application collapsed corrupt/unfamiliar files into defaults, so
+//! `Corrupt` here is the fix, not a rough edge to smooth over. If a bug
+//! report about a rejected file leads to adding `#[serde(default)]` to one
+//! of these fields, that change reintroduces the exact silent-reset
+//! behaviour this module exists to remove — reconsider before doing that.
 
 pub mod session;
 pub mod settings;

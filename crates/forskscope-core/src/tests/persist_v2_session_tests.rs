@@ -10,6 +10,7 @@ const SESSION_V1_FILEPAIR_FIXTURE: &str =
     include_str!("fixtures/persistence/session-v1-filepair-envelope.json");
 const SESSION_V1_DIRPAIR_FIXTURE: &str =
     include_str!("fixtures/persistence/session-v1-dirpair-envelope.json");
+const SESSION_V2_FIXTURE: &str = include_str!("fixtures/persistence/session-v2.json");
 
 fn sample_v2() -> PersistedSessionV2 {
     PersistedSessionV2 {
@@ -60,6 +61,33 @@ fn current_v2_tolerates_unknown_payload_fields() {
     match load_session_v2(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value, sample_v2()),
         other => panic!("expected Current despite unknown field, got {other:?}"),
+    }
+}
+
+/// Pins the v2 wire *format* (review 035 C2) — see the settings-side
+/// counterpart for why a struct round-trip test cannot substitute for this.
+#[test]
+fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
+    let expected = PersistedSessionV2 {
+        tabs: vec![
+            PersistedComparePairV2 {
+                left: "/tmp/fixtures/left.txt".into(),
+                right: "/tmp/fixtures/right.txt".into(),
+            },
+            PersistedComparePairV2 {
+                left: "/tmp/fixtures/left-b.txt".into(),
+                right: "/tmp/fixtures/right-b.txt".into(),
+            },
+        ],
+        active_tab: Some(1),
+        explorer_roots: Some(PersistedDirectoryPairV2 {
+            left: "/tmp/fixtures/left-dir".into(),
+            right: "/tmp/fixtures/right-dir".into(),
+        }),
+    };
+    match load_session_v2(SESSION_V2_FIXTURE) {
+        PersistenceLoad::Current { value } => assert_eq!(value, expected),
+        other => panic!("expected Current, got {other:?}"),
     }
 }
 

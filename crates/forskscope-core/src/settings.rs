@@ -187,6 +187,12 @@ impl UserSettings {
     /// migration-input reader without re-deriving the v1 JSON shape, which
     /// has transforms (e.g. `compare_profile` serialized as a name lookup)
     /// that a fresh `serde` derive would not reproduce.
+    ///
+    /// This is a frozen migration input, not a parser to evolve: RFC-076
+    /// treats the v1 shape as immutable, and any future change to this
+    /// function's behaviour is a change to what v1 files are read as, not
+    /// just an internal refactor. `pub(crate)` alone does not communicate
+    /// that — this comment is the actual boundary.
     pub(crate) fn from_payload_json(json: &str) -> Result<Self, ()> {
         let theme = extract_nested_str(json, "appearance", "theme")
             .and_then(|s| ThemeId::from_id(&s))

@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 
 /// Diff algorithm selection, mapped onto `similar` v3 algorithms inside the
 /// engine. UI layers must use this enum, never `similar::Algorithm`.
+///
+/// Part of the settings v2 on-disk schema (RFC-076); a variant rename is a
+/// schema change, not just a Rust-level rename.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum DiffAlgorithm {
@@ -16,6 +19,9 @@ pub enum DiffAlgorithm {
 }
 
 /// When inline (character-level) refinement is computed.
+///
+/// Part of the settings v2 on-disk schema (RFC-076); a variant rename is a
+/// schema change, not just a Rust-level rename.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum InlineMode {
@@ -66,6 +72,9 @@ impl Default for DiffOptions {
 // ── RFC-028: Richer compare option types and named profiles ───────────────────
 
 /// How whitespace is treated during comparison (RFC-028).
+///
+/// Part of the settings v2 on-disk schema (RFC-076); a variant rename is a
+/// schema change, not just a Rust-level rename.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum WhitespaceMode {
@@ -81,6 +90,9 @@ pub enum WhitespaceMode {
 }
 
 /// How newline style differences are treated during comparison (RFC-028).
+///
+/// Part of the settings v2 on-disk schema (RFC-076); a variant rename is a
+/// schema change, not just a Rust-level rename.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum NewlineCompareMode {
@@ -92,6 +104,9 @@ pub enum NewlineCompareMode {
 }
 
 /// Case sensitivity for comparison (RFC-028).
+///
+/// Part of the settings v2 on-disk schema (RFC-076); a variant rename is a
+/// schema change, not just a Rust-level rename.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum CaseSensitivity {

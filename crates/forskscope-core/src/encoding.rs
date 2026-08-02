@@ -107,6 +107,9 @@ pub fn detect_newline_style(text: &str) -> NewlineStyle {
 ///
 /// The default (`Preserve`) keeps whatever style was detected on load.
 /// Conversion to a specific style is an explicit user choice.
+///
+/// Part of the settings v2 on-disk schema (RFC-076); a variant rename is a
+/// schema change, not just a Rust-level rename.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum NewlinePolicy {

@@ -17,6 +17,7 @@ use crate::settings::display::{
 const SETTINGS_V0_FIXTURE: &str = include_str!("fixtures/persistence/settings-v0.json");
 const SETTINGS_V1_ENVELOPE_FIXTURE: &str =
     include_str!("fixtures/persistence/settings-v1-envelope.json");
+const SETTINGS_V2_FIXTURE: &str = include_str!("fixtures/persistence/settings-v2.json");
 
 fn sample_v2() -> PersistedSettingsV2 {
     PersistedSettingsV2 {
@@ -89,6 +90,83 @@ fn current_v2_tolerates_unknown_payload_fields() {
     match load_settings_v2(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value, sample_v2()),
         other => panic!("expected Current despite unknown field, got {other:?}"),
+    }
+}
+
+/// Pins the v2 wire *format*, not just round-trip self-consistency (review
+/// 035 C2). `SETTINGS_V2_FIXTURE` is a literal JSON file, independent of how
+/// `PersistedSettingsV2` currently serializes itself — a struct round-trip
+/// test cannot catch a variant rename because both directions would agree on
+/// the new name. This test can: it fails the moment any enum variant's wire
+/// representation changes, since every enum reachable from the payload
+/// appears in this fixture at least once.
+#[test]
+fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
+    let expected = PersistedSettingsV2 {
+        theme: ThemeId::Night,
+        language: LocaleId::japanese(),
+        diff_font_size: 15,
+        diff_font_family: DiffFontFamilySetting::Consolas,
+        appearance_font_size: 12,
+        appearance_font_family: FontFamilySetting::SystemSans,
+        density: Density::Spacious,
+        context_lines: 4,
+        last_left_dir: Some("/tmp/fixtures/left".into()),
+        last_right_dir: None,
+        profiles: vec![
+            PersistedDiffProfileV2 {
+                name: "Exact (default)".into(),
+                whitespace: WhitespaceMode::Significant,
+                newlines: NewlineCompareMode::Significant,
+                case: CaseSensitivity::Sensitive,
+                inline_mode: InlineMode::Lazy,
+                algorithm: DiffAlgorithm::Myers,
+                built_in: true,
+            },
+            PersistedDiffProfileV2 {
+                name: "Trailing whitespace, insensitive, no inline".into(),
+                whitespace: WhitespaceMode::IgnoreTrailing,
+                newlines: NewlineCompareMode::IgnoreDifference,
+                case: CaseSensitivity::Insensitive,
+                inline_mode: InlineMode::None,
+                algorithm: DiffAlgorithm::Patience,
+                built_in: false,
+            },
+            PersistedDiffProfileV2 {
+                name: "Ignore all whitespace, eager inline, lcs".into(),
+                whitespace: WhitespaceMode::IgnoreAll,
+                newlines: NewlineCompareMode::Significant,
+                case: CaseSensitivity::Sensitive,
+                inline_mode: InlineMode::EagerForSmallHunks,
+                algorithm: DiffAlgorithm::Lcs,
+                built_in: false,
+            },
+            PersistedDiffProfileV2 {
+                name: "Ignore blank lines, histogram".into(),
+                whitespace: WhitespaceMode::IgnoreBlankLines,
+                newlines: NewlineCompareMode::Significant,
+                case: CaseSensitivity::Sensitive,
+                inline_mode: InlineMode::Lazy,
+                algorithm: DiffAlgorithm::Histogram,
+                built_in: false,
+            },
+        ],
+        active_profile: 0,
+        ignore_extensions: "o, tmp".into(),
+        ignore_dirs: "target".into(),
+        explorer_compact: true,
+        enable_binary_comparison: false,
+        remember_explorer_dirs: true,
+        show_line_numbers: true,
+        wrap_long_lines: false,
+        newline_policy: NewlinePolicy::ForceLf,
+        restore_session: true,
+        recent_limit: 20,
+        performance: PerformanceLimits::default(),
+    };
+    match load_settings_v2(SETTINGS_V2_FIXTURE) {
+        PersistenceLoad::Current { value } => assert_eq!(value, expected),
+        other => panic!("expected Current, got {other:?}"),
     }
 }
 
@@ -264,6 +342,25 @@ fn out_of_range_appearance_font_size_clamps() {
     let raw = envelope_for(2, &payload);
     match load_settings_v2(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value.appearance_font_size, 50),
+        other => panic!("expected Current, got {other:?}"),
+    }
+}
+
+#[test]
+fn out_of_range_diff_font_size_clamps() {
+    let mut too_large = sample_v2();
+    too_large.diff_font_size = 9999;
+    let raw = envelope_for(2, &serde_json::to_value(&too_large).unwrap());
+    match load_settings_v2(&raw) {
+        PersistenceLoad::Current { value } => assert_eq!(value.diff_font_size, 50),
+        other => panic!("expected Current, got {other:?}"),
+    }
+
+    let mut too_small = sample_v2();
+    too_small.diff_font_size = 0;
+    let raw = envelope_for(2, &serde_json::to_value(&too_small).unwrap());
+    match load_settings_v2(&raw) {
+        PersistenceLoad::Current { value } => assert_eq!(value.diff_font_size, 6),
         other => panic!("expected Current, got {other:?}"),
     }
 }

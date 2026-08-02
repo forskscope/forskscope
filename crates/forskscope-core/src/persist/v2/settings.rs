@@ -124,6 +124,14 @@ fn default_recent_limit() -> usize {
 fn default_appearance_font_size() -> u8 {
     14
 }
+/// Distinct from [`default_appearance_font_size`] even though both are `14`
+/// today: they are different settings with different owners (diff-pane font
+/// is UI-owned, appearance font is core-owned — see the module doc). Keeping
+/// separate functions means a future change to one default cannot silently
+/// drag the other along.
+fn default_diff_font_size() -> u32 {
+    14
+}
 
 // ── Routing ──────────────────────────────────────────────────────────────
 
@@ -302,7 +310,7 @@ fn migrate_from_v1(v1: UserSettings) -> PersistedSettingsV2 {
         language: v1.locale.locale.clone(),
         // v1 has no diff-pane font concept distinct from appearance; UI
         // defaults apply and the user's next UI-driven save fills it in.
-        diff_font_size: default_appearance_font_size() as u32,
+        diff_font_size: default_diff_font_size(),
         diff_font_family: DiffFontFamilySetting::default(),
         appearance_font_size: v1.appearance.font_size,
         appearance_font_family: v1.appearance.font_family,
@@ -381,6 +389,9 @@ fn is_core_preset_name(name: &str) -> bool {
 /// (RFC-076 §"Validation").
 fn normalize(mut v2: PersistedSettingsV2) -> PersistedSettingsV2 {
     v2.appearance_font_size = v2.appearance_font_size.clamp(FONT_SIZE_MIN, FONT_SIZE_MAX);
+    v2.diff_font_size = v2
+        .diff_font_size
+        .clamp(u32::from(FONT_SIZE_MIN), u32::from(FONT_SIZE_MAX));
     v2.context_lines = v2.context_lines.min(CONTEXT_LINES_MAX);
     if v2.profiles.is_empty() {
         v2.profiles = ui_builtin_profiles();

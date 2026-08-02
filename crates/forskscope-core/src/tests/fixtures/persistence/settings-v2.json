@@ -1,0 +1,75 @@
+{
+  "schema_name": "settings",
+  "schema_version": 2,
+  "app_version": "0.165.1",
+  "created_unix": 1700000000,
+  "updated_unix": 1700000100,
+  "payload": {
+    "theme": "night",
+    "language": "ja",
+    "diff_font_size": 15,
+    "diff_font_family": "consolas",
+    "appearance_font_size": 12,
+    "appearance_font_family": "system-sans",
+    "density": "spacious",
+    "context_lines": 4,
+    "last_left_dir": "/tmp/fixtures/left",
+    "profiles": [
+      {
+        "name": "Exact (default)",
+        "whitespace": "significant",
+        "newlines": "significant",
+        "case": "sensitive",
+        "inline_mode": "lazy",
+        "algorithm": "myers",
+        "built_in": true
+      },
+      {
+        "name": "Trailing whitespace, insensitive, no inline",
+        "whitespace": "ignore-trailing",
+        "newlines": "ignore-difference",
+        "case": "insensitive",
+        "inline_mode": "none",
+        "algorithm": "patience",
+        "built_in": false
+      },
+      {
+        "name": "Ignore all whitespace, eager inline, lcs",
+        "whitespace": "ignore-all",
+        "newlines": "significant",
+        "case": "sensitive",
+        "inline_mode": "eager-for-small-hunks",
+        "algorithm": "lcs",
+        "built_in": false
+      },
+      {
+        "name": "Ignore blank lines, histogram",
+        "whitespace": "ignore-blank-lines",
+        "newlines": "significant",
+        "case": "sensitive",
+        "inline_mode": "lazy",
+        "algorithm": "histogram",
+        "built_in": false
+      }
+    ],
+    "active_profile": 0,
+    "ignore_extensions": "o, tmp",
+    "ignore_dirs": "target",
+    "explorer_compact": true,
+    "enable_binary_comparison": false,
+    "remember_explorer_dirs": true,
+    "show_line_numbers": true,
+    "wrap_long_lines": false,
+    "newline_policy": "force-lf",
+    "restore_session": true,
+    "recent_limit": 20,
+    "performance": {
+      "max_eager_text_bytes": 524288,
+      "medium_text_threshold_bytes": 4194304,
+      "large_text_threshold_bytes": 67108864,
+      "max_inline_diff_chars_per_hunk": 2000,
+      "max_directory_entries_eager": 500,
+      "max_eager_lines": 50000
+    }
+  }
+}
