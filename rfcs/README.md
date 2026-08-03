@@ -125,6 +125,7 @@ RFC design decisions.
 
 - [RFC-074 R0 stabilization-baseline handoff](./handoffs/074-v1-release-stabilization-program/r0-stabilization-baseline-handoff.md)
 - [RFC-074 M2-A release-mechanics handoff](./handoffs/074-v1-release-stabilization-program/m2a-release-mechanics-handoff.md)
+- [RFC-074 F32 compare-view alignment handoff](./handoffs/074-v1-release-stabilization-program/f32-compare-view-alignment-handoff.md)
 - [RFC-075 implementation handoff](./handoffs/075-async-compare-identity-and-generation/implementation-handoff.md)
 - [RFC-076 implementation handoff](./handoffs/076-versioned-runtime-persistence/implementation-handoff.md)
 - [RFC-076 convergence-cleanup handoff (patch 5)](./handoffs/076-versioned-runtime-persistence/convergence-cleanup-handoff.md)
