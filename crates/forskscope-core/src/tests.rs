@@ -33,6 +33,7 @@ mod path_tests;
 mod persist_tests;
 mod persist_v2_repository_tests;
 mod persist_v2_runtime_tests;
+mod persist_v2_schema_enum_wire_format_tests;
 mod persist_v2_session_tests;
 mod persist_v2_settings_tests;
 mod platform_tests;

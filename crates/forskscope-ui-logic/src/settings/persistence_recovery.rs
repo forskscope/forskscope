@@ -31,7 +31,15 @@ pub struct MigrationNotice {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecoveryDialogAction {
     Exit,
+    /// Proceed using `resolution.value`, which is temporary defaults for
+    /// `Incompatible`/`CorruptPreserved` (review 038: the file is preserved
+    /// unread/unparsed).
     ContinueWithTemporaryDefaults,
+    /// Proceed using `resolution.value`, which for `Migrated(Failed)` is the
+    /// correctly migrated settings — not defaults (review 039 N1: reusing
+    /// `ContinueWithTemporaryDefaults` here would tell the user they lost
+    /// settings they still have).
+    ContinueWithoutSaving,
     ResetAndBackupOriginal,
 }
 
@@ -79,7 +87,7 @@ impl SettingsRecoveryView {
                     ),
                     actions: vec![
                         RecoveryDialogAction::Exit,
-                        RecoveryDialogAction::ContinueWithTemporaryDefaults,
+                        RecoveryDialogAction::ContinueWithoutSaving,
                     ],
                 }),
             },
@@ -195,7 +203,14 @@ mod tests {
         assert!(
             dialog
                 .actions
-                .contains(&RecoveryDialogAction::ContinueWithTemporaryDefaults)
+                .contains(&RecoveryDialogAction::ContinueWithoutSaving),
+            "the migrated settings are correct and in use, not defaults — the action must say so"
+        );
+        assert!(
+            !dialog
+                .actions
+                .contains(&RecoveryDialogAction::ContinueWithTemporaryDefaults),
+            "review 039 N1: this label would falsely imply the user's settings were lost"
         );
     }
 
