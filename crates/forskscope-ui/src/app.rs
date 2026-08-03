@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
 
-use crate::state::{Store, open_compare, restore_session, save_session};
+use crate::state::{Store, open_compare, resolve_session, restore_tabs, save_session};
 use crate::ui::layout::header::Header;
 use crate::ui::layout::statusbar::StatusBar;
 use crate::ui::layout::tabs::TabBar;
@@ -39,6 +39,18 @@ pub fn App() -> Element {
     });
 
     use_hook(|| {
+        // Resolving the session file (and setting session_write_disabled)
+        // must happen unconditionally, before branching on a CLI startup
+        // pair — review 041 C1: a CLI launch never restores tabs from the
+        // session file, but still opens a tab and triggers a save, which
+        // must not silently overwrite a future/corrupt session.json.
+        let (session_resolution, session_notice) = resolve_session(&mut store);
+        if store.toast.read().is_none()
+            && let Some(notice) = session_notice
+        {
+            store.toast.set(Some(notice));
+        }
+
         if let Some(Some((left, right))) = STARTUP_PAIR.get() {
             let previous_tab_count = store.tabs.read().len();
             open_compare(&mut store, left.clone(), right.clone());
@@ -57,13 +69,7 @@ pub fn App() -> Element {
             }
         } else {
             // No explicit startup pair — restore the previous session (RFC-035).
-            // A settings-load notice (if any) takes priority over a session
-            // one when both fire on the same launch.
-            if let Some(notice) = restore_session(&mut store)
-                && store.toast.read().is_none()
-            {
-                store.toast.set(Some(notice));
-            }
+            restore_tabs(&mut store, &session_resolution);
         }
     });
 

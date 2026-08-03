@@ -151,7 +151,11 @@ want to decide on it deliberately.
 2. Repository and safe-write tests.
 3. Runtime adapters and their tests, while the old UI path remains active.
 4. Switch settings, then session; remove duplicate serialization ownership.
-5. Recovery UI and documentation.
+5. **Convergence cleanup** — see
+   `convergence-cleanup-handoff.md`. Added 2026-08-03; it precedes the recovery
+   UI so neither the UI nor the documentation is written against type names and
+   models that are about to be removed or renamed.
+6. Recovery UI and documentation.
 
 **Stop after patch 1 and request design review.** Verify the migration field
 matrix, every deliberate legacy-metadata discard, and downgrade behaviour before

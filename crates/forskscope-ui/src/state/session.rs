@@ -23,16 +23,31 @@ fn repository() -> SessionRepository {
 /// source this run could not establish is safe to overwrite (RFC-076
 /// "persistence_write_disabled").
 pub fn save_session(store: &Store) {
-    if *store.session_write_disabled.read() {
-        return;
-    }
     let pairs: Vec<(Option<PathBuf>, Option<PathBuf>)> = store
         .tabs
         .read()
         .iter()
         .map(|tab| (tab.left_path.clone(), tab.right_path.clone()))
         .collect();
-    persist_session(&build_save_payload(&pairs), &repository());
+    save_session_if_allowed(
+        *store.session_write_disabled.read(),
+        &build_save_payload(&pairs),
+        &repository(),
+    );
+}
+
+/// The write-disable gate itself, exposed for direct testing (review 041
+/// C1): asserts that a `write_disabled` source is never written to, without
+/// needing a `Store`/Dioxus runtime to exercise `save_session`'s call site.
+pub fn save_session_if_allowed(
+    write_disabled: bool,
+    payload: &PersistedSessionV2,
+    repo: &SessionRepository,
+) {
+    if write_disabled {
+        return;
+    }
+    persist_session(payload, repo);
 }
 
 /// The Store-independent half of [`save_session`]: what gets written. Split
@@ -63,19 +78,33 @@ pub fn persist_session(payload: &PersistedSessionV2, repo: &SessionRepository) {
 }
 
 /// Loads the last-saved session via the RFC-076 repository, durably
-/// committing any legacy migration, opens each tab whose paths still exist
-/// (silently skipping pairs where both sides are gone), and sets
-/// `store.session_write_disabled` from the resolution. Returns a one-time
-/// startup notice, if any — see `crate::ui::view::settings::recovery_notice`.
-pub fn restore_session(store: &mut Store) -> Option<Notice> {
+/// committing any legacy migration, and sets `store.session_write_disabled`
+/// from the resolution. Returns the resolution (for [`restore_tabs`])
+/// alongside a one-time startup notice, if any — see
+/// `crate::ui::view::settings::recovery_notice`.
+///
+/// Review 041 C1: this must run unconditionally at startup, independent of
+/// whether tabs actually get restored from it — a CLI-mode launch
+/// (`forskscope left right`) never restores tabs, but still needs
+/// `session_write_disabled` set before its own `open_compare` triggers a
+/// `save_session`, or a future/corrupt session file is silently overwritten.
+pub fn resolve_session(store: &mut Store) -> (SessionRuntimeResolution, Option<Notice>) {
     let resolution = load_session(&repository());
     store.session_write_disabled.set(resolution.write_disabled);
+    let notice = recovery_notice(&resolution);
+    (resolution, notice)
+}
+
+/// Opens each tab in `resolution.value.tabs` whose paths still exist
+/// (silently skipping pairs where both sides are gone). Only called when no
+/// CLI startup pair was given — see [`resolve_session`]'s doc for why
+/// resolving and restoring are two separate steps.
+pub fn restore_tabs(store: &mut Store, resolution: &SessionRuntimeResolution) {
     for pair in &resolution.value.tabs {
         if pair.left.exists() || pair.right.exists() {
             open_compare(store, pair.left.clone(), pair.right.clone());
         }
     }
-    recovery_notice(&resolution)
 }
 
 /// The repository-explicit half of [`restore_session`], exposed for direct

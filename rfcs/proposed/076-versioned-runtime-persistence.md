@@ -5,6 +5,41 @@
 **Touches.** Core persistence/settings/session models, UI settings/session
 adapters, config-file migration, user-visible recovery, and runtime-path tests.
 
+## Amendment — 2026-08-03: core-v1 support withdrawn
+
+**The core schema-v1 migration path is removed from this RFC's scope.** Every
+clause below that commits to importing, migrating, or testing core-v1 envelopes
+is superseded by this amendment. UI schema v0 support is unaffected and remains
+mandatory.
+
+**Why.** v1 was specified in RFC-031, implemented in `forskscope-core`, and
+never wired to the running application. Verified over the full history of the
+UI crate:
+
+```sh
+git log -S "UserSettings"     -- crates/forskscope-ui/   # no commits
+git log -S "WorkspaceSession" -- crates/forskscope-ui/   # no commits
+```
+
+`app_json_settings::ConfigManager` was the settings path from the earliest
+architecture commits until RFC-076 patch 4 replaced it. No released version ever
+produced a v1 file, so no user configuration of that shape can exist. Supporting
+it costs a permanently public second settings model, a second session model, and
+an envelope layer whose own documented contract is untrue — for a file that
+cannot occur.
+
+**Residual risk, bounded.** A hand-built v1 file would load as `Corrupt`:
+preserved untouched, reported to the user, never overwritten. That is the same
+handling any unrecognised file receives, so removal cannot cause data loss.
+
+**Consequences.** The v1 DTOs, `migrate_from_v1`, and the RFC-031
+`VersionedEnvelope`/`SchemaName`/`MigrationPolicy` types become removable, along
+with `UserSettings` and `WorkspaceSession` and their companion types. A routing
+input declaring `schema_version = 1` is `Corrupt`, not a migration candidate.
+This is executed as the convergence-cleanup patch in the M2-B sequence.
+
+Approved by the project owner, 2026-08-03.
+
 ## Summary
 
 ForskScope will have one canonical persisted settings contract and one
@@ -235,8 +270,8 @@ Parse the top-level object once with `serde_json`, then route without guessing:
 | Input | Detection | Action |
 |---|---|---|
 | UI settings/session v0 | no `schema_name`; exact legacy DTO matches | migrate to v2 |
-| Core settings envelope v1 | `schema_name = settings`, version 1 | parse `CoreSettingsEnvelopeV1`, migrate union fields to v2 |
-| Core session envelope v1 | `schema_name = session`, version 1 | parse `CoreSessionEnvelopeV1`, preserve restorable roots/path pairs, migrate to v2 |
+| ~~Core settings envelope v1~~ | ~~`schema_name = settings`, version 1~~ | **Superseded by the 2026-08-03 amendment — version 1 is `Corrupt`, not a migration candidate** |
+| ~~Core session envelope v1~~ | ~~`schema_name = session`, version 1~~ | **Superseded by the 2026-08-03 amendment — version 1 is `Corrupt`, not a migration candidate** |
 | Current envelope v2 | matching schema name and version 2 | validate and load |
 | Future envelope | matching schema name and version greater than 2 | preserve and return `FutureVersion` |
 | Wrong schema name or malformed recognized input | any | preserve and return `Corrupt`/schema mismatch |
@@ -351,11 +386,14 @@ parsers.
 
 ## Compatibility
 
-- Existing v0.164 plain settings/session files are supported as UI schema v0.
-- Existing core settings/session envelope fixtures remain supported as schema
-  v1 migration inputs even though the shipping UI did not write them.
-- New files use schema v2; schema version 1 is never reinterpreted with a new
-  payload shape.
+- Existing plain settings/session files from every released version are
+  supported as UI schema v0. This is the only legacy format users can have and
+  its support is mandatory.
+- ~~Existing core settings/session envelope fixtures remain supported as schema
+  v1 migration inputs~~ — **withdrawn by the 2026-08-03 amendment**; no released
+  version ever wrote one.
+- New files use schema v2. A file declaring schema version 1 is reported as
+  `Corrupt`: preserved, never overwritten, never silently defaulted.
 - Downgrading to v0.164 after migration may not understand the envelope; the
   `.pre-v2.bak` file provides recovery. Document this before release.
 - Unknown future versions are never silently downgraded.
@@ -375,15 +413,22 @@ authentication surface is introduced.
 4. Add runtime adapter tests before changing `App`.
 5. Migrate UI settings load/save and remove duplicate serialization ownership.
 6. Migrate UI session load/save.
-7. Add recovery UI and write-disable protection.
-8. Update docs, requirements mapping, and threat model.
+7. Converge the data model: remove the v1 path and the RFC-031 envelope types
+   per the 2026-08-03 amendment, and drop the version suffix from the canonical
+   module and types so a future schema version renames nothing. This precedes
+   the recovery UI and documentation so neither is written against names and
+   models that are about to change.
+8. Add recovery UI and write-disable protection.
+9. Update docs, requirements mapping, and threat model.
 
 ## Acceptance criteria
 
 - The running app reads and writes versioned settings/session envelopes.
 - Every current UI setting survives a legacy migration test.
-- Existing core-v1 settings/session envelopes migrate without schema
-  reinterpretation and preserve every restorable setting/path field.
+- ~~Existing core-v1 settings/session envelopes migrate without schema
+  reinterpretation~~ — **withdrawn by the 2026-08-03 amendment**. Replaced by:
+  the v1 models, `migrate_from_v1`, and the RFC-031 envelope types are removed,
+  and exactly one canonical persisted model per document remains in core.
 - Future and corrupt schemas are preserved and visibly reported.
 - No production path calls plain `ConfigManager<AppSettings/SessionState>`.
 - Runtime-path tests exercise the same functions invoked at startup/effects.

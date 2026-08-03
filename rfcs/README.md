@@ -127,5 +127,6 @@ RFC design decisions.
 - [RFC-074 M2-A release-mechanics handoff](./handoffs/074-v1-release-stabilization-program/m2a-release-mechanics-handoff.md)
 - [RFC-075 implementation handoff](./handoffs/075-async-compare-identity-and-generation/implementation-handoff.md)
 - [RFC-076 implementation handoff](./handoffs/076-versioned-runtime-persistence/implementation-handoff.md)
+- [RFC-076 convergence-cleanup handoff (patch 5)](./handoffs/076-versioned-runtime-persistence/convergence-cleanup-handoff.md)
 - [RFC-077 implementation handoff](./handoffs/077-mergetool-save-target-model/implementation-handoff.md)
 - [RFC-078 acceptance handoff](./handoffs/078-platform-runtime-acceptance/acceptance-handoff.md)
