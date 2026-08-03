@@ -25,7 +25,18 @@ pub static STARTUP_MERGED: std::sync::OnceLock<Option<PathBuf>> = std::sync::Onc
 
 #[component]
 pub fn App() -> Element {
-    let mut store = use_context_provider(|| Store::new(load()));
+    let mut store = use_context_provider(|| {
+        let (settings, resolution) = load();
+        let mut store = Store::new(
+            settings,
+            resolution.value.clone(),
+            resolution.write_disabled,
+        );
+        if let Some(notice) = crate::ui::view::settings::recovery_notice(&resolution) {
+            store.toast.set(Some(notice));
+        }
+        store
+    });
 
     use_hook(|| {
         if let Some(Some((left, right))) = STARTUP_PAIR.get() {
@@ -46,7 +57,13 @@ pub fn App() -> Element {
             }
         } else {
             // No explicit startup pair — restore the previous session (RFC-035).
-            restore_session(&mut store);
+            // A settings-load notice (if any) takes priority over a session
+            // one when both fire on the same launch.
+            if let Some(notice) = restore_session(&mut store)
+                && store.toast.read().is_none()
+            {
+                store.toast.set(Some(notice));
+            }
         }
     });
 

@@ -6,9 +6,9 @@
 //! for a legacy/older-version file, durably commits the migration
 //! immediately — this is the caller [`super::SettingsRepository::commit_migration`]
 //! did not yet have when review 037 raised N1. Pure data out: no dialog text,
-//! no Dioxus/GTK dependency. Nothing here is wired into `App` yet;
-//! `forskscope-ui` still calls `app_json_settings::ConfigManager` directly
-//! until patch 4.
+//! no Dioxus/GTK dependency. As of patch 4, `forskscope_ui::ui::view::settings::load`
+//! calls this directly at startup; `app_json_settings::ConfigManager` is no
+//! longer called from production code.
 
 use std::path::PathBuf;
 

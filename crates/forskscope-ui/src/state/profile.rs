@@ -22,7 +22,7 @@ pub fn add_profile(
             algorithm,
             built_in: false,
         });
-    crate::ui::view::settings::persist(&store.settings.read());
+    crate::ui::view::settings::persist(*store);
 }
 
 pub fn remove_profile(store: &mut Store, index: usize) {
@@ -42,5 +42,5 @@ pub fn remove_profile(store: &mut Store, index: usize) {
         s.active_profile = s.profiles.len().saturating_sub(1);
     }
     drop(s);
-    crate::ui::view::settings::persist(&store.settings.read());
+    crate::ui::view::settings::persist(*store);
 }

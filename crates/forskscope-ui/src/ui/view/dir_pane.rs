@@ -352,7 +352,7 @@ pub fn navigate_to(
     // Persist so the remembered directory survives a restart. No-op effect on
     // disk content when remember_explorer_dirs is off (last_* left unchanged).
     if store.settings.read().remember_explorer_dirs {
-        crate::ui::view::settings::persist(&store.settings.read());
+        crate::ui::view::settings::persist(store);
     }
     history.write().push(path.clone());
     current_dir.set(path);

@@ -5,7 +5,7 @@
 //! - `types`     — `BatchResultSpec`, `DirOp`
 //! - `tab`       — `CompareTab`, `TabState`, `recompute_diff`, `swap_sides`
 //! - `compare`   — `open_compare`, `reload_tab`, `load_and_diff`, dir tabs
-//! - `session`   — `SessionState`, `save_session`, `restore_session`, `close_tab`
+//! - `session`   — `save_session`, `restore_session`, `close_tab` (RFC-076 repository-backed)
 //! - `profile`   — `add_profile`, `remove_profile`
 
 pub mod compare;
@@ -23,8 +23,21 @@ pub use tab::{CompareTab, TabState, recompute_diff, swap_sides};
 pub use types::{BatchResultSpec, DirOp};
 
 use dioxus::prelude::*;
+use forskscope_core::persist::v2::settings::PersistedSettingsV2;
 use forskscope_ui_logic::{CompareTabId, CompareTabIdAllocator, LoadIdentityError};
 use std::path::PathBuf;
+
+/// Resolves `settings.json`/`session.json`'s explicit path (RFC-076: the
+/// repositories never resolve a platform config directory themselves — that
+/// stays a UI/infrastructure concern). Falls back to the current directory
+/// if the platform config directory cannot be determined, matching
+/// `app-json-settings`'s previous behavior.
+pub(crate) fn config_file_path(file_name: &str) -> PathBuf {
+    dirs_next::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("forskscope")
+        .join(file_name)
+}
 
 // ── Modal variants ────────────────────────────────────────────────────────────
 
@@ -111,6 +124,16 @@ pub struct Store {
     pub dir_tabs: Signal<Vec<(PathBuf, PathBuf)>>,
     pub active_dir: Signal<Option<usize>>,
     pub settings: Signal<AppSettings>,
+    /// The last-resolved canonical settings (RFC-076), cached so `persist()`
+    /// can merge UI-editable changes onto it without resetting fields the UI
+    /// has no control over. See `AppSettings::merge_into_v2`.
+    pub settings_v2_base: Signal<PersistedSettingsV2>,
+    /// `true` when the settings file is a future/corrupt/unwritable source
+    /// this run could not establish is safe to overwrite — `persist()`
+    /// becomes a no-op while this is set (RFC-076 "persistence_write_disabled").
+    pub settings_write_disabled: Signal<bool>,
+    /// Session mirror of [`Self::settings_write_disabled`].
+    pub session_write_disabled: Signal<bool>,
     pub left_pick: Signal<Option<PathBuf>>,
     pub right_pick: Signal<Option<PathBuf>>,
     pub modal: Signal<Modal>,
@@ -123,7 +146,11 @@ impl Store {
     /// Signals must be rooted at the application root scope so that tasks
     /// spawned via `spawn_forever` (which runs at `ScopeId(0)`) can write to
     /// them without triggering the "copy value hoisted" warning.
-    pub fn new(settings: AppSettings) -> Self {
+    pub fn new(
+        settings: AppSettings,
+        settings_v2_base: PersistedSettingsV2,
+        settings_write_disabled: bool,
+    ) -> Self {
         Self {
             tabs: Signal::new_in_scope(Vec::new(), ScopeId::ROOT),
             compare_tab_ids: Signal::new_in_scope(CompareTabIdAllocator::new(), ScopeId::ROOT),
@@ -131,6 +158,9 @@ impl Store {
             dir_tabs: Signal::new_in_scope(Vec::new(), ScopeId::ROOT),
             active_dir: Signal::new_in_scope(None, ScopeId::ROOT),
             settings: Signal::new_in_scope(settings, ScopeId::ROOT),
+            settings_v2_base: Signal::new_in_scope(settings_v2_base, ScopeId::ROOT),
+            settings_write_disabled: Signal::new_in_scope(settings_write_disabled, ScopeId::ROOT),
+            session_write_disabled: Signal::new_in_scope(false, ScopeId::ROOT),
             left_pick: Signal::new_in_scope(None, ScopeId::ROOT),
             right_pick: Signal::new_in_scope(None, ScopeId::ROOT),
             modal: Signal::new_in_scope(Modal::None, ScopeId::ROOT),

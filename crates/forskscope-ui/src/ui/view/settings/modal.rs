@@ -47,7 +47,7 @@ pub fn SettingsModal() -> Element {
                         value: tv(cur.theme),
                         onchange: move |e| {
                             store.settings.write().theme = tf(&e.value());
-                            super::persist(&store.settings.read());
+                            super::persist(store);
                         },
                         option { value: "dark",  "Dark"  }
                         option { value: "light", "Light" }
@@ -60,7 +60,7 @@ pub fn SettingsModal() -> Element {
                         value: lv(cur.language),
                         onchange: move |e| {
                             store.settings.write().language = lf(&e.value());
-                            super::persist(&store.settings.read());
+                            super::persist(store);
                         },
                         option { value: "en", "English" }
                         option { value: "ja", "日本語"   }
@@ -74,7 +74,7 @@ pub fn SettingsModal() -> Element {
                         onchange: move |e| {
                             if let Ok(n) = e.value().parse::<u32>() {
                                 store.settings.write().diff_font_size = n.clamp(8, 32);
-                                super::persist(&store.settings.read());
+                                super::persist(store);
                             }
                         }
                     }
@@ -99,7 +99,7 @@ pub fn SettingsModal() -> Element {
                                 _             => DiffFontFamily::Monospace,
                             };
                             store.settings.write().diff_font_family = ff;
-                            super::persist(&store.settings.read());
+                            super::persist(store);
                         },
                         option { value: "monospace",  {t(lang, "Monospace (default)")} }
                         option { value: "sans-serif",  {t(lang, "Sans-serif")} }
@@ -126,7 +126,7 @@ pub fn SettingsModal() -> Element {
                             title: t(lang, "When off, binary files cannot be compared and are shown as non-actionable in the Explorer."),
                             onchange: move |e| {
                                 store.settings.write().enable_binary_comparison = e.checked();
-                                super::persist(&store.settings.read());
+                                super::persist(store);
                             }
                         }
                     }
@@ -136,7 +136,7 @@ pub fn SettingsModal() -> Element {
                             value: if cur.explorer_compact { "compact" } else { "aligned" },
                             onchange: move |e| {
                                 store.settings.write().explorer_compact = e.value() == "compact";
-                                super::persist(&store.settings.read());
+                                super::persist(store);
                             },
                             option { value: "aligned", {t(lang, "Aligned (default)")} }
                             option { value: "compact", {t(lang, "Compact (independent panes)")} }
@@ -160,7 +160,7 @@ pub fn SettingsModal() -> Element {
                                         s.last_right_dir = None;
                                     }
                                 }
-                                super::persist(&store.settings.read());
+                                super::persist(store);
                             }
                         }
                     }
@@ -171,7 +171,7 @@ pub fn SettingsModal() -> Element {
                             onchange: move |e| {
                                 if let Ok(n) = e.value().parse::<usize>() {
                                     store.settings.write().context_lines = n;
-                                    super::persist(&store.settings.read());
+                                    super::persist(store);
                                 }
                             },
                             option { value: "0",  {t(lang, "0 (show all)")} }
@@ -190,7 +190,7 @@ pub fn SettingsModal() -> Element {
                             value: "{cur.ignore_extensions}",
                             oninput: move |e| {
                                 store.settings.write().ignore_extensions = e.value();
-                                super::persist(&store.settings.read());
+                                super::persist(store);
                             }
                         }
                     }
@@ -202,7 +202,7 @@ pub fn SettingsModal() -> Element {
                             value: "{cur.ignore_dirs}",
                             oninput: move |e| {
                                 store.settings.write().ignore_dirs = e.value();
-                                super::persist(&store.settings.read());
+                                super::persist(store);
                             }
                         }
                     }
@@ -218,7 +218,7 @@ pub fn SettingsModal() -> Element {
                                         class: "profile-name",
                                         onclick: move |_| {
                                             store.settings.write().active_profile = i;
-                                            super::persist(&store.settings.read());
+                                            super::persist(store);
                                         },
                                         if cur.active_profile == i { "▸ " } else { "  " }
                                         "{p.name}"

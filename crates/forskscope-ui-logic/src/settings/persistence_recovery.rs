@@ -10,8 +10,10 @@
 //! ordered recovery actions. Same "core decides, ui-logic renders" split as
 //! [`crate::compare::save_error::SaveErrorView`].
 //!
-//! Patch 3 boundary: nothing here is called by `App` yet — `forskscope-ui`
-//! still calls `app_json_settings::ConfigManager` directly until patch 4.
+//! As of patch 4, `forskscope_ui::ui::view::settings::recovery_notice` calls
+//! `from_resolution` to build a startup toast from `migration_notice`/`dialog`'s
+//! text — the full dialog UI with Exit/Continue/Reset buttons is still
+//! patch 5's job.
 
 use forskscope_core::persist::v2::settings::runtime::{
     MigrationCommitOutcome, SettingsRuntimeOutcome, SettingsRuntimeResolution,
