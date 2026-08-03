@@ -1,25 +1,18 @@
-//! Runtime resolution for the settings file (RFC-076 §"User-facing behavior",
+//! Runtime resolution for the session file (RFC-076 §"User-facing behavior",
 //! implementation sequence step 4: "Add runtime adapter tests before changing
-//! `App`").
-//!
-//! [`resolve_and_commit`] decides what value a run should actually use and,
-//! for a legacy/older-version file, durably commits the migration
-//! immediately — this is the caller [`super::SettingsRepository::commit_migration`]
-//! did not yet have when review 037 raised N1. Pure data out: no dialog text,
-//! no Dioxus/GTK dependency. As of patch 4, `forskscope_ui::ui::view::settings::load`
-//! calls this directly at startup; `app_json_settings::ConfigManager` is no
-//! longer called from production code.
+//! `App`"). Mirrors [`super::super::settings::runtime`]; see its module doc
+//! for the full rationale.
 
 use std::path::PathBuf;
 
-use super::{PersistedSettingsV2, SettingsRepository};
-use crate::persist::v2::{PersistenceCommitError, PersistenceError, PersistenceLoad};
+use super::{PersistedSession, SessionRepository};
+use crate::persist::schema::{PersistenceCommitError, PersistenceError, PersistenceLoad};
 
-/// What happened when resolving a settings file at startup, after any
-/// durable migration commit.
+/// What happened when resolving a session file at startup, after any durable
+/// migration commit.
 #[derive(Debug, Clone, PartialEq)]
-pub enum SettingsRuntimeOutcome {
-    /// No file existed; the resolved value is defaults.
+pub enum SessionRuntimeOutcome {
+    /// No file existed; the resolved value is defaults (no restorable tabs).
     Fresh,
     /// A current v2 file was loaded as-is.
     Current,
@@ -28,11 +21,11 @@ pub enum SettingsRuntimeOutcome {
     Migrated(MigrationCommitOutcome),
     /// The file's schema is newer than this build understands. The original
     /// bytes are untouched on disk; the resolved value is temporary
-    /// defaults.
+    /// defaults (no restorable tabs).
     Incompatible { schema: String, version: u32 },
     /// The file could not be parsed as any recognized shape. The original
     /// bytes are untouched on disk; the resolved value is temporary
-    /// defaults.
+    /// defaults (no restorable tabs).
     CorruptPreserved { detail: PersistenceError },
 }
 
@@ -58,56 +51,55 @@ pub enum MigrationCommitOutcome {
     Failed { detail: String },
 }
 
-/// The resolved settings state for this run.
+/// The resolved session state for this run.
 #[derive(Debug, Clone, PartialEq)]
-pub struct SettingsRuntimeResolution {
-    pub value: PersistedSettingsV2,
+pub struct SessionRuntimeResolution {
+    pub value: PersistedSession,
     /// `true` whenever this run must not write the file back: a
     /// future/corrupt source (RFC-076 "persistence_write_disabled"), or a
     /// migration commit that was refused or failed (review 038 C2) — in
     /// both cases nothing has established that overwriting the file is
     /// safe.
     pub write_disabled: bool,
-    pub outcome: SettingsRuntimeOutcome,
+    pub outcome: SessionRuntimeOutcome,
 }
 
 /// Loads `repo` and, for a legacy/older-version file, durably commits the
 /// migration immediately. Never writes for `Missing`, `Current`,
 /// `FutureVersion`, or `Corrupt` — those are read-only outcomes by
 /// definition.
-pub fn resolve_and_commit(repo: &SettingsRepository) -> SettingsRuntimeResolution {
+pub fn resolve_and_commit(repo: &SessionRepository) -> SessionRuntimeResolution {
     let (load, raw) = repo.load_with_raw();
     match load {
-        PersistenceLoad::Missing { defaults } => SettingsRuntimeResolution {
+        PersistenceLoad::Missing { defaults } => SessionRuntimeResolution {
             value: defaults,
             write_disabled: false,
-            outcome: SettingsRuntimeOutcome::Fresh,
+            outcome: SessionRuntimeOutcome::Fresh,
         },
-        PersistenceLoad::Current { value } => SettingsRuntimeResolution {
+        PersistenceLoad::Current { value } => SessionRuntimeResolution {
             value,
             write_disabled: false,
-            outcome: SettingsRuntimeOutcome::Current,
+            outcome: SessionRuntimeOutcome::Current,
         },
         PersistenceLoad::MigratedLegacy { value, .. } => commit_migrated(repo, value, raw),
-        PersistenceLoad::MigratedVersion { value, .. } => commit_migrated(repo, value, raw),
-        PersistenceLoad::FutureVersion { schema, version } => SettingsRuntimeResolution {
-            value: PersistedSettingsV2::default(),
+        PersistenceLoad::FutureVersion { schema, version } => SessionRuntimeResolution {
+            value: PersistedSession::default(),
             write_disabled: true,
-            outcome: SettingsRuntimeOutcome::Incompatible { schema, version },
+            outcome: SessionRuntimeOutcome::Incompatible { schema, version },
         },
-        PersistenceLoad::Corrupt { detail } => SettingsRuntimeResolution {
-            value: PersistedSettingsV2::default(),
+        PersistenceLoad::Corrupt { detail } => SessionRuntimeResolution {
+            value: PersistedSession::default(),
             write_disabled: true,
-            outcome: SettingsRuntimeOutcome::CorruptPreserved { detail },
+            outcome: SessionRuntimeOutcome::CorruptPreserved { detail },
         },
     }
 }
 
 fn commit_migrated(
-    repo: &SettingsRepository,
-    value: PersistedSettingsV2,
+    repo: &SessionRepository,
+    value: PersistedSession,
     raw: Option<Vec<u8>>,
-) -> SettingsRuntimeResolution {
+) -> SessionRuntimeResolution {
     let commit = match raw
         .as_deref()
         .map(|bytes| repo.commit_migration(&value, bytes))
@@ -125,9 +117,9 @@ fn commit_migrated(
         },
     };
     let write_disabled = !matches!(commit, MigrationCommitOutcome::Committed { .. });
-    SettingsRuntimeResolution {
+    SessionRuntimeResolution {
         value,
         write_disabled,
-        outcome: SettingsRuntimeOutcome::Migrated(commit),
+        outcome: SessionRuntimeOutcome::Migrated(commit),
     }
 }

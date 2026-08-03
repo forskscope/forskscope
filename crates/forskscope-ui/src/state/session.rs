@@ -3,11 +3,11 @@
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
-use forskscope_core::persist::v2::session::runtime::{
+use forskscope_core::persist::schema::session::runtime::{
     SessionRuntimeResolution, resolve_and_commit,
 };
-use forskscope_core::persist::v2::session::{
-    PersistedComparePairV2, PersistedSessionV2, SessionRepository,
+use forskscope_core::persist::schema::session::{
+    PersistedComparePair, PersistedSession, SessionRepository,
 };
 use forskscope_ui_logic::SessionRecoveryView;
 
@@ -41,7 +41,7 @@ pub fn save_session(store: &Store) {
 /// needing a `Store`/Dioxus runtime to exercise `save_session`'s call site.
 pub fn save_session_if_allowed(
     write_disabled: bool,
-    payload: &PersistedSessionV2,
+    payload: &PersistedSession,
     repo: &SessionRepository,
 ) {
     if write_disabled {
@@ -54,16 +54,16 @@ pub fn save_session_if_allowed(
 /// out so a test can exercise it without needing a running Dioxus runtime or
 /// constructing a full `CompareTab` — only the path pair matters here.
 /// Drops any pair where either side is `None`.
-pub fn build_save_payload(pairs: &[(Option<PathBuf>, Option<PathBuf>)]) -> PersistedSessionV2 {
-    let saved: Vec<PersistedComparePairV2> = pairs
+pub fn build_save_payload(pairs: &[(Option<PathBuf>, Option<PathBuf>)]) -> PersistedSession {
+    let saved: Vec<PersistedComparePair> = pairs
         .iter()
         .filter_map(|(l, r)| {
             let left = l.clone()?;
             let right = r.clone()?;
-            Some(PersistedComparePairV2 { left, right })
+            Some(PersistedComparePair { left, right })
         })
         .collect();
-    PersistedSessionV2 {
+    PersistedSession {
         tabs: saved,
         active_tab: None,
         explorer_roots: None,
@@ -73,7 +73,7 @@ pub fn build_save_payload(pairs: &[(Option<PathBuf>, Option<PathBuf>)]) -> Persi
 /// Writes `payload` via `repo` — the exact repository call `save_session`
 /// makes, exposed for direct testing (handoff §6: "targeted tests proving
 /// the actual UI startup and save functions use the new repositories").
-pub fn persist_session(payload: &PersistedSessionV2, repo: &SessionRepository) {
+pub fn persist_session(payload: &PersistedSession, repo: &SessionRepository) {
     let _ = repo.save(payload);
 }
 

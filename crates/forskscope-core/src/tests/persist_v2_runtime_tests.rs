@@ -1,29 +1,28 @@
 //! RFC-076 patch 3: runtime adapter tests (implementation sequence step 4,
 //! "Add runtime adapter tests before changing `App`").
 //!
-//! Exercises [`crate::persist::v2::settings::runtime::resolve_and_commit`]
+//! Exercises [`crate::persist::schema::settings::runtime::resolve_and_commit`]
 //! and its session mirror end to end against real temp-path repositories:
-//! fresh/current pass through unchanged, legacy and core-v1 files are
-//! migrated and durably committed, future/corrupt files resolve to
-//! temporary defaults with writes disabled and the original bytes
-//! untouched, and a commit that fails for a persistent reason (review 038
-//! C1/C2) is reported with its cause and disables writes rather than
-//! silently retrying forever.
+//! fresh/current pass through unchanged, legacy files are migrated and
+//! durably committed, future/corrupt files resolve to temporary defaults
+//! with writes disabled and the original bytes untouched, and a commit that
+//! fails for a persistent reason (review 038 C1/C2) is reported with its
+//! cause and disables writes rather than silently retrying forever.
 
 use std::fs;
 use std::path::PathBuf;
 
-use crate::persist::v2::PersistenceLoad;
-use crate::persist::v2::session::runtime::{
+use crate::persist::schema::PersistenceLoad;
+use crate::persist::schema::session::runtime::{
     MigrationCommitOutcome as SessionMigrationCommitOutcome, SessionRuntimeOutcome,
     resolve_and_commit as resolve_session,
 };
-use crate::persist::v2::session::{PersistedSessionV2, SessionRepository};
-use crate::persist::v2::settings::runtime::{
+use crate::persist::schema::session::{PersistedSession, SessionRepository};
+use crate::persist::schema::settings::runtime::{
     MigrationCommitOutcome as SettingsMigrationCommitOutcome, SettingsRuntimeOutcome,
     resolve_and_commit as resolve_settings,
 };
-use crate::persist::v2::settings::{PersistedSettingsV2, SettingsRepository};
+use crate::persist::schema::settings::{PersistedSettings, SettingsRepository};
 
 fn temp_path(tag: &str, file_name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
@@ -58,7 +57,7 @@ fn settings_resolve_missing_is_fresh_and_writable() {
     let repo = SettingsRepository::new(path);
 
     let resolved = resolve_settings(&repo);
-    assert_eq!(resolved.value, PersistedSettingsV2::default());
+    assert_eq!(resolved.value, PersistedSettings::default());
     assert!(!resolved.write_disabled);
     assert_eq!(resolved.outcome, SettingsRuntimeOutcome::Fresh);
 }
@@ -67,9 +66,9 @@ fn settings_resolve_missing_is_fresh_and_writable() {
 fn settings_resolve_current_passes_through_unchanged() {
     let path = temp_path("settings-current", "settings.json");
     let repo = SettingsRepository::new(path);
-    let value = PersistedSettingsV2 {
+    let value = PersistedSettings {
         diff_font_size: 22,
-        ..PersistedSettingsV2::default()
+        ..PersistedSettings::default()
     };
     repo.save(&value).unwrap();
 
@@ -106,23 +105,6 @@ fn settings_resolve_migrates_legacy_v0_and_commits_durably() {
 }
 
 #[test]
-fn settings_resolve_migrates_core_v1_envelope_and_commits_durably() {
-    let path = temp_path("settings-migrate-v1", "settings.json");
-    fs::write(&path, fixture("settings-v1-envelope.json")).unwrap();
-    let repo = SettingsRepository::new(path.clone());
-
-    let resolved = resolve_settings(&repo);
-    assert!(matches!(
-        resolved.outcome,
-        SettingsRuntimeOutcome::Migrated(SettingsMigrationCommitOutcome::Committed { .. })
-    ));
-    match repo.load() {
-        PersistenceLoad::Current { .. } => {}
-        other => panic!("expected Current after durable commit, got {other:?}"),
-    }
-}
-
-#[test]
 fn settings_resolve_future_version_disables_writes_and_preserves_bytes() {
     let path = temp_path("settings-future", "settings.json");
     let raw = serde_json::json!({
@@ -138,7 +120,7 @@ fn settings_resolve_future_version_disables_writes_and_preserves_bytes() {
     let repo = SettingsRepository::new(path.clone());
 
     let resolved = resolve_settings(&repo);
-    assert_eq!(resolved.value, PersistedSettingsV2::default());
+    assert_eq!(resolved.value, PersistedSettings::default());
     assert!(resolved.write_disabled);
     match resolved.outcome {
         SettingsRuntimeOutcome::Incompatible { schema, version } => {
@@ -161,7 +143,7 @@ fn settings_resolve_corrupt_disables_writes_and_preserves_bytes() {
     let repo = SettingsRepository::new(path.clone());
 
     let resolved = resolve_settings(&repo);
-    assert_eq!(resolved.value, PersistedSettingsV2::default());
+    assert_eq!(resolved.value, PersistedSettings::default());
     assert!(resolved.write_disabled);
     assert!(matches!(
         resolved.outcome,
@@ -209,7 +191,7 @@ fn session_resolve_missing_is_fresh_and_writable() {
     let repo = SessionRepository::new(path);
 
     let resolved = resolve_session(&repo);
-    assert_eq!(resolved.value, PersistedSessionV2::default());
+    assert_eq!(resolved.value, PersistedSession::default());
     assert!(!resolved.write_disabled);
     assert_eq!(resolved.outcome, SessionRuntimeOutcome::Fresh);
 }
@@ -279,7 +261,7 @@ fn session_resolve_future_version_disables_writes_and_preserves_bytes() {
     let repo = SessionRepository::new(path.clone());
 
     let resolved = resolve_session(&repo);
-    assert_eq!(resolved.value, PersistedSessionV2::default());
+    assert_eq!(resolved.value, PersistedSession::default());
     assert!(resolved.write_disabled);
     assert!(matches!(
         resolved.outcome,
@@ -295,7 +277,7 @@ fn session_resolve_corrupt_disables_writes_and_preserves_bytes() {
     let repo = SessionRepository::new(path.clone());
 
     let resolved = resolve_session(&repo);
-    assert_eq!(resolved.value, PersistedSessionV2::default());
+    assert_eq!(resolved.value, PersistedSession::default());
     assert!(resolved.write_disabled);
     assert!(matches!(
         resolved.outcome,

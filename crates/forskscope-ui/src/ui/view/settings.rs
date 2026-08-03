@@ -7,10 +7,10 @@ pub mod modal;
 pub mod profile;
 
 use dioxus::prelude::*;
-use forskscope_core::persist::v2::settings::runtime::{
+use forskscope_core::persist::schema::settings::runtime::{
     SettingsRuntimeResolution, resolve_and_commit,
 };
-use forskscope_core::persist::v2::settings::{PersistedSettingsV2, SettingsRepository};
+use forskscope_core::persist::schema::settings::{PersistedSettings, SettingsRepository};
 use forskscope_ui_logic::SettingsRecoveryView;
 
 use crate::state::{AppSettings, Lang, Modal, Notice, Store, Theme, config_file_path};
@@ -46,17 +46,14 @@ pub fn persist(mut store: Store) {
 /// The Store-independent half of [`persist`]: what gets written and where.
 /// Split out so a test can exercise it against a temp-path repository
 /// without needing a running Dioxus runtime to construct a `Store`.
-pub fn build_save_payload(
-    settings: &AppSettings,
-    base: &PersistedSettingsV2,
-) -> PersistedSettingsV2 {
+pub fn build_save_payload(settings: &AppSettings, base: &PersistedSettings) -> PersistedSettings {
     settings.merge_into_v2(base)
 }
 
 /// Writes `payload` via `repo` — the exact repository call `persist` makes,
 /// exposed for direct testing (handoff §6: "targeted tests proving the
 /// actual UI startup and save functions use the new repositories").
-pub fn persist_settings(payload: &PersistedSettingsV2, repo: &SettingsRepository) {
+pub fn persist_settings(payload: &PersistedSettings, repo: &SettingsRepository) {
     let _ = repo.save(payload);
 }
 

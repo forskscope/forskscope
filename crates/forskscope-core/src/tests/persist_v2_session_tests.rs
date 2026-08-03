@@ -1,25 +1,25 @@
 //! RFC-076 session schema v2: routing, migration, and validation tests.
+//!
+//! Core schema v1 (RFC-031) was never shipped to users and its migration
+//! path was removed by RFC-076's 2026-08-03 amendment (patch 5) — see
+//! `schema_version_1_is_corrupt_not_migrated`.
 
-use crate::persist::v2::PersistenceLoad;
-use crate::persist::v2::session::{
-    PersistedComparePairV2, PersistedDirectoryPairV2, PersistedSessionV2, load_session_v2,
+use crate::persist::schema::PersistenceLoad;
+use crate::persist::schema::session::{
+    PersistedComparePair, PersistedDirectoryPair, PersistedSession, load_session,
 };
 
 const SESSION_V0_FIXTURE: &str = include_str!("fixtures/persistence/session-v0.json");
-const SESSION_V1_FILEPAIR_FIXTURE: &str =
-    include_str!("fixtures/persistence/session-v1-filepair-envelope.json");
-const SESSION_V1_DIRPAIR_FIXTURE: &str =
-    include_str!("fixtures/persistence/session-v1-dirpair-envelope.json");
 const SESSION_V2_FIXTURE: &str = include_str!("fixtures/persistence/session-v2.json");
 
-fn sample_v2() -> PersistedSessionV2 {
-    PersistedSessionV2 {
-        tabs: vec![PersistedComparePairV2 {
+fn sample_v2() -> PersistedSession {
+    PersistedSession {
+        tabs: vec![PersistedComparePair {
             left: "/tmp/fixtures/left.txt".into(),
             right: "/tmp/fixtures/right.txt".into(),
         }],
         active_tab: Some(0),
-        explorer_roots: Some(PersistedDirectoryPairV2 {
+        explorer_roots: Some(PersistedDirectoryPair {
             left: "/tmp/fixtures/left-dir".into(),
             right: "/tmp/fixtures/right-dir".into(),
         }),
@@ -44,7 +44,7 @@ fn envelope_for(schema_version: u32, payload: &serde_json::Value) -> String {
 fn current_v2_envelope_round_trips() {
     let payload = serde_json::to_value(sample_v2()).unwrap();
     let raw = envelope_for(2, &payload);
-    match load_session_v2(&raw) {
+    match load_session(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value, sample_v2()),
         other => panic!("expected Current, got {other:?}"),
     }
@@ -58,7 +58,7 @@ fn current_v2_tolerates_unknown_payload_fields() {
         .unwrap()
         .insert("some_future_field".into(), serde_json::json!(42));
     let raw = envelope_for(2, &payload);
-    match load_session_v2(&raw) {
+    match load_session(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value, sample_v2()),
         other => panic!("expected Current despite unknown field, got {other:?}"),
     }
@@ -68,24 +68,24 @@ fn current_v2_tolerates_unknown_payload_fields() {
 /// counterpart for why a struct round-trip test cannot substitute for this.
 #[test]
 fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
-    let expected = PersistedSessionV2 {
+    let expected = PersistedSession {
         tabs: vec![
-            PersistedComparePairV2 {
+            PersistedComparePair {
                 left: "/tmp/fixtures/left.txt".into(),
                 right: "/tmp/fixtures/right.txt".into(),
             },
-            PersistedComparePairV2 {
+            PersistedComparePair {
                 left: "/tmp/fixtures/left-b.txt".into(),
                 right: "/tmp/fixtures/right-b.txt".into(),
             },
         ],
         active_tab: Some(1),
-        explorer_roots: Some(PersistedDirectoryPairV2 {
+        explorer_roots: Some(PersistedDirectoryPair {
             left: "/tmp/fixtures/left-dir".into(),
             right: "/tmp/fixtures/right-dir".into(),
         }),
     };
-    match load_session_v2(SESSION_V2_FIXTURE) {
+    match load_session(SESSION_V2_FIXTURE) {
         PersistenceLoad::Current { value } => assert_eq!(value, expected),
         other => panic!("expected Current, got {other:?}"),
     }
@@ -95,7 +95,7 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
 
 #[test]
 fn legacy_v0_fixture_migrates_every_field_exactly() {
-    match load_session_v2(SESSION_V0_FIXTURE) {
+    match load_session(SESSION_V0_FIXTURE) {
         PersistenceLoad::MigratedLegacy {
             value,
             source_backup_required,
@@ -125,65 +125,32 @@ fn legacy_v0_fixture_migrates_every_field_exactly() {
 #[test]
 fn unrecognized_legacy_shape_is_corrupt_not_defaults() {
     let raw = r#"{"totally":"unrelated","shape":true}"#;
-    match load_session_v2(raw) {
+    match load_session(raw) {
         PersistenceLoad::Corrupt { .. } => {}
         other => panic!("expected Corrupt for an unrecognized no-schema_name shape, got {other:?}"),
     }
 }
 
-// ── Core v1 ──────────────────────────────────────────────────────────────
-
-#[test]
-fn core_v1_filepair_envelope_migrates_root_as_the_sole_tab() {
-    match load_session_v2(SESSION_V1_FILEPAIR_FIXTURE) {
-        PersistenceLoad::MigratedVersion { value, from } => {
-            assert_eq!(from, 1);
-            assert_eq!(value.tabs.len(), 1);
-            assert_eq!(
-                value.tabs[0].left,
-                std::path::PathBuf::from("/tmp/fixtures/left.txt")
-            );
-            assert_eq!(
-                value.tabs[0].right,
-                std::path::PathBuf::from("/tmp/fixtures/right.txt")
-            );
-            assert_eq!(value.active_tab, Some(0));
-            assert_eq!(value.explorer_roots, None);
-        }
-        other => panic!("expected MigratedVersion{{from: 1}}, got {other:?}"),
-    }
-}
-
-#[test]
-fn core_v1_dirpair_envelope_migrates_root_as_explorer_roots() {
-    match load_session_v2(SESSION_V1_DIRPAIR_FIXTURE) {
-        PersistenceLoad::MigratedVersion { value, from } => {
-            assert_eq!(from, 1);
-            assert!(value.tabs.is_empty());
-            assert_eq!(value.active_tab, None);
-            let roots = value
-                .explorer_roots
-                .expect("directory_pair root should migrate");
-            assert_eq!(
-                roots.left,
-                std::path::PathBuf::from("/tmp/fixtures/left-dir")
-            );
-            assert_eq!(
-                roots.right,
-                std::path::PathBuf::from("/tmp/fixtures/right-dir")
-            );
-        }
-        other => panic!("expected MigratedVersion{{from: 1}}, got {other:?}"),
-    }
-}
-
 // ── Future / corrupt ─────────────────────────────────────────────────────
+
+/// RFC-076's 2026-08-03 amendment (patch 5): core schema v1 (RFC-031's
+/// `WorkspaceSession`) was never shipped to users, so its migration path was
+/// removed. A v1 envelope must now be preserved and reported as `Corrupt`,
+/// not silently reinterpreted.
+#[test]
+fn schema_version_1_is_corrupt_not_migrated() {
+    let raw = envelope_for(1, &serde_json::json!({}));
+    match load_session(&raw) {
+        PersistenceLoad::Corrupt { .. } => {}
+        other => panic!("expected Corrupt for schema_version 1, got {other:?}"),
+    }
+}
 
 #[test]
 fn future_schema_version_is_preserved_not_defaulted() {
     let payload = serde_json::to_value(sample_v2()).unwrap();
     let raw = envelope_for(3, &payload);
-    match load_session_v2(&raw) {
+    match load_session(&raw) {
         PersistenceLoad::FutureVersion { schema, version } => {
             assert_eq!(schema, "session");
             assert_eq!(version, 3);
@@ -204,7 +171,7 @@ fn wrong_schema_name_is_corrupt() {
         "payload": payload,
     })
     .to_string();
-    match load_session_v2(&raw) {
+    match load_session(&raw) {
         PersistenceLoad::Corrupt { .. } => {}
         other => panic!("expected Corrupt for a schema-name mismatch, got {other:?}"),
     }
@@ -212,7 +179,7 @@ fn wrong_schema_name_is_corrupt() {
 
 #[test]
 fn malformed_json_is_corrupt() {
-    match load_session_v2("not json at all") {
+    match load_session("not json at all") {
         PersistenceLoad::Corrupt { .. } => {}
         other => panic!("expected Corrupt for malformed JSON, got {other:?}"),
     }
@@ -226,7 +193,7 @@ fn out_of_range_active_tab_normalizes() {
     invalid.active_tab = Some(99);
     let payload = serde_json::to_value(&invalid).unwrap();
     let raw = envelope_for(2, &payload);
-    match load_session_v2(&raw) {
+    match load_session(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value.active_tab, Some(0)),
         other => panic!("expected Current, got {other:?}"),
     }
@@ -239,7 +206,7 @@ fn active_tab_normalizes_to_none_when_tabs_empty() {
     invalid.active_tab = Some(0);
     let payload = serde_json::to_value(&invalid).unwrap();
     let raw = envelope_for(2, &payload);
-    match load_session_v2(&raw) {
+    match load_session(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value.active_tab, None),
         other => panic!("expected Current, got {other:?}"),
     }

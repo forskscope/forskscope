@@ -1,37 +1,38 @@
-//! Canonical settings/session schema v2 (RFC-076, audit finding B2).
+//! Canonical settings/session schema (RFC-076, audit finding B2).
 //!
-//! The running application currently serializes its own plain-JSON structs
-//! directly, bypassing the core's tested [`super::VersionedEnvelope`]
-//! entirely — a corrupt or future-schema file is then indistinguishable from
-//! a missing one, and both silently collapse to defaults. This module makes
-//! `forskscope-core` the canonical owner of the settings and session disk
-//! schema: it defines the v2 payload shapes, migrates the shipping UI's
-//! plain-JSON v0 files and the existing (never-shipped-to-users) core v1
-//! envelopes into v2, and reports what happened via [`PersistenceLoad`]
-//! instead of collapsing every failure mode into the same silent default.
+//! The running application used to serialize its own plain-JSON structs
+//! directly — a corrupt or future-schema file was then indistinguishable
+//! from a missing one, and both silently collapsed to defaults. This module
+//! makes `forskscope-core` the canonical owner of the settings and session
+//! disk schema: it defines the canonical payload shapes, migrates the
+//! shipping UI's plain-JSON v0 files, and reports what happened via
+//! [`PersistenceLoad`] instead of collapsing every failure mode into the
+//! same silent default.
 //!
-//! ## Why this does not reuse `VersionedEnvelope::parse`
+//! Core schema v1 (RFC-031's `UserSettings`/`WorkspaceSession`, wrapped in
+//! the now-removed `VersionedEnvelope`) was never shipped to users and its
+//! migration path was removed by RFC-076's 2026-08-03 amendment (patch 5). A
+//! v1 envelope is preserved and reported as `Corrupt`, like any other
+//! unrecognized version — see [`settings`] and [`session`]'s module docs.
 //!
-//! [`super::VersionedEnvelope`]'s parser is a minimal hand-written field
-//! extractor — adequate for the fixed shape it was designed for, but not a
-//! general JSON parser. RFC-076 requires unfamiliar fields, escaped strings,
-//! and nested payloads to be handled correctly, and v0 detection needs to
-//! distinguish "no envelope at all" (legacy UI JSON) from "envelope present
-//! but malformed" — a distinction the existing parser's `Result` collapses.
-//! This module reads the raw file with `serde_json` instead.
+//! This module reads raw JSON with `serde_json` rather than a hand-written
+//! field extractor, since v0 detection needs to distinguish "no envelope at
+//! all" (legacy UI JSON) from "envelope present but malformed", and
+//! unfamiliar fields, escaped strings, and nested payloads must be handled
+//! correctly.
 //!
 //! ## What this module does not do (patch 1 boundary)
 //!
-//! No file I/O. [`settings::load_settings_v2`] and [`session::load_session_v2`]
+//! No file I/O. [`settings::load_settings`] and [`session::load_session`]
 //! are pure functions from a JSON string to a [`PersistenceLoad`]; the
 //! explicit-path repositories that read and write files are patch 2.
 //! Production `forskscope-ui` call sites are unchanged until patch 4.
 //!
 //! ## Why several fields have no `#[serde(default)]`
 //!
-//! `PersistedSettingsV2`'s `theme`, `language`, `diff_font_size`,
+//! `PersistedSettings`'s `theme`, `language`, `diff_font_size`,
 //! `context_lines`, `profiles`, and `active_profile`, and
-//! `PersistedSessionV2`'s `tabs`, are required: a v2 payload missing one of
+//! `PersistedSession`'s `tabs`, are required: a v2 payload missing one of
 //! them is [`PersistenceError::MalformedPayload`], not silently defaulted.
 //! This is deliberate, not an oversight — B2 exists because the running
 //! application collapsed corrupt/unfamiliar files into defaults, so
@@ -64,8 +65,6 @@ pub enum PersistenceLoad<T> {
         value: T,
         source_backup_required: bool,
     },
-    /// An existing core v1 envelope was migrated (never reinterpreted as v2).
-    MigratedVersion { value: T, from: u32 },
     /// The schema name matched but the version is newer than this build
     /// understands. The original bytes must be preserved, never overwritten.
     FutureVersion { schema: String, version: u32 },

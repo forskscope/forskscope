@@ -6,8 +6,8 @@ use super::super::repository::{
     PersistenceCommitError, PersistenceIoError, PersistenceSaveOutcome, atomic_write_envelope,
     build_envelope_json, ensure_pre_v2_backup, read_to_string_or_missing, verify_unchanged,
 };
-use super::{PersistedSessionV2, SESSION_SCHEMA_NAME, SESSION_SCHEMA_VERSION_V2, load_session_v2};
-use crate::persist::v2::{PersistenceError, PersistenceLoad};
+use super::{PersistedSession, SESSION_SCHEMA_NAME, SESSION_SCHEMA_VERSION_V2, load_session};
+use crate::persist::schema::{PersistenceError, PersistenceLoad};
 
 /// Reads and writes the session file at an explicit path. Never resolves a
 /// platform config directory itself — see [`super::super::settings::SettingsRepository`]
@@ -21,7 +21,7 @@ impl SessionRepository {
         Self { path }
     }
 
-    pub fn load(&self) -> PersistenceLoad<PersistedSessionV2> {
+    pub fn load(&self) -> PersistenceLoad<PersistedSession> {
         self.load_with_raw().0
     }
 
@@ -29,15 +29,15 @@ impl SessionRepository {
     /// read (when a file was present). A caller that intends to call
     /// [`Self::commit_migration`] needs this pairing: passing bytes from a
     /// separate, later read would defeat [`verify_unchanged`]'s guarantee.
-    pub fn load_with_raw(&self) -> (PersistenceLoad<PersistedSessionV2>, Option<Vec<u8>>) {
+    pub fn load_with_raw(&self) -> (PersistenceLoad<PersistedSession>, Option<Vec<u8>>) {
         match read_to_string_or_missing(&self.path) {
             Ok(Some(raw)) => {
                 let bytes = raw.clone().into_bytes();
-                (load_session_v2(&raw), Some(bytes))
+                (load_session(&raw), Some(bytes))
             }
             Ok(None) => (
                 PersistenceLoad::Missing {
-                    defaults: PersistedSessionV2::default(),
+                    defaults: PersistedSession::default(),
                 },
                 None,
             ),
@@ -52,7 +52,7 @@ impl SessionRepository {
 
     /// Ordinary atomic write of the current state. No backup — that policy
     /// belongs to [`Self::commit_migration`], the one-time durable rewrite.
-    pub fn save(&self, value: &PersistedSessionV2) -> Result<(), PersistenceIoError> {
+    pub fn save(&self, value: &PersistedSession) -> Result<(), PersistenceIoError> {
         let json = build_envelope_json(
             SESSION_SCHEMA_NAME,
             SESSION_SCHEMA_VERSION_V2,
@@ -70,7 +70,7 @@ impl SessionRepository {
     /// [`Self::load_with_raw`] call that produced `value`.
     pub fn commit_migration(
         &self,
-        value: &PersistedSessionV2,
+        value: &PersistedSession,
         original_bytes: &[u8],
     ) -> Result<PersistenceSaveOutcome, PersistenceCommitError> {
         verify_unchanged(&self.path, original_bytes)?;

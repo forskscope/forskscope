@@ -23,7 +23,7 @@ pub use tab::{CompareTab, TabState, recompute_diff, swap_sides};
 pub use types::{BatchResultSpec, DirOp};
 
 use dioxus::prelude::*;
-use forskscope_core::persist::v2::settings::PersistedSettingsV2;
+use forskscope_core::persist::schema::settings::PersistedSettings;
 use forskscope_ui_logic::{CompareTabId, CompareTabIdAllocator, LoadIdentityError};
 use std::path::PathBuf;
 
@@ -127,7 +127,7 @@ pub struct Store {
     /// The last-resolved canonical settings (RFC-076), cached so `persist()`
     /// can merge UI-editable changes onto it without resetting fields the UI
     /// has no control over. See `AppSettings::merge_into_v2`.
-    pub settings_v2_base: Signal<PersistedSettingsV2>,
+    pub settings_v2_base: Signal<PersistedSettings>,
     /// `true` when the settings file is a future/corrupt/unwritable source
     /// this run could not establish is safe to overwrite — `persist()`
     /// becomes a no-op while this is set (RFC-076 "persistence_write_disabled").
@@ -148,7 +148,7 @@ impl Store {
     /// them without triggering the "copy value hoisted" warning.
     pub fn new(
         settings: AppSettings,
-        settings_v2_base: PersistedSettingsV2,
+        settings_v2_base: PersistedSettings,
         settings_write_disabled: bool,
     ) -> Self {
         Self {

@@ -6,8 +6,8 @@
 use std::fs;
 use std::path::PathBuf;
 
-use forskscope_core::persist::v2::PersistenceLoad;
-use forskscope_core::persist::v2::settings::{PersistedSettingsV2, SettingsRepository};
+use forskscope_core::persist::schema::PersistenceLoad;
+use forskscope_core::persist::schema::settings::{PersistedSettings, SettingsRepository};
 
 use super::{build_save_payload, load_settings, persist_settings};
 use crate::state::AppSettings;
@@ -20,10 +20,10 @@ fn temp_path(tag: &str) -> PathBuf {
 
 #[test]
 fn build_save_payload_overlays_ui_fields_but_preserves_the_rest() {
-    let base = PersistedSettingsV2 {
+    let base = PersistedSettings {
         density: forskscope_core::settings::display::Density::Spacious,
         show_line_numbers: false,
-        ..PersistedSettingsV2::default()
+        ..PersistedSettings::default()
     };
     let mut edited = AppSettings::from_v2(&base);
     edited.context_lines = 9;
@@ -46,9 +46,9 @@ fn build_save_payload_overlays_ui_fields_but_preserves_the_rest() {
 fn persist_settings_writes_through_the_real_repository() {
     let path = temp_path("persist");
     let repo = SettingsRepository::new(path);
-    let payload = PersistedSettingsV2 {
+    let payload = PersistedSettings {
         context_lines: 11,
-        ..PersistedSettingsV2::default()
+        ..PersistedSettings::default()
     };
 
     persist_settings(&payload, &repo);
@@ -70,7 +70,7 @@ fn load_settings_resolves_missing_file_as_fresh_defaults() {
     assert!(!resolution.write_disabled);
     assert_eq!(
         settings.diff_font_size,
-        PersistedSettingsV2::default().diff_font_size
+        PersistedSettings::default().diff_font_size
     );
 }
 
@@ -78,10 +78,10 @@ fn load_settings_resolves_missing_file_as_fresh_defaults() {
 fn load_settings_round_trips_through_persist_settings() {
     let path = temp_path("round-trip");
     let repo = SettingsRepository::new(path);
-    let payload = PersistedSettingsV2 {
+    let payload = PersistedSettings {
         context_lines: 8,
         explorer_compact: true,
-        ..PersistedSettingsV2::default()
+        ..PersistedSettings::default()
     };
     persist_settings(&payload, &repo);
 

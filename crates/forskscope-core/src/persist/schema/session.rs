@@ -1,12 +1,17 @@
 //! Session schema v2 (RFC-076 §"Session schema v2").
 //!
 //! The canonical payload stores restorable path state, not live task
-//! identity or unsaved content. RFC-075's [`crate::session::tab::TabId`]-like
-//! runtime concurrency identity is always freshly allocated on restore and is
-//! never populated from a persisted identifier — installing a legacy ID as a
-//! runtime token would let a restored value validate a task from another
-//! process lifetime. This module knows nothing about that runtime identity;
-//! it only produces path pairs for the caller to open.
+//! identity or unsaved content. RFC-075's runtime concurrency identity
+//! (`forskscope_ui_logic::CompareTabId`) is always freshly allocated on
+//! restore and is never populated from a persisted identifier — installing a
+//! legacy ID as a runtime token would let a restored value validate a task
+//! from another process lifetime. This module knows nothing about that
+//! runtime identity; it only produces path pairs for the caller to open.
+//!
+//! Schema v1 (RFC-031's `WorkspaceSession`) was never shipped to users — no
+//! released version ever wrote one — and its migration path was removed by
+//! RFC-076's 2026-08-03 amendment (patch 5). A v1 envelope is preserved and
+//! reported as `Corrupt`, the same as any other unrecognized version.
 
 mod repository;
 pub mod runtime;
@@ -18,7 +23,6 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::{PersistenceError, PersistenceLoad};
-use crate::session::{WorkspaceRoot, WorkspaceSession};
 
 pub const SESSION_SCHEMA_NAME: &str = "session";
 pub const SESSION_SCHEMA_VERSION_V2: u32 = 2;
@@ -29,22 +33,22 @@ pub const SESSION_SCHEMA_VERSION_V2: u32 = 2;
 /// no active tab, no explorer roots — which is what a repository returns for
 /// [`PersistenceLoad::Missing`] when no session file exists yet.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct PersistedSessionV2 {
-    pub tabs: Vec<PersistedComparePairV2>,
+pub struct PersistedSession {
+    pub tabs: Vec<PersistedComparePair>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_tab: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub explorer_roots: Option<PersistedDirectoryPairV2>,
+    pub explorer_roots: Option<PersistedDirectoryPair>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PersistedComparePairV2 {
+pub struct PersistedComparePair {
     pub left: PathBuf,
     pub right: PathBuf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PersistedDirectoryPairV2 {
+pub struct PersistedDirectoryPair {
     pub left: PathBuf,
     pub right: PathBuf,
 }
@@ -62,7 +66,7 @@ struct LegacySessionStateV0 {
 // ── Routing ──────────────────────────────────────────────────────────────
 
 /// Load and route a raw session file. Pure: no file I/O, no side effects.
-pub fn load_session_v2(raw: &str) -> PersistenceLoad<PersistedSessionV2> {
+pub fn load_session(raw: &str) -> PersistenceLoad<PersistedSession> {
     let value: serde_json::Value = match serde_json::from_str(raw) {
         Ok(v) => v,
         Err(_) => {
@@ -119,7 +123,7 @@ pub fn load_session_v2(raw: &str) -> PersistenceLoad<PersistedSessionV2> {
     };
     match version {
         SESSION_SCHEMA_VERSION_V2 => {
-            match serde_json::from_value::<PersistedSessionV2>(payload.clone()) {
+            match serde_json::from_value::<PersistedSession>(payload.clone()) {
                 Ok(v2) => PersistenceLoad::Current {
                     value: normalize(v2),
                 },
@@ -128,15 +132,10 @@ pub fn load_session_v2(raw: &str) -> PersistenceLoad<PersistedSessionV2> {
                 },
             }
         }
-        1 => match WorkspaceSession::from_payload_json(&payload.to_string()) {
-            Ok(v1) => PersistenceLoad::MigratedVersion {
-                value: migrate_from_v1(v1),
-                from: 1,
-            },
-            Err(_) => PersistenceLoad::Corrupt {
-                detail: PersistenceError::MalformedPayload,
-            },
-        },
+        // Core schema v1 (RFC-031) was never shipped to users. Its migration
+        // path is removed (RFC-076's 2026-08-03 amendment); a v1 envelope is
+        // preserved and reported as Corrupt like any other unrecognized
+        // version, never silently reinterpreted.
         _ => PersistenceLoad::Corrupt {
             detail: PersistenceError::MalformedVersion,
         },
@@ -145,59 +144,26 @@ pub fn load_session_v2(raw: &str) -> PersistenceLoad<PersistedSessionV2> {
 
 // ── Migration ────────────────────────────────────────────────────────────
 
-fn migrate_from_v0(v0: LegacySessionStateV0) -> PersistedSessionV2 {
+fn migrate_from_v0(v0: LegacySessionStateV0) -> PersistedSession {
     let tabs = v0
         .tabs
         .into_iter()
-        .map(|(left, right)| PersistedComparePairV2 {
+        .map(|(left, right)| PersistedComparePair {
             left: PathBuf::from(left),
             right: PathBuf::from(right),
         })
         .collect();
     // v0 tracks an ordered list only, no active-tab index and no directory
     // comparison root; the UI re-derives an active tab after restore.
-    normalize(PersistedSessionV2 {
+    normalize(PersistedSession {
         tabs,
         active_tab: None,
         explorer_roots: None,
     })
 }
 
-/// v1's own parser always returns an empty `tabs` list — restoring the full
-/// tab list was never wired up in v1 (see its own doc comment). The only
-/// restorable path information v1 actually carries is `root`, so that is all
-/// this can recover: a `FilePair` root becomes the sole compare tab, a
-/// `DirectoryPair` root becomes `explorer_roots`, and `Empty` recovers
-/// nothing. This is a deliberate, bounded discard, not a bug reintroduced
-/// here — v1 files were never written by the shipping UI in the first place.
-fn migrate_from_v1(v1: WorkspaceSession) -> PersistedSessionV2 {
-    let (tabs, explorer_roots) = match v1.root {
-        WorkspaceRoot::Empty => (vec![], None),
-        WorkspaceRoot::FilePair(pair) => (
-            vec![PersistedComparePairV2 {
-                left: pair.left,
-                right: pair.right,
-            }],
-            None,
-        ),
-        WorkspaceRoot::DirectoryPair(pair) => (
-            vec![],
-            Some(PersistedDirectoryPairV2 {
-                left: pair.left,
-                right: pair.right,
-            }),
-        ),
-    };
-    let active_tab = if tabs.is_empty() { None } else { Some(0) };
-    normalize(PersistedSessionV2 {
-        tabs,
-        active_tab,
-        explorer_roots,
-    })
-}
-
 /// Clamps `active_tab` to a valid index without dropping the tab list.
-fn normalize(mut v2: PersistedSessionV2) -> PersistedSessionV2 {
+fn normalize(mut v2: PersistedSession) -> PersistedSession {
     if let Some(i) = v2.active_tab
         && i >= v2.tabs.len()
     {

@@ -2,18 +2,18 @@
 //!
 //! RFC-076 (patch 4): this is a non-serializing view adapter, not an
 //! independent disk format. The canonical, persisted type is
-//! [`forskscope_core::persist::v2::settings::PersistedSettingsV2`]; see
+//! [`forskscope_core::persist::schema::settings::PersistedSettings`]; see
 //! [`AppSettings::from_v2`] and [`AppSettings::merge_into_v2`] for the
 //! boundary. `Theme`/`Lang`/`DiffFontFamily`/`DiffAlgorithmSetting`/
 //! `DiffProfile` are UI-only projections of the richer core types
 //! (`ThemeId`/`LocaleId`/`DiffFontFamilySetting`/`DiffAlgorithm`/
-//! `PersistedDiffProfileV2`) — never serialized on their own.
+//! `PersistedDiffProfile`) — never serialized on their own.
 
 use std::path::PathBuf;
 
 pub use forskscope_core::DiffAlgorithm;
 use forskscope_core::DiffOptions;
-use forskscope_core::persist::v2::settings::{PersistedDiffProfileV2, PersistedSettingsV2};
+use forskscope_core::persist::schema::settings::{PersistedDiffProfile, PersistedSettings};
 use forskscope_core::settings::display::DiffFontFamilySetting;
 use forskscope_core::settings::{LocaleId, ThemeId};
 use forskscope_core::{CaseSensitivity, NewlineCompareMode, WhitespaceMode};
@@ -115,7 +115,7 @@ impl DiffProfile {
     /// mode) — every profile the UI itself has ever written round-trips
     /// exactly, since it only ever writes the values [`Self::to_v2`]
     /// produces.
-    pub fn from_v2(p: &PersistedDiffProfileV2) -> Self {
+    pub fn from_v2(p: &PersistedDiffProfile) -> Self {
         Self {
             name: p.name.clone(),
             ignore_whitespace: p.whitespace != WhitespaceMode::Significant,
@@ -133,11 +133,11 @@ impl DiffProfile {
     }
 
     /// Inverse of [`Self::from_v2`]. Matches
-    /// `forskscope_core::persist::v2::settings::ui_builtin_profiles`'s exact
+    /// `forskscope_core::persist::schema::settings::ui_builtin_profiles`'s exact
     /// mapping so a round trip through the UI never changes a built-in
     /// profile's canonical shape.
-    pub fn to_v2(&self) -> PersistedDiffProfileV2 {
-        PersistedDiffProfileV2 {
+    pub fn to_v2(&self) -> PersistedDiffProfile {
+        PersistedDiffProfile {
             name: self.name.clone(),
             whitespace: if self.ignore_whitespace {
                 WhitespaceMode::IgnoreAll
@@ -191,7 +191,7 @@ pub struct AppSettings {
 
 impl Default for AppSettings {
     fn default() -> Self {
-        Self::from_v2(&PersistedSettingsV2::default())
+        Self::from_v2(&PersistedSettings::default())
     }
 }
 
@@ -203,7 +203,7 @@ impl AppSettings {
 
     /// Projects the UI-editable subset of the canonical v2 settings
     /// (RFC-076) into this view type.
-    pub fn from_v2(v2: &PersistedSettingsV2) -> Self {
+    pub fn from_v2(v2: &PersistedSettings) -> Self {
         Self {
             theme: match v2.theme {
                 ThemeId::Dark => Theme::Dark,
@@ -241,11 +241,11 @@ impl AppSettings {
     /// density, `show_line_numbers`, ...) untouched via struct-update syntax
     /// — a field neither this function nor [`Self::from_v2`] mentions is
     /// automatically preserved rather than silently reset, including any
-    /// added to `PersistedSettingsV2` after this code was written. This is
+    /// added to `PersistedSettings` after this code was written. This is
     /// what makes `persist()` safe to call after every settings-dialog
     /// change without resetting fields the UI has no control over.
-    pub fn merge_into_v2(&self, base: &PersistedSettingsV2) -> PersistedSettingsV2 {
-        PersistedSettingsV2 {
+    pub fn merge_into_v2(&self, base: &PersistedSettings) -> PersistedSettings {
+        PersistedSettings {
             theme: match self.theme {
                 Theme::Dark => ThemeId::Dark,
                 Theme::Light => ThemeId::Light,

@@ -13,9 +13,9 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::persist::v2::session::{PersistedSessionV2, SessionRepository};
-use crate::persist::v2::settings::{PersistedSettingsV2, SettingsRepository};
-use crate::persist::v2::{PersistenceCommitError, PersistenceLoad};
+use crate::persist::schema::session::{PersistedSession, SessionRepository};
+use crate::persist::schema::settings::{PersistedSettings, SettingsRepository};
+use crate::persist::schema::{PersistenceCommitError, PersistenceLoad};
 
 fn temp_path(tag: &str, file_name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("fsk-persist-v2-{tag}-{}", std::process::id()));
@@ -46,7 +46,7 @@ fn settings_missing_file_returns_defaults() {
     let repo = SettingsRepository::new(path);
     match repo.load() {
         PersistenceLoad::Missing { defaults } => {
-            assert_eq!(defaults, PersistedSettingsV2::default())
+            assert_eq!(defaults, PersistedSettings::default())
         }
         other => panic!("expected Missing, got {other:?}"),
     }
@@ -56,10 +56,10 @@ fn settings_missing_file_returns_defaults() {
 fn settings_save_then_load_round_trips() {
     let path = temp_path("settings-roundtrip", "settings.json");
     let repo = SettingsRepository::new(path);
-    let value = PersistedSettingsV2 {
+    let value = PersistedSettings {
         diff_font_size: 20,
         ignore_extensions: "o, tmp".into(),
-        ..PersistedSettingsV2::default()
+        ..PersistedSettings::default()
     };
     repo.save(&value).expect("save must succeed");
     match repo.load() {
@@ -72,7 +72,7 @@ fn settings_save_then_load_round_trips() {
 fn settings_save_leaves_no_stray_temp_file() {
     let path = temp_path("settings-notemp", "settings.json");
     let repo = SettingsRepository::new(path.clone());
-    repo.save(&PersistedSettingsV2::default()).unwrap();
+    repo.save(&PersistedSettings::default()).unwrap();
     let dir = path.parent().unwrap();
     let stray: Vec<_> = fs::read_dir(dir)
         .unwrap()
@@ -90,14 +90,14 @@ fn settings_save_leaves_no_stray_temp_file() {
 fn settings_resave_preserves_created_unix() {
     let path = temp_path("settings-created", "settings.json");
     let repo = SettingsRepository::new(path.clone());
-    repo.save(&PersistedSettingsV2::default()).unwrap();
+    repo.save(&PersistedSettings::default()).unwrap();
     let first_raw = fs::read_to_string(&path).unwrap();
     let first_created = created_unix_of(&first_raw);
 
     // A second save, with different content, should not reset created_unix.
-    let changed = PersistedSettingsV2 {
+    let changed = PersistedSettings {
         context_lines: 9,
-        ..PersistedSettingsV2::default()
+        ..PersistedSettings::default()
     };
     repo.save(&changed).unwrap();
     let second_raw = fs::read_to_string(&path).unwrap();
@@ -112,13 +112,13 @@ fn settings_commit_migration_creates_backup_and_v2_file() {
 
     let repo = SettingsRepository::new(path.clone());
     let outcome = repo
-        .commit_migration(&PersistedSettingsV2::default(), original_bytes)
+        .commit_migration(&PersistedSettings::default(), original_bytes)
         .expect("commit_migration must succeed");
 
     let backup_path = outcome.backup_path.expect("backup path must be reported");
     assert_eq!(fs::read(&backup_path).unwrap(), original_bytes);
     match repo.load() {
-        PersistenceLoad::Current { value } => assert_eq!(value, PersistedSettingsV2::default()),
+        PersistenceLoad::Current { value } => assert_eq!(value, PersistedSettings::default()),
         other => panic!("expected Current after migration commit, got {other:?}"),
     }
 }
@@ -138,7 +138,7 @@ fn settings_commit_migration_does_not_overwrite_existing_backup() {
 
     let repo = SettingsRepository::new(path.clone());
     let outcome = repo
-        .commit_migration(&PersistedSettingsV2::default(), original)
+        .commit_migration(&PersistedSettings::default(), original)
         .expect("commit_migration must succeed");
 
     assert_eq!(outcome.backup_path.as_deref(), Some(backup_path.as_path()));
@@ -158,7 +158,7 @@ fn settings_commit_migration_rejects_stale_bytes_after_external_change() {
     fs::write(&path, changed).unwrap();
 
     let err = repo
-        .commit_migration(&PersistedSettingsV2::default(), original)
+        .commit_migration(&PersistedSettings::default(), original)
         .expect_err("must reject stale original_bytes");
     assert_eq!(err, PersistenceCommitError::Conflict);
     assert_eq!(
@@ -184,7 +184,7 @@ fn settings_commit_migration_survives_failure_between_backup_and_replace() {
     fs::create_dir_all(temp_write_path_for(&path)).unwrap();
 
     let repo = SettingsRepository::new(path.clone());
-    let result = repo.commit_migration(&PersistedSettingsV2::default(), original);
+    let result = repo.commit_migration(&PersistedSettings::default(), original);
     assert!(
         result.is_err(),
         "the write must fail because its temp path is a directory"
@@ -206,11 +206,11 @@ fn settings_commit_migration_survives_failure_between_backup_and_replace() {
 fn settings_load_with_raw_pairs_bytes_with_the_loaded_value() {
     let path = temp_path("settings-load-raw", "settings.json");
     let repo = SettingsRepository::new(path.clone());
-    repo.save(&PersistedSettingsV2::default()).unwrap();
+    repo.save(&PersistedSettings::default()).unwrap();
 
     let (load, raw) = repo.load_with_raw();
     match load {
-        PersistenceLoad::Current { value } => assert_eq!(value, PersistedSettingsV2::default()),
+        PersistenceLoad::Current { value } => assert_eq!(value, PersistedSettings::default()),
         other => panic!("expected Current, got {other:?}"),
     }
     assert_eq!(raw.unwrap(), fs::read(&path).unwrap());
@@ -239,7 +239,7 @@ fn session_missing_file_returns_defaults() {
     let repo = SessionRepository::new(path);
     match repo.load() {
         PersistenceLoad::Missing { defaults } => {
-            assert_eq!(defaults, PersistedSessionV2::default())
+            assert_eq!(defaults, PersistedSession::default())
         }
         other => panic!("expected Missing, got {other:?}"),
     }
@@ -249,7 +249,7 @@ fn session_missing_file_returns_defaults() {
 fn session_save_then_load_round_trips() {
     let path = temp_path("session-roundtrip", "session.json");
     let repo = SessionRepository::new(path);
-    let value = PersistedSessionV2::default();
+    let value = PersistedSession::default();
     repo.save(&value).expect("save must succeed");
     match repo.load() {
         PersistenceLoad::Current { value: loaded } => assert_eq!(loaded, value),
@@ -265,13 +265,13 @@ fn session_commit_migration_creates_backup_and_v2_file() {
 
     let repo = SessionRepository::new(path.clone());
     let outcome = repo
-        .commit_migration(&PersistedSessionV2::default(), original_bytes)
+        .commit_migration(&PersistedSession::default(), original_bytes)
         .expect("commit_migration must succeed");
 
     let backup_path = outcome.backup_path.expect("backup path must be reported");
     assert_eq!(fs::read(&backup_path).unwrap(), original_bytes);
     match repo.load() {
-        PersistenceLoad::Current { value } => assert_eq!(value, PersistedSessionV2::default()),
+        PersistenceLoad::Current { value } => assert_eq!(value, PersistedSession::default()),
         other => panic!("expected Current after migration commit, got {other:?}"),
     }
 }
@@ -287,7 +287,7 @@ fn session_commit_migration_does_not_overwrite_existing_backup() {
 
     let repo = SessionRepository::new(path.clone());
     let outcome = repo
-        .commit_migration(&PersistedSessionV2::default(), original)
+        .commit_migration(&PersistedSession::default(), original)
         .expect("commit_migration must succeed");
 
     assert_eq!(outcome.backup_path.as_deref(), Some(backup_path.as_path()));
@@ -305,7 +305,7 @@ fn session_commit_migration_rejects_stale_bytes_after_external_change() {
     fs::write(&path, changed).unwrap();
 
     let err = repo
-        .commit_migration(&PersistedSessionV2::default(), original)
+        .commit_migration(&PersistedSession::default(), original)
         .expect_err("must reject stale original_bytes");
     assert_eq!(err, PersistenceCommitError::Conflict);
     assert_eq!(
@@ -327,7 +327,7 @@ fn session_commit_migration_survives_failure_between_backup_and_replace() {
     fs::create_dir_all(temp_write_path_for(&path)).unwrap();
 
     let repo = SessionRepository::new(path.clone());
-    let result = repo.commit_migration(&PersistedSessionV2::default(), original);
+    let result = repo.commit_migration(&PersistedSession::default(), original);
     assert!(
         result.is_err(),
         "the write must fail because its temp path is a directory"
@@ -349,11 +349,11 @@ fn session_commit_migration_survives_failure_between_backup_and_replace() {
 fn session_load_with_raw_pairs_bytes_with_the_loaded_value() {
     let path = temp_path("session-load-raw", "session.json");
     let repo = SessionRepository::new(path.clone());
-    repo.save(&PersistedSessionV2::default()).unwrap();
+    repo.save(&PersistedSession::default()).unwrap();
 
     let (load, raw) = repo.load_with_raw();
     match load {
-        PersistenceLoad::Current { value } => assert_eq!(value, PersistedSessionV2::default()),
+        PersistenceLoad::Current { value } => assert_eq!(value, PersistedSession::default()),
         other => panic!("expected Current, got {other:?}"),
     }
     assert_eq!(raw.unwrap(), fs::read(&path).unwrap());

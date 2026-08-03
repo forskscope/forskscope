@@ -1,5 +1,5 @@
 //! RFC-076 F26: per-variant serialization assertions for the ten schema
-//! enums [`crate::persist::v2::settings::PersistedSettingsV2`] reuses
+//! enums [`crate::persist::schema::settings::PersistedSettings`] reuses
 //! directly as canonical v2 wire types.
 //!
 //! Five of these enums (`WhitespaceMode`, `NewlineCompareMode`,

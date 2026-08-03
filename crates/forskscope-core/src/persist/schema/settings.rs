@@ -1,12 +1,16 @@
 //! Settings schema v2 (RFC-076 §"Settings schema v2").
 //!
-//! [`PersistedSettingsV2`] is a superset of the fields represented by either
-//! the shipping UI's plain-JSON `AppSettings` (schema v0) or the existing,
-//! never-shipped-to-users core `UserSettings` (schema v1) — so converging
-//! them cannot silently discard a field either source actually uses. The
-//! diff-pane font (UI-owned, five families) and the appearance font
-//! (core-owned, three families) stay distinct fields per RFC-076: `CourierNew`
-//! and `Consolas` are exact choices that must not normalize to `SystemMono`.
+//! [`PersistedSettings`] is a superset of the fields represented by the
+//! shipping UI's plain-JSON `AppSettings` (schema v0) plus core-owned fields
+//! the UI has never surfaced. The diff-pane font (UI-owned, five families)
+//! and the appearance font (core-owned, three families) stay distinct fields
+//! per RFC-076: `CourierNew` and `Consolas` are exact choices that must not
+//! normalize to `SystemMono`.
+//!
+//! Schema v1 (RFC-031's `UserSettings`) was never shipped to users — no
+//! released version ever wrote one — and its migration path was removed by
+//! RFC-076's 2026-08-03 amendment (patch 5). A v1 envelope is preserved and
+//! reported as `Corrupt`, the same as any other unrecognized version.
 
 mod legacy;
 mod repository;
@@ -22,7 +26,6 @@ use super::{PersistenceError, PersistenceLoad};
 use crate::diff::{CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode};
 use crate::encoding::NewlinePolicy;
 use crate::job::PerformanceLimits;
-use crate::settings::UserSettings;
 use crate::settings::display::{
     Density, DiffFontFamilySetting, FontFamilySetting, LocaleId, ThemeId,
 };
@@ -43,7 +46,7 @@ const CONTEXT_LINES_MAX: usize = 20;
 /// some fields look duplicated — they represent genuinely distinct settings
 /// that the UI and core each already track separately.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PersistedSettingsV2 {
+pub struct PersistedSettings {
     pub theme: ThemeId,
     pub language: LocaleId,
 
@@ -68,7 +71,7 @@ pub struct PersistedSettingsV2 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_right_dir: Option<PathBuf>,
 
-    pub profiles: Vec<PersistedDiffProfileV2>,
+    pub profiles: Vec<PersistedDiffProfile>,
     pub active_profile: usize,
 
     #[serde(default)]
@@ -102,7 +105,7 @@ pub struct PersistedSettingsV2 {
 /// since v2 is the converged canonical form; v0 profiles migrate up into it
 /// (see [`migrate_from_v0`]), never the reverse.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PersistedDiffProfileV2 {
+pub struct PersistedDiffProfile {
     pub name: String,
     #[serde(default)]
     pub whitespace: WhitespaceMode,
@@ -123,7 +126,7 @@ pub struct PersistedDiffProfileV2 {
 /// for UI-owned fields and core's own defaults for core-owned fields —
 /// exactly what a repository returns for [`PersistenceLoad::Missing`] when
 /// no settings file exists yet.
-impl Default for PersistedSettingsV2 {
+impl Default for PersistedSettings {
     fn default() -> Self {
         Self {
             theme: ThemeId::default(),
@@ -174,7 +177,7 @@ fn default_diff_font_size() -> u32 {
 // ── Routing ──────────────────────────────────────────────────────────────
 
 /// Load and route a raw settings file. Pure: no file I/O, no side effects.
-pub fn load_settings_v2(raw: &str) -> PersistenceLoad<PersistedSettingsV2> {
+pub fn load_settings(raw: &str) -> PersistenceLoad<PersistedSettings> {
     let value: serde_json::Value = match serde_json::from_str(raw) {
         Ok(v) => v,
         Err(_) => {
@@ -231,7 +234,7 @@ pub fn load_settings_v2(raw: &str) -> PersistenceLoad<PersistedSettingsV2> {
     };
     match version {
         SETTINGS_SCHEMA_VERSION_V2 => {
-            match serde_json::from_value::<PersistedSettingsV2>(payload.clone()) {
+            match serde_json::from_value::<PersistedSettings>(payload.clone()) {
                 Ok(v2) => PersistenceLoad::Current {
                     value: normalize(v2),
                 },
@@ -240,15 +243,11 @@ pub fn load_settings_v2(raw: &str) -> PersistenceLoad<PersistedSettingsV2> {
                 },
             }
         }
-        1 => match UserSettings::from_payload_json(&payload.to_string()) {
-            Ok(v1) => PersistenceLoad::MigratedVersion {
-                value: migrate_from_v1(v1),
-                from: 1,
-            },
-            Err(_) => PersistenceLoad::Corrupt {
-                detail: PersistenceError::MalformedPayload,
-            },
-        },
+        // Core schema v1 (RFC-031) was never shipped to users — no released
+        // version ever wrote one. Its migration path is removed (RFC-076's
+        // 2026-08-03 amendment); a v1 envelope is preserved and reported as
+        // Corrupt like any other unrecognized version, never silently
+        // reinterpreted.
         _ => PersistenceLoad::Corrupt {
             detail: PersistenceError::MalformedVersion,
         },
@@ -257,11 +256,11 @@ pub fn load_settings_v2(raw: &str) -> PersistenceLoad<PersistedSettingsV2> {
 
 // ── Migration ────────────────────────────────────────────────────────────
 
-fn migrate_from_v0(v0: LegacyAppSettingsV0) -> PersistedSettingsV2 {
+fn migrate_from_v0(v0: LegacyAppSettingsV0) -> PersistedSettings {
     let profiles = v0
         .profiles
         .iter()
-        .map(|p| PersistedDiffProfileV2 {
+        .map(|p| PersistedDiffProfile {
             name: p.name.clone(),
             whitespace: if p.ignore_whitespace {
                 WhitespaceMode::IgnoreAll
@@ -284,7 +283,7 @@ fn migrate_from_v0(v0: LegacyAppSettingsV0) -> PersistedSettingsV2 {
         })
         .collect();
 
-    normalize(PersistedSettingsV2 {
+    normalize(PersistedSettings {
         theme: match v0.theme {
             LegacyThemeV0::Dark => ThemeId::Dark,
             LegacyThemeV0::Light => ThemeId::Light,
@@ -326,60 +325,12 @@ fn migrate_from_v0(v0: LegacyAppSettingsV0) -> PersistedSettingsV2 {
     })
 }
 
-fn migrate_from_v1(v1: UserSettings) -> PersistedSettingsV2 {
-    let selected = PersistedDiffProfileV2 {
-        name: v1.diff.compare_profile.name.clone(),
-        whitespace: v1.diff.compare_profile.whitespace,
-        newlines: v1.diff.compare_profile.newlines,
-        case: v1.diff.compare_profile.case,
-        inline_mode: v1.diff.compare_profile.inline_mode,
-        algorithm: v1.diff.compare_profile.algorithm,
-        built_in: is_core_preset_name(&v1.diff.compare_profile.name),
-    };
-    let mut profiles = vec![selected];
-    for builtin in ui_builtin_profiles() {
-        if !profiles.iter().any(|p| p.name == builtin.name) {
-            profiles.push(builtin);
-        }
-    }
-
-    normalize(PersistedSettingsV2 {
-        theme: v1.appearance.theme,
-        language: v1.locale.locale.clone(),
-        // v1 has no diff-pane font concept distinct from appearance; UI
-        // defaults apply and the user's next UI-driven save fills it in.
-        diff_font_size: default_diff_font_size(),
-        diff_font_family: DiffFontFamilySetting::default(),
-        appearance_font_size: v1.appearance.font_size,
-        appearance_font_family: v1.appearance.font_family,
-        density: v1.appearance.density,
-        // v1 has no context-lines, explorer, or ignore-pattern concept; the
-        // UI's own default (matches `legacy::legacy_default_context_lines`).
-        context_lines: 3,
-        last_left_dir: None,
-        last_right_dir: None,
-        profiles,
-        active_profile: 0,
-        ignore_extensions: String::new(),
-        ignore_dirs: String::new(),
-        explorer_compact: false,
-        enable_binary_comparison: false,
-        remember_explorer_dirs: true,
-        show_line_numbers: v1.diff.show_line_numbers,
-        wrap_long_lines: v1.diff.wrap_long_lines,
-        newline_policy: v1.files.newline_policy,
-        restore_session: v1.files.restore_session,
-        recent_limit: v1.files.recent_limit,
-        performance: v1.files.performance,
-    })
-}
-
 /// The UI's four shipping built-in profiles, expressed in v2 shape. Canonical
 /// for v2 because these are the profiles users have actually seen; core's
 /// richer [`crate::diff::CompareProfile::all_presets`] is a different,
 /// UI-unreached preset set (see the review request for the full rationale).
-fn ui_builtin_profiles() -> Vec<PersistedDiffProfileV2> {
-    let base = |name: &str, whitespace, case, algorithm| PersistedDiffProfileV2 {
+fn ui_builtin_profiles() -> Vec<PersistedDiffProfile> {
+    let base = |name: &str, whitespace, case, algorithm| PersistedDiffProfile {
         name: name.to_string(),
         whitespace,
         newlines: NewlineCompareMode::Significant,
@@ -416,16 +367,9 @@ fn ui_builtin_profiles() -> Vec<PersistedDiffProfileV2> {
     ]
 }
 
-fn is_core_preset_name(name: &str) -> bool {
-    matches!(
-        name,
-        "Default" | "Code Review" | "Loose Text" | "Large File Safe"
-    )
-}
-
 /// Normalizes invalid indexes/ranges without dropping otherwise valid fields
 /// (RFC-076 §"Validation").
-fn normalize(mut v2: PersistedSettingsV2) -> PersistedSettingsV2 {
+fn normalize(mut v2: PersistedSettings) -> PersistedSettings {
     v2.appearance_font_size = v2.appearance_font_size.clamp(FONT_SIZE_MIN, FONT_SIZE_MAX);
     v2.diff_font_size = v2
         .diff_font_size

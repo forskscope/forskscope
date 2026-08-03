@@ -98,7 +98,7 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
 /// Atomic on POSIX (`rename` within the same volume); on failure the temp
 /// file is removed and the original at `target` is left untouched.
 ///
-/// `pub(crate)` so `persist::v2`'s repositories (RFC-076) can reuse this
+/// `pub(crate)` so `persist::schema`'s repositories (RFC-076) can reuse this
 /// primitive for settings/session writes instead of hand-rolling their own
 /// temp-then-rename logic. This function carries no document-save-specific
 /// behavior (no fingerprint check, no `.bak` backup) — those stay in

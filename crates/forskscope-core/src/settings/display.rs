@@ -2,9 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Schema version for the settings file.
-pub const SETTINGS_SCHEMA_VERSION: u32 = 1;
-
 // ── Theme ─────────────────────────────────────────────────────────────────────
 
 /// Named theme. Drives the CSS variable set injected by the Dioxus app.

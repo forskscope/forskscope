@@ -6,10 +6,8 @@ use super::super::repository::{
     PersistenceCommitError, PersistenceIoError, PersistenceSaveOutcome, atomic_write_envelope,
     build_envelope_json, ensure_pre_v2_backup, read_to_string_or_missing, verify_unchanged,
 };
-use super::{
-    PersistedSettingsV2, SETTINGS_SCHEMA_NAME, SETTINGS_SCHEMA_VERSION_V2, load_settings_v2,
-};
-use crate::persist::v2::{PersistenceError, PersistenceLoad};
+use super::{PersistedSettings, SETTINGS_SCHEMA_NAME, SETTINGS_SCHEMA_VERSION_V2, load_settings};
+use crate::persist::schema::{PersistenceError, PersistenceLoad};
 
 /// Reads and writes the settings file at an explicit path. Never resolves a
 /// platform config directory itself — RFC-076 keeps that in the UI/
@@ -24,7 +22,7 @@ impl SettingsRepository {
         Self { path }
     }
 
-    pub fn load(&self) -> PersistenceLoad<PersistedSettingsV2> {
+    pub fn load(&self) -> PersistenceLoad<PersistedSettings> {
         self.load_with_raw().0
     }
 
@@ -32,15 +30,15 @@ impl SettingsRepository {
     /// read (when a file was present). A caller that intends to call
     /// [`Self::commit_migration`] needs this pairing: passing bytes from a
     /// separate, later read would defeat [`verify_unchanged`]'s guarantee.
-    pub fn load_with_raw(&self) -> (PersistenceLoad<PersistedSettingsV2>, Option<Vec<u8>>) {
+    pub fn load_with_raw(&self) -> (PersistenceLoad<PersistedSettings>, Option<Vec<u8>>) {
         match read_to_string_or_missing(&self.path) {
             Ok(Some(raw)) => {
                 let bytes = raw.clone().into_bytes();
-                (load_settings_v2(&raw), Some(bytes))
+                (load_settings(&raw), Some(bytes))
             }
             Ok(None) => (
                 PersistenceLoad::Missing {
-                    defaults: PersistedSettingsV2::default(),
+                    defaults: PersistedSettings::default(),
                 },
                 None,
             ),
@@ -55,7 +53,7 @@ impl SettingsRepository {
 
     /// Ordinary atomic write of the current state. No backup — that policy
     /// belongs to [`Self::commit_migration`], the one-time durable rewrite.
-    pub fn save(&self, value: &PersistedSettingsV2) -> Result<(), PersistenceIoError> {
+    pub fn save(&self, value: &PersistedSettings) -> Result<(), PersistenceIoError> {
         let json = build_envelope_json(
             SETTINGS_SCHEMA_NAME,
             SETTINGS_SCHEMA_VERSION_V2,
@@ -73,7 +71,7 @@ impl SettingsRepository {
     /// [`Self::load_with_raw`] call that produced `value`.
     pub fn commit_migration(
         &self,
-        value: &PersistedSettingsV2,
+        value: &PersistedSettings,
         original_bytes: &[u8],
     ) -> Result<PersistenceSaveOutcome, PersistenceCommitError> {
         verify_unchanged(&self.path, original_bytes)?;

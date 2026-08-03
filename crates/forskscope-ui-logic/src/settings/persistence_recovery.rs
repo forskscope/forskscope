@@ -15,7 +15,7 @@
 //! text — the full dialog UI with Exit/Continue/Reset buttons is still
 //! patch 5's job.
 
-use forskscope_core::persist::v2::settings::runtime::{
+use forskscope_core::persist::schema::settings::runtime::{
     MigrationCommitOutcome, SettingsRuntimeOutcome, SettingsRuntimeResolution,
 };
 
@@ -126,15 +126,15 @@ impl SettingsRecoveryView {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use forskscope_core::persist::v2::PersistenceError;
-    use forskscope_core::persist::v2::settings::PersistedSettingsV2;
+    use forskscope_core::persist::schema::PersistenceError;
+    use forskscope_core::persist::schema::settings::PersistedSettings;
 
     fn resolution(
         outcome: SettingsRuntimeOutcome,
         write_disabled: bool,
     ) -> SettingsRuntimeResolution {
         SettingsRuntimeResolution {
-            value: PersistedSettingsV2::default(),
+            value: PersistedSettings::default(),
             write_disabled,
             outcome,
         }

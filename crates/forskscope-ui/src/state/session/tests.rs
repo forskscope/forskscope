@@ -10,8 +10,8 @@
 use std::fs;
 use std::path::PathBuf;
 
-use forskscope_core::persist::v2::PersistenceLoad;
-use forskscope_core::persist::v2::session::{PersistedComparePairV2, SessionRepository};
+use forskscope_core::persist::schema::PersistenceLoad;
+use forskscope_core::persist::schema::session::{PersistedComparePair, SessionRepository};
 
 use super::{build_save_payload, load_session, persist_session, save_session_if_allowed};
 
@@ -35,7 +35,7 @@ fn build_save_payload_keeps_only_pairs_with_both_paths() {
 
     assert_eq!(
         payload.tabs,
-        vec![PersistedComparePairV2 {
+        vec![PersistedComparePair {
             left: "/old/a.rs".into(),
             right: "/new/a.rs".into(),
         }]

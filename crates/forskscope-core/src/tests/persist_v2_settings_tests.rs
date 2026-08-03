@@ -1,26 +1,27 @@
 //! RFC-076 settings schema v2: routing, migration, and validation tests.
 //!
 //! Covers the acceptance criteria from the RFC-076 handoff's §"Core schema
-//! tests": current-envelope round-trip, exact field-for-field legacy v0 and
-//! core v1 migration, future/corrupt/unrecognized-legacy handling, unknown
-//! payload fields tolerated, and range/index normalization.
+//! tests": current-envelope round-trip, exact field-for-field legacy v0
+//! migration, future/corrupt/unrecognized-legacy handling, unknown payload
+//! fields tolerated, and range/index normalization. Core schema v1 (RFC-031)
+//! was never shipped to users and its migration path was removed by
+//! RFC-076's 2026-08-03 amendment (patch 5) — see
+//! `schema_version_1_is_corrupt_not_migrated`.
 
 use crate::diff::{CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode};
 use crate::encoding::NewlinePolicy;
 use crate::job::PerformanceLimits;
-use crate::persist::v2::PersistenceLoad;
-use crate::persist::v2::settings::{PersistedDiffProfileV2, PersistedSettingsV2, load_settings_v2};
+use crate::persist::schema::PersistenceLoad;
+use crate::persist::schema::settings::{PersistedDiffProfile, PersistedSettings, load_settings};
 use crate::settings::display::{
     Density, DiffFontFamilySetting, FontFamilySetting, LocaleId, ThemeId,
 };
 
 const SETTINGS_V0_FIXTURE: &str = include_str!("fixtures/persistence/settings-v0.json");
-const SETTINGS_V1_ENVELOPE_FIXTURE: &str =
-    include_str!("fixtures/persistence/settings-v1-envelope.json");
 const SETTINGS_V2_FIXTURE: &str = include_str!("fixtures/persistence/settings-v2.json");
 
-fn sample_v2() -> PersistedSettingsV2 {
-    PersistedSettingsV2 {
+fn sample_v2() -> PersistedSettings {
+    PersistedSettings {
         theme: ThemeId::Night,
         language: LocaleId::english(),
         diff_font_size: 15,
@@ -31,7 +32,7 @@ fn sample_v2() -> PersistedSettingsV2 {
         context_lines: 4,
         last_left_dir: Some("/tmp/fixtures/left".into()),
         last_right_dir: None,
-        profiles: vec![PersistedDiffProfileV2 {
+        profiles: vec![PersistedDiffProfile {
             name: "Exact (default)".into(),
             whitespace: WhitespaceMode::Significant,
             newlines: NewlineCompareMode::Significant,
@@ -73,7 +74,7 @@ fn envelope_for(schema_version: u32, payload: &serde_json::Value) -> String {
 fn current_v2_envelope_round_trips() {
     let payload = serde_json::to_value(sample_v2()).unwrap();
     let raw = envelope_for(2, &payload);
-    match load_settings_v2(&raw) {
+    match load_settings(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value, sample_v2()),
         other => panic!("expected Current, got {other:?}"),
     }
@@ -87,7 +88,7 @@ fn current_v2_tolerates_unknown_payload_fields() {
         .unwrap()
         .insert("some_future_field".into(), serde_json::json!("unused"));
     let raw = envelope_for(2, &payload);
-    match load_settings_v2(&raw) {
+    match load_settings(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value, sample_v2()),
         other => panic!("expected Current despite unknown field, got {other:?}"),
     }
@@ -95,14 +96,14 @@ fn current_v2_tolerates_unknown_payload_fields() {
 
 /// Pins the v2 wire *format*, not just round-trip self-consistency (review
 /// 035 C2). `SETTINGS_V2_FIXTURE` is a literal JSON file, independent of how
-/// `PersistedSettingsV2` currently serializes itself — a struct round-trip
+/// `PersistedSettings` currently serializes itself — a struct round-trip
 /// test cannot catch a variant rename because both directions would agree on
 /// the new name. This test can: it fails the moment any enum variant's wire
 /// representation changes, since every enum reachable from the payload
 /// appears in this fixture at least once.
 #[test]
 fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
-    let expected = PersistedSettingsV2 {
+    let expected = PersistedSettings {
         theme: ThemeId::Night,
         language: LocaleId::japanese(),
         diff_font_size: 15,
@@ -114,7 +115,7 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
         last_left_dir: Some("/tmp/fixtures/left".into()),
         last_right_dir: None,
         profiles: vec![
-            PersistedDiffProfileV2 {
+            PersistedDiffProfile {
                 name: "Exact (default)".into(),
                 whitespace: WhitespaceMode::Significant,
                 newlines: NewlineCompareMode::Significant,
@@ -123,7 +124,7 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
                 algorithm: DiffAlgorithm::Myers,
                 built_in: true,
             },
-            PersistedDiffProfileV2 {
+            PersistedDiffProfile {
                 name: "Trailing whitespace, insensitive, no inline".into(),
                 whitespace: WhitespaceMode::IgnoreTrailing,
                 newlines: NewlineCompareMode::IgnoreDifference,
@@ -132,7 +133,7 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
                 algorithm: DiffAlgorithm::Patience,
                 built_in: false,
             },
-            PersistedDiffProfileV2 {
+            PersistedDiffProfile {
                 name: "Ignore all whitespace, eager inline, lcs".into(),
                 whitespace: WhitespaceMode::IgnoreAll,
                 newlines: NewlineCompareMode::Significant,
@@ -141,7 +142,7 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
                 algorithm: DiffAlgorithm::Lcs,
                 built_in: false,
             },
-            PersistedDiffProfileV2 {
+            PersistedDiffProfile {
                 name: "Ignore blank lines, histogram".into(),
                 whitespace: WhitespaceMode::IgnoreBlankLines,
                 newlines: NewlineCompareMode::Significant,
@@ -164,7 +165,7 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
         recent_limit: 7,
         performance: PerformanceLimits::default(),
     };
-    match load_settings_v2(SETTINGS_V2_FIXTURE) {
+    match load_settings(SETTINGS_V2_FIXTURE) {
         PersistenceLoad::Current { value } => assert_eq!(value, expected),
         other => panic!("expected Current, got {other:?}"),
     }
@@ -174,7 +175,7 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
 
 #[test]
 fn legacy_v0_fixture_migrates_every_field_exactly() {
-    match load_settings_v2(SETTINGS_V0_FIXTURE) {
+    match load_settings(SETTINGS_V0_FIXTURE) {
         PersistenceLoad::MigratedLegacy {
             value,
             source_backup_required,
@@ -210,52 +211,32 @@ fn legacy_v0_fixture_migrates_every_field_exactly() {
 #[test]
 fn unrecognized_legacy_shape_is_corrupt_not_defaults() {
     let raw = r#"{"totally":"unrelated","shape":true}"#;
-    match load_settings_v2(raw) {
+    match load_settings(raw) {
         PersistenceLoad::Corrupt { .. } => {}
         other => panic!("expected Corrupt for an unrecognized no-schema_name shape, got {other:?}"),
     }
 }
 
-// ── Core v1 ──────────────────────────────────────────────────────────────
+// ── Future / corrupt ─────────────────────────────────────────────────────
 
+/// RFC-076's 2026-08-03 amendment (patch 5): core schema v1 (RFC-031's
+/// `UserSettings`) was never shipped to users, so its migration path was
+/// removed. A v1 envelope must now be preserved and reported as `Corrupt`,
+/// not silently reinterpreted — never treated as `Missing` or defaulted.
 #[test]
-fn core_v1_envelope_fixture_migrates_every_represented_field() {
-    match load_settings_v2(SETTINGS_V1_ENVELOPE_FIXTURE) {
-        PersistenceLoad::MigratedVersion { value, from } => {
-            assert_eq!(from, 1);
-            assert_eq!(value.theme, ThemeId::Light);
-            assert_eq!(value.appearance_font_size, 18);
-            assert_eq!(value.appearance_font_family, FontFamilySetting::SystemSerif);
-            assert_eq!(value.density, Density::Compact);
-            assert_eq!(value.language, LocaleId::japanese());
-            assert!(!value.show_line_numbers);
-            assert!(value.wrap_long_lines);
-            assert_eq!(value.newline_policy, NewlinePolicy::ForceLf);
-            assert!(!value.restore_session);
-            assert_eq!(value.recent_limit, 7);
-            // The one selected core profile becomes profiles[0]...
-            assert_eq!(value.profiles[0].name, "Code Review");
-            assert_eq!(value.profiles[0].algorithm, DiffAlgorithm::Histogram);
-            assert!(value.profiles[0].built_in);
-            assert_eq!(value.active_profile, 0);
-            // ...and canonical UI built-ins are appended, not replaced.
-            assert!(value.profiles.iter().any(|p| p.name == "Exact (default)"));
-            assert!(value.profiles.iter().any(|p| p.name == "Ignore whitespace"));
-            // v1 has no explorer/ignore-pattern concept: core/UI defaults apply.
-            assert_eq!(value.ignore_extensions, "");
-            assert!(!value.explorer_compact);
-        }
-        other => panic!("expected MigratedVersion{{from: 1}}, got {other:?}"),
+fn schema_version_1_is_corrupt_not_migrated() {
+    let raw = envelope_for(1, &serde_json::json!({}));
+    match load_settings(&raw) {
+        PersistenceLoad::Corrupt { .. } => {}
+        other => panic!("expected Corrupt for schema_version 1, got {other:?}"),
     }
 }
-
-// ── Future / corrupt ─────────────────────────────────────────────────────
 
 #[test]
 fn future_schema_version_is_preserved_not_defaulted() {
     let payload = serde_json::to_value(sample_v2()).unwrap();
     let raw = envelope_for(3, &payload);
-    match load_settings_v2(&raw) {
+    match load_settings(&raw) {
         PersistenceLoad::FutureVersion { schema, version } => {
             assert_eq!(schema, "settings");
             assert_eq!(version, 3);
@@ -276,7 +257,7 @@ fn wrong_schema_name_is_corrupt() {
         "payload": payload,
     })
     .to_string();
-    match load_settings_v2(&raw) {
+    match load_settings(&raw) {
         PersistenceLoad::Corrupt { .. } => {}
         other => panic!("expected Corrupt for a schema-name mismatch, got {other:?}"),
     }
@@ -284,7 +265,7 @@ fn wrong_schema_name_is_corrupt() {
 
 #[test]
 fn malformed_json_is_corrupt() {
-    match load_settings_v2("{not valid json") {
+    match load_settings("{not valid json") {
         PersistenceLoad::Corrupt { .. } => {}
         other => panic!("expected Corrupt for malformed JSON, got {other:?}"),
     }
@@ -301,7 +282,7 @@ fn malformed_payload_under_valid_envelope_is_corrupt() {
         "payload": "not an object",
     })
     .to_string();
-    match load_settings_v2(&raw) {
+    match load_settings(&raw) {
         PersistenceLoad::Corrupt { .. } => {}
         other => panic!("expected Corrupt for a malformed payload, got {other:?}"),
     }
@@ -315,7 +296,7 @@ fn out_of_range_active_profile_normalizes_to_zero() {
     invalid.active_profile = 99;
     let payload = serde_json::to_value(&invalid).unwrap();
     let raw = envelope_for(2, &payload);
-    match load_settings_v2(&raw) {
+    match load_settings(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value.active_profile, 0),
         other => panic!("expected Current, got {other:?}"),
     }
@@ -328,7 +309,7 @@ fn empty_profile_list_restores_builtin_defaults() {
     invalid.active_profile = 0;
     let payload = serde_json::to_value(&invalid).unwrap();
     let raw = envelope_for(2, &payload);
-    match load_settings_v2(&raw) {
+    match load_settings(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value.profiles.len(), 4),
         other => panic!("expected Current, got {other:?}"),
     }
@@ -340,7 +321,7 @@ fn out_of_range_appearance_font_size_clamps() {
     invalid.appearance_font_size = 200;
     let payload = serde_json::to_value(&invalid).unwrap();
     let raw = envelope_for(2, &payload);
-    match load_settings_v2(&raw) {
+    match load_settings(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value.appearance_font_size, 50),
         other => panic!("expected Current, got {other:?}"),
     }
@@ -351,7 +332,7 @@ fn out_of_range_diff_font_size_clamps() {
     let mut too_large = sample_v2();
     too_large.diff_font_size = 9999;
     let raw = envelope_for(2, &serde_json::to_value(&too_large).unwrap());
-    match load_settings_v2(&raw) {
+    match load_settings(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value.diff_font_size, 50),
         other => panic!("expected Current, got {other:?}"),
     }
@@ -359,7 +340,7 @@ fn out_of_range_diff_font_size_clamps() {
     let mut too_small = sample_v2();
     too_small.diff_font_size = 0;
     let raw = envelope_for(2, &serde_json::to_value(&too_small).unwrap());
-    match load_settings_v2(&raw) {
+    match load_settings(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value.diff_font_size, 6),
         other => panic!("expected Current, got {other:?}"),
     }

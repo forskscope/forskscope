@@ -2,7 +2,7 @@
 //! behavior"). Mirrors [`crate::settings::persistence_recovery`]; see its
 //! module doc for the full rationale.
 
-use forskscope_core::persist::v2::session::runtime::{
+use forskscope_core::persist::schema::session::runtime::{
     MigrationCommitOutcome, SessionRuntimeOutcome, SessionRuntimeResolution,
 };
 
@@ -113,15 +113,15 @@ impl SessionRecoveryView {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use forskscope_core::persist::v2::PersistenceError;
-    use forskscope_core::persist::v2::session::PersistedSessionV2;
+    use forskscope_core::persist::schema::PersistenceError;
+    use forskscope_core::persist::schema::session::PersistedSession;
 
     fn resolution(
         outcome: SessionRuntimeOutcome,
         write_disabled: bool,
     ) -> SessionRuntimeResolution {
         SessionRuntimeResolution {
-            value: PersistedSessionV2::default(),
+            value: PersistedSession::default(),
             write_disabled,
             outcome,
         }
