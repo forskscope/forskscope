@@ -110,6 +110,65 @@ fn must_be_absent_conflicts_when_a_directory_exists() {
     assert!(matches!(result, Err(CoreError::Conflict { .. })));
 }
 
+#[cfg(unix)]
+#[test]
+fn must_be_absent_conflicts_on_a_dangling_symlink() {
+    // Review 046 N1: `Path::exists()` follows symlinks and reports a
+    // dangling one as absent — `check_precondition` must not, since a
+    // symlink entry at the path is still an entry.
+    let dir = temp_dir("must-be-absent-dangling-symlink");
+    let path = dir.join("dangling-link");
+    let _ = fs::remove_file(&path);
+    std::os::unix::fs::symlink(dir.join("nonexistent-target"), &path).unwrap();
+
+    let result = check_precondition(&path, &TargetPrecondition::MustBeAbsent);
+
+    assert!(
+        matches!(result, Err(CoreError::Conflict { .. })),
+        "a dangling symlink is still an entry at the path, not an absent target"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn must_be_absent_propagates_a_genuine_read_failure_as_io_not_ok() {
+    // Review 046 N1: a metadata read failure (here, permission denied on the
+    // parent directory) must surface as `CoreError::Io`, not be silently
+    // treated as "absent".
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = temp_dir("must-be-absent-unreadable-parent");
+    let blocked = dir.join("blocked");
+    let _ = fs::remove_dir_all(&blocked);
+    fs::create_dir(&blocked).unwrap();
+    let path = blocked.join("target.txt");
+    fs::set_permissions(&blocked, fs::Permissions::from_mode(0o000)).unwrap();
+
+    // Running as root bypasses directory permission bits entirely, so
+    // `0o000` would not actually block the read on such a runner — confirm
+    // the restriction actually took effect before trusting the assertion
+    // below, rather than assuming non-root (e.g. some containerized CI runs
+    // as root).
+    let restriction_is_effective = fs::metadata(&path).is_err();
+
+    let result = check_precondition(&path, &TargetPrecondition::MustBeAbsent);
+
+    // Restore permissions before any assertion can panic and leak an
+    // unreadable directory into the shared temp root.
+    fs::set_permissions(&blocked, fs::Permissions::from_mode(0o755)).unwrap();
+
+    if !restriction_is_effective {
+        eprintln!(
+            "skipping assertion: 0o000 did not block metadata reads (likely running as root)"
+        );
+        return;
+    }
+    assert!(
+        matches!(result, Err(CoreError::Io { .. })),
+        "expected Io for a genuine read failure, got {result:?}"
+    );
+}
+
 // ── check_precondition: Force ───────────────────────────────────────────────
 
 #[test]

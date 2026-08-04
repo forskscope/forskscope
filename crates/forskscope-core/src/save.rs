@@ -124,6 +124,11 @@ pub(crate) fn atomic_replace(target: &Path, bytes: &[u8]) -> Result<()> {
 /// Distinct from [`SaveRequest::expected_fingerprint`]: that field is
 /// `Option<FileFingerprint>`, which cannot express "the path must not
 /// exist" — `None` there means "skip the check," not "must be absent."
+///
+/// The save-time counterpart of [`crate::compare_prep::TargetExpectation`],
+/// the load-time snapshot this is checked against — read them together, not
+/// as one type: a snapshot is captured once at preparation time, a
+/// precondition is checked immediately before every write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TargetPrecondition {
     /// The target must exist, be a plain text file, and match this
@@ -146,20 +151,22 @@ pub enum TargetPrecondition {
 /// Returns [`CoreError::Conflict`] on any precondition failure, never
 /// [`CoreError::Io`] for an ordinary "not what was expected" case — review
 /// 038 C1 (RFC-076) established that a stale-read conflict and a genuine I/O
-/// failure must stay distinguishable; only a metadata read failure inside
-/// `MustBeAbsent`'s existence check propagates as `Io`.
+/// failure must stay distinguishable. `MustBeAbsent` uses
+/// [`fs::symlink_metadata`] rather than [`Path::exists`] so a dangling
+/// symlink (an entry the path-following `exists()` would misreport as
+/// absent) is correctly treated as present, and a genuine read failure (e.g.
+/// permission denied on a parent directory) propagates as `Io` instead of
+/// being silently swallowed as "absent" (review 046 N1).
 pub fn check_precondition(target: &Path, precondition: &TargetPrecondition) -> Result<()> {
     match precondition {
         TargetPrecondition::Force => Ok(()),
-        TargetPrecondition::MustBeAbsent => {
-            if target.exists() {
-                Err(CoreError::Conflict {
-                    message: "target already exists".into(),
-                })
-            } else {
-                Ok(())
-            }
-        }
+        TargetPrecondition::MustBeAbsent => match fs::symlink_metadata(target) {
+            Ok(_) => Err(CoreError::Conflict {
+                message: "target already exists".into(),
+            }),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(CoreError::io(target, IoOperation::Metadata, &e)),
+        },
         TargetPrecondition::MustMatch(expected) => {
             match check_external_state(target, expected, false) {
                 ExternalFileState::Clean => Ok(()),
