@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
+use forskscope_core::compare_prep::SaveTargetSnapshot;
 use forskscope_core::diff::DiffDocument;
 use forskscope_core::document::LoadedDocument;
 use forskscope_core::{DiffOptions, MergeSession, compute_diff};
@@ -41,6 +42,12 @@ pub struct CompareTab {
     pub char_mode: bool,
     pub word_wrap: bool,
     pub focused_change: usize,
+    /// Where a save on this tab will go, and under what precondition
+    /// (RFC-077). `None` while `state == TabState::Loading` — the same
+    /// prepared-comparison commit that installs `left_doc`/`right_doc`/
+    /// `diff`/`merge` installs this too, so a tab is never left with some
+    /// pieces from an old load and others from a new one.
+    pub save_target: Option<SaveTargetSnapshot>,
 }
 
 impl CompareTab {

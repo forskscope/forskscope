@@ -1,3 +1,5 @@
+use std::fs;
+
 use super::*;
 use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
@@ -26,6 +28,7 @@ fn loading_tab(id_value: u64, generation_value: u64) -> CompareTab {
         char_mode: true,
         word_wrap: false,
         focused_change: 9,
+        save_target: None,
     }
 }
 
@@ -34,11 +37,15 @@ fn token(tab: &CompareTab) -> LoadToken {
 }
 
 fn ready_result(can_save: bool) -> LoadResult {
-    LoadResult::Ready(Box::new(LoadedComparison {
-        left_doc: LoadedDocument::empty(),
-        right_doc: LoadedDocument::empty(),
+    let right = PathBuf::from("right");
+    let save_target =
+        forskscope_core::compare_prep::save_target_from_loaded(&right, &LoadedDocument::empty());
+    LoadResult::Ready(Box::new(PreparedCompare {
+        left: LoadedDocument::empty(),
+        right: LoadedDocument::empty(),
         diff: DiffDocument::empty(),
         merge: MergeSession::empty(),
+        save_target,
         can_save,
     }))
 }
@@ -146,4 +153,123 @@ fn accepted_ready_result_resets_transient_navigation_state() {
 
     assert!(!tabs[0].char_mode);
     assert_eq!(tabs[0].focused_change, 0);
+}
+
+// ── load_and_diff (RFC-077 patch 3: PreparedCompare, unchanged behaviour) ──
+
+use forskscope_core::compare_prep::{SaveTargetState, TargetExpectation};
+
+fn temp_dir(tag: &str) -> PathBuf {
+    let dir =
+        std::env::temp_dir().join(format!("fsk-ui-load-and-diff-{tag}-{}", std::process::id()));
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
+#[test]
+fn normal_compare_save_target_is_the_right_input_must_match_its_own_fingerprint() {
+    let dir = temp_dir("existing-right");
+    let left = dir.join("left.txt");
+    let right = dir.join("right.txt");
+    fs::write(&left, "a\n").unwrap();
+    fs::write(&right, "b\n").unwrap();
+
+    let prepared =
+        load_and_diff(left, right.clone(), DiffOptions::default(), Lang::En, false).unwrap();
+
+    assert_eq!(prepared.save_target.path, right);
+    let expected_fp = forskscope_core::document::FileFingerprint::capture(&right, None).unwrap();
+    match prepared.save_target.state {
+        SaveTargetState::Writable { expectation, .. } => match expectation {
+            TargetExpectation::MustMatch(fp) => assert_eq!(fp.len, expected_fp.len),
+            other => panic!("expected MustMatch, got {other:?}"),
+        },
+        other => panic!("expected Writable, got {other:?}"),
+    }
+}
+
+#[test]
+fn normal_compare_save_target_is_must_be_absent_when_right_is_missing() {
+    let dir = temp_dir("missing-right");
+    let left = dir.join("left.txt");
+    let right = dir.join("does-not-exist.txt");
+    fs::write(&left, "a\n").unwrap();
+    let _ = fs::remove_file(&right);
+
+    let prepared = load_and_diff(left, right, DiffOptions::default(), Lang::En, false).unwrap();
+
+    match prepared.save_target.state {
+        SaveTargetState::Writable { expectation, .. } => {
+            assert_eq!(expectation, TargetExpectation::MustBeAbsent);
+        }
+        other => panic!("expected Writable(MustBeAbsent), got {other:?}"),
+    }
+}
+
+#[test]
+fn normal_compare_can_save_and_diff_are_unaffected_by_the_prepared_compare_refactor() {
+    let dir = temp_dir("can-save");
+    let left = dir.join("left.txt");
+    let right = dir.join("right.txt");
+    fs::write(&left, "one\ntwo\n").unwrap();
+    fs::write(&right, "one\nTWO\n").unwrap();
+
+    let prepared = load_and_diff(left, right, DiffOptions::default(), Lang::En, false).unwrap();
+
+    assert!(
+        prepared.can_save,
+        "both sides are plain text — must remain saveable"
+    );
+    assert!(
+        !prepared.diff.hunks.is_empty(),
+        "the actual content difference must still be computed"
+    );
+}
+
+#[test]
+fn binary_comparison_disabled_error_message_is_unchanged() {
+    let dir = temp_dir("binary-disabled");
+    let left = dir.join("left.bin");
+    let right = dir.join("right.txt");
+    fs::write(&left, [0u8, 1, 2, 3]).unwrap();
+    fs::write(&right, "text\n").unwrap();
+
+    let result = load_and_diff(left, right, DiffOptions::default(), Lang::En, false);
+
+    assert_eq!(
+        result.unwrap_err(),
+        "Binary comparison is off. Enable it in Settings → Advanced."
+    );
+}
+
+#[test]
+fn binary_vs_text_mismatch_error_message_is_unchanged() {
+    let dir = temp_dir("binary-text-mismatch");
+    let left = dir.join("left.bin");
+    let right = dir.join("right.txt");
+    fs::write(&left, [0u8, 1, 2, 3]).unwrap();
+    fs::write(&right, "text\n").unwrap();
+
+    let result = load_and_diff(left, right, DiffOptions::default(), Lang::En, true);
+
+    assert_eq!(
+        result.unwrap_err(),
+        "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary."
+    );
+}
+
+#[test]
+fn xlsx_target_error_message_is_unchanged() {
+    let dir = temp_dir("xlsx");
+    let left = dir.join("left.txt");
+    let right = dir.join("right.xlsx");
+    fs::write(&left, "text\n").unwrap();
+    fs::write(&right, b"not a real workbook").unwrap();
+
+    let result = load_and_diff(left, right, DiffOptions::default(), Lang::En, false);
+
+    assert_eq!(
+        result.unwrap_err(),
+        "Spreadsheet comparison is temporarily disabled for security."
+    );
 }

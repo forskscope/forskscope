@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use dioxus::prelude::*;
 use dioxus_core::spawn_forever;
+use forskscope_core::compare_prep::{PreparedCompare, save_target_from_loaded};
 use forskscope_core::diff::DiffDocument;
 use forskscope_core::document::{LoadOptions, LoadedDocument, load_path};
 use forskscope_core::file_kind::FileKind;
@@ -16,20 +17,16 @@ use crate::i18n::t;
 use crate::state::tab::{CompareTab, TabState, tab_title};
 use crate::state::{Store, settings::Lang};
 
-struct LoadedComparison {
-    left_doc: LoadedDocument,
-    right_doc: LoadedDocument,
-    diff: DiffDocument,
-    merge: MergeSession,
-    can_save: bool,
-}
-
 enum LoadResult {
-    Ready(Box<LoadedComparison>),
+    Ready(Box<PreparedCompare>),
     Error(String),
 }
 
 /// Install a prepared load only when its complete runtime token is still live.
+/// `PreparedCompare` commits `left_doc`/`right_doc`/`diff`/`merge`/`can_save`/
+/// `save_target` together (RFC-077) — the same atomicity RFC-075 already gave
+/// tab identity, extended so a save target is never installed from a
+/// different load than the documents it was derived from.
 fn commit_load_result(
     tabs: &mut [CompareTab],
     token: LoadToken,
@@ -48,13 +45,14 @@ fn commit_load_result(
     }
 
     match result {
-        LoadResult::Ready(loaded) => {
+        LoadResult::Ready(prepared) => {
             tab.state = TabState::Ready;
-            tab.left_doc = loaded.left_doc;
-            tab.right_doc = loaded.right_doc;
-            tab.diff = loaded.diff;
-            tab.merge = loaded.merge;
-            tab.can_save = loaded.can_save;
+            tab.left_doc = prepared.left;
+            tab.right_doc = prepared.right;
+            tab.diff = prepared.diff;
+            tab.merge = prepared.merge;
+            tab.can_save = prepared.can_save;
+            tab.save_target = Some(prepared.save_target);
             tab.char_mode = false;
             tab.focused_change = 0;
         }
@@ -65,28 +63,9 @@ fn commit_load_result(
     decision
 }
 
-fn prepared_result(
-    result: Result<
-        (
-            LoadedDocument,
-            LoadedDocument,
-            DiffDocument,
-            MergeSession,
-            bool,
-        ),
-        String,
-    >,
-) -> LoadResult {
+fn prepared_result(result: Result<PreparedCompare, String>) -> LoadResult {
     match result {
-        Ok((left_doc, right_doc, diff, merge, can_save)) => {
-            LoadResult::Ready(Box::new(LoadedComparison {
-                left_doc,
-                right_doc,
-                diff,
-                merge,
-                can_save,
-            }))
-        }
+        Ok(prepared) => LoadResult::Ready(Box::new(prepared)),
         Err(message) => LoadResult::Error(message),
     }
 }
@@ -172,6 +151,7 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
         char_mode: false,
         word_wrap: false,
         focused_change: 0,
+        save_target: None,
     };
     let idx = store.tabs.read().len();
     store.tabs.write().push(tab);
@@ -198,23 +178,17 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     });
 }
 
-/// Load, classify, and diff two files off the UI thread (RFC-065).
+/// Load, classify, diff, and derive the save target for two files off the UI
+/// thread (RFC-065, RFC-077). Normal two-file compare's save target *is* the
+/// right input, already loaded here — no extra I/O
+/// (`compare_prep::save_target_from_loaded`).
 pub(super) fn load_and_diff(
     left: PathBuf,
     right: PathBuf,
     opts: DiffOptions,
     lang: Lang,
     enable_binary: bool,
-) -> Result<
-    (
-        LoadedDocument,
-        LoadedDocument,
-        DiffDocument,
-        MergeSession,
-        bool,
-    ),
-    String,
-> {
+) -> Result<PreparedCompare, String> {
     let options = LoadOptions {
         allow_missing: true,
     };
@@ -276,7 +250,15 @@ pub(super) fn load_and_diff(
     let diff = compute_diff(ld.diff_text(), rd.diff_text(), opts);
     let merge = MergeSession::from_diff(&diff);
     let can_save = ld.kind.is_mergeable_text() && rd.kind.is_mergeable_text();
-    Ok((ld, rd, diff, merge, can_save))
+    let save_target = save_target_from_loaded(&right, &rd);
+    Ok(PreparedCompare {
+        left: ld,
+        right: rd,
+        diff,
+        merge,
+        save_target,
+        can_save,
+    })
 }
 
 #[cfg(test)]
