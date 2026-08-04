@@ -14,8 +14,8 @@ gate evidence exists.
 
 The `forskscope-core` and `forskscope-ui-logic` crates are feature-complete for
 the v1 two-way diff/merge workflow. The current observed headless gate passes
-**1029 tests** with zero failures: 658 core unit tests, 45 core integration
-tests, 255 ui-logic unit tests, 58 forskscope-ui unit tests (the same 29 run
+**1031 tests** with zero failures: 658 core unit tests, 45 core integration
+tests, 257 ui-logic unit tests, 58 forskscope-ui unit tests (the same 29 run
 once each for its `lib` and `bin` targets), 6 CSS integration tests, and 7
 doctests.
 
