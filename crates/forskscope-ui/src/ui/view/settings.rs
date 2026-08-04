@@ -7,6 +7,7 @@ pub mod modal;
 pub mod profile;
 
 use dioxus::prelude::*;
+use forskscope_core::persist::schema::PersistenceCommitError;
 use forskscope_core::persist::schema::settings::runtime::{
     SettingsRuntimeResolution, resolve_and_commit,
 };
@@ -17,7 +18,7 @@ use crate::state::{AppSettings, Lang, Modal, Notice, Store, Theme, config_file_p
 use crate::ui::overlay::keybindings::KeyboardRefModal;
 use crate::ui::overlay::modals::{
     AboutModal, BatchCopyModal, BatchResultModal, CloseTabModal, ConfirmDirOpModal, OverwriteModal,
-    ReloadModal, SaveAsModal, SwapModal,
+    ReloadModal, SaveAsModal, SessionRecoveryModal, SettingsRecoveryModal, SwapModal,
 };
 use modal::SettingsModal;
 
@@ -72,20 +73,47 @@ pub fn load_settings(repo: &SettingsRepository) -> (AppSettings, SettingsRuntime
     (settings, resolution)
 }
 
-/// Maps a settings load's resolution to a one-time startup toast, if any —
-/// an informational notice for a durably-committed migration, or a warning
-/// for an outcome that leaves writes disabled. Reuses `forskscope-ui-logic`'s
-/// already-tested recovery copy rather than duplicating message text; the
-/// full recovery dialog (Exit/Continue/Reset actions) is patch 5's job.
+/// Maps a settings load's resolution to a one-time startup toast: an
+/// informational notice for a durably-committed migration. An outcome that
+/// needs a blocking dialog (`Incompatible`/`CorruptPreserved`/
+/// `Migrated(Failed)`) is no longer surfaced as a toast — see
+/// [`recovery_modal`], patch 6's replacement for the interim toast this
+/// function used to also produce.
 pub fn recovery_notice(resolution: &SettingsRuntimeResolution) -> Option<Notice> {
     let view = SettingsRecoveryView::from_resolution(resolution);
-    if let Some(notice) = view.migration_notice {
-        return Some(Notice::success(notice.message));
-    }
-    if let Some(dialog) = view.dialog {
-        return Some(Notice::error(dialog.body));
-    }
-    None
+    view.migration_notice.map(|n| Notice::success(n.message))
+}
+
+/// The blocking-dialog counterpart of [`recovery_notice`] (RFC-076 patch 6):
+/// `Some` exactly when [`SettingsRecoveryView::dialog`] is set, wrapping
+/// `resolution` for [`crate::ui::overlay::modals::SettingsRecoveryModal`] to
+/// render and act on.
+pub fn recovery_modal(resolution: &SettingsRuntimeResolution) -> Option<Modal> {
+    let view = SettingsRecoveryView::from_resolution(resolution);
+    view.dialog
+        .is_some()
+        .then(|| Modal::SettingsRecovery(resolution.clone()))
+}
+
+/// Explicit, user-confirmed reset of a `Corrupt` settings file
+/// (`RecoveryDialogAction::ResetAndBackupOriginal`): backs up
+/// `original_bytes` then writes `value`. Thin wrapper so the recovery modal
+/// doesn't need to know the repository's on-disk path.
+pub fn reset_settings_with_backup(
+    value: &PersistedSettings,
+    original_bytes: &[u8],
+) -> Result<(), PersistenceCommitError> {
+    reset_settings(value, original_bytes, &repository())
+}
+
+/// The repository-explicit half of [`reset_settings_with_backup`], exposed
+/// for direct testing (same split as [`load`]/[`load_settings`]).
+pub fn reset_settings(
+    value: &PersistedSettings,
+    original_bytes: &[u8],
+    repo: &SettingsRepository,
+) -> Result<(), PersistenceCommitError> {
+    repo.reset_with_backup(value, original_bytes).map(|_| ())
 }
 
 // ── Modal dispatcher ──────────────────────────────────────────────────────────
@@ -107,6 +135,8 @@ pub fn ModalLayer() -> Element {
         Modal::ConfirmBatchCopy(spec) => rsx! { BatchCopyModal   { spec } },
         Modal::BatchResult(spec) => rsx! { BatchResultModal { spec } },
         Modal::KeyboardRef => rsx! { KeyboardRefModal {} },
+        Modal::SettingsRecovery(resolution) => rsx! { SettingsRecoveryModal { resolution } },
+        Modal::SessionRecovery(resolution) => rsx! { SessionRecoveryModal { resolution } },
     }
 }
 

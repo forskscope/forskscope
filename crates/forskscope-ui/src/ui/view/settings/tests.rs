@@ -7,10 +7,13 @@ use std::fs;
 use std::path::PathBuf;
 
 use forskscope_core::persist::schema::PersistenceLoad;
+use forskscope_core::persist::schema::settings::runtime::{
+    MigrationCommitOutcome, SettingsRuntimeOutcome, SettingsRuntimeResolution,
+};
 use forskscope_core::persist::schema::settings::{PersistedSettings, SettingsRepository};
 
-use super::{build_save_payload, load_settings, persist_settings};
-use crate::state::AppSettings;
+use super::{build_save_payload, load_settings, persist_settings, recovery_modal, reset_settings};
+use crate::state::{AppSettings, Modal};
 
 fn temp_path(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("fsk-ui-settings-{tag}-{}", std::process::id()));
@@ -89,4 +92,77 @@ fn load_settings_round_trips_through_persist_settings() {
 
     assert_eq!(settings.context_lines, 8);
     assert!(settings.explorer_compact);
+}
+
+// ── RFC-076 patch 6: reset_settings / recovery_modal ──────────────────────
+
+fn resolution(outcome: SettingsRuntimeOutcome) -> SettingsRuntimeResolution {
+    SettingsRuntimeResolution {
+        value: PersistedSettings::default(),
+        write_disabled: true,
+        outcome,
+        raw_bytes: None,
+    }
+}
+
+#[test]
+fn reset_settings_writes_backup_and_new_value_through_the_real_repository() {
+    let path = temp_path("reset");
+    fs::write(&path, "{not valid json").unwrap();
+    let repo = SettingsRepository::new(path.clone());
+    let value = PersistedSettings {
+        context_lines: 5,
+        ..PersistedSettings::default()
+    };
+
+    reset_settings(&value, b"{not valid json", &repo).expect("reset must succeed");
+
+    let backup_path = path.with_file_name("settings.json.reset.bak");
+    assert_eq!(
+        fs::read_to_string(&backup_path).unwrap(),
+        "{not valid json",
+        "the corrupt original must be preserved under a distinct .reset.bak name"
+    );
+    match repo.load() {
+        PersistenceLoad::Current { value } => assert_eq!(value.context_lines, 5),
+        other => panic!("expected Current after reset_settings, got {other:?}"),
+    }
+}
+
+#[test]
+fn reset_settings_rejects_stale_bytes_after_external_change() {
+    let path = temp_path("reset-stale");
+    fs::write(&path, "{not valid json").unwrap();
+    let repo = SettingsRepository::new(path.clone());
+
+    let result = reset_settings(&PersistedSettings::default(), b"different bytes", &repo);
+
+    assert!(
+        result.is_err(),
+        "must refuse to reset over bytes that no longer match what's on disk"
+    );
+}
+
+#[test]
+fn recovery_modal_is_none_for_outcomes_without_a_dialog() {
+    for outcome in [
+        SettingsRuntimeOutcome::Fresh,
+        SettingsRuntimeOutcome::Current,
+        SettingsRuntimeOutcome::Migrated(MigrationCommitOutcome::Committed { backup_path: None }),
+        SettingsRuntimeOutcome::Migrated(MigrationCommitOutcome::DeferredByConflict),
+    ] {
+        assert!(recovery_modal(&resolution(outcome)).is_none());
+    }
+}
+
+#[test]
+fn recovery_modal_is_some_for_outcomes_with_a_dialog() {
+    let res = resolution(SettingsRuntimeOutcome::Incompatible {
+        schema: "settings".into(),
+        version: 99,
+    });
+    assert!(matches!(
+        recovery_modal(&res),
+        Some(Modal::SettingsRecovery(_))
+    ));
 }

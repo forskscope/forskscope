@@ -7,7 +7,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Implemented (49)
+## Implemented (50)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
@@ -60,17 +60,18 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 071 | [UI Module Structural Redesign (Rust 2024 Hierarchy)](./done/071-ui-module-structural-redesign.md) | v0.152.0–v0.158.0 |
 | 073 | [Bridge Minimisation (Phase 5)](./done/073-bridge-minimisation.md) | v0.161.0 |
 | 075 | [Async Compare Identity and Load Generations](./done/075-async-compare-identity-and-generation.md) | post-v0.164.0 stabilization |
+| 076 | [Versioned Runtime Settings and Session Persistence](./done/076-versioned-runtime-persistence.md) | post-v0.165.1 stabilization |
 
-## Proposed (18)
+## Proposed (17)
 
 RFC-004–040 are editor-adapter track, platform/packaging, or governance/documentation.
 RFC-026 and RFC-030 are substantially implemented; their remaining items require GTK or are deferred.
 RFC-060–063 are the UI/UX architect review remediation track (shipped across v0.145.0–v0.145.3).
 RFC-072 is the remaining phase of the UI structural redesign (RFC-071).
-RFC-074 and RFC-076–078 are the remaining release-stabilization program created
-from the 2026-07-15 architecture audit; they are release-blocking in dependency
-order. RFC-075 is implemented and closes audit finding B1, but the overall v1
-release remains No-Go.
+RFC-074, RFC-077, and RFC-078 are the remaining release-stabilization program
+created from the 2026-07-15 architecture audit; they are release-blocking in
+dependency order. RFC-075 and RFC-076 are implemented and close audit findings
+B1 and B2 respectively, but the overall v1 release remains No-Go.
 
 | ID | Title | Category | Progress |
 |----|-------|----------|----------|
@@ -89,7 +90,6 @@ release remains No-Go.
 | 063 | [Trust, Clarity, and Calm UI Hardening](./proposed/063-trust-clarity-and-calm-ui-hardening.md) | UX review remediation | **Mostly shipped** v0.145.1–.3 — C1/C2/C3/C5/C6/C7/C9/C10 done; C4 audited; C8 rejected |
 | 072 | [UI Component Extraction (Phase 4)](./proposed/072-ui-component-extraction.md) | Structural | **Partially shipped** v0.160.0 — `Notice` extracted; `EmptyState`/`PathLabel`/`IconButton` deferred |
 | 074 | [v1 Release Stabilization Program](./proposed/074-v1-release-stabilization-program.md) | Release stabilization | Program schedule, milestones, gates, and final go/no-go package |
-| 076 | [Versioned Runtime Settings and Session Persistence](./proposed/076-versioned-runtime-persistence.md) | Compatibility | Audit B2 — schema v2 plus UI-v0/core-v1 migrations |
 | 077 | [Git Mergetool Save-Target Model](./proposed/077-mergetool-save-target-model.md) | File safety | Audit B3 — distinct input/output with match-or-absence guards; requires RFC-075 |
 | 078 | [Platform Runtime Acceptance and Release Evidence](./proposed/078-platform-runtime-acceptance.md) | Release QA | Audit B4 — exact-artifact runtime matrix after RFC-075–077 |
 

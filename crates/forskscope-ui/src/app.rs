@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
 
-use crate::state::{Store, open_compare, resolve_session, restore_tabs, save_session};
+use crate::state::{
+    Store, advance_recovery_queue, open_compare, resolve_session, restore_tabs, save_session,
+};
 use crate::ui::layout::header::Header;
 use crate::ui::layout::statusbar::StatusBar;
 use crate::ui::layout::tabs::TabBar;
@@ -35,6 +37,9 @@ pub fn App() -> Element {
         if let Some(notice) = crate::ui::view::settings::recovery_notice(&resolution) {
             store.toast.set(Some(notice));
         }
+        if let Some(modal) = crate::ui::view::settings::recovery_modal(&resolution) {
+            store.pending_recovery.write().push(modal);
+        }
         store
     });
 
@@ -50,6 +55,14 @@ pub fn App() -> Element {
         {
             store.toast.set(Some(notice));
         }
+        if let Some(modal) = crate::state::session::recovery_modal(&session_resolution) {
+            store.pending_recovery.write().push(modal);
+        }
+        // F28b: settings and session resolve independently and either (or
+        // both) can need a blocking dialog on the same launch — both pushes
+        // above have landed by now, so this shows the first without dropping
+        // a second queued behind it.
+        advance_recovery_queue(&mut store);
 
         if let Some(Some((left, right))) = STARTUP_PAIR.get() {
             let previous_tab_count = store.tabs.read().len();
@@ -114,9 +127,17 @@ pub fn App() -> Element {
             },
             onkeydown: move |e: Event<KeyboardData>| {
                 let modal_open = !matches!(*store.modal.read(), crate::state::Modal::None);
+                // RFC-076 patch 6: a recovery dialog is never dismissible by
+                // Escape — every one of its actions must be an explicit,
+                // considered choice (Exit/Continue/Reset), not an accidental
+                // keypress that silently picks "continue" on the user's behalf.
+                let recovery_open = matches!(
+                    *store.modal.read(),
+                    crate::state::Modal::SettingsRecovery(_) | crate::state::Modal::SessionRecovery(_)
+                );
                 // Escape closes any open modal regardless of whether a tab is active.
                 if e.key() == Key::Escape {
-                    if modal_open {
+                    if modal_open && !recovery_open {
                         store.modal.set(crate::state::Modal::None);
                     }
                     return;

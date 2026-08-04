@@ -1,6 +1,6 @@
 # RFC 076: Versioned Runtime Settings and Session Persistence
 
-**Status.** Proposed
+**Status.** Implemented (Milestone M2-B)
 **Tracks.** Release-stabilization audit finding B2.
 **Touches.** Core persistence/settings/session models, UI settings/session
 adapters, config-file migration, user-visible recovery, and runtime-path tests.
@@ -437,6 +437,41 @@ authentication surface is introduced.
 - Core and UI no longer contain competing persisted settings/session models.
 - RFC-011 and core documentation distinguish legacy persisted IDs from
   RFC-075's fresh runtime-only compare/load identity.
+
+## Implementation outcome
+
+Implemented across six reviewed patches:
+
+- **Patch 1** (`5054000`) added the serde-backed envelope and v0/v1/v2 payload
+  DTOs, migration routing, and the `PersistenceLoad` taxonomy in core.
+- **Patch 2** (`b710e7f`) added the explicit-path `SettingsRepository`/
+  `SessionRepository` and the atomic backup-then-write migration commit.
+- **Patch 3** (`9abafab`, with review 037 N1's stale-caller-conflict guard)
+  added the runtime adapters (`resolve_and_commit`) that durably commit a
+  legacy migration and report `SettingsRuntimeOutcome`/`SessionRuntimeOutcome`.
+- **Patch 4** (`2a26f09`, with review 041 C1's CLI-mode session-write-disable
+  fix) switched `forskscope-ui` production load/save onto the new
+  repositories, retiring `app_json_settings::ConfigManager`.
+- **Patch 5** (`62c61f8`) executed the convergence cleanup committed to by the
+  2026-08-03 amendment: the core-v1 DTOs, `migrate_from_v1`, and the RFC-031
+  `VersionedEnvelope` types were removed, and `persist::v2` was renamed to
+  `persist::schema` so a future schema version renames nothing.
+- **Patch 6** added the recovery UI: blocking dialogs (not toasts) for
+  `Incompatible`, `CorruptPreserved`, and `Migrated(Failed)`, with real
+  behavior for all four `RecoveryDialogAction` variants — including a new
+  `reset_with_backup` repository method that backs up a corrupt file under a
+  distinct `.reset.bak` name before an explicit, user-confirmed reset — plus
+  this threat-model, RFC-011, and user-documentation update.
+
+This closes release-stabilization finding B2 and Milestone M2-B. Every
+acceptance criterion above is met: the running app reads and writes versioned
+envelopes exclusively through the core repositories; legacy UI-v0 settings and
+session files migrate with a `.pre-v2.bak` backup; future-version and corrupt
+files are preserved byte-identical and reported to the user rather than
+silently defaulted; core and UI no longer contain competing persisted models.
+It does not by itself make the v1/public release Go: RFC-077 and RFC-078,
+integrated gates, platform evidence, and the final architecture decision
+remain outstanding.
 
 ## Alternatives considered
 

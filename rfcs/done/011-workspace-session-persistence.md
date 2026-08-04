@@ -2,6 +2,28 @@
 
 **Status.** Implemented (v0.56.0) — core fully complete; tab list JSON persistence deferred to schema v2
 
+## Amendment — 2026-08-04: `WorkspaceSession` model removed by RFC-076
+
+The `WorkspaceSession`/`WorkspaceRoot`/`WorkspaceTab`/`RecentSessionEntry`
+types and their `VersionedEnvelope`-based `to_json`/`from_json` described
+below were never wired to the running application (RFC-076's 2026-08-03
+amendment verified this over the crate's full history) and were removed
+entirely in RFC-076 patch 5's convergence cleanup, along with the rest of the
+RFC-031 schema-v1 envelope. This section is not rewritten — it remains the
+historical record of what schema v1 designed and core implemented — but none
+of it exists in the codebase as of RFC-076 (`rfcs/done/076-...`).
+
+The identity/close-flow/dirty-tracking concepts this RFC explored (§6–§11)
+are superseded by two unrelated, still-current mechanisms: `CompareTabId`/
+`LoadGeneration` (RFC-075) for in-memory tab identity, which is intentionally
+not persisted, and `persist::schema::session::PersistedSession` (RFC-076) for
+the actual on-disk session format — a flat list of restorable path pairs, not
+an identity-rich session model. Anyone reading this RFC for the *current*
+session-persistence design should read RFC-076 instead; this RFC's remaining
+value is historical (why v1 opted to defer tab-list persistence to schema v2,
+and why that schema v2 shape, per RFC-076, ended up simpler than this RFC
+sketched).
+
 ## Status
 
 Core implementation complete in v0.56.0. `forskscope-core::session` ships:

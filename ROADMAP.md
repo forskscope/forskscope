@@ -14,8 +14,10 @@ gate evidence exists.
 
 The `forskscope-core` and `forskscope-ui-logic` crates are feature-complete for
 the v1 two-way diff/merge workflow. The current observed headless gate passes
-**943 tests** with zero failures: 643 core unit tests, 45 core integration
-tests, 241 ui-logic unit tests, 6 CSS integration tests, and 8 doctests.
+**1029 tests** with zero failures: 658 core unit tests, 45 core integration
+tests, 255 ui-logic unit tests, 58 forskscope-ui unit tests (the same 29 run
+once each for its `lib` and `bin` targets), 6 CSS integration tests, and 7
+doctests.
 
 The UI crate (`forskscope-ui`) has the v1 two-way workflow implemented:
 two-pane diff with independent pane labels and shared horizontal scroll;
@@ -91,6 +93,14 @@ content will decide its level; RFC-076's persistence schema change is expected
 to promote it to `0.166.0` at release time. The N1–N6 documentation-currency
 follow-ups from review 032 (registered as F19–F21) ride with M2 rather than
 shipping separately.
+
+**Progress (2026-08-04):** RFC-076 is implemented, resolving audit finding B2.
+The running app now reads and writes settings/session exclusively through
+core's versioned schema-v2 repositories; legacy UI-v0 files migrate with a
+durable backup; future-version and corrupt files are preserved untouched and
+reported via a blocking recovery dialog (Exit/Continue/Reset) rather than
+silently collapsed to defaults. M2-B's exit criterion is met; M2-A (release
+notes, release policy docs, threat-model currency) remains open.
 
 RFC-078 host access for Linux, Windows, and macOS is confirmed available, so M5
 is schedulable once M4 completes. M2–M6 remain outstanding and R0 closed no
@@ -426,7 +436,6 @@ buffer can be write-only in v1), but is required for full manual-edit support.
 | 041 | Post-v1 | v1.0 product stabilization |
 | 042 | Ongoing | Roadmap (this document) |
 | 074 | Pre-v1 stabilization | Umbrella schedule, milestones, gates, and final go/no-go package |
-| 076 | Milestone M2 | Versioned runtime settings/session persistence and legacy migration |
 | 077 | Milestone M3 | Git mergetool save-target identity and fingerprint safety |
 | 078 | Milestone M5 | Platform runtime acceptance and retained release evidence |
 

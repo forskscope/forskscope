@@ -150,6 +150,12 @@ fn settings_resolve_corrupt_disables_writes_and_preserves_bytes() {
         SettingsRuntimeOutcome::CorruptPreserved { .. }
     ));
     assert_eq!(fs::read_to_string(&path).unwrap(), "{not valid json");
+    // Patch 6: raw_bytes must be populated for Corrupt, or an explicit
+    // reset (SettingsRepository::reset_with_backup) has nothing to back up.
+    assert_eq!(
+        resolved.raw_bytes.as_deref(),
+        Some(b"{not valid json".as_slice())
+    );
 }
 
 #[test]
@@ -284,4 +290,8 @@ fn session_resolve_corrupt_disables_writes_and_preserves_bytes() {
         SessionRuntimeOutcome::CorruptPreserved { .. }
     ));
     assert_eq!(fs::read_to_string(&path).unwrap(), "{not valid json");
+    assert_eq!(
+        resolved.raw_bytes.as_deref(),
+        Some(b"{not valid json".as_slice())
+    );
 }

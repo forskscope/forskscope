@@ -62,6 +62,12 @@ pub struct SessionRuntimeResolution {
     /// safe.
     pub write_disabled: bool,
     pub outcome: SessionRuntimeOutcome,
+    /// The exact bytes read at load time, when a file was present.
+    /// Patch 6: a `CorruptPreserved` outcome's explicit, user-confirmed
+    /// "reset" action needs these to back up the corrupt file before
+    /// replacing it — the same load/commit bytes pairing `commit_migration`
+    /// already requires, extended to a caller that isn't a migration.
+    pub raw_bytes: Option<Vec<u8>>,
 }
 
 /// Loads `repo` and, for a legacy/older-version file, durably commits the
@@ -75,22 +81,26 @@ pub fn resolve_and_commit(repo: &SessionRepository) -> SessionRuntimeResolution 
             value: defaults,
             write_disabled: false,
             outcome: SessionRuntimeOutcome::Fresh,
+            raw_bytes: raw,
         },
         PersistenceLoad::Current { value } => SessionRuntimeResolution {
             value,
             write_disabled: false,
             outcome: SessionRuntimeOutcome::Current,
+            raw_bytes: raw,
         },
         PersistenceLoad::MigratedLegacy { value, .. } => commit_migrated(repo, value, raw),
         PersistenceLoad::FutureVersion { schema, version } => SessionRuntimeResolution {
             value: PersistedSession::default(),
             write_disabled: true,
             outcome: SessionRuntimeOutcome::Incompatible { schema, version },
+            raw_bytes: raw,
         },
         PersistenceLoad::Corrupt { detail } => SessionRuntimeResolution {
             value: PersistedSession::default(),
             write_disabled: true,
             outcome: SessionRuntimeOutcome::CorruptPreserved { detail },
+            raw_bytes: raw,
         },
     }
 }
@@ -121,5 +131,6 @@ fn commit_migrated(
         value,
         write_disabled,
         outcome: SessionRuntimeOutcome::Migrated(commit),
+        raw_bytes: raw,
     }
 }

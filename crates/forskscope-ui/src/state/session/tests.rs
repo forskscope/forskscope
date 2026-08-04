@@ -11,9 +11,18 @@ use std::fs;
 use std::path::PathBuf;
 
 use forskscope_core::persist::schema::PersistenceLoad;
-use forskscope_core::persist::schema::session::{PersistedComparePair, SessionRepository};
+use forskscope_core::persist::schema::session::runtime::{
+    MigrationCommitOutcome, SessionRuntimeOutcome, SessionRuntimeResolution,
+};
+use forskscope_core::persist::schema::session::{
+    PersistedComparePair, PersistedSession, SessionRepository,
+};
 
-use super::{build_save_payload, load_session, persist_session, save_session_if_allowed};
+use super::{
+    build_save_payload, load_session, persist_session, recovery_modal, reset_session,
+    save_session_if_allowed,
+};
+use crate::state::Modal;
 
 fn temp_path(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("fsk-ui-session-{tag}-{}", std::process::id()));
@@ -136,4 +145,81 @@ fn future_version_session_stays_byte_identical_through_a_disabled_save() {
         raw,
         "a write-disabled source must stay byte-identical even with tabs open"
     );
+}
+
+// ── RFC-076 patch 6: reset_session / recovery_modal ────────────────────────
+
+fn resolution(outcome: SessionRuntimeOutcome) -> SessionRuntimeResolution {
+    SessionRuntimeResolution {
+        value: PersistedSession::default(),
+        write_disabled: true,
+        outcome,
+        raw_bytes: None,
+    }
+}
+
+#[test]
+fn reset_session_writes_backup_and_new_value_through_the_real_repository() {
+    let path = temp_path("reset");
+    fs::write(&path, "{not valid json").unwrap();
+    let repo = SessionRepository::new(path.clone());
+    let value = PersistedSession {
+        tabs: vec![PersistedComparePair {
+            left: "/a".into(),
+            right: "/b".into(),
+        }],
+        active_tab: None,
+        explorer_roots: None,
+    };
+
+    reset_session(&value, b"{not valid json", &repo).expect("reset must succeed");
+
+    let backup_path = path.with_file_name("session.json.reset.bak");
+    assert_eq!(
+        fs::read_to_string(&backup_path).unwrap(),
+        "{not valid json",
+        "the corrupt original must be preserved under a distinct .reset.bak name"
+    );
+    match repo.load() {
+        PersistenceLoad::Current { value } => assert_eq!(value.tabs.len(), 1),
+        other => panic!("expected Current after reset_session, got {other:?}"),
+    }
+}
+
+#[test]
+fn reset_session_rejects_stale_bytes_after_external_change() {
+    let path = temp_path("reset-stale");
+    fs::write(&path, "{not valid json").unwrap();
+    let repo = SessionRepository::new(path.clone());
+
+    let result = reset_session(&PersistedSession::default(), b"different bytes", &repo);
+
+    assert!(
+        result.is_err(),
+        "must refuse to reset over bytes that no longer match what's on disk"
+    );
+}
+
+#[test]
+fn recovery_modal_is_none_for_outcomes_without_a_dialog() {
+    for outcome in [
+        SessionRuntimeOutcome::Fresh,
+        SessionRuntimeOutcome::Current,
+        SessionRuntimeOutcome::Migrated(MigrationCommitOutcome::Committed { backup_path: None }),
+        SessionRuntimeOutcome::Migrated(MigrationCommitOutcome::DeferredByConflict),
+    ] {
+        assert!(recovery_modal(&resolution(outcome)).is_none());
+    }
+}
+
+#[test]
+fn recovery_modal_is_some_for_outcomes_with_a_dialog() {
+    let res = resolution(SessionRuntimeOutcome::Incompatible {
+        schema: "session".into(),
+        version: 99,
+    });
+    assert!(matches!(
+        recovery_modal(&res),
+        Some(Modal::SessionRecovery(_))
+    ));
 }

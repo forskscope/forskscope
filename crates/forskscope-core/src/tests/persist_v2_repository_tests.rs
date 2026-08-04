@@ -37,6 +37,13 @@ fn temp_write_path_for(path: &std::path::Path) -> PathBuf {
     ))
 }
 
+fn reset_backup_path_for(path: &std::path::Path) -> PathBuf {
+    path.with_file_name(format!(
+        "{}.reset.bak",
+        path.file_name().unwrap().to_string_lossy()
+    ))
+}
+
 // ── Settings ─────────────────────────────────────────────────────────────
 
 #[test]
@@ -203,6 +210,74 @@ fn settings_commit_migration_survives_failure_between_backup_and_replace() {
 }
 
 #[test]
+fn settings_reset_with_backup_creates_a_distinct_backup_and_writes_the_value() {
+    let path = temp_path("settings-reset", "settings.json");
+    let corrupt = b"{not valid json";
+    fs::write(&path, corrupt).unwrap();
+
+    let repo = SettingsRepository::new(path.clone());
+    let outcome = repo
+        .reset_with_backup(&PersistedSettings::default(), corrupt)
+        .expect("reset_with_backup must succeed");
+
+    let backup_path = outcome.backup_path.expect("backup path must be reported");
+    assert_eq!(backup_path, reset_backup_path_for(&path));
+    assert_ne!(
+        backup_path,
+        backup_path_for(&path),
+        "a reset backup must not reuse the .pre-v2.bak migration-backup name"
+    );
+    assert_eq!(fs::read(&backup_path).unwrap(), corrupt);
+    match repo.load() {
+        PersistenceLoad::Current { value } => assert_eq!(value, PersistedSettings::default()),
+        other => panic!("expected Current after reset, got {other:?}"),
+    }
+}
+
+#[test]
+fn settings_reset_with_backup_does_not_overwrite_existing_backup() {
+    let path = temp_path("settings-reset-retry", "settings.json");
+    let corrupt = b"{not valid json";
+    fs::write(&path, corrupt).unwrap();
+    let backup_path = reset_backup_path_for(&path);
+    let stale_backup = b"a reset backup already on disk from a prior attempt";
+    fs::write(&backup_path, stale_backup).unwrap();
+
+    let repo = SettingsRepository::new(path.clone());
+    let outcome = repo
+        .reset_with_backup(&PersistedSettings::default(), corrupt)
+        .expect("reset_with_backup must succeed");
+
+    assert_eq!(outcome.backup_path.as_deref(), Some(backup_path.as_path()));
+    assert_eq!(fs::read(&backup_path).unwrap(), stale_backup);
+}
+
+#[test]
+fn settings_reset_with_backup_rejects_stale_bytes_after_external_change() {
+    let path = temp_path("settings-reset-conflict", "settings.json");
+    let corrupt = b"{not valid json";
+    fs::write(&path, corrupt).unwrap();
+    let repo = SettingsRepository::new(path.clone());
+
+    let changed = b"changed after load, before reset";
+    fs::write(&path, changed).unwrap();
+
+    let err = repo
+        .reset_with_backup(&PersistedSettings::default(), corrupt)
+        .expect_err("must reject stale original_bytes");
+    assert_eq!(err, PersistenceCommitError::Conflict);
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        changed,
+        "target must be untouched"
+    );
+    assert!(
+        !reset_backup_path_for(&path).exists(),
+        "no backup should be created for a rejected reset"
+    );
+}
+
+#[test]
 fn settings_load_with_raw_pairs_bytes_with_the_loaded_value() {
     let path = temp_path("settings-load-raw", "settings.json");
     let repo = SettingsRepository::new(path.clone());
@@ -342,6 +417,74 @@ fn session_commit_migration_survives_failure_between_backup_and_replace() {
         fs::read(&path).unwrap(),
         original,
         "target must be untouched by the failed write"
+    );
+}
+
+#[test]
+fn session_reset_with_backup_creates_a_distinct_backup_and_writes_the_value() {
+    let path = temp_path("session-reset", "session.json");
+    let corrupt = b"{not valid json";
+    fs::write(&path, corrupt).unwrap();
+
+    let repo = SessionRepository::new(path.clone());
+    let outcome = repo
+        .reset_with_backup(&PersistedSession::default(), corrupt)
+        .expect("reset_with_backup must succeed");
+
+    let backup_path = outcome.backup_path.expect("backup path must be reported");
+    assert_eq!(backup_path, reset_backup_path_for(&path));
+    assert_ne!(
+        backup_path,
+        backup_path_for(&path),
+        "a reset backup must not reuse the .pre-v2.bak migration-backup name"
+    );
+    assert_eq!(fs::read(&backup_path).unwrap(), corrupt);
+    match repo.load() {
+        PersistenceLoad::Current { value } => assert_eq!(value, PersistedSession::default()),
+        other => panic!("expected Current after reset, got {other:?}"),
+    }
+}
+
+#[test]
+fn session_reset_with_backup_does_not_overwrite_existing_backup() {
+    let path = temp_path("session-reset-retry", "session.json");
+    let corrupt = b"{not valid json";
+    fs::write(&path, corrupt).unwrap();
+    let backup_path = reset_backup_path_for(&path);
+    let stale_backup = b"a reset backup already on disk from a prior attempt";
+    fs::write(&backup_path, stale_backup).unwrap();
+
+    let repo = SessionRepository::new(path.clone());
+    let outcome = repo
+        .reset_with_backup(&PersistedSession::default(), corrupt)
+        .expect("reset_with_backup must succeed");
+
+    assert_eq!(outcome.backup_path.as_deref(), Some(backup_path.as_path()));
+    assert_eq!(fs::read(&backup_path).unwrap(), stale_backup);
+}
+
+#[test]
+fn session_reset_with_backup_rejects_stale_bytes_after_external_change() {
+    let path = temp_path("session-reset-conflict", "session.json");
+    let corrupt = b"{not valid json";
+    fs::write(&path, corrupt).unwrap();
+    let repo = SessionRepository::new(path.clone());
+
+    let changed = b"changed after load, before reset";
+    fs::write(&path, changed).unwrap();
+
+    let err = repo
+        .reset_with_backup(&PersistedSession::default(), corrupt)
+        .expect_err("must reject stale original_bytes");
+    assert_eq!(err, PersistenceCommitError::Conflict);
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        changed,
+        "target must be untouched"
+    );
+    assert!(
+        !reset_backup_path_for(&path).exists(),
+        "no backup should be created for a rejected reset"
     );
 }
 

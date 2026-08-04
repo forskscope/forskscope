@@ -64,6 +64,7 @@ pub use explore::status::{RowStatusKind, StatusRow};
 pub use session::persistence_recovery::{
     MigrationNotice as SessionMigrationNotice, RecoveryDialogAction as SessionRecoveryDialogAction,
     RecoveryDialogView as SessionRecoveryDialogView, SessionRecoveryView,
+    action_label as session_recovery_action_label,
 };
 
 // settings
@@ -71,6 +72,7 @@ pub use settings::persistence_recovery::{
     MigrationNotice as SettingsMigrationNotice,
     RecoveryDialogAction as SettingsRecoveryDialogAction,
     RecoveryDialogView as SettingsRecoveryDialogView, SettingsRecoveryView,
+    action_label as settings_recovery_action_label,
 };
 pub use settings::settings_view::{
     ProfileChoice, SelectChoice, clamp_font_size, density_choices, find_active,

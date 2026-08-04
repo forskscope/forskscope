@@ -45,6 +45,17 @@ pub enum RecoveryDialogAction {
     ResetAndBackupOriginal,
 }
 
+/// Short button label for a [`RecoveryDialogAction`] (mirrors
+/// [`crate::compare::save_error::action_label`]'s established pattern).
+pub fn action_label(action: RecoveryDialogAction) -> &'static str {
+    match action {
+        RecoveryDialogAction::Exit => "Exit",
+        RecoveryDialogAction::ContinueWithTemporaryDefaults => "Continue with defaults",
+        RecoveryDialogAction::ContinueWithoutSaving => "Continue without saving",
+        RecoveryDialogAction::ResetAndBackupOriginal => "Reset and back up",
+    }
+}
+
 /// A blocking dialog for a future-version, corrupt, or unwritable settings
 /// file.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -98,7 +109,7 @@ impl SettingsRecoveryView {
                 dialog: Some(RecoveryDialogView {
                     title: "Settings file is from a newer version".into(),
                     body: format!(
-                        "This settings file uses \"{schema}\" schema version {version}, which this version of ForskScope does not understand. The file has not been modified."
+                        "This settings file uses \"{schema}\" schema version {version}, which this version of ForskScope does not understand. The file has not been modified. Changes you make this session will not be saved."
                     ),
                     actions: vec![
                         RecoveryDialogAction::Exit,
@@ -111,7 +122,7 @@ impl SettingsRecoveryView {
                 dialog: Some(RecoveryDialogView {
                     title: "Settings file could not be read".into(),
                     body: format!(
-                        "The settings file is preserved but could not be parsed: {detail}."
+                        "The settings file is preserved but could not be parsed: {detail}. Changes you make this session will not be saved unless you reset it."
                     ),
                     actions: vec![
                         RecoveryDialogAction::ContinueWithTemporaryDefaults,
@@ -137,6 +148,7 @@ mod tests {
             value: PersistedSettings::default(),
             write_disabled,
             outcome,
+            raw_bytes: None,
         }
     }
 
@@ -239,6 +251,10 @@ mod tests {
             "a future file must never be offered for reset — it may be valid to a newer build"
         );
         assert!(dialog.body.contains("99"));
+        assert!(
+            dialog.body.to_lowercase().contains("will not be saved"),
+            "F28: the dialog must state that changes will not persist"
+        );
     }
 
     #[test]
@@ -261,5 +277,9 @@ mod tests {
                 .contains(&RecoveryDialogAction::ResetAndBackupOriginal)
         );
         assert!(!dialog.actions.contains(&RecoveryDialogAction::Exit));
+        assert!(
+            dialog.body.to_lowercase().contains("will not be saved"),
+            "F28: the dialog must state that changes will not persist"
+        );
     }
 }

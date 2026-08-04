@@ -86,6 +86,17 @@ only one side is gone the tab opens with that side showing an empty document.
 
 ---
 
+## A dialog says my settings/session file could not be read or is from a newer version
+
+ForskScope preserves a settings or session file it doesn't recognize instead
+of silently resetting it — you'll see a dialog explaining why and offering a
+safe next step (exit, continue for this session only, or reset with an
+automatic backup). See [Where your settings and session are
+stored](settings.md#where-your-settings-and-session-are-stored) for what each
+option does and how to recover after downgrading ForskScope.
+
+---
+
 ## How do I report a bug?
 
 1. Open the **About** panel (ℹ button in the header).

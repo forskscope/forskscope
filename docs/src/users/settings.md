@@ -163,3 +163,36 @@ The **ℹ** button in the Settings header opens the About dialog. It shows:
 
 Click **Copy diagnostics** to copy this information to the clipboard for
 use in bug reports.
+
+---
+
+## Where your settings and session are stored
+
+ForskScope keeps two small JSON files in your platform config directory
+(typically `~/.config/forskscope/` on Linux, `%APPDATA%\forskscope\` on
+Windows): `settings.json` for everything on this page, and `session.json` for
+your open tabs (see [My session was not restored](faq.md#my-session-was-not-restored-after-restarting)).
+Both files stay on this computer — nothing here is uploaded.
+
+If one of these files can't be used as-is — it was written by a newer version
+of ForskScope, or it's unreadable/corrupted — a dialog appears at startup
+instead of silently falling back to defaults. What it offers depends on why:
+
+| Situation | What you see |
+|---|---|
+| File is from a newer ForskScope version | **Exit**, or **Continue with defaults** for this session. The file itself is left untouched — a future version can still read it. |
+| File is unreadable/corrupted | **Continue with defaults**, or **Reset and back up**, which backs up the unreadable file (as `<name>.reset.bak`, next to the original) before writing a fresh one. |
+
+Either way, until you choose an action, nothing you change in that session is
+saved — the dialog says so explicitly. Choosing **Continue…** lets you keep
+using ForskScope for the session without touching the file on disk; closing
+and reopening will show the same dialog again until the underlying file is
+fixed, replaced, or reset.
+
+**Downgrading ForskScope:** if you install an older version after having run a
+newer one, the older version will not understand the current file format and
+will show the "newer version" dialog above. Your settings/session are not
+lost — install the newer version again to read them, or use **Reset and back
+up**/reinstall to start fresh. A settings or session file that was
+automatically upgraded from an older format keeps a one-time backup of the
+original alongside it, named `<name>.pre-v2.bak`.

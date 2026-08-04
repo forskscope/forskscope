@@ -23,7 +23,9 @@ pub use tab::{CompareTab, TabState, recompute_diff, swap_sides};
 pub use types::{BatchResultSpec, DirOp};
 
 use dioxus::prelude::*;
+use forskscope_core::persist::schema::session::runtime::SessionRuntimeResolution;
 use forskscope_core::persist::schema::settings::PersistedSettings;
+use forskscope_core::persist::schema::settings::runtime::SettingsRuntimeResolution;
 use forskscope_ui_logic::{CompareTabId, CompareTabIdAllocator, LoadIdentityError};
 use std::path::PathBuf;
 
@@ -55,6 +57,12 @@ pub enum Modal {
     BatchResult(BatchResultSpec),
     About,
     KeyboardRef,
+    /// RFC-076 patch 6: a blocking settings-recovery dialog (future-version,
+    /// corrupt, or a failed migration commit) — the resolution the dialog
+    /// renders and acts on. Never dismissible by Escape (see `app.rs`).
+    SettingsRecovery(SettingsRuntimeResolution),
+    /// Session mirror of [`Self::SettingsRecovery`].
+    SessionRecovery(SessionRuntimeResolution),
 }
 
 // ── Toast / notice ────────────────────────────────────────────────────────────
@@ -138,6 +146,12 @@ pub struct Store {
     pub right_pick: Signal<Option<PathBuf>>,
     pub modal: Signal<Modal>,
     pub toast: Signal<Option<Notice>>,
+    /// RFC-076 patch 6 / F28b: recovery dialogs still waiting to be shown.
+    /// Settings and session resolve independently and either (or both) can
+    /// need a blocking dialog on the same launch; queuing rather than
+    /// dropping the second is what keeps both visible in sequence. See
+    /// [`advance_recovery_queue`].
+    pub pending_recovery: Signal<Vec<Modal>>,
 }
 
 impl Store {
@@ -165,6 +179,7 @@ impl Store {
             right_pick: Signal::new_in_scope(None, ScopeId::ROOT),
             modal: Signal::new_in_scope(Modal::None, ScopeId::ROOT),
             toast: Signal::new_in_scope(None, ScopeId::ROOT),
+            pending_recovery: Signal::new_in_scope(Vec::new(), ScopeId::ROOT),
         }
     }
     pub fn lang(&self) -> Lang {
@@ -187,4 +202,17 @@ impl Store {
     pub fn notify_warning(&mut self, msg: impl Into<String>) {
         self.toast.set(Some(Notice::warning(msg)));
     }
+}
+
+/// Dismisses the current modal and shows the next queued recovery dialog, if
+/// any (RFC-076 patch 6 / F28b). Every recovery-dialog action handler calls
+/// this instead of `store.modal.set(Modal::None)` directly, so a session
+/// dialog queued behind a settings one is never silently dropped.
+pub fn advance_recovery_queue(store: &mut Store) {
+    let next = if store.pending_recovery.read().is_empty() {
+        None
+    } else {
+        Some(store.pending_recovery.write().remove(0))
+    };
+    store.modal.set(next.unwrap_or(Modal::None));
 }

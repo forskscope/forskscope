@@ -112,30 +112,51 @@ In the Explorer UI, `classify()` is also called lazily per rendered row via
 **Residual concerns:** none beyond normal file-system write failures, which are
 handled as `Ok(None)` in the result path.
 
-### 4. Settings persistence
+### 4. Settings and session persistence
 
-**Flow:** `AppSettings` is serialized to JSON by `app_json_settings::ConfigManager`
-into the platform config directory (`dirs_next::config_dir()`) as `settings.json`.
+**Flow:** `forskscope-core::persist::schema` is the sole owner of the on-disk
+settings/session schema. `SettingsRepository`/`SessionRepository`
+(`persist::schema::settings`/`session`) read and write an explicit path —
+`forskscope-ui` resolves that path to the platform config directory
+(`dirs_next::config_dir()`) as `settings.json`/`session.json` and never
+serializes either document itself. At startup, `resolve_and_commit` loads the
+file, classifies it (`PersistenceLoad`: `Missing`/`Current`/`MigratedLegacy`/
+`FutureVersion`/`Corrupt`), and durably commits a legacy migration immediately
+if one applies.
 
 **Controls:**
-- Reads and writes use standard serde-json; no `unsafe` or raw pointer
+- Reads and writes use standard serde-json through a versioned envelope
+  (`schema_name`, `schema_version`, `payload`); no `unsafe` or raw pointer
   manipulation.
-- `#[serde(default)]` on all new fields means that a settings file written by an
-  older version will deserialize cleanly without panicking.
-- The file is written synchronously from the settings dialog on every change.
-  No background thread; no race with the UI signal reads.
+- A v2 payload's required fields (`theme`, `language`, `tabs`, etc.) have no
+  `#[serde(default)]` — a payload missing one is `Corrupt`, not silently
+  defaulted. This is deliberate: architecture-audit finding B2 existed
+  *because* the previous `app_json_settings::ConfigManager` path collapsed
+  every unrecognized shape into defaults.
+- A future-schema-version or corrupt file is left byte-for-byte untouched on
+  disk and the run's writes are disabled (`write_disabled`) until the user
+  takes an explicit recovery action — a blocking dialog, not a toast, since a
+  write-disabled session that silently discards edits is a data-loss surface
+  in its own right (RFC-076 "User-facing behavior").
+- A legacy (pre-schema-v2) file is migrated and its original bytes preserved
+  as a non-overwriting `<name>.pre-v2.bak` sibling before the new envelope is
+  written (`ensure_pre_v2_backup`); the migrated file is re-read with
+  `verify_unchanged` immediately before that commit, refusing to overwrite if
+  the file changed underneath the migration (review 037 N1).
+- The recovery dialog's explicit "Reset and back up" action (offered only for
+  `CorruptPreserved`, never for a future-version file, which may be valid to a
+  newer build) backs up the corrupt original under a distinct
+  `<name>.reset.bak` name before writing — `reset_with_backup`, gated by the
+  same `verify_unchanged` stale-caller guard as a migration commit.
+- Settings and session resolve and report independently: if both are
+  simultaneously write-disabled, both dialogs are shown in sequence
+  (`pending_recovery` queue), never one silently dropped by the other.
 
-**Residual concerns:** the running UI serializes its own `AppSettings` and
-`SessionState` structs directly through `app_json_settings::ConfigManager`
-rather than through the core's tested, schema-versioned `VersionedEnvelope`
-contract. Consequently, a settings or session file written by a future schema
-version, or one that is corrupted, is not distinguished from a missing file —
-`#[serde(default)]` causes it to silently deserialize to defaults rather than
-being preserved and reported to the user. This is tracked as architecture-audit
-finding B2 and is the subject of RFC-076 (Versioned Runtime Settings and
-Session Persistence), which makes the core the canonical schema owner, routes
-production load/save through it, and distinguishes first-run, legacy-migration,
-corruption, and future-version cases instead of collapsing them into defaults.
+**Residual concerns:** none beyond normal file-system write failures, which
+disable further writes for the run and are surfaced to the user rather than
+retried silently. This closes architecture-audit finding B2; see RFC-076
+(Versioned Runtime Settings and Session Persistence, `rfcs/done/`) for the
+full design and implementation record.
 
 ### 5. External tool launch (`core::external_tool`)
 
@@ -258,3 +279,4 @@ exception or split the dependency before release.
 | v0.165.0 | Dioxus desktop dependency policy reviewed | Accepts loopback WebSocket IPC only; `cargo xtask audit-deps` enforces no devtools and reviewed network-capable paths |
 | v0.165.0 | Release UI build compatibility with `dioxus-desktop`/`wry` | Enables `wry/devtools` method surface without `dioxus-devtools`; removes default Dioxus menu bar |
 | v0.165.0 | Release archive and CI gates aligned | Archive layout, version sync, i18n coverage, audit policy, and dependency paths are enforced before release artifact creation |
+| v0.165.1 | Versioned settings/session persistence (RFC-076) — closes audit finding B2 | Core owns a schema-versioned envelope; a future-version or corrupt file is preserved untouched and reported via a blocking recovery dialog rather than silently collapsed to defaults; legacy migration and explicit reset both create a non-overwriting backup before any write |

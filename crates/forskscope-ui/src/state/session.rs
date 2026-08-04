@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
+use forskscope_core::persist::schema::PersistenceCommitError;
 use forskscope_core::persist::schema::session::runtime::{
     SessionRuntimeResolution, resolve_and_commit,
 };
@@ -12,7 +13,7 @@ use forskscope_core::persist::schema::session::{
 use forskscope_ui_logic::SessionRecoveryView;
 
 use crate::state::compare::open_compare;
-use crate::state::{Notice, Store, config_file_path};
+use crate::state::{Modal, Notice, Store, config_file_path};
 
 fn repository() -> SessionRepository {
     SessionRepository::new(config_file_path("session.json"))
@@ -116,13 +117,33 @@ pub fn load_session(repo: &SessionRepository) -> SessionRuntimeResolution {
 /// Session mirror of `crate::ui::view::settings::recovery_notice`.
 pub fn recovery_notice(resolution: &SessionRuntimeResolution) -> Option<Notice> {
     let view = SessionRecoveryView::from_resolution(resolution);
-    if let Some(notice) = view.migration_notice {
-        return Some(Notice::success(notice.message));
-    }
-    if let Some(dialog) = view.dialog {
-        return Some(Notice::error(dialog.body));
-    }
-    None
+    view.migration_notice.map(|n| Notice::success(n.message))
+}
+
+/// Session mirror of `crate::ui::view::settings::recovery_modal`.
+pub fn recovery_modal(resolution: &SessionRuntimeResolution) -> Option<Modal> {
+    let view = SessionRecoveryView::from_resolution(resolution);
+    view.dialog
+        .is_some()
+        .then(|| Modal::SessionRecovery(resolution.clone()))
+}
+
+/// Session mirror of `crate::ui::view::settings::reset_settings_with_backup`.
+pub fn reset_session_with_backup(
+    value: &PersistedSession,
+    original_bytes: &[u8],
+) -> Result<(), PersistenceCommitError> {
+    reset_session(value, original_bytes, &repository())
+}
+
+/// The repository-explicit half of [`reset_session_with_backup`], exposed
+/// for direct testing (same split as [`load_session`]).
+pub fn reset_session(
+    value: &PersistedSession,
+    original_bytes: &[u8],
+    repo: &SessionRepository,
+) -> Result<(), PersistenceCommitError> {
+    repo.reset_with_backup(value, original_bytes).map(|_| ())
 }
 
 /// Close the tab at `index`, adjusting the active index so another tab

@@ -4,7 +4,8 @@ use std::path::PathBuf;
 
 use super::super::repository::{
     PersistenceCommitError, PersistenceIoError, PersistenceSaveOutcome, atomic_write_envelope,
-    build_envelope_json, ensure_pre_v2_backup, read_to_string_or_missing, verify_unchanged,
+    build_envelope_json, ensure_pre_v2_backup, ensure_reset_backup, read_to_string_or_missing,
+    verify_unchanged,
 };
 use super::{PersistedSettings, SETTINGS_SCHEMA_NAME, SETTINGS_SCHEMA_VERSION_V2, load_settings};
 use crate::persist::schema::{PersistenceError, PersistenceLoad};
@@ -76,6 +77,27 @@ impl SettingsRepository {
     ) -> Result<PersistenceSaveOutcome, PersistenceCommitError> {
         verify_unchanged(&self.path, original_bytes)?;
         let backup_path = ensure_pre_v2_backup(&self.path, original_bytes)?;
+        self.save(value)?;
+        Ok(PersistenceSaveOutcome {
+            backup_path: Some(backup_path),
+        })
+    }
+
+    /// Explicit, user-confirmed reset of a `Corrupt` file (RFC-076: "any
+    /// reset is an explicit confirmed action that creates a backup"):
+    /// confirms the file still holds exactly `original_bytes`, preserves it
+    /// as a non-overwriting `<name>.reset.bak`, then atomically writes
+    /// `value`. `original_bytes` must come from the same
+    /// [`Self::load_with_raw`] call (or
+    /// [`crate::persist::schema::settings::runtime::SettingsRuntimeResolution::raw_bytes`])
+    /// that produced the resolution the user is resetting.
+    pub fn reset_with_backup(
+        &self,
+        value: &PersistedSettings,
+        original_bytes: &[u8],
+    ) -> Result<PersistenceSaveOutcome, PersistenceCommitError> {
+        verify_unchanged(&self.path, original_bytes)?;
+        let backup_path = ensure_reset_backup(&self.path, original_bytes)?;
         self.save(value)?;
         Ok(PersistenceSaveOutcome {
             backup_path: Some(backup_path),

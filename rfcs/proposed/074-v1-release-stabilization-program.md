@@ -177,8 +177,19 @@ to milestone IDs so they do not become competing schedules.
   content with owner confirmation. The tree was re-bumped `0.166.0` → `0.165.1`
   accordingly. Registered as F19–F21 against M2.
 
-- B2–B4, Gate C, runtime/platform evidence, and the final architecture verdict
-  remain outstanding. The v1/public-release decision remains **No-Go**.
+- **2026-08-04 — M2-B/B2 complete.** RFC-076 moved to `done/` after six
+  reviewed patches. The running app reads and writes settings/session
+  exclusively through core's versioned schema-v2 repositories; a legacy
+  UI-v0 file migrates with a durable `.pre-v2.bak` backup; a future-version or
+  corrupt file is preserved byte-identical and reported through a blocking
+  recovery dialog (Exit/Continue with defaults/Continue without
+  saving/Reset and back up) instead of silently collapsing to defaults.
+  M2-A (release-notes composition, release policy documentation,
+  threat-model currency) remains open within M2.
+
+- B3, B4, Gate C, runtime/platform evidence, and the final architecture
+  verdict remain outstanding. The v1/public-release decision remains
+  **No-Go**.
 
 ## Gate model
 

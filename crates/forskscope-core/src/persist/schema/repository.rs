@@ -160,6 +160,36 @@ fn pre_v2_backup_path(path: &Path) -> PathBuf {
     }
 }
 
+/// Copies `original_bytes` to `<name>.reset.bak` next to `path`, unless that
+/// backup already exists — same non-overwrite semantics as
+/// [`ensure_pre_v2_backup`], deliberately a distinct filename: `.pre-v2.bak`
+/// names a specific historical event (the v2 migration) and a `Corrupt`
+/// reset is not that event (patch 5's handoff: "do not generalise it").
+/// RFC-076: "any reset is an explicit confirmed action that creates a
+/// backup."
+pub(super) fn ensure_reset_backup(
+    path: &Path,
+    original_bytes: &[u8],
+) -> Result<PathBuf, PersistenceIoError> {
+    let backup = reset_backup_path(path);
+    if !backup.exists() {
+        fs::write(&backup, original_bytes).map_err(|e| PersistenceIoError(e.to_string()))?;
+    }
+    Ok(backup)
+}
+
+fn reset_backup_path(path: &Path) -> PathBuf {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "forskscope".into());
+    let backup_name = format!("{name}.reset.bak");
+    match path.parent() {
+        Some(parent) => parent.join(backup_name),
+        None => PathBuf::from(backup_name),
+    }
+}
+
 fn unix_now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

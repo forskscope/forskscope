@@ -2,8 +2,8 @@
 //!
 //! Provides the *picker metadata* the settings dialog needs: what options
 //! appear in each `<select>` dropdown, what their display labels are, and
-//! validation helpers for numeric fields. No I/O; pure derivation from
-//! `UserSettings` types.
+//! validation helpers for numeric fields. No I/O; pure derivation from core's
+//! `Density`/`FontFamilySetting`/`ThemeId`/`CompareProfile` types.
 //!
 //! ## Why a separate module?
 //!
@@ -15,8 +15,8 @@
 //! ## Scope
 //!
 //! This module covers *display* metadata — labels and identifiers. It does not
-//! re-implement persistence (`UserSettings::to_json`) or CSS injection
-//! (`ThemeId::css_var_names`), which live in core.
+//! re-implement persistence (`persist::schema::settings::SettingsRepository`)
+//! or CSS injection (`ThemeId::css_var_names`), which live in core.
 
 use forskscope_core::diff::CompareProfile;
 use forskscope_core::settings::{Density, FontFamilySetting, ThemeId};

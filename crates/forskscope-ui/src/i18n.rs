@@ -273,6 +273,44 @@ fn ja(key: &str) -> Option<&'static str> {
         "File type not supported for merge — read-only." => {
             "このファイル形式は結合に対応していません — 読み取り専用。"
         }
+        // RFC-076 patch 6: settings/session recovery dialogs.
+        "Settings file is from a newer version" => "設定ファイルは新しいバージョン向けです",
+        "This settings file uses" => "この設定ファイルは",
+        "Settings file could not be read" => "設定ファイルを読み込めませんでした",
+        "The settings file is preserved but could not be parsed" => {
+            "設定ファイルは保持されていますが、解析できませんでした"
+        }
+        "Settings could not be upgraded" => "設定をアップグレードできませんでした",
+        "Your settings were read and are in use for this session, but they could not be saved in the new format" => {
+            "設定は読み込まれ今回のセッションで使用されていますが、新しい形式で保存できませんでした"
+        }
+        "Session file is from a newer version" => "セッションファイルは新しいバージョン向けです",
+        "This session file uses" => "このセッションファイルは",
+        "Session file could not be read" => "セッションファイルを読み込めませんでした",
+        "The session file is preserved but could not be parsed" => {
+            "セッションファイルは保持されていますが、解析できませんでした"
+        }
+        "Session could not be upgraded" => "セッションをアップグレードできませんでした",
+        "Your session was read and is in use for this run, but it could not be saved in the new format" => {
+            "セッションは読み込まれ今回の実行で使用されていますが、新しい形式で保存できませんでした"
+        }
+        "schema version" => "スキーマバージョン",
+        "which this version of ForskScope does not understand. The file has not been modified." => {
+            "を使用しており、このバージョンのForskScopeでは認識できません。ファイルは変更されていません。"
+        }
+        "Changes you make this session will not be saved." => {
+            "このセッション中の変更は保存されません。"
+        }
+        "Changes you make this session will not be saved unless you reset it." => {
+            "リセットしない限り、このセッション中の変更は保存されません。"
+        }
+        "Changes will not be saved until this is resolved." => {
+            "この問題が解決するまで変更は保存されません。"
+        }
+        "Exit" => "終了",
+        "Continue with defaults" => "デフォルトのまま続行",
+        "Continue without saving" => "保存せずに続行",
+        "Reset and back up" => "リセットしてバックアップ",
         _ => return None,
     };
     Some(v)
