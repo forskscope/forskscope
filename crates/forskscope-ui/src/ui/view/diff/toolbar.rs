@@ -45,7 +45,7 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 }
                 button {
                     disabled: !snap.is_dirty,
-                    onclick: move |_| save_tab(&mut store, index, false),
+                    onclick: move |_| save_tab(&mut store, index),
                     aria_label: t(lang, "Save merge result (Ctrl+S)"),
                     {t(lang, "Save")}
                 }

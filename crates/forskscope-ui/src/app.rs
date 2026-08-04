@@ -160,7 +160,7 @@ pub fn App() -> Element {
                     Key::Enter => apply_focused_hunk(&mut store, index),
                     Key::Character(ref s) if mods.contains(Modifiers::CONTROL) => {
                         match s.to_ascii_lowercase().as_str() {
-                            "s" => save_tab(&mut store, index, false),
+                            "s" => save_tab(&mut store, index),
                             "z" => { let _ = store.tabs.write().get_mut(index).map(|t| t.merge.undo()); }
                             "y" => { let _ = store.tabs.write().get_mut(index).map(|t| t.merge.redo()); }
                             "w" => {

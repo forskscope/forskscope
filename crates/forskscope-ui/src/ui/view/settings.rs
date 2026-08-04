@@ -125,7 +125,7 @@ pub fn ModalLayer() -> Element {
     match modal {
         Modal::None => rsx! {},
         Modal::Settings => rsx! { SettingsModal {} },
-        Modal::ConfirmOverwrite(i) => rsx! { OverwriteModal    { index: i } },
+        Modal::ConfirmOverwrite(i, target) => rsx! { OverwriteModal { index: i, target } },
         Modal::SaveAs(i, path) => rsx! { SaveAsModal       { index: i, initial_path: path } },
         Modal::ConfirmReload(i) => rsx! { ReloadModal       { index: i } },
         Modal::ConfirmSwap(i) => rsx! { SwapModal         { index: i } },

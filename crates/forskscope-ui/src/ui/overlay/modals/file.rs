@@ -1,23 +1,34 @@
 //! File safety modals: overwrite confirmation, save-as, reload, and swap sides.
 
+use std::path::PathBuf;
+
 use dioxus::prelude::*;
 
 use crate::i18n::t;
 use crate::state::{Modal, Store, reload_tab, swap_sides};
-use crate::ui::view::diff::save_as;
+use crate::ui::view::diff::{confirm_overwrite, save_as};
 
+/// `target` is the exact path the conflicting save attempted — the tab's own
+/// save target for a plain save conflict, or the Save As destination for a
+/// Save As conflict (review 048 C1: confirming must overwrite this path,
+/// never silently fall back to whatever the tab's current save target is).
 #[component]
-pub fn OverwriteModal(index: usize) -> Element {
+pub fn OverwriteModal(index: usize, target: PathBuf) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
+    let path_display = target.display().to_string();
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "File changed on disk"),
             div { class: "modal",
                 h2 { {t(lang, "File changed on disk")} }
                 p { {t(lang, "The target file was modified after it was loaded. Overwrite anyway?")} }
+                code { class: "path-display", "{path_display}" }
                 div { class: "actions",
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
-                    button { onclick: move |_| super::save_tab_force(&mut store, index), {t(lang, "Overwrite")} }
+                    button {
+                        onclick: move |_| confirm_overwrite(&mut store, index, target.clone()),
+                        {t(lang, "Overwrite")}
+                    }
                 }
             }
         }

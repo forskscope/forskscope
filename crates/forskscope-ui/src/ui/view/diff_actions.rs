@@ -7,9 +7,12 @@ use dioxus::prelude::*;
 
 use forskscope_core::CoreError;
 use forskscope_core::compare_prep::{
-    SaveTargetSnapshot, SaveTargetState, TargetExpectation, inspect_save_target,
+    SaveTargetBlockReason, SaveTargetSnapshot, SaveTargetState, TargetExpectation,
+    inspect_save_target,
 };
-use forskscope_core::save::{BackupPolicy, SaveRequest, TargetPrecondition, save_text};
+use forskscope_core::save::{
+    BackupPolicy, SaveOutcome, SaveRequest, TargetPrecondition, save_text,
+};
 
 use crate::i18n::t;
 use crate::state::tab::CompareTab;
@@ -72,46 +75,81 @@ pub fn move_focus(store: &mut Store, index: usize, delta: i32) {
     });
 }
 
-pub fn save_tab(store: &mut Store, index: usize, force: bool) {
-    let Some(request) = build_request(store, index, force, None) else {
-        return;
-    };
-    let result = save_text(&request);
-    handle_result(store, index, &request, result);
+pub fn save_tab(store: &mut Store, index: usize) {
+    dispatch(store, index, build_request(store, index, false, None));
 }
 
 /// Save As: the destination is a path the tab's `save_target` doesn't
 /// describe, so it's inspected fresh rather than reused — RFC-077:
 /// "validate/inspect the selected destination and derive `MustBeAbsent` or
 /// `MustMatch`; selecting an existing file does not imply force." `force`
-/// is therefore always `false` here; only [`build_request`]'s no-target
-/// branch (the confirmed-overwrite flow) ever constructs
-/// [`TargetPrecondition::Force`].
+/// is always `false` here; only [`confirm_overwrite`] ever constructs
+/// [`TargetPrecondition::Force`], and only for the exact path the user just
+/// confirmed (review 048 C1 — never a path a stale `Store` read reintroduces).
 pub fn save_as(store: &mut Store, index: usize, path: String) {
     let target = PathBuf::from(&path);
-    let Some(request) = build_request(store, index, false, Some(target)) else {
-        return;
-    };
-    let result = save_text(&request);
-    handle_result(store, index, &request, result);
+    dispatch(
+        store,
+        index,
+        build_request(store, index, false, Some(target)),
+    );
+}
+
+/// The confirmed-overwrite flow, reached only from `OverwriteModal`'s
+/// `Modal::ConfirmOverwrite(index, target)` — `target` is `request.target`
+/// from whichever save produced the conflict (review 048 C1: the tab's own
+/// save target for a plain `save_tab` conflict, or the exact Save As
+/// destination for a Save As conflict — never one confused for the other).
+pub fn confirm_overwrite(store: &mut Store, index: usize, target: PathBuf) {
+    dispatch(
+        store,
+        index,
+        build_request(store, index, true, Some(target)),
+    );
+}
+
+/// Common tail for every save entry point: run the request (if any) through
+/// `save_text` and `handle_result`, or report a blocked destination
+/// (review 048 C2 — a blocked target used to fail silently).
+fn dispatch(store: &mut Store, index: usize, outcome: RequestOutcome) {
+    match outcome {
+        RequestOutcome::Ready(request) => {
+            let result = save_text(&request);
+            handle_result(store, index, &request, result);
+        }
+        RequestOutcome::NotSaveable => {}
+        RequestOutcome::Blocked(reason) => store.notify(describe_block(&reason)),
+    }
+}
+
+/// What [`build_request`] found, distinguishing an ordinary "nothing to do"
+/// (no tab, tab isn't saveable) from a destination that exists but cannot be
+/// written to — the two used to be conflated into one silent `None`
+/// (review 048 C2).
+enum RequestOutcome {
+    Ready(SaveRequest),
+    NotSaveable,
+    Blocked(SaveTargetBlockReason),
 }
 
 /// Builds the exact write that will be attempted, using only `tab.save_target`
 /// for target path, precondition, and encoding (RFC-077: `build_request`
 /// "never reads `right_doc.fingerprint_at_load` as an implicit save
-/// target"). `target: Some(_)` is Save As to an explicit destination;
-/// `target: None` is a normal save (or, with `force: true`, a confirmed
-/// overwrite of the tab's existing save target).
+/// target"). `target: Some(_)` is Save As (or, with `force: true`, a
+/// confirmed overwrite of that same explicit destination — see
+/// [`confirm_overwrite`]); `target: None` is a normal, unforced save.
 fn build_request(
     store: &Store,
     index: usize,
     force: bool,
     target: Option<PathBuf>,
-) -> Option<SaveRequest> {
+) -> RequestOutcome {
     let tabs = store.tabs.read();
-    let tab = tabs.get(index)?;
+    let Some(tab) = tabs.get(index) else {
+        return RequestOutcome::NotSaveable;
+    };
     if !tab.can_save {
-        return None;
+        return RequestOutcome::NotSaveable;
     }
 
     let (tgt, precondition, encoding_label) = match target {
@@ -122,12 +160,25 @@ fn build_request(
                 SaveTargetState::Writable {
                     expectation,
                     encoding_label,
-                } => (explicit, to_precondition(expectation), encoding_label),
-                SaveTargetState::Blocked { .. } => return None,
+                } => {
+                    let precondition = if force {
+                        TargetPrecondition::Force
+                    } else {
+                        to_precondition(expectation)
+                    };
+                    (explicit, precondition, encoding_label)
+                }
+                // Force still rejects an unsupported target kind (RFC-077:
+                // "Force... still rejects unsupported target kinds unless
+                // the user chose a different valid path") — it bypasses the
+                // conflict check, not the classification.
+                SaveTargetState::Blocked { reason } => return RequestOutcome::Blocked(reason),
             }
         }
         None => {
-            let save_target = tab.save_target.as_ref()?;
+            let Some(save_target) = tab.save_target.as_ref() else {
+                return RequestOutcome::NotSaveable;
+            };
             match &save_target.state {
                 SaveTargetState::Writable {
                     expectation,
@@ -144,12 +195,14 @@ fn build_request(
                         encoding_label.clone(),
                     )
                 }
-                SaveTargetState::Blocked { .. } => return None,
+                SaveTargetState::Blocked { reason } => {
+                    return RequestOutcome::Blocked(reason.clone());
+                }
             }
         }
     };
 
-    Some(SaveRequest {
+    RequestOutcome::Ready(SaveRequest {
         target: tgt,
         content: tab.merge.result_text(),
         encoding_label,
@@ -175,16 +228,37 @@ fn current_encoding_label(tab: &CompareTab) -> String {
         .unwrap_or_else(|| "UTF-8".into())
 }
 
+/// User-facing message for a save destination `build_request` refused
+/// (review 048 C2). Not run through `t()`: `handle_result`'s own
+/// `Err(e) => store.notify(e.to_string())` arm below is the established
+/// precedent for this function's error messages staying English-only.
+fn describe_block(reason: &SaveTargetBlockReason) -> String {
+    match reason {
+        SaveTargetBlockReason::Binary => "Cannot save here: the target is a binary file.".into(),
+        SaveTargetBlockReason::Spreadsheet => {
+            "Cannot save here: the target is a spreadsheet file.".into()
+        }
+        SaveTargetBlockReason::NotAPlainFile { reason } => {
+            format!("Cannot save here: {reason}.")
+        }
+        SaveTargetBlockReason::Unreadable { message } => {
+            format!("Cannot save here: {message}")
+        }
+    }
+}
+
 /// On success, replaces `tab.save_target` with `MustMatch(outcome.new_fingerprint)`
 /// at the path just written — never `tab.right_doc.fingerprint_at_load`, and
 /// never `tab.right_path` (RFC-077: "do not change the compared right input
 /// path"). `request` is the exact request that produced `result`, so the
-/// updated snapshot's path/encoding always match what was actually written.
+/// updated snapshot's path/encoding always match what was actually written,
+/// and a conflict's `ConfirmOverwrite` always names that same exact path
+/// (review 048 C1).
 fn handle_result(
     store: &mut Store,
     index: usize,
     request: &SaveRequest,
-    result: Result<forskscope_core::save::SaveOutcome, CoreError>,
+    result: Result<SaveOutcome, CoreError>,
 ) {
     match result {
         Ok(outcome) => {
@@ -203,7 +277,11 @@ fn handle_result(
             store.modal.set(Modal::None);
             store.notify_success(t(store.lang(), "Saved."));
         }
-        Err(CoreError::Conflict { .. }) => store.modal.set(Modal::ConfirmOverwrite(index)),
+        Err(CoreError::Conflict { .. }) => {
+            store
+                .modal
+                .set(Modal::ConfirmOverwrite(index, request.target.clone()));
+        }
         Err(e) => store.notify(e.to_string()),
     }
 }
@@ -318,5 +396,37 @@ mod tests {
             to_precondition(TargetExpectation::MustBeAbsent),
             TargetPrecondition::MustBeAbsent
         );
+    }
+
+    // ── describe_block (review 048 C2) ──────────────────────────────────
+
+    #[test]
+    fn describe_block_is_non_empty_for_every_reason() {
+        let reasons = [
+            SaveTargetBlockReason::Binary,
+            SaveTargetBlockReason::Spreadsheet,
+            SaveTargetBlockReason::NotAPlainFile {
+                reason: "not a regular file".into(),
+            },
+            SaveTargetBlockReason::Unreadable {
+                message: "permission denied".into(),
+            },
+        ];
+        for reason in reasons {
+            assert!(!describe_block(&reason).is_empty());
+        }
+    }
+
+    #[test]
+    fn describe_block_includes_the_underlying_detail() {
+        let reason = SaveTargetBlockReason::NotAPlainFile {
+            reason: "not a regular file".into(),
+        };
+        assert!(describe_block(&reason).contains("not a regular file"));
+
+        let reason = SaveTargetBlockReason::Unreadable {
+            message: "permission denied".into(),
+        };
+        assert!(describe_block(&reason).contains("permission denied"));
     }
 }

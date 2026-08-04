@@ -12,7 +12,9 @@ use crate::i18n::t;
 use crate::state::Store;
 use crate::ui::component::notice::{Notice, NoticeKind};
 use crate::ui::view::diff_actions::trunc;
-pub use crate::ui::view::diff_actions::{apply_focused_hunk, move_focus, save_as, save_tab};
+pub use crate::ui::view::diff_actions::{
+    apply_focused_hunk, confirm_overwrite, move_focus, save_as, save_tab,
+};
 use crate::ui::view::hunk::{HunkBlock, HunkCol};
 use crate::ui::view::search::{SearchBar, SearchCtx, scroll_to_focused};
 use forskscope_ui_logic::MatchIndex;

@@ -18,10 +18,3 @@ pub use copy::{BatchCopyModal, BatchResultModal, ConfirmDirOpModal};
 pub use file::{OverwriteModal, ReloadModal, SaveAsModal, SwapModal};
 pub use recovery::{SessionRecoveryModal, SettingsRecoveryModal};
 pub use tab::CloseTabModal;
-
-use crate::state::Store;
-
-/// Force-save (skip mtime check). Used by `OverwriteModal`.
-pub(super) fn save_tab_force(store: &mut Store, index: usize) {
-    crate::ui::view::diff::save_tab(store, index, true);
-}

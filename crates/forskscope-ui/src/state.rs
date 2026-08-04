@@ -49,7 +49,13 @@ pub(crate) fn config_file_path(file_name: &str) -> PathBuf {
 pub enum Modal {
     None,
     Settings,
-    ConfirmOverwrite(usize),
+    /// A save conflicted. `target` is the exact path that conflicting save
+    /// attempted — the tab's own save target for an ordinary `save_tab`
+    /// conflict, or the Save As destination for a Save As conflict.
+    /// Confirming must overwrite this exact path, never silently fall back
+    /// to whatever the tab's current save target happens to be (RFC-077,
+    /// review 048 C1).
+    ConfirmOverwrite(usize, std::path::PathBuf),
     SaveAs(usize, String),
     ConfirmReload(usize),
     ConfirmSwap(usize),
