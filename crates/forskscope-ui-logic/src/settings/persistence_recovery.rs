@@ -140,6 +140,18 @@ mod tests {
     use forskscope_core::persist::schema::PersistenceError;
     use forskscope_core::persist::schema::settings::PersistedSettings;
 
+    #[test]
+    fn all_recovery_dialog_actions_have_non_empty_labels() {
+        for action in [
+            RecoveryDialogAction::Exit,
+            RecoveryDialogAction::ContinueWithTemporaryDefaults,
+            RecoveryDialogAction::ContinueWithoutSaving,
+            RecoveryDialogAction::ResetAndBackupOriginal,
+        ] {
+            assert!(!action_label(action).is_empty());
+        }
+    }
+
     fn resolution(
         outcome: SettingsRuntimeOutcome,
         write_disabled: bool,
