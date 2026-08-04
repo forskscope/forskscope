@@ -209,10 +209,10 @@ fn RowLeft(
 
     rsx! {
         div { class: "{row_class}", role: "row",
-            if let Some(ref lbl) = sr_label { span { class: "sr-only", "{lbl}: " } }
             div { class: "{gutter_class}", {left_no.map(|n| n.to_string()).unwrap_or_default()} }
             span { class: "diff-mark", aria_hidden: "true", "{mark}" }
             div { class: "cell",
+                if let Some(ref lbl) = sr_label { span { class: "sr-only", "{lbl}: " } }
                 if let Some(ref spans) = inline_left {
                     for s in spans.iter() { span { class: icls(s.kind), "{s.text}" } }
                 } else if let Some(ref l) = left { "{l}" }
@@ -272,10 +272,10 @@ fn RowRight(
 
     rsx! {
         div { class: "{row_class}", role: "row",
-            if let Some(ref lbl) = sr_label { span { class: "sr-only", "{lbl}: " } }
             div { class: "{gutter_class}", {right_no.map(|n| n.to_string()).unwrap_or_default()} }
             span { class: "diff-mark", aria_hidden: "true", "{mark}" }
             div { class: "cell",
+                if let Some(ref lbl) = sr_label { span { class: "sr-only", "{lbl}: " } }
                 if let Some(ref spans) = inline_right {
                     for s in spans.iter() { span { class: icls(s.kind), "{s.text}" } }
                 } else if let Some(ref r) = right { "{r}" }
