@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::document::FileFingerprint;
 use crate::error::CoreError;
-use crate::save::{BackupPolicy, SaveRequest, save_text};
+use crate::save::{BackupPolicy, SaveRequest, TargetPrecondition, save_text};
 
 fn temp_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("fsk-save-{tag}-{}", std::process::id()));
@@ -19,7 +19,7 @@ fn save_writes_content_and_returns_fingerprint() {
         target: target.clone(),
         content: "merged\nresult\n".into(),
         encoding_label: "UTF-8".into(),
-        expected_fingerprint: None,
+        precondition: TargetPrecondition::Force,
         backup: BackupPolicy::None,
     };
     let outcome = save_text(&request).unwrap();
@@ -38,7 +38,7 @@ fn save_creates_sibling_backup_when_requested() {
         target: target.clone(),
         content: "updated\n".into(),
         encoding_label: "UTF-8".into(),
-        expected_fingerprint: Some(fingerprint),
+        precondition: TargetPrecondition::MustMatch(fingerprint),
         backup: BackupPolicy::SiblingBak,
     };
     let outcome = save_text(&request).unwrap();
@@ -62,7 +62,7 @@ fn external_modification_is_detected_as_conflict() {
         target: target.clone(),
         content: "our-merge\n".into(),
         encoding_label: "UTF-8".into(),
-        expected_fingerprint: Some(stale),
+        precondition: TargetPrecondition::MustMatch(stale),
         backup: BackupPolicy::None,
     };
     let err = save_text(&request).unwrap_err();
@@ -81,7 +81,7 @@ fn save_creates_nested_parent_dirs() {
         target: target.clone(),
         content: "nested\n".to_string(),
         encoding_label: "UTF-8".to_string(),
-        expected_fingerprint: None,
+        precondition: TargetPrecondition::Force,
         backup: crate::save::BackupPolicy::None,
     };
     crate::save::save_text(&req).unwrap();
@@ -97,7 +97,7 @@ fn save_without_backup_does_not_create_bak_file() {
         target: target.clone(),
         content: "overwritten\n".to_string(),
         encoding_label: "UTF-8".to_string(),
-        expected_fingerprint: None,
+        precondition: TargetPrecondition::Force,
         backup: crate::save::BackupPolicy::None,
     };
     crate::save::save_text(&req).unwrap();
@@ -125,7 +125,7 @@ fn conflict_error_contains_path_info() {
         target: target.clone(),
         content: "v3-ours\n".to_string(),
         encoding_label: "UTF-8".to_string(),
-        expected_fingerprint: Some(fp),
+        precondition: TargetPrecondition::MustMatch(fp),
         backup: crate::save::BackupPolicy::None,
     };
     let err = crate::save::save_text(&req).unwrap_err();
@@ -145,7 +145,7 @@ fn save_with_none_fingerprint_always_succeeds() {
         target: target.clone(),
         content: "new\n".to_string(),
         encoding_label: "UTF-8".to_string(),
-        expected_fingerprint: None,
+        precondition: TargetPrecondition::Force,
         backup: crate::save::BackupPolicy::None,
     };
     // No expected fingerprint → never a conflict.
@@ -163,7 +163,7 @@ fn backup_path_is_none_when_policy_is_none() {
         target: target.clone(),
         content: "data\n".into(),
         encoding_label: "UTF-8".into(),
-        expected_fingerprint: None,
+        precondition: TargetPrecondition::Force,
         backup: BackupPolicy::None,
     };
     let outcome = save_text(&request).unwrap();
@@ -185,7 +185,7 @@ fn new_fingerprint_reflects_written_content() {
         target: target.clone(),
         content: "updated content here\n".into(),
         encoding_label: "UTF-8".into(),
-        expected_fingerprint: None,
+        precondition: TargetPrecondition::Force,
         backup: BackupPolicy::None,
     };
     let outcome = save_text(&request).unwrap();
@@ -210,7 +210,7 @@ fn encoding_fallback_to_utf8_is_true_for_unknown_encoding() {
         target: target.clone(),
         content: "hello world\n".into(),
         encoding_label: "DEFINITELY-NOT-A-REAL-ENCODING-LABEL".into(),
-        expected_fingerprint: None,
+        precondition: TargetPrecondition::Force,
         backup: BackupPolicy::None,
     };
     let outcome = save_text(&request).unwrap();
@@ -232,12 +232,62 @@ fn written_bytes_matches_content_length() {
         target: target.clone(),
         content: content.into(),
         encoding_label: "UTF-8".into(),
-        expected_fingerprint: None,
+        precondition: TargetPrecondition::Force,
         backup: BackupPolicy::None,
     };
     let outcome = save_text(&request).unwrap();
     assert_eq!(
         outcome.written_bytes, 18,
         "written_bytes must equal the byte length of the content"
+    );
+}
+
+// ── RFC-077: save_text routed through TargetPrecondition::MustBeAbsent ────
+
+#[test]
+fn must_be_absent_precondition_creates_a_missing_target_through_save_text() {
+    let dir = temp_dir("precondition-must-be-absent-create");
+    let target = dir.join("new-mergetool-output.txt");
+    let _ = fs::remove_file(&target);
+    let request = SaveRequest {
+        target: target.clone(),
+        content: "merged result\n".into(),
+        encoding_label: "UTF-8".into(),
+        precondition: TargetPrecondition::MustBeAbsent,
+        backup: BackupPolicy::SiblingBak,
+    };
+
+    let outcome = save_text(&request).unwrap();
+
+    assert_eq!(fs::read_to_string(&target).unwrap(), "merged result\n");
+    assert!(outcome.backup_path.is_none(), "nothing existed to back up");
+}
+
+#[test]
+fn must_be_absent_precondition_conflicts_and_leaves_an_existing_target_untouched() {
+    let dir = temp_dir("precondition-must-be-absent-conflict");
+    let target = dir.join("appeared-externally.txt");
+    fs::write(&target, "someone else's content\n").unwrap();
+    let request = SaveRequest {
+        target: target.clone(),
+        content: "our merge result\n".into(),
+        encoding_label: "UTF-8".into(),
+        precondition: TargetPrecondition::MustBeAbsent,
+        backup: BackupPolicy::SiblingBak,
+    };
+
+    let err = save_text(&request).unwrap_err();
+
+    assert!(matches!(err, CoreError::Conflict { .. }));
+    assert_eq!(
+        fs::read_to_string(&target).unwrap(),
+        "someone else's content\n",
+        "a MustBeAbsent conflict must never touch the existing target, and must not \
+         silently replace it — RFC-077's central no-clobber guarantee"
+    );
+    let bak = dir.join("appeared-externally.txt.bak");
+    assert!(
+        !bak.exists(),
+        "no backup should be attempted for a save that never wrote anything"
     );
 }

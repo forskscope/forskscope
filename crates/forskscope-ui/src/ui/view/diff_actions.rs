@@ -1,12 +1,18 @@
 //! Diff workspace action functions (pure state mutations, RFC-003 §state ownership).
 //! These are free functions used by `diff.rs` components and `app.rs` keyboard handlers.
 
+use std::path::PathBuf;
+
 use dioxus::prelude::*;
 
 use forskscope_core::CoreError;
-use forskscope_core::save::{BackupPolicy, SaveRequest, save_text};
+use forskscope_core::compare_prep::{
+    SaveTargetSnapshot, SaveTargetState, TargetExpectation, inspect_save_target,
+};
+use forskscope_core::save::{BackupPolicy, SaveRequest, TargetPrecondition, save_text};
 
 use crate::i18n::t;
+use crate::state::tab::CompareTab;
 use crate::state::{Modal, Store};
 
 // ─── Public action functions ──────────────────────────────────────────────────
@@ -67,66 +73,117 @@ pub fn move_focus(store: &mut Store, index: usize, delta: i32) {
 }
 
 pub fn save_tab(store: &mut Store, index: usize, force: bool) {
-    let req = build_request(store, index, force, None);
-    let Some(request) = req else { return };
-    handle_result(store, index, save_text(&request));
+    let Some(request) = build_request(store, index, force, None) else {
+        return;
+    };
+    let result = save_text(&request);
+    handle_result(store, index, &request, result);
 }
 
+/// Save As: the destination is a path the tab's `save_target` doesn't
+/// describe, so it's inspected fresh rather than reused — RFC-077:
+/// "validate/inspect the selected destination and derive `MustBeAbsent` or
+/// `MustMatch`; selecting an existing file does not imply force." `force`
+/// is therefore always `false` here; only [`build_request`]'s no-target
+/// branch (the confirmed-overwrite flow) ever constructs
+/// [`TargetPrecondition::Force`].
 pub fn save_as(store: &mut Store, index: usize, path: String) {
-    let target = std::path::PathBuf::from(&path);
-    let req = build_request(store, index, true, Some(target.clone()));
-    let Some(request) = req else { return };
-    match save_text(&request) {
-        Ok(outcome) => {
-            let mut tabs = store.tabs.write();
-            if let Some(tab) = tabs.get_mut(index) {
-                tab.merge.mark_saved();
-                tab.right_path = Some(target);
-                tab.right_doc.fingerprint_at_load = Some(outcome.new_fingerprint);
-            }
-            drop(tabs);
-            store.modal.set(Modal::None);
-            store.notify_success(t(store.lang(), "Saved."));
-        }
-        Err(e) => store.notify(e.to_string()),
-    }
+    let target = PathBuf::from(&path);
+    let Some(request) = build_request(store, index, false, Some(target)) else {
+        return;
+    };
+    let result = save_text(&request);
+    handle_result(store, index, &request, result);
 }
 
+/// Builds the exact write that will be attempted, using only `tab.save_target`
+/// for target path, precondition, and encoding (RFC-077: `build_request`
+/// "never reads `right_doc.fingerprint_at_load` as an implicit save
+/// target"). `target: Some(_)` is Save As to an explicit destination;
+/// `target: None` is a normal save (or, with `force: true`, a confirmed
+/// overwrite of the tab's existing save target).
 fn build_request(
     store: &Store,
     index: usize,
     force: bool,
-    target: Option<std::path::PathBuf>,
+    target: Option<PathBuf>,
 ) -> Option<SaveRequest> {
     let tabs = store.tabs.read();
     let tab = tabs.get(index)?;
     if !tab.can_save {
         return None;
     }
-    let tgt = target.or_else(|| tab.right_path.clone())?;
-    let enc = tab
-        .right_doc
-        .text
-        .as_ref()
-        .map(|t| t.encoding.label.clone())
-        .unwrap_or_else(|| "UTF-8".into());
-    let expected = if force {
-        forskscope_core::document::FileFingerprint::capture(&tgt, None).ok()
-    } else {
-        tab.right_doc.fingerprint_at_load
+
+    let (tgt, precondition, encoding_label) = match target {
+        Some(explicit) => {
+            let fallback_encoding = current_encoding_label(tab);
+            let snapshot = inspect_save_target(&explicit, &fallback_encoding);
+            match snapshot.state {
+                SaveTargetState::Writable {
+                    expectation,
+                    encoding_label,
+                } => (explicit, to_precondition(expectation), encoding_label),
+                SaveTargetState::Blocked { .. } => return None,
+            }
+        }
+        None => {
+            let save_target = tab.save_target.as_ref()?;
+            match &save_target.state {
+                SaveTargetState::Writable {
+                    expectation,
+                    encoding_label,
+                } => {
+                    let precondition = if force {
+                        TargetPrecondition::Force
+                    } else {
+                        to_precondition(*expectation)
+                    };
+                    (
+                        save_target.path.clone(),
+                        precondition,
+                        encoding_label.clone(),
+                    )
+                }
+                SaveTargetState::Blocked { .. } => return None,
+            }
+        }
     };
+
     Some(SaveRequest {
         target: tgt,
         content: tab.merge.result_text(),
-        encoding_label: enc,
-        expected_fingerprint: expected,
+        encoding_label,
+        precondition,
         backup: BackupPolicy::SiblingBak,
     })
 }
 
+fn to_precondition(expectation: TargetExpectation) -> TargetPrecondition {
+    match expectation {
+        TargetExpectation::MustMatch(fp) => TargetPrecondition::MustMatch(fp),
+        TargetExpectation::MustBeAbsent => TargetPrecondition::MustBeAbsent,
+    }
+}
+
+fn current_encoding_label(tab: &CompareTab) -> String {
+    tab.save_target
+        .as_ref()
+        .and_then(|st| match &st.state {
+            SaveTargetState::Writable { encoding_label, .. } => Some(encoding_label.clone()),
+            SaveTargetState::Blocked { .. } => None,
+        })
+        .unwrap_or_else(|| "UTF-8".into())
+}
+
+/// On success, replaces `tab.save_target` with `MustMatch(outcome.new_fingerprint)`
+/// at the path just written — never `tab.right_doc.fingerprint_at_load`, and
+/// never `tab.right_path` (RFC-077: "do not change the compared right input
+/// path"). `request` is the exact request that produced `result`, so the
+/// updated snapshot's path/encoding always match what was actually written.
 fn handle_result(
     store: &mut Store,
     index: usize,
+    request: &SaveRequest,
     result: Result<forskscope_core::save::SaveOutcome, CoreError>,
 ) {
     match result {
@@ -134,7 +191,13 @@ fn handle_result(
             let mut tabs = store.tabs.write();
             if let Some(tab) = tabs.get_mut(index) {
                 tab.merge.mark_saved();
-                tab.right_doc.fingerprint_at_load = Some(outcome.new_fingerprint);
+                tab.save_target = Some(SaveTargetSnapshot {
+                    path: request.target.clone(),
+                    state: SaveTargetState::Writable {
+                        expectation: TargetExpectation::MustMatch(outcome.new_fingerprint),
+                        encoding_label: request.encoding_label.clone(),
+                    },
+                });
             }
             drop(tabs);
             store.modal.set(Modal::None);
@@ -221,4 +284,39 @@ pub fn export_patch(store: &Store, index: usize) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use forskscope_core::document::FileFingerprint;
+
+    // `build_request`/`save_tab`/`save_as`/`handle_result` all need a live
+    // `Store` (Signal::new_in_scope panics outside a Dioxus runtime — F36,
+    // the same limitation review 046 named for RFC-076's Store-dependent
+    // code). `to_precondition` is the one piece of this migration's logic
+    // that's genuinely pure; the rest is covered by runtime evidence
+    // (see the RFC-077 patch 4b review request).
+
+    #[test]
+    fn to_precondition_maps_must_match_one_to_one() {
+        let dir = std::env::temp_dir().join(format!("fsk-diff-actions-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("f.txt");
+        std::fs::write(&path, "x").unwrap();
+        let fp = FileFingerprint::capture(&path, None).unwrap();
+
+        assert_eq!(
+            to_precondition(TargetExpectation::MustMatch(fp)),
+            TargetPrecondition::MustMatch(fp)
+        );
+    }
+
+    #[test]
+    fn to_precondition_maps_must_be_absent_one_to_one() {
+        assert_eq!(
+            to_precondition(TargetExpectation::MustBeAbsent),
+            TargetPrecondition::MustBeAbsent
+        );
+    }
 }

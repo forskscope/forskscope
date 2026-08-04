@@ -1,7 +1,7 @@
-//! RFC-077 patch 2: `TargetPrecondition`/`check_precondition` and the
-//! no-clobber commit (`persist_noclobber`). Additive to `save_text`'s
-//! existing path — nothing here is wired into it yet; that migration is a
-//! later patch in the same milestone.
+//! RFC-077: `TargetPrecondition`/`check_precondition` and the no-clobber
+//! commit (`persist_noclobber`), which `save_text` routes through for
+//! `TargetPrecondition::MustBeAbsent` (see `save_tests.rs` for coverage of
+//! that integration; this file tests the primitives directly).
 
 use std::fs;
 use std::path::PathBuf;
@@ -247,5 +247,29 @@ fn persist_noclobber_leaves_no_temp_file_behind_on_conflict() {
         before.len(),
         after.len(),
         "a failed commit must not leak its temp file into the target directory"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn persist_noclobber_output_is_not_left_with_tempfiles_narrow_default_permissions() {
+    // NamedTempFile defaults to 0600; a mergetool output file that ends up
+    // more restrictive than an ordinary save (0644-ish) would be a quiet
+    // surprise for the next tool that reads it. Found while checking runtime
+    // evidence for RFC-077 patch 4b — `ls -la` on a freshly-created merged
+    // output showed 0600 where a normally-saved file showed 0644.
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = temp_dir("noclobber-permissions");
+    let path = dir.join("new-output.txt");
+    let _ = fs::remove_file(&path);
+
+    persist_noclobber(&path, b"content\n").unwrap();
+
+    let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+    assert_eq!(
+        mode, 0o644,
+        "expected 0644, got {mode:o} — a no-clobber-created file must not be \
+         more restrictive than an ordinary save"
     );
 }

@@ -31,9 +31,10 @@ pub struct SaveRequest {
     pub content: String,
     /// Encoding label to encode with; unknown labels fall back to UTF-8.
     pub encoding_label: String,
-    /// Fingerprint captured when the file was loaded. `None` for a new file
-    /// (Save As to a non-existent path); `Some` enables conflict detection.
-    pub expected_fingerprint: Option<FileFingerprint>,
+    /// What must be true about `target` immediately before writing
+    /// (RFC-077). Replaces the older `Option<FileFingerprint>`, which could
+    /// not distinguish "skip the check" from "the path must be absent."
+    pub precondition: TargetPrecondition,
     pub backup: BackupPolicy,
 }
 
@@ -49,22 +50,15 @@ pub struct SaveOutcome {
 }
 
 /// Save text to a file with conflict detection, optional backup, and an
-/// atomic temp-then-rename write.
+/// atomic commit — no-clobber (`persist_noclobber`) when `precondition` is
+/// [`TargetPrecondition::MustBeAbsent`], temp-then-rename
+/// (`atomic_replace`) otherwise. RFC-077: a save whose target must not
+/// exist never falls back to an overwriting write, even if no-clobber
+/// commit fails for some other reason — the error propagates instead.
 pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
     let target = request.target.as_path();
 
-    if let Some(expected) = request.expected_fingerprint
-        && target.exists()
-    {
-        let current = FileFingerprint::capture(target, None)?;
-        if current.len != expected.len
-            || current.modified_unix_nanos != expected.modified_unix_nanos
-        {
-            return Err(CoreError::Conflict {
-                message: "target changed on disk after it was loaded".into(),
-            });
-        }
-    }
+    check_precondition(target, &request.precondition)?;
 
     let (bytes, fallback) = encode_text(&request.content, &request.encoding_label);
 
@@ -76,14 +70,19 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
         None
     };
 
-    // Create parent directories for Save As to new nested paths.
-    if let Some(parent) = target.parent()
-        && !parent.exists()
-    {
-        fs::create_dir_all(parent).map_err(|e| CoreError::io(parent, IoOperation::Write, &e))?;
+    match request.precondition {
+        TargetPrecondition::MustBeAbsent => persist_noclobber(target, &bytes)?,
+        TargetPrecondition::MustMatch(_) | TargetPrecondition::Force => {
+            // Create parent directories for Save As to new nested paths.
+            if let Some(parent) = target.parent()
+                && !parent.exists()
+            {
+                fs::create_dir_all(parent)
+                    .map_err(|e| CoreError::io(parent, IoOperation::Write, &e))?;
+            }
+            atomic_replace(target, &bytes)?;
+        }
     }
-
-    atomic_replace(target, &bytes)?;
 
     let new_fingerprint = FileFingerprint::capture(target, Some(&bytes))?;
     Ok(SaveOutcome {
@@ -114,16 +113,11 @@ pub(crate) fn atomic_replace(target: &Path, bytes: &[u8]) -> Result<()> {
 }
 
 // ── RFC-077: explicit target precondition and no-clobber commit ───────────────
-//
-// Additive to the `SaveRequest`/`save_text` path above — nothing here is
-// wired into it yet. `TargetPrecondition` is the save-time counterpart of
-// `compare_prep::TargetExpectation`; routing `save_text` through it is a
-// later patch in the same milestone (RFC-077 §"Core commit semantics").
 
 /// What a save must find true about its target immediately before writing.
-/// Distinct from [`SaveRequest::expected_fingerprint`]: that field is
-/// `Option<FileFingerprint>`, which cannot express "the path must not
-/// exist" — `None` there means "skip the check," not "must be absent."
+/// `SaveRequest::precondition`'s type — replaces an earlier
+/// `Option<FileFingerprint>`, which could not express "the path must not
+/// exist" (`None` there meant "skip the check," not "must be absent").
 ///
 /// The save-time counterpart of [`crate::compare_prep::TargetExpectation`],
 /// the load-time snapshot this is checked against — read them together, not
@@ -212,6 +206,20 @@ pub(crate) fn persist_noclobber_with_hook(
     let dir = target.parent().unwrap_or_else(|| Path::new("."));
     let mut tmp = tempfile::NamedTempFile::new_in(dir)
         .map_err(|e| CoreError::io(dir, IoOperation::Write, &e))?;
+    // `NamedTempFile` defaults to 0600 (deliberately narrow, since temp
+    // files often hold sensitive scratch data) — but this one becomes a
+    // permanent, ordinary output file. Match the permissions
+    // `atomic_replace`'s plain `fs::write` would have produced, so a
+    // no-clobber-created mergetool output isn't unexpectedly more
+    // restrictive than a normal save. No Windows equivalent (no POSIX mode
+    // bits); its default ACL behavior is unaffected.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        tmp.as_file()
+            .set_permissions(fs::Permissions::from_mode(0o644))
+            .map_err(|e| CoreError::io(target, IoOperation::Write, &e))?;
+    }
     std::io::Write::write_all(&mut tmp, bytes)
         .map_err(|e| CoreError::io(target, IoOperation::Write, &e))?;
 
