@@ -13,6 +13,7 @@
 
 pub mod cancel;
 pub mod command;
+pub mod compare_prep;
 pub mod conflict_nav;
 pub mod diff;
 pub mod diff_decoration;
@@ -38,6 +39,16 @@ pub mod vcs;
 pub mod watcher;
 pub mod xlsx;
 
+pub use compare_prep::{
+    // RFC-077
+    PreparedCompare,
+    SaveTargetBlockReason,
+    SaveTargetSnapshot,
+    SaveTargetState,
+    TargetExpectation,
+    inspect_save_target,
+    save_target_from_loaded,
+};
 pub use diff::{
     // RFC-028
     CaseSensitivity,
@@ -98,7 +109,16 @@ pub use patch::{
     LineOrigin, PatchDocument, PatchFileChange, PatchFormat, PatchHunk, PatchLine, PatchOptions,
     PatchSummary, patch_from_directories, patch_from_file_diff, to_unified,
 };
-pub use save::{BackupPolicy, SaveOutcome, SaveRequest, save_text};
+pub use save::{
+    BackupPolicy,
+    SaveOutcome,
+    SaveRequest,
+    // RFC-077
+    TargetPrecondition,
+    check_precondition,
+    persist_noclobber,
+    save_text,
+};
 
 #[cfg(test)]
 mod tests;

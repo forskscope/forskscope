@@ -216,6 +216,7 @@ Key crates touching file I/O or process execution:
 | `dioxus-desktop` | 0.7.9 | Desktop WebView host | Uses authenticated loopback WebSocket IPC between WebView and host |
 | `tungstenite` / `native-tls` | 0.28 / 0.2 | Dioxus desktop transport dependency | Accepted only via `dioxus-desktop`; no app-authored remote connections |
 | `quick-xml` | 0.39.x | Wayland protocol code generation through GTK/Dioxus stack | Build-time/proc-macro path; not reachable from user-supplied files |
+| `tempfile` | 3.27.0 | RFC-077: promoted from a `forskscope-core` dev-dependency to a normal one for the Git mergetool save target's no-clobber commit (`save::persist_noclobber`, using `NamedTempFile::persist_noclobber`) | Local filesystem only — creates a same-directory temp file and commits or discards it; no network data flow; re-audited with `cargo xtask audit-deps` and `cargo audit` after promotion, no new advisories |
 
 ### Accepted local WebView transport
 

@@ -18,6 +18,8 @@
 //!   - `save_error`: `SaveErrorView` — `AppError` → dialog content.
 //!   - `scroll_sync`: `ScrollSyncState` for synchronized pane scrolling.
 //!   - `search_index`: in-diff match index (`advance`/`retreat`).
+//!   - `startup`: `StartupRequest` CLI parsing and mergetool-to-`CompareRequest`
+//!     conversion (RFC-077).
 //!   - `summary`: `CompareStatusSummary` and `DiffNavigationState`.
 //!   - `tab_state`: `TabStateSnapshot` → `CommandContext` bridge.
 //! - [`settings`] — settings form logic:
@@ -52,6 +54,9 @@ pub use compare::palette_view::{
 pub use compare::save_error::{RecoveryButton, SaveErrorView, action_label};
 pub use compare::scroll_sync::ScrollSyncState;
 pub use compare::search_index::{MatchIndex, MatchPosition, MatchSide};
+pub use compare::startup::{
+    CompareRequest, SaveDestination, StartupArgError, StartupRequest, parse_startup_args,
+};
 pub use compare::summary::{CompareStatusSummary, DiffNavigationState};
 pub use compare::tab_state::{TabStateSnapshot, context_from_snapshot};
 

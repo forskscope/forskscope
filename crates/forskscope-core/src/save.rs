@@ -10,7 +10,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::document::FileFingerprint;
+use crate::document::{ExternalFileState, FileFingerprint, check_external_state};
 use crate::encoding::encode_text;
 use crate::error::{CoreError, IoOperation, Result};
 
@@ -110,6 +110,115 @@ pub(crate) fn atomic_replace(target: &Path, bytes: &[u8]) -> Result<()> {
         let _ = fs::remove_file(&temp);
         return Err(CoreError::io(target, IoOperation::Rename, &e));
     }
+    Ok(())
+}
+
+// ── RFC-077: explicit target precondition and no-clobber commit ───────────────
+//
+// Additive to the `SaveRequest`/`save_text` path above — nothing here is
+// wired into it yet. `TargetPrecondition` is the save-time counterpart of
+// `compare_prep::TargetExpectation`; routing `save_text` through it is a
+// later patch in the same milestone (RFC-077 §"Core commit semantics").
+
+/// What a save must find true about its target immediately before writing.
+/// Distinct from [`SaveRequest::expected_fingerprint`]: that field is
+/// `Option<FileFingerprint>`, which cannot express "the path must not
+/// exist" — `None` there means "skip the check," not "must be absent."
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetPrecondition {
+    /// The target must exist, be a plain text file, and match this
+    /// fingerprint exactly.
+    MustMatch(FileFingerprint),
+    /// The target must not exist at all — any entry (file, directory, or
+    /// otherwise) at the path is a conflict.
+    MustBeAbsent,
+    /// Skip the check. Constructed only after an explicit, one-time user
+    /// overwrite confirmation — never stored as a tab's load-time snapshot
+    /// (RFC-077).
+    Force,
+}
+
+/// Checks `precondition` against `target`'s current on-disk state, without
+/// writing anything. Reuses [`check_external_state`] (RFC-036) for
+/// `MustMatch` rather than re-deriving fingerprint comparison — the same
+/// missing/changed/replaced distinctions apply to both.
+///
+/// Returns [`CoreError::Conflict`] on any precondition failure, never
+/// [`CoreError::Io`] for an ordinary "not what was expected" case — review
+/// 038 C1 (RFC-076) established that a stale-read conflict and a genuine I/O
+/// failure must stay distinguishable; only a metadata read failure inside
+/// `MustBeAbsent`'s existence check propagates as `Io`.
+pub fn check_precondition(target: &Path, precondition: &TargetPrecondition) -> Result<()> {
+    match precondition {
+        TargetPrecondition::Force => Ok(()),
+        TargetPrecondition::MustBeAbsent => {
+            if target.exists() {
+                Err(CoreError::Conflict {
+                    message: "target already exists".into(),
+                })
+            } else {
+                Ok(())
+            }
+        }
+        TargetPrecondition::MustMatch(expected) => {
+            match check_external_state(target, expected, false) {
+                ExternalFileState::Clean => Ok(()),
+                other => Err(CoreError::Conflict {
+                    message: format!("target changed on disk after it was loaded ({other:?})"),
+                }),
+            }
+        }
+    }
+}
+
+/// Atomically commits `bytes` to `target`, failing rather than replacing if
+/// any entry already exists there. Same-directory temp file + platform
+/// no-clobber commit (`tempfile::NamedTempFile::persist_noclobber`), per
+/// RFC-077: "If any filesystem entry appears after preparation, normal save
+/// returns a conflict and preserves that entry." Creates missing parent
+/// directories first, mirroring [`save_text`]'s Save-As-to-new-path support.
+///
+/// If the platform cannot provide this guarantee, the error propagates —
+/// callers must not fall back to an overwriting write (RFC-077: "normal save
+/// fails rather than falling back to replacement").
+pub fn persist_noclobber(target: &Path, bytes: &[u8]) -> Result<()> {
+    persist_noclobber_with_hook(target, bytes, || {})
+}
+
+/// The same commit, with a hook that runs after the temp file is fully
+/// written but before the no-clobber commit — the deterministic race seam
+/// RFC-077's test design calls for ("a test-only before-commit seam creates
+/// the competing file after preparation/temp write but before
+/// `persist_noclobber`"), used instead of sleeps to exercise the race
+/// reliably. `pub(crate)` — only [`persist_noclobber`] and this module's own
+/// tests need it.
+pub(crate) fn persist_noclobber_with_hook(
+    target: &Path,
+    bytes: &[u8],
+    before_commit: impl FnOnce(),
+) -> Result<()> {
+    if let Some(parent) = target.parent()
+        && !parent.exists()
+    {
+        fs::create_dir_all(parent).map_err(|e| CoreError::io(parent, IoOperation::Write, &e))?;
+    }
+    let dir = target.parent().unwrap_or_else(|| Path::new("."));
+    let mut tmp = tempfile::NamedTempFile::new_in(dir)
+        .map_err(|e| CoreError::io(dir, IoOperation::Write, &e))?;
+    std::io::Write::write_all(&mut tmp, bytes)
+        .map_err(|e| CoreError::io(target, IoOperation::Write, &e))?;
+
+    before_commit();
+
+    tmp.persist_noclobber(target).map_err(|e| {
+        if e.error.kind() == std::io::ErrorKind::AlreadyExists {
+            CoreError::Conflict {
+                message: "target already exists".into(),
+            }
+        } else {
+            CoreError::io(target, IoOperation::Rename, &e.error)
+        }
+    })?;
     Ok(())
 }
 

@@ -8,5 +8,6 @@ pub mod palette_view;
 pub mod save_error;
 pub mod scroll_sync;
 pub mod search_index;
+pub mod startup;
 pub mod summary;
 pub mod tab_state;

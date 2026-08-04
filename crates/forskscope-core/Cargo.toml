@@ -17,6 +17,7 @@ chrono                      = { workspace = true }
 serde                       = { workspace = true }
 serde_json                  = { workspace = true }
 similar                     = { workspace = true }
-
-[dev-dependencies]
+# RFC-077: promoted from dev-dependency for the mergetool save target's
+# no-clobber commit (`save::persist_noclobber`), which needs
+# `NamedTempFile::persist_noclobber` at runtime, not only in tests.
 tempfile                    = { workspace = true }
