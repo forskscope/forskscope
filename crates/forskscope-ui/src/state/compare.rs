@@ -4,17 +4,20 @@ use std::path::PathBuf;
 
 use dioxus::prelude::*;
 use dioxus_core::spawn_forever;
-use forskscope_core::compare_prep::{PreparedCompare, save_target_from_loaded};
+use forskscope_core::compare_prep::{
+    PreparedCompare, inspect_save_target, save_target_from_loaded,
+};
 use forskscope_core::diff::DiffDocument;
 use forskscope_core::document::{LoadOptions, LoadedDocument, load_path};
 use forskscope_core::file_kind::FileKind;
 use forskscope_core::{DiffOptions, MergeSession, compute_diff};
 use forskscope_ui_logic::{
-    CompletionDecision, LoadGeneration, LoadIdentitySnapshot, LoadToken, completion_decision,
+    CompareRequest, CompletionDecision, LoadGeneration, LoadIdentitySnapshot, LoadToken,
+    SaveDestination, completion_decision,
 };
 
 use crate::i18n::t;
-use crate::state::tab::{CompareTab, TabState, tab_title};
+use crate::state::tab::{CompareLaunchMode, CompareTab, TabState, tab_title};
 use crate::state::{Store, settings::Lang};
 
 enum LoadResult {
@@ -71,7 +74,7 @@ fn prepared_result(result: Result<PreparedCompare, String>) -> LoadResult {
 }
 
 pub fn reload_tab(store: &mut Store, index: usize) {
-    let (lp, rp, opts, token) = {
+    let (request, opts, token) = {
         let mut tabs = store.tabs.write();
         let Some(tab) = tabs.get_mut(index) else {
             return;
@@ -85,9 +88,20 @@ pub fn reload_tab(store: &mut Store, index: usize) {
         };
         tab.load_generation = generation;
         tab.state = TabState::Loading;
+        // Reload re-derives its request from `launch_mode` rather than
+        // re-deciding launch mode — the tab's save destination must not
+        // silently change identity on reload (RFC-077).
+        let save_destination = match &tab.launch_mode {
+            CompareLaunchMode::Normal => SaveDestination::RightInput,
+            CompareLaunchMode::MergeTool { merged } => SaveDestination::Explicit(merged.clone()),
+        };
+        let request = CompareRequest {
+            left_input: tab.left_path.clone().unwrap_or_default(),
+            right_input: tab.right_path.clone().unwrap_or_default(),
+            save_destination,
+        };
         (
-            tab.left_path.clone(),
-            tab.right_path.clone(),
+            request,
             tab.diff_options,
             LoadToken::new(tab.id, generation),
         )
@@ -99,12 +113,9 @@ pub fn reload_tab(store: &mut Store, index: usize) {
 
     // spawn_forever: reload must survive any component remounting during load.
     spawn_forever(async move {
-        let left = lp.unwrap_or_default();
-        let right = rp.unwrap_or_default();
-        let result = tokio::task::spawn_blocking(move || {
-            load_and_diff(left, right, opts, lang, enable_binary)
-        })
-        .await;
+        let result =
+            tokio::task::spawn_blocking(move || load_and_diff(request, opts, lang, enable_binary))
+                .await;
 
         let mut tabs = tabs_signal.write();
         let result = match result {
@@ -115,7 +126,28 @@ pub fn reload_tab(store: &mut Store, index: usize) {
     });
 }
 
+/// Open a normal two-file comparison — `git difftool`-style, Explorer
+/// clicks, deep-compare, and session restore all use this. Thin wrapper over
+/// [`open_compare_request`] kept as its own function so these many in-app
+/// call sites never need to construct a `CompareRequest` themselves for what
+/// is always the same `SaveDestination::RightInput` case.
 pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
+    open_compare_request(
+        store,
+        CompareRequest {
+            left_input: left,
+            right_input: right,
+            save_destination: SaveDestination::RightInput,
+        },
+    );
+}
+
+/// Open a comparison from a fully-formed request — the one entry point that
+/// understands both normal compare and Git mergetool mode (RFC-077).
+/// `app.rs`'s startup wiring is the only caller that constructs a
+/// `MergeTool`-derived request directly; everything else goes through
+/// [`open_compare`].
+pub fn open_compare_request(store: &mut Store, request: CompareRequest) {
     let id = match store.allocate_compare_tab_id() {
         Ok(id) => id,
         Err(error) => {
@@ -133,14 +165,27 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
         (opts, settings.enable_binary_comparison)
     };
 
-    let title = tab_title(&left, &right, store.lang());
+    let left = request.left_input.clone();
+    let right = request.right_input.clone();
+    let launch_mode = match &request.save_destination {
+        SaveDestination::RightInput => CompareLaunchMode::Normal,
+        SaveDestination::Explicit(merged) => CompareLaunchMode::MergeTool {
+            merged: merged.clone(),
+        },
+    };
+
+    let mut title = tab_title(&left, &right, store.lang());
+    if matches!(launch_mode, CompareLaunchMode::MergeTool { .. }) {
+        title = format!("{title} ({})", t(store.lang(), "merge"));
+    }
+
     let generation = LoadGeneration::INITIAL;
     let tab = CompareTab {
         id,
         load_generation: generation,
         title,
-        left_path: Some(left.clone()),
-        right_path: Some(right.clone()),
+        left_path: Some(left),
+        right_path: Some(right),
         state: TabState::Loading,
         left_doc: LoadedDocument::empty(),
         right_doc: LoadedDocument::empty(),
@@ -152,6 +197,7 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
         word_wrap: false,
         focused_change: 0,
         save_target: None,
+        launch_mode,
     };
     let idx = store.tabs.read().len();
     store.tabs.write().push(tab);
@@ -164,10 +210,9 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     // spawn_forever: the task must survive the Explorer unmounting when the
     // new tab opens and replaces it with DiffWorkspace (RFC-065).
     spawn_forever(async move {
-        let load_result = tokio::task::spawn_blocking(move || {
-            load_and_diff(left, right, opts, lang, enable_binary)
-        })
-        .await;
+        let load_result =
+            tokio::task::spawn_blocking(move || load_and_diff(request, opts, lang, enable_binary))
+                .await;
 
         let mut tabs = tabs_signal.write();
         let result = match load_result {
@@ -178,17 +223,23 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     });
 }
 
-/// Load, classify, diff, and derive the save target for two files off the UI
-/// thread (RFC-065, RFC-077). Normal two-file compare's save target *is* the
-/// right input, already loaded here — no extra I/O
-/// (`compare_prep::save_target_from_loaded`).
+/// Load, classify, diff, and derive the save target for one comparison off
+/// the UI thread (RFC-065, RFC-077). Normal compare's save target *is* the
+/// already-loaded right document (`compare_prep::save_target_from_loaded`,
+/// no extra I/O); Git mergetool mode independently inspects the merged
+/// output path (`compare_prep::inspect_save_target`) — its content is never
+/// fed into `left`/`right`.
 pub(super) fn load_and_diff(
-    left: PathBuf,
-    right: PathBuf,
+    request: CompareRequest,
     opts: DiffOptions,
     lang: Lang,
     enable_binary: bool,
 ) -> Result<PreparedCompare, String> {
+    let CompareRequest {
+        left_input: left,
+        right_input: right,
+        save_destination,
+    } = request;
     let options = LoadOptions {
         allow_missing: true,
     };
@@ -250,7 +301,17 @@ pub(super) fn load_and_diff(
     let diff = compute_diff(ld.diff_text(), rd.diff_text(), opts);
     let merge = MergeSession::from_diff(&diff);
     let can_save = ld.kind.is_mergeable_text() && rd.kind.is_mergeable_text();
-    let save_target = save_target_from_loaded(&right, &rd);
+    let save_target = match &save_destination {
+        SaveDestination::RightInput => save_target_from_loaded(&right, &rd),
+        SaveDestination::Explicit(merged) => {
+            let fallback_encoding = rd
+                .text
+                .as_ref()
+                .map(|t| t.encoding.label.clone())
+                .unwrap_or_else(|| "UTF-8".into());
+            inspect_save_target(merged, &fallback_encoding)
+        }
+    };
     Ok(PreparedCompare {
         left: ld,
         right: rd,

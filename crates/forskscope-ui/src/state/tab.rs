@@ -22,6 +22,20 @@ pub enum TabState {
     Error(String),
 }
 
+/// How a tab was launched, and — for Git mergetool mode — the distinct
+/// output path a save writes to (RFC-077). Carrying `merged` here (rather
+/// than a separate field on `CompareTab`) means `launch_mode` alone is
+/// enough to reconstruct the tab's `SaveDestination` on reload.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum CompareLaunchMode {
+    /// Two-argument CLI / `git difftool`: save target is the right input.
+    Normal,
+    /// Three-argument CLI / `git mergetool`: `left_path`/`right_path` are
+    /// the compared local/remote inputs; save writes to `merged`, a
+    /// genuinely distinct path never aliased to either compared input.
+    MergeTool { merged: PathBuf },
+}
+
 #[derive(Clone)]
 pub struct CompareTab {
     /// Process-local identity; never persisted or derived from vector position.
@@ -48,6 +62,10 @@ pub struct CompareTab {
     /// `diff`/`merge` installs this too, so a tab is never left with some
     /// pieces from an old load and others from a new one.
     pub save_target: Option<SaveTargetSnapshot>,
+    /// How this tab was launched (RFC-077). Set once at tab creation and
+    /// never mutated afterward — reload derives its `CompareRequest` from
+    /// this rather than re-deciding launch mode.
+    pub launch_mode: CompareLaunchMode,
 }
 
 impl CompareTab {

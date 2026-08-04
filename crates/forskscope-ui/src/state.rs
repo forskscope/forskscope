@@ -15,7 +15,9 @@ pub mod settings;
 pub mod tab;
 pub mod types;
 
-pub use compare::{close_dir_tab, open_compare, open_dir_compare, reload_tab};
+pub use compare::{
+    close_dir_tab, open_compare, open_compare_request, open_dir_compare, reload_tab,
+};
 pub use profile::{add_profile, remove_profile};
 pub use session::{close_tab, resolve_session, restore_tabs, save_session};
 pub use settings::{AppSettings, BatchCopySpec, DiffAlgorithmSetting, DiffFontFamily, Lang, Theme};

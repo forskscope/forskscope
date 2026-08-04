@@ -1,12 +1,12 @@
 //! Application root with global keyboard shortcuts and accessibility (RFC-003, RFC-019, RFC-046).
 
-use std::path::PathBuf;
-
 use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
+use forskscope_ui_logic::StartupRequest;
 
 use crate::state::{
-    Store, advance_recovery_queue, open_compare, resolve_session, restore_tabs, save_session,
+    Store, advance_recovery_queue, open_compare_request, resolve_session, restore_tabs,
+    save_session,
 };
 use crate::ui::layout::header::Header;
 use crate::ui::layout::statusbar::StatusBar;
@@ -19,11 +19,11 @@ use crate::ui::view::settings::{ModalLayer, load};
 // Regenerate with: cargo xtask css
 const MAIN_CSS: &str = include_str!("../assets/main.css");
 
-pub static STARTUP_PAIR: std::sync::OnceLock<Option<(PathBuf, PathBuf)>> =
-    std::sync::OnceLock::new();
-/// If set, the active tab's save target is overridden to this path after
-/// the initial comparison opens (git mergetool mode).
-pub static STARTUP_MERGED: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+/// Set once by `main()` from parsed CLI arguments (RFC-077), before the
+/// Dioxus event loop starts. `App()` reads it exactly once, in its startup
+/// `use_hook`. Falls back to `StartupRequest::Explorer` if never set (e.g. a
+/// future test harness that constructs `App` without going through `main`).
+pub static STARTUP_REQUEST: std::sync::OnceLock<StartupRequest> = std::sync::OnceLock::new();
 
 #[component]
 pub fn App() -> Element {
@@ -64,25 +64,21 @@ pub fn App() -> Element {
         // a second queued behind it.
         advance_recovery_queue(&mut store);
 
-        if let Some(Some((left, right))) = STARTUP_PAIR.get() {
-            let previous_tab_count = store.tabs.read().len();
-            open_compare(&mut store, left.clone(), right.clone());
-            // git mergetool mode: redirect save target to the merged path.
-            let current_tab_count = store.tabs.read().len();
-            if current_tab_count > previous_tab_count
-                && let Some(Some(merged)) = STARTUP_MERGED.get()
-            {
-                let idx = current_tab_count - 1;
-                let merge_label = crate::i18n::t(store.lang(), "merge");
-                if let Some(tab) = store.tabs.write().get_mut(idx) {
-                    tab.right_path = Some(merged.clone());
-                    tab.right_doc.fingerprint_at_load = None;
-                    tab.title = format!("{} ({})", tab.title, merge_label);
-                }
+        // RFC-077: a single typed request replaces the STARTUP_PAIR/
+        // STARTUP_MERGED pair. `into_compare_request()` is where
+        // normal-vs-mergetool save destination is decided; `open_compare_request`
+        // installs it atomically with the tab, so there is no window where
+        // `right_path` means one thing and the save target means another.
+        let startup_request = STARTUP_REQUEST
+            .get()
+            .cloned()
+            .unwrap_or(StartupRequest::Explorer);
+        match startup_request.into_compare_request() {
+            Some(request) => open_compare_request(&mut store, request),
+            None => {
+                // No explicit startup pair — restore the previous session (RFC-035).
+                restore_tabs(&mut store, &session_resolution);
             }
-        } else {
-            // No explicit startup pair — restore the previous session (RFC-035).
-            restore_tabs(&mut store, &session_resolution);
         }
     });
 

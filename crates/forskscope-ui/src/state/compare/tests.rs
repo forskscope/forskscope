@@ -29,6 +29,7 @@ fn loading_tab(id_value: u64, generation_value: u64) -> CompareTab {
         word_wrap: false,
         focused_change: 9,
         save_target: None,
+        launch_mode: CompareLaunchMode::Normal,
     }
 }
 
@@ -155,7 +156,7 @@ fn accepted_ready_result_resets_transient_navigation_state() {
     assert_eq!(tabs[0].focused_change, 0);
 }
 
-// ── load_and_diff (RFC-077 patch 3: PreparedCompare, unchanged behaviour) ──
+// ── load_and_diff (RFC-077 patches 3-4a: PreparedCompare, CompareRequest) ──
 
 use forskscope_core::compare_prep::{SaveTargetState, TargetExpectation};
 
@@ -166,6 +167,22 @@ fn temp_dir(tag: &str) -> PathBuf {
     dir
 }
 
+fn normal_request(left: PathBuf, right: PathBuf) -> CompareRequest {
+    CompareRequest {
+        left_input: left,
+        right_input: right,
+        save_destination: SaveDestination::RightInput,
+    }
+}
+
+fn mergetool_request(local: PathBuf, remote: PathBuf, merged: PathBuf) -> CompareRequest {
+    CompareRequest {
+        left_input: local,
+        right_input: remote,
+        save_destination: SaveDestination::Explicit(merged),
+    }
+}
+
 #[test]
 fn normal_compare_save_target_is_the_right_input_must_match_its_own_fingerprint() {
     let dir = temp_dir("existing-right");
@@ -174,8 +191,13 @@ fn normal_compare_save_target_is_the_right_input_must_match_its_own_fingerprint(
     fs::write(&left, "a\n").unwrap();
     fs::write(&right, "b\n").unwrap();
 
-    let prepared =
-        load_and_diff(left, right.clone(), DiffOptions::default(), Lang::En, false).unwrap();
+    let prepared = load_and_diff(
+        normal_request(left, right.clone()),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    )
+    .unwrap();
 
     assert_eq!(prepared.save_target.path, right);
     let expected_fp = forskscope_core::document::FileFingerprint::capture(&right, None).unwrap();
@@ -196,7 +218,13 @@ fn normal_compare_save_target_is_must_be_absent_when_right_is_missing() {
     fs::write(&left, "a\n").unwrap();
     let _ = fs::remove_file(&right);
 
-    let prepared = load_and_diff(left, right, DiffOptions::default(), Lang::En, false).unwrap();
+    let prepared = load_and_diff(
+        normal_request(left, right),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    )
+    .unwrap();
 
     match prepared.save_target.state {
         SaveTargetState::Writable { expectation, .. } => {
@@ -214,7 +242,13 @@ fn normal_compare_can_save_and_diff_are_unaffected_by_the_prepared_compare_refac
     fs::write(&left, "one\ntwo\n").unwrap();
     fs::write(&right, "one\nTWO\n").unwrap();
 
-    let prepared = load_and_diff(left, right, DiffOptions::default(), Lang::En, false).unwrap();
+    let prepared = load_and_diff(
+        normal_request(left, right),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    )
+    .unwrap();
 
     assert!(
         prepared.can_save,
@@ -234,7 +268,12 @@ fn binary_comparison_disabled_error_message_is_unchanged() {
     fs::write(&left, [0u8, 1, 2, 3]).unwrap();
     fs::write(&right, "text\n").unwrap();
 
-    let result = load_and_diff(left, right, DiffOptions::default(), Lang::En, false);
+    let result = load_and_diff(
+        normal_request(left, right),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    );
 
     assert_eq!(
         result.unwrap_err(),
@@ -250,7 +289,12 @@ fn binary_vs_text_mismatch_error_message_is_unchanged() {
     fs::write(&left, [0u8, 1, 2, 3]).unwrap();
     fs::write(&right, "text\n").unwrap();
 
-    let result = load_and_diff(left, right, DiffOptions::default(), Lang::En, true);
+    let result = load_and_diff(
+        normal_request(left, right),
+        DiffOptions::default(),
+        Lang::En,
+        true,
+    );
 
     assert_eq!(
         result.unwrap_err(),
@@ -266,10 +310,110 @@ fn xlsx_target_error_message_is_unchanged() {
     fs::write(&left, "text\n").unwrap();
     fs::write(&right, b"not a real workbook").unwrap();
 
-    let result = load_and_diff(left, right, DiffOptions::default(), Lang::En, false);
+    let result = load_and_diff(
+        normal_request(left, right),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    );
 
     assert_eq!(
         result.unwrap_err(),
         "Spreadsheet comparison is temporarily disabled for security."
+    );
+}
+
+// ── load_and_diff: Git mergetool save destination (RFC-077 patch 4a) ──────
+
+#[test]
+fn mergetool_save_target_is_the_merged_path_not_the_compared_remote() {
+    // The exact defect RFC-077 closes: local/remote are what's compared,
+    // merged is where a save goes — and they must never be conflated.
+    let dir = temp_dir("mergetool-existing-merged");
+    let local = dir.join("local.txt");
+    let remote = dir.join("remote.txt");
+    let merged = dir.join("merged.txt");
+    fs::write(&local, "ours\n").unwrap();
+    fs::write(&remote, "theirs\n").unwrap();
+    fs::write(&merged, "already merged\n").unwrap();
+
+    let prepared = load_and_diff(
+        mergetool_request(local, remote.clone(), merged.clone()),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    )
+    .unwrap();
+
+    assert_eq!(
+        prepared.save_target.path, merged,
+        "save target must be the merged output, not the compared remote"
+    );
+    assert_ne!(prepared.save_target.path, remote);
+    let expected_fp = forskscope_core::document::FileFingerprint::capture(&merged, None).unwrap();
+    match prepared.save_target.state {
+        SaveTargetState::Writable { expectation, .. } => match expectation {
+            TargetExpectation::MustMatch(fp) => assert_eq!(fp.len, expected_fp.len),
+            other => panic!("expected MustMatch, got {other:?}"),
+        },
+        other => panic!("expected Writable, got {other:?}"),
+    }
+}
+
+#[test]
+fn mergetool_save_target_is_must_be_absent_when_merged_does_not_exist_yet() {
+    let dir = temp_dir("mergetool-missing-merged");
+    let local = dir.join("local.txt");
+    let remote = dir.join("remote.txt");
+    let merged = dir.join("does-not-exist-yet.txt");
+    fs::write(&local, "ours\n").unwrap();
+    fs::write(&remote, "theirs\n").unwrap();
+    let _ = fs::remove_file(&merged);
+
+    let prepared = load_and_diff(
+        mergetool_request(local, remote, merged),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    )
+    .unwrap();
+
+    match prepared.save_target.state {
+        SaveTargetState::Writable { expectation, .. } => {
+            assert_eq!(expectation, TargetExpectation::MustBeAbsent);
+        }
+        other => panic!("expected Writable(MustBeAbsent), got {other:?}"),
+    }
+}
+
+#[test]
+fn mergetool_compares_local_and_remote_not_local_and_merged() {
+    // RFC-077 "Alternatives considered: compare local directly against
+    // merged — Rejected". Prove the diff comes from local vs remote.
+    let dir = temp_dir("mergetool-diff-source");
+    let local = dir.join("local.txt");
+    let remote = dir.join("remote.txt");
+    let merged = dir.join("merged.txt");
+    fs::write(&local, "same\n").unwrap();
+    fs::write(&remote, "same\n").unwrap();
+    fs::write(
+        &merged,
+        "wildly different content that would show as a diff\n",
+    )
+    .unwrap();
+
+    let prepared = load_and_diff(
+        mergetool_request(local, remote, merged),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    )
+    .unwrap();
+
+    assert!(
+        prepared.diff.hunks.iter().all(|h| !h.kind.is_change()),
+        "local and remote are identical — the diff must show no changes, proving \
+         merged's very different content was never fed into the comparison: {:?}",
+        prepared.diff.hunks
     );
 }

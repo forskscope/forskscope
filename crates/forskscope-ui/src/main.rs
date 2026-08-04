@@ -9,6 +9,9 @@
 //!                                       # save result to <merged>
 //! forskscope --diagnostics         # Print platform diagnostics and exit
 //! ```
+//!
+//! Any other argument count is a startup error (non-zero exit), not a
+//! silent fallback to the Explorer workspace (RFC-077).
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
@@ -16,12 +19,11 @@ mod i18n;
 mod state;
 mod ui;
 
-use std::path::PathBuf;
-
 use dioxus_desktop::tao::dpi::LogicalSize;
 use dioxus_desktop::{Config, WindowBuilder};
+use forskscope_ui_logic::parse_startup_args;
 
-use app::{App, STARTUP_MERGED, STARTUP_PAIR};
+use app::{App, STARTUP_REQUEST};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -34,18 +36,13 @@ fn main() {
         return;
     }
 
-    match args.as_slice() {
-        [left, right] => {
-            let _ = STARTUP_PAIR.set(Some((PathBuf::from(left), PathBuf::from(right))));
-            let _ = STARTUP_MERGED.set(None);
+    match parse_startup_args(&args) {
+        Ok(request) => {
+            let _ = STARTUP_REQUEST.set(request);
         }
-        [local, remote, merged] => {
-            let _ = STARTUP_PAIR.set(Some((PathBuf::from(local), PathBuf::from(remote))));
-            let _ = STARTUP_MERGED.set(Some(PathBuf::from(merged)));
-        }
-        _ => {
-            let _ = STARTUP_PAIR.set(None);
-            let _ = STARTUP_MERGED.set(None);
+        Err(error) => {
+            eprintln!("forskscope: {error}");
+            std::process::exit(1);
         }
     }
 
