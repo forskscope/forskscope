@@ -109,6 +109,7 @@ B1 and B2 respectively, but the overall v1 release remains No-Go.
 - [implementation-checklist](./notes/implementation-checklist.md)
 - [implementation-gate-checklist-v0.2](./notes/implementation-gate-checklist-v0.2.md)
 - [modern-diff-merge-tools-feature-candidates](./notes/modern-diff-merge-tools-feature-candidates.md)
+- [post-v1-theme-candidates-evaluation](./notes/post-v1-theme-candidates-evaluation.md)
 - [release-readiness-checklist-v0.3](./notes/release-readiness-checklist-v0.3.md)
 - [rfc-cross-reference-matrix](./notes/rfc-cross-reference-matrix.md)
 - [rfc-dependency-map-v0.2](./notes/rfc-dependency-map-v0.2.md)
