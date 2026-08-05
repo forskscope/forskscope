@@ -28,7 +28,10 @@ forskscope <local> <remote> <merged>
 
 Opens a diff of `local` (your branch) vs `remote` (the other branch). When you
 **Save**, the result is written to `<merged>` — the path git expects to contain
-the resolved file. The tab title carries a "(merge)" suffix as a reminder.
+the resolved file, never to `remote`. The tab title carries a "(merge)"
+suffix, and a quiet `Result: <merged>` line under the file header names the
+save destination throughout — it is not a button; the normal save/overwrite
+guards are the only path to writing there.
 
 ---
 
@@ -93,10 +96,13 @@ merge-tool = ["forskscope", "$left", "$right", "$output"]
 | Code | Meaning |
 |------|---------|
 | `0`  | Normal exit |
-| Non-zero | Startup error (e.g. path not found) |
+| `1`  | Unsupported argument count — anything other than 0, 2, or 3 positional arguments (`--diagnostics` is handled separately, before this check). An error naming the argument count is printed to stderr. |
 
-The exit code does not indicate whether changes were saved — git determines that
-by inspecting whether `$MERGED` was written.
+A missing file path is **not** a startup error: one side of a comparison may
+be absent (e.g. a newly-added or deleted file), so `forskscope <left> <right>`
+opens normally with the missing side shown as empty. The exit code does not
+indicate whether changes were saved, either — git determines that by
+inspecting whether `$MERGED` was written.
 
 ### Print platform diagnostics
 

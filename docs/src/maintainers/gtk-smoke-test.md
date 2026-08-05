@@ -24,7 +24,7 @@ niri msg -j windows
 niri msg action screenshot-window --id <WINDOW_ID> --path "$PWD/.git-exclude/runtime-smoke/linux-wayland-cli-open.png"
 ```
 
-All 930 headless tests must pass before running UI smoke tests:
+The full headless test suite must pass before running UI smoke tests:
 
 ```sh
 cargo test -p forskscope-core -p forskscope-ui-logic
@@ -86,6 +86,25 @@ highlighted with gutter markers.
 - Type a string that appears in the diff
 - Expected: matching rows highlighted; **F3** / next button advances through
   matches
+
+### 1h. Git mergetool mode (RFC-077)
+
+```sh
+./target/release/forskscope tests/fixtures/text/left_function.txt \
+                             tests/fixtures/text/right_function.txt \
+                             /tmp/merge-smoke-output.txt
+```
+
+- Expected on open: left/right headers show the two compared inputs (never
+  the third path); a quiet, non-interactive `Result: /tmp/merge-smoke-output.txt`
+  line appears under the file header; tab title carries a `(merge)` suffix
+- Apply at least one hunk, press **Ctrl+S**
+- Expected: `/tmp/merge-smoke-output.txt` is created with the merge result;
+  neither of the two compared input files changed
+- Re-run the same command a second time (target now exists), apply a hunk,
+  save again
+- Expected: `.bak` sibling backup created next to the target holding its
+  pre-save content
 
 ---
 

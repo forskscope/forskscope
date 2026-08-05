@@ -52,6 +52,15 @@
 .diff-file-header .path-new { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .diff-file-header .path-new { text-align: right; }
 
+/* ---- mergetool result line (RFC-077): quiet, non-interactive, no
+   destructive control — just states where a save writes ---- */
+.diff-mergetool-result {
+  padding: .2rem .6rem; background: var(--surface-2);
+  border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted);
+  flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.diff-mergetool-result .result-path { color: var(--text); }
+
 /* ---- pane header labels ---- */
 .diff-pane-labels {
   display: flex;

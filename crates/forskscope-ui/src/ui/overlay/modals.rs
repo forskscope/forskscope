@@ -15,6 +15,6 @@ pub mod tab;
 
 pub use about::AboutModal;
 pub use copy::{BatchCopyModal, BatchResultModal, ConfirmDirOpModal};
-pub use file::{OverwriteModal, ReloadModal, SaveAsModal, SwapModal};
+pub use file::{ConfirmSaveAsOverwriteModal, OverwriteModal, ReloadModal, SaveAsModal, SwapModal};
 pub use recovery::{SessionRecoveryModal, SettingsRecoveryModal};
 pub use tab::CloseTabModal;

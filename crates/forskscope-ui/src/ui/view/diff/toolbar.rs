@@ -51,8 +51,14 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 }
                 button {
                     onclick: move |_| {
+                        // Default to the tab's actual save target
+                        // (RFC-077) — for a mergetool tab that's the merged
+                        // output, not right_path/the compared remote input.
+                        // Falls back to right_path only if no save target
+                        // was ever resolved (shouldn't happen once Ready).
                         let path = store.tabs.read().get(index)
-                            .and_then(|t| t.right_path.as_ref())
+                            .and_then(|t| t.save_target.as_ref().map(|st| st.path.clone())
+                                .or_else(|| t.right_path.clone()))
                             .map(|p| p.display().to_string()).unwrap_or_default();
                         store.modal.set(Modal::SaveAs(index, path));
                     },

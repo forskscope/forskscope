@@ -57,6 +57,15 @@ pub enum Modal {
     /// review 048 C1).
     ConfirmOverwrite(usize, std::path::PathBuf),
     SaveAs(usize, String),
+    /// Save As chose a destination that already exists on disk (RFC-077
+    /// test design: "select an existing Save As destination: overwrite
+    /// confirmation is required"). Distinct from `ConfirmOverwrite`: this
+    /// fires *before* any write is attempted, from a plain existence check
+    /// in `SaveAsModal` — not from a `CoreError::Conflict` a save produced.
+    /// Confirming proceeds to the real `save_as` call, which still runs its
+    /// own fresh precondition check (a true race between this confirmation
+    /// and the write still surfaces as `ConfirmOverwrite`).
+    ConfirmSaveAsOverwrite(usize, std::path::PathBuf),
     ConfirmReload(usize),
     ConfirmSwap(usize),
     ConfirmDirOp(DirOp),

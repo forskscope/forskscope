@@ -253,11 +253,18 @@ fn install_hscroll_sync(index: usize) {
 #[component]
 fn DiffHeader(index: usize) -> Element {
     let store = use_context::<Store>();
-    let (left, right) = {
+    let lang = store.lang();
+    let (left, right, merged) = {
         let tabs = store.tabs.read();
         let tab = match tabs.get(index) {
             Some(t) => t,
             None => return rsx! {},
+        };
+        let merged = match &tab.launch_mode {
+            crate::state::tab::CompareLaunchMode::MergeTool { merged } => {
+                Some(merged.display().to_string())
+            }
+            crate::state::tab::CompareLaunchMode::Normal => None,
         };
         (
             tab.left_path
@@ -268,6 +275,7 @@ fn DiffHeader(index: usize) -> Element {
                 .as_ref()
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| "—".into()),
+            merged,
         )
     };
     rsx! {
@@ -275,6 +283,17 @@ fn DiffHeader(index: usize) -> Element {
             span { class: "path-old", title: "{left}",  {trunc(&left)} }
             span { class: "arrow", "↔" }
             span { class: "path-new", title: "{right}", {trunc(&right)} }
+        }
+        // RFC-077: a quiet, non-interactive line naming the save
+        // destination for a Git mergetool tab. Never a button/link — the
+        // normal save guards (conflict/backup/no-clobber) are the only path
+        // to writing here.
+        if let Some(merged) = merged {
+            div { class: "diff-mergetool-result", title: "{merged}",
+                {t(lang, "Result:")}
+                " "
+                span { class: "result-path", {trunc(&merged)} }
+            }
         }
     }
 }

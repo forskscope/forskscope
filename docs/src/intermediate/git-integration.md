@@ -49,7 +49,9 @@ Git passes three paths:
 | `$MERGED` | File that git expects to contain the final result |
 
 ForskScope opens `$LOCAL` vs `$REMOTE` for comparison. When you **Save**,
-the merged result is written to `$MERGED` (not to `$REMOTE`). After
+the merged result is written to `$MERGED` (never to `$REMOTE`, and never to
+`$LOCAL`) — a quiet `Result: $MERGED` line under the file header names this
+throughout, so it's never ambiguous which file a save affects. After
 ForskScope closes, git marks the conflict as resolved if `$MERGED` was
 written successfully.
 

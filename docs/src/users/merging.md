@@ -50,13 +50,28 @@ Closing a dirty tab shows a confirmation dialog. Reloading asks before discardin
 
 ## Saving the result
 
-Click **Save** (or **Ctrl+S**) to write the result buffer to the right-side file path.
+Click **Save** (or **Ctrl+S**) to write the result buffer to the tab's save
+target. For a normal two-file comparison, that's the right-side file path.
+For a Git mergetool tab (three arguments on the command line), it is the
+distinct `$MERGED` path git expects — **never** the right-side file, which
+stays the compared reference and is never written to. A mergetool tab shows
+a quiet `Result: <path>` line under the file header naming this target
+throughout.
 
-If the file on disk was modified by another process since it was loaded, ForskScope detects the conflict and shows an **overwrite confirmation** rather than silently replacing external changes.
+If the target was modified by another process since it was loaded — or, for
+a new file, if something now exists where nothing did — ForskScope detects
+the conflict and shows an **overwrite confirmation** naming the exact path,
+rather than silently replacing what's there.
 
-**Save As** writes the result to a different path. The tab then points to the new path for future saves.
+**Save As** writes the result to a different path you choose. If that path
+already exists, ForskScope asks for confirmation *before* attempting the
+write. The tab then points to the new path for future saves — the original
+compared files are never affected by a Save As.
 
-Before overwriting, ForskScope creates a `.bak` sibling backup if the destination already exists.
+Before overwriting an existing target, ForskScope creates a `.bak` sibling
+backup. Writing to a path that doesn't exist yet creates it (and any missing
+parent directories) atomically — it either appears complete or not at all,
+never partially written.
 
 ---
 

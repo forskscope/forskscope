@@ -311,6 +311,11 @@ fn ja(key: &str) -> Option<&'static str> {
         "Continue with defaults" => "デフォルトのまま続行",
         "Continue without saving" => "保存せずに続行",
         "Reset and back up" => "リセットしてバックアップ",
+        // RFC-077 patch 5: mergetool result line.
+        "Result:" => "結果:",
+        // RFC-077 patch 5: Save As to an existing destination.
+        "Overwrite existing file?" => "既存のファイルを上書きしますか？",
+        "A file already exists at this path." => "このパスには既にファイルが存在します。",
         _ => return None,
     };
     Some(v)

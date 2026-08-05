@@ -52,8 +52,52 @@ pub fn SaveAsModal(index: usize, initial_path: String) -> Element {
                     button { onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
                     button {
                         disabled: path.read().trim().is_empty(),
-                        onclick: move |_| save_as(&mut store, index, path.read().cloned()),
+                        onclick: move |_| {
+                            let typed = path.read().cloned();
+                            let target = PathBuf::from(&typed);
+                            // RFC-077 test design: an existing Save As
+                            // destination needs confirmation *before* any
+                            // write is attempted — not just a reactive
+                            // conflict dialog if a race happens to occur.
+                            // A plain existence check is enough here; the
+                            // real safety boundary is still `build_request`/
+                            // `save_text`'s fresh precondition check.
+                            if target.exists() {
+                                store.modal.set(Modal::ConfirmSaveAsOverwrite(index, target));
+                            } else {
+                                save_as(&mut store, index, typed);
+                            }
+                        },
                         {t(lang, "Save")}
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Confirmed via [`Modal::ConfirmSaveAsOverwrite`] — an existing Save As
+/// destination the user explicitly chose to overwrite. Proceeds to the real
+/// `save_as`, which still runs its own fresh precondition check (RFC-077:
+/// selecting a path never itself constructs `Force`).
+#[component]
+pub fn ConfirmSaveAsOverwriteModal(index: usize, target: PathBuf) -> Element {
+    let mut store = use_context::<Store>();
+    let lang = store.lang();
+    let path_display = target.display().to_string();
+    rsx! {
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Save As"),
+            div { class: "modal",
+                h2 { {t(lang, "Overwrite existing file?")} }
+                p { {t(lang, "A file already exists at this path.")} }
+                code { class: "path-display", "{path_display}" }
+                div { class: "actions",
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button {
+                        onclick: move |_| {
+                            save_as(&mut store, index, target.display().to_string());
+                        },
+                        {t(lang, "Overwrite")}
                     }
                 }
             }
