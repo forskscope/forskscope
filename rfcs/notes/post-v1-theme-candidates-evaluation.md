@@ -14,7 +14,7 @@ scheduled, and none of it competes with M3–M6.
 | Candidate | Verdict | Principal risk |
 |---|---|---|
 | Sort before compare | Split it — one half is cheap, one is not | Sorted view breaks the merge coordinate system |
-| Robustness at scale | Real, partly built already | The name "memory safety" misdescribes it |
+| Robustness at scale | Resolved — it is deferred RFC-013 + RFC-037 work | One element (result-size guard) has no RFC home |
 | Spreadsheet comparison | Blocked upstream, not by design | Non-goal boundary: "universal document comparator" |
 | History | Coherent, but it is a **new persistent data category** | Privacy — it records what a user opened |
 
@@ -73,15 +73,36 @@ button as a merge commit.
 Lowest priority of the three parts, and the one most likely to be better served
 by telling the user to use `sort`.
 
-## 2. "Memory safety" — robustness at scale
+## 2. "Memory safety" — resolved as existing RFC work
 
-### The name should change
+**Naming question closed by the owner, 2026-08-04.** It became moot: both
+sub-items turned out to have RFC homes with deferred halves, so this is not a new
+theme needing a name.
 
-Rust gives memory safety by construction, and this project's threat model uses
-"safety" with precision. What is actually proposed is **robustness under scale**:
-bounded resource use, responsiveness, and honest failure when input exceeds what
-the tool can handle. Calling it memory safety would mislead a Rust audience and
-blur a term the security documentation depends on.
+| Sub-item | Home | Deferred part |
+|---|---|---|
+| Compare view: too-large diff should require intent | **RFC-013** — Large File, Performance, Virtualization | row virtualization UI |
+| Explorer: too many children breaks summary status | **RFC-037** — Scalable Directory Compare Index | persistent on-disk index cache, incremental refresh |
+
+That is a better outcome than a new theme would have been: both RFCs already
+carry design decisions worth honouring rather than re-deriving.
+
+For the record, "memory safety" was the wrong label regardless — Rust provides it
+by construction, and this project's threat model uses "safety" with precision, so
+the term would have blurred a word the security documentation depends on. Moot
+now, but worth not reintroducing.
+
+### One element has no home
+
+The guards discussed below key on **input size**. Nothing guards the **size of
+the computed result**, and that is in neither RFC-013 nor RFC-037. If this work
+is ever picked up, that piece needs somewhere to live — it is the only genuinely
+new design element the proposal contained.
+
+Deliberately not entered in `ROADMAP.md`'s F-register: those items are tracked
+against milestones M2–M6 of the v1 stabilization program, and this is a post-v1
+candidate. It stays here so it is not lost, and not there so the register keeps
+meaning what it means.
 
 ### Compare view — mostly built, with a real gap
 
