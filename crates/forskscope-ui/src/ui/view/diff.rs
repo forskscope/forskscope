@@ -13,7 +13,8 @@ use crate::state::Store;
 use crate::ui::component::notice::{Notice, NoticeKind};
 use crate::ui::view::diff_actions::trunc;
 pub use crate::ui::view::diff_actions::{
-    apply_focused_hunk, confirm_overwrite, move_focus, save_as, save_tab,
+    SaveAsPrecheck, apply_focused_hunk, confirm_overwrite, move_focus, precheck_save_as_target,
+    save_as, save_tab,
 };
 use crate::ui::view::hunk::{HunkBlock, HunkCol};
 use crate::ui::view::search::{SearchBar, SearchCtx, scroll_to_focused};

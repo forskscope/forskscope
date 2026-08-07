@@ -95,6 +95,47 @@ pub fn save_as(store: &mut Store, index: usize, path: String) {
     );
 }
 
+/// What choosing `target` as a Save As destination requires, before any
+/// write is attempted — `SaveAsModal`'s pre-check (review 050 §3.2). Reuses
+/// [`inspect_save_target`]'s classification rather than a plain
+/// `Path::exists()`, which could not distinguish "exists and is
+/// overwritable" from "exists and can never be written to" (a directory, a
+/// binary file, ...) — the latter used to show a confirmation dialog asking
+/// to overwrite something that would then be refused as unwritable one step
+/// later.
+pub enum SaveAsPrecheck {
+    /// Nothing exists at this path yet — proceed straight to `save_as`.
+    New,
+    /// A plain, writable file exists — show a pre-write confirmation.
+    Overwrite,
+    /// This path can never be written to — report immediately, no
+    /// confirmation dialog to dismiss first.
+    Blocked(String),
+}
+
+pub fn precheck_save_as_target(
+    store: &Store,
+    index: usize,
+    target: &std::path::Path,
+) -> SaveAsPrecheck {
+    let tabs = store.tabs.read();
+    let Some(tab) = tabs.get(index) else {
+        return SaveAsPrecheck::New;
+    };
+    let fallback_encoding = current_encoding_label(tab);
+    match inspect_save_target(target, &fallback_encoding).state {
+        SaveTargetState::Writable {
+            expectation: TargetExpectation::MustBeAbsent,
+            ..
+        } => SaveAsPrecheck::New,
+        SaveTargetState::Writable {
+            expectation: TargetExpectation::MustMatch(_),
+            ..
+        } => SaveAsPrecheck::Overwrite,
+        SaveTargetState::Blocked { reason } => SaveAsPrecheck::Blocked(describe_block(&reason)),
+    }
+}
+
 /// The confirmed-overwrite flow, reached only from `OverwriteModal`'s
 /// `Modal::ConfirmOverwrite(index, target)` — `target` is `request.target`
 /// from whichever save produced the conflict (review 048 C1: the tab's own

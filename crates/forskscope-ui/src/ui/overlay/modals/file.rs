@@ -6,7 +6,7 @@ use dioxus::prelude::*;
 
 use crate::i18n::t;
 use crate::state::{Modal, Store, reload_tab, swap_sides};
-use crate::ui::view::diff::{confirm_overwrite, save_as};
+use crate::ui::view::diff::{SaveAsPrecheck, confirm_overwrite, precheck_save_as_target, save_as};
 
 /// `target` is the exact path the conflicting save attempted — the tab's own
 /// save target for a plain save conflict, or the Save As destination for a
@@ -59,13 +59,18 @@ pub fn SaveAsModal(index: usize, initial_path: String) -> Element {
                             // destination needs confirmation *before* any
                             // write is attempted — not just a reactive
                             // conflict dialog if a race happens to occur.
-                            // A plain existence check is enough here; the
-                            // real safety boundary is still `build_request`/
-                            // `save_text`'s fresh precondition check.
-                            if target.exists() {
-                                store.modal.set(Modal::ConfirmSaveAsOverwrite(index, target));
-                            } else {
-                                save_as(&mut store, index, typed);
+                            // Classified via inspect_save_target (review 050
+                            // §3.2), not a plain existence check, so a
+                            // destination that can never be written to
+                            // (a directory, binary, ...) is reported
+                            // immediately instead of asking to "overwrite"
+                            // something the next step would refuse anyway.
+                            match precheck_save_as_target(&store, index, &target) {
+                                SaveAsPrecheck::New => save_as(&mut store, index, typed),
+                                SaveAsPrecheck::Overwrite => {
+                                    store.modal.set(Modal::ConfirmSaveAsOverwrite(index, target));
+                                }
+                                SaveAsPrecheck::Blocked(message) => store.notify(message),
                             }
                         },
                         {t(lang, "Save")}
