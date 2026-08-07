@@ -1,6 +1,6 @@
 # RFC 077: Git Mergetool Save-Target Model
 
-**Status.** Proposed
+**Status.** Implemented (Milestone M3)
 **Tracks.** Release-stabilization audit finding B3.
 **Touches.** CLI startup requests, compare preparation, tab state, save/save-as,
 reload, external-change handling, Git documentation, and integration tests.
@@ -365,6 +365,77 @@ no external network workflow is added.
 - Normal compare continues saving to the right input with its fingerprint.
 - Save As and reload preserve compared input identity.
 - Git/JJ documentation matches observed behavior.
+
+## Implementation outcome
+
+Implemented across five reviewed patches plus two review-driven corrections:
+
+- **Patches 1–2** (`fe234f5`) added the target model types (`SaveTargetSnapshot`,
+  `SaveTargetState`, `TargetExpectation`, `TargetPrecondition`), the
+  precondition check built on RFC-036's `check_external_state`, and the
+  no-clobber commit primitive (`persist_noclobber`, `tempfile` promoted to a
+  normal core dependency). Review 046 N1 — `MustBeAbsent` must not swallow a
+  read failure — was fixed separately in `5500b81`.
+- **Patch 3** (`064584f`) changed normal-compare preparation to return
+  `PreparedCompare` atomically, verified to change no observable behavior.
+- **Patch 4a** (`b387f59`) replaced `STARTUP_PAIR`/`STARTUP_MERGED` with
+  `StartupRequest`/`CompareRequest`, and made argument-arity errors exit
+  non-zero instead of silently opening Explorer.
+- **Patch 4b** (`5be4086`) routed save/save-as/overwrite/reload through
+  `tab.save_target` exclusively, eliminating the post-spawn `right_path`
+  mutation that produced the false-conflict/wrong-fingerprint bug this RFC
+  exists to close. **This closes finding B3.**
+- **Patch 5** (`c789636`, preceded by review 048 C1/C2's fix in `b95ed39` —
+  `ConfirmOverwrite` now carries the exact attempted target, and a blocked
+  save destination reports instead of failing silently) added the quiet
+  mergetool `Result:` presentation line, the Save-As-destination-exists
+  confirmation dialog, a default-path regression review 048 had missed (Save
+  As on a mergetool tab was defaulting to the remote input, not the merge
+  target), and the Git/JJ/merging documentation updates.
+- Review 050 §3.2's fix (`7595802`) replaced that confirmation dialog's plain
+  `Path::exists()` gate with the same `inspect_save_target` classification
+  `build_request` already used, so a destination that can never be written to
+  (a directory, a binary file) is reported immediately instead of asking to
+  overwrite something the next step would then refuse.
+
+Acceptance criteria:
+
+| Criterion | Status |
+|---|---|
+| Compared right input and save output cannot share one ambiguous field | Met — typed `CompareRequest`/`SaveDestination`, `CompareTab.launch_mode` |
+| Mergetool preparation fingerprints the actual merged target | Met — `inspect_save_target` |
+| Existing/missing/appeared/deleted/changed/replaced target tests pass | Partially — see below |
+| A path expected to be absent is committed with no-clobber semantics | Met — `persist_noclobber`, tested and runtime-verified |
+| Save As never bypasses conflict checks merely because a path was selected | Met |
+| Normal compare continues saving to the right input with its fingerprint | Met |
+| Save As and reload preserve compared input identity | Met — `reload_tab` derives from `launch_mode`, never touches `left_path`/`right_path` |
+| Git/JJ documentation matches observed behavior | Met |
+
+The "partially": every named target transition (missing→appeared,
+existing→deleted, existing→changed, existing→replaced) is covered by
+`check_precondition`'s own tests, and `check_precondition` is exactly what
+`build_request`/`save_text` call at save time — not a parallel
+implementation exercised only in tests. Two of the four additionally have
+direct runtime evidence gathered against a running process (an existing-target
+round trip, and a target replaced by a directory). What is not independently
+re-verified is each transition specifically through a live mergetool process
+racing against a real concurrent external actor, as opposed to the core-level
+tests' direct function calls. The shared code path is the reason this is
+judged sufficient rather than a gap; it is a judgment call, not something
+proven to the same standard as the two runtime-evidenced transitions.
+
+Windows replacement semantics for `persist_noclobber` — whether
+`NamedTempFile::persist_noclobber` provides the same atomic no-clobber
+guarantee there as on the platforms exercised so far — are explicitly
+deferred to RFC-078's platform runtime matrix, per this RFC's own
+"Dependencies" section.
+
+This closes release-stabilization finding B3. It does not by itself make the
+v1/public release Go: RFC-078, integrated gates, and platform evidence remain
+outstanding, and finding F38 (the `0o644` permission fix in
+`persist_noclobber` ignores umask, registered by review 048) remains open
+against Milestone M3 — moving this RFC to `done/` records that its design has
+shipped, not that M3's gate is satisfied.
 
 ## Alternatives considered
 
