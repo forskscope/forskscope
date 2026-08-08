@@ -1,6 +1,6 @@
 # ForskScope Roadmap
 
-**Last updated:** 0.165.0 released; 0.166.0 in development (2026-08-01)
+**Last updated:** 0.166.0 cut (2026-08-08); M2 and M3 complete
 **Current phase:** v1 release stabilization — release-baseline reconciliation,
 then correctness workstreams, then runtime/platform acceptance and a new
 architecture go/no-go review.
@@ -13,16 +13,13 @@ gate evidence exists.
 ## Current state
 
 The `forskscope-core` and `forskscope-ui-logic` crates are feature-complete for
-the v1 two-way diff/merge workflow. The current observed headless gate passes
-**1031 tests** with zero failures: 658 core unit tests, 45 core integration
-tests, 257 ui-logic unit tests, 58 forskscope-ui unit tests (the same 29 run
-once each for its `lib` and `bin` targets), 6 CSS integration tests, and 7
-doctests.
+the v1 two-way diff/merge workflow. The current observed workspace gate passes
+**1094 tests** with zero failures.
 
 The UI crate (`forskscope-ui`) has the v1 two-way workflow implemented:
 two-pane diff with independent pane labels and shared horizontal scroll;
 English/Japanese translation-key coverage enforced by `cargo xtask i18n`
-(203 `t(...)` keys); per-file and batch copy in the directory report view;
+(223 `t(...)` keys); per-file and batch copy in the directory report view;
 F3/Shift+F3 search navigation; compare profiles; session restore; patch export;
 and release-gate CSS freshness checks.
 
@@ -41,12 +38,16 @@ Release-readiness hardening completed after v0.140.0:
   tags are checked against the workspace version before artifacts are created.
 
 The 2026-07-15 architecture audit approved continued development but issued a
-v1/public-release No-Go. Three correctness workstreams now precede runtime QA:
-stable async tab/load identity, versioned production settings/session
-persistence, and a distinct Git-mergetool save-target model. GTK/WebKitGTK and
-cross-platform package verification follow only after those workstreams pass.
-Three-way merge conflict workspace UI, command palette, and editor adapter work
-remain post-v1.
+v1/public-release No-Go over four blockers. **Three are now closed:** B1 (stable
+async tab/load identity, RFC-075, released in `0.165.0`), B2 (versioned
+production settings/session persistence, RFC-076) and B3 (a distinct
+Git-mergetool save-target model, RFC-077), both released in `0.166.0`.
+
+**B4 remains open** — platform runtime evidence, RFC-078 — so the v1/public
+release decision stays **No-Go**. GTK/WebKitGTK and cross-platform package
+verification are M5, gated behind M4's integrated stabilization. Three-way merge
+conflict workspace UI, command palette, and editor adapter work remain
+post-v1.
 
 ---
 
@@ -136,9 +137,20 @@ verified by mutation in review 053, including the demonstration the implementer
 could not run in their sandbox, and the pinned `actionlint` checksum was
 confirmed against the published artifact.
 
-**Nothing now blocks M2's release cut.** Its remaining exit criterion is
-verification at that cut, which is an owner action. RFC-076's persistence
-schema change is expected to promote the level to `0.166.0`.
+**Progress (2026-08-08): `0.166.0` is cut.** Promoted from the post-release
+patch default to a minor level per `release.md`'s content-driven rule: RFC-076's
+persistence schema change and RFC-077's save-target behaviour are both
+user-visible. The full pre-release checklist passed, including MSRV 1.91 and the
+source-archive layout contract; `version-sync` caught a fourth version carrier
+(`xtask/Cargo.toml`) that the other three bumps had missed.
+
+**M2 closes with this cut** — the verification its exit gate required. With M3
+already closed, **M4 is now unblocked**: Gate C, advisory dispositions, the
+frozen `matrix-plan.md`, and the accumulated register.
+
+The release is **tagged and drafted, not published**. Per `release.md`,
+publication out of draft is an explicit owner action and is the point after
+which the version is immutable.
 
 ### R0 rationale
 

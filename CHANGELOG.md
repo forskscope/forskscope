@@ -5,7 +5,98 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.165.1] — Unreleased
+## [0.166.0] — 2026-08-08
+
+Closes two of the four architecture-audit blockers: **B2** (runtime persistence
+had no schema version and no recovery path) and **B3** (the compared right-hand
+input and the save destination were one ambiguous field, so a Git mergetool
+session could fingerprint and overwrite the wrong file). Both were correctness
+defects in paths that touch user data, and both are closed by design changes
+rather than patches — RFC-076 and RFC-077 respectively.
+
+Also fixes a visible compare-view rendering defect on WebKitGTK that had
+shipped in two releases with every gate green.
+
+### Changed
+
+**Settings and session files are versioned, and damaged ones are no longer
+silently discarded (RFC-076).**
+
+Settings and session state now read and write exclusively through a canonical
+schema v2 with an explicit version envelope. What changes for you:
+
+- Existing settings/session files migrate automatically on first launch, and
+  the pre-migration file is kept as a durable backup rather than replaced.
+- A file written by a **newer** version of ForskScope, or one that is corrupt,
+  is now **preserved untouched** and reported through a blocking recovery
+  dialog offering Exit, Continue (with defaults, without writing), or Reset.
+  Previously such a file was silently collapsed to defaults and then
+  overwritten — losing the original with no notice.
+- When a document cannot be read, ForskScope no longer writes to it. A
+  read-only session is explicit rather than accidental.
+
+**Git mergetool sessions write to the merge target, not the remote input
+(RFC-077).**
+
+The compared right-hand file and the save destination are now distinct typed
+values instead of one reused field. What changes for you:
+
+- A mergetool tab fingerprints and saves to the actual merged output
+  (`$MERGED`). Previously the alias between the two could produce false
+  external-change conflicts and, in the wrong sequence, direct a save at the
+  remote input.
+- Save As on a mergetool tab defaults to the merge target rather than the
+  remote input.
+- Save As asks for confirmation before overwriting an existing destination,
+  and reports a destination that can never be written to (a directory, a
+  binary file) immediately instead of asking you to confirm an overwrite that
+  the next step would refuse.
+- A mergetool tab shows a quiet `Result: <path>` line naming the output file.
+  It is plain text, not a control.
+- Saving to a path expected to be absent uses no-clobber semantics: if
+  something appeared there in the meantime, the save reports a conflict and
+  preserves what is already on disk instead of replacing it.
+- An unsupported number of command-line arguments now exits non-zero. It
+  previously fell through to opening the explorer, which looked like success.
+
+### Fixed
+
+**Changed rows were misaligned against their gutter on WebKitGTK (F32).**
+
+The screen-reader label span for a changed row sat outside the row's cell, so
+on WebKitGTK the affected rows shifted horizontally relative to unchanged rows.
+The span now sits inside the cell. Present since the labels were introduced and
+invisible to every existing gate, because nothing in CI or release preflight
+looked at the rendered application.
+
+**Files created by the mergetool no-clobber save path ignored the process
+umask (F38).**
+
+The path hardcoded `0o644`, which is only correct under `umask 022`. Under a
+restrictive umask such as `077`, an ordinary save produced `0600` while the
+no-clobber path produced `0644` — more permissive than the environment asked
+for, in a tool routinely used on credentials and production logs. Permissions
+are now umask-derived, matching what the ordinary save path produces.
+
+### Documentation
+
+- `cli.md`'s exit-code table documented a non-zero exit for "path not found"
+  that never existed — a missing side has always loaded as empty content.
+  It now describes the argument-arity exit introduced above.
+- `merging.md` stated that Save always writes to the right-side file path.
+  It now names the save target explicitly for both normal and mergetool modes.
+- Git and JJ integration documentation matches observed behaviour.
+
+### Internal
+
+- Workflow files are linted by a pinned, checksum-verified `actionlint` on
+  every push and pull request (F23). No workflow file had ever been
+  machine-parsed; `release.yml` triggers only on tag push, so a syntax error
+  in it was undetectable until a release cut.
+- File-permission tests additionally run under a non-default umask, so a
+  regression to a hardcoded mode is observable in CI (F41).
+- Release notes are composed in CI from this file's section for the tag, and
+  fail closed when that section is absent or empty (F22).
 
 ## [0.165.0] — 2026-08-01
 
