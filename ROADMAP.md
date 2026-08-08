@@ -106,6 +106,21 @@ RFC-078 host access for Linux, Windows, and macOS is confirmed available, so M5
 is schedulable once M4 completes. M2–M6 remain outstanding and R0 closed no
 audit blocker, so v1/public release remains **No-Go**.
 
+**Progress (2026-08-08): M3 is complete, resolving audit finding B3.** RFC-077
+is in `rfcs/done/` with its implementation outcome recorded; the compared right
+input and the save destination are now distinct typed values, mergetool
+preparation fingerprints the actual merged target, and a target expected to be
+absent is committed with no-clobber semantics. F38, the only register entry
+tagged against M3, is resolved.
+
+M3 closed **out of table order**: M2-A (F19–F22) is still open and F23 still
+gates M2's cut. This is permitted — M3's only hard dependency is M1, and the
+"sequenced after M2" note is a single-developer resource constraint rather than
+a gate — but the recorded sequence and the tree have diverged, so the order
+above describes the plan, not what happened. **M4 remains blocked**: it depends
+on M2 as well as M3, so the critical path is now M2-A plus F23, not Gate C.
+M3's `0.167.0` release column is contingent on M2's cut landing first.
+
 ### R0 rationale
 
 `0.164.0` is a published, immutable tag. The working tree has advanced well
@@ -234,6 +249,7 @@ sourced from the 2026-07-15 architecture audit keep their audit finding ID.
 | F37 | RFC-078's P08 covers persistence migration but predates the recovery dialogs, so the `Exit` action's behaviour on Windows and macOS is in no platform case. Verified on Linux/WebKitGTK only. Fold into P08 before M5 | review 045 | M4, for M5 |
 | F38 | **Resolved.** `persist_noclobber` requested `tempfile::Builder::permissions(0o666)` before creating the same-directory temp file, replacing the hardcoded `0o644` `set_permissions` call that was correct only under `umask 022`. The kernel applies the process umask to the requested mode the same way it does for `atomic_replace`'s `fs::write`, so no umask query/reset is needed. The permissions test now asserts equality against a same-directory `fs::write`-created reference file's own mode rather than the literal `0o644`, verified locally under both the default umask and `umask 077`. `persist_noclobber` runs only for `MustBeAbsent`, so there is never an existing mode to preserve — that option was inapplicable by construction; F9's overwrite-mode-loss case is adjacent but distinct | review 048, direction review 051 §3.3 | before M3 closes |
 | F39 | Five user-visible error paths reach the toast without `t()` (`diff_actions.rs:285`, `recovery.rs:142`/`:252`, `state/compare.rs:154`, `describe_block`), while G-006 requires all user-visible strings routed through the translation layer with zero gaps. `cargo xtask i18n` reports pass throughout because it compares `t(...)` call sites against the Japanese map and is structurally blind to strings that never reach one — the same shape as `version-sync` missing published-tag collisions and `css_coverage` not seeing layout. Decide: translate the error path, or narrow G-006's wording to match reality | review 049 | M4 |
+| F41 | The F38 permission test can only fail under a non-default umask, and CI runs under `umask 022`. Confirmed by mutation: reverting to the hardcoded `0o644` passes on CI's mask and fails only under `077`, so a regression of the exact defect F38 fixed would go green forever. Fifth instance of the named pattern — a green gate credited with more than it measures (`version-sync` blind to published tags, `css_coverage` blind to layout, the release workflow that had never fired, `i18n` blind to strings bypassing `t()`). Fix: one CI step re-running the save-permission tests in a subshell under a non-default umask. A subprocess is the only safe mechanism — umask is process-global and Rust tests share a process, so an in-test `libc::umask` would race the rest of the suite | review 052 | M4 |
 | F40 | Toggling **Ignore WS**, **Ignore case**, or the diff **algorithm** calls `recompute_diff`, which does `tab.merge = MergeSession::from_diff(&diff)` — discarding every applied hunk *and* the whole undo stack, unrecoverably and with no confirmation. `swap_sides` reaches the same function but is guarded by `ConfirmSwap` when dirty; the three toolbar controls are not. Worse, the fresh session reports `is_dirty() == false` (empty stack, baseline 0), so the unsaved-work warning is lost with the work: Ctrl+W then closes the tab without prompting. Contradicts RFC-015 §8 rule 4 verbatim — "Recomputing diff after an edit must not erase undo history" — in an RFC marked Implemented. Options: re-derive the diff while replaying the transaction log, or (cheaper) gate the three toggles behind the same dirty confirmation `swap_sides` already uses | review 051 follow-up question, 2026-08-08 | M4 |
 | F35 | Empty counterpart rows in a multi-line Replace hunk carry the `Changed:` screen-reader label with no gutter number and no content, so an assistive technology announces "Changed" once per blank row — four times for one logical change in the review fixture. Pre-existing, not an F32 regression; surfaced by F32's AT-SPI verification. Decide whether such rows should be labelled differently or left unlabelled | review 044 (N1), RFC-061 track | M4 |
 | F28b | Both documents can be write-disabled on one launch (corrupt `settings.json` alongside a future-version `session.json`), but the startup notice drops the session one when a settings one exists. Acceptable for toasts; must not survive into the recovery dialogs, where the user would be told about one read-only document and nothing about the other | review 042 §4 | RFC-076 patch 6 (recovery UI) |
