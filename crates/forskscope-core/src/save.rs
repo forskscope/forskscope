@@ -204,22 +204,26 @@ pub(crate) fn persist_noclobber_with_hook(
         fs::create_dir_all(parent).map_err(|e| CoreError::io(parent, IoOperation::Write, &e))?;
     }
     let dir = target.parent().unwrap_or_else(|| Path::new("."));
-    let mut tmp = tempfile::NamedTempFile::new_in(dir)
-        .map_err(|e| CoreError::io(dir, IoOperation::Write, &e))?;
     // `NamedTempFile` defaults to 0600 (deliberately narrow, since temp
     // files often hold sensitive scratch data) — but this one becomes a
-    // permanent, ordinary output file. Match the permissions
-    // `atomic_replace`'s plain `fs::write` would have produced, so a
-    // no-clobber-created mergetool output isn't unexpectedly more
-    // restrictive than a normal save. No Windows equivalent (no POSIX mode
-    // bits); its default ACL behavior is unaffected.
+    // permanent, ordinary output file, and it must end up with the
+    // permissions `atomic_replace`'s plain `fs::write` would have produced:
+    // whatever the process umask allows for a freshly created file, not a
+    // hardcoded constant that's only correct under `umask 022`. Requesting
+    // 0o666 and letting the kernel apply the umask (the same thing
+    // `open(2)`'s default create mode does for `fs::write`) gets that
+    // property without querying or touching the process-wide umask
+    // ourselves. No Windows equivalent (no POSIX mode bits); its default
+    // ACL behavior is unaffected.
+    let mut builder = tempfile::Builder::new();
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        tmp.as_file()
-            .set_permissions(fs::Permissions::from_mode(0o644))
-            .map_err(|e| CoreError::io(target, IoOperation::Write, &e))?;
+        builder.permissions(fs::Permissions::from_mode(0o666));
     }
+    let mut tmp = builder
+        .tempfile_in(dir)
+        .map_err(|e| CoreError::io(dir, IoOperation::Write, &e))?;
     std::io::Write::write_all(&mut tmp, bytes)
         .map_err(|e| CoreError::io(target, IoOperation::Write, &e))?;
 

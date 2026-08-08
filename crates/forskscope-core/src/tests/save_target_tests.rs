@@ -254,22 +254,33 @@ fn persist_noclobber_leaves_no_temp_file_behind_on_conflict() {
 #[test]
 fn persist_noclobber_output_is_not_left_with_tempfiles_narrow_default_permissions() {
     // NamedTempFile defaults to 0600; a mergetool output file that ends up
-    // more restrictive than an ordinary save (0644-ish) would be a quiet
-    // surprise for the next tool that reads it. Found while checking runtime
-    // evidence for RFC-077 patch 4b — `ls -la` on a freshly-created merged
-    // output showed 0600 where a normally-saved file showed 0644.
+    // more restrictive than an ordinary save would be a quiet surprise for
+    // the next tool that reads it. Found while checking runtime evidence for
+    // RFC-077 patch 4b — `ls -la` on a freshly-created merged output showed
+    // 0600 where a normally-saved file showed 0644.
+    //
+    // Asserted against a same-directory `fs::write`-created file's own mode
+    // rather than a hardcoded `0o644` (F38, review 051 §3.3): the property
+    // is "the permissions the normal save path would have produced," which
+    // is umask-derived and only equals `0o644` under `umask 022`. Comparing
+    // against a reference file created the same way in the same process
+    // makes the test correct under any umask.
     use std::os::unix::fs::PermissionsExt;
 
     let dir = temp_dir("noclobber-permissions");
     let path = dir.join("new-output.txt");
     let _ = fs::remove_file(&path);
+    let reference_path = dir.join("reference-output.txt");
+    fs::write(&reference_path, b"reference\n").unwrap();
+    let expected_mode = fs::metadata(&reference_path).unwrap().permissions().mode() & 0o777;
 
     persist_noclobber(&path, b"content\n").unwrap();
 
     let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
     assert_eq!(
-        mode, 0o644,
-        "expected 0644, got {mode:o} — a no-clobber-created file must not be \
-         more restrictive than an ordinary save"
+        mode, expected_mode,
+        "expected {expected_mode:o} (a plain fs::write's mode in the same directory), \
+         got {mode:o} — a no-clobber-created file must not be more restrictive \
+         than an ordinary save"
     );
 }
