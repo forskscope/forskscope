@@ -99,8 +99,13 @@ The running app now reads and writes settings/session exclusively through
 core's versioned schema-v2 repositories; legacy UI-v0 files migrate with a
 durable backup; future-version and corrupt files are preserved untouched and
 reported via a blocking recovery dialog (Exit/Continue/Reset) rather than
-silently collapsed to defaults. M2-B's exit criterion is met; M2-A (release
-notes, release policy docs, threat-model currency) remains open.
+silently collapsed to defaults. M2-B's exit criterion is met.
+
+M2-A's **content** is complete and approved (`896f2c6`, C1 fix `fe9940e`,
+review 034): F19–F22 are resolved. What keeps M2 open is the rest of its exit
+gate — F23 (`actionlint`), which must land before the cut, and the gate's
+requirement that the release mechanics be *verified at a real release cut*,
+which has not happened since `0.165.0`.
 
 RFC-078 host access for Linux, Windows, and macOS is confirmed available, so M5
 is schedulable once M4 completes. M2–M6 remain outstanding and R0 closed no
@@ -113,13 +118,15 @@ preparation fingerprints the actual merged target, and a target expected to be
 absent is committed with no-clobber semantics. F38, the only register entry
 tagged against M3, is resolved.
 
-M3 closed **out of table order**: M2-A (F19–F22) is still open and F23 still
-gates M2's cut. This is permitted — M3's only hard dependency is M1, and the
-"sequenced after M2" note is a single-developer resource constraint rather than
-a gate — but the recorded sequence and the tree have diverged, so the order
-above describes the plan, not what happened. **M4 remains blocked**: it depends
-on M2 as well as M3, so the critical path is now M2-A plus F23, not Gate C.
-M3's `0.167.0` release column is contingent on M2's cut landing first.
+M3 closed **out of table order**, before M2. This is permitted — M3's only hard
+dependency is M1, and the "sequenced after M2" note is a single-developer
+resource constraint rather than a gate — but the recorded sequence and the tree
+have diverged, so the table above describes the plan, not what happened.
+
+**M4 remains blocked**, since it depends on M2 as well as M3. M2's remaining
+work is **F23** and then **the release cut itself**, which its exit gate
+requires as verification. So the critical path is F23 → cut → M2 closes → M4,
+and M3's `0.167.0` release column is contingent on that cut landing first.
 
 ### R0 rationale
 
@@ -229,11 +236,11 @@ sourced from the 2026-07-15 architecture audit keep their audit finding ID.
 | F15 | `README.md` describes the three-way conflict workspace UI as "in progress" although it is a deferred post-v1 slice and an explicit RFC-074 non-goal | 2026-08-01 review of 001 / review 001 finding B | R0 |
 | F16 | Public feature claims are not systematically audited for core-complete versus user-reachable status | review 001 finding B | M4 |
 | F18 | `xtask` is outside `cargo fmt --check` (not a workspace member, DEC-005), so `xtask/src/main.rs` has drifted from current rustfmt output; the drift nearly pushed R0's addition over the 500-ELOC hard threshold | review 032 / R0 review question 3 | M4 |
-| F19 | `docs/src/maintainers/release.md` has no re-release or immutability policy, although that policy governed R0's tag re-cut; it exists only in the superseded v0.164.0 handoff bundle | review 032 (N2) | M2 |
-| F20 | Threat-model audit history omits the RFC-075 integrity fix and retains the superseded v0.148.0 stale-tab-guard claim; section heading still reads v0.164.0 | review 032 (N3, N4) | M2 |
-| F21 | `release.md` must record the corrected release-cycle rules: post-release patch default, promotion at release time, and the definition of "published" as a release out of draft state — aligned with the `version-sync` check, which keys on tag existence | 2026-08-02 owner decision | M2 |
-| F22 | Release notes are produced by `generate_release_notes: true`, which summarises pull requests; this project commits directly to `main`, so it emits only a compare link and ignores the CHANGELOG. Compose notes in CI from the tag's CHANGELOG section, failing closed when absent, and document the publish step as an explicit owner action | 2026-08-02 owner question | M2 |
-| F23 | No workflow file is ever parsed or linted. `release.yml` triggers only on tag push, so an edit to it is unvalidated until a release cut, where a syntax error means no release at all; no YAML parser was available to either the implementer or the reviewer. Add `actionlint` to CI so every workflow is checked on every push | review 033 (N1) | **before M2's release cut** |
+| F19 | **Resolved** (`896f2c6`, review 034). `docs/src/maintainers/release.md` had no re-release or immutability policy, although that policy governed R0's tag re-cut; it exists only in the superseded v0.164.0 handoff bundle | review 032 (N2) | M2 |
+| F20 | **Resolved** (`896f2c6`, review 034). Threat-model audit history omitted the RFC-075 integrity fix and retains the superseded v0.148.0 stale-tab-guard claim; section heading still reads v0.164.0 | review 032 (N3, N4) | M2 |
+| F21 | **Resolved** (`896f2c6`, review 034). `release.md` now records the corrected release-cycle rules: post-release patch default, promotion at release time, and the definition of "published" as a release out of draft state — aligned with the `version-sync` check, which keys on tag existence | 2026-08-02 owner decision | M2 |
+| F22 | **Resolved** (`896f2c6`, C1 fix `fe9940e`, review 034). Release notes were produced by `generate_release_notes: true`, which summarises pull requests; this project commits directly to `main`, so it emits only a compare link and ignores the CHANGELOG. Compose notes in CI from the tag's CHANGELOG section, failing closed when absent, and document the publish step as an explicit owner action | 2026-08-02 owner question | M2 |
+| F23 | No workflow file is ever parsed or linted. `release.yml` triggers only on tag push, so an edit to it is unvalidated until a release cut, where a syntax error means no release at all; no YAML parser was available to either the implementer or the reviewer. Add `actionlint` to CI so every workflow is checked on every push. Handoff: `rfcs/handoffs/074-v1-release-stabilization-program/f23-workflow-linting-handoff.md`, which folds in F41 | review 033 (N1) | **before M2's release cut** |
 | F24 | The empty-CHANGELOG-section guard fires in the release workflow's last job, after the source archive and all three platform builds — detectable at preflight from the repository alone, and by then the tag exists so recovery needs a re-cut. Extend `version-sync`'s **release mode only** to require non-whitespace content; dev mode must keep accepting the empty section the post-release bump opens | review 034 (N1) | M4 |
 | F25 | Two divergent "built-in" compare-profile sets: the UI's four (now canonical for persisted schema v2) and core's `CompareProfile::all_presets()`, which no UI reaches and v2 never produces, yet which `is_core_preset_name` still consults. Pre-existing; convergence is the point to resolve or explicitly document it as legacy | review 035 (N3) | M4 |
 | F25b | **Corrects F25's text.** Core's preset set is *not* unreached: `ui-logic::settings_view::profile_presets()` consumes `CompareProfile::all_presets()` and is re-exported from `ui-logic/src/lib.rs`. What keeps the divergence invisible today is only that no `forskscope-ui` file calls it. Patch 5 removed `is_core_preset_name` — the consultation — but both sets remain and still differ, so wiring the picker in any later settings work would show four preset names unrelated to the four built-in profiles actually persisted | review 043 | M4, with F25 |
@@ -249,7 +256,7 @@ sourced from the 2026-07-15 architecture audit keep their audit finding ID.
 | F37 | RFC-078's P08 covers persistence migration but predates the recovery dialogs, so the `Exit` action's behaviour on Windows and macOS is in no platform case. Verified on Linux/WebKitGTK only. Fold into P08 before M5 | review 045 | M4, for M5 |
 | F38 | **Resolved.** `persist_noclobber` requested `tempfile::Builder::permissions(0o666)` before creating the same-directory temp file, replacing the hardcoded `0o644` `set_permissions` call that was correct only under `umask 022`. The kernel applies the process umask to the requested mode the same way it does for `atomic_replace`'s `fs::write`, so no umask query/reset is needed. The permissions test now asserts equality against a same-directory `fs::write`-created reference file's own mode rather than the literal `0o644`, verified locally under both the default umask and `umask 077`. `persist_noclobber` runs only for `MustBeAbsent`, so there is never an existing mode to preserve — that option was inapplicable by construction; F9's overwrite-mode-loss case is adjacent but distinct | review 048, direction review 051 §3.3 | before M3 closes |
 | F39 | Five user-visible error paths reach the toast without `t()` (`diff_actions.rs:285`, `recovery.rs:142`/`:252`, `state/compare.rs:154`, `describe_block`), while G-006 requires all user-visible strings routed through the translation layer with zero gaps. `cargo xtask i18n` reports pass throughout because it compares `t(...)` call sites against the Japanese map and is structurally blind to strings that never reach one — the same shape as `version-sync` missing published-tag collisions and `css_coverage` not seeing layout. Decide: translate the error path, or narrow G-006's wording to match reality | review 049 | M4 |
-| F41 | The F38 permission test can only fail under a non-default umask, and CI runs under `umask 022`. Confirmed by mutation: reverting to the hardcoded `0o644` passes on CI's mask and fails only under `077`, so a regression of the exact defect F38 fixed would go green forever. Fifth instance of the named pattern — a green gate credited with more than it measures (`version-sync` blind to published tags, `css_coverage` blind to layout, the release workflow that had never fired, `i18n` blind to strings bypassing `t()`). Fix: one CI step re-running the save-permission tests in a subshell under a non-default umask. A subprocess is the only safe mechanism — umask is process-global and Rust tests share a process, so an in-test `libc::umask` would race the rest of the suite | review 052 | M4 |
+| F41 | The F38 permission test can only fail under a non-default umask, and CI runs under `umask 022`. Confirmed by mutation: reverting to the hardcoded `0o644` passes on CI's mask and fails only under `077`, so a regression of the exact defect F38 fixed would go green forever. Fifth instance of the named pattern — a green gate credited with more than it measures (`version-sync` blind to published tags, `css_coverage` blind to layout, the release workflow that had never fired, `i18n` blind to strings bypassing `t()`). Fix: one CI step re-running the save-permission tests in a subshell under a non-default umask. A subprocess is the only safe mechanism — umask is process-global and Rust tests share a process, so an in-test `libc::umask` would race the rest of the suite. Folded into F23's handoff — same file, same class of gate defect | review 052 | M2, with F23 |
 | F40 | Toggling **Ignore WS**, **Ignore case**, or the diff **algorithm** calls `recompute_diff`, which does `tab.merge = MergeSession::from_diff(&diff)` — discarding every applied hunk *and* the whole undo stack, unrecoverably and with no confirmation. `swap_sides` reaches the same function but is guarded by `ConfirmSwap` when dirty; the three toolbar controls are not. Worse, the fresh session reports `is_dirty() == false` (empty stack, baseline 0), so the unsaved-work warning is lost with the work: Ctrl+W then closes the tab without prompting. Contradicts RFC-015 §8 rule 4 verbatim — "Recomputing diff after an edit must not erase undo history" — in an RFC marked Implemented. Options: re-derive the diff while replaying the transaction log, or (cheaper) gate the three toggles behind the same dirty confirmation `swap_sides` already uses | review 051 follow-up question, 2026-08-08 | M4 |
 | F35 | Empty counterpart rows in a multi-line Replace hunk carry the `Changed:` screen-reader label with no gutter number and no content, so an assistive technology announces "Changed" once per blank row — four times for one logical change in the review fixture. Pre-existing, not an F32 regression; surfaced by F32's AT-SPI verification. Decide whether such rows should be labelled differently or left unlabelled | review 044 (N1), RFC-061 track | M4 |
 | F28b | Both documents can be write-disabled on one launch (corrupt `settings.json` alongside a future-version `session.json`), but the startup notice drops the session one when a settings one exists. Acceptable for toasts; must not survive into the recovery dialogs, where the user would be told about one read-only document and nothing about the other | review 042 §4 | RFC-076 patch 6 (recovery UI) |
