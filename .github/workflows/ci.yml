@@ -19,6 +19,25 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      # F23: no workflow file was ever machine-parsed before this — release.yml
+      # only triggers on tag push, so a syntax error there was invisible until
+      # a real cut. Runs before the system-dependency install and Rust
+      # toolchain setup so a bad workflow file is reported in seconds, not
+      # after the slowest steps in the job.
+      - name: Install actionlint
+        run: |
+          curl -sSLO "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint_1.7.12_linux_amd64.tar.gz" | sha256sum -c -
+          tar xzf actionlint_1.7.12_linux_amd64.tar.gz actionlint
+          sudo mv actionlint /usr/local/bin/actionlint
+
+      # No args: actionlint discovers every file under .github/workflows/
+      # itself, so a third workflow added later is covered with no CI edit.
+      # Its bundled shellcheck pass covers every `run:` block, including
+      # release.yml's, without executing any of them.
+      - name: Lint workflow files (actionlint)
+        run: actionlint
+
       - name: Install system dependencies (WebKitGTK, GTK3)
         run: |
           sudo apt-get update -qq
@@ -71,6 +90,25 @@ jobs:
 
       - name: cargo test (workspace)
         run: cargo test --workspace
+
+      # F41: the F38 permission-regression test asserts against a same-
+      # directory fs::write's mode, which is correct, but can only *fail*
+      # under a non-default umask — CI's own default (022) can't observe a
+      # regression back to a hardcoded mode. 077 is what review 052's
+      # mutation used. A dedicated step in its own shell is required rather
+      # than an in-test `libc::umask` call: umask is process-global, and
+      # `cargo test` runs every test as a thread in one process, so an
+      # in-test change would race the other ~1090 tests.
+      #
+      # Filter: any test whose name contains "permissions" — today that's
+      # persist_noclobber's F38 regression test, plus one unrelated
+      # RecoveryHint-mapping test caught incidentally (harmless under any
+      # umask). A future test asserting on a created file's mode must
+      # include "permissions" in its name to be covered here automatically.
+      - name: File permission tests under a non-default umask (F41)
+        run: |
+          umask 077
+          cargo test -p forskscope-core permissions
 
       - name: cargo clippy (workspace)
         run: cargo clippy --workspace -- -D warnings
