@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.166.1] — Unreleased
+
 ## [0.166.0] — 2026-08-08
 
 Closes two of the four architecture-audit blockers: **B2** (runtime persistence
