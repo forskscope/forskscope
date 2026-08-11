@@ -182,7 +182,8 @@ can be reviewed under the attention its content needs:
 |---|---|---|
 | **M4-A** | Residual correctness — real defects in shipped behaviour | F40, F8, F35, F10 |
 | **M4-B** | Gate integrity — make each gate measure what it is credited with | F6, F18, F24, F34, F36, F42 |
-| **M4-C** | Truth reconciliation, advisory dispositions, `matrix-plan.md` freeze | F7, F9, F11, F12, F16, F25/F25b, F31, F37, F39, F43 |
+| **M4-C1** | Advisory dispositions and the platform-matrix freeze — the Gate C and M5 prerequisites | F7 (N5), F9 (N2), F37, `matrix-plan.md` |
+| **M4-C2** | Documentation and code truth | F11, F12, F16, F25/F25b, F31, F39, F43, F48 |
 
 **M4-A leads because F40 is the most user-harmful item in the register** — a
 diff-option toggle silently discards every applied merge *and* the undo history,
