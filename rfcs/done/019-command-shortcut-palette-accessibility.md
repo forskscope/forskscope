@@ -156,6 +156,27 @@ Every command-backed control must have:
 
 Toolbar icon-only buttons must expose command labels to assistive technology.
 
+**F35 (2026-08-08), diff-view row ARIA.** In a multi-line Replace hunk
+(`crates/forskscope-ui/src/ui/view/hunk.rs`, `RowLeft`/`RowRight`), a row
+whose left/right line counts differ produces some rows with no counterpart
+line on one side. Those blank rows carried the same `Changed:` sr-only label
+as rows with real content, so a screen reader announced a bare "Changed"
+once per blank row — four times for one logical change in the review
+fixture, discovered via RFC-061's F32 AT-SPI pass and originally recorded
+there before moving here (review 054 §4.3: this RFC owns row ARIA).
+
+Decision: leave blank counterpart rows unlabelled rather than labelling only
+the first row of a run or the hunk as a whole. A row with real content keeps
+its per-line `Changed: <line>` label (useful when navigating row by row); a
+row with nothing to say gets no label. Implemented as a pure
+`wants_replace_label(kind, has_content)` predicate, directly unit-tested
+(three cases: content present, content absent, non-Replace kinds) since
+`RowLeft`/`RowRight` themselves are `Store`-dependent components (F36) and
+not testable in isolation. AT-SPI-verified against a 4-line-left/1-line-right
+Replace fixture: the shorter side's three blank counterpart rows expose no
+`Changed:` text at all, while every row with real content on either side
+still announces `Changed: <line>` correctly.
+
 ## 11. Menu Structure
 
 ```text

@@ -128,30 +128,12 @@ keep it at all is an open question.
 
 ## Related accessibility decisions (not Explorer-scoped)
 
-**F35 (2026-08-08).** Not part of this RFC's own scope (Explorer pane
-focus) — recorded here per the M4-A handoff's direction that this is "the
-accessibility track." In a multi-line Replace hunk in the diff/merge view
-(`crates/forskscope-ui/src/ui/view/hunk.rs`, `RowLeft`/`RowRight`), a row
-whose left/right line counts differ produces some rows with no counterpart
-line on one side. Those blank rows carried the same `Changed:` sr-only label
-as rows with real content, so a screen reader announced a bare "Changed"
-once per blank row — four times for one logical change in the review
-fixture, discovered via F32's AT-SPI pass.
-
-Decision: leave blank counterpart rows unlabelled rather than labelling only
-the first row of a run or the hunk as a whole. A row with real content keeps
-its per-line `Changed: <line>` label (useful when navigating row by row); a
-row with nothing to say gets no label. Implemented as a pure
-`wants_replace_label(kind, has_content)` predicate, directly unit-tested
-(three cases: content present, content absent, non-Replace kinds) since
-`RowLeft`/`RowRight` themselves are `Store`-dependent components (F36) and
-not testable in isolation.
-
-Note for whoever next touches this: RFC-061 §"Cross-references" itself says
-RFC-019 "owns row ARIA," which reads as a more precise home for this
-specific decision than this RFC's own Explorer-focus scope. Recorded here
-because that's what the handoff named; move to RFC-019 if that's the better
-fit on reflection.
+**F35 (2026-08-08).** The blank-counterpart-row screen-reader labelling
+decision for the diff/merge view's Replace hunks was recorded here
+initially, per the M4-A handoff's direction — moved to RFC-019 §"Accessibility
+Requirements" (review 054 §4.3: RFC-019, not this RFC, "owns row ARIA") since
+that is the more precise home. Surfaced by this RFC's own F32 AT-SPI work,
+which is why it passed through here first.
 
 ## Open questions
 
