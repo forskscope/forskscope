@@ -1,0 +1,6 @@
+alpha
+old-line
+gamma
+delete-line
+epsilon
+zeta

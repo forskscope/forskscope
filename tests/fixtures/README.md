@@ -25,6 +25,7 @@ fixtures/
 | `left_deletions.txt` / `right_deletions.txt` | deletions | Right side is missing two lines |
 | `left_reordered.txt` / `right_reordered.txt` | reordered blocks | Section A and B swapped |
 | `left_function.txt` / `right_function.txt` | single-line code change | `return a` → `return a + 1` |
+| `left_all_hunk_kinds.txt` / `right_all_hunk_kinds.txt` | Replace + Delete + Insert together | one file pair producing all three label-bearing hunk kinds; also drives `packaging/render_check.py` (F34) |
 | `empty.txt` | (with `nonempty.txt`) | Empty vs non-empty comparison |
 | `nonempty.txt` | (with `empty.txt`) | Non-empty vs empty comparison |
 

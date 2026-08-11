@@ -114,6 +114,32 @@ fn deletions_fixture_produces_delete_hunks() {
     assert!(doc.stats.lines_deleted > 0);
 }
 
+// ── Text: all three label-bearing hunk kinds in one pair (F34) ────────────────
+
+#[test]
+fn all_hunk_kinds_fixture_produces_exactly_one_replace_insert_and_delete_hunk() {
+    // The fixture the F34 rendering check drives — one file pair producing
+    // Replace, Insert, and pure Delete hunks together, per review 044,
+    // rather than the release check assembling its own ad-hoc fixture.
+    // Pinned here so a future corpus change can't silently reshape it out
+    // from under the rendering check without a test noticing.
+    let left = load("text/left_all_hunk_kinds.txt");
+    let right = load("text/right_all_hunk_kinds.txt");
+    let doc = compute_diff(&left, &right, opts_default());
+    let changed: Vec<HunkKind> = doc
+        .hunks
+        .iter()
+        .filter(|h| h.kind.is_change())
+        .map(|h| h.kind)
+        .collect();
+    assert_eq!(
+        changed,
+        vec![HunkKind::Replace, HunkKind::Delete, HunkKind::Insert],
+        "fixture must produce exactly one Replace, one Delete, and one \
+         Insert hunk, in that order"
+    );
+}
+
 // ── Text: empty file comparisons ──────────────────────────────────────────────
 
 #[test]

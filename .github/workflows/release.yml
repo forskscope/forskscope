@@ -112,7 +112,8 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             pkg-config libssl-dev \
-            libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev
+            libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev \
+            xvfb dbus-x11 at-spi2-core python3-gi gir1.2-atspi-2.0
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -126,6 +127,22 @@ jobs:
 
       - name: Build release binary
         run: cargo build --release --locked -p forskscope-ui
+
+      # F34: nothing had ever looked at the rendered application before this
+      # - F32 shipped misaligned in two releases with every gate green, and
+      # 0.166.0 shipped with no artifact having been launched by anyone
+      # (F44 followed). Drives the actual just-built binary against a fixed
+      # file pair (Replace + Delete + Insert hunks together, pinned by a
+      # core corpus test) under a virtual display and a real AT-SPI bus, and
+      # asserts every diff row's on-screen geometry matches its neighbours -
+      # the visual symptom F32 actually had, not just its one historical
+      # cause. See packaging/render_check.py's module docstring for the
+      # full design rationale, and its falsifiability demonstration in the
+      # review request this landed with.
+      - name: Compare view renders without column misalignment (F34)
+        run: |
+          xvfb-run --auto-servernum dbus-run-session -- \
+            env NO_AT_BRIDGE=0 python3 packaging/render_check.py target/release/forskscope
 
       - name: Package
         run: |

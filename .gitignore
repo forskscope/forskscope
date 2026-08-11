@@ -16,3 +16,6 @@ target/
 # Custom
 /.git-exclude/
 *.local.json
+
+# packaging/render_check.py (F34) is run directly with python3, not installed
+__pycache__/

@@ -33,6 +33,18 @@ cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
 
 ---
 
+## Automated rendering check (F34)
+
+`packaging/render_check.py` runs in the Linux release job (`release.yml`),
+against the actual just-built release binary, under a virtual display and a
+real AT-SPI bus (`xvfb-run` + `dbus-run-session`). It drives
+`tests/fixtures/text/{left,right}_all_hunk_kinds.txt` (one Replace, one
+Delete, one Insert hunk) and asserts every diff row's on-screen geometry
+matches its neighbours in the same pane — the visual symptom F32 actually
+had (a screen-reader label rendered outside `.cell` shifted Delete/Replace
+rows one column right, with content clipped). This does not replace the
+checklist below; it only covers column alignment, not the interactive flows.
+
 ## RFC-041 item 1 — Two-way file compare works end to end
 
 ### 1a. Open via CLI
