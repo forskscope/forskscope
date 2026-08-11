@@ -31,6 +31,20 @@ jobs:
           tar xzf actionlint_1.7.12_linux_amd64.tar.gz actionlint
           sudo mv actionlint /usr/local/bin/actionlint
 
+      # F42: actionlint's shellcheck pass runs only if a `shellcheck` binary
+      # is on PATH — absent, it silently skips the rule and exits 0, so
+      # `release.yml`'s eleven `run:` blocks would stop being checked with
+      # CI still green. `ubuntu-latest` ships shellcheck today; this step
+      # exists so its removal is a loud CI failure instead of a silent
+      # narrowing of what "Lint workflow files" actually covers.
+      - name: Verify shellcheck is present (F42)
+        run: |
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            echo "::error::shellcheck is not on PATH — actionlint's shellcheck pass would silently skip every run: block instead of checking them (F42)"
+            exit 1
+          fi
+          shellcheck --version
+
       # No args: actionlint discovers every file under .github/workflows/
       # itself, so a third workflow added later is covered with no CI edit.
       # Its bundled shellcheck pass covers every `run:` block, including
@@ -105,9 +119,20 @@ jobs:
       # RecoveryHint-mapping test caught incidentally (harmless under any
       # umask). A future test asserting on a created file's mode must
       # include "permissions" in its name to be covered here automatically.
+      # F42: `cargo test` exits 0 when a filter matches no tests at all (and
+      # even `-- --exact <unknown-name>` exits 0), so a rename of the F38
+      # regression test would silently turn this step into a no-op that
+      # still reports success. `--list` first and grep for the exact test
+      # path, so a rename fails loudly here instead of the umask coverage
+      # quietly disappearing.
       - name: File permission tests under a non-default umask (F41)
         run: |
           umask 077
+          if ! cargo test -p forskscope-core permissions -- --list 2>/dev/null \
+              | grep -q '^tests::save_target_tests::persist_noclobber_output_is_not_left_with_tempfiles_narrow_default_permissions: test$'; then
+            echo "::error::the \"permissions\" filter no longer matches persist_noclobber_output_is_not_left_with_tempfiles_narrow_default_permissions — F38's umask regression test is no longer covered by this step (F42)"
+            exit 1
+          fi
           cargo test -p forskscope-core permissions
 
       - name: cargo clippy (workspace)
