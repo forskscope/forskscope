@@ -17,9 +17,9 @@ use forskscope_ui_logic::SettingsRecoveryView;
 use crate::state::{AppSettings, Lang, Modal, Notice, Store, Theme, config_file_path};
 use crate::ui::overlay::keybindings::KeyboardRefModal;
 use crate::ui::overlay::modals::{
-    AboutModal, BatchCopyModal, BatchResultModal, CloseTabModal, ConfirmDirOpModal,
-    ConfirmSaveAsOverwriteModal, OverwriteModal, ReloadModal, SaveAsModal, SessionRecoveryModal,
-    SettingsRecoveryModal, SwapModal,
+    AboutModal, BatchCopyModal, BatchResultModal, CloseTabModal, ConfirmDiffOptionChangeModal,
+    ConfirmDirOpModal, ConfirmSaveAsOverwriteModal, OverwriteModal, ReloadModal, SaveAsModal,
+    SessionRecoveryModal, SettingsRecoveryModal, SwapModal,
 };
 use modal::SettingsModal;
 
@@ -133,6 +133,9 @@ pub fn ModalLayer() -> Element {
         },
         Modal::ConfirmReload(i) => rsx! { ReloadModal       { index: i } },
         Modal::ConfirmSwap(i) => rsx! { SwapModal         { index: i } },
+        Modal::ConfirmDiffOptionChange(i, options) => rsx! {
+            ConfirmDiffOptionChangeModal { index: i, options }
+        },
         Modal::ConfirmDirOp(op) => rsx! { ConfirmDirOpModal  { op } },
         Modal::ConfirmClose(i) => rsx! { CloseTabModal      { index: i } },
         Modal::About => rsx! { AboutModal         {} },

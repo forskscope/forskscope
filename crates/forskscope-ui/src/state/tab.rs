@@ -101,6 +101,51 @@ pub fn swap_sides(store: &mut crate::state::Store, index: usize) {
     recompute_diff(tab);
 }
 
+/// Installs `next` and recomputes the diff immediately, discarding any
+/// applied merge work and undo/redo history without asking. Used when a tab
+/// isn't dirty, and by `ConfirmDiffOptionChangeModal`'s confirm button after
+/// the user has already been warned (F40) — never call this from anywhere
+/// that hasn't already checked `is_dirty()` or gotten explicit confirmation.
+pub fn set_diff_options(store: &mut crate::state::Store, index: usize, next: DiffOptions) {
+    let mut tabs = store.tabs.write();
+    if let Some(tab) = tabs.get_mut(index) {
+        tab.diff_options = next;
+        recompute_diff(tab);
+    }
+}
+
+/// Changes a tab's diff options, guarding against silently discarding
+/// applied merge work and the undo/redo stack (F40): `recompute_diff`
+/// rebuilds `MergeSession` from scratch, so a dirty tab defers to
+/// `Modal::ConfirmDiffOptionChange` instead of applying `next` immediately —
+/// the same class of hazard `swap_sides`'s `ConfirmSwap` guard already
+/// covers for side-swapping. `next` is computed by the caller (at click
+/// time, from the tab's current `diff_options`) so this function stays
+/// agnostic to which control was used.
+///
+/// This does not implement RFC-015 §8 rule 4 ("recomputing diff after an
+/// edit must not erase undo history"): once the user confirms, applied
+/// merges and the undo stack are discarded, not preserved and reapplied
+/// against the new hunks. Hunk identity is not stable across a recompute
+/// (`DiffId` is a fresh global counter on every `compute_diff` call), so
+/// reapplication would need a rebasing rule this slice does not implement —
+/// see RFC-015's recorded gap.
+pub fn change_diff_options(store: &mut crate::state::Store, index: usize, next: DiffOptions) {
+    let dirty = store
+        .tabs
+        .read()
+        .get(index)
+        .map(|t| t.merge.is_dirty())
+        .unwrap_or(false);
+    if dirty {
+        store
+            .modal
+            .set(crate::state::Modal::ConfirmDiffOptionChange(index, next));
+    } else {
+        set_diff_options(store, index, next);
+    }
+}
+
 /// Derive a human-readable tab title from the two file paths.
 pub(crate) fn tab_title(l: &std::path::Path, r: &std::path::Path, lang: Lang) -> String {
     use crate::i18n::t;

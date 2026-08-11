@@ -246,6 +246,12 @@ fn ja(key: &str) -> Option<&'static str> {
             "左右入替時に未保存のマージ変更は破棄されます。"
         }
         "Discard and Swap" => "破棄して入替",
+        "Change diff options" => "差分オプションの変更",
+        "Change diff options?" => "差分オプションを変更しますか？",
+        "Unsaved merge changes will be discarded when diff options change." => {
+            "差分オプション変更時に未保存のマージ変更は破棄されます。"
+        }
+        "Discard and Change" => "破棄して変更",
         "Close comparison?" => "比較を閉じますか？",
         "Discard and close" => "破棄して閉じる",
         "Copy diagnostics" => "診断情報をコピー",

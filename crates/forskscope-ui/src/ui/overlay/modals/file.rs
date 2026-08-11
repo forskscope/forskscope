@@ -1,11 +1,14 @@
-//! File safety modals: overwrite confirmation, save-as, reload, and swap sides.
+//! File and merge-state safety modals: overwrite confirmation, save-as,
+//! reload, swap sides, and diff-option changes — each guards an action that
+//! would otherwise discard unsaved merge work without asking.
 
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
+use forskscope_core::DiffOptions;
 
 use crate::i18n::t;
-use crate::state::{Modal, Store, reload_tab, swap_sides};
+use crate::state::{Modal, Store, reload_tab, set_diff_options, swap_sides};
 use crate::ui::view::diff::{SaveAsPrecheck, confirm_overwrite, precheck_save_as_target, save_as};
 
 /// `target` is the exact path the conflicting save attempted — the tab's own
@@ -103,6 +106,33 @@ pub fn ConfirmSaveAsOverwriteModal(index: usize, target: PathBuf) -> Element {
                             save_as(&mut store, index, target.display().to_string());
                         },
                         {t(lang, "Overwrite")}
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Confirmed via [`Modal::ConfirmDiffOptionChange`] — installs `options` and
+/// recomputes the diff, discarding applied merge work and the undo/redo
+/// stack (F40), same discard-and-proceed pattern as [`SwapModal`].
+#[component]
+pub fn ConfirmDiffOptionChangeModal(index: usize, options: DiffOptions) -> Element {
+    let mut store = use_context::<Store>();
+    let lang = store.lang();
+    rsx! {
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Change diff options"),
+            div { class: "modal",
+                h2 { {t(lang, "Change diff options?")} }
+                p { {t(lang, "Unsaved merge changes will be discarded when diff options change.")} }
+                div { class: "actions",
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button {
+                        onclick: move |_| {
+                            set_diff_options(&mut store, index, options);
+                            store.modal.set(Modal::None);
+                        },
+                        {t(lang, "Discard and Change")}
                     }
                 }
             }

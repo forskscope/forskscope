@@ -119,8 +119,33 @@ Rules:
 1. Applying a transaction pushes it to `undo_stack` and clears `redo_stack`.
 2. Undo applies the inverse operation and moves the transaction to `redo_stack`.
 3. Redo reapplies the operation and moves it back to `undo_stack`.
-4. Recomputing diff after an edit must not erase undo history.
+4. Recomputing diff after an edit must not erase undo history. **Not met** —
+   see the F40 note below.
 5. Save marks a clean baseline revision but does not erase history automatically.
+
+**F40 (2026-08-08).** Rule 4 is unmet in the shipped implementation.
+`recompute_diff` (`forskscope-ui::state::tab`) always rebuilds
+`MergeSession::from_diff` from the two documents, which discards every
+applied merge and the entire undo/redo stack — it does not reapply history
+against the new hunk set. This is a real gap, not a documentation-only
+inaccuracy: hunk identity (`HunkId`) is derived in part from `DiffId`, a
+process-global counter incremented on every `compute_diff` call
+(`forskscope-core::diff::engine`), so a hunk's ID is never stable across a
+recompute — not even between two recomputes with identical content and
+options. Reapplying transactions against the new hunk set (§12's original
+intent: "history remains valid but hunk navigation may show it as stale")
+would require a rebasing rule for transactions whose hunk no longer exists
+under the new, unrelated IDs.
+
+Given that, the two call sites that trigger a recompute while merge state
+may be dirty (`swap_sides`, and — as of F40's fix — `change_diff_options` for
+the ignore-whitespace/ignore-case/algorithm toolbar controls) both **ask
+first** rather than silently discarding: a dirty tab defers to a confirm
+dialog (`Modal::ConfirmSwap` / `Modal::ConfirmDiffOptionChange`) naming what
+will be lost, and only recomputes if the user confirms. `is_dirty()` never
+silently becomes `false` while work is discarded out from under the user —
+but the work itself is still discarded, once confirmed. Preserve-and-reapply
+(rule 4 as originally written) remains a follow-up, not implemented here.
 
 ## 9. Editor Undo vs Core Undo
 

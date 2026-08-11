@@ -3,7 +3,7 @@
 //! Submodules:
 //! - `settings`  — `AppSettings`, `DiffProfile`, theme/lang/font types
 //! - `types`     — `BatchResultSpec`, `DirOp`
-//! - `tab`       — `CompareTab`, `TabState`, `recompute_diff`, `swap_sides`
+//! - `tab`       — `CompareTab`, `TabState`, `swap_sides`, `change_diff_options`, `set_diff_options`
 //! - `compare`   — `open_compare`, `reload_tab`, `load_and_diff`, dir tabs
 //! - `session`   — `save_session`, `restore_session`, `close_tab` (RFC-076 repository-backed)
 //! - `profile`   — `add_profile`, `remove_profile`
@@ -21,7 +21,7 @@ pub use compare::{
 pub use profile::{add_profile, remove_profile};
 pub use session::{close_tab, resolve_session, restore_tabs, save_session};
 pub use settings::{AppSettings, BatchCopySpec, DiffAlgorithmSetting, DiffFontFamily, Lang, Theme};
-pub use tab::{CompareTab, TabState, recompute_diff, swap_sides};
+pub use tab::{CompareTab, TabState, change_diff_options, set_diff_options, swap_sides};
 pub use types::{BatchResultSpec, DirOp};
 
 use dioxus::prelude::*;
@@ -68,6 +68,15 @@ pub enum Modal {
     ConfirmSaveAsOverwrite(usize, std::path::PathBuf),
     ConfirmReload(usize),
     ConfirmSwap(usize),
+    /// A diff-option toggle (ignore whitespace/case, algorithm) would
+    /// discard applied merge work and the undo/redo stack — `recompute_diff`
+    /// rebuilds `MergeSession` from scratch (F40). `options` is the new
+    /// value to install on confirm, computed at click time so the toolbar
+    /// doesn't need a second enum describing which control was used. Same
+    /// hazard class as `ConfirmSwap`; this does not implement RFC-015 §8
+    /// rule 4 (see `change_diff_options`'s doc comment and RFC-015's
+    /// recorded gap).
+    ConfirmDiffOptionChange(usize, forskscope_core::DiffOptions),
     ConfirmDirOp(DirOp),
     ConfirmClose(usize),
     ConfirmBatchCopy(BatchCopySpec),

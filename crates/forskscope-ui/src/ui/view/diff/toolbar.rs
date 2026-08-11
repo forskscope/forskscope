@@ -5,7 +5,7 @@ use dioxus::prelude::*;
 
 use super::TabSnapshot;
 use crate::i18n::t;
-use crate::state::{Lang, Modal, Store, recompute_diff, reload_tab, swap_sides};
+use crate::state::{Lang, Modal, Store, change_diff_options, reload_tab, swap_sides};
 use crate::ui::view::diff_actions::{algo_val, export_patch, save_tab};
 use crate::ui::view::search::SearchCtx;
 
@@ -128,10 +128,16 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     aria_pressed: if snap.ignore_whitespace { "true" } else { "false" },
                     aria_label: t(lang, "Toggle ignore whitespace"),
                     onclick: move |_| {
-                        let mut tabs = store.tabs.write();
-                        if let Some(tab) = tabs.get_mut(index) {
-                            tab.diff_options.ignore_whitespace ^= true;
-                            recompute_diff(tab);
+                        // F40: computed here and handed to change_diff_options,
+                        // which guards against discarding applied merge work
+                        // rather than mutating tab.diff_options directly.
+                        let next = store.tabs.read().get(index).map(|t| {
+                            let mut o = t.diff_options;
+                            o.ignore_whitespace ^= true;
+                            o
+                        });
+                        if let Some(next) = next {
+                            change_diff_options(&mut store, index, next);
                         }
                     },
                     {format!("{}: {}", t(lang, "Ignore WS"), t(lang, if snap.ignore_whitespace { "on" } else { "off" }))}
@@ -140,10 +146,13 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     aria_pressed: if snap.ignore_case { "true" } else { "false" },
                     aria_label: t(lang, "Toggle ignore case"),
                     onclick: move |_| {
-                        let mut tabs = store.tabs.write();
-                        if let Some(tab) = tabs.get_mut(index) {
-                            tab.diff_options.ignore_case ^= true;
-                            recompute_diff(tab);
+                        let next = store.tabs.read().get(index).map(|t| {
+                            let mut o = t.diff_options;
+                            o.ignore_case ^= true;
+                            o
+                        });
+                        if let Some(next) = next {
+                            change_diff_options(&mut store, index, next);
                         }
                     },
                     {format!("{}: {}", t(lang, "Ignore case"), t(lang, if snap.ignore_case { "on" } else { "off" }))}
@@ -152,15 +161,19 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     title: t(lang, "Diff algorithm"),
                     value: algo_val(snap.algorithm),
                     onchange: move |e| {
-                        let mut tabs = store.tabs.write();
-                        if let Some(tab) = tabs.get_mut(index) {
-                            use forskscope_core::DiffAlgorithm;
-                            tab.diff_options.algorithm = match e.value().as_str() {
-                                "patience"  => DiffAlgorithm::Patience,
-                                "histogram" => DiffAlgorithm::Histogram,
-                                _           => DiffAlgorithm::Myers,
-                            };
-                            recompute_diff(tab);
+                        use forskscope_core::DiffAlgorithm;
+                        let algorithm = match e.value().as_str() {
+                            "patience"  => DiffAlgorithm::Patience,
+                            "histogram" => DiffAlgorithm::Histogram,
+                            _           => DiffAlgorithm::Myers,
+                        };
+                        let next = store.tabs.read().get(index).map(|t| {
+                            let mut o = t.diff_options;
+                            o.algorithm = algorithm;
+                            o
+                        });
+                        if let Some(next) = next {
+                            change_diff_options(&mut store, index, next);
                         }
                     },
                     option { value: "myers",     "Myers"     }

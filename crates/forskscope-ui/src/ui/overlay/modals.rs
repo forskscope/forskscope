@@ -1,7 +1,7 @@
 //! Overlay modals: all safety and action dialogs dispatched from `ModalLayer`.
 //!
 //! Submodules by category:
-//! - `file`     — `OverwriteModal`, `SaveAsModal`, `ReloadModal`, `SwapModal`
+//! - `file`     — `OverwriteModal`, `SaveAsModal`, `ReloadModal`, `SwapModal`, `ConfirmDiffOptionChangeModal`
 //! - `tab`      — `CloseTabModal`
 //! - `copy`     — `ConfirmDirOpModal`, `BatchCopyModal`, `BatchResultModal`
 //! - `about`    — `AboutModal`
@@ -15,6 +15,9 @@ pub mod tab;
 
 pub use about::AboutModal;
 pub use copy::{BatchCopyModal, BatchResultModal, ConfirmDirOpModal};
-pub use file::{ConfirmSaveAsOverwriteModal, OverwriteModal, ReloadModal, SaveAsModal, SwapModal};
+pub use file::{
+    ConfirmDiffOptionChangeModal, ConfirmSaveAsOverwriteModal, OverwriteModal, ReloadModal,
+    SaveAsModal, SwapModal,
+};
 pub use recovery::{SessionRecoveryModal, SettingsRecoveryModal};
 pub use tab::CloseTabModal;
