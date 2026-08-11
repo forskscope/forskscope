@@ -12,25 +12,35 @@ use crate::job::{
 fn inline_diff_threshold_is_below_very_large_threshold() {
     // The inline-diff threshold must be lower than the very-large-file
     // threshold so a file can hit one without immediately hitting the other.
-    assert!(
-        LARGE_FILE_INLINE_DIFF_BYTES < VERY_LARGE_FILE_BYTES,
-        "inline-diff threshold ({LARGE_FILE_INLINE_DIFF_BYTES}) must be < very-large threshold ({VERY_LARGE_FILE_BYTES})"
-    );
+    // Both sides are `const`, so this is checked at compile time (F6) —
+    // still a named `#[test]` so `cargo test` output keeps listing it.
+    const {
+        assert!(
+            LARGE_FILE_INLINE_DIFF_BYTES < VERY_LARGE_FILE_BYTES,
+            "inline-diff threshold must be < very-large threshold"
+        );
+    }
 }
 
 #[test]
 fn concurrency_limit_is_positive() {
-    assert!(DIGEST_CONCURRENCY_LIMIT > 0);
+    const {
+        assert!(DIGEST_CONCURRENCY_LIMIT > 0);
+    }
 }
 
 #[test]
 fn virtual_threshold_is_positive() {
-    assert!(LARGE_DIRECTORY_VIRTUAL_THRESHOLD > 0);
+    const {
+        assert!(LARGE_DIRECTORY_VIRTUAL_THRESHOLD > 0);
+    }
 }
 
 #[test]
 fn auto_expand_threshold_is_positive() {
-    assert!(LARGE_HUNK_AUTO_EXPAND_LINES > 0);
+    const {
+        assert!(LARGE_HUNK_AUTO_EXPAND_LINES > 0);
+    }
 }
 
 // ── JobProgress ───────────────────────────────────────────────────────────────

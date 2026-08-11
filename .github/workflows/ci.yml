@@ -148,5 +148,16 @@ jobs:
       - name: cargo clippy (workspace)
         run: cargo clippy --workspace -- -D warnings
 
+      # F6: the mandatory gate above passes `--lib --bins` implicitly but not
+      # `--tests`, so lints in test code (including integration test crates
+      # under tests/) were never checked — RFC-074 N6 asked for this stronger
+      # form to be run and recorded, which had not happened since M1. All
+      # findings here were mechanical (manual `contains()`, an owned-value
+      # comparison, a type alias for a test fixture's signature, four
+      # threshold assertions moved into `const` blocks so they're checked at
+      # compile time) — no lint needed a suppression.
+      - name: cargo clippy (workspace, all targets)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
       - name: cargo build (UI — ensures it compiles)
         run: cargo build -p forskscope-ui

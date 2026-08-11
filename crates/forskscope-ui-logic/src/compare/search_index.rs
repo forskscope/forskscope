@@ -160,11 +160,14 @@ impl MatchIndex {
 mod tests {
     use super::*;
 
-    fn rows<'a>(contents: &[(&'a str, &'a str)]) -> Vec<(Option<&'a str>, Option<&'a str>)> {
+    type Row<'a> = (Option<&'a str>, Option<&'a str>);
+    type Hunk<'a> = (u64, Vec<Row<'a>>);
+
+    fn rows<'a>(contents: &[(&'a str, &'a str)]) -> Vec<Row<'a>> {
         contents.iter().map(|(l, r)| (Some(*l), Some(*r))).collect()
     }
 
-    fn index_for(query: &str, hunks: &[(u64, Vec<(Option<&str>, Option<&str>)>)]) -> MatchIndex {
+    fn index_for(query: &str, hunks: &[Hunk<'_>]) -> MatchIndex {
         MatchIndex::build(hunks.iter().map(|(id, rs)| (*id, rs.as_slice())), query)
     }
 

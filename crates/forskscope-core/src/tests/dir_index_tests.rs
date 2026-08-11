@@ -70,7 +70,7 @@ fn evidence_for(left: &DirectoryIndex, right: &DirectoryIndex, rel: &str) -> Equ
     let set = pair_entries(left, right);
     set.entries
         .into_iter()
-        .find(|e| e.relative_path == PathBuf::from(rel))
+        .find(|e| e.relative_path == *rel)
         .map(|e| e.evidence)
         .unwrap_or(EqualityEvidence::Unknown)
 }

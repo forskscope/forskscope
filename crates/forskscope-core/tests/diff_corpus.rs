@@ -73,11 +73,11 @@ fn one_changed_line_produces_one_replace_hunk() {
         .filter_map(|r| r.right.as_ref().map(|r| r.content.trim()))
         .collect();
     assert!(
-        left_text.iter().any(|s| *s == "charlie"),
+        left_text.contains(&"charlie"),
         "left side must contain original 'charlie'"
     );
     assert!(
-        right_text.iter().any(|s| *s == "CHARLIE"),
+        right_text.contains(&"CHARLIE"),
         "right side must contain changed 'CHARLIE'"
     );
 }

@@ -321,9 +321,7 @@ fn context_lines_warning_absent_for_small_file() {
     let right = "line1\nLINE2\nline3\n";
     let doc = compute_diff(left, right, DiffOptions::default());
     assert!(
-        !doc.warnings
-            .iter()
-            .any(|w| *w == DiffWarning::LargeFilePolicyApplied),
+        !doc.warnings.contains(&DiffWarning::LargeFilePolicyApplied),
         "small file must not trigger the large-file policy warning"
     );
 }
