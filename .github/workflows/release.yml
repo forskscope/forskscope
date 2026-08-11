@@ -220,6 +220,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      # F24: this empty-section guard used to be the *only* check, and it ran
+      # here — after the tag, source archive, and all three platform builds
+      # already existed, so recovering from an empty section meant a re-cut.
+      # `preflight`'s `cargo xtask version-sync "${GITHUB_REF_NAME}"` now
+      # rejects an empty section before any of that work starts (`xtask`'s
+      # release mode, not just its dev-mode header-presence check). This one
+      # stays as a second, independent check on the same condition — cheap,
+      # and it would still catch a preflight regression — but preflight is
+      # the one that actually saves the re-cut.
       - name: Compose release notes from CHANGELOG
         run: |
           awk -v ver="${GITHUB_REF_NAME}" '

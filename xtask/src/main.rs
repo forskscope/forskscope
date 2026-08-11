@@ -5,7 +5,7 @@
 //!   cargo xtask css --check   — verify main.css is current (exits non-zero if stale)
 //!   cargo xtask audit-deps    — verify reviewed security dependency paths
 //!   cargo xtask i18n          — verify Japanese translations cover UI keys
-//!   cargo xtask version-sync [expected] — verify version metadata is in sync (no-arg mode also rejects an already-published version)
+//!   cargo xtask version-sync [expected] — verify version metadata is in sync (no-arg mode also rejects an already-published version; [expected] mode additionally requires non-empty CHANGELOG content, F24)
 //!   cargo xtask archive-layout [archive] — verify source archive layout
 //!
 //! CSS source files under assets/css/ are assembled in alphabetical order.
@@ -28,7 +28,9 @@ fn main() {
         }
         Some("audit-deps") if args.len() == 1 => run_audit_deps(),
         Some("i18n") if args.len() == 1 => run_i18n_audit(),
-        Some("version-sync") if args.len() <= 2 => run_version_sync(args.get(1).map(String::as_str)),
+        Some("version-sync") if args.len() <= 2 => {
+            run_version_sync(args.get(1).map(String::as_str))
+        }
         Some("archive-layout") if args.len() <= 2 => {
             let archive = args.get(1).map(PathBuf::from);
             run_archive_layout_check(archive.as_deref());
@@ -295,19 +297,62 @@ fn run_version_sync(expected_version: Option<&str>) {
         "CHANGELOG release section",
     );
 
+    // F24: release mode only. The release workflow's own empty-section guard
+    // used to run in its *last* job, after the tag, source archive, and all
+    // three platform builds already existed — by then, recovering from an
+    // empty section meant a re-cut. Dev mode (no `expected_version`) must
+    // keep accepting an empty section: the tree normally carries one for the
+    // in-progress version between releases (opened by the post-release bump,
+    // closed when release notes are actually written), and failing dev-mode
+    // CI on that would turn every ordinary commit red.
+    if expected_version.is_some() {
+        let changelog = read_file(&root.join("CHANGELOG.md"));
+        if changelog_section_is_empty(&changelog, &version) {
+            fail(&format!(
+                "CHANGELOG section for {version} has no content — release notes would ship blank"
+            ));
+        }
+    }
+
     let cargo_lock = read_file(&root.join("Cargo.lock"));
-    for package in [
-        "forskscope-core",
-        "forskscope-ui",
-        "forskscope-ui-logic",
-    ] {
+    for package in ["forskscope-core", "forskscope-ui", "forskscope-ui-logic"] {
         let expected = format!("name = \"{package}\"\nversion = \"{version}\"");
         if !cargo_lock.contains(&expected) {
-            fail(&format!("Cargo.lock package {package} is not version {version}"));
+            fail(&format!(
+                "Cargo.lock package {package} is not version {version}"
+            ));
         }
     }
 
     println!("version sync passed for v{version}.");
+}
+
+// Mirrors the awk extraction `release.yml`'s "Compose release notes" step
+// uses: everything between a line starting with `## [version]` and the next
+// line starting with `## [`, matched the same way (`index($0, hdr) == 1`
+// there, `starts_with` here — both prefix matches, so trailing text like
+// " — Unreleased" or " — 2026-08-08" after the bracket doesn't break either).
+// Kept as one Rust implementation rather than shelling out to `awk`, so the
+// preflight check and the release-notes step can independently agree or
+// disagree without one calling the other.
+fn changelog_section_is_empty(changelog: &str, version: &str) -> bool {
+    let header = format!("## [{version}]");
+    let mut in_section = false;
+    let mut content = String::new();
+    for line in changelog.lines() {
+        if line.starts_with(&header) {
+            in_section = true;
+            continue;
+        }
+        if in_section {
+            if line.starts_with("## [") {
+                break;
+            }
+            content.push_str(line);
+            content.push('\n');
+        }
+    }
+    content.trim().is_empty()
 }
 
 // No-arg mode only: fails if `version` is a tag that exists but not at HEAD.
@@ -395,7 +440,10 @@ fn run_archive_layout_check(archive: Option<&Path>) {
         fail("source archive contains generated, ignored, or local-only paths");
     }
 
-    println!("source archive layout check passed for {}.", archive.display());
+    println!(
+        "source archive layout check passed for {}.",
+        archive.display()
+    );
 }
 
 fn read_file(path: &Path) -> String {
@@ -574,4 +622,87 @@ fn cargo_tree(args: &[&str]) -> Output {
         .current_dir(workspace_root())
         .output()
         .unwrap_or_else(|e| panic!("failed to run cargo {}: {e}", args.join(" ")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::changelog_section_is_empty;
+
+    #[test]
+    fn empty_section_is_reported_empty() {
+        let changelog = "\
+# Changelog
+
+## [0.166.1] — Unreleased
+
+## [0.166.0] — 2026-08-08
+
+Some prior content.
+";
+        assert!(changelog_section_is_empty(changelog, "0.166.1"));
+    }
+
+    #[test]
+    fn whitespace_only_section_is_reported_empty() {
+        let changelog = "\
+## [0.166.1] — Unreleased
+
+
+\t
+## [0.166.0] — 2026-08-08
+";
+        assert!(changelog_section_is_empty(changelog, "0.166.1"));
+    }
+
+    #[test]
+    fn section_with_real_content_is_not_empty() {
+        let changelog = "\
+## [0.166.1] — Unreleased
+
+### Changed
+
+- Something shipped.
+
+## [0.166.0] — 2026-08-08
+";
+        assert!(!changelog_section_is_empty(changelog, "0.166.1"));
+    }
+
+    #[test]
+    fn content_belonging_to_a_different_version_does_not_count() {
+        // The 0.166.1 section itself is empty; real content lives only
+        // under the *next* header. Must not bleed across the boundary.
+        let changelog = "\
+## [0.166.1] — Unreleased
+
+## [0.166.0] — 2026-08-08
+
+Real content here belongs to 0.166.0, not 0.166.1.
+";
+        assert!(changelog_section_is_empty(changelog, "0.166.1"));
+    }
+
+    #[test]
+    fn missing_header_is_reported_empty() {
+        // No `## [...]` header for this version at all — an absent section
+        // has no content by definition. (The separate CHANGELOG-heading
+        // presence check in run_version_sync is what catches a missing
+        // header as its own distinct failure.)
+        let changelog = "## [0.166.0] — 2026-08-08\n\nSome content.\n";
+        assert!(changelog_section_is_empty(changelog, "0.166.1"));
+    }
+
+    #[test]
+    fn trailing_text_after_the_bracket_does_not_prevent_a_match() {
+        let changelog = "\
+## [0.166.1] — Unreleased
+
+### Changed
+
+- Real content.
+
+## [0.166.0] — 2026-08-08
+";
+        assert!(!changelog_section_is_empty(changelog, "0.166.1"));
+    }
 }
