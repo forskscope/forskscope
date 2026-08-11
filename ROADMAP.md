@@ -158,6 +158,20 @@ The release is **tagged and drafted, not published**. Per `release.md`,
 publication out of draft is an explicit owner action and is the point after
 which the version is immutable.
 
+**Progress (2026-08-11): M4-A is complete.** F40 (diff-option toggles silently
+discarded applied merges and the undo stack), F35 (blank counterpart rows
+announced a bare "Changed") and F10 (VCS discovery tests assumed the OS temp
+directory sits outside a repository) are resolved; F8 was investigated and found
+not to be a defect, and now points at RFC-074's advisory N1, which tracks the
+same thing.
+
+F40 shipped ask-first rather than preserve-and-reapply, for a reason worth
+keeping: `HunkId` is not a stable identifier across recomputes at all — `diff_id`
+comes from a process-global counter incremented on every `compute_diff` — so
+preserving history needs stable identity or a rebasing rule, registered as F47
+for post-v1. RFC-015 §8 rule 4 is recorded **Not met** rather than left
+asserting something the code does not do.
+
 ### M4 slicing
 
 M4 opens carrying **20 open register items** — three times M2's load, and too
