@@ -64,8 +64,8 @@ evidence. No milestone carries a target date or effort estimate.
 | — | M1 — Async identity | Stable tab IDs, load generations, deterministic race tests | M0 | RFC-075 acceptance complete | — |
 | — | R0 — Stabilization baseline | Version/CHANGELOG reconciliation for the unreleased delta; release-trigger reconciliation; documentation-truth fixes; version-sync tag check | M1 | Gate B plus an observed release-workflow run and owner release approval | 0.165.0 |
 | 1 | M2 — Release mechanics and persistence convergence | **M2-A:** release-notes composition, release policy documentation, threat-model currency (F19–F22). **M2-B:** canonical schema v2 plus UI-v0/core-v1 migrations | R0 | M2-A content review plus verification at the next real release cut; RFC-076 acceptance complete | level decided at release time |
-| 2 | M3 — Mergetool target safety | Separate remote input/output identity and explicit match/absence preconditions | M1 (hard); sequenced after M2 | RFC-077 acceptance complete | 0.167.0 |
-| 3 | M4 — Integrated stabilization | Full gates, docs/RFC reconciliation, advisory dispositions, frozen `matrix-plan.md` | M2, M3 | Gate C — release-core candidate approved for QA | 0.168.0 candidate |
+| 2 | M3 — Mergetool target safety | Separate remote input/output identity and explicit match/absence preconditions | M1 (hard); sequenced after M2 | RFC-077 acceptance complete | shipped in 0.166.0 |
+| 3 | M4 — Integrated stabilization | **M4-A:** residual correctness. **M4-B:** gate integrity. **M4-C:** truth reconciliation, advisory dispositions, frozen `matrix-plan.md` | M2, M3 | Gate C — release-core candidate approved for QA | level decided at cut time |
 | 4 | M5 — Platform acceptance | Linux Wayland/X11, Windows, macOS runtime matrix | M4 | Gate D — RFC-078 evidence complete | candidate re-cuts as needed |
 | 5 | M6 — Handoff and go/no-go | Refresh handoff and independent architecture review | M5 | Gate E — explicit v1 Go or continued No-Go | — |
 
@@ -119,6 +119,12 @@ preparation fingerprints the actual merged target, and a target expected to be
 absent is committed with no-clobber semantics. F38, the only register entry
 tagged against M3, is resolved.
 
+**Release column correction.** M3's row said `0.167.0` and M4's said
+`0.168.0 candidate`. Both pre-committed a version level before the content
+existed — the mechanical rule `release.md` removed at F21, reappearing in this
+table. M3 in fact shipped inside `0.166.0`, and later levels are decided at the
+cut. The column now says so rather than predicting.
+
 M3 closed **out of table order**, before M2. This is permitted — M3's only hard
 dependency is M1, and the "sequenced after M2" note is a single-developer
 resource constraint rather than a gate — but the recorded sequence and the tree
@@ -151,6 +157,38 @@ frozen `matrix-plan.md`, and the accumulated register.
 The release is **tagged and drafted, not published**. Per `release.md`,
 publication out of draft is an explicit owner action and is the point after
 which the version is immutable.
+
+### M4 slicing
+
+M4 opens carrying **20 open register items** — three times M2's load, and too
+many to review as one change. It is split by what each item is *for*, so a slice
+can be reviewed under the attention its content needs:
+
+| Slice | Purpose | Items |
+|---|---|---|
+| **M4-A** | Residual correctness — real defects in shipped behaviour | F40, F8, F35, F10 |
+| **M4-B** | Gate integrity — make each gate measure what it is credited with | F6, F18, F24, F34, F36, F42 |
+| **M4-C** | Truth reconciliation, advisory dispositions, `matrix-plan.md` freeze | F7, F9, F11, F12, F16, F25/F25b, F31, F37, F39, F43 |
+
+**M4-A leads because F40 is the most user-harmful item in the register** — a
+diff-option toggle silently discards every applied merge *and* the undo history,
+then clears the dirty flag so the close guard stops warning about the work it
+just destroyed. Nothing else open costs a user their work.
+
+**M4-B is the theme of this whole program.** The single most repeated finding
+here is a green gate credited with more than it measures — `version-sync` blind
+to published tags, `css_coverage` blind to layout, a release workflow that had
+never fired, `i18n` blind to strings bypassing `t()`, and a permission test that
+cannot fail under CI's umask. M4-B is where that stops being a pattern.
+
+**M4-C is last** because freezing `matrix-plan.md` and disposing of advisories
+both require knowing what is actually true, which A and B settle.
+
+Architect-owned in parallel, not blocking the dev team: **F33** (README
+installation path and screenshots, unblocked now that F32 is resolved — and
+`0.166.0` publishes four artifacts while the docs still say "build from source")
+and a recommendation on **F43**, which is an owner decision rather than an
+implementation task.
 
 ### R0 rationale
 
