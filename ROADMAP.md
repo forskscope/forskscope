@@ -288,7 +288,7 @@ sourced from the 2026-07-15 architecture audit keep their audit finding ID.
 | F5 | `cargo xtask version-sync` cannot detect workspace version equal to a published tag | 2026-08-01 review | R0 |
 | F6 | `cargo clippy --workspace --all-targets` fails on test-target lints | audit N6 | M4 |
 | F7 | Allowed `cargo audit` warnings include unsoundness advisories needing individual disposition | audit N5 | M4 |
-| F8 | `FileFingerprint` digest is captured but unused at save time | audit N1 | M4 |
+| F8 | **Clarified, not a new defect — same finding as RFC-074 N1.** Investigated per the M4-A handoff: `SaveOutcome.new_fingerprint` (the whole struct `save_text` returns, `save.rs:87`/`:45`) is **not** unused — `diff_actions.rs::handle_result` (`:312`) stores it as the tab's next `TargetExpectation::MustMatch`, closing what would otherwise have been a real defect. What remains unused is narrower: the `digest: Option<u64>` field *within* `FileFingerprint`, captured by `FileFingerprint::capture` (a content hash) but never read by `check_external_state` (`document.rs`), which decides `MustMatch` conflicts on `len`+`modified_unix_nanos` alone. That is exactly RFC-074 N1's own finding and remediation choice ("use the digest when metadata is inconclusive, or document the same-size/same-mtime limitation") — unchanged by this investigation and not re-solved here; N1 remains the tracking entry, still open at M4 | audit N1 | M4 |
 | F9 | Atomic/power-loss durability wording exceeds what the implementation proves | audit N2 | M4/M5 |
 | F10 | VCS discovery tests assume the OS temp directory sits outside any repository | audit N7 | M4 |
 | F11 | RFC-058 status does not record the fail-closed security suspension | audit N4 | M4 |
