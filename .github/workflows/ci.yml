@@ -81,6 +81,16 @@ jobs:
       - name: cargo fmt
         run: cargo fmt --check
 
+      # F18: xtask is not a workspace member (DEC-005 — it must build and run
+      # standalone even if the main workspace's Cargo.toml is broken), so
+      # `cargo fmt --check` above never sees it: it resolves formatting
+      # targets from the nearest [workspace] table, and xtask/Cargo.toml
+      # declares its own. Without this, xtask/src/main.rs drifts from current
+      # rustfmt output silently — it already had, distorting the file's ELOC
+      # figure against the 300/500-line thresholds (F13).
+      - name: cargo fmt (xtask)
+        run: cargo fmt --manifest-path xtask/Cargo.toml --check
+
       - name: CSS generated artifact check
         run: cargo xtask css --check
 
