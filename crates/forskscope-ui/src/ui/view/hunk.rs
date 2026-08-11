@@ -196,10 +196,18 @@ fn RowLeft(
         HunkKind::Delete | HunkKind::Replace => "−",
         _ => " ",
     };
-    let sr_label: Option<String> = match kind {
-        HunkKind::Delete => Some(t(lang, "Deleted")),
-        HunkKind::Replace => Some(t(lang, "Changed")),
-        _ => None,
+    // F35: a Replace hunk with unequal side lengths produces rows where one
+    // side has no counterpart line (`left` is `None` here). Labelling those
+    // too made a screen reader announce a bare "Changed" — no line content
+    // follows it — once per blank row: four times for one logical change in
+    // the review fixture. A blank row carries nothing to say, so it gets no
+    // label; a row with real content still says "Changed: <line>" as before.
+    let sr_label: Option<String> = if kind == HunkKind::Delete {
+        Some(t(lang, "Deleted"))
+    } else if wants_replace_label(kind, left.is_some()) {
+        Some(t(lang, "Changed"))
+    } else {
+        None
     };
     let row_class = if is_match {
         "diff-row match"
@@ -259,10 +267,14 @@ fn RowRight(
         HunkKind::Insert | HunkKind::Replace => "+",
         _ => " ",
     };
-    let sr_label: Option<String> = match kind {
-        HunkKind::Insert => Some(t(lang, "Inserted")),
-        HunkKind::Replace => Some(t(lang, "Changed")),
-        _ => None,
+    // F35: see the matching note in RowLeft — a blank counterpart row (no
+    // content on this side) gets no label instead of a bare "Changed".
+    let sr_label: Option<String> = if kind == HunkKind::Insert {
+        Some(t(lang, "Inserted"))
+    } else if wants_replace_label(kind, right.is_some()) {
+        Some(t(lang, "Changed"))
+    } else {
+        None
     };
     let row_class = if is_match {
         "diff-row match"
@@ -325,5 +337,40 @@ fn icls(k: InlineKind) -> &'static str {
         InlineKind::Equal => "",
         InlineKind::Delete => "in-del",
         InlineKind::Insert => "in-ins",
+    }
+}
+
+/// Whether a Replace-hunk row-half should carry the "Changed" screen-reader
+/// label (F35). `has_content` is whether *this* side of *this* row has a
+/// line at all — a Replace hunk with unequal left/right line counts
+/// produces rows where one side is a blank counterpart of the other, and
+/// labelling those too made a screen reader announce a bare "Changed" with
+/// no line content after it, once per blank row. Pure and side-independent
+/// so it's directly testable without a Dioxus scope (F36); `RowLeft`/
+/// `RowRight` are themselves `Store`-dependent components.
+fn wants_replace_label(kind: HunkKind, has_content: bool) -> bool {
+    kind == HunkKind::Replace && has_content
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn replace_row_with_content_wants_the_label() {
+        assert!(wants_replace_label(HunkKind::Replace, true));
+    }
+
+    #[test]
+    fn replace_row_without_content_is_a_blank_counterpart_and_wants_no_label() {
+        assert!(!wants_replace_label(HunkKind::Replace, false));
+    }
+
+    #[test]
+    fn non_replace_kinds_never_want_the_replace_label_regardless_of_content() {
+        for kind in [HunkKind::Equal, HunkKind::Insert, HunkKind::Delete] {
+            assert!(!wants_replace_label(kind, true));
+            assert!(!wants_replace_label(kind, false));
+        }
     }
 }
