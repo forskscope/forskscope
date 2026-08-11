@@ -18,6 +18,28 @@ fn tmp(tag: &str) -> PathBuf {
     d
 }
 
+/// Whether any ancestor of `path` (inclusive) contains a `.git` entry.
+/// Independent of `find_git_root`/`detect()` — a separate, obviously-correct
+/// walk used only to verify the "outside any repo" tests' own precondition
+/// (F10), never to test the upward walk itself. If it reused `detect()`, a
+/// genuine bug in `detect()` and a contaminated environment would be
+/// indistinguishable: both would report "confounded" and skip, silently
+/// hiding the bug it exists to protect against.
+fn ancestor_has_git(path: &std::path::Path) -> bool {
+    let Ok(mut cur) = path.canonicalize() else {
+        return false;
+    };
+    loop {
+        if cur.join(".git").exists() {
+            return true;
+        }
+        match cur.parent() {
+            Some(parent) => cur = parent.to_path_buf(),
+            None => return false,
+        }
+    }
+}
+
 fn git(dir: &std::path::Path, args: &[&str]) {
     let status = Command::new("git")
         .current_dir(dir)
@@ -54,6 +76,26 @@ fn detect_returns_git_provider_inside_repo() {
 fn detect_returns_none_outside_any_repo() {
     let dir = tmp("detect-none");
     // No git init — plain directory.
+
+    // detect() walks upward from `dir` looking for `.git`. If the OS temp
+    // directory's own ancestry happens to contain a Git repo (e.g. TMPDIR
+    // pointed into a checkout, some container layouts), the walk finds
+    // that enclosing repo and this test would be asserting against the
+    // wrong thing (F10). `dir` itself was never `git init`-ed, so any
+    // `Some` below can only come from ancestry above it — verify that
+    // precondition independently before trusting the assertion, rather
+    // than assuming the environment is clean.
+    if ancestor_has_git(&dir) {
+        eprintln!(
+            "skipping detect_returns_none_outside_any_repo: {} sits inside \
+             an enclosing Git repo — environment confound, not a `detect()` \
+             defect",
+            dir.display()
+        );
+        let _ = fs::remove_dir_all(&dir);
+        return;
+    }
+
     let provider = detect(&dir);
     assert!(provider.is_none(), "must return None outside a VCS repo");
     let _ = fs::remove_dir_all(&dir);
@@ -194,6 +236,20 @@ fn merge_base_of_head_with_itself_returns_head_hash() {
 #[test]
 fn git_provider_detect_returns_none_outside_git_repo() {
     let dir = tmp("no-git");
+
+    // Same environment confound as detect_returns_none_outside_any_repo
+    // (F10) — verify independently before trusting the assertion below.
+    if ancestor_has_git(&dir) {
+        eprintln!(
+            "skipping git_provider_detect_returns_none_outside_git_repo: {} \
+             sits inside an enclosing Git repo — environment confound, not \
+             a `GitProvider::detect` defect",
+            dir.display()
+        );
+        let _ = fs::remove_dir_all(&dir);
+        return;
+    }
+
     let result = GitProvider::detect(&dir);
     assert!(
         result.is_none(),
@@ -208,4 +264,38 @@ fn git_provider_detect_returns_none_outside_git_repo() {
 fn vcs_revision_display() {
     assert_eq!(VcsRevision::head().to_string(), "HEAD");
     assert_eq!(VcsRevision::working_tree().to_string(), "WORKING");
+}
+
+// ── ancestor_has_git() — the F10 precondition check itself ────────────────────
+
+#[test]
+fn ancestor_has_git_finds_a_dotgit_directly_present() {
+    let dir = tmp("ancestor-direct");
+    fs::create_dir_all(dir.join(".git")).unwrap();
+    assert!(ancestor_has_git(&dir));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn ancestor_has_git_finds_a_dotgit_several_levels_up() {
+    let root = tmp("ancestor-nested");
+    fs::create_dir_all(root.join(".git")).unwrap();
+    let nested = root.join("a").join("b").join("c");
+    fs::create_dir_all(&nested).unwrap();
+    assert!(
+        ancestor_has_git(&nested),
+        "must find an enclosing .git several levels above the starting path"
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn ancestor_has_git_is_false_with_no_dotgit_anywhere_in_the_fixture() {
+    let dir = tmp("ancestor-clean");
+    // No .git anywhere under `dir` itself. This cannot prove the real
+    // system temp root is clean (that's exactly the condition under test
+    // in the two "outside repo" tests above) — it only proves the walk
+    // logic itself doesn't false-positive on an ordinary directory tree.
+    assert!(!ancestor_has_git(&dir));
+    let _ = fs::remove_dir_all(&dir);
 }
