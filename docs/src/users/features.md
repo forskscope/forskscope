@@ -17,7 +17,9 @@
   you do not want.
 - **Undo / redo** — every merge action is reversible; Ctrl+Z / Ctrl+Y.
 - **Safe save** — external-modification detection before writing; automatic
-  `.bak` backup; atomic write.
+  `.bak` backup; atomic write (a reader never sees a partial file — see
+  [Merging](merging.md#saving-the-result) for exactly what this does and
+  does not guarantee).
 
 ---
 

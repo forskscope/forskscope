@@ -4,8 +4,14 @@
 //! fingerprint is compared against the current on-disk fingerprint; a
 //! mismatch is reported as [`CoreError::Conflict`] so the UI can offer
 //! reload / overwrite / save-as rather than silently clobbering external
-//! edits. Writes are atomic (temp file in the same directory, then rename)
-//! and an optional backup is taken before the rename.
+//! edits. Writes go through a temp file in the same directory, then
+//! `rename` — atomic in the sense that matters most day to day: a
+//! concurrent reader sees the old file or the new one, never a partial
+//! write (F9/N2). This is **not** a power-loss durability guarantee —
+//! neither the temp file nor its parent directory is `fsync`ed, so a crash
+//! at the wrong moment can still leave the target missing or, on some
+//! filesystems/mount options, present with unexpected content. An optional
+//! backup is taken before the rename.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -94,8 +100,13 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
 }
 
 /// Writes `bytes` to a sibling temp file, then renames it onto `target`.
-/// Atomic on POSIX (`rename` within the same volume); on failure the temp
-/// file is removed and the original at `target` is left untouched.
+/// Atomic *visibility* on POSIX (`rename` within the same volume): a
+/// concurrent reader sees the old file or the new one, never a partial
+/// write. On failure the temp file is removed and the original at `target`
+/// is left untouched. This is not a power-loss durability guarantee — no
+/// `fsync`/`sync_all` is called on the temp file or the parent directory
+/// (F9/N2) — only that no reader ever observes a torn write while the
+/// process keeps running.
 ///
 /// `pub(crate)` so `persist::schema`'s repositories (RFC-076) can reuse this
 /// primitive for settings/session writes instead of hand-rolling their own

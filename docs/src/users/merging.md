@@ -73,6 +73,18 @@ backup. Writing to a path that doesn't exist yet creates it (and any missing
 parent directories) atomically — it either appears complete or not at all,
 never partially written.
 
+**What "atomically" does and does not cover.** The write goes to a temporary
+file next to the target, then a rename replaces the target. That means
+another program reading the file at the same moment always sees either the
+complete old content or the complete new content — never a half-written
+file. It does **not** mean the write survives a power loss or a hard crash
+at exactly the wrong instant: ForskScope does not force the write to
+physical storage (`fsync`) before or after the rename, so on an unclean
+shutdown a save can, in rare cases, still be lost or incomplete depending on
+the filesystem and mount options. If that stronger guarantee matters for
+your workflow, keep your own backups or use a filesystem/mount configuration
+that provides it independently.
+
 ---
 
 ## Merge and the compare profile

@@ -121,8 +121,10 @@ settings/session schema. `SettingsRepository`/`SessionRepository`
 (`dirs_next::config_dir()`) as `settings.json`/`session.json` and never
 serializes either document itself. At startup, `resolve_and_commit` loads the
 file, classifies it (`PersistenceLoad`: `Missing`/`Current`/`MigratedLegacy`/
-`FutureVersion`/`Corrupt`), and durably commits a legacy migration immediately
-if one applies.
+`FutureVersion`/`Corrupt`), and commits a legacy migration immediately if one
+applies, through the same temp-file-then-rename primitive `save.rs` uses —
+visibility-atomic (a reader never sees a partial file), not a power-loss
+guarantee (F9/N2; no `fsync`/`sync_all` anywhere in `forskscope-core`).
 
 **Controls:**
 - Reads and writes use standard serde-json through a versioned envelope

@@ -120,6 +120,12 @@ with exact versions and records the owner-approved support minimum before the
 first artifact is exercised. Missing ownership or unavailable access blocks M5
 start and triggers schedule rebaselining; it does not narrow support silently.
 
+P08's three recovery-dialog actions (F37 amendment above) are required on
+every row regardless of its stated "Required level" here — a row whose level
+is narrower than "Full functional matrix" is not exempt from P08 specifically,
+because Exit's platform-specific process-termination path is exactly the kind
+of thing a narrower row would otherwise never exercise.
+
 ## Test corpus
 
 Use repository fixtures copied to an isolated temporary workspace. Never modify
@@ -206,7 +212,24 @@ runtime integration.
 - verify settings and eligible tabs migrate without loss;
 - verify backup and versioned envelope;
 - future-schema fixture produces visible incompatibility and is not overwritten;
-- corrupt fixture is preserved until explicit reset.
+- corrupt fixture is preserved until explicit reset;
+- **F37 amendment (2026-08-11):** this case predates RFC-076's blocking
+  recovery dialog (`RecoveryDialogAction`: `Exit`,
+  `ContinueWithTemporaryDefaults`, `ContinueWithoutSaving`,
+  `ResetAndBackupOriginal`), so the dialog's actions have been verified on
+  Linux/WebKitGTK only. Each of the three user-facing choices — **Exit**,
+  **Continue** (either variant — both dismiss the dialog and proceed without
+  blocking further), and **Reset** — must be exercised on every platform row
+  in the matrix, not only where a fixture happens to trigger the dialog for
+  an unrelated reason. **Exit is the one that matters most**: it terminates
+  the process from inside a modal during startup, invoked while a WebView-hosted
+  GUI event loop is running — exactly the kind of path that can hang, leave an
+  orphaned process, or behave inconsistently across window toolkits (WebKitGTK,
+  WebView2, WKWebView), and Linux-only evidence says nothing about whether it
+  does. A platform row is not P08-complete until all three choices have been
+  observed to actually resolve the dialog and leave the process in the
+  expected state (running normally for Continue, fully exited with no
+  orphaned process for Exit, dialog dismissed with the file reset for Reset).
 
 ### P09 — Mergetool
 
