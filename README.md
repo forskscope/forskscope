@@ -14,6 +14,14 @@ forskscope old/src/main.rs new/src/main.rs
 
 ForskScope opens two files (or two directories) side by side, highlights every change at line and character level, and lets you apply hunks from left to right with a single keystroke. Everything runs locally — no accounts, no uploads, no telemetry.
 
+![Side-by-side diff with per-hunk apply buttons](docs/src/assets/screenshot-diff.png)
+
+Every change is navigable with F7/F8 and applied with Enter or the **Use** button. Character-level highlighting shows what actually changed within a line.
+
+![Two-pane explorer comparing two directories](docs/src/assets/screenshot-explorer.png)
+
+Browse two directories side by side, see at a glance which files match, and open any pair in a diff tab.
+
 ---
 
 ## Why ForskScope
@@ -24,18 +32,29 @@ ForskScope fills that gap: a desktop app built on [Dioxus](https://dioxuslabs.co
 
 ---
 
-## Quick start
+## Install
 
-### Build from source
+Prebuilt binaries for Linux, macOS, and Windows are on the
+[Releases page](https://github.com/forskscope/forskscope/releases). Windows is
+also on the [Microsoft Store](https://apps.microsoft.com/detail/9p63f7npc3mh)
+(not always the newest build).
 
 ```sh
-# Prerequisites: Rust 1.91+, WebKitGTK 4.1 (Linux only)
-# Ubuntu / Debian:
-sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev pkg-config
+# Linux — prebuilt (Debian/Ubuntu-family; see note below)
+curl -LO https://github.com/forskscope/forskscope/releases/latest/download/forskscope-v0.166.0-linux-x86_64.tar.gz
+tar -xzf forskscope-v0.166.0-linux-x86_64.tar.gz && ./forskscope
 
-cargo build --release -p forskscope-ui
-./target/release/forskscope
+# Any distribution — build from source (Rust 1.91+)
+sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev pkg-config libssl-dev
+cargo build --release -p forskscope-ui && ./target/release/forskscope
 ```
+
+> The prebuilt Linux binary records `libxdo.so.3` and does not start on Arch or
+> other distributions shipping libxdo 4. Build from source there — see
+> [Installation](docs/src/users/installation.md) for the detail, and for macOS
+> Gatekeeper and Windows WebView2 notes.
+
+**[Full installation guide →](docs/src/users/installation.md)**
 
 ### Compare two files
 

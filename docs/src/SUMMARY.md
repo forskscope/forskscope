@@ -7,6 +7,7 @@
 ## New Users
 
 - [Features](./users/features.md)
+- [Installation](./users/installation.md)
 - [Quick start](./users/quick-start.md)
 - [Basic diff workflow](./users/diff-workflow.md)
 - [Merging changes](./users/merging.md)
