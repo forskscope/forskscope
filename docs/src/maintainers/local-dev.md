@@ -75,6 +75,32 @@ To add a new case:
 **CSS coverage tests** (`crates/forskscope-ui-logic/tests/css_coverage.rs`) compile
 `main.css` at build time and verify every CSS class token from core is present.
 
+**Testing `Store`-dependent UI logic (F36).** `Store::new` needs a live Dioxus
+runtime — `Signal::new_in_scope` panics without one, which a bare `#[test]` fn
+doesn't have. Two ways to get real test coverage instead of relying on
+AT-SPI/runtime evidence alone:
+
+1. **Prefer extracting a pure predicate.** If the logic under test is really a
+   decision — "does this row get a screen-reader label," "would this action
+   discard unsaved work" — pull it into a plain function over owned/borrowed
+   values with no `Store`/`Signal` involved, and unit-test that directly.
+   `wants_replace_label` (`ui/view/hunk.rs`, F35) and `recompute_diff`'s
+   destructive-contract test (`state/tab/tests.rs`, F40) are the examples to
+   copy. This is the default — reach for it first.
+2. **When the logic genuinely needs a `Store`** (dirty-check-then-modal
+   guards, tab mutation call sites), use `state::with_test_store` (`#[cfg(test)]`,
+   `pub(crate)`): it spins up a headless `dioxus_core::VirtualDom` — no
+   renderer, no WebView, no GTK — runs a trivial root component to get a real
+   `Store` backed by real `Signal`s, and hands it to your closure. See
+   `change_diff_options_defers_to_confirmation_when_the_tab_is_dirty` in
+   `state/tab/tests.rs` for a working example: push a fixture tab, call the
+   action function, assert on `store.modal`/`store.tabs` afterward, same as
+   any other unit test.
+
+Neither covers rendering, event dispatch from a real click, or visual
+correctness — those still need AT-SPI runtime evidence (or a rendering check,
+see F34). `with_test_store` closes the gap for *state mutation* logic only.
+
 ---
 
 ## MSRV

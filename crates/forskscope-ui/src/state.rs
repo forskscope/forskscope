@@ -242,3 +242,58 @@ pub fn advance_recovery_queue(store: &mut Store) {
     };
     store.modal.set(next.unwrap_or(Modal::None));
 }
+
+/// Test-only construction of a real, usable [`Store`] (F36). `Store::new`
+/// requires a live Dioxus runtime — `Signal::new_in_scope` panics without
+/// one — which a bare `#[test]` fn doesn't have. A headless
+/// `dioxus_core::VirtualDom` provides that runtime with no renderer, no
+/// WebView, no GTK: its root component runs inside a real scope, and the
+/// `Store` constructed there stays fully readable/writable after
+/// `rebuild_in_place()` returns, as long as `vdom` stays alive — which it
+/// does for the duration of `f`.
+///
+/// This closes the gap for testing `Store`-mutating logic directly: call
+/// the action function under test against a real `Store` and assert on the
+/// resulting `Signal` values, the same as any other unit test. It does not
+/// touch rendering, event dispatch, or visual correctness — those stay
+/// outside this helper's scope (F34's territory, not F36's).
+#[cfg(test)]
+pub(crate) fn with_test_store<R>(f: impl FnOnce(&mut Store) -> R) -> R {
+    use std::cell::RefCell;
+
+    thread_local! {
+        static CAPTURED: RefCell<Option<Store>> = const { RefCell::new(None) };
+    }
+
+    fn root() -> Element {
+        let store = Store::new(AppSettings::default(), Default::default(), false);
+        CAPTURED.with(|c| *c.borrow_mut() = Some(store));
+        rsx! {}
+    }
+
+    let mut vdom = VirtualDom::new(root);
+    vdom.rebuild_in_place();
+    let mut store = CAPTURED
+        .with(|c| c.borrow_mut().take())
+        .expect("root() must have run synchronously during rebuild_in_place()");
+    let result = f(&mut store);
+    drop(vdom);
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::with_test_store;
+    use dioxus::prelude::ReadableExt;
+
+    #[test]
+    fn with_test_store_yields_a_real_usable_store() {
+        with_test_store(|store| {
+            store.notify_success("hi");
+            assert_eq!(
+                store.toast.read().as_ref().map(|n| n.message.clone()),
+                Some("hi".to_string())
+            );
+        });
+    }
+}
