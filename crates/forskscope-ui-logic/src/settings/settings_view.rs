@@ -106,8 +106,15 @@ pub struct ProfileChoice {
 
 /// All built-in compare profile presets, in display order.
 ///
-/// These are the options shown in the profile picker. Custom profiles added by
-/// the user are appended after the presets in the component.
+/// These are the options meant for the toolbar profile picker RFC-028
+/// deferred post-v1 — no `forskscope-ui` file calls this function today
+/// (F25/F25b). They bridge `CompareProfile::all_presets()`, RFC-028's legacy
+/// preset set; they are **not** the profiles the shipped Settings dialog
+/// persists (`persist::schema::settings::ui_builtin_profiles()`), which use
+/// different names and are not kept in sync with these on purpose — see
+/// `CompareProfile::all_presets`'s doc for the full reasoning. Custom
+/// profiles added by the user are appended after the presets in the
+/// component, for whichever picker eventually consumes this.
 pub fn profile_presets() -> Vec<ProfileChoice> {
     CompareProfile::all_presets()
         .into_iter()

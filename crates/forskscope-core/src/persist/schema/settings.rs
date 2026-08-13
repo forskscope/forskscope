@@ -327,8 +327,9 @@ fn migrate_from_v0(v0: LegacyAppSettingsV0) -> PersistedSettings {
 
 /// The UI's four shipping built-in profiles, expressed in v2 shape. Canonical
 /// for v2 because these are the profiles users have actually seen; core's
-/// richer [`crate::diff::CompareProfile::all_presets`] is a different,
-/// UI-unreached preset set (see the review request for the full rationale).
+/// richer [`crate::diff::CompareProfile::all_presets`] is RFC-028's legacy
+/// toolbar-picker preset set, deliberately not kept in sync with this one —
+/// see its doc comment for the full reasoning (F25/F25b).
 fn ui_builtin_profiles() -> Vec<PersistedDiffProfile> {
     let base = |name: &str, whitespace, case, algorithm| PersistedDiffProfile {
         name: name.to_string(),

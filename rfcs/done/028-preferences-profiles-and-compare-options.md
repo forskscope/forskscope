@@ -2,6 +2,8 @@
 
 **Status.** Implemented (v0.50.0 + v0.60.0 + v0.66.0) — core fully complete; toolbar profile selector UI deferred post-v1
 
+**F25/F25b (2026-08-13):** because that toolbar UI was never built, `CompareProfile::all_presets()`'s four presets have never been shown to a user. RFC-076's settings v2 schema later needed its own built-in profile list for the (separate, shipped) Settings dialog and defined its own four independently — see `persist::schema::settings::ui_builtin_profiles()`'s doc comment. The two lists are not the same profiles and are deliberately not kept in sync.
+
 ## Status
 
 Core implementation complete across three releases:

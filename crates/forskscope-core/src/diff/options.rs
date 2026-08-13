@@ -185,6 +185,22 @@ impl CompareProfile {
     }
 
     /// All built-in profiles, in display order.
+    ///
+    /// **F25/F25b (decided 2026-08-13): this is RFC-028's legacy toolbar
+    /// profile-selector preset set, not the profiles the shipped Settings
+    /// dialog uses.** RFC-028's own status line already records that the
+    /// toolbar profile selector these presets were designed for was
+    /// deferred post-v1 and never built — no `forskscope-ui` file calls
+    /// this or `ui-logic::settings_view::profile_presets()`, its only
+    /// bridge. The four presets a user actually sees and persists today are
+    /// `persist::schema::settings::ui_builtin_profiles()`'s ("Exact
+    /// (default)", "Ignore whitespace", "Ignore case", "Histogram"),
+    /// authoritative for schema v2. The two sets are deliberately not kept
+    /// in sync — they serve two different, currently-unconnected features —
+    /// and must not be assumed interchangeable. If the toolbar profile
+    /// selector is ever built, its author must actively decide whether to
+    /// reuse `ui_builtin_profiles`'s names or this legacy set; do not assume
+    /// either answer.
     pub fn all_presets() -> Vec<Self> {
         vec![
             Self::default_profile(),
