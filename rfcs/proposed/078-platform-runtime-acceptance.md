@@ -106,9 +106,8 @@ sufficient for accountability.
 | Linux x86_64 | Current supported distribution, Wayland, WebKitGTK 4.1 | Full functional + visual matrix |
 | Linux x86_64 | X11 session, WebKitGTK 4.1 | Launch, compare, explorer, save, keyboard |
 | Windows x86_64 | Windows 11 with WebView2 | Full functional + packaging/save matrix |
-| Windows x86_64 | Windows 10 1903+ candidate | Launch/prerequisite/save matrix, or narrow published minimum with owner approval |
-| macOS aarch64 | Oldest claimed macOS version | Launch, compare, save, package/Gatekeeper matrix |
-| macOS aarch64 | Current macOS | Full functional matrix |
+| Windows x86_64 | Windows 10, version 1809+ candidate (F49: matches `AppxManifest.xml`'s current `MinVersion`, pending owner confirmation) | Launch/prerequisite/save matrix, or narrow published minimum with owner approval |
+| macOS aarch64 | macOS 13.0+ (F49: one row, not two — see "Execution model" below) | Launch, compare, save, package/Gatekeeper matrix, full functional where CI can observe it |
 
 One host may satisfy multiple rows only when it genuinely provides the named
 runtime/session. Virtual machines are acceptable if file-system and WebView
@@ -125,6 +124,69 @@ every row regardless of its stated "Required level" here — a row whose level
 is narrower than "Full functional matrix" is not exempt from P08 specifically,
 because Exit's platform-specific process-termination path is exactly the kind
 of thing a narrower row would otherwise never exercise.
+
+## Execution model (M4-C2 amendment, 2026-08-11)
+
+This RFC originally assumed named humans executing all twelve cases across
+six rows. That was never the actual resourcing, and freezing a matrix plan
+on top of an assumption the project cannot staff would have produced a
+schedule nobody could meet. The owner has stated the real model:
+
+> **Users:** Windows, macOS, Linux.
+> **Verification:** GitHub Actions CI on `windows-latest`, `macos-latest`,
+> `ubuntu-latest`, plus occasional manual tests on Linux Wayland and
+> Windows 11.
+
+This is a better fit than the original text, and F34 (the AT-SPI geometry
+rendering check added in `release.yml`'s `linux` job) already proves headless
+GUI verification genuinely works under this model — it is not a downgrade in
+rigor, it is describing what has already been demonstrated capable.
+
+**What CI covers, concretely:**
+
+- `ubuntu-latest` + `xvfb-run` + `dbus-run-session` (F34's mechanism):
+  functional cases that don't require a specific display protocol — this is
+  an X11-family virtual framebuffer, so it stands in for the `linux-x11` row
+  reasonably, but it is **not** a real Wayland compositor. The `linux-wayland`
+  row's Wayland-specific coverage still depends on the stated manual pass.
+- `windows-latest`: a Windows Server-based image, not literally a retail
+  Windows 10 or 11 install — close enough for save/filesystem/WebView2
+  behavior in the common case, but not a substitute for the manual Windows 11
+  pass where the two might actually differ (prerequisite state is the sharp
+  example, below).
+- `macos-latest`: whatever macOS version GitHub currently backs this label
+  with — a real Apple Silicon host, not virtualized. This is the **only**
+  macOS host in the stated model; there is no manual macOS pass. That is why
+  macOS collapses to one row above instead of two: a "current macOS" row with
+  no host to run it on is not a row, it is an aspiration, and RFC-000's own
+  discipline is to record what is true rather than what was hoped for.
+
+**Two cases are structurally invisible to CI, and a green matrix must not be
+read as covering them:**
+
+- **F45 — Windows prerequisites.** `windows-latest` runners ship with the
+  VC++ redistributable and WebView2 already preinstalled. A CI launch proves
+  the binary runs *on a machine that already has both* — the actual failure
+  mode this case exists to catch is a clean machine, and no CI runner is
+  one. **P01's prerequisite sub-case on Windows is marked manual-only**; the
+  owner's occasional Windows 11 manual pass is what covers it, not CI. A
+  Windows CI job passing P01 says nothing about F45 either way.
+- **F46 — macOS Gatekeeper.** Gatekeeper only refuses a file carrying the
+  quarantine extended attribute, which a real browser/`curl` download applies
+  and a CI `actions/checkout` does not. A `macos-latest` job launching a
+  locally-built, unquarantined app bundle will succeed regardless of whether
+  a real user's download would be refused — the case cannot distinguish
+  "signed and notarized" from "unsigned, Gatekeeper just never saw the
+  quarantine bit." With no macOS manual host anywhere in the stated model,
+  **F46 cannot be verified at all under current resourcing.** This is
+  recorded as an explicit open gap with release impact — not waived, not
+  marked Pass, not silently absorbed into a green `macos-aarch64` row. Per
+  RFC-078's own Waiver policy, "inability to launch on a claimed supported
+  platform" is never waivable, and an unverifiable Gatekeeper posture is
+  adjacent to that: a real user's first-launch experience on macOS is
+  unknown, not merely untested-but-probably-fine. Gate D's evidence for the
+  `macos-aarch64` row must state this gap explicitly rather than let a
+  passing P01 on `macos-latest` imply it.
 
 ## Test corpus
 
@@ -262,6 +324,21 @@ runtime integration.
 
 ### Windows
 
+- **F49 amendment (2026-08-11):** four sources disagreed on the minimum
+  Windows version — `packaging/windows/AppxManifest.xml`'s `MinVersion`
+  (10.0.17763.0, Windows 10 1809), its own `MaxVersionTested` (10.0.19041.0,
+  Windows 10 2004 — predating Windows 11 entirely, in tension with this
+  RFC's own Windows 11 row below), this table's prior "1903+", and
+  `docs/src/users/installation.md`'s formerly-vague "Windows 10 or later."
+  `installation.md` now states **Windows 10, version 1809** explicitly,
+  matching `AppxManifest.xml`'s `MinVersion` as written — chosen because
+  `AppxManifest.xml` may back a live Microsoft Store submission
+  (`docs/src/users/installation.md` links one), and changing its declared
+  version constraints without knowing that submission's actual state carries
+  real risk this slice is not positioned to take. **This is an open owner
+  question, not a resolved one** — see the M4-C2 review request for whether
+  the manifest's values themselves should change, and note `MaxVersionTested`
+  still undersells Windows 11 compatibility regardless;
 - test overwrite semantics on an existing destination;
 - verify backup and temp replacement behavior on NTFS;
 - verify long-path behavior according to documented support;
@@ -274,8 +351,21 @@ amendment and implementation fix.
 
 ### macOS
 
-- resolve the documentation conflict between macOS 12 and the package's
-  `LSMinimumSystemVersion` 13.0 from observed build/runtime support;
+- **F49 amendment (2026-08-11):** the documentation conflict this RFC
+  originally named ("macOS 12" here vs. the package's `LSMinimumSystemVersion`
+  13.0) had drifted — "macOS 12" appeared nowhere else in the repository, and
+  neither number came from an explicit build-time deployment target
+  (`MACOSX_DEPLOYMENT_TARGET` was unset, so the Mach-O's `minos` was whatever
+  the build runner's SDK happened to yield — observed as 11.0 on the
+  `0.166.0` artifact, a third, undocumented number). `MACOSX_DEPLOYMENT_TARGET`
+  is now set explicitly to **13.0** in `release.yml`'s macOS job, matching
+  `Info.plist`'s existing `LSMinimumSystemVersion` — the value already
+  enforced by macOS Launch Services on every DMG-installed copy today, so
+  this reconciliation does not change what already runs. **This specific
+  floor (13.0) is provisional pending explicit owner confirmation** — see
+  the M4-C2 review request; a future decision to widen support to an earlier
+  macOS version requires updating both `Info.plist` and this build-time
+  target together, not just one;
 - verify DMG opens, app bundle layout, executable launch, and Gatekeeper
   guidance;
 - record signing/notarization as Pass, Deferred-with-warning, or Blocked.

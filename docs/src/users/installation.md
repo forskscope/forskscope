@@ -85,9 +85,11 @@ Download `forskscope-vX.Y.Z-windows-x64.zip` from the
 run `forskscope.exe`. The archive also contains the README, license, notice, and
 changelog.
 
-Windows 10 or later. ForskScope renders through the **WebView2 runtime**, which
-is preinstalled on Windows 11 and on current Windows 10; if the window opens
-blank or fails to start, install the
+**Windows 10, version 1809, or later** (matches the Store manifest's
+declared `MinVersion`; see this slice's review request for an open question
+on whether this floor should change). ForskScope renders through the
+**WebView2 runtime**, which is preinstalled on Windows 11 and on current
+Windows 10; if the window opens blank or fails to start, install the
 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) and
 the [Visual C++ redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe).
 
@@ -96,7 +98,8 @@ the [Visual C++ redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe)
 ## macOS
 
 Download `forskscope-vX.Y.Z-macos-aarch64.dmg` (Apple silicon), open it, and drag
-ForskScope to Applications.
+ForskScope to Applications. Requires **macOS 13.0 or later** (matches
+`Info.plist`'s `LSMinimumSystemVersion`, which macOS enforces at launch).
 
 > **The build is not signed with an Apple Developer ID and is not notarized.**
 > macOS may therefore refuse to open it on first launch. Right-click the app and

@@ -1,18 +1,22 @@
 # Platform Runtime Matrix Plan
 
 **Governing RFC:** RFC-078 (Platform Runtime Acceptance and Release
-Evidence), P08 as amended by F37 (2026-08-11).
+Evidence), P08 as amended by F37 (2026-08-11), execution model and macOS row
+count as amended by F49/M4-C2 (2026-08-11).
 **Status: structurally complete, not yet frozen.** The case-to-row mapping
-below is decided. The per-row execution facts — exact OS version, executor,
-host-access status — are owner-dependent and marked `TBD` throughout; see
-"Questions for the owner" at the end. Per RFC-078's own Precondition, this
-plan is **committed before M5 begins**, not before every field is known —
-but M5 cannot actually *start* until the `TBD`s are resolved, since a row
-with no named executor and no confirmed host-access status cannot be
-executed.
+below is decided, and the CI-vs-manual verification method per row is now
+settled (RFC-078's "Execution model" amendment). The per-row execution
+facts that remain open — exact OS version confirmation, executor,
+host-access status for the manual passes — are owner-dependent and marked
+`TBD`/provisional throughout; see "Questions for the owner" at the end. Per
+RFC-078's own Precondition, this plan is **committed before M5 begins**, not
+before every field is known — but M5 cannot actually *start* until the open
+items are resolved, since a manual-pass row with no named executor cannot
+be executed.
 
 **This slice plans and freezes the plan. It does not execute any case.**
-Running the matrix is M5's work.
+Running the matrix — including the CI-automated rows, once the release
+workflow actually produces a tagged candidate — is M5's work.
 
 This directory name (`0.167.0-rc1`) is a placeholder — see this slice's
 review request for the version/RC-identifier question to the owner.
@@ -23,25 +27,30 @@ review request for the version/RC-identifier question to the owner.
 
 Five rows, per RFC-078's "Durable evidence layout" file list
 (`linux-wayland.md`, `linux-x11.md`, `windows-11.md`, `windows-10.md`,
-`macos-aarch64.md`) — **not** the six rows in RFC-078's own "Required
-platform matrix" table, which splits macOS into "oldest claimed" and
-"current" as two separate table rows sharing one evidence file. See
-Question 3 below: whether `macos-aarch64.md` needs two sub-sections (one per
-macOS version) or the "current" sub-target is dropped for v1.
+`macos-aarch64.md`) — matching RFC-078's own "Required platform matrix"
+table, **now also five rows** after the F49/M4-C2 amendment resolved the
+internal inconsistency review 056 flagged (the table previously split macOS
+into "oldest claimed" and "current" as two rows sharing one evidence file).
+Resolution: there is no manual macOS host in the owner's stated execution
+model — `macos-latest` CI is the *only* macOS access this project has — so a
+second, CI-inaccessible "current macOS, full matrix" row was never
+executable under current resourcing. One row, matching the one real host.
 
-| Row | Target | Exact OS version | Architecture | Executor (owner/role) | Host-access status |
-|---|---|---|---|---|---|
-| `linux-wayland` | Linux x86_64, Wayland, WebKitGTK 4.1 | **TBD** | x86_64 | **TBD** | **TBD** |
-| `linux-x11` | Linux x86_64, X11, WebKitGTK 4.1 | **TBD** | x86_64 | **TBD** | **TBD** |
-| `windows-11` | Windows 11 with WebView2 | **TBD** | x86_64 | **TBD** | **TBD** |
-| `windows-10` | Windows 10 1903+ | **TBD** | x86_64 | **TBD** | **TBD** |
-| `macos-aarch64` | macOS, aarch64 | **TBD** — see Question 3 | aarch64 | **TBD** | **TBD** |
+| Row | Target | Exact OS version | Architecture | Verification method | Executor (owner/role) | Host-access status |
+|---|---|---|---|---|---|---|
+| `linux-wayland` | Linux x86_64, Wayland, WebKitGTK 4.1 | **TBD** | x86_64 | **Manual** — CI's Xvfb is X11-family, not real Wayland | **TBD** | **TBD** |
+| `linux-x11` | Linux x86_64, X11, WebKitGTK 4.1 | **TBD** | x86_64 | **CI** — `ubuntu-latest` + `xvfb-run`/`dbus-run-session` (F34's mechanism) stands in for this row reasonably | n/a (CI) | CI — available now |
+| `windows-11` | Windows 11 with WebView2 | **TBD** | x86_64 | **CI** for most cases, **Manual** for F45's prerequisite sub-case (§3) | CI: n/a; Manual: **TBD** | CI available now; Manual: **TBD** |
+| `windows-10` | Windows 10, version 1809+ (F49, provisional) | provisional: **1809** | x86_64 | **CI** — `windows-latest` is a Server-based image, not a literal retail Win10/11 install, but stands in reasonably for save/filesystem/WebView2 behavior | n/a (CI) | CI — available now |
+| `macos-aarch64` | macOS 13.0+ (F49, provisional) | provisional: **13.0** | aarch64 | **CI only** — `macos-latest`; **F46 (Gatekeeper) cannot be verified under this model at all** (§3) | n/a (CI) | CI — available now |
 
-`ROADMAP.md` currently records "RFC-078 host access for Linux, Windows, and
-macOS is confirmed available" — that is not the same claim as a named
-executor with a specific machine per row, which is what RFC-078's
-Precondition actually requires. Not treated as sufficient here; see
-Question 2.
+`ROADMAP.md` previously recorded "RFC-078 host access for Linux, Windows,
+and macOS is confirmed available" — now superseded by the more precise
+statement above: CI access is confirmed and already usable *today* for
+`linux-x11`, `windows-10`/`windows-11` (except F45's prerequisite sub-case),
+and `macos-aarch64` (except F46 entirely); the *manual* passes
+(`linux-wayland`, and Windows 11's prerequisite sub-case) still need a named
+executor per RFC-078's Precondition — see Question 2.
 
 ---
 
@@ -89,20 +98,36 @@ rendering engine; a spot-check (open the compare view, confirm no
 misalignment by eye) catches an X11-specific windowing regression without
 duplicating the Wayland row's full pass.
 
-**P06 (Spot-check on linux-x11, windows-10).** RFC-078's own case text:
-*"Deterministic automated tests remain the primary proof; this case
-confirms runtime integration."* RFC-075's deterministic test suite already
-exhaustively covers the async-identity state machine itself (close-before-
-reindex, overlapping reloads, obsolete completions — see
-`state/compare/tests.rs`). What P06 adds beyond that is confirmation the
-state machine integrates correctly with each platform's own async
-runtime/event loop. linux-wayland and windows-11 (the two "Full functional"
-rows) each cover one such engine family (WebKitGTK+GTK's glib main loop,
-WebView2's own message loop); linux-x11 shares linux-wayland's engine family
-and windows-10 shares windows-11's, so a full second confirmation on the
-narrower row of the *same* engine family has low marginal value. macos-aarch64
-is Required regardless, since WKWebView/Cocoa's run loop is a third distinct
-family with no other row to inherit coverage from.
+**P06 (Spot-check on linux-x11, windows-10) — with an open axis question
+(review 056 N1).** RFC-078's own case text: *"Deterministic automated tests
+remain the primary proof; this case confirms runtime integration."*
+RFC-075's deterministic test suite already exhaustively covers the
+async-identity state machine itself (close-before-reindex, overlapping
+reloads, obsolete completions — see `state/compare/tests.rs`). What P06 adds
+beyond that is confirmation the state machine integrates correctly with each
+platform's own async runtime/event loop. linux-wayland and windows-11 (the
+two "Full functional" rows) each cover one such engine family
+(WebKitGTK+GTK's glib main loop, WebView2's own message loop); linux-x11
+shares linux-wayland's engine family and windows-10 shares windows-11's, so
+a full second confirmation on the narrower row of the *same* engine family
+has low marginal value. macos-aarch64 is Required regardless, since
+WKWebView/Cocoa's run loop is a third distinct family with no other row to
+inherit coverage from.
+
+**The engine-family axis may not be the right one for this specific case.**
+Async identity is fundamentally about *timing* — a background compare
+completing against live tab state — and the completion path runs through
+the windowing event loop, which for Linux is `tao`'s Wayland-versus-X11
+backend, not WebKitGTK itself. Wayland and X11 share WebKitGTK's rendering
+engine but not their own event-loop integration, so `linux-x11` is not as
+obviously covered by `linux-wayland` for *this* case as it is for P03 (a
+genuinely rendering-engine-scoped case). This is a judgment call, not
+settled fact — recorded here rather than silently assumed, per review 056.
+**Backstop rule, adopted regardless of how the axis question resolves: if
+any P06 defect appears on any row, every P06 spot-check on that platform is
+upgraded to Required before the matrix closes.** A cheap assumption that
+fails loudly on first contrary evidence is safe to make; one that stays
+cheap after evidence contradicts it is not.
 
 **P08 (Required everywhere — F37).** Explicit per the amendment: narrower row
 scope does not exempt P08. Exit's process-termination path is the specific
@@ -175,27 +200,41 @@ waived. Once the `dioxus-desktop` release carrying the fix lands, this
 constraint is removed and P01 is re-verified against the fixed artifact.
 
 **F45 — the Windows artifact's undeclared `VCRUNTIME140.dll`/WebView2
-dependencies.** `windows-11` and `windows-10`'s P01 must explicitly include a
-sub-case on a machine **without** the VC++ redistributable and, for
-`windows-10` specifically, without WebView2 preinstalled (not guaranteed the
-way it is on Windows 11) — not only a machine that already happens to have
-both. This is inspection-level (artifact import-table analysis), not yet
-confirmed by execution.
+dependencies — structurally invisible to CI (RFC-078 "Execution model"
+amendment).** `windows-latest` runners ship with the VC++ redistributable
+and WebView2 already preinstalled, so a CI pass on `windows-11`/`windows-10`
+proves the binary runs on a machine that already has both — it cannot
+observe the actual failure mode. **P01's prerequisite sub-case is marked
+manual-only** on both Windows rows; it depends entirely on the owner's
+stated occasional Windows 11 manual pass (there is no manual Windows 10 pass
+in the stated model, so `windows-10`'s prerequisite sub-case has the same
+gap as `macos-aarch64`'s F46 below — recorded, not yet resolved by this
+plan). This is inspection-level (artifact import-table analysis) until that
+manual pass runs.
 
-**F46 — the macOS artifact is unsigned and unnotarized.** `macos-aarch64`'s
-P01 must use the **real download path** (a DMG actually downloaded through a
-browser or `curl`, carrying the quarantine extended attribute) — a
-locally-built, unquarantined bundle will not observe Gatekeeper's expected
-refusal at all, defeating the point of the case. Also resolve the
-macOS-12-vs-`LSMinimumSystemVersion`-13.0 conflict from observed
-build/runtime support, per RFC-078's own macOS platform-specific case text.
-This is inspection-level (artifact/Mach-O analysis), not yet confirmed by
-execution.
+**F46 — the macOS artifact is unsigned and unnotarized — unverifiable under
+current resourcing (RFC-078 "Execution model" amendment).** Gatekeeper only
+refuses a file carrying the quarantine extended attribute, which a real
+browser/`curl` download applies and `actions/checkout` does not — a
+`macos-latest` CI job launching a locally-built, unquarantined bundle cannot
+distinguish "properly signed" from "unsigned but Gatekeeper never saw the
+quarantine bit." **With no manual macOS host anywhere in the owner's stated
+execution model, F46 cannot be verified at all**, not just "not yet." This
+is not the same status as F45 (which *can* be resolved by the stated
+Windows 11 manual pass) — F46 has no path to resolution under current
+resourcing, full stop. Record this as an explicit open gap with release
+impact in `macos-aarch64.md`'s evidence, not as a passing row; per RFC-078's
+Waiver policy, this is adjacent to "inability to launch on a claimed
+supported platform," which is never waivable. The macOS-12-vs-
+`LSMinimumSystemVersion`-13.0 conflict itself is resolved by F49 (§ above) —
+what remains open here is Gatekeeper specifically, not the version conflict.
 
-All three are **inspection-level findings except F44** (which has direct
-execution evidence — the owner ran the artifact and observed the launch
-failure). The matrix's job is to convert F45 and F46 from inspection to
-verified-by-execution, and to re-verify F44 once the upstream fix ships.
+**F44 remains the only one of the three with direct execution evidence** —
+the owner ran the artifact and observed the launch failure. F45 has a
+resolution path (the manual Windows 11 pass) that this plan records but has
+not yet executed. F46 has no resolution path under current resourcing at
+all — the matrix's job for F46 is to make that gap explicit and visible in
+Gate D's evidence, not to close it.
 
 ---
 
@@ -204,46 +243,49 @@ verified-by-execution, and to re-verify F44 once the upstream fix ships.
 Collected here, not guessed, per the handoff's explicit instruction that "a
 frozen plan built on guesses is worse than an unfrozen one."
 
-1. **Exact OS versions per row.** RFC-078 §118 requires concrete versions,
-   not "current" or "oldest claimed." Specifically:
-   - `linux-wayland`/`linux-x11`: which distribution and version is the
-     actual supported baseline? (The CI-built artifact is Ubuntu-family;
-     is the *claimed* support baseline also Ubuntu/Debian-family, or does
-     it include libxdo-4 distros like Arch, in which case F44 blocks P01
-     there until the dioxus fix ships and this needs to be reflected as a
-     schedule dependency, not just a footnote?)
-   - `windows-11`: a specific build/version string, or "any Windows 11"?
-   - `windows-10`: RFC-078 names "1903+" as a starting point — is that the
-     actual claimed minimum, or does the owner want to narrow it (RFC-078
-     explicitly permits "narrow published minimum with owner approval")?
-   - `macos-aarch64`: RFC-078's table names both an "oldest claimed" version
-     and "current" as separate targets sharing this row/file — what are
-     those two versions concretely? (Ties into Question 3.)
+1. **Exact OS versions per row — two now have a proposed default, three
+   remain fully open.** RFC-078 §118 requires concrete versions, not
+   "current" or "oldest claimed":
+   - `macos-aarch64`: **proposed 13.0**, matching `Info.plist`'s
+     `LSMinimumSystemVersion` (already enforced on every DMG-installed copy
+     today) — F49 set `MACOSX_DEPLOYMENT_TARGET` to match. Confirm, or state
+     the real floor if it should widen to capture more Apple Silicon Macs
+     (11.0 is the hardware floor).
+   - `windows-10`/`windows-11`: **proposed 1809**, matching
+     `AppxManifest.xml`'s current `MinVersion` — deliberately *not* changed
+     by this plan, since that manifest may back a live Microsoft Store
+     submission (`docs/src/users/installation.md` links one) and editing its
+     declared constraints without knowing the submission's real state is not
+     a call this slice is positioned to make. Confirm whether the manifest's
+     values themselves should change, and separately, whether
+     `MaxVersionTested` (currently 10.0.19041.0, Windows 10 2004 — below
+     Windows 11) should be raised.
+   - `linux-wayland`/`linux-x11`: still fully open. Which distribution and
+     version is the actual supported baseline? The CI-built artifact is
+     Ubuntu-family; is the *claimed* support baseline also Ubuntu/
+     Debian-family, or does it include libxdo-4 distros like Arch, in which
+     case F44 blocks P01 there until the dioxus fix ships and this needs to
+     be a schedule dependency, not just a footnote?
 
-2. **Executor owner/role per row.** Who actually runs each row — a name or
-   role, and do the same person/role cover multiple rows, or is each row
-   independently owned? `ROADMAP.md`'s "host access is confirmed available"
-   note doesn't name anyone; RFC-078's Precondition requires a named
-   executor, not just confirmed access to *some* host.
+2. **Executor owner/role for the manual passes.** The CI rows
+   (`linux-x11`, `windows-10`, `windows-11` except F45's sub-case,
+   `macos-aarch64` except F46) need no named human — CI runs them. The
+   manual rows/sub-cases (`linux-wayland` in full; `windows-11`'s F45
+   prerequisite sub-case) do: who actually runs them, a name or role?
+   `ROADMAP.md`'s former "host access is confirmed available" note named no
+   one; RFC-078's Precondition requires a named executor for whatever is not
+   automated.
 
-3. **Host-access status per row**, and specifically: is there a real
-   physical or virtual host for each of the five rows right now, or does
-   access need to be arranged before M5 can start for some of them? RFC-078
-   permits VMs "if file-system and WebView behavior are representative and
-   recorded" — does the actual access plan rely on VMs for any row, and if
-   so, which?
+3. **Host-access status for the manual passes specifically.** Is there a
+   real Linux-with-real-Wayland host and a real Windows 11 host available
+   right now for the two manual passes, or does access need arranging
+   before M5 can start? (The five CI rows need no separate host-access
+   question — GitHub-hosted runners are the host, already available.)
 
-4. **macOS: one row or two?** RFC-078's "Required platform matrix" table
-   lists macOS twice (oldest-claimed and current) as separate targets with
-   different required levels ("Launch, compare, save, package/Gatekeeper
-   matrix" vs. "Full functional matrix"), but the "Durable evidence layout"
-   lists only one `macos-aarch64.md` file, and this handoff's own row list
-   names only one `macos-aarch64` row. Should `macos-aarch64.md` contain two
-   dated sub-sections (one per macOS version, both exercising their
-   respective required-level case sets), or is the "current macOS" full-matrix
-   target dropped for v1 and only the oldest-claimed row's narrower set
-   required? This changes the case-to-row table above for macOS if the
-   answer is "two sub-sections, different levels each."
+4. ~~macOS: one row or two?~~ **Resolved by this slice.** One row — there is
+   no manual macOS host in the stated execution model, so a second row
+   requiring one was never executable. See RFC-078's "Execution model"
+   amendment and §1 above.
 
 5. **Version/RC identifier for this evidence directory.** `0.167.0-rc1` was
    chosen only as a placeholder so this plan has somewhere to live before a

@@ -45,11 +45,22 @@ desktop backend, reached via `dioxus-desktop` → (`tao`, `wry`, `muda`,
 `glib` directly — confirmed by `grep -rn "glib::\|use glib" crates/` finding
 no matches.
 
-**Reachability — not reachable, established by full-source search.**
-`VariantStrIter` has exactly one public constructor:
+**Reachability — not reachable, established two ways.** `VariantStrIter::new`
+(`glib-0.18.5/src/variant_iter.rs:108-109`) is `pub(crate)` — **the type has
+no external constructor at all**, a compiler-enforced fact checked by
+reading one visibility modifier, not by searching for absence of a call
+site. The only route in from outside `glib` is
 `glib::Variant::array_iter_str(&self) -> Result<VariantStrIter, ...>`
-(`glib-0.18.5/src/variant.rs:843`). It is the *only* way to obtain the
-unsound iterator anywhere in the crate. Searched every locally cached
+(`glib-0.18.5/src/variant.rs:843`), which wraps `new` for library-internal
+use. Stating the disposition as "no external construction path exists"
+(review 056) is both stronger and cheaper to re-verify than "nothing
+currently calls the one public constructor": the `pub(crate)` check is a
+one-line grep the compiler itself already enforces for every external
+crate, with no risk of a macro-expanded or otherwise-obscured call site
+being missed the way a text search always risks. The full-source grep below
+is the second, independent confirmation — that nothing calls
+`array_iter_str` either, so even the crate-internal path glib itself
+provides goes unused by anything downstream. Searched every locally cached
 version of every crate in the dependency chain that could reach `glib`
 (`atk`, `atk-sys`, `cairo-rs`, `gdk`, `gdk-pixbuf`, `gdk-sys`, `gio`,
 `glib-macros`, `gtk`, `gtk-sys`, `gtk3-macros`, `muda`, `tao`, `tray-icon`,
@@ -99,7 +110,16 @@ of generated data), and trace-level logging is active (or warn-level with
 `rand` 0.7.3 — the unsound path requires an application to wire a custom
 logger into `rand`'s internals.
 
-**Dependency path — established via `cargo tree -i rand@0.7.3 --target all`:**
+**Dependency path — established via `cargo tree -i rand@0.7.3 --target all`.**
+`--target all` is required: `cargo tree -i rand@0.7.3 -p forskscope-ui`
+(the obvious command a future reviewer would reach for first) prints
+*"nothing to print"* and suggests `--target all` itself, because the whole
+path is `[build-dependencies]`-only and `cargo tree` filters those out of
+the default host-target view. **A future reviewer running the shorter
+command without `--target all` will see no output and could conclude the
+advisory has lapsed — it has not; the dependency is still present, just
+invisible to that command.** Noted here so re-verification doesn't require
+rediscovering this (review 056).
 
 ```text
 rand v0.7.3

@@ -158,7 +158,7 @@ jobs:
   # ── macOS aarch64 ───────────────────────────────────────────────────────────
   macos:
     name: macOS aarch64
-    runs-on: macos-14
+    runs-on: macos-latest
     needs: source
     steps:
       - uses: actions/checkout@v7
@@ -177,7 +177,14 @@ jobs:
             target
           key: macos-release-${{ hashFiles('**/Cargo.lock') }}
 
+      # F49: explicit, not left to whatever SDK the runner image happens to
+      # carry — Info.plist's LSMinimumSystemVersion (packaging/macos/build-dmg.sh)
+      # must keep agreeing with this. 13.0 matches the Info.plist value already
+      # in place; see this slice's review request for the open question on
+      # whether that floor itself should change.
       - name: Build release binary
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "13.0"
         run: cargo build --release --locked --target aarch64-apple-darwin -p forskscope-ui
 
       - name: Package
