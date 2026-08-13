@@ -8,12 +8,17 @@ plan frozen by F56/M4-C4 (2026-08-13).
 **Status: FROZEN as of 2026-08-13.** Hosts, cases, and executors below are
 fixed. Changing any of them after M5 begins invalidates evidence already
 gathered under this plan — a row re-planned mid-matrix is not the row that
-produced the evidence collected so far. This is a **standing document**: it
-lives at `release-evidence/matrix-plan.md`, not inside a per-cut directory,
-because the plan itself (hosts, cases, executors) does not change per
-release the way results do — see F56 and RFC-078's "Durable evidence
-layout" for the reasoning. Per-cut results (`artifacts.md`, platform
-records) live under `release-evidence/<tag>/`, created at the actual cut.
+produced the evidence collected so far. **Unfreezing (review 061 §3.3):**
+amending a frozen row after M5 begins requires **owner and architect
+agreement**, and every affected row's evidence is **re-gathered, not
+reinterpreted** — a control, not just a warning, so a future slice under
+time pressure cannot quietly amend a row and keep evidence gathered under
+the plan it just changed. This is a **standing document**: it lives at
+`release-evidence/matrix-plan.md`, not inside a per-cut directory, because
+the plan itself (hosts, cases, executors) does not change per release the
+way results do — see F56 and RFC-078's "Durable evidence layout" for the
+reasoning. Per-cut results (`artifacts.md`, platform records) live under
+`release-evidence/<tag>/`, created at the actual cut.
 
 **This plan does not execute any case.** Running the matrix — including the
 CI-automated rows, once the release workflow actually produces a tagged
@@ -240,12 +245,24 @@ per the handoff's explicit instruction to decide rather than default):**
   a new discovery, but not a **waived** one in the sense that matters for
   release decisions.
 - **What this plan does not do:** decide, in advance, that this failure
-  blocks the release. That is Gate D's call, weighing this alongside
-  everything else — this plan's job is to make sure the failure is
-  *visible and correctly attributed* when Gate D happens, not to
-  pre-resolve it into a No-Go before the evidence exists. Hiding it (by
-  testing only a compatible host) would be the opposite failure — a green
-  matrix that doesn't mean what it appears to.
+  blocks the release. That is Gate D's call — this plan's job is to make
+  sure the failure is *visible and correctly attributed* when Gate D
+  happens, not to pre-resolve it into a No-Go before the evidence exists.
+  Hiding it (by testing only a compatible host) would be the opposite
+  failure — a green matrix that doesn't mean what it appears to.
+- **Correction (review 061 §3.1): "Gate D's call" above is not discretion —
+  it is already decided.** RFC-078's Waiver policy states no waiver may
+  turn "inability to launch on a claimed supported platform" into a
+  release pass, and an un-fixed F44 failure on a libxdo-4 host is exactly
+  that. So this is not a risk Gate D weighs against other factors; it is a
+  **binary schedule dependency**: if the upstream `dioxus-desktop` release
+  has landed before M5 runs P01, the candidate can pass on Linux; if it has
+  not, Linux P01 fails un-waivably and **the candidate cannot pass Gate D
+  until it does**. There is nothing to lean on, so this plan states the
+  binary outcome directly rather than leaving a future reader to discover
+  the Waiver policy's implication themselves. Practically: the upstream
+  release is now on this project's critical path for M5, not merely
+  something to watch.
 
 **Tie to F55/review 060's residual:** the `dioxus-desktop` bump that fixes
 F44 is, by definition, a `Cargo.lock` change — the natural first real
