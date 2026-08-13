@@ -44,6 +44,22 @@ executable under current resourcing. One row, matching the one real host.
 | `windows-10` | Windows 10, version 1809+ (F49, provisional) | provisional: **1809** | x86_64 | **CI** — `windows-latest` is a Server-based image, not a literal retail Win10/11 install, but stands in reasonably for save/filesystem/WebView2 behavior | n/a (CI) | CI — available now |
 | `macos-aarch64` | macOS 13.0+ (F49, provisional) | provisional: **13.0** | aarch64 | **CI only** — `macos-latest`; **F46 (Gatekeeper) cannot be verified under this model at all** (§3) | n/a (CI) | CI — available now |
 
+**Rolling-label caveat (review 057 §4.3).** `macos-latest`, `windows-latest`,
+and `ubuntu-latest` are rolling labels — GitHub advances what they resolve
+to on its own schedule, so a row's actual runtime can change without any
+commit in this repository. Evidence recorded under "macos-latest" alone is
+not reproducible from this plan, which is precisely what RFC-078 §118's
+"concrete versions, not 'current'" requirement exists to prevent. Matters
+most for `macos-aarch64`: it is the only row with no manual pass behind it,
+so the CI run *is* the entire evidence for that platform, with no
+independent check to catch a silent runner-image drift. **Each evidence
+file must record the resolved image version the run actually used at
+execution time** (e.g. the `ImageVersion`/`ImageOS` values GitHub Actions
+exposes in the runner environment, or the platform version a diagnostic
+step prints), not just the rolling label — so a row states which macOS,
+Windows, or Ubuntu build actually ran, even though this plan can only name
+the moving label in advance.
+
 `ROADMAP.md` previously recorded "RFC-078 host access for Linux, Windows,
 and macOS is confirmed available" — now superseded by the more precise
 statement above: CI access is confirmed and already usable *today* for
