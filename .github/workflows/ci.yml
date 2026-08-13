@@ -75,9 +75,6 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --version 0.22.2 --locked
-
       - name: cargo fmt
         run: cargo fmt --check
 
@@ -100,9 +97,13 @@ jobs:
       - name: i18n coverage check
         run: cargo xtask i18n
 
-      - name: Security advisory audit
-        run: cargo audit
-
+      # F55: cargo audit itself moved to a daily scheduled workflow
+      # (audit.yml) — it reads a mutable external database, so a per-push
+      # result is a property of the commit and the clock, not just the
+      # commit (F50). audit-deps stays here: it checks this repo's own
+      # dependency-path shape against .cargo/audit.toml's reviewed
+      # exceptions, which cargo.lock alone determines deterministically —
+      # it has none of cargo audit's live-database flakiness.
       - name: Security dependency path check
         run: cargo xtask audit-deps
 

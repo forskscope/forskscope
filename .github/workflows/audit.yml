@@ -1,0 +1,60 @@
+name: Scheduled Security Advisory Audit
+
+# F55: `cargo audit` reads a mutable external database (RustSec), so a
+# per-push result is a property of the commit *and the clock*, not the
+# commit alone — F50 demonstrated this directly (two CI runs on `main`
+# minutes apart, one green one red, no dependency change between them). A
+# blocking per-push gate on that kind of check rewards making CI green
+# *fast*, and the fastest path is widening `.cargo/audit.toml`'s ignore
+# list — exactly what the disposition process (reachability, owner, review
+# date, upgrade trigger) exists to prevent.
+#
+# This workflow replaces per-push `cargo audit` in ci.yml with a daily
+# check against `main`, so a new advisory is noticed within a day and
+# handled on its own terms — a tracked finding, not an obstacle blocking
+# whatever unrelated work happens to be in flight when the database
+# mutates. Release preflight's `cargo audit` (release.yml) is unchanged and
+# remains a hard, deterministic block on the tag being released — it runs
+# against a fixed ref, so it never has this problem.
+#
+# Loud on failure, deliberately: GitHub emails failure notifications for
+# scheduled workflow runs to the repository's watchers by default — the
+# same mechanism that already covers this repo's other automation. No
+# additional notification plumbing is added here; if that default ever
+# proves insufficient, add one rather than assuming silence means "safe."
+on:
+  schedule:
+    # Daily, off the top of the hour to avoid GitHub's scheduled-workflow
+    # traffic spike (its own documented recommendation).
+    - cron: '17 6 * * *'
+  # Lets a run be triggered on demand — including against a non-default
+  # ref, which is how this workflow's fail/pass behavior was verified
+  # without waiting for a day or a real new advisory (see F55's review
+  # request for the falsifiability demonstration).
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  audit:
+    name: cargo audit (main)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+          key: scheduled-audit-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --version 0.22.2 --locked
+
+      - name: cargo audit
+        run: cargo audit
