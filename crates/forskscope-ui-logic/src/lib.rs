@@ -11,7 +11,6 @@
 //! - [`compare`] — diff/compare logic:
 //!   - `command_bar`: `ToolbarSection` list from `CommandRegistry` + `CommandContext`.
 //!   - `conflict_nav_view`: `ConflictNavView` rail snapshot for three-way merge.
-//!   - `hunk_decorations`: `DecorationIndex` — O(1) row→CSS class lookup.
 //!   - `load_guard`: pre-diff `LoadGuard` from `FileSizeClass`.
 //!   - `load_identity`: runtime tab/load tokens and completion validation.
 //!   - `palette_view`: `PaletteRow` list for the command palette.
@@ -42,7 +41,6 @@ pub use compare::command_bar::{
     ToolbarItem, ToolbarSection, build_toolbar, enabled_count, find_item,
 };
 pub use compare::conflict_nav_view::{ConflictNavView, ConflictRailRow};
-pub use compare::hunk_decorations::{DecorationIndex, DiffSide, RowDecoration};
 pub use compare::load_guard::{LoadGuard, guard_for_sizes, guard_for_sizes_with_limits};
 pub use compare::load_identity::{
     CompareTabId, CompareTabIdAllocator, CompletionDecision, LoadGeneration, LoadIdentityError,

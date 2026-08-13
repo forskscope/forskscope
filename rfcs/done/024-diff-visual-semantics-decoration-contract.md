@@ -1,10 +1,27 @@
 # RFC 024 — Diff Visual Semantics and Decoration Contract
 
-**Status.** Implemented (v0.61.0) — core complete; renderer wiring in Dioxus diff component deferred to UI layer
-
 ## Status
 
-Proposed.
+**Core complete, renderer wiring not implemented (F48, 2026-08-13).**
+`DiffDecorationSet`/`LineDecorationKind`/`InlineDecorationKind`
+(`forskscope-core::diff_decoration`) exist, are tested, and satisfy the
+"renderer-independent decoration sets" goal below on their own terms. The
+Dioxus/CodeMirror class contract this RFC specifies — `fs-line-*`,
+`fs-inline-*` — was never consumed by `forskscope-ui`: `hunk.rs` computes its
+own, simpler, hunk-level (not per-row) background classes directly from
+`HunkKind` (`.hunk-del`/`.hunk-ins`/`.hunk-rep`, `.pane-gutter`, `.in-del`/
+`.in-ins`; see `11-view-diff.css`), and does not distinguish `Conflict` or
+`MergeApplied` visually the way the class list below anticipates. The
+`.fs-line-*`/`.fs-inline-*` stylesheet and the `hunk_decorations` view-model
+that fed it (`forskscope-ui-logic::compare::hunk_decorations`) were deleted
+as dead weight rather than wired through — no product justification for the
+richer per-row contract was identified, and wiring it in would be a real
+visual change (adding conflict/merge-applied row coloring the UI does not
+have today), not a documentation fix. The acceptance criterion "Dioxus UI
+consumes decoration sets without recomputing diff semantics" is **not met**
+and is not expected to be under the current renderer design. A future
+renderer change that wants this richer per-row contract can still build on
+the surviving core model — nothing there was removed.
 
 ## Summary
 

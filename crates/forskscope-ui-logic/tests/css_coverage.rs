@@ -1,10 +1,18 @@
-//! CSS class contract coverage test (RFC-024, RFC-034).
+//! CSS class contract coverage test (RFC-034).
 //!
 //! Verifies that every CSS class token produced by `forskscope-core` is
 //! defined somewhere in the main stylesheet. This prevents silent breakage
 //! where a core constant is renamed or added but the CSS is not updated.
 //!
 //! This test runs without GTK — it reads the CSS file as a static string.
+//!
+//! F48: this file used to also cover RFC-024's `LineDecorationKind`/
+//! `InlineDecorationKind` CSS classes. That contract's DOM side (the
+//! `.fs-line-*`/`.fs-inline-*` stylesheet and its `hunk_decorations`
+//! view-model) was deleted rather than wired through — see RFC-024's status
+//! note and 30-contract-diff-decorations.css's header for the reasoning.
+//! `forskscope-core::diff_decoration` itself is untouched; its `css_class()`
+//! methods are still covered by `forskscope-core`'s own unit tests.
 
 /// The runtime stylesheet, included at compile time.
 /// Generated from `assets/css/` via `cargo xtask css`.
@@ -16,47 +24,6 @@ fn css_contains_class(css: &str, class: &str) -> bool {
     // This is a simple substring search — sufficient for a flat CSS file.
     let selector = format!(".{class}");
     css.contains(&selector)
-}
-
-#[test]
-fn line_decoration_css_classes_defined_in_main_css() {
-    use forskscope_core::diff_decoration::LineDecorationKind;
-
-    let classes = [
-        LineDecorationKind::Unchanged.css_class(),
-        LineDecorationKind::Added.css_class(),
-        LineDecorationKind::Deleted.css_class(),
-        LineDecorationKind::Modified.css_class(),
-        LineDecorationKind::EmptyCounterpart.css_class(),
-        LineDecorationKind::Conflict.css_class(),
-        LineDecorationKind::MergeApplied.css_class(),
-    ];
-
-    for class in &classes {
-        assert!(
-            css_contains_class(MAIN_CSS, class),
-            "main.css must define CSS class .{class} (from LineDecorationKind::css_class)"
-        );
-    }
-}
-
-#[test]
-fn inline_decoration_css_classes_defined_in_main_css() {
-    use forskscope_core::diff_decoration::InlineDecorationKind;
-
-    let classes = [
-        InlineDecorationKind::InsertedChars.css_class(),
-        InlineDecorationKind::DeletedChars.css_class(),
-        InlineDecorationKind::ReplacedChars.css_class(),
-        InlineDecorationKind::WhitespaceOnly.css_class(),
-    ];
-
-    for class in &classes {
-        assert!(
-            css_contains_class(MAIN_CSS, class),
-            "main.css must define CSS class .{class} (from InlineDecorationKind::css_class)"
-        );
-    }
 }
 
 #[test]
