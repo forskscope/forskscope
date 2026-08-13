@@ -54,20 +54,34 @@ approve a newer artifact.
 
 ## Durable evidence layout
 
-Add records under:
+**Amended by F56/M4-C4 (2026-08-13).** The original layout below hard-coded
+a `vX.Y.Z-rcN/` directory per candidate. Three problems with that, found
+when the first real plan tried to use it: this project's tags are
+unprefixed (`0.166.0`, not `v0.166.0` — `release.md`'s trigger only
+matches the unprefixed form); nothing in Gate D actually requires an RC
+number — its real requirements are artifacts built by the release workflow
+from a known commit, with every result naming the artifact digest it
+tested, and the project's own draft-release mechanism (build, create a
+**draft**, tag re-cuttable while in draft, publish is a separate owner
+action) already makes the draft *the* candidate without a second numbering
+scheme; and naming a directory after a version before that version's
+content exists pre-commits a release level the same way `release.md`'s own
+post-F21 rule forbids elsewhere.
+
+**Current layout** splits what doesn't change per release from what does:
 
 ```text
 docs/src/maintainers/release-evidence/
-  vX.Y.Z-rcN/
+  matrix-plan.md      # standing: hosts, cases, executors — frozen once, read every cut
+  advisories.md       # standing: dispositions, policy, upgrade triggers
+  <tag>/               # per-cut: created at the cut, named for the tag actually cut
     README.md
     artifacts.md
-    matrix-plan.md
     linux-wayland.md
     linux-x11.md
     windows-11.md
     windows-10.md
     macos-aarch64.md
-    advisories.md
 ```
 
 `README.md` summarizes verdict and links to every required record. Evidence
@@ -106,8 +120,8 @@ sufficient for accountability.
 | Linux x86_64 | Current supported distribution, Wayland, WebKitGTK 4.1 | Full functional + visual matrix |
 | Linux x86_64 | X11 session, WebKitGTK 4.1 | Launch, compare, explorer, save, keyboard |
 | Windows x86_64 | Windows 11 with WebView2 | Full functional + packaging/save matrix |
-| Windows x86_64 | Windows 10, version 1809+ candidate (F49: matches `AppxManifest.xml`'s current `MinVersion`, pending owner confirmation) | Launch/prerequisite/save matrix, or narrow published minimum with owner approval |
-| macOS aarch64 | macOS 13.0+ (F49: one row, not two — see "Execution model" below) | Launch, compare, save, package/Gatekeeper matrix, full functional where CI can observe it |
+| Windows x86_64 | Windows 10, version 1809+ (F49/F49b: matches `AppxManifest.xml`'s current `MinVersion`, confirmed by the owner — no change) | Launch/prerequisite/save matrix, or narrow published minimum with owner approval |
+| macOS aarch64 | macOS 13.0+ (F49: one row, not two, confirmed by the owner — see "Execution model" below) | Launch, compare, save, package/Gatekeeper matrix, full functional where CI can observe it |
 
 One host may satisfy multiple rows only when it genuinely provides the named
 runtime/session. Virtual machines are acceptable if file-system and WebView
@@ -335,10 +349,15 @@ runtime integration.
   `AppxManifest.xml` may back a live Microsoft Store submission
   (`docs/src/users/installation.md` links one), and changing its declared
   version constraints without knowing that submission's actual state carries
-  real risk this slice is not positioned to take. **This is an open owner
-  question, not a resolved one** — see the M4-C2 review request for whether
-  the manifest's values themselves should change, and note `MaxVersionTested`
-  still undersells Windows 11 compatibility regardless;
+  real risk this slice was not positioned to take. **Resolved by the owner
+  (F49b, 2026-08-13): both `MinVersion` and `MaxVersionTested` stay
+  unchanged.** Raising the floor excludes users for no demonstrated benefit;
+  `MaxVersionTested` records what was *validated*, not what merely
+  installs, and no Windows 11 validation evidence exists yet — an earlier
+  recommendation to bump it preemptively was reviewed and withdrawn for
+  exactly that reason. Both fields are revisited at M5 as an **output** of
+  the Windows evidence, to whatever build was actually tested, not chosen
+  in advance;
 - test overwrite semantics on an existing destination;
 - verify backup and temp replacement behavior on NTFS;
 - verify long-path behavior according to documented support;
@@ -361,17 +380,25 @@ amendment and implementation fix.
   is now set explicitly to **13.0** in `release.yml`'s macOS job, matching
   `Info.plist`'s existing `LSMinimumSystemVersion` — the value already
   enforced by macOS Launch Services on every DMG-installed copy today, so
-  this reconciliation does not change what already runs. **This specific
-  floor (13.0) is provisional pending explicit owner confirmation** — see
-  the M4-C2 review request; a future decision to widen support to an earlier
-  macOS version requires updating both `Info.plist` and this build-time
-  target together, not just one;
+  this reconciliation does not change what already runs. **Confirmed by the
+  owner (2026-08-13): 13.0 is settled, no widening.** A future decision to
+  widen support to an earlier macOS version requires updating both
+  `Info.plist` and this build-time target together, not just one;
 - verify DMG opens, app bundle layout, executable launch, and Gatekeeper
   guidance;
 - record signing/notarization as Pass, Deferred-with-warning, or Blocked.
 
 ### Linux
 
+- **F56/M4-C4 amendment (2026-08-13):** Linux support is **unqualified —
+  Windows, macOS, Linux, no per-distribution floor** (owner-confirmed).
+  This is a support-breadth statement, distinct from which host tests it
+  (`ubuntu-latest` in CI, plus a manual Wayland pass) — see
+  `matrix-plan.md` §1a. The direct consequence is F44: the published Linux
+  artifact fails to start on libxdo-4 distributions (Arch/CachyOS-family),
+  which are supported platforms under this statement, not out-of-scope
+  ones. `matrix-plan.md` §3 records how this is represented at M5 without
+  either hiding the expected failure or pre-declaring a release No-Go;
 - run the maintained GTK checklist on real Wayland and X11 sessions;
 - record WebKitGTK/GTK versions;
 - verify no blank region, row drift, or missing scrollbars;

@@ -1,8 +1,14 @@
 # Security Advisory Dispositions
 
-**Source commit:** see this evidence directory's `README.md` / `artifacts.md`
-once a real release candidate is cut against this plan.
-**Review date:** 2026-08-11
+**Status: standing document (F56/M4-C4, 2026-08-13).** Lives at
+`release-evidence/advisories.md`, not inside a per-cut directory — the
+dispositions below are tied to dependency versions and code paths, not to
+a release number, so they don't change per release the way per-cut results
+do. **Source commit:** see the relevant cut's `release-evidence/<tag>/README.md`
+/ `artifacts.md` for which commit's `Cargo.lock` these dispositions apply
+to at release time; re-verify (not necessarily re-write) each disposition
+against the actual cut commit's dependency graph before Gate D.
+**Review date:** 2026-08-11 (dispositions below); layout amended 2026-08-13.
 **Reviewer:** implementer (M4-C1 handoff), pending owner/architect sign-off.
 
 `cargo audit` currently exits 0 while reporting **14 warnings** — 12
@@ -13,13 +19,6 @@ statement, owner, review date, and upgrade trigger in the release evidence."*
 Per advisory N5: *"keep policy-pass distinct from a clean advisory set."* This
 document is that distinction, made explicit. A green `cargo audit` here means
 *reviewed and accepted*, not *clean*.
-
-This directory name (`0.167.0-rc1`) is a **placeholder** chosen only so this
-evidence has somewhere to live before a real release candidate exists — see
-this slice's review request for the explicit question to the owner about the
-actual version/RC identifier. Nothing in this document depends on the
-placeholder being correct; the dispositions below are tied to dependency
-versions and code paths, not to a release number.
 
 ---
 

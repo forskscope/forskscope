@@ -2,24 +2,22 @@
 
 **Governing RFC:** RFC-078 (Platform Runtime Acceptance and Release
 Evidence), P08 as amended by F37 (2026-08-11), execution model and macOS row
-count as amended by F49/M4-C2 (2026-08-11).
-**Status: structurally complete, not yet frozen.** The case-to-row mapping
-below is decided, and the CI-vs-manual verification method per row is now
-settled (RFC-078's "Execution model" amendment). The per-row execution
-facts that remain open — exact OS version confirmation, executor,
-host-access status for the manual passes — are owner-dependent and marked
-`TBD`/provisional throughout; see "Questions for the owner" at the end. Per
-RFC-078's own Precondition, this plan is **committed before M5 begins**, not
-before every field is known — but M5 cannot actually *start* until the open
-items are resolved, since a manual-pass row with no named executor cannot
-be executed.
+count as amended by F49/M4-C2 (2026-08-11), evidence layout restructured and
+plan frozen by F56/M4-C4 (2026-08-13).
 
-**This slice plans and freezes the plan. It does not execute any case.**
-Running the matrix — including the CI-automated rows, once the release
-workflow actually produces a tagged candidate — is M5's work.
+**Status: FROZEN as of 2026-08-13.** Hosts, cases, and executors below are
+fixed. Changing any of them after M5 begins invalidates evidence already
+gathered under this plan — a row re-planned mid-matrix is not the row that
+produced the evidence collected so far. This is a **standing document**: it
+lives at `release-evidence/matrix-plan.md`, not inside a per-cut directory,
+because the plan itself (hosts, cases, executors) does not change per
+release the way results do — see F56 and RFC-078's "Durable evidence
+layout" for the reasoning. Per-cut results (`artifacts.md`, platform
+records) live under `release-evidence/<tag>/`, created at the actual cut.
 
-This directory name (`0.167.0-rc1`) is a placeholder — see this slice's
-review request for the version/RC-identifier question to the owner.
+**This plan does not execute any case.** Running the matrix — including the
+CI-automated rows, once the release workflow actually produces a tagged
+candidate — is M5's work.
 
 ---
 
@@ -38,11 +36,23 @@ executable under current resourcing. One row, matching the one real host.
 
 | Row | Target | Exact OS version | Architecture | Verification method | Executor (owner/role) | Host-access status |
 |---|---|---|---|---|---|---|
-| `linux-wayland` | Linux x86_64, Wayland, WebKitGTK 4.1 | **TBD** | x86_64 | **Manual** — CI's Xvfb is X11-family, not real Wayland | **TBD** | **TBD** |
-| `linux-x11` | Linux x86_64, X11, WebKitGTK 4.1 | **TBD** | x86_64 | **CI** — `ubuntu-latest` + `xvfb-run`/`dbus-run-session` (F34's mechanism) stands in for this row reasonably | n/a (CI) | CI — available now |
-| `windows-11` | Windows 11 with WebView2 | **TBD** | x86_64 | **CI** for most cases, **Manual** for F45's prerequisite sub-case (§3) | CI: n/a; Manual: **TBD** | CI available now; Manual: **TBD** |
-| `windows-10` | Windows 10, version 1809+ (F49, provisional) | provisional: **1809** | x86_64 | **CI** — `windows-latest` is a Server-based image, not a literal retail Win10/11 install, but stands in reasonably for save/filesystem/WebView2 behavior | n/a (CI) | CI — available now |
-| `macos-aarch64` | macOS 13.0+ (F49, provisional) | provisional: **13.0** | aarch64 | **CI only** — `macos-latest`; **F46 (Gatekeeper) cannot be verified under this model at all** (§3) | n/a (CI) | CI — available now |
+| `linux-wayland` | Linux x86_64, Wayland, WebKitGTK 4.1 | Unqualified — no per-distribution floor (owner, 2026-08-13; §1a below) | x86_64 | **Manual** — CI's Xvfb is X11-family, not real Wayland | Owner | Available — owner-executed |
+| `linux-x11` | Linux x86_64, X11, WebKitGTK 4.1 | Unqualified — no per-distribution floor (owner, 2026-08-13; §1a below) | x86_64 | **CI** — `ubuntu-latest` + `xvfb-run`/`dbus-run-session` (F34's mechanism) stands in for this row reasonably | GitHub Actions (CI) | CI — available now |
+| `windows-11` | Windows 11 with WebView2 | Windows 11, any build GitHub's `windows-latest` currently backs | x86_64 | **CI** for most cases, **Manual** for F45's prerequisite sub-case (§3) | CI: GitHub Actions; Manual (F45 sub-case): Owner | CI available now; Manual: available — owner-executed |
+| `windows-10` | Windows 10, version 1809+ | **1809** — settled (F49b, owner 2026-08-13: `AppxManifest.xml`'s `MinVersion` stays unchanged) | x86_64 | **CI** — `windows-latest` is a Server-based image, not a literal retail Win10/11 install, but stands in reasonably for save/filesystem/WebView2 behavior | GitHub Actions (CI) | CI — available now |
+| `macos-aarch64` | macOS 13.0+ | **13.0** — settled (owner, 2026-08-13: already enforced by `Info.plist` and `MACOSX_DEPLOYMENT_TARGET`) | aarch64 | **CI only** — `macos-latest`; **F46 (Gatekeeper) cannot be verified under this model at all** (§3) | GitHub Actions (CI) | CI — available now |
+
+**§1a — supported platforms versus test hosts (owner, 2026-08-13).**
+ForskScope supports **Windows, macOS, and Linux, unqualified** — there is
+no per-distribution Linux floor, and this plan does not imply one by naming
+a test distribution. Support breadth and test hosts are different things:
+the *test* hosts remain `ubuntu-latest` (CI), `windows-latest` (CI),
+`macos-latest` (CI), plus the two manual passes (Linux Wayland, Windows 11)
+above. A CI pass on `ubuntu-latest` is evidence about ForskScope on Linux
+generally to the extent `ubuntu-latest` is representative — it is not a
+claim that Ubuntu specifically is the supported baseline, nor a claim that
+every distribution is separately verified. See §3 for the direct
+consequence of this for F44.
 
 **Rolling-label caveat (review 057 §4.3).** `macos-latest`, `windows-latest`,
 and `ubuntu-latest` are rolling labels — GitHub advances what they resolve
@@ -65,8 +75,8 @@ and macOS is confirmed available" — now superseded by the more precise
 statement above: CI access is confirmed and already usable *today* for
 `linux-x11`, `windows-10`/`windows-11` (except F45's prerequisite sub-case),
 and `macos-aarch64` (except F46 entirely); the *manual* passes
-(`linux-wayland`, and Windows 11's prerequisite sub-case) still need a named
-executor per RFC-078's Precondition — see Question 2.
+(`linux-wayland`, and Windows 11's prerequisite sub-case) are executed by
+the owner — see §4 Q2.
 
 ---
 
@@ -205,15 +215,45 @@ already covers the relevant numbered case, not tracked separately:
 
 ## 3. Known facts folded in (not rediscovered at M5)
 
-**F44 — the published Linux artifact does not start on libxdo-4 distributions.**
-Fixed upstream (`DioxusLabs/dioxus#5749`, merged 2026-08-10), not yet
-released. `linux-wayland` and `linux-x11`'s P01 must record which exact
-artifact was tested (the CI-built artifact is Debian/Ubuntu-family,
-`libxdo.so.3`) and, if run against a host shipping `libxdo.so.4` (e.g.
-Arch/CachyOS-family) before the fix ships, must record the launch failure as
-an **expected, already-tracked** result — not a new finding, and not silently
-waived. Once the `dioxus-desktop` release carrying the fix lands, this
-constraint is removed and P01 is re-verified against the fixed artifact.
+**F44 — the published Linux artifact does not start on libxdo-4
+distributions, and this is now a Go/No-Go input, not a footnote (F56/M4-C4,
+2026-08-13).** Fixed upstream (`DioxusLabs/dioxus#5749`, merged 2026-08-10),
+not yet released as of this freeze. Because §1a establishes Linux support as
+**unqualified** — no per-distribution floor — a libxdo-4 distribution
+(Arch/CachyOS-family) is a supported platform like any other, not an
+out-of-scope one. "We only tested Ubuntu" does not satisfy a claim of Linux
+support, and P01 cannot pass on a libxdo-4 host while F44 is open.
+
+**How this plan represents it (the one judgment call this freeze makes,
+per the handoff's explicit instruction to decide rather than default):**
+
+- **If the `dioxus-desktop` release carrying the fix has landed by the time
+  M5 runs P01 on `linux-wayland`/`linux-x11`:** the constraint is gone. P01
+  is Required in full, tested against the fixed artifact, no caveat needed.
+- **If it has not landed:** P01 on a libxdo-4 host **must still be run and
+  recorded as Fail** — not silently skipped, not waived, not tested only
+  against a Debian/Ubuntu-family host to avoid the failure. RFC-078's own
+  Waiver policy already forbids waiving "inability to launch on a claimed
+  supported platform," and F44's failure is exactly that. The evidence
+  record states plainly: known cause, upstream fix merged, release not yet
+  cut, tracked as F44 — an **expected** failure in the sense that it is not
+  a new discovery, but not a **waived** one in the sense that matters for
+  release decisions.
+- **What this plan does not do:** decide, in advance, that this failure
+  blocks the release. That is Gate D's call, weighing this alongside
+  everything else — this plan's job is to make sure the failure is
+  *visible and correctly attributed* when Gate D happens, not to
+  pre-resolve it into a No-Go before the evidence exists. Hiding it (by
+  testing only a compatible host) would be the opposite failure — a green
+  matrix that doesn't mean what it appears to.
+
+**Tie to F55/review 060's residual:** the `dioxus-desktop` bump that fixes
+F44 is, by definition, a `Cargo.lock` change — the natural first real
+exercise of `audit.yml`'s path-filtered `push`/`pull_request` trigger
+(F55 N1), which has so far only been exercised via `workflow_dispatch`
+(review 060). That slice's review request should record whether the audit
+workflow fired, closing that residual as a side effect of unrelated,
+already-scheduled work rather than needing a dedicated demonstration.
 
 **F45 — the Windows artifact's undeclared `VCRUNTIME140.dll`/WebView2
 dependencies — structurally invisible to CI (RFC-078 "Execution model"
@@ -238,84 +278,76 @@ quarantine bit." **With no manual macOS host anywhere in the owner's stated
 execution model, F46 cannot be verified at all**, not just "not yet." This
 is not the same status as F45 (which *can* be resolved by the stated
 Windows 11 manual pass) — F46 has no path to resolution under current
-resourcing, full stop. Record this as an explicit open gap with release
-impact in `macos-aarch64.md`'s evidence, not as a passing row; per RFC-078's
-Waiver policy, this is adjacent to "inability to launch on a claimed
+resourcing, full stop. Record this as an **explicit open Gate D input**
+with release impact in `macos-aarch64.md`'s evidence — not a passing row,
+and not something Gate D can treat as silently resolved by a green CI
+run — because it is Gate D, not this plan, that weighs an unverifiable
+Gatekeeper posture against everything else at release-decision time. Per
+RFC-078's Waiver policy, this is adjacent to "inability to launch on a claimed
 supported platform," which is never waivable. The macOS-12-vs-
-`LSMinimumSystemVersion`-13.0 conflict itself is resolved by F49 (§ above) —
+`LSMinimumSystemVersion`-13.0 conflict itself is resolved by F49 (§1) —
 what remains open here is Gatekeeper specifically, not the version conflict.
 
-**F44 remains the only one of the three with direct execution evidence** —
-the owner ran the artifact and observed the launch failure. F45 has a
+**All three now have a clear disposition.** F44 has direct execution
+evidence (the owner ran the artifact and observed the launch failure) and,
+as of this freeze, a defined resolution path with a real Go/No-Go
+consequence if the upstream fix hasn't landed by M5 — see above. F45 has a
 resolution path (the manual Windows 11 pass) that this plan records but has
 not yet executed. F46 has no resolution path under current resourcing at
-all — the matrix's job for F46 is to make that gap explicit and visible in
-Gate D's evidence, not to close it.
+all — the matrix's job for F46 is to make that gap an explicit Gate D
+input, not to close it.
 
 ---
 
-## 4. Questions for the owner
+## 4. Owner questions — all resolved (2026-08-13)
 
-Collected here, not guessed, per the handoff's explicit instruction that "a
-frozen plan built on guesses is worse than an unfrozen one."
+Every question this plan raised before freezing, with the answer applied
+above. Kept as a record rather than deleted, so a future reader can see
+what was asked and why, not just the resulting numbers.
 
-1. **Exact OS versions per row — two now have a proposed default, three
-   remain fully open.** RFC-078 §118 requires concrete versions, not
-   "current" or "oldest claimed":
-   - `macos-aarch64`: **proposed 13.0**, matching `Info.plist`'s
-     `LSMinimumSystemVersion` (already enforced on every DMG-installed copy
-     today) — F49 set `MACOSX_DEPLOYMENT_TARGET` to match. Confirm, or state
-     the real floor if it should widen to capture more Apple Silicon Macs
-     (11.0 is the hardware floor).
-   - `windows-10`/`windows-11`: **proposed 1809**, matching
-     `AppxManifest.xml`'s current `MinVersion` — deliberately *not* changed
-     by this plan, since that manifest may back a live Microsoft Store
-     submission (`docs/src/users/installation.md` links one) and editing its
-     declared constraints without knowing the submission's real state is not
-     a call this slice is positioned to make. Confirm whether the manifest's
-     values themselves should change, and separately, whether
-     `MaxVersionTested` (currently 10.0.19041.0, Windows 10 2004 — below
-     Windows 11) should be raised.
-   - `linux-wayland`/`linux-x11`: still fully open. Which distribution and
-     version is the actual supported baseline? The CI-built artifact is
-     Ubuntu-family; is the *claimed* support baseline also Ubuntu/
-     Debian-family, or does it include libxdo-4 distros like Arch, in which
-     case F44 blocks P01 there until the dioxus fix ships and this needs to
-     be a schedule dependency, not just a footnote?
+1. ~~Exact OS versions per row.~~ **Resolved.**
+   `macos-aarch64`: **13.0**, matching `Info.plist`'s
+   `LSMinimumSystemVersion`, already enforced on every DMG-installed copy —
+   confirmed, no widening. `windows-10`/`windows-11`: **1809** stays,
+   matching `AppxManifest.xml`'s current `MinVersion`; `MaxVersionTested`
+   stays unchanged too, pending real M5 evidence rather than a
+   speculative bump (F49b — the architect's own earlier recommendation to
+   raise it was reviewed and withdrawn, since the field records what was
+   *validated*, not what merely installs). `linux-wayland`/`linux-x11`:
+   **unqualified — no per-distribution floor** (§1a) — this was the
+   question with the largest consequence, since it's what makes F44 a
+   Go/No-Go input rather than a footnote (§3).
 
-2. **Executor owner/role for the manual passes.** The CI rows
-   (`linux-x11`, `windows-10`, `windows-11` except F45's sub-case,
-   `macos-aarch64` except F46) need no named human — CI runs them. The
-   manual rows/sub-cases (`linux-wayland` in full; `windows-11`'s F45
-   prerequisite sub-case) do: who actually runs them, a name or role?
-   `ROADMAP.md`'s former "host access is confirmed available" note named no
-   one; RFC-078's Precondition requires a named executor for whatever is not
-   automated.
+2. ~~Executor owner/role for the manual passes.~~ **Resolved.** CI rows are
+   executed by GitHub Actions (no named human). The two manual
+   rows/sub-cases — `linux-wayland` in full, `windows-11`'s F45
+   prerequisite sub-case — are executed by the owner.
 
-3. **Host-access status for the manual passes specifically.** Is there a
-   real Linux-with-real-Wayland host and a real Windows 11 host available
-   right now for the two manual passes, or does access need arranging
-   before M5 can start? (The five CI rows need no separate host-access
-   question — GitHub-hosted runners are the host, already available.)
+3. ~~Host-access status for the manual passes.~~ **Resolved as a
+   consequence of Q2**, not asked separately: the owner is the named
+   executor for both manual passes, so access is the owner's own by
+   taking on the role.
 
-4. ~~macOS: one row or two?~~ **Resolved by this slice.** One row — there is
-   no manual macOS host in the stated execution model, so a second row
+4. ~~macOS: one row or two?~~ **Resolved earlier (M4-C2).** One row — there
+   is no manual macOS host in the stated execution model, so a second row
    requiring one was never executable. See RFC-078's "Execution model"
    amendment and §1 above.
 
-5. **Version/RC identifier for this evidence directory.** `0.167.0-rc1` was
-   chosen only as a placeholder so this plan has somewhere to live before a
-   real release candidate exists (see this slice's review request). What
-   should the actual directory be named, or should it stay a placeholder
-   renamed at real cut time?
+5. ~~Version/RC identifier for the evidence directory.~~ **Resolved by
+   F56/M4-C4 — the question no longer applies.** There is no RC
+   identifier: this plan is a standing document at
+   `release-evidence/matrix-plan.md`, and results live under
+   `release-evidence/<tag>/`, named for the tag actually cut, created at
+   the cut. See RFC-078's amended "Durable evidence layout."
 
 ---
 
 ## 5. What this plan is not
 
-Per the handoff's explicit scope boundary: this plan does not gather any
-platform evidence, does not run any case, and does not create
-`linux-wayland.md`/`linux-x11.md`/`windows-11.md`/`windows-10.md`/
-`macos-aarch64.md`/`artifacts.md`/`README.md` — those are M5's outputs,
-each following the evidence record schema in RFC-078 §"Evidence record
-schema," populated only once a real release candidate exists to test.
+This plan does not gather any platform evidence, does not run any case,
+and does not create `release-evidence/<tag>/`'s contents
+(`README.md`, `artifacts.md`, `linux-wayland.md`, `linux-x11.md`,
+`windows-11.md`, `windows-10.md`, `macos-aarch64.md`) — those are M5's
+outputs, created at the actual cut, each following the evidence record
+schema in RFC-078 §"Evidence record schema," populated only once a real
+release candidate exists to test.
