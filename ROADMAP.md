@@ -1,6 +1,6 @@
 # ForskScope Roadmap
 
-**Last updated:** 0.166.0 cut (2026-08-08); M2 and M3 complete
+**Last updated:** 0.167.0 cut (2026-08-13); M4 complete, Gate C passed
 **Current phase:** v1 release stabilization — release-baseline reconciliation,
 then correctness workstreams, then runtime/platform acceptance and a new
 architecture go/no-go review.
@@ -44,7 +44,9 @@ production settings/session persistence, RFC-076) and B3 (a distinct
 Git-mergetool save-target model, RFC-077), both released in `0.166.0`.
 
 **B4 remains open** — platform runtime evidence, RFC-078 — so the v1/public
-release decision stays **No-Go**. GTK/WebKitGTK and cross-platform package
+release decision stays **No-Go**. `0.167.0` is the candidate M5 runs its matrix
+against; it carries F44 knowingly, because the upstream `dioxus-desktop` fix is
+merged but unreleased and only a `0.8.0-alpha` exists. GTK/WebKitGTK and cross-platform package
 verification are M5, gated behind M4's integrated stabilization. Three-way merge
 conflict workspace UI, command palette, and editor adapter work remain
 post-v1.

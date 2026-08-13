@@ -5,7 +5,79 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.166.1] — Unreleased
+## [0.167.0] — 2026-08-13
+
+The integrated stabilization release (RFC-074 milestone M4). It closes no audit
+blocker on its own — its purpose is to make the release core trustworthy enough
+that platform testing is worth doing, and it is the candidate that platform
+acceptance (M5) will be run against.
+
+Two user-facing fixes, one security dependency update, and a substantial
+tightening of the checks that decide whether a release is fit to ship.
+
+### Fixed
+
+**Changing a diff option silently discarded merged work.**
+
+Toggling **Ignore whitespace**, **Ignore case**, or the diff **algorithm** on a
+tab with applied merges rebuilt the comparison from scratch — throwing away
+every applied hunk and the entire undo history, with no warning. Worse, the
+rebuilt session reported itself as unmodified, so the unsaved-work prompt was
+destroyed along with the work: closing the tab afterwards asked nothing.
+
+These three controls now ask before discarding, the same way **Swap sides**
+already did. A tab with no unsaved work still applies them immediately.
+
+**Screen readers announced "Changed" on blank rows.**
+
+In a change where one side has more lines than the other, the shorter side's
+empty filler rows each carried a "Changed" label with nothing after it — so a
+four-line replacement was announced five times, four of them empty. Rows with
+no content on that side are now unlabelled; rows with content still announce
+`Changed: <line>` as before.
+
+### Security
+
+**`webbrowser` updated to 1.2.4**, clearing `RUSTSEC-2026-0257` (argument
+injection through the Unix `BROWSER` variable). ForskScope opens no external
+links, so the affected code path is not reachable from the application; the
+dependency arrives through the desktop framework.
+
+### Changed
+
+**The source archive is no longer published as a release asset.** It duplicated
+the "Source code (tar.gz)" download GitHub attaches to every release — the same
+files, differing only in an omitted top-level directory. The Arch `PKGBUILD`
+now fetches GitHub's archive directly, so building it no longer requires
+downloading a file by hand first.
+
+### Internal
+
+Release and CI checks were reworked so that a passing build means more than it
+did:
+
+- A **rendering check** now runs against the built application before packaging
+  and fails the release if compare-view rows are misaligned — the defect class
+  that shipped in two releases with every check green.
+- `cargo audit` moved off the per-push gate to a daily schedule plus
+  dependency-changing commits, because it reads a database that changes without
+  us: a build could go red overnight with no change to the code. Release
+  preflight still blocks on it.
+- `clippy` now covers test targets, `xtask` is covered by the format check, and
+  the empty-changelog guard runs at preflight instead of after the artifacts are
+  already built.
+- Every unsoundness advisory in the dependency tree now has a recorded
+  reachability statement, owner, review date, and upgrade trigger.
+
+### Known limitation
+
+**The prebuilt Linux binary does not start on distributions shipping libxdo 4**
+(Arch and other rolling releases), failing with
+`error while loading shared libraries: libxdo.so.3`. Installing `xdotool` does
+not help — the required version is not available there. Build from source on
+those systems; see the installation guide. The cause is fixed upstream
+([DioxusLabs/dioxus#5749](https://github.com/DioxusLabs/dioxus/pull/5749)) and
+awaiting a release.
 
 ## [0.166.0] — 2026-08-08
 
