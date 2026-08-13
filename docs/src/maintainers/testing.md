@@ -38,6 +38,43 @@ The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
 be tested in environments without a display server. Core and ui-logic tests
 run anywhere Rust is installed.
 
+## What `cargo xtask i18n` actually guarantees (F39)
+
+`cargo xtask i18n` verifies that every `t(lang, "key")` call site in
+`forskscope-ui` has a matching Japanese translation in `i18n.rs`. This is a
+**closed-world check over call sites that already reach `t()`** — it cannot
+see a user-visible string that never calls `t()` in the first place, because
+there is nothing structural distinguishing "user-visible string" from any
+other `String`/`&str` in the crate for a source scan to key on.
+
+Five error paths currently bypass `t()` this way, all going to a toast via
+`store.notify(...)`:
+
+- `ui/view/diff_actions.rs` — `handle_result`'s `Err(e) => store.notify(e.to_string())`
+- `ui/view/diff_actions.rs` — `describe_block(...)`
+- `ui/overlay/modals/recovery.rs` (two sites) — settings/session reset-with-backup failure
+- `state/compare.rs` — tab ID allocation failure
+
+**Decision (review 049 N1 / F39, 2026-08-13): these are not being translated,
+and the gate's scope is documented here rather than widened to catch them.**
+All five carry `CoreError`'s `Display` output — for the `Io`/`Decode`/
+`Unsupported`/`InternalInvariant` variants, that `message` field is generated
+by the OS or a dependency at the moment of the error (e.g. `std::io::Error`'s
+platform-native text), not authored copy in this codebase, so there is no
+fixed string to put in a translation map. `describe_block`'s `Binary`/
+`Spreadsheet` arms are the one exception — genuine static literals that could
+be translated — but translating only those two without a working detector
+for future bypasses would recreate exactly the gap this decision documents,
+so they stay matched to the established `e.to_string()` precedent (review 048
+C2) instead of splitting the function's i18n treatment silently.
+
+A structured taxonomy for exactly this problem already exists —
+`AppError`/`AppErrorKind`/`SaveErrorView` (RFC-017) map `CoreError` into
+translatable categories with detail kept separate — but `forskscope-ui` does
+not use it anywhere; see F52. Routing these five sites through it would be
+the real fix, and is future work, not a mechanical `t()`-wrapping of the
+current passthrough text.
+
 ## Test counts (v0.165.0)
 
 Observed with `cargo test -p forskscope-core -p forskscope-ui-logic`.

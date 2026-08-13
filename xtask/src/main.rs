@@ -125,6 +125,17 @@ fn run_audit_deps() {
     println!("security dependency path check passed.");
 }
 
+/// Checks that every `t(lang, "key")` call site in `forskscope-ui` has a
+/// Japanese translation. It does **not** check that every user-visible
+/// string is routed through `t()` in the first place (F39, G-006 narrowed
+/// 2026-08-13): a string that never reaches a `t(...)` call is invisible to
+/// this scan by construction, not merely uncovered. Known bypasses today are
+/// `store.notify(err.to_string())` sites carrying `CoreError`/`AppError`
+/// `Display` output — filesystem/OS error text and other dependency-
+/// generated messages, not authored UI copy — which cannot be pre-translated
+/// because their content does not exist until the error occurs. See
+/// `docs/src/maintainers/testing.md`'s i18n section for the full list and
+/// reasoning.
 fn run_i18n_audit() {
     let root = workspace_root();
     let i18n_file = root.join("crates/forskscope-ui/src/i18n.rs");
