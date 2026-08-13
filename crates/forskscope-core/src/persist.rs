@@ -5,8 +5,12 @@
 //! `PersistenceLoad` — see its module doc for the full design.
 //!
 //! This module does not claim to cover every file ForskScope writes:
-//! `dir::batch::BatchManifest::to_json` hand-rolls its own JSON with no
-//! schema envelope, and nothing here versions it (tracked as F31, M4).
+//! `dir::batch::BatchManifest::to_json` and `report::{file,dir}`'s
+//! `to_json` hand-roll their own JSON with no schema envelope. **Decided
+//! (F31, 2026-08-13): both stay explicitly unversioned** — see their module
+//! docs for the reasoning (in short: nothing ever reads a batch manifest or
+//! an exported report back into this app, so there is no read path for a
+//! schema version to protect).
 //!
 //! RFC-031's original `VersionedEnvelope`/`SchemaName`/`MigrationPolicy`
 //! wrapper and the v1 settings/session records it carried (`UserSettings`,

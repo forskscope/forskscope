@@ -1,5 +1,16 @@
 //! Comparison report types for file and directory diffs (RFC-006, RFC-008).
 //! File-level report lives in `file`; directory-level in `dir`.
+//!
+//! ## Schema versioning (F31, decided 2026-08-13)
+//!
+//! `FileComparisonReport::to_json`/`DirComparisonReport::to_json` hand-roll
+//! JSON with no schema envelope, deliberately, for the same reason
+//! `dir::batch::BatchManifest` does (see its module doc): both are built
+//! only from live in-memory data (`from_diff`/`from_entries`), and nothing
+//! in ForskScope ever parses an exported report JSON file back in. They are
+//! a write-only export for the user — something to save, share, or feed to
+//! another tool — not something this app reloads across versions, so there
+//! is no read path a schema version would protect.
 
 pub mod dir;
 pub mod file;

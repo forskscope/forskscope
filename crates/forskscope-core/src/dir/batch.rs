@@ -9,6 +9,27 @@
 //! The manifest is written *after* all attempted copies so it reflects the
 //! actual outcome rather than the plan. Backups created by successful copies
 //! are preserved even when a later entry fails.
+//!
+//! ## Schema versioning (F31, decided 2026-08-13)
+//!
+//! [`BatchManifest::to_json`] hand-rolls JSON with no schema envelope
+//! (`forskscope-core::persist` does not cover it) and stays that way
+//! deliberately, not by oversight: [`restore_from_manifest`] operates
+//! directly on the in-memory `BatchManifest` produced by the batch that just
+//! ran — nothing in ForskScope ever reads a manifest `.json` file back off
+//! disk and parses it into a `BatchManifest`. There is no read path a schema
+//! version would protect, unlike settings/session (RFC-076), which the app
+//! genuinely reloads across upgrades.
+//!
+//! The manifest is a write-only record for the user: something to keep,
+//! inspect, or attach to a bug report, not something this app consumes
+//! again. Every manifest already carries `app_version` — the version that
+//! wrote it — which is enough for a human (or a future tool) to tell an old
+//! manifest's shape apart from a current one without a dedicated schema
+//! field. If a future version ever adds a feature that reads historical
+//! manifests back in, that feature should add its own tolerant parsing
+//! informed by `app_version` at that time; it does not need this format
+//! pre-versioned today for a consumer that does not exist.
 
 use std::fmt::Write as FmtWrite;
 use std::fs;
