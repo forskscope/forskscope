@@ -1,5 +1,8 @@
 # Arch Linux PKGBUILD for ForskScope.
-# Place the release source archive in the same directory before running makepkg.
+# makepkg downloads the source directly from GitHub's own per-tag archive
+# (F43: the project's custom source archive was dropped - it duplicated
+# GitHub's automatic one exactly, differing only in an omitted top-level
+# directory that existed solely to suit this file's old cd "$srcdir").
 
 pkgname=forskscope
 # Keep pkgver in sync with [workspace.package] version in Cargo.toml on each release.
@@ -11,16 +14,16 @@ url="https://github.com/forskscope/forskscope"
 license=('Apache-2.0')
 depends=('webkit2gtk-4.1' 'gtk3')
 makedepends=('cargo' 'pkg-config' 'openssl')
-source=("$pkgname-v$pkgver.tar.gz")
+source=("$pkgname-$pkgver.tar.gz::https://github.com/forskscope/forskscope/archive/refs/tags/$pkgver.tar.gz")
 sha256sums=('SKIP')
 
 build() {
-    cd "$srcdir"
+    cd "$pkgname-$pkgver"
     cargo build --release --locked
 }
 
 package() {
-    cd "$srcdir"
+    cd "$pkgname-$pkgver"
     install -Dm755 "target/release/forskscope" "$pkgdir/usr/bin/forskscope"
     install -Dm644 "packaging/linux/forskscope.desktop" \
         "$pkgdir/usr/share/applications/forskscope.desktop"

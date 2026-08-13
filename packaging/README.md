@@ -20,8 +20,9 @@ bash packaging/linux/install.sh
 
 **Arch Linux (AUR-style):**
 
-Copy `packaging/linux/PKGBUILD` and the release source archive into a
-directory, then run `makepkg -si`.
+Copy `packaging/linux/PKGBUILD` into a directory and run `makepkg -si`.
+`makepkg` downloads the matching source directly from GitHub's own
+per-tag archive.
 
 **System requirements at runtime:**
 
@@ -62,10 +63,7 @@ the workspace version on each release (four-part `X.Y.Z.0` form).
 
 ## Source archive
 
-The source archive is the primary release artifact:
-
-```sh
-# Produces target/forskscope-vX.Y.Z.tar.gz
-# Unpacks files directly into the extraction directory
-bash packaging/build-release.sh
-```
+The project does not build its own source archive (F43: dropped — it
+duplicated GitHub's automatic one). GitHub attaches a source archive to
+every tag automatically:
+`https://github.com/forskscope/forskscope/archive/refs/tags/<tag>.tar.gz`

@@ -11,46 +11,27 @@
 7. Version metadata is synchronized: `cargo xtask version-sync`
 8. Release tag matches the workspace version: `cargo xtask version-sync "${GITHUB_REF_NAME}"`
 9. Japanese localization covers `t(...)` UI keys: `cargo xtask i18n`
-10. Source archive layout is verified: `cargo xtask archive-layout target/forskscope-vX.Y.Z.tar.gz`
-11. `CHANGELOG.md` updated with the new version and date.
-12. `version` bumped in the workspace `Cargo.toml` (`[workspace.package]`).
-13. Completed RFCs moved from `rfcs/proposed/` to `rfcs/done/`; `rfcs/README.md` updated.
-14. `ROADMAP.md` current state paragraph updated if the milestone is significant.
+10. `CHANGELOG.md` updated with the new version and date.
+11. `version` bumped in the workspace `Cargo.toml` (`[workspace.package]`).
+12. Completed RFCs moved from `rfcs/proposed/` to `rfcs/done/`; `rfcs/README.md` updated.
+13. `ROADMAP.md` current state paragraph updated if the milestone is significant.
 
 ---
 
-## Building the release archive
+## Source archive (F43: dropped)
 
-The release is a `.tar.gz` of tracked Cargo workspace files. The source archive
-has no top-level parent directory; files unpack directly into the extraction
-destination.
-
-Use the release script (handles version extraction and archive naming automatically):
-
-```sh
-bash packaging/build-release.sh
-```
-
-Or manually:
-
-```sh
-# Extract version from [workspace.package] — never grep '^' version directly
-# as that may match dependency entries
-VER=$(awk '/^\[workspace\.package\]/{f=1} f&&/^version[[:space:]]*=/{gsub(/[^0-9.]/,""); print; exit}' Cargo.toml)
-
-git ls-files -z | tar --null -czf "target/forskscope-v${VER}.tar.gz" --files-from -
-```
-
-Verify the archive unpacks correctly:
-
-```sh
-tar -tzf "target/forskscope-v${VER}.tar.gz" | awk '{p=$0; sub(/^\.\//,"",p); print p}' | head -5
-# Expected includes Cargo.toml at archive root, not forskscope-vX.Y.Z/Cargo.toml.
-tar -tzf "target/forskscope-v${VER}.tar.gz" | awk '{p=$0; sub(/^\.\//,"",p); if (p=="Cargo.toml") found=1} END{exit found ? 0 : 1}'
-tar -tzf "target/forskscope-v${VER}.tar.gz" | awk -v prefix="forskscope-v${VER}" '{p=$0; sub(/^\.\//,"",p); if (p==prefix || index(p,prefix"/")==1) bad=1} END{exit bad ? 1 : 0}'
-tar -tzf "target/forskscope-v${VER}.tar.gz" | awk -v archive="forskscope-v${VER}.tar.gz" '{p=$0; sub(/^\.\//,"",p); if (p==archive || p==".git-exclude" || index(p,".git-exclude/")==1 || p==".git" || index(p,".git/")==1 || p=="target" || index(p,"target/")==1) bad=1} END{exit bad ? 1 : 0}'
-cargo xtask archive-layout "target/forskscope-v${VER}.tar.gz"
-```
+ForskScope no longer builds its own source archive. It used to produce one
+with the top-level parent directory stripped, so `PKGBUILD` could `cd
+"$srcdir"` directly — but that stripped-prefix archive was otherwise
+byte-for-byte identical to GitHub's own automatic per-tag source archive
+(`https://github.com/forskscope/forskscope/archive/refs/tags/<tag>.tar.gz`),
+and the custom build step's only stated justification (checksum stability)
+never applied: `PKGBUILD`'s `sha256sums=('SKIP')` never checked one, and
+`source=` was a bare local filename makepkg never fetched. `PKGBUILD` now
+points at GitHub's tarball directly and `cd`s into its actual top-level
+directory (`$pkgname-$pkgver`, GitHub's own naming), Arch's conventional
+form. `packaging/build-release.sh` and `cargo xtask` no longer build or
+verify a source archive at all.
 
 ---
 
@@ -58,10 +39,12 @@ cargo xtask archive-layout "target/forskscope-v${VER}.tar.gz"
 
 | File | Contents |
 |------|----------|
-| `forskscope-vX.Y.Z.tar.gz` | Source archive for the release |
 | `forskscope-vX.Y.Z-linux-x86_64.tar.gz` | Linux x86_64 release binary |
 | `forskscope-vX.Y.Z-macos-aarch64.dmg` | macOS aarch64 DMG |
 | `forskscope-vX.Y.Z-windows-x64.zip` | Windows x64 release zip with README, license, notice, changelog, and executable |
+
+A source archive is still attached to every GitHub Release automatically —
+GitHub generates one for every tag regardless of what this project does.
 
 ---
 

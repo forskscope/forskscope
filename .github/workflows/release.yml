@@ -67,43 +67,11 @@ jobs:
       - name: i18n coverage check
         run: cargo xtask i18n
 
-  # ── Source archive ──────────────────────────────────────────────────────────
-  source:
-    name: Source archive
-    runs-on: ubuntu-latest
-    needs: preflight
-    outputs:
-      version: ${{ steps.ver.outputs.version }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - id: ver
-        run: echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-
-      - name: Create source archive
-        run: |
-          VER=${{ steps.ver.outputs.version }}
-          git archive --format=tar.gz \
-              --output="${RUNNER_TEMP}/forskscope-v${VER}.tar.gz" \
-              HEAD
-
-      - name: Verify source archive layout
-        run: |
-          VER=${{ steps.ver.outputs.version }}
-          cargo xtask archive-layout "${RUNNER_TEMP}/forskscope-v${VER}.tar.gz"
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: source-archive
-          path: ${{ runner.temp }}/forskscope-v${{ steps.ver.outputs.version }}.tar.gz
-
   # ── Linux x86_64 ────────────────────────────────────────────────────────────
   linux:
     name: Linux x86_64
     runs-on: ubuntu-latest
-    needs: source
+    needs: preflight
     steps:
       - uses: actions/checkout@v7
 
@@ -146,7 +114,7 @@ jobs:
 
       - name: Package
         run: |
-          VER=${{ needs.source.outputs.version }}
+          VER="${GITHUB_REF_NAME}"
           tar -czf "forskscope-v${VER}-linux-x86_64.tar.gz" \
               -C target/release forskscope
 
@@ -159,7 +127,7 @@ jobs:
   macos:
     name: macOS aarch64
     runs-on: macos-latest
-    needs: source
+    needs: preflight
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -199,7 +167,7 @@ jobs:
   windows:
     name: Windows x86_64
     runs-on: windows-latest
-    needs: source
+    needs: preflight
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -218,7 +186,7 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          VER=${{ needs.source.outputs.version }}
+          VER="${GITHUB_REF_NAME}"
           STAGE="target/forskscope-v${VER}-windows-x64"
           rm -rf "$STAGE"
           mkdir -p "$STAGE"
@@ -235,7 +203,7 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [source, linux, macos, windows]
+    needs: [linux, macos, windows]
     steps:
       # Must run before actions/download-artifact: checkout cleans the
       # workspace by default, and would wipe downloaded artifacts if it ran
@@ -245,8 +213,8 @@ jobs:
           fetch-depth: 0
 
       # F24: this empty-section guard used to be the *only* check, and it ran
-      # here — after the tag, source archive, and all three platform builds
-      # already existed, so recovering from an empty section meant a re-cut.
+      # here — after the tag and all three platform builds already existed,
+      # so recovering from an empty section meant a re-cut.
       # `preflight`'s `cargo xtask version-sync "${GITHUB_REF_NAME}"` now
       # rejects an empty section before any of that work starts (`xtask`'s
       # release mode, not just its dev-mode header-presence check). This one

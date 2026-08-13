@@ -48,8 +48,9 @@ sudo pacman -S webkit2gtk-4.1 gtk3                    # Arch
 ### Arch Linux
 
 A [PKGBUILD](https://github.com/forskscope/forskscope/blob/main/packaging/linux/PKGBUILD)
-ships in the repository. Place the release source archive beside it and run
-`makepkg -si`.
+ships in the repository. Copy it into a directory and run `makepkg -si` —
+`makepkg` downloads the matching source directly from GitHub's own per-tag
+archive.
 
 ### Build from source
 

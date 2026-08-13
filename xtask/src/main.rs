@@ -6,7 +6,6 @@
 //!   cargo xtask audit-deps    — verify reviewed security dependency paths
 //!   cargo xtask i18n          — verify Japanese translations cover UI keys
 //!   cargo xtask version-sync [expected] — verify version metadata is in sync (no-arg mode also rejects an already-published version; [expected] mode additionally requires non-empty CHANGELOG content, F24)
-//!   cargo xtask archive-layout [archive] — verify source archive layout
 //!
 //! CSS source files under assets/css/ are assembled in alphabetical order.
 //! The numeric prefix on each filename (00-, 01-, …) encodes the cascade order.
@@ -31,10 +30,6 @@ fn main() {
         Some("version-sync") if args.len() <= 2 => {
             run_version_sync(args.get(1).map(String::as_str))
         }
-        Some("archive-layout") if args.len() <= 2 => {
-            let archive = args.get(1).map(PathBuf::from);
-            run_archive_layout_check(archive.as_deref());
-        }
         Some(cmd) => {
             eprintln!("unknown command: {cmd}");
             print_usage();
@@ -52,7 +47,6 @@ fn print_usage() {
     eprintln!("       cargo xtask audit-deps");
     eprintln!("       cargo xtask i18n");
     eprintln!("       cargo xtask version-sync [expected]");
-    eprintln!("       cargo xtask archive-layout [archive]");
 }
 
 fn workspace_root() -> PathBuf {
@@ -298,9 +292,10 @@ fn run_version_sync(expected_version: Option<&str>) {
     );
 
     // F24: release mode only. The release workflow's own empty-section guard
-    // used to run in its *last* job, after the tag, source archive, and all
-    // three platform builds already existed — by then, recovering from an
-    // empty section meant a re-cut. Dev mode (no `expected_version`) must
+    // used to run in its *last* job, after the tag, source archive (dropped
+    // since, F43), and all three platform builds already existed — by then,
+    // recovering from an empty section meant a re-cut. Dev mode (no
+    // `expected_version`) must
     // keep accepting an empty section: the tree normally carries one for the
     // in-progress version between releases (opened by the post-release bump,
     // closed when release notes are actually written), and failing dev-mode
@@ -385,65 +380,6 @@ fn git_lines(root: &Path, args: &[&str]) -> Result<Vec<String>, String> {
     }
     let text = String::from_utf8_lossy(&out.stdout);
     Ok(text.lines().map(str::to_string).collect())
-}
-
-fn run_archive_layout_check(archive: Option<&Path>) {
-    let root = workspace_root();
-    let cargo_toml = read_file(&root.join("Cargo.toml"));
-    let version = extract_workspace_value(&cargo_toml, "version")
-        .unwrap_or_else(|| fail("could not find [workspace.package] version in Cargo.toml"));
-    let default_archive = root.join(format!("target/forskscope-v{version}.tar.gz"));
-    let archive = archive.unwrap_or(&default_archive);
-
-    let output = Command::new("tar")
-        .args(["-tzf"])
-        .arg(archive)
-        .output()
-        .unwrap_or_else(|e| panic!("failed to list {}: {e}", archive.display()));
-    if !output.status.success() {
-        eprintln!("could not list source archive {}", archive.display());
-        eprintln!("{}", String::from_utf8_lossy(&output.stderr));
-        process::exit(1);
-    }
-
-    let archive_name = archive
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("source archive");
-    let parent_prefix = format!("forskscope-v{version}");
-    let mut has_root_cargo_toml = false;
-    let mut has_parent_dir = false;
-    let mut has_hygiene_violation = false;
-
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let path = line.strip_prefix("./").unwrap_or(line);
-        has_root_cargo_toml |= path == "Cargo.toml";
-        has_parent_dir |= path == parent_prefix || path.starts_with(&format!("{parent_prefix}/"));
-        has_hygiene_violation |= path == archive_name
-            || path == ".git-exclude"
-            || path.starts_with(".git-exclude/")
-            || path == ".git"
-            || path.starts_with(".git/")
-            || path == "target"
-            || path.starts_with("target/");
-    }
-
-    if !has_root_cargo_toml {
-        fail("source archive does not contain Cargo.toml at archive root");
-    }
-    if has_parent_dir {
-        fail(&format!(
-            "source archive contains forbidden top-level {parent_prefix}/ directory"
-        ));
-    }
-    if has_hygiene_violation {
-        fail("source archive contains generated, ignored, or local-only paths");
-    }
-
-    println!(
-        "source archive layout check passed for {}.",
-        archive.display()
-    );
 }
 
 fn read_file(path: &Path) -> String {

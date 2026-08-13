@@ -31,8 +31,8 @@ Release-readiness hardening completed after v0.140.0:
 - Dioxus desktop network-capable transitive dependencies were reviewed. Default
   Dioxus features/devtools are disabled, and the accepted loopback WebSocket IPC
   path is enforced by `cargo xtask audit-deps`.
-- Source archives now have a no-parent-directory contract, verified locally and
-  in the release workflow by `cargo xtask archive-layout`.
+- The project no longer builds its own source archive (F43); `PKGBUILD` fetches
+  GitHub's automatic per-tag archive directly instead.
 - CI and release preflight now run the documented gates: format, CSS, audit,
   dependency-path audit, version sync, i18n coverage, tests, and clippy. Release
   tags are checked against the workspace version before artifacts are created.
