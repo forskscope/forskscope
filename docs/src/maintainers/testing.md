@@ -38,34 +38,40 @@ The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
 be tested in environments without a display server. Core and ui-logic tests
 run anywhere Rust is installed.
 
-## `cargo audit`'s cadence (F55)
+## `cargo audit`'s cadence (F55, refined per review 059 N1)
 
-`cargo audit` runs in two different places with two different jobs, since
-2026-08-13:
+`cargo audit` runs in three different places, since 2026-08-13:
 
 - **Release preflight** (`release.yml`) still hard-blocks: it runs against
   a fixed, tagged ref, so its result is deterministic, and a release must
   never ship a known-vulnerable dependency. Unchanged by F55.
-- **`ci.yml`'s per-push job no longer runs `cargo audit` at all.** It read
-  a mutable external database (RustSec) from a blocking per-push gate, so a
-  green result was a property of the commit *and the clock*, not the
-  commit alone — F50 demonstrated this directly: two CI runs on `main`
-  minutes apart, one green and one red, with no dependency change between
-  them. A blocking per-push gate on that kind of check rewards making CI
-  green *fast*, and the fastest path is widening `.cargo/audit.toml`'s
-  ignore list — exactly what the disposition process (reachability, owner,
-  review date, upgrade trigger) exists to prevent.
-- **`.github/workflows/audit.yml`** runs `cargo audit` against `main` on a
-  daily schedule (plus `workflow_dispatch` for on-demand/testing runs), so
-  a new advisory is still noticed within a day, on its own terms — a
-  tracked finding, not an obstacle blocking whatever unrelated work was in
-  flight when the database happened to mutate. Loud on failure: GitHub
-  emails scheduled-workflow failures to the repository's watchers by
-  default; no additional notification plumbing was added, since that
-  default already covers it. `cargo xtask audit-deps` (dependency-path
-  shape against `.cargo/audit.toml`'s reviewed exceptions) stays in the
-  per-push job — it depends only on `Cargo.lock`, not a live external
-  database, so it has none of `cargo audit`'s flakiness.
+- **`ci.yml`'s per-push job no longer runs `cargo audit` at all**,
+  unconditionally. It read a mutable external database (RustSec) from a
+  blocking per-push gate, so a green result was a property of the commit
+  *and the clock*, not the commit alone — F50 demonstrated this directly:
+  two CI runs on `main` minutes apart, one green and one red, with no
+  dependency change between them. A blocking per-push gate on that kind of
+  check rewards making CI green *fast*, and the fastest path is widening
+  `.cargo/audit.toml`'s ignore list — exactly what the disposition process
+  (reachability, owner, review date, upgrade trigger) exists to prevent.
+  `cargo xtask audit-deps` (dependency-path shape against
+  `.cargo/audit.toml`'s reviewed exceptions) stays in this job — it
+  depends only on `Cargo.lock`, not a live external database, so it has
+  none of `cargo audit`'s flakiness and belongs on a deterministic gate.
+- **`.github/workflows/audit.yml`** runs `cargo audit` on three triggers,
+  each answering a different question: a **daily schedule** (did the
+  advisory database change under code that didn't? — loud on failure via
+  GitHub's default scheduled-workflow-failure email), **`push`/
+  `pull_request` filtered to `Cargo.lock`/`**/Cargo.toml` only** (did
+  *this* dependency-graph change introduce something vulnerable? —
+  audited immediately, on the commit that actually made the change, so a
+  future security bump like F50's own fix still gets audited on the
+  commit that makes it, not just the next day), and **`workflow_dispatch`**
+  (on-demand runs against any ref — how the workflow's fail/pass behavior
+  was verified without waiting a day; see F55's review request for the
+  falsifiability demonstration). Unrelated pushes match none of the
+  path-filtered triggers, so the non-determinism removed from `ci.yml`
+  stays removed for the common case.
 
 ## What `cargo xtask i18n` actually guarantees (F39)
 

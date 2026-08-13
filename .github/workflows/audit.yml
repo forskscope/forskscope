@@ -1,44 +1,83 @@
-name: Scheduled Security Advisory Audit
+name: Security Advisory Audit
 
 # F55: `cargo audit` reads a mutable external database (RustSec), so a
 # per-push result is a property of the commit *and the clock*, not the
 # commit alone — F50 demonstrated this directly (two CI runs on `main`
 # minutes apart, one green one red, no dependency change between them). A
-# blocking per-push gate on that kind of check rewards making CI green
-# *fast*, and the fastest path is widening `.cargo/audit.toml`'s ignore
-# list — exactly what the disposition process (reachability, owner, review
-# date, upgrade trigger) exists to prevent.
+# blocking gate on every push rewards making CI green *fast*, and the
+# fastest path is widening `.cargo/audit.toml`'s ignore list — exactly what
+# the disposition process (reachability, owner, review date, upgrade
+# trigger) exists to prevent. `cargo audit` was removed from `ci.yml`'s
+# unconditional per-push job for that reason.
 #
-# This workflow replaces per-push `cargo audit` in ci.yml with a daily
-# check against `main`, so a new advisory is noticed within a day and
-# handled on its own terms — a tracked finding, not an obstacle blocking
-# whatever unrelated work happens to be in flight when the database
-# mutates. Release preflight's `cargo audit` (release.yml) is unchanged and
-# remains a hard, deterministic block on the tag being released — it runs
-# against a fixed ref, so it never has this problem.
+# But removing it from every push loses something real too (review 059
+# N1): a commit that actually changes `Cargo.lock`/`Cargo.toml` and pulls
+# in a vulnerable dependency is bad *because of that change*, not because
+# the database mutated underneath an unrelated commit — F50's own fix was
+# exactly this shape (a `Cargo.lock` change), and under a schedule-only
+# design the commit that fixes an advisory gets no audit confirming the
+# fix, only the next day's run. So this workflow runs on four distinct
+# triggers, each answering a different question:
+#
+# - `schedule` (daily) — did the advisory database change under code that
+#   didn't? Noticed within a day, on its own terms, not as an obstacle
+#   blocking unrelated work in flight.
+# - `push`/`pull_request`, **path-filtered to `Cargo.lock`/`**/Cargo.toml`
+#   only** — did *this* dependency-graph change introduce something
+#   vulnerable? Audited immediately, on the commit/PR that made the
+#   change, where a failure is attributable to what's in front of you.
+#   Unrelated pushes never match the path filter, so the non-determinism
+#   removed from `ci.yml` stays removed for the common case.
+# - `workflow_dispatch` — on-demand runs against any ref, including a
+#   non-default one; how this workflow's fail/pass behavior was verified
+#   without waiting a day or for a real new advisory (see F55's review
+#   request for the falsifiability demonstration).
+#
+# Release preflight's `cargo audit` (release.yml) is unchanged and remains
+# a hard, deterministic block on the tag being released — it runs against
+# a fixed ref, so it never has this workflow's motivating problem at all.
+#
+# Required-status-check note: a path-filtered trigger reports as skipped
+# when its paths don't match, which can permanently block a PR if this
+# workflow is ever configured as a required status check under branch
+# protection — GitHub does not treat "skipped due to path filter" as
+# "passed" for that purpose. Not applicable today: `main` has no branch
+# protection configured (verified via the GitHub API before adding this
+# filter). If branch protection is added later, this job must not be
+# marked required as-is, or the path filter must be replaced with an
+# always-run job that conditionally skips the actual audit step instead.
 #
 # Loud on failure, deliberately: GitHub emails failure notifications for
 # scheduled workflow runs to the repository's watchers by default — the
 # same mechanism that already covers this repo's other automation. No
 # additional notification plumbing is added here; if that default ever
 # proves insufficient, add one rather than assuming silence means "safe."
+# One related failure mode to know about, not requiring action today:
+# GitHub disables a repository's scheduled workflows after 60 days with no
+# repository activity, and emails the owner when it does — the daily run
+# going silent is exactly the case a quiet repository would otherwise miss.
 on:
   schedule:
     # Daily, off the top of the hour to avoid GitHub's scheduled-workflow
     # traffic spike (its own documented recommendation).
     - cron: '17 6 * * *'
-  # Lets a run be triggered on demand — including against a non-default
-  # ref, which is how this workflow's fail/pass behavior was verified
-  # without waiting for a day or a real new advisory (see F55's review
-  # request for the falsifiability demonstration).
   workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - 'Cargo.lock'
+      - '**/Cargo.toml'
+  pull_request:
+    paths:
+      - 'Cargo.lock'
+      - '**/Cargo.toml'
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   audit:
-    name: cargo audit (main)
+    name: cargo audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
