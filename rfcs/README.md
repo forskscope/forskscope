@@ -7,7 +7,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Implemented (51)
+## Implemented (52)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
@@ -50,6 +50,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 057 | [Settings Dialog Layout Refinements](./done/057-settings-dialog-layout-refinements.md) | v0.36.0 |
 | 058 | [Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract](./done/058-spreadsheet-xlsx-structural-diff.md) | v0.57.0 (aligned view deferred) |
 | 059 | [Explorer and Compare UI/UX Audit Remediation](./done/059-explorer-and-compare-uiux-audit-remediation.md) | v0.41.0 (UI keyboard items deferred) |
+| 062 | [Safe Batch Copy UX and Restore Manifest Integration](./done/062-safe-batch-copy-ux-and-restore-manifest.md) | v0.145.3 |
 | 064 | [Compare View — Per-Pane Scroll and All-Different Coloring](./done/064-compare-view-scroll-and-coloring-fixes.md) | v0.147.0 |
 | 065 | [Asynchronous Comparison and Loading-State Tabs](./done/065-async-comparison-and-loading-state-tabs.md) | v0.148.0 |
 | 066 | [Binary Comparison Policy — Off by Default](./done/066-binary-comparison-policy.md) | v0.149.0 |
@@ -63,11 +64,11 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 076 | [Versioned Runtime Settings and Session Persistence](./done/076-versioned-runtime-persistence.md) | post-v0.165.1 stabilization |
 | 077 | [Git Mergetool Save-Target Model](./done/077-mergetool-save-target-model.md) | post-v0.165.1 stabilization |
 
-## Proposed (16)
+## Proposed (15)
 
 RFC-004–040 are editor-adapter track, platform/packaging, or governance/documentation.
 RFC-026 and RFC-030 are substantially implemented; their remaining items require GTK or are deferred.
-RFC-060–063 are the UI/UX architect review remediation track (shipped across v0.145.0–v0.145.3).
+RFC-060, 061, and 063 are the remaining UI/UX architect review remediation track (shipped across v0.145.0–v0.145.3); RFC-062, the fourth, is fully shipped and filed under Implemented.
 RFC-072 is the remaining phase of the UI structural redesign (RFC-071).
 RFC-074 and RFC-078 are the remaining release-stabilization program created
 from the 2026-07-15 architecture audit; they are release-blocking in
@@ -88,7 +89,6 @@ remains No-Go.
 | 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) | Governance | Living document — pre-GTK verification phase |
 | 060 | [Global Keyboard Scope and Modal/Input Safety](./proposed/060-global-keyboard-scope-and-modal-input-safety.md) | UX review remediation | **Partially shipped** v0.145.0–.1 — modal guard + per-surface propagation; W2/W3 tests remain |
 | 061 | [Explorer Pane Focus and Keyboard Completeness](./proposed/061-explorer-pane-focus-and-keyboard-completeness.md) | UX review remediation | **Partially implemented** v0.145.2 — focused pane, F6, per-pane Alt+↑; row ARIA remains |
-| 062 | [Safe Batch Copy UX and Restore Manifest Integration](./proposed/062-safe-batch-copy-ux-and-restore-manifest.md) | UX review remediation | **Shipped** v0.145.3 — manifest routing, result modal, explicit directions |
 | 063 | [Trust, Clarity, and Calm UI Hardening](./proposed/063-trust-clarity-and-calm-ui-hardening.md) | UX review remediation | **Mostly shipped** v0.145.1–.3 — C1/C2/C3/C5/C6/C7/C9/C10 done; C4 audited; C8 rejected |
 | 072 | [UI Component Extraction (Phase 4)](./proposed/072-ui-component-extraction.md) | Structural | **Partially shipped** v0.160.0 — `Notice` extracted; `EmptyState`/`PathLabel`/`IconButton` deferred |
 | 074 | [v1 Release Stabilization Program](./proposed/074-v1-release-stabilization-program.md) | Release stabilization | Program schedule, milestones, gates, and final go/no-go package |

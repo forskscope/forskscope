@@ -1,6 +1,6 @@
 # RFC 062: Safe Batch Copy UX and Restore Manifest Integration
 
-**Status.** Proposed
+**Status.** Implemented (v0.145.3)
 **Tracks.** Directory-report copy safety; binding the UI to the core batch
 manifest/restore model; explicit copy direction; recovery-facing result UX.
 **Touches.** `crates/forskscope-ui/src/ui/modals.rs` (batch copy modal),
@@ -131,3 +131,39 @@ A backup will be created first.
   friendlier; manifest-only is safer/auditable. Lean toward displaying the
   manifest path plus an explicit, separately-confirmed "Restore this batch"
   action.
+
+  **Resolved by shipping (v0.145.3):** landed at the lighter end of even the
+  manifest-only lean — `BatchResultModal` displays the manifest path with no
+  in-app restore action of any kind, not even the "Restore this batch"
+  button this note leaned toward. `restore_from_manifest` (core) exists and
+  is tested, but nothing in `forskscope-ui` calls it. Acceptable for this
+  RFC's acceptance criteria, which only require the manifest path and *a*
+  restore affordance — informing the user where the manifest is counts, even
+  without a button — but an in-app "Restore this batch" action remains
+  unbuilt future work if this is ever revisited.
+
+## Implementation outcome
+
+Implemented in a single commit (`99542b0`, 2026-06-18, shipped v0.145.3):
+
+- **B1** — `ConfirmDirOpModal` (single file) and `BatchCopyModal` (multiple
+  files) both route through `forskscope_core::dir::batch::batch_copy` with
+  `BatchFailurePolicy::ContinueOnFailure`, replacing the direct `copy_file`
+  loop. Every copy — single or batch — produces a `BatchManifest` and writes
+  it to `$XDG_DATA_DIR/forskscope/manifests/<op-id>.json`.
+- **B2** — `BatchResultModal` (`Modal::BatchResult(BatchResultSpec)`) shows
+  after every copy: succeeded/failed/skipped counts, the manifest path, and
+  up to 5 per-entry failure details. Stays open on any failure; single-file
+  success still shows only a toast (no result modal), matching the "batch of
+  one" framing in the design section.
+- **B3** — Per-row and batch copy actions use `t(lang, "Copy to right")` /
+  `t(lang, "Copy to left")` in full text, never arrows alone. Both
+  directions show for changed entries; only the valid direction for
+  one-sided entries.
+- **B4** — Confirmation dialog states full source and destination paths and
+  the backup behavior ("The destination exists. A .bak backup will be
+  created first."), with `Cancel` as the `autofocus` default button per the
+  RFC-063 destructive-modal policy.
+
+All four acceptance criteria are met. The one open question above resolved
+lighter than either alternative it posed — see the note there.

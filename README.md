@@ -100,7 +100,7 @@ git mergetool
 - **Navigation history** — back/forward per explorer pane
 - **Dark, Light, and Night themes**
 - **English and Japanese UI** (i18n)
-- **GitHub Actions gates** — CI and draft-release workflows check formatting, tests, clippy, audit policy, dependency paths, i18n, version metadata, and archive layout
+- **GitHub Actions gates** — CI and draft-release workflows check formatting, tests, clippy, audit policy, dependency paths, i18n, and version metadata
 
 ---
 

@@ -2,6 +2,21 @@
 
 **Status.** Implemented (v0.57.0) — migrated to sheets-diff v2.2.1; structured result, no catch_unwind, cancellation wired
 
+**Security suspension (F11, audit N4, current as of 2026-08-13):** the
+runtime path this status line describes is not what ships today.
+`sheets-diff -> calamine -> quick-xml` carries active denial-of-service
+advisories for XML input; because `.xlsx` files are user-supplied local
+archives containing XML, `.xlsx` structural comparison **fails closed**
+instead of parsing workbook content through that chain (`crates/
+forskscope-core/src/xlsx.rs`, `diff_xlsx` returns `Unsupported` without
+parsing). `.xlsx` files are still recognized and always read-only
+(`FileKind::ExcelXlsx` is never mergeable or saveable). This note documents
+the current decision on top of the historical implementation record above,
+rather than rewriting it — the v0.57.0 migration described above did happen
+and shipped; it is simply not reachable at runtime right now. Re-enabling
+requires the dependency path to be remediated first (tracked in
+`docs/src/maintainers/release-evidence/*/advisories.md`).
+
 ## Status
 Implemented (v0.45.0). The core-layer deliverables from RFC-058 are shipped:
 
