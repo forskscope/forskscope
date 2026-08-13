@@ -202,6 +202,26 @@ executor owner/role, and host-access status per row are owner-dependent and
 recorded as open questions rather than guessed. M5 cannot begin until those
 are answered.
 
+**Progress (2026-08-13): M4 is complete and Gate C passes.** All eight
+documented gates run clean on `b7960bc`, strengthened by M4-B's additions
+(`clippy --all-targets`, `xtask` under `fmt --check`, `actionlint` over every
+workflow, umask-scoped permission tests, and the F34 rendering check that would
+have caught F32). Advisory dispositions are recorded with reachability, owner,
+review date and upgrade trigger for both unsoundness advisories; docs and RFC
+status are reconciled; `matrix-plan.md` is frozen.
+
+**The release core is approved as a candidate for runtime QA.** This does not
+mean the release is good: B4 is open, no platform runtime evidence exists for
+any target, and **v1/public release remains No-Go**. Three of four audit
+blockers are closed — B1 (`0.165.0`), B2 and B3 (`0.166.0`).
+
+Carrying into M5: **F44 is a schedule dependency, not a risk** — RFC-078's
+waiver policy forbids waiving "inability to launch on a claimed supported
+platform," so if the upstream `dioxus-desktop` release has not landed, Linux P01
+fails un-waivably. **F46 is unverifiable** under current resourcing; one person
+opening the DMG on any Mac once closes it. **F45 is manual-only** by
+construction, since CI runners already carry the prerequisites.
+
 ### M4 slicing
 
 M4 opens carrying **20 open register items** — three times M2's load, and too
