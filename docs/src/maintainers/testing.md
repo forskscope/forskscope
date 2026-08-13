@@ -71,9 +71,12 @@ C2) instead of splitting the function's i18n treatment silently.
 A structured taxonomy for exactly this problem already exists —
 `AppError`/`AppErrorKind`/`SaveErrorView` (RFC-017) map `CoreError` into
 translatable categories with detail kept separate — but `forskscope-ui` does
-not use it anywhere; see F52. Routing these five sites through it would be
+not use it anywhere; see **F52**. Routing these five sites through it would be
 the real fix, and is future work, not a mechanical `t()`-wrapping of the
-current passthrough text.
+current passthrough text. **F52 is not tidiness** (review 058 §5.1): every
+save/IO failure reaches the user as raw `CoreError` `Display` text, in
+English, regardless of locale, until it's done — this gate's narrow scope is
+a symptom of that gap, not a separate problem with its own fix.
 
 ## Test counts (v0.165.0)
 

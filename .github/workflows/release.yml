@@ -249,7 +249,6 @@ jobs:
           draft: true
           body_path: release-notes.md
           files: |
-            forskscope-v*.tar.gz
             forskscope-v*-linux-x86_64.tar.gz
             forskscope-v*-macos-aarch64.dmg
             forskscope-v*-windows-x64.zip

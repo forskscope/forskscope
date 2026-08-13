@@ -15,6 +15,12 @@ license=('Apache-2.0')
 depends=('webkit2gtk-4.1' 'gtk3')
 makedepends=('cargo' 'pkg-config' 'openssl')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/forskscope/forskscope/archive/refs/tags/$pkgver.tar.gz")
+# SKIP is a real gap, not an oversight: F43 switched this from a local file
+# (no network, nothing to distrust) to a network fetch, and no real release
+# tag exists yet to hash against - any value written now would be wrong the
+# moment a real tag is cut. Before or at each release, run `updpkgsums` (or
+# `sha256sum` the actual tag tarball) against the real, tagged $pkgver and
+# commit the resulting hash here; do not leave SKIP once a real tag exists.
 sha256sums=('SKIP')
 
 build() {

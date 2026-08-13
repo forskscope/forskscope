@@ -11,6 +11,16 @@
 //! The guarded *apply* workflow (preflight, backup-protected writes) remains
 //! proposed in RFC-039 and is intentionally not implemented here, so patch
 //! export never performs writes to the user's tree.
+//!
+//! ## No schema versioning (F31's reasoning, review 058 §5.2)
+//!
+//! `to_unified`'s output carries no schema envelope, deliberately, for the
+//! same reason `dir::batch::BatchManifest`/`report` don't (see their module
+//! docs): a schema version protects a read path, and this module has none —
+//! nothing in ForskScope parses an exported `.patch` file back in. It's a
+//! write-only export for an external consumer (`patch -p1`, `git apply`)
+//! with its own fixed, external format; unified diff needs no ForskScope
+//! schema on top of it.
 
 mod build;
 mod directory;

@@ -110,7 +110,13 @@ annotated tag object (`git tag -l <tag>`) and re-push.
 3. Push the tag. The release workflow builds the source and platform artifacts,
    composes release notes from the tag's `CHANGELOG.md` section, and creates a
    **draft** GitHub release. It does not publish anything by itself.
-4. **Publish is a separate, explicit owner action — this is the approval gate,
+4. Refresh `PKGBUILD`'s `sha256sums` against the real, now-tagged source:
+   `updpkgsums` (or `sha256sum` the tag tarball directly) once the tag from
+   step 2 is pushed — GitHub's per-tag archive URL is fetchable immediately,
+   before the release workflow finishes. `sha256sums=('SKIP')` is committed
+   in the tree between releases because no real tag exists to hash yet; it
+   must not stay `SKIP` once one does.
+5. **Publish is a separate, explicit owner action — this is the approval gate,
    not a formality.** Inspect the draft release artifacts and composed notes,
    then publish:
    ```sh
