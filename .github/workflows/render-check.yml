@@ -1,0 +1,65 @@
+name: Render Check (on demand)
+
+# F57: the only way to run F34's rendering check used to be pushing a
+# release tag, so every fix attempt cost a re-cut. This gives it the
+# property M4-B's other gates already have — demonstrable failing and
+# passing on demand — by building the Linux release binary and running
+# render_check.py against it without creating a release or moving a tag.
+#
+# `inject_f32_defect` exists only to prove the check still detects the
+# defect it was built for (F32) after any change to its readiness logic —
+# a readiness fix that accidentally made the check permissive would
+# otherwise look identical to a working one. It patches
+# crates/forskscope-ui/src/ui/view/hunk.rs in this run's checkout only
+# (packaging/reintroduce_f32_defect.py) — never committed, never the
+# default.
+on:
+  workflow_dispatch:
+    inputs:
+      inject_f32_defect:
+        description: >-
+          Temporarily reintroduce F32's exact defect shape before building,
+          to demonstrate the check still detects it. Applied only to this
+          run's checkout; never committed.
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  render-check:
+    name: Compare view renders without column misalignment (F34)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            pkg-config libssl-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev \
+            xvfb dbus-x11 at-spi2-core python3-gi gir1.2-atspi-2.0
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: render-check-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Reintroduce F32's defect shape (demonstration only)
+        if: ${{ inputs.inject_f32_defect }}
+        run: python3 packaging/reintroduce_f32_defect.py
+
+      - name: Build release binary
+        run: cargo build --release --locked -p forskscope-ui
+
+      - name: Compare view renders without column misalignment (F34)
+        run: |
+          xvfb-run --auto-servernum dbus-run-session -- \
+            env NO_AT_BRIDGE=0 python3 packaging/render_check.py target/release/forskscope
