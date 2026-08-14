@@ -53,13 +53,16 @@ LAUNCH_TIMEOUT_S = 45
 
 
 def send_ctrl_s_to_window_titled(title):
-    """Activate the named window and send it Ctrl+S, via `xdotool`.
+    """Focus the named window and send it Ctrl+S, via `xdotool`.
 
     `Atspi.generate_keyboard_event` (AT-SPI's own key-synthesis API) sends
     to whatever X11 considers focused - under a bare Xvfb display there is
     no window manager, so a newly mapped window never receives focus and
-    the event goes nowhere. `xdotool key --window <id>` addresses a
-    specific window directly, independent of ambient focus.
+    the event goes nowhere. `windowfocus` issues `XSetInputFocus` directly
+    (no window-manager cooperation needed); `windowactivate` was tried
+    first and failed here specifically because it depends on a WM handling
+    an EWMH `_NET_ACTIVE_WINDOW` request that nothing under bare Xvfb ever
+    answers.
     """
     found = subprocess.run(
         ["xdotool", "search", "--name", title],
@@ -68,7 +71,7 @@ def send_ctrl_s_to_window_titled(title):
     window_id = found.stdout.strip().splitlines()[0] if found.stdout.strip() else None
     if not window_id:
         raise RuntimeError(f"xdotool found no window titled {title!r}")
-    subprocess.run(["xdotool", "windowactivate", "--sync", window_id], check=True, timeout=15)
+    subprocess.run(["xdotool", "windowfocus", "--sync", window_id], check=True, timeout=15)
     subprocess.run(["xdotool", "key", "--window", window_id, "ctrl+s"], check=True, timeout=15)
 
 
