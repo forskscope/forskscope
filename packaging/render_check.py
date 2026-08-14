@@ -17,6 +17,17 @@ neighbours, is the visible symptom regardless of which future markup change
 produces it - checking the outcome is more general than pattern-matching
 the one historical cause.
 
+F57: the check waits (`wait_for_ready`) until the accessible tree reaches
+the fixture's known, pinned row shape before checking alignment - not just
+until the app registers on the accessibility bus, and not just until a
+single tree walk happens to find the landmark. A window registers as soon
+as it exists; the WebView's DOM, and the row content that alignment
+checking needs, only appears after first paint, which a software-rendered
+CI runner can take much longer to reach than a developer machine with a
+GPU. The first real release run failed here: the app registered in under a
+second, one tree walk found no landmark yet, and the check gave up with
+twenty-seven of its thirty-second budget unspent.
+
 Usage: render_check.py <path-to-forskscope-binary>
 Exit 0 and prints a summary on success. Exit 1 with a description of every
 misaligned row on failure.
@@ -38,7 +49,27 @@ LEFT_FIXTURE = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
 RIGHT_FIXTURE = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
 
 APP_TIMEOUT_S = 30
+# F57: the app registering on the accessibility bus (APP_TIMEOUT_S, above)
+# happens as soon as its window exists - well before the WebView's DOM
+# exists, let alone paints. READY_TIMEOUT_S is the separate budget for
+# waiting on *that*: the compare view's accessible tree reaching its full,
+# expected shape. A CI runner's software rendering (no GPU, `libEGL
+# warning: DRI3 error`) makes first paint far slower than on a developer
+# machine - the original release failure hit at 3s into a 30s budget only
+# because the check never retried at all, not because 30s was too short.
+READY_TIMEOUT_S = 45
 POLL_INTERVAL_S = 0.5
+
+# F57: exactly how many `DiffRow`s (one accessible "table row" per side)
+# the fixture pair produces, pinned by
+# `all_hunk_kinds_fixture_produces_exactly_seven_visual_rows` in
+# forskscope-core's diff_corpus.rs. The readiness condition waits for
+# *this* rather than "the landmark exists" - collect_rows does a single
+# tree traversal, so a tree caught mid-render could yield a partial row
+# set that either fails confusingly ("found only N rows") or, worse,
+# compares a subset and passes. Waiting for the known shape is what makes
+# this check slow-tolerant instead of merely lucky.
+EXPECTED_ROWS_PER_PANE = 7
 
 
 def find_app(name, timeout_s=APP_TIMEOUT_S):
@@ -78,6 +109,42 @@ def collect_rows(node, rows):
 
 def extents(accessible):
     return Atspi.Component.get_extents(accessible, Atspi.CoordType.SCREEN)
+
+
+def wait_for_ready(app, expected_rows_per_pane, timeout_s=READY_TIMEOUT_S):
+    """Poll until the compare view's accessible tree has fully rendered:
+    the 'File comparison' landmark and application frame both exist, and
+    each pane has exactly `expected_rows_per_pane` table rows (F57).
+
+    Every step here retries against the deadline rather than trying once -
+    the original defect was exactly this: a single traversal immediately
+    after the app registered on the bus, with three seconds of a
+    thirty-second budget consumed and twenty-seven never spent.
+
+    Returns (landmark, frame, left_rows, right_rows) once ready, or
+    (None, None, [], []) if `timeout_s` elapses first.
+    """
+    deadline = time.monotonic() + timeout_s
+    frame = None
+    while time.monotonic() < deadline:
+        landmark = find_by_role(app, "landmark", deadline)
+        if landmark is not None:
+            if frame is None:
+                frame = find_by_role(app, "frame", deadline)
+            if frame is not None:
+                frame_extents = extents(frame)
+                midline_x = frame_extents.x + frame_extents.width / 2
+                rows = []
+                collect_rows(landmark, rows)
+                left_rows = [r for r in rows if extents(r).x < midline_x]
+                right_rows = [r for r in rows if extents(r).x >= midline_x]
+                if (
+                    len(left_rows) == expected_rows_per_pane
+                    and len(right_rows) == expected_rows_per_pane
+                ):
+                    return landmark, frame, left_rows, right_rows
+        time.sleep(POLL_INTERVAL_S)
+    return None, None, [], []
 
 
 def check_pane(rows, pane_name):
@@ -127,26 +194,17 @@ def main():
                 )
                 return 1
 
-            landmark = find_by_role(app, "landmark", time.monotonic() + APP_TIMEOUT_S)
+            landmark, _frame, left_rows, right_rows = wait_for_ready(
+                app, EXPECTED_ROWS_PER_PANE
+            )
             if landmark is None:
-                print("FAIL: could not find the 'File comparison' landmark", file=sys.stderr)
+                print(
+                    "FAIL: compare view did not reach the expected render "
+                    f"shape ({EXPECTED_ROWS_PER_PANE} rows per pane) within "
+                    f"{READY_TIMEOUT_S}s",
+                    file=sys.stderr,
+                )
                 return 1
-
-            frame = find_by_role(app, "frame")
-            if frame is None:
-                print("FAIL: could not find the application frame", file=sys.stderr)
-                return 1
-            frame_extents = extents(frame)
-            midline_x = frame_extents.x + frame_extents.width / 2
-
-            rows = []
-            collect_rows(landmark, rows)
-            if len(rows) < 2:
-                print(f"FAIL: found only {len(rows)} table rows, expected several", file=sys.stderr)
-                return 1
-
-            left_rows = [r for r in rows if extents(r).x < midline_x]
-            right_rows = [r for r in rows if extents(r).x >= midline_x]
 
             failures = check_pane(left_rows, "left pane") + check_pane(right_rows, "right pane")
 

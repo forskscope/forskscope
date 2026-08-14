@@ -140,6 +140,28 @@ fn all_hunk_kinds_fixture_produces_exactly_one_replace_insert_and_delete_hunk() 
     );
 }
 
+#[test]
+fn all_hunk_kinds_fixture_produces_exactly_seven_visual_rows() {
+    // F57: `packaging/render_check.py`'s readiness condition waits for
+    // exactly this many `DiffRow`s per pane (one accessible "table row" per
+    // side, per `hunk.rs`'s RowLeft/RowRight) before checking alignment -
+    // pinning it here is what makes that number a fact about the fixture,
+    // not a number read off one observed run. Derivation: alpha (Equal),
+    // old-line/new-line (Replace), gamma (Equal), delete-line/<empty>
+    // (Delete), epsilon (Equal), zeta (Equal), <empty>/insert-line
+    // (Insert) = 7 rows. Independently confirmed against a real rendered
+    // instance's AT-SPI tree (7 left + 7 right) - see F57's review
+    // request.
+    let left = load("text/left_all_hunk_kinds.txt");
+    let right = load("text/right_all_hunk_kinds.txt");
+    let doc = compute_diff(&left, &right, opts_default());
+    let total_rows: usize = doc.hunks.iter().map(|h| h.rows.len()).sum();
+    assert_eq!(
+        total_rows, 7,
+        "fixture must produce exactly 7 visual rows total across all hunks"
+    );
+}
+
 // ── Text: empty file comparisons ──────────────────────────────────────────────
 
 #[test]
