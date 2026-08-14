@@ -15,6 +15,15 @@ acceptance (M5) will be run against.
 Two user-facing fixes, one security dependency update, and a substantial
 tightening of the checks that decide whether a release is fit to ship.
 
+**Re-cut (F57).** The first `0.167.0` tag failed at the rendering check on
+its Linux build before any artifact was published — the check itself was
+at fault (it gave up after one tree walk instead of retrying until the
+WebView had actually painted, which a software-rendered CI runner reaches
+much slower than a developer machine), not the product; macOS and Windows
+had already passed. No release was created, not even a draft, so the tag
+was deleted and re-cut against the corrected commit per `release.md`'s
+immutability policy — nothing published needed to change.
+
 ### Fixed
 
 **Changing a diff option silently discarded merged work.**
