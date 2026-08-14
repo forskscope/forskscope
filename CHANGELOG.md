@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.167.1] — Unreleased
+
 ## [0.167.0] — 2026-08-13
 
 The integrated stabilization release (RFC-074 milestone M4). It closes no audit
