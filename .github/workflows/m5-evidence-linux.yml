@@ -79,10 +79,10 @@ jobs:
       # Not documented in installation.md - installed here only so this
       # harness can proceed to exercise P01/P02/P09/P10 themselves. Real
       # users following the current docs exactly do not get this.
-      - name: Install undocumented libxdo3 dependency, and AT-SPI driving tools
+      - name: Install undocumented libxdo3 dependency, and AT-SPI/xdotool driving tools
         run: |
           sudo apt-get install -y -qq \
-            libxdo3 xvfb dbus-x11 at-spi2-core python3-gi gir1.2-atspi-2.0
+            libxdo3 xvfb dbus-x11 at-spi2-core python3-gi gir1.2-atspi-2.0 xdotool
 
       - name: Run case
         run: |

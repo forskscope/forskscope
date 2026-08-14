@@ -49,18 +49,27 @@ from gi.repository import Atspi  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
-# X11 keysyms (from X11/keysymdef.h) - stable, standard values.
-KEYSYM_CONTROL_L = 0xFFE3
-KEYSYM_S = ord("s")
-
 LAUNCH_TIMEOUT_S = 45
 
 
-def send_ctrl_s():
-    """Synthesize a Ctrl+S key chord via AT-SPI's system-wide key event API."""
-    Atspi.generate_keyboard_event(KEYSYM_CONTROL_L, None, Atspi.KeySynthType.PRESS)
-    Atspi.generate_keyboard_event(KEYSYM_S, None, Atspi.KeySynthType.PRESSRELEASE)
-    Atspi.generate_keyboard_event(KEYSYM_CONTROL_L, None, Atspi.KeySynthType.RELEASE)
+def send_ctrl_s_to_window_titled(title):
+    """Activate the named window and send it Ctrl+S, via `xdotool`.
+
+    `Atspi.generate_keyboard_event` (AT-SPI's own key-synthesis API) sends
+    to whatever X11 considers focused - under a bare Xvfb display there is
+    no window manager, so a newly mapped window never receives focus and
+    the event goes nowhere. `xdotool key --window <id>` addresses a
+    specific window directly, independent of ambient focus.
+    """
+    found = subprocess.run(
+        ["xdotool", "search", "--name", title],
+        capture_output=True, text=True, timeout=15,
+    )
+    window_id = found.stdout.strip().splitlines()[0] if found.stdout.strip() else None
+    if not window_id:
+        raise RuntimeError(f"xdotool found no window titled {title!r}")
+    subprocess.run(["xdotool", "windowactivate", "--sync", window_id], check=True, timeout=15)
+    subprocess.run(["xdotool", "key", "--window", window_id, "ctrl+s"], check=True, timeout=15)
 
 
 def find_text_containing(node, substring, depth=0, max_depth=60):
@@ -255,13 +264,7 @@ def p09(binary, break_mode=False):
             if frame is None:
                 print("FAIL: could not find the application frame", file=sys.stderr)
                 return 1
-            # Give the window manager time to give the new window OS-level
-            # keyboard focus - generate_keyboard_event is a system-wide X11
-            # synthesis, not addressed to a specific AT-SPI node, so it only
-            # reaches forskscope once the WM has actually focused it.
-            time.sleep(3)
-
-            send_ctrl_s()
+            send_ctrl_s_to_window_titled("ForskScope")
 
             deadline = time.monotonic() + LAUNCH_TIMEOUT_S
             while time.monotonic() < deadline and not merged.exists():
