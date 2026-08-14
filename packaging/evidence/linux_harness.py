@@ -65,13 +65,28 @@ def send_ctrl_s_to_window_titled(title):
     answers.
     """
     found = subprocess.run(
-        ["xdotool", "search", "--name", title],
+        ["xdotool", "search", "--onlyvisible", "--name", title],
         capture_output=True, text=True, timeout=15,
     )
     window_id = found.stdout.strip().splitlines()[0] if found.stdout.strip() else None
     if not window_id:
-        raise RuntimeError(f"xdotool found no window titled {title!r}")
-    subprocess.run(["xdotool", "windowfocus", "--sync", window_id], check=True, timeout=15)
+        raise RuntimeError(f"xdotool found no visible window titled {title!r}")
+
+    # XSetInputFocus (via `windowfocus`) can fail with BadMatch if the
+    # window isn't yet viewable in exactly the state X11 wants at that
+    # instant - retry briefly rather than treat one race as a hard failure.
+    last_error = None
+    for _ in range(10):
+        result = subprocess.run(
+            ["xdotool", "windowfocus", "--sync", window_id], timeout=15
+        )
+        if result.returncode == 0:
+            break
+        last_error = result.returncode
+        time.sleep(0.5)
+    else:
+        raise RuntimeError(f"xdotool windowfocus kept failing (exit {last_error})")
+
     subprocess.run(["xdotool", "key", "--window", window_id, "ctrl+s"], check=True, timeout=15)
 
 
