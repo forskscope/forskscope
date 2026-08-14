@@ -1,0 +1,65 @@
+name: M5 Evidence - Linux
+
+# M5-A: runs P01/P02/P09/P10 against the *published* 0.167.0 Linux artifact
+# (downloaded from the release, digest-verified - never built from source,
+# per RFC-078 §5: the evidence is about what users actually have) on
+# ubuntu-latest, representing the linux-x11 CI row per matrix-plan.md.
+#
+# `break_case: true` runs the selected case's built-in falsifiability
+# demonstration (packaging/evidence/linux_harness.py's `--break` flag) -
+# each case asserts against a condition that cannot be satisfied, proving
+# the check is a real assertion and not vacuously green.
+on:
+  workflow_dispatch:
+    inputs:
+      case:
+        description: 'Which case to run'
+        type: choice
+        options: [p01, p02, p09, p10]
+        required: true
+      break_case:
+        description: 'Run in --break mode (falsifiability demonstration)'
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  evidence:
+    name: M5-A Linux evidence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            xvfb dbus-x11 at-spi2-core python3-gi gir1.2-atspi-2.0
+
+      - name: Download published 0.167.0 Linux artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download 0.167.0 -R "${{ github.repository }}" \
+            -p "forskscope-v0.167.0-linux-x86_64.tar.gz"
+
+      # RFC-078 §5: verify after download, never trust the release page.
+      - name: Verify digest
+        run: |
+          echo "e17baa26abbb91e5e8e046d3812b08203f0d1ddfd6f8dc9fb9182326ed04bf09  forskscope-v0.167.0-linux-x86_64.tar.gz" \
+            | sha256sum -c -
+
+      - name: Extract
+        run: tar -xzf forskscope-v0.167.0-linux-x86_64.tar.gz
+
+      - name: Run case
+        run: |
+          BREAK_FLAG=""
+          if [ "${{ inputs.break_case }}" = "true" ]; then
+            BREAK_FLAG="--break"
+          fi
+          xvfb-run --auto-servernum dbus-run-session -- \
+            env NO_AT_BRIDGE=0 python3 packaging/evidence/linux_harness.py \
+              "${{ inputs.case }}" ./forskscope $BREAK_FLAG
