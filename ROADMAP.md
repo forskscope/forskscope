@@ -204,6 +204,20 @@ executor owner/role, and host-access status per row are owner-dependent and
 recorded as open questions rather than guessed. M5 cannot begin until those
 are answered.
 
+**Progress (2026-08-14): `0.167.0` is published and M5 has begun.** The
+candidate carries F44 knowingly — the upstream `dioxus-desktop` fix is merged
+but unreleased, and only a `0.8.0-alpha` exists. Publishing rather than holding
+was the owner's call: `0.167.0` carries a data-loss fix (F40) and a security fix
+(F50) that users on `0.166.0` are exposed to, and M5 runs equally well against
+published artifacts since RFC-078 requires recorded digests, not draft state.
+Publishing also closed F58's immediate instance.
+
+M5 is sliced: **M5-A** (harness plus P01/P02/P09/P10, the launch and CLI cases),
+**M5-B** (interaction: P04, P05, P06, P08, P12), **M5-C** (visual and
+navigation: P03, P07, P11, plus the owner's manual passes and evidence
+assembly). Four of five rows are CI-verified per the frozen plan, so M5 is
+substantially a harness-building effort rather than a checklist run.
+
 **Progress (2026-08-13): M4 is complete and Gate C passes.** All eight
 documented gates run clean on `b7960bc`, strengthened by M4-B's additions
 (`clippy --all-targets`, `xtask` under `fmt --check`, `actionlint` over every
