@@ -33,23 +33,12 @@ jobs:
       - uses: actions/checkout@v7
 
       # Exactly installation.md's documented Debian/Ubuntu runtime
-      # prerequisites, plus the AT-SPI driving tools this harness itself
-      # needs (not something a real user installs) - kept as two separate
-      # groups so a P01 failure here is attributable to the documented
-      # prerequisites specifically, not the test tooling.
+      # prerequisites - nothing else - so the launch attempt below is
+      # attributable to what the docs actually tell a user to install.
       - name: Install documented runtime prerequisites
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libwebkit2gtk-4.1-0 libgtk-3-0
-          echo "--- diagnostic: is libxdo present without an explicit install? ---"
-          ldconfig -p | grep -i libxdo || echo "libxdo: not present"
-          echo "--- diagnostic: candidate package names ---"
-          apt-cache search libxdo 2>&1 || true
-
-      - name: Install AT-SPI driving tools (test tooling, not a user prerequisite)
-        run: |
-          sudo apt-get install -y -qq \
-            xvfb dbus-x11 at-spi2-core python3-gi gir1.2-atspi-2.0
 
       - name: Download published 0.167.0 Linux artifact
         env:
@@ -66,6 +55,34 @@ jobs:
 
       - name: Extract
         run: tar -xzf forskscope-v0.167.0-linux-x86_64.tar.gz
+
+      # Registered separately (see the review request/ROADMAP): a fresh
+      # ubuntu-latest host with exactly installation.md's documented
+      # prerequisites installed cannot launch the binary at all -
+      # `libxdo.so.3` is required but not pulled in by
+      # libwebkit2gtk-4.1-0/libgtk-3-0, and is not mentioned in the docs.
+      # Recorded here as its own evidence line, not silently worked
+      # around, before installing the missing library so the rest of
+      # this run's case can actually execute.
+      - name: Attempt launch against documented prerequisites only (evidence)
+        run: |
+          set +e
+          ./forskscope --diagnostics
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            echo "UNEXPECTED: launch succeeded against documented-only prerequisites"
+          else
+            echo "CONFIRMED (undocumented prerequisite gap): exit $code against documented-only prerequisites"
+          fi
+
+      # Not documented in installation.md - installed here only so this
+      # harness can proceed to exercise P01/P02/P09/P10 themselves. Real
+      # users following the current docs exactly do not get this.
+      - name: Install undocumented libxdo3 dependency, and AT-SPI driving tools
+        run: |
+          sudo apt-get install -y -qq \
+            libxdo3 xvfb dbus-x11 at-spi2-core python3-gi gir1.2-atspi-2.0
 
       - name: Run case
         run: |
