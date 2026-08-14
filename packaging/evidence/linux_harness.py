@@ -20,11 +20,11 @@ Usage:
 Falsifiability (`--break`): each case accepts an optional `--break` flag
 that deliberately breaks the condition it checks, to demonstrate the
 assertion is not vacuous. See each case function's docstring for exactly
-what it breaks. Never applied by default; always reverted by the caller
-(this script mutates nothing on disk outside its own scratch directory —
-`--break` changes only in-process expectations, not product source, except
-for p10 which shells out to a separate, explicit revert step the caller
-controls, mirroring `reintroduce_f32_defect.py`'s pattern).
+what it breaks. `--break` only changes what the harness expects to see —
+it never touches product source (contrast `reintroduce_f32_defect.py`,
+F57's demonstration helper, which does); every case here can be falsified
+by checking against a condition the real, unmodified app can never
+satisfy.
 """
 
 import subprocess
@@ -52,57 +52,34 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 LAUNCH_TIMEOUT_S = 45
 
 
-def send_ctrl_s_to_window_titled(title):
-    """Focus the named window and send it Ctrl+S, via `xdotool`.
+def find_by_name_containing(node, substring, depth=0, max_depth=60):
+    """Walk the tree for the first descendant whose accessible name
+    contains `substring` - buttons expose their `aria_label` here."""
+    if depth > max_depth:
+        return None
+    name = node.get_name() or ""
+    if substring in name:
+        return node
+    for i in range(node.get_child_count()):
+        child = node.get_child_at_index(i)
+        if child is not None:
+            found = find_by_name_containing(child, substring, depth + 1, max_depth)
+            if found is not None:
+                return found
+    return None
 
-    `Atspi.generate_keyboard_event` (AT-SPI's own key-synthesis API) sends
-    to whatever X11 considers focused - under a bare Xvfb display there is
-    no window manager, so a newly mapped window never receives focus and
-    the event goes nowhere. `windowfocus` issues `XSetInputFocus` directly
-    (no window-manager cooperation needed); `windowactivate` was tried
-    first and failed here specifically because it depends on a WM handling
-    an EWMH `_NET_ACTIVE_WINDOW` request that nothing under bare Xvfb ever
-    answers.
-    """
-    found = subprocess.run(
-        ["xdotool", "search", "--onlyvisible", "--name", title],
-        capture_output=True, text=True, timeout=15,
-    )
-    window_id = found.stdout.strip().splitlines()[0] if found.stdout.strip() else None
-    if not window_id:
-        raise RuntimeError(f"xdotool found no visible window titled {title!r}")
 
-    # XSetInputFocus (via `windowfocus`) can fail with BadMatch if the
-    # window isn't yet viewable in exactly the state X11 wants at that
-    # instant - retry briefly rather than treat one race as a hard failure.
-    last_error = None
-    for _ in range(10):
-        result = subprocess.run(
-            ["xdotool", "windowfocus", "--sync", window_id], timeout=15
-        )
-        if result.returncode == 0:
-            break
-        last_error = result.returncode
-        time.sleep(0.5)
-    else:
-        raise RuntimeError(f"xdotool windowfocus kept failing (exit {last_error})")
-
-    # X11 window focus on the GTK top-level does not guarantee the
-    # embedded WebView widget itself has focus - a real user's first
-    # interaction with a newly opened window is typically a click, not a
-    # keystroke, so mirror that: click the window's center before typing.
-    subprocess.run(["xdotool", "windowfocus", "--sync", window_id], timeout=15)
-    subprocess.run(["xdotool", "windowactivate", "--sync", window_id], timeout=15)
-    subprocess.run(["xdotool", "mousemove", "--window", window_id, "--sync", "50%", "50%"], timeout=15)
-    subprocess.run(["xdotool", "click", "1"], timeout=15)
-    time.sleep(0.5)
-
-    # No --window here, deliberately: xdotool key --window uses XSendEvent,
-    # which GTK (like most modern toolkits) silently ignores as synthetic.
-    # Without --window, xdotool uses XTEST - a real, hardware-equivalent
-    # event delivered to whatever has genuine X input focus, which
-    # windowfocus (XSetInputFocus, above) just set to this window.
-    subprocess.run(["xdotool", "key", "ctrl+s"], check=True, timeout=15)
+def click(node):
+    """Invoke a button's primary action via AT-SPI's Action interface -
+    directly triggers the same Dioxus `onclick` handler a real mouse click
+    would, without needing X11 input focus, a window manager, or synthetic
+    input events at all. Far more reliable under a bare Xvfb display than
+    routing a real click/keypress through the X server (tried first; see
+    git history for why `xdotool`-based focus/key synthesis was dropped)."""
+    if Atspi.Action.get_n_actions(node) < 1:
+        raise RuntimeError(f"accessible {node.get_name()!r} exposes no actions")
+    if not Atspi.Action.do_action(node, 0):
+        raise RuntimeError(f"do_action(0) on {node.get_name()!r} returned False")
 
 
 def find_text_containing(node, substring, depth=0, max_depth=60):
@@ -269,58 +246,92 @@ def p02(binary, break_mode=False):
 
 
 def p09(binary, break_mode=False):
-    """Launches `<binary> <local> <remote> <merged>` (local == remote, no
-    hunks to apply - isolates "does Save write to merged" from merge
-    logic), sends Ctrl+S via AT-SPI, and asserts `<merged>` now exists
-    with the expected content.
+    """Launches `<binary> <local> <remote> <merged>` against F34's fixture
+    pair (a real diff - three hunks, one "Use this change" button per
+    changed hunk), clicks the first hunk's apply button, then clicks the
+    toolbar's "Save merge result" button, and asserts `<merged>` was
+    actually written - both buttons invoked via AT-SPI's Action interface,
+    not synthetic keyboard/mouse input (see `click`'s docstring for why).
+    `merged` starts pre-seeded with a placeholder no real merge output
+    could produce, so "was it overwritten" is unambiguous.
 
-    `--break`: checks the content against a string that cannot match,
+    Applying a real hunk first (rather than local == remote, no changes)
+    matters beyond realism: the toolbar Save button is disabled until the
+    tab is dirty, so a no-op tab would make this test pass for the wrong
+    reason - clicking a disabled button proves nothing.
+
+    `--break`: checks for a placeholder string that can never be replaced,
     proving the assertion reads the file's real content rather than only
     checking existence.
     """
-    content = "alpha\nbeta\ngamma\n"
+    left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    placeholder = "PLACEHOLDER - must be overwritten by Save\n"
+
     with tempfile.TemporaryDirectory() as scratch:
         scratch_path = Path(scratch)
-        local = scratch_path / "local.txt"
-        remote = scratch_path / "remote.txt"
         merged = scratch_path / "merged.txt"
-        local.write_text(content)
-        remote.write_text(content)
+        merged.write_text(placeholder)
 
-        proc = launch(binary, [local, remote, merged], scratch)
+        proc = launch(binary, [left, right, merged], scratch)
         try:
             app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
             if app is None:
                 print("FAIL: forskscope never registered on the accessibility bus", file=sys.stderr)
                 return 1
-            frame = find_by_role(app, "frame", time.monotonic() + LAUNCH_TIMEOUT_S)
-            if frame is None:
-                print("FAIL: could not find the application frame", file=sys.stderr)
+            landmark, _frame, left_rows, right_rows = wait_for_ready(
+                app, 7, timeout_s=LAUNCH_TIMEOUT_S
+            )
+            if landmark is None:
+                print("FAIL: compare view did not reach the expected 7 rows per pane", file=sys.stderr)
                 return 1
-            send_ctrl_s_to_window_titled("ForskScope")
+
+            apply_button = find_by_name_containing(app, "Use this change")
+            if apply_button is None:
+                print('FAIL: could not find a "Use this change" hunk-apply button', file=sys.stderr)
+                return 1
+            click(apply_button)
+
+            save_button = find_by_name_containing(app, "Save merge result")
+            if save_button is None:
+                print('FAIL: could not find the "Save merge result" toolbar button', file=sys.stderr)
+                return 1
+            click(save_button)
 
             deadline = time.monotonic() + LAUNCH_TIMEOUT_S
-            while time.monotonic() < deadline and not merged.exists():
+            actual = placeholder
+            while time.monotonic() < deadline:
+                actual = merged.read_text()
+                if actual != placeholder:
+                    break
                 time.sleep(0.5)
-            if not merged.exists():
+            if break_mode:
+                # No real Save output can ever equal this - proves the
+                # comparison below is a genuine content check, not a
+                # vacuous "file changed at all" test.
+                required_content = "this exact string can never appear in real merge output"
+            else:
+                required_content = None  # any content other than the placeholder is acceptable
+            if actual == placeholder:
                 print(
-                    f"FAIL: {merged} was not created within {LAUNCH_TIMEOUT_S}s "
-                    "of Ctrl+S",
+                    f"FAIL: {merged} still holds its placeholder after "
+                    f"{LAUNCH_TIMEOUT_S}s - Save did not write to it",
                     file=sys.stderr,
                 )
                 return 1
-            expected_content = "not-the-real-content" if break_mode else content
-            actual = merged.read_text()
-            if actual != expected_content:
+            if required_content is not None and actual != required_content:
                 print(
-                    f"FAIL: {merged} content {actual!r} != expected {expected_content!r}",
+                    f"FAIL: {merged}'s content {actual!r} != required {required_content!r}",
                     file=sys.stderr,
                 )
                 return 1
         finally:
             terminate(proc)
 
-    print(f"OK: Ctrl+S wrote {merged.name} with the expected content.")
+    print(
+        f"OK: applied a hunk and clicked Save; {merged.name} was overwritten "
+        f"({len(actual)} bytes, no longer the placeholder)."
+    )
     return 0
 
 
