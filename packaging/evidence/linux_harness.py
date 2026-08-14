@@ -87,6 +87,16 @@ def send_ctrl_s_to_window_titled(title):
     else:
         raise RuntimeError(f"xdotool windowfocus kept failing (exit {last_error})")
 
+    # X11 window focus on the GTK top-level does not guarantee the
+    # embedded WebView widget itself has focus - a real user's first
+    # interaction with a newly opened window is typically a click, not a
+    # keystroke, so mirror that: click the window's center before typing.
+    subprocess.run(["xdotool", "windowfocus", "--sync", window_id], timeout=15)
+    subprocess.run(["xdotool", "windowactivate", "--sync", window_id], timeout=15)
+    subprocess.run(["xdotool", "mousemove", "--window", window_id, "--sync", "50%", "50%"], timeout=15)
+    subprocess.run(["xdotool", "click", "1"], timeout=15)
+    time.sleep(0.5)
+
     # No --window here, deliberately: xdotool key --window uses XSendEvent,
     # which GTK (like most modern toolkits) silently ignores as synthetic.
     # Without --window, xdotool uses XTEST - a real, hardware-equivalent
