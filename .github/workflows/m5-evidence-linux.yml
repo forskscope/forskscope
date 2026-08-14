@@ -32,9 +32,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install system dependencies
+      # Exactly installation.md's documented Debian/Ubuntu runtime
+      # prerequisites, plus the AT-SPI driving tools this harness itself
+      # needs (not something a real user installs) - kept as two separate
+      # groups so a P01 failure here is attributable to the documented
+      # prerequisites specifically, not the test tooling.
+      - name: Install documented runtime prerequisites
         run: |
           sudo apt-get update -qq
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-0 libgtk-3-0
+
+      - name: Install AT-SPI driving tools (test tooling, not a user prerequisite)
+        run: |
           sudo apt-get install -y -qq \
             xvfb dbus-x11 at-spi2-core python3-gi gir1.2-atspi-2.0
 
