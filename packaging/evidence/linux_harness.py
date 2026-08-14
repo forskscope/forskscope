@@ -87,7 +87,12 @@ def send_ctrl_s_to_window_titled(title):
     else:
         raise RuntimeError(f"xdotool windowfocus kept failing (exit {last_error})")
 
-    subprocess.run(["xdotool", "key", "--window", window_id, "ctrl+s"], check=True, timeout=15)
+    # No --window here, deliberately: xdotool key --window uses XSendEvent,
+    # which GTK (like most modern toolkits) silently ignores as synthetic.
+    # Without --window, xdotool uses XTEST - a real, hardware-equivalent
+    # event delivered to whatever has genuine X input focus, which
+    # windowfocus (XSetInputFocus, above) just set to this window.
+    subprocess.run(["xdotool", "key", "ctrl+s"], check=True, timeout=15)
 
 
 def find_text_containing(node, substring, depth=0, max_depth=60):
