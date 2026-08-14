@@ -41,6 +41,10 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libwebkit2gtk-4.1-0 libgtk-3-0
+          echo "--- diagnostic: is libxdo present without an explicit install? ---"
+          ldconfig -p | grep -i libxdo || echo "libxdo: not present"
+          echo "--- diagnostic: candidate package names ---"
+          apt-cache search libxdo 2>&1 || true
 
       - name: Install AT-SPI driving tools (test tooling, not a user prerequisite)
         run: |
