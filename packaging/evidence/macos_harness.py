@@ -116,6 +116,7 @@ def terminate(proc):
         proc.wait(timeout=5)
     except subprocess.TimeoutExpired:
         proc.kill()
+        proc.wait(timeout=5)
 
 
 def run_diagnostics(binary):
@@ -1859,6 +1860,11 @@ def p06(binary, break_mode=False):
             return 1
 
         # ── Phase 2: only now launch process B, single-process pattern ──
+        # A settle delay: proc.poll() confirms the OS process was reaped,
+        # but macOS-level cleanup (WindowServer, the WebContent renderer,
+        # any launchd bookkeeping) is not guaranteed to be instantaneous -
+        # give it a moment before launching a fresh instance.
+        time.sleep(2.0)
         proc_b = launch(binary, [left_b, right_b], scratch, home=home_b)
         try:
             try:
