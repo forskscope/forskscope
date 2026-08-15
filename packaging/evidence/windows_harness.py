@@ -351,11 +351,33 @@ def wait_and_invoke(win, text_substring, timeout_s=READY_TIMEOUT_S):
     invoke(elem)
 
 
-def _combo_shows(elem, text):
+def _combo_readback(elem):
+    """Every readback source this harness knows how to ask a ComboBox
+    about its current value, gathered together because it's not known
+    (M5-B: readback via `window_text()` alone was not conclusive - see
+    `select_dropdown`'s docstring) which one, if any, WebView2/Chromium's
+    `<select>`-as-"ComboBox" mapping actually keeps in sync with a real
+    selection. Returns a dict of source-name -> value-or-None, used both
+    for `_combo_shows`'s check and for a rich diagnostic on failure."""
+    out = {}
     try:
-        return text in (elem.window_text() or "")
-    except Exception:  # noqa: BLE001
-        return False
+        out["window_text"] = elem.window_text()
+    except Exception as exc:  # noqa: BLE001
+        out["window_text"] = f"<error: {exc}>"
+    try:
+        out["iface_value.CurrentValue"] = elem.iface_value.CurrentValue
+    except Exception as exc:  # noqa: BLE001
+        out["iface_value.CurrentValue"] = f"<error: {exc}>"
+    try:
+        out["legacy_properties.Value"] = elem.legacy_properties()["Value"]
+    except Exception as exc:  # noqa: BLE001
+        out["legacy_properties.Value"] = f"<error: {exc}>"
+    return out
+
+
+def _combo_shows(elem, text):
+    readback = _combo_readback(elem)
+    return any(text in str(v) for v in readback.values())
 
 
 def select_dropdown(elem, text):
@@ -408,18 +430,20 @@ def select_dropdown(elem, text):
         elem.iface_value.SetValue(text)
         return "value-pattern"
 
-    last_exc = None
+    attempt_log = []
     for attempt in (try_selection_item, try_expand_and_invoke_item, try_value_pattern):
         try:
             path = attempt()
         except Exception as exc:  # noqa: BLE001
-            last_exc = exc
+            attempt_log.append(f"{attempt.__name__}: raised {exc!r}")
             continue
         if _combo_shows(elem, text):
             return path
-        last_exc = RuntimeError(f"{path} did not raise, but the combo still doesn't show {text!r}")
+        attempt_log.append(f"{attempt.__name__} ({path}): did not raise, readback={_combo_readback(elem)!r}")
 
-    raise RuntimeError(f"could not select {text!r} via any known pattern: {last_exc}")
+    raise RuntimeError(
+        f"could not select {text!r} via any known pattern:\n  " + "\n  ".join(attempt_log)
+    )
 
 
 def find_number_inputs(win):
