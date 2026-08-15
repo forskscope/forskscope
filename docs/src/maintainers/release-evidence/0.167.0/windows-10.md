@@ -47,8 +47,13 @@ host was available under this milestone's resourcing (see `matrix-plan.md`
 |---|---|---|
 | P01 — Install and cold launch | **Pass** | CI run [`31853150147`](https://github.com/forskscope/forskscope/actions/runs/31853150147) |
 | P02 — CLI file compare | **Pass** | CI run [`31853258477`](https://github.com/forskscope/forskscope/actions/runs/31853258477) |
+| P04 — Merge, undo/redo, safe save | **Pass** (mouse path) / **Not executed** (keyboard path — see `windows-11.md`) | CI run [`31878228535`](https://github.com/forskscope/forskscope/actions/runs/31878228535) |
+| P05 — External modification | **Pass** | CI run [`31878276750`](https://github.com/forskscope/forskscope/actions/runs/31878276750) |
+| P06 — Async identity | **Pass** | CI run [`31879158929`](https://github.com/forskscope/forskscope/actions/runs/31879158929) |
+| P08 — Persistence migration and recovery | **Pass** | CI run [`31878490123`](https://github.com/forskscope/forskscope/actions/runs/31878490123) |
 | P09 — Mergetool | **Pass** | CI run [`31853496997`](https://github.com/forskscope/forskscope/actions/runs/31853496997) |
 | P10 — Binary/XLSX fail-closed policy | **Pass** | CI run [`31853362804`](https://github.com/forskscope/forskscope/actions/runs/31853362804) |
+| P12 — Session/settings restart | **Pass** | CI run [`31880416324`](https://github.com/forskscope/forskscope/actions/runs/31880416324) |
 
 Harness: `packaging/evidence/windows_harness.py`, driven by
 `.github/workflows/m5-evidence-windows.yml`. See `windows-11.md` for the
@@ -63,6 +68,17 @@ redacted `Home: C:\Users\***`; cold launch produced a real 1044×788
 window. No launch-blocking issue was observed — this row does not have a
 Linux-style F44/F59 finding.
 
+## M5-B — the interaction cases
+
+P04, P05, P06, P08, P12: same CI runs as `windows-11.md`, since both
+rows share one CI host (`windows-latest`) per `matrix-plan.md`. See
+`windows-11.md`'s M5-B section for the full per-case narrative
+(behavior observed, deviations reported, the config-directory reasoning
+for P08/P12) — reproduced here would be a verbatim duplicate of the same
+runs' logs. P04's keyboard path is not executed, for the same reason
+recorded there (`app.rs`'s Enter-key shortcut has no bound UI element
+for any accessibility API to invoke).
+
 ## Falsifiability
 
 Every case's `--break` mode was run and confirmed to fail for the
@@ -75,12 +91,30 @@ CI host):
 | P02 | [`31853350190`](https://github.com/forskscope/forskscope/actions/runs/31853350190) | Fail — `compare view never rendered these expected tokens within 60s: ['this-token-cannot-appear-in-real-output']` |
 | P09 | [`31853592413`](https://github.com/forskscope/forskscope/actions/runs/31853592413) | Fail — content check correctly rejected a value real Save output can never produce |
 | P10 | [`31853491433`](https://github.com/forskscope/forskscope/actions/runs/31853491433) | Fail — `could not find text containing 'this message cannot appear' within 60s` |
+| P04 | [`31878264147`](https://github.com/forskscope/forskscope/actions/runs/31878264147) | Fail — saved content check correctly rejected a value real Save output can never produce |
+| P05 | [`31878529324`](https://github.com/forskscope/forskscope/actions/runs/31878529324) | Fail — `.bak` content check correctly rejected a value this harness never externally writes |
+| P06 | [`31878786557`](https://github.com/forskscope/forskscope/actions/runs/31878786557) | Fail — process B correctly never showed process A's token |
+| P08 | [`31878790194`](https://github.com/forskscope/forskscope/actions/runs/31878790194) | Fail — §6's specifically-flagged Exit risk, demonstrated: requiring the impossible (process still running) correctly fails |
+| P12 | [`31880463459`](https://github.com/forskscope/forskscope/actions/runs/31880463459) | Fail — header button never showed the impossible required label after restart |
+
+M5-B's cases needed real iteration against actual CI output before
+passing (P06, P08, and especially P12) — see `windows-11.md`'s
+Falsifiability section for the full explanation; the same CI runs are
+recorded here since both rows share one host.
 
 ## Failures and issue links
 
 None specific to this row. F45 (Windows P01's prerequisite sub-case)
 is recorded under `windows-11.md` since it is that row's Required
-sub-case, not this row's.
+sub-case, not this row's. P04's keyboard path, the candidate product
+defect found while building P12 (a 2-arg CLI-launched compare's tab is
+never persisted to `session.json` — see `windows-11.md`'s Failures
+section for the full detail, not fixed here), and the two other
+discovered (not invented) app behaviors noted in `windows-11.md`'s M5-B
+section (Toolbar hidden during `TabState::Loading`; tabs referencing
+nonexistent paths pruned by `restore_tabs` + auto-save) apply identically
+here, since this row runs the identical CI evidence — recorded under
+`windows-11.md` to avoid duplication, not omitted.
 
 ## Waivers
 
