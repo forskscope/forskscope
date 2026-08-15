@@ -2069,33 +2069,41 @@ def p12(binary, break_mode=False):
         left.write_text(left_src.read_text())
         right.write_text(right_src.read_text())
 
+        # The session-seeded check runs *while the process is still
+        # alive*, not after terminate() - `save_session`'s reactive
+        # use_effect (app.rs) writes asynchronously to when the DOM
+        # content UIA can see actually commits, so terminating the
+        # process the instant tokens are visible races the write and can
+        # win (M5-B, P12: the file was consistently seen as never seeded
+        # when this poll happened after the `with` block, i.e. after
+        # terminate() had already run).
+        session_path = config_dir / "session.json"
         with tempfile.TemporaryDirectory() as cwd:
             proc = launch(binary, [left, right], cwd)
+            seeded = False
             try:
                 app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
                 ok, texts, missing = wait_for_tokens(win, FIXTURE_TOKENS, timeout_s=READY_TIMEOUT_S)
                 if not ok:
                     print(f"FAIL: seeding compare tab never rendered expected tokens: {missing}", file=sys.stderr)
                     return 1
+
+                deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+                while time.monotonic() < deadline:
+                    if session_path.exists():
+                        try:
+                            payload = json.loads(session_path.read_text()).get("payload", {})
+                            if payload.get("tabs"):
+                                seeded = True
+                                break
+                        except Exception:  # noqa: BLE001
+                            pass
+                    time.sleep(POLL_INTERVAL_S)
             except RuntimeError as exc:
                 print(f"FAIL: {exc}", file=sys.stderr)
                 return 1
             finally:
                 terminate(proc)
-
-        session_path = config_dir / "session.json"
-        deadline = time.monotonic() + LAUNCH_TIMEOUT_S
-        seeded = False
-        while time.monotonic() < deadline:
-            if session_path.exists():
-                try:
-                    payload = json.loads(session_path.read_text()).get("payload", {})
-                    if payload.get("tabs"):
-                        seeded = True
-                        break
-                except Exception:  # noqa: BLE001
-                    pass
-            time.sleep(POLL_INTERVAL_S)
         if not seeded:
             print(f"FAIL: {session_path} was never seeded with a tab after the CLI-arg launch", file=sys.stderr)
             return 1
