@@ -161,6 +161,17 @@ def collect_texts(win):
     return texts
 
 
+def debug_dump(texts, limit=80):
+    """Print a bounded sample of collected accessible text to stderr on a
+    FAIL path - the only way to diagnose a UIA content-search miss from CI
+    log output alone, without a separate ad hoc tree-dump run."""
+    print(f"  ({len(texts)} accessible text nodes collected; sample follows)", file=sys.stderr)
+    for t in texts[:limit]:
+        print(f"    {t!r}", file=sys.stderr)
+    if len(texts) > limit:
+        print(f"    ... ({len(texts) - limit} more, truncated)", file=sys.stderr)
+
+
 def find_by_text_containing(win, substring):
     """First descendant (or the window itself) whose own text contains
     `substring` - the Windows analogue of `find_by_name_containing`."""
@@ -314,13 +325,14 @@ def p02(binary, break_mode=False):
         proc = launch(binary, [left, right], scratch)
         try:
             app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
-            ok, _texts, missing = wait_for_tokens(win, tokens, timeout_s=READY_TIMEOUT_S)
+            ok, texts, missing = wait_for_tokens(win, tokens, timeout_s=READY_TIMEOUT_S)
             if not ok:
                 print(
                     f"FAIL: compare view never rendered these expected tokens within "
                     f"{READY_TIMEOUT_S}s: {missing}",
                     file=sys.stderr,
                 )
+                debug_dump(texts)
                 return 1
         except RuntimeError as exc:
             print(f"FAIL: {exc}", file=sys.stderr)
@@ -365,18 +377,20 @@ def p09(binary, break_mode=False):
         proc = launch(binary, [left, right, merged], scratch)
         try:
             app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
-            ok, _texts, missing = wait_for_tokens(win, FIXTURE_TOKENS, timeout_s=READY_TIMEOUT_S)
+            ok, texts, missing = wait_for_tokens(win, FIXTURE_TOKENS, timeout_s=READY_TIMEOUT_S)
             if not ok:
                 print(
                     f"FAIL: compare view never rendered these expected tokens within "
                     f"{READY_TIMEOUT_S}s: {missing}",
                     file=sys.stderr,
                 )
+                debug_dump(texts)
                 return 1
 
             apply_button = find_by_text_containing(win, "Use this change")
             if apply_button is None:
                 print('FAIL: could not find a "Use this change" hunk-apply button', file=sys.stderr)
+                debug_dump(collect_texts(win))
                 return 1
             invoke(apply_button)
 
@@ -480,6 +494,7 @@ def p10(binary, break_mode=False):
                     f"{READY_TIMEOUT_S}s",
                     file=sys.stderr,
                 )
+                debug_dump(collect_texts(win))
                 return 1
         except RuntimeError as exc:
             print(f"FAIL: {exc}", file=sys.stderr)
