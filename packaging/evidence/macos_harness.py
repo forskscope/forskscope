@@ -1749,7 +1749,13 @@ def p06(binary, break_mode=False):
                 print(f"FAIL: {exc}", file=sys.stderr)
                 return 1
 
-            r = ui("click_any", "Explorer", timeout=60)
+            r = poll_ui(
+                "click_any",
+                "Explorer",
+                predicate=lambda r: r.startswith("CLICKED"),
+                timeout=LAUNCH_TIMEOUT_S,
+                call_timeout=30,
+            )
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not switch to the Explorer tab: {r}", file=sys.stderr)
                 return 1
