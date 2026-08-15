@@ -2126,7 +2126,12 @@ def p12(binary, break_mode=False):
             finally:
                 terminate(proc)
         if not seeded:
-            print(f"FAIL: {session_path} was never seeded with a tab after the CLI-arg launch", file=sys.stderr)
+            current = session_path.read_text() if session_path.exists() else "<file does not exist>"
+            print(
+                f"FAIL: {session_path} was never seeded with a tab after the CLI-arg launch. "
+                f"Current content: {current!r}",
+                file=sys.stderr,
+            )
             return 1
 
         # No CLI args -> the seeded tab must auto-restore.
