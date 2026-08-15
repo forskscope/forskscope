@@ -48,6 +48,13 @@
 -- not AXButton, popup/combo controls (Theme/Language/font-family selects),
 -- a numeric spinner (font size), and reading back a control's own value
 -- rather than only finding text on the page):
+--   click_button_exact <proc> <needle> -> like click_button, but exact
+--                                      match (`d is needle`) instead of
+--                                      substring - for button-text pairs
+--                                      that collide under `contains`
+--                                      (e.g. Save As modal's plain "Save"
+--                                      vs the toolbar's "Save merge result
+--                                      (Ctrl+S)").
 --   click_row <proc> <needle>      -> "CLICKED: <label>", "NOT_FOUND" - like
 --                                      click_button but for role "AXRow"
 --                                      (Explorer's TreeRow, hunk.rs's
@@ -79,7 +86,7 @@
 --                                      from `terminate()`'s SIGTERM (P12 needs
 --                                      a real "quit and flush session" path,
 --                                      not a signal).
---   dump_roles <proc> [<cap>]      -> one "role|title|description|value|enabled"
+--   dump_roles <proc> [<cap>]      -> one "role|title|description|value"
 --                                      line per element (default cap 300) -
 --                                      a debugging aid for recording exactly
 --                                      what WebKit's accessibility mapping
@@ -192,6 +199,45 @@ on runOnce(argv)
                             end try
                         end if
                         if d contains needle then
+                            set isEnabled to true
+                            try
+                                set isEnabled to (enabled of e)
+                            end try
+                            if isEnabled then
+                                click e
+                                return "CLICKED: " & d
+                            else
+                                return "DISABLED: " & d
+                            end if
+                        end if
+                    end if
+                end repeat
+                return "NOT_FOUND"
+
+            else if cmdName is "click_button_exact" then
+                -- Same as click_button, but `d is needle` (exact match)
+                -- instead of `d contains needle` - some button pairs
+                -- collide under substring matching (e.g. a Save As
+                -- modal's plain "Save" vs the toolbar's "Save merge
+                -- result (Ctrl+S)", which contains "Save" too).
+                set needle to item 3 of argv
+                set allEl to my safeContents(w)
+                repeat with e in allEl
+                    set isButton to false
+                    try
+                        if role of e is "AXButton" then set isButton to true
+                    end try
+                    if isButton then
+                        set d to ""
+                        try
+                            set d to description of e
+                        end try
+                        if d is "" then
+                            try
+                                set d to title of e
+                            end try
+                        end if
+                        if d is needle then
                             set isEnabled to true
                             try
                                 set isEnabled to (enabled of e)
@@ -382,7 +428,6 @@ on runOnce(argv)
                     set ti to ""
                     set de to ""
                     set va to ""
-                    set en to ""
                     try
                         set rl to (role of e) as string
                     end try
@@ -395,10 +440,17 @@ on runOnce(argv)
                     try
                         set va to (value of e) as string
                     end try
-                    try
-                        set en to (enabled of e) as string
-                    end try
-                    set end of outLines to rl & "|" & ti & "|" & de & "|" & va & "|" & en
+                    -- Deliberately no `enabled of e` here - querying it
+                    -- unconditionally across every element (not just a
+                    -- button already matched by role, which is all
+                    -- click_button ever asks it of) reproduced the same
+                    -- "-10000" failure this whole investigation chased,
+                    -- even with plain `entire contents` on the same view
+                    -- M5-A's commands already prove works. Left unexplained
+                    -- (a WebKit/System Events accessibility-bridge quirk
+                    -- for attributes some element kinds don't support, is
+                    -- the best guess) but confirmed as the actual trigger.
+                    set end of outLines to rl & "|" & ti & "|" & de & "|" & va
                 end repeat
                 set AppleScript's text item delimiters to linefeed
                 set outStr to outLines as string
