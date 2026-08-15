@@ -129,7 +129,15 @@ def type_into_field(node, window_title, text):
     subprocess.run(["xdotool", "click", "1"], check=True, timeout=15)
     time.sleep(0.3)
     subprocess.run(["xdotool", "key", "ctrl+a"], check=True, timeout=15)
-    subprocess.run(["xdotool", "type", "--clearmodifiers", text], check=True, timeout=15)
+    time.sleep(0.2)
+    # Confirmed on CI (run 31877814616): plain `xdotool type` with no
+    # --delay sends keystrokes faster than the WebView's input pipeline
+    # processes them, producing scrambled/reordered text (e.g. typing
+    # "/tmp/x/saveas-target.txt" landed as "/t/twovu/vetaettx") rather
+    # than a clean failure - a real, reproducible synthesis-speed defect
+    # in this harness, not a flake. A per-keystroke delay fixes it.
+    subprocess.run(["xdotool", "type", "--clearmodifiers", "--delay", "80", text], check=True, timeout=30)
+    time.sleep(0.3)
 
 
 def is_enabled(node):
@@ -821,7 +829,284 @@ def p05(binary, break_mode=False):
     return 0
 
 
-CASES = {"p01": p01, "p02": p02, "p04": p04, "p05": p05, "p09": p09, "p10": p10}
+# ── P12 — Session/settings restart ──────────────────────────────────────────
+
+
+def find_combo_boxes(node, out=None):
+    """Settings' `<select>` elements expose no accessible name (confirmed
+    by inspection - WebKitGTK does not auto-associate the preceding
+    `<span>` label), so they're found by role and identified by their
+    stable DOM order instead: Theme (0), Language (1), Diff font family
+    (2), per `settings/modal.rs`."""
+    if out is None:
+        out = []
+    if node.get_role_name() == "combo box":
+        out.append(node)
+    for i in range(node.get_child_count()):
+        child = node.get_child_at_index(i)
+        if child is not None:
+            find_combo_boxes(child, out)
+    return out
+
+
+def select_combo_option(combo, option_index):
+    """Changes a `<select>`'s value to `option_index` via real X11 input
+    synthesis - not `Atspi.Selection.select_child` or `Atspi.Action.
+    do_action` on the menu/menu-item, both of which were tried first and
+    both of which report success and even flip the AT-SPI-level SELECTED
+    state, but do **not** fire the underlying Dioxus `onchange` handler
+    (confirmed empirically: `settings.json` is never written after either
+    call, across repeated direct diagnostics against a locally-built
+    binary). This is a second, distinct instance of the same family of
+    gap as the Save As path field's missing EditableText interface - the
+    accessibility bridge's own "change value" APIs are shadow state here,
+    not the real thing - so, as with `type_into_field`, this falls back
+    to genuine XTEST synthesis: click the combo's on-screen center to
+    open its native popup, arrow-key to the target option, Enter to
+    confirm. Caller must verify the change actually landed (via
+    `selected_option_name` and/or a settings.json read) rather than
+    trusting this function's return - a synthesis delivery failure here
+    must fail loudly at the point of change, not confusingly downstream.
+    """
+    menu = combo.get_child_at_index(0)
+    if menu is None or menu.get_role_name() != "menu":
+        raise RuntimeError(f"combo box's first child is not a menu: {menu}")
+    current_index = 0
+    for i in range(menu.get_child_count()):
+        item = menu.get_child_at_index(i)
+        if item.get_state_set().contains(Atspi.StateType.SELECTED):
+            current_index = i
+            break
+    ext = extents(combo)
+    cx, cy = ext.x + ext.width // 2, ext.y + ext.height // 2
+    subprocess.run(["xdotool", "mousemove", "--sync", str(cx), str(cy)], check=True, timeout=15)
+    subprocess.run(["xdotool", "click", "1"], check=True, timeout=15)
+    time.sleep(0.3)
+    delta = option_index - current_index
+    step_key = "Down" if delta >= 0 else "Up"
+    for _ in range(abs(delta)):
+        subprocess.run(["xdotool", "key", step_key], check=True, timeout=15)
+        time.sleep(0.2)
+    subprocess.run(["xdotool", "key", "Return"], check=True, timeout=15)
+    time.sleep(0.3)
+
+
+def selected_option_name(combo):
+    """The name of whichever menu-item child currently carries the
+    SELECTED AT-SPI state - the only way to read a combo box's current
+    value back, since the combo box itself exposes no Text/Value."""
+    menu = combo.get_child_at_index(0)
+    for i in range(menu.get_child_count()):
+        item = menu.get_child_at_index(i)
+        if item.get_state_set().contains(Atspi.StateType.SELECTED):
+            return item.get_name()
+    return None
+
+
+def p12(binary, break_mode=False):
+    """Two sub-tests, both against a scratch `XDG_CONFIG_HOME` (never the
+    real user's config):
+
+    1. Change Theme and Language via the Settings dialog's combo boxes
+       (`select_combo_option`/`Selection.select_child` - the same
+       EditableText-less-widget problem P05's path field had, solved the
+       same way: use whichever interface the widget *does* expose).
+       Settings persist immediately on change (`modal.rs`'s `onchange`
+       calls `persist` directly, not only on exit), so a plain
+       `terminate()` after changing them is sufficient - no clean-shutdown
+       sequence needed. Relaunch and confirm both combos show the changed
+       value SELECTED, and that a Japanese label ("Settings" -> "設定")
+       renders — not just that the process didn't crash.
+    2. Open a compare (2 args), terminate, relaunch with **no** args and
+       confirm the tab restores (session saves reactively on every tab
+       change, per `app.rs`'s `use_effect` — no clean-shutdown sequence
+       needed here either); then relaunch with **different** explicit
+       file args and confirm that compare opens instead of the restored
+       tab — the CLI-args-suppress-restore distinction the case exists to
+       check, not just "does *a* compare tab appear".
+
+    `--break`: sub-test 1 checks the restored language combo's selection
+    against a value that could never be selected by this test, proving
+    the state-reading assertion is real.
+    """
+    left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    other_left = REPO_ROOT / "tests/fixtures/text/left_one_changed.txt"
+    other_right = REPO_ROOT / "tests/fixtures/text/right_one_changed.txt"
+
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+        config_home = scratch_path / "config"
+        config_home.mkdir()
+        env = dict(os.environ)
+        env["XDG_CONFIG_HOME"] = str(config_home)
+
+        # ── Sub-test 1: theme/language restore ──────────────────────────
+        proc = subprocess.Popen([binary], cwd=str(scratch_path), env=env)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered on the accessibility bus (settings sub-test, launch 1)", file=sys.stderr)
+                return 1
+            settings_btn = find_by_exact_name(app, "Settings")
+            if settings_btn is None:
+                print('FAIL: could not find the "Settings" header button', file=sys.stderr)
+                return 1
+            click(settings_btn)
+
+            combos = None
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                combos = find_combo_boxes(app)
+                if len(combos) >= 2:
+                    break
+                time.sleep(0.5)
+            if combos is None or len(combos) < 2:
+                print(f"FAIL: expected at least 2 combo boxes in Settings, found {len(combos) if combos else 0}", file=sys.stderr)
+                return 1
+
+            select_combo_option(combos[0], 1)  # Theme: Dark(0) -> Light(1)
+            theme_after_change = selected_option_name(combos[0])
+            if theme_after_change != "Light":
+                print(
+                    f"FAIL: Theme selection reads {theme_after_change!r} immediately after "
+                    "select_combo_option(1) - X11 input synthesis for the combo's native "
+                    "popup did not land (see select_combo_option's docstring)",
+                    file=sys.stderr,
+                )
+                return 1
+
+            select_combo_option(combos[1], 1)  # Language: English(0) -> 日本語(1)
+            lang_after_change = selected_option_name(combos[1])
+            if lang_after_change != "日本語":
+                print(
+                    f"FAIL: Language selection reads {lang_after_change!r} immediately after "
+                    "select_combo_option(1) - X11 input synthesis for the combo's native "
+                    "popup did not land (see select_combo_option's docstring)",
+                    file=sys.stderr,
+                )
+                return 1
+            time.sleep(1)  # let the reactive persist effect run
+        finally:
+            terminate(proc)
+
+        settings_json = config_home / "forskscope" / "settings.json"
+        deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+        persisted_ok = False
+        while time.monotonic() < deadline:
+            if settings_json.exists():
+                text = settings_json.read_text()
+                if '"light"' in text and '"ja"' in text:
+                    persisted_ok = True
+                    break
+            time.sleep(0.5)
+        if not persisted_ok:
+            print(f"FAIL: {settings_json} does not show theme=light/language=ja after change+terminate", file=sys.stderr)
+            return 1
+
+        proc = subprocess.Popen([binary], cwd=str(scratch_path), env=env)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered on the accessibility bus (settings sub-test, launch 2)", file=sys.stderr)
+                return 1
+
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            japanese_label_found = False
+            while time.monotonic() < deadline:
+                if find_text_containing(app, "設定") is not None:
+                    japanese_label_found = True
+                    break
+                time.sleep(0.5)
+            if not japanese_label_found:
+                print('FAIL: no "設定" (Japanese "Settings") label found after restart with language=ja', file=sys.stderr)
+                return 1
+
+            settings_btn = find_by_name_containing(app, "設定")
+            if settings_btn is None:
+                print('FAIL: could not find the Japanese-labelled Settings button to reopen the dialog', file=sys.stderr)
+                return 1
+            click(settings_btn)
+
+            combos = None
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                combos = find_combo_boxes(app)
+                if len(combos) >= 2:
+                    break
+                time.sleep(0.5)
+            if combos is None or len(combos) < 2:
+                print("FAIL: could not find the Settings combo boxes after restart", file=sys.stderr)
+                return 1
+
+            theme_selected = selected_option_name(combos[0])
+            if theme_selected != "Light":
+                print(f"FAIL: restored Theme selection is {theme_selected!r}, expected 'Light'", file=sys.stderr)
+                return 1
+
+            lang_selected = selected_option_name(combos[1])
+            required_lang = "this value can never be selected" if break_mode else "日本語"
+            if lang_selected != required_lang:
+                print(f"FAIL: restored Language selection is {lang_selected!r}, required {required_lang!r}", file=sys.stderr)
+                return 1
+        finally:
+            terminate(proc)
+
+        # ── Sub-test 2: tab restore only with no explicit CLI paths ────
+        proc = launch(binary, [left, right], scratch_path)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered (tab-restore sub-test, launch 1)", file=sys.stderr)
+                return 1
+            landmark, _f, _l, _r = wait_for_ready(app, 7, timeout_s=LAUNCH_TIMEOUT_S)
+            if landmark is None:
+                print("FAIL: first compare did not render (tab-restore sub-test)", file=sys.stderr)
+                return 1
+            time.sleep(1)  # let the reactive session-save effect run
+        finally:
+            terminate(proc)
+
+        proc = subprocess.Popen([binary], cwd=str(scratch_path), env=env)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered (no-args relaunch)", file=sys.stderr)
+                return 1
+            landmark, _f, left_rows, _r = wait_for_ready(app, 7, timeout_s=LAUNCH_TIMEOUT_S)
+            if landmark is None:
+                print("FAIL: no-args relaunch did not restore the compare tab (expected 7 rows/pane)", file=sys.stderr)
+                return 1
+        finally:
+            terminate(proc)
+
+        proc = launch(binary, [other_left, other_right], scratch_path)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered (explicit-args relaunch)", file=sys.stderr)
+                return 1
+            # left_one_changed/right_one_changed is 5 lines (alpha, bravo,
+            # charlie/CHARLIE, delta, echo) with one Replace hunk at line
+            # 3 - confirmed against the actual fixture files, not assumed
+            # from the hunk-kind test alone (that only pins the hunk kind,
+            # not the surrounding line count).
+            landmark, _f, left_rows, _r = wait_for_ready(app, 5, timeout_s=LAUNCH_TIMEOUT_S)
+            if landmark is None:
+                print(
+                    "FAIL: relaunch with explicit file args did not open that compare "
+                    "(expected 5 rows/pane, from the different fixture pair, not the restored tab)",
+                    file=sys.stderr,
+                )
+                return 1
+        finally:
+            terminate(proc)
+
+    print("OK: theme/language restored across restart with a Japanese label present; tabs restore only with no explicit CLI paths.")
+    return 0
+
+
+CASES = {"p01": p01, "p02": p02, "p04": p04, "p05": p05, "p09": p09, "p10": p10, "p12": p12}
 
 
 def main():
