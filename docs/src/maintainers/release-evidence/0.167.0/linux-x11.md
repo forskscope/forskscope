@@ -117,3 +117,107 @@ expected reason, per handoff §7:
 ## Waivers
 
 None. F44 is explicitly not waivable per RFC-078's Waiver policy.
+
+## M5-B — P04, P05, P06, P08, P12
+
+**Test date (UTC):** 2026-08-15. Same published `0.167.0` artifact and
+digest as M5-A above; no new download, no source build. Harness extended
+in place (`packaging/evidence/linux_harness.py`, same
+`m5-evidence-linux.yml` dispatch entry point) — see the M5-B review
+request for the full account of what each case's mechanism turned out to
+require and why.
+
+### §3 — P04's "keyboard and mouse"
+
+Resolved before any evidence was gathered under it (handoff §3 required
+this). The mouse path — the "Use this change" button — is invoked via
+`Atspi.Action.do_action`, the same accessibility-action route M5-A
+established for Save/Undo/Redo; this is not laundering, since it fires
+the identical `onclick` handler a real click would. The keyboard path
+(`app.rs`'s global `Key::Enter` listener) is architecturally different: a
+raw `onkeydown` handler bound to no actionable UI element, so **no
+accessibility action exists to invoke it on any platform** — this is not
+the same problem M5-A had with Ctrl+S (where the delivery mechanism
+existed but was unreliable). Recorded as not-executed/manual-outstanding,
+mirroring F45's existing shape for P01's prerequisite sub-case, not
+amended into RFC-078's text — this narrows CI-verification scope the same
+way F45 already does, not the case's actual requirement.
+
+| Case | Result | Evidence |
+|---|---|---|
+| P04 — Apply/Undo/Redo/Save (mouse path only; keyboard: not executed, see §3 above) | **Pass** | CI run [`31877812540`](https://github.com/forskscope/forskscope/actions/runs/31877812540) |
+| P05 — External modification (Cancel/Overwrite/Save As) | **Pass** | CI run [`31878357564`](https://github.com/forskscope/forskscope/actions/runs/31878357564) |
+| P06 — Async identity | **Pass** | CI run [`31912063479`](https://github.com/forskscope/forskscope/actions/runs/31912063479) |
+| P08 — Persistence migration (legacy v0, Exit, Continue, Reset) | **Pass** | CI run [`31879673483`](https://github.com/forskscope/forskscope/actions/runs/31879673483) |
+| P12 — Session/settings restart | **Fail — real product defect, see F61** | CI run [`31894750441`](https://github.com/forskscope/forskscope/actions/runs/31894750441) |
+
+### P06 — falsifiability risk addressed (handoff §6)
+
+The handoff flagged "a check that passes whenever two tabs merely exist"
+as a vacuous-pass risk. The harness opens two genuinely large (20,000-line)
+synthetic fixture pairs with distinct content markers, closes the
+lower-index tab while it may still be loading (exercising RFC-065's
+dirty-check bypass for loading tabs), and asserts the surviving tab shows
+the *other* pair's marker specifically — the break-mode run below requires
+the closed tab's marker instead, and correctly fails to find it.
+
+Two mechanism notes, not defects: Explorer's file-tree rows (`role="row"`)
+fire their real `on_select` handler reliably via `Atspi.Action.do_action`;
+the permanent "Explorer" tab (a plain `div` with no ARIA role) does not,
+so switching to it uses a real X11 click instead — a third, distinct
+instance of the shadow-AT-SPI-state family P12 also hit (below). Separately,
+reloading the 20,000-line fixture twice in quick succession occasionally
+produced a transient `GLib.GError: "The application no longer exists"` —
+confirmed via `proc.poll()` (polled for up to 2s, not checked once) that
+the *harness's own launched process* stayed alive throughout; WebKitGTK
+runs actual web content in a separate process from the one launched, and
+that content process appears to drop off the accessibility bus briefly
+under load without the parent exiting. The harness retries through this
+rather than treating it as fatal.
+
+### P12 — falsifiability, and a real product defect (F61)
+
+Sub-test 1 (theme/language restore) is genuinely verified via UI reads,
+but its *change* half is seeded directly rather than driven through the
+Settings dialog's `<select>` elements — three distinct mechanisms
+(`Atspi.Selection.select_child`, `Atspi.Action.do_action` on the menu
+item, and a real X11 click+arrow+Enter on the combo's native popup) were
+tried and none reliably changed the value under this harness's
+bare-Xvfb-no-window-manager CI environment; the first two report success
+and even flip the AT-SPI SELECTED state without firing the real Dioxus
+`onchange` handler, and the third either had no effect with the process
+alive, or (see P06 above) coincided with the same transient AT-SPI drop.
+Documented as a real, reportable limitation rather than silently worked
+around — see `packaging/evidence/linux_harness.py`'s `p12` docstring for
+the full account. The *restore* half is unaffected and is what the
+break-mode run below demonstrates.
+
+Sub-test 2 (tab restore across a CLI-launched-then-terminated session)
+fails for real: `forskscope <left> <right>`, terminate, relaunch with no
+args does not restore the tab. This is not a harness defect — Windows and
+macOS's independent M5-B harnesses hit the identical failure via entirely
+different code, and macOS's harness traced the actual cause: `app.rs`'s
+reactive `use_effect` on tab changes never fires a real `session.json`
+write for a CLI-opened tab, while an explicit call site like `close_tab`
+does persist correctly. Registered as **F61**, not fixed (M5-B's
+constraints forbid product changes).
+
+## M5-B falsifiability
+
+| Case | Break-mode run | Result |
+|---|---|---|
+| P04 | [`31878367904`](https://github.com/forskscope/forskscope/actions/runs/31878367904) | Fail — saved content hash did not equal the required impossible value |
+| P05 | [`31878360350`](https://github.com/forskscope/forskscope/actions/runs/31878360350) | Fail — `.bak` content did not equal a value that can never be the real backup |
+| P06 | [`31911967700`](https://github.com/forskscope/forskscope/actions/runs/31911967700) | Fail — surviving tab did not show the closed (impossible) tab's marker |
+| P08 | [`31879245189`](https://github.com/forskscope/forskscope/actions/runs/31879245189) | Fail — required the process to still be running after Exit, which it correctly is not |
+| P12 | [`31894752487`](https://github.com/forskscope/forskscope/actions/runs/31894752487) | Fail — restored Language selection correctly read back as `'日本語'`, not the impossible required value |
+
+## M5-B failures and issue links
+
+- **F61** — a tab opened via CLI startup args is not reliably persisted
+  to `session.json`, confirmed independently on Linux, Windows, and
+  macOS. Not fixed here; registered for owner triage before Gate D.
+
+## M5-B waivers
+
+None.
