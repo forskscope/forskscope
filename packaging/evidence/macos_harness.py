@@ -1244,6 +1244,28 @@ def p08_fs(binary, break_mode=False):
         REPO_ROOT / "crates/forskscope-core/src/tests/fixtures/persistence/session-v0.json"
     ).read_text()
 
+    # The v0 session fixture's tab paths are literal `/tmp/fixtures/...`
+    # (RFC-078's sanitized-fixture convention) - app.rs's startup sequence
+    # migrates the session file *before* restore_tabs runs, but
+    # restore_tabs itself only reopens a pair if at least one side
+    # `.exists()`, and the tabs-changed `use_effect` immediately re-saves
+    # session.json to match whatever actually got restored. Left as
+    # nonexistent paths, restore keeps 0 of the 2 pairs and that same-
+    # launch re-save clobbers the migration's own output before this
+    # harness ever reads it - not a migration defect, a test setup gap.
+    # Create empty placeholder files at those exact paths so restore keeps
+    # both pairs and the round-trip save preserves them.
+    fixture_paths = [
+        Path("/tmp/fixtures/left-a.txt"),
+        Path("/tmp/fixtures/right-a.txt"),
+        Path("/tmp/fixtures/left-b.txt"),
+        Path("/tmp/fixtures/right-b.txt"),
+    ]
+    Path("/tmp/fixtures").mkdir(parents=True, exist_ok=True)
+    for p in fixture_paths:
+        if not p.exists():
+            p.write_text("placeholder\n")
+
     with tempfile.TemporaryDirectory() as scratch:
         home = Path(scratch) / "home"
         home.mkdir()
@@ -1342,6 +1364,11 @@ def p08_fs(binary, break_mode=False):
                 return 1
         finally:
             terminate(proc)
+            for p in fixture_paths:
+                try:
+                    p.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     print(
         "OK: legacy v0 settings/session migrated without loss (theme/language/"
