@@ -447,23 +447,42 @@ def select_dropdown(elem, text):
 
 
 def find_number_inputs(win):
-    """Descendants for an `<input type="number">` field. Empirically
-    (M5-B, P12's first CI run), Chromium/WebView2 does NOT map a number
-    input to UIA ControlType "Edit" the way a plain text input does (the
-    Save As path field, a plain `<input type="text">`, is found via
-    "Edit" without trouble) - it maps to "Spinner" instead, presumably
-    because of the native up/down stepper Chromium renders for numeric
-    inputs. Tries "Spinner" first since that's what was actually
-    observed, falling back to "Edit" in case a future WebView2 build's
-    mapping changes."""
-    for control_type in ("Spinner", "Edit"):
+    """Descendants for an `<input type="number">` field, preferring the
+    actual editable part over its container. Empirically (M5-B, P12's
+    first CI run), Chromium/WebView2 does NOT map a number input to UIA
+    ControlType "Edit" the way a plain text input does (the Save As path
+    field, a plain `<input type="text">`, is found via "Edit" without
+    trouble) - it maps to "Spinner" instead, presumably because of the
+    native up/down stepper Chromium renders for numeric inputs. But
+    (M5-B, P12's later CI attempts) setting a value on that outer
+    "Spinner" element - via ValuePattern, a Tab-commit, or even full
+    keystroke synthesis after `set_focus()` - never changed what any
+    readback source reported, across three escalating attempts: a
+    strong signal the "Spinner" node is a non-editable *container*
+    (mirroring a classic Win32 buddy-edit + up-down composite), with the
+    real editable text living in a nested "Edit" child UIA does expose
+    separately. This now looks for that nested Edit **inside** each
+    Spinner match first (`spinner.descendants(control_type="Edit")`),
+    falling back to the Spinner itself if none is found, and finally to
+    a bare "Edit" match at the top level for a future WebView2 mapping
+    that doesn't nest this way at all."""
+    try:
+        spinners = win.descendants(control_type="Spinner")
+    except Exception:  # noqa: BLE001
+        spinners = []
+    for spinner in spinners:
         try:
-            found = win.descendants(control_type=control_type)
+            nested_edits = spinner.descendants(control_type="Edit")
         except Exception:  # noqa: BLE001
-            found = []
-        if found:
-            return found
-    return []
+            nested_edits = []
+        if nested_edits:
+            return nested_edits
+    if spinners:
+        return spinners
+    try:
+        return win.descendants(control_type="Edit")
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def set_value_text(elem, text):
