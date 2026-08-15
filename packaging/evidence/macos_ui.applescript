@@ -416,6 +416,68 @@ on runOnce(argv)
                 end repeat
                 return "NOT_FOUND"
 
+            else if cmdName is "probe_popup" then
+                -- Diagnostic only (not used by any case): select_popup_item
+                -- found "Can't get menu 1 of pop up button N ... Invalid
+                -- index" - no native AXMenu child at all. Before concluding
+                -- these controls have no accessible open-dropdown state
+                -- whatsoever, check whether WebKit exposes the open
+                -- dropdown's options as ordinary elements elsewhere instead
+                -- of via the `menu`/`menu item` collection: how many
+                -- windows exist post-click (a floating panel might be a
+                -- second window), and how many AXMenuItem/AXRow-role
+                -- elements now exist inside window 1 itself.
+                set n to (item 3 of argv) as integer
+                set idx to 0
+                set allEl to my safeContents(w)
+                set target to missing value
+                repeat with e in allEl
+                    set isMatch to false
+                    try
+                        if role of e is "AXPopUpButton" then set isMatch to true
+                    end try
+                    if isMatch then
+                        set idx to idx + 1
+                        if idx is n then
+                            set target to e
+                            exit repeat
+                        end if
+                    end if
+                end repeat
+                if target is missing value then return "NOT_FOUND"
+                try
+                    click target
+                on error errMsg
+                    return "ERROR: click popup: " & errMsg
+                end try
+                delay 0.4
+                set winCount to 0
+                try
+                    set winCount to count of windows
+                end try
+                set miCount to 0
+                set rowCount to 0
+                set sample to ""
+                try
+                    set allEl2 to my safeContents(w)
+                    repeat with e2 in allEl2
+                        set rl2 to ""
+                        try
+                            set rl2 to role of e2
+                        end try
+                        if rl2 is "AXMenuItem" then
+                            set miCount to miCount + 1
+                            try
+                                set sample to sample & "[" & (title of e2) & "/" & (description of e2) & "]"
+                            end try
+                        else if rl2 is "AXRow" then
+                            set rowCount to rowCount + 1
+                        end if
+                    end repeat
+                end try
+                key code 53 -- Escape, to close whatever may have opened
+                return "windows=" & winCount & " menuitems=" & miCount & " rows=" & rowCount & " sample=" & sample
+
             else if cmdName is "select_popup_item" then
                 -- M5-B recon found `set_value`/`perform_action "AXIncrement"`
                 -- are silent no-ops against these WebKit-rendered `<select>`

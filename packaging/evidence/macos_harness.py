@@ -485,6 +485,170 @@ def p10(binary, break_mode=False):
     return 0
 
 
+# ── P04 — Merge, undo/redo, safe save ───────────────────────────────────────
+
+
+def p04(binary, break_mode=False):
+    """Launches `<binary> <left> <right>` (plain 2-arg compare, not
+    mergetool - RFC-078's own text, so Save writes to `<right>`, per
+    `compare.rs`'s `SaveDestination::RightInput` for this launch mode).
+
+    Per the handoff's §3 resolution (mouse-only reading of "keyboard and
+    mouse"): applies the focused hunk via the "Use this change" button's
+    `AXPress` (System Events `click`, same technique as M5-A's P09 Save
+    button) - the keyboard path (`Key::Enter` in `app.rs`'s global
+    `onkeydown`) is a raw keydown listener bound to no actionable UI
+    element, structurally unreachable by any accessibility action on any
+    platform, and is recorded here as explicitly NOT executed (manual-
+    outstanding, mirroring F45's shape) rather than silently skipped.
+
+    Sequence: apply hunk -> dirty marker ("unsaved", statusbar.rs) appears
+    -> Undo -> dirty marker disappears -> open the advanced panel ("More
+    (British Cross) - actually "More ▼") -> Redo -> dirty marker
+    reappears -> Save -> dirty marker disappears again, `<right>`'s saved
+    content differs from its pre-edit content, a `.bak` sibling exists
+    whose bytes equal the *pre-save* content (the original `right` fixture
+    - RFC-077's `SiblingBak` copies the target before overwriting), and no
+    leftover `.{name}.fsk-tmp` sidecar remains (`save.rs`'s
+    `temp_path_for`).
+
+    `--break`: asserts the saved content equals a string that can never be
+    real merge output, proving the check reads real content, not just
+    "changed from before" (same shape as P09's break mode).
+    """
+    left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right_src = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    original_right = right_src.read_bytes()
+
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+        right = scratch_path / "right.txt"
+        right.write_bytes(original_right)
+
+        proc = launch(binary, [left, right], scratch)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+
+            rows = wait_rows(14)
+            if rows != "14":
+                print(
+                    f"FAIL: compare view never reached 14 AXRow elements (last: {rows!r})",
+                    file=sys.stderr,
+                )
+                return 1
+
+            pre = find_wait("unsaved", timeout=5, want_found=False)
+            if pre.startswith("FOUND"):
+                print(f"FAIL: dirty marker present before any edit: {pre}", file=sys.stderr)
+                return 1
+
+            r = click_wait("Use this change")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click 'Use this change': {r}", file=sys.stderr)
+                return 1
+
+            r = find_wait("unsaved", want_found=True)
+            if not r.startswith("FOUND"):
+                print(
+                    f"FAIL: dirty marker ('unsaved') never appeared after applying a hunk: {r}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            r = click_wait("Undo last merge action")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Undo: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("unsaved", want_found=False)
+            if r.startswith("FOUND"):
+                print(f"FAIL: dirty marker still present after Undo: {r}", file=sys.stderr)
+                return 1
+
+            r = click_wait("More ▼")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not open the advanced panel ('More ▼'): {r}", file=sys.stderr)
+                return 1
+            r = click_wait("Redo")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Redo: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("unsaved", want_found=True)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: dirty marker never reappeared after Redo: {r}", file=sys.stderr)
+                return 1
+
+            r = click_wait("Save merge result")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Save: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("unsaved", want_found=False)
+            if r.startswith("FOUND"):
+                print(f"FAIL: dirty marker still present after Save: {r}", file=sys.stderr)
+                return 1
+
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            saved_bytes = original_right
+            while time.monotonic() < deadline:
+                saved_bytes = right.read_bytes()
+                if saved_bytes != original_right:
+                    break
+                time.sleep(0.5)
+
+            impossible = b"this exact string can never appear in real merge output"
+            if break_mode:
+                if saved_bytes != impossible:
+                    print(
+                        f"FAIL: saved content {saved_bytes!r} != impossible expected {impossible!r}",
+                        file=sys.stderr,
+                    )
+                    return 1
+            else:
+                if saved_bytes == original_right:
+                    print(
+                        f"FAIL: {right} still holds its pre-edit content after Save",
+                        file=sys.stderr,
+                    )
+                    return 1
+
+            bak = scratch_path / "right.txt.bak"
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            bak_bytes = None
+            while time.monotonic() < deadline:
+                if bak.exists():
+                    bak_bytes = bak.read_bytes()
+                    break
+                time.sleep(0.5)
+            if bak_bytes is None:
+                print(f"FAIL: no .bak sibling found at {bak}", file=sys.stderr)
+                return 1
+            if bak_bytes != original_right:
+                print(
+                    f"FAIL: .bak content ({len(bak_bytes)} bytes) does not equal the "
+                    f"pre-save content ({len(original_right)} bytes)",
+                    file=sys.stderr,
+                )
+                return 1
+
+            leftover = scratch_path / ".right.txt.fsk-tmp"
+            if leftover.exists():
+                print(f"FAIL: leftover temp/sidecar file remains: {leftover}", file=sys.stderr)
+                return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: apply (mouse/AXPress) -> dirty marker -> Undo -> Redo -> Save cycle "
+        f"verified; saved content differs ({len(saved_bytes)} bytes), .bak matches "
+        "pre-save content, no leftover temp file. Keyboard-Enter apply path NOT "
+        "executed (structurally unreachable via accessibility - see handoff §3)."
+    )
+    return 0
+
+
 # ── recon — not an RFC-078 case ─────────────────────────────────────────────
 
 
@@ -561,6 +725,7 @@ def recon_settings(binary, break_mode=False):
             # these controls ("SET: Dark -> Dark", "SET: 14 -> 14", no change
             # after AXIncrement either). Round 3 tests the real fallbacks:
             # native popup-menu click and keystroke-based text entry.
+            _probe("probe-popup-1", "probe_popup", "1")
             _probe("select-popup-1-night", "select_popup_item", "1", "Night")
             _probe("get-value-popup-1-after-select", "get_value", "AXPopUpButton", "1")
             _probe(
