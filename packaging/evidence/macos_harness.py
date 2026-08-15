@@ -1756,6 +1756,21 @@ def p06(binary, break_mode=False):
                 print(f"FAIL: {exc}", file=sys.stderr)
                 return 1
 
+            # TEMP DIAGNOSTIC: click_row_side has hung (45s+) on every
+            # attempt regardless of fixture size (20,000 -> 4,000 -> 1,500
+            # lines), while the identical command runs in ~2s in
+            # recon_explorer where nothing else is loading. Testing whether
+            # tab 0's still-in-progress background diff (not fixture size)
+            # is what's actually causing the slowdown, by waiting for it to
+            # finish first - this defeats the "still loading" requirement
+            # for this one diagnostic dispatch only, not the real case.
+            t_wait_start = time.monotonic()
+            r = ui("find_text", sentinel_a, timeout=45)
+            print(
+                f"PROBE: tab 0 finished loading after {time.monotonic() - t_wait_start:.1f}s: {r!r}",
+                flush=True,
+            )
+
             r = poll_ui(
                 "click_any",
                 "Explorer",
