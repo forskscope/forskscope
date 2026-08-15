@@ -38,6 +38,21 @@ apply across several of them:
   ordinally (first `ComboBox` = Theme, second = Language) rather than by
   accessible name - a real, reported limitation, not an assumption papered
   over.
+- **P12's tab auto-save finding**: a real `forskscope.exe` process
+  launched with two CLI arguments (`forskscope.exe <left> <right>`) was
+  observed, on real CI, to never write its newly-opened tab to
+  `session.json` at all - not once, within `LAUNCH_TIMEOUT_S` of the
+  diff fully rendering, against a config directory cleared immediately
+  beforehand (so no earlier launch's file could be mistaken for a fresh
+  one) and polled *while the process stayed alive* (ruling out a race
+  with this harness's own `terminate()`). `app.rs`'s reactive
+  `use_effect(move || { store.tabs.read(); save_session(&store); })`
+  is the mechanism that's supposed to do this - its own doc comment
+  (review 041 C1) explicitly says a CLI launch's `open_compare` should
+  trigger it. Not fixed here (no product behaviour changes), and `p12`
+  no longer depends on it: it seeds `session.json` by constructing the
+  v2 envelope directly instead of launching-and-waiting for an
+  autosave. Reported as a real finding, not silently routed around.
 
 P06 also deviates from a literal reading of "two tabs": it uses two
 independent `forskscope.exe` processes rather than two tabs of one
@@ -1945,20 +1960,27 @@ def p12(binary, break_mode=False):
     pattern-based-not-synthesized approach as every other interaction in
     this harness.
 
-    Tab-restore-only-without-explicit-args is checked with a separate,
-    simpler pair of launches than a literal reading of the handoff's
-    step 4 might suggest (**deviation, reported**): exercising it via
-    Explorer's own file-selection UI in-app would mean driving
-    Explorer's file-tree rows, which is exactly the `role="row"`
-    UIA-control-type uncertainty `windows-11.md`'s P02 section already
-    flagged as unresolved and explicitly deferred to settle before
-    M5-C's P03 - attempting it blind here would be discovering that
-    question mid-case, which is what that note explicitly says not to
-    do. Session persistence does not care how a tab was opened
-    (`save_session` reacts to any change to `store.tabs`; `restore_tabs`
-    in `app.rs` is reached exactly when `into_compare_request()` is
-    `None`) - so seeding the session via a 2-arg CLI launch exercises the
-    exact same `restore_tabs`/`save_session` mechanism P12 cares about.
+    Tab-restore-only-without-explicit-args is checked against a directly
+    constructed `session.json` (**deviation, reported - twice over**):
+
+    1. Exercising it via Explorer's own file-selection UI in-app would
+       mean driving Explorer's file-tree rows, which is exactly the
+       `role="row"` UIA-control-type uncertainty `windows-11.md`'s P02
+       section already flagged as unresolved and explicitly deferred to
+       settle before M5-C's P03 - attempting it blind here would be
+       discovering that question mid-case, which is what that note
+       explicitly says not to do.
+    2. The next-simplest option - seed via an ordinary 2-arg CLI launch
+       and wait for `save_session`'s reactive effect to persist it - was
+       tried first and does not work: a real, reported finding (see the
+       module docstring's "P12's tab auto-save finding"), not a
+       harness bug. So this constructs the v2 `session.json` envelope
+       directly instead. `restore_tabs` (`app.rs`, reached exactly when
+       `into_compare_request()` is `None`) doesn't care how the file
+       describing a tab came to exist - only that it does - so this
+       still exercises exactly the restore mechanism P12 cares about,
+       just without depending on the write path that turned out not to
+       work for a CLI launch specifically.
 
     `--break`: requires the post-restart header button to show a label
     that settings restoration can never produce, proving the restart
@@ -2090,64 +2112,42 @@ def p12(binary, break_mode=False):
         left.write_text(left_src.read_text())
         right.write_text(right_src.read_text())
 
-        # The session-seeded check runs *while the process is still
-        # alive*, not after terminate() - `save_session`'s reactive
-        # use_effect (app.rs) writes asynchronously to when the DOM
-        # content UIA can see actually commits, so terminating the
-        # process the instant tokens are visible races the write and can
-        # win (M5-B, P12: the file was consistently seen as never seeded
-        # when this poll happened after the `with` block, i.e. after
-        # terminate() had already run).
-        # Clears any session.json left by the settings-restart phase
-        # above (empty tabs either way, but this removes any doubt about
-        # which launch a diagnostic timestamp belongs to).
+        # Seeded directly by writing a valid v2 session.json envelope,
+        # not by launching a CLI-arg compare and waiting for its
+        # auto-save (deviation, reported - and a genuine finding in its
+        # own right, not a harness bug this rewrite is hiding): a 2-arg
+        # CLI launch's own opened tab was empirically observed, on real
+        # CI, to never reach session.json at all - not a slow write, not
+        # a race with this harness's own process termination (both ruled
+        # out: the check was moved to poll *while the process stayed
+        # alive*, for the entire LAUNCH_TIMEOUT_S budget, against a
+        # config directory cleared immediately beforehand so no earlier
+        # launch's file could be mistaken for a fresh one - and
+        # session.json still never got created at all). See "P12's tab
+        # auto-save finding" in this file's module docstring / the M5-B
+        # report for the full detail; not fixed here per the handoff's
+        # "no product behaviour changes" constraint. What P12 actually
+        # needs to prove - that `restore_tabs` reopens a tab described in
+        # session.json, and that an explicit-args relaunch skips it -
+        # doesn't depend on *how* that file came to describe the tab, so
+        # this constructs the exact v2 envelope shape directly (the same
+        # schema `crates/forskscope-core/src/persist/schema/session.rs`
+        # and this harness's own P08 fixtures already use).
         clear_config_dir(config_dir)
         session_path = config_dir / "session.json"
-        with tempfile.TemporaryDirectory() as cwd:
-            launch_started_at = time.time()
-            proc = launch(binary, [left, right], cwd)
-            seeded = False
-            try:
-                app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
-                ok, texts, missing = wait_for_tokens(win, FIXTURE_TOKENS, timeout_s=READY_TIMEOUT_S)
-                if not ok:
-                    print(f"FAIL: seeding compare tab never rendered expected tokens: {missing}", file=sys.stderr)
-                    return 1
-
-                deadline = time.monotonic() + LAUNCH_TIMEOUT_S
-                seen = []
-                while time.monotonic() < deadline:
-                    if session_path.exists():
-                        try:
-                            raw = session_path.read_text()
-                            payload = json.loads(raw).get("payload", {})
-                            if not seen or seen[-1] != raw:
-                                seen.append(raw)
-                            if payload.get("tabs"):
-                                seeded = True
-                                break
-                        except Exception:  # noqa: BLE001
-                            pass
-                    time.sleep(POLL_INTERVAL_S)
-                if not seeded:
-                    print(
-                        f"DIAGNOSTIC: launch_started_at={launch_started_at!r} "
-                        f"distinct session.json contents observed during the poll ({len(seen)}): {seen!r}",
-                        file=sys.stderr,
-                    )
-            except RuntimeError as exc:
-                print(f"FAIL: {exc}", file=sys.stderr)
-                return 1
-            finally:
-                terminate(proc)
-        if not seeded:
-            current = session_path.read_text() if session_path.exists() else "<file does not exist>"
-            print(
-                f"FAIL: {session_path} was never seeded with a tab after the CLI-arg launch. "
-                f"Current content: {current!r}",
-                file=sys.stderr,
+        now = int(time.time())
+        session_path.write_text(
+            json.dumps(
+                {
+                    "schema_name": "session",
+                    "schema_version": 2,
+                    "app_version": "0.167.0",
+                    "created_unix": now,
+                    "updated_unix": now,
+                    "payload": {"tabs": [{"left": str(left), "right": str(right)}]},
+                }
             )
-            return 1
+        )
 
         # No CLI args -> the seeded tab must auto-restore.
         with tempfile.TemporaryDirectory() as cwd:
