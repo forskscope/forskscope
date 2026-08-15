@@ -1967,6 +1967,23 @@ def recon_explorer(binary, break_mode=False):
             _probe("filename-left-text", "find_text", "recon-left.txt")
             _probe("filename-left-click-row", "click_row", "recon-left.txt")
             _probe("filename-right-click-row", "click_row", "recon-right.txt")
+            # P06's click_row_side kept timing out (45s+) against its
+            # 4,000-line fixtures even after removing `position of e` - test
+            # the *same* command against these trivially small files to
+            # isolate whether the slowness is fixture-size-related or a
+            # logic bug in click_row_side's occurrence-counting rewrite.
+            t0 = time.monotonic()
+            r = ui("click_row_side", "recon-left.txt", "left", timeout=30)
+            print(
+                f"PROBE click_row_side-left: {r!r} ({time.monotonic() - t0:.1f}s)",
+                flush=True,
+            )
+            t0 = time.monotonic()
+            r = ui("click_row_side", "recon-right.txt", "right", timeout=30)
+            print(
+                f"PROBE click_row_side-right: {r!r} ({time.monotonic() - t0:.1f}s)",
+                flush=True,
+            )
             _probe("compare-btn-text", "find_text", "Compare")
             _probe("compare-btn-click", "click_button", "Compare")
         finally:
