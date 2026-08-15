@@ -2110,16 +2110,22 @@ def p12(binary, break_mode=False):
                     return 1
 
                 deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+                seen = []
                 while time.monotonic() < deadline:
                     if session_path.exists():
                         try:
-                            payload = json.loads(session_path.read_text()).get("payload", {})
+                            raw = session_path.read_text()
+                            payload = json.loads(raw).get("payload", {})
+                            if not seen or seen[-1] != raw:
+                                seen.append(raw)
                             if payload.get("tabs"):
                                 seeded = True
                                 break
                         except Exception:  # noqa: BLE001
                             pass
                     time.sleep(POLL_INTERVAL_S)
+                if not seeded:
+                    print(f"DIAGNOSTIC: distinct session.json contents observed during the poll ({len(seen)}): {seen!r}", file=sys.stderr)
             except RuntimeError as exc:
                 print(f"FAIL: {exc}", file=sys.stderr)
                 return 1
