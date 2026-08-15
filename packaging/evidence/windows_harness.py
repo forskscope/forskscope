@@ -562,18 +562,29 @@ def set_value_text(elem, text):
         elem.type_keys("{END}{BACKSPACE 6}" + text + "{TAB}")
         return "click-then-keystroke-synthesis"
 
-    for attempt in (try_pattern, try_pattern_then_tab, try_real_keystrokes, try_click_then_keystrokes):
-        try:
-            path = attempt()
-        except Exception as exc:  # noqa: BLE001
-            attempt_log.append(f"{attempt.__name__}: raised {exc!r}")
-            continue
-        if _combo_shows(elem, text):
-            return path
-        attempt_log.append(f"{attempt.__name__} ({path}): did not raise, readback={_combo_readback(elem)!r}")
+    # Outer retry: even the full click-then-keystroke attempt was found
+    # (M5-B, P12) to work on one CI run and leave the value completely
+    # unchanged on a later run of the *identical* code - real
+    # UI-automation flakiness (timing against the WebView2 renderer),
+    # not a logic bug this loop's ordering alone can fix. Each full pass
+    # still only counts a success when the value genuinely reads back
+    # (`_combo_shows`), so retrying doesn't weaken the assertion.
+    for retry in range(3):
+        for attempt in (try_pattern, try_pattern_then_tab, try_real_keystrokes, try_click_then_keystrokes):
+            try:
+                path = attempt()
+            except Exception as exc:  # noqa: BLE001
+                attempt_log.append(f"retry {retry} {attempt.__name__}: raised {exc!r}")
+                continue
+            if _combo_shows(elem, text):
+                return path
+            attempt_log.append(
+                f"retry {retry} {attempt.__name__} ({path}): did not raise, readback={_combo_readback(elem)!r}"
+            )
+        time.sleep(POLL_INTERVAL_S)
 
     raise RuntimeError(
-        f"set_value_text: could not set {text!r} via any known approach:\n  "
+        f"set_value_text: could not set {text!r} via any known approach across 3 retries:\n  "
         + "\n  ".join(attempt_log)
     )
 
