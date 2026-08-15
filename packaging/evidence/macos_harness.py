@@ -2029,6 +2029,35 @@ def recon_session_save(binary, break_mode=False):
     return 0
 
 
+def recon_generated_pair_alone(binary, break_mode=False):
+    """Not a scored case. P06's sentinel is never found even in the fully
+    sequential variant (process A launched+terminated, only THEN process B
+    launched alone, single-process pattern identical to every other
+    passing case). Strips away every other variable: launches ONE process
+    with ONE `_generate_large_pair` fixture, nothing else, to test whether
+    the generation function/fixture shape itself is the problem, or
+    whether it's really about process A's prior (brief) existence."""
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+        sentinel = "ISOLATED-SENTINEL-9f2c"
+        left, right = _generate_large_pair(scratch, "solo-left.txt", "solo-right.txt", 400, sentinel)
+        proc = launch(binary, [left, right], scratch, home=home)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"PROBE: never registered a window: {exc}", flush=True)
+                return 0
+            print(f"PROBE count_rows: {ui('count_rows', timeout=20)!r}", flush=True)
+            print(f"PROBE find_text 'line': {ui('find_text', 'line', timeout=20)!r}", flush=True)
+            r = find_wait(sentinel, timeout=LAUNCH_TIMEOUT_S)
+            print(f"PROBE find_text sentinel (after poll): {r!r}", flush=True)
+        finally:
+            terminate(proc)
+    return 0
+
+
 def recon_tab_plus_explorer(binary, break_mode=False):
     """Not a scored case. P06's click_row_side hangs 45s+ against its own
     fixtures no matter how small they get (tried 20,000/4,000/1,500 lines,
@@ -2143,6 +2172,7 @@ CASES = {
     "recon_settings": recon_settings,
     "recon_session_save": recon_session_save,
     "recon_tab_plus_explorer": recon_tab_plus_explorer,
+    "recon_generated_pair_alone": recon_generated_pair_alone,
     "recon_explorer": recon_explorer,
 }
 
