@@ -169,10 +169,29 @@ on runOnce(argv)
     set procName to item 2 of argv
 
     tell application "System Events"
-        if not (exists process procName) then
-            return "NO_PROCESS"
+        -- M5-B P06 (two-process variant): when a second same-named
+        -- "forskscope" process launches while a first one is still being
+        -- torn down, `process procName` addressing can resolve to
+        -- whichever the window server happens to enumerate first - which
+        -- was observed to be the dying one (count_rows returned 0, only a
+        -- single stale text fragment left, even though the OS process had
+        -- already been reaped per `proc.poll()`). A caller can pass
+        -- "pid:<n>" instead of a plain name to address a process
+        -- unambiguously by PID, sidestepping the name collision entirely.
+        if procName starts with "pid:" then
+            set targetPid to (text 5 thru -1 of procName) as integer
+            set matchingProcs to (every process whose unix id is targetPid)
+            if (count of matchingProcs) is 0 then
+                return "NO_PROCESS"
+            end if
+            set targetProc to item 1 of matchingProcs
+        else
+            if not (exists process procName) then
+                return "NO_PROCESS"
+            end if
+            set targetProc to process procName
         end if
-        tell process procName
+        tell targetProc
             if (count of windows) = 0 then
                 return "NO_WINDOW"
             end if

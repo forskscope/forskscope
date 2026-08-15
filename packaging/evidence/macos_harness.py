@@ -55,13 +55,26 @@ class PermissionWall(RuntimeError):
     not to force past it insecurely."""
 
 
-def ui(cmd, *args, timeout=15):
+def pid_target(pid):
+    """A process identifier for `ui()`'s `proc_name` override that
+    addresses a process by PID instead of by name - see
+    macos_ui.applescript's `runOnce` comment on why: two same-named
+    "forskscope" processes briefly coexisting (P06's two-process variant)
+    can make plain name-based `process procName` addressing resolve to
+    whichever one the window server enumerates first, observed to
+    sometimes be the dying one even after `proc.poll()` confirms the OS
+    process was already reaped."""
+    return f"pid:{pid}"
+
+
+def ui(cmd, *args, timeout=15, proc_name=None):
     """Run one `macos_ui.applescript` command and return its stdout,
     stripped. Raises PermissionWall if System Events itself refused the
     request (assistive access not granted), rather than folding that into
-    an ordinary NOT_FOUND result."""
+    an ordinary NOT_FOUND result. `proc_name` overrides the default
+    PROC_NAME target - see `pid_target`."""
     proc = subprocess.run(
-        ["osascript", str(APPLESCRIPT), cmd, PROC_NAME, *args],
+        ["osascript", str(APPLESCRIPT), cmd, proc_name or PROC_NAME, *args],
         capture_output=True,
         text=True,
         timeout=timeout,
@@ -113,12 +126,13 @@ def run_diagnostics(binary):
     return result.returncode, result.stdout, result.stderr
 
 
-def wait_for_window(deadline):
+def wait_for_window(deadline, proc_name=None):
     """Poll until `forskscope` registers a window with positive extents.
-    Returns (width, height) or raises on timeout/permission wall."""
+    Returns (width, height) or raises on timeout/permission wall.
+    `proc_name` overrides the default PROC_NAME target - see `pid_target`."""
     last = None
     while time.monotonic() < deadline:
-        last = ui("window_size", timeout=20)
+        last = ui("window_size", timeout=20, proc_name=proc_name)
         if last not in ("NO_PROCESS", "NO_WINDOW"):
             try:
                 w_str, h_str = last.split("x")
@@ -140,18 +154,19 @@ def wait_for_window(deadline):
 # here is more honest than copy-pasting five more inline loops.
 
 
-def poll_ui(cmd, *args, predicate, timeout, interval=0.5, call_timeout=20):
+def poll_ui(cmd, *args, predicate, timeout, interval=0.5, call_timeout=20, proc_name=None):
     """Poll `ui(cmd, *args)` until `predicate(result)` is true or the
     timeout elapses; returns the last result either way (callers decide
     what "never satisfied" means for their case). `call_timeout` is the
     per-`ui()`-call subprocess timeout, not the overall poll budget -
     raise it for a command that can each legitimately take a while (e.g.
-    a query against a view backing a large diff)."""
+    a query against a view backing a large diff). `proc_name` overrides
+    the default PROC_NAME target - see `pid_target`."""
     deadline = time.monotonic() + timeout
     result = ""
     while time.monotonic() < deadline:
         try:
-            result = ui(cmd, *args, timeout=call_timeout)
+            result = ui(cmd, *args, timeout=call_timeout, proc_name=proc_name)
         except subprocess.TimeoutExpired:
             # A single slow call (e.g. right after launch, or while
             # another process/window briefly coexists) shouldn't crash
@@ -178,18 +193,22 @@ def wait_rows(expected, timeout=LAUNCH_TIMEOUT_S):
     return poll_ui("count_rows", predicate=pred, timeout=timeout)
 
 
-def click_wait(needle, timeout=LAUNCH_TIMEOUT_S, exact=False):
+def click_wait(needle, timeout=LAUNCH_TIMEOUT_S, exact=False, proc_name=None):
     cmd = "click_button_exact" if exact else "click_button"
     return poll_ui(
-        cmd, needle, predicate=lambda r: r.startswith("CLICKED"), timeout=timeout
+        cmd,
+        needle,
+        predicate=lambda r: r.startswith("CLICKED"),
+        timeout=timeout,
+        proc_name=proc_name,
     )
 
 
-def find_wait(needle, timeout=LAUNCH_TIMEOUT_S, want_found=True):
+def find_wait(needle, timeout=LAUNCH_TIMEOUT_S, want_found=True, proc_name=None):
     def pred(r):
         return r.startswith("FOUND") == want_found
 
-    return poll_ui("find_text", needle, predicate=pred, timeout=timeout)
+    return poll_ui("find_text", needle, predicate=pred, timeout=timeout, proc_name=proc_name)
 
 
 # ── P01 — Install and cold launch ───────────────────────────────────────────
@@ -1831,6 +1850,14 @@ def p06(binary, break_mode=False):
         proc_b = None
         try:
             proc_b = launch(binary, [left_b, right_b], scratch, home=home_b)
+            # Both processes share the name "forskscope" (same binary) -
+            # address process B unambiguously by PID from this point on
+            # (see pid_target's docstring). Plain name-based addressing was
+            # observed to sometimes resolve to process A's not-yet-fully-
+            # torn-down window server entry even after proc.poll() confirmed
+            # the OS process had already been reaped (count_rows returned
+            # 0 with only a single stale text fragment still findable).
+            b = pid_target(proc_b.pid)
 
             terminate(proc_a)
             if proc_a.poll() is None:
@@ -1838,7 +1865,7 @@ def p06(binary, break_mode=False):
                 return 1
 
             try:
-                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S, proc_name=b)
             except (PermissionWall, TimeoutError) as exc:
                 print(f"FAIL: process B never registered a window: {exc}", file=sys.stderr)
                 return 1
@@ -1850,17 +1877,12 @@ def p06(binary, break_mode=False):
                 )
                 return 1
 
-            print(f"DEBUG: count_rows for process B: {ui('count_rows', timeout=20)!r}", flush=True)
-            print(
-                f"DEBUG: find_text 'line' for process B: {ui('find_text', 'line', timeout=20)!r}",
-                flush=True,
-            )
-
             r = poll_ui(
                 "find_text",
                 sentinel_b_v1,
                 predicate=lambda r: r.startswith("FOUND"),
                 timeout=LAUNCH_TIMEOUT_S,
+                proc_name=b,
             )
             if not r.startswith("FOUND"):
                 print(
@@ -1879,18 +1901,18 @@ def p06(binary, break_mode=False):
 
             # ── Reload twice in quick succession, within process B ──────
             right_b.write_text(f"content v1\n{sentinel_b_v1}\n")
-            r = click_wait("Reload files from disk")
+            r = click_wait("Reload files from disk", proc_name=b)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Reload (first): {r}", file=sys.stderr)
                 return 1
             right_b.write_text(f"content v2\n{sentinel_b_v2}\n")
-            r = ui("click_button", "Reload files from disk", timeout=20)
+            r = ui("click_button", "Reload files from disk", timeout=20, proc_name=b)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Reload (second): {r}", file=sys.stderr)
                 return 1
 
             expected_final = sentinel_b_v1 if break_mode else sentinel_b_v2
-            r = find_wait(expected_final, timeout=LAUNCH_TIMEOUT_S)
+            r = find_wait(expected_final, timeout=LAUNCH_TIMEOUT_S, proc_name=b)
             if not r.startswith("FOUND"):
                 print(
                     f"FAIL: expected final sentinel {expected_final!r} never appeared: {r}",
@@ -1898,7 +1920,7 @@ def p06(binary, break_mode=False):
                 )
                 return 1
             if not break_mode:
-                r = ui("find_text", sentinel_b_v1, timeout=20)
+                r = ui("find_text", sentinel_b_v1, timeout=20, proc_name=b)
                 if r.startswith("FOUND"):
                     print(
                         "FAIL: the first (stale) reload's sentinel is still visible - "
