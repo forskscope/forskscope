@@ -1751,23 +1751,29 @@ def p12(binary, break_mode=False):
 
 def _generate_large_pair(dir_, left_name, right_name, n_lines, sentinel):
     """Two genuinely large text files (`n_lines` lines each) differing at
-    ~120 scattered points plus one final sentinel line - real work for
-    `compute_diff`, not a synthetic delay hook. RFC-078: "Deterministic
-    automated tests remain the primary proof; this case confirms runtime
-    integration" - a large file is the light, real way to get a loading
-    window, not elaborate timing machinery."""
+    scattered points plus one sentinel line at the file's midpoint (not
+    the last line - an end-of-file sentinel was tried first and its diff
+    never seemed to finish rendering past the first line in real CI runs;
+    moving it to the middle was the next thing to try before concluding
+    this case is blocked outright) - real work for `compute_diff`, not a
+    synthetic delay hook. RFC-078: "Deterministic automated tests remain
+    the primary proof; this case confirms runtime integration" - a large
+    file is the light, real way to get a loading window, not elaborate
+    timing machinery."""
     left_path = Path(dir_) / left_name
     right_path = Path(dir_) / right_name
     left_lines = []
     right_lines = []
+    sentinel_index = n_lines // 2
     for i in range(n_lines):
         base = f"line {i:07d} padding text to make the diff heavier xxxxxxxxxxxxxxxxxxxx\n"
         left_lines.append(base)
-        if i % 20 == 10:
+        if i == sentinel_index:
+            right_lines.append(f"{sentinel}\n")
+        elif i % 20 == 10:
             right_lines.append(f"line {i:07d} CHANGED padding text yyyyyyyyyyyyyyyyyyyyyyyyyy\n")
         else:
             right_lines.append(base)
-    right_lines[-1] = f"{sentinel}\n"
     left_path.write_text("".join(left_lines))
     right_path.write_text("".join(right_lines))
     return left_path, right_path
