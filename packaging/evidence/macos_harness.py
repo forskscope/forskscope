@@ -420,7 +420,55 @@ def p10(binary, break_mode=False):
     return 0
 
 
-CASES = {"p01": p01, "p02": p02, "p09": p09, "p10": p10}
+# ── recon — not an RFC-078 case ─────────────────────────────────────────────
+
+
+def recon_settings(binary, break_mode=False):
+    """Not a scored case. Opens the Settings modal and dumps
+    `dump_roles` so the exact AXRole WebKit assigns to the Theme/Language/
+    font-family `<select>`s and the font-size `<input type=number>` can be
+    read directly from a live macos-latest run, instead of guessed - P12's
+    `set_value`/`perform_action` targeting depends on getting this right on
+    the first real attempt rather than burning CI iterations on a guess."""
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = launch(binary, [], scratch)
+        try:
+            wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            result = ui("click_button", "Settings", timeout=20)
+            print(f"click Settings: {result}")
+            time.sleep(1.0)
+            dump = ui("dump_roles", "400", timeout=20)
+            print(dump)
+        finally:
+            terminate(proc)
+    return 0
+
+
+def recon_explorer(binary, break_mode=False):
+    """Not a scored case. Dumps the Explorer view's accessible tree so
+    TreeRow's real AXRole/clickability and the footer Compare button's
+    exact accessible name can be confirmed before P06's implementation
+    relies on them."""
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = launch(binary, [], scratch)
+        try:
+            wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            time.sleep(1.0)
+            dump = ui("dump_roles", "400", timeout=20)
+            print(dump)
+        finally:
+            terminate(proc)
+    return 0
+
+
+CASES = {
+    "p01": p01,
+    "p02": p02,
+    "p09": p09,
+    "p10": p10,
+    "recon_settings": recon_settings,
+    "recon_explorer": recon_explorer,
+}
 
 
 def main():
