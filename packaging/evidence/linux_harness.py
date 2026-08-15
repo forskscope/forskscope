@@ -49,7 +49,7 @@ from render_check import (  # noqa: E402
 import gi  # noqa: E402
 
 gi.require_version("Atspi", "2.0")
-from gi.repository import Atspi  # noqa: E402
+from gi.repository import Atspi, GLib  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -1433,13 +1433,27 @@ def wait_for_dialog(app, title, timeout_s=LAUNCH_TIMEOUT_S):
     return None
 
 
-def wait_for_dialog_gone(app, title, timeout_s=LAUNCH_TIMEOUT_S):
+def wait_for_dialog_gone(app, title, proc, timeout_s=LAUNCH_TIMEOUT_S):
+    """Returns "gone", "still_present", or "process_died". A dialog
+    action (Continue/Reset) should dismiss the dialog without touching
+    the process - if the AT-SPI bus reports the app no longer exists
+    (`GLib.GError`) while polling, that's not the same thing as "the
+    dialog closed normally", so it's surfaced distinctly rather than
+    letting the traversal crash uncaught (confirmed on CI, run
+    31879242484: an uncaught `GLib.GError: The application no longer
+    exists` during this exact poll, worth telling apart from a real
+    process-state defect rather than treating as a harness bug either
+    way)."""
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
-        if find_by_exact_name(app, title) is None:
-            return True
+        try:
+            if find_by_exact_name(app, title) is None:
+                return "gone"
+        except GLib.GError:
+            if proc.poll() is not None:
+                return "process_died"
         time.sleep(0.3)
-    return False
+    return "still_present"
 
 
 def p08(binary, break_mode=False):
@@ -1596,7 +1610,15 @@ def p08(binary, break_mode=False):
                 return 1
             click(continue_btn)
 
-            if not wait_for_dialog_gone(app, "Session file is from a newer version"):
+            dialog_result = wait_for_dialog_gone(app, "Session file is from a newer version", proc)
+            if dialog_result == "process_died":
+                print(
+                    "FAIL: the process exited unexpectedly after clicking Continue with "
+                    "defaults - it must keep running (possible product defect)",
+                    file=sys.stderr,
+                )
+                return 1
+            if dialog_result != "gone":
                 print("FAIL: the dialog is still present after clicking Continue with defaults", file=sys.stderr)
                 return 1
             time.sleep(1)
@@ -1636,7 +1658,15 @@ def p08(binary, break_mode=False):
                 return 1
             click(reset_btn)
 
-            if not wait_for_dialog_gone(app, "Session file could not be read"):
+            dialog_result = wait_for_dialog_gone(app, "Session file could not be read", proc)
+            if dialog_result == "process_died":
+                print(
+                    "FAIL: the process exited unexpectedly after clicking Reset and back up "
+                    "- it must keep running (possible product defect)",
+                    file=sys.stderr,
+                )
+                return 1
+            if dialog_result != "gone":
                 print("FAIL: the dialog is still present after clicking Reset and back up", file=sys.stderr)
                 return 1
             time.sleep(1)  # let the reactive persist/backup effect run
