@@ -357,11 +357,19 @@ on runOnce(argv)
                 end try
 
             else if cmdName is "dump_roles" then
-                -- One `properties of e` per element (a single AppleEvent
-                -- round trip) rather than five separate property fetches -
-                -- fewer round trips against a view that may still be
-                -- mutating (Explorer's async scan) means fewer chances to
-                -- race it, on top of `run`'s retry wrapper above.
+                -- NOTE: deliberately five separate `try`-wrapped property
+                -- fetches per element, matching count_rows/find_text/
+                -- click_button's already-proven-reliable style, NOT a bulk
+                -- `properties of e` record fetch - an earlier version tried
+                -- that "fewer round trips" optimisation and it broke every
+                -- single element on every view, including the CLI-compare
+                -- view M5-A's commands already prove `entire contents`/
+                -- per-property fetches work on ("AppleEvent handler failed
+                -- (-10000)", persisting across all of `run`'s retries -
+                -- consistent with `properties of e` wedging the whole
+                -- System Events connection for the rest of that osascript
+                -- process, not just failing for one element). Left as a
+                -- documented dead end rather than silently dropped.
                 set capN to 300
                 if (count of argv) > 2 then set capN to (item 3 of argv) as integer
                 set outLines to {}
@@ -376,22 +384,19 @@ on runOnce(argv)
                     set va to ""
                     set en to ""
                     try
-                        set p to (properties of e)
-                        try
-                            set rl to (role of p) as string
-                        end try
-                        try
-                            set ti to (title of p) as string
-                        end try
-                        try
-                            set de to (description of p) as string
-                        end try
-                        try
-                            set va to (value of p) as string
-                        end try
-                        try
-                            set en to (enabled of p) as string
-                        end try
+                        set rl to (role of e) as string
+                    end try
+                    try
+                        set ti to (title of e) as string
+                    end try
+                    try
+                        set de to (description of e) as string
+                    end try
+                    try
+                        set va to (value of e) as string
+                    end try
+                    try
+                        set en to (enabled of e) as string
                     end try
                     set end of outLines to rl & "|" & ti & "|" & de & "|" & va & "|" & en
                 end repeat
