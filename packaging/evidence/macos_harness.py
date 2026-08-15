@@ -1440,29 +1440,35 @@ def p12(binary, break_mode=False):
     with tempfile.TemporaryDirectory() as scratch:
         home = Path(scratch) / "home"
         home.mkdir()
-        # PRODUCT DEFECT found while developing this case, registered not
-        # fixed (see the M5-B report): neither `persist_session`
-        # (state/session.rs) nor `persist_settings` (ui/view/settings.rs)
-        # ever creates `dirs_next::config_dir()/forskscope` - both call
-        # `repo.save(...)` and discard the Result with `let _ =`. `save`'s
-        # `atomic_replace` writes a sibling temp file *inside* that
-        # directory first; if it doesn't exist yet, that write fails and
-        # the error is silently swallowed. Confirmed empirically: a first
-        # real P12 dispatch against a truly untouched `$HOME` left
-        # `session.json` completely absent after Launch A closed, even
-        # though a tab was open and settings were changed (both trigger a
-        # save). Nothing anywhere in the shipped binary calls
-        # `create_dir_all` for this directory - a genuinely fresh install
-        # (this is exactly what a fresh `$HOME` simulates) never persists
-        # ANYTHING, silently, indefinitely. Pre-creating the directory
-        # here (matching what a real installer's first-run step
-        # conceivably should do, and what p08's fixture-seeding already
-        # does for its own reasons) is not hiding this - it's the only way
-        # to test *this* case's actual subject (does a successfully-saved
-        # setting survive a restart) instead of being blocked entirely by
-        # a defect this case doesn't own. Reported separately and
-        # explicitly, not fixed here.
+        # UNDER INVESTIGATION / possible product defect, not fixed here:
+        # neither `persist_session` (state/session.rs) nor
+        # `persist_settings` (ui/view/settings.rs) ever check the Result
+        # of `repo.save(...)` - both discard it with `let _ =`, so any
+        # write failure is silent by construction. Two real P12 dispatches
+        # against a truly untouched `$HOME` found `session.json` completely
+        # absent even moments after a tab opened (which triggers a save) -
+        # first hypothesis was the missing `dirs_next::config_dir()/
+        # forskscope` directory (no `create_dir_all` anywhere in the
+        # shipped binary), but pre-creating it (below) did NOT fix it -
+        # the file was still absent on the very next dispatch. Current
+        # leading hypothesis: App Sandbox entitlements restricting writes
+        # outside a sandboxed container, which `codesign -d --entitlements`
+        # (dumped just below) will confirm or rule out. Pre-creating the
+        # directory is kept regardless since it's cheap and rules out one
+        # variable; if the real cause turns out to be sandboxing, this
+        # comment (and the M5-B report) will be corrected to say so before
+        # this case is called complete.
         _config_dir(home).mkdir(parents=True, exist_ok=True)
+        codesign = subprocess.run(
+            ["codesign", "-d", "--entitlements", ":-", str(binary)],
+            capture_output=True,
+            text=True,
+        )
+        print(
+            f"DEBUG: codesign entitlements (rc={codesign.returncode}):\n"
+            f"stdout={codesign.stdout!r}\nstderr={codesign.stderr!r}",
+            flush=True,
+        )
 
         left1 = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
         right1 = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"

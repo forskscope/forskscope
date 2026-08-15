@@ -349,20 +349,39 @@ on runOnce(argv)
             else if cmdName is "click_row_side" then
                 -- Explorer's Aligned view (tree.rs) shows the SAME
                 -- directory in both panes by default (default_explorer_dir
-                -- with remember_explorer_dirs off), so a given filename can
-                -- appear as an AXRow on *both* sides - click_row's
+                -- with remember_explorer_dirs off), so a given filename
+                -- appears as an AXRow on *both* sides - click_row's
                 -- first-match behaviour picked the wrong pane's copy in
                 -- P06 recon (both clicks ended up setting left_pick,
-                -- Compare stayed disabled). Panes are laid out side by
-                -- side, so the left-pane copy's X position is always less
-                -- than the right-pane copy's - collect every AXRow whose
-                -- text matches `needle` and pick the one with the min (for
-                -- "left") or max (for "right") X position instead of
-                -- always the first document-order match.
+                -- Compare stayed disabled).
+                --
+                -- First fix attempt queried `position of e` per candidate
+                -- to disambiguate by X coordinate - that made click_row_side
+                -- itself time out (45s+) even after switching its inner
+                -- text search to direct children only and shrinking the
+                -- fixtures to 4,000 lines, while click_any (no position
+                -- query) stayed fast. The same shape as dump_roles'
+                -- `enabled of e` dead end earlier in this investigation: an
+                -- innocuous-looking property query that is disproportionately
+                -- expensive (or outright wedges something) for this
+                -- WebKit-rendered element class. Avoided entirely instead
+                -- of chased further.
+                --
+                -- tree.rs's aligned-row markup renders left's `pane-half`
+                -- before right's for the same row (`div.pane-half { left
+                -- TreeRow } div.pane-half { right TreeRow }`), and a
+                -- filename that exists in both panes (the aligned view
+                -- browsing one shared directory) produces exactly one
+                -- aligned-row containing exactly two AXRow matches for
+                -- that name - the first in document order is always the
+                -- left copy, the second always the right. No coordinates
+                -- needed: "left" -> 1st match, "right" -> 2nd match.
                 set needle to item 3 of argv
                 set side to item 4 of argv
+                set wantNth to 1
+                if side is "right" then set wantNth to 2
                 set allEl to my safeContents(w)
-                set candidates to {}
+                set seenN to 0
                 repeat with e in allEl
                     set isRow to false
                     try
@@ -374,9 +393,7 @@ on runOnce(argv)
                         -- full recursive safeContents(e) - TreeRow's own
                         -- markup (dir_pane.rs) is shallow (caret/icon/
                         -- label/status spans, no nesting), so this is both
-                        -- correct and far cheaper per row than a recursive
-                        -- fetch, which mattered once Explorer's directory
-                        -- held several large files (P06's fixtures).
+                        -- correct and far cheaper per row.
                         try
                             set innerEl to (UI elements of e)
                             repeat with ie in innerEl
@@ -399,32 +416,19 @@ on runOnce(argv)
                             end repeat
                         end try
                         if hit then
-                            try
-                                set p to position of e
-                                set end of candidates to {item 1 of p, e}
-                            end try
+                            set seenN to seenN + 1
+                            if seenN is wantNth then
+                                try
+                                    click e
+                                    return "CLICKED: occurrence=" & seenN
+                                on error errMsg
+                                    return "ERROR: click: " & errMsg
+                                end try
+                            end if
                         end if
                     end if
                 end repeat
-                if (count of candidates) is 0 then return "NOT_FOUND"
-                set bestX to item 1 of item 1 of candidates
-                set bestE to item 2 of item 1 of candidates
-                repeat with c in candidates
-                    set cx to item 1 of c
-                    if side is "left" and cx < bestX then
-                        set bestX to cx
-                        set bestE to item 2 of c
-                    else if side is "right" and cx > bestX then
-                        set bestX to cx
-                        set bestE to item 2 of c
-                    end if
-                end repeat
-                try
-                    click bestE
-                on error errMsg
-                    return "ERROR: click: " & errMsg
-                end try
-                return "CLICKED: x=" & bestX
+                return "NOT_FOUND"
 
             else if cmdName is "click_any" then
                 -- Broadest of the click_* family: no role filter at all.
