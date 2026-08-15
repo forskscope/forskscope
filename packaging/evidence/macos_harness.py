@@ -1517,6 +1517,13 @@ def p12(binary, break_mode=False):
                 print(f"FAIL: Theme popup does not read back Night: {r}", file=sys.stderr)
                 return 1
 
+            settings_debug_path = _config_dir(home) / "settings.json"
+            print(
+                f"DEBUG: settings.json right after selecting Theme=Night: "
+                f"{settings_debug_path.read_text() if settings_debug_path.exists() else '<missing>'}",
+                flush=True,
+            )
+
             r = ui("select_popup_item", "2", "日本語", timeout=20)
             if not r.startswith("SELECTED"):
                 print(f"FAIL: could not select Language=日本語: {r}", file=sys.stderr)
