@@ -467,43 +467,68 @@ def find_number_inputs(win):
 
 
 def set_value_text(elem, text):
-    """Sets a control's text via whichever pattern it exposes -
-    `set_edit_text()` (pywinauto's `EditWrapper`, `ValuePattern.SetValue`
-    under the hood) where pywinauto wraps the control that way, falling
-    back to calling `ValuePattern.SetValue` directly for a control type
-    (e.g. "Spinner" - see `find_number_inputs`) pywinauto doesn't wrap
-    with `EditWrapper` - then, if the value still doesn't read back,
-    sends a real Tab keystroke to the control as a last resort.
+    """Sets a control's text, verifying the value actually reads back
+    (via `_combo_shows`) before accepting each attempt, in ascending
+    order of how much it relies on real input synthesis rather than an
+    accessibility pattern:
 
-    That last step matters and was needed on real CI (M5-B, P12): setting
-    an `<input type="number">`'s value via `ValuePattern.SetValue` alone
+    1. `set_edit_text()` (pywinauto's `EditWrapper`, `ValuePattern.SetValue`
+       under the hood) where pywinauto wraps the control that way, or
+       `ValuePattern.SetValue` directly for a control type (e.g.
+       "Spinner" - see `find_number_inputs`) pywinauto doesn't wrap with
+       `EditWrapper`.
+    2. The same, followed by a synthesized Tab keystroke.
+    3. Real keyboard synthesis start to finish: focus the control,
+       select-all + delete, type the text, Tab to commit.
+
+    Steps 1 and 2 were each found on real CI (M5-B, P12) not to be
+    enough for an `<input type="number">`: `ValuePattern.SetValue`
     updated the DOM value but never fired Dioxus's `onchange` listener
     (a plain `change` event, which for a number input normally fires on
-    blur/commit, not on every value write) - `set_value_text` returned
-    without raising, but `persist(store)` was never called, and the
-    setting was silently lost. A synthesized Tab is the one place in
-    this harness that falls back to real input synthesis for something
-    an accessibility pattern alone doesn't reliably replicate, mirroring
+    blur/commit, not on every value write), and a bare Tab keystroke
+    with no preceding focus() had nothing to commit *from* - the value
+    was never actually focused via SetValue alone, so the Tab likely
+    went nowhere useful. Step 3 is the one place in this harness that
+    falls back to full real input synthesis for something no
+    accessibility pattern alone reliably replicates here, mirroring
     `invoke()`'s own established Invoke-then-`click_input()` fallback
-    (and reported the same way: only used, and only reported, when the
-    pattern-only path didn't verifiably work)."""
-    try:
-        elem.set_edit_text(text)
-        path = "set_edit_text"
-    except Exception:  # noqa: BLE001
-        elem.iface_value.SetValue(text)
-        path = "value-pattern"
-    if _combo_shows(elem, text):
-        return path
-    try:
-        elem.type_keys("{TAB}")
-    except Exception:  # noqa: BLE001
-        pass
-    if _combo_shows(elem, text):
+    shape (try the pattern first, report which path actually worked)."""
+    attempt_log = []
+
+    def try_pattern():
+        try:
+            elem.set_edit_text(text)
+            return "set_edit_text"
+        except Exception:  # noqa: BLE001
+            elem.iface_value.SetValue(text)
+            return "value-pattern"
+
+    def try_pattern_then_tab():
+        path = try_pattern()
+        try:
+            elem.type_keys("{TAB}")
+        except Exception:  # noqa: BLE001
+            pass
         return f"{path}+tab-commit"
+
+    def try_real_keystrokes():
+        elem.set_focus()
+        elem.type_keys("^a{BACKSPACE}" + text + "{TAB}")
+        return "keystroke-synthesis"
+
+    for attempt in (try_pattern, try_pattern_then_tab, try_real_keystrokes):
+        try:
+            path = attempt()
+        except Exception as exc:  # noqa: BLE001
+            attempt_log.append(f"{attempt.__name__}: raised {exc!r}")
+            continue
+        if _combo_shows(elem, text):
+            return path
+        attempt_log.append(f"{attempt.__name__} ({path}): did not raise, readback={_combo_readback(elem)!r}")
+
     raise RuntimeError(
-        f"set_value_text: {text!r} still doesn't read back after {path} and a Tab "
-        f"commit: {_combo_readback(elem)!r}"
+        f"set_value_text: could not set {text!r} via any known approach:\n  "
+        + "\n  ".join(attempt_log)
     )
 
 
@@ -1261,22 +1286,26 @@ def p05(binary, break_mode=False):
 # ── P06 — Async identity (M5-B) ──────────────────────────────────────────────
 
 
-def _pair_content(tag, token, num_lines=60_000):
-    """Synthetic large left/right text, distinguished by `token` in the
-    right file's first line plus scattered per-`tag` differences every
-    60 lines - large enough for loading (I/O + `compute_diff`, off the
-    UI thread via `tokio::task::spawn_blocking`, per `state/compare.rs`)
-    to take a real, observable amount of wall-clock time (RFC-078: "a
-    light but real exercise", not an internal timing hook). Scaled down
-    from an initial 300,000-line/300-line-spacing attempt (M5-B, first
-    CI run): three sequential process launches each waiting up to
-    `LAUNCH_TIMEOUT_S`+`READY_TIMEOUT_S` for a busy two-large-diffs-at-once
-    CI runner pushed the whole case close to ten minutes; the actual
-    correctness being tested (identity/reload) doesn't need files this
-    large, just genuinely slow enough to give a real interaction window."""
+def _pair_content(tag, token, num_lines=8_000):
+    """Synthetic left/right text, distinguished by `token` in the right
+    file's first line plus scattered per-`tag` differences every 20
+    lines - large enough for loading (I/O + `compute_diff`, off the UI
+    thread via `tokio::task::spawn_blocking`, per `state/compare.rs`) to
+    take a real, observable amount of wall-clock time (RFC-078: "a light
+    but real exercise", not an internal timing hook), without needing an
+    enlarged timeout budget to match. Scaled down twice from an initial
+    300,000-line/300-line-spacing attempt (M5-B, first CI run: three
+    sequential process launches each waiting up to a minute pushed the
+    whole case close to ten minutes) and a 60,000-line follow-up (M5-B,
+    third CI run: still timed out waiting for the second reload - this
+    app+runner combination is evidently slower to load even a
+    tens-of-thousands-of-lines file than assumed). The correctness being
+    tested (identity/reload) doesn't need files this large, just
+    genuinely slow enough to give a real interaction window - see
+    `p06`'s own launch-timeout override for the other half of this fix."""
     left_lines = [f"line-{tag}-{i:06d}" for i in range(num_lines)]
     right_lines = list(left_lines)
-    for i in range(0, num_lines, 60):
+    for i in range(0, num_lines, 20):
         right_lines[i] = f"line-{tag}-{i:06d}-CHANGED-{token}"
     right_lines.insert(0, f"TOKEN-{token}")
     return "\n".join(left_lines) + "\n", "\n".join(right_lines) + "\n"
@@ -1415,21 +1444,27 @@ def p06(binary, break_mode=False):
                 print('FAIL(reload): could not find the "Reload files from disk" toolbar button', file=sys.stderr)
                 return 1
 
+            # Generous, reload-specific budget (not the shared
+            # READY_TIMEOUT_S): the second wait must cover the *entire*
+            # first reload's load time before its button reappears at
+            # all (M5-B, third CI run: 60s was not enough headroom on a
+            # busy runner even for the reduced 8,000-line fixture).
+            reload_timeout_s = 180
             _rewrite_pair(left_r, right_r, "reload", "V2")
             try:
-                wait_and_invoke(win, "Reload files from disk", timeout_s=READY_TIMEOUT_S)
+                wait_and_invoke(win, "Reload files from disk", timeout_s=reload_timeout_s)
             except RuntimeError as exc:
                 print(f"FAIL(reload): could not click the first reload: {exc}", file=sys.stderr)
                 return 1
 
             _rewrite_pair(left_r, right_r, "reload", "V3")
             try:
-                wait_and_invoke(win, "Reload files from disk", timeout_s=READY_TIMEOUT_S)
+                wait_and_invoke(win, "Reload files from disk", timeout_s=reload_timeout_s)
             except RuntimeError as exc:
                 print(f"FAIL(reload): could not click the second reload: {exc}", file=sys.stderr)
                 return 1
 
-            ok, texts, missing = wait_for_tokens(win, ["TOKEN-V3"], timeout_s=READY_TIMEOUT_S)
+            ok, texts, missing = wait_for_tokens(win, ["TOKEN-V3"], timeout_s=reload_timeout_s)
             if not ok:
                 print(f"FAIL(reload): final state never settled to TOKEN-V3: {missing}", file=sys.stderr)
                 debug_dump(texts)
