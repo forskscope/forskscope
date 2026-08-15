@@ -408,27 +408,39 @@ on runOnce(argv)
 end runOnce
 
 -- See the M5-B comment above `on run argv` for why this exists instead of
--- a plain `entire contents of el`.
+-- a plain `entire contents of el`. Both handlers wrap their own `tell
+-- application "System Events"` rather than relying on the caller's -
+-- "UI elements of"/"entire contents of"/etc. are System Events terminology
+-- that only resolves at compile time inside a `tell` block for that
+-- application; a top-level handler called via `my` from inside runOnce's
+-- `tell` block does NOT inherit that terminology context (confirmed the
+-- hard way: without this, osascript fails to *compile* the script at all,
+-- "Expected "," but found property. (-2741)", on every command, not just
+-- the ones that use these handlers).
 on safeContents(el)
-    try
-        return (entire contents of el)
-    on error
-        set outList to {}
-        my flatWalk(el, 30, outList)
-        return outList
-    end try
+    tell application "System Events"
+        try
+            return (entire contents of el)
+        on error
+            set outList to {}
+            my flatWalk(el, 30, outList)
+            return outList
+        end try
+    end tell
 end safeContents
 
 on flatWalk(el, maxDepth, outList)
     if maxDepth < 0 then return
-    try
-        set kids to (UI elements of el)
-    on error
-        -- This node refuses to enumerate its children (the poison-node
-        -- case `safeContents` exists for) - treat it as a leaf rather
-        -- than failing the whole walk.
-        return
-    end try
+    tell application "System Events"
+        try
+            set kids to (UI elements of el)
+        on error
+            -- This node refuses to enumerate its children (the poison-node
+            -- case `safeContents` exists for) - treat it as a leaf rather
+            -- than failing the whole walk.
+            return
+        end try
+    end tell
     repeat with k in kids
         set end of outList to k
         my flatWalk(k, maxDepth - 1, outList)
