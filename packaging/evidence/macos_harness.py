@@ -850,15 +850,25 @@ def p05(binary, break_mode=False):
                 print(f"FAIL: Save As dialog's Path field never appeared: {r}", file=sys.stderr)
                 return 1
 
-            r = ui("type_into", "AXTextField", "1", str(other_path), timeout=20)
-            if not r.startswith("TYPED"):
-                print(f"FAIL: could not type into the Save As path field: {r}", file=sys.stderr)
-                return 1
-            typed_value = r[len("TYPED: ") :]
-            if typed_value != str(other_path):
+            # `set_value` was a confirmed no-op against the Settings font-
+            # size <input type="number"> spinner during recon, but that
+            # control was never tested - this is a plain <input
+            # type="text"> (SaveAsModal's path field), a materially
+            # different control WebKit may support direct AXValue writes
+            # for even where it doesn't for a number spinner. Try it first;
+            # fall back to type_into's click+keystroke if it no-ops.
+            r = ui("set_value", "AXTextField", "1", str(other_path), timeout=20)
+            wrote_value = r.startswith("SET:") and r == f"SET: {right} -> {other_path}"
+            if not wrote_value:
+                r2 = ui("get_value", "AXTextField", "1", timeout=20)
+                wrote_value = r2 == f"VALUE: {other_path}"
+            if not wrote_value:
+                r = ui("type_into", "AXTextField", "1", str(other_path), timeout=20)
+                wrote_value = r == f"TYPED: {other_path}"
+            if not wrote_value:
                 print(
-                    f"FAIL: Save As path field reads back {typed_value!r}, expected "
-                    f"{str(other_path)!r} - typing did not take effect",
+                    f"FAIL: could not get the Save As path field to read back "
+                    f"{str(other_path)!r} via set_value or type_into (last result: {r})",
                     file=sys.stderr,
                 )
                 return 1
@@ -1381,6 +1391,208 @@ def p08_fs(binary, break_mode=False):
     return 0
 
 
+# ── P12 — Session/settings restart ──────────────────────────────────────────
+
+
+def p12(binary, break_mode=False):
+    """Three launches sharing one isolated `$HOME`:
+
+    A. CLI-opens F34's fixture pair (a real tab to restore later). Changes
+       Theme and Language via the Settings dialog's `AXPopUpButton`s
+       (`select_popup_item` - `get_value`/`set_value`/`perform_action
+       "AXIncrement"`/keystroke-after-focus/keystroke-after-a-real-
+       coordinate-click were all confirmed no-ops for these controls
+       during this slice's recon; `select_popup_item`'s AXPress-on-the-
+       opened-dropdown's-AXMenuItem is the one that actually works - see
+       macos_ui.applescript's history). Closes via the window's own close
+       button (`close_window`), not a signal, so the app has a real chance
+       to flush - though `super::persist(store)` already runs synchronously
+       on every settings change, so this mostly matters for matching the
+       handoff's letter ("not kill -9").
+    B. Relaunches with no CLI args: the fixture tab must restore (RFC-035,
+       `restore_tabs` - only reached when no explicit startup pair, per
+       `app.rs`), and Theme/Language must read back as set. A Japanese
+       label (the header's own "Settings"/"設定" button) must render in
+       Japanese - a practical-workflow check, not a translation audit.
+    C. Relaunches with explicit CLI args (a different, distinct pair):
+       `StartupRequest::Compare` takes the `into_compare_request()` branch,
+       which never calls `restore_tabs` (`app.rs`) - the F34 tab must NOT
+       reappear alongside the explicitly-requested one.
+
+    Font size is NOT changed via the UI in this case: every accessibility
+    technique tried against the font-size `AXTextField` spinner during this
+    slice's recon failed to actually change its value (direct AXValue
+    write, `AXIncrement`, keystroke after `set focused`, keystroke after a
+    UI-element `click`, keystroke after a real coordinate `click at {x,y}`
+    with the process made frontmost first) - five independent attempts,
+    all silent no-ops on readback. This is recorded here as explicitly NOT
+    executed / manual-outstanding (mirroring F45's shape and the handoff
+    §3 treatment of P04's keyboard path), not silently skipped or claimed
+    covered - see the case's OK/report output.
+
+    `--break`: asserts the restored Theme reads back as "Light" (the
+    default, never what this case actually sets it to) - false under real
+    (persisted-and-restored) behaviour, so this must fail.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+
+        left1 = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+        right1 = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+
+        # ── Launch A: open a tab, change Theme/Language, close normally ──
+        proc = launch(binary, [left1, right1], scratch, home=home)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+            rows = wait_rows(14)
+            if rows != "14":
+                print(f"FAIL: compare view never reached 14 rows (last: {rows!r})", file=sys.stderr)
+                return 1
+
+            r = click_wait("Settings")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not open Settings: {r}", file=sys.stderr)
+                return 1
+            time.sleep(0.3)
+
+            r = ui("select_popup_item", "1", "Night", timeout=20)
+            if not r.startswith("SELECTED"):
+                print(f"FAIL: could not select Theme=Night: {r}", file=sys.stderr)
+                return 1
+            r = ui("get_value", "AXPopUpButton", "1", timeout=20)
+            if r != "VALUE: Night":
+                print(f"FAIL: Theme popup does not read back Night: {r}", file=sys.stderr)
+                return 1
+
+            r = ui("select_popup_item", "2", "日本語", timeout=20)
+            if not r.startswith("SELECTED"):
+                print(f"FAIL: could not select Language=日本語: {r}", file=sys.stderr)
+                return 1
+            r = ui("get_value", "AXPopUpButton", "2", timeout=20)
+            if r != "VALUE: 日本語":
+                print(f"FAIL: Language popup does not read back 日本語: {r}", file=sys.stderr)
+                return 1
+
+            # Settings' own Close button is now rendered in Japanese.
+            r = click_wait("閉じる")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not close Settings ('閉じる'): {r}", file=sys.stderr)
+                return 1
+
+            r = ui("close_window", timeout=20)
+            if not r.startswith("CLOSED"):
+                print(f"FAIL: could not close the window: {r}", file=sys.stderr)
+                return 1
+
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline and proc.poll() is None:
+                time.sleep(0.3)
+            if proc.poll() is None:
+                print("FAIL: process still running 20s after closing the window", file=sys.stderr)
+                terminate(proc)
+                return 1
+        finally:
+            if proc.poll() is None:
+                terminate(proc)
+
+        # ── Launch B: relaunch with no CLI args - restore ────────────────
+        proc = launch(binary, [], scratch, home=home)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+
+            rows = wait_rows(14)
+            if rows != "14":
+                print(
+                    f"FAIL: fixture tab did not restore (rows: {rows!r}, expected 14)",
+                    file=sys.stderr,
+                )
+                return 1
+
+            r = find_wait("設定", timeout=10)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: no Japanese label ('設定') found after restart: {r}", file=sys.stderr)
+                return 1
+
+            r = click_wait("設定")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not reopen Settings ('設定'): {r}", file=sys.stderr)
+                return 1
+            time.sleep(0.3)
+
+            expected_theme = "Light" if break_mode else "Night"
+            r = ui("get_value", "AXPopUpButton", "1", timeout=20)
+            if r != f"VALUE: {expected_theme}":
+                print(
+                    f"FAIL: restored Theme {r!r} != expected 'VALUE: {expected_theme}'",
+                    file=sys.stderr,
+                )
+                return 1
+            r = ui("get_value", "AXPopUpButton", "2", timeout=20)
+            if r != "VALUE: 日本語":
+                print(f"FAIL: restored Language {r!r} != 'VALUE: 日本語'", file=sys.stderr)
+                return 1
+        finally:
+            terminate(proc)
+
+        # ── Launch C: relaunch with explicit CLI args - no restore ───────
+        pair_dir = Path(scratch) / "explicit-pair"
+        pair_dir.mkdir()
+        left2 = pair_dir / "left" / "explicit.txt"
+        right2 = pair_dir / "right" / "explicit.txt"
+        left2.parent.mkdir()
+        right2.parent.mkdir()
+        left2.write_text("alpha\nbeta\ngamma\n")
+        right2.write_text("alpha\nBETA\ngamma\n")
+
+        proc = launch(binary, [left2, right2], scratch, home=home)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+
+            r = find_wait("explicit.txt", timeout=LAUNCH_TIMEOUT_S)
+            if not r.startswith("FOUND"):
+                print(
+                    f"FAIL: the explicitly-requested pair's tab never appeared: {r}",
+                    file=sys.stderr,
+                )
+                return 1
+            r = ui("find_text", "left_all_hunk_kinds.txt", timeout=20)
+            if r.startswith("FOUND"):
+                print(
+                    "FAIL: the old (restored-in-B) fixture tab reappeared alongside "
+                    "the explicit CLI compare - explicit args must not restore the "
+                    "previous session",
+                    file=sys.stderr,
+                )
+                return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: Theme (Night) and Language (日本語) survived a normal close+restart "
+        "and a Japanese label rendered post-restart; a CLI-opened tab restored "
+        "automatically on a no-args relaunch but was NOT restored when the "
+        "relaunch gave explicit file args. Font size was NOT changed via the UI "
+        "in this run - every accessibility technique tried against the font-size "
+        "spinner (AXValue write, AXIncrement, keystroke after focus/click/real-"
+        "coordinate-click) was a confirmed no-op; recorded here as manual-"
+        "outstanding, not covered."
+    )
+    return 0
+
+
 # ── recon — not an RFC-078 case ─────────────────────────────────────────────
 
 
@@ -1502,6 +1714,7 @@ CASES = {
     "p08_continue": p08_continue,
     "p08_reset": p08_reset,
     "p08_fs": p08_fs,
+    "p12": p12,
     "recon_settings": recon_settings,
     "recon_explorer": recon_explorer,
 }
