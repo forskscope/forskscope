@@ -80,6 +80,28 @@
 --                                      the given role, for controls where a
 --                                      direct AXValue write may not be
 --                                      honoured (spinner fallback).
+--   select_popup_item <proc> <n> <label>
+--                                   -> "SELECTED: <label>", "NOT_FOUND", or
+--                                      "ERROR: <msg>" - set_value/
+--                                      perform_action's AXIncrement both
+--                                      confirmed silent no-ops against
+--                                      Theme/Language/font-family's
+--                                      AXPopUpButton controls (recon:
+--                                      "SET: Dark -> Dark"). Clicks the n-th
+--                                      AXPopUpButton (opens its menu, a real
+--                                      click) then clicks the named item in
+--                                      that menu - real menu-item selection.
+--   type_into <proc> <role> <n> <text>
+--                                   -> "TYPED: <value-read-back>",
+--                                      "NOT_FOUND", or "ERROR: <msg>" - same
+--                                      no-op problem for the font-size
+--                                      spinner's AXValue. Focuses the n-th
+--                                      element of the given role, selects all
+--                                      (Cmd+A) and types `text` via real
+--                                      `keystroke` - see the command's own
+--                                      comment for why this is a different
+--                                      situation from the Linux harness's
+--                                      keystroke-synthesis problems.
 --   close_window <proc>            -> "CLOSED" or "ERROR: <msg>" - clicks the
 --                                      window's own close (traffic-light)
 --                                      button, for a normal-quit test distinct
@@ -393,6 +415,106 @@ on runOnce(argv)
                     end if
                 end repeat
                 return "NOT_FOUND"
+
+            else if cmdName is "select_popup_item" then
+                -- M5-B recon found `set_value`/`perform_action "AXIncrement"`
+                -- are silent no-ops against these WebKit-rendered `<select>`
+                -- controls (AXValue reads back unchanged either way) - the
+                -- direct-write path M5-A's button work generalised from
+                -- doesn't hold for this control kind. This is the standard
+                -- AppleScript technique for a real popup button instead:
+                -- click it (opens its menu, same as a real mouse click
+                -- would), then click the wanted item in that menu - actual
+                -- menu-item selection, not a value write.
+                set n to (item 3 of argv) as integer
+                set optionLabel to item 4 of argv
+                set idx to 0
+                set allEl to my safeContents(w)
+                set target to missing value
+                repeat with e in allEl
+                    set isMatch to false
+                    try
+                        if role of e is "AXPopUpButton" then set isMatch to true
+                    end try
+                    if isMatch then
+                        set idx to idx + 1
+                        if idx is n then
+                            set target to e
+                            exit repeat
+                        end if
+                    end if
+                end repeat
+                if target is missing value then return "NOT_FOUND"
+                try
+                    click target
+                on error errMsg
+                    return "ERROR: click popup: " & errMsg
+                end try
+                delay 0.3
+                try
+                    click menu item optionLabel of menu 1 of target
+                on error errMsg
+                    -- Menu may still be open - try to dismiss it so a
+                    -- failed attempt doesn't leave the UI in a stuck state
+                    -- for the next command.
+                    try
+                        key code 53 -- Escape
+                    end try
+                    return "ERROR: click menu item " & optionLabel & ": " & errMsg
+                end try
+                return "SELECTED: " & optionLabel
+
+            else if cmdName is "type_into" then
+                -- Text-field counterpart to select_popup_item: `set value
+                -- of e to ...` was also confirmed a silent no-op for the
+                -- font-size spinner. Focuses the field, selects all
+                -- existing text (Cmd+A) and types the replacement - real
+                -- keystroke synthesis, which M5-A's Linux harness found
+                -- unreliable only because bare Xvfb has no window manager
+                -- and X11 focus does not imply widget focus; this runner is
+                -- a real GUI session (per the M5-A evidence doc) where
+                -- System Events UI scripting has so far needed no special
+                -- handling, so keystroke delivery to a genuinely focused
+                -- field is a materially different situation.
+                set roleWanted to item 3 of argv
+                set n to (item 4 of argv) as integer
+                set newText to item 5 of argv
+                set idx to 0
+                set allEl to my safeContents(w)
+                set target to missing value
+                repeat with e in allEl
+                    set isMatch to false
+                    try
+                        if role of e is roleWanted then set isMatch to true
+                    end try
+                    if isMatch then
+                        set idx to idx + 1
+                        if idx is n then
+                            set target to e
+                            exit repeat
+                        end if
+                    end if
+                end repeat
+                if target is missing value then return "NOT_FOUND"
+                try
+                    set focused of target to true
+                on error errMsg
+                    return "ERROR: focus: " & errMsg
+                end try
+                delay 0.2
+                try
+                    keystroke "a" using {command down}
+                    delay 0.1
+                    keystroke newText
+                on error errMsg
+                    return "ERROR: keystroke: " & errMsg
+                end try
+                delay 0.2
+                try
+                    return "TYPED: " & (value of target)
+                on error errMsg
+                    return "ERROR: readback: " & errMsg
+                end try
 
             else if cmdName is "close_window" then
                 try

@@ -557,6 +557,20 @@ def recon_settings(binary, break_mode=False):
             _probe(
                 "get-value-textfield-1-after-increment", "get_value", "AXTextField", "1"
             )
+            # Round 2's finding: set_value/AXIncrement are silent no-ops for
+            # these controls ("SET: Dark -> Dark", "SET: 14 -> 14", no change
+            # after AXIncrement either). Round 3 tests the real fallbacks:
+            # native popup-menu click and keystroke-based text entry.
+            _probe("select-popup-1-night", "select_popup_item", "1", "Night")
+            _probe("get-value-popup-1-after-select", "get_value", "AXPopUpButton", "1")
+            _probe(
+                "select-popup-2-japanese", "select_popup_item", "2", "日本語"
+            )
+            _probe("get-value-popup-2-after-select", "get_value", "AXPopUpButton", "2")
+            _probe("type-into-textfield-1-20", "type_into", "AXTextField", "1", "20")
+            _probe(
+                "get-value-textfield-1-after-type", "get_value", "AXTextField", "1"
+            )
         finally:
             terminate(proc)
     return 0
