@@ -118,7 +118,7 @@ on run argv
             if errNum is -10000 and attemptN < 6 then
                 delay 0.5
             else
-                error errMsg number errNum
+                error ("after " & attemptN & " attempt(s): " & errMsg) number errNum
             end if
         end try
     end repeat
