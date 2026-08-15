@@ -2041,6 +2041,53 @@ def recon_session_save(binary, break_mode=False):
     return 0
 
 
+def recon_tab_plus_explorer(binary, break_mode=False):
+    """Not a scored case. P06's click_row_side hangs 45s+ against its own
+    fixtures no matter how small they get (tried 20,000/4,000/1,500 lines,
+    and confirmed the hang persists even well after tab 0 finishes
+    loading), while the identical command against recon_explorer's
+    trivial 1-2 line files runs in ~2s. The one remaining structural
+    difference: P06 always has a *second* tab open (even once finished
+    loading) while viewing Explorer; recon_explorer never opens any tab
+    at all. Isolates whether merely having another tab exist - regardless
+    of its size - is what slows Explorer's accessibility queries down, by
+    opening a TRIVIALLY small CLI tab (not "big" at all) and then timing
+    click_row_side against tiny Explorer files, same as recon_explorer."""
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+        (home / "recon-left.txt").write_text("left content\n")
+        (home / "recon-right.txt").write_text("right content\n")
+        tiny_left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+        tiny_right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+
+        proc = launch(binary, [tiny_left, tiny_right], scratch, home=home)
+        try:
+            wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            rows = wait_rows(14)
+            print(f"PROBE tab rows: {rows!r}", flush=True)
+
+            r = poll_ui(
+                "click_any",
+                "Explorer",
+                predicate=lambda r: r.startswith("CLICKED"),
+                timeout=LAUNCH_TIMEOUT_S,
+                call_timeout=30,
+            )
+            print(f"PROBE click Explorer: {r!r}", flush=True)
+
+            t0 = time.monotonic()
+            r = ui("click_row_side", "recon-left.txt", "left", timeout=45)
+            print(
+                f"PROBE click_row_side-left (with another tab open): {r!r} "
+                f"({time.monotonic() - t0:.1f}s)",
+                flush=True,
+            )
+        finally:
+            terminate(proc)
+    return 0
+
+
 def recon_explorer(binary, break_mode=False):
     """Not a scored case. Same pivot as recon_settings - probes instead of
     a dump_roles bulk dump. Both Explorer panes default to `$HOME` itself
@@ -2107,6 +2154,7 @@ CASES = {
     "p06": p06,
     "recon_settings": recon_settings,
     "recon_session_save": recon_session_save,
+    "recon_tab_plus_explorer": recon_tab_plus_explorer,
     "recon_explorer": recon_explorer,
 }
 
