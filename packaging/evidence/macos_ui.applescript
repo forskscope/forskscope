@@ -370,8 +370,15 @@ on runOnce(argv)
                     end try
                     if isRow then
                         set hit to false
+                        -- Direct children only (`UI elements of e`), not a
+                        -- full recursive safeContents(e) - TreeRow's own
+                        -- markup (dir_pane.rs) is shallow (caret/icon/
+                        -- label/status spans, no nesting), so this is both
+                        -- correct and far cheaper per row than a recursive
+                        -- fetch, which mattered once Explorer's directory
+                        -- held several large files (P06's fixtures).
                         try
-                            set innerEl to my safeContents(e)
+                            set innerEl to (UI elements of e)
                             repeat with ie in innerEl
                                 try
                                     set iv to value of ie

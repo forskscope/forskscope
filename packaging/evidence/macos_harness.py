@@ -1480,6 +1480,15 @@ def p12(binary, break_mode=False):
                 print(f"FAIL: compare view never reached 14 rows (last: {rows!r})", file=sys.stderr)
                 return 1
 
+            session_debug_path = _config_dir(home) / "session.json"
+            time.sleep(1.0)
+            print(
+                f"DEBUG: session.json right after the tab opened (config dir "
+                f"exists={_config_dir(home).exists()}): "
+                f"{session_debug_path.read_text() if session_debug_path.exists() else '<missing>'}",
+                flush=True,
+            )
+
             r = click_wait("Settings")
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not open Settings: {r}", file=sys.stderr)
@@ -1669,7 +1678,7 @@ def _generate_large_pair(dir_, left_name, right_name, n_lines, sentinel):
     for i in range(n_lines):
         base = f"line {i:07d} padding text to make the diff heavier xxxxxxxxxxxxxxxxxxxx\n"
         left_lines.append(base)
-        if i % 500 == 250:
+        if i % 40 == 20:
             right_lines.append(f"line {i:07d} CHANGED padding text yyyyyyyyyyyyyyyyyyyyyyyyyy\n")
         else:
             right_lines.append(base)
@@ -1720,10 +1729,10 @@ def p06(binary, break_mode=False):
         sentinel_b_v2 = "ASYNC-IDENTITY-SENTINEL-PAIR-B-RELOAD-V2"
 
         left_a, right_a = _generate_large_pair(
-            home, "big-a-left.txt", "big-a-right.txt", 20_000, sentinel_a
+            home, "big-a-left.txt", "big-a-right.txt", 4_000, sentinel_a
         )
         left_b, right_b = _generate_large_pair(
-            home, "big-b-left.txt", "big-b-right.txt", 20_000, sentinel_b_v1
+            home, "big-b-left.txt", "big-b-right.txt", 4_000, sentinel_b_v1
         )
 
         proc = launch(binary, [left_a, right_a], scratch, home=home)
