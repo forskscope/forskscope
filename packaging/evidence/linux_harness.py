@@ -1303,18 +1303,43 @@ def p06(binary, break_mode=False):
             click(reload_btn)
             time.sleep(0.15)
             b_right.write_text("RELOAD-V2-MARKER\n")
-            try:
-                click(reload_btn)
-            except GLib.GError as e:
-                if process_died(proc):
-                    print(
-                        "FAIL (possible product defect, not fixed here per the handoff's "
-                        "constraints): the process exited after two Reload clicks in quick "
-                        f"succession, {e}",
-                        file=sys.stderr,
-                    )
-                    return 1
-                raise
+
+            # A GLib.GError here ("The application no longer exists") is not
+            # necessarily the whole process dying - WebKitGTK runs the actual
+            # web content in a separate process from the one `proc` refers
+            # to, and that content process can transiently drop off the
+            # accessibility bus under load (reloading a non-trivial file
+            # twice in quick succession, on CI's software-rendered, no-GPU
+            # Xvfb) without the parent process exiting. Confirmed on CI (runs
+            # 31894748081, 31911964811): `process_died(proc)` - which polls
+            # for up to 2s - consistently found the parent still running.
+            # So: retry through the GError for a while, and only call it a
+            # possible product defect if the parent process itself is
+            # confirmed gone.
+            retry_deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            reload_dispatched = False
+            while time.monotonic() < retry_deadline:
+                try:
+                    click(reload_btn)
+                    reload_dispatched = True
+                    break
+                except GLib.GError as e:
+                    if process_died(proc):
+                        print(
+                            "FAIL (possible product defect, not fixed here per the handoff's "
+                            "constraints): the process exited after two Reload clicks in quick "
+                            f"succession, {e}",
+                            file=sys.stderr,
+                        )
+                        return 1
+                    time.sleep(1)
+            if not reload_dispatched:
+                print(
+                    "FAIL: could not deliver the second Reload click - the accessibility bus "
+                    "kept reporting the app as gone without the process itself exiting",
+                    file=sys.stderr,
+                )
+                return 1
 
             required_reload_marker = "this marker was never written to disk" if break_mode else "RELOAD-V2-MARKER"
             reload_ok = False
@@ -1333,7 +1358,6 @@ def p06(binary, break_mode=False):
                             file=sys.stderr,
                         )
                         return 1
-                    raise
                 time.sleep(0.3)
             if not reload_ok:
                 print(
