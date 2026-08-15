@@ -467,18 +467,44 @@ def find_number_inputs(win):
 
 
 def set_value_text(elem, text):
-    """Sets a control's text via whichever pattern it exposes:
+    """Sets a control's text via whichever pattern it exposes -
     `set_edit_text()` (pywinauto's `EditWrapper`, `ValuePattern.SetValue`
     under the hood) where pywinauto wraps the control that way, falling
     back to calling `ValuePattern.SetValue` directly for a control type
     (e.g. "Spinner" - see `find_number_inputs`) pywinauto doesn't wrap
-    with `EditWrapper`."""
+    with `EditWrapper` - then, if the value still doesn't read back,
+    sends a real Tab keystroke to the control as a last resort.
+
+    That last step matters and was needed on real CI (M5-B, P12): setting
+    an `<input type="number">`'s value via `ValuePattern.SetValue` alone
+    updated the DOM value but never fired Dioxus's `onchange` listener
+    (a plain `change` event, which for a number input normally fires on
+    blur/commit, not on every value write) - `set_value_text` returned
+    without raising, but `persist(store)` was never called, and the
+    setting was silently lost. A synthesized Tab is the one place in
+    this harness that falls back to real input synthesis for something
+    an accessibility pattern alone doesn't reliably replicate, mirroring
+    `invoke()`'s own established Invoke-then-`click_input()` fallback
+    (and reported the same way: only used, and only reported, when the
+    pattern-only path didn't verifiably work)."""
     try:
         elem.set_edit_text(text)
-        return "set_edit_text"
+        path = "set_edit_text"
     except Exception:  # noqa: BLE001
         elem.iface_value.SetValue(text)
-        return "value-pattern"
+        path = "value-pattern"
+    if _combo_shows(elem, text):
+        return path
+    try:
+        elem.type_keys("{TAB}")
+    except Exception:  # noqa: BLE001
+        pass
+    if _combo_shows(elem, text):
+        return f"{path}+tab-commit"
+    raise RuntimeError(
+        f"set_value_text: {text!r} still doesn't read back after {path} and a Tab "
+        f"commit: {_combo_readback(elem)!r}"
+    )
 
 
 def modal_action_button(win, label):
