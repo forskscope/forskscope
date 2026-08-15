@@ -1306,7 +1306,7 @@ def p06(binary, break_mode=False):
             try:
                 click(reload_btn)
             except GLib.GError as e:
-                if proc.poll() is not None:
+                if process_died(proc):
                     print(
                         "FAIL (possible product defect, not fixed here per the handoff's "
                         "constraints): the process exited after two Reload clicks in quick "
@@ -1325,7 +1325,7 @@ def p06(binary, break_mode=False):
                         reload_ok = True
                         break
                 except GLib.GError as e:
-                    if proc.poll() is not None:
+                    if process_died(proc):
                         print(
                             "FAIL (possible product defect, not fixed here per the handoff's "
                             "constraints): the process exited while waiting for the second "
@@ -1372,6 +1372,22 @@ SESSION_V0_FIXTURE = REPO_ROOT / "crates/forskscope-core/src/tests/fixtures/pers
 SETTINGS_V2_FIXTURE = REPO_ROOT / "crates/forskscope-core/src/tests/fixtures/persistence/settings-v2.json"
 
 
+def process_died(proc, timeout_s=2):
+    """Polls `proc.poll()` briefly rather than checking once - a process
+    that has genuinely crashed can still report as "running" for a brief
+    moment before Python reaps it, and checking exactly once right after
+    an AT-SPI `GLib.GError: The application no longer exists` can race
+    that gap (confirmed on CI, run 31894748081: the check saw `poll() is
+    None` and re-raised the original GError uncaught, even though the
+    process really had died moments later)."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            return True
+        time.sleep(0.2)
+    return False
+
+
 def wait_for_dialog(app, title, timeout_s=LAUNCH_TIMEOUT_S):
     """Polls for the recovery dialog's own accessible - its `aria_label`
     is the dialog title (`recovery.rs`: `role: "dialog", aria_label:
@@ -1402,7 +1418,7 @@ def wait_for_dialog_gone(app, title, proc, timeout_s=LAUNCH_TIMEOUT_S):
             if find_by_exact_name(app, title) is None:
                 return "gone"
         except GLib.GError:
-            if proc.poll() is not None:
+            if process_died(proc):
                 return "process_died"
         time.sleep(0.3)
     return "still_present"
