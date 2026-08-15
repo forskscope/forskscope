@@ -148,9 +148,20 @@ def poll_ui(cmd, *args, predicate, timeout, interval=0.5, call_timeout=20):
     raise it for a command that can each legitimately take a while (e.g.
     a query against a view backing a large diff)."""
     deadline = time.monotonic() + timeout
-    result = None
+    result = ""
     while time.monotonic() < deadline:
-        result = ui(cmd, *args, timeout=call_timeout)
+        try:
+            result = ui(cmd, *args, timeout=call_timeout)
+        except subprocess.TimeoutExpired:
+            # A single slow call (e.g. right after launch, or while
+            # another process/window briefly coexists) shouldn't crash
+            # the whole poll loop the way an uncaught exception would -
+            # treat it as "not satisfied yet" and keep polling within the
+            # overall budget. `result` keeps its last real value so a
+            # caller inspecting the return after the deadline still sees
+            # something informative rather than a Python traceback.
+            time.sleep(interval)
+            continue
         if predicate(result):
             return result
         time.sleep(interval)
