@@ -32,6 +32,7 @@ what it breaks. `--break` only changes what the harness expects to see;
 it never touches product source.
 """
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -74,8 +75,25 @@ def ui(cmd, *args, timeout=15):
     return proc.stdout.strip()
 
 
-def launch(binary, args, cwd):
-    return subprocess.Popen([str(binary), *[str(a) for a in args]], cwd=str(cwd))
+def launch(binary, args, cwd, home=None):
+    """`home`, if given, overrides `$HOME` for the launched process - both
+    to isolate `dirs_next::config_dir()` (P08/P12: never touch the real
+    runner's `~/Library/Application Support`) and, independently, to keep
+    the Explorer workspace's default directory listing small. The latter
+    matters beyond tidiness: `entire contents of w` against a still-async-
+    scanning Explorer view (`tree.rs`'s `scans_l`/`scans_r`) can race the
+    scan and fail with "AppleEvent handler failed (-10000)" - a real
+    failure hit during this slice's own recon runs against the runner's
+    unmodified (and much larger) real home directory. A small, controlled
+    `$HOME` keeps the scan short-lived and the tree small.
+    """
+    env = None
+    if home is not None:
+        env = dict(os.environ)
+        env["HOME"] = str(home)
+    return subprocess.Popen(
+        [str(binary), *[str(a) for a in args]], cwd=str(cwd), env=env
+    )
 
 
 def terminate(proc):
@@ -424,21 +442,31 @@ def p10(binary, break_mode=False):
 
 
 def recon_settings(binary, break_mode=False):
-    """Not a scored case. Opens the Settings modal and dumps
-    `dump_roles` so the exact AXRole WebKit assigns to the Theme/Language/
-    font-family `<select>`s and the font-size `<input type=number>` can be
-    read directly from a live macos-latest run, instead of guessed - P12's
-    `set_value`/`perform_action` targeting depends on getting this right on
-    the first real attempt rather than burning CI iterations on a guess."""
+    """Not a scored case. Dumps the base Explorer window's accessible tree
+    (an empty, isolated `$HOME` keeps it small and static - see `launch`'s
+    docstring for why an unmodified real home directory made this fail in
+    the first recon attempt), then tries to open Settings and dumps again,
+    so the exact AXRole/name WebKit assigns to the header's Settings
+    button and the Theme/Language/font-family `<select>`s and the
+    font-size `<input type=number>` can be read directly from a live
+    macos-latest run instead of guessed."""
     with tempfile.TemporaryDirectory() as scratch:
-        proc = launch(binary, [], scratch)
+        home = Path(scratch) / "home"
+        home.mkdir()
+        proc = launch(binary, [], scratch, home=home)
         try:
             wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            time.sleep(0.5)
+            print("--- base window ---")
+            print(ui("dump_roles", "200", timeout=25))
             result = ui("click_button", "Settings", timeout=20)
             print(f"click Settings: {result}")
+            if not result.startswith("CLICKED"):
+                result = ui("click_row", "Settings", timeout=20)
+                print(f"click_row Settings: {result}")
             time.sleep(1.0)
-            dump = ui("dump_roles", "400", timeout=20)
-            print(dump)
+            print("--- after clicking Settings ---")
+            print(ui("dump_roles", "300", timeout=25))
         finally:
             terminate(proc)
     return 0
@@ -448,9 +476,16 @@ def recon_explorer(binary, break_mode=False):
     """Not a scored case. Dumps the Explorer view's accessible tree so
     TreeRow's real AXRole/clickability and the footer Compare button's
     exact accessible name can be confirmed before P06's implementation
-    relies on them."""
+    relies on them. `$HOME` is isolated and seeded with two small,
+    distinctly-named directories, one file each, so the dump reflects
+    what a real pick-two-files-and-compare flow will see."""
     with tempfile.TemporaryDirectory() as scratch:
-        proc = launch(binary, [], scratch)
+        home = Path(scratch) / "home"
+        (home / "recon-left").mkdir(parents=True)
+        (home / "recon-right").mkdir(parents=True)
+        (home / "recon-left" / "a.txt").write_text("left content\n")
+        (home / "recon-right" / "a.txt").write_text("right content\n")
+        proc = launch(binary, [], scratch, home=home)
         try:
             wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
             time.sleep(1.0)

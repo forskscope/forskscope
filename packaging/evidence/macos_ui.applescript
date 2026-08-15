@@ -92,7 +92,31 @@
 -- Python side treats as its own distinct, reportable failure mode rather
 -- than papering over it as "element not found".
 
+-- M5-B: Explorer's directory tree scans asynchronously (`tree.rs`'s
+-- `scans_l`/`scans_r` channels populate rows as the scan progresses), so
+-- `entire contents of w` against the Explorer view can race a live tree
+-- mutation and come back as "System Events got an error: AppleEvent
+-- handler failed. (-10000)" - a transient failure, not a real one (M5-A's
+-- four cases never hit this because none of them target a still-mutating
+-- view). Retry a bounded number of times before giving up, so a single
+-- race during a scan doesn't fail an otherwise-correct case.
 on run argv
+    set attemptN to 0
+    repeat
+        set attemptN to attemptN + 1
+        try
+            return runOnce(argv)
+        on error errMsg number errNum
+            if errNum is -10000 and attemptN < 6 then
+                delay 0.5
+            else
+                error errMsg number errNum
+            end if
+        end try
+    end repeat
+end run
+
+on runOnce(argv)
     set cmdName to item 1 of argv
     set procName to item 2 of argv
 
@@ -305,6 +329,11 @@ on run argv
                 end try
 
             else if cmdName is "dump_roles" then
+                -- One `properties of e` per element (a single AppleEvent
+                -- round trip) rather than five separate property fetches -
+                -- fewer round trips against a view that may still be
+                -- mutating (Explorer's async scan) means fewer chances to
+                -- race it, on top of `run`'s retry wrapper above.
                 set capN to 300
                 if (count of argv) > 2 then set capN to (item 3 of argv) as integer
                 set outLines to {}
@@ -319,19 +348,22 @@ on run argv
                     set va to ""
                     set en to ""
                     try
-                        set rl to (role of e) as string
-                    end try
-                    try
-                        set ti to (title of e) as string
-                    end try
-                    try
-                        set de to (description of e) as string
-                    end try
-                    try
-                        set va to (value of e) as string
-                    end try
-                    try
-                        set en to (enabled of e) as string
+                        set p to (properties of e)
+                        try
+                            set rl to (role of p) as string
+                        end try
+                        try
+                            set ti to (title of p) as string
+                        end try
+                        try
+                            set de to (description of p) as string
+                        end try
+                        try
+                            set va to (value of p) as string
+                        end try
+                        try
+                            set en to (enabled of p) as string
+                        end try
                     end try
                     set end of outLines to rl & "|" & ti & "|" & de & "|" & va & "|" & en
                 end repeat
@@ -345,4 +377,4 @@ on run argv
             end if
         end tell
     end tell
-end run
+end runOnce
