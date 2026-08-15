@@ -130,6 +130,53 @@ def wait_for_window(deadline):
     raise TimeoutError(f"no non-empty window within the timeout (last: {last!r})")
 
 
+# ── M5-B shared polling helpers ─────────────────────────────────────────────
+#
+# P01/P02/P09/P10 above each inline their own poll loop (M5-A's style, left
+# untouched). P04/P05/P06/P08/P12 below share the same small set of poll
+# shapes often enough (wait for a row count, click a button once it's
+# actionable, wait for text to appear/disappear) that factoring them out
+# here is more honest than copy-pasting five more inline loops.
+
+
+def poll_ui(cmd, *args, predicate, timeout, interval=0.5):
+    """Poll `ui(cmd, *args)` until `predicate(result)` is true or the
+    timeout elapses; returns the last result either way (callers decide
+    what "never satisfied" means for their case)."""
+    deadline = time.monotonic() + timeout
+    result = None
+    while time.monotonic() < deadline:
+        result = ui(cmd, *args, timeout=20)
+        if predicate(result):
+            return result
+        time.sleep(interval)
+    return result
+
+
+def wait_rows(expected, timeout=LAUNCH_TIMEOUT_S):
+    def pred(r):
+        try:
+            return int(r) == expected
+        except ValueError:
+            return False
+
+    return poll_ui("count_rows", predicate=pred, timeout=timeout)
+
+
+def click_wait(needle, timeout=LAUNCH_TIMEOUT_S, exact=False):
+    cmd = "click_button_exact" if exact else "click_button"
+    return poll_ui(
+        cmd, needle, predicate=lambda r: r.startswith("CLICKED"), timeout=timeout
+    )
+
+
+def find_wait(needle, timeout=LAUNCH_TIMEOUT_S, want_found=True):
+    def pred(r):
+        return r.startswith("FOUND") == want_found
+
+    return poll_ui("find_text", needle, predicate=pred, timeout=timeout)
+
+
 # ── P01 — Install and cold launch ───────────────────────────────────────────
 
 
@@ -456,7 +503,7 @@ def recon_compare(binary, break_mode=False):
             wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
             time.sleep(1.0)
             print("--- compare view ---", flush=True)
-            print(ui("dump_roles", "60", timeout=25), flush=True)
+            print(ui("dump_roles", "8", timeout=25), flush=True)
         finally:
             terminate(proc)
     return 0
