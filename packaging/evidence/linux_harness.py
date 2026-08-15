@@ -948,7 +948,17 @@ def p12(binary, break_mode=False):
             if app is None:
                 print("FAIL: forskscope never registered on the accessibility bus (settings sub-test, launch 1)", file=sys.stderr)
                 return 1
-            settings_btn = find_by_exact_name(app, "Settings")
+            # Poll rather than a single lookup right after find_app returns -
+            # the app registering on the accessibility bus does not mean its
+            # UI tree has finished populating yet (F57's lesson, matching
+            # wait_for_ready's own retry discipline elsewhere in this file).
+            settings_btn = None
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                settings_btn = find_by_exact_name(app, "Settings")
+                if settings_btn is not None:
+                    break
+                time.sleep(0.5)
             if settings_btn is None:
                 print('FAIL: could not find the "Settings" header button', file=sys.stderr)
                 return 1
@@ -1106,7 +1116,274 @@ def p12(binary, break_mode=False):
     return 0
 
 
-CASES = {"p01": p01, "p02": p02, "p04": p04, "p05": p05, "p09": p09, "p10": p10, "p12": p12}
+# ── P06 — Async identity ─────────────────────────────────────────────────
+
+
+def real_click_at(node):
+    """Real X11 mouse click at `node`'s on-screen center - for elements
+    that expose no accessible name AND whose single AT-SPI action does
+    not fire their real onclick handler. Confirmed empirically: TabBar's
+    permanent "Explorer" tab is a plain `div` with an onclick listener
+    but no explicit ARIA `role` attribute (unlike Explorer's file-tree
+    rows, `role="row"`, confirmed working via `Action.do_action`, or real
+    `<button>` elements); `Action.do_action` on it reports success but
+    the view never switches. A third instance of this harness's shadow-
+    AT-SPI-state family - see `select_combo_option`'s docstring for the
+    first two."""
+    ext = extents(node)
+    cx, cy = ext.x + ext.width // 2, ext.y + ext.height // 2
+    subprocess.run(["xdotool", "mousemove", "--sync", str(cx), str(cy)], check=True, timeout=15)
+    subprocess.run(["xdotool", "click", "1"], check=True, timeout=15)
+    time.sleep(0.3)
+
+
+def find_app_root(node):
+    """The outer `<div id="app-root">` - located by its DOM id via
+    `Accessible.get_attributes` rather than by name, since (like
+    Explorer's tab bar and tree rows) it exposes no accessible name."""
+    attrs = dict(Atspi.Accessible.get_attributes(node) or {})
+    if attrs.get("id") == "app-root":
+        return node
+    for i in range(node.get_child_count()):
+        child = node.get_child_at_index(i)
+        if child is not None:
+            found = find_app_root(child)
+            if found is not None:
+                return found
+    return None
+
+
+def explorer_rows_by_pane(app):
+    """Explorer's aligned-tree rows, split left/right pane by on-screen
+    x-position (same technique `wait_for_ready` uses for the diff view's
+    rows) and sorted top-to-bottom, so a row's index matches its position
+    in the pane's alphabetically sorted directory listing."""
+    rows = []
+
+    def collect(node):
+        if node.get_role_name() == "table row":
+            rows.append(node)
+        for i in range(node.get_child_count()):
+            child = node.get_child_at_index(i)
+            if child is not None:
+                collect(child)
+
+    collect(app)
+    if not rows:
+        return [], []
+    xs = [extents(r).x for r in rows]
+    mid = (min(xs) + max(xs)) / 2
+    left = sorted((r for r in rows if extents(r).x < mid), key=lambda r: extents(r).y)
+    right = sorted((r for r in rows if extents(r).x >= mid), key=lambda r: extents(r).y)
+    return left, right
+
+
+def navigate_pane_to(app, pane_index, target_dir):
+    """Navigates Explorer's left (`pane_index=0`) or right (`1`) pane to
+    `target_dir` via its "Edit path" (`✎`) button - a real `<button>`,
+    reliable via `click()` - followed by typing the path into the
+    resulting text input via real X11 synthesis (`type_into_field`; this
+    input has no EditableText interface either, same gap as the Save As
+    path field) and pressing Enter, which is what the input's `onkeydown`
+    handler actually commits navigation on."""
+    edit_buttons = []
+
+    def collect(node):
+        if (node.get_name() or "") == "✎":
+            edit_buttons.append(node)
+        for i in range(node.get_child_count()):
+            child = node.get_child_at_index(i)
+            if child is not None:
+                collect(child)
+
+    collect(app)
+    if len(edit_buttons) < 2:
+        raise RuntimeError(f"expected 2 'Edit path' (✎) buttons, found {len(edit_buttons)}")
+    click(edit_buttons[pane_index])
+    time.sleep(0.3)
+    entry = find_by_role(app, "entry")
+    if entry is None:
+        raise RuntimeError("no path entry found after clicking Edit path")
+    type_into_field(entry, "ForskScope", str(target_dir))
+    subprocess.run(["xdotool", "key", "Return"], check=True, timeout=15)
+    time.sleep(0.5)
+
+
+def p06(binary, break_mode=False):
+    """Two sub-tests against genuinely large (150,000-line) synthetic
+    fixture pairs - large enough to give the diff engine's async
+    computation a real, non-instant window, without any artificial
+    delay/mocking machinery (handoff §5: "do not build elaborate timing
+    machinery").
+
+    1. Launch with pair A (CLI 2-arg, tab 0). Switch to Explorer as fast
+       as possible (`real_click_at` on the Explorer tab), pick pair B via
+       its tree rows and the Compare button, opening tab 1 - both while
+       pair A's diff may still be computing. Close tab 0 (pair A)
+       immediately via its real close button, which bypasses the dirty
+       check specifically while loading (RFC-065, `tabs.rs`) - exercising
+       that code path for real. The single remaining tab must then show
+       pair B's *own* content, not pair A's - not merely "a tab exists"
+       (handoff §6's explicit vacuous-pass warning for this case).
+    2. On the surviving tab, trigger Reload twice in quick succession,
+       changing the right file's content in between, and confirm the
+       final render reflects the *second* (latest) request, not the
+       first - the other explicit non-vacuous requirement (RFC-078 P06).
+
+    `--break`: sub-test 1 requires pair A's content (impossible - pair A's
+    tab was closed) instead of pair B's; sub-test 2 requires a marker
+    that was never written to disk.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+        data_dir = scratch_path / "data"
+        data_dir.mkdir()
+
+        a_left = data_dir / "pair-a-left.txt"
+        a_right = data_dir / "pair-a-right.txt"
+        b_left = data_dir / "pair-b-left.txt"
+        b_right = data_dir / "pair-b-right.txt"
+
+        n_lines = 150_000
+
+        def write_fixture(path, marker, changed):
+            lines = [f"{marker} {i}" for i in range(n_lines)]
+            if changed:
+                lines[n_lines // 2] = f"{marker} CHANGED {n_lines // 2}"
+            path.write_text("\n".join(lines) + "\n")
+
+        write_fixture(a_left, "PAIR-A-MARKER", changed=False)
+        write_fixture(a_right, "PAIR-A-MARKER", changed=True)
+        write_fixture(b_left, "PAIR-B-MARKER", changed=False)
+        write_fixture(b_right, "PAIR-B-MARKER", changed=True)
+
+        env = dict(os.environ)
+        env["XDG_CONFIG_HOME"] = str(scratch_path / "config")
+        (scratch_path / "config").mkdir()
+
+        proc = subprocess.Popen([binary, str(a_left), str(a_right)], cwd=str(scratch_path), env=env)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered on the accessibility bus", file=sys.stderr)
+                return 1
+
+            root = find_app_root(app)
+            if root is None or root.get_child_count() < 3:
+                print("FAIL: could not locate app-root / the Explorer tab", file=sys.stderr)
+                return 1
+            real_click_at(root.get_child_at_index(2))
+
+            explorer_ready = False
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                if find_by_name_containing(app, "Select a file or directory") is not None:
+                    explorer_ready = True
+                    break
+                time.sleep(0.3)
+            if not explorer_ready:
+                print("FAIL: clicking the Explorer tab did not return to the Explorer view", file=sys.stderr)
+                return 1
+
+            navigate_pane_to(app, 0, data_dir)
+            navigate_pane_to(app, 1, data_dir)
+
+            left_rows, right_rows = [], []
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                left_rows, right_rows = explorer_rows_by_pane(app)
+                if len(left_rows) == 4 and len(right_rows) == 4:
+                    break
+                time.sleep(0.3)
+            if len(left_rows) != 4 or len(right_rows) != 4:
+                print(
+                    f"FAIL: expected 4 rows per pane after navigating to the fixture dir, "
+                    f"got {len(left_rows)}/{len(right_rows)}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            click(left_rows[2])  # pair-b-left.txt
+            click(right_rows[3])  # pair-b-right.txt
+
+            compare_btn = None
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                compare_btn = find_by_exact_name(app, "Compare selected files")
+                if compare_btn is not None:
+                    break
+                time.sleep(0.3)
+            if compare_btn is None:
+                print("FAIL: Compare button never enabled after picking pair B's files", file=sys.stderr)
+                return 1
+            click(compare_btn)
+
+            close_a = find_by_name_containing(app, "Close pair-a-left.txt")
+            if close_a is None:
+                print("FAIL: could not find pair A's tab-close button", file=sys.stderr)
+                return 1
+            click(close_a)
+
+            required_marker = "PAIR-A-MARKER" if break_mode else "PAIR-B-MARKER"
+            found = None
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                found = find_text_containing(app, required_marker)
+                if found is not None:
+                    break
+                time.sleep(0.3)
+            if found is None:
+                print(
+                    f"FAIL: surviving tab does not show {required_marker!r} content "
+                    "after closing the loading tab",
+                    file=sys.stderr,
+                )
+                return 1
+
+            reload_btn = find_by_name_containing(app, "Reload files from disk")
+            if reload_btn is None:
+                print("FAIL: could not find the Reload button", file=sys.stderr)
+                return 1
+
+            b_right.write_text("RELOAD-V1-MARKER\n")
+            click(reload_btn)
+            time.sleep(0.15)
+            b_right.write_text("RELOAD-V2-MARKER\n")
+            click(reload_btn)
+
+            required_reload_marker = "this marker was never written to disk" if break_mode else "RELOAD-V2-MARKER"
+            reload_ok = False
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                if find_text_containing(app, required_reload_marker) is not None:
+                    reload_ok = True
+                    break
+                time.sleep(0.3)
+            if not reload_ok:
+                print(
+                    f"FAIL: after reloading twice, {required_reload_marker!r} is not present "
+                    "- the latest reload request did not win",
+                    file=sys.stderr,
+                )
+                return 1
+            if not break_mode and find_text_containing(app, "RELOAD-V1-MARKER") is not None:
+                print(
+                    "FAIL: the first (stale) reload's content is still present after the "
+                    "second reload completed",
+                    file=sys.stderr,
+                )
+                return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: closing a loading tab leaves the correct sibling tab's content; "
+        "a second reload's result wins over the first's."
+    )
+    return 0
+
+
+CASES = {"p01": p01, "p02": p02, "p04": p04, "p05": p05, "p06": p06, "p09": p09, "p10": p10, "p12": p12}
 
 
 def main():
