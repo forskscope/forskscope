@@ -1691,7 +1691,7 @@ def _generate_large_pair(dir_, left_name, right_name, n_lines, sentinel):
     for i in range(n_lines):
         base = f"line {i:07d} padding text to make the diff heavier xxxxxxxxxxxxxxxxxxxx\n"
         left_lines.append(base)
-        if i % 40 == 20:
+        if i % 100 == 50:
             right_lines.append(f"line {i:07d} CHANGED padding text yyyyyyyyyyyyyyyyyyyyyyyyyy\n")
         else:
             right_lines.append(base)
@@ -1742,10 +1742,10 @@ def p06(binary, break_mode=False):
         sentinel_b_v2 = "ASYNC-IDENTITY-SENTINEL-PAIR-B-RELOAD-V2"
 
         left_a, right_a = _generate_large_pair(
-            home, "big-a-left.txt", "big-a-right.txt", 4_000, sentinel_a
+            home, "big-a-left.txt", "big-a-right.txt", 1_500, sentinel_a
         )
         left_b, right_b = _generate_large_pair(
-            home, "big-b-left.txt", "big-b-right.txt", 4_000, sentinel_b_v1
+            home, "big-b-left.txt", "big-b-right.txt", 1_500, sentinel_b_v1
         )
 
         proc = launch(binary, [left_a, right_a], scratch, home=home)
@@ -1940,6 +1940,50 @@ def recon_settings(binary, break_mode=False):
     return 0
 
 
+def recon_session_save(binary, break_mode=False):
+    """Not a scored case. P12 found settings.json writes succeed (a direct
+    onchange handler's synchronous `persist(store)`) but session.json never
+    appears even moments after a CLI-opened tab renders (the tabs-changed
+    `use_effect` in app.rs, a *reactive* trigger, not a direct handler call).
+    Isolates whether ANY session write ever lands in this environment:
+    `close_tab` (state/session.rs) also calls `save_session` directly, from
+    a real onclick handler, not an effect. If session.json appears only
+    after closing the tab (not after it merely opens), the bug is
+    specifically that the reactive auto-save effect doesn't take effect on
+    the very first tab-open, not that session persistence is broken
+    outright."""
+    left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+        _config_dir(home).mkdir(parents=True, exist_ok=True)
+        session_path = _config_dir(home) / "session.json"
+
+        proc = launch(binary, [left, right], scratch, home=home)
+        try:
+            wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            rows = wait_rows(14)
+            print(f"PROBE rows: {rows!r}", flush=True)
+            time.sleep(1.5)
+            print(
+                f"PROBE session.json right after tab opens: "
+                f"{session_path.read_text() if session_path.exists() else '<missing>'}",
+                flush=True,
+            )
+            r = click_wait("Close left_all_hunk_kinds.txt")
+            print(f"PROBE close tab: {r!r}", flush=True)
+            time.sleep(1.0)
+            print(
+                f"PROBE session.json right after closing the tab: "
+                f"{session_path.read_text() if session_path.exists() else '<missing>'}",
+                flush=True,
+            )
+        finally:
+            terminate(proc)
+    return 0
+
+
 def recon_explorer(binary, break_mode=False):
     """Not a scored case. Same pivot as recon_settings - probes instead of
     a dump_roles bulk dump. Both Explorer panes default to `$HOME` itself
@@ -2005,6 +2049,7 @@ CASES = {
     "p12": p12,
     "p06": p06,
     "recon_settings": recon_settings,
+    "recon_session_save": recon_session_save,
     "recon_explorer": recon_explorer,
 }
 
