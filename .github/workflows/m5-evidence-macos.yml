@@ -1,0 +1,111 @@
+name: M5 Evidence - macOS
+
+# M5-A: runs P01/P02/P09/P10 against the *published* 0.167.0 macOS artifact
+# (downloaded from the release, digest-verified - never built from source,
+# per RFC-078 §5: the evidence is about what users actually have) on
+# macos-latest, representing the macos-aarch64 CI row per matrix-plan.md.
+#
+# This does NOT and cannot exercise F46 (Gatekeeper) - a CI checkout/download
+# via `gh release download` carries no quarantine attribute, so Gatekeeper
+# never engages here, matching matrix-plan.md §3's F46 note exactly. This
+# workflow is P01 (basic launch)/P02/P09/P10 functional evidence only.
+#
+# `break_case: true` runs the selected case's built-in falsifiability
+# demonstration (packaging/evidence/macos_harness.py's `--break` flag) -
+# each case asserts against a condition that cannot be satisfied, proving
+# the check is a real assertion and not vacuously green.
+on:
+  workflow_dispatch:
+    inputs:
+      case:
+        description: 'Which case to run'
+        type: choice
+        options: [p01, p02, p09, p10]
+        required: true
+      break_case:
+        description: 'Run in --break mode (falsifiability demonstration)'
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  evidence:
+    name: M5-A macOS evidence
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Rolling-label caveat (matrix-plan.md, review 057 §4.3): `macos-latest`
+      # is not itself reproducible - record what it actually resolved to.
+      - name: Record resolved runner image
+        run: |
+          echo "ImageOS=$ImageOS"
+          echo "ImageVersion=$ImageVersion"
+          sw_vers
+          uname -a
+
+      - name: Download published 0.167.0 macOS artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download 0.167.0 -R "${{ github.repository }}" \
+            -p "forskscope-v0.167.0-macos-aarch64.dmg"
+
+      # RFC-078 §5: verify after download, never trust the release page.
+      - name: Verify digest
+        run: |
+          echo "2d66f125f0325adfef36cdf9bbb643a8deed50112db77707f7e6c9970ca25099  forskscope-v0.167.0-macos-aarch64.dmg" \
+            | shasum -a 256 -c -
+
+      # F46 (matrix-plan.md §3): mounting here never applies a quarantine
+      # attribute the way a real browser/curl-to-Finder download would, so
+      # Gatekeeper cannot engage regardless of what this step does - not
+      # worked around, just structurally out of reach under this model.
+      - name: Mount the DMG and locate the .app bundle
+        run: |
+          MOUNT_JSON=$(hdiutil attach forskscope-v0.167.0-macos-aarch64.dmg -nobrowse -plist)
+          MOUNT_POINT=$(echo "$MOUNT_JSON" | plutil -extract system-entities.0.mount-point raw - 2>/dev/null || true)
+          if [ -z "$MOUNT_POINT" ]; then
+            # Fall back to scanning /Volumes for the newly mounted volume
+            MOUNT_POINT=$(find /Volumes -maxdepth 1 -name 'ForskScope*' | head -1)
+          fi
+          echo "Mounted at: $MOUNT_POINT"
+          APP_PATH=$(find "$MOUNT_POINT" -maxdepth 1 -name '*.app' | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::no .app bundle found under $MOUNT_POINT"
+            exit 1
+          fi
+          echo "Found app bundle: $APP_PATH"
+          BINARY="$APP_PATH/Contents/MacOS/forskscope"
+          if [ ! -x "$BINARY" ]; then
+            echo "::error::expected executable not found at $BINARY"
+            exit 1
+          fi
+          # Copy out of the DMG (read-only, and gets detached before the
+          # harness needs the binary to still exist) into a working copy.
+          mkdir -p "$RUNNER_TEMP/app"
+          cp -R "$APP_PATH" "$RUNNER_TEMP/app/"
+          hdiutil detach "$MOUNT_POINT"
+          echo "binary=$RUNNER_TEMP/app/$(basename "$APP_PATH")/Contents/MacOS/forskscope" >> "$GITHUB_ENV"
+
+      - name: Verify System Events UI-scripting access
+        run: |
+          set +e
+          RESULT=$(osascript -e 'tell application "System Events" to get name of every process' 2>&1)
+          CODE=$?
+          set -e
+          echo "$RESULT"
+          if [ $CODE -ne 0 ]; then
+            echo "::warning::System Events UI scripting appears unavailable on this runner (exit $CODE) - P02/P09/P10 (which need button/element interaction) will report this as a failure, not silently skip it. P01's --diagnostics/window-existence check does not depend on this."
+          fi
+
+      - name: Run case
+        run: |
+          BREAK_FLAG=""
+          if [ "${{ inputs.break_case }}" = "true" ]; then
+            BREAK_FLAG="--break"
+          fi
+          python3 packaging/evidence/macos_harness.py \
+            "${{ inputs.case }}" "$binary" $BREAK_FLAG
