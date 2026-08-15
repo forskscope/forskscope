@@ -292,11 +292,22 @@ def p09(binary, break_mode=False):
                 return 1
             click(apply_button)
 
-            save_button = find_by_name_containing(app, "Save merge result")
-            if save_button is None:
-                print('FAIL: could not find the "Save merge result" toolbar button', file=sys.stderr)
+            # The re-render that enables the Save button (tab becomes
+            # dirty) happens asynchronously after the click returns -
+            # find it fresh and retry do_action rather than assume the
+            # tree already reflects the new state.
+            save_button = None
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            clicked_save = False
+            while time.monotonic() < deadline and not clicked_save:
+                save_button = find_by_name_containing(app, "Save merge result")
+                if save_button is not None and Atspi.Action.get_n_actions(save_button) >= 1:
+                    clicked_save = Atspi.Action.do_action(save_button, 0)
+                if not clicked_save:
+                    time.sleep(0.5)
+            if not clicked_save:
+                print('FAIL: could not click "Save merge result" within the timeout', file=sys.stderr)
                 return 1
-            click(save_button)
 
             deadline = time.monotonic() + LAUNCH_TIMEOUT_S
             actual = placeholder
