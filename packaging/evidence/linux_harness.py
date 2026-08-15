@@ -1386,15 +1386,37 @@ def p06(binary, break_mode=False):
             click(reload_btn)
             time.sleep(0.15)
             b_right.write_text("RELOAD-V2-MARKER\n")
-            click(reload_btn)
+            try:
+                click(reload_btn)
+            except GLib.GError as e:
+                if proc.poll() is not None:
+                    print(
+                        "FAIL (possible product defect, not fixed here per the handoff's "
+                        "constraints): the process exited after two Reload clicks in quick "
+                        f"succession, {e}",
+                        file=sys.stderr,
+                    )
+                    return 1
+                raise
 
             required_reload_marker = "this marker was never written to disk" if break_mode else "RELOAD-V2-MARKER"
             reload_ok = False
             deadline = time.monotonic() + LAUNCH_TIMEOUT_S
             while time.monotonic() < deadline:
-                if find_text_containing(app, required_reload_marker) is not None:
-                    reload_ok = True
-                    break
+                try:
+                    if find_text_containing(app, required_reload_marker) is not None:
+                        reload_ok = True
+                        break
+                except GLib.GError as e:
+                    if proc.poll() is not None:
+                        print(
+                            "FAIL (possible product defect, not fixed here per the handoff's "
+                            "constraints): the process exited while waiting for the second "
+                            f"reload's content to render, {e}",
+                            file=sys.stderr,
+                        )
+                        return 1
+                    raise
                 time.sleep(0.3)
             if not reload_ok:
                 print(
