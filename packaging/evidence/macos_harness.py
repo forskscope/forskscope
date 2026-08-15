@@ -1750,21 +1750,27 @@ def p12(binary, break_mode=False):
 
 
 def _generate_large_pair(dir_, left_name, right_name, n_lines, sentinel):
-    """Two genuinely large text files (`n_lines` lines each) differing at
-    scattered points plus one sentinel line at the file's midpoint (not
-    the last line - an end-of-file sentinel was tried first and its diff
-    never seemed to finish rendering past the first line in real CI runs;
-    moving it to the middle was the next thing to try before concluding
-    this case is blocked outright) - real work for `compute_diff`, not a
-    synthetic delay hook. RFC-078: "Deterministic automated tests remain
-    the primary proof; this case confirms runtime integration" - a large
-    file is the light, real way to get a loading window, not elaborate
-    timing machinery."""
+    """Two genuinely large text files (`n_lines` lines each) - real work
+    for `compute_diff`, not a synthetic delay hook - with the sentinel
+    line placed *near the top* (line 5), not the middle or the end.
+    `recon_generated_pair_alone` proved this the hard way: a sentinel at
+    the last line, then at the midpoint, was never findable even in a
+    single isolated process with no other complication whatsoever
+    (count_rows stayed 0; only the file's first line was ever findable,
+    even after 60s+ of polling) - consistent with the diff view
+    virtualizing/lazily rendering rows outside the initial viewport, so
+    accessibility queries only ever see what's visible without scrolling.
+    Content that must be accessibility-findable belongs near the top;
+    everything after it is just bulk padding for `compute_diff`'s
+    benefit, not expected to ever be queried. RFC-078: "Deterministic
+    automated tests remain the primary proof; this case confirms runtime
+    integration" - a large file is the light, real way to get a loading
+    window, not elaborate timing machinery."""
     left_path = Path(dir_) / left_name
     right_path = Path(dir_) / right_name
     left_lines = []
     right_lines = []
-    sentinel_index = n_lines // 2
+    sentinel_index = 5
     for i in range(n_lines):
         base = f"line {i:07d} padding text to make the diff heavier xxxxxxxxxxxxxxxxxxxx\n"
         left_lines.append(base)
