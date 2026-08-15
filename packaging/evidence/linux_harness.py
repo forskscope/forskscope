@@ -29,6 +29,7 @@ satisfy.
 """
 
 import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -1383,7 +1384,273 @@ def p06(binary, break_mode=False):
     return 0
 
 
-CASES = {"p01": p01, "p02": p02, "p04": p04, "p05": p05, "p06": p06, "p09": p09, "p10": p10, "p12": p12}
+# ── P08 — Persistence migration ──────────────────────────────────────────
+
+FUTURE_SCHEMA_SESSION = (
+    '{"schema_name": "session", "schema_version": 99, "app_version": "0.165.1", '
+    '"created_unix": 0, "updated_unix": 0, "payload": {}}'
+)
+CORRUPT_SESSION = "{not valid json"
+
+SETTINGS_V0_FIXTURE = REPO_ROOT / "crates/forskscope-core/src/tests/fixtures/persistence/settings-v0.json"
+SESSION_V0_FIXTURE = REPO_ROOT / "crates/forskscope-core/src/tests/fixtures/persistence/session-v0.json"
+
+
+def wait_for_dialog(app, title, timeout_s=LAUNCH_TIMEOUT_S):
+    """Polls for the recovery dialog's own accessible - its `aria_label`
+    is the dialog title (`recovery.rs`: `role: "dialog", aria_label:
+    "{title}"`), so it's found the same way as any other named element."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        dialog = find_by_exact_name(app, title)
+        if dialog is not None:
+            return dialog
+        time.sleep(0.3)
+    return None
+
+
+def wait_for_dialog_gone(app, title, timeout_s=LAUNCH_TIMEOUT_S):
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if find_by_exact_name(app, title) is None:
+            return True
+        time.sleep(0.3)
+    return False
+
+
+def p08(binary, break_mode=False):
+    """F37's three recovery-dialog choices, each with the process-state
+    assertion the handoff requires (§4) - not just that the dialog
+    disappeared - plus the filesystem-observable legacy-migration path.
+    Four independent launches, each with its own scratch
+    `XDG_CONFIG_HOME`:
+
+    1. Legacy v0 migration: the repository's own tested `settings-v0.json`/
+       `session-v0.json` fixtures placed at the config path. Produces no
+       dialog (`Migrated(Committed)` is a silent notice, not a blocking
+       dialog) - verified filesystem-only: both files become the current
+       v2 envelope and each original is preserved byte-for-byte in a
+       `.pre-v2.bak` sibling.
+    2. Future-schema session fixture -> Incompatible dialog -> **Exit**.
+       The one that matters (handoff §4): asserts the OS process actually
+       exits - not just that the dialog disappeared, since "an Exit that
+       dismisses the dialog and leaves a zombie is a failure that looks
+       like a pass" - and that the file is byte-for-byte untouched.
+    3. Future-schema session fixture (fresh copy) -> Incompatible dialog
+       -> **Continue with defaults**. Asserts the process keeps running,
+       the dialog is dismissed, and the file remains untouched.
+    4. Corrupt session fixture -> CorruptPreserved dialog -> **Reset and
+       back up**. Asserts the dialog is dismissed, `.reset.bak` preserves
+       the original corrupt bytes, and session.json is reset to valid
+       content.
+
+    `--break`: launch 2 requires the process to *still be running* after
+    Exit - impossible for the real, unmodified app - demonstrating the
+    handoff's explicitly flagged vacuous-pass risk is a real assertion.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+
+        # ── 1: legacy v0 migration, both settings and session ───────────
+        config_home = scratch_path / "config1"
+        config_dir = config_home / "forskscope"
+        config_dir.mkdir(parents=True)
+        settings_path = config_dir / "settings.json"
+        session_path = config_dir / "session.json"
+        settings_v0_bytes = SETTINGS_V0_FIXTURE.read_bytes()
+        session_v0_bytes = SESSION_V0_FIXTURE.read_bytes()
+        settings_path.write_bytes(settings_v0_bytes)
+        session_path.write_bytes(session_v0_bytes)
+
+        env = dict(os.environ)
+        env["XDG_CONFIG_HOME"] = str(config_home)
+        proc = subprocess.Popen([binary], cwd=str(scratch_path), env=env)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered on the accessibility bus (legacy migration launch)", file=sys.stderr)
+                return 1
+
+            settings_backup = config_dir / "settings.json.pre-v2.bak"
+            session_backup = config_dir / "session.json.pre-v2.bak"
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                if settings_backup.exists() and session_backup.exists():
+                    break
+                time.sleep(0.3)
+        finally:
+            terminate(proc)
+
+        if not settings_backup.exists() or settings_backup.read_bytes() != settings_v0_bytes:
+            print("FAIL: settings.json.pre-v2.bak missing or does not match the original v0 bytes", file=sys.stderr)
+            return 1
+        if not session_backup.exists() or session_backup.read_bytes() != session_v0_bytes:
+            print("FAIL: session.json.pre-v2.bak missing or does not match the original v0 bytes", file=sys.stderr)
+            return 1
+        try:
+            settings_after = json.loads(settings_path.read_text())
+            session_after = json.loads(session_path.read_text())
+        except json.JSONDecodeError as e:
+            print(f"FAIL: migrated settings/session.json is not valid JSON: {e}", file=sys.stderr)
+            return 1
+        if settings_after.get("schema_version", 0) < 2 or settings_after.get("payload", {}).get("theme") != "light":
+            print(f"FAIL: settings.json was not migrated to a v2 envelope preserving theme=light: {settings_after}", file=sys.stderr)
+            return 1
+        if session_after.get("schema_version", 0) < 2:
+            print(f"FAIL: session.json was not migrated to a v2 envelope: {session_after}", file=sys.stderr)
+            return 1
+
+        # ── 2: future-schema -> Exit ──────────────────────────────────────
+        config_home = scratch_path / "config2"
+        config_dir = config_home / "forskscope"
+        config_dir.mkdir(parents=True)
+        session_path = config_dir / "session.json"
+        session_path.write_text(FUTURE_SCHEMA_SESSION)
+        original_bytes = session_path.read_bytes()
+
+        env = dict(os.environ)
+        env["XDG_CONFIG_HOME"] = str(config_home)
+        proc = subprocess.Popen([binary], cwd=str(scratch_path), env=env)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered on the accessibility bus (future-schema/Exit launch)", file=sys.stderr)
+                return 1
+            dialog = wait_for_dialog(app, "Session file is from a newer version")
+            if dialog is None:
+                print("FAIL: the Incompatible-session recovery dialog never appeared", file=sys.stderr)
+                return 1
+            exit_btn = find_by_exact_name(app, "Exit")
+            if exit_btn is None:
+                print("FAIL: could not find the dialog's Exit button", file=sys.stderr)
+                return 1
+            click(exit_btn)
+
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline and proc.poll() is None:
+                time.sleep(0.3)
+            still_running = proc.poll() is None
+            ok = still_running if break_mode else not still_running
+            if not ok:
+                print(
+                    f"FAIL: after clicking Exit, the process is "
+                    f"{'still running' if still_running else 'exited'} - required "
+                    f"{'still running (break mode)' if break_mode else 'exited, with no orphaned process'}",
+                    file=sys.stderr,
+                )
+                return 1
+        finally:
+            terminate(proc)
+
+        if session_path.read_bytes() != original_bytes:
+            print("FAIL: Exit must not modify the untouched session file, but its bytes changed", file=sys.stderr)
+            return 1
+
+        # ── 3: future-schema (fresh) -> Continue with defaults ────────────
+        config_home = scratch_path / "config3"
+        config_dir = config_home / "forskscope"
+        config_dir.mkdir(parents=True)
+        session_path = config_dir / "session.json"
+        session_path.write_text(FUTURE_SCHEMA_SESSION)
+        original_bytes = session_path.read_bytes()
+
+        env = dict(os.environ)
+        env["XDG_CONFIG_HOME"] = str(config_home)
+        proc = subprocess.Popen([binary], cwd=str(scratch_path), env=env)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered on the accessibility bus (future-schema/Continue launch)", file=sys.stderr)
+                return 1
+            dialog = wait_for_dialog(app, "Session file is from a newer version")
+            if dialog is None:
+                print("FAIL: the Incompatible-session recovery dialog never appeared", file=sys.stderr)
+                return 1
+            continue_btn = find_by_exact_name(app, "Continue with defaults")
+            if continue_btn is None:
+                print("FAIL: could not find the dialog's Continue with defaults button", file=sys.stderr)
+                return 1
+            click(continue_btn)
+
+            if not wait_for_dialog_gone(app, "Session file is from a newer version"):
+                print("FAIL: the dialog is still present after clicking Continue with defaults", file=sys.stderr)
+                return 1
+            time.sleep(1)
+            if proc.poll() is not None:
+                print("FAIL: the process exited after Continue with defaults - it must keep running", file=sys.stderr)
+                return 1
+        finally:
+            terminate(proc)
+
+        if session_path.read_bytes() != original_bytes:
+            print("FAIL: Continue with defaults must not write to the untouched session file, but its bytes changed", file=sys.stderr)
+            return 1
+
+        # ── 4: corrupt -> Reset and back up ────────────────────────────────
+        config_home = scratch_path / "config4"
+        config_dir = config_home / "forskscope"
+        config_dir.mkdir(parents=True)
+        session_path = config_dir / "session.json"
+        session_path.write_text(CORRUPT_SESSION)
+        original_bytes = session_path.read_bytes()
+
+        env = dict(os.environ)
+        env["XDG_CONFIG_HOME"] = str(config_home)
+        proc = subprocess.Popen([binary], cwd=str(scratch_path), env=env)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered on the accessibility bus (corrupt/Reset launch)", file=sys.stderr)
+                return 1
+            dialog = wait_for_dialog(app, "Session file could not be read")
+            if dialog is None:
+                print("FAIL: the CorruptPreserved recovery dialog never appeared", file=sys.stderr)
+                return 1
+            reset_btn = find_by_exact_name(app, "Reset and back up")
+            if reset_btn is None:
+                print("FAIL: could not find the dialog's Reset and back up button", file=sys.stderr)
+                return 1
+            click(reset_btn)
+
+            if not wait_for_dialog_gone(app, "Session file could not be read"):
+                print("FAIL: the dialog is still present after clicking Reset and back up", file=sys.stderr)
+                return 1
+            time.sleep(1)  # let the reactive persist/backup effect run
+        finally:
+            terminate(proc)
+
+        reset_backup = config_dir / "session.json.reset.bak"
+        if not reset_backup.exists() or reset_backup.read_bytes() != original_bytes:
+            print("FAIL: session.json.reset.bak missing or does not equal the original corrupt bytes", file=sys.stderr)
+            return 1
+        try:
+            reset_content = json.loads(session_path.read_text())
+        except json.JSONDecodeError as e:
+            print(f"FAIL: session.json after Reset is not valid JSON: {e}", file=sys.stderr)
+            return 1
+        if reset_content.get("schema_version", 0) < 2:
+            print(f"FAIL: session.json after Reset is not a valid v2 envelope: {reset_content}", file=sys.stderr)
+            return 1
+
+    print(
+        "OK: legacy v0 settings/session migrate without loss (backed up byte-for-byte); "
+        "Exit terminates the process with the file untouched; Continue leaves the process "
+        "running with the file untouched; Reset backs up the corrupt original and resets the file."
+    )
+    return 0
+
+
+CASES = {
+    "p01": p01,
+    "p02": p02,
+    "p04": p04,
+    "p05": p05,
+    "p06": p06,
+    "p08": p08,
+    "p09": p09,
+    "p10": p10,
+    "p12": p12,
+}
 
 
 def main():
