@@ -1733,7 +1733,7 @@ def _generate_large_pair(dir_, left_name, right_name, n_lines, sentinel):
     for i in range(n_lines):
         base = f"line {i:07d} padding text to make the diff heavier xxxxxxxxxxxxxxxxxxxx\n"
         left_lines.append(base)
-        if i % 100 == 50:
+        if i % 20 == 10:
             right_lines.append(f"line {i:07d} CHANGED padding text yyyyyyyyyyyyyyyyyyyyyyyyyy\n")
         else:
             right_lines.append(base)
@@ -1744,10 +1744,20 @@ def _generate_large_pair(dir_, left_name, right_name, n_lines, sentinel):
 
 
 def p06(binary, break_mode=False):
-    """RFC-078's async-identity case, using two genuinely large (80,000-
-    line) synthetic file pairs so `compute_diff` (`tokio::task::
-    spawn_blocking` in `open_compare_request`/`reload_tab`) takes real,
-    measurable time - a real loading window, not a synthetic hook.
+    """RFC-078's async-identity case, using two synthetic file pairs (400
+    lines each, changes scattered every 20 lines) so `compute_diff`
+    (`tokio::task::spawn_blocking` in `open_compare_request`/`reload_tab`)
+    takes real, measurable time - a real loading window, not a synthetic
+    hook. Sizing this took real CI iteration to land on: click_row_side
+    (used below to pick pair B's files in Explorer) hung 45s+ against
+    every size from 1,500 up to 20,000 lines whenever pair A's tab was
+    *also* open - but ran in ~2s against the same large files with no
+    other tab open, and ~4s against tiny files with another tab open.
+    Neither condition alone was slow; only large-files-in-Explorer AND
+    another-tab-open together were. 400 lines keeps both conditions true
+    (a real background diff, a second tab open) while staying under
+    whatever combined-cost threshold caused the stall - RFC-078 asks for
+    "light but real", not "as large as tolerable".
 
     1. CLI-opens pair A (tab index 0, starts loading). Switches to the
        Explorer tab (`click_any` - `TabBar`'s Explorer tab is a plain
@@ -1756,7 +1766,8 @@ def p06(binary, break_mode=False):
        pair B's two files (`click_row_side` - Explorer's Aligned view
        shows the same directory in both panes by default, so a filename
        can appear as a row on both sides; `left`/`right` disambiguate by
-       X position) and clicks Compare, opening pair B as a second tab.
+       document-order occurrence, not position, per the command's own
+       comment) and clicks Compare, opening pair B as a second tab.
     2. Closes tab 0 (`Close <pair A's tab title>`) while it may still be
        loading.
     3. Asserts the surviving tab shows pair B's own sentinel line - not
@@ -1784,10 +1795,10 @@ def p06(binary, break_mode=False):
         sentinel_b_v2 = "ASYNC-IDENTITY-SENTINEL-PAIR-B-RELOAD-V2"
 
         left_a, right_a = _generate_large_pair(
-            home, "big-a-left.txt", "big-a-right.txt", 1_500, sentinel_a
+            home, "big-a-left.txt", "big-a-right.txt", 400, sentinel_a
         )
         left_b, right_b = _generate_large_pair(
-            home, "big-b-left.txt", "big-b-right.txt", 1_500, sentinel_b_v1
+            home, "big-b-left.txt", "big-b-right.txt", 400, sentinel_b_v1
         )
 
         proc = launch(binary, [left_a, right_a], scratch, home=home)
@@ -1797,21 +1808,6 @@ def p06(binary, break_mode=False):
             except (PermissionWall, TimeoutError) as exc:
                 print(f"FAIL: {exc}", file=sys.stderr)
                 return 1
-
-            # TEMP DIAGNOSTIC: click_row_side has hung (45s+) on every
-            # attempt regardless of fixture size (20,000 -> 4,000 -> 1,500
-            # lines), while the identical command runs in ~2s in
-            # recon_explorer where nothing else is loading. Testing whether
-            # tab 0's still-in-progress background diff (not fixture size)
-            # is what's actually causing the slowdown, by waiting for it to
-            # finish first - this defeats the "still loading" requirement
-            # for this one diagnostic dispatch only, not the real case.
-            t_wait_start = time.monotonic()
-            r = ui("find_text", sentinel_a, timeout=45)
-            print(
-                f"PROBE: tab 0 finished loading after {time.monotonic() - t_wait_start:.1f}s: {r!r}",
-                flush=True,
-            )
 
             r = poll_ui(
                 "click_any",
@@ -2101,13 +2097,8 @@ def recon_explorer(binary, break_mode=False):
     with tempfile.TemporaryDirectory() as scratch:
         home = Path(scratch) / "home"
         home.mkdir()
-        # TEMP: swapped from trivial 1-line files to P06-sized (1,500-line)
-        # ones, no other tab open at all - recon_tab_plus_explorer just
-        # showed click_row_side stays fast (4.1s) even WITH another tab
-        # open, as long as Explorer's own browsed files are tiny. This is
-        # the one remaining untested variable: are Explorer's *own* files'
-        # size/content (not any other tab) what's actually slow.
-        _generate_large_pair(home, "recon-left.txt", "recon-right.txt", 1_500, "SENTINEL")
+        (home / "recon-left.txt").write_text("left content\n")
+        (home / "recon-right.txt").write_text("right content\n")
         proc = launch(binary, [], scratch, home=home)
         try:
             wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
