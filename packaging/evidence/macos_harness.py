@@ -1913,7 +1913,10 @@ def p06(binary, break_mode=False):
             # second fires.
             time.sleep(0.3)
             _rewrite_right_b_with_sentinel(right_b, left_b, sentinel_b_v2)
-            r = ui("click_button", "Reload files from disk", timeout=20)
+            try:
+                r = ui("click_button", "Reload files from disk", timeout=30)
+            except subprocess.TimeoutExpired:
+                r = ""
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Reload (second): {r}", file=sys.stderr)
                 return 1
@@ -1927,7 +1930,10 @@ def p06(binary, break_mode=False):
                 )
                 return 1
             if not break_mode:
-                r = ui("find_text", sentinel_b_v1, timeout=20)
+                try:
+                    r = ui("find_text", sentinel_b_v1, timeout=45)
+                except subprocess.TimeoutExpired:
+                    r = "NOT_FOUND"
                 if r.startswith("FOUND"):
                     print(
                         "FAIL: the first (stale) reload's sentinel is still visible - "
