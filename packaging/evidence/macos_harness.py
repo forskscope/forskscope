@@ -525,14 +525,38 @@ def recon_settings(binary, break_mode=False):
         try:
             wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
             time.sleep(0.5)
-            _probe("settings-button-text", "find_text", "Settings")
-            _probe("settings-button-click", "click_button", "Settings")
-            _probe("settings-button-row", "click_row", "Settings")
-            _probe("keyboard-ref-text", "find_text", "?")
-            _probe("get-value-popup-1", "get_value", "AXPopUpButton", "1")
-            _probe("get-value-combo-1", "get_value", "AXComboBox", "1")
-            _probe("get-value-textfield-1", "get_value", "AXTextField", "1")
-            _probe("get-value-any-static-1", "get_value", "AXStaticText", "1")
+            # M5-B recon round 1 found the header's "Settings" button
+            # unclickable via a probe fired immediately after the window
+            # appeared, but clickable ~0.4s later (a second, separate probe
+            # in the same run) - almost certainly the accessibility tree
+            # lagging the DOM right after initial mount, not a real "no
+            # accessible name" gap. click_wait's poll loop (used by the
+            # real cases, not this recon) already tolerates exactly that.
+            click_wait("Settings", timeout=10)
+            _probe("get-value-popup-1-theme", "get_value", "AXPopUpButton", "1")
+            _probe("get-value-popup-2-lang", "get_value", "AXPopUpButton", "2")
+            _probe("get-value-popup-3-font-family", "get_value", "AXPopUpButton", "3")
+            _probe("get-value-textfield-1-fontsize", "get_value", "AXTextField", "1")
+            _probe(
+                "set-value-popup-1-to-night", "set_value", "AXPopUpButton", "1", "Night"
+            )
+            _probe("get-value-popup-1-after-set", "get_value", "AXPopUpButton", "1")
+            _probe(
+                "set-value-textfield-1-to-20", "set_value", "AXTextField", "1", "20"
+            )
+            _probe(
+                "get-value-textfield-1-after-set", "get_value", "AXTextField", "1"
+            )
+            _probe(
+                "perform-increment-textfield-1",
+                "perform_action",
+                "AXTextField",
+                "1",
+                "AXIncrement",
+            )
+            _probe(
+                "get-value-textfield-1-after-increment", "get_value", "AXTextField", "1"
+            )
         finally:
             terminate(proc)
     return 0
@@ -540,25 +564,33 @@ def recon_settings(binary, break_mode=False):
 
 def recon_explorer(binary, break_mode=False):
     """Not a scored case. Same pivot as recon_settings - probes instead of
-    a dump_roles bulk dump. `$HOME` is isolated and seeded with two small,
-    distinctly-named directories, one file each, so the probes reflect what
-    a real pick-two-files-and-compare flow will see."""
+    a dump_roles bulk dump. Both Explorer panes default to `$HOME` itself
+    (`explorer.rs`'s `default_explorer_dir()` when `remember_explorer_dirs`
+    is off, which it is by default) - the first attempt put the fixture
+    files one level down in subdirectories and got an empty aligned view
+    within its 1s wait; this one puts two distinctly-named files directly
+    in `$HOME` (so both panes show the same two file rows immediately,
+    no directory navigation needed) and polls count_rows instead of a
+    fixed sleep, since `dioxus_swdir_tree`'s scan is genuinely async."""
     with tempfile.TemporaryDirectory() as scratch:
         home = Path(scratch) / "home"
-        (home / "recon-left").mkdir(parents=True)
-        (home / "recon-right").mkdir(parents=True)
-        (home / "recon-left" / "a.txt").write_text("left content\n")
-        (home / "recon-right" / "a.txt").write_text("right content\n")
+        home.mkdir()
+        (home / "recon-left.txt").write_text("left content\n")
+        (home / "recon-right.txt").write_text("right content\n")
         proc = launch(binary, [], scratch, home=home)
         try:
             wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
-            time.sleep(1.0)
-            _probe("row-count", "count_rows")
-            _probe("filename-a-text", "find_text", "a.txt")
-            _probe("filename-a-click-row", "click_row", "a.txt")
+            rows = poll_ui(
+                "count_rows",
+                predicate=lambda r: r not in ("0", ""),
+                timeout=LAUNCH_TIMEOUT_S,
+            )
+            print(f"PROBE row-count-settled: {rows!r}", flush=True)
+            _probe("filename-left-text", "find_text", "recon-left.txt")
+            _probe("filename-left-click-row", "click_row", "recon-left.txt")
+            _probe("filename-right-click-row", "click_row", "recon-right.txt")
             _probe("compare-btn-text", "find_text", "Compare")
             _probe("compare-btn-click", "click_button", "Compare")
-            _probe("choose-hint-text", "find_text", "Choose a file")
         finally:
             terminate(proc)
     return 0
