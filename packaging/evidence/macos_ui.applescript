@@ -513,16 +513,53 @@ on runOnce(argv)
                     return "ERROR: click popup: " & errMsg
                 end try
                 delay 0.3
+                -- probe_popup found the open dropdown's options as plain
+                -- AXMenuItem elements inside window 1's own tree (title
+                -- holding the option label), NOT nested under a `menu 1 of`
+                -- collection the standard `menu item X of menu 1 of Y`
+                -- reference syntax expects ("Can't get menu 1 of pop up
+                -- button N ... Invalid index") - this control isn't a true
+                -- native NSPopUpButton, just styled to look like one. Find
+                -- and click the AXMenuItem directly, same pattern as
+                -- click_row/click_button.
+                set itemEl to missing value
                 try
-                    click menu item optionLabel of menu 1 of target
-                on error errMsg
-                    -- Menu may still be open - try to dismiss it so a
-                    -- failed attempt doesn't leave the UI in a stuck state
-                    -- for the next command.
+                    set allEl2 to my safeContents(w)
+                    repeat with e2 in allEl2
+                        set rl2 to ""
+                        try
+                            set rl2 to role of e2
+                        end try
+                        if rl2 is "AXMenuItem" then
+                            set lbl to ""
+                            try
+                                set lbl to title of e2
+                            end try
+                            if lbl is "" then
+                                try
+                                    set lbl to description of e2
+                                end try
+                            end if
+                            if lbl is optionLabel then
+                                set itemEl to e2
+                                exit repeat
+                            end if
+                        end if
+                    end repeat
+                end try
+                if itemEl is missing value then
                     try
-                        key code 53 -- Escape
+                        key code 53 -- Escape, don't leave the dropdown open
                     end try
-                    return "ERROR: click menu item " & optionLabel & ": " & errMsg
+                    return "ERROR: no AXMenuItem titled " & optionLabel & " found after opening the popup"
+                end if
+                try
+                    click itemEl
+                on error errMsg
+                    try
+                        key code 53
+                    end try
+                    return "ERROR: click AXMenuItem " & optionLabel & ": " & errMsg
                 end try
                 return "SELECTED: " & optionLabel
 
@@ -558,10 +595,16 @@ on runOnce(argv)
                     end if
                 end repeat
                 if target is missing value then return "NOT_FOUND"
+                -- First attempt used `set focused of target to true` (an
+                -- accessibility-attribute write) and the keystrokes landed
+                -- nowhere (readback unchanged). `click target` first - a
+                -- real click event, the same kind click_button already
+                -- relies on firing real onclick handlers - to actually
+                -- focus the underlying WKWebView text input before typing.
                 try
-                    set focused of target to true
+                    click target
                 on error errMsg
-                    return "ERROR: focus: " & errMsg
+                    return "ERROR: click-to-focus: " & errMsg
                 end try
                 delay 0.2
                 try
