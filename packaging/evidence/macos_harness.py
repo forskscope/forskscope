@@ -1352,9 +1352,12 @@ def p08_fs(binary, break_mode=False):
 
             session_payload = session_after["payload"]
             tabs = session_payload.get("tabs")
+            # PersistedComparePair serializes as {"left": ..., "right": ...}
+            # objects, not 2-element arrays like the v0 DTO's (String, String)
+            # tuples - confirmed by the first real dispatch's FAIL output.
             if tabs != [
-                ["/tmp/fixtures/left-a.txt", "/tmp/fixtures/right-a.txt"],
-                ["/tmp/fixtures/left-b.txt", "/tmp/fixtures/right-b.txt"],
+                {"left": "/tmp/fixtures/left-a.txt", "right": "/tmp/fixtures/right-a.txt"},
+                {"left": "/tmp/fixtures/left-b.txt", "right": "/tmp/fixtures/right-b.txt"},
             ]:
                 print(
                     f"FAIL: migrated session payload tabs {tabs!r} do not match "
