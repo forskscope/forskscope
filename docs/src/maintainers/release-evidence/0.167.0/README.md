@@ -8,14 +8,24 @@ P11–P12 and the two owner manual passes are later M5 slices; see
 
 ## Verdict for this slice
 
-**Every case this slice covers passes on every CI-verified row.** Three
-real findings surfaced along the way, all recorded rather than fixed or
-laundered, per the M5-A handoff's explicit constraint:
+**This evidence cannot support a Gate D pass, and nothing below changes
+that.** F44 fails Linux P01 un-waivably on a supported platform
+(libxdo-4 distributions) — reproduced directly on a real host, not
+simulated. RFC-078's Waiver policy has no waiver for "inability to launch
+on a claimed supported platform," and `matrix-plan.md`/review 061 §3.1
+already settled this as a schedule dependency on an upstream
+`dioxus-desktop` release, not something any further evidence-gathering
+closes. While F44 is open, v1 cannot go regardless of how clean the rest
+of this evidence is.
 
-- **F44** (already known, now directly confirmed) — Linux P01 fails
-  un-waivably on libxdo-4 distributions. Reproduced on a real host, not
-  simulated. Still open; a schedule dependency on an upstream
-  `dioxus-desktop` release, not something this evidence pass can close.
+**Within that constraint, every case this slice covers passes on every
+CI-verified row.** This slice's job was to gather accurate evidence, not
+to produce a passing matrix — see the M5-A handoff §1: "A case that
+fails, recorded accurately with its cause, is a successful outcome for
+this milestone." Three further findings surfaced along the way, all
+recorded rather than fixed or laundered, per the handoff's explicit
+constraint:
+
 - **F45** (already known, confirmed structurally invisible to CI as
   expected) — Windows P01's "prerequisites missing" sub-case cannot run
   on `windows-latest`, which already ships both dependencies. Owner-
@@ -27,16 +37,15 @@ laundered, per the M5-A handoff's explicit constraint:
 - **F59** (new, found while building this slice) — `installation.md`'s
   documented Debian/Ubuntu runtime prerequisites are missing `libxdo3`,
   distinct from F44. A one-line documentation fix, not a schedule
-  dependency; registered, not fixed here.
-
-**This does not mean Gate D can pass.** F44 alone is un-waivable per
-RFC-078's Waiver policy and RFC-078/`matrix-plan.md`'s own framing
-(review 061 §3.1): while it's open, Linux P01 fails on a supported
-platform with no waiver available, so v1 cannot go regardless of how
-clean the rest of this evidence is. This slice's job was to gather
-accurate evidence, not to produce a passing matrix — see the M5-A
-handoff §1: "A case that fails, recorded accurately with its cause, is a
-successful outcome for this milestone."
+  dependency; registered, and — now unblocked per review 063 — fixed in
+  `installation.md` directly.
+- **F60** (found by review 063, not by this slice): the declared Windows
+  floor (`AppxManifest.xml`'s `MinVersion` 1809, matching
+  `installation.md`) has no runtime evidence and none is planned — the
+  `windows-10` row's CI host is NT 10.0.26100, seven years newer, and no
+  Windows 10 host exists anywhere in the execution model. Not a defect in
+  this slice; a Gate D input the owner needs to see before the go/no-go,
+  not discover while reading a verdict.
 
 ## Rows in this evidence set
 
@@ -89,3 +98,10 @@ source.
   around them.
 - P03–P08, P11, P12 are later M5 slices, per the M5-A handoff's explicit
   scope boundary — not started here.
+- **Dependency for M5-C, not a limitation here (review 063 §5.3):**
+  Windows's P02 readiness check uses content-token presence, not an
+  exact row count like Linux's. Sufficient for P02; P03 (compare layout
+  and scrolling) needs row-level precision the same way F34 does on
+  Linux, so the UIA control-type mapping this slice didn't need to
+  establish should be settled before M5-C's P03 work starts — see
+  `windows-11.md`.

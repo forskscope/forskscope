@@ -22,10 +22,16 @@ tar -xzf forskscope-v0.166.0-linux-x86_64.tar.gz
 You need WebKitGTK 4.1 and GTK 3 at runtime:
 
 ```sh
-sudo apt-get install libwebkit2gtk-4.1-0 libgtk-3-0   # Debian / Ubuntu
-sudo dnf install webkit2gtk4.1 gtk3                   # Fedora
-sudo pacman -S webkit2gtk-4.1 gtk3                    # Arch
+sudo apt-get install libwebkit2gtk-4.1-0 libgtk-3-0 libxdo3   # Debian / Ubuntu
+sudo dnf install webkit2gtk4.1 gtk3                            # Fedora
+sudo pacman -S webkit2gtk-4.1 gtk3                             # Arch
 ```
+
+`libxdo3` (F59) is required but is not pulled in by either
+`libwebkit2gtk-4.1-0` or `libgtk-3-0` — a Debian/Ubuntu host without it
+fails to launch at all (`error while loading shared libraries:
+libxdo.so.3`), confirmed on a fresh `ubuntu-latest` host that had only
+the other two packages installed.
 
 > **Known limitation — the prebuilt binary is Debian/Ubuntu-family only.**
 >

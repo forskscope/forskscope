@@ -94,6 +94,18 @@ tokens to appear in the UIA tree, not an exact per-pane row count —
 that the exact UIA control type WebView2 maps `role="row"` to was never
 empirically confirmed, since the content-based check already worked.
 
+**Known dependency of M5-C, not a limitation of this slice (review 063
+§5.3):** P02's content-presence check is sufficient for what P02 itself
+needs — early satisfaction of "these tokens exist somewhere" costs
+nothing when there's no wrong-answer risk from a partially-rendered tree.
+It is not sufficient for **P03 (compare layout and scrolling)**, which
+compares row alignment across the whole tree the way F34's Linux check
+does — a partial row set there would compare a subset and risk a false
+pass, the exact failure shape F34 exists to prevent. Establishing the
+UIA control type WebView2 maps `role="row"` to (so an exact row count
+becomes possible on Windows, matching Linux's AT-SPI approach) is
+something to settle **before** P03 in M5-C, not discover during it.
+
 ## Failures and issue links
 
 - **F45** — Windows P01's prerequisite sub-case ("VC++ redistributable /
