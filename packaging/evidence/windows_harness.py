@@ -535,7 +535,23 @@ def set_value_text(elem, text):
         elem.type_keys("^a{BACKSPACE}" + text + "{TAB}")
         return "keystroke-synthesis"
 
-    for attempt in (try_pattern, try_pattern_then_tab, try_real_keystrokes):
+    def try_click_then_keystrokes():
+        # UIA's SetFocus (what set_focus() and the plain
+        # keystroke-synthesis attempt above use) is an
+        # accessibility-level focus call - empirically (M5-B, P12) it did
+        # not route real keyboard input into this WebView2/Chromium
+        # number input at all, readback never moved off the app's actual
+        # default. A synthesized *click* physically focuses the element
+        # the same way real user interaction would (Chromium's own
+        # hit-testing/focus routing, not just the UIA focus notion), so
+        # this clicks first, then types - the most input-synthesis-heavy
+        # attempt in this harness, used only because every accessibility-
+        # pattern-only approach was verified not to work here.
+        elem.click_input()
+        elem.type_keys("^a{BACKSPACE}" + text + "{TAB}")
+        return "click-then-keystroke-synthesis"
+
+    for attempt in (try_pattern, try_pattern_then_tab, try_real_keystrokes, try_click_then_keystrokes):
         try:
             path = attempt()
         except Exception as exc:  # noqa: BLE001
