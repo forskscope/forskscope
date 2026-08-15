@@ -488,36 +488,36 @@ def p10(binary, break_mode=False):
 # ── recon — not an RFC-078 case ─────────────────────────────────────────────
 
 
-def recon_compare(binary, break_mode=False):
-    """Not a scored case. Dumps the CLI-compare view (F34 fixtures) that
-    M5-A's count_rows/click_button already proved `entire contents of w`
-    works reliably against, as a control: if dump_roles ALSO fails here,
-    the bug is in dump_roles itself, not Explorer-specific; if it succeeds
-    here and keeps failing against Explorer, the bug really is Explorer's
-    tree."""
-    left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
-    right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
-    with tempfile.TemporaryDirectory() as scratch:
-        proc = launch(binary, [left, right], scratch)
-        try:
-            wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
-            time.sleep(1.0)
-            print("--- compare view ---", flush=True)
-            print(ui("dump_roles", "8", timeout=25), flush=True)
-        finally:
-            terminate(proc)
-    return 0
+def _probe(label, cmd, *args):
+    """Run one `ui()` probe, print PROBE/PERM-WALL/ERROR and return the
+    result (or None on failure) - never raises, so one bad probe doesn't
+    abort the rest of the batch."""
+    try:
+        result = ui(cmd, *args, timeout=20)
+        print(f"PROBE {label}: {cmd} {args!r} -> {result!r}", flush=True)
+        return result
+    except PermissionWall as exc:
+        print(f"PROBE {label}: PERM-WALL: {exc}", flush=True)
+        return None
+    except Exception as exc:  # noqa: BLE001 - recon must never crash mid-batch
+        print(f"PROBE {label}: ERROR: {exc}", flush=True)
+        return None
 
 
 def recon_settings(binary, break_mode=False):
-    """Not a scored case. Dumps the base Explorer window's accessible tree
-    (an empty, isolated `$HOME` keeps it small and static - see `launch`'s
-    docstring for why an unmodified real home directory made this fail in
-    the first recon attempt), then tries to open Settings and dumps again,
-    so the exact AXRole/name WebKit assigns to the header's Settings
-    button and the Theme/Language/font-family `<select>`s and the
-    font-size `<input type=number>` can be read directly from a live
-    macos-latest run instead of guessed."""
+    """Not a scored case. `dump_roles`'s bulk tree dump turned out to be
+    unreliable for reasons this investigation never fully pinned down (see
+    macos_ui.applescript's dump_roles comment and the commit history around
+    it - every isolated variant, including one with `entire contents`
+    identical to the already-proven count_rows/find_text/click_button and a
+    tiny 8-element cap, still failed "AppleEvent handler failed (-10000)"
+    on the same view those three commands already handle fine). Dropped in
+    favour of this: a batch of targeted find_text/click_button probes using
+    only the primitives M5-A already proved reliable, to answer the actual
+    open questions (does the header's "Settings" button's accessible name
+    really contain "Settings"? what roles do the Theme/Language/font-family
+    selects and the font-size spinner expose?) without needing a full-tree
+    dump at all."""
     with tempfile.TemporaryDirectory() as scratch:
         home = Path(scratch) / "home"
         home.mkdir()
@@ -525,28 +525,24 @@ def recon_settings(binary, break_mode=False):
         try:
             wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
             time.sleep(0.5)
-            print("--- base window ---", flush=True)
-            print(ui("dump_roles", "200", timeout=25), flush=True)
-            result = ui("click_button", "Settings", timeout=20)
-            print(f"click Settings: {result}", flush=True)
-            if not result.startswith("CLICKED"):
-                result = ui("click_row", "Settings", timeout=20)
-                print(f"click_row Settings: {result}", flush=True)
-            time.sleep(1.0)
-            print("--- after clicking Settings ---", flush=True)
-            print(ui("dump_roles", "300", timeout=25), flush=True)
+            _probe("settings-button-text", "find_text", "Settings")
+            _probe("settings-button-click", "click_button", "Settings")
+            _probe("settings-button-row", "click_row", "Settings")
+            _probe("keyboard-ref-text", "find_text", "?")
+            _probe("get-value-popup-1", "get_value", "AXPopUpButton", "1")
+            _probe("get-value-combo-1", "get_value", "AXComboBox", "1")
+            _probe("get-value-textfield-1", "get_value", "AXTextField", "1")
+            _probe("get-value-any-static-1", "get_value", "AXStaticText", "1")
         finally:
             terminate(proc)
     return 0
 
 
 def recon_explorer(binary, break_mode=False):
-    """Not a scored case. Dumps the Explorer view's accessible tree so
-    TreeRow's real AXRole/clickability and the footer Compare button's
-    exact accessible name can be confirmed before P06's implementation
-    relies on them. `$HOME` is isolated and seeded with two small,
-    distinctly-named directories, one file each, so the dump reflects
-    what a real pick-two-files-and-compare flow will see."""
+    """Not a scored case. Same pivot as recon_settings - probes instead of
+    a dump_roles bulk dump. `$HOME` is isolated and seeded with two small,
+    distinctly-named directories, one file each, so the probes reflect what
+    a real pick-two-files-and-compare flow will see."""
     with tempfile.TemporaryDirectory() as scratch:
         home = Path(scratch) / "home"
         (home / "recon-left").mkdir(parents=True)
@@ -557,8 +553,12 @@ def recon_explorer(binary, break_mode=False):
         try:
             wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
             time.sleep(1.0)
-            dump = ui("dump_roles", "400", timeout=20)
-            print(dump, flush=True)
+            _probe("row-count", "count_rows")
+            _probe("filename-a-text", "find_text", "a.txt")
+            _probe("filename-a-click-row", "click_row", "a.txt")
+            _probe("compare-btn-text", "find_text", "Compare")
+            _probe("compare-btn-click", "click_button", "Compare")
+            _probe("choose-hint-text", "find_text", "Choose a file")
         finally:
             terminate(proc)
     return 0
@@ -569,7 +569,6 @@ CASES = {
     "p02": p02,
     "p09": p09,
     "p10": p10,
-    "recon_compare": recon_compare,
     "recon_settings": recon_settings,
     "recon_explorer": recon_explorer,
 }
