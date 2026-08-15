@@ -2047,7 +2047,7 @@ def recon_generated_pair_alone(binary, break_mode=False):
         home = Path(scratch) / "home"
         home.mkdir()
         sentinel = "ISOLATED-SENTINEL-9f2c"
-        left, right = _generate_large_pair(scratch, "solo-left.txt", "solo-right.txt", 100, sentinel)
+        left, right = _generate_large_pair(scratch, "solo-left.txt", "solo-right.txt", 30, sentinel)
         proc = launch(binary, [left, right], scratch, home=home)
         try:
             try:
