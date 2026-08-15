@@ -1877,6 +1877,19 @@ def p06(binary, break_mode=False):
                 )
                 return 1
 
+            print(f"DEBUG: pid_target={b!r}, proc_a.pid={proc_a.pid}, proc_b.pid={proc_b.pid}", flush=True)
+            print(f"DEBUG: count_rows for B (by pid): {ui('count_rows', timeout=20, proc_name=b)!r}", flush=True)
+            print(
+                f"DEBUG: find_text 'line' for B (by pid): "
+                f"{ui('find_text', 'line', timeout=20, proc_name=b)!r}",
+                flush=True,
+            )
+            print(
+                f"DEBUG: find_text 'line' for B (by name): "
+                f"{ui('find_text', 'line', timeout=20)!r}",
+                flush=True,
+            )
+
             r = poll_ui(
                 "find_text",
                 sentinel_b_v1,
