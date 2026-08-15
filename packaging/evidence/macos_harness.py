@@ -1887,6 +1887,12 @@ def p06(binary, break_mode=False):
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Reload (first): {r}", file=sys.stderr)
                 return 1
+            # A small gap (not zero) between the two clicks - still well
+            # within "quick succession" (both fire long before either
+            # reload could plausibly finish), but gives the first click's
+            # event handling a moment to actually register before the
+            # second fires.
+            time.sleep(0.3)
             right_b.write_text(f"content v2\n{sentinel_b_v2}\n")
             r = ui("click_button", "Reload files from disk", timeout=20)
             if not r.startswith("CLICKED"):
@@ -1896,6 +1902,11 @@ def p06(binary, break_mode=False):
             expected_final = sentinel_b_v1 if break_mode else sentinel_b_v2
             r = find_wait(expected_final, timeout=LAUNCH_TIMEOUT_S)
             if not r.startswith("FOUND"):
+                print(
+                    f"DEBUG: find_text 'content' after reloads: "
+                    f"{ui('find_text', 'content', timeout=20)!r}",
+                    file=sys.stderr,
+                )
                 print(
                     f"FAIL: expected final sentinel {expected_final!r} never appeared: {r}",
                     file=sys.stderr,
