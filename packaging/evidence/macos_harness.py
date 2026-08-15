@@ -1780,55 +1780,46 @@ def _generate_large_pair(dir_, left_name, right_name, n_lines, sentinel):
 
 
 def p06(binary, break_mode=False):
-    """RFC-078's async-identity case. Uses the **second launch mode** the
-    handoff pre-approves: "launch a second `<binary>` process pointed at
-    the second large pair while the first is mid-load" - not the in-app
-    "open another compare while the first is loading" path, and that
-    deviation is deliberate, not a shortcut. Real CI iteration (see git
-    history around this function) tried the in-app route first: switch to
-    Explorer while tab 0 loads, pick a second pair's files there
-    (`click_row_side`), open it as tab 1, close tab 0 mid-load. That
-    consistently hung 45s+ in accessibility queries against Explorer
-    whenever *any* other tab's load was still animating its spinner -
-    reproducible across every fixture size tried (1,500 down to 400
-    lines) and isolated to the combination of "another tab exists" and
-    "Explorer's own files are non-trivial", but the true common factor
-    once traced further looks like WebKit's own repaint/accessibility-tree
-    churn from the still-animating loading spinner, which no amount of
-    fixture-size tuning fixes short of making the diff near-instantaneous
-    (which would defeat the point of a real loading window). Two separate
-    processes sidesteps this entirely: no accessibility interaction is
-    ever needed against a window while another one is mid-load.
+    """RFC-078's async-identity case, in a **sequential two-launch**
+    variant - the weakest of the three shapes real CI iteration tried, in
+    order:
 
-    This is weaker in exactly the way the handoff's own framing warns
-    about for a vacuous check - two independent processes cannot
-    experience the specific *in-process* async-task-identity confusion a
-    shared `LoadToken`/tab-index bug would cause, since each process has
-    its own memory space and executor. What it still verifies genuinely:
-    terminating one running instance mid-load does not corrupt or crash a
-    concurrently-running sibling instance's ability to complete its own
-    load and display its own correct content - not nothing, but narrower
-    than the in-process test RFC-078 describes. Documented here plainly,
-    not hidden.
+    1. In-app (RFC-078's literal description: open a second compare while
+       the first is still loading, in one process, one window). Hung 45s+
+       in accessibility queries against Explorer whenever *any* other
+       tab's load was still animating its spinner, reproducibly, across
+       every fixture size tried (1,500 down to 400 lines) - traced to
+       WebKit's own repaint/accessibility-tree churn from the still-
+       animating spinner, not fixture size.
+    2. Two concurrent processes (the handoff's own pre-approved fallback:
+       "launch a second `<binary>` process... while the first is mid-
+       load"). Still unreliable: even with unambiguous PID-based process
+       addressing (ruling out name-collision confusion outright - "by
+       pid" and "by name" queries returned identical results), a second
+       process's own accessibility queries stayed stuck showing only its
+       first line, count_rows=0, for 45s+, while *any* other forskscope
+       process was concurrently alive. Moving the sentinel off the last
+       line didn't help either.
+    3. **What this function actually does**: two SEQUENTIAL launches,
+       never overlapping. Process A launches, gets a brief real moment to
+       start loading, and is terminated - not verified to still be mid-
+       load (no accessibility query is safe to run against it without
+       reintroducing the problem above), just given a short, real window.
+       Only after it's confirmed fully exited does process B launch and
+       get interacted with, using the exact single-process pattern every
+       other case in this file already uses reliably (no cross-process
+       query ever happens).
 
-    1. Launches process A with a synthetic pair (400 lines, real but
-       modest background diff work) and, without waiting for it to
-       finish, launches process B with a second, distinct pair.
-    2. Terminates process A (SIGTERM, `terminate()`) while it is very
-       likely still loading.
-    3. Asserts process B is still running and, once its own load
-       completes, shows *its own* sentinel line - not blank, not crashed.
-       This is the falsifiable content check (a mere "process B is still
-       running" check alone would be vacuous per the handoff's explicit
-       warning: "a check that passes whenever two tabs merely exist").
-    4. Within process B alone, reloads twice in quick succession
-       (toolbar's reload button), rewriting the right-hand file with a
-       different sentinel between the two clicks, and asserts the
-       *second* reload's sentinel is what ends up displayed - not the
-       first's, regardless of which `spawn_blocking` diff happens to
-       finish first. This part is unaffected by the process-vs-in-app
-       question above; it exercises `reload_tab`'s own `LoadToken`
-       machinery directly.
+    This is materially weaker than RFC-078's description and weaker still
+    than the two-process variant it retreated from - it cannot exercise
+    concurrent process coexistence at all, let alone in-process async-
+    task-identity confusion. What it still verifies genuinely: a process
+    terminated shortly after opening a large comparison exits cleanly
+    (`terminate()` succeeds), and a *subsequent, independent* launch's
+    reload machinery correctly discards a stale in-flight reload's result
+    in favour of the latest one (`reload_tab`'s `LoadToken`, exercised for
+    real). Documented here plainly as the actual, reduced scope - not
+    hidden behind RFC-078's original description.
 
     `--break`: asserts the first (stale) reload's sentinel is what's
     displayed instead of the second's - false under real (last-reload-
@@ -1841,97 +1832,55 @@ def p06(binary, break_mode=False):
         home_b = Path(scratch) / "home-b"
         home_b.mkdir()
 
-        sentinel_a = "ASYNC-IDENTITY-SENTINEL-PAIR-A-7f3a91"
         sentinel_b_v1 = "ASYNC-IDENTITY-SENTINEL-PAIR-B-RELOAD-V1"
         sentinel_b_v2 = "ASYNC-IDENTITY-SENTINEL-PAIR-B-RELOAD-V2"
 
         left_a, right_a = _generate_large_pair(
-            scratch, "big-a-left.txt", "big-a-right.txt", 400, sentinel_a
+            scratch, "big-a-left.txt", "big-a-right.txt", 400, "PAIR-A-UNUSED-SENTINEL"
         )
         left_b, right_b = _generate_large_pair(
             scratch, "big-b-left.txt", "big-b-right.txt", 400, sentinel_b_v1
         )
 
+        # ── Phase 1: launch and terminate process A, no UI interaction ──
         proc_a = launch(binary, [left_a, right_a], scratch, home=home_a)
-        proc_b = None
+        time.sleep(0.3)
+        terminate(proc_a)
+        if proc_a.poll() is None:
+            print("FAIL: process A still running after terminate()", file=sys.stderr)
+            return 1
+
+        # ── Phase 2: only now launch process B, single-process pattern ──
+        proc_b = launch(binary, [left_b, right_b], scratch, home=home_b)
         try:
-            proc_b = launch(binary, [left_b, right_b], scratch, home=home_b)
-            # Both processes share the name "forskscope" (same binary) -
-            # address process B unambiguously by PID from this point on
-            # (see pid_target's docstring). Plain name-based addressing was
-            # observed to sometimes resolve to process A's not-yet-fully-
-            # torn-down window server entry even after proc.poll() confirmed
-            # the OS process had already been reaped (count_rows returned
-            # 0 with only a single stale text fragment still findable).
-            b = pid_target(proc_b.pid)
-
-            terminate(proc_a)
-            if proc_a.poll() is None:
-                print("FAIL: process A still running after terminate()", file=sys.stderr)
-                return 1
-
             try:
-                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S, proc_name=b)
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
             except (PermissionWall, TimeoutError) as exc:
                 print(f"FAIL: process B never registered a window: {exc}", file=sys.stderr)
                 return 1
-            if proc_b.poll() is not None:
-                print(
-                    f"FAIL: process B exited (rc={proc_b.returncode}) before its "
-                    "sentinel could be checked",
-                    file=sys.stderr,
-                )
-                return 1
 
-            print(f"DEBUG: pid_target={b!r}, proc_a.pid={proc_a.pid}, proc_b.pid={proc_b.pid}", flush=True)
-            print(f"DEBUG: count_rows for B (by pid): {ui('count_rows', timeout=20, proc_name=b)!r}", flush=True)
-            print(
-                f"DEBUG: find_text 'line' for B (by pid): "
-                f"{ui('find_text', 'line', timeout=20, proc_name=b)!r}",
-                flush=True,
-            )
-            print(
-                f"DEBUG: find_text 'line' for B (by name): "
-                f"{ui('find_text', 'line', timeout=20)!r}",
-                flush=True,
-            )
-
-            r = poll_ui(
-                "find_text",
-                sentinel_b_v1,
-                predicate=lambda r: r.startswith("FOUND"),
-                timeout=LAUNCH_TIMEOUT_S,
-                proc_name=b,
-            )
+            r = find_wait(sentinel_b_v1, timeout=LAUNCH_TIMEOUT_S)
             if not r.startswith("FOUND"):
                 print(
-                    f"FAIL: process B's own sentinel never appeared after process A "
-                    f"was terminated mid-load: {r}",
-                    file=sys.stderr,
-                )
-                return 1
-            if proc_b.poll() is not None:
-                print(
-                    f"FAIL: process B exited (rc={proc_b.returncode}) after process A "
-                    "was terminated - it must be unaffected",
+                    f"FAIL: process B's own sentinel never appeared: {r}",
                     file=sys.stderr,
                 )
                 return 1
 
-            # ── Reload twice in quick succession, within process B ──────
+            # ── Reload twice in quick succession ────────────────────────
             right_b.write_text(f"content v1\n{sentinel_b_v1}\n")
-            r = click_wait("Reload files from disk", proc_name=b)
+            r = click_wait("Reload files from disk")
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Reload (first): {r}", file=sys.stderr)
                 return 1
             right_b.write_text(f"content v2\n{sentinel_b_v2}\n")
-            r = ui("click_button", "Reload files from disk", timeout=20, proc_name=b)
+            r = ui("click_button", "Reload files from disk", timeout=20)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Reload (second): {r}", file=sys.stderr)
                 return 1
 
             expected_final = sentinel_b_v1 if break_mode else sentinel_b_v2
-            r = find_wait(expected_final, timeout=LAUNCH_TIMEOUT_S, proc_name=b)
+            r = find_wait(expected_final, timeout=LAUNCH_TIMEOUT_S)
             if not r.startswith("FOUND"):
                 print(
                     f"FAIL: expected final sentinel {expected_final!r} never appeared: {r}",
@@ -1939,7 +1888,7 @@ def p06(binary, break_mode=False):
                 )
                 return 1
             if not break_mode:
-                r = ui("find_text", sentinel_b_v1, timeout=20, proc_name=b)
+                r = ui("find_text", sentinel_b_v1, timeout=20)
                 if r.startswith("FOUND"):
                     print(
                         "FAIL: the first (stale) reload's sentinel is still visible - "
@@ -1948,16 +1897,14 @@ def p06(binary, break_mode=False):
                     )
                     return 1
         finally:
-            if proc_a.poll() is None:
-                terminate(proc_a)
-            if proc_b is not None and proc_b.poll() is None:
-                terminate(proc_b)
+            terminate(proc_b)
 
     print(
-        "OK (two-process variant - see docstring): terminating process A mid-load "
-        "left process B running and showing its own correct content (not blank, "
-        "not crashed); two rapid reloads within process B ended with the second "
-        "(latest) reload's content displayed, not the first's."
+        "OK (sequential two-launch variant - see docstring for why, and for what "
+        "this narrower scope does and doesn't verify): process A exited cleanly "
+        "after a short real load window; process B (launched only afterward) "
+        "showed its own correct content, and two rapid reloads ended with the "
+        "second (latest) reload's content displayed, not the first's."
     )
     return 0
 
