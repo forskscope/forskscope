@@ -1464,7 +1464,14 @@ def p12(binary, break_mode=False):
             if not r.startswith("SELECTED"):
                 print(f"FAIL: could not select Theme=Night: {r}", file=sys.stderr)
                 return 1
-            r = ui("get_value", "AXPopUpButton", "1", timeout=20)
+            time.sleep(0.5)
+            r = poll_ui(
+                "get_value",
+                "AXPopUpButton",
+                "1",
+                predicate=lambda r: r == "VALUE: Night",
+                timeout=10,
+            )
             if r != "VALUE: Night":
                 print(f"FAIL: Theme popup does not read back Night: {r}", file=sys.stderr)
                 return 1
@@ -1473,7 +1480,14 @@ def p12(binary, break_mode=False):
             if not r.startswith("SELECTED"):
                 print(f"FAIL: could not select Language=日本語: {r}", file=sys.stderr)
                 return 1
-            r = ui("get_value", "AXPopUpButton", "2", timeout=20)
+            time.sleep(0.5)
+            r = poll_ui(
+                "get_value",
+                "AXPopUpButton",
+                "2",
+                predicate=lambda r: r == "VALUE: 日本語",
+                timeout=10,
+            )
             if r != "VALUE: 日本語":
                 print(f"FAIL: Language popup does not read back 日本語: {r}", file=sys.stderr)
                 return 1
@@ -1529,14 +1543,26 @@ def p12(binary, break_mode=False):
             time.sleep(0.3)
 
             expected_theme = "Light" if break_mode else "Night"
-            r = ui("get_value", "AXPopUpButton", "1", timeout=20)
+            r = poll_ui(
+                "get_value",
+                "AXPopUpButton",
+                "1",
+                predicate=lambda r: r == f"VALUE: {expected_theme}",
+                timeout=10,
+            )
             if r != f"VALUE: {expected_theme}":
                 print(
                     f"FAIL: restored Theme {r!r} != expected 'VALUE: {expected_theme}'",
                     file=sys.stderr,
                 )
                 return 1
-            r = ui("get_value", "AXPopUpButton", "2", timeout=20)
+            r = poll_ui(
+                "get_value",
+                "AXPopUpButton",
+                "2",
+                predicate=lambda r: r == "VALUE: 日本語",
+                timeout=10,
+            )
             if r != "VALUE: 日本語":
                 print(f"FAIL: restored Language {r!r} != 'VALUE: 日本語'", file=sys.stderr)
                 return 1

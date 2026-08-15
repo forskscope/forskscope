@@ -61,6 +61,17 @@
 --                                      RowLeft/RowRight are role="row" too,
 --                                      so `needle` should be specific enough
 --                                      to disambiguate, e.g. a file name)
+--   click_row_side <proc> <needle> <left|right>
+--                                   -> "CLICKED: x=<n>", "NOT_FOUND", or
+--                                      "ERROR: <msg>" - Explorer's Aligned
+--                                      view shows the same directory in
+--                                      both panes by default, so a
+--                                      filename can appear as an AXRow on
+--                                      both sides; click_row's first-match
+--                                      behaviour can click the wrong
+--                                      pane's copy. Picks the matching row
+--                                      with the min ("left") or max
+--                                      ("right") X position instead.
 --   get_value <proc> <role> <n>    -> "VALUE: <v>", "NOT_FOUND" - the AXValue
 --                                      of the n-th (1-based) element with the
 --                                      given AXRole, in tree-walk order
@@ -334,6 +345,79 @@ on runOnce(argv)
                     end if
                 end repeat
                 return "NOT_FOUND"
+
+            else if cmdName is "click_row_side" then
+                -- Explorer's Aligned view (tree.rs) shows the SAME
+                -- directory in both panes by default (default_explorer_dir
+                -- with remember_explorer_dirs off), so a given filename can
+                -- appear as an AXRow on *both* sides - click_row's
+                -- first-match behaviour picked the wrong pane's copy in
+                -- P06 recon (both clicks ended up setting left_pick,
+                -- Compare stayed disabled). Panes are laid out side by
+                -- side, so the left-pane copy's X position is always less
+                -- than the right-pane copy's - collect every AXRow whose
+                -- text matches `needle` and pick the one with the min (for
+                -- "left") or max (for "right") X position instead of
+                -- always the first document-order match.
+                set needle to item 3 of argv
+                set side to item 4 of argv
+                set allEl to my safeContents(w)
+                set candidates to {}
+                repeat with e in allEl
+                    set isRow to false
+                    try
+                        if role of e is "AXRow" then set isRow to true
+                    end try
+                    if isRow then
+                        set hit to false
+                        try
+                            set innerEl to my safeContents(e)
+                            repeat with ie in innerEl
+                                try
+                                    set iv to value of ie
+                                    if class of iv is text and iv contains needle then
+                                        set hit to true
+                                        exit repeat
+                                    end if
+                                end try
+                                if not hit then
+                                    try
+                                        set it3 to title of ie
+                                        if it3 contains needle then
+                                            set hit to true
+                                            exit repeat
+                                        end if
+                                    end try
+                                end if
+                            end repeat
+                        end try
+                        if hit then
+                            try
+                                set p to position of e
+                                set end of candidates to {item 1 of p, e}
+                            end try
+                        end if
+                    end if
+                end repeat
+                if (count of candidates) is 0 then return "NOT_FOUND"
+                set bestX to item 1 of item 1 of candidates
+                set bestE to item 2 of item 1 of candidates
+                repeat with c in candidates
+                    set cx to item 1 of c
+                    if side is "left" and cx < bestX then
+                        set bestX to cx
+                        set bestE to item 2 of c
+                    else if side is "right" and cx > bestX then
+                        set bestX to cx
+                        set bestE to item 2 of c
+                    end if
+                end repeat
+                try
+                    click bestE
+                on error errMsg
+                    return "ERROR: click: " & errMsg
+                end try
+                return "CLICKED: x=" & bestX
 
             else if cmdName is "get_value" then
                 set roleWanted to item 3 of argv
