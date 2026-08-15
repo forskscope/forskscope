@@ -2101,8 +2101,13 @@ def recon_explorer(binary, break_mode=False):
     with tempfile.TemporaryDirectory() as scratch:
         home = Path(scratch) / "home"
         home.mkdir()
-        (home / "recon-left.txt").write_text("left content\n")
-        (home / "recon-right.txt").write_text("right content\n")
+        # TEMP: swapped from trivial 1-line files to P06-sized (1,500-line)
+        # ones, no other tab open at all - recon_tab_plus_explorer just
+        # showed click_row_side stays fast (4.1s) even WITH another tab
+        # open, as long as Explorer's own browsed files are tiny. This is
+        # the one remaining untested variable: are Explorer's *own* files'
+        # size/content (not any other tab) what's actually slow.
+        _generate_large_pair(home, "recon-left.txt", "recon-right.txt", 1_500, "SENTINEL")
         proc = launch(binary, [], scratch, home=home)
         try:
             wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
