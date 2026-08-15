@@ -8,6 +8,13 @@ name: M5 Evidence - Windows
 # that file's justification for treating a Server-based image as a
 # reasonable stand-in for save/filesystem/WebView2 behavior on either).
 #
+# M5-B adds P04, P05, P06, P08, P12 - the interaction cases - against the
+# same published artifact and digest, same workflow_dispatch/one-case-
+# per-run shape. See packaging/evidence/windows_harness.py's module
+# docstring for each case's reasoning, including P04's mouse-only scope
+# (§3 of the M5-B handoff) and P08/P12's use of the runner's real config
+# directory instead of an (ineffective, on Windows) APPDATA override.
+#
 # Mirrors m5-evidence-linux.yml's shape exactly (workflow_dispatch, one
 # case per run, `break_case` for the falsifiability demonstration) but
 # drives the app through Windows UI Automation via `pywinauto` instead of
@@ -25,7 +32,7 @@ on:
       case:
         description: 'Which case to run'
         type: choice
-        options: [p01, p02, p09, p10]
+        options: [p01, p02, p04, p05, p06, p08, p09, p10, p12]
         required: true
       break_case:
         description: 'Run in --break mode (falsifiability demonstration)'
@@ -57,7 +64,12 @@ jobs:
           python-version: '3.12'
 
       - name: Install pywinauto
-        run: python -m pip install --disable-pip-version-check pywinauto
+        # psutil: M5-B's P08 Exit sub-case needs to confirm the OS process
+        # is actually gone after clicking Exit, not just that the dialog
+        # closed (handoff §4/§6) - psutil.pid_exists() queries the OS
+        # directly, the same thing an external operator checking for a
+        # zombie process would do.
+        run: python -m pip install --disable-pip-version-check pywinauto psutil
 
       - name: Download published 0.167.0 Windows artifact
         env:

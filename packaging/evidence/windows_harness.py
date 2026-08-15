@@ -1,13 +1,52 @@
 #!/usr/bin/env python3
-"""M5-A: Windows evidence harness for P01, P02, P09, P10 (RFC-078).
+"""M5-A/M5-B: Windows evidence harness for P01, P02, P04, P05, P06, P08,
+P09, P10, P12 (RFC-078).
 
-Windows counterpart to `linux_harness.py`. Same four cases, same
-falsifiability contract (`--break`), same CLI shape - but driven through
-Windows UI Automation (UIA) via `pywinauto` instead of AT-SPI, because
-there is no AT-SPI on Windows and no Xvfb/X11 story either: `windows-latest`
-GitHub Actions runners provide a real interactive desktop session, so (per
-the M5-A handoff) launches here should just work without any virtual
-display machinery.
+Windows counterpart to `linux_harness.py`. Same falsifiability contract
+(`--break`), same CLI shape - but driven through Windows UI Automation
+(UIA) via `pywinauto` instead of AT-SPI, because there is no AT-SPI on
+Windows and no Xvfb/X11 story either: `windows-latest` GitHub Actions
+runners provide a real interactive desktop session, so (per the M5-A
+handoff) launches here should just work without any virtual display
+machinery.
+
+M5-B adds P04, P05, P06, P08, P12 - the interaction cases. See each
+function's docstring for its own reasoning; three module-wide notes that
+apply across several of them:
+
+- **P04's keyboard path is not exercised** (M5-B handoff §3): only the
+  mouse path (UIA Invoke on "Use this change") is demonstrated here. The
+  Enter-key shortcut is a raw `onkeydown` listener with no bound UI
+  element for any accessibility API to invoke, on any platform - see
+  `p04`'s docstring.
+- **P08/P12 use the CI runner's real (but disposable) `%APPDATA%\\forskscope`
+  directory directly, not an environment-variable override.**
+  `dirs_next::config_dir()` resolves via the Win32
+  `SHGetKnownFolderPath` API on Windows, which reads the registry/user
+  profile - not the `APPDATA` process environment variable - so setting
+  `APPDATA` on the launched subprocess would not actually redirect
+  anything (unlike POSIX platforms, where `dirs`/`dirs_next` does honor
+  the environment). On a `windows-latest` runner the whole VM is thrown
+  away after the run, so there is no real user's config to protect;
+  using the real profile directory and clearing it between launches
+  (`clear_config_dir`) gives the same practical isolation the M5-B
+  handoff's phrasing asks for, empirically resolving what that handoff
+  flagged as something to confirm rather than assume.
+- **Settings dialog controls have no `aria-label`** (`Theme`/`Language`
+  `<select>`s sit next to a plain sibling `<span>`, with no
+  `<label for>`/`aria-labelledby`), so this harness locates them
+  ordinally (first `ComboBox` = Theme, second = Language) rather than by
+  accessible name - a real, reported limitation, not an assumption papered
+  over.
+
+P06 also deviates from a literal reading of "two tabs": it uses two
+independent `forskscope.exe` processes rather than two tabs of one
+running instance, because opening a second comparison in-app depends on
+Explorer's file-tree row selection - the same `role="row"` UIA-control-type
+question `windows-11.md`'s P02 section already flagged as unresolved and
+explicitly deferred to settle before M5-C's P03. The M5-B handoff
+explicitly allows either approach ("whichever is achievable, document
+which you did"); see `p06`'s docstring.
 
 Why `pywinauto`, not a `.ps1` harness: the handoff's falsifiability
 requirement and the AT-SPI-derived Linux harness both depend on walking an
@@ -42,8 +81,13 @@ the reasoning.
 Usage:
   windows_harness.py p01 <binary>
   windows_harness.py p02 <binary>
+  windows_harness.py p04 <binary>
+  windows_harness.py p05 <binary>
+  windows_harness.py p06 <binary>
+  windows_harness.py p08 <binary>
   windows_harness.py p09 <binary>
   windows_harness.py p10 <binary>
+  windows_harness.py p12 <binary>
 
 Falsifiability (`--break`): each case accepts an optional `--break` flag
 that deliberately breaks the condition it checks, to demonstrate the
@@ -52,6 +96,9 @@ what it breaks. `--break` never touches product source; it only changes
 what the harness expects to see.
 """
 
+import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -190,6 +237,146 @@ def find_by_text_containing(win, substring):
     return None
 
 
+def find_exact(win, text, control_type=None):
+    """First descendant (or the window itself) whose own text equals
+    `text` exactly - stricter than `find_by_text_containing`, needed
+    wherever a substring match risks hitting more than one control (e.g.
+    a toolbar "Save" button and a modal's own "Save" button coexist in
+    the accessible tree at the same time, since Dioxus keeps the tab
+    behind a modal mounted). `control_type` narrows the UIA ControlType
+    string (e.g. "Button", "Edit", "ComboBox") when supplied, which both
+    disambiguates further and avoids walking irrelevant nodes."""
+    try:
+        candidates = (
+            win.descendants(control_type=control_type)
+            if control_type
+            else win.descendants()
+        )
+    except Exception:  # noqa: BLE001
+        candidates = []
+    for d in candidates:
+        try:
+            t = d.window_text()
+        except Exception:  # noqa: BLE001
+            continue
+        if t and t.strip() == text:
+            return d
+    return None
+
+
+def wait_for_exact(win, text, control_type=None, timeout_s=READY_TIMEOUT_S):
+    """Polls `find_exact` until it succeeds or `timeout_s` elapses -
+    re-searches the live tree every iteration rather than caching a
+    single lookup, since a UIA element reference can go stale across a
+    Dioxus re-render (the same reason `p09`'s Save-button retry loop in
+    M5-A re-finds the button fresh on every attempt)."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        found = find_exact(win, text, control_type=control_type)
+        if found is not None:
+            return found
+        time.sleep(POLL_INTERVAL_S)
+    return find_exact(win, text, control_type=control_type)
+
+
+def wait_button_enabled(win, text_substring, expected, timeout_s=READY_TIMEOUT_S):
+    """Polls `find_by_text_containing` + `is_enabled` until the button's
+    enabled state matches `expected` or `timeout_s` elapses. Re-finds the
+    element on every poll for the same stale-reference reason as
+    `wait_for_exact`. Used as the dirty-state signal for P04: the
+    toolbar's Save button is enabled exactly when `snap.is_dirty`
+    (`toolbar.rs`: `disabled: !snap.is_dirty`)."""
+    deadline = time.monotonic() + timeout_s
+    last = None
+    while time.monotonic() < deadline:
+        elem = find_by_text_containing(win, text_substring)
+        if elem is not None:
+            last = is_enabled(elem)
+            if last == expected:
+                return True
+        time.sleep(POLL_INTERVAL_S)
+    return last == expected
+
+
+def wait_for_first(win, control_type, timeout_s=READY_TIMEOUT_S):
+    """First descendant of the given UIA ControlType, polled until it
+    appears or `timeout_s` elapses."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        try:
+            found = win.descendants(control_type=control_type)
+        except Exception:  # noqa: BLE001
+            found = []
+        if found:
+            return found[0]
+        time.sleep(POLL_INTERVAL_S)
+    return None
+
+
+def wait_gone(win, text_substring, timeout_s=READY_TIMEOUT_S):
+    """Polls until no descendant's text contains `text_substring` -
+    used to confirm a modal has actually dismissed, not just that its
+    action was clicked."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if find_by_text_containing(win, text_substring) is None:
+            return True
+        time.sleep(POLL_INTERVAL_S)
+    return find_by_text_containing(win, text_substring) is None
+
+
+def modal_action_button(win, label):
+    """Finds the action button labelled `label` inside the currently-open
+    modal, disambiguated from an identically-labelled toolbar control
+    (both the toolbar and `SaveAsModal` have a "Save" button, both the
+    toolbar and `OverwriteModal`/`SaveAsModal` share no "Cancel", but the
+    principle generalises) by anchoring on the modal's own "Cancel"
+    button - which no toolbar control carries - and searching only
+    within its sibling container (`div.actions`) rather than the whole
+    tree. Falls back to a plain exact-text search if no "Cancel" button
+    is present (e.g. the P08 recovery dialogs, whose action labels are
+    already globally unique)."""
+    cancel = find_exact(win, "Cancel", control_type="Button")
+    if cancel is not None:
+        try:
+            container = cancel.parent()
+            for child in container.children(control_type="Button"):
+                if child.window_text().strip() == label:
+                    return child
+        except Exception:  # noqa: BLE001
+            pass
+    return find_exact(win, label, control_type="Button")
+
+
+# ── M5-B: config-directory isolation for P08/P12 ────────────────────────────
+
+
+def resolve_config_dir():
+    """`forskscope`'s config directory, exactly as
+    `crate::state::config_file_path` derives it (`dirs_next::config_dir()
+    .join("forskscope")`) - here computed as `%APPDATA%\\forskscope`
+    directly, since `%APPDATA%` and what `SHGetKnownFolderPath` returns
+    are the same value for the current user under normal circumstances
+    (see the module docstring for why an env-var override wouldn't
+    actually redirect this)."""
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        raise RuntimeError(
+            "APPDATA is not set in this environment - cannot resolve "
+            "forskscope's config directory"
+        )
+    return Path(appdata) / "forskscope"
+
+
+def clear_config_dir(config_dir):
+    """Removes and recreates `config_dir` - sequential isolation between
+    P08/P12's several launches against the one real config directory
+    available on this runner (see the module docstring)."""
+    if config_dir.exists():
+        shutil.rmtree(config_dir)
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+
 def wait_for_tokens(win, tokens, timeout_s=READY_TIMEOUT_S):
     """Poll until every string in `tokens` appears somewhere in the
     accessible tree's text. Returns (True, texts, []) on success or
@@ -210,8 +397,11 @@ def wait_for_tokens(win, tokens, timeout_s=READY_TIMEOUT_S):
     return False, texts, missing
 
 
-def launch(binary, args, cwd):
-    return subprocess.Popen([str(binary), *[str(a) for a in args]], cwd=str(cwd))
+def launch(binary, args, cwd, env=None):
+    run_env = dict(os.environ) if env is None else env
+    return subprocess.Popen(
+        [str(binary), *[str(a) for a in args]], cwd=str(cwd), env=run_env
+    )
 
 
 def terminate(proc):
@@ -506,7 +696,1151 @@ def p10(binary, break_mode=False):
     return 0
 
 
-CASES = {"p01": p01, "p02": p02, "p09": p09, "p10": p10}
+# ── P04 — Merge, undo/redo, safe save (M5-B) ────────────────────────────────
+
+
+def p04(binary, break_mode=False):
+    """Two-argument compare mode (not mergetool): applies the first
+    changed hunk via the "Use this change" button (UIA Invoke), watches
+    the toolbar's Save button flip disabled -> enabled as the dirty-state
+    signal (`toolbar.rs`: `disabled: !snap.is_dirty`), undoes via the
+    toolbar's Undo button and confirms the apply reverted (Save goes back
+    to disabled and "Use this change" reappears), opens the "More"
+    disclosure panel and redoes via the Redo button, confirming the
+    change is reapplied (Save re-enabled), then saves and checks: the
+    saved file's exact resulting lines against what applying only the
+    fixture's first (Replace) hunk predicts, a `.bak` sibling equal to
+    the pre-save (original right fixture) content, and no leftover
+    temp/sidecar file in the scratch working directory.
+
+    KEYBOARD PATH NOT EXERCISED. RFC-078 P04 asks for "keyboard and
+    mouse". `app.rs`'s Enter-key shortcut
+    (`Key::Enter => apply_focused_hunk(...)`) is a raw `onkeydown`
+    listener with no bound UI element - there is nothing for UIA (or any
+    accessibility API, on any platform) to invoke for it, unlike a
+    button's Invoke pattern. Per the M5-B handoff §3, this harness
+    demonstrates only the mouse path (UIA Invoke on "Use this change",
+    the same equivalent-path argument M5-A already used for Save); the
+    keyboard path is recorded in the evidence doc as not executed /
+    manual-outstanding, the same shape as F45's Windows sub-case - not
+    silently skipped, not claimed as covered.
+
+    `--break`: requires the saved file's content to equal a string no
+    real Save output can ever produce, proving the final check reads
+    real content rather than only "did the file change at all".
+    """
+    left_src = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right_src = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    original_right = right_src.read_text()
+
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+        left = scratch_path / "left.txt"
+        right = scratch_path / "right.txt"
+        left.write_text(left_src.read_text())
+        right.write_text(original_right)
+
+        proc = launch(binary, [left, right], scratch)
+        try:
+            app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            ok, texts, missing = wait_for_tokens(win, FIXTURE_TOKENS, timeout_s=READY_TIMEOUT_S)
+            if not ok:
+                print(
+                    f"FAIL: compare view never rendered these expected tokens within "
+                    f"{READY_TIMEOUT_S}s: {missing}",
+                    file=sys.stderr,
+                )
+                debug_dump(texts)
+                return 1
+
+            if not wait_button_enabled(win, "Save merge result", False, timeout_s=LAUNCH_TIMEOUT_S):
+                print("FAIL: Save is enabled before any hunk was applied - dirty state is wrong from the start", file=sys.stderr)
+                return 1
+
+            apply_button = find_by_text_containing(win, "Use this change")
+            if apply_button is None:
+                print('FAIL: could not find a "Use this change" hunk-apply button', file=sys.stderr)
+                debug_dump(collect_texts(win))
+                return 1
+            invoke(apply_button)
+
+            if not wait_button_enabled(win, "Save merge result", True, timeout_s=LAUNCH_TIMEOUT_S):
+                print("FAIL: Save button never became enabled after applying a hunk (dirty-state indicator did not appear)", file=sys.stderr)
+                return 1
+
+            undo_button = find_by_text_containing(win, "Undo last merge action")
+            if undo_button is None or not is_enabled(undo_button):
+                print("FAIL: could not find an enabled Undo button after applying a hunk", file=sys.stderr)
+                return 1
+            invoke(undo_button)
+
+            if not wait_button_enabled(win, "Save merge result", False, timeout_s=LAUNCH_TIMEOUT_S):
+                print("FAIL: Save button did not return to disabled after Undo - the apply was not reverted", file=sys.stderr)
+                return 1
+            if find_by_text_containing(win, "Use this change") is None:
+                print('FAIL: "Use this change" button did not reappear after Undo - the hunk does not look reverted', file=sys.stderr)
+                return 1
+
+            more_button = find_by_text_containing(win, "More")
+            if more_button is None:
+                print('FAIL: could not find the toolbar "More" disclosure button', file=sys.stderr)
+                return 1
+            invoke(more_button)
+
+            redo_button = wait_for_exact(win, "Redo", control_type="Button", timeout_s=LAUNCH_TIMEOUT_S)
+            if redo_button is None or not is_enabled(redo_button):
+                print("FAIL: could not find an enabled Redo button in the advanced panel", file=sys.stderr)
+                return 1
+            invoke(redo_button)
+
+            if not wait_button_enabled(win, "Save merge result", True, timeout_s=LAUNCH_TIMEOUT_S):
+                print("FAIL: Save button did not return to enabled after Redo - the change was not reapplied", file=sys.stderr)
+                return 1
+
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            clicked_save = False
+            while time.monotonic() < deadline and not clicked_save:
+                save_button = find_by_text_containing(win, "Save merge result")
+                if save_button is not None and is_enabled(save_button):
+                    try:
+                        invoke(save_button)
+                        clicked_save = True
+                    except Exception:  # noqa: BLE001 - transient COM/UIA error, retry
+                        pass
+                if not clicked_save:
+                    time.sleep(POLL_INTERVAL_S)
+            if not clicked_save:
+                print('FAIL: could not click "Save merge result" within the timeout', file=sys.stderr)
+                return 1
+
+            # Applying only the fixture's first (Replace) hunk left-to-right
+            # replaces right's "new-line" with left's "old-line"; every
+            # other line is unchanged (see the fixture pair and the module
+            # docstring's FIXTURE_TOKENS list).
+            expected_lines = (
+                ["this exact content can never appear in real merge output"]
+                if break_mode
+                else ["alpha", "old-line", "gamma", "epsilon", "zeta", "insert-line"]
+            )
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            actual_lines = right.read_text().splitlines()
+            while time.monotonic() < deadline and actual_lines != expected_lines:
+                time.sleep(POLL_INTERVAL_S)
+                actual_lines = right.read_text().splitlines()
+            if actual_lines != expected_lines:
+                print(f"FAIL: {right}'s content {actual_lines!r} != expected {expected_lines!r}", file=sys.stderr)
+                return 1
+
+            bak = right.with_name(right.name + ".bak")
+            if not bak.exists():
+                print(f"FAIL: no backup sibling {bak} was created", file=sys.stderr)
+                return 1
+            if bak.read_text() != original_right:
+                print(f"FAIL: {bak}'s content does not equal the pre-save (original right fixture) content", file=sys.stderr)
+                return 1
+
+            leftover = [
+                p.name
+                for p in scratch_path.iterdir()
+                if p.name not in {"left.txt", "right.txt", bak.name}
+            ]
+            if leftover:
+                print(f"FAIL: leftover temp/sidecar files remain in the working directory: {leftover}", file=sys.stderr)
+                return 1
+        except RuntimeError as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: applied a hunk via mouse/Invoke, watched Save track dirty state through "
+        "undo and redo, saved, and verified the saved content, .bak, and clean working "
+        "directory. Keyboard path (Enter) NOT exercised - see this function's docstring."
+    )
+    return 0
+
+
+# ── P05 — External modification (M5-B) ──────────────────────────────────────
+
+
+def p05(binary, break_mode=False):
+    """Three fresh launches against scratch copies of the P02/P04 fixture
+    pair, each applying the first hunk (so the ordinary toolbar Save
+    button - gated on `is_dirty` - is actually clickable) and then
+    modifying the right file's bytes externally before attempting a
+    write, exercising one of the three outcomes:
+
+    1. Cancel: Save is blocked by `OverwriteModal` ("File changed on
+       disk"); the on-disk file still holds the externally-written bytes
+       both before and after clicking Cancel.
+    2. Overwrite: confirms the write; the resulting `.bak` sibling's
+       bytes equal the *externally-modified* content that was just
+       overwritten (not the original pre-modification content -
+       `save_text` backs up the target's current on-disk bytes
+       immediately before replacing them).
+    3. Save As, to a different path: the original target is left with
+       its externally-modified bytes untouched; the new path holds the
+       app's content.
+
+    `--break` (time-boxed to sub-case 2, the one with the meaningful byte
+    comparison): requires the `.bak` sibling's bytes to equal a string
+    this harness never externally writes, proving the comparison reads
+    real bytes rather than only checking existence.
+    """
+    left_src = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right_src = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    left_text = left_src.read_text()
+    original_right = right_src.read_text()
+    external_content = "EXTERNALLY-MODIFIED-CONTENT\nsecond line\n"
+    expected_saved_lines = ["alpha", "old-line", "gamma", "epsilon", "zeta", "insert-line"]
+
+    def fresh_pair(scratch_path):
+        left = scratch_path / "left.txt"
+        right = scratch_path / "right.txt"
+        left.write_text(left_text)
+        right.write_text(original_right)
+        return left, right
+
+    def open_and_dirty(scratch, left, right):
+        """Launches, waits for the diff to render, applies the first
+        hunk, and waits for the dirty-state Save-enabled signal - the
+        common setup all three sub-cases share before their own external
+        modification and action."""
+        proc = launch(binary, [left, right], scratch)
+        app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+        ok, texts, missing = wait_for_tokens(win, FIXTURE_TOKENS, timeout_s=READY_TIMEOUT_S)
+        if not ok:
+            raise AssertionError(f"compare view never rendered expected tokens: {missing}")
+        apply_button = find_by_text_containing(win, "Use this change")
+        if apply_button is None:
+            raise AssertionError('could not find a "Use this change" hunk-apply button')
+        invoke(apply_button)
+        if not wait_button_enabled(win, "Save merge result", True, timeout_s=LAUNCH_TIMEOUT_S):
+            raise AssertionError("Save button never became enabled after applying a hunk")
+        return proc, win
+
+    # ── Sub-case 1: Cancel ───────────────────────────────────────────────
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+        left, right = fresh_pair(scratch_path)
+        proc = None
+        try:
+            proc, win = open_and_dirty(scratch, left, right)
+            right.write_text(external_content)
+
+            save_button = find_by_text_containing(win, "Save merge result")
+            invoke(save_button)
+            if not wait_for_tokens(win, ["File changed on disk"], timeout_s=READY_TIMEOUT_S)[0]:
+                print('FAIL(P05-cancel): the "File changed on disk" conflict modal never appeared', file=sys.stderr)
+                return 1
+            if right.read_text() != external_content:
+                print("FAIL(P05-cancel): the target was overwritten despite the conflict - Save should have been blocked", file=sys.stderr)
+                return 1
+
+            cancel_button = modal_action_button(win, "Cancel")
+            if cancel_button is None:
+                print('FAIL(P05-cancel): could not find the modal\'s "Cancel" button', file=sys.stderr)
+                return 1
+            invoke(cancel_button)
+            if not wait_gone(win, "File changed on disk", timeout_s=LAUNCH_TIMEOUT_S):
+                print("FAIL(P05-cancel): the conflict dialog never dismissed after Cancel", file=sys.stderr)
+                return 1
+            if right.read_text() != external_content:
+                print("FAIL(P05-cancel): the target's bytes changed after Cancel - it must stay exactly as externally modified", file=sys.stderr)
+                return 1
+        except (RuntimeError, AssertionError) as exc:
+            print(f"FAIL(P05-cancel): {exc}", file=sys.stderr)
+            return 1
+        finally:
+            if proc is not None:
+                terminate(proc)
+
+    # ── Sub-case 2: Overwrite ────────────────────────────────────────────
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+        left, right = fresh_pair(scratch_path)
+        proc = None
+        try:
+            proc, win = open_and_dirty(scratch, left, right)
+            right.write_text(external_content)
+
+            save_button = find_by_text_containing(win, "Save merge result")
+            invoke(save_button)
+            if not wait_for_tokens(win, ["File changed on disk"], timeout_s=READY_TIMEOUT_S)[0]:
+                print('FAIL(P05-overwrite): the "File changed on disk" conflict modal never appeared', file=sys.stderr)
+                return 1
+
+            overwrite_button = modal_action_button(win, "Overwrite")
+            if overwrite_button is None:
+                print('FAIL(P05-overwrite): could not find the modal\'s "Overwrite" button', file=sys.stderr)
+                return 1
+            invoke(overwrite_button)
+            if not wait_gone(win, "File changed on disk", timeout_s=LAUNCH_TIMEOUT_S):
+                print("FAIL(P05-overwrite): the conflict dialog never dismissed after Overwrite", file=sys.stderr)
+                return 1
+
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            actual_lines = right.read_text().splitlines()
+            while time.monotonic() < deadline and actual_lines != expected_saved_lines:
+                time.sleep(POLL_INTERVAL_S)
+                actual_lines = right.read_text().splitlines()
+            if actual_lines != expected_saved_lines:
+                print(f"FAIL(P05-overwrite): {right}'s content {actual_lines!r} != expected {expected_saved_lines!r}", file=sys.stderr)
+                return 1
+
+            bak = right.with_name(right.name + ".bak")
+            expected_bak = (
+                "IMPOSSIBLE - this harness never externally writes this content"
+                if break_mode
+                else external_content
+            )
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            actual_bak = bak.read_text() if bak.exists() else None
+            while time.monotonic() < deadline and actual_bak != expected_bak:
+                time.sleep(POLL_INTERVAL_S)
+                actual_bak = bak.read_text() if bak.exists() else None
+            if actual_bak != expected_bak:
+                print(f"FAIL(P05-overwrite): {bak}'s content {actual_bak!r} != expected {expected_bak!r} (must equal the externally-modified bytes it replaced)", file=sys.stderr)
+                return 1
+        except (RuntimeError, AssertionError) as exc:
+            print(f"FAIL(P05-overwrite): {exc}", file=sys.stderr)
+            return 1
+        finally:
+            if proc is not None:
+                terminate(proc)
+
+    if break_mode:
+        print("OK(break): the .bak content check correctly rejected an impossible required value.")
+        return 0
+
+    # ── Sub-case 3: Save As, to a different path ────────────────────────
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+        left, right = fresh_pair(scratch_path)
+        new_path = scratch_path / "saved_as.txt"
+        proc = None
+        try:
+            proc, win = open_and_dirty(scratch, left, right)
+            right.write_text(external_content)
+
+            save_as_button = find_by_text_containing(win, "Save As")
+            if save_as_button is None:
+                print('FAIL(P05-saveas): could not find the "Save As" toolbar button', file=sys.stderr)
+                return 1
+            invoke(save_as_button)
+
+            edit = wait_for_first(win, "Edit", timeout_s=LAUNCH_TIMEOUT_S)
+            if edit is None:
+                print("FAIL(P05-saveas): could not find the Save As path input", file=sys.stderr)
+                return 1
+            edit.set_edit_text(str(new_path))
+
+            save_click_button = modal_action_button(win, "Save")
+            if save_click_button is None:
+                print('FAIL(P05-saveas): could not find the Save As dialog\'s own "Save" button', file=sys.stderr)
+                return 1
+            invoke(save_click_button)
+
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline and not new_path.exists():
+                time.sleep(POLL_INTERVAL_S)
+            if not new_path.exists():
+                print(f"FAIL(P05-saveas): {new_path} was never written", file=sys.stderr)
+                return 1
+
+            if right.read_text() != external_content:
+                print("FAIL(P05-saveas): the original target's bytes changed - Save As must never touch it", file=sys.stderr)
+                return 1
+
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            actual_lines = new_path.read_text().splitlines()
+            while time.monotonic() < deadline and actual_lines != expected_saved_lines:
+                time.sleep(POLL_INTERVAL_S)
+                actual_lines = new_path.read_text().splitlines()
+            if actual_lines != expected_saved_lines:
+                print(f"FAIL(P05-saveas): {new_path}'s content {actual_lines!r} != expected {expected_saved_lines!r}", file=sys.stderr)
+                return 1
+        except (RuntimeError, AssertionError) as exc:
+            print(f"FAIL(P05-saveas): {exc}", file=sys.stderr)
+            return 1
+        finally:
+            if proc is not None:
+                terminate(proc)
+
+    print(
+        "OK: Cancel blocked the write and preserved the externally-modified bytes; "
+        "Overwrite wrote the app's content and backed up the externally-modified bytes "
+        "it replaced; Save As wrote to a new path and left the original target untouched."
+    )
+    return 0
+
+
+# ── P06 — Async identity (M5-B) ──────────────────────────────────────────────
+
+
+def _pair_content(tag, token, num_lines=300_000):
+    """Synthetic large left/right text, distinguished by `token` in the
+    right file's first line plus scattered per-`tag` differences every
+    300 lines - large enough for `compute_diff` to take a real,
+    observable amount of wall-clock time (RFC-078: "a light but real
+    exercise", not an internal timing hook), not so large that a CI run
+    times out. See `p06`'s docstring for how this size was chosen."""
+    left_lines = [f"line-{tag}-{i:06d}" for i in range(num_lines)]
+    right_lines = list(left_lines)
+    for i in range(0, num_lines, 300):
+        right_lines[i] = f"line-{tag}-{i:06d}-CHANGED-{token}"
+    right_lines.insert(0, f"TOKEN-{token}")
+    return "\n".join(left_lines) + "\n", "\n".join(right_lines) + "\n"
+
+
+def _write_large_pair(scratch_path, tag, token):
+    left_text, right_text = _pair_content(tag, token)
+    left = scratch_path / f"{tag}-left.txt"
+    right = scratch_path / f"{tag}-right.txt"
+    left.write_text(left_text)
+    right.write_text(right_text)
+    return left, right
+
+
+def _rewrite_pair(left, right, tag, token):
+    left_text, right_text = _pair_content(tag, token)
+    left.write_text(left_text)
+    right.write_text(right_text)
+
+
+def p06(binary, break_mode=False):
+    """Two large, deliberately slow comparisons at once, plus a rapid
+    double-reload - RFC-078: "Deterministic automated tests remain the
+    primary proof; this case confirms runtime integration", so this is a
+    light but real exercise, not elaborate timing machinery: two
+    ~300,000-line synthetic file pairs with scattered differences give
+    `compute_diff` a real observable duration, no internal API/env-var
+    hook involved.
+
+    Two tabs, as two independent `forskscope.exe` processes rather than
+    two tabs of one running instance: opening a second comparison in-app
+    while the first is still loading would go through Explorer's
+    file-tree row selection, which depends on the exact UIA control type
+    WebView2 maps a bare `role="row"` div to - the same open question
+    `windows-11.md`'s P02 section already flags as unresolved and
+    explicitly defers to settle before M5-C's P03, not discover here.
+    The M5-B handoff explicitly allows either approach ("whichever is
+    achievable, document which you did"); this harness uses two
+    processes. "tab index 0" / the remaining tab(s) below read as "the
+    first-launched process" / "the second-launched process".
+
+    Falsifiability: each fixture pair's right file carries a token unique
+    to it (`TOKEN-AAAA` / `TOKEN-BBBB`), so a check that only confirmed
+    "some window with some content exists" would pass even if process
+    B's window were showing process A's content, blank output, or a
+    crash. The check below requires B's own token to be present in B's
+    accessible text *and* requires A's token to be absent from it - a
+    check that only ever verified two windows existed would not catch a
+    identity leak between them; this one does. The reload half is
+    analogous: it requires the *first* reload's token to be replaced by
+    the *second* reload's, not merely that a reload happened at all.
+
+    `--break`: requires process B's window to show process A's token
+    instead of its own, and (independently) requires the reload check to
+    find the *first* reload's token still present - both impossible
+    under correct behavior, proving neither check is vacuous. The
+    reload half is skipped in normal mode's `--break` run for CI time;
+    see the code below.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+        left_a, right_a = _write_large_pair(scratch_path, "a", "AAAA")
+        left_b, right_b = _write_large_pair(scratch_path, "b", "BBBB")
+
+        proc_a = launch(binary, [left_a, right_a], scratch)
+        proc_b = launch(binary, [left_b, right_b], scratch)
+        try:
+            # Give A a real moment to start loading before tearing it
+            # down - the point under test is "closed while loading", not
+            # "never given a chance to start".
+            time.sleep(0.5)
+            terminate(proc_a)
+
+            app_b, win_b = connect(proc_b.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            needed_token = "TOKEN-AAAA" if break_mode else "TOKEN-BBBB"
+            ok, texts, missing = wait_for_tokens(win_b, [needed_token], timeout_s=READY_TIMEOUT_S)
+            if not ok:
+                print(f"FAIL: process B never rendered {needed_token!r}: missing {missing}", file=sys.stderr)
+                debug_dump(texts)
+                return 1
+            blob = "\n".join(texts)
+            if not break_mode and "TOKEN-AAAA" in blob:
+                print("FAIL: process B's window shows process A's token - cross-tab identity leak", file=sys.stderr)
+                return 1
+        except RuntimeError as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc_a)
+            terminate(proc_b)
+
+        if break_mode:
+            print("OK(break): process-identity check correctly rejected the impossible required token.")
+            return 0
+
+        # ── Rapid double reload: the second (latest) reload wins ───────────
+        left_r, right_r = _write_large_pair(scratch_path, "reload", "V1")
+        proc = launch(binary, [left_r, right_r], scratch)
+        try:
+            app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            ok, texts, missing = wait_for_tokens(win, ["TOKEN-V1"], timeout_s=READY_TIMEOUT_S)
+            if not ok:
+                print(f"FAIL(reload): initial load never rendered TOKEN-V1: {missing}", file=sys.stderr)
+                return 1
+
+            reload_button = find_by_text_containing(win, "Reload files from disk")
+            if reload_button is None:
+                print('FAIL(reload): could not find the "Reload files from disk" toolbar button', file=sys.stderr)
+                return 1
+
+            _rewrite_pair(left_r, right_r, "reload", "V2")
+            invoke(reload_button)
+            _rewrite_pair(left_r, right_r, "reload", "V3")
+            reload_button = find_by_text_containing(win, "Reload files from disk")
+            invoke(reload_button)
+
+            ok, texts, missing = wait_for_tokens(win, ["TOKEN-V3"], timeout_s=READY_TIMEOUT_S)
+            if not ok:
+                print(f"FAIL(reload): final state never settled to TOKEN-V3: {missing}", file=sys.stderr)
+                debug_dump(texts)
+                return 1
+            blob = "\n".join(texts)
+            if "TOKEN-V2" in blob:
+                print("FAIL(reload): the first reload's (stale) content is still displayed - the second reload did not win", file=sys.stderr)
+                return 1
+        except RuntimeError as exc:
+            print(f"FAIL(reload): {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: process B kept its own identity after A closed mid-load; the second of two "
+        "rapid reloads is what's ultimately displayed."
+    )
+    return 0
+
+
+# ── P08 — Persistence migration and recovery (M5-B) ─────────────────────────
+
+FUTURE_SESSION_JSON = json.dumps(
+    {
+        "schema_name": "session",
+        "schema_version": 99,
+        "app_version": "0.165.1",
+        "created_unix": 0,
+        "updated_unix": 0,
+        "payload": {},
+    }
+)
+CORRUPT_SESSION_JSON = "{not valid json"
+
+
+def _p08_legacy_migration_subcase(binary, config_dir):
+    """Filesystem-only, no dialog interaction needed: legacy v0
+    settings.json/session.json (the exact fixtures the project's own
+    Rust tests use - `crates/forskscope-core/src/tests/fixtures/persistence/`)
+    migrate to a versioned v2 envelope without losing their values, and a
+    `.pre-v2.bak` sibling preserves the original bytes. A legacy migration
+    commits synchronously during `resolve_and_commit` at startup
+    (confirmed by reading `persist_v2_runtime_tests.rs`), independent of
+    how or when the process later exits, so this only needs a launch and
+    a short poll of the files on disk - no dialog to click through.
+    """
+    settings_v0 = (
+        REPO_ROOT / "crates/forskscope-core/src/tests/fixtures/persistence/settings-v0.json"
+    ).read_text()
+    session_v0 = (
+        REPO_ROOT / "crates/forskscope-core/src/tests/fixtures/persistence/session-v0.json"
+    ).read_text()
+    clear_config_dir(config_dir)
+    (config_dir / "settings.json").write_text(settings_v0)
+    (config_dir / "session.json").write_text(session_v0)
+
+    with tempfile.TemporaryDirectory() as cwd:
+        proc = launch(binary, [], cwd)
+        settings_migrated = session_migrated = False
+        try:
+            connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline and not (settings_migrated and session_migrated):
+                try:
+                    s = json.loads((config_dir / "settings.json").read_text())
+                    settings_migrated = s.get("schema_version") == 2
+                except Exception:  # noqa: BLE001
+                    pass
+                try:
+                    j = json.loads((config_dir / "session.json").read_text())
+                    session_migrated = j.get("schema_version") == 2
+                except Exception:  # noqa: BLE001
+                    pass
+                if not (settings_migrated and session_migrated):
+                    time.sleep(POLL_INTERVAL_S)
+        except RuntimeError as exc:
+            print(f"FAIL(P08-legacy): {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
+
+    if not settings_migrated:
+        print("FAIL(P08-legacy): settings.json was never migrated to a v2 envelope", file=sys.stderr)
+        return 1
+    if not session_migrated:
+        print("FAIL(P08-legacy): session.json was never migrated to a v2 envelope", file=sys.stderr)
+        return 1
+
+    settings_bak = config_dir / "settings.json.pre-v2.bak"
+    session_bak = config_dir / "session.json.pre-v2.bak"
+    if not settings_bak.exists() or settings_bak.read_text() != settings_v0:
+        print(f"FAIL(P08-legacy): {settings_bak} missing or does not match the original v0 bytes", file=sys.stderr)
+        return 1
+    if not session_bak.exists() or session_bak.read_text() != session_v0:
+        print(f"FAIL(P08-legacy): {session_bak} missing or does not match the original v0 bytes", file=sys.stderr)
+        return 1
+
+    # Semantic preservation - concrete field values, not just "some v2
+    # envelope exists" (checked against the fixture's actual values, per
+    # settings-v0.json/session-v0.json/legacy.rs's field names).
+    settings_payload = json.loads((config_dir / "settings.json").read_text()).get("payload", {})
+    expected_settings = {
+        "theme": "light",
+        "language": "ja",
+        "diff_font_size": 16,
+        "diff_font_family": "consolas",
+        "context_lines": 5,
+        "active_profile": 4,
+        "ignore_extensions": "o, class, tmp",
+        "ignore_dirs": "target, node_modules",
+        "explorer_compact": True,
+        "enable_binary_comparison": True,
+        "remember_explorer_dirs": False,
+    }
+    for key, expected in expected_settings.items():
+        actual = settings_payload.get(key)
+        if actual != expected:
+            print(
+                f"FAIL(P08-legacy): migrated settings field {key!r} = {actual!r}, "
+                f"expected {expected!r} (v0 fixture value lost/changed)",
+                file=sys.stderr,
+            )
+            return 1
+    if len(settings_payload.get("profiles", [])) != 5:
+        print(f"FAIL(P08-legacy): migrated settings lost profiles: {settings_payload.get('profiles')!r}", file=sys.stderr)
+        return 1
+
+    session_payload = json.loads((config_dir / "session.json").read_text()).get("payload", {})
+    expected_tabs = [
+        {"left": "/tmp/fixtures/left-a.txt", "right": "/tmp/fixtures/right-a.txt"},
+        {"left": "/tmp/fixtures/left-b.txt", "right": "/tmp/fixtures/right-b.txt"},
+    ]
+    actual_tabs = session_payload.get("tabs")
+    if actual_tabs != expected_tabs:
+        print(f"FAIL(P08-legacy): migrated session tabs = {actual_tabs!r}, expected {expected_tabs!r}", file=sys.stderr)
+        return 1
+
+    print(
+        f"OK: legacy v0 settings/session migrated to versioned v2 envelopes without loss; "
+        f"backups at {settings_bak} and {session_bak} match the originals."
+    )
+    return 0
+
+
+def _p08_exit_subcase(binary, config_dir, break_mode):
+    """Future-schema session.json -> Exit -> the process must actually be
+    gone, not just the window/dialog. Per the M5-B handoff §4/§6, this is
+    the single most important check in P08: "Assert the process state,
+    not just the dialog's disappearance. An Exit that dismisses the
+    dialog and leaves a zombie is a failure that looks like a pass."
+    Process liveness is checked with `psutil.pid_exists`, not `proc.poll()`
+    alone, because polling a `subprocess.Popen` you spawned only reflects
+    *your own process's* wait() bookkeeping - `psutil` queries the OS
+    directly, the same thing an external operator checking for a zombie
+    would do.
+    """
+    import psutil  # noqa: PLC0415 - Windows-only, lazily imported like pywinauto
+
+    clear_config_dir(config_dir)
+    (config_dir / "session.json").write_text(FUTURE_SESSION_JSON)
+
+    with tempfile.TemporaryDirectory() as cwd:
+        proc = launch(binary, [], cwd)
+        gone = False
+        try:
+            app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            exit_button = wait_for_exact(win, "Exit", control_type="Button", timeout_s=READY_TIMEOUT_S)
+            if exit_button is None:
+                print('FAIL(P08-exit): could not find the "Exit" recovery-dialog button', file=sys.stderr)
+                debug_dump(collect_texts(win))
+                return 1
+            invoke(exit_button)
+
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                if not psutil.pid_exists(proc.pid):
+                    gone = True
+                    break
+                time.sleep(POLL_INTERVAL_S)
+
+            if break_mode:
+                # Deliberately require the impossible: that the process is
+                # STILL running after Exit. Real Exit behavior never
+                # leaves this true, so this run is expected to (and must)
+                # fail - proving the liveness check would actually catch
+                # a zombie, not just rubber-stamp "the dialog is gone".
+                if gone:
+                    print(
+                        "FAIL(P08-exit --break): the process exited as expected, but --break "
+                        "requires it to still be running - this IS the falsifiability "
+                        "demonstration succeeding: the real check below is not vacuous.",
+                        file=sys.stderr,
+                    )
+                    return 1
+                print("OK(break): unexpectedly still running - see message above.")
+                return 0
+
+            if not gone:
+                print(
+                    f"FAIL(P08-exit): pid {proc.pid} is STILL RUNNING {LAUNCH_TIMEOUT_S}s after "
+                    f"clicking Exit (psutil.pid_exists == True) - the dialog may have closed but "
+                    f"the process did not",
+                    file=sys.stderr,
+                )
+                return 1
+        except RuntimeError as exc:
+            print(f"FAIL(P08-exit): {exc}", file=sys.stderr)
+            return 1
+        finally:
+            if not gone:
+                try:
+                    if psutil.pid_exists(proc.pid):
+                        proc.kill()
+                except Exception:  # noqa: BLE001
+                    pass
+
+    print(f"OK: Exit terminated pid {proc.pid} - confirmed gone via psutil.pid_exists() within {LAUNCH_TIMEOUT_S}s.")
+    return 0
+
+
+def _p08_continue_subcase(binary, config_dir):
+    """Future-schema session.json -> "Continue with defaults" -> the app
+    keeps running (dialog dismissed, process still alive) and
+    session.json's bytes are unchanged on disk (write-disabled, per
+    `SessionRuntimeResolution::write_disabled`)."""
+    clear_config_dir(config_dir)
+    session_path = config_dir / "session.json"
+    original_bytes = FUTURE_SESSION_JSON.encode("utf-8")
+    session_path.write_bytes(original_bytes)
+
+    with tempfile.TemporaryDirectory() as cwd:
+        proc = launch(binary, [], cwd)
+        try:
+            app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            button = wait_for_exact(win, "Continue with defaults", control_type="Button", timeout_s=READY_TIMEOUT_S)
+            if button is None:
+                print('FAIL(P08-continue): could not find the "Continue with defaults" button', file=sys.stderr)
+                debug_dump(collect_texts(win))
+                return 1
+            invoke(button)
+
+            if not wait_gone(win, "Session file is from a newer version", timeout_s=LAUNCH_TIMEOUT_S):
+                print("FAIL(P08-continue): the recovery dialog never dismissed", file=sys.stderr)
+                return 1
+            if proc.poll() is not None:
+                print(f'FAIL(P08-continue): the process exited ({proc.returncode}) after "Continue with defaults" - it should keep running', file=sys.stderr)
+                return 1
+
+            time.sleep(1.0)  # give any (incorrect) write a moment to land
+            current_bytes = session_path.read_bytes()
+            if current_bytes != original_bytes:
+                print(
+                    f"FAIL(P08-continue): session.json bytes changed after Continue with "
+                    f"defaults - write-disabled did not hold. Expected {original_bytes!r}, "
+                    f"got {current_bytes!r}",
+                    file=sys.stderr,
+                )
+                return 1
+        except RuntimeError as exc:
+            print(f"FAIL(P08-continue): {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
+
+    print("OK: Continue with defaults dismissed the dialog, the app kept running, and session.json's bytes were unchanged on disk.")
+    return 0
+
+
+def _p08_reset_subcase(binary, config_dir):
+    """Corrupt session.json -> "Reset and back up" -> the dialog
+    dismisses, session.json is reset to a fresh default v2 envelope, and
+    a `.reset.bak` sibling holds the original corrupt bytes
+    (`ensure_reset_backup` / `<name>.reset.bak` - confirmed by reading
+    `persist/schema/repository.rs`, not assumed)."""
+    clear_config_dir(config_dir)
+    session_path = config_dir / "session.json"
+    session_path.write_text(CORRUPT_SESSION_JSON)
+    bak_path = config_dir / "session.json.reset.bak"
+
+    with tempfile.TemporaryDirectory() as cwd:
+        proc = launch(binary, [], cwd)
+        try:
+            app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            button = wait_for_exact(win, "Reset and back up", control_type="Button", timeout_s=READY_TIMEOUT_S)
+            if button is None:
+                print('FAIL(P08-reset): could not find the "Reset and back up" button', file=sys.stderr)
+                debug_dump(collect_texts(win))
+                return 1
+            invoke(button)
+
+            if not wait_gone(win, "Session file could not be read", timeout_s=LAUNCH_TIMEOUT_S):
+                print("FAIL(P08-reset): the recovery dialog never dismissed", file=sys.stderr)
+                return 1
+
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            bak_bytes = bak_path.read_bytes() if bak_path.exists() else None
+            while time.monotonic() < deadline and bak_bytes is None:
+                time.sleep(POLL_INTERVAL_S)
+                bak_bytes = bak_path.read_bytes() if bak_path.exists() else None
+            expected_corrupt = CORRUPT_SESSION_JSON.encode("utf-8")
+            if bak_bytes != expected_corrupt:
+                print(f"FAIL(P08-reset): {bak_path}'s bytes {bak_bytes!r} != the original corrupt bytes {expected_corrupt!r}", file=sys.stderr)
+                return 1
+
+            new_bytes = session_path.read_bytes()
+            if new_bytes == expected_corrupt:
+                print("FAIL(P08-reset): session.json still holds the corrupt bytes after Reset", file=sys.stderr)
+                return 1
+            try:
+                envelope = json.loads(new_bytes)
+            except json.JSONDecodeError:
+                print(f"FAIL(P08-reset): session.json after Reset is not valid JSON: {new_bytes!r}", file=sys.stderr)
+                return 1
+            if envelope.get("schema_name") != "session" or envelope.get("schema_version") != 2:
+                print(f"FAIL(P08-reset): session.json after Reset is not a versioned v2 envelope: {envelope!r}", file=sys.stderr)
+                return 1
+        except RuntimeError as exc:
+            print(f"FAIL(P08-reset): {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
+
+    print(f"OK: Reset and back up dismissed the dialog, wrote a fresh v2 session.json, and backed up the original corrupt bytes to {bak_path}.")
+    return 0
+
+
+def p08(binary, break_mode=False):
+    """The highest-value case in M5-B (handoff §4): F37's amendment
+    requires all three recovery-dialog choices - Exit, Continue (either
+    variant), Reset - exercised, with the process's actual state
+    asserted, not just the dialog's disappearance. Runs four sub-checks
+    in sequence against the runner's real (but disposable) config
+    directory (see the module docstring): legacy v0 migration without
+    loss, Exit (process confirmed gone via `psutil`), Continue with
+    defaults (write stays disabled), and Reset and back up (file reset,
+    original backed up). Each launch clears and reseeds the config
+    directory first, so the four sub-checks never see each other's state.
+
+    `--break`: runs only the Exit sub-case (the specifically-flagged
+    vacuous-pass risk per handoff §6: "a check that passes whenever the
+    dialog closes, regardless of whether the process died"), inverted to
+    require the process to still be running - see
+    `_p08_exit_subcase`'s docstring.
+    """
+    config_dir = resolve_config_dir()
+    try:
+        if break_mode:
+            return _p08_exit_subcase(binary, config_dir, break_mode=True)
+
+        rc = _p08_legacy_migration_subcase(binary, config_dir)
+        if rc != 0:
+            return rc
+        rc = _p08_exit_subcase(binary, config_dir, break_mode=False)
+        if rc != 0:
+            return rc
+        rc = _p08_continue_subcase(binary, config_dir)
+        if rc != 0:
+            return rc
+        rc = _p08_reset_subcase(binary, config_dir)
+        if rc != 0:
+            return rc
+    finally:
+        try:
+            clear_config_dir(config_dir)
+        except Exception:  # noqa: BLE001
+            pass
+
+    print(
+        "OK: P08 all sub-cases passed - legacy migration without loss, Exit (process "
+        "confirmed gone), Continue with defaults (write-disabled held), Reset and back "
+        "up (file reset, original backed up)."
+    )
+    return 0
+
+
+# ── P12 — Session/settings restart (M5-B) ───────────────────────────────────
+
+
+def p12(binary, break_mode=False):
+    """Changes theme/language/font size via the Settings dialog, exits,
+    relaunches with no CLI arguments, and confirms restoration - then
+    confirms tab restore happens only on a no-args relaunch, not one with
+    explicit CLI paths.
+
+    Settings dialog controls are located ordinally (first `ComboBox` =
+    Theme, second = Language), not by accessible name: neither `<select>`
+    carries an `aria-label`/`<label for>` in `settings/modal.rs`, so
+    there is nothing for UIA to expose beyond the generic ComboBox role -
+    a real, reported harness limitation (see the module docstring), not
+    an assumption. The font-size number input is set via
+    `set_edit_text()` (UIA's ValuePattern.SetValue), the same
+    pattern-based-not-synthesized approach as every other interaction in
+    this harness.
+
+    Tab-restore-only-without-explicit-args is checked with a separate,
+    simpler pair of launches than a literal reading of the handoff's
+    step 4 might suggest (**deviation, reported**): exercising it via
+    Explorer's own file-selection UI in-app would mean driving
+    Explorer's file-tree rows, which is exactly the `role="row"`
+    UIA-control-type uncertainty `windows-11.md`'s P02 section already
+    flagged as unresolved and explicitly deferred to settle before
+    M5-C's P03 - attempting it blind here would be discovering that
+    question mid-case, which is what that note explicitly says not to
+    do. Session persistence does not care how a tab was opened
+    (`save_session` reacts to any change to `store.tabs`; `restore_tabs`
+    in `app.rs` is reached exactly when `into_compare_request()` is
+    `None`) - so seeding the session via a 2-arg CLI launch exercises the
+    exact same `restore_tabs`/`save_session` mechanism P12 cares about.
+
+    `--break`: requires the post-restart header button to show a label
+    that settings restoration can never produce, proving the restart
+    comparison reads real state.
+    """
+    config_dir = resolve_config_dir()
+    clear_config_dir(config_dir)
+
+    # ── Launch 1: change theme/language/font, then exit ─────────────────
+    with tempfile.TemporaryDirectory() as cwd:
+        proc = launch(binary, [], cwd)
+        try:
+            app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            settings_btn = wait_for_exact(win, "Settings", control_type="Button", timeout_s=READY_TIMEOUT_S)
+            if settings_btn is None:
+                print('FAIL: could not find the header "Settings" button', file=sys.stderr)
+                debug_dump(collect_texts(win))
+                return 1
+            invoke(settings_btn)
+
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            combos = []
+            while time.monotonic() < deadline and len(combos) < 2:
+                try:
+                    combos = win.descendants(control_type="ComboBox")
+                except Exception:  # noqa: BLE001
+                    combos = []
+                if len(combos) < 2:
+                    time.sleep(POLL_INTERVAL_S)
+            if len(combos) < 2:
+                print(f"FAIL: expected at least 2 ComboBox controls (Theme, Language) in the Settings dialog, found {len(combos)}", file=sys.stderr)
+                debug_dump(collect_texts(win))
+                return 1
+            theme_combo, lang_combo = combos[0], combos[1]
+            theme_combo.select("Light")
+            lang_combo.select("日本語")
+
+            edits = win.descendants(control_type="Edit")
+            if not edits:
+                print("FAIL: could not find the diff font size Edit control", file=sys.stderr)
+                return 1
+            edits[0].set_edit_text("18")
+
+            close_btn = wait_for_exact(win, "Close", control_type="Button", timeout_s=LAUNCH_TIMEOUT_S)
+            if close_btn is None:
+                print('FAIL: could not find the Settings dialog "Close" button', file=sys.stderr)
+                return 1
+            invoke(close_btn)
+        except RuntimeError as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            # settings.json is written immediately on every change
+            # (`super::persist(store)` inline in each onchange handler,
+            # not deferred to an exit hook) - a plain terminate() after
+            # the changes above land is enough; no special "graceful
+            # exit" API is needed for correctness here (contrast P08's
+            # Exit sub-case, which specifically tests the in-dialog Exit
+            # button's own process-termination behavior).
+            terminate(proc)
+
+    settings_path = config_dir / "settings.json"
+    deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+    saved = None
+    while time.monotonic() < deadline:
+        if settings_path.exists():
+            try:
+                saved = json.loads(settings_path.read_text()).get("payload", {})
+            except Exception:  # noqa: BLE001
+                saved = None
+        if saved and saved.get("theme") == "light":
+            break
+        time.sleep(POLL_INTERVAL_S)
+    if not saved or saved.get("theme") != "light":
+        print(f"FAIL: {settings_path} was never written with theme=light after changing settings", file=sys.stderr)
+        return 1
+
+    # ── Relaunch, no CLI args: theme/language/font must be restored ─────
+    with tempfile.TemporaryDirectory() as cwd:
+        proc = launch(binary, [], cwd)
+        try:
+            app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            expected_label = "this-label-can-never-appear" if break_mode else "設定"
+            found = wait_for_exact(win, expected_label, control_type="Button", timeout_s=READY_TIMEOUT_S)
+            if found is None:
+                print(f"FAIL: header button never showed {expected_label!r} after restart", file=sys.stderr)
+                debug_dump(collect_texts(win))
+                return 1
+            invoke(found)  # reopen Settings to read back Theme/Language/font
+
+            wait_for_first(win, "ComboBox", timeout_s=LAUNCH_TIMEOUT_S)
+            combos = win.descendants(control_type="ComboBox")
+            if not combos or len(combos) < 2:
+                print(f"FAIL: expected at least 2 ComboBox controls after restart, found {len(combos or [])}", file=sys.stderr)
+                return 1
+            theme_value = combos[0].window_text()
+            lang_value = combos[1].window_text()
+            if "Light" not in theme_value:
+                print(f"FAIL: restored Theme combobox reads {theme_value!r}, expected it to show Light", file=sys.stderr)
+                return 1
+            if "日本語" not in lang_value:
+                print(f"FAIL: restored Language combobox reads {lang_value!r}, expected it to show 日本語", file=sys.stderr)
+                return 1
+            edits = win.descendants(control_type="Edit")
+            font_value = edits[0].window_text().strip() if edits else ""
+            if font_value != "18":
+                print(f"FAIL: restored diff font size reads {font_value!r}, expected '18'", file=sys.stderr)
+                return 1
+        except RuntimeError as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
+
+    if break_mode:
+        print("OK(break): correctly failed to find the impossible post-restart label.")
+        return 0
+
+    # ── Tab restore: only when no explicit CLI paths are given ──────────
+    left_src = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right_src = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+        left = scratch_path / "left.txt"
+        right = scratch_path / "right.txt"
+        left.write_text(left_src.read_text())
+        right.write_text(right_src.read_text())
+
+        with tempfile.TemporaryDirectory() as cwd:
+            proc = launch(binary, [left, right], cwd)
+            try:
+                app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+                ok, texts, missing = wait_for_tokens(win, FIXTURE_TOKENS, timeout_s=READY_TIMEOUT_S)
+                if not ok:
+                    print(f"FAIL: seeding compare tab never rendered expected tokens: {missing}", file=sys.stderr)
+                    return 1
+            except RuntimeError as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+            finally:
+                terminate(proc)
+
+        session_path = config_dir / "session.json"
+        deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+        seeded = False
+        while time.monotonic() < deadline:
+            if session_path.exists():
+                try:
+                    payload = json.loads(session_path.read_text()).get("payload", {})
+                    if payload.get("tabs"):
+                        seeded = True
+                        break
+                except Exception:  # noqa: BLE001
+                    pass
+            time.sleep(POLL_INTERVAL_S)
+        if not seeded:
+            print(f"FAIL: {session_path} was never seeded with a tab after the CLI-arg launch", file=sys.stderr)
+            return 1
+
+        # No CLI args -> the seeded tab must auto-restore.
+        with tempfile.TemporaryDirectory() as cwd:
+            proc = launch(binary, [], cwd)
+            try:
+                app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+                ok, texts, missing = wait_for_tokens(win, FIXTURE_TOKENS, timeout_s=READY_TIMEOUT_S)
+                if not ok:
+                    print(f"FAIL: no-args relaunch never restored the seeded tab (missing {missing})", file=sys.stderr)
+                    debug_dump(texts)
+                    return 1
+            except RuntimeError as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+            finally:
+                terminate(proc)
+
+        # Explicit CLI args -> opens the specified compare, not the
+        # restored session (a second, distinct fixture pair).
+        left2 = scratch_path / "left2.txt"
+        right2 = scratch_path / "right2.txt"
+        left2.write_text("distinct-p12-left-content\nALPHA-P12-TOKEN\n")
+        right2.write_text("distinct-p12-right-content\nBETA-P12-TOKEN\n")
+        with tempfile.TemporaryDirectory() as cwd:
+            proc = launch(binary, [left2, right2], cwd)
+            try:
+                app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+                ok, texts, missing = wait_for_tokens(
+                    win, ["ALPHA-P12-TOKEN", "BETA-P12-TOKEN"], timeout_s=READY_TIMEOUT_S
+                )
+                if not ok:
+                    print(f"FAIL: explicit-args relaunch never showed the explicitly requested compare (missing {missing})", file=sys.stderr)
+                    debug_dump(texts)
+                    return 1
+                blob = "\n".join(texts)
+                if any(tok in blob for tok in FIXTURE_TOKENS):
+                    print(
+                        "FAIL: explicit-args relaunch shows tokens from the restored session "
+                        "tab instead of (or in addition to) the explicitly requested compare "
+                        "- restore did not stay skipped",
+                        file=sys.stderr,
+                    )
+                    return 1
+            except RuntimeError as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+            finally:
+                terminate(proc)
+
+    print(
+        "OK: theme/language/font size restored after restart, a Japanese label rendered, "
+        "and tab restore happened only on a no-args relaunch (explicit CLI args opened the "
+        "specified compare instead)."
+    )
+    return 0
+
+
+CASES = {
+    "p01": p01,
+    "p02": p02,
+    "p04": p04,
+    "p05": p05,
+    "p06": p06,
+    "p08": p08,
+    "p09": p09,
+    "p10": p10,
+    "p12": p12,
+}
 
 
 def main():
