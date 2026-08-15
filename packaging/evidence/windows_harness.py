@@ -2098,8 +2098,13 @@ def p12(binary, break_mode=False):
         # win (M5-B, P12: the file was consistently seen as never seeded
         # when this poll happened after the `with` block, i.e. after
         # terminate() had already run).
+        # Clears any session.json left by the settings-restart phase
+        # above (empty tabs either way, but this removes any doubt about
+        # which launch a diagnostic timestamp belongs to).
+        clear_config_dir(config_dir)
         session_path = config_dir / "session.json"
         with tempfile.TemporaryDirectory() as cwd:
+            launch_started_at = time.time()
             proc = launch(binary, [left, right], cwd)
             seeded = False
             try:
@@ -2125,7 +2130,11 @@ def p12(binary, break_mode=False):
                             pass
                     time.sleep(POLL_INTERVAL_S)
                 if not seeded:
-                    print(f"DIAGNOSTIC: distinct session.json contents observed during the poll ({len(seen)}): {seen!r}", file=sys.stderr)
+                    print(
+                        f"DIAGNOSTIC: launch_started_at={launch_started_at!r} "
+                        f"distinct session.json contents observed during the poll ({len(seen)}): {seen!r}",
+                        file=sys.stderr,
+                    )
             except RuntimeError as exc:
                 print(f"FAIL: {exc}", file=sys.stderr)
                 return 1
