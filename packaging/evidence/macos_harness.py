@@ -1436,39 +1436,59 @@ def p12(binary, break_mode=False):
     `--break`: asserts the restored Theme reads back as "Light" (the
     default, never what this case actually sets it to) - false under real
     (persisted-and-restored) behaviour, so this must fail.
+
+    KNOWN RESULT: this case's normal-mode run genuinely FAILS on the
+    tab-restore assertion, not because of a harness bug - see the PRODUCT
+    DEFECT comment right after `tempfile.TemporaryDirectory()` below for
+    the full root-cause writeup (confirmed via `recon_session_save`):
+    session.json is never written for a CLI-opened tab that's never closed
+    again before quitting, because the tabs-changed `use_effect` meant to
+    auto-persist it doesn't actually write, while direct save call sites
+    (`close_tab`, settings' `persist`) do. Settings restoration (Theme/
+    Language) is checked and passes; tab restoration is checked and fails,
+    honestly, per the handoff's "do not weaken a case to make it pass."
     """
     with tempfile.TemporaryDirectory() as scratch:
         home = Path(scratch) / "home"
         home.mkdir()
-        # UNDER INVESTIGATION / possible product defect, not fixed here:
-        # neither `persist_session` (state/session.rs) nor
-        # `persist_settings` (ui/view/settings.rs) ever check the Result
-        # of `repo.save(...)` - both discard it with `let _ =`, so any
-        # write failure is silent by construction. Two real P12 dispatches
-        # against a truly untouched `$HOME` found `session.json` completely
-        # absent even moments after a tab opened (which triggers a save) -
-        # first hypothesis was the missing `dirs_next::config_dir()/
-        # forskscope` directory (no `create_dir_all` anywhere in the
-        # shipped binary), but pre-creating it (below) did NOT fix it -
-        # the file was still absent on the very next dispatch. Current
-        # leading hypothesis: App Sandbox entitlements restricting writes
-        # outside a sandboxed container, which `codesign -d --entitlements`
-        # (dumped just below) will confirm or rule out. Pre-creating the
-        # directory is kept regardless since it's cheap and rules out one
-        # variable; if the real cause turns out to be sandboxing, this
-        # comment (and the M5-B report) will be corrected to say so before
-        # this case is called complete.
+        # PRODUCT DEFECT, confirmed via real CI dispatches, registered here
+        # and reported in the M5-B report - NOT fixed:
+        #
+        # session.json is never written for a tab opened via CLI startup
+        # that is never closed again before the app quits. Root cause,
+        # isolated across several dispatches (chased two wrong hypotheses
+        # first - missing config directory, then App Sandbox entitlements;
+        # both ruled out: pre-creating the directory below didn't fix it,
+        # and `codesign -d --entitlements` came back empty/unsigned, no
+        # sandbox): app.rs registers a `use_effect` that's supposed to
+        # auto-persist the session on every `store.tabs` mutation -
+        #   use_effect(move || { let _tabs = store.tabs.read(); save_session(&store); });
+        # `recon_session_save` proved this effect does not actually write
+        # session.json when the tab is pushed via `open_compare_request`
+        # during startup's `use_hook` (file still missing 1.5s after the
+        # tab renders), while `close_tab`'s *direct*, non-reactive call to
+        # `save_session` (state/session.rs) - triggered from a real onclick
+        # handler, not a reactive effect - writes correctly in the exact
+        # same environment moments later. settings.json's independent,
+        # synchronous `persist(store)` (ui/view/settings.rs, also a direct
+        # onclick/onchange call, never reactive) also writes correctly -
+        # this narrows the defect specifically to the reactive tabs-changed
+        # effect, not to persistence, the config directory, or sandboxing.
+        # Practical impact: a session opened via `forskscope <left> <right>`
+        # and closed without any other tab-list-mutating action in between
+        # (e.g. quit immediately, or close via the window's own close
+        # button as this case does) never gets recorded - restart loses it
+        # silently. Separately, both `persist_session` and `persist_settings`
+        # discard their `repo.save(...)` Result with `let _ =`, so this (or
+        # any other write failure) would never surface to the user either
+        # way.
+        #
+        # This case is left to genuinely fail at the tab-restore assertion
+        # below because of this real defect - not worked around. Settings
+        # restoration (Theme/Language, via the working settings.json path)
+        # is still checked and reported, so a run's FAIL output shows
+        # exactly what did and didn't survive the restart.
         _config_dir(home).mkdir(parents=True, exist_ok=True)
-        codesign = subprocess.run(
-            ["codesign", "-d", "--entitlements", ":-", str(binary)],
-            capture_output=True,
-            text=True,
-        )
-        print(
-            f"DEBUG: codesign entitlements (rc={codesign.returncode}):\n"
-            f"stdout={codesign.stdout!r}\nstderr={codesign.stderr!r}",
-            flush=True,
-        )
 
         left1 = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
         right1 = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
@@ -1570,20 +1590,21 @@ def p12(binary, break_mode=False):
         )
 
         # ── Launch B: relaunch with no CLI args - restore ────────────────
+        #
+        # Order matters here: settings restoration (Theme/Language, via
+        # settings.json) and tab restoration (via session.json) go through
+        # completely different persistence paths and this slice found they
+        # do NOT behave the same way - see the PRODUCT DEFECT note above
+        # `_config_dir(home).mkdir(...)`. Checking settings first means a
+        # tab-restore failure's FAIL message still reports whether settings
+        # genuinely did restore, rather than the case aborting before ever
+        # finding out.
         proc = launch(binary, [], scratch, home=home)
         try:
             try:
                 wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
             except (PermissionWall, TimeoutError) as exc:
                 print(f"FAIL: {exc}", file=sys.stderr)
-                return 1
-
-            rows = wait_rows(14)
-            if rows != "14":
-                print(
-                    f"FAIL: fixture tab did not restore (rows: {rows!r}, expected 14)",
-                    file=sys.stderr,
-                )
                 return 1
 
             r = find_wait("設定", timeout=10)
@@ -1620,6 +1641,27 @@ def p12(binary, break_mode=False):
             )
             if r != "VALUE: 日本語":
                 print(f"FAIL: restored Language {r!r} != 'VALUE: 日本語'", file=sys.stderr)
+                return 1
+
+            r = click_wait("閉じる")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not close Settings ('閉じる'): {r}", file=sys.stderr)
+                return 1
+
+            rows = wait_rows(14)
+            if rows != "14":
+                print(
+                    f"FAIL: fixture tab did not restore (rows: {rows!r}, expected 14). "
+                    "Settings DID restore correctly (Theme/Language confirmed above) - "
+                    "this is the PRODUCT DEFECT registered at the top of this case: "
+                    "session.json is never written for a tab opened via CLI startup "
+                    "that is never closed before quitting (the tabs-changed use_effect "
+                    "in app.rs does not persist it; only direct save_session call "
+                    "sites like close_tab do, confirmed via recon_session_save). This "
+                    "is the case's real, expected result given that defect, not a "
+                    "harness bug - do not weaken this assertion to hide it.",
+                    file=sys.stderr,
+                )
                 return 1
         finally:
             terminate(proc)
