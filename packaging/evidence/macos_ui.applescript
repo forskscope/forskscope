@@ -373,7 +373,7 @@ on runOnce(argv)
                 set capN to 300
                 if (count of argv) > 2 then set capN to (item 3 of argv) as integer
                 set outLines to {}
-                set allEl to my safeContents(w)
+                set allEl to entire contents of w
                 set seen to 0
                 repeat with e in allEl
                     set seen to seen + 1
