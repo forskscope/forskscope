@@ -82,11 +82,17 @@ Unlike the Linux harness's development history (several iterations were
 needed to get P09's button-invocation working reliably under a bare
 Xvfb display with no window manager), every case here passed in normal
 mode and failed correctly in break mode on the **first** dispatched run
-of each — see "What went right" in the M5-A Windows report for why this
-is not assumed to mean the checks are weaker, and for the one deliberate
-difference from the Linux harness's readiness condition (content-token
-presence, not an exact row count — see `windows_harness.py`'s module
-docstring).
+of each. Every break-mode run above is a genuine, observed failure with
+the expected message, not an assumption — this is not treated as
+evidence the checks are weaker, only that a real interactive Windows
+desktop session (unlike Linux's bare Xvfb) gave UIA's Invoke pattern a
+straightforward path with no window-manager/focus complications to work
+around. One deliberate difference from the Linux harness's readiness
+condition: this harness waits for the fixture's distinguishing text
+tokens to appear in the UIA tree, not an exact per-pane row count —
+`windows_harness.py`'s module docstring has the full reasoning, including
+that the exact UIA control type WebView2 maps `role="row"` to was never
+empirically confirmed, since the content-based check already worked.
 
 ## Failures and issue links
 
