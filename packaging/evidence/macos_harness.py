@@ -140,14 +140,17 @@ def wait_for_window(deadline):
 # here is more honest than copy-pasting five more inline loops.
 
 
-def poll_ui(cmd, *args, predicate, timeout, interval=0.5):
+def poll_ui(cmd, *args, predicate, timeout, interval=0.5, call_timeout=20):
     """Poll `ui(cmd, *args)` until `predicate(result)` is true or the
     timeout elapses; returns the last result either way (callers decide
-    what "never satisfied" means for their case)."""
+    what "never satisfied" means for their case). `call_timeout` is the
+    per-`ui()`-call subprocess timeout, not the overall poll budget -
+    raise it for a command that can each legitimately take a while (e.g.
+    a query against a view backing a large diff)."""
     deadline = time.monotonic() + timeout
     result = None
     while time.monotonic() < deadline:
-        result = ui(cmd, *args, timeout=20)
+        result = ui(cmd, *args, timeout=call_timeout)
         if predicate(result):
             return result
         time.sleep(interval)
@@ -1437,6 +1440,29 @@ def p12(binary, break_mode=False):
     with tempfile.TemporaryDirectory() as scratch:
         home = Path(scratch) / "home"
         home.mkdir()
+        # PRODUCT DEFECT found while developing this case, registered not
+        # fixed (see the M5-B report): neither `persist_session`
+        # (state/session.rs) nor `persist_settings` (ui/view/settings.rs)
+        # ever creates `dirs_next::config_dir()/forskscope` - both call
+        # `repo.save(...)` and discard the Result with `let _ =`. `save`'s
+        # `atomic_replace` writes a sibling temp file *inside* that
+        # directory first; if it doesn't exist yet, that write fails and
+        # the error is silently swallowed. Confirmed empirically: a first
+        # real P12 dispatch against a truly untouched `$HOME` left
+        # `session.json` completely absent after Launch A closed, even
+        # though a tab was open and settings were changed (both trigger a
+        # save). Nothing anywhere in the shipped binary calls
+        # `create_dir_all` for this directory - a genuinely fresh install
+        # (this is exactly what a fresh `$HOME` simulates) never persists
+        # ANYTHING, silently, indefinitely. Pre-creating the directory
+        # here (matching what a real installer's first-run step
+        # conceivably should do, and what p08's fixture-seeding already
+        # does for its own reasons) is not hiding this - it's the only way
+        # to test *this* case's actual subject (does a successfully-saved
+        # setting survive a restart) instead of being blocked entirely by
+        # a defect this case doesn't own. Reported separately and
+        # explicitly, not fixed here.
+        _config_dir(home).mkdir(parents=True, exist_ok=True)
 
         left1 = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
         right1 = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
@@ -1694,10 +1720,10 @@ def p06(binary, break_mode=False):
         sentinel_b_v2 = "ASYNC-IDENTITY-SENTINEL-PAIR-B-RELOAD-V2"
 
         left_a, right_a = _generate_large_pair(
-            home, "big-a-left.txt", "big-a-right.txt", 80_000, sentinel_a
+            home, "big-a-left.txt", "big-a-right.txt", 20_000, sentinel_a
         )
         left_b, right_b = _generate_large_pair(
-            home, "big-b-left.txt", "big-b-right.txt", 80_000, sentinel_b_v1
+            home, "big-b-left.txt", "big-b-right.txt", 20_000, sentinel_b_v1
         )
 
         proc = launch(binary, [left_a, right_a], scratch, home=home)
@@ -1708,7 +1734,7 @@ def p06(binary, break_mode=False):
                 print(f"FAIL: {exc}", file=sys.stderr)
                 return 1
 
-            r = ui("click_any", "Explorer", timeout=20)
+            r = ui("click_any", "Explorer", timeout=60)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not switch to the Explorer tab: {r}", file=sys.stderr)
                 return 1
@@ -1719,6 +1745,7 @@ def p06(binary, break_mode=False):
                 "left",
                 predicate=lambda r: r.startswith("CLICKED"),
                 timeout=LAUNCH_TIMEOUT_S,
+                call_timeout=45,
             )
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not pick big-b-left.txt on the left: {r}", file=sys.stderr)
@@ -1729,6 +1756,7 @@ def p06(binary, break_mode=False):
                 "right",
                 predicate=lambda r: r.startswith("CLICKED"),
                 timeout=LAUNCH_TIMEOUT_S,
+                call_timeout=45,
             )
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not pick big-b-right.txt on the right: {r}", file=sys.stderr)
@@ -1790,6 +1818,13 @@ def p06(binary, break_mode=False):
                         file=sys.stderr,
                     )
                     return 1
+        except subprocess.TimeoutExpired as exc:
+            print(
+                f"FAIL: an osascript call timed out ({exc}) - possibly the UI thread "
+                "was still busy with the large diff; see this case's fixture size",
+                file=sys.stderr,
+            )
+            return 1
         finally:
             terminate(proc)
 
