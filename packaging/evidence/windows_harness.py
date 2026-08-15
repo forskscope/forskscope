@@ -430,19 +430,29 @@ def select_dropdown(elem, text):
         elem.iface_value.SetValue(text)
         return "value-pattern"
 
+    # Outer retry: the same general UI-automation flakiness
+    # set_value_text() documents (identical code passing on one CI run
+    # and failing outright on the very next) was also observed here for
+    # combo selection itself, not just the font-size field - each retry
+    # still only counts a success when the value genuinely reads back.
     attempt_log = []
-    for attempt in (try_selection_item, try_expand_and_invoke_item, try_value_pattern):
-        try:
-            path = attempt()
-        except Exception as exc:  # noqa: BLE001
-            attempt_log.append(f"{attempt.__name__}: raised {exc!r}")
-            continue
-        if _combo_shows(elem, text):
-            return path
-        attempt_log.append(f"{attempt.__name__} ({path}): did not raise, readback={_combo_readback(elem)!r}")
+    for retry in range(3):
+        for attempt in (try_selection_item, try_expand_and_invoke_item, try_value_pattern):
+            try:
+                path = attempt()
+            except Exception as exc:  # noqa: BLE001
+                attempt_log.append(f"retry {retry} {attempt.__name__}: raised {exc!r}")
+                continue
+            if _combo_shows(elem, text):
+                return path
+            attempt_log.append(
+                f"retry {retry} {attempt.__name__} ({path}): did not raise, readback={_combo_readback(elem)!r}"
+            )
+        time.sleep(POLL_INTERVAL_S)
 
     raise RuntimeError(
-        f"could not select {text!r} via any known pattern:\n  " + "\n  ".join(attempt_log)
+        f"could not select {text!r} via any known pattern across 3 retries:\n  "
+        + "\n  ".join(attempt_log)
     )
 
 
