@@ -497,21 +497,32 @@ def set_value_text(elem, text):
        "Spinner" - see `find_number_inputs`) pywinauto doesn't wrap with
        `EditWrapper`.
     2. The same, followed by a synthesized Tab keystroke.
-    3. Real keyboard synthesis start to finish: focus the control,
-       select-all + delete, type the text, Tab to commit.
+    3. Real keyboard synthesis: `set_focus()` (UIA's accessibility-level
+       focus, not a physical click), then End + repeated Backspace to
+       clear the field, type the text, Tab to commit.
+    4. The same keystroke sequence, but preceded by a real synthesized
+       click (`click_input()`) instead of `set_focus()`.
 
-    Steps 1 and 2 were each found on real CI (M5-B, P12) not to be
-    enough for an `<input type="number">`: `ValuePattern.SetValue`
-    updated the DOM value but never fired Dioxus's `onchange` listener
-    (a plain `change` event, which for a number input normally fires on
-    blur/commit, not on every value write), and a bare Tab keystroke
-    with no preceding focus() had nothing to commit *from* - the value
-    was never actually focused via SetValue alone, so the Tab likely
-    went nowhere useful. Step 3 is the one place in this harness that
-    falls back to full real input synthesis for something no
-    accessibility pattern alone reliably replicates here, mirroring
-    `invoke()`'s own established Invoke-then-`click_input()` fallback
-    shape (try the pattern first, report which path actually worked)."""
+    All four were needed, in order, on real CI (M5-B, P12):
+    `ValuePattern.SetValue` updates the DOM value but never fires
+    Dioxus's `onchange` listener (a plain `change` event, which for a
+    number input normally fires on blur/commit, not on every value
+    write); a bare Tab keystroke with no preceding focus has nothing to
+    commit *from*; `set_focus()`'s UIA-level focus did not route real
+    keyboard input into this WebView2/Chromium control at all (readback
+    never moved off the app's own default); and even after switching to
+    a real click to establish genuine focus, `^a` (Ctrl+A, "select all")
+    turned out not to actually clear the field's existing content
+    either - the first click-based attempt read back `32`, the input's
+    own `max` clamp, which only makes sense if the typed digits landed
+    *appended* to the untouched default rather than replacing it (`1418`
+    or similar, clamped down to `32`) - so step 4 clears with an
+    explicit End + repeated-Backspace instead of relying on select-all.
+    Steps 3-4 are the one place in this harness that falls back to full
+    real input synthesis for something no accessibility pattern alone
+    reliably replicates here, mirroring `invoke()`'s own established
+    Invoke-then-`click_input()` fallback shape (try the pattern first,
+    report which path actually worked)."""
     attempt_log = []
 
     def try_pattern():
@@ -532,7 +543,7 @@ def set_value_text(elem, text):
 
     def try_real_keystrokes():
         elem.set_focus()
-        elem.type_keys("^a{BACKSPACE}" + text + "{TAB}")
+        elem.type_keys("{END}{BACKSPACE 6}" + text + "{TAB}")
         return "keystroke-synthesis"
 
     def try_click_then_keystrokes():
@@ -548,7 +559,7 @@ def set_value_text(elem, text):
         # attempt in this harness, used only because every accessibility-
         # pattern-only approach was verified not to work here.
         elem.click_input()
-        elem.type_keys("^a{BACKSPACE}" + text + "{TAB}")
+        elem.type_keys("{END}{BACKSPACE 6}" + text + "{TAB}")
         return "click-then-keystroke-synthesis"
 
     for attempt in (try_pattern, try_pattern_then_tab, try_real_keystrokes, try_click_then_keystrokes):
