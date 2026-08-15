@@ -32,6 +32,7 @@ what it breaks. `--break` only changes what the harness expects to see;
 it never touches product source.
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -909,6 +910,447 @@ def p05(binary, break_mode=False):
     return 0
 
 
+# ── P08 — Persistence migration / recovery dialogs ──────────────────────────
+#
+# Split into four independently-dispatchable cases (matching the handoff's
+# "three separate launches" plus the filesystem-only checks) rather than one
+# p08 that internally launches four times - a failure in one sub-case's
+# dialog interaction shouldn't obscure whether the other three passed, and
+# each needs its own fresh, isolated config directory anyway.
+#
+# `dirs_next::config_dir()` on macOS is `$HOME/Library/Application Support`
+# (confirmed in `dirs-next-2.0.0/src/lib.rs`); `state.rs`'s `config_file_path`
+# joins `forskscope/<file_name>` onto that - see `launch()`'s `home` param.
+
+FUTURE_SESSION_JSON = (
+    '{"schema_name": "session", "schema_version": 99, '
+    '"app_version": "0.165.1", "created_unix": 0, "updated_unix": 0, '
+    '"payload": {}}'
+)
+CORRUPT_SESSION_BYTES = b"{not valid json"
+
+
+def _config_dir(home):
+    return Path(home) / "Library" / "Application Support" / "forskscope"
+
+
+def _seed_config(home, settings_text=None, session_text=None):
+    cfg = _config_dir(home)
+    cfg.mkdir(parents=True, exist_ok=True)
+    if settings_text is not None:
+        (cfg / "settings.json").write_text(settings_text)
+    if session_text is not None:
+        (cfg / "session.json").write_text(session_text)
+    return cfg
+
+
+def _pid_alive(pid):
+    """`kill -0`-equivalent: True if `pid` still names a live process.
+    Used only as corroborating evidence alongside `proc.poll()` (the
+    direct, non-racy child-reap check) - see p08_exit's docstring."""
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def p08_exit(binary, break_mode=False):
+    """The single most important assertion in this slice (handoff §4): a
+    future-schema session fixture triggers the "Session file is from a
+    newer version" recovery dialog (`session/persistence_recovery.rs`'s
+    `Incompatible` outcome, actions Exit/Continue with defaults - no Reset,
+    since a future file may be valid to a newer build). Clicking Exit
+    (`recovery.rs`: `dioxus_desktop::window().close()`) must actually
+    terminate the OS process, not just dismiss the dialog/window - "An Exit
+    that dismisses the dialog and leaves a zombie is a failure that looks
+    like a pass" (handoff §4).
+
+    Process-state evidence: `proc.poll()` is the direct, non-racy check -
+    it reads this exact child's wait status via this process's own
+    waitpid, so there is no PID-reuse ambiguity. `os.kill(pid, 0)`
+    (`_pid_alive`) is recorded alongside it as the independent `kill -0`-
+    style corroboration the handoff suggested, checked immediately so a
+    reused PID cannot yet exist.
+
+    `--break`: asserts the process is still running after clicking Exit -
+    false under real (correct) behaviour, so this must fail; a harness
+    that only checked "the dialog is gone" would pass here regardless,
+    which is exactly the vacuous check the handoff calls out by name.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+        _seed_config(home, session_text=FUTURE_SESSION_JSON)
+        proc = launch(binary, [], scratch, home=home)
+        pid = proc.pid
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+
+            r = find_wait("Session file is from a newer version", timeout=LAUNCH_TIMEOUT_S)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: recovery dialog never appeared: {r}", file=sys.stderr)
+                return 1
+
+            r = ui("click_button_exact", "Exit", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Exit: {r}", file=sys.stderr)
+                return 1
+
+            deadline = time.monotonic() + 20
+            exited = False
+            while time.monotonic() < deadline:
+                if proc.poll() is not None:
+                    exited = True
+                    break
+                time.sleep(0.3)
+            alive_via_kill0 = _pid_alive(pid)
+
+            if break_mode:
+                if exited:
+                    print(
+                        f"FAIL (expected, --break): process (pid {pid}) exited with "
+                        f"returncode {proc.returncode} within 20s of clicking Exit - "
+                        "the real behaviour --break's impossible expectation "
+                        "('still running') was checked against.",
+                        file=sys.stderr,
+                    )
+                    return 1
+                print(
+                    f"WARNING: --break's impossible condition ('process still "
+                    f"running after Exit') was NOT falsified - pid {pid} is still "
+                    f"alive (kill(pid,0) alive={alive_via_kill0}). This does not "
+                    "mean the harness is broken; it would mean Exit really does "
+                    "leave the process running, which is the real defect this "
+                    "assertion exists to catch. Investigate before trusting "
+                    "the normal-mode run's pass.",
+                    file=sys.stderr,
+                )
+                return 1
+            else:
+                if not exited:
+                    print(
+                        f"FAIL: process (pid {pid}) still running 20s after clicking "
+                        f"Exit (proc.poll()=None, kill(pid,0) alive={alive_via_kill0}) "
+                        "- Exit dismissed the dialog without terminating the process",
+                        file=sys.stderr,
+                    )
+                    return 1
+        finally:
+            if proc.poll() is None:
+                terminate(proc)
+
+    print(
+        f"OK: Exit terminated the process - proc.poll() returncode="
+        f"{proc.returncode}, corroborated by kill(pid={pid}, 0) reporting no "
+        "such process."
+    )
+    return 0
+
+
+def p08_continue(binary, break_mode=False):
+    """Same future-schema session fixture as p08_exit, this time "Continue
+    with defaults". Asserts the app is running normally afterward (window
+    still present, dialog dismissed) and, critically, that `session.json`'s
+    bytes are byte-for-byte unchanged - `SessionRuntimeResolution.
+    write_disabled` for an `Incompatible` outcome (confirmed by
+    `session_resolve_future_version_disables_writes_and_preserves_bytes`)
+    means this run must never write to it, no matter what the user does
+    afterward.
+
+    `--break`: asserts the file's bytes differ from the seeded fixture -
+    false under real (write-disabled) behaviour, so this must fail.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+        cfg = _seed_config(home, session_text=FUTURE_SESSION_JSON)
+        session_path = cfg / "session.json"
+        proc = launch(binary, [], scratch, home=home)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+
+            r = find_wait("Session file is from a newer version", timeout=LAUNCH_TIMEOUT_S)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: recovery dialog never appeared: {r}", file=sys.stderr)
+                return 1
+
+            r = ui("click_button_exact", "Continue with defaults", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click 'Continue with defaults': {r}", file=sys.stderr)
+                return 1
+
+            time.sleep(1.0)
+            if proc.poll() is not None:
+                print(
+                    f"FAIL: process exited (rc={proc.returncode}) after "
+                    "'Continue with defaults' - expected it to keep running",
+                    file=sys.stderr,
+                )
+                return 1
+            try:
+                wait_for_window(time.monotonic() + 10)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"FAIL: no window after continuing: {exc}", file=sys.stderr)
+                return 1
+
+            time.sleep(1.0)  # give any (wrongly) pending write a chance to land
+            after = session_path.read_text()
+            if break_mode:
+                if after == FUTURE_SESSION_JSON:
+                    print(
+                        "FAIL (expected, --break): session.json is unchanged, "
+                        "matching write-disabled behaviour - --break's impossible "
+                        "expectation ('bytes changed') was correctly not satisfied",
+                        file=sys.stderr,
+                    )
+                    return 1
+            else:
+                if after != FUTURE_SESSION_JSON:
+                    print(
+                        "FAIL: session.json was modified despite the future-schema "
+                        f"write-disabled state.\nbefore: {FUTURE_SESSION_JSON!r}\n"
+                        f"after:  {after!r}",
+                        file=sys.stderr,
+                    )
+                    return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: 'Continue with defaults' dismissed the dialog, the app kept running, "
+        "and session.json's bytes were confirmed unchanged (write-disabled)."
+    )
+    return 0
+
+
+def p08_reset(binary, break_mode=False):
+    """A corrupt session fixture (literally invalid JSON) triggers the
+    "Session file could not be read" dialog (`CorruptPreserved`, actions
+    Continue with defaults/Reset and back up - no Exit, per
+    `corrupt_shows_continue_and_reset_but_not_exit`). Clicking "Reset and
+    back up" must dismiss the dialog, reset the session file to a fresh
+    default, and back up the original corrupt bytes to `session.json.
+    reset.bak` (`ensure_reset_backup` in `persist/schema/repository.rs`).
+
+    `--break`: asserts the backup's bytes differ from the original corrupt
+    bytes - false under real behaviour, so this must fail; catches a
+    harness that only checked "a .reset.bak file exists" without reading
+    it.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+        cfg = _seed_config(home, session_text=None)
+        cfg.mkdir(parents=True, exist_ok=True)
+        session_path = cfg / "session.json"
+        session_path.write_bytes(CORRUPT_SESSION_BYTES)
+        proc = launch(binary, [], scratch, home=home)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+
+            r = find_wait("Session file could not be read", timeout=LAUNCH_TIMEOUT_S)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: recovery dialog never appeared: {r}", file=sys.stderr)
+                return 1
+
+            r = ui("click_button_exact", "Reset and back up", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click 'Reset and back up': {r}", file=sys.stderr)
+                return 1
+
+            r = find_wait("Session file could not be read", timeout=10, want_found=False)
+            if r.startswith("FOUND"):
+                print(f"FAIL: dialog still present after Reset and back up: {r}", file=sys.stderr)
+                return 1
+
+            backup = cfg / "session.json.reset.bak"
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            backup_bytes = None
+            while time.monotonic() < deadline:
+                if backup.exists():
+                    backup_bytes = backup.read_bytes()
+                    break
+                time.sleep(0.5)
+            if backup_bytes is None:
+                print(f"FAIL: no reset backup found at {backup}", file=sys.stderr)
+                return 1
+
+            if break_mode:
+                impossible = b"this exact string can never be the original corrupt bytes"
+                if backup_bytes != impossible:
+                    print(
+                        f"FAIL: backup content {backup_bytes!r} != impossible expected "
+                        f"{impossible!r}",
+                        file=sys.stderr,
+                    )
+                    return 1
+            else:
+                if backup_bytes != CORRUPT_SESSION_BYTES:
+                    print(
+                        f"FAIL: backup content {backup_bytes!r} != original corrupt "
+                        f"bytes {CORRUPT_SESSION_BYTES!r}",
+                        file=sys.stderr,
+                    )
+                    return 1
+
+            after = session_path.read_bytes()
+            if after == CORRUPT_SESSION_BYTES:
+                print(
+                    "FAIL: session.json still holds the corrupt bytes after reset",
+                    file=sys.stderr,
+                )
+                return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: 'Reset and back up' dismissed the dialog, session.json was reset "
+        f"(no longer the corrupt bytes), and {backup.name} matches the original "
+        "corrupt bytes exactly."
+    )
+    return 0
+
+
+def p08_fs(binary, break_mode=False):
+    """Filesystem-only checks needing no dialog interaction: a legacy v0
+    settings/session pair (F34/M5-A's own fixture format, reused verbatim
+    from `crates/forskscope-core/src/tests/fixtures/persistence/
+    settings-v0.json`/`session-v0.json` - already sanitized, `/tmp/
+    fixtures/...` paths, per RFC-078's schema) migrates without loss to a
+    versioned envelope, with a `.pre-v2.bak` backup of the original bytes
+    (`ensure_pre_v2_backup`).
+
+    `--break`: asserts the migrated settings' language is a value the v0
+    fixture never had - false under real (loss-free) migration, so this
+    must fail.
+    """
+    v0_settings = (
+        REPO_ROOT / "crates/forskscope-core/src/tests/fixtures/persistence/settings-v0.json"
+    ).read_text()
+    v0_session = (
+        REPO_ROOT / "crates/forskscope-core/src/tests/fixtures/persistence/session-v0.json"
+    ).read_text()
+
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+        cfg = _seed_config(home, settings_text=v0_settings, session_text=v0_session)
+        settings_path = cfg / "settings.json"
+        session_path = cfg / "session.json"
+        proc = launch(binary, [], scratch, home=home)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+
+            # A committed migration produces a toast, not a blocking dialog
+            # (SessionRecoveryView::from_resolution's Migrated(Committed)
+            # arm) - just give the async resolve-and-commit time to land.
+            time.sleep(2.0)
+
+            settings_bak = cfg / "settings.json.pre-v2.bak"
+            session_bak = cfg / "session.json.pre-v2.bak"
+            for label, bak, original in (
+                ("settings", settings_bak, v0_settings),
+                ("session", session_bak, v0_session),
+            ):
+                deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+                bak_text = None
+                while time.monotonic() < deadline:
+                    if bak.exists():
+                        bak_text = bak.read_text()
+                        break
+                    time.sleep(0.5)
+                if bak_text is None:
+                    print(f"FAIL: no {label} pre-v2 backup found at {bak}", file=sys.stderr)
+                    return 1
+                if bak_text != original:
+                    print(
+                        f"FAIL: {label} pre-v2 backup does not match the original v0 fixture",
+                        file=sys.stderr,
+                    )
+                    return 1
+
+            settings_after = json.loads(settings_path.read_text())
+            session_after = json.loads(session_path.read_text())
+
+            if "schema_version" not in settings_after or "payload" not in settings_after:
+                print(
+                    f"FAIL: migrated settings.json is not a versioned envelope: "
+                    f"{settings_after!r}",
+                    file=sys.stderr,
+                )
+                return 1
+            if "schema_version" not in session_after or "payload" not in session_after:
+                print(
+                    f"FAIL: migrated session.json is not a versioned envelope: "
+                    f"{session_after!r}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            payload = settings_after["payload"]
+            expected_language = "impossible-language" if break_mode else "ja"
+            if payload.get("language") != expected_language:
+                print(
+                    f"FAIL: migrated settings payload language "
+                    f"{payload.get('language')!r} != expected {expected_language!r}",
+                    file=sys.stderr,
+                )
+                return 1
+            if payload.get("theme") != "light":
+                print(
+                    f"FAIL: migrated settings payload theme {payload.get('theme')!r} "
+                    "!= expected 'light' (lost during migration?)",
+                    file=sys.stderr,
+                )
+                return 1
+            if payload.get("diff_font_size") != 16:
+                print(
+                    f"FAIL: migrated settings payload diff_font_size "
+                    f"{payload.get('diff_font_size')!r} != expected 16",
+                    file=sys.stderr,
+                )
+                return 1
+
+            session_payload = session_after["payload"]
+            tabs = session_payload.get("tabs")
+            if tabs != [
+                ["/tmp/fixtures/left-a.txt", "/tmp/fixtures/right-a.txt"],
+                ["/tmp/fixtures/left-b.txt", "/tmp/fixtures/right-b.txt"],
+            ]:
+                print(
+                    f"FAIL: migrated session payload tabs {tabs!r} do not match "
+                    "the v0 fixture's tab pairs",
+                    file=sys.stderr,
+                )
+                return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: legacy v0 settings/session migrated without loss (theme/language/"
+        "font size/tabs all preserved in the payload); both got a versioned "
+        "envelope and a .pre-v2.bak matching the original v0 bytes exactly."
+    )
+    return 0
+
+
 # ── recon — not an RFC-078 case ─────────────────────────────────────────────
 
 
@@ -1026,6 +1468,10 @@ CASES = {
     "p10": p10,
     "p04": p04,
     "p05": p05,
+    "p08_exit": p08_exit,
+    "p08_continue": p08_continue,
+    "p08_reset": p08_reset,
+    "p08_fs": p08_fs,
     "recon_settings": recon_settings,
     "recon_explorer": recon_explorer,
 }

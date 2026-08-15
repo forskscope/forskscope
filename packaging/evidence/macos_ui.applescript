@@ -608,10 +608,20 @@ on runOnce(argv)
                 if target is missing value then return "NOT_FOUND"
                 -- First attempt used `set focused of target to true` (an
                 -- accessibility-attribute write) and the keystrokes landed
-                -- nowhere (readback unchanged). `click target` first - a
-                -- real click event, the same kind click_button already
-                -- relies on firing real onclick handlers - to actually
-                -- focus the underlying WKWebView text input before typing.
+                -- nowhere. Second attempt added `click target` first (a
+                -- real click event, same as click_button relies on) and
+                -- still nothing changed - `keystroke` sends to whichever
+                -- application is frontmost, which is not necessarily
+                -- `procName` just because `tell process procName` scoped
+                -- the click to it; `osascript`'s own process (or whatever
+                -- last had focus) may still be frontmost. Explicitly
+                -- activate the target process first - the one thing not
+                -- yet tried and the standard fix for "keystroke goes
+                -- nowhere" in AppleScript UI scripting.
+                try
+                    set frontmost of process procName to true
+                end try
+                delay 0.2
                 try
                     click target
                 on error errMsg

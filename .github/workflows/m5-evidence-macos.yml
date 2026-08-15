@@ -20,7 +20,7 @@ on:
       case:
         description: 'Which case to run'
         type: choice
-        options: [p01, p02, p04, p05, p09, p10, recon_settings, recon_explorer]
+        options: [p01, p02, p04, p05, p08_exit, p08_continue, p08_reset, p08_fs, p09, p10, recon_settings, recon_explorer]
         required: true
       break_case:
         description: 'Run in --break mode (falsifiability demonstration)'
