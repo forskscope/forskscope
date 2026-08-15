@@ -35,7 +35,7 @@ below)
 | P08 — Persistence migration and recovery | **Pass** | CI run [`31878490123`](https://github.com/forskscope/forskscope/actions/runs/31878490123) |
 | P09 — Mergetool | **Pass** | CI run [`31853496997`](https://github.com/forskscope/forskscope/actions/runs/31853496997) |
 | P10 — Binary/XLSX fail-closed policy | **Pass** | CI run [`31853362804`](https://github.com/forskscope/forskscope/actions/runs/31853362804) |
-| P12 — Session/settings restart | **Pass** | CI run [`31880416324`](https://github.com/forskscope/forskscope/actions/runs/31880416324) |
+| P12 — Session/settings restart | **Fail — real path not exercised (F61)**; theme/language/font restore itself passes | CI run [`31880416324`](https://github.com/forskscope/forskscope/actions/runs/31880416324) |
 
 Harness: `packaging/evidence/windows_harness.py`, driven by
 `.github/workflows/m5-evidence-windows.yml` (`workflow_dispatch`, one
@@ -271,6 +271,15 @@ care how the file came to describe a tab — only that it does, and that
 no explicit CLI paths were given at startup. This still exercises
 exactly the restore mechanism P12 cares about, and separately confirms
 the no-args-vs-explicit-args distinction the case is actually about.
+
+**Recorded as Fail at the case level (review 064 §5.4), not Pass.** The
+harness's own (worked-around) assertions all pass, but the case's real
+path — a CLI-launched tab surviving to the next launch — is exactly what
+F61 breaks, and it was never exercised here. A table reading "Pass" would
+tell a reader this row is unaffected by F61, which is untrue; Linux and
+macOS's P12 rows correctly read Fail for the same underlying defect,
+reached without a workaround. The passing part (theme/language/font
+restore) is real and independent of F61.
 
 ## Falsifiability
 
