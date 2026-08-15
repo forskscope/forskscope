@@ -1926,18 +1926,21 @@ def p12(binary, break_mode=False):
             if not combos or len(combos) < 2:
                 print(f"FAIL: expected at least 2 ComboBox controls after restart, found {len(combos or [])}", file=sys.stderr)
                 return 1
-            theme_value = combos[0].window_text()
-            lang_value = combos[1].window_text()
-            if "Light" not in theme_value:
-                print(f"FAIL: restored Theme combobox reads {theme_value!r}, expected it to show Light", file=sys.stderr)
+            # window_text() alone was empirically found (M5-B) not to
+            # reliably reflect a <select>'s current value for this UIA
+            # ComboBox mapping - _combo_shows checks every readback
+            # source select_dropdown() itself accepts as evidence of a
+            # real change, for the same reason.
+            if not _combo_shows(combos[0], "Light"):
+                print(f"FAIL: restored Theme combobox does not show Light: {_combo_readback(combos[0])!r}", file=sys.stderr)
                 return 1
-            if "日本語" not in lang_value:
-                print(f"FAIL: restored Language combobox reads {lang_value!r}, expected it to show 日本語", file=sys.stderr)
+            if not _combo_shows(combos[1], "日本語"):
+                print(f"FAIL: restored Language combobox does not show 日本語: {_combo_readback(combos[1])!r}", file=sys.stderr)
                 return 1
             edits = find_number_inputs(win)
-            font_value = edits[0].window_text().strip() if edits else ""
-            if font_value != "18":
-                print(f"FAIL: restored diff font size reads {font_value!r}, expected '18'", file=sys.stderr)
+            if not edits or not _combo_shows(edits[0], "18"):
+                diag = _combo_readback(edits[0]) if edits else "no Spinner/Edit control found"
+                print(f"FAIL: restored diff font size does not show '18': {diag!r}", file=sys.stderr)
                 return 1
         except RuntimeError as exc:
             print(f"FAIL: {exc}", file=sys.stderr)
