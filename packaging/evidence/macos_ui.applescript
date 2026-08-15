@@ -622,10 +622,30 @@ on runOnce(argv)
                     set frontmost of process procName to true
                 end try
                 delay 0.2
+                -- Third attempt: frontmost + `click target` (the UI-
+                -- element-reference form, which drives the accessibility
+                -- bridge's AXPress-equivalent) still left keystrokes
+                -- landing nowhere. `click target` is not necessarily the
+                -- same thing as a genuine mouse event at that element's
+                -- screen position - for a button, AXPress firing the same
+                -- onclick handler a real click would is enough; a text
+                -- field's actual OS-level key-window/first-responder focus
+                -- may specifically require a real positional click.
+                -- `click at {x, y}` (System Events' location-based form)
+                -- synthesizes an actual mouse click, not an accessibility
+                -- action - try that instead, at the field's own center.
                 try
-                    click target
+                    set p to position of target
+                    set sz to size of target
+                    set cx to (item 1 of p) + ((item 1 of sz) / 2)
+                    set cy to (item 2 of p) + ((item 2 of sz) / 2)
                 on error errMsg
-                    return "ERROR: click-to-focus: " & errMsg
+                    return "ERROR: position/size: " & errMsg
+                end try
+                try
+                    click at {cx, cy}
+                on error errMsg
+                    return "ERROR: click-at-coords: " & errMsg
                 end try
                 delay 0.2
                 try
