@@ -441,6 +441,27 @@ def p10(binary, break_mode=False):
 # ── recon — not an RFC-078 case ─────────────────────────────────────────────
 
 
+def recon_compare(binary, break_mode=False):
+    """Not a scored case. Dumps the CLI-compare view (F34 fixtures) that
+    M5-A's count_rows/click_button already proved `entire contents of w`
+    works reliably against, as a control: if dump_roles ALSO fails here,
+    the bug is in dump_roles itself, not Explorer-specific; if it succeeds
+    here and keeps failing against Explorer, the bug really is Explorer's
+    tree."""
+    left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = launch(binary, [left, right], scratch)
+        try:
+            wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            time.sleep(1.0)
+            print("--- compare view ---", flush=True)
+            print(ui("dump_roles", "60", timeout=25), flush=True)
+        finally:
+            terminate(proc)
+    return 0
+
+
 def recon_settings(binary, break_mode=False):
     """Not a scored case. Dumps the base Explorer window's accessible tree
     (an empty, isolated `$HOME` keeps it small and static - see `launch`'s
@@ -457,16 +478,16 @@ def recon_settings(binary, break_mode=False):
         try:
             wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
             time.sleep(0.5)
-            print("--- base window ---")
-            print(ui("dump_roles", "200", timeout=25))
+            print("--- base window ---", flush=True)
+            print(ui("dump_roles", "200", timeout=25), flush=True)
             result = ui("click_button", "Settings", timeout=20)
-            print(f"click Settings: {result}")
+            print(f"click Settings: {result}", flush=True)
             if not result.startswith("CLICKED"):
                 result = ui("click_row", "Settings", timeout=20)
-                print(f"click_row Settings: {result}")
+                print(f"click_row Settings: {result}", flush=True)
             time.sleep(1.0)
-            print("--- after clicking Settings ---")
-            print(ui("dump_roles", "300", timeout=25))
+            print("--- after clicking Settings ---", flush=True)
+            print(ui("dump_roles", "300", timeout=25), flush=True)
         finally:
             terminate(proc)
     return 0
@@ -490,7 +511,7 @@ def recon_explorer(binary, break_mode=False):
             wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
             time.sleep(1.0)
             dump = ui("dump_roles", "400", timeout=20)
-            print(dump)
+            print(dump, flush=True)
         finally:
             terminate(proc)
     return 0
@@ -501,6 +522,7 @@ CASES = {
     "p02": p02,
     "p09": p09,
     "p10": p10,
+    "recon_compare": recon_compare,
     "recon_settings": recon_settings,
     "recon_explorer": recon_explorer,
 }
