@@ -325,32 +325,101 @@ def wait_gone(win, text_substring, timeout_s=READY_TIMEOUT_S):
     return find_by_text_containing(win, text_substring) is None
 
 
-def select_dropdown(elem, text):
-    """Selects `text` in a dropdown control via whichever UIA pattern it
-    actually exposes. `pywinauto`'s `ComboBoxWrapper.select()`
-    (`SelectionItemPattern`, via expand/collapse) is tried first - the
-    Invoke-pattern analogue for list selection - but WebView2/Chromium's
-    mapping of a bare HTML `<select>` to UIA "ComboBox" was empirically
-    found (M5-B, first CI run) not to expose a selectable item list that
-    way (`pywinauto` raises `IndexError: item '...' not found`); this
-    falls back to `ValuePattern.SetValue` directly on the control, which
-    Chromium's `<select>` implementation does honor (it resolves the
-    given text against its own option list and updates `selectedIndex`,
-    the same DOM-level effect the ComboBox's `onchange` handler needs).
-    Returns which path worked."""
+def wait_and_invoke(win, text_substring, timeout_s=READY_TIMEOUT_S):
+    """Polls for a descendant whose text contains `text_substring` and
+    invokes it as soon as it's found, instead of one lookup-then-invoke.
+    Needed wherever a control can be transiently *absent* from the tree
+    rather than merely disabled - e.g. the toolbar (and its Reload
+    button) during `TabState::Loading`: `diff.rs` returns an early
+    loading-spinner view with no `Toolbar` at all while a tab is loading
+    (confirmed by reading the component, not assumed - a blind
+    lookup-then-invoke here raised `AttributeError: 'NoneType' object
+    has no attribute 'invoke'` on M5-B's first CI run for P06's second,
+    immediately-following reload click). Raises if nothing appears
+    within `timeout_s`."""
+    deadline = time.monotonic() + timeout_s
+    elem = None
+    while time.monotonic() < deadline:
+        elem = find_by_text_containing(win, text_substring)
+        if elem is not None:
+            break
+        time.sleep(POLL_INTERVAL_S)
+    if elem is None:
+        raise RuntimeError(
+            f"no descendant with text containing {text_substring!r} appeared within {timeout_s}s"
+        )
+    invoke(elem)
+
+
+def _combo_shows(elem, text):
     try:
+        return text in (elem.window_text() or "")
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def select_dropdown(elem, text):
+    """Selects `text` in a dropdown control, trying three UIA-level
+    approaches in order and *verifying* the combo's own reported text
+    actually changed after each one (not just that the call didn't
+    raise) before accepting it as a success - two of these three were
+    each individually found, on real CI, to either raise or silently not
+    take effect:
+
+    1. `pywinauto`'s `ComboBoxWrapper.select()` (`SelectionItemPattern`,
+       via expand/collapse) - raised `IndexError: item '...' not found`
+       on the first CI attempt: WebView2/Chromium's mapping of a bare
+       HTML `<select>` to UIA "ComboBox" does not expose a selectable
+       item list the way `pywinauto` expects for a classic Win32 combo.
+    2. Expand the combo (best-effort - Chromium's `<select>` popup on
+       Windows is its own rendered surface, not a literal Win32
+       COMBOBOX popup) and search the *whole window* for a descendant
+       whose text matches, then Invoke it directly - the same
+       accessibility-action approach every button in this harness uses.
+    3. `ValuePattern.SetValue` directly on the control - didn't raise on
+       the second CI attempt, but the value never actually landed
+       (`settings.json` was never written with the new theme), so this
+       is verified like the others rather than trusted on a clean return.
+
+    Returns which path actually worked (confirmed by readback).
+    """
+
+    def try_selection_item():
         elem.select(text)
         return "selection-item-pattern"
-    except Exception:  # noqa: BLE001 - fall through to ValuePattern
-        pass
-    try:
+
+    def try_expand_and_invoke_item():
+        try:
+            elem.expand()
+        except Exception:  # noqa: BLE001 - best-effort; the item may already be reachable
+            pass
+        top = elem.top_level_parent()
+        item = wait_for_exact(top, text, timeout_s=5)
+        if item is None:
+            raise RuntimeError(f"no descendant with text {text!r} found after expand()")
+        invoke(item)
+        try:
+            elem.collapse()
+        except Exception:  # noqa: BLE001
+            pass
+        return "expand-then-invoke-item"
+
+    def try_value_pattern():
         elem.iface_value.SetValue(text)
         return "value-pattern"
-    except Exception as exc:  # noqa: BLE001
-        raise RuntimeError(
-            f"could not select {text!r}: neither SelectionItemPattern nor "
-            f"ValuePattern worked ({exc})"
-        ) from exc
+
+    last_exc = None
+    for attempt in (try_selection_item, try_expand_and_invoke_item, try_value_pattern):
+        try:
+            path = attempt()
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            continue
+        if _combo_shows(elem, text):
+            return path
+        last_exc = RuntimeError(f"{path} did not raise, but the combo still doesn't show {text!r}")
+
+    raise RuntimeError(f"could not select {text!r} via any known pattern: {last_exc}")
 
 
 def find_number_inputs(win):
@@ -1142,16 +1211,22 @@ def p05(binary, break_mode=False):
 # ── P06 — Async identity (M5-B) ──────────────────────────────────────────────
 
 
-def _pair_content(tag, token, num_lines=300_000):
+def _pair_content(tag, token, num_lines=60_000):
     """Synthetic large left/right text, distinguished by `token` in the
     right file's first line plus scattered per-`tag` differences every
-    300 lines - large enough for `compute_diff` to take a real,
-    observable amount of wall-clock time (RFC-078: "a light but real
-    exercise", not an internal timing hook), not so large that a CI run
-    times out. See `p06`'s docstring for how this size was chosen."""
+    60 lines - large enough for loading (I/O + `compute_diff`, off the
+    UI thread via `tokio::task::spawn_blocking`, per `state/compare.rs`)
+    to take a real, observable amount of wall-clock time (RFC-078: "a
+    light but real exercise", not an internal timing hook). Scaled down
+    from an initial 300,000-line/300-line-spacing attempt (M5-B, first
+    CI run): three sequential process launches each waiting up to
+    `LAUNCH_TIMEOUT_S`+`READY_TIMEOUT_S` for a busy two-large-diffs-at-once
+    CI runner pushed the whole case close to ten minutes; the actual
+    correctness being tested (identity/reload) doesn't need files this
+    large, just genuinely slow enough to give a real interaction window."""
     left_lines = [f"line-{tag}-{i:06d}" for i in range(num_lines)]
     right_lines = list(left_lines)
-    for i in range(0, num_lines, 300):
+    for i in range(0, num_lines, 60):
         right_lines[i] = f"line-{tag}-{i:06d}-CHANGED-{token}"
     right_lines.insert(0, f"TOKEN-{token}")
     return "\n".join(left_lines) + "\n", "\n".join(right_lines) + "\n"
@@ -1173,13 +1248,24 @@ def _rewrite_pair(left, right, tag, token):
 
 
 def p06(binary, break_mode=False):
-    """Two large, deliberately slow comparisons at once, plus a rapid
+    """Two large, deliberately slow comparisons at once, plus a
     double-reload - RFC-078: "Deterministic automated tests remain the
     primary proof; this case confirms runtime integration", so this is a
     light but real exercise, not elaborate timing machinery: two
-    ~300,000-line synthetic file pairs with scattered differences give
-    `compute_diff` a real observable duration, no internal API/env-var
-    hook involved.
+    60,000-line synthetic file pairs with scattered differences give
+    loading (I/O + `compute_diff`) a real observable duration, no
+    internal API/env-var hook involved. (Scaled down from an initial
+    300,000-line attempt that pushed this case toward ten minutes on a
+    busy CI runner - see `_pair_content`'s docstring.)
+
+    The double-reload is NOT a literal overlapping race (deviation,
+    reported - see the code below): `diff.rs` renders no Toolbar at all
+    while `TabState::Loading`, and there is no reload keyboard shortcut,
+    so a second reload is structurally unreachable through the UI while
+    the first is in flight, on any platform - the same shape of finding
+    as P04's keyboard path. What's exercised instead: firing the second
+    reload the moment the UI allows it again, still asserting the
+    *second* reload's content is what's ultimately displayed.
 
     Two tabs, as two independent `forskscope.exe` processes rather than
     two tabs of one running instance: opening a second comparison in-app
@@ -1247,7 +1333,25 @@ def p06(binary, break_mode=False):
             print("OK(break): process-identity check correctly rejected the impossible required token.")
             return 0
 
-        # ── Rapid double reload: the second (latest) reload wins ───────────
+        # ── Double reload: the second (latest) reload wins ──────────────────
+        # NOT a literal overlapping race (deviation, reported): `diff.rs`
+        # renders no Toolbar at all while `TabState::Loading` (a bare
+        # loading-spinner view instead - confirmed by reading the
+        # component), and there is no keyboard shortcut for reload
+        # (`app.rs`'s onkeydown has none), so the *only* UI path to
+        # trigger a second reload is the toolbar button, which is
+        # unreachable for the entire duration the first reload is in
+        # flight. A true concurrent-generation race is therefore
+        # structurally unreachable through this app's UI on any
+        # platform - the same shape of finding as P04's keyboard path.
+        # What this exercises instead: firing a second reload the moment
+        # the UI allows another interaction (as soon as the first
+        # reload's Ready state - and its Toolbar - reappears), with a
+        # still-real, still-meaningful assertion: the *second* reload's
+        # content is what's ultimately displayed, not stale first-reload
+        # content left over from a missed re-render. RFC-078's own
+        # framing already gives deterministic tests the primary-proof
+        # role here ("this case confirms runtime integration").
         left_r, right_r = _write_large_pair(scratch_path, "reload", "V1")
         proc = launch(binary, [left_r, right_r], scratch)
         try:
@@ -1257,16 +1361,23 @@ def p06(binary, break_mode=False):
                 print(f"FAIL(reload): initial load never rendered TOKEN-V1: {missing}", file=sys.stderr)
                 return 1
 
-            reload_button = find_by_text_containing(win, "Reload files from disk")
-            if reload_button is None:
+            if find_by_text_containing(win, "Reload files from disk") is None:
                 print('FAIL(reload): could not find the "Reload files from disk" toolbar button', file=sys.stderr)
                 return 1
 
             _rewrite_pair(left_r, right_r, "reload", "V2")
-            invoke(reload_button)
+            try:
+                wait_and_invoke(win, "Reload files from disk", timeout_s=READY_TIMEOUT_S)
+            except RuntimeError as exc:
+                print(f"FAIL(reload): could not click the first reload: {exc}", file=sys.stderr)
+                return 1
+
             _rewrite_pair(left_r, right_r, "reload", "V3")
-            reload_button = find_by_text_containing(win, "Reload files from disk")
-            invoke(reload_button)
+            try:
+                wait_and_invoke(win, "Reload files from disk", timeout_s=READY_TIMEOUT_S)
+            except RuntimeError as exc:
+                print(f"FAIL(reload): could not click the second reload: {exc}", file=sys.stderr)
+                return 1
 
             ok, texts, missing = wait_for_tokens(win, ["TOKEN-V3"], timeout_s=READY_TIMEOUT_S)
             if not ok:
