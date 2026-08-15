@@ -1837,6 +1837,19 @@ def p06(binary, break_mode=False):
                 print("FAIL: process A still running after terminate()", file=sys.stderr)
                 return 1
 
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"FAIL: process B never registered a window: {exc}", file=sys.stderr)
+                return 1
+            if proc_b.poll() is not None:
+                print(
+                    f"FAIL: process B exited (rc={proc_b.returncode}) before its "
+                    "sentinel could be checked",
+                    file=sys.stderr,
+                )
+                return 1
+
             r = poll_ui(
                 "find_text",
                 sentinel_b_v1,
