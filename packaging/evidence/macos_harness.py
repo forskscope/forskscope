@@ -1514,6 +1514,13 @@ def p12(binary, break_mode=False):
             if proc.poll() is None:
                 terminate(proc)
 
+        session_debug_path = _config_dir(home) / "session.json"
+        print(
+            f"DEBUG: session.json after Launch A close: "
+            f"{session_debug_path.read_text() if session_debug_path.exists() else '<missing>'}",
+            flush=True,
+        )
+
         # ── Launch B: relaunch with no CLI args - restore ────────────────
         proc = launch(binary, [], scratch, home=home)
         try:
@@ -1615,6 +1622,181 @@ def p12(binary, break_mode=False):
         "spinner (AXValue write, AXIncrement, keystroke after focus/click/real-"
         "coordinate-click) was a confirmed no-op; recorded here as manual-"
         "outstanding, not covered."
+    )
+    return 0
+
+
+# ── P06 — Async identity ────────────────────────────────────────────────────
+
+
+def _generate_large_pair(dir_, left_name, right_name, n_lines, sentinel):
+    """Two genuinely large text files (`n_lines` lines each) differing at
+    ~120 scattered points plus one final sentinel line - real work for
+    `compute_diff`, not a synthetic delay hook. RFC-078: "Deterministic
+    automated tests remain the primary proof; this case confirms runtime
+    integration" - a large file is the light, real way to get a loading
+    window, not elaborate timing machinery."""
+    left_path = Path(dir_) / left_name
+    right_path = Path(dir_) / right_name
+    left_lines = []
+    right_lines = []
+    for i in range(n_lines):
+        base = f"line {i:07d} padding text to make the diff heavier xxxxxxxxxxxxxxxxxxxx\n"
+        left_lines.append(base)
+        if i % 500 == 250:
+            right_lines.append(f"line {i:07d} CHANGED padding text yyyyyyyyyyyyyyyyyyyyyyyyyy\n")
+        else:
+            right_lines.append(base)
+    right_lines[-1] = f"{sentinel}\n"
+    left_path.write_text("".join(left_lines))
+    right_path.write_text("".join(right_lines))
+    return left_path, right_path
+
+
+def p06(binary, break_mode=False):
+    """RFC-078's async-identity case, using two genuinely large (80,000-
+    line) synthetic file pairs so `compute_diff` (`tokio::task::
+    spawn_blocking` in `open_compare_request`/`reload_tab`) takes real,
+    measurable time - a real loading window, not a synthetic hook.
+
+    1. CLI-opens pair A (tab index 0, starts loading). Switches to the
+       Explorer tab (`click_any` - `TabBar`'s Explorer tab is a plain
+       `div` with no ARIA role, so neither click_button nor click_row
+       matches it) and, while tab 0 is presumably still loading, picks
+       pair B's two files (`click_row_side` - Explorer's Aligned view
+       shows the same directory in both panes by default, so a filename
+       can appear as a row on both sides; `left`/`right` disambiguate by
+       X position) and clicks Compare, opening pair B as a second tab.
+    2. Closes tab 0 (`Close <pair A's tab title>`) while it may still be
+       loading.
+    3. Asserts the surviving tab shows pair B's own sentinel line - not
+       blank, not crashed, and specifically not pair A's sentinel, which
+       is the falsifiable content check (a tab-count check alone would be
+       vacuous per the handoff's explicit warning: "a check that passes
+       whenever two tabs merely exist").
+    4. Reloads twice in quick succession (toolbar's reload button),
+       rewriting the right-hand file with a different sentinel between
+       the two clicks, and asserts the *second* reload's sentinel is what
+       ends up displayed - not the first's, regardless of which
+       `spawn_blocking` diff happens to finish first.
+
+    `--break`: asserts the first (stale) reload's sentinel is what's
+    displayed instead of the second's - false under real (last-reload-
+    wins) behaviour, so this must fail; per handoff §6, a vacuous version
+    of this check would pass on "some reload happened" alone.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+
+        sentinel_a = "ASYNC-IDENTITY-SENTINEL-PAIR-A-7f3a91"
+        sentinel_b_v1 = "ASYNC-IDENTITY-SENTINEL-PAIR-B-RELOAD-V1"
+        sentinel_b_v2 = "ASYNC-IDENTITY-SENTINEL-PAIR-B-RELOAD-V2"
+
+        left_a, right_a = _generate_large_pair(
+            home, "big-a-left.txt", "big-a-right.txt", 80_000, sentinel_a
+        )
+        left_b, right_b = _generate_large_pair(
+            home, "big-b-left.txt", "big-b-right.txt", 80_000, sentinel_b_v1
+        )
+
+        proc = launch(binary, [left_a, right_a], scratch, home=home)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+
+            r = ui("click_any", "Explorer", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not switch to the Explorer tab: {r}", file=sys.stderr)
+                return 1
+
+            r = poll_ui(
+                "click_row_side",
+                "big-b-left.txt",
+                "left",
+                predicate=lambda r: r.startswith("CLICKED"),
+                timeout=LAUNCH_TIMEOUT_S,
+            )
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not pick big-b-left.txt on the left: {r}", file=sys.stderr)
+                return 1
+            r = poll_ui(
+                "click_row_side",
+                "big-b-right.txt",
+                "right",
+                predicate=lambda r: r.startswith("CLICKED"),
+                timeout=LAUNCH_TIMEOUT_S,
+            )
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not pick big-b-right.txt on the right: {r}", file=sys.stderr)
+                return 1
+
+            r = click_wait("Compare")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Compare: {r}", file=sys.stderr)
+                return 1
+
+            r = click_wait("Close big-a-left.txt", timeout=LAUNCH_TIMEOUT_S)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not close pair A's tab: {r}", file=sys.stderr)
+                return 1
+
+            r = find_wait(sentinel_b_v1, timeout=LAUNCH_TIMEOUT_S)
+            if not r.startswith("FOUND"):
+                print(
+                    f"FAIL: pair B's sentinel never appeared after closing pair A's "
+                    f"tab mid-load: {r}",
+                    file=sys.stderr,
+                )
+                return 1
+            r = ui("find_text", sentinel_a, timeout=20)
+            if r.startswith("FOUND"):
+                print(
+                    f"FAIL: pair A's sentinel is visible after its tab was closed - "
+                    "stale content leaked into the surviving tab",
+                    file=sys.stderr,
+                )
+                return 1
+
+            # ── Reload twice in quick succession ──────────────────────
+            right_b.write_text(f"content v1\n{sentinel_b_v1}\n")
+            r = click_wait("Reload files from disk")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Reload (first): {r}", file=sys.stderr)
+                return 1
+            right_b.write_text(f"content v2\n{sentinel_b_v2}\n")
+            r = ui("click_button", "Reload files from disk", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Reload (second): {r}", file=sys.stderr)
+                return 1
+
+            expected_final = sentinel_b_v1 if break_mode else sentinel_b_v2
+            r = find_wait(expected_final, timeout=LAUNCH_TIMEOUT_S)
+            if not r.startswith("FOUND"):
+                print(
+                    f"FAIL: expected final sentinel {expected_final!r} never appeared: {r}",
+                    file=sys.stderr,
+                )
+                return 1
+            if not break_mode:
+                r = ui("find_text", sentinel_b_v1, timeout=20)
+                if r.startswith("FOUND"):
+                    print(
+                        "FAIL: the first (stale) reload's sentinel is still visible - "
+                        "the second reload should have won",
+                        file=sys.stderr,
+                    )
+                    return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: closing pair A's tab mid-load left pair B's tab showing its own "
+        "correct content (not pair A's, not blank); two rapid reloads ended with "
+        "the second (latest) reload's content displayed, not the first's."
     )
     return 0
 
@@ -1741,6 +1923,7 @@ CASES = {
     "p08_reset": p08_reset,
     "p08_fs": p08_fs,
     "p12": p12,
+    "p06": p06,
     "recon_settings": recon_settings,
     "recon_explorer": recon_explorer,
 }

@@ -419,6 +419,63 @@ on runOnce(argv)
                 end try
                 return "CLICKED: x=" & bestX
 
+            else if cmdName is "click_any" then
+                -- Broadest of the click_* family: no role filter at all.
+                -- TabBar's Explorer tab (tabs.rs) is a plain `div` with an
+                -- onclick and no `role` attribute set, so it's neither
+                -- AXButton (click_button) nor AXRow (click_row) - matches
+                -- by the same own-or-nested-text rule as click_row, on any
+                -- role, and clicks the first hit in document order.
+                set needle to item 3 of argv
+                set allEl to my safeContents(w)
+                repeat with e in allEl
+                    set hit to false
+                    set d to ""
+                    try
+                        if (description of e) contains needle then
+                            set hit to true
+                            set d to description of e
+                        end if
+                    end try
+                    if not hit then
+                        try
+                            set innerEl to my safeContents(e)
+                            repeat with ie in innerEl
+                                try
+                                    set iv to value of ie
+                                    if class of iv is text and iv contains needle then
+                                        set hit to true
+                                        set d to iv
+                                        exit repeat
+                                    end if
+                                end try
+                                if not hit then
+                                    try
+                                        set it4 to title of ie
+                                        if it4 contains needle then
+                                            set hit to true
+                                            set d to it4
+                                            exit repeat
+                                        end if
+                                    end try
+                                end if
+                            end repeat
+                        end try
+                    end if
+                    if hit then
+                        try
+                            click e
+                            return "CLICKED: " & d
+                        on error errMsg
+                            -- Not every matched element is itself
+                            -- clickable (a static-text leaf inside a
+                            -- clickable ancestor, say) - keep looking
+                            -- rather than failing outright.
+                        end try
+                    end if
+                end repeat
+                return "NOT_FOUND"
+
             else if cmdName is "get_value" then
                 set roleWanted to item 3 of argv
                 set n to (item 4 of argv) as integer
