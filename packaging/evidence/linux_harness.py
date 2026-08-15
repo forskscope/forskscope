@@ -889,14 +889,26 @@ def select_combo_option(combo, option_index):
         subprocess.run(["xdotool", "key", step_key], check=True, timeout=15)
         time.sleep(0.2)
     subprocess.run(["xdotool", "key", "Return"], check=True, timeout=15)
-    time.sleep(0.3)
+    time.sleep(0.6)
 
 
-def selected_option_name(combo):
+def selected_option_name(combo, timeout_s=5):
     """The name of whichever menu-item child currently carries the
     SELECTED AT-SPI state - the only way to read a combo box's current
-    value back, since the combo box itself exposes no Text/Value."""
-    menu = combo.get_child_at_index(0)
+    value back, since the combo box itself exposes no Text/Value. Polls
+    for the menu child rather than assuming it's immediately available -
+    confirmed on CI (run 31879066537) that right after a real X11 click
+    opens/closes the combo's native popup, `get_child_at_index(0)` can
+    transiently return None while the tree restabilizes."""
+    deadline = time.monotonic() + timeout_s
+    menu = None
+    while time.monotonic() < deadline:
+        menu = combo.get_child_at_index(0)
+        if menu is not None:
+            break
+        time.sleep(0.2)
+    if menu is None:
+        return None
     for i in range(menu.get_child_count()):
         item = menu.get_child_at_index(i)
         if item.get_state_set().contains(Atspi.StateType.SELECTED):
@@ -1269,7 +1281,19 @@ def p06(binary, break_mode=False):
                 print("FAIL: forskscope never registered on the accessibility bus", file=sys.stderr)
                 return 1
 
-            root = find_app_root(app)
+            # Poll rather than a single lookup right after find_app returns -
+            # the app registering on the accessibility bus does not mean its
+            # UI tree (including pair A's own diff computation) has finished
+            # populating yet (F57's lesson, matching wait_for_ready's own
+            # retry discipline elsewhere in this file - confirmed as the
+            # actual cause of CI run 31879060228's failure).
+            root = None
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                root = find_app_root(app)
+                if root is not None and root.get_child_count() >= 3:
+                    break
+                time.sleep(0.3)
             if root is None or root.get_child_count() < 3:
                 print("FAIL: could not locate app-root / the Explorer tab", file=sys.stderr)
                 return 1
