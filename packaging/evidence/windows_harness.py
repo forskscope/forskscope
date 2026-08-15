@@ -353,6 +353,41 @@ def select_dropdown(elem, text):
         ) from exc
 
 
+def find_number_inputs(win):
+    """Descendants for an `<input type="number">` field. Empirically
+    (M5-B, P12's first CI run), Chromium/WebView2 does NOT map a number
+    input to UIA ControlType "Edit" the way a plain text input does (the
+    Save As path field, a plain `<input type="text">`, is found via
+    "Edit" without trouble) - it maps to "Spinner" instead, presumably
+    because of the native up/down stepper Chromium renders for numeric
+    inputs. Tries "Spinner" first since that's what was actually
+    observed, falling back to "Edit" in case a future WebView2 build's
+    mapping changes."""
+    for control_type in ("Spinner", "Edit"):
+        try:
+            found = win.descendants(control_type=control_type)
+        except Exception:  # noqa: BLE001
+            found = []
+        if found:
+            return found
+    return []
+
+
+def set_value_text(elem, text):
+    """Sets a control's text via whichever pattern it exposes:
+    `set_edit_text()` (pywinauto's `EditWrapper`, `ValuePattern.SetValue`
+    under the hood) where pywinauto wraps the control that way, falling
+    back to calling `ValuePattern.SetValue` directly for a control type
+    (e.g. "Spinner" - see `find_number_inputs`) pywinauto doesn't wrap
+    with `EditWrapper`."""
+    try:
+        elem.set_edit_text(text)
+        return "set_edit_text"
+    except Exception:  # noqa: BLE001
+        elem.iface_value.SetValue(text)
+        return "value-pattern"
+
+
 def modal_action_button(win, label):
     """Finds the action button labelled `label` inside the currently-open
     modal, disambiguated from an identically-labelled toolbar control
@@ -1698,11 +1733,11 @@ def p12(binary, break_mode=False):
             theme_path = select_dropdown(theme_combo, "Light")
             lang_path = select_dropdown(lang_combo, "日本語")
 
-            edits = win.descendants(control_type="Edit")
+            edits = find_number_inputs(win)
             if not edits:
-                print("FAIL: could not find the diff font size Edit control", file=sys.stderr)
+                print("FAIL: could not find the diff font size input (tried Spinner and Edit control types)", file=sys.stderr)
                 return 1
-            edits[0].set_edit_text("18")
+            set_value_text(edits[0], "18")
 
             close_btn = wait_for_exact(win, "Close", control_type="Button", timeout_s=LAUNCH_TIMEOUT_S)
             if close_btn is None:
@@ -1764,7 +1799,7 @@ def p12(binary, break_mode=False):
             if "日本語" not in lang_value:
                 print(f"FAIL: restored Language combobox reads {lang_value!r}, expected it to show 日本語", file=sys.stderr)
                 return 1
-            edits = win.descendants(control_type="Edit")
+            edits = find_number_inputs(win)
             font_value = edits[0].window_text().strip() if edits else ""
             if font_value != "18":
                 print(f"FAIL: restored diff font size reads {font_value!r}, expected '18'", file=sys.stderr)
