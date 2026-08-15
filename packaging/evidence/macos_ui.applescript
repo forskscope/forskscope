@@ -92,14 +92,22 @@
 -- Python side treats as its own distinct, reportable failure mode rather
 -- than papering over it as "element not found".
 
--- M5-B: Explorer's directory tree scans asynchronously (`tree.rs`'s
--- `scans_l`/`scans_r` channels populate rows as the scan progresses), so
--- `entire contents of w` against the Explorer view can race a live tree
--- mutation and come back as "System Events got an error: AppleEvent
--- handler failed. (-10000)" - a transient failure, not a real one (M5-A's
--- four cases never hit this because none of them target a still-mutating
--- view). Retry a bounded number of times before giving up, so a single
--- race during a scan doesn't fail an otherwise-correct case.
+-- M5-B: recon against the Explorer view found `entire contents of w`
+-- itself throwing "System Events got an error: AppleEvent handler failed.
+-- (-10000)" - deterministically, not as a transient race (M5-A's four
+-- cases never hit this because none of them target the Explorer view;
+-- their `entire contents of w` calls are left exactly as they were).
+-- `entire contents` is one bulk AppleEvent that resolves the *entire*
+-- subtree at once; some node under Explorer's WKWebView-rendered tree
+-- (likely the async-scanning file tree itself - `tree.rs`'s scans_l/
+-- scans_r channels mutate it while System Events is trying to resolve a
+-- stable snapshot) makes that single bulk call fail as a whole, with no
+-- way to skip just the poison node. `safeContents` falls back to a manual,
+-- per-node `UI elements of` walk (`flatWalk`) that tolerates any single
+-- node refusing to enumerate its children - it just treats that node as a
+-- leaf instead of failing the entire traversal. The bounded retry loop
+-- below stays as a second, independent layer - even a per-node walk can
+-- still race a concurrent mutation at the exact node it is standing on.
 on run argv
     set attemptN to 0
     repeat
@@ -136,7 +144,7 @@ on runOnce(argv)
 
             else if cmdName is "count_rows" then
                 set n to 0
-                set allEl to entire contents of w
+                set allEl to my safeContents(w)
                 repeat with e in allEl
                     try
                         if role of e is "AXRow" then set n to n + 1
@@ -146,7 +154,7 @@ on runOnce(argv)
 
             else if cmdName is "find_text" then
                 set needle to item 3 of argv
-                set allEl to entire contents of w
+                set allEl to my safeContents(w)
                 repeat with e in allEl
                     try
                         set d to description of e
@@ -167,7 +175,7 @@ on runOnce(argv)
 
             else if cmdName is "click_button" then
                 set needle to item 3 of argv
-                set allEl to entire contents of w
+                set allEl to my safeContents(w)
                 repeat with e in allEl
                     set isButton to false
                     try
@@ -201,7 +209,7 @@ on runOnce(argv)
 
             else if cmdName is "click_row" then
                 set needle to item 3 of argv
-                set allEl to entire contents of w
+                set allEl to my safeContents(w)
                 repeat with e in allEl
                     set isRow to false
                     try
@@ -218,7 +226,7 @@ on runOnce(argv)
                         end try
                         if not hit then
                             try
-                                set innerEl to entire contents of e
+                                set innerEl to my safeContents(e)
                                 repeat with ie in innerEl
                                     try
                                         set iv to value of ie
@@ -228,6 +236,26 @@ on runOnce(argv)
                                             exit repeat
                                         end if
                                     end try
+                                    if not hit then
+                                        try
+                                            set it2 to title of ie
+                                            if it2 contains needle then
+                                                set hit to true
+                                                set d to it2
+                                                exit repeat
+                                            end if
+                                        end try
+                                    end if
+                                    if not hit then
+                                        try
+                                            set id2 to description of ie
+                                            if id2 contains needle then
+                                                set hit to true
+                                                set d to id2
+                                                exit repeat
+                                            end if
+                                        end try
+                                    end if
                                 end repeat
                             end try
                         end if
@@ -243,7 +271,7 @@ on runOnce(argv)
                 set roleWanted to item 3 of argv
                 set n to (item 4 of argv) as integer
                 set idx to 0
-                set allEl to entire contents of w
+                set allEl to my safeContents(w)
                 repeat with e in allEl
                     set isMatch to false
                     try
@@ -267,7 +295,7 @@ on runOnce(argv)
                 set n to (item 4 of argv) as integer
                 set newVal to item 5 of argv
                 set idx to 0
-                set allEl to entire contents of w
+                set allEl to my safeContents(w)
                 repeat with e in allEl
                     set isMatch to false
                     try
@@ -300,7 +328,7 @@ on runOnce(argv)
                 set n to (item 4 of argv) as integer
                 set actionName to item 5 of argv
                 set idx to 0
-                set allEl to entire contents of w
+                set allEl to my safeContents(w)
                 repeat with e in allEl
                     set isMatch to false
                     try
@@ -337,7 +365,7 @@ on runOnce(argv)
                 set capN to 300
                 if (count of argv) > 2 then set capN to (item 3 of argv) as integer
                 set outLines to {}
-                set allEl to entire contents of w
+                set allEl to my safeContents(w)
                 set seen to 0
                 repeat with e in allEl
                     set seen to seen + 1
@@ -378,3 +406,31 @@ on runOnce(argv)
         end tell
     end tell
 end runOnce
+
+-- See the M5-B comment above `on run argv` for why this exists instead of
+-- a plain `entire contents of el`.
+on safeContents(el)
+    try
+        return (entire contents of el)
+    on error
+        set outList to {}
+        my flatWalk(el, 30, outList)
+        return outList
+    end try
+end safeContents
+
+on flatWalk(el, maxDepth, outList)
+    if maxDepth < 0 then return
+    try
+        set kids to (UI elements of el)
+    on error
+        -- This node refuses to enumerate its children (the poison-node
+        -- case `safeContents` exists for) - treat it as a leaf rather
+        -- than failing the whole walk.
+        return
+    end try
+    repeat with k in kids
+        set end of outList to k
+        my flatWalk(k, maxDepth - 1, outList)
+    end repeat
+end flatWalk
