@@ -1844,6 +1844,25 @@ def p06(binary, break_mode=False):
         sentinel_b_v1 = "ASYNC-IDENTITY-SENTINEL-PAIR-B-RELOAD-V1"
         sentinel_b_v2 = "ASYNC-IDENTITY-SENTINEL-PAIR-B-RELOAD-V2"
 
+        def _rewrite_right_b_with_sentinel(right_path, left_path, new_sentinel):
+            # Keep the same 30-line shape as the original pair - a reload
+            # that suddenly shrinks the file to 2 lines makes for a much
+            # bigger structural diff than the ones already confirmed to
+            # render reliably (see _generate_large_pair's docstring for
+            # the size investigation this is built on).
+            n = len(left_path.read_text().splitlines())
+            lines = []
+            for i in range(n):
+                if i == 5:
+                    lines.append(f"{new_sentinel}\n")
+                elif i % 20 == 10:
+                    lines.append(f"line {i:07d} CHANGED padding text yyyyyyyyyyyyyyyyyyyyyyyyyy\n")
+                else:
+                    lines.append(
+                        f"line {i:07d} padding text to make the diff heavier xxxxxxxxxxxxxxxxxxxx\n"
+                    )
+            right_path.write_text("".join(lines))
+
         left_a, right_a = _generate_large_pair(
             scratch, "big-a-left.txt", "big-a-right.txt", 30, "PAIR-A-UNUSED-SENTINEL"
         )
@@ -1882,7 +1901,7 @@ def p06(binary, break_mode=False):
                 return 1
 
             # ── Reload twice in quick succession ────────────────────────
-            right_b.write_text(f"content v1\n{sentinel_b_v1}\n")
+            _rewrite_right_b_with_sentinel(right_b, left_b, sentinel_b_v1)
             r = click_wait("Reload files from disk")
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Reload (first): {r}", file=sys.stderr)
@@ -1893,7 +1912,7 @@ def p06(binary, break_mode=False):
             # event handling a moment to actually register before the
             # second fires.
             time.sleep(0.3)
-            right_b.write_text(f"content v2\n{sentinel_b_v2}\n")
+            _rewrite_right_b_with_sentinel(right_b, left_b, sentinel_b_v2)
             r = ui("click_button", "Reload files from disk", timeout=20)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Reload (second): {r}", file=sys.stderr)
@@ -1902,11 +1921,6 @@ def p06(binary, break_mode=False):
             expected_final = sentinel_b_v1 if break_mode else sentinel_b_v2
             r = find_wait(expected_final, timeout=LAUNCH_TIMEOUT_S)
             if not r.startswith("FOUND"):
-                print(
-                    f"DEBUG: find_text 'content' after reloads: "
-                    f"{ui('find_text', 'content', timeout=20)!r}",
-                    file=sys.stderr,
-                )
                 print(
                     f"FAIL: expected final sentinel {expected_final!r} never appeared: {r}",
                     file=sys.stderr,
