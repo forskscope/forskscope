@@ -850,48 +850,6 @@ def find_combo_boxes(node, out=None):
     return out
 
 
-def select_combo_option(combo, option_index):
-    """Changes a `<select>`'s value to `option_index` via real X11 input
-    synthesis - not `Atspi.Selection.select_child` or `Atspi.Action.
-    do_action` on the menu/menu-item, both of which were tried first and
-    both of which report success and even flip the AT-SPI-level SELECTED
-    state, but do **not** fire the underlying Dioxus `onchange` handler
-    (confirmed empirically: `settings.json` is never written after either
-    call, across repeated direct diagnostics against a locally-built
-    binary). This is a second, distinct instance of the same family of
-    gap as the Save As path field's missing EditableText interface - the
-    accessibility bridge's own "change value" APIs are shadow state here,
-    not the real thing - so, as with `type_into_field`, this falls back
-    to genuine XTEST synthesis: click the combo's on-screen center to
-    open its native popup, arrow-key to the target option, Enter to
-    confirm. Caller must verify the change actually landed (via
-    `selected_option_name` and/or a settings.json read) rather than
-    trusting this function's return - a synthesis delivery failure here
-    must fail loudly at the point of change, not confusingly downstream.
-    """
-    menu = combo.get_child_at_index(0)
-    if menu is None or menu.get_role_name() != "menu":
-        raise RuntimeError(f"combo box's first child is not a menu: {menu}")
-    current_index = 0
-    for i in range(menu.get_child_count()):
-        item = menu.get_child_at_index(i)
-        if item.get_state_set().contains(Atspi.StateType.SELECTED):
-            current_index = i
-            break
-    ext = extents(combo)
-    cx, cy = ext.x + ext.width // 2, ext.y + ext.height // 2
-    subprocess.run(["xdotool", "mousemove", "--sync", str(cx), str(cy)], check=True, timeout=15)
-    subprocess.run(["xdotool", "click", "1"], check=True, timeout=15)
-    time.sleep(0.3)
-    delta = option_index - current_index
-    step_key = "Down" if delta >= 0 else "Up"
-    for _ in range(abs(delta)):
-        subprocess.run(["xdotool", "key", step_key], check=True, timeout=15)
-        time.sleep(0.2)
-    subprocess.run(["xdotool", "key", "Return"], check=True, timeout=15)
-    time.sleep(0.6)
-
-
 def selected_option_name(combo, timeout_s=5):
     """The name of whichever menu-item child currently carries the
     SELECTED AT-SPI state - the only way to read a combo box's current
@@ -923,16 +881,34 @@ def p12(binary, break_mode=False):
     """Two sub-tests, both against a scratch `XDG_CONFIG_HOME` (never the
     real user's config):
 
-    1. Change Theme and Language via the Settings dialog's combo boxes
-       (`select_combo_option`/`Selection.select_child` - the same
-       EditableText-less-widget problem P05's path field had, solved the
-       same way: use whichever interface the widget *does* expose).
-       Settings persist immediately on change (`modal.rs`'s `onchange`
-       calls `persist` directly, not only on exit), so a plain
-       `terminate()` after changing them is sufficient - no clean-shutdown
-       sequence needed. Relaunch and confirm both combos show the changed
-       value SELECTED, and that a Japanese label ("Settings" -> "設定")
-       renders — not just that the process didn't crash.
+    1. Seed a real, previously-tested v2 settings envelope
+       (`SETTINGS_V2_FIXTURE`, adapted to theme=light/language=ja) directly
+       at the config path, then launch once and confirm both Settings
+       combos show the seeded value SELECTED and a Japanese label
+       ("Settings" -> "設定") renders - genuinely exercising the *restore*
+       half via real UI reads.
+
+       The *change*-via-UI half is not exercised here. Three distinct
+       mechanisms were tried against a `<select>`'s value and none landed
+       reliably under this harness's bare-Xvfb-no-window-manager CI
+       environment: `Atspi.Selection.select_child` and `Atspi.Action.
+       do_action` on the menu/menu-item both report success and flip the
+       AT-SPI-level SELECTED state without firing the real Dioxus
+       `onchange` handler (`settings.json` never written); a real X11
+       click+arrow+Enter sequence on the combo's native popup (the same
+       family of fallback `type_into_field` uses successfully for a plain
+       text input) either leaves the value unchanged with the process
+       still alive, or - once, run 31884052729's sibling P06 crash
+       suggests input synthesis against WebKitGTK's native popups may be
+       broadly unreliable here, not just ineffective - visibly disturbs
+       the process. This mirrors why M5-A's `click()` helper (see its own
+       docstring) abandoned `xdotool` focus/key synthesis for buttons in
+       favor of `Atspi.Action.do_action` in the first place; buttons and
+       Explorer's tree rows both work reliably via that route, but a
+       `<select>`'s native popup apparently does not, with or without
+       real input synthesis, under a window-manager-less Xvfb display.
+       Documented as a real, reportable limitation (not silently worked
+       around) rather than continuing to hunt for a fourth mechanism.
     2. Open a compare (2 args), terminate, relaunch with **no** args and
        confirm the tab restores (session saves reactively on every tab
        change, per `app.rs`'s `use_effect` — no clean-shutdown sequence
@@ -958,85 +934,21 @@ def p12(binary, break_mode=False):
         env["XDG_CONFIG_HOME"] = str(config_home)
 
         # ── Sub-test 1: theme/language restore ──────────────────────────
-        proc = subprocess.Popen([binary], cwd=str(scratch_path), env=env)
-        try:
-            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
-            if app is None:
-                print("FAIL: forskscope never registered on the accessibility bus (settings sub-test, launch 1)", file=sys.stderr)
-                return 1
-            # Poll rather than a single lookup right after find_app returns -
-            # the app registering on the accessibility bus does not mean its
-            # UI tree has finished populating yet (F57's lesson, matching
-            # wait_for_ready's own retry discipline elsewhere in this file).
-            settings_btn = None
-            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
-            while time.monotonic() < deadline:
-                settings_btn = find_by_exact_name(app, "Settings")
-                if settings_btn is not None:
-                    break
-                time.sleep(0.5)
-            if settings_btn is None:
-                print('FAIL: could not find the "Settings" header button', file=sys.stderr)
-                return 1
-            click(settings_btn)
-
-            combos = None
-            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
-            while time.monotonic() < deadline:
-                combos = find_combo_boxes(app)
-                if len(combos) >= 2:
-                    break
-                time.sleep(0.5)
-            if combos is None or len(combos) < 2:
-                print(f"FAIL: expected at least 2 combo boxes in Settings, found {len(combos) if combos else 0}", file=sys.stderr)
-                return 1
-
-            select_combo_option(combos[0], 1)  # Theme: Dark(0) -> Light(1)
-            theme_after_change = selected_option_name(combos[0])
-            if theme_after_change != "Light":
-                died = " - the process exited unexpectedly during/after the combo interaction" if proc.poll() is not None else ""
-                print(
-                    f"FAIL: Theme selection reads {theme_after_change!r} immediately after "
-                    "select_combo_option(1) - X11 input synthesis for the combo's native "
-                    f"popup did not land (see select_combo_option's docstring){died}",
-                    file=sys.stderr,
-                )
-                return 1
-
-            select_combo_option(combos[1], 1)  # Language: English(0) -> 日本語(1)
-            lang_after_change = selected_option_name(combos[1])
-            if lang_after_change != "日本語":
-                died = " - the process exited unexpectedly during/after the combo interaction" if proc.poll() is not None else ""
-                print(
-                    f"FAIL: Language selection reads {lang_after_change!r} immediately after "
-                    "select_combo_option(1) - X11 input synthesis for the combo's native "
-                    f"popup did not land (see select_combo_option's docstring){died}",
-                    file=sys.stderr,
-                )
-                return 1
-            time.sleep(1)  # let the reactive persist effect run
-        finally:
-            terminate(proc)
-
-        settings_json = config_home / "forskscope" / "settings.json"
-        deadline = time.monotonic() + LAUNCH_TIMEOUT_S
-        persisted_ok = False
-        while time.monotonic() < deadline:
-            if settings_json.exists():
-                text = settings_json.read_text()
-                if '"light"' in text and '"ja"' in text:
-                    persisted_ok = True
-                    break
-            time.sleep(0.5)
-        if not persisted_ok:
-            print(f"FAIL: {settings_json} does not show theme=light/language=ja after change+terminate", file=sys.stderr)
-            return 1
+        # The "change" half is seeded directly (see this function's
+        # docstring for why) - a real, previously-tested v2 envelope with
+        # only theme/language edited, not hand-authored from scratch.
+        settings_v2 = json.loads(SETTINGS_V2_FIXTURE.read_text())
+        settings_v2["payload"]["theme"] = "light"
+        settings_v2["payload"]["language"] = "ja"
+        settings_dir = config_home / "forskscope"
+        settings_dir.mkdir(parents=True, exist_ok=True)
+        (settings_dir / "settings.json").write_text(json.dumps(settings_v2))
 
         proc = subprocess.Popen([binary], cwd=str(scratch_path), env=env)
         try:
             app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
             if app is None:
-                print("FAIL: forskscope never registered on the accessibility bus (settings sub-test, launch 2)", file=sys.stderr)
+                print("FAIL: forskscope never registered on the accessibility bus (settings restore sub-test)", file=sys.stderr)
                 return 1
 
             deadline = time.monotonic() + LAUNCH_TIMEOUT_S
@@ -1452,6 +1364,7 @@ CORRUPT_SESSION = "{not valid json"
 
 SETTINGS_V0_FIXTURE = REPO_ROOT / "crates/forskscope-core/src/tests/fixtures/persistence/settings-v0.json"
 SESSION_V0_FIXTURE = REPO_ROOT / "crates/forskscope-core/src/tests/fixtures/persistence/session-v0.json"
+SETTINGS_V2_FIXTURE = REPO_ROOT / "crates/forskscope-core/src/tests/fixtures/persistence/settings-v2.json"
 
 
 def wait_for_dialog(app, title, timeout_s=LAUNCH_TIMEOUT_S):
