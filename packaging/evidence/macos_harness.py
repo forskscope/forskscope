@@ -1850,6 +1850,12 @@ def p06(binary, break_mode=False):
                 )
                 return 1
 
+            print(f"DEBUG: count_rows for process B: {ui('count_rows', timeout=20)!r}", flush=True)
+            print(
+                f"DEBUG: find_text 'line' for process B: {ui('find_text', 'line', timeout=20)!r}",
+                flush=True,
+            )
+
             r = poll_ui(
                 "find_text",
                 sentinel_b_v1,
