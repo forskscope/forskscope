@@ -553,13 +553,24 @@ on runOnce(argv)
                     end try
                     return "ERROR: no AXMenuItem titled " & optionLabel & " found after opening the popup"
                 end if
+                -- `click itemEl` (System Events' generic verb) did not
+                -- change the underlying value in the previous recon round
+                -- (readback stayed "Dark"/"English" despite "SELECTED: ..."
+                -- - the click itself succeeded structurally but nothing
+                -- downstream reacted). Try the explicit AXPress action
+                -- instead - `click` on a UI element is documented as
+                -- roughly equivalent to `perform action "AXPress"`, but
+                -- they are not guaranteed identical for every AXRole, and
+                -- click_button's own success has only ever been observed
+                -- via `click`, never compared against explicit AXPress for
+                -- a menu-item-shaped role.
                 try
-                    click itemEl
+                    perform action "AXPress" of itemEl
                 on error errMsg
                     try
                         key code 53
                     end try
-                    return "ERROR: click AXMenuItem " & optionLabel & ": " & errMsg
+                    return "ERROR: AXPress AXMenuItem " & optionLabel & ": " & errMsg
                 end try
                 return "SELECTED: " & optionLabel
 

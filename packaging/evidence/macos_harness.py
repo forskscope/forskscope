@@ -649,6 +649,266 @@ def p04(binary, break_mode=False):
     return 0
 
 
+# ── P05 — External modification ─────────────────────────────────────────────
+
+
+def _p05_open_dirty(binary, scratch):
+    """Copies F34's fixture pair into `scratch`, opens `<left> <right>`,
+    and applies the first hunk (mouse/AXPress, same as P04) so the tab is
+    dirty - `toolbar.rs`'s Save button is `disabled: !snap.is_dirty`, so a
+    clean tab's Save click would be a no-op that never reaches the
+    conflict path this case tests. Returns `(proc, left, right)`."""
+    left_src = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right_src = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    left = Path(scratch) / "left.txt"
+    right = Path(scratch) / "right.txt"
+    left.write_bytes(left_src.read_bytes())
+    right.write_bytes(right_src.read_bytes())
+
+    proc = launch(binary, [left, right], scratch)
+    wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+    rows = wait_rows(14)
+    if rows != "14":
+        raise RuntimeError(f"compare view never reached 14 AXRow elements (last: {rows!r})")
+    r = click_wait("Use this change")
+    if not r.startswith("CLICKED"):
+        raise RuntimeError(f"could not click 'Use this change': {r}")
+    r = find_wait("unsaved", want_found=True)
+    if not r.startswith("FOUND"):
+        raise RuntimeError(f"dirty marker never appeared: {r}")
+    return proc, left, right
+
+
+def p05(binary, break_mode=False):
+    """Three fresh launches (each starting from F34's fixture pair, made
+    dirty via P04's technique), covering RFC-078's external-modification
+    sub-cases:
+
+    1. Cancel: while the app has `<right>` open, overwrite it *outside the
+       app* with different bytes, then click Save. `save.rs`'s
+       `TargetPrecondition::MustMatch` fingerprint check must reject the
+       write - `OverwriteModal` ("File changed on disk") appears, and
+       `<right>` still holds the externally-written bytes (Save did not
+       silently win the race). Clicking Cancel closes the dialog without
+       touching the file.
+    2. Overwrite: same setup, this time click "Overwrite". The write
+       proceeds, and the `.bak` sibling `save.rs`'s `SiblingBak` policy
+       creates must hold the bytes that were *just overwritten* - the
+       externally-modified content, not the original pre-edit fixture
+       content (the detail that makes this check meaningful rather than
+       "a .bak exists").
+    3. Save As: same setup, this time "Save As" to a different path
+       (`type_into`'s click-to-focus + keystroke, per recon - `set_value`
+       is a confirmed no-op for this control). The original `<right>`
+       target must be untouched (still the externally-modified bytes) and
+       the new path must hold the app's own merge output.
+
+    `--break`: sub-case 2's `.bak`-content check is flipped to expect
+    bytes that can never be real - proves the check reads real bytes, not
+    just "a .bak file exists" (per the handoff's explicit warning that
+    ".bak exists" alone is the vacuous version of this check).
+    """
+    external_bytes = b"EXTERNALLY MODIFIED WHILE APP WAS OPEN\nsecond line\n"
+
+    # ── Sub-case 1: blocked, then Cancel ────────────────────────────────
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = None
+        try:
+            proc, left, right = _p05_open_dirty(binary, scratch)
+            time.sleep(0.3)
+            right.write_bytes(external_bytes)
+
+            r = click_wait("Save merge result")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Save: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("File changed on disk", want_found=True)
+            if not r.startswith("FOUND"):
+                print(
+                    f"FAIL: 'File changed on disk' modal never appeared after an "
+                    f"external modification + Save: {r}",
+                    file=sys.stderr,
+                )
+                return 1
+            if right.read_bytes() != external_bytes:
+                print(
+                    "FAIL: Save silently overwrote the externally-modified file "
+                    "instead of being blocked",
+                    file=sys.stderr,
+                )
+                return 1
+
+            r = ui("click_button_exact", "Cancel", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Cancel: {r}", file=sys.stderr)
+                return 1
+            time.sleep(0.5)
+            if right.read_bytes() != external_bytes:
+                print(
+                    "FAIL: file content changed after clicking Cancel (should be untouched)",
+                    file=sys.stderr,
+                )
+                return 1
+        except (PermissionWall, TimeoutError, RuntimeError) as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            if proc is not None:
+                terminate(proc)
+
+    # ── Sub-case 2: Overwrite, .bak matches the externally-modified bytes ──
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = None
+        try:
+            proc, left, right = _p05_open_dirty(binary, scratch)
+            time.sleep(0.3)
+            right.write_bytes(external_bytes)
+
+            r = click_wait("Save merge result")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Save: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("File changed on disk", want_found=True)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: modal never appeared: {r}", file=sys.stderr)
+                return 1
+
+            r = ui("click_button_exact", "Overwrite", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Overwrite: {r}", file=sys.stderr)
+                return 1
+
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            after = external_bytes
+            while time.monotonic() < deadline:
+                after = right.read_bytes()
+                if after != external_bytes:
+                    break
+                time.sleep(0.5)
+            if after == external_bytes:
+                print(
+                    f"FAIL: {right} still holds the externally-modified bytes "
+                    f"after Overwrite within {LAUNCH_TIMEOUT_S}s",
+                    file=sys.stderr,
+                )
+                return 1
+
+            bak = Path(scratch) / "right.txt.bak"
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            bak_bytes = None
+            while time.monotonic() < deadline:
+                if bak.exists():
+                    bak_bytes = bak.read_bytes()
+                    break
+                time.sleep(0.5)
+            if bak_bytes is None:
+                print(f"FAIL: no .bak sibling found at {bak}", file=sys.stderr)
+                return 1
+
+            if break_mode:
+                impossible = b"this exact string can never be the pre-overwrite content"
+                if bak_bytes != impossible:
+                    print(
+                        f"FAIL: .bak content {bak_bytes!r} != impossible expected "
+                        f"{impossible!r}",
+                        file=sys.stderr,
+                    )
+                    return 1
+            else:
+                if bak_bytes != external_bytes:
+                    print(
+                        f"FAIL: .bak content ({len(bak_bytes)} bytes) does not equal the "
+                        f"externally-modified content that was just overwritten "
+                        f"({len(external_bytes)} bytes) - it must reflect what was on "
+                        f"disk immediately before Overwrite, not the original fixture",
+                        file=sys.stderr,
+                    )
+                    return 1
+        except (PermissionWall, TimeoutError, RuntimeError) as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            if proc is not None:
+                terminate(proc)
+
+    # ── Sub-case 3: Save As leaves the original target untouched ───────────
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = None
+        try:
+            proc, left, right = _p05_open_dirty(binary, scratch)
+            time.sleep(0.3)
+            right.write_bytes(external_bytes)
+
+            other_path = Path(scratch) / "saved-as-elsewhere.txt"
+            r = click_wait("Save As")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Save As: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("Path", want_found=True)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: Save As dialog's Path field never appeared: {r}", file=sys.stderr)
+                return 1
+
+            r = ui("type_into", "AXTextField", "1", str(other_path), timeout=20)
+            if not r.startswith("TYPED"):
+                print(f"FAIL: could not type into the Save As path field: {r}", file=sys.stderr)
+                return 1
+            typed_value = r[len("TYPED: ") :]
+            if typed_value != str(other_path):
+                print(
+                    f"FAIL: Save As path field reads back {typed_value!r}, expected "
+                    f"{str(other_path)!r} - typing did not take effect",
+                    file=sys.stderr,
+                )
+                return 1
+
+            r = ui("click_button_exact", "Save", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click the Save As dialog's Save button: {r}", file=sys.stderr)
+                return 1
+
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            new_bytes = None
+            while time.monotonic() < deadline:
+                if other_path.exists():
+                    new_bytes = other_path.read_bytes()
+                    break
+                time.sleep(0.5)
+            if new_bytes is None:
+                print(f"FAIL: Save As never created {other_path}", file=sys.stderr)
+                return 1
+            if not new_bytes or new_bytes == external_bytes:
+                print(
+                    f"FAIL: {other_path}'s content is not the app's own merge output "
+                    f"(empty or equal to the externally-written bytes)",
+                    file=sys.stderr,
+                )
+                return 1
+
+            if right.read_bytes() != external_bytes:
+                print(
+                    f"FAIL: the original target {right} was modified by Save As - "
+                    "it must stay untouched",
+                    file=sys.stderr,
+                )
+                return 1
+        except (PermissionWall, TimeoutError, RuntimeError) as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            if proc is not None:
+                terminate(proc)
+
+    print(
+        "OK: external modification blocked Save with 'File changed on disk' and "
+        "Cancel left the file untouched; Overwrite wrote through and its .bak "
+        "matched the externally-modified (not original) content; Save As to a "
+        "different path left the original target untouched and wrote the app's "
+        "own content to the new path."
+    )
+    return 0
+
+
 # ── recon — not an RFC-078 case ─────────────────────────────────────────────
 
 
@@ -682,57 +942,41 @@ def recon_settings(binary, break_mode=False):
     really contain "Settings"? what roles do the Theme/Language/font-family
     selects and the font-size spinner expose?) without needing a full-tree
     dump at all."""
+    # Round 4 isolation: rounds 1-3 ran every probe in one launch, in
+    # sequence - round 4's select_popup_item (AXMenuItem tree-walk click)
+    # succeeded structurally ("SELECTED: Night") but the readback still
+    # showed "Dark", AND the following type_into probe returned NOT_FOUND
+    # for a field that unquestionably exists, suggesting the popup
+    # interactions left the modal/tree in a state the later probes didn't
+    # expect. Round 5 isolates each technique in its own fresh launch.
     with tempfile.TemporaryDirectory() as scratch:
         home = Path(scratch) / "home"
         home.mkdir()
         proc = launch(binary, [], scratch, home=home)
         try:
             wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
-            time.sleep(0.5)
-            # M5-B recon round 1 found the header's "Settings" button
-            # unclickable via a probe fired immediately after the window
-            # appeared, but clickable ~0.4s later (a second, separate probe
-            # in the same run) - almost certainly the accessibility tree
-            # lagging the DOM right after initial mount, not a real "no
-            # accessible name" gap. click_wait's poll loop (used by the
-            # real cases, not this recon) already tolerates exactly that.
             click_wait("Settings", timeout=10)
+            time.sleep(0.5)
             _probe("get-value-popup-1-theme", "get_value", "AXPopUpButton", "1")
-            _probe("get-value-popup-2-lang", "get_value", "AXPopUpButton", "2")
-            _probe("get-value-popup-3-font-family", "get_value", "AXPopUpButton", "3")
-            _probe("get-value-textfield-1-fontsize", "get_value", "AXTextField", "1")
-            _probe(
-                "set-value-popup-1-to-night", "set_value", "AXPopUpButton", "1", "Night"
-            )
-            _probe("get-value-popup-1-after-set", "get_value", "AXPopUpButton", "1")
-            _probe(
-                "set-value-textfield-1-to-20", "set_value", "AXTextField", "1", "20"
-            )
-            _probe(
-                "get-value-textfield-1-after-set", "get_value", "AXTextField", "1"
-            )
-            _probe(
-                "perform-increment-textfield-1",
-                "perform_action",
-                "AXTextField",
-                "1",
-                "AXIncrement",
-            )
-            _probe(
-                "get-value-textfield-1-after-increment", "get_value", "AXTextField", "1"
-            )
-            # Round 2's finding: set_value/AXIncrement are silent no-ops for
-            # these controls ("SET: Dark -> Dark", "SET: 14 -> 14", no change
-            # after AXIncrement either). Round 3 tests the real fallbacks:
-            # native popup-menu click and keystroke-based text entry.
             _probe("probe-popup-1", "probe_popup", "1")
+            time.sleep(0.5)
             _probe("select-popup-1-night", "select_popup_item", "1", "Night")
+            time.sleep(0.5)
             _probe("get-value-popup-1-after-select", "get_value", "AXPopUpButton", "1")
-            _probe(
-                "select-popup-2-japanese", "select_popup_item", "2", "日本語"
-            )
-            _probe("get-value-popup-2-after-select", "get_value", "AXPopUpButton", "2")
+        finally:
+            terminate(proc)
+
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+        proc = launch(binary, [], scratch, home=home)
+        try:
+            wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            click_wait("Settings", timeout=10)
+            time.sleep(0.5)
+            _probe("get-value-textfield-1-fontsize", "get_value", "AXTextField", "1")
             _probe("type-into-textfield-1-20", "type_into", "AXTextField", "1", "20")
+            time.sleep(0.5)
             _probe(
                 "get-value-textfield-1-after-type", "get_value", "AXTextField", "1"
             )
@@ -780,6 +1024,8 @@ CASES = {
     "p02": p02,
     "p09": p09,
     "p10": p10,
+    "p04": p04,
+    "p05": p05,
     "recon_settings": recon_settings,
     "recon_explorer": recon_explorer,
 }
