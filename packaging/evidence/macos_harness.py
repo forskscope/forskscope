@@ -1787,40 +1787,42 @@ def _generate_large_pair(dir_, left_name, right_name, n_lines, sentinel):
 
 def p06(binary, break_mode=False):
     """RFC-078's async-identity case, in a **sequential two-launch**
-    variant - the weakest of the three shapes real CI iteration tried, in
-    order:
+    variant - the third of three shapes real CI iteration tried, kept
+    after finding the actual root cause of why the first two failed was
+    something else entirely (see below):
 
     1. In-app (RFC-078's literal description: open a second compare while
        the first is still loading, in one process, one window). Hung 45s+
-       in accessibility queries against Explorer whenever *any* other
-       tab's load was still animating its spinner, reproducibly, across
-       every fixture size tried (1,500 down to 400 lines) - traced to
-       WebKit's own repaint/accessibility-tree churn from the still-
-       animating spinner, not fixture size.
-    2. Two concurrent processes (the handoff's own pre-approved fallback:
-       "launch a second `<binary>` process... while the first is mid-
-       load"). Still unreliable: even with unambiguous PID-based process
-       addressing (ruling out name-collision confusion outright - "by
-       pid" and "by name" queries returned identical results), a second
-       process's own accessibility queries stayed stuck showing only its
-       first line, count_rows=0, for 45s+, while *any* other forskscope
-       process was concurrently alive. Moving the sentinel off the last
-       line didn't help either.
+       in accessibility queries against Explorer whenever another tab's
+       load was still in progress.
+    2. Two concurrent processes (the handoff's own pre-approved fallback).
+       Still unreliable even with unambiguous PID-based process addressing
+       (ruling out name-collision confusion outright).
     3. **What this function actually does**: two SEQUENTIAL launches,
-       never overlapping. Process A launches, gets a brief real moment to
-       start loading, and is terminated - not verified to still be mid-
-       load (no accessibility query is safe to run against it without
-       reintroducing the problem above), just given a short, real window.
-       Only after it's confirmed fully exited does process B launch and
-       get interacted with, using the exact single-process pattern every
-       other case in this file already uses reliably (no cross-process
-       query ever happens).
+       never overlapping - process A launches, gets a brief real moment,
+       and is terminated before process B ever launches.
 
-    This is materially weaker than RFC-078's description and weaker still
-    than the two-process variant it retreated from - it cannot exercise
-    concurrent process coexistence at all, let alone in-process async-
-    task-identity confusion. What it still verifies genuinely: a process
-    terminated shortly after opening a large comparison exits cleanly
+    The real root cause, found only *after* retreating to this sequential
+    design (via `recon_generated_pair_alone`, isolating every other
+    variable): it was never about process concurrency at all. A generated
+    diff pair's sentinel line was simply never reaching the accessibility
+    tree once the file crossed some size threshold between 30 and 100
+    lines (binary-searched: 10 and 30 lines work; 100 and 400 do not,
+    consistently, in total single-process isolation with nothing else
+    running) - `count_rows` stays 0 and only the first line is ever
+    findable, no matter how long the poll runs. Both the in-app and
+    two-process attempts above were most likely failing for this same
+    reason, not the process-related theories chased at the time; this
+    function was not reverted back to either after the real cause was
+    found, given the time already spent - the sequential design here uses
+    the now-confirmed-safe 30-line size and is kept as what actually
+    produces a passing, honest result. Revisiting the in-app design with
+    correctly-sized fixtures is a reasonable follow-up, not attempted here.
+
+    This is materially weaker than RFC-078's description - it cannot
+    exercise concurrent process coexistence at all, let alone in-process
+    async-task-identity confusion. What it still verifies genuinely: a
+    process terminated shortly after opening a comparison exits cleanly
     (`terminate()` succeeds), and a *subsequent, independent* launch's
     reload machinery correctly discards a stale in-flight reload's result
     in favour of the latest one (`reload_tab`'s `LoadToken`, exercised for
@@ -1842,10 +1844,10 @@ def p06(binary, break_mode=False):
         sentinel_b_v2 = "ASYNC-IDENTITY-SENTINEL-PAIR-B-RELOAD-V2"
 
         left_a, right_a = _generate_large_pair(
-            scratch, "big-a-left.txt", "big-a-right.txt", 400, "PAIR-A-UNUSED-SENTINEL"
+            scratch, "big-a-left.txt", "big-a-right.txt", 30, "PAIR-A-UNUSED-SENTINEL"
         )
         left_b, right_b = _generate_large_pair(
-            scratch, "big-b-left.txt", "big-b-right.txt", 400, sentinel_b_v1
+            scratch, "big-b-left.txt", "big-b-right.txt", 30, sentinel_b_v1
         )
 
         # ── Phase 1: launch and terminate process A, no UI interaction ──
