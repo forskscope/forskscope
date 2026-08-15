@@ -903,7 +903,10 @@ def selected_option_name(combo, timeout_s=5):
     deadline = time.monotonic() + timeout_s
     menu = None
     while time.monotonic() < deadline:
-        menu = combo.get_child_at_index(0)
+        try:
+            menu = combo.get_child_at_index(0)
+        except GLib.GError:
+            menu = None
         if menu is not None:
             break
         time.sleep(0.2)
@@ -991,10 +994,11 @@ def p12(binary, break_mode=False):
             select_combo_option(combos[0], 1)  # Theme: Dark(0) -> Light(1)
             theme_after_change = selected_option_name(combos[0])
             if theme_after_change != "Light":
+                died = " - the process exited unexpectedly during/after the combo interaction" if proc.poll() is not None else ""
                 print(
                     f"FAIL: Theme selection reads {theme_after_change!r} immediately after "
                     "select_combo_option(1) - X11 input synthesis for the combo's native "
-                    "popup did not land (see select_combo_option's docstring)",
+                    f"popup did not land (see select_combo_option's docstring){died}",
                     file=sys.stderr,
                 )
                 return 1
@@ -1002,10 +1006,11 @@ def p12(binary, break_mode=False):
             select_combo_option(combos[1], 1)  # Language: English(0) -> 日本語(1)
             lang_after_change = selected_option_name(combos[1])
             if lang_after_change != "日本語":
+                died = " - the process exited unexpectedly during/after the combo interaction" if proc.poll() is not None else ""
                 print(
                     f"FAIL: Language selection reads {lang_after_change!r} immediately after "
                     "select_combo_option(1) - X11 input synthesis for the combo's native "
-                    "popup did not land (see select_combo_option's docstring)",
+                    f"popup did not land (see select_combo_option's docstring){died}",
                     file=sys.stderr,
                 )
                 return 1
@@ -1064,13 +1069,15 @@ def p12(binary, break_mode=False):
 
             theme_selected = selected_option_name(combos[0])
             if theme_selected != "Light":
-                print(f"FAIL: restored Theme selection is {theme_selected!r}, expected 'Light'", file=sys.stderr)
+                died = " (process exited unexpectedly)" if proc.poll() is not None else ""
+                print(f"FAIL: restored Theme selection is {theme_selected!r}, expected 'Light'{died}", file=sys.stderr)
                 return 1
 
             lang_selected = selected_option_name(combos[1])
             required_lang = "this value can never be selected" if break_mode else "日本語"
             if lang_selected != required_lang:
-                print(f"FAIL: restored Language selection is {lang_selected!r}, required {required_lang!r}", file=sys.stderr)
+                died = " (process exited unexpectedly)" if proc.poll() is not None else ""
+                print(f"FAIL: restored Language selection is {lang_selected!r}, required {required_lang!r}{died}", file=sys.stderr)
                 return 1
         finally:
             terminate(proc)
@@ -1213,8 +1220,13 @@ def navigate_pane_to(app, pane_index, target_dir):
     if len(edit_buttons) < 2:
         raise RuntimeError(f"expected 2 'Edit path' (✎) buttons, found {len(edit_buttons)}")
     click(edit_buttons[pane_index])
-    time.sleep(0.3)
-    entry = find_by_role(app, "entry")
+    entry = None
+    deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+    while time.monotonic() < deadline:
+        entry = find_by_role(app, "entry")
+        if entry is not None:
+            break
+        time.sleep(0.3)
     if entry is None:
         raise RuntimeError("no path entry found after clicking Edit path")
     type_into_field(entry, "ForskScope", str(target_dir))
