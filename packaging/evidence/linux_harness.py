@@ -1181,7 +1181,12 @@ def p06(binary, break_mode=False):
         b_left = data_dir / "pair-b-left.txt"
         b_right = data_dir / "pair-b-right.txt"
 
-        n_lines = 150_000
+        # 150,000 lines (the original size) left the reload sub-test either
+        # timing out or, once, crashing the process (CI runs 31879660008,
+        # 31884052729) - right-sized down to keep a real, non-instant async
+        # window without stacking two full reloads of a very large file on
+        # top of CI's software-rendered (no GPU, DRI3-less) Xvfb.
+        n_lines = 20_000
 
         def write_fixture(path, marker, changed):
             lines = [f"{marker} {i}" for i in range(n_lines)]
