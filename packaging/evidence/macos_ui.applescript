@@ -1092,6 +1092,111 @@ on runOnce(argv)
                     return "ERROR: " & errMsg
                 end try
 
+            else if cmdName is "scroll_area_bars" then
+                -- M5-C / P03's horizontal-scroll-mirror check: a role
+                -- tally against a wide-line fixture found `AXScrollArea=1`
+                -- but `AXScrollBar=0` in the ordinary CHILD tree walk
+                -- (`safeContents`/`UI elements of`) - standard
+                -- NSAccessibility exposes a scroll area's bars as
+                -- ATTRIBUTE-valued UI element references
+                -- (`AXHorizontalScrollBar`/`AXVerticalScrollBar`), not as
+                -- ordinary children reachable by walking `UI elements of`,
+                -- which is exactly what a plain child-tree walk would miss.
+                -- Finds the nth AXScrollArea (safeContents role filter,
+                -- already proven reliable) and reads both scrollbar
+                -- attributes directly off it, each with its own AXValue.
+                set n to (item 3 of argv) as integer
+                set allEl to my safeContents(w)
+                set idx to 0
+                set target to missing value
+                repeat with e in allEl
+                    set isMatch to false
+                    try
+                        if role of e is "AXScrollArea" then set isMatch to true
+                    end try
+                    if isMatch then
+                        set idx to idx + 1
+                        if idx is n then
+                            set target to e
+                            exit repeat
+                        end if
+                    end if
+                end repeat
+                if target is missing value then return "NOT_FOUND"
+                set hResult to "absent"
+                try
+                    set hBar to (value of attribute "AXHorizontalScrollBar" of target)
+                    if hBar is missing value then
+                        set hResult to "missing"
+                    else
+                        set hVal to "?"
+                        try
+                            set hVal to (value of hBar) as string
+                        on error eh
+                            set hVal to "ERR:" & eh
+                        end try
+                        set hResult to "value=" & hVal
+                    end if
+                on error eh2
+                    set hResult to "ERROR:" & eh2
+                end try
+                set vResult to "absent"
+                try
+                    set vBar to (value of attribute "AXVerticalScrollBar" of target)
+                    if vBar is missing value then
+                        set vResult to "missing"
+                    else
+                        set vVal to "?"
+                        try
+                            set vVal to (value of vBar) as string
+                        on error ev
+                            set vVal to "ERR:" & ev
+                        end try
+                        set vResult to "value=" & vVal
+                    end if
+                on error ev2
+                    set vResult to "ERROR:" & ev2
+                end try
+                return "SCROLLBARS: horizontal=" & hResult & " vertical=" & vResult
+
+            else if cmdName is "set_scroll_bar" then
+                -- Companion write to `scroll_area_bars`'s read: sets the
+                -- nth AXScrollArea's named scrollbar (AXHorizontalScrollBar
+                -- or AXVerticalScrollBar) AXValue directly - same direct-
+                -- AXValue-write technique `set_value` already established
+                -- for other controls, applied to the attribute-valued
+                -- scrollbar reference `scroll_area_bars` found rather than
+                -- an ordinary child element.
+                set n to (item 3 of argv) as integer
+                set whichBar to item 4 of argv
+                set newVal to (item 5 of argv) as real
+                set allEl to my safeContents(w)
+                set idx to 0
+                set target to missing value
+                repeat with e in allEl
+                    set isMatch to false
+                    try
+                        if role of e is "AXScrollArea" then set isMatch to true
+                    end try
+                    if isMatch then
+                        set idx to idx + 1
+                        if idx is n then
+                            set target to e
+                            exit repeat
+                        end if
+                    end if
+                end repeat
+                if target is missing value then return "NOT_FOUND"
+                try
+                    set bar to (value of attribute whichBar of target)
+                    if bar is missing value then return "MISSING_BAR"
+                    set value of bar to newVal
+                    set afterVal to (value of bar) as string
+                    return "SET: " & afterVal
+                on error errMsg
+                    return "ERROR: " & errMsg
+                end try
+
             else if cmdName is "list_roles" then
                 -- M5-C / F63 investigation: a cheap, bounded alternative to
                 -- `dump_roles`'s abandoned bulk dump (see that command's own

@@ -2102,7 +2102,17 @@ def p07(binary, break_mode=False):
             if not r.startswith("VALUE:"):
                 print(f"FAIL: path-edit text field never appeared: {r}", file=sys.stderr)
                 return 1
+            print(
+                f"DEBUG: AXTextField focus before type_into: "
+                f"{ui('find_focused', 'AXTextField', timeout=20)!r}",
+                flush=True,
+            )
             r = ui("type_into", "AXTextField", "1", str(root_a), timeout=20)
+            print(
+                f"DEBUG: type_into result={r!r} focus after: "
+                f"{ui('find_focused', 'AXTextField', timeout=20)!r}",
+                flush=True,
+            )
             if not r.startswith("TYPED:") or str(root_a) not in r:
                 print(f"FAIL: could not type root-a's path into the path-edit field: {r}", file=sys.stderr)
                 return 1
@@ -2991,6 +3001,16 @@ def recon_p03_scroll(binary, break_mode=False):
             for n in range(1, 5):
                 before = _probe(f"scrollbar-{n}-get", "get_value", "AXScrollBar", str(n))
                 if before is None or before == "NOT_FOUND":
+                    break
+
+            # The child-tree walk above found AXScrollBar=0 even though
+            # AXScrollArea=1 - standard NSAccessibility exposes a scroll
+            # area's bars as ATTRIBUTE-valued references
+            # (AXHorizontalScrollBar/AXVerticalScrollBar), not ordinary
+            # children a plain `UI elements of` walk would ever find.
+            for n in range(1, 3):
+                r = _probe(f"scroll-area-{n}-bars", "scroll_area_bars", str(n))
+                if r is None or r == "NOT_FOUND":
                     break
         finally:
             terminate(proc)
