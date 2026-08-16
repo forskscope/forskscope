@@ -2885,6 +2885,53 @@ def recon_f63_v3_count_rows_alone(binary, break_mode=False):
     return 0
 
 
+def recon_p03_scroll(binary, break_mode=False):
+    """Not a scored case. P03's horizontal-scroll-mirror requirement (RFC-
+    078: "horizontal scrolling mirrors between panes without feedback/
+    jitter") has no precedent anywhere in this program on any platform.
+    Before writing p03's real assertions, this establishes: (1) does a wide
+    fixture (long lines, forcing `.diff-col-left`/`.diff-col-right`'s
+    `overflow-x: auto` to actually overflow) produce real AXScrollBar
+    elements on macOS at all, and (2) what document-order index
+    corresponds to which pane's horizontal scrollbar, so `get_value`/
+    `set_value`'s existing `AXScrollBar` role addressing (established for
+    the F63 investigation) can be used to drive and read pane scroll
+    position directly, without needing pixel-level screenshot comparison."""
+    left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+        wide_left = Path(scratch) / "wide-left.txt"
+        wide_right = Path(scratch) / "wide-right.txt"
+        pad = "X" * 60
+        lines_l = [f"line {i:03d} {pad} {pad} {pad} left-tail\n" for i in range(5)]
+        lines_r = [f"line {i:03d} {pad} {pad} {pad} right-tail-CHANGED\n" if i == 2
+                   else f"line {i:03d} {pad} {pad} {pad} left-tail\n" for i in range(5)]
+        wide_left.write_text("".join(lines_l))
+        wide_right.write_text("".join(lines_r))
+
+        proc = launch(binary, [wide_left, wide_right], scratch, home=home)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"PROBE: never registered a window: {exc}", flush=True)
+                return 0
+            r = poll_ui("count_rows", predicate=lambda r: r not in ("0", ""), timeout=LAUNCH_TIMEOUT_S)
+            print(f"PROBE rows: {r!r}", flush=True)
+
+            roles = _probe("role-tally", "list_roles")
+
+            for n in range(1, 5):
+                before = _probe(f"scrollbar-{n}-get", "get_value", "AXScrollBar", str(n))
+                if before is None or before == "NOT_FOUND":
+                    break
+        finally:
+            terminate(proc)
+    return 0
+
+
 CASES = {
     "p01": p01,
     "p02": p02,
@@ -2908,6 +2955,7 @@ CASES = {
     "recon_f63_investigation": recon_f63_investigation,
     "recon_f63_v2_single_call": recon_f63_v2_single_call,
     "recon_f63_v3_count_rows_alone": recon_f63_v3_count_rows_alone,
+    "recon_p03_scroll": recon_p03_scroll,
 }
 
 
