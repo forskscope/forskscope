@@ -65,6 +65,17 @@
 --                                      buttons (e.g. PathBar's "⌂"), the
 --                                      button-family counterpart to
 --                                      click_row_side's row disambiguation.
+--   click_role_nth <proc> <role> <n>
+--                                   -> "CLICKED: <role> occurrence=<n>",
+--                                      "NOT_FOUND", or "ERROR: ..." - the
+--                                      Nth (1-based) element of `role`,
+--                                      invoked via the generic `click` verb
+--                                      (not `perform_action`'s explicit
+--                                      AXPress) - for controls like a
+--                                      checkbox, where AXPress structurally
+--                                      succeeds but does not fire the real
+--                                      DOM "change" event, and which has no
+--                                      useful own text to search by.
 --   click_row <proc> <needle>      -> "CLICKED: <label>", "NOT_FOUND" - like
 --                                      click_button but for role "AXRow"
 --                                      (Explorer's TreeRow, hunk.rs's
@@ -903,6 +914,49 @@ on runOnce(argv)
                                 return "ERROR: " & errMsg
                             end try
                             return "DONE"
+                        end if
+                    end if
+                end repeat
+                return "NOT_FOUND"
+
+            else if cmdName is "click_role_nth" then
+                -- M5-C / P07: the Nth (1-based) element of `roleWanted`,
+                -- invoked via the GENERIC `click` verb rather than
+                -- `perform_action`'s explicit `perform action "AXPress"`.
+                -- A real dispatch found `perform_action ... "AXPress"`
+                -- against an AXCheckBox structurally succeeds ("DONE") but
+                -- never fires the real "change" DOM event Dioxus needs
+                -- (settings.json stayed completely unwritten even after
+                -- two such calls) - the same shape as `select_popup_item`'s
+                -- own finding that the generic `click` verb and explicit
+                -- AXPress are NOT interchangeable for every control class,
+                -- just the opposite direction (that finding was AXPress
+                -- succeeding where generic `click` failed, for an
+                -- AXMenuItem; this is generic `click` needed where AXPress
+                -- silently no-ops, for an AXCheckBox). `click_button`/
+                -- `click_row`/`click_any` already rely on this same generic
+                -- verb and have been the most reliable technique in this
+                -- whole harness - this generalises it to an arbitrary role
+                -- and index instead of a text match, for controls (like a
+                -- checkbox) with no useful own text to search by.
+                set roleWanted to item 3 of argv
+                set n to (item 4 of argv) as integer
+                set idx to 0
+                set allEl to my safeContents(w)
+                repeat with e in allEl
+                    set isMatch to false
+                    try
+                        if role of e is roleWanted then set isMatch to true
+                    end try
+                    if isMatch then
+                        set idx to idx + 1
+                        if idx is n then
+                            try
+                                click e
+                            on error errMsg
+                                return "ERROR: " & errMsg
+                            end try
+                            return "CLICKED: " & roleWanted & " occurrence=" & idx
                         end if
                     end if
                 end repeat

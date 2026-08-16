@@ -2111,12 +2111,18 @@ def p07(binary, break_mode=False):
                 except (json.JSONDecodeError, KeyError):
                     return False
 
+            # `perform_action`'s explicit AXPress was tried first - a real
+            # dispatch showed it structurally succeeds ("DONE") without
+            # ever writing settings.json at all, meaning it never actually
+            # fires the checkbox's real "change" DOM event. `click_role_nth`
+            # (the generic `click` verb, matching `click_button`/`click_row`/
+            # `click_any`'s already-reliable mechanism) is used instead.
             toggled_indices = []
             for idx in ("1", "2"):
                 if _remember_on():
                     break
-                r = ui("perform_action", "AXCheckBox", idx, "AXPress", timeout=20)
-                if not r.startswith("DONE"):
+                r = ui("click_role_nth", "AXCheckBox", idx, timeout=20)
+                if not r.startswith("CLICKED"):
                     continue
                 toggled_indices.append(idx)
                 time.sleep(0.3)
@@ -2133,7 +2139,7 @@ def p07(binary, break_mode=False):
             # is confirmed to be the real target - leaves settings in a
             # clean, single-change state.
             if toggled_indices == ["1", "2"]:
-                ui("perform_action", "AXCheckBox", "1", "AXPress", timeout=20)
+                ui("click_role_nth", "AXCheckBox", "1", timeout=20)
 
             r = click_wait("Close")
             if not r.startswith("CLICKED"):
