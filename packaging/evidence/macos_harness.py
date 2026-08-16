@@ -2170,6 +2170,31 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: could not click the right pane's Home ('⌂') button: {r}", file=sys.stderr)
                 return 1
 
+            # Verify both took effect against the real persisted file
+            # (ground truth) right away, rather than discovering much
+            # later (at the per-file-copy step) that one silently didn't -
+            # a real dispatch found exactly that: last_left_dir was set
+            # correctly but last_right_dir was completely absent from the
+            # payload despite this click reporting CLICKED.
+            deadline = time.monotonic() + 10
+            payload = {}
+            while time.monotonic() < deadline:
+                if settings_path.exists():
+                    try:
+                        payload = json.loads(settings_path.read_text())["payload"]
+                    except (json.JSONDecodeError, KeyError):
+                        payload = {}
+                    if "last_left_dir" in payload and "last_right_dir" in payload:
+                        break
+                time.sleep(0.3)
+            if "last_left_dir" not in payload or "last_right_dir" not in payload:
+                print(
+                    f"FAIL: last_left_dir/last_right_dir not both set after both Home "
+                    f"clicks - payload: {payload!r}",
+                    file=sys.stderr,
+                )
+                return 1
+
             # ── Navigation/history (mouse-driven; the keyboard sub-part is
             # NOT executed - see this case's OK output) ───────────────────
             #
