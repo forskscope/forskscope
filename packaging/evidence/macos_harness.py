@@ -2462,6 +2462,15 @@ def p07(binary, break_mode=False):
 
             # ── Batch copy: manifest CONTENTS and backup BYTES, not just
             # "it reported success" (handoff §5 / F62's lesson) ───────────
+            manifests_dir = _manifests_dir(home)
+            # The per-file copy above already wrote one manifest into this
+            # same directory - a real dispatch showed picking "the first
+            # *.json found" (glob order is not chronological) can silently
+            # re-read THAT one instead of the batch's own, new manifest.
+            # Records what's already there first, then waits for a file
+            # that is genuinely new.
+            existing_manifests = set(manifests_dir.glob("*.json")) if manifests_dir.exists() else set()
+
             r = click_wait("Copy to left", timeout=10)  # toolbar batch button (has a count), first in doc order
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click the batch 'Copy to left' button: {r}", file=sys.stderr)
@@ -2475,18 +2484,17 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: could not confirm the batch copy: {r}", file=sys.stderr)
                 return 1
 
-            manifests_dir = _manifests_dir(home)
             deadline = time.monotonic() + LAUNCH_TIMEOUT_S
             manifest_json = None
             while time.monotonic() < deadline:
                 if manifests_dir.exists():
-                    jsons = list(manifests_dir.glob("*.json"))
-                    if jsons:
-                        manifest_json = json.loads(jsons[0].read_text())
+                    new_jsons = set(manifests_dir.glob("*.json")) - existing_manifests
+                    if new_jsons:
+                        manifest_json = json.loads(sorted(new_jsons)[0].read_text())
                         break
                 time.sleep(0.5)
             if manifest_json is None:
-                print(f"FAIL: no batch-copy manifest JSON found under {manifests_dir}", file=sys.stderr)
+                print(f"FAIL: no NEW batch-copy manifest JSON found under {manifests_dir}", file=sys.stderr)
                 return 1
 
             # Real consequence of the SECOND defect for the batch path
