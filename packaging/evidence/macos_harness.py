@@ -2065,58 +2065,76 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: Explorer never showed any rows at $HOME (last: {r!r})", file=sys.stderr)
                 return 1
 
-            # Two real dispatches found the per-file copy buttons (below)
-            # never rendering at all, and settings.json never getting
-            # written despite several `navigate_to` calls. `DeepRow`
+            # Three real dispatches found: the per-file copy buttons (below)
+            # never rendering; settings.json never getting written despite
+            # several `navigate_to` calls; and "Remember Explorer
+            # directories" (settings/modal.rs) not existing as any AXButton/
+            # AXCheckBox/AXRadioButton at all - because, unlike this
+            # docstring first assumed, that checkbox is ITSELF inside the
+            # "Advanced" disclosure (`if *show_advanced.read()`), alongside
+            # "Enable binary comparison" (a second, identically-shaped
+            # checkbox that precedes it in document order). `DeepRow`
             # (deep_compare.rs) gates the per-row copy buttons on
             # `store.settings.read().last_left_dir`/`last_right_dir` being
             # `Some(...)`, which `navigate_to` (dir_pane.rs) only sets (and
             # only persists) when `remember_explorer_dirs` is on - current
             # repo HEAD's `PersistedSettings::default()` sets this `true`,
             # but the empirical evidence (settings.json genuinely never
-            # created) shows the PUBLISHED 0.167.0 artifact this harness is
-            # constrained to test against defaults it to `false` - the repo
-            # has moved on since that release was cut, and the current
-            # source is not a reliable guide to what 0.167.0 actually does
-            # (the recon-era comment elsewhere in this harness claiming
-            # "off by default" was empirically right about 0.167.0 all
-            # along, not stale). Enables it via the real Settings dialog
-            # checkbox (`settings/modal.rs`'s "Remember Explorer
-            # directories", role AXCheckBox - not AXButton, the same
-            # aria-driven role difference already seen for P03's word-wrap
-            # toggle - `perform_action`'s `AXPress`, matching the technique
-            # `select_popup_item` already established for this dialog's
-            # other WebKit-custom controls). It is the ONLY checkbox
-            # present without opening "Advanced" first, so index "1" is
-            # unambiguous.
+            # created before this fix) shows the PUBLISHED 0.167.0 artifact
+            # this harness is constrained to test against defaults it to
+            # `false` (the recon-era comment elsewhere in this harness
+            # claiming "off by default" was right about 0.167.0 all along).
+            #
+            # Verified against the actual persisted JSON (ground truth),
+            # not just a "DONE" from perform_action, since which checkbox
+            # index maps to which setting was not knowable in advance and a
+            # wrong guess would silently toggle "Enable binary comparison"
+            # instead while still reporting success.
             r = click_wait("Settings")
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not open Settings: {r}", file=sys.stderr)
                 return 1
             time.sleep(0.3)
-            # "AXCheckBox" was a guess a real dispatch showed wrong
-            # (NOT_FOUND). Only AXRadioButton is tried as a second guess -
-            # NOT AXButton, since the Settings dialog's "Advanced" disclosure
-            # toggle is a real, earlier-in-document-order AXButton that
-            # `perform_action`'s generic "DONE" success would silently
-            # match instead, without actually toggling the setting this
-            # case needs.
-            toggled = False
-            tried = []
-            for role_guess in ("AXCheckBox", "AXRadioButton"):
-                r = ui("perform_action", role_guess, "1", "AXPress", timeout=20)
-                tried.append(f"{role_guess}={r!r}")
-                if r.startswith("DONE"):
-                    toggled = True
+            r = click_wait("Advanced", timeout=10)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not open the Settings 'Advanced' panel: {r}", file=sys.stderr)
+                return 1
+            time.sleep(0.3)
+
+            settings_path = _config_dir(home) / "settings.json"
+
+            def _remember_on():
+                if not settings_path.exists():
+                    return False
+                try:
+                    return bool(json.loads(settings_path.read_text())["payload"]["remember_explorer_dirs"])
+                except (json.JSONDecodeError, KeyError):
+                    return False
+
+            toggled_indices = []
+            for idx in ("1", "2"):
+                if _remember_on():
                     break
-            if not toggled:
-                roles = ui("list_roles", timeout=20)
+                r = ui("perform_action", "AXCheckBox", idx, "AXPress", timeout=20)
+                if not r.startswith("DONE"):
+                    continue
+                toggled_indices.append(idx)
+                time.sleep(0.3)
+            if not _remember_on():
                 print(
-                    f"FAIL: could not toggle 'Remember Explorer directories' via any "
-                    f"tried role: {'; '.join(tried)} (role tally: {roles!r})",
+                    f"FAIL: 'Remember Explorer directories' still off in settings.json "
+                    f"after toggling AXCheckBox indices {toggled_indices}: "
+                    f"{settings_path.read_text() if settings_path.exists() else '<missing>'}",
                     file=sys.stderr,
                 )
                 return 1
+            # If index 1 was the wrong checkbox (toggled "Enable binary
+            # comparison" on instead), toggle it back off now that index 2
+            # is confirmed to be the real target - leaves settings in a
+            # clean, single-change state.
+            if toggled_indices == ["1", "2"]:
+                ui("perform_action", "AXCheckBox", "1", "AXPress", timeout=20)
+
             r = click_wait("Close")
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not close Settings: {r}", file=sys.stderr)
