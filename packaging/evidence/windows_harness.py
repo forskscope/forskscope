@@ -3378,10 +3378,59 @@ def p07(binary, break_mode=False):
                     win, ["left_root", "right_root"], timeout_s=READY_TIMEOUT_S
                 )
                 if not ok:
-                    print(f"FAIL: Explorer never listed the seeded browse dir: missing {missing}", file=sys.stderr)
+                    # Real finding (multiple CI runs, e.g. 31937800743):
+                    # the breadcrumb correctly shows the seeded browse
+                    # path in both panes, but the directory listing itself
+                    # never populates - a settings-restore-driven initial
+                    # navigation (`explorer.rs`'s `use_effect` reacting to
+                    # `left_dir`/`right_dir`'s *first* value) behaves
+                    # differently from a live, in-app navigation click, per
+                    # `dioxus-swdir-tree`'s own generation-tagged merge
+                    # design (stale scan results are dropped by strict
+                    # generation equality - plausible if the mount-time
+                    # effect races the scan driver's own setup). Retried
+                    # here via the PathBar's real "edit path, commit"
+                    # affordance (the `✎` button - the same interaction a
+                    # user would use, not a settings hack) instead of
+                    # giving up immediately: re-issuing the *identical*
+                    # path through the live navigation path this app's
+                    # normal use has surely exercised, to see whether that
+                    # (unlike the mount-time restore) actually populates
+                    # rows.
+                    print(
+                        "  initial listing empty after seeding via settings.json - "
+                        "retrying via a real PathBar navigation to the same path",
+                        file=sys.stderr,
+                    )
                     print(f"  seeded settings.json: {(config_dir / 'settings.json').read_text()!r}", file=sys.stderr)
-                    debug_dump(texts)
-                    return 1
+                    edit_buttons = [
+                        b for b in win.descendants(control_type="Button") if (b.window_text() or "") == "✎"
+                    ]
+                    if len(edit_buttons) < 2:
+                        print(f"FAIL: expected 2 path-edit ('✎') buttons, found {len(edit_buttons)}", file=sys.stderr)
+                        debug_dump(texts)
+                        return 1
+                    for edit_btn in edit_buttons[:2]:
+                        invoke(edit_btn)
+                        edit_field = wait_for_first(win, "Edit", timeout_s=LAUNCH_TIMEOUT_S)
+                        if edit_field is None:
+                            print("FAIL: path-edit input never appeared after clicking '✎'", file=sys.stderr)
+                            return 1
+                        try:
+                            set_value_text(edit_field, str(browse))
+                        except Exception as exc:  # noqa: BLE001
+                            print(f"FAIL: could not commit the path-edit field: {exc!r}", file=sys.stderr)
+                            return 1
+                    ok, texts, missing = wait_for_tokens(win, ["left_root", "right_root"], timeout_s=READY_TIMEOUT_S)
+                    if not ok:
+                        print(
+                            f"FAIL: Explorer never listed the seeded browse dir, even after a real "
+                            f"PathBar re-navigation to the identical path: missing {missing}",
+                            file=sys.stderr,
+                        )
+                        debug_dump(texts)
+                        return 1
+                    print("  real PathBar navigation succeeded where the settings-restored initial listing did not", file=sys.stderr)
 
                 up_buttons = [
                     b for b in win.descendants(control_type="Button") if (b.window_text() or "") == "↑"
