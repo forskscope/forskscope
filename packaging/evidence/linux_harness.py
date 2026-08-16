@@ -40,6 +40,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from render_check import (  # noqa: E402
     APP_TIMEOUT_S,
+    check_pane,
     extents,
     find_app,
     find_by_role,
@@ -1686,9 +1687,248 @@ def p08(binary, break_mode=False):
     return 0
 
 
+# ── P03 — Visual/navigation ──────────────────────────────────────────────
+
+
+def collect_all_rows(node, out=None):
+    if out is None:
+        out = []
+    if node.get_role_name() == "table row":
+        out.append(node)
+    for i in range(node.get_child_count()):
+        child = node.get_child_at_index(i)
+        if child is not None:
+            collect_all_rows(child, out)
+    return out
+
+
+def find_all_by_name_containing(node, substring, out=None):
+    if out is None:
+        out = []
+    if substring in (node.get_name() or ""):
+        out.append(node)
+    for i in range(node.get_child_count()):
+        child = node.get_child_at_index(i)
+        if child is not None:
+            find_all_by_name_containing(child, substring, out)
+    return out
+
+
+def p03(binary, break_mode=False):
+    """RFC-078 P03, five sub-checks against the published binary:
+
+    1. Full-width short-row backgrounds: every row in a pane reports the
+       same on-screen width regardless of its own text length -
+       `left_all_hunk_kinds.txt`/`right_*` mixes short and long lines,
+       so this is a real, not synthetic, exercise of the CSS contract
+       (`11-view-diff.css`'s "short rows fill the visible column width").
+    2. Action-row alignment across multiple hunks: every "Use this
+       change" button's y-center falls within one row-height of a real
+       left-pane row's y-center and a real right-pane row's - the act
+       column's own rows are not exposed as `role="row"` at all
+       (confirmed by direct inspection - `.diff-act-row` produces zero
+       AT-SPI "table row" nodes, unlike `.diff-row`), so this checks
+       against the actionable buttons themselves instead.
+    3. Vertical/geometry alignment: F34's `check_pane` logic (child-count
+       and content-cell x-origin), reused directly against a genuine
+       multi-hunk fixture - M5-C prerequisite A already proved this
+       assertion is real, not vacuous (see `inject_geometry_defect.py`).
+    4. Horizontal scroll mirroring, with settling: real X11 wheel-scroll
+       synthesis on the left pane (this is the one interaction in this
+       function that falls back to synthesis rather than an accessibility
+       action - there is no AT-SPI action for "scroll", and
+       `Atspi.Component.scroll_to_point` was tried first and confirmed to
+       report success without moving anything - a fourth instance of this
+       program's shadow-AT-SPI-state family), then the right pane's
+       content-cell x is sampled three times over a settling window and
+       required to (a) have moved from its pre-scroll position and (b) be
+       stable across all three samples - "without feedback or jitter"
+       means an oscillating value is itself a failure, not just an
+       unmirrored one.
+    5. Word wrap remains usable: toggling wrap on does not lose the row
+       count or crash the view.
+
+    `--break`: sub-check 3 (reusing check_pane) requires the impossible
+    baseline x from `inject_geometry_defect.py`'s own falsifiability
+    convention; sub-check 4 requires the right pane's content to have
+    *not* moved, which is false under real mirroring.
+    """
+    left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    left_wide = REPO_ROOT / "tests/fixtures/text/left_long_line.txt"
+    right_wide = REPO_ROOT / "tests/fixtures/text/right_long_line.txt"
+
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+
+        # ── 1-3: full-width rows, action-row alignment, geometry ────────
+        proc = launch(binary, [left, right], scratch_path)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered on the accessibility bus", file=sys.stderr)
+                return 1
+            landmark, frame, left_rows, right_rows = wait_for_ready(app, 7, timeout_s=LAUNCH_TIMEOUT_S)
+            if landmark is None:
+                print("FAIL: compare view did not reach the expected 7 rows/pane shape", file=sys.stderr)
+                return 1
+
+            # 1. Full-width rows.
+            for pane_name, rows in [("left", left_rows), ("right", right_rows)]:
+                widths = {round(extents(r).width) for r in rows}
+                if len(widths) != 1:
+                    print(
+                        f"FAIL: {pane_name} pane rows have inconsistent widths {sorted(widths)} "
+                        "- a short row's background does not span the full widest-line area",
+                        file=sys.stderr,
+                    )
+                    return 1
+
+            # 2. Action-row alignment.
+            act_buttons = find_all_by_name_containing(app, "Use this change")
+            if not act_buttons:
+                print("FAIL: no 'Use this change' action buttons found in a multi-hunk fixture", file=sys.stderr)
+                return 1
+            row_height = extents(left_rows[0]).height
+            for btn in act_buttons:
+                btn_center_y = extents(btn).y + extents(btn).height / 2
+                left_match = any(
+                    abs((extents(r).y + extents(r).height / 2) - btn_center_y) <= row_height
+                    for r in left_rows
+                )
+                right_match = any(
+                    abs((extents(r).y + extents(r).height / 2) - btn_center_y) <= row_height
+                    for r in right_rows
+                )
+                if not (left_match and right_match):
+                    print(
+                        f"FAIL: an action button at y={extents(btn).y} has no left/right row "
+                        "within one row-height - action rows are not aligned",
+                        file=sys.stderr,
+                    )
+                    return 1
+
+            # 3. Vertical/geometry alignment (F34's check_pane, reused).
+            failures = check_pane(left_rows, "left pane") + check_pane(right_rows, "right pane")
+            if break_mode:
+                # Falsifiability: require the impossible - that check_pane
+                # found a mismatch against the real, unmodified binary.
+                if not failures:
+                    print(
+                        "FAIL (expected, --break): check_pane found no misalignment against "
+                        "an unmodified build - required a mismatch that cannot be real",
+                        file=sys.stderr,
+                    )
+                    return 1
+            elif failures:
+                print("FAIL: geometry/alignment check found misalignment:", file=sys.stderr)
+                for f in failures:
+                    print(f"  - {f}", file=sys.stderr)
+                return 1
+        finally:
+            terminate(proc)
+
+        # ── 4: horizontal scroll mirroring, with settling ────────────────
+        proc = launch(binary, [left_wide, right_wide], scratch_path)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered (scroll-mirror launch)", file=sys.stderr)
+                return 1
+            landmark, frame, left_rows, right_rows = wait_for_ready(app, 1, timeout_s=LAUNCH_TIMEOUT_S)
+            if landmark is None:
+                print("FAIL: compare view did not reach the expected 1 row/pane shape", file=sys.stderr)
+                return 1
+
+            def right_cell_x():
+                row = right_rows[0]
+                cell = row.get_child_at_index(row.get_child_count() - 1)
+                return extents(cell).x
+
+            before = right_cell_x()
+            row_ext = extents(left_rows[0])
+            cx, cy = row_ext.x + 100, row_ext.y + row_ext.height // 2
+            subprocess.run(["xdotool", "mousemove", "--sync", str(cx), str(cy)], check=True, timeout=15)
+            for _ in range(20):
+                subprocess.run(["xdotool", "click", "7"], check=False, timeout=15)
+            time.sleep(0.5)
+
+            samples = []
+            for _ in range(3):
+                samples.append(right_cell_x())
+                time.sleep(0.3)
+
+            required_moved = False if break_mode else True
+            moved = samples[0] != before
+            settled = samples[0] == samples[1] == samples[2]
+            if moved != required_moved:
+                print(
+                    f"FAIL: right pane content x {'moved' if moved else 'did not move'} "
+                    f"after scrolling the left pane (before={before}, after={samples[0]}) "
+                    f"- required {'unchanged (break mode)' if break_mode else 'to move (mirrored)'}",
+                    file=sys.stderr,
+                )
+                return 1
+            if not break_mode and not settled:
+                print(
+                    f"FAIL: right pane content x did not settle after scrolling - samples "
+                    f"{samples} over 0.9s show feedback/jitter, not a stable mirror",
+                    file=sys.stderr,
+                )
+                return 1
+        finally:
+            terminate(proc)
+
+        # ── 5: word wrap remains usable ───────────────────────────────────
+        proc = launch(binary, [left, right], scratch_path)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered (wrap-toggle launch)", file=sys.stderr)
+                return 1
+            landmark, frame, left_rows, right_rows = wait_for_ready(app, 7, timeout_s=LAUNCH_TIMEOUT_S)
+            if landmark is None:
+                print("FAIL: compare view did not reach ready shape for the wrap-toggle check", file=sys.stderr)
+                return 1
+
+            more_btn = find_by_exact_name(app, "More ▼")
+            if more_btn is None:
+                print("FAIL: could not find the 'More ▼' disclosure toggle", file=sys.stderr)
+                return 1
+            click(more_btn)
+
+            wrap_btn = None
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                wrap_btn = find_by_name_containing(app, "Toggle word wrap")
+                if wrap_btn is not None:
+                    break
+                time.sleep(0.3)
+            if wrap_btn is None:
+                print("FAIL: could not find the word-wrap toggle button", file=sys.stderr)
+                return 1
+            click(wrap_btn)
+            time.sleep(0.5)
+
+            landmark2, _f2, left_rows2, right_rows2 = wait_for_ready(app, 7, timeout_s=LAUNCH_TIMEOUT_S)
+            if landmark2 is None:
+                print("FAIL: compare view lost its 7-row shape after enabling word wrap", file=sys.stderr)
+                return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: rows are full-width regardless of content length; action buttons align with "
+        "their left/right rows; geometry/alignment holds across a multi-hunk fixture; "
+        "horizontal scroll mirrors and settles; word wrap keeps the view usable."
+    )
+    return 0
+
+
 CASES = {
     "p01": p01,
     "p02": p02,
+    "p03": p03,
     "p04": p04,
     "p05": p05,
     "p06": p06,
