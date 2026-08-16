@@ -1925,6 +1925,232 @@ def p03(binary, break_mode=False):
     return 0
 
 
+# ── P07 — Explorer and directory report ──────────────────────────────────
+
+
+def p07(binary, break_mode=False):
+    """RFC-078 P07 against a real directory pair (one file each of Equal,
+    Changed, LeftOnly, RightOnly), plus a light navigation-history check.
+    "Focused-pane keyboard behaviour" is not exercised here - like every
+    keyboard-only interaction in this program, no accessibility API can
+    synthesize the keystrokes it needs; recorded as manual-outstanding in
+    the evidence, mirroring F45's shape.
+
+    1. Status classification: `DeepCompareView`'s own summary line
+       ("N different · N equal · N left only · N right only") is checked
+       for an exact match - `DeepRow`'s row `div`s carry no explicit
+       `role="row"` (confirmed by inspection, unlike Explorer's tree
+       rows), so individual rows aren't AT-SPI-readable the way the diff
+       view's are; the aggregate summary line is, and directly answers
+       what RFC-078 asks for ("equal/different/one-sided statuses").
+    2. Filter buttons ("Different"/"All"/"Equal only") are each clicked
+       and confirmed not to break the view (the summary line, which
+       reflects all entries regardless of filter, must still be present
+       after each).
+    3. Batch copy: "Copy to right N" (copies Changed + LeftOnly entries),
+       confirmed via the actual files and the actual manifest - not just
+       that the operation reported success (F62's lesson: an unverified
+       "success" is a claim, not evidence). Verifies changed.txt's new
+       content, its `.bak` backup's content (the *original* right-side
+       content, byte-for-byte), left_only.txt's new content, right_only.txt
+       left untouched, and the manifest JSON's entries (two Copied
+       outcomes, exactly one with a non-null backup_path).
+    4. Light navigation-history check: "↑" (up-one-directory) and "⌂"
+       (home) buttons in the left pane's PathBar are clicked and confirmed
+       clickable via a real do_action return - RFC-078 doesn't ask for a
+       navigation-history *state* check beyond this, and neither does this
+       function build one.
+
+    `--break`: sub-check 1 requires an impossible summary line; sub-check
+    3 requires the backup's content to equal a value the real batch copy
+    can never produce.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+        data_dir = scratch_path / "data"
+        data_dir.mkdir()
+        left_dir = data_dir / "left"
+        right_dir = data_dir / "right"
+        left_dir.mkdir()
+        right_dir.mkdir()
+        (left_dir / "same.txt").write_text("same content\n")
+        (right_dir / "same.txt").write_text("same content\n")
+        (left_dir / "changed.txt").write_text("left version\n")
+        original_right_changed = "right version\n"
+        (right_dir / "changed.txt").write_text(original_right_changed)
+        (left_dir / "left_only.txt").write_text("only in left\n")
+        (right_dir / "right_only.txt").write_text("only in right\n")
+
+        config_home = scratch_path / "config"
+        config_home.mkdir()
+        xdg_data_home = scratch_path / "xdg-data"
+        xdg_data_home.mkdir()
+        env = dict(os.environ)
+        env["XDG_CONFIG_HOME"] = str(config_home)
+        env["XDG_DATA_HOME"] = str(xdg_data_home)
+
+        proc = subprocess.Popen([binary], cwd=str(scratch_path), env=env)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered on the accessibility bus", file=sys.stderr)
+                return 1
+
+            navigate_pane_to(app, 0, data_dir)
+            navigate_pane_to(app, 1, data_dir)
+
+            left_rows, right_rows = [], []
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                left_rows, right_rows = explorer_rows_by_pane(app)
+                if len(left_rows) == 2 and len(right_rows) == 2:
+                    break
+                time.sleep(0.3)
+            if len(left_rows) != 2 or len(right_rows) != 2:
+                print(
+                    f"FAIL: expected 2 rows (left, right dirs) per pane, "
+                    f"got {len(left_rows)}/{len(right_rows)}",
+                    file=sys.stderr,
+                )
+                return 1
+            click(left_rows[0])  # "left" dir, alphabetically first
+            click(right_rows[1])  # "right" dir
+
+            cmp_btn = None
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                cmp_btn = find_by_exact_name(app, "Compare selected directories")
+                if cmp_btn is not None:
+                    break
+                time.sleep(0.3)
+            if cmp_btn is None:
+                print("FAIL: Compare button never showed 'Compare selected directories'", file=sys.stderr)
+                return 1
+            click(cmp_btn)
+
+            # 1. Status classification via the summary line.
+            required_summary = (
+                "9 different · 9 equal · 9 left only · 9 right only"
+                if break_mode
+                else "1 different · 1 equal · 1 left only · 1 right only"
+            )
+            summary_node = None
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                summary_node = find_text_containing(app, required_summary)
+                if summary_node is not None:
+                    break
+                time.sleep(0.3)
+            if summary_node is None:
+                print(
+                    f"FAIL: deep-compare summary line never showed {required_summary!r} "
+                    "- status classification is wrong",
+                    file=sys.stderr,
+                )
+                return 1
+
+            # 2. Filter buttons don't break the view.
+            for label in ["Different", "All", "Equal only"]:
+                btn = find_by_exact_name(app, label)
+                if btn is None:
+                    print(f"FAIL: could not find the '{label}' filter button", file=sys.stderr)
+                    return 1
+                click(btn)
+                time.sleep(0.3)
+                if find_text_containing(app, required_summary) is None:
+                    print(f"FAIL: summary line disappeared after clicking the '{label}' filter", file=sys.stderr)
+                    return 1
+
+            # 3. Batch copy, verified against real files and the manifest.
+            copy_btn = find_by_name_containing(app, "Copy to right")
+            if copy_btn is None:
+                print("FAIL: could not find the 'Copy to right N' button", file=sys.stderr)
+                return 1
+            click(copy_btn)
+
+            confirm_btn = None
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                confirm_btn = find_by_exact_name(app, "Copy all")
+                if confirm_btn is not None:
+                    break
+                time.sleep(0.3)
+            if confirm_btn is None:
+                print("FAIL: batch-copy confirmation dialog's 'Copy all' button never appeared", file=sys.stderr)
+                return 1
+            click(confirm_btn)
+            time.sleep(1)
+        finally:
+            terminate(proc)
+
+        if (right_dir / "changed.txt").read_text() != "left version\n":
+            print("FAIL: changed.txt in the right dir does not hold the copied left content", file=sys.stderr)
+            return 1
+        backup = right_dir / "changed.txt.bak"
+        required_backup = "this content was never on disk" if break_mode else original_right_changed
+        if not backup.exists() or backup.read_text() != required_backup:
+            print(
+                f"FAIL: changed.txt.bak missing or does not equal "
+                f"{'an impossible value (break mode)' if break_mode else 'the original right-side content'}",
+                file=sys.stderr,
+            )
+            return 1
+        if not (right_dir / "left_only.txt").exists() or (right_dir / "left_only.txt").read_text() != "only in left\n":
+            print("FAIL: left_only.txt was not copied to the right dir with the correct content", file=sys.stderr)
+            return 1
+        if (right_dir / "right_only.txt").read_text() != "only in right\n":
+            print("FAIL: right_only.txt (untouched by this copy direction) changed unexpectedly", file=sys.stderr)
+            return 1
+
+        manifest_dir = xdg_data_home / "forskscope" / "manifests"
+        manifests = list(manifest_dir.glob("*.json")) if manifest_dir.exists() else []
+        if not manifests:
+            print(f"FAIL: no manifest JSON found under {manifest_dir}", file=sys.stderr)
+            return 1
+        manifest = json.loads(manifests[0].read_text())
+        entries = manifest.get("entries", [])
+        copied = [e for e in entries if e.get("outcome") == "copied"]
+        if len(copied) != 2:
+            print(f"FAIL: expected exactly 2 'copied' manifest entries, got {len(copied)}: {entries}", file=sys.stderr)
+            return 1
+        with_backup = [e for e in copied if e.get("backup_path")]
+        if len(with_backup) != 1:
+            print(
+                f"FAIL: expected exactly 1 manifest entry with a backup_path (changed.txt "
+                f"overwrote an existing file; left_only.txt did not), got {len(with_backup)}",
+                file=sys.stderr,
+            )
+            return 1
+
+        # 4. Light navigation-history check.
+        proc = subprocess.Popen([binary], cwd=str(scratch_path), env=env)
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered (navigation-history launch)", file=sys.stderr)
+                return 1
+            time.sleep(1)
+            up_buttons = []
+            find_all_by_name_containing(app, "Go up one directory", up_buttons)
+            home_buttons = []
+            find_all_by_name_containing(app, "Home directory", home_buttons)
+            if not up_buttons or not home_buttons:
+                print("FAIL: could not find the left pane's Up/Home navigation buttons", file=sys.stderr)
+                return 1
+            click(up_buttons[0])
+            time.sleep(0.3)
+            click(home_buttons[0])
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: status classification matches the real directory pair; filters don't break the "
+        "view; batch copy's files, backup, and manifest all verified; navigation buttons "
+        "clickable."
+    )
+    return 0
+
+
 CASES = {
     "p01": p01,
     "p02": p02,
@@ -1932,6 +2158,7 @@ CASES = {
     "p04": p04,
     "p05": p05,
     "p06": p06,
+    "p07": p07,
     "p08": p08,
     "p09": p09,
     "p10": p10,

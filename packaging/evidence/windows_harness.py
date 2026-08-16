@@ -972,6 +972,144 @@ def rowprobe(binary, break_mode=False):
     return 0
 
 
+def scrollprobe(binary, break_mode=False):
+    """NOT an evidence case, like `rowprobe` above - a one-shot diagnostic
+    for P03's horizontal-scroll-mirroring requirement, which has no
+    precedent anywhere in this program on any platform. `diff.rs`'s
+    `.diff-col-left`/`.diff-col-right` (`#diff-col-left-{index}`/
+    `#diff-col-right-{index}`) are plain `overflow-x:auto` divs, not
+    native scrollbars - `install_hscroll_sync`'s JS mirrors `scrollLeft`
+    between them on a `scroll` event. Nothing in this harness has yet
+    established whether Windows UIA exposes `IScrollProvider`
+    (`ScrollPattern`) on a Chromium/WebView2 overflow container, or
+    whether scrolling one from outside the DOM requires falling back to
+    synthesized input the way `set_value_text` ultimately had to for the
+    font-size field. This probe launches against the repo's existing
+    `left_long_line.txt`/`right_long_line.txt` fixture pair (a single
+    2,000-character line per side - already tracked, not invented for
+    this), locates both pane containers by automation id (rowprobe
+    already established Chromium/WebView2's UIA `AutomationId` mirrors
+    the HTML `id` attribute directly), and tries, in ascending order of
+    how much each relies on an accessibility pattern versus raw input
+    synthesis, reporting which one actually moved `HorizontalScrollPercent`
+    (read back independently, not trusted on a clean return - the same
+    discipline `select_dropdown`/`set_value_text` already established):
+
+    1. `IUIAutomationScrollPattern.SetScrollPercent` via pywinauto's
+       `iface_scroll` (the ScrollPattern's direct value-set entry point).
+    2. `IUIAutomationScrollPattern.Scroll` with a `LargeIncrement` amount
+       (the discrete-step entry point some UIA providers implement even
+       when `SetScrollPercent` is unsupported).
+    3. `UIAWrapper.scroll('right', 'page')` (pywinauto's own high-level
+       helper over the same pattern, in case it exercises the pattern
+       differently than calling the COM methods directly).
+    4. A real synthesized mouse wheel at the pane's on-screen coordinates
+       (`pywinauto.mouse.scroll`) - the last-resort, most
+       input-synthesis-heavy path, used only to establish whether it is
+       even necessary.
+
+    No assertion, no `--break` mode - this exists to produce a real,
+    observed answer for P03's own docstring/evidence writeup to cite.
+    """
+    del break_mode
+    left = REPO_ROOT / "tests/fixtures/text/left_long_line.txt"
+    right = REPO_ROOT / "tests/fixtures/text/right_long_line.txt"
+
+    def scroll_state(elem, label):
+        try:
+            sc = elem.iface_scroll
+            state = {
+                "HorizontallyScrollable": sc.CurrentHorizontallyScrollable,
+                "HorizontalScrollPercent": sc.CurrentHorizontalScrollPercent,
+                "HorizontalViewSize": sc.CurrentHorizontalViewSize,
+            }
+        except Exception as exc:  # noqa: BLE001
+            state = {"error": repr(exc)}
+        print(f"  {label}: {state}")
+        return state
+
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = launch(binary, [left, right], scratch)
+        try:
+            app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            ok, texts, missing = wait_for_tokens(win, ["AAAA", "BBBB"], timeout_s=READY_TIMEOUT_S)
+            if not ok:
+                print(f"FAIL: compare view never rendered expected tokens: {missing}", file=sys.stderr)
+                debug_dump(texts)
+                return 1
+
+            print("=== descendants with an id-derived automation_id containing 'diff-col' ===")
+            panes = {}
+            for d in win.descendants():
+                try:
+                    aid = d.element_info.automation_id
+                except Exception:  # noqa: BLE001
+                    aid = ""
+                if aid and "diff-col-left" in aid:
+                    panes["left"] = d
+                    print(f"  left  -> automation_id={aid!r} control_type={d.element_info.control_type!r}")
+                elif aid and "diff-col-right" in aid:
+                    panes["right"] = d
+                    print(f"  right -> automation_id={aid!r} control_type={d.element_info.control_type!r}")
+
+            if "left" not in panes or "right" not in panes:
+                print("FAIL: could not locate both diff-col-left-* and diff-col-right-* by automation_id", file=sys.stderr)
+                return 1
+
+            left_pane, right_pane = panes["left"], panes["right"]
+            print("\n=== initial scroll state ===")
+            scroll_state(left_pane, "left")
+            scroll_state(right_pane, "right")
+
+            print("\n=== attempt 1: iface_scroll.SetScrollPercent(50, -1) on left ===")
+            try:
+                left_pane.iface_scroll.SetScrollPercent(50, -1)
+                print("  call did not raise")
+            except Exception as exc:  # noqa: BLE001
+                print(f"  raised: {exc!r}")
+            scroll_state(left_pane, "left after attempt 1")
+            scroll_state(right_pane, "right after attempt 1")
+
+            print("\n=== attempt 2: iface_scroll.Scroll(NoAmount=2, LargeIncrement=3) on left (horizontal=3, vertical=2) ===")
+            try:
+                left_pane.iface_scroll.Scroll(3, 2)
+                print("  call did not raise")
+            except Exception as exc:  # noqa: BLE001
+                print(f"  raised: {exc!r}")
+            scroll_state(left_pane, "left after attempt 2")
+            scroll_state(right_pane, "right after attempt 2")
+
+            print("\n=== attempt 3: UIAWrapper.scroll('right', 'page') on left ===")
+            try:
+                left_pane.scroll("right", "page")
+                print("  call did not raise")
+            except Exception as exc:  # noqa: BLE001
+                print(f"  raised: {exc!r}")
+            scroll_state(left_pane, "left after attempt 3")
+            scroll_state(right_pane, "right after attempt 3")
+
+            print("\n=== attempt 4: synthesized mouse wheel on left ===")
+            try:
+                from pywinauto import mouse  # noqa: PLC0415
+
+                r = left_pane.rectangle()
+                pt = (r.left + r.width() // 2, r.top + r.height() // 2)
+                mouse.scroll(coords=pt, wheel_dist=-10)
+                print(f"  call did not raise (coords={pt})")
+            except Exception as exc:  # noqa: BLE001
+                print(f"  raised: {exc!r}")
+            scroll_state(left_pane, "left after attempt 4")
+            scroll_state(right_pane, "right after attempt 4")
+        except RuntimeError as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
+
+    print("\nOK: scrollprobe dump complete (diagnostic only - no assertion).")
+    return 0
+
+
 # ── P09 — Mergetool ──────────────────────────────────────────────────────────
 
 
@@ -2358,6 +2496,7 @@ CASES = {
     "p01": p01,
     "p02": p02,
     "rowprobe": rowprobe,
+    "scrollprobe": scrollprobe,
     "p04": p04,
     "p05": p05,
     "p06": p06,
