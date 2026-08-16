@@ -13,6 +13,15 @@ name: Render Check (on demand)
 # crates/forskscope-ui/src/ui/view/hunk.rs in this run's checkout only
 # (packaging/reintroduce_f32_defect.py) — never committed, never the
 # default.
+#
+# `inject_geometry_defect` (M5-C prerequisite A) demonstrates
+# check_pane's *other* branch — a content-cell x-origin shift with no
+# accessible-structure change at all, which F32's own defect shape never
+# exercises (an extra accessible child short-circuits the count check
+# before the x-origin comparison is ever reached for that row). Patches
+# crates/forskscope-ui/assets/css/11-view-diff.css and regenerates
+# main.css in this run's checkout only (packaging/inject_geometry_defect.py)
+# — never committed, never the default.
 on:
   workflow_dispatch:
     inputs:
@@ -21,6 +30,14 @@ on:
           Temporarily reintroduce F32's exact defect shape before building,
           to demonstrate the check still detects it. Applied only to this
           run's checkout; never committed.
+        type: boolean
+        default: false
+      inject_geometry_defect:
+        description: >-
+          Temporarily inject a geometry-only misalignment (no accessible
+          structure change) before building, to demonstrate check_pane's
+          x-origin comparison still detects it. Applied only to this run's
+          checkout; never committed.
         type: boolean
         default: false
 
@@ -55,6 +72,10 @@ jobs:
       - name: Reintroduce F32's defect shape (demonstration only)
         if: ${{ inputs.inject_f32_defect }}
         run: python3 packaging/reintroduce_f32_defect.py
+
+      - name: Inject a geometry-only defect (demonstration only)
+        if: ${{ inputs.inject_geometry_defect }}
+        run: python3 packaging/inject_geometry_defect.py
 
       - name: Build release binary
         run: cargo build --release --locked -p forskscope-ui
