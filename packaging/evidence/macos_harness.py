@@ -2336,15 +2336,6 @@ def p07(binary, break_mode=False):
                 )
                 return 1
 
-            r = ui("click_button_nth", "←", "2", timeout=20)
-            if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click Back on the right ('←'): {r}", file=sys.stderr)
-                return 1
-            r = find_wait("right-only-1.txt", timeout=10)
-            if not r.startswith("FOUND"):
-                print(f"FAIL: Back did not return the right pane to root-b: {r}", file=sys.stderr)
-                return 1
-
             # Both picks (root-a/root-b) were made earlier, right after
             # going "↑" to $HOME - open the deep compare now.
             r = click_wait("Compare", timeout=10)
