@@ -1318,7 +1318,24 @@ def p03(binary, break_mode=False):
                 return 1
             try:
                 rect = win.rectangle()
-                win.move_window(rect.left, rect.top, 480, rect.height())
+                try:
+                    # UIA TransformPattern - the pattern-based resize entry
+                    # point (same family as iface_scroll/iface_value
+                    # elsewhere in this harness). `HwndWrapper.move_window`
+                    # (a Win32-backend-only method) doesn't exist on this
+                    # UIA-backend wrapper - confirmed on real CI, not assumed.
+                    win.iface_transform.Resize(480, rect.height())
+                except Exception:  # noqa: BLE001
+                    # Fallback: raw Win32 SetWindowPos on the real HWND
+                    # (stdlib ctypes only) - guaranteed to exist regardless
+                    # of which pywinauto wrapper method names this version
+                    # happens to expose.
+                    import ctypes  # noqa: PLC0415
+
+                    SWP_NOZORDER = 0x0004
+                    ctypes.windll.user32.SetWindowPos(
+                        win.handle, 0, rect.left, rect.top, 480, rect.height(), SWP_NOZORDER
+                    )
             except Exception as exc:  # noqa: BLE001
                 print(f"FAIL(narrow): could not resize the window narrower: {exc!r}", file=sys.stderr)
                 return 1
