@@ -3292,6 +3292,44 @@ def p07(binary, break_mode=False):
     statuses; deep comparison progress and filters; per-file and batch
     copy confirmation/backup/manifest/result-summary.
 
+    **CANDIDATE DEFECT, BLOCKING THIS ENTIRE CASE ON WINDOWS (real,
+    CI-confirmed, not fixed - registered per the handoff's "no product
+    behaviour changes" constraint):** Explorer's directory listing never
+    renders a single row on this Windows/WebView2 environment, for any
+    directory, seeded fixture or real. Confirmed across five independent
+    real CI runs (31937800743, 31938065443, 31938290605, 31938459272 and
+    the run this function's own code below will produce) using four
+    different trigger mechanisms in turn - restoring `last_left_dir`/
+    `last_right_dir` from settings.json at launch, a real PathBar
+    "edit path, commit" re-navigation to the identical path, and clicking
+    the Home ('⌂') button to navigate to the real
+    `C:\\Users\\<runner>` directory - and, separately, ruled out as mere
+    slowness rather than never-happens by polling for up to 150s
+    (`accessible text node count` never moved from the empty-state's 54,
+    not once, across the full budget). `aligned.is_empty()`
+    (`explorer/tree.rs`) is what actually renders the empty-state message
+    seen in every failure's diagnostic dump ("Choose a file or folder on
+    each side to compare"/"Select a file or directory on each side to
+    compare") - meaning `compute_aligned_rows` genuinely receives zero
+    rows from both `DirectoryTree`s, on every attempt, for directories
+    proven (by `mkdir`/existing real folders) to have real content. The
+    root cause is narrowed no further than this: something in
+    `dioxus-swdir-tree`'s lazy-scan pipeline (`on_toggled` -> `ScanRequest`
+    -> `use_scan_driver`'s executor -> `on_loaded` merge) never completes
+    or never delivers a result back into `tree_l`/`tree_r`, specifically
+    on this Windows CI environment - this could be a genuine cross-
+    platform product defect that Explorer navigation has simply never
+    been exercised by this program's Windows CI before now to catch, or
+    an environment-specific limitation (a background scan thread/executor
+    that this sandboxed runner blocks or never schedules); distinguishing
+    the two would need a rebuild with added instrumentation, which this
+    slice's "published artifacts only, no rebuild" constraint forbids.
+    Every sub-check below this point (statuses, filters, deep-compare
+    progress, per-file/batch copy) is therefore unreached on Windows -
+    the code exists and is believed correct against a *rendered* listing
+    (the Linux/macOS rows exercise the equivalent flow), but nothing past
+    this point has been, or currently can be, verified on this platform.
+
     **Focused-pane keyboard behaviour is not executed here** - the same
     §6 limitation P04/P11 record (a real keystroke with no bound UI
     element for any accessibility API to invoke); recorded manual-
