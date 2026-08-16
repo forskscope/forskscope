@@ -102,7 +102,31 @@ binary the Windows zip already uses. It must:
 The four-part `Version` attribute (`X.Y.Z.0`) is Store-specific and already
 maintained; nothing here changes the versioning scheme.
 
-### 2. Credentials — federated, not stored
+### 2. Credentials
+
+**Owner decision (2026-08-16): an Entra ID client secret in GitHub Actions
+Secrets.** That is functionally sufficient — the Partner Center API accepts
+tenant/client/secret, and it is the documented path.
+
+Two costs follow from it, and neither blocks:
+
+- **Entra ID client secrets expire** (24 months maximum, frequently shorter
+  under tenant policy). A stored secret means releases break silently at
+  expiry, at whatever moment that happens to be. **The expiry date must be
+  recorded where it surfaces before it lapses** — otherwise this becomes
+  another check that appears healthy until the moment it is needed, which is
+  the failure shape this project has now catalogued five times.
+- It is the only credential in this project whose compromise lets someone ship
+  code to users under the project's identity. Scope it to the minimum Partner
+  Center permissions the submission API needs, not to whatever the registration
+  already has.
+
+**Federated credentials (OIDC) remain the preferred end state** and can be
+adopted later without redesign: the workflow shape is identical and only the
+authentication step changes. Recorded here so the choice is a decision with
+known costs rather than a default.
+
+### 2a. Signing — resolved, nothing to handle
 
 Authentication uses the project's existing Entra ID app registration via
 **OIDC federated credentials**: GitHub's `id-token: write` permission plus a
@@ -224,13 +248,19 @@ makes unsettled claims recurring").
 1. **Timing.** Implement after Gate D as §8 proposes, or sooner? A separate
    workflow keeps the risk low either way; the cost of "sooner" is re-running
    M5's Windows rows.
-2. **Signing.** `Publisher="CN=C4BA37E8-8670-4C82-8365-5ECB57373921"` is a
-   Store-assigned publisher identity, which implies Microsoft signs the package
-   and no code-signing certificate of the project's own is involved. **Confirm.**
-   If submissions have been signed locally with a certificate, §1 and §2 change
-   shape and the certificate becomes a second credential to handle.
-3. **F60.** What does the Windows floor claim? Automation makes the answer ship
-   on every release.
+2. ~~**Signing.**~~ **Closed (2026-08-16).** `Publisher="CN=C4BA37E8-8670-4C82-8365-5ECB57373921"`
+   is a Store-assigned publisher identity: Microsoft signs the package on
+   submission, and no code-signing certificate of the project's own is
+   involved. Nothing further to handle.
+3. **F60.** Still open. The owner's direction (2026-08-16) is that Windows
+   release verification in CI should improve before automation — right on its
+   own merits, but it **cannot close F60**: GitHub Actions offers no Windows 10
+   runner, and `windows-latest` is a Server-2025-based image at kernel
+   NT 10.0.26100. The gap is a machine nobody has, not a check nobody wrote, so
+   no amount of CI improvement evidences Windows 10 1809. F60's three
+   resolutions stand — narrow the floor to what is evidenced, obtain a Windows
+   10 host (a VM is the cheap version), or state openly that 1809 is a declared
+   compatibility floor carrying no runtime evidence.
 4. **Entra ID app registration.** Does the existing registration already have
    the Partner Center permissions this needs, and can a federated credential be
    added to it — or is a separate registration preferable so that publishing
