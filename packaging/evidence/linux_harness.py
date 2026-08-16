@@ -2208,13 +2208,19 @@ def p07(binary, break_mode=False):
             if app is None:
                 print("FAIL: forskscope never registered (navigation-history launch)", file=sys.stderr)
                 return 1
+            # dir_pane.rs's Up/Home buttons carry only a `title` tooltip
+            # ("Go up one directory"/"Home directory"), never an
+            # aria_label - their AT-SPI accessible name is their glyph
+            # text content instead ("↑"/"⌂"), the same pattern already
+            # established for this exact path-bar's Edit-path button
+            # ("✎", not "Edit path") in navigate_pane_to.
             up_buttons, home_buttons = [], []
             deadline = time.monotonic() + LAUNCH_TIMEOUT_S
             while time.monotonic() < deadline:
                 up_buttons = []
-                find_all_by_name_containing(app, "Go up one directory", up_buttons)
+                find_all_by_name_containing(app, "↑", up_buttons)
                 home_buttons = []
-                find_all_by_name_containing(app, "Home directory", home_buttons)
+                find_all_by_name_containing(app, "⌂", home_buttons)
                 if up_buttons and home_buttons:
                     break
                 time.sleep(0.3)
