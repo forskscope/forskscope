@@ -2220,7 +2220,11 @@ def p07(binary, break_mode=False):
                 return 1
 
             # ── Equal/different/one-sided statuses, deep-compare stats ────
-            for needle in ("aaa-changed.txt", "equal.txt", "left-only.txt", "right-only-1.txt", "right-only-2.txt"):
+            # `equal.txt` is deliberately NOT checked here - the default
+            # filter is DeepFilter::Different, which excludes Equal
+            # entries by design (checked below, under the "All" filter,
+            # where it belongs).
+            for needle in ("aaa-changed.txt", "left-only.txt", "right-only-1.txt", "right-only-2.txt"):
                 r = find_wait(needle, timeout=LAUNCH_TIMEOUT_S)
                 if not r.startswith("FOUND"):
                     print(f"FAIL: deep-compare row for {needle!r} never appeared: {r}", file=sys.stderr)
