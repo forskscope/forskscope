@@ -36,6 +36,9 @@ mounted with `hdiutil attach`, `ForskScope.app` copied out, its
 | P08 — Persistence: Reset and back up | **Pass** | CI run [`31879567945`](https://github.com/forskscope/forskscope/actions/runs/31879567945) |
 | P08 — Persistence: legacy migration (filesystem) | **Pass** | CI run [`31879767594`](https://github.com/forskscope/forskscope/actions/runs/31879767594) |
 | P12 — Session/settings restart | **Fail** (real product defect found — session not persisted; see below) | CI run [`31881394791`](https://github.com/forskscope/forskscope/actions/runs/31881394791) |
+| P03 — Compare layout and scrolling | **Pass** (basic layout observation, per RFC-078's macOS depth — see M5-C notes) | CI run [`31937970972`](https://github.com/forskscope/forskscope/actions/runs/31937970972) |
+| P07 — Explorer and directory report | **Pass** (two real product defects and a harness/technique limitation found and registered — see M5-C notes) | CI run [`31941623347`](https://github.com/forskscope/forskscope/actions/runs/31941623347) |
+| P11 — Keyboard and modal safety | **Pass** (modal-focus sub-case only — see M5-C notes) | CI run [`31937264321`](https://github.com/forskscope/forskscope/actions/runs/31937264321) |
 
 Harness: `packaging/evidence/macos_harness.py` + `macos_ui.applescript`,
 driven by `.github/workflows/m5-evidence-macos.yml` (`workflow_dispatch`,
@@ -442,6 +445,290 @@ accessibility techniques all confirmed no-ops, for the latter) — neither
 silently skipped nor claimed covered.
 
 ## M5-B — Waivers
+
+None.
+
+## M5-C — visual/navigation cases and evidence assembly (P03, P07, P11)
+
+Same artifact, same digests, same harness family (`macos_harness.py` +
+`macos_ui.applescript`, extended with new commands and case functions, not
+restructured). This slice's first, primary deliverable — per the M5-C
+handoff's explicit instruction — was resolving F63 (whether macOS content
+above a certain file size genuinely never reaches the accessibility tree,
+or whether M5-B's harness simply gave up too soon) *before* gathering any
+P03/P07 evidence against it.
+
+### F63 resolution — harness artifact, not a product accessibility defect
+
+M5-B found a diff pair's content stopped reaching the macOS accessibility
+tree above a file-size threshold between 30 and 100 lines. Three real
+dispatches, run in order, resolve this conclusively:
+
+1. **`recon_f63_investigation`** ([`31936174801`](https://github.com/forskscope/forskscope/actions/runs/31936174801)) — a 200-line fixture with sentinels near the top and at line 150. A 90-second, zero-interaction poll loop (far longer than any case's normal timeout) never found the deep sentinel, and every call after it — `list_roles`, a keyboard-scroll attempt, follow-on `count_rows`/`find_text` — started hitting this harness's 20s per-call subprocess timeout. That is a different symptom from M5-B's own finding (a prompt, repeatable "0 rows"/"NOT_FOUND", never a timeout) — consistent with this investigation's own repeated heavy `entire contents of window` queries degrading the WebProcess/accessibility server's responsiveness over the run, not with genuinely empty content.
+2. **`recon_f63_v2_single_call`** ([`31936446822`](https://github.com/forskscope/forskscope/actions/runs/31936446822)) — isolates the confound: one fresh launch, one `find_text` call for a line-60 sentinel in a 100-line fixture, given a 150-second timeout and nothing run before it. Result: **`FOUND` after 95.8 seconds.** The content reaches the accessibility tree well past the ~30–100 line threshold M5-B recorded — it is simply far slower to enumerate via this harness's bulk `entire contents of window` AppleScript technique than any case's default 15–45s timeout allows. The same run's `count_rows` call (issued first) returned `'0'` in only 1.3s, a real asymmetry worth resolving on its own.
+3. **`recon_f63_v3_count_rows_alone`** ([`31936590400`](https://github.com/forskscope/forskscope/actions/runs/31936590400)) — isolates `count_rows` specifically, with a 150s timeout and nothing else run first. First call: `'0'` in 0.8s (fast, but wrong). A **second** `count_rows` call in the *same launch*, immediately after: **`'82'` in 24.0s** — a large, real, correct-shaped row count. The first call's bulk `entire contents of window` AppleEvent evidently returns fast but incomplete before WebKit's own accessibility-tree computation has caught up; a second call, benefiting from whatever computation the first triggered, returns far more complete (and still slow) results.
+
+**Conclusion: F63 is a harness artifact, not a product accessibility
+defect.** Content does reach the macOS accessibility tree for files well
+past the previously-recorded threshold — this was never a case of content
+being invisible to assistive technology. The real, evidenced cause is that
+WebKit's own accessibility-tree computation for a sizeable view is
+measurably slow to complete via this harness's bulk `entire contents of
+window` AppleScript technique (tens of seconds, scaling with content), and
+this program's default per-call timeouts (15–45s) were too short to let a
+correct enumeration finish — the first query after a fresh window
+sometimes returns fast-but-incomplete rather than blocking until genuinely
+done. **This resolution is offered with one honest caveat, not verified
+here:** VoiceOver's own real navigation model queries the tree
+incrementally (one focused element at a time), not via a single blanket
+bulk fetch the way this harness's technique does — so this program has no
+direct evidence about whether an actual screen-reader user experiences
+comparable latency on the same content. That remains an open, unverified
+question, not a finding either way.
+
+**Practical consequence for this slice:** P03/P07 do not need this
+large-fixture workaround at all. P03's multi-hunk requirement is already
+satisfied by F34's small `all_hunk_kinds` fixture (14 rows, already proven
+fast and reliable across P02/P04/P05/P09); P07's Explorer/directory-report
+fixtures are small by nature. Retrofitting M5-B's own P06 (which uses a
+much larger generated pair) with this understanding is a reasonable
+follow-up, not attempted in this slice (out of scope, and P06 is not one
+of this slice's assigned cases).
+
+### P03 — Compare layout and scrolling
+
+RFC-078 requires this case in full only on WebKitGTK; macOS WebKit gets "a
+basic layout observation," matching `matrix-plan.md`'s Spot-check depth
+for this row. What was actually attempted and found, real dispatches
+throughout:
+
+- **Multi-hunk rendering**: F34's `all_hunk_kinds` fixture renders 14
+  `AXRow` elements across multiple hunks, matching P02's own established
+  count.
+- **Word wrap**: the toggle (`aria_pressed`-carrying, inside the toolbar's
+  "Advanced" disclosure) toggles on and off without breaking the view —
+  rows remain present and correctly counted after each toggle. A real
+  dispatch found this control does not respond to `click_button`'s
+  `AXButton`-role-filtered search via either its `aria_label` or its inner
+  text — `aria_pressed` plausibly maps it to a different accessibility
+  role, the same class of ARIA-state-driven role change already seen
+  elsewhere in this program (`<select>` → `AXPopUpButton`, not
+  `AXComboBox`). `click_any` (no role filter) was used instead.
+- **Narrow window**: resizing the window to 480×500 (well below the
+  fixture's natural content width) still renders all 14 rows — the view
+  stays usable, not blank.
+- **Horizontal-scroll-mirror — attempted for real, not skipped.** This is
+  the item with no precedent anywhere in this program (per the handoff),
+  so full effort went into it before falling back to "basic." Two
+  dedicated recon rounds (`recon_p03_scroll`,
+  [`31936939543`](https://github.com/forskscope/forskscope/actions/runs/31936939543)) against a wide-line fixture (forcing `.diff-col-left`/`.diff-col-right`'s `overflow-x:auto` to genuinely overflow) found: a plain child-tree walk (`list_roles`) reports `AXScrollArea=1` but `AXScrollBar=0` — no ordinary `AXScrollBar` children at all, and only **one** `AXScrollArea` total (not two, so even distinguishing per-pane scroll state structurally is unclear from this alone); the standard NSAccessibility fallback — a scroll area's bars exposed as attribute-valued references (`AXHorizontalScrollBar`/`AXVerticalScrollBar`), not ordinary children — resolved to `missing value` for both orientations on the one `AXScrollArea` that does exist (`scroll_area_bars`, a new command added for this). **No accessibility-exposed scroll-position property was found for this content on macOS, via any technique this harness's established AppleScript/System Events approach can reach.** This is recorded as a genuine, evidenced platform/technique limitation — the horizontal-scroll-mirror assertion itself is **not executed** on macOS, consistent with the handoff's own framing that this item may or may not be solved on every platform yet.
+
+`--break`: asserts an impossible row count (99) immediately after the
+word-wrap toggle — real behaviour shows 14, so this correctly fails. CI
+run [`31941710391`](https://github.com/forskscope/forskscope/actions/runs/31941710391) — `FAIL: after toggling word wrap, row count is '14', expected 99`.
+
+Normal-mode CI run: [`31937970972`](https://github.com/forskscope/forskscope/actions/runs/31937970972) — **Pass.**
+
+### P07 — Explorer and directory report
+
+Mostly automatable through the accessibility-action approach established
+by M5-A/M5-B, but this slice's most extensively iterated case by far —
+real, extensive CI iteration (dozens of dispatches) was needed to separate
+real defects from harness technique problems, exactly as the handoff
+anticipated. Three genuine findings resulted, all disclosed in full below
+and in the harness's own inline comments (`packaging/evidence/
+macos_harness.py`'s `p07` docstring and case body).
+
+**Navigation/history.** Executed via `PathBar`'s "↑" (Go up one directory)
+and the Back/Forward toolbar buttons — ordinary, single `AXPress` clicks —
+but **only reliably on the LEFT Explorer pane.** Directory-descent via a
+directory row (a real double-click, two positioned `click at {x,y}`
+events) did not trigger `tree.rs`'s `ondoubleclick` at all in a real
+dispatch; `PathBar`'s edit-path mode (type a path into the revealed
+`<input>`, submit via Return or blur) also never produced real navigation
+despite `find_focused` confirming the field genuinely had focus, unlike
+Save As's outwardly-identical field in P05, where the same techniques
+demonstrably worked. Separately — see **Finding 3** below — the RIGHT
+pane's own button clicks were found unreliable via three further real
+dispatches. Only the left pane's button clicks, and row picks
+(`click_row_side`) on *either* pane, proved reliable throughout.
+
+**Equal/different/one-sided statuses, deep-compare stats, and filters.**
+All confirmed via a five-file fixture (`aaa-changed.txt` Changed,
+`equal.txt` Equal, `left-only.txt` LeftOnly, `right-only-1.txt`/
+`right-only-2.txt` RightOnly ×2): all five entries findable, the summary
+stats line present, and the Different (default)/All/Equal-only filters
+each showing the expected subset (`equal.txt` absent under the default
+filter, present under "All"; `left-only.txt` absent under "Equal only").
+
+**"Focused-pane keyboard behaviour" was NOT executed** — it hits the same
+structurally-not-CI-verifiable limitation as P04's keyboard-Enter path and
+P11's items 1/3/4 (handoff §6): F6 pane-toggle and the aligned tree's
+arrow-key navigation are raw `onkeydown` handling with no accessible
+action to invoke. Recorded here, not silently skipped.
+
+**Per-file and batch copy: manifest CONTENTS and backup BYTES, not just
+"it reported success"** (handoff §5 / F62's lesson) — and where **Finding
+2** below was actually discovered. A per-file copy's real `.bak` backup
+and overwritten content were read and verified against the true pre-copy
+bytes; a batch copy's manifest JSON was read from disk (with a real
+dispatch catching and fixing a bug in the harness's own manifest lookup,
+which initially picked up the per-file copy's own earlier manifest
+instead of the batch's new one) and all 3 entries verified by name,
+outcome, and real backup/content bytes.
+
+**Finding 1 — PRODUCT DEFECT, registered, not fixed: Back destroys
+Forward history.** Clicking Back correctly returns to the previous
+directory, but Forward is then permanently disabled — not "nothing to go
+forward to yet." Root cause, traced in source: `NavHistory::back()`
+(`dir_pane.rs`) only decrements an index, leaving `entries` untouched, so
+`can_forward()` should read `true` afterward. But `explorer.rs`'s
+`on_back` handler calls **both** `history.write().back()` (moves the
+index) **and then** `navigate_to()` with the popped path — and
+`navigate_to` *unconditionally* calls `history.write().push(path)` too.
+`push`'s own re-entrancy guard (`if entries.last() == path { return }`)
+does not save this, since `entries.last()` is still the not-yet-truncated
+forward entry, not equal to the path Back just navigated to — so `push`
+truncates `entries` and re-appends, destroying the forward entry. Any
+Back click destroys that pane's Forward history. Not macOS-specific —
+shared `dir_pane.rs`/`explorer.rs` code, so this almost certainly affects
+every platform. Confirmed via real dispatch (Forward reports `DISABLED`
+immediately after a correct Back); `--break` asserts the impossible
+opposite (Forward enabled after Back) and correctly fails.
+
+**Finding 2 — PRODUCT DEFECT, registered, not fixed: per-row copy buttons
+use Explorer's remembered pane directory, not the compare root.**
+`DeepRow`'s per-row copy buttons (`deep_compare.rs`) compute their src/dst
+paths from `store.settings.read().last_left_dir`/`last_right_dir`
+(Explorer's own "remembered pane directory" setting) — **not** from the
+deep-compare view's own `left_root`/`right_root` props (the actual roots
+being compared). `BatchCopyButtons` does **not** share this defect — a
+real dispatch confirmed its manifest entries' `src` genuinely came from
+`right_root`, not `last_right_dir`, so only the per-row path is affected.
+Concretely demonstrated: with `last_right_dir` unable to track the actual
+right compare root (Finding 3 means the right pane can never be
+navigated there), a per-row "Copy to right" click landed at
+`$HOME/aaa-changed.txt` — verified via a real backup and overwrite —
+while `root-b/aaa-changed.txt`, the file the deep-compare view was
+actually showing as "Changed," was verified completely untouched. **No
+error surfaces to the user** — the per-row copy simply writes to the
+wrong place, silently. This is exactly the class of silent, destructive
+mismatch the handoff's F62-lesson emphasis on real backup/manifest
+verification exists to catch, and it would not have been caught by a
+check that only confirmed "the operation reported success."
+
+**Finding 3 — HARNESS/TECHNIQUE LIMITATION, not a product defect: the
+right Explorer pane's controls do not respond to this harness's `click`
+technique.** Three real dispatches — two occurrence indices (`↑` at
+positions 2 and 3), both click orderings (right-pane-first and
+left-pane-first) — conclusively found the right pane's own PathBar
+buttons report `CLICKED` (the AppleScript `click` verb structurally
+succeeds) but never produce the expected navigation effect, while the
+identical technique against the left pane's buttons works every time.
+This is recorded as a genuine, evidenced technique limitation specific to
+this harness's approach on this platform, not a product defect — it rules
+out an entire technique family (right-pane button-driven navigation) for
+any future work on this control. Worked around by design: `last_left_dir`
+is kept genuinely correct via the left pane's own reliable navigation
+(exercising Finding 1 for real in the process); `last_right_dir` is seeded
+to `$HOME` and never navigated, which is exactly what exercises Finding 2
+for real rather than working around it.
+
+Normal-mode CI run: [`31941623347`](https://github.com/forskscope/forskscope/actions/runs/31941623347) — **Pass** (for what this case's decomposition actually verifies — both defects and the technique limitation are registered, not hidden inside a passing result). `--break`: flips the batch's existing-destination backup-bytes check to an impossible expected value; CI run [`31941706567`](https://github.com/forskscope/forskscope/actions/runs/31941706567) correctly failed on the *earlier*, more fundamental Forward-disabled-after-Back assertion first (the same real defect Finding 1 registers) — `FAIL (expected, --break): Forward is disabled after Back ('DISABLED: →') - the real (defective) behaviour --break's impossible expectation ('enabled') was checked against.`
+
+### P11 — Keyboard and modal safety (the CI-verifiable sub-case only)
+
+RFC-078's P11 has four sub-items (handoff §6). Decomposition, as executed:
+
+| Item | CI-verifiable? | Executed? |
+|---|---|---|
+| 1. Execute the maintained keyboard checklist | **No** | Manual-outstanding |
+| 2. Modal focus starts on the safe/cancel action for destructive operations | **Yes** | **Executed — this case** |
+| 3. Global shortcuts do not affect the background view while a modal is open | **No** | Manual-outstanding |
+| 4. Escape behaviour is consistent | **No** | Manual-outstanding |
+
+Items 1, 3, and 4 all require a real keystroke to test — the same
+structurally-not-CI-verifiable limitation M5-B's P04 already established
+for the keyboard-Enter apply path: no accessibility API can invoke a raw
+global `onkeydown` handler bound to no actionable UI element. Recorded
+here as owner-executed/manual-outstanding, mirroring F45's shape — not
+silently skipped, not claimed covered.
+
+Item 2 is CI-verifiable because focus **position** is exposed through the
+accessibility tree without synthesizing any input at all. Two techniques
+were tried: `focused_element` (the aggregate `AXFocusedUIElement` pointer,
+queried at the process level, then window level) resolved to `missing
+value` at the process level and errored outright at the window level, for
+this WKWebView-hosted content — a real dispatch confirmed this. `find_focused`
+(a per-element `AXFocused` boolean walk over a role's matching elements,
+not dependent on any aggregate pointer) is what actually works. Using
+P05's technique (external modification + Save) to open `OverwriteModal`
+("File changed on disk") — a genuinely destructive-operation-adjacent
+modal, since confirming it discards the externally-changed file's content
+— `find_focused` confirmed the "Cancel" button (the safe action, which
+carries `autofocus: true` in `ui/overlay/modals/file.rs`) reports
+`AXFocused=true`, and "Overwrite" (the destructive action, no autofocus)
+does not.
+
+**Consequence, stated plainly per the handoff:** the documented keyboard
+interface has no automated runtime coverage on any platform. Keyboard
+operability is a claim this project makes in its README and its
+accessibility RFCs; only the one sub-item with a genuine data-safety
+consequence (destructive-modal focus position) has real, automated,
+CI-verified coverage anywhere in this program.
+
+Normal-mode CI run: [`31937264321`](https://github.com/forskscope/forskscope/actions/runs/31937264321) — **Pass** — `OK: destructive-operation modal ('File changed on disk') opened with keyboard focus on the safe/cancel action ('Cancel'), not the destructive one ('Overwrite'), confirmed via a per-element AXFocused boolean walk with no input synthesized.`
+
+`--break`: asserts focus is on the destructive "Overwrite" action instead
+of "Cancel" — real behaviour shows "Cancel," so this correctly fails. CI
+run [`31941714393`](https://github.com/forskscope/forskscope/actions/runs/31941714393) — `FAIL: focused element 'FOCUSED: Cancel' does not name the expected safe/cancel action 'Overwrite'`.
+
+## M5-C — Falsifiability
+
+| Case | Break-mode run | Result |
+|---|---|---|
+| P03 | [`31941710391`](https://github.com/forskscope/forskscope/actions/runs/31941710391) | Fail (expected) — `after toggling word wrap, row count is '14', expected 99` |
+| P07 | [`31941706567`](https://github.com/forskscope/forskscope/actions/runs/31941706567) | Fail (expected) — `Forward is disabled after Back ('DISABLED: →') - the real (defective) behaviour --break's impossible expectation ('enabled') was checked against` |
+| P11 | [`31941714393`](https://github.com/forskscope/forskscope/actions/runs/31941714393) | Fail (expected) — `focused element 'FOCUSED: Cancel' does not name the expected safe/cancel action 'Overwrite'` |
+
+## M5-C — Failures and issue links
+
+**F63 is resolved: harness artifact, not a product accessibility
+defect** — see the dedicated section above for the full, three-dispatch
+investigation. No case result depends on F63 remaining open.
+
+**Two real product defects found via P07, registered, not fixed:**
+
+1. Explorer's Back button destroys that pane's Forward history —
+   `explorer.rs`'s `on_back` handler's `navigate_to()` call unconditionally
+   re-pushes onto the same history `NavHistory::back()` just rewound,
+   truncating the forward entry. Not macOS-specific.
+2. `DeepRow`'s per-row copy buttons use Explorer's remembered pane
+   directory (`last_left_dir`/`last_right_dir`), not the deep-compare
+   view's own compare roots — a mismatch (trivially easy to trigger, since
+   nothing about the aligned-view picker requires navigating into a root
+   first) silently writes to the wrong location with no error shown.
+   `BatchCopyButtons` does not share this defect.
+
+**One harness/technique limitation found via P07, registered:** the right
+Explorer pane's PathBar buttons do not respond to this harness's `click`
+(AXPress) technique the way the left pane's do, confirmed via three real
+dispatches. Rules out button-driven navigation on the right pane for any
+future work on this harness; row picks (`click_row_side`) remain reliable
+on both panes.
+
+P03's horizontal-scroll-mirror assertion is **not executed** on macOS — a
+genuine, evidenced platform/technique limitation (no accessibility-exposed
+scroll-position property was found for this content via any technique
+tried), not a skipped or weakened check.
+
+P11 items 1/3/4 (keyboard checklist, global-shortcut inertness behind a
+modal, Escape consistency) are **not executed** — structurally not
+CI-verifiable on any platform, recorded as owner-executed/manual-
+outstanding, mirroring F45's shape. P07's "focused-pane keyboard
+behaviour" hits the same limitation.
+
+## M5-C — Waivers
 
 None.
 
