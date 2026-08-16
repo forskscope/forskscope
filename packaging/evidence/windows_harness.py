@@ -128,9 +128,14 @@ from pathlib import Path
 # front, for every case - not just rowprobe - since any case's
 # debug_dump()/collect_texts() could hit the same wall on accessible text
 # this harness doesn't control the content of.
+# Also forced to line-buffering: PowerShell's captured-output ordering
+# otherwise interleaves a block-buffered stdout with an unbuffered
+# stderr out of chronological order (observed on scrollprobe's first CI
+# run - a stderr FAIL line appeared before the stdout diagnostic dump
+# that logically preceded it, though it did run first).
 for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
-        _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+        _stream.reconfigure(encoding="utf-8", errors="backslashreplace", line_buffering=True)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -835,6 +840,412 @@ def p02(binary, break_mode=False):
     return 0
 
 
+# ── P03 — Compare layout and scrolling (M5-C) ───────────────────────────────
+
+# M5-C Prerequisite B (see `rowprobe` below, and the M5-C review request):
+# `hunk.rs`'s `div.diff-row[role="row"]` maps to UIA control_type "DataItem"
+# with `class_name` (UIA ClassName, sourced from the DOM class attribute)
+# exactly `"diff-row"` - confirmed empirically against the real published
+# 0.167.0 artifact (CI runs 31936191442/31936284361), not assumed. This is a
+# *more* precise filter than Linux's AT-SPI "table row" role name, since it
+# matches the literal CSS class rather than an ARIA-role-derived label, and
+# it resolves Prerequisite B favorably: row-count and per-row geometry are
+# both checkable on Windows, matching (not merely approximating) Linux
+# F34/`render_check.py`'s `check_pane`, even though RFC-078 only requires "a
+# basic layout observation" here. The row's own accessible children (probed:
+# 2 per row - a gutter DataItem then a content-cell DataItem; the
+# `aria_hidden` +/- mark span between them is correctly absent from the
+# accessibility tree) are used exactly like Linux's `row.get_child_at_index(
+# n-1)` for the content-cell x-origin comparison.
+EXPECTED_ROWS_PER_PANE = 7
+
+
+def _row_left_x(row):
+    try:
+        return row.rectangle().left
+    except Exception:  # noqa: BLE001
+        return float("inf")
+
+
+def find_by_automation_id(win, automation_id):
+    """First descendant whose UIA AutomationId equals `automation_id` -
+    confirmed (rowprobe) that WebView2/Chromium maps a plain HTML `id`
+    attribute straight onto AutomationId (`id="app-root"` -> automation_id
+    `'app-root'`, etc.), so this locates `diff.rs`'s per-pane horizontal
+    scroll containers (`id="diff-col-left-{index}"` /
+    `id="diff-col-right-{index}"`) precisely, the same way `find_exact`
+    locates controls by name."""
+    try:
+        candidates = win.descendants()
+    except Exception:  # noqa: BLE001
+        candidates = []
+    for d in candidates:
+        try:
+            if d.element_info.automation_id == automation_id:
+                return d
+        except Exception:  # noqa: BLE001
+            continue
+    return None
+
+
+def collect_diff_rows(win):
+    """Every `div.diff-row[role="row"]` in the tree, identified by UIA
+    control_type "DataItem" + ClassName "diff-row" (see the module note
+    above) - the Windows analogue of `render_check.py`'s
+    `collect_rows`/"table row" walk."""
+    rows = []
+    try:
+        candidates = win.descendants(control_type="DataItem")
+    except Exception:  # noqa: BLE001
+        candidates = []
+    for d in candidates:
+        try:
+            if d.element_info.class_name == "diff-row":
+                rows.append(d)
+        except Exception:  # noqa: BLE001
+            continue
+    return rows
+
+
+def find_diff_wrap(win):
+    """The `div.diff-wrap[role="region"]` landmark - Windows analogue of
+    `render_check.py`'s `find_by_role(app, "landmark")`/`"frame"` pair,
+    used the same way: to get a stable frame rectangle to compute the
+    left/right pane midline from."""
+    try:
+        candidates = win.descendants(control_type="Group")
+    except Exception:  # noqa: BLE001
+        candidates = []
+    for d in candidates:
+        try:
+            if d.element_info.class_name == "diff-wrap":
+                return d
+        except Exception:  # noqa: BLE001
+            continue
+    return None
+
+
+def wait_for_row_shape(win, expected_per_pane, timeout_s=READY_TIMEOUT_S):
+    """Poll until the compare view's accessible tree has fully rendered:
+    the `diff-wrap` frame exists and each pane (split by the frame's own
+    midline x, exactly like `render_check.py`'s `wait_for_ready`) has
+    exactly `expected_per_pane` `diff-row` elements. F57's lesson applies
+    here as much as it does on Linux: a single tree walk right after
+    `connect()` can catch WebView2 mid-render and see a partial row set,
+    which would either fail confusingly or - worse - compare a subset and
+    pass. Returns (frame, left_rows, right_rows), or (None, [], []) if
+    `timeout_s` elapses first.
+    """
+    deadline = time.monotonic() + timeout_s
+    frame = None
+    while time.monotonic() < deadline:
+        if frame is None:
+            frame = find_diff_wrap(win)
+        if frame is not None:
+            try:
+                fr = frame.rectangle()
+                midline_x = fr.left + fr.width() / 2
+            except Exception:  # noqa: BLE001
+                frame = None
+                time.sleep(POLL_INTERVAL_S)
+                continue
+            rows = collect_diff_rows(win)
+            left_rows = [r for r in rows if _row_left_x(r) < midline_x]
+            right_rows = [r for r in rows if _row_left_x(r) >= midline_x]
+            if len(left_rows) == expected_per_pane and len(right_rows) == expected_per_pane:
+                return frame, left_rows, right_rows
+        time.sleep(POLL_INTERVAL_S)
+    return None, [], []
+
+
+def check_pane_geometry(rows, pane_name):
+    """Windows analogue of `render_check.py`'s `check_pane`, extended by
+    one more comparison. Ordered by vertical position (top) first, since
+    `descendants()` does not guarantee document order the way AT-SPI's
+    child walk does:
+
+    1. every row has the same accessible child count as the first row
+       (F32's defect shape: a screen-reader label rendering as a sibling
+       of the content cell instead of inside it);
+    2. every row's content cell (its last accessible child) starts at the
+       same x as every other row's (a column shift - F32's visible
+       symptom);
+    3. every row's own rectangle spans the same (left, right) as every
+       other row's in the pane - the Windows-observable proxy for "short-row
+       backgrounds span the full widest-line area" (RFC-078 P03): the
+       fixture mixes short lines (`gamma`) and long ones
+       (`Deleted: delete-line`), so a background/box that only extended
+       under short content would show up here as a narrower rectangle,
+       not just as a paint-level difference this harness cannot see
+       directly.
+    """
+    failures = []
+    if not rows:
+        return [f"{pane_name}: no rows found"]
+    try:
+        ordered = sorted(rows, key=lambda r: r.rectangle().top)
+    except Exception as exc:  # noqa: BLE001
+        return [f"{pane_name}: could not read row rectangles: {exc!r}"]
+
+    try:
+        baseline_count = len(ordered[0].children())
+    except Exception as exc:  # noqa: BLE001
+        return [f"{pane_name}: could not read first row's children: {exc!r}"]
+
+    baseline_x = None
+    baseline_left = None
+    baseline_right = None
+    for row in ordered:
+        try:
+            children = row.children()
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"{pane_name}: could not read a row's children: {exc!r}")
+            continue
+        n = len(children)
+        if n != baseline_count:
+            failures.append(
+                f"{pane_name}: a row has {n} accessible children, other rows "
+                f"have {baseline_count} - a label is likely rendering as a "
+                f"sibling of the content cell instead of inside it (F32's "
+                f"defect shape)"
+            )
+            continue
+        try:
+            r = row.rectangle()
+            cx = children[-1].rectangle().left
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"{pane_name}: could not read a row/cell rectangle: {exc!r}")
+            continue
+        if baseline_x is None:
+            baseline_x = cx
+        elif cx != baseline_x:
+            failures.append(
+                f"{pane_name}: a row's content starts at x={cx}, other rows "
+                f"start at x={baseline_x} - a column shift, the visual "
+                f"symptom of F32"
+            )
+        if baseline_left is None:
+            baseline_left, baseline_right = r.left, r.right
+        elif r.left != baseline_left or r.right != baseline_right:
+            failures.append(
+                f"{pane_name}: a row spans ({r.left},{r.right}), other rows "
+                f"span ({baseline_left},{baseline_right}) - row width is not "
+                f"uniform across short and long content"
+            )
+    return failures
+
+
+def scroll_percent_h(elem):
+    """Current horizontal scroll position (0-100) via UIA's ScrollPattern -
+    a direct pattern read, not a synthesized-input result. Returns `None`
+    if the pattern is unavailable or unreadable (e.g. content narrower than
+    its viewport, where WebView2 may report `NoScroll`/`-1` for the whole
+    axis instead of a real percent)."""
+    try:
+        v = elem.iface_scroll.CurrentHorizontalScrollPercent
+    except Exception:  # noqa: BLE001
+        return None
+    return None if v is None or v < 0 else v
+
+
+def set_scroll_percent_h(elem, target):
+    """Sets horizontal scroll position via `IUIAutomationScrollPattern.
+    SetScrollPercent` - the pattern-invocation approach this harness
+    prefers everywhere else (`invoke()`, `select_dropdown()`), not a
+    synthesized mouse wheel/trackpad gesture. `-1` (UIA's `NoScroll`
+    sentinel) for the vertical argument leaves vertical scroll untouched."""
+    elem.iface_scroll.SetScrollPercent(target, -1)
+
+
+def p03(binary, break_mode=False):
+    """Compare layout and scrolling. RFC-078 requires this in full on
+    WebKitGTK and "a basic layout observation" on WebView2/macOS WebKit;
+    Prerequisite B (see the module note above `EXPECTED_ROWS_PER_PANE`)
+    resolved favorably, so this does the fuller Linux-parity check where
+    it's cheap to, rather than stopping at the RFC's stated minimum:
+
+    1. **Row shape and alignment** (`wait_for_row_shape` +
+       `check_pane_geometry`, both panes): exactly 7 `diff-row`s per pane
+       (the pinned `all_hunk_kinds` fixture shape, matching
+       `render_check.py`'s `EXPECTED_ROWS_PER_PANE`), uniform accessible
+       child count, uniform content-cell x-origin, and uniform row extents
+       - covers "action rows align with left/right rows across multiple
+       hunks" and "vertical rows remain aligned" together, the same way
+       Linux's single F34 check covers both rather than asserting each
+       bullet separately.
+    2. **Horizontal scroll mirroring** (no precedent elsewhere in this
+       program - built here for the first time): scrolls the left pane
+       (`#diff-col-left-0`, via `SetScrollPercent` - a direct pattern
+       call, not synthesized input) to a mid-range position, polls the
+       right pane (`#diff-col-right-0`) until its own scroll percent
+       matches, then samples it several more times after that match to
+       confirm it *settles* rather than merely touching the target once -
+       "without feedback/jitter" (RFC-078) means an oscillation is itself
+       a failure, so a single post-scroll sample would not be sufficient
+       evidence.
+    3. **Narrow window, basic usability** (RFC-078's "word wrap and narrow
+       window modes remain usable" - a basic observation, not full
+       pixel-level wrap verification): resizes the real OS window
+       narrower and confirms the fixture's content tokens are still
+       present in the accessible tree afterward - usable, not blank or
+       crashed.
+
+    `--break`: three independent, impossible-value assertions (one per
+    numbered check above), each proving its comparison reads real,
+    specific state rather than passing vacuously. Unlike Linux's
+    `inject_geometry_defect.py`, this harness has no way to inject a real
+    layout defect into a published, digest-verified black-box artifact
+    (no local rebuild - see the constraints this slice runs under), so
+    `--break` here follows this file's own established pattern for that
+    situation (P01/P02/P09/P10/...): assert against a value the real,
+    correct app can never produce, rather than against an intentionally
+    broken build. This is a deliberate, reported deviation from Linux's
+    real-defect-injection falsifiability, not an oversight.
+    """
+    left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = launch(binary, [left, right], scratch)
+        try:
+            app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+
+            # ── 1. Row shape and alignment ───────────────────────────────
+            frame, left_rows, right_rows = wait_for_row_shape(
+                win, EXPECTED_ROWS_PER_PANE, timeout_s=READY_TIMEOUT_S
+            )
+            if frame is None:
+                print(
+                    f"FAIL: compare view never reached {EXPECTED_ROWS_PER_PANE} "
+                    f"diff-row elements per pane within {READY_TIMEOUT_S}s "
+                    f"(found {len(collect_diff_rows(win))} total)",
+                    file=sys.stderr,
+                )
+                debug_dump(collect_texts(win))
+                return 1
+
+            failures = check_pane_geometry(left_rows, "left") + check_pane_geometry(
+                right_rows, "right"
+            )
+            if break_mode:
+                # The real app's rows are perfectly aligned (failures ==
+                # []); requiring an impossible non-empty failure list
+                # proves this comparison is live, not vacuously true.
+                if not failures:
+                    print(
+                        "FAIL(--break): row geometry required an impossible "
+                        "misalignment to be present, and correctly found none "
+                        "- the real check above is not vacuous",
+                        file=sys.stderr,
+                    )
+                    return 1
+            elif failures:
+                print("FAIL: row geometry check found real misalignment:", file=sys.stderr)
+                for f in failures:
+                    print(f"  - {f}", file=sys.stderr)
+                return 1
+
+            # ── 2. Horizontal scroll mirroring ───────────────────────────
+            left_col = find_by_automation_id(win, "diff-col-left-0")
+            right_col = find_by_automation_id(win, "diff-col-right-0")
+            if left_col is None or right_col is None:
+                print(
+                    "FAIL: could not find diff-col-left-0/diff-col-right-0 "
+                    "(the per-pane horizontal scroll containers) by AutomationId",
+                    file=sys.stderr,
+                )
+                return 1
+
+            target = 55.0
+            try:
+                set_scroll_percent_h(left_col, target)
+            except Exception as exc:  # noqa: BLE001
+                print(f"FAIL: could not set left pane's horizontal scroll: {exc!r}", file=sys.stderr)
+                return 1
+
+            required = -1.0 if break_mode else target
+            deadline = time.monotonic() + READY_TIMEOUT_S
+            mirrored = False
+            last_seen = None
+            while time.monotonic() < deadline:
+                last_seen = scroll_percent_h(right_col)
+                if last_seen is not None and abs(last_seen - required) < 1.0:
+                    mirrored = True
+                    break
+                time.sleep(POLL_INTERVAL_S)
+            if not mirrored:
+                label = "(--break) impossible target" if break_mode else "the left pane's position"
+                print(
+                    f"FAIL: right pane's horizontal scroll never matched {label} "
+                    f"within {READY_TIMEOUT_S}s (last seen: {last_seen!r}, required: {required!r})",
+                    file=sys.stderr,
+                )
+                return 1
+            if break_mode:
+                print(
+                    "FAIL(--break): right pane matched an impossible scroll "
+                    "target - the mirroring check above is not vacuous",
+                    file=sys.stderr,
+                )
+                return 1
+
+            # Settling check: sample several more times after the match -
+            # "without feedback/jitter" means oscillation itself is a
+            # failure, so one post-scroll sample is not sufficient.
+            settle_samples = []
+            for _ in range(6):
+                time.sleep(POLL_INTERVAL_S)
+                settle_samples.append(scroll_percent_h(right_col))
+            unsettled = [s for s in settle_samples if s is None or abs(s - target) > 1.0]
+            if unsettled:
+                print(
+                    f"FAIL: right pane's horizontal scroll did not settle after "
+                    f"mirroring - samples after the match: {settle_samples!r} "
+                    f"(target {target})",
+                    file=sys.stderr,
+                )
+                return 1
+
+            # ── 3. Narrow window, basic usability ────────────────────────
+            try:
+                rect = win.rectangle()
+                win.move_window(rect.left, rect.top, 480, rect.height())
+            except Exception as exc:  # noqa: BLE001
+                print(f"FAIL: could not resize the window narrower: {exc!r}", file=sys.stderr)
+                return 1
+            time.sleep(1.0)  # let WebView2 reflow before re-checking content
+            ok, texts, missing = wait_for_tokens(win, FIXTURE_TOKENS, timeout_s=READY_TIMEOUT_S)
+            if not ok:
+                print(
+                    f"FAIL: compare view lost expected content after narrowing "
+                    f"the window: missing {missing}",
+                    file=sys.stderr,
+                )
+                debug_dump(texts)
+                return 1
+            new_rect = win.rectangle()
+            if new_rect.width() <= 0 or new_rect.height() <= 0:
+                print(
+                    f"FAIL: window has non-positive extents after narrowing "
+                    f"({new_rect.width()}x{new_rect.height()})",
+                    file=sys.stderr,
+                )
+                return 1
+        except RuntimeError as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: 7 diff-rows per pane, uniform child count/content-cell x-origin/row "
+        "extents in both panes; horizontal scroll mirrored from left to right and "
+        "settled; content remained present and the window stayed valid after "
+        "narrowing."
+    )
+    return 0
+
+
 # ── M5-C Prerequisite B probe — Windows UIA control type for row divs ───────
 
 
@@ -1038,22 +1449,37 @@ def scrollprobe(binary, break_mode=False):
                 debug_dump(texts)
                 return 1
 
-            print("=== descendants with an id-derived automation_id containing 'diff-col' ===")
-            panes = {}
+            print("=== every non-empty automation_id in the tree ===", flush=True)
+            any_aid = False
             for d in win.descendants():
                 try:
                     aid = d.element_info.automation_id
                 except Exception:  # noqa: BLE001
                     aid = ""
-                if aid and "diff-col-left" in aid:
+                if aid:
+                    any_aid = True
+                    print(f"  automation_id={aid!r} control_type={d.element_info.control_type!r}", flush=True)
+            if not any_aid:
+                print("  (none found anywhere in the tree)", flush=True)
+
+            print("=== every non-empty class_name in the tree containing 'diff-col' ===", flush=True)
+            panes = {}
+            for d in win.descendants():
+                try:
+                    cls = d.element_info.class_name
+                except Exception:  # noqa: BLE001
+                    cls = ""
+                if cls and "diff-col-left" in cls:
                     panes["left"] = d
-                    print(f"  left  -> automation_id={aid!r} control_type={d.element_info.control_type!r}")
-                elif aid and "diff-col-right" in aid:
+                    print(f"  left  -> class_name={cls!r} control_type={d.element_info.control_type!r}", flush=True)
+                elif cls and "diff-col-right" in cls:
                     panes["right"] = d
-                    print(f"  right -> automation_id={aid!r} control_type={d.element_info.control_type!r}")
+                    print(f"  right -> class_name={cls!r} control_type={d.element_info.control_type!r}", flush=True)
+                elif cls and "diff-col" in cls:
+                    print(f"  other diff-col class_name={cls!r} control_type={d.element_info.control_type!r}", flush=True)
 
             if "left" not in panes or "right" not in panes:
-                print("FAIL: could not locate both diff-col-left-* and diff-col-right-* by automation_id", file=sys.stderr)
+                print("FAIL: could not locate both diff-col-left and diff-col-right containers", file=sys.stderr)
                 return 1
 
             left_pane, right_pane = panes["left"], panes["right"]
@@ -2495,6 +2921,7 @@ def p12(binary, break_mode=False):
 CASES = {
     "p01": p01,
     "p02": p02,
+    "p03": p03,
     "rowprobe": rowprobe,
     "scrollprobe": scrollprobe,
     "p04": p04,
