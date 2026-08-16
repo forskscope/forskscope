@@ -32,7 +32,7 @@ on:
       case:
         description: 'Which case to run'
         type: choice
-        options: [p01, p02, rowprobe, scrollprobe, p04, p05, p06, p08, p09, p10, p12]
+        options: [p01, p02, p03, rowprobe, scrollprobe, p04, p05, p06, p08, p09, p10, p12]
         required: true
       break_case:
         description: 'Run in --break mode (falsifiability demonstration)'
