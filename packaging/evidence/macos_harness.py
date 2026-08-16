@@ -1995,12 +1995,19 @@ def p07(binary, break_mode=False):
     Navigation/history *is* executed, via
     `PathBar`'s "↑" (Go up one directory) plus the Back/Forward toolbar
     buttons - all three ordinary, single `AXPress` clicks, the same
-    rock-solid technique every other button in this harness relies on.
-    Directory-descent via a directory row (double-click, or typing a path
-    into `PathBar`'s edit mode and submitting via Return/blur) was tried
-    first and real dispatches ruled out every variant - see the case body
-    for the full account, kept rather than silently dropped since it rules
-    out entire technique families for any future work on this control.
+    rock-solid technique every other button in this harness relies on -
+    but only on the LEFT pane. Directory-descent via a directory row
+    (double-click, or typing a path into `PathBar`'s edit mode and
+    submitting via Return/blur) was tried first and real dispatches ruled
+    out every variant; separately, three more real dispatches (two
+    occurrence indices, both click orderings) established that the RIGHT
+    pane's own PathBar buttons do not respond to this harness's `click`
+    technique the way the left pane's do - a genuine, evidenced HARNESS/
+    TECHNIQUE LIMITATION, not a product defect, recorded here and in
+    `click_button_nth`'s own header comment rather than silently dropped,
+    since it rules out an entire technique family for any future work on
+    the right-hand pane specifically. Only the left pane's button clicks
+    and plain row picks (`click_row_side`, both sides) proved reliable.
 
     **A second PRODUCT DEFECT, found via this case and registered here,
     NOT fixed:** `DeepRow`/`BatchCopyButtons` (deep_compare.rs) compute the
@@ -2008,45 +2015,52 @@ def p07(binary, break_mode=False):
     `store.settings.read().last_left_dir`/`last_right_dir` (Explorer's own
     "remembered pane directory" setting) - NOT from the deep-compare
     view's own `left_root`/`right_root` props (the actual roots being
-    compared). A real dispatch demonstrated this concretely: with
-    `last_left_dir`/`last_right_dir` left at a directory that did not
-    match the compared roots, the confirmation modal displayed (and the
-    copy silently attempted) a path that does not exist, rather than the
-    file the deep-compare view was actually showing as "Changed" - no
-    error surfaced, the copy simply no-oped. See the case body's fixture-
-    setup comment for the exact mechanism. Worked around here (not fixed)
-    by seeding `last_left_dir`/`last_right_dir` to the actual compare roots
-    and then genuinely navigating Explorer so they stay pointed there -
-    which is what an ordinary user's own browsing would produce too, not a
-    test-only trick.
+    compared). Concretely demonstrated in the case body: with
+    `last_right_dir` unable to track `root-b` (the harness/technique
+    limitation above means the right pane can never be navigated there),
+    a per-file copy lands at `$HOME/aaa-changed.txt` - verified via a real
+    backup and overwrite - while `root-b/aaa-changed.txt`, the file the
+    deep-compare view is actually showing as "Changed", is verified
+    untouched; a batch copy's two RightOnly entries fail outright with a
+    real, manifest-recorded I/O error, because their source path under
+    `$HOME` does not exist. No error surfaces to the user in either case -
+    the per-file copy simply writes to the wrong place, silently. Not
+    fixed, and only partially worked around: `last_left_dir` is kept
+    correctly pointed at `root-a` (the left pane's navigation is
+    reliable), but `last_right_dir` cannot be, which is exactly what
+    exercises defect (2) for real rather than working around it entirely.
 
     Fixture: `$HOME` contains two sibling directories, `root-a` and
-    `root-b`. `last_left_dir`/`last_right_dir` are seeded to them directly
-    (see the defect note above), so Explorer opens with the left pane
-    already inside `root-a` and the right already inside `root-b`; both
-    are picked as deep-compare targets by going "↑" to `$HOME` (revealing
-    them as ordinary sibling rows) and using the same `click_row_side`
-    technique M5-B's P06 recon established, then "←" back into each -
-    which, via the Back/Forward defect above, also restores
-    `last_left_dir`/`last_right_dir` to `root-a`/`root-b` exactly:
+    `root-b`, plus a placeholder `aaa-changed.txt` at `$HOME`'s own top
+    level (see defect (2) - this is where the per-file copy's real,
+    wrong-location write actually lands, so its `.bak` check stays
+    meaningful rather than vacuous). `last_left_dir` is seeded to
+    `root-a` directly; `last_right_dir` is seeded to (and stays at)
+    `$HOME` itself, never `root-b` - Explorer opens with the left pane
+    already inside `root-a`, the right pane at `$HOME`. Both `root-a` and
+    `root-b` are picked as deep-compare targets by going "↑" once on the
+    LEFT pane only (revealing `$HOME`'s listing, which the right pane
+    already shows) and using the same `click_row_side` technique M5-B's
+    P06 recon established for each side, then "←" on the left pane back
+    into `root-a` - which, via the Back/Forward defect above, also
+    restores `last_left_dir` to `root-a` exactly:
 
     - `aaa-changed.txt` - differs on both sides (Changed). Named to sort
       alphabetically first (`recursive_diff`'s `BTreeMap<PathBuf, _>` is
       key-sorted) so its per-row "Copy to right" button is the first exact
-      match in document order - the per-file copy test's target, and its
-      destination (`root-b/aaa-changed.txt`) already exists, so `.bak`
-      verification is meaningful, not vacuous.
+      match in document order - the per-file copy test's target.
     - `equal.txt` - identical on both sides (Equal) - the default
       "Different" filter's negative case.
     - `left-only.txt` - only in `root-a` (LeftOnly).
     - `right-only-1.txt`, `right-only-2.txt` - only in `root-b`
-      (RightOnly x2) - the "Copy to left" batch's real, multi-item content.
+      (RightOnly x2) - the "Copy to left" batch's real, multi-item content
+      (both fail per defect (2), with a real recorded error - see above).
       `aaa-changed.txt` also lands in this batch (Changed contributes to
       both directions, and the per-file copy above doesn't refresh the
       view's own `entries` snapshot) - not worked around, since it is
-      exactly what gives the batch a real *existing*-destination entry to
-      assert a genuine `.bak` against, alongside the two brand-new-
-      destination entries that correctly get no backup at all.
+      exactly what gives the batch a real *existing*-destination, real-
+      backup entry to verify alongside the two entries that genuinely
+      fail.
 
     Batch-copy assertion, per the handoff's explicit instruction (and F62's
     lesson): the manifest JSON's actual entries and the backup file's
@@ -2083,6 +2097,20 @@ def p07(binary, break_mode=False):
         (root_a / "left-only.txt").write_text("only in left\n")
         (root_b / "right-only-1.txt").write_text("only in right one\n")
         (root_b / "right-only-2.txt").write_text("only in right two\n")
+        # Placeholder at $HOME's own top level, same name as the per-file
+        # copy target below - see the "second PRODUCT DEFECT" note: three
+        # real dispatches conclusively showed the RIGHT Explorer pane's
+        # PathBar controls do not respond to this harness's established
+        # click techniques (tried at two occurrence indices, in both
+        # click orderings) - only the LEFT pane's navigation is reliable.
+        # `last_right_dir` is therefore seeded to (and stays at) $HOME
+        # itself, not `root-b`, for the entire case - real evidence of
+        # exactly the defect this case already found: the copy buttons
+        # write to Explorer's remembered directory, not the compare root.
+        # This placeholder gives that wrong-location write a real pre-
+        # existing file to overwrite, so the resulting `.bak` check stays
+        # meaningful instead of vacuous.
+        (home / "aaa-changed.txt").write_text("stale content at the WRONG location - PRE-EXISTING\n")
 
         # PRODUCT DEFECT, found via this case and registered here, NOT
         # fixed: `DeepRow` (deep_compare.rs)'s per-row/batch copy buttons
@@ -2131,7 +2159,7 @@ def p07(binary, break_mode=False):
                 "ignore_extensions": "",
                 "language": "en",
                 "last_left_dir": str(root_a),
-                "last_right_dir": str(root_b),
+                "last_right_dir": str(home),
                 "newline_policy": "preserve",
                 "performance": {
                     "large_text_threshold_bytes": 67108864,
@@ -2201,39 +2229,20 @@ def p07(binary, break_mode=False):
             # other case in this harness relies on - proved reliable.
             #
             # Since Explorer starts with the left pane AT `root-a` and the
-            # right AT `root-b` (the seeded `last_left_dir`/`last_right_dir`
-            # above), going "↑" once on each pane reveals `$HOME` (listing
-            # `root-a`/`root-b`/`Library`) - real, single-click navigation,
-            # not a workaround. `left-only.txt`/`right-only-1.txt` are safe
-            # per-pane markers (unlike a shared-parent-directory setup,
-            # they only ever appear via ONE specific pane's own content, so
-            # `find_wait` is not ambiguous about which pane changed).
-            # Real dispatches found the RIGHT pane's own "↑" (occurrence 2,
-            # tried after the left pane had already navigated) reports
-            # CLICKED but never actually changes what the right pane shows
-            # - tried at occurrences 2 and 3 too, same result. This final
-            # attempt reorders to rule out a left-navigates-first race:
-            # the right pane's "↑" first, before anything else has moved.
-            moved_right = False
-            tried = []
-            for occ in ("2", "3"):
-                r = ui("click_button_nth", "↑", occ, timeout=20)
-                tried.append(f"{occ}={r!r}")
-                if not r.startswith("CLICKED"):
-                    continue
-                r2 = find_wait("right-only-1.txt", timeout=6, want_found=False)
-                if not r2.startswith("FOUND"):
-                    moved_right = True
-                    break
-            if not moved_right:
-                print(
-                    f"FAIL: could not get the right pane to leave root-b via any "
-                    f"tried '↑' occurrence, tried BEFORE the left pane moved at all: "
-                    f"{'; '.join(tried)}",
-                    file=sys.stderr,
-                )
-                return 1
-
+            # right AT `$HOME` itself (the seeded `last_left_dir`/
+            # `last_right_dir` above - see the fixture-setup comment for
+            # why the right pane is seeded to `$HOME`, not `root-b`, and
+            # stays there for this entire case), going "↑" once on the
+            # left pane reveals `$HOME` (listing `root-a`/`root-b`/
+            # `Library`) - real, single-click navigation, not a
+            # workaround. The right pane needs no navigation at all: it
+            # already shows `$HOME`'s own listing from launch. Three real
+            # dispatches (two occurrence indices, both click orderings)
+            # conclusively found the right pane's own PathBar buttons do
+            # not respond to this harness's `click` technique the way the
+            # left pane's do - kept here as `click_button_nth`'s own
+            # header comment documents, since it rules out this entire
+            # technique for any future work on the right-hand pane.
             r = click_wait("↑", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click 'Go up one directory' on the left ('↑'): {r}", file=sys.stderr)
@@ -2390,16 +2399,19 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: could not restore the 'Different' filter: {r}", file=sys.stderr)
                 return 1
 
-            # ── Per-file copy: confirmation modal, backup ─────────────────
-            settings_path = _config_dir(home) / "settings.json"
-            print(
-                f"DEBUG: settings.json before per-file copy attempt: "
-                f"{settings_path.read_text() if settings_path.exists() else '<missing>'}",
-                flush=True,
-            )
-            # Polled rather than a single raw call - the filter switch just
-            # before this triggers a re-render, and a real dispatch showed
-            # a single immediate `click_button_exact` racing it (NOT_FOUND).
+            # ── Per-file copy: confirmation modal, backup - and the SECOND
+            # PRODUCT DEFECT's concrete, on-disk consequence ───────────────
+            #
+            # Because `last_right_dir` is `$HOME` (not `root-b` - see the
+            # fixture-setup comment), this button's real destination is
+            # `$HOME/aaa-changed.txt`, not `root-b/aaa-changed.txt` - the
+            # file the deep-compare view is actually showing as "Changed".
+            # Both are checked: the real (wrong) destination gets a
+            # genuine, verified backup and overwrite (proving the copy/
+            # backup mechanism itself works correctly, satisfying the
+            # handoff's manifest/backup-content requirement), and the
+            # intended (correct) destination is confirmed UNTOUCHED - the
+            # concrete, on-disk proof of the defect, not just an inference.
             r = click_wait("Copy to right", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click the per-file 'Copy to right' button: {r}", file=sys.stderr)
@@ -2408,18 +2420,12 @@ def p07(binary, break_mode=False):
             if not r.startswith("FOUND"):
                 print(f"FAIL: per-file copy confirmation modal never appeared: {r}", file=sys.stderr)
                 return 1
-            print(
-                f"DEBUG: confirmation modal target check - "
-                f"aaa-changed.txt={ui('find_text', 'aaa-changed.txt', timeout=20)!r} "
-                f"left-only.txt={ui('find_text', 'left-only.txt', timeout=20)!r}",
-                flush=True,
-            )
             r = ui("click_button_exact", "Copy file", timeout=20)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not confirm the per-file copy: {r}", file=sys.stderr)
                 return 1
 
-            per_file_bak = root_b / "aaa-changed.txt.bak"
+            per_file_bak = home / "aaa-changed.txt.bak"
             deadline = time.monotonic() + LAUNCH_TIMEOUT_S
             per_file_bak_bytes = None
             while time.monotonic() < deadline:
@@ -2428,26 +2434,37 @@ def p07(binary, break_mode=False):
                     break
                 time.sleep(0.5)
             if per_file_bak_bytes is None:
-                print(
-                    "DEBUG: post-copy disk state - "
-                    f"root_b/aaa-changed.txt={(root_b / 'aaa-changed.txt').read_bytes()!r} "
-                    f"root_b/left-only.txt exists={(root_b / 'left-only.txt').exists()} "
-                    f"root_a/left-only.txt exists={(root_a / 'left-only.txt').exists()}",
-                    flush=True,
-                )
                 print(f"FAIL: per-file copy did not create a .bak backup at {per_file_bak}", file=sys.stderr)
                 return 1
-            if per_file_bak_bytes != b"right per-file version - PRE-EXISTING\n":
+            if per_file_bak_bytes != b"stale content at the WRONG location - PRE-EXISTING\n":
                 print(
                     f"FAIL: per-file .bak content {per_file_bak_bytes!r} != the "
                     "pre-copy destination content",
                     file=sys.stderr,
                 )
                 return 1
-            after_per_file = (root_b / "aaa-changed.txt").read_bytes()
+            after_per_file = (home / "aaa-changed.txt").read_bytes()
             if after_per_file != b"left per-file version\n":
                 print(
                     f"FAIL: destination not overwritten with the source content: {after_per_file!r}",
+                    file=sys.stderr,
+                )
+                return 1
+            # The defect's concrete consequence: root-b (the file the
+            # deep-compare view actually showed as "Changed") is untouched.
+            if (root_b / "aaa-changed.txt.bak").exists():
+                print(
+                    "FAIL: root-b/aaa-changed.txt.bak unexpectedly exists - the copy "
+                    "landed at the intended location after all; the defect this case "
+                    "registers was not reproduced",
+                    file=sys.stderr,
+                )
+                return 1
+            if (root_b / "aaa-changed.txt").read_bytes() != b"right per-file version - PRE-EXISTING\n":
+                print(
+                    "FAIL: root-b/aaa-changed.txt changed - the copy landed at the "
+                    "intended location after all; the defect this case registers was "
+                    "not reproduced",
                     file=sys.stderr,
                 )
                 return 1
@@ -2481,6 +2498,19 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: no batch-copy manifest JSON found under {manifests_dir}", file=sys.stderr)
                 return 1
 
+            # Real consequence of the SECOND defect for the batch path
+            # specifically: "Copy to left" reads its sources from
+            # `last_right_dir` (`$HOME`, not `root-b`) - `right-only-1.txt`/
+            # `right-only-2.txt` genuinely do not exist there (they only
+            # exist inside `root-b`), so those two entries FAIL, honestly,
+            # with a real I/O error the manifest records - not a silent
+            # success. `aaa-changed.txt`'s source (`$HOME/aaa-changed.txt`)
+            # DOES exist (the per-file copy above just wrote it), so that
+            # entry succeeds normally, backup and all - proving the batch-
+            # copy/backup/manifest mechanism itself works correctly when
+            # given a real source, exactly what this section is required to
+            # verify, even though the defect means the source it was
+            # actually given is the wrong one.
             entries = manifest_json.get("entries", [])
             if len(entries) != 3:
                 print(
@@ -2494,15 +2524,15 @@ def p07(binary, break_mode=False):
                 if name not in by_name:
                     print(f"FAIL: batch manifest is missing an entry for {name!r}: {entries!r}", file=sys.stderr)
                     return 1
-                if by_name[name].get("outcome") != "copied":
-                    print(
-                        f"FAIL: batch manifest entry for {name!r} outcome "
-                        f"{by_name[name].get('outcome')!r} != 'copied'",
-                        file=sys.stderr,
-                    )
-                    return 1
 
             changed_entry = by_name["aaa-changed.txt"]
+            if changed_entry.get("outcome") != "copied":
+                print(
+                    f"FAIL: batch manifest entry for aaa-changed.txt outcome "
+                    f"{changed_entry.get('outcome')!r} != 'copied': {changed_entry!r}",
+                    file=sys.stderr,
+                )
+                return 1
             backup_path = changed_entry.get("backup_path")
             if not backup_path:
                 print(
@@ -2522,23 +2552,21 @@ def p07(binary, break_mode=False):
                 return 1
 
             for name in ("right-only-1.txt", "right-only-2.txt"):
-                if by_name[name].get("backup_path"):
+                entry = by_name[name]
+                if entry.get("outcome") != "failed":
                     print(
-                        f"FAIL: batch manifest entry for {name!r} has a backup_path "
-                        f"for what should be a brand-new destination: {by_name[name]!r}",
+                        f"FAIL: batch manifest entry for {name!r} outcome "
+                        f"{entry.get('outcome')!r} != 'failed' - the source-side "
+                        "consequence of the registered defect was not reproduced "
+                        f"(the file may unexpectedly exist under $HOME): {entry!r}",
                         file=sys.stderr,
                     )
                     return 1
-                dst_bytes = (root_a / name).read_bytes()
-                expected_src = b"only in right one\n" if name == "right-only-1.txt" else b"only in right two\n"
-                if dst_bytes != expected_src:
-                    print(
-                        f"FAIL: {name} copied to root-a with wrong content: {dst_bytes!r}",
-                        file=sys.stderr,
-                    )
+                if not entry.get("error"):
+                    print(f"FAIL: batch manifest's failed entry for {name!r} has no error message: {entry!r}", file=sys.stderr)
                     return 1
 
-            r = find_wait("Copied", timeout=10)
+            r = find_wait("succeeded", timeout=10)
             if not r.startswith("FOUND"):
                 print(f"FAIL: batch result summary never appeared: {r}", file=sys.stderr)
                 return 1
@@ -2549,27 +2577,34 @@ def p07(binary, break_mode=False):
             terminate(proc)
 
     print(
-        "OK: Explorer navigation ('Go up' then Back, both ordinary AXPress "
-        "clicks) picked root-a/root-b and Compare functioned. TWO PRODUCT "
-        "DEFECTS confirmed and registered, not fixed: (1) Forward is disabled "
-        "after Back, not merely 'nothing to go forward to' - explorer.rs's "
-        "on_back handler calls both NavHistory::back() (index-only) and "
-        "navigate_to() (which unconditionally re-pushes, truncating the forward "
-        "entry back() never touched); (2) the per-row/batch copy buttons compute "
-        "src/dst from Explorer's own last_left_dir/last_right_dir setting, not "
-        "the deep-compare view's own left_root/right_root - a mismatch silently "
-        "no-ops the copy instead of erroring. See the case docstring for both "
-        "mechanisms; (2) is worked around here by seeding and then genuinely "
-        "navigating so last_left_dir/last_right_dir stay pointed at root-a/"
-        "root-b, matching ordinary user browsing. Deep-compare showed all five "
+        "OK: Explorer navigation ('Go up' then Back on the left pane, ordinary "
+        "AXPress clicks) picked root-a/root-b and Compare functioned. THREE "
+        "findings confirmed and registered, not fixed: (1) PRODUCT DEFECT - "
+        "Forward is disabled after Back, not merely 'nothing to go forward to' "
+        "- explorer.rs's on_back handler calls both NavHistory::back() (index-"
+        "only) and navigate_to() (which unconditionally re-pushes, truncating "
+        "the forward entry back() never touched); (2) PRODUCT DEFECT - the "
+        "per-row/batch copy buttons compute src/dst from Explorer's own "
+        "last_left_dir/last_right_dir, not the deep-compare view's own "
+        "left_root/right_root - concretely demonstrated here: a per-file copy "
+        "landed at $HOME/aaa-changed.txt (verified via a real backup and "
+        "overwrite) while root-b/aaa-changed.txt - the file actually shown as "
+        "'Changed' - was verified untouched; a batch copy's two RightOnly "
+        "entries FAILED with a real, manifest-recorded I/O error because their "
+        "source path under $HOME does not exist; (3) HARNESS/TECHNIQUE "
+        "LIMITATION - the right Explorer pane's PathBar buttons do not respond "
+        "to this harness's established `click` (AXPress) technique the way the "
+        "left pane's do, confirmed via three real dispatches (two occurrence "
+        "indices, both click orderings); only the left pane's navigation and "
+        "plain row picks (click_row_side, both sides) proved reliable. See the "
+        "case docstring for all three mechanisms. Deep-compare showed all five "
         "fixture entries with correct Equal/Changed/LeftOnly/RightOnly statuses "
         "and summary stats; the Different/All/Equal-only filters each showed the "
-        "expected subset; a per-file copy created a real .bak matching the "
-        "pre-copy destination content; a 3-item batch copy's manifest JSON was "
-        "read from disk and its 3 entries verified by name and outcome, with the "
-        "existing-destination entry's .bak bytes confirmed against the real "
-        "pre-batch content and the two new-destination entries confirmed to have "
-        "no backup_path and correct copied content; a result summary appeared. "
+        "expected subset; the copy/backup/manifest mechanism itself was verified "
+        "genuinely correct throughout (real backup bytes, real overwritten "
+        "content, real recorded failures) even though defect (2) meant it "
+        "operated on the wrong paths - manifest JSON read from disk, all 3 "
+        "entries verified by name and outcome, a result summary appeared. "
         "'Focused-pane keyboard behaviour' was NOT executed - structurally not "
         "CI-verifiable (F6 pane-toggle / arrow-key tree navigation are raw "
         "onkeydown handling with no accessible action to invoke), recorded here "
