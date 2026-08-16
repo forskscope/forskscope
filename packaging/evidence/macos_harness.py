@@ -2335,6 +2335,58 @@ def recon_f63_investigation(binary, break_mode=False):
     return 0
 
 
+def recon_f63_v2_single_call(binary, break_mode=False):
+    """Not a scored case. `recon_f63_investigation`'s first real dispatch
+    surfaced a confound: after ~90s of repeated rapid `entire contents of w`
+    calls (the long-wait control's poll loop, one call roughly every 3s),
+    every subsequent call - including the follow-on `list_roles`,
+    `click_row`, and post-scroll `find_text`/`count_rows` calls - started
+    hitting the harness's own 20s subprocess timeout, not returning a quick
+    empty/NOT_FOUND. That is a materially different symptom from P06's
+    original finding (a prompt, repeatable "0"/"NOT_FOUND" with no
+    subprocess timeout, at 100-400 lines) - consistent with this
+    investigation's own repeated heavy queries degrading the WebProcess/
+    accessibility server's responsiveness over the run, not with the
+    underlying question this case exists to answer. This case isolates
+    that: ONE fresh launch, ONE single `find_text`/`count_rows` call each,
+    with a much longer subprocess timeout (150s) than any other case in
+    this harness uses, and nothing else run beforehand - to see whether the
+    query is genuinely slow-but-eventually-correct (a harness-timeout
+    artifact) or genuinely returns empty/NOT_FOUND promptly regardless of
+    how long it's given (not a timeout problem at all)."""
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+        deep_sentinel = "F63-V2-DEEP-SENTINEL-LINE-60"
+        left, right = _generate_pair_with_sentinels(
+            scratch, "f63v2-left.txt", "f63v2-right.txt", 100, {60: deep_sentinel}
+        )
+        proc = launch(binary, [left, right], scratch, home=home)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"PROBE: never registered a window: {exc}", flush=True)
+                return 0
+
+            t0 = time.monotonic()
+            try:
+                r = ui("count_rows", timeout=150)
+                print(f"PROBE single-count-rows: {r!r} ({time.monotonic() - t0:.1f}s)", flush=True)
+            except subprocess.TimeoutExpired:
+                print(f"PROBE single-count-rows: TIMEOUT-AT-150s ({time.monotonic() - t0:.1f}s)", flush=True)
+
+            t0 = time.monotonic()
+            try:
+                r = ui("find_text", deep_sentinel, timeout=150)
+                print(f"PROBE single-deep-sentinel: {r!r} ({time.monotonic() - t0:.1f}s)", flush=True)
+            except subprocess.TimeoutExpired:
+                print(f"PROBE single-deep-sentinel: TIMEOUT-AT-150s ({time.monotonic() - t0:.1f}s)", flush=True)
+        finally:
+            terminate(proc)
+    return 0
+
+
 CASES = {
     "p01": p01,
     "p02": p02,
@@ -2354,6 +2406,7 @@ CASES = {
     "recon_generated_pair_alone": recon_generated_pair_alone,
     "recon_explorer": recon_explorer,
     "recon_f63_investigation": recon_f63_investigation,
+    "recon_f63_v2_single_call": recon_f63_v2_single_call,
 }
 
 
