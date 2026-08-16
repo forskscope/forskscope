@@ -2208,23 +2208,12 @@ def p07(binary, break_mode=False):
             # per-pane markers (unlike a shared-parent-directory setup,
             # they only ever appear via ONE specific pane's own content, so
             # `find_wait` is not ambiguous about which pane changed).
-            r = click_wait("↑", exact=True, timeout=10)
-            if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click 'Go up one directory' on the left ('↑'): {r}", file=sys.stderr)
-                return 1
-            r = find_wait("left-only.txt", timeout=10, want_found=False)
-            if r.startswith("FOUND"):
-                print(f"FAIL: left pane's 'Go up' did not leave root-a: {r}", file=sys.stderr)
-                return 1
-
-            # Occurrence 2 was a real dispatch's own most-likely guess (the
-            # left pane's own "↑" is occurrence 1, so the right's should be
-            # 2) but did not produce the expected navigation - tries a
-            # small range of nearby occurrence indices, verifying each
-            # against the real, independent effect (right-only.txt leaving
-            # view) rather than trusting "CLICKED" alone, matching the same
-            # verify-against-ground-truth discipline this case already
-            # applies to the checkbox toggle attempt.
+            # Real dispatches found the RIGHT pane's own "↑" (occurrence 2,
+            # tried after the left pane had already navigated) reports
+            # CLICKED but never actually changes what the right pane shows
+            # - tried at occurrences 2 and 3 too, same result. This final
+            # attempt reorders to rule out a left-navigates-first race:
+            # the right pane's "↑" first, before anything else has moved.
             moved_right = False
             tried = []
             for occ in ("2", "3"):
@@ -2239,9 +2228,19 @@ def p07(binary, break_mode=False):
             if not moved_right:
                 print(
                     f"FAIL: could not get the right pane to leave root-b via any "
-                    f"tried '↑' occurrence: {'; '.join(tried)}",
+                    f"tried '↑' occurrence, tried BEFORE the left pane moved at all: "
+                    f"{'; '.join(tried)}",
                     file=sys.stderr,
                 )
+                return 1
+
+            r = click_wait("↑", exact=True, timeout=10)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click 'Go up one directory' on the left ('↑'): {r}", file=sys.stderr)
+                return 1
+            r = find_wait("left-only.txt", timeout=10, want_found=False)
+            if r.startswith("FOUND"):
+                print(f"FAIL: left pane's 'Go up' did not leave root-a: {r}", file=sys.stderr)
                 return 1
 
             # Both panes now show $HOME (root-a/root-b/Library each) -
