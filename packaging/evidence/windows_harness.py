@@ -1035,26 +1035,46 @@ def check_pane_geometry(rows, pane_name):
     return failures
 
 
-def scroll_percent_h(elem):
-    """Current horizontal scroll position (0-100) via UIA's ScrollPattern -
-    a direct pattern read, not a synthesized-input result. Returns `None`
-    if the pattern is unavailable or unreadable (e.g. content narrower than
-    its viewport, where WebView2 may report `NoScroll`/`-1` for the whole
-    axis instead of a real percent)."""
+def send_horizontal_wheel(pt, notches):
+    """Native `WM_MOUSEHWHEEL` via `SendInput`/`mouse_event` (stdlib
+    `ctypes` only - no new dependency), at screen point `pt`. Confirmed
+    empirically (`scrollprobe`, CI run 31936958119) to be the mechanism
+    that actually moves this app's horizontal scroll on Windows - see the
+    module note above `EXPECTED_ROWS_PER_PANE` and `p03`'s own docstring
+    for the full story of why: `.diff-col-left`/`.diff-col-right` carry no
+    ARIA role, are absent from the UIA tree entirely (confirmed:
+    `rowprobe`'s ancestor walk skips straight from a row to `diff-wrap`;
+    `scrollprobe`'s capability scan found zero `CurrentHorizontallyScrollable`
+    descendants anywhere), so there is no `IScrollProvider`/`ScrollPattern`
+    to invoke - a real synthesized wheel event is not a fallback of
+    convenience here, it is the *only* mechanism this harness found that
+    reaches this container at all. `10 * WHEEL_DELTA` matches what
+    `scrollprobe` used and observed to move a 2,000-character line's cell
+    by a clean, repeatable 1,000px."""
+    import ctypes  # noqa: PLC0415
+
+    user32 = ctypes.windll.user32
+    user32.SetCursorPos(int(pt[0]), int(pt[1]))
+    MOUSEEVENTF_HWHEEL = 0x01000
+    WHEEL_DELTA = 120
+    user32.mouse_event(MOUSEEVENTF_HWHEEL, 0, 0, notches * WHEEL_DELTA, 0)
+
+
+def find_leaf_rect(win, substring):
+    """Rectangle of the first descendant whose own text contains
+    `substring`, or `None` - used by `p03`'s scroll-mirroring check to
+    read a row's on-screen position directly by fixture-anchor text
+    (`find_by_text_containing`), the same anchor-first approach
+    `scrollprobe` converged on after its midline-x row classification
+    turned out to be exactly what a real scroll perturbs (circular as a
+    *precondition* for reading the very rectangles being probed)."""
+    elem = find_by_text_containing(win, substring)
+    if elem is None:
+        return None
     try:
-        v = elem.iface_scroll.CurrentHorizontalScrollPercent
+        return elem.rectangle()
     except Exception:  # noqa: BLE001
         return None
-    return None if v is None or v < 0 else v
-
-
-def set_scroll_percent_h(elem, target):
-    """Sets horizontal scroll position via `IUIAutomationScrollPattern.
-    SetScrollPercent` - the pattern-invocation approach this harness
-    prefers everywhere else (`invoke()`, `select_dropdown()`), not a
-    synthesized mouse wheel/trackpad gesture. `-1` (UIA's `NoScroll`
-    sentinel) for the vertical argument leaves vertical scroll untouched."""
-    elem.iface_scroll.SetScrollPercent(target, -1)
 
 
 def p03(binary, break_mode=False):
@@ -1062,29 +1082,71 @@ def p03(binary, break_mode=False):
     WebKitGTK and "a basic layout observation" on WebView2/macOS WebKit;
     Prerequisite B (see the module note above `EXPECTED_ROWS_PER_PANE`)
     resolved favorably, so this does the fuller Linux-parity check where
-    it's cheap to, rather than stopping at the RFC's stated minimum:
+    it's cheap to, rather than stopping at the RFC's stated minimum.
 
-    1. **Row shape and alignment** (`wait_for_row_shape` +
+    Three independent launches (mirrors `p05`'s multi-launch shape), each
+    against the fixture pair its own sub-check actually needs rather than
+    forcing one fixture to serve all three:
+
+    1. **Row shape and alignment** (`left_all_hunk_kinds.txt`/
+       `right_all_hunk_kinds.txt`, via `wait_for_row_shape` +
        `check_pane_geometry`, both panes): exactly 7 `diff-row`s per pane
-       (the pinned `all_hunk_kinds` fixture shape, matching
-       `render_check.py`'s `EXPECTED_ROWS_PER_PANE`), uniform accessible
-       child count, uniform content-cell x-origin, and uniform row extents
-       - covers "action rows align with left/right rows across multiple
-       hunks" and "vertical rows remain aligned" together, the same way
-       Linux's single F34 check covers both rather than asserting each
-       bullet separately.
-    2. **Horizontal scroll mirroring** (no precedent elsewhere in this
-       program - built here for the first time): scrolls the left pane
-       (`#diff-col-left-0`, via `SetScrollPercent` - a direct pattern
-       call, not synthesized input) to a mid-range position, polls the
-       right pane (`#diff-col-right-0`) until its own scroll percent
-       matches, then samples it several more times after that match to
+       (the pinned fixture shape, matching `render_check.py`'s
+       `EXPECTED_ROWS_PER_PANE`), uniform accessible child count, uniform
+       content-cell x-origin, and uniform row extents - covers "action
+       rows align with left/right rows across multiple hunks", "vertical
+       rows remain aligned", and "short-row backgrounds span the full
+       widest-line area" together, the same way Linux's single F34 check
+       covers several bullets at once rather than asserting each
+       separately.
+    2. **Horizontal scroll mirroring** (`left_long_line.txt`/
+       `right_long_line.txt` - a single 2,000-character line per side,
+       guaranteed to overflow any reasonable viewport; no precedent
+       elsewhere in this program on any platform, built here for the
+       first time). Real investigation, not assumption, is why this
+       looks the way it does:
+
+       - `rowprobe`'s own ancestor walk (CI run 31936262847) already
+         showed `.diff-row`'s parent chain skips straight from the row to
+         `.diff-wrap` - `.diff-col-left`/`.diff-col-right` (plain
+         `overflow-x:auto` divs, no ARIA role) are not nodes in the UIA
+         tree at all, a real Chromium accessibility-tree simplification
+         (collapsing a "non-interesting" single-child wrapper, reparenting
+         its children to the nearest node that *is* interesting), not a
+         lookup bug.
+       - `scrollprobe`'s capability scan (CI run 31936889265 and again
+         31936958119) confirmed zero descendants anywhere report
+         `CurrentHorizontallyScrollable == True` - there is no
+         `IScrollProvider`/`ScrollPattern` to invoke, on any element, for
+         this container.
+       - `scrollprobe` v5 (CI run 31936958119) found what *does* work: a
+         native `WM_MOUSEHWHEEL` (`send_horizontal_wheel`, real
+         `SendInput`, the same escalation this harness's `invoke()`/
+         `set_value_text()` already use as a last resort when no pattern
+         is available) at a point inside the left pane moved the left
+         row's own on-screen rectangle by exactly the scrolled amount -
+         AND the right row's rectangle moved by the identical delta at
+         the same time, real, observed proof `install_hscroll_sync`'s
+         mirror works (`(33,15453)`/`(572,15991)` before ->
+         `(-967,14453)`/`(-428,14991)` after one wheel event, `(-1967,...)`/
+         `(-1428,...)` after a second - both panes moving together by
+         1,000px each time, not just one).
+
+       This checks exactly that: scroll the left pane via
+       `send_horizontal_wheel`, poll the right pane's own row rectangle
+       (found by its own fixture anchor text, `find_leaf_rect` -
+       `scrollprobe`'s hard-won lesson that a midline-x row
+       classification is exactly what a real scroll perturbs, so it
+       cannot also gate reading the rectangles the perturbation is
+       measured in) until it has moved by the same delta as the left
+       pane's, then samples it several more times after that match to
        confirm it *settles* rather than merely touching the target once -
        "without feedback/jitter" (RFC-078) means an oscillation is itself
        a failure, so a single post-scroll sample would not be sufficient
        evidence.
-    3. **Narrow window, basic usability** (RFC-078's "word wrap and narrow
-       window modes remain usable" - a basic observation, not full
+    3. **Narrow window, basic usability** (`left_all_hunk_kinds.txt`/
+       `right_all_hunk_kinds.txt` again - RFC-078's "word wrap and narrow
+       window modes remain usable" is a basic observation, not full
        pixel-level wrap verification): resizes the real OS window
        narrower and confirms the fixture's content tokens are still
        present in the accessible tree afterward - usable, not blank or
@@ -1102,21 +1164,20 @@ def p03(binary, break_mode=False):
     broken build. This is a deliberate, reported deviation from Linux's
     real-defect-injection falsifiability, not an oversight.
     """
-    left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
-    right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    all_left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    all_right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
 
+    # ── 1. Row shape and alignment ───────────────────────────────────────
     with tempfile.TemporaryDirectory() as scratch:
-        proc = launch(binary, [left, right], scratch)
+        proc = launch(binary, [all_left, all_right], scratch)
         try:
             app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
-
-            # ── 1. Row shape and alignment ───────────────────────────────
             frame, left_rows, right_rows = wait_for_row_shape(
                 win, EXPECTED_ROWS_PER_PANE, timeout_s=READY_TIMEOUT_S
             )
             if frame is None:
                 print(
-                    f"FAIL: compare view never reached {EXPECTED_ROWS_PER_PANE} "
+                    f"FAIL(geometry): compare view never reached {EXPECTED_ROWS_PER_PANE} "
                     f"diff-row elements per pane within {READY_TIMEOUT_S}s "
                     f"(found {len(collect_diff_rows(win))} total)",
                     file=sys.stderr,
@@ -1133,58 +1194,91 @@ def p03(binary, break_mode=False):
                 # proves this comparison is live, not vacuously true.
                 if not failures:
                     print(
-                        "FAIL(--break): row geometry required an impossible "
+                        "FAIL(geometry --break): row geometry required an impossible "
                         "misalignment to be present, and correctly found none "
                         "- the real check above is not vacuous",
                         file=sys.stderr,
                     )
                     return 1
             elif failures:
-                print("FAIL: row geometry check found real misalignment:", file=sys.stderr)
+                print("FAIL(geometry): row geometry check found real misalignment:", file=sys.stderr)
                 for f in failures:
                     print(f"  - {f}", file=sys.stderr)
                 return 1
+        except RuntimeError as exc:
+            print(f"FAIL(geometry): {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
 
-            # ── 2. Horizontal scroll mirroring ───────────────────────────
-            left_col = find_by_automation_id(win, "diff-col-left-0")
-            right_col = find_by_automation_id(win, "diff-col-right-0")
-            if left_col is None or right_col is None:
-                print(
-                    "FAIL: could not find diff-col-left-0/diff-col-right-0 "
-                    "(the per-pane horizontal scroll containers) by AutomationId",
-                    file=sys.stderr,
-                )
+    if break_mode:
+        print("OK(break): row geometry's impossible-misalignment check correctly rejected the vacuous case.")
+        return 0
+
+    # ── 2. Horizontal scroll mirroring ───────────────────────────────────
+    long_left = REPO_ROOT / "tests/fixtures/text/left_long_line.txt"
+    long_right = REPO_ROOT / "tests/fixtures/text/right_long_line.txt"
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = launch(binary, [long_left, long_right], scratch)
+        try:
+            app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            # The fixture's own content, not FIXTURE_TOKENS - a single
+            # 2,000-character line per side, distinguished by its leading
+            # 'A'/'B' run rather than the all_hunk_kinds fixture's tokens.
+            ok, texts, missing = wait_for_tokens(win, ["AAAA", "BBBB"], timeout_s=READY_TIMEOUT_S)
+            if not ok:
+                print(f"FAIL(scroll): compare view never rendered expected tokens: {missing}", file=sys.stderr)
+                debug_dump(texts)
                 return 1
 
-            target = 55.0
+            baseline_left = find_leaf_rect(win, "AAAA")
+            baseline_right = find_leaf_rect(win, "BBBB")
+            if baseline_left is None or baseline_right is None:
+                print("FAIL(scroll): could not read both panes' baseline row rectangles", file=sys.stderr)
+                return 1
+
+            win_rect = win.rectangle()
+            pt = (
+                min(max(baseline_left.left + 40, win_rect.left + 10), win_rect.right - 10),
+                min(
+                    max(baseline_left.top + max(1, min(baseline_left.height(), 20) // 2), win_rect.top + 10),
+                    win_rect.bottom - 10,
+                ),
+            )
             try:
-                set_scroll_percent_h(left_col, target)
+                send_horizontal_wheel(pt, notches=10)
             except Exception as exc:  # noqa: BLE001
-                print(f"FAIL: could not set left pane's horizontal scroll: {exc!r}", file=sys.stderr)
+                print(f"FAIL(scroll): could not send a horizontal wheel event at {pt}: {exc!r}", file=sys.stderr)
                 return 1
 
-            required = -1.0 if break_mode else target
             deadline = time.monotonic() + READY_TIMEOUT_S
             mirrored = False
-            last_seen = None
+            last_left = last_right = None
             while time.monotonic() < deadline:
-                last_seen = scroll_percent_h(right_col)
-                if last_seen is not None and abs(last_seen - required) < 1.0:
-                    mirrored = True
-                    break
+                last_left = find_leaf_rect(win, "AAAA")
+                last_right = find_leaf_rect(win, "BBBB")
+                if last_left is not None and last_right is not None:
+                    left_delta = last_left.left - baseline_left.left
+                    right_delta = last_right.left - baseline_right.left
+                    if left_delta != 0:
+                        target_delta = 999999 if break_mode else left_delta
+                        if right_delta == target_delta:
+                            mirrored = True
+                            break
                 time.sleep(POLL_INTERVAL_S)
             if not mirrored:
-                label = "(--break) impossible target" if break_mode else "the left pane's position"
                 print(
-                    f"FAIL: right pane's horizontal scroll never matched {label} "
-                    f"within {READY_TIMEOUT_S}s (last seen: {last_seen!r}, required: {required!r})",
+                    f"FAIL(scroll): right pane's row never mirrored the left pane's scroll "
+                    f"within {READY_TIMEOUT_S}s (baseline left={baseline_left.left}, right="
+                    f"{baseline_right.left}; last seen left={last_left.left if last_left else None}, "
+                    f"right={last_right.left if last_right else None})",
                     file=sys.stderr,
                 )
                 return 1
             if break_mode:
                 print(
-                    "FAIL(--break): right pane matched an impossible scroll "
-                    "target - the mirroring check above is not vacuous",
+                    "FAIL(scroll --break): right pane matched an impossible scroll delta "
+                    "- the mirroring check above is not vacuous",
                     file=sys.stderr,
                 )
                 return 1
@@ -1192,56 +1286,82 @@ def p03(binary, break_mode=False):
             # Settling check: sample several more times after the match -
             # "without feedback/jitter" means oscillation itself is a
             # failure, so one post-scroll sample is not sufficient.
+            expected_right = last_right.left
             settle_samples = []
             for _ in range(6):
                 time.sleep(POLL_INTERVAL_S)
-                settle_samples.append(scroll_percent_h(right_col))
-            unsettled = [s for s in settle_samples if s is None or abs(s - target) > 1.0]
+                r = find_leaf_rect(win, "BBBB")
+                settle_samples.append(r.left if r is not None else None)
+            unsettled = [s for s in settle_samples if s != expected_right]
             if unsettled:
                 print(
-                    f"FAIL: right pane's horizontal scroll did not settle after "
-                    f"mirroring - samples after the match: {settle_samples!r} "
-                    f"(target {target})",
+                    f"FAIL(scroll): right pane's position did not settle after mirroring - "
+                    f"samples after the match: {settle_samples!r} (expected {expected_right})",
                     file=sys.stderr,
                 )
                 return 1
+        except RuntimeError as exc:
+            print(f"FAIL(scroll): {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
 
-            # ── 3. Narrow window, basic usability ────────────────────────
+    # ── 3. Narrow window, basic usability ────────────────────────────────
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = launch(binary, [all_left, all_right], scratch)
+        try:
+            app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            ok, texts, missing = wait_for_tokens(win, FIXTURE_TOKENS, timeout_s=READY_TIMEOUT_S)
+            if not ok:
+                print(f"FAIL(narrow): compare view never rendered expected tokens: {missing}", file=sys.stderr)
+                debug_dump(texts)
+                return 1
             try:
                 rect = win.rectangle()
                 win.move_window(rect.left, rect.top, 480, rect.height())
             except Exception as exc:  # noqa: BLE001
-                print(f"FAIL: could not resize the window narrower: {exc!r}", file=sys.stderr)
+                print(f"FAIL(narrow): could not resize the window narrower: {exc!r}", file=sys.stderr)
                 return 1
             time.sleep(1.0)  # let WebView2 reflow before re-checking content
-            ok, texts, missing = wait_for_tokens(win, FIXTURE_TOKENS, timeout_s=READY_TIMEOUT_S)
+            required_tokens = ["this-token-cannot-appear-in-real-output"] if break_mode else FIXTURE_TOKENS
+            ok, texts, missing = wait_for_tokens(win, required_tokens, timeout_s=READY_TIMEOUT_S)
             if not ok:
+                if break_mode:
+                    print("OK(break): correctly failed to find the impossible token after narrowing.")
+                    return 0
                 print(
-                    f"FAIL: compare view lost expected content after narrowing "
+                    f"FAIL(narrow): compare view lost expected content after narrowing "
                     f"the window: missing {missing}",
                     file=sys.stderr,
                 )
                 debug_dump(texts)
                 return 1
+            if break_mode:
+                print(
+                    "FAIL(narrow --break): found an impossible token after narrowing "
+                    "- the content check above is not vacuous",
+                    file=sys.stderr,
+                )
+                return 1
             new_rect = win.rectangle()
             if new_rect.width() <= 0 or new_rect.height() <= 0:
                 print(
-                    f"FAIL: window has non-positive extents after narrowing "
+                    f"FAIL(narrow): window has non-positive extents after narrowing "
                     f"({new_rect.width()}x{new_rect.height()})",
                     file=sys.stderr,
                 )
                 return 1
         except RuntimeError as exc:
-            print(f"FAIL: {exc}", file=sys.stderr)
+            print(f"FAIL(narrow): {exc}", file=sys.stderr)
             return 1
         finally:
             terminate(proc)
 
     print(
         "OK: 7 diff-rows per pane, uniform child count/content-cell x-origin/row "
-        "extents in both panes; horizontal scroll mirrored from left to right and "
-        "settled; content remained present and the window stayed valid after "
-        "narrowing."
+        "extents in both panes; a real horizontal wheel event on the left pane "
+        "mirrored to the right pane by the identical delta and settled; content "
+        "remained present and the window stayed valid after narrowing."
     )
     return 0
 
@@ -3053,6 +3173,387 @@ def p12(binary, break_mode=False):
         "OK: theme/language/font size restored after restart, a Japanese label rendered, "
         "and tab restore happened only on a no-args relaunch (explicit CLI args opened the "
         "specified compare instead)."
+    )
+    return 0
+
+
+# ── P07 — Explorer and directory report (M5-C) ──────────────────────────────
+
+
+def _seed_explorer_settings(config_dir, browse_dir, remember=True):
+    """Writes a v2 settings.json envelope based on the project's own
+    `settings-v2.json` fixture (same fixture P08 uses), overriding only
+    `last_left_dir`/`last_right_dir` (both panes' remembered browse root -
+    `browse_dir`) and `remember_explorer_dirs` - so Explorer opens both
+    panes directly on `browse_dir` with no path-typing/tree-navigation
+    needed to get there (mirrors P12's direct-envelope-construction
+    reasoning: `restore_tabs`/Explorer's own init don't care how the file
+    describing the starting state came to exist, only that it does)."""
+    fixture = json.loads(
+        (
+            REPO_ROOT
+            / "crates/forskscope-core/src/tests/fixtures/persistence/settings-v2.json"
+        ).read_text()
+    )
+    fixture["payload"]["last_left_dir"] = str(browse_dir)
+    fixture["payload"]["last_right_dir"] = str(browse_dir)
+    fixture["payload"]["remember_explorer_dirs"] = remember
+    now = int(time.time())
+    fixture["created_unix"] = now
+    fixture["updated_unix"] = now
+    (config_dir / "settings.json").write_text(json.dumps(fixture))
+
+
+def _p07_fixture(scratch_path):
+    """`browse/{left_root,right_root}` - a shared parent both Explorer
+    panes browse (so `left_root`/`right_root` appear as sibling rows to
+    pick, matching the only reachable UI path to a directory pick - see
+    `p07`'s docstring for why this shared-parent shape matters beyond
+    convenience), each holding one file per RFC-078 status: equal,
+    changed (distinct content each side), left-only, right-only."""
+    browse = scratch_path / "browse"
+    left_root = browse / "left_root"
+    right_root = browse / "right_root"
+    left_root.mkdir(parents=True)
+    right_root.mkdir(parents=True)
+    (left_root / "equal.txt").write_text("EQUAL-CONTENT\n")
+    (right_root / "equal.txt").write_text("EQUAL-CONTENT\n")
+    (left_root / "changed.txt").write_text("LEFT-CHANGED-CONTENT\n")
+    (right_root / "changed.txt").write_text("RIGHT-CHANGED-CONTENT\n")
+    (left_root / "left-only.txt").write_text("LEFT-ONLY-CONTENT\n")
+    (right_root / "right-only.txt").write_text("RIGHT-ONLY-CONTENT\n")
+    return browse, left_root, right_root
+
+
+def p07(binary, break_mode=False):
+    """Explorer and directory report. RFC-078 requires: navigation/
+    history/focused-pane keyboard behaviour; equal/different/one-sided
+    statuses; deep comparison progress and filters; per-file and batch
+    copy confirmation/backup/manifest/result-summary.
+
+    **Focused-pane keyboard behaviour is not executed here** - the same
+    §6 limitation P04/P11 record (a real keystroke with no bound UI
+    element for any accessibility API to invoke); recorded manual-
+    outstanding, not silently skipped.
+
+    **Navigation/history**: the left pane navigates up one level (real
+    directory listing changes, `Back` flips enabled) and back again
+    (listing returns, matching what F57-style polling already
+    establishes elsewhere in this harness) - real navigation, not just
+    button-enabled-state theatre.
+
+    **Statuses/deep comparison/filters**: a 4-file fixture pair (one
+    equal, one changed, one left-only, one right-only - the exact set
+    RFC-078 asks P07 to distinguish) is opened as a directory compare via
+    Explorer's own pick-two-directories-then-Compare flow (not seeded
+    directly - unlike `dir_tabs`, which nothing persists to session.json,
+    this *is* reachable and reasonably fast through real UI). The stats
+    line's exact composed count string is asserted verbatim, and the
+    `Equal only`/`All`/`Different` filter buttons are confirmed to
+    actually change which rows render, not just to toggle their own
+    `active` class.
+
+    **A real, discovered defect - per-file copy uses the wrong base
+    directory.** `deep_compare.rs`'s `DeepRow` (the per-file "Copy to
+    right"/"Copy to left" buttons) computes `src`/`dst` from
+    `store.settings.read().last_left_dir`/`last_right_dir` - the
+    Explorer *pane's* remembered browse directory - not from the
+    `left_root`/`right_root` props `DeepCompareView` actually passed it
+    (confirmed by reading the component, not assumed).
+    `BatchCopyButtons`, a sibling component, correctly closes over
+    `left_root`/`right_root` instead. Under the *only* UI path that
+    reaches a directory compare at all (browse to a parent, pick two of
+    its child rows, click Compare - directory roots themselves are never
+    individually selectable, since `explorer.rs` filters the pane's own
+    root out of the row list), `last_left_dir`/`last_right_dir` are
+    *always* one level up from the picked roots, never equal to them -
+    so this is not a contrived mismatch, it is what every real directory
+    compare produces. This harness demonstrates it directly: the
+    `ConfirmDirOpModal`'s own displayed "From" path is read back and
+    shown to be the wrong (pane-browse-root-based) path, and the
+    resulting copy attempt fails with `source does not exist` against
+    that wrong path - a **safe, loud failure** here only because nothing
+    happens to exist at the wrong location in this fixture; a coincidental
+    collision elsewhere could silently copy the wrong file instead.
+    Registered, not fixed (no product behaviour changes, this slice).
+
+    **Batch copy - the real, correct path.** `BatchCopyButtons` (using
+    `left_root`/`right_root` correctly) copies `changed.txt` and
+    `left-only.txt` to the right; the resulting manifest JSON is read
+    from disk (its path comes off `BatchResultModal`'s own displayed
+    text) and its **entries are asserted against real content**, per the
+    handoff: `changed.txt`'s entry carries a non-null `backup_path` whose
+    on-disk bytes equal the *pre-copy* right-side content, and the
+    destination's final bytes equal the left-side content that was
+    copied in; `left-only.txt`'s entry (a new destination file, nothing
+    to back up) carries a null `backup_path`. The result modal's title is
+    checked against the exact "Copied 2 files" success format.
+
+    `--break` (time-boxed to the batch-copy manifest check, the one with
+    the most consequential byte comparison, mirroring P05's own
+    time-boxing precedent): requires the backup file's bytes to equal a
+    string this harness never wrote, proving the byte comparison is real.
+    """
+    config_dir = resolve_config_dir()
+    clear_config_dir(config_dir)
+
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+        browse, left_root, right_root = _p07_fixture(scratch_path)
+        _seed_explorer_settings(config_dir, browse)
+
+        with tempfile.TemporaryDirectory() as cwd:
+            proc = launch(binary, [], cwd)
+            try:
+                app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+
+                # ── Navigation / history ─────────────────────────────────
+                ok, _texts, missing = wait_for_tokens(
+                    win, ["left_root", "right_root"], timeout_s=READY_TIMEOUT_S
+                )
+                if not ok:
+                    print(f"FAIL: Explorer never listed the seeded browse dir: missing {missing}", file=sys.stderr)
+                    return 1
+
+                up_buttons = [
+                    b for b in win.descendants(control_type="Button") if (b.window_text() or "") == "↑"
+                ]
+                if not up_buttons:
+                    print('FAIL: could not find the "Go up one directory" (↑) button', file=sys.stderr)
+                    return 1
+                invoke(up_buttons[0])
+
+                if not wait_for_tokens(win, ["browse"], timeout_s=READY_TIMEOUT_S)[0]:
+                    print('FAIL: left pane did not navigate up to show "browse" as a row', file=sys.stderr)
+                    return 1
+                back_buttons = [b for b in win.descendants(control_type="Button") if (b.window_text() or "") == "←"]
+                if not back_buttons or not is_enabled(back_buttons[0]):
+                    print('FAIL: "Back" (←) button is not enabled after navigating - history was not recorded', file=sys.stderr)
+                    return 1
+                invoke(back_buttons[0])
+                ok, _texts, missing = wait_for_tokens(win, ["left_root", "right_root"], timeout_s=READY_TIMEOUT_S)
+                if not ok:
+                    print(f"FAIL: Back did not return to the browse listing: missing {missing}", file=sys.stderr)
+                    return 1
+
+                # ── Pick left_root / right_root and compare ──────────────
+                left_row = find_by_text_containing(win, "left_root")
+                right_row = find_by_text_containing(win, "right_root")
+                if left_row is None or right_row is None:
+                    print("FAIL: could not find left_root/right_root rows to pick", file=sys.stderr)
+                    debug_dump(collect_texts(win))
+                    return 1
+                invoke(left_row)
+                invoke(right_row)
+
+                compare_btn = find_by_text_containing(win, "Compare")
+                if compare_btn is None or not is_enabled(compare_btn):
+                    print("FAIL: footer Compare button not found or not enabled after picking both directories", file=sys.stderr)
+                    return 1
+                invoke(compare_btn)
+
+                # ── Statuses / stats line ────────────────────────────────
+                ok, texts, missing = wait_for_tokens(
+                    win, ["left-only.txt", "right-only.txt", "changed.txt"], timeout_s=READY_TIMEOUT_S
+                )
+                if not ok:
+                    print(f"FAIL: deep compare never rendered expected rows: missing {missing}", file=sys.stderr)
+                    debug_dump(texts)
+                    return 1
+                expected_stats = "1 different · 1 equal · 1 left only · 1 right only"
+                blob = "\n".join(collect_texts(win))
+                if expected_stats not in blob:
+                    print(f"FAIL: stats line did not contain the expected exact counts {expected_stats!r}", file=sys.stderr)
+                    debug_dump(collect_texts(win))
+                    return 1
+
+                # ── Filters ───────────────────────────────────────────────
+                if "equal.txt" in blob:
+                    print("FAIL: equal.txt is visible under the default 'Different' filter - filter is not actually filtering", file=sys.stderr)
+                    return 1
+                equal_only_btn = find_exact(win, "Equal only", control_type="Button")
+                if equal_only_btn is None:
+                    print('FAIL: could not find the "Equal only" filter button', file=sys.stderr)
+                    return 1
+                invoke(equal_only_btn)
+                if not wait_for_tokens(win, ["equal.txt"], timeout_s=READY_TIMEOUT_S)[0]:
+                    print('FAIL: "Equal only" filter did not reveal equal.txt', file=sys.stderr)
+                    return 1
+                if find_by_text_containing(win, "left-only.txt") is not None:
+                    print("FAIL: 'Equal only' filter still shows left-only.txt", file=sys.stderr)
+                    return 1
+                all_btn = find_exact(win, "All", control_type="Button")
+                if all_btn is None:
+                    print('FAIL: could not find the "All" filter button', file=sys.stderr)
+                    return 1
+                invoke(all_btn)
+                ok, texts, missing = wait_for_tokens(
+                    win,
+                    ["equal.txt", "changed.txt", "left-only.txt", "right-only.txt"],
+                    timeout_s=READY_TIMEOUT_S,
+                )
+                if not ok:
+                    print(f"FAIL: 'All' filter did not show every entry: missing {missing}", file=sys.stderr)
+                    return 1
+
+                # ── Per-file copy: the wrong-base-directory defect ───────
+                # "Copy to left" is not unique: changed.txt (Changed status)
+                # also carries one, alongside "Copy to right" - both
+                # directions apply to a Changed entry (`deep_compare.rs`).
+                # Disambiguate by row position (same on-screen top as the
+                # right-only.txt path text) rather than assuming order.
+                path_elem = find_by_text_containing(win, "right-only.txt")
+                if path_elem is None:
+                    print("FAIL: could not find the right-only.txt row", file=sys.stderr)
+                    return 1
+                row_top = path_elem.rectangle().top
+                copy_left_candidates = [
+                    b
+                    for b in win.descendants(control_type="Button")
+                    if (b.window_text() or "").strip() == "Copy to left"
+                ]
+                copy_left_btn = next(
+                    (b for b in copy_left_candidates if abs(b.rectangle().top - row_top) < 15),
+                    None,
+                )
+                if copy_left_btn is None:
+                    print(
+                        f'FAIL: could not find a "Copy to left" button on right-only.txt\'s row '
+                        f"(row_top={row_top}, candidates at tops "
+                        f"{[c.rectangle().top for c in copy_left_candidates]!r})",
+                        file=sys.stderr,
+                    )
+                    return 1
+                invoke(copy_left_btn)
+                if not wait_for_tokens(win, ["Copy this file?"], timeout_s=READY_TIMEOUT_S)[0]:
+                    print("FAIL: per-file copy confirmation modal never appeared", file=sys.stderr)
+                    return 1
+                wrong_src = str(browse / "right-only.txt")
+                shown = "\n".join(collect_texts(win))
+                if wrong_src not in shown:
+                    print(
+                        f"FAIL(unexpected): the confirmation modal's displayed source path was NOT "
+                        f"the wrong (pane-browse-root-based) path {wrong_src!r} this defect predicts - "
+                        f"either the defect is fixed, or this harness's understanding of it is wrong; "
+                        f"either way this needs a human to look, not a silent pass",
+                        file=sys.stderr,
+                    )
+                    debug_dump(collect_texts(win))
+                    return 1
+                copy_file_btn = modal_action_button(win, "Copy file")
+                if copy_file_btn is None:
+                    print('FAIL: could not find the confirmation modal\'s "Copy file" button', file=sys.stderr)
+                    return 1
+                invoke(copy_file_btn)
+                if not wait_for_tokens(win, ["does not exist"], timeout_s=READY_TIMEOUT_S)[0]:
+                    print(
+                        "FAIL(unexpected): per-file copy did not fail with 'source does not exist' "
+                        "against the wrong path - the predicted defect did not reproduce as expected",
+                        file=sys.stderr,
+                    )
+                    debug_dump(collect_texts(win))
+                    return 1
+                close_btn = find_exact(win, "Close", control_type="Button")
+                if close_btn is not None:
+                    invoke(close_btn)
+                    wait_gone(win, "does not exist", timeout_s=LAUNCH_TIMEOUT_S)
+                if (left_root / "right-only.txt").exists():
+                    print("FAIL: right-only.txt appeared at the correct left_root location despite the predicted wrong-path failure - investigate", file=sys.stderr)
+                    return 1
+
+                # ── Batch copy: the correct path, manifest + backup ─────
+                manifests_dir = config_dir / "manifests"
+                before_manifests = set(manifests_dir.glob("*.json")) if manifests_dir.exists() else set()
+
+                batch_btn = find_by_text_containing(win, "Copy to right 2")
+                if batch_btn is None:
+                    print('FAIL: could not find the "Copy to right 2" batch-copy button', file=sys.stderr)
+                    debug_dump(collect_texts(win))
+                    return 1
+                invoke(batch_btn)
+                if not wait_for_tokens(win, ["manifest will be saved"], timeout_s=READY_TIMEOUT_S)[0]:
+                    print("FAIL: batch copy confirmation modal never appeared", file=sys.stderr)
+                    return 1
+                copy_all_btn = modal_action_button(win, "Copy all")
+                if copy_all_btn is None:
+                    print('FAIL: could not find the batch modal\'s "Copy all" button', file=sys.stderr)
+                    return 1
+                invoke(copy_all_btn)
+
+                expected_title = "Copied 2 files"
+                if not wait_for_tokens(win, [expected_title], timeout_s=READY_TIMEOUT_S)[0]:
+                    print(f"FAIL: batch result modal never showed {expected_title!r}", file=sys.stderr)
+                    debug_dump(collect_texts(win))
+                    return 1
+
+                deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+                new_manifests = []
+                while time.monotonic() < deadline and not new_manifests:
+                    current = set(manifests_dir.glob("*.json")) if manifests_dir.exists() else set()
+                    new_manifests = list(current - before_manifests)
+                    if not new_manifests:
+                        time.sleep(POLL_INTERVAL_S)
+                if not new_manifests:
+                    print(f"FAIL: no new manifest file appeared under {manifests_dir}", file=sys.stderr)
+                    return 1
+                manifest = json.loads(new_manifests[0].read_text())
+                entries = {Path(e["dst"]).name: e for e in manifest.get("entries", [])}
+
+                changed_entry = entries.get("changed.txt")
+                left_only_entry = entries.get("left-only.txt")
+                if changed_entry is None or left_only_entry is None:
+                    print(f"FAIL: manifest entries missing changed.txt/left-only.txt: {entries.keys()!r}", file=sys.stderr)
+                    return 1
+                if changed_entry.get("outcome") != "copied" or left_only_entry.get("outcome") != "copied":
+                    print(f"FAIL: manifest entries not both 'copied': {entries!r}", file=sys.stderr)
+                    return 1
+
+                changed_bak = changed_entry.get("backup_path")
+                if not changed_bak:
+                    print("FAIL: changed.txt's manifest entry has no backup_path, but its destination already existed", file=sys.stderr)
+                    return 1
+                required_bak_content = (
+                    "this exact backup content can never be written by this harness"
+                    if break_mode
+                    else "RIGHT-CHANGED-CONTENT\n"
+                )
+                actual_bak_content = Path(changed_bak).read_text() if Path(changed_bak).exists() else None
+                if actual_bak_content != required_bak_content:
+                    print(
+                        f"FAIL: {changed_bak}'s content {actual_bak_content!r} != required {required_bak_content!r}",
+                        file=sys.stderr,
+                    )
+                    return 1
+                if break_mode:
+                    print("OK(break): backup-content check correctly rejected an impossible required value.")
+                    return 0
+
+                if left_only_entry.get("backup_path"):
+                    print(f"FAIL: left-only.txt's manifest entry has a backup_path {left_only_entry['backup_path']!r}, but its destination was new", file=sys.stderr)
+                    return 1
+
+                actual_changed_dst = (right_root / "changed.txt").read_text()
+                if actual_changed_dst != "LEFT-CHANGED-CONTENT\n":
+                    print(f"FAIL: {right_root / 'changed.txt'}'s content {actual_changed_dst!r} != expected 'LEFT-CHANGED-CONTENT\\n'", file=sys.stderr)
+                    return 1
+                if not (right_root / "left-only.txt").exists():
+                    print(f"FAIL: {right_root / 'left-only.txt'} was never created by the batch copy", file=sys.stderr)
+                    return 1
+                actual_left_only_dst = (right_root / "left-only.txt").read_text()
+                if actual_left_only_dst != "LEFT-ONLY-CONTENT\n":
+                    print(f"FAIL: {right_root / 'left-only.txt'}'s content {actual_left_only_dst!r} != expected 'LEFT-ONLY-CONTENT\\n'", file=sys.stderr)
+                    return 1
+            except RuntimeError as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+            finally:
+                terminate(proc)
+
+    print(
+        "OK: navigation/history real; equal/changed/left-only/right-only statuses and exact "
+        "stats counts confirmed; filters actually re-render; per-file copy's wrong-base-"
+        "directory defect demonstrated (registered, not fixed); batch copy's manifest and "
+        ".bak backup verified against real bytes, not just a reported result summary."
     )
     return 0
 
