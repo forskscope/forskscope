@@ -238,6 +238,29 @@ fails un-waivably. **F46 is unverifiable** under current resourcing; one person
 opening the DMG on any Mac once closes it. **F45 is manual-only** by
 construction, since CI runners already carry the prerequisites.
 
+**M5-C, Linux row (2026-08-16): P03/P07/P11 all CI-confirmed, both directions.**
+P03 (full-width rows, action-button alignment, F34's geometry check, horizontal
+scroll mirroring, word wrap) and P07 (Explorer status classification, filters,
+batch copy verified against real files/backup/manifest, navigation buttons) and
+P11 (RFC-078's one CI-verifiable keyboard item — a destructive confirmation
+modal's initial focus lands on the safe control, not the destructive one) each
+pass in normal mode and correctly fail in `--break` mode on real CI (Xvfb), not
+just locally — this sandbox's own local X11 input synthesis is confirmed broken
+for everything (even a plain vertical scroll no-ops here), so every one of
+these needed CI itself to settle, several after a first CI dispatch caught a
+real harness bug: `render_check.py`'s `find_by_role`/`collect_rows` (and later
+`linux_harness.py`'s `find_text_containing`) crashed outright on a stale AT-SPI
+node mid-render-mutation (`GLib.GError: Object does not exist` / `The
+application no longer exists`) rather than retrying like every other
+not-ready-yet state `wait_for_ready` already tolerated — a new failure mode
+beyond F57's original "tree caught mid-render," now hardened for every case,
+not just these three. P03's horizontal-scroll-mirror sub-check needed a
+fallback chain (button-7, the GTK convention, silently does nothing on Xvfb's
+default virtual pointer; shift+button-4 is what actually works) rather than one
+assumed method. Windows and macOS rows are in progress (background work,
+independent scroll/focus-synthesis approaches per platform — WM_MOUSEHWHEEL on
+Windows, AXFocusedUIElement on macOS).
+
 ### M4 slicing
 
 M4 opens carrying **20 open register items** — three times M2's load, and too
