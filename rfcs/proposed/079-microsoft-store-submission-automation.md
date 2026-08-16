@@ -24,8 +24,8 @@ producing a correct, validated MSIX at all.
 ## Goals
 
 - Build a Store-ready MSIX from the same commit that produced a release.
-- Submit it automatically, without a long-lived publishing secret in the
-  repository.
+- Submit it automatically, with the narrowest credential that does the job
+  (§2).
 - Keep the owner's existing approval gate — a human decides what ships.
 - Make a failed or rejected submission loud, and make the resulting state
   recoverable by hand.
@@ -128,20 +128,14 @@ known costs rather than a default.
 
 ### 2a. Signing — resolved, nothing to handle
 
-Authentication uses the project's existing Entra ID app registration via
-**OIDC federated credentials**: GitHub's `id-token: write` permission plus a
-federated credential on the app registration, scoped to this repository and to
-the specific workflow.
+`AppxManifest.xml` declares `Publisher="CN=C4BA37E8-8670-4C82-8365-5ECB57373921"`,
+a **Store-assigned publisher identity**. Packages submitted under it are signed
+by Microsoft during certification, so no code-signing certificate of the
+project's own is involved and none needs handling in CI.
 
-**No client secret is stored in repository settings.** A long-lived publishing
-credential would be the weakest link in a release path that otherwise enforces
-dependency paths, disposes of advisories individually, and fails closed on
-untrusted input. It would also be the only project secret whose compromise lets
-someone ship code to users under the project's identity.
-
-Scope the federated credential as narrowly as the provider allows — repository,
-workflow, and environment — so it cannot be used from an unrelated workflow or a
-fork.
+The manifest's `Identity`, `Publisher` and `PublisherDisplayName` must
+nevertheless match the Store listing exactly, or the submission is rejected —
+which is why §3 validates them locally before anything is uploaded.
 
 ### 3. Validation before submission
 
