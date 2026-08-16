@@ -55,6 +55,16 @@
 --                                      (e.g. Save As modal's plain "Save"
 --                                      vs the toolbar's "Save merge result
 --                                      (Ctrl+S)").
+--   click_button_nth <proc> <needle> <n>
+--                                   -> "CLICKED: <desc> occurrence=<n>",
+--                                      "DISABLED: ...", or "NOT_FOUND" - the
+--                                      Nth (1-based) AXButton whose exact
+--                                      description-or-title equals `needle`,
+--                                      for disambiguating identically-
+--                                      labelled left/right-pane icon
+--                                      buttons (e.g. PathBar's "⌂"), the
+--                                      button-family counterpart to
+--                                      click_row_side's row disambiguation.
 --   click_row <proc> <needle>      -> "CLICKED: <label>", "NOT_FOUND" - like
 --                                      click_button but for role "AXRow"
 --                                      (Explorer's TreeRow, hunk.rs's
@@ -366,6 +376,52 @@ on runOnce(argv)
                                 return "CLICKED: " & d
                             else
                                 return "DISABLED: " & d
+                            end if
+                        end if
+                    end if
+                end repeat
+                return "NOT_FOUND"
+
+            else if cmdName is "click_button_nth" then
+                -- M5-C / P07: the Nth (1-based) AXButton whose exact
+                -- description-or-title equals `needle` - for disambiguating
+                -- left-pane-vs-right-pane icon buttons that render
+                -- identically on both sides (e.g. PathBar's "⌂"/"↑"), the
+                -- same problem `click_row_side` already solves for rows,
+                -- generalised to buttons with an explicit occurrence index
+                -- instead of a fixed left/right mapping.
+                set needle to item 3 of argv
+                set wantNth to (item 4 of argv) as integer
+                set seenN to 0
+                set allEl to my safeContents(w)
+                repeat with e in allEl
+                    set isButton to false
+                    try
+                        if role of e is "AXButton" then set isButton to true
+                    end try
+                    if isButton then
+                        set d to ""
+                        try
+                            set d to description of e
+                        end try
+                        if d is "" then
+                            try
+                                set d to title of e
+                            end try
+                        end if
+                        if d is needle then
+                            set seenN to seenN + 1
+                            if seenN is wantNth then
+                                set isEnabled to true
+                                try
+                                    set isEnabled to (enabled of e)
+                                end try
+                                if isEnabled then
+                                    click e
+                                    return "CLICKED: " & d & " occurrence=" & seenN
+                                else
+                                    return "DISABLED: " & d & " occurrence=" & seenN
+                                end if
                             end if
                         end if
                     end if

@@ -2065,6 +2065,28 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: Explorer never showed any rows at $HOME (last: {r!r})", file=sys.stderr)
                 return 1
 
+            # A real dispatch found the per-file copy buttons (below) never
+            # rendering at all: `DeepRow` (deep_compare.rs) gates them on
+            # `store.settings.read().last_left_dir`/`last_right_dir` being
+            # `Some(...)`, which `navigate_to` (dir_pane.rs) only sets when
+            # `remember_explorer_dirs` is on (the actual shipping default,
+            # per `PersistedSettings::default()` - the recon-era comment
+            # elsewhere in this harness claiming it defaults off predates
+            # that and is now wrong). The navigation dance below only ever
+            # touches the LEFT pane, so `last_right_dir` stays `None`
+            # regardless - `has_right_root` alone was enough to hide every
+            # per-row button. One harmless click of each pane's own "⌂"
+            # (Home) button - a real navigate_to(home) to the SAME path
+            # already showing, so nothing visibly changes - sets both.
+            r = ui("click_button_nth", "⌂", "1", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click the left pane's Home ('⌂') button: {r}", file=sys.stderr)
+                return 1
+            r = ui("click_button_nth", "⌂", "2", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click the right pane's Home ('⌂') button: {r}", file=sys.stderr)
+                return 1
+
             # ── Navigation/history (mouse-driven; the keyboard sub-part is
             # NOT executed - see this case's OK output) ───────────────────
             #
@@ -2270,15 +2292,6 @@ def p07(binary, break_mode=False):
             # Polled rather than a single raw call - the filter switch just
             # before this triggers a re-render, and a real dispatch showed
             # a single immediate `click_button_exact` racing it (NOT_FOUND).
-            print(
-                f"DEBUG: pre-copy state - aaa-changed.txt="
-                f"{ui('find_text', 'aaa-changed.txt', timeout=20)!r} "
-                f"'Copy to right' substring="
-                f"{ui('find_text', 'Copy to right', timeout=20)!r} "
-                f"'Copy to right' exact(unclicked probe via get info)="
-                f"{ui('click_button_exact', 'Copy to right', timeout=20)!r}",
-                flush=True,
-            )
             r = click_wait("Copy to right", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click the per-file 'Copy to right' button: {r}", file=sys.stderr)
