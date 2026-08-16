@@ -215,6 +215,21 @@ def is_enabled(elem):
         return True
 
 
+def has_keyboard_focus(elem):
+    """Reads UIA's `HasKeyboardFocus` property directly off the raw COM
+    element (`element_info.element`, the same escape hatch
+    `_combo_readback`'s `iface_value.CurrentValue` already uses for a
+    property pywinauto's wrapper doesn't surface a dedicated method for) -
+    a pure accessibility-tree read, no input synthesized. Used by P11's
+    modal-focus-position check: RFC-078 asks whether a destructive
+    modal's focus *starts* on the safe/cancel action, which is answerable
+    this way with nothing to invoke or click."""
+    try:
+        return bool(elem.element_info.element.CurrentHasKeyboardFocus)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def collect_texts(win):
     """Flatten every descendant's own accessible text (`window_text()`,
     which pywinauto's UIA backend backs with the control's Name property -
@@ -3325,11 +3340,13 @@ def p07(binary, break_mode=False):
                 app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
 
                 # ── Navigation / history ─────────────────────────────────
-                ok, _texts, missing = wait_for_tokens(
+                ok, texts, missing = wait_for_tokens(
                     win, ["left_root", "right_root"], timeout_s=READY_TIMEOUT_S
                 )
                 if not ok:
                     print(f"FAIL: Explorer never listed the seeded browse dir: missing {missing}", file=sys.stderr)
+                    print(f"  seeded settings.json: {(config_dir / 'settings.json').read_text()!r}", file=sys.stderr)
+                    debug_dump(texts)
                     return 1
 
                 up_buttons = [
@@ -3575,6 +3592,174 @@ def p07(binary, break_mode=False):
     return 0
 
 
+# ── P11 — Keyboard and modal safety (M5-C) ──────────────────────────────────
+
+
+def p11(binary, break_mode=False):
+    """Keyboard and modal safety. RFC-078 requires: (1) execute the
+    maintained keyboard checklist; (2) modal focus starts on the safe/
+    cancel action for destructive operations; (3) global shortcuts do not
+    affect the background view while a modal is open; (4) Escape
+    behaviour is consistent.
+
+    **Decomposition (handoff §6), not a whole-case manual mark:**
+
+    | Item | CI-verifiable here? |
+    |---|---|
+    | (1) Keyboard checklist | **No** - manual, owner-executed |
+    | (2) Modal focus on safe/cancel | **Yes** - this function |
+    | (3) Global shortcuts inert behind a modal | **No** - needs a real keystroke |
+    | (4) Escape behaviour | **No** - needs a real keystroke |
+
+    (1)/(3)/(4) all need a real keystroke dispatched at the OS/window
+    level and observed to (not) do something - the exact structural gap
+    M5-B §3 already established for P04's Enter-shortcut path and P06's
+    double-reload: no accessibility API can invoke a global `onkeydown`
+    listener bound to no UI element, on any platform. Recorded
+    manual-outstanding here, the same shape as F45's Windows sub-case -
+    not attempted, not silently folded into a "Pass".
+
+    (2) is genuinely different and is what this function checks: focus
+    *position* is a plain accessibility-tree property
+    (`HasKeyboardFocus`, via `has_keyboard_focus()`), readable with
+    nothing synthesized - and it is the one item with a real data-safety
+    consequence (a destructive modal whose focus starts on the
+    destructive action, not Cancel, is a hazard a screen-reader user
+    hitting Enter/Space immediately after the modal announces itself
+    would hit for real).
+
+    Reuses P05's own conflict setup (apply a hunk, modify the target
+    externally, Save) to reach `OverwriteModal` - a genuinely destructive
+    modal already exercised elsewhere in this harness, not a new fixture
+    invented for this case: confirming "Overwrite" discards the
+    externally-written bytes on disk. `modal.rs`/`file.rs` put
+    `autofocus: true` on every such modal's own Cancel-equivalent button
+    (`OverwriteModal`, `BatchCopyModal`, `ConfirmDirOpModal`, `ReloadModal`,
+    `SwapModal`, `ConfirmDiffOptionChangeModal`, `ConfirmSaveAsOverwriteModal`
+    - confirmed by reading every one of them, not sampled), so this one
+    modal's focus behaviour is representative of the pattern, not a
+    special case picked to pass.
+
+    `--break`: requires the *destructive* ("Overwrite") button to hold
+    focus instead of Cancel - false on the real, correctly-behaving app,
+    proving the focus read is a live property check and not vacuous.
+
+    **Keyboard-coverage statement (handoff §6, stated plainly per its
+    instruction):** across items (1)/(3)/(4) here and P04's Enter-apply
+    path (M5-B), the documented keyboard interface has no automated
+    runtime coverage on any platform this program has evidence for.
+    Keyboard operability is a claim this project's README and
+    accessibility RFCs make; this case's decomposition is what makes
+    that gap explicit rather than leaving it implied by an unqualified
+    "Pass".
+    """
+    left_src = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right_src = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    external_content = "EXTERNALLY-MODIFIED-CONTENT-P11\nsecond line\n"
+
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch_path = Path(scratch)
+        left = scratch_path / "left.txt"
+        right = scratch_path / "right.txt"
+        left.write_text(left_src.read_text())
+        right.write_text(right_src.read_text())
+
+        proc = launch(binary, [left, right], scratch)
+        try:
+            app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            ok, texts, missing = wait_for_tokens(win, FIXTURE_TOKENS, timeout_s=READY_TIMEOUT_S)
+            if not ok:
+                print(f"FAIL: compare view never rendered expected tokens: {missing}", file=sys.stderr)
+                debug_dump(texts)
+                return 1
+
+            apply_button = find_by_text_containing(win, "Use this change")
+            if apply_button is None:
+                print('FAIL: could not find a "Use this change" hunk-apply button', file=sys.stderr)
+                return 1
+            invoke(apply_button)
+            if not wait_button_enabled(win, "Save merge result", True, timeout_s=LAUNCH_TIMEOUT_S):
+                print("FAIL: Save button never became enabled after applying a hunk", file=sys.stderr)
+                return 1
+
+            right.write_text(external_content)
+            save_button = find_by_text_containing(win, "Save merge result")
+            invoke(save_button)
+            if not wait_for_tokens(win, ["File changed on disk"], timeout_s=READY_TIMEOUT_S)[0]:
+                print('FAIL: the "File changed on disk" conflict modal never appeared', file=sys.stderr)
+                return 1
+
+            cancel_button = modal_action_button(win, "Cancel")
+            overwrite_button = modal_action_button(win, "Overwrite")
+            if cancel_button is None or overwrite_button is None:
+                print("FAIL: could not find both the Cancel and Overwrite buttons in the conflict modal", file=sys.stderr)
+                return 1
+
+            # Poll briefly - autofocus lands the moment the modal mounts,
+            # but the modal's own appearance (already awaited above via
+            # wait_for_tokens) and its focus assignment are not
+            # necessarily the same React/Dioxus tick.
+            deadline = time.monotonic() + READY_TIMEOUT_S
+            cancel_focused = overwrite_focused = None
+            required_button = overwrite_button if break_mode else cancel_button
+            while time.monotonic() < deadline:
+                cancel_focused = has_keyboard_focus(cancel_button)
+                overwrite_focused = has_keyboard_focus(overwrite_button)
+                if has_keyboard_focus(required_button):
+                    break
+                time.sleep(POLL_INTERVAL_S)
+
+            if break_mode:
+                if not has_keyboard_focus(overwrite_button):
+                    print(
+                        "FAIL(--break): the destructive 'Overwrite' button never held focus "
+                        "(Cancel does, correctly) - the impossible requirement was correctly "
+                        "rejected, proving the focus check above is not vacuous",
+                        file=sys.stderr,
+                    )
+                    return 1
+                print("FAIL(--break): impossible focus requirement unexpectedly held.", file=sys.stderr)
+                return 1
+
+            if not cancel_focused:
+                print(
+                    f"FAIL: 'Cancel' does not hold keyboard focus when the conflict modal opens "
+                    f"(cancel_focused={cancel_focused!r}, overwrite_focused={overwrite_focused!r}) "
+                    f"- a destructive modal must start focus on the safe action",
+                    file=sys.stderr,
+                )
+                return 1
+            if overwrite_focused:
+                print("FAIL: 'Overwrite' (the destructive action) also reports holding focus - ambiguous/wrong initial focus", file=sys.stderr)
+                return 1
+
+            # Real consequence check, not just a focus-property reading:
+            # Cancel actually being the safe default is only meaningful if
+            # invoking it truly preserves the externally-written bytes.
+            invoke(cancel_button)
+            if not wait_gone(win, "File changed on disk", timeout_s=LAUNCH_TIMEOUT_S):
+                print("FAIL: the conflict modal never dismissed after Cancel", file=sys.stderr)
+                return 1
+            if right.read_text() != external_content:
+                print("FAIL: the target's bytes changed after Cancel - the externally-modified content must survive", file=sys.stderr)
+                return 1
+        except RuntimeError as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: modal focus starts on 'Cancel' (the safe action), not 'Overwrite' (the "
+        "destructive one), when the file-conflict modal opens - and Cancel genuinely "
+        "preserves the externally-modified bytes. Items (1) keyboard checklist, (3) global "
+        "shortcuts behind a modal, and (4) Escape behaviour are manual-outstanding - see "
+        "this function's docstring for why none of the three can be automated on any "
+        "platform this program has evidence for."
+    )
+    return 0
+
+
 CASES = {
     "p01": p01,
     "p02": p02,
@@ -3588,6 +3773,7 @@ CASES = {
     "p08": p08,
     "p09": p09,
     "p10": p10,
+    "p11": p11,
     "p12": p12,
 }
 
