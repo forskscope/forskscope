@@ -159,6 +159,9 @@
 --                                      trigger Explorer's directory-navigate
 --                                      double-click handler, for P07's
 --                                      navigation/history check.
+--   resize_window <proc> <w> <h>    -> "RESIZED: <w>x<h>" or "ERROR: ..." -
+--                                      a direct `size of w` write, for
+--                                      P03's narrow-window usability check.
 --   focused_element <proc>         -> "FOCUSED: source=<process|window>
 --                                      class=<c> role=<r> desc=<d>
 --                                      title=<t> value=<v>", "FOCUSED:
@@ -1091,6 +1094,22 @@ on runOnce(argv)
                 on error errMsg
                     return "ERROR: " & errMsg
                 end try
+
+            else if cmdName is "resize_window" then
+                -- M5-C / P03's narrow-window usability check: a direct
+                -- accessibility-attribute write of `size of w`, same kind
+                -- of direct write `set_value` already establishes for
+                -- other controls, applied to the window itself rather than
+                -- a form control.
+                set newW to (item 3 of argv) as integer
+                set newH to (item 4 of argv) as integer
+                try
+                    set size of w to {newW, newH}
+                on error errMsg
+                    return "ERROR: " & errMsg
+                end try
+                set sz to size of w
+                return "RESIZED: " & ((item 1 of sz) as string) & "x" & ((item 2 of sz) as string)
 
             else if cmdName is "scroll_area_bars" then
                 -- M5-C / P03's horizontal-scroll-mirror check: a role
