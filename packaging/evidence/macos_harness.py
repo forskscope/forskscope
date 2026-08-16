@@ -2049,11 +2049,18 @@ def p07(binary, break_mode=False):
             # Forward buttons; the keyboard sub-part is NOT executed - see
             # this case's OK output) ────────────────────────────────────
             r = ui("double_click_row_side", "root-a", "left", timeout=20)
+            print(f"DEBUG: double_click_row_side result: {r!r}", flush=True)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not double-click into root-a on the left pane: {r}", file=sys.stderr)
                 return 1
             r = find_wait("left-only.txt", timeout=10)
             if not r.startswith("FOUND"):
+                print(
+                    f"DEBUG: post-dblclick count_rows={ui('count_rows', timeout=20)!r} "
+                    f"find('root-a')={ui('find_text', 'root-a', timeout=20)!r} "
+                    f"find('root-b')={ui('find_text', 'root-b', timeout=20)!r}",
+                    flush=True,
+                )
                 print(
                     f"FAIL: left pane did not navigate into root-a "
                     f"(left-only.txt not visible): {r}",

@@ -564,6 +564,7 @@ on runOnce(argv)
                 try
                     set frontmost of process procName to true
                 end try
+                delay 0.2
                 try
                     click at {cx, cy}
                     delay 0.15
@@ -571,7 +572,7 @@ on runOnce(argv)
                 on error errMsg
                     return "ERROR: double-click-at-coords: " & errMsg
                 end try
-                return "CLICKED: occurrence=" & seenN
+                return "CLICKED: occurrence=" & seenN & " at={" & cx & "," & cy & "}"
 
             else if cmdName is "focused_element" then
                 -- M5-C / P11's modal-focus check: reads back WHICH element
@@ -586,21 +587,46 @@ on runOnce(argv)
                 try
                     set fe to (value of attribute "AXFocusedUIElement" of targetProc)
                 on error errMsg
-                    return "ERROR: " & errMsg
+                    return "ERROR: get-focused: " & errMsg
                 end try
-                set frole to ""
-                set fdesc to ""
-                set ftitle to ""
+                -- Diagnostic-first version (real dispatch's first attempt
+                -- returned "role= desc= title=" with every property empty
+                -- and no error surfaced, because each bare `try` swallowed
+                -- whatever went wrong) - every property fetch now reports
+                -- its OWN error text instead of silently defaulting to ""
+                -- so a real failure and a genuinely-empty property are
+                -- distinguishable from the caller's output.
+                set fclass to "?"
+                try
+                    set fclass to (class of fe) as string
+                on error e0
+                    set fclass to "ERR:" & e0
+                end try
+                set frole to "?"
                 try
                     set frole to (role of fe) as string
+                on error e1
+                    set frole to "ERR:" & e1
                 end try
+                set fdesc to "?"
                 try
                     set fdesc to (description of fe) as string
+                on error e2
+                    set fdesc to "ERR:" & e2
                 end try
+                set ftitle to "?"
                 try
                     set ftitle to (title of fe) as string
+                on error e3
+                    set ftitle to "ERR:" & e3
                 end try
-                return "FOCUSED: role=" & frole & " desc=" & fdesc & " title=" & ftitle
+                set fvalue to "?"
+                try
+                    set fvalue to (value of fe) as string
+                on error e4
+                    set fvalue to "ERR:" & e4
+                end try
+                return "FOCUSED: class=" & fclass & " role=" & frole & " desc=" & fdesc & " title=" & ftitle & " value=" & fvalue
 
             else if cmdName is "click_any" then
                 -- Broadest of the click_* family: no role filter at all.
