@@ -2434,7 +2434,18 @@ def p07(binary, break_mode=False):
                     file=sys.stderr,
                 )
                 return 1
-            after_per_file = (home / "aaa-changed.txt").read_bytes()
+            # Polled, not a single read - a real dispatch caught this file
+            # empty once, right after the .bak's own poll succeeded,
+            # consistent with the backup and the overwrite being two
+            # separate steps (backup first, then write) that this harness
+            # can race if it only waits for the first to land.
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            after_per_file = b""
+            while time.monotonic() < deadline:
+                after_per_file = (home / "aaa-changed.txt").read_bytes()
+                if after_per_file == b"left per-file version\n":
+                    break
+                time.sleep(0.5)
             if after_per_file != b"left per-file version\n":
                 print(
                     f"FAIL: destination not overwritten with the source content: {after_per_file!r}",
