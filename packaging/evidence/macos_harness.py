@@ -2289,6 +2289,12 @@ def p07(binary, break_mode=False):
                 return 1
 
             # ── Per-file copy: confirmation modal, backup ─────────────────
+            settings_path = _config_dir(home) / "settings.json"
+            print(
+                f"DEBUG: settings.json before per-file copy attempt: "
+                f"{settings_path.read_text() if settings_path.exists() else '<missing>'}",
+                flush=True,
+            )
             # Polled rather than a single raw call - the filter switch just
             # before this triggers a re-render, and a real dispatch showed
             # a single immediate `click_button_exact` racing it (NOT_FOUND).
