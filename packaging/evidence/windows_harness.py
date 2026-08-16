@@ -1479,8 +1479,56 @@ def scrollprobe(binary, break_mode=False):
                     print(f"  other diff-col class_name={cls!r} control_type={d.element_info.control_type!r}", flush=True)
 
             if "left" not in panes or "right" not in panes:
-                print("FAIL: could not locate both diff-col-left and diff-col-right containers", file=sys.stderr)
-                return 1
+                print(
+                    "  could not locate both diff-col-left/diff-col-right by "
+                    "class_name - falling back to a capability scan: every "
+                    "descendant whose ScrollPattern reports "
+                    "CurrentHorizontallyScrollable == True (a bare wrapper div "
+                    "with no distinguishing role/attributes is a real Chromium "
+                    "pruning candidate - collapsed out of the platform tree "
+                    "with its content reparented to the nearest 'interesting' "
+                    "ancestor, per Chromium's own AX tree-simplification "
+                    "behavior - so this looks for the capability directly "
+                    "instead of assuming the wrapper survives)",
+                    flush=True,
+                )
+                scrollable = []
+                for d in win.descendants():
+                    try:
+                        if bool(d.iface_scroll.CurrentHorizontallyScrollable):
+                            scrollable.append(d)
+                    except Exception:  # noqa: BLE001
+                        continue
+                print(f"  found {len(scrollable)} horizontally-scrollable descendant(s)", flush=True)
+                for d in scrollable:
+                    try:
+                        ei = d.element_info
+                        r = d.rectangle()
+                        print(
+                            f"    control_type={ei.control_type!r} automation_id={ei.automation_id!r} "
+                            f"class_name={ei.class_name!r} rect=({r.left},{r.top})-({r.right},{r.bottom}) "
+                            f"HorizontalScrollPercent={d.iface_scroll.CurrentHorizontalScrollPercent!r}",
+                            flush=True,
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"    <error describing candidate: {exc!r}>", flush=True)
+                if len(scrollable) >= 2:
+                    # Left/right disambiguated by on-screen position, same as
+                    # collect_diff_rows's midline split elsewhere in this module.
+                    scrollable.sort(key=lambda d: d.rectangle().left)
+                    panes["left"], panes["right"] = scrollable[0], scrollable[-1]
+                    print(
+                        f"  using leftmost/rightmost by rect.left as left/right pane "
+                        f"for the remaining attempts below",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        "FAIL: could not locate two horizontally-scrollable panes "
+                        "by class_name or by ScrollPattern capability",
+                        file=sys.stderr,
+                    )
+                    return 1
 
             left_pane, right_pane = panes["left"], panes["right"]
             print("\n=== initial scroll state ===")
