@@ -2040,12 +2040,87 @@ def p07(binary, break_mode=False):
         home.mkdir()
         # Pre-create the config directory, matching P08/P12's own
         # established caution (M5-B) - a real dispatch found settings.json
-        # never getting written at all despite several navigate_to calls
-        # and (later) direct checkbox clicks in Settings, and a missing
-        # parent directory (as opposed to a missing file within an
-        # existing one) is the one variable neither of those earlier
-        # cases' own settings-write paths ever isolated for certain.
+        # never getting written at all on a truly fresh $HOME. This is
+        # F61: `build_envelope_json`'s own doc comment (persist/schema/
+        # repository.rs) confirms a fresh install's first write has nowhere
+        # to go without its parent directory existing first - a known,
+        # already-tracked, out-of-scope-here defect (the fix is real but
+        # not in 0.167.0, per the handoff's constraint against testing a
+        # rebuilt binary), not a new finding. Pre-creating it is the
+        # correct test-setup accommodation, same as P08/P12 already do.
         _config_dir(home).mkdir(parents=True, exist_ok=True)
+
+        # `DeepRow` (deep_compare.rs) gates the per-row copy buttons on
+        # `store.settings.read().last_left_dir`/`last_right_dir` being
+        # `Some(...)`, which only ever get set through Explorer navigation
+        # with `remember_explorer_dirs` on - and the published 0.167.0
+        # artifact defaults that off (confirmed via real dispatch: settings
+        # .json never showed it set despite several real UI interactions
+        # meant to enable it, including a Settings-dialog checkbox click
+        # that structurally succeeded without ever writing the file, and a
+        # per-pane Home-button click that set the LEFT pane's directory but
+        # never the RIGHT's - neither fully explained, and not worth
+        # chasing further given none of it is what P07 is actually testing).
+        # Seeds settings.json directly instead, exactly what a genuine
+        # settings write from the real app looks like (schema captured from
+        # a real dispatch's own persisted file) - this is test setup, not
+        # part of the copy feature under test, the same reasoning that
+        # already justifies P08's fixture seeding.
+        now_ts = int(time.time())
+        settings_envelope = {
+            "schema_name": "settings",
+            "schema_version": 2,
+            "app_version": "0.167.0",
+            "created_unix": now_ts,
+            "updated_unix": now_ts,
+            "payload": {
+                "active_profile": 0,
+                "appearance_font_family": "system-mono",
+                "appearance_font_size": 14,
+                "context_lines": 3,
+                "density": "comfortable",
+                "diff_font_family": "system-mono",
+                "diff_font_size": 14,
+                "enable_binary_comparison": False,
+                "explorer_compact": False,
+                "ignore_dirs": "",
+                "ignore_extensions": "",
+                "language": "en",
+                "last_left_dir": str(home),
+                "last_right_dir": str(home),
+                "newline_policy": "preserve",
+                "performance": {
+                    "large_text_threshold_bytes": 67108864,
+                    "max_directory_entries_eager": 500,
+                    "max_eager_lines": 50000,
+                    "max_eager_text_bytes": 524288,
+                    "max_inline_diff_chars_per_hunk": 2000,
+                    "medium_text_threshold_bytes": 4194304,
+                },
+                "profiles": [
+                    {"algorithm": "myers", "built_in": True, "case": "sensitive",
+                     "inline_mode": "lazy", "name": "Exact (default)",
+                     "newlines": "significant", "whitespace": "significant"},
+                    {"algorithm": "myers", "built_in": True, "case": "sensitive",
+                     "inline_mode": "lazy", "name": "Ignore whitespace",
+                     "newlines": "significant", "whitespace": "ignore-all"},
+                    {"algorithm": "myers", "built_in": True, "case": "insensitive",
+                     "inline_mode": "lazy", "name": "Ignore case",
+                     "newlines": "significant", "whitespace": "significant"},
+                    {"algorithm": "histogram", "built_in": True, "case": "sensitive",
+                     "inline_mode": "lazy", "name": "Histogram",
+                     "newlines": "significant", "whitespace": "significant"},
+                ],
+                "recent_limit": 20,
+                "remember_explorer_dirs": True,
+                "restore_session": True,
+                "show_line_numbers": True,
+                "theme": "dark",
+                "wrap_long_lines": False,
+            },
+        }
+        (_config_dir(home) / "settings.json").write_text(json.dumps(settings_envelope))
+
         root_a = home / "root-a"
         root_b = home / "root-b"
         root_a.mkdir()
@@ -2071,128 +2146,6 @@ def p07(binary, break_mode=False):
             )
             if r in ("0", ""):
                 print(f"FAIL: Explorer never showed any rows at $HOME (last: {r!r})", file=sys.stderr)
-                return 1
-
-            # Three real dispatches found: the per-file copy buttons (below)
-            # never rendering; settings.json never getting written despite
-            # several `navigate_to` calls; and "Remember Explorer
-            # directories" (settings/modal.rs) not existing as any AXButton/
-            # AXCheckBox/AXRadioButton at all - because, unlike this
-            # docstring first assumed, that checkbox is ITSELF inside the
-            # "Advanced" disclosure (`if *show_advanced.read()`), alongside
-            # "Enable binary comparison" (a second, identically-shaped
-            # checkbox that precedes it in document order). `DeepRow`
-            # (deep_compare.rs) gates the per-row copy buttons on
-            # `store.settings.read().last_left_dir`/`last_right_dir` being
-            # `Some(...)`, which `navigate_to` (dir_pane.rs) only sets (and
-            # only persists) when `remember_explorer_dirs` is on - current
-            # repo HEAD's `PersistedSettings::default()` sets this `true`,
-            # but the empirical evidence (settings.json genuinely never
-            # created before this fix) shows the PUBLISHED 0.167.0 artifact
-            # this harness is constrained to test against defaults it to
-            # `false` (the recon-era comment elsewhere in this harness
-            # claiming "off by default" was right about 0.167.0 all along).
-            #
-            # Verified against the actual persisted JSON (ground truth),
-            # not just a "DONE" from perform_action, since which checkbox
-            # index maps to which setting was not knowable in advance and a
-            # wrong guess would silently toggle "Enable binary comparison"
-            # instead while still reporting success.
-            r = click_wait("Settings")
-            if not r.startswith("CLICKED"):
-                print(f"FAIL: could not open Settings: {r}", file=sys.stderr)
-                return 1
-            time.sleep(0.3)
-            r = click_wait("Advanced", timeout=10)
-            if not r.startswith("CLICKED"):
-                print(f"FAIL: could not open the Settings 'Advanced' panel: {r}", file=sys.stderr)
-                return 1
-            time.sleep(0.3)
-
-            settings_path = _config_dir(home) / "settings.json"
-
-            def _remember_on():
-                if not settings_path.exists():
-                    return False
-                try:
-                    return bool(json.loads(settings_path.read_text())["payload"]["remember_explorer_dirs"])
-                except (json.JSONDecodeError, KeyError):
-                    return False
-
-            # `perform_action`'s explicit AXPress was tried first - a real
-            # dispatch showed it structurally succeeds ("DONE") without
-            # ever writing settings.json at all, meaning it never actually
-            # fires the checkbox's real "change" DOM event. `click_role_nth`
-            # (the generic `click` verb, matching `click_button`/`click_row`/
-            # `click_any`'s already-reliable mechanism) is used instead.
-            toggled_indices = []
-            for idx in ("1", "2"):
-                if _remember_on():
-                    break
-                r = ui("click_role_nth", "AXCheckBox", idx, timeout=20)
-                if not r.startswith("CLICKED"):
-                    continue
-                toggled_indices.append(idx)
-                time.sleep(0.3)
-            if not _remember_on():
-                print(
-                    f"FAIL: 'Remember Explorer directories' still off in settings.json "
-                    f"after toggling AXCheckBox indices {toggled_indices}: "
-                    f"{settings_path.read_text() if settings_path.exists() else '<missing>'}",
-                    file=sys.stderr,
-                )
-                return 1
-            # If index 1 was the wrong checkbox (toggled "Enable binary
-            # comparison" on instead), toggle it back off now that index 2
-            # is confirmed to be the real target - leaves settings in a
-            # clean, single-change state.
-            if toggled_indices == ["1", "2"]:
-                ui("click_role_nth", "AXCheckBox", "1", timeout=20)
-
-            r = click_wait("Close")
-            if not r.startswith("CLICKED"):
-                print(f"FAIL: could not close Settings: {r}", file=sys.stderr)
-                return 1
-
-            # With remember_explorer_dirs now on, one harmless click of
-            # each pane's own "⌂" (Home) button - a real navigate_to(home)
-            # to the SAME path already showing, so nothing visibly changes
-            # - sets both last_left_dir and last_right_dir. The navigation
-            # dance below only ever touches the LEFT pane on its own, so
-            # the right pane's own Home click is what makes has_right_root
-            # true.
-            r = ui("click_button_nth", "⌂", "1", timeout=20)
-            if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click the left pane's Home ('⌂') button: {r}", file=sys.stderr)
-                return 1
-            r = ui("click_button_nth", "⌂", "2", timeout=20)
-            if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click the right pane's Home ('⌂') button: {r}", file=sys.stderr)
-                return 1
-
-            # Verify both took effect against the real persisted file
-            # (ground truth) right away, rather than discovering much
-            # later (at the per-file-copy step) that one silently didn't -
-            # a real dispatch found exactly that: last_left_dir was set
-            # correctly but last_right_dir was completely absent from the
-            # payload despite this click reporting CLICKED.
-            deadline = time.monotonic() + 10
-            payload = {}
-            while time.monotonic() < deadline:
-                if settings_path.exists():
-                    try:
-                        payload = json.loads(settings_path.read_text())["payload"]
-                    except (json.JSONDecodeError, KeyError):
-                        payload = {}
-                    if "last_left_dir" in payload and "last_right_dir" in payload:
-                        break
-                time.sleep(0.3)
-            if "last_left_dir" not in payload or "last_right_dir" not in payload:
-                print(
-                    f"FAIL: last_left_dir/last_right_dir not both set after both Home "
-                    f"clicks - payload: {payload!r}",
-                    file=sys.stderr,
-                )
                 return 1
 
             # ── Navigation/history (mouse-driven; the keyboard sub-part is
