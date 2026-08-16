@@ -3,8 +3,8 @@
 **Artifact filename:** `forskscope-v0.167.0-linux-x86_64.tar.gz`
 **SHA-256:** `e17baa26abbb91e5e8e046d3812b08203f0d1ddfd6f8dc9fb9182326ed04bf09`
 **Source commit:** `cb6f5b6`
-**Test date (UTC):** 2026-08-14 / 2026-08-15
-**Tester role:** implementer (M5-A), automated via CI + one manual sub-check on a real host
+**Test date (UTC):** 2026-08-14 / 2026-08-15 / 2026-08-16
+**Tester role:** implementer (M5-A/B/C), automated via CI + one manual sub-check on a real host
 **Host OS and version:** Ubuntu 24.04.4 LTS — **resolved runner image**
 `ubuntu-24.04`, image version `20260810.271.1` (recorded per review 057
 §4.3's rolling-label caveat: `ubuntu-latest` itself is not reproducible,
@@ -219,5 +219,146 @@ constraints forbid product changes).
   macOS. Not fixed here; registered for owner triage before Gate D.
 
 ## M5-B waivers
+
+None.
+
+## M5-C — P03, P07, P11
+
+| Case | Result | Evidence |
+|---|---|---|
+| P03 — Visual/navigation (full-width rows, action alignment, geometry, horizontal scroll mirror, word wrap) | **Pass** | CI run [`31937038496`](https://github.com/forskscope/forskscope/actions/runs/31937038496) |
+| P07 — Explorer and directory report (status classification, filters, batch copy, navigation) | **Pass** | CI run [`31937164577`](https://github.com/forskscope/forskscope/actions/runs/31937164577) |
+| P11 — Keyboard interface (CI-verifiable sub-item only — see below) | **Pass** | CI run [`31937229160`](https://github.com/forskscope/forskscope/actions/runs/31937229160) |
+
+Harness: `packaging/evidence/linux_harness.py` (same file as M5-A/M5-B),
+same `workflow_dispatch` mechanism.
+
+### P03 — five sub-checks, one required a fallback chain
+
+1. **Full-width rows** — every row in a pane reports the same on-screen
+   width regardless of its own text length, checked against
+   `left_all_hunk_kinds.txt`/`right_*` (a real mix of short and long
+   lines, not a synthetic one-line fixture).
+2. **Action-row alignment** — every "Use this change" button's y-center
+   falls within one row-height of a real left-pane row's y-center and a
+   real right-pane row's. The act column's own rows are not exposed as
+   `role="row"` at all (confirmed by direct inspection), so this checks
+   the actionable buttons themselves instead.
+3. **Vertical/geometry alignment** — F34's `check_pane` (child-count and
+   content-cell x-origin), reused directly against a genuine multi-hunk
+   fixture.
+4. **Horizontal scroll mirroring, with settling** — real X11 wheel-scroll
+   synthesis on the left pane, then the right pane's content-cell x is
+   sampled three times over a settling window and required to have moved
+   and be stable across all three samples. **Needed a fallback chain, not
+   one assumed method**: button-7 (the GTK horizontal-wheel convention)
+   silently did nothing on Xvfb's default virtual pointer (commonly only
+   5 buttons defined, swallowing 6/7 with no error) — CI run
+   [`31936716874`](https://github.com/forskscope/forskscope/actions/runs/31936716874)
+   confirmed this with a real "did not move" result, not a guess.
+   `shift+button-4` (shifted vertical wheel, the more portable
+   convention) is what actually works; the harness now tries all three in
+   order and records which one moved the pane. This sandbox's own local
+   X11 input synthesis is confirmed broken for everything (even a plain
+   vertical scroll no-ops here), so none of this could be validated
+   locally — every iteration here needed a real CI dispatch.
+5. **Word wrap** — toggling wrap on does not lose the 7-row shape.
+
+`--break`: sub-check 3 requires the impossible baseline x from
+`inject_geometry_defect.py`'s own falsifiability convention.
+
+### P07 — status classification via the summary line, batch copy verified against real files
+
+`DeepCompareView`'s own summary line ("N different · N equal · N left
+only · N right only") is checked for an exact match against a real
+directory pair (one file each of Equal, Changed, LeftOnly, RightOnly) —
+`DeepRow`'s row `div`s carry no explicit `role="row"`, so individual rows
+aren't AT-SPI-readable the way the diff view's are; the aggregate summary
+line is. Filter buttons ("Different"/"All"/"Equal only") are each clicked
+and confirmed not to break the view. Batch copy ("Copy to right N") is
+verified against the actual files on disk, the actual `.bak` backup's
+byte-for-byte content, and the actual manifest JSON (two `Copied`
+outcomes, exactly one with a non-null `backup_path`) — not just that the
+operation reported success (F62's lesson). A light navigation-history
+check confirms the Up/Home buttons are clickable via a real `do_action`
+return.
+
+**Two harness bugs found and fixed by CI itself**, not by local testing
+(this sandbox's own X11 synthesis cannot validate any of this):
+
+- `navigate_pane_to`'s "Edit path" (✎) button lookup is a single
+  unretried tree walk, and the window registers on the a11y bus before
+  the WebView paints — the F57 race, a new symptom ("expected 2 buttons,
+  found 0" instead of a silently-partial row set). P07 launches straight
+  into the Explorer view (no tab click needed) but was missing the same
+  readiness poll P06 (`navigate_pane_to`'s other caller) already has.
+- The Up/Home buttons (`dir_pane.rs`) carry only a `title` tooltip
+  ("Go up one directory"/"Home directory"), never an `aria_label` — their
+  real AT-SPI accessible name is their glyph text content ("↑"/"⌂"), the
+  same pattern already established for this exact PathBar's Edit-path
+  button ("✎", not "Edit path"). The harness searched for the tooltip
+  strings and never found them.
+
+A third bug, found via `--break` mode's long retry search for an
+impossible summary line: `find_text_containing` crashed on a stale AT-SPI
+node mid-render-mutation (`GLib.GError: The application no longer
+exists`) — the same class of race as `render_check.py`'s fix below, never
+hit here before because no other caller polls this function as long as an
+impossible-string search does.
+
+"Focused-pane keyboard behaviour" (arrow-key navigation within Explorer)
+is not exercised — no accessibility API can synthesize the needed
+keystrokes; recorded as manual-outstanding, mirroring F45's shape.
+
+### P11 — the one RFC-078 keyboard item this program can verify without synthesizing keystrokes
+
+RFC-078's keyboard coverage decomposes into four items. Three need real
+keyboard input no accessibility action can produce (the manual checklist,
+global shortcuts staying inert behind an open modal, Escape closing a
+modal) — recorded as manual-outstanding, mirroring F45's shape, not
+attempted here. The fourth — **a destructive operation's confirmation
+modal starts focus on the safe/cancel control, not the destructive one**
+— is CI-verifiable with no input synthesis at all: `autofocus: true` sets
+DOM focus on mount, and reading AT-SPI's own `FOCUSED` state observes
+that real post-mount outcome directly.
+
+Applies a hunk via "Use this change" to genuinely dirty a tab (what
+`toolbar.rs` actually gates `ConfirmSwap` behind, not a stub), opens
+"Swap sides" through the advanced disclosure panel, then reads `FOCUSED`
+on the modal's Cancel and "Discard and Swap" controls: Cancel is focused,
+the destructive control is not.
+
+### Harness hardening found by this row, benefiting every case
+
+CI run [`31936218182`](https://github.com/forskscope/forskscope/actions/runs/31936218182)
+(P03's first dispatch) crashed with an uncaught `GLib.GError` inside
+`render_check.py`'s `find_by_role`, called from every case's
+`wait_for_ready`. F57 already handles a tree caught mid-*render* (a
+partial-but-consistent row set, fixed by waiting for the pinned shape)
+but not a tree caught mid-*mutation*: a proxy for a node the DOM has
+already torn down raises `GError` the instant any walk touches it,
+crashing the whole script instead of retrying like every other
+not-ready-yet state `wait_for_ready` already tolerated. `find_by_role`
+and `collect_rows` now treat a `GError`'d node as simply absent from that
+walk, letting the existing 0.5s poll loop retry once the tree settles —
+this is shared infrastructure, so every case in every M5 slice benefits
+from this fix retroactively, not just M5-C's own three.
+
+## M5-C falsifiability
+
+| Case | Break-mode run | Result |
+|---|---|---|
+| P03 | [`31937227134`](https://github.com/forskscope/forskscope/actions/runs/31937227134) | Fail (expected) — `check_pane` found no misalignment against an unmodified build, required a mismatch that cannot be real |
+| P07 | [`31937314306`](https://github.com/forskscope/forskscope/actions/runs/31937314306) | Fail (expected) — deep-compare summary line never showed the required impossible counts |
+| P11 | [`31937230438`](https://github.com/forskscope/forskscope/actions/runs/31937230438) | Fail (expected) — modal focus state required the destructive control focused, which is false against the real build (Cancel is focused) |
+
+## M5-C failures and issue links
+
+None — no new product defects found in this row. (F61's product defect
+from M5-B carries forward unchanged; P12 needs re-running against a new
+candidate build once the real fix, already merged to `main`, is in a
+published artifact — see ROADMAP.md.)
+
+## M5-C waivers
 
 None.
