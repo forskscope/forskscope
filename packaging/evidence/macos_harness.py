@@ -2002,11 +2002,33 @@ def p07(binary, break_mode=False):
     for the full account, kept rather than silently dropped since it rules
     out entire technique families for any future work on this control.
 
+    **A second PRODUCT DEFECT, found via this case and registered here,
+    NOT fixed:** `DeepRow`/`BatchCopyButtons` (deep_compare.rs) compute the
+    per-row and batch copy buttons' src/dst paths from
+    `store.settings.read().last_left_dir`/`last_right_dir` (Explorer's own
+    "remembered pane directory" setting) - NOT from the deep-compare
+    view's own `left_root`/`right_root` props (the actual roots being
+    compared). A real dispatch demonstrated this concretely: with
+    `last_left_dir`/`last_right_dir` left at a directory that did not
+    match the compared roots, the confirmation modal displayed (and the
+    copy silently attempted) a path that does not exist, rather than the
+    file the deep-compare view was actually showing as "Changed" - no
+    error surfaced, the copy simply no-oped. See the case body's fixture-
+    setup comment for the exact mechanism. Worked around here (not fixed)
+    by seeding `last_left_dir`/`last_right_dir` to the actual compare roots
+    and then genuinely navigating Explorer so they stay pointed there -
+    which is what an ordinary user's own browsing would produce too, not a
+    test-only trick.
+
     Fixture: `$HOME` contains two sibling directories, `root-a` and
-    `root-b`, picked as the deep-compare roots via the same
-    `click_row_side` technique M5-B's P06 recon established (both panes
-    default to `$HOME`, so `root-a`/`root-b` appear as ordinary rows in
-    both, disambiguated left/right by document order):
+    `root-b`. `last_left_dir`/`last_right_dir` are seeded to them directly
+    (see the defect note above), so Explorer opens with the left pane
+    already inside `root-a` and the right already inside `root-b`; both
+    are picked as deep-compare targets by going "↑" to `$HOME` (revealing
+    them as ordinary sibling rows) and using the same `click_row_side`
+    technique M5-B's P06 recon established, then "←" back into each -
+    which, via the Back/Forward defect above, also restores
+    `last_left_dir`/`last_right_dir` to `root-a`/`root-b` exactly:
 
     - `aaa-changed.txt` - differs on both sides (Changed). Named to sort
       alphabetically first (`recursive_diff`'s `BTreeMap<PathBuf, _>` is
@@ -2050,22 +2072,44 @@ def p07(binary, break_mode=False):
         # correct test-setup accommodation, same as P08/P12 already do.
         _config_dir(home).mkdir(parents=True, exist_ok=True)
 
-        # `DeepRow` (deep_compare.rs) gates the per-row copy buttons on
-        # `store.settings.read().last_left_dir`/`last_right_dir` being
-        # `Some(...)`, which only ever get set through Explorer navigation
-        # with `remember_explorer_dirs` on - and the published 0.167.0
-        # artifact defaults that off (confirmed via real dispatch: settings
-        # .json never showed it set despite several real UI interactions
-        # meant to enable it, including a Settings-dialog checkbox click
-        # that structurally succeeded without ever writing the file, and a
-        # per-pane Home-button click that set the LEFT pane's directory but
-        # never the RIGHT's - neither fully explained, and not worth
-        # chasing further given none of it is what P07 is actually testing).
-        # Seeds settings.json directly instead, exactly what a genuine
-        # settings write from the real app looks like (schema captured from
-        # a real dispatch's own persisted file) - this is test setup, not
-        # part of the copy feature under test, the same reasoning that
-        # already justifies P08's fixture seeding.
+        root_a = home / "root-a"
+        root_b = home / "root-b"
+        root_a.mkdir()
+        root_b.mkdir()
+        (root_a / "aaa-changed.txt").write_text("left per-file version\n")
+        (root_b / "aaa-changed.txt").write_text("right per-file version - PRE-EXISTING\n")
+        (root_a / "equal.txt").write_text("same content\n")
+        (root_b / "equal.txt").write_text("same content\n")
+        (root_a / "left-only.txt").write_text("only in left\n")
+        (root_b / "right-only-1.txt").write_text("only in right one\n")
+        (root_b / "right-only-2.txt").write_text("only in right two\n")
+
+        # PRODUCT DEFECT, found via this case and registered here, NOT
+        # fixed: `DeepRow` (deep_compare.rs)'s per-row/batch copy buttons
+        # compute their src/dst paths from `store.settings.read().
+        # last_left_dir`/`last_right_dir` (Explorer's own "remembered pane
+        # directory" setting) - NOT from the deep-compare view's own
+        # `left_root`/`right_root` props (the actual roots being compared).
+        # A real dispatch demonstrated this concretely: with
+        # last_left_dir/last_right_dir seeded to plain `$HOME` while
+        # comparing `root-a`/`root-b`, the confirmation modal displayed
+        # (and the copy attempted) `$HOME/aaa-changed.txt` - a path that
+        # does not exist - not `root-a/aaa-changed.txt`, the file the
+        # deep-compare view was actually showing as "Changed". The copy
+        # silently no-oped (no error surfaced, no file written) rather than
+        # failing loudly. Whenever a user's Explorer pane's remembered
+        # directory differs even slightly from the roots they are deep-
+        # comparing - trivially easy given the aligned-view picker doesn't
+        # require navigating INTO a root at all - copy silently targets the
+        # wrong location. Seeds `last_left_dir`/`last_right_dir` to
+        # `root-a`/`root-b` directly below so the copy buttons this case
+        # needs to test actually operate on real files, and separately
+        # exercises real Explorer navigation (`↑`/`←`, matching the
+        # already-proven Back/Forward technique) to pick them as deep-
+        # compare targets - not a workaround for the defect, since the
+        # navigation below genuinely re-lands on `root-a`/`root-b` and
+        # keeps `last_left_dir`/`last_right_dir` pointed at them; it is
+        # what a real user's normal Explorer browsing would produce too.
         now_ts = int(time.time())
         settings_envelope = {
             "schema_name": "settings",
@@ -2086,8 +2130,8 @@ def p07(binary, break_mode=False):
                 "ignore_dirs": "",
                 "ignore_extensions": "",
                 "language": "en",
-                "last_left_dir": str(home),
-                "last_right_dir": str(home),
+                "last_left_dir": str(root_a),
+                "last_right_dir": str(root_b),
                 "newline_policy": "preserve",
                 "performance": {
                     "large_text_threshold_bytes": 67108864,
@@ -2121,18 +2165,6 @@ def p07(binary, break_mode=False):
         }
         (_config_dir(home) / "settings.json").write_text(json.dumps(settings_envelope))
 
-        root_a = home / "root-a"
-        root_b = home / "root-b"
-        root_a.mkdir()
-        root_b.mkdir()
-        (root_a / "aaa-changed.txt").write_text("left per-file version\n")
-        (root_b / "aaa-changed.txt").write_text("right per-file version - PRE-EXISTING\n")
-        (root_a / "equal.txt").write_text("same content\n")
-        (root_b / "equal.txt").write_text("same content\n")
-        (root_a / "left-only.txt").write_text("only in left\n")
-        (root_b / "right-only-1.txt").write_text("only in right one\n")
-        (root_b / "right-only-2.txt").write_text("only in right two\n")
-
         proc = launch(binary, [], scratch, home=home)
         try:
             try:
@@ -2145,88 +2177,78 @@ def p07(binary, break_mode=False):
                 "count_rows", predicate=lambda r: r not in ("0", ""), timeout=LAUNCH_TIMEOUT_S
             )
             if r in ("0", ""):
-                print(f"FAIL: Explorer never showed any rows at $HOME (last: {r!r})", file=sys.stderr)
+                print(f"FAIL: Explorer never showed any rows at root-a (last: {r!r})", file=sys.stderr)
                 return 1
 
-            # ── Navigation/history (mouse-driven; the keyboard sub-part is
-            # NOT executed - see this case's OK output) ───────────────────
+            # ── Navigation/history, AND picking root-a/root-b as deep-
+            # compare targets (mouse-driven; the keyboard sub-part is NOT
+            # executed - see this case's OK output) ─────────────────────
             #
-            # Real, extensive iteration (six real dispatches) preceded
-            # this final design and is recorded here rather than silently
-            # dropped, since it rules out entire technique families for any
-            # future work on this same control family:
+            # Real, extensive iteration preceded this final design and is
+            # recorded here rather than silently dropped, since it rules
+            # out entire technique families for any future work on this
+            # same control family: `double_click_row_side` (two positioned
+            # `click at {x,y}` events at a directory row) did not trigger
+            # `tree.rs`'s `ondoubleclick` at all; `PathBar`'s edit-path
+            # mode (`type_into`'s Cmd+A/keystroke, `set_value`'s direct
+            # AXValue write, `key code 36` Return, `click_title_bar`'s
+            # blur) never produced real navigation either, despite
+            # `find_focused` confirming the field genuinely had focus -
+            # unlike Save As's identical-looking field in P05, where the
+            # same techniques demonstrably worked. Only plain, single
+            # `AXPress` clicks on `PathBar`'s own "↑"/"←"/"→" buttons and
+            # `click_row_side` picks - the same rock-solid mechanism every
+            # other case in this harness relies on - proved reliable.
             #
-            # 1. `double_click_row_side` (two positioned `click at {x,y}`
-            #    events at a directory row) did not trigger `tree.rs`'s
-            #    `ondoubleclick` at all - row count and both "root-a"/
-            #    "root-b" strings were completely unchanged afterward.
-            #    AppleScript's `click at` has no documented guarantee it
-            #    stamps the OS-level click-count metadata a genuine double-
-            #    click needs for WebKit's own dblclick detection.
-            # 2. `PathBar`'s edit-path mode (click "✎", write the target
-            #    path into the revealed `<input>`, submit) was tried next:
-            #    `type_into`'s Cmd+A/keystroke path left the field's value
-            #    completely unchanged (not merely slow) despite
-            #    `find_focused` confirming the field genuinely had
-            #    AXFocused=true. `set_value`'s direct AXValue write DID
-            #    change the field's own readable value - but neither a real
-            #    `key code 36` (Return, read back byte-for-byte unchanged
-            #    before/after the keypress) nor a real mouse click outside
-            #    all web content (`click_title_bar`, to drive the field's
-            #    `onblur` handler) ever produced the navigation the app's
-            #    own logic would trigger from a genuinely-updated value -
-            #    consistent with the raw AXValue write never reaching
-            #    Dioxus's own `input_val` signal for this specific control
-            #    (unlike Save As's path field in P05, where the identical
-            #    `set_value` technique demonstrably did propagate all the
-            #    way through to the app's own save logic).
-            #
-            # What actually works, avoiding every input-synthesis problem
-            # above entirely: PathBar's own "↑" (Go up one directory)
-            # button is a single, ordinary `AXPress` - the same rock-solid
-            # technique every other button in this harness already relies
-            # on - and it drives the identical `navigate_to`/`NavHistory`
-            # machinery "history" is actually about. Going up from `$HOME`
-            # (which contains `root-a`/`root-b`) to its own parent (the
-            # scratch tempdir, which does not) gives Back/Forward a real,
-            # observable state change with no double-click, no text input,
-            # and no keystroke anywhere in the sequence.
-            # `find_text`/`find_wait` search the WHOLE window, not a single
-            # pane - since only the LEFT pane ever navigates here (the
-            # right stays at $HOME throughout), "root-a" would always still
-            # be FOUND via the right pane's own unchanged copy regardless
-            # of whether the left pane's navigation actually worked. Uses
-            # `count_rows`'s aggregate total instead, which does change
-            # predictably: $HOME lists 3 entries (`root-a`/`root-b`, plus
-            # `Library` - the config directory pre-created above, itself
-            # inside `$HOME` since that's the same overridden `HOME` env
-            # var) in each of the two panes (6 total); `scratch` (`$HOME`'s
-            # own parent) contains exactly one entry (`home` itself), so a
-            # correct "Go up" changes the total from 6 to 4 (1 left + 3
-            # right), and Back/Forward should toggle between the two.
+            # Since Explorer starts with the left pane AT `root-a` and the
+            # right AT `root-b` (the seeded `last_left_dir`/`last_right_dir`
+            # above), going "↑" once on each pane reveals `$HOME` (listing
+            # `root-a`/`root-b`/`Library`) - real, single-click navigation,
+            # not a workaround. `left-only.txt`/`right-only-1.txt` are safe
+            # per-pane markers (unlike a shared-parent-directory setup,
+            # they only ever appear via ONE specific pane's own content, so
+            # `find_wait` is not ambiguous about which pane changed).
             r = click_wait("↑", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click 'Go up one directory' ('↑'): {r}", file=sys.stderr)
+                print(f"FAIL: could not click 'Go up one directory' on the left ('↑'): {r}", file=sys.stderr)
                 return 1
-            rows = wait_rows(4, timeout=10)
-            if rows != "4":
-                print(
-                    f"FAIL: 'Go up' did not change the aggregate row count to 4 "
-                    f"(1 left + 3 right unchanged) - last count: {rows!r}",
-                    file=sys.stderr,
-                )
+            r = find_wait("left-only.txt", timeout=10, want_found=False)
+            if r.startswith("FOUND"):
+                print(f"FAIL: left pane's 'Go up' did not leave root-a: {r}", file=sys.stderr)
+                return 1
+
+            r = ui("click_button_nth", "↑", "2", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click 'Go up one directory' on the right ('↑'): {r}", file=sys.stderr)
+                return 1
+            r = find_wait("right-only-1.txt", timeout=10, want_found=False)
+            if r.startswith("FOUND"):
+                print(f"FAIL: right pane's 'Go up' did not leave root-b: {r}", file=sys.stderr)
+                return 1
+
+            # Both panes now show $HOME (root-a/root-b/Library each) -
+            # pick root-a via the left pane's own copy, root-b via the
+            # right's, the same occurrence disambiguation P06's recon
+            # established for a shared-parent aligned view.
+            r = ui("click_row_side", "root-a", "left", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not pick root-a on the left: {r}", file=sys.stderr)
+                return 1
+            r = ui("click_row_side", "root-b", "right", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not pick root-b on the right: {r}", file=sys.stderr)
                 return 1
 
             r = click_wait("←", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click Back ('←'): {r}", file=sys.stderr)
+                print(f"FAIL: could not click Back on the left ('←'): {r}", file=sys.stderr)
                 return 1
-            rows = wait_rows(6, timeout=10)
-            if rows != "6":
-                print(f"FAIL: Back did not return the row count to 6 (last: {rows!r})", file=sys.stderr)
+            r = find_wait("left-only.txt", timeout=10)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: Back did not return the left pane to root-a: {r}", file=sys.stderr)
                 return 1
 
-            # PRODUCT DEFECT, confirmed via this real dispatch, registered
+            # PRODUCT DEFECT, confirmed via a real dispatch, registered
             # here and reported in the review request - NOT fixed:
             #
             # Back correctly returns to the previous directory, but Forward
@@ -2235,9 +2257,9 @@ def p07(binary, break_mode=False):
             # `on_forward` handlers, not in `NavHistory` itself.
             # `NavHistory::back()` (dir_pane.rs) *only* decrements `idx` -
             # it does not touch `entries` - so after Back, `entries` still
-            # holds the forward entry (`[$HOME, scratch]`, `idx=0`) and
-            # `can_forward()` (`idx+1 < entries.len()`) should read `true`.
-            # But `explorer.rs`'s `on_back` handler calls BOTH
+            # holds the forward entry and `can_forward()`
+            # (`idx+1 < entries.len()`) should read `true`. But
+            # `explorer.rs`'s `on_back` handler calls BOTH
             # `history.write().back()` (moves `idx`) AND then
             # `navigate_to(p, ...)` with the popped path - and
             # `navigate_to` (dir_pane.rs) *unconditionally* calls
@@ -2245,15 +2267,13 @@ def p07(binary, break_mode=False):
             # (`if entries.last() == path { return }`) does not save this,
             # since `entries.last()` is still the (not-yet-truncated)
             # forward entry, not equal to the path Back just navigated to -
-            # so `push` truncates `entries` to `idx+1` and re-appends,
-            # destroying the forward entry: `[$HOME, scratch]` becomes
-            # `[$HOME, $HOME]`, and `can_forward()` now reads `false`. Any
-            # Back click destroys that pane's Forward history, on every
-            # platform this shared `dir_pane.rs`/`explorer.rs` code runs on
-            # - not macOS-specific. This case tests the REAL (defective)
-            # behaviour rather than the browser-like behaviour a user would
-            # reasonably expect, per the handoff's "do not weaken a case to
-            # make it pass."
+            # so `push` truncates `entries` and re-appends, destroying the
+            # forward entry. Any Back click destroys that pane's Forward
+            # history, on every platform this shared `dir_pane.rs`/
+            # `explorer.rs` code runs on - not macOS-specific. This case
+            # tests the REAL (defective) behaviour rather than the
+            # browser-like behaviour a user would reasonably expect, per
+            # the handoff's "do not weaken a case to make it pass."
             r = poll_ui(
                 "click_button", "→",
                 predicate=lambda r: r.startswith("CLICKED") or r.startswith("DISABLED"),
@@ -2290,15 +2310,17 @@ def p07(binary, break_mode=False):
                 )
                 return 1
 
-            # ── Pick root-a (left) / root-b (right), open deep compare ───
-            r = ui("click_row_side", "root-a", "left", timeout=20)
+            r = ui("click_button_nth", "←", "2", timeout=20)
             if not r.startswith("CLICKED"):
-                print(f"FAIL: could not pick root-a on the left: {r}", file=sys.stderr)
+                print(f"FAIL: could not click Back on the right ('←'): {r}", file=sys.stderr)
                 return 1
-            r = ui("click_row_side", "root-b", "right", timeout=20)
-            if not r.startswith("CLICKED"):
-                print(f"FAIL: could not pick root-b on the right: {r}", file=sys.stderr)
+            r = find_wait("right-only-1.txt", timeout=10)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: Back did not return the right pane to root-b: {r}", file=sys.stderr)
                 return 1
+
+            # Both picks (root-a/root-b) were made earlier, right after
+            # going "↑" to $HOME - open the deep compare now.
             r = click_wait("Compare", timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Compare: {r}", file=sys.stderr)
@@ -2511,12 +2533,18 @@ def p07(binary, break_mode=False):
 
     print(
         "OK: Explorer navigation ('Go up' then Back, both ordinary AXPress "
-        "clicks) and Compare all functioned. PRODUCT DEFECT confirmed and "
-        "registered, not fixed: Forward is disabled after Back, not merely "
-        "'nothing to go forward to' - explorer.rs's on_back handler calls both "
-        "NavHistory::back() (index-only) and navigate_to() (which unconditionally "
-        "re-pushes, truncating the forward entry back() never touched) - see the "
-        "case docstring for the full mechanism. Deep-compare showed all five "
+        "clicks) picked root-a/root-b and Compare functioned. TWO PRODUCT "
+        "DEFECTS confirmed and registered, not fixed: (1) Forward is disabled "
+        "after Back, not merely 'nothing to go forward to' - explorer.rs's "
+        "on_back handler calls both NavHistory::back() (index-only) and "
+        "navigate_to() (which unconditionally re-pushes, truncating the forward "
+        "entry back() never touched); (2) the per-row/batch copy buttons compute "
+        "src/dst from Explorer's own last_left_dir/last_right_dir setting, not "
+        "the deep-compare view's own left_root/right_root - a mismatch silently "
+        "no-ops the copy instead of erroring. See the case docstring for both "
+        "mechanisms; (2) is worked around here by seeding and then genuinely "
+        "navigating so last_left_dir/last_right_dir stay pointed at root-a/"
+        "root-b, matching ordinary user browsing. Deep-compare showed all five "
         "fixture entries with correct Equal/Changed/LeftOnly/RightOnly statuses "
         "and summary stats; the Different/All/Equal-only filters each showed the "
         "expected subset; a per-file copy created a real .bak matching the "
