@@ -2219,20 +2219,22 @@ def p07(binary, break_mode=False):
             # be FOUND via the right pane's own unchanged copy regardless
             # of whether the left pane's navigation actually worked. Uses
             # `count_rows`'s aggregate total instead, which does change
-            # predictably: $HOME lists 2 directories (`root-a`/`root-b`) in
-            # each of the two panes (4 total); `scratch` (`$HOME`'s own
-            # parent) contains exactly one entry (`home` itself), so a
-            # correct "Go up" changes the total from 4 to 3 (1 left + 2
+            # predictably: $HOME lists 3 entries (`root-a`/`root-b`, plus
+            # `Library` - the config directory pre-created above, itself
+            # inside `$HOME` since that's the same overridden `HOME` env
+            # var) in each of the two panes (6 total); `scratch` (`$HOME`'s
+            # own parent) contains exactly one entry (`home` itself), so a
+            # correct "Go up" changes the total from 6 to 4 (1 left + 3
             # right), and Back/Forward should toggle between the two.
             r = click_wait("↑", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click 'Go up one directory' ('↑'): {r}", file=sys.stderr)
                 return 1
-            rows = wait_rows(3, timeout=10)
-            if rows != "3":
+            rows = wait_rows(4, timeout=10)
+            if rows != "4":
                 print(
-                    f"FAIL: 'Go up' did not change the aggregate row count to 3 "
-                    f"(1 left + 2 right unchanged) - last count: {rows!r}",
+                    f"FAIL: 'Go up' did not change the aggregate row count to 4 "
+                    f"(1 left + 3 right unchanged) - last count: {rows!r}",
                     file=sys.stderr,
                 )
                 return 1
@@ -2241,9 +2243,9 @@ def p07(binary, break_mode=False):
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Back ('←'): {r}", file=sys.stderr)
                 return 1
-            rows = wait_rows(4, timeout=10)
-            if rows != "4":
-                print(f"FAIL: Back did not return the row count to 4 (last: {rows!r})", file=sys.stderr)
+            rows = wait_rows(6, timeout=10)
+            if rows != "6":
+                print(f"FAIL: Back did not return the row count to 6 (last: {rows!r})", file=sys.stderr)
                 return 1
 
             # PRODUCT DEFECT, confirmed via this real dispatch, registered
