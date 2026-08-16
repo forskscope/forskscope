@@ -2387,6 +2387,57 @@ def recon_f63_v2_single_call(binary, break_mode=False):
     return 0
 
 
+def recon_f63_v3_count_rows_alone(binary, break_mode=False):
+    """Not a scored case. `recon_f63_v2_single_call`'s result was the pivotal
+    one for F63: a single `find_text` call against a 100-line pair's deep
+    (line 60) sentinel, given a 150s timeout instead of the usual 20s,
+    returned `FOUND` after 95.8s - content DOES reach the accessibility
+    tree well past the previously-assumed 30-100 line failure threshold; it
+    is just far slower to enumerate via this bulk `entire contents of w`
+    AppleScript technique than any case's default per-call timeout allows.
+    That run's `count_rows` call (issued first, before find_text) returned
+    '0' in only 1.3s though - a real asymmetry worth resolving on its own,
+    since count_rows and find_text both call the identical `safeContents`
+    enumeration. This isolates count_rows alone, with a long (150s) timeout
+    and nothing run before it in the same launch, to see whether it too
+    just needs more time (matching find_text) or is structurally different
+    (e.g. its own error handling short-circuits to 0 rather than falling
+    through to the same slow-but-complete enumeration find_text used)."""
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+        left, right = _generate_pair_with_sentinels(
+            scratch, "f63v3-left.txt", "f63v3-right.txt", 100, {}
+        )
+        proc = launch(binary, [left, right], scratch, home=home)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"PROBE: never registered a window: {exc}", flush=True)
+                return 0
+
+            t0 = time.monotonic()
+            try:
+                r = ui("count_rows", timeout=150)
+                print(f"PROBE count-rows-alone-150s: {r!r} ({time.monotonic() - t0:.1f}s)", flush=True)
+            except subprocess.TimeoutExpired:
+                print(f"PROBE count-rows-alone-150s: TIMEOUT-AT-150s ({time.monotonic() - t0:.1f}s)", flush=True)
+
+            # Immediately afterward, in the SAME launch: does a second
+            # count_rows call (now that the tree has presumably been
+            # walked/populated once already) come back fast and correct?
+            t0 = time.monotonic()
+            try:
+                r = ui("count_rows", timeout=150)
+                print(f"PROBE count-rows-second-call: {r!r} ({time.monotonic() - t0:.1f}s)", flush=True)
+            except subprocess.TimeoutExpired:
+                print(f"PROBE count-rows-second-call: TIMEOUT-AT-150s ({time.monotonic() - t0:.1f}s)", flush=True)
+        finally:
+            terminate(proc)
+    return 0
+
+
 CASES = {
     "p01": p01,
     "p02": p02,
@@ -2407,6 +2458,7 @@ CASES = {
     "recon_explorer": recon_explorer,
     "recon_f63_investigation": recon_f63_investigation,
     "recon_f63_v2_single_call": recon_f63_v2_single_call,
+    "recon_f63_v3_count_rows_alone": recon_f63_v3_count_rows_alone,
 }
 
 

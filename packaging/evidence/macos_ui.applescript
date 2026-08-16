@@ -149,6 +149,23 @@
 --                                      exposes (F63) and, for P03, to drive
 --                                      one pane's horizontal scroll and
 --                                      check the other pane follows.
+--   double_click_row_side <proc> <needle> <left|right>
+--                                   -> "CLICKED: occurrence=N", "NOT_FOUND",
+--                                      or "ERROR: ..." - like
+--                                      click_row_side, but two real
+--                                      `click at {x,y}` mouse events at the
+--                                      row's own screen position (no
+--                                      AXDoublePress equivalent exists) to
+--                                      trigger Explorer's directory-navigate
+--                                      double-click handler, for P07's
+--                                      navigation/history check.
+--   focused_element <proc>         -> "FOCUSED: role=<r> desc=<d>
+--                                      title=<t>" or "ERROR: ..." - reads
+--                                      back which element currently holds
+--                                      keyboard focus via
+--                                      AXFocusedUIElement, with no input
+--                                      synthesized at all. For P11's modal-
+--                                      focus-on-safe-action check.
 --
 -- Every command returns a plain string on stdout; a System Events
 -- permission failure (e.g. "not allowed assistive access") surfaces as an
@@ -472,6 +489,118 @@ on runOnce(argv)
                     end if
                 end repeat
                 return "NOT_FOUND"
+
+            else if cmdName is "double_click_row_side" then
+                -- M5-C / P07's navigation-history check: `click_row_side`
+                -- (above) invokes AXPress via `click e`, which fires the
+                -- row's real onclick handler (on_select - picks the row,
+                -- does not navigate into it). Navigating INTO a directory
+                -- is tree.rs's separate `on_dblclick` handler, which has no
+                -- accessible-action equivalent to invoke directly (unlike a
+                -- plain click, there is no "AXDoublePress"). The standard
+                -- System Events technique for a real double-click is two
+                -- genuine `click at {x,y}` mouse events at the element's
+                -- own screen position, close enough together to register as
+                -- a double-click at the OS level (the same position-based
+                -- click `type_into` already established as reliable for
+                -- delivering real input this harness's element-reference
+                -- `click e` cannot). Reuses click_row_side's left/right
+                -- occurrence disambiguation (1st match = left pane's copy,
+                -- 2nd = right's) since Explorer's aligned view shows the
+                -- same directory names on both sides by default.
+                set needle to item 3 of argv
+                set side to item 4 of argv
+                set wantNth to 1
+                if side is "right" then set wantNth to 2
+                set allEl to my safeContents(w)
+                set seenN to 0
+                set target to missing value
+                repeat with e in allEl
+                    set isRow to false
+                    try
+                        if role of e is "AXRow" then set isRow to true
+                    end try
+                    if isRow then
+                        set hit to false
+                        try
+                            set innerEl to (UI elements of e)
+                            repeat with ie in innerEl
+                                try
+                                    set iv to value of ie
+                                    if class of iv is text and iv contains needle then
+                                        set hit to true
+                                        exit repeat
+                                    end if
+                                end try
+                                if not hit then
+                                    try
+                                        set it5 to title of ie
+                                        if it5 contains needle then
+                                            set hit to true
+                                            exit repeat
+                                        end if
+                                    end try
+                                end if
+                            end repeat
+                        end try
+                        if hit then
+                            set seenN to seenN + 1
+                            if seenN is wantNth then
+                                set target to e
+                                exit repeat
+                            end if
+                        end if
+                    end if
+                end repeat
+                if target is missing value then return "NOT_FOUND"
+                try
+                    set p to position of target
+                    set sz to size of target
+                    set cx to (item 1 of p) + ((item 1 of sz) / 2)
+                    set cy to (item 2 of p) + ((item 2 of sz) / 2)
+                on error errMsg
+                    return "ERROR: position/size: " & errMsg
+                end try
+                try
+                    set frontmost of process procName to true
+                end try
+                try
+                    click at {cx, cy}
+                    delay 0.15
+                    click at {cx, cy}
+                on error errMsg
+                    return "ERROR: double-click-at-coords: " & errMsg
+                end try
+                return "CLICKED: occurrence=" & seenN
+
+            else if cmdName is "focused_element" then
+                -- M5-C / P11's modal-focus check: reads back WHICH element
+                -- currently holds keyboard focus, via the process's own
+                -- AXFocusedUIElement attribute - a pure read, synthesizes no
+                -- input at all (distinct from send_key/type_into/click,
+                -- which all perform an action). This is what makes P11's
+                -- "modal focus starts on the safe/cancel action" item
+                -- CI-verifiable in the first place (handoff M5-C §6): focus
+                -- POSITION is exposed through the accessibility tree
+                -- whether or not any input is ever synthesized.
+                try
+                    set fe to (value of attribute "AXFocusedUIElement" of targetProc)
+                on error errMsg
+                    return "ERROR: " & errMsg
+                end try
+                set frole to ""
+                set fdesc to ""
+                set ftitle to ""
+                try
+                    set frole to (role of fe) as string
+                end try
+                try
+                    set fdesc to (description of fe) as string
+                end try
+                try
+                    set ftitle to (title of fe) as string
+                end try
+                return "FOCUSED: role=" & frole & " desc=" & fdesc & " title=" & ftitle
 
             else if cmdName is "click_any" then
                 -- Broadest of the click_* family: no role filter at all.
