@@ -3437,9 +3437,25 @@ def p07(binary, break_mode=False):
                         home_diag = "no '⌂' button found"
                         if home_buttons:
                             invoke(home_buttons[0])
-                            time.sleep(3.0)
+                            # Generous, diagnostic-only budget (P06's own
+                            # precedent: this app+runner combination has
+                            # been found slower than assumed before) -
+                            # polls for up to 150s to distinguish "never
+                            # happens" from "just very slow here", tracking
+                            # the max text-node count observed at any point.
+                            deadline = time.monotonic() + 150
+                            max_count = 0
                             home_texts = collect_texts(win)
-                            home_diag = f"{len(home_texts)} accessible text nodes after Home; sample: {home_texts[:40]!r}"
+                            while time.monotonic() < deadline:
+                                home_texts = collect_texts(win)
+                                max_count = max(max_count, len(home_texts))
+                                if len(home_texts) > 60:  # meaningfully more than the ~54-node empty state
+                                    break
+                                time.sleep(2.0)
+                            home_diag = (
+                                f"{len(home_texts)} accessible text nodes after Home (max seen: {max_count} "
+                                f"over up to 150s); sample: {home_texts[:40]!r}"
+                            )
                         print(
                             f"FAIL: Explorer never listed the seeded browse dir, even after a real "
                             f"PathBar re-navigation to the identical path: missing {missing}",
