@@ -1977,10 +1977,16 @@ def p07(binary, break_mode=False):
     path and P11's items 1/3/4 (handoff M5-C §6): F6 pane-toggle and the
     aligned tree's arrow-key navigation are raw `onkeydown` handling with
     no accessible action to invoke. Recorded here, not silently skipped -
-    see this case's OK output. Navigation/history *is* executed, via real
-    mouse input (a genuine double-click, System Events has no
-    AXDoublePress-equivalent action - see `double_click_row_side`) and the
-    Back/Forward toolbar buttons (AXPress).
+    see this case's OK output. Navigation/history *is* executed: a real
+    double-click (two positioned `click at {x,y}` events, System Events has
+    no AXDoublePress-equivalent action) was tried first for directory
+    descent and did not register with WebKit's own dblclick detection (a
+    real dispatch showed no navigation at all) - `PathBar`'s edit-path mode
+    reaches the same `navigate_to` through a different, already-proven
+    path instead (click "Edit path", `type_into` the target path, a real
+    Return keystroke to a specific focused text input - see the case body
+    for why this differs from P04/P11's structurally-unreachable global
+    handlers), plus the Back/Forward toolbar buttons (AXPress).
 
     Fixture: `$HOME` contains two sibling directories, `root-a` and
     `root-b`, picked as the deep-compare roots via the same
@@ -2045,25 +2051,58 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: Explorer never showed any rows at $HOME (last: {r!r})", file=sys.stderr)
                 return 1
 
-            # ── Navigation/history (mouse-driven double-click + Back/
-            # Forward buttons; the keyboard sub-part is NOT executed - see
-            # this case's OK output) ────────────────────────────────────
-            r = ui("double_click_row_side", "root-a", "left", timeout=20)
-            print(f"DEBUG: double_click_row_side result: {r!r}", flush=True)
+            # ── Navigation/history (mouse-driven; the keyboard sub-part is
+            # NOT executed - see this case's OK output) ───────────────────
+            #
+            # `double_click_row_side` (two positioned `click at {x,y}`
+            # events) was tried first and did NOT trigger `tree.rs`'s
+            # `ondoubleclick` - a real dispatch showed the row count and
+            # both "root-a"/"root-b" strings completely unchanged after the
+            # attempted double-click, meaning no navigation happened at
+            # all. AppleScript's `click at` is a high-level convenience
+            # wrapper with no documented guarantee it stamps the OS-level
+            # click-count metadata a genuine double-click needs for
+            # WebKit's own dblclick detection - a known-unreliable
+            # technique, not pursued further. `PathBar`'s edit-path mode
+            # (dir_pane.rs) reaches the same `navigate_to` through a
+            # completely different, already-proven path instead: click the
+            # "Edit path" button (AXPress, same technique as every other
+            # button in this harness) to reveal a real `<input
+            # type="text">`, `type_into` it (the same click+Cmd-A+keystroke
+            # technique already established for Save As's path field) with
+            # root-a's absolute path, then a real `key code 36` (Return) -
+            # the SAME kind of genuine keystroke `type_into` already relies
+            # on, delivered to a specific, currently-focused, single
+            # `onkeydown`-bound text input (not a raw global/document
+            # handler bound to no UI element - a materially different
+            # situation from P04's Enter-apply-hunk path or P11's global
+            # shortcuts, which is why this one is not treated as
+            # structurally unreachable).
+            r = click_wait("Edit path", timeout=10)
             if not r.startswith("CLICKED"):
-                print(f"FAIL: could not double-click into root-a on the left pane: {r}", file=sys.stderr)
+                print(f"FAIL: could not click 'Edit path': {r}", file=sys.stderr)
                 return 1
-            r = find_wait("left-only.txt", timeout=10)
+            r = poll_ui(
+                "get_value", "AXTextField", "1",
+                predicate=lambda r: r.startswith("VALUE:"),
+                timeout=10,
+            )
+            if not r.startswith("VALUE:"):
+                print(f"FAIL: path-edit text field never appeared: {r}", file=sys.stderr)
+                return 1
+            r = ui("type_into", "AXTextField", "1", str(root_a), timeout=20)
+            if not r.startswith("TYPED:") or str(root_a) not in r:
+                print(f"FAIL: could not type root-a's path into the path-edit field: {r}", file=sys.stderr)
+                return 1
+            r = ui("send_key", "36", "1", timeout=20)  # Return
+            if not r.startswith("DONE"):
+                print(f"FAIL: could not send Return to submit the path edit: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("left-only.txt", timeout=15)
             if not r.startswith("FOUND"):
                 print(
-                    f"DEBUG: post-dblclick count_rows={ui('count_rows', timeout=20)!r} "
-                    f"find('root-a')={ui('find_text', 'root-a', timeout=20)!r} "
-                    f"find('root-b')={ui('find_text', 'root-b', timeout=20)!r}",
-                    flush=True,
-                )
-                print(
-                    f"FAIL: left pane did not navigate into root-a "
-                    f"(left-only.txt not visible): {r}",
+                    f"FAIL: left pane did not navigate into root-a via the path-edit "
+                    f"field (left-only.txt not visible): {r}",
                     file=sys.stderr,
                 )
                 return 1

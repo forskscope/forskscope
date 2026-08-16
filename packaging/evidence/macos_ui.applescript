@@ -584,18 +584,37 @@ on runOnce(argv)
                 -- CI-verifiable in the first place (handoff M5-C §6): focus
                 -- POSITION is exposed through the accessibility tree
                 -- whether or not any input is ever synthesized.
+                -- Real dispatch #1 found every property empty with no error
+                -- (bare `try` swallowed the cause); real dispatch #2, with
+                -- per-property error text added, showed `fe` itself was
+                -- `missing value` - the process-level AXFocusedUIElement
+                -- attribute resolved cleanly but held nothing. Standard
+                -- AppleScript UI-scripting fallback for exactly this: focus
+                -- is also exposed as an attribute of the frontmost WINDOW,
+                -- which is sometimes populated when the application-level
+                -- one is not (observed in other AppleScript accessibility
+                -- recipes for WebView-hosted content specifically). Try
+                -- process-level first, then window-level, and report which
+                -- source actually produced a non-missing value.
+                set fe to missing value
+                set feSource to "none"
                 try
                     set fe to (value of attribute "AXFocusedUIElement" of targetProc)
+                    if fe is not missing value then set feSource to "process"
                 on error errMsg
-                    return "ERROR: get-focused: " & errMsg
+                    return "ERROR: get-focused-process: " & errMsg
                 end try
-                -- Diagnostic-first version (real dispatch's first attempt
-                -- returned "role= desc= title=" with every property empty
-                -- and no error surfaced, because each bare `try` swallowed
-                -- whatever went wrong) - every property fetch now reports
-                -- its OWN error text instead of silently defaulting to ""
-                -- so a real failure and a genuinely-empty property are
-                -- distinguishable from the caller's output.
+                if fe is missing value then
+                    try
+                        set fe to (value of attribute "AXFocusedUIElement" of w)
+                        if fe is not missing value then set feSource to "window"
+                    on error errMsg2
+                        return "ERROR: get-focused-window: " & errMsg2
+                    end try
+                end if
+                if fe is missing value then
+                    return "FOCUSED: MISSING (checked process and window attributes, both missing value)"
+                end if
                 set fclass to "?"
                 try
                     set fclass to (class of fe) as string
@@ -626,7 +645,7 @@ on runOnce(argv)
                 on error e4
                     set fvalue to "ERR:" & e4
                 end try
-                return "FOCUSED: class=" & fclass & " role=" & frole & " desc=" & fdesc & " title=" & ftitle & " value=" & fvalue
+                return "FOCUSED: source=" & feSource & " class=" & fclass & " role=" & frole & " desc=" & fdesc & " title=" & ftitle & " value=" & fvalue
 
             else if cmdName is "click_any" then
                 -- Broadest of the click_* family: no role filter at all.
