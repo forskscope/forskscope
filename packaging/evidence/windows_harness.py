@@ -698,6 +698,29 @@ def clear_config_dir(config_dir):
     config_dir.mkdir(parents=True, exist_ok=True)
 
 
+def long_path(p):
+    """Expands any 8.3 short-name path component (e.g. `RUNNER~1`) to its
+    real long form via `GetLongPathNameW` (stdlib `ctypes` only). This
+    runner's own `%TEMP%` resolves through a short-name component
+    (`tempfile.TemporaryDirectory()` inherits it) - real, observed on CI
+    (P07's first failures: the seeded `settings.json` held
+    `...\\RUNNER~1\\...`, and Explorer's directory scan never populated any
+    rows for it, though the breadcrumb displayed the literal string
+    unchanged). Some Windows Server NTFS volumes disable 8.3 name
+    generation entirely for performance, in which case a short alias like
+    this is not merely cosmetic - it may not resolve via ordinary file
+    APIs at all, which is consistent with a `read_dir`-style scan finding
+    nothing there. `GetLongPathNameW` (not `Path.resolve()`, which on
+    Windows can return an extended-length `\\\\?\\`-prefixed form the app
+    was never written to expect) keeps the same path shape, just with
+    every component expanded to its real name."""
+    import ctypes  # noqa: PLC0415
+
+    buf = ctypes.create_unicode_buffer(4096)
+    n = ctypes.windll.kernel32.GetLongPathNameW(str(p), buf, 4096)
+    return Path(buf.value) if n else Path(p)
+
+
 def wait_for_tokens(win, tokens, timeout_s=READY_TIMEOUT_S):
     """Poll until every string in `tokens` appears somewhere in the
     accessible tree's text. Returns (True, texts, []) on success or
@@ -3336,7 +3359,12 @@ def p07(binary, break_mode=False):
     clear_config_dir(config_dir)
 
     with tempfile.TemporaryDirectory() as scratch:
-        scratch_path = Path(scratch)
+        # long_path: this runner's %TEMP% resolves through an 8.3
+        # short-name component (RUNNER~1) - real, observed on CI (see
+        # long_path's own docstring). Normalized once, here, before any
+        # path derived from it is written to settings.json or compared
+        # against anything the app displays.
+        scratch_path = long_path(Path(scratch))
         browse, left_root, right_root = _p07_fixture(scratch_path)
         _seed_explorer_settings(config_dir, browse)
 
