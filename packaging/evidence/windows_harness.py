@@ -1436,31 +1436,34 @@ def scrollprobe(binary, break_mode=False):
     right = REPO_ROOT / "tests/fixtures/text/right_long_line.txt"
 
     def cell_rects(win):
-        """(left_cell_rect, right_cell_rect) of the fixture's one row per
-        pane, or (None, None) if the row shape isn't the expected 1+1."""
-        frame = find_diff_wrap(win)
-        if frame is None:
-            return None, None
-        rows = collect_diff_rows(win)
-        try:
-            fr = frame.rectangle()
-            midline_x = fr.left + fr.width() / 2
-        except Exception:  # noqa: BLE001
-            return None, None
-        left_rows = [r for r in rows if _row_left_x(r) < midline_x]
-        right_rows = [r for r in rows if _row_left_x(r) >= midline_x]
-        if len(left_rows) != 1 or len(right_rows) != 1:
-            print(
-                f"  (unexpected row shape: {len(left_rows)} left, "
-                f"{len(right_rows)} right - expected 1 each)"
-            )
-            return None, None
-        try:
-            lc = left_rows[0].children()[-1].rectangle()
-            rc = right_rows[0].children()[-1].rectangle()
-        except Exception as exc:  # noqa: BLE001
-            print(f"  (could not read cell rectangles: {exc!r})")
-            return None, None
+        """(left_cell_rect, right_cell_rect), found directly by each
+        fixture's own distinguishing anchor text ('AAAA' / 'BBBB') via
+        `find_by_text_containing` - not by the midline-x row classification
+        `wait_for_row_shape`/`check_pane_geometry` use elsewhere. That
+        classification is exactly what a real horizontal scroll would be
+        expected to perturb (a row's x-position is the whole signal being
+        probed here), so leaning on it as a *precondition* for reading the
+        rectangles at all would make a real scroll effect look like a
+        harness error instead of data. Anchor-text lookup has no such
+        circularity: it does not care where on screen the matched element
+        currently is."""
+        left_leaf = find_by_text_containing(win, "AAAA")
+        right_leaf = find_by_text_containing(win, "BBBB")
+        lc = rc = None
+        if left_leaf is not None:
+            try:
+                lc = left_leaf.rectangle()
+            except Exception as exc:  # noqa: BLE001
+                print(f"  (could not read left cell rectangle: {exc!r})")
+        else:
+            print("  (no descendant containing 'AAAA' found)")
+        if right_leaf is not None:
+            try:
+                rc = right_leaf.rectangle()
+            except Exception as exc:  # noqa: BLE001
+                print(f"  (could not read right cell rectangle: {exc!r})")
+        else:
+            print("  (no descendant containing 'BBBB' found)")
         return lc, rc
 
     def fmt_rect(r):
@@ -1565,12 +1568,20 @@ def scrollprobe(binary, break_mode=False):
                     scroll_state(left_pane, "left pane (ScrollPattern)")
                     scroll_state(right_pane, "right pane (ScrollPattern)")
                 lc, rc = report_cells("row-cell rectangles")
-                moved = (
+                left_moved = (
                     baseline_lc is not None
                     and lc is not None
                     and (lc.left != baseline_lc.left or lc.right != baseline_lc.right)
                 )
-                print(f"  left cell rectangle moved from baseline: {moved}", flush=True)
+                right_moved = (
+                    baseline_rc is not None
+                    and rc is not None
+                    and (rc.left != baseline_rc.left or rc.right != baseline_rc.right)
+                )
+                print(
+                    f"  left cell moved: {left_moved}, right cell moved: {right_moved}",
+                    flush=True,
+                )
                 return lc, rc
 
             if left_pane is not None:
