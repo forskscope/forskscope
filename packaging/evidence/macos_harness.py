@@ -2201,6 +2201,140 @@ def recon_explorer(binary, break_mode=False):
     return 0
 
 
+# ── M5-C / F63 investigation ────────────────────────────────────────────────
+
+
+def _generate_pair_with_sentinels(dir_, left_name, right_name, n_lines, sentinels):
+    """Like P06's `_generate_large_pair`, but places an arbitrary map of
+    `{line_index: sentinel_text}` instead of a single fixed one at line 5 -
+    needed here to test whether content near the TOP (already known
+    findable, per P06) versus content deep in the middle/bottom of a
+    file crossing F63's ~30-100 line threshold behaves differently."""
+    left_path = Path(dir_) / left_name
+    right_path = Path(dir_) / right_name
+    left_lines = []
+    right_lines = []
+    for i in range(n_lines):
+        base = f"line {i:07d} padding text to make the diff heavier xxxxxxxxxxxxxxxxxxxx\n"
+        left_lines.append(base)
+        if i in sentinels:
+            right_lines.append(f"{sentinels[i]}\n")
+        elif i % 20 == 10:
+            right_lines.append(f"line {i:07d} CHANGED padding text yyyyyyyyyyyyyyyyyyyyyyyyyy\n")
+        else:
+            right_lines.append(base)
+    left_path.write_text("".join(left_lines))
+    right_path.write_text("".join(right_lines))
+    return left_path, right_path
+
+
+def recon_f63_investigation(binary, break_mode=False):
+    """Not a scored case. Resolves F63 (handoff M5-C §4): does a diff pair's
+    content above ~30-100 lines fail to reach the macOS accessibility tree
+    because of a genuine product accessibility defect, or because the
+    harness's plain "query right after launch" pattern races WebKit's own
+    viewport-based accessibility-tree population (the hypothesis already
+    recorded in P06's `_generate_large_pair` docstring, never tested until
+    now)?
+
+    Four independent probes, in order, each printed as its own PROBE line
+    so the real CI run's log is the evidence, not this docstring:
+
+    1. **Long-wait control** (rules out "just needs more time"): poll
+       count_rows and a deep (near-bottom) sentinel for 90s with zero
+       interaction - far longer than every other case's LAUNCH_TIMEOUT_S.
+    2. **list_roles**: does this view expose a real AXScrollArea/AXScrollBar
+       at all, distinct from the AXRow count itself?
+    3. **Scroll-bar value probe**: if any AXScrollBar exists, set its value
+       toward 1.0 (bottom) via the same direct-AXValue-write technique
+       M5-B's `set_value` already established for other controls, then
+       re-check the deep sentinel.
+    4. **Keyboard-scroll probe**: click a known-visible top-of-file row
+       (real focus, not just a query), send real Page Down key events
+       (`send_key`, keycode 121) via System Events, then re-check the deep
+       sentinel.
+
+    A 200-line fixture is used (well past the confirmed ~100-line failure
+    point) with sentinels at line 5 (top - known findable per P06) and line
+    150 (deep - the one this investigation is actually about).
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+        top_sentinel = "F63-TOP-SENTINEL-KNOWN-FINDABLE"
+        deep_sentinel = "F63-DEEP-SENTINEL-LINE-150"
+        left, right = _generate_pair_with_sentinels(
+            scratch, "f63-left.txt", "f63-right.txt", 200, {5: top_sentinel, 150: deep_sentinel}
+        )
+        proc = launch(binary, [left, right], scratch, home=home)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"PROBE: never registered a window: {exc}", flush=True)
+                return 0
+
+            print(f"PROBE top-sentinel-immediate: {ui('find_text', top_sentinel, timeout=20)!r}", flush=True)
+
+            # ── 1. Long-wait control, no interaction ────────────────────
+            deadline = time.monotonic() + 90
+            last_rows = None
+            last_deep = None
+            while time.monotonic() < deadline:
+                try:
+                    last_rows = ui("count_rows", timeout=20)
+                except subprocess.TimeoutExpired:
+                    last_rows = "TIMEOUT"
+                try:
+                    last_deep = ui("find_text", deep_sentinel, timeout=20)
+                except subprocess.TimeoutExpired:
+                    last_deep = "TIMEOUT"
+                if last_deep.startswith("FOUND"):
+                    break
+                time.sleep(3)
+            print(
+                f"PROBE long-wait-control (90s, no interaction): "
+                f"count_rows={last_rows!r} deep_sentinel={last_deep!r}",
+                flush=True,
+            )
+
+            # ── 2. Role tally ────────────────────────────────────────────
+            roles = _probe("role-tally", "list_roles")
+
+            # ── 3. Scroll-bar value probe ────────────────────────────────
+            scrollbar_worked = False
+            if roles and "AXScrollBar=0" not in roles:
+                for n in range(1, 4):
+                    before = _probe(f"scrollbar-{n}-get-before", "get_value", "AXScrollBar", str(n))
+                    if before is None or before == "NOT_FOUND":
+                        break
+                    _probe(f"scrollbar-{n}-set-to-1.0", "set_value", "AXScrollBar", str(n), "1.0")
+                    after = _probe(f"scrollbar-{n}-get-after", "get_value", "AXScrollBar", str(n))
+                    time.sleep(1.0)
+                    deep_after_scrollbar = _probe(f"scrollbar-{n}-deep-sentinel-after", "find_text", deep_sentinel)
+                    if deep_after_scrollbar and deep_after_scrollbar.startswith("FOUND"):
+                        scrollbar_worked = True
+            else:
+                print(f"PROBE scrollbar-probe-skipped: no AXScrollBar in tally ({roles!r})", flush=True)
+
+            # ── 4. Keyboard-scroll probe ─────────────────────────────────
+            r = _probe("focus-top-row-click", "click_row", top_sentinel[:20])
+            r2 = _probe("send-key-pagedown-x40", "send_key", "121", "40")
+            time.sleep(1.0)
+            deep_after_keys = _probe("deep-sentinel-after-keyboard-scroll", "find_text", deep_sentinel)
+            rows_after_keys = _probe("rows-after-keyboard-scroll", "count_rows")
+
+            print(
+                f"PROBE F63-SUMMARY: scrollbar_revealed_deep_content={scrollbar_worked} "
+                f"keyboard_scroll_revealed_deep_content="
+                f"{bool(deep_after_keys and deep_after_keys.startswith('FOUND'))}",
+                flush=True,
+            )
+        finally:
+            terminate(proc)
+    return 0
+
+
 CASES = {
     "p01": p01,
     "p02": p02,
@@ -2219,6 +2353,7 @@ CASES = {
     "recon_tab_plus_explorer": recon_tab_plus_explorer,
     "recon_generated_pair_alone": recon_generated_pair_alone,
     "recon_explorer": recon_explorer,
+    "recon_f63_investigation": recon_f63_investigation,
 }
 
 

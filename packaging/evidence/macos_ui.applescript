@@ -126,6 +126,30 @@
 --                                      produces for a given view, not used by
 --                                      any case's pass/fail logic itself.
 --
+-- M5-C additions (F63 investigation, P03's scroll-mirroring check):
+--   list_roles <proc>              -> "AXRow=N AXScrollArea=N AXScrollBar=N
+--                                      AXStaticText=N AXGroup=N AXWebArea=N
+--                                      total=N" - a bounded tally of a FIXED
+--                                      small set of roles of interest (not
+--                                      dump_roles' abandoned open-ended bulk
+--                                      dump - see that command's comment),
+--                                      built to answer one question: does a
+--                                      given view expose a real
+--                                      AXScrollArea/AXScrollBar distinct
+--                                      from "how many AXRow currently
+--                                      exist" (which count_rows answers).
+--   send_key <proc> <keycode> <n>  -> "DONE" or "ERROR: ..." - activates
+--                                      the process then sends the given key
+--                                      code n times with a short delay
+--                                      between presses (real key events, via
+--                                      `key code`, not `keystroke` - this is
+--                                      navigation input, not text). Used to
+--                                      test whether keyboard-driven scrolling
+--                                      changes what the accessibility tree
+--                                      exposes (F63) and, for P03, to drive
+--                                      one pane's horizontal scroll and
+--                                      check the other pane follows.
+--
 -- Every command returns a plain string on stdout; a System Events
 -- permission failure (e.g. "not allowed assistive access") surfaces as an
 -- AppleScript runtime error on stderr with non-zero exit, which the
@@ -840,6 +864,77 @@ on runOnce(argv)
                 on error errMsg
                     return "ERROR: " & errMsg
                 end try
+
+            else if cmdName is "list_roles" then
+                -- M5-C / F63 investigation: a cheap, bounded alternative to
+                -- `dump_roles`'s abandoned bulk dump (see that command's own
+                -- comment for why it wedges). Tallies occurrences of a FIXED
+                -- small set of roles of interest - not an open-ended tally
+                -- over every distinct role string, which would need
+                -- per-element list membership checks against a growing list
+                -- and get slow the same way `dump_roles` did. Answers the
+                -- specific F63 question this exists for: does the diff
+                -- view's scroll container expose a real AXScrollArea/
+                -- AXScrollBar at all, distinct from just "how many AXRow
+                -- exist right now" (which count_rows already answers).
+                set allEl to my safeContents(w)
+                set rowN to 0
+                set scrollAreaN to 0
+                set scrollBarN to 0
+                set staticTextN to 0
+                set groupN to 0
+                set webAreaN to 0
+                set totalN to 0
+                repeat with e in allEl
+                    set totalN to totalN + 1
+                    set rl to ""
+                    try
+                        set rl to role of e
+                    end try
+                    if rl is "AXRow" then
+                        set rowN to rowN + 1
+                    else if rl is "AXScrollArea" then
+                        set scrollAreaN to scrollAreaN + 1
+                    else if rl is "AXScrollBar" then
+                        set scrollBarN to scrollBarN + 1
+                    else if rl is "AXStaticText" then
+                        set staticTextN to staticTextN + 1
+                    else if rl is "AXGroup" then
+                        set groupN to groupN + 1
+                    else if rl is "AXWebArea" then
+                        set webAreaN to webAreaN + 1
+                    end if
+                end repeat
+                return "AXRow=" & rowN & " AXScrollArea=" & scrollAreaN & " AXScrollBar=" & scrollBarN & " AXStaticText=" & staticTextN & " AXGroup=" & groupN & " AXWebArea=" & webAreaN & " total=" & totalN
+
+            else if cmdName is "send_key" then
+                -- M5-C / F63 investigation, and reused by P03's horizontal-
+                -- scroll-mirroring check: a keyboard-driven scroll, distinct
+                -- from `type_into`'s keystroke-of-text technique. Activates
+                -- the target process first (the same fix `type_into` needed
+                -- - `keystroke`/`key code` go to whichever app is actually
+                -- frontmost, not merely whichever `tell process` scoped an
+                -- earlier query to) then sends the given key code
+                -- `repeatN` times with a short delay between presses, long
+                -- enough for the WebView's own scroll/paint to keep up
+                -- rather than coalescing every press into one jump.
+                -- Key codes used by callers: 121 = Page Down, 125 = Down
+                -- Arrow, 124 = Right Arrow (see Apple's Events.h list).
+                set keyCode to (item 3 of argv) as integer
+                set repeatN to (item 4 of argv) as integer
+                try
+                    set frontmost of process procName to true
+                end try
+                delay 0.2
+                repeat repeatN times
+                    try
+                        key code keyCode
+                    on error errMsg
+                        return "ERROR: key code " & keyCode & ": " & errMsg
+                    end try
+                    delay 0.15
+                end repeat
+                return "DONE"
 
             else if cmdName is "dump_roles" then
                 -- NOTE: deliberately five separate `try`-wrapped property
