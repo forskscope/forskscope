@@ -1335,6 +1335,9 @@ on runOnce(argv)
                 set staticTextN to 0
                 set groupN to 0
                 set webAreaN to 0
+                set checkBoxN to 0
+                set radioN to 0
+                set buttonN to 0
                 set totalN to 0
                 repeat with e in allEl
                     set totalN to totalN + 1
@@ -1354,9 +1357,15 @@ on runOnce(argv)
                         set groupN to groupN + 1
                     else if rl is "AXWebArea" then
                         set webAreaN to webAreaN + 1
+                    else if rl is "AXCheckBox" then
+                        set checkBoxN to checkBoxN + 1
+                    else if rl is "AXRadioButton" then
+                        set radioN to radioN + 1
+                    else if rl is "AXButton" then
+                        set buttonN to buttonN + 1
                     end if
                 end repeat
-                return "AXRow=" & rowN & " AXScrollArea=" & scrollAreaN & " AXScrollBar=" & scrollBarN & " AXStaticText=" & staticTextN & " AXGroup=" & groupN & " AXWebArea=" & webAreaN & " total=" & totalN
+                return "AXRow=" & rowN & " AXScrollArea=" & scrollAreaN & " AXScrollBar=" & scrollBarN & " AXStaticText=" & staticTextN & " AXGroup=" & groupN & " AXWebArea=" & webAreaN & " AXCheckBox=" & checkBoxN & " AXRadioButton=" & radioN & " AXButton=" & buttonN & " total=" & totalN
 
             else if cmdName is "send_key" then
                 -- M5-C / F63 investigation, and reused by P03's horizontal-

@@ -2094,9 +2094,28 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: could not open Settings: {r}", file=sys.stderr)
                 return 1
             time.sleep(0.3)
-            r = ui("perform_action", "AXCheckBox", "1", "AXPress", timeout=20)
-            if not r.startswith("DONE"):
-                print(f"FAIL: could not toggle 'Remember Explorer directories': {r}", file=sys.stderr)
+            # "AXCheckBox" was a guess a real dispatch showed wrong
+            # (NOT_FOUND). Only AXRadioButton is tried as a second guess -
+            # NOT AXButton, since the Settings dialog's "Advanced" disclosure
+            # toggle is a real, earlier-in-document-order AXButton that
+            # `perform_action`'s generic "DONE" success would silently
+            # match instead, without actually toggling the setting this
+            # case needs.
+            toggled = False
+            tried = []
+            for role_guess in ("AXCheckBox", "AXRadioButton"):
+                r = ui("perform_action", role_guess, "1", "AXPress", timeout=20)
+                tried.append(f"{role_guess}={r!r}")
+                if r.startswith("DONE"):
+                    toggled = True
+                    break
+            if not toggled:
+                roles = ui("list_roles", timeout=20)
+                print(
+                    f"FAIL: could not toggle 'Remember Explorer directories' via any "
+                    f"tried role: {'; '.join(tried)} (role tally: {roles!r})",
+                    file=sys.stderr,
+                )
                 return 1
             r = click_wait("Close")
             if not r.startswith("CLICKED"):
