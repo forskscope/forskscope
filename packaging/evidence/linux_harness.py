@@ -166,22 +166,40 @@ def is_focused(node):
 def find_text_containing(node, substring, depth=0, max_depth=60):
     """Walk the tree for any accessible whose name, description, or Text
     interface content contains `substring`. Used for message-presence
-    checks where the exact role/nesting isn't part of the contract."""
+    checks where the exact role/nesting isn't part of the contract.
+
+    A `--break` mode caller asks this to find a summary line that can
+    never be real, so it runs its full retry budget every time - far
+    longer than any other walk in this program stays live against a
+    mutating tree. CI run 31937228151 crashed here with GLib.GError
+    ("The application no longer exists") from a stale node mid-walk, the
+    same render_check.py-class race (see its `_role_name_or_none` and
+    friends) but never hit here before because no other caller polls
+    this long. Treating a GError'd node as simply not a match, rather
+    than propagating, lets the caller's own retry loop continue instead
+    of crashing the whole script."""
     if depth > max_depth:
         return None
-    name = node.get_name() or ""
-    if substring in name:
-        return node
-    desc = node.get_description() or ""
-    if substring in desc:
-        return node
-    interfaces = Atspi.Accessible.get_interfaces(node) or []
-    if "Text" in interfaces:
-        text_content = Atspi.Text.get_text(node, 0, -1)
-        if text_content and substring in text_content:
+    try:
+        name = node.get_name() or ""
+        if substring in name:
             return node
-    for i in range(node.get_child_count()):
-        child = node.get_child_at_index(i)
+        desc = node.get_description() or ""
+        if substring in desc:
+            return node
+        interfaces = Atspi.Accessible.get_interfaces(node) or []
+        if "Text" in interfaces:
+            text_content = Atspi.Text.get_text(node, 0, -1)
+            if text_content and substring in text_content:
+                return node
+        child_count = node.get_child_count()
+    except GLib.GError:
+        return None
+    for i in range(child_count):
+        try:
+            child = node.get_child_at_index(i)
+        except GLib.GError:
+            continue
         if child is not None:
             found = find_text_containing(child, substring, depth + 1, max_depth)
             if found is not None:
