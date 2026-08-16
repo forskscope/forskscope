@@ -1954,6 +1954,453 @@ def p06(binary, break_mode=False):
     return 0
 
 
+# ── P07 — Explorer and directory report ─────────────────────────────────────
+
+
+def _manifests_dir(home):
+    """Batch copy's manifest directory: `dirs_next::data_dir()` on macOS
+    resolves to the same base as `_config_dir`'s `dirs_next::config_dir()`
+    (`$HOME/Library/Application Support` - macOS does not distinguish
+    config vs. data the way XDG does), joined with `forskscope/manifests`
+    per `ui/overlay/modals/copy.rs`'s `manifest_dir` construction."""
+    return _config_dir(home) / "manifests"
+
+
+def p07(binary, break_mode=False):
+    """RFC-078's P07: navigation/history/focused-pane keyboard behaviour,
+    equal/different/one-sided statuses, deep comparison progress and
+    filters, and per-file/batch copy with confirmation, backup, manifest,
+    and result summary.
+
+    **"Focused-pane keyboard behaviour" is NOT executed** - it hits the
+    same structurally-not-CI-verifiable limitation as P04's keyboard-Enter
+    path and P11's items 1/3/4 (handoff M5-C §6): F6 pane-toggle and the
+    aligned tree's arrow-key navigation are raw `onkeydown` handling with
+    no accessible action to invoke. Recorded here, not silently skipped -
+    see this case's OK output. Navigation/history *is* executed, via real
+    mouse input (a genuine double-click, System Events has no
+    AXDoublePress-equivalent action - see `double_click_row_side`) and the
+    Back/Forward toolbar buttons (AXPress).
+
+    Fixture: `$HOME` contains two sibling directories, `root-a` and
+    `root-b`, picked as the deep-compare roots via the same
+    `click_row_side` technique M5-B's P06 recon established (both panes
+    default to `$HOME`, so `root-a`/`root-b` appear as ordinary rows in
+    both, disambiguated left/right by document order):
+
+    - `aaa-changed.txt` - differs on both sides (Changed). Named to sort
+      alphabetically first (`recursive_diff`'s `BTreeMap<PathBuf, _>` is
+      key-sorted) so its per-row "Copy to right" button is the first exact
+      match in document order - the per-file copy test's target, and its
+      destination (`root-b/aaa-changed.txt`) already exists, so `.bak`
+      verification is meaningful, not vacuous.
+    - `equal.txt` - identical on both sides (Equal) - the default
+      "Different" filter's negative case.
+    - `left-only.txt` - only in `root-a` (LeftOnly).
+    - `right-only-1.txt`, `right-only-2.txt` - only in `root-b`
+      (RightOnly x2) - the "Copy to left" batch's real, multi-item content.
+      `aaa-changed.txt` also lands in this batch (Changed contributes to
+      both directions, and the per-file copy above doesn't refresh the
+      view's own `entries` snapshot) - not worked around, since it is
+      exactly what gives the batch a real *existing*-destination entry to
+      assert a genuine `.bak` against, alongside the two brand-new-
+      destination entries that correctly get no backup at all.
+
+    Batch-copy assertion, per the handoff's explicit instruction (and F62's
+    lesson): the manifest JSON's actual entries and the backup file's
+    actual bytes are read and checked, not just "the operation reported
+    success".
+
+    `--break`: the batch manifest's backup-bytes check is flipped to expect
+    a string real backup content can never be - false under real (correct
+    backup) behaviour, so this must fail.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        home = Path(scratch) / "home"
+        home.mkdir()
+        root_a = home / "root-a"
+        root_b = home / "root-b"
+        root_a.mkdir()
+        root_b.mkdir()
+        (root_a / "aaa-changed.txt").write_text("left per-file version\n")
+        (root_b / "aaa-changed.txt").write_text("right per-file version - PRE-EXISTING\n")
+        (root_a / "equal.txt").write_text("same content\n")
+        (root_b / "equal.txt").write_text("same content\n")
+        (root_a / "left-only.txt").write_text("only in left\n")
+        (root_b / "right-only-1.txt").write_text("only in right one\n")
+        (root_b / "right-only-2.txt").write_text("only in right two\n")
+
+        proc = launch(binary, [], scratch, home=home)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+
+            r = poll_ui(
+                "count_rows", predicate=lambda r: r not in ("0", ""), timeout=LAUNCH_TIMEOUT_S
+            )
+            if r in ("0", ""):
+                print(f"FAIL: Explorer never showed any rows at $HOME (last: {r!r})", file=sys.stderr)
+                return 1
+
+            # ── Navigation/history (mouse-driven double-click + Back/
+            # Forward buttons; the keyboard sub-part is NOT executed - see
+            # this case's OK output) ────────────────────────────────────
+            r = ui("double_click_row_side", "root-a", "left", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not double-click into root-a on the left pane: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("left-only.txt", timeout=10)
+            if not r.startswith("FOUND"):
+                print(
+                    f"FAIL: left pane did not navigate into root-a "
+                    f"(left-only.txt not visible): {r}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            r = click_wait("Back", timeout=10)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Back: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("left-only.txt", timeout=10, want_found=False)
+            if r.startswith("FOUND"):
+                print(f"FAIL: Back did not leave root-a: {r}", file=sys.stderr)
+                return 1
+
+            r = click_wait("Forward", timeout=10)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Forward: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("left-only.txt", timeout=10)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: Forward did not return to root-a: {r}", file=sys.stderr)
+                return 1
+
+            r = click_wait("Back", timeout=10)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Back (return to $HOME): {r}", file=sys.stderr)
+                return 1
+            r = find_wait("left-only.txt", timeout=10, want_found=False)
+            if r.startswith("FOUND"):
+                print(f"FAIL: did not return to $HOME after Back: {r}", file=sys.stderr)
+                return 1
+
+            # ── Pick root-a (left) / root-b (right), open deep compare ───
+            r = ui("click_row_side", "root-a", "left", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not pick root-a on the left: {r}", file=sys.stderr)
+                return 1
+            r = ui("click_row_side", "root-b", "right", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not pick root-b on the right: {r}", file=sys.stderr)
+                return 1
+            r = click_wait("Compare", timeout=10)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Compare: {r}", file=sys.stderr)
+                return 1
+
+            # ── Equal/different/one-sided statuses, deep-compare stats ────
+            for needle in ("aaa-changed.txt", "equal.txt", "left-only.txt", "right-only-1.txt", "right-only-2.txt"):
+                r = find_wait(needle, timeout=LAUNCH_TIMEOUT_S)
+                if not r.startswith("FOUND"):
+                    print(f"FAIL: deep-compare row for {needle!r} never appeared: {r}", file=sys.stderr)
+                    return 1
+            r = find_wait("different", timeout=10)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: deep-compare summary stats never appeared: {r}", file=sys.stderr)
+                return 1
+
+            # ── Filters ────────────────────────────────────────────────────
+            r = find_wait("equal.txt", timeout=5, want_found=False)
+            if r.startswith("FOUND"):
+                print(
+                    f"FAIL: 'equal.txt' visible under the default 'Different' filter: {r}",
+                    file=sys.stderr,
+                )
+                return 1
+            r = ui("click_button_exact", "All", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click the 'All' filter: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("equal.txt", timeout=10)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: 'equal.txt' not visible under the 'All' filter: {r}", file=sys.stderr)
+                return 1
+            r = click_wait("Equal only", timeout=10)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click the 'Equal only' filter: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("left-only.txt", timeout=5, want_found=False)
+            if r.startswith("FOUND"):
+                print(
+                    f"FAIL: 'left-only.txt' visible under the 'Equal only' filter: {r}",
+                    file=sys.stderr,
+                )
+                return 1
+            r = ui("click_button_exact", "Different", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not restore the 'Different' filter: {r}", file=sys.stderr)
+                return 1
+
+            # ── Per-file copy: confirmation modal, backup ─────────────────
+            r = ui("click_button_exact", "Copy to right", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click the per-file 'Copy to right' button: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("Copy this file?", timeout=10)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: per-file copy confirmation modal never appeared: {r}", file=sys.stderr)
+                return 1
+            r = ui("click_button_exact", "Copy file", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not confirm the per-file copy: {r}", file=sys.stderr)
+                return 1
+
+            per_file_bak = root_b / "aaa-changed.txt.bak"
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            per_file_bak_bytes = None
+            while time.monotonic() < deadline:
+                if per_file_bak.exists():
+                    per_file_bak_bytes = per_file_bak.read_bytes()
+                    break
+                time.sleep(0.5)
+            if per_file_bak_bytes is None:
+                print(f"FAIL: per-file copy did not create a .bak backup at {per_file_bak}", file=sys.stderr)
+                return 1
+            if per_file_bak_bytes != b"right per-file version - PRE-EXISTING\n":
+                print(
+                    f"FAIL: per-file .bak content {per_file_bak_bytes!r} != the "
+                    "pre-copy destination content",
+                    file=sys.stderr,
+                )
+                return 1
+            after_per_file = (root_b / "aaa-changed.txt").read_bytes()
+            if after_per_file != b"left per-file version\n":
+                print(
+                    f"FAIL: destination not overwritten with the source content: {after_per_file!r}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            # ── Batch copy: manifest CONTENTS and backup BYTES, not just
+            # "it reported success" (handoff §5 / F62's lesson) ───────────
+            r = click_wait("Copy to left", timeout=10)  # toolbar batch button (has a count), first in doc order
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click the batch 'Copy to left' button: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("files?", timeout=10)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: batch copy confirmation modal never appeared: {r}", file=sys.stderr)
+                return 1
+            r = ui("click_button_exact", "Copy all", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not confirm the batch copy: {r}", file=sys.stderr)
+                return 1
+
+            manifests_dir = _manifests_dir(home)
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            manifest_json = None
+            while time.monotonic() < deadline:
+                if manifests_dir.exists():
+                    jsons = list(manifests_dir.glob("*.json"))
+                    if jsons:
+                        manifest_json = json.loads(jsons[0].read_text())
+                        break
+                time.sleep(0.5)
+            if manifest_json is None:
+                print(f"FAIL: no batch-copy manifest JSON found under {manifests_dir}", file=sys.stderr)
+                return 1
+
+            entries = manifest_json.get("entries", [])
+            if len(entries) != 3:
+                print(
+                    f"FAIL: batch manifest has {len(entries)} entries, expected 3 "
+                    f"(aaa-changed.txt, right-only-1.txt, right-only-2.txt): {entries!r}",
+                    file=sys.stderr,
+                )
+                return 1
+            by_name = {Path(e["dst"]).name: e for e in entries}
+            for name in ("aaa-changed.txt", "right-only-1.txt", "right-only-2.txt"):
+                if name not in by_name:
+                    print(f"FAIL: batch manifest is missing an entry for {name!r}: {entries!r}", file=sys.stderr)
+                    return 1
+                if by_name[name].get("outcome") != "copied":
+                    print(
+                        f"FAIL: batch manifest entry for {name!r} outcome "
+                        f"{by_name[name].get('outcome')!r} != 'copied'",
+                        file=sys.stderr,
+                    )
+                    return 1
+
+            changed_entry = by_name["aaa-changed.txt"]
+            backup_path = changed_entry.get("backup_path")
+            if not backup_path:
+                print(
+                    f"FAIL: batch manifest's aaa-changed.txt entry has no backup_path "
+                    f"(destination pre-existed, a backup was required): {changed_entry!r}",
+                    file=sys.stderr,
+                )
+                return 1
+            backup_bytes = Path(backup_path).read_bytes()
+            impossible = b"this exact string can never be the pre-batch destination content"
+            expected_backup = impossible if break_mode else b"left per-file version\n"
+            if backup_bytes != expected_backup:
+                print(
+                    f"FAIL: batch backup content {backup_bytes!r} != expected {expected_backup!r}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            for name in ("right-only-1.txt", "right-only-2.txt"):
+                if by_name[name].get("backup_path"):
+                    print(
+                        f"FAIL: batch manifest entry for {name!r} has a backup_path "
+                        f"for what should be a brand-new destination: {by_name[name]!r}",
+                        file=sys.stderr,
+                    )
+                    return 1
+                dst_bytes = (root_a / name).read_bytes()
+                expected_src = b"only in right one\n" if name == "right-only-1.txt" else b"only in right two\n"
+                if dst_bytes != expected_src:
+                    print(
+                        f"FAIL: {name} copied to root-a with wrong content: {dst_bytes!r}",
+                        file=sys.stderr,
+                    )
+                    return 1
+
+            r = find_wait("Copied", timeout=10)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: batch result summary never appeared: {r}", file=sys.stderr)
+                return 1
+        except (PermissionWall, TimeoutError, RuntimeError) as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: Explorer navigation (double-click into root-a, Back, Forward - all "
+        "mouse-driven) and Compare all functioned; deep-compare showed all five "
+        "fixture entries with correct Equal/Changed/LeftOnly/RightOnly statuses "
+        "and summary stats; the Different/All/Equal-only filters each showed the "
+        "expected subset; a per-file copy created a real .bak matching the "
+        "pre-copy destination content; a 3-item batch copy's manifest JSON was "
+        "read from disk and its 3 entries verified by name and outcome, with the "
+        "existing-destination entry's .bak bytes confirmed against the real "
+        "pre-batch content and the two new-destination entries confirmed to have "
+        "no backup_path and correct copied content; a result summary appeared. "
+        "'Focused-pane keyboard behaviour' was NOT executed - structurally not "
+        "CI-verifiable (F6 pane-toggle / arrow-key tree navigation are raw "
+        "onkeydown handling with no accessible action to invoke), recorded here "
+        "as owner-executed/manual-outstanding, mirroring F45's shape."
+    )
+    return 0
+
+
+# ── P11 — Keyboard and modal safety (the CI-verifiable sub-case only) ──────
+
+
+def p11_modal_focus(binary, break_mode=False):
+    """RFC-078's P11 has four sub-items (handoff M5-C §6). Three require a
+    real keystroke and are structurally not CI-verifiable on any platform -
+    the same finding M5-B's P04 already established for the keyboard-Enter
+    apply path (no accessibility mechanism exists to exercise a raw global
+    `onkeydown` handler bound to no actionable UI element):
+
+    1. Execute the maintained keyboard checklist - **NOT executed, manual**.
+    2. Modal focus starts on the safe/cancel action for destructive
+       operations - **executed here; the only CI-verifiable sub-item.**
+    3. Global shortcuts do not affect the background view while a modal is
+       open - **NOT executed, manual** (needs a real keystroke to test).
+    4. Escape behaviour is consistent - **NOT executed, manual** (same).
+
+    Item 2 is checkable with NO input synthesized at all: focus position is
+    exposed through `AXFocusedUIElement` (`focused_element`) the instant a
+    modal's `autofocus` element mounts - a real, load-bearing product
+    behaviour (`ui/overlay/modals/file.rs`'s `OverwriteModal`: `button {
+    autofocus: true, ... "Cancel" }` on the safe action, no autofocus on
+    "Overwrite"), not a harness convenience. Uses P05's technique (external
+    modification + Save) to open `OverwriteModal` - a genuinely
+    destructive-operation-adjacent modal, since confirming it discards the
+    externally-changed file's content.
+
+    `--break`: asserts focus is on the destructive "Overwrite" action
+    instead of "Cancel" - false under real (safe-default-focus) behaviour,
+    so this must fail.
+    """
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = None
+        try:
+            proc, left, right = _p05_open_dirty(binary, scratch)
+            time.sleep(0.3)
+            right.write_bytes(b"EXTERNALLY MODIFIED WHILE APP WAS OPEN\nsecond line\n")
+
+            r = click_wait("Save merge result")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click Save: {r}", file=sys.stderr)
+                return 1
+            r = find_wait("File changed on disk", want_found=True)
+            if not r.startswith("FOUND"):
+                print(
+                    f"FAIL: 'File changed on disk' modal never appeared: {r}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            # A brief settle: autofocus fires on mount, but the
+            # accessibility tree reflecting it can lag the DOM slightly
+            # (same lesson as M5-B's "Settings button lagged the DOM right
+            # after mount" finding) - poll, don't sample once.
+            r = poll_ui(
+                "focused_element",
+                predicate=lambda r: r.startswith("FOCUSED:"),
+                timeout=10,
+            )
+            if not r.startswith("FOCUSED:"):
+                print(f"FAIL: could not read AXFocusedUIElement: {r}", file=sys.stderr)
+                return 1
+
+            expected = "Overwrite" if break_mode else "Cancel"
+            unexpected = "Cancel" if break_mode else "Overwrite"
+            if expected not in r:
+                print(
+                    f"FAIL: focused element {r!r} does not name the expected "
+                    f"safe/cancel action {expected!r}",
+                    file=sys.stderr,
+                )
+                return 1
+            if unexpected in r:
+                print(
+                    f"FAIL: focused element {r!r} unexpectedly also names "
+                    f"the destructive action {unexpected!r}",
+                    file=sys.stderr,
+                )
+                return 1
+        except (PermissionWall, TimeoutError, RuntimeError) as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            if proc is not None:
+                terminate(proc)
+
+    print(
+        "OK: destructive-operation modal ('File changed on disk') opened with "
+        "keyboard focus on the safe/cancel action ('Cancel'), not the "
+        "destructive one ('Overwrite'), confirmed via AXFocusedUIElement with "
+        "no input synthesized. Items 1/3/4 of P11 (keyboard checklist, global-"
+        "shortcut inertness behind a modal, Escape consistency) all require a "
+        "real keystroke and are NOT executed here - structurally not CI-"
+        "verifiable on any platform, recorded as owner-executed/manual-"
+        "outstanding (mirroring F45's shape), not silently skipped. "
+        "Consequence: the documented keyboard interface has no automated "
+        "runtime coverage on any platform."
+    )
+    return 0
+
+
 # ── recon — not an RFC-078 case ─────────────────────────────────────────────
 
 
@@ -2451,6 +2898,8 @@ CASES = {
     "p08_fs": p08_fs,
     "p12": p12,
     "p06": p06,
+    "p07": p07,
+    "p11_modal_focus": p11_modal_focus,
     "recon_settings": recon_settings,
     "recon_session_save": recon_session_save,
     "recon_tab_plus_explorer": recon_tab_plus_explorer,
