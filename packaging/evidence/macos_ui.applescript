@@ -162,6 +162,17 @@
 --   resize_window <proc> <w> <h>    -> "RESIZED: <w>x<h>" or "ERROR: ..." -
 --                                      a direct `size of w` write, for
 --                                      P03's narrow-window usability check.
+--   click_title_bar <proc>          -> "CLICKED: title-bar at={x,y}" or
+--                                      "ERROR: ..." - a raw `click at
+--                                      {x,y}` at the native title bar
+--                                      (outside any web content), to blur
+--                                      whatever has focus inside the
+--                                      WKWebView without any keystroke -
+--                                      for P07's path-edit field, whose
+--                                      onblur also submits a valid typed
+--                                      path (real Return-key delivery to
+--                                      this specific field was tried and
+--                                      confirmed NOT to reach it).
 --   focused_element <proc>         -> "FOCUSED: source=<process|window>
 --                                      class=<c> role=<r> desc=<d>
 --                                      title=<t> value=<v>", "FOCUSED:
@@ -1094,6 +1105,39 @@ on runOnce(argv)
                 on error errMsg
                     return "ERROR: " & errMsg
                 end try
+
+            else if cmdName is "click_title_bar" then
+                -- M5-C / P07's path-edit submission: two independent real
+                -- dispatches proved `key code 36` (Return) never reaches a
+                -- confirmed-AXFocused text field inside this WKWebView-
+                -- hosted content (the field's own value, read back
+                -- immediately before AND after the keypress, was byte-for-
+                -- byte identical - the keystroke had zero effect, not
+                -- merely a slow one) - the same underlying gap `type_into`'s
+                -- Cmd+A/keystroke path already hit for this field. Rather
+                -- than chase keyboard-event delivery into WKWebView further,
+                -- this drives the field's `onblur` handler (which also
+                -- submits a valid typed path, per `dir_pane.rs`'s
+                -- `PathBar`) via a genuine mouse click OUTSIDE any web
+                -- content at all: the native title bar, computed from the
+                -- window's own position/size (not an AXPress on any
+                -- element - a raw `click at {x,y}`, the same mechanism
+                -- `type_into`/`double_click_row_side` already rely on for
+                -- real positional input).
+                try
+                    set p to position of w
+                    set sz to size of w
+                    set cx to (item 1 of p) + ((item 1 of sz) / 2)
+                    set cy to (item 2 of p) + 10
+                on error errMsg
+                    return "ERROR: position/size: " & errMsg
+                end try
+                try
+                    click at {cx, cy}
+                on error errMsg
+                    return "ERROR: click-at-coords: " & errMsg
+                end try
+                return "CLICKED: title-bar at={" & cx & "," & cy & "}"
 
             else if cmdName is "resize_window" then
                 -- M5-C / P03's narrow-window usability check: a direct

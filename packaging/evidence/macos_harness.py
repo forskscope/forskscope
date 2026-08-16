@@ -2130,21 +2130,19 @@ def p07(binary, break_mode=False):
                     file=sys.stderr,
                 )
                 return 1
-            print(
-                f"DEBUG: field value right before Return: "
-                f"{ui('get_value', 'AXTextField', '1', timeout=20)!r}",
-                flush=True,
-            )
-            r = ui("send_key", "36", "1", timeout=20)  # Return
-            if not r.startswith("DONE"):
-                print(f"FAIL: could not send Return to submit the path edit: {r}", file=sys.stderr)
+            # Two real dispatches proved `key code 36` (Return) does not
+            # reach this field at all: its value, read back immediately
+            # before and after the keypress, was byte-for-byte identical -
+            # not slow, simply never delivered. Rather than chase keyboard-
+            # event delivery into this WKWebView further, submit via the
+            # field's `onblur` handler instead (dir_pane.rs's PathBar also
+            # navigates on blur for a valid typed path) - driven by a real
+            # mouse click OUTSIDE any web content (the native title bar),
+            # not a keystroke at all.
+            r = ui("click_title_bar", timeout=20)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click the title bar to blur the path field: {r}", file=sys.stderr)
                 return 1
-            time.sleep(0.5)
-            print(
-                f"DEBUG: field presence/value after Return: "
-                f"{ui('get_value', 'AXTextField', '1', timeout=20)!r}",
-                flush=True,
-            )
             r = find_wait("left-only.txt", timeout=15)
             if not r.startswith("FOUND"):
                 print(
@@ -2572,6 +2570,15 @@ def p03(binary, break_mode=False):
                     f"multiple hunks (last: {rows!r})",
                     file=sys.stderr,
                 )
+                return 1
+
+            # The word-wrap toggle lives in the toolbar's "advanced" panel
+            # (`diff-toolbar advanced` in toolbar.rs), hidden until "More ▼"
+            # is clicked - same prerequisite M5-B's P04 already established
+            # for reaching Redo.
+            r = click_wait("More ▼", timeout=10)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not open the advanced panel ('More ▼'): {r}", file=sys.stderr)
                 return 1
 
             r = click_wait("Toggle word wrap", timeout=10)
