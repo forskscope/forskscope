@@ -257,24 +257,17 @@ pub fn advance_recovery_queue(store: &mut Store) {
 /// resulting `Signal` values, the same as any other unit test. It does not
 /// touch rendering, event dispatch, or visual correctness — those stay
 /// outside this helper's scope (F34's territory, not F36's).
-/// Serializes every test that constructs a `VirtualDom` — `with_test_store`
-/// below, and `app::tests`'s F61 regression test, which renders the real
-/// `App()`. Confirmed empirically (F61 handoff work) that two `VirtualDom`s
-/// rendering concurrently on different test threads genuinely interfere
-/// with each other (a test that passed reliably alone or serial flaked
-/// under default parallel `cargo test`); Dioxus's runtime state is not
-/// documented as safe for concurrent instances, so treat it as unsafe
-/// rather than as a timing bug in either test.
-#[cfg(test)]
-pub(crate) static DIOXUS_VDOM_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
+///
+/// Runs `f` inside the `VirtualDom`'s own runtime context
+/// (`VirtualDom::in_runtime`), not just during the initial
+/// `rebuild_in_place()` — a function under test may itself need
+/// `Runtime::current()` to succeed (e.g. anything that calls `spawn`/
+/// `spawn_forever`, confirmed while testing `open_compare_request` for
+/// F61: without this, task-spawning code panics with "Components run in
+/// the Dioxus runtime" once outside the bare `rebuild_in_place()` scope).
 #[cfg(test)]
 pub(crate) fn with_test_store<R>(f: impl FnOnce(&mut Store) -> R) -> R {
     use std::cell::RefCell;
-
-    let _guard = DIOXUS_VDOM_TEST_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
 
     thread_local! {
         static CAPTURED: RefCell<Option<Store>> = const { RefCell::new(None) };
@@ -291,7 +284,7 @@ pub(crate) fn with_test_store<R>(f: impl FnOnce(&mut Store) -> R) -> R {
     let mut store = CAPTURED
         .with(|c| c.borrow_mut().take())
         .expect("root() must have run synchronously during rebuild_in_place()");
-    let result = f(&mut store);
+    let result = vdom.in_runtime(|| f(&mut store));
     drop(vdom);
     result
 }

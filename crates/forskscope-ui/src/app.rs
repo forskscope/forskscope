@@ -6,7 +6,6 @@ use forskscope_ui_logic::StartupRequest;
 
 use crate::state::{
     Store, advance_recovery_queue, open_compare_request, resolve_session, restore_tabs,
-    save_session,
 };
 use crate::ui::layout::header::Header;
 use crate::ui::layout::statusbar::StatusBar;
@@ -42,9 +41,6 @@ pub fn App() -> Element {
         }
         store
     });
-
-    #[cfg(test)]
-    tests::CAPTURED_STORE.with(|c| *c.borrow_mut() = Some(store));
 
     use_hook(|| {
         // Resolving the session file (and setting session_write_disabled)
@@ -83,12 +79,6 @@ pub fn App() -> Element {
                 restore_tabs(&mut store, &session_resolution);
             }
         }
-    });
-
-    // Persist the session whenever the tab list changes.
-    use_effect(move || {
-        let _tabs = store.tabs.read(); // subscribe to the tabs signal
-        save_session(&store);
     });
 
     // Update the OS window title to reflect the active comparison.
@@ -243,6 +233,3 @@ pub fn App() -> Element {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

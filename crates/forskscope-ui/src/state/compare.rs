@@ -18,7 +18,7 @@ use forskscope_ui_logic::{
 
 use crate::i18n::t;
 use crate::state::tab::{CompareLaunchMode, CompareTab, TabState, tab_title};
-use crate::state::{Store, settings::Lang};
+use crate::state::{Store, save_session, settings::Lang};
 
 enum LoadResult {
     Ready(Box<PreparedCompare>),
@@ -202,6 +202,16 @@ pub fn open_compare_request(store: &mut Store, request: CompareRequest) {
     let idx = store.tabs.read().len();
     store.tabs.write().push(tab);
     store.active.set(Some(idx));
+    // F61: session persistence is an explicit call, not the reactive
+    // `use_effect` app.rs used to have on `store.tabs` - confirmed on a
+    // real desktop process that the effect never runs for a signal write
+    // made here (synchronously, during startup hook execution, outside any
+    // discrete UI-event dispatch), even though the exact same write
+    // correctly triggers a visual re-render. Only a write made from inside
+    // a real Dioxus event handler (e.g. `close_tab`'s `onclick`) reliably
+    // flushed the effect queue. See ROADMAP.md's F61 entry for the full
+    // account.
+    save_session(store);
 
     let mut tabs_signal = store.tabs;
     let lang = store.lang();
@@ -220,6 +230,10 @@ pub fn open_compare_request(store: &mut Store, request: CompareRequest) {
             Err(_join_err) => LoadResult::Error(t(lang, "Could not open")),
         };
         commit_load_result(&mut tabs, token, result);
+        // No save_session call needed here: the session payload only ever
+        // holds left_path/right_path (build_save_payload), both already
+        // final at the synchronous push above - the diff/load outcome
+        // this task commits doesn't change what gets persisted.
     });
 }
 

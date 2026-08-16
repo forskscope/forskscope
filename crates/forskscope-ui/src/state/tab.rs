@@ -9,6 +9,7 @@ use forskscope_core::document::LoadedDocument;
 use forskscope_core::{DiffOptions, MergeSession, compute_diff};
 use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
+use crate::state::save_session;
 use crate::state::settings::Lang;
 
 /// Lifecycle state of a comparison tab (RFC-065).
@@ -91,14 +92,21 @@ pub fn recompute_diff(tab: &mut CompareTab) {
 }
 
 pub fn swap_sides(store: &mut crate::state::Store, index: usize) {
-    let mut tabs = store.tabs.write();
-    let Some(tab) = tabs.get_mut(index) else {
-        return;
-    };
-    std::mem::swap(&mut tab.left_doc, &mut tab.right_doc);
-    std::mem::swap(&mut tab.left_path, &mut tab.right_path);
-    tab.can_save = tab.left_doc.kind.is_mergeable_text() && tab.right_doc.kind.is_mergeable_text();
-    recompute_diff(tab);
+    {
+        let mut tabs = store.tabs.write();
+        let Some(tab) = tabs.get_mut(index) else {
+            return;
+        };
+        std::mem::swap(&mut tab.left_doc, &mut tab.right_doc);
+        std::mem::swap(&mut tab.left_path, &mut tab.right_path);
+        tab.can_save =
+            tab.left_doc.kind.is_mergeable_text() && tab.right_doc.kind.is_mergeable_text();
+        recompute_diff(tab);
+    }
+    // F61: swap_sides changes left_path/right_path, which is exactly what
+    // session persistence needs to reflect - see open_compare_request's
+    // save_session call for why this is now explicit rather than reactive.
+    save_session(store);
 }
 
 /// Installs `next` and recomputes the diff immediately, discarding any

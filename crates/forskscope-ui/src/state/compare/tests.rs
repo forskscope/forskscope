@@ -1,6 +1,8 @@
 use std::fs;
 
 use super::*;
+use forskscope_core::persist::schema::PersistenceLoad;
+use forskscope_core::persist::schema::session::SessionRepository;
 use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
 fn id(value: u64) -> CompareTabId {
@@ -416,4 +418,78 @@ fn mergetool_compares_local_and_remote_not_local_and_merged() {
          merged's very different content was never fed into the comparison: {:?}",
         prepared.diff.hunks
     );
+}
+
+// ── F61 regression: a CLI-opened tab must persist without waiting for any
+// reactive effect ────────────────────────────────────────────────────────
+//
+// `app.rs` used to persist the session via a `use_effect` on `store.tabs`.
+// Confirmed on a real desktop process (not a VirtualDom harness — that
+// diverged from production, see ROADMAP.md's F61 entry for the full
+// account) that this effect never ran for a signal write made outside a
+// discrete Dioxus event dispatch: neither the synchronous push here nor
+// the async load task's later write ever reached it, even after 30 real
+// seconds idle, even though the same writes correctly drove a visual
+// re-render. Only a write made from inside a real `onclick` handler
+// (`close_tab`) reliably flushed it. Fixed by removing the effect and
+// calling `save_session` explicitly at every site that changes what a
+// session needs to remember (this function's push; `swap_sides`), the
+// same way `close_tab` already did. This test exercises that explicit
+// call, synchronously, through `with_test_store` (F36) — no VirtualDom
+// rendering, no waiting on a scheduler, and so nothing here can diverge
+// from production timing the way the deleted harness did.
+
+static XDG_CONFIG_HOME_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[test]
+fn opening_a_tab_persists_the_session_without_any_further_render() {
+    let _guard = XDG_CONFIG_HOME_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+
+    let dir = temp_dir("f61-open-compare-persists");
+    let left = dir.join("left.txt");
+    let right = dir.join("right.txt");
+    fs::write(&left, "alpha\n").unwrap();
+    fs::write(&right, "beta\n").unwrap();
+    let config_home = dir.join("config");
+    fs::create_dir_all(&config_home).unwrap();
+
+    let previous_xdg = std::env::var("XDG_CONFIG_HOME").ok();
+    // SAFETY: serialized by XDG_CONFIG_HOME_LOCK; no other test in this
+    // suite reads or writes this env var.
+    unsafe {
+        std::env::set_var("XDG_CONFIG_HOME", &config_home);
+    }
+
+    crate::state::with_test_store(|store| {
+        open_compare_request(store, normal_request(left.clone(), right.clone()));
+    });
+
+    // SAFETY: still serialized by XDG_CONFIG_HOME_LOCK.
+    unsafe {
+        match &previous_xdg {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+    }
+
+    let session_path = config_home.join("forskscope").join("session.json");
+    assert!(
+        session_path.exists(),
+        "F61: opening a tab must persist session.json synchronously, with \
+         no further render or async completion needed, but no file was \
+         written at {}",
+        session_path.display()
+    );
+
+    let repo = SessionRepository::new(session_path);
+    match repo.load() {
+        PersistenceLoad::Current { value } => {
+            assert_eq!(value.tabs.len(), 1, "expected exactly the one opened tab");
+            assert_eq!(value.tabs[0].left, left);
+            assert_eq!(value.tabs[0].right, right);
+        }
+        other => panic!("session.json was written but does not parse as current: {other:?}"),
+    }
 }
