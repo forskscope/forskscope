@@ -2270,6 +2270,15 @@ def p07(binary, break_mode=False):
             # Polled rather than a single raw call - the filter switch just
             # before this triggers a re-render, and a real dispatch showed
             # a single immediate `click_button_exact` racing it (NOT_FOUND).
+            print(
+                f"DEBUG: pre-copy state - aaa-changed.txt="
+                f"{ui('find_text', 'aaa-changed.txt', timeout=20)!r} "
+                f"'Copy to right' substring="
+                f"{ui('find_text', 'Copy to right', timeout=20)!r} "
+                f"'Copy to right' exact(unclicked probe via get info)="
+                f"{ui('click_button_exact', 'Copy to right', timeout=20)!r}",
+                flush=True,
+            )
             r = click_wait("Copy to right", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click the per-file 'Copy to right' button: {r}", file=sys.stderr)
