@@ -43,6 +43,9 @@ pub fn App() -> Element {
         store
     });
 
+    #[cfg(test)]
+    tests::CAPTURED_STORE.with(|c| *c.borrow_mut() = Some(store));
+
     use_hook(|| {
         // Resolving the session file (and setting session_write_disabled)
         // must happen unconditionally, before branching on a CLI startup
@@ -240,3 +243,6 @@ pub fn App() -> Element {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

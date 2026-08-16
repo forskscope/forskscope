@@ -125,8 +125,18 @@ fn existing_created_unix(path: &Path) -> Option<u64> {
 
 /// Atomically writes `json` to `path` (temp file in the same directory, then
 /// rename), reusing the same primitive [`crate::save::save_text`] uses for
-/// document saves.
+/// document saves. F61: this is the *first* write a fresh install ever makes
+/// — nothing else in the app creates `path`'s parent directory (`~/.config/
+/// forskscope`, or platform equivalent) beforehand, so `atomic_replace`'s
+/// temp file had nowhere to go and every first write failed with
+/// `NotFound`, silently (F62) until now. `ensure_pre_v2_backup`/
+/// `ensure_reset_backup` don't need this: they only ever run against a file
+/// that was just successfully read, so its parent directory is already
+/// known to exist.
 pub(super) fn atomic_write_envelope(path: &Path, json: &str) -> Result<(), PersistenceIoError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| PersistenceIoError(e.to_string()))?;
+    }
     crate::save::atomic_replace(path, json.as_bytes())
         .map_err(|e| PersistenceIoError(e.to_string()))
 }

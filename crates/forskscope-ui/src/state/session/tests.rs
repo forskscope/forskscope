@@ -62,7 +62,7 @@ fn persist_session_writes_through_the_real_repository() {
         Some(PathBuf::from("/new/a.rs")),
     )];
 
-    persist_session(&build_save_payload(&pairs), &repo);
+    persist_session(&build_save_payload(&pairs), &repo).expect("persist_session must succeed");
 
     match repo.load() {
         PersistenceLoad::Current { value } => {
@@ -99,7 +99,7 @@ fn load_session_round_trips_through_persist_session() {
             Some(PathBuf::from("/new/b.rs")),
         ),
     ];
-    persist_session(&build_save_payload(&pairs), &repo);
+    persist_session(&build_save_payload(&pairs), &repo).expect("persist_session must succeed");
 
     let resolution = load_session(&repo);
 
@@ -134,12 +134,17 @@ fn future_version_session_stays_byte_identical_through_a_disabled_save() {
     );
 
     let pairs = vec![(Some(PathBuf::from("/left")), Some(PathBuf::from("/right")))];
-    save_session_if_allowed(
+    let result = save_session_if_allowed(
         resolution.write_disabled,
         &build_save_payload(&pairs),
         &repo,
     );
 
+    assert_eq!(
+        result,
+        Ok(()),
+        "a disabled write is a deliberate no-op, not a failure"
+    );
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
         raw,

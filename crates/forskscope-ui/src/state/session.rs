@@ -3,13 +3,13 @@
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
-use forskscope_core::persist::schema::PersistenceCommitError;
 use forskscope_core::persist::schema::session::runtime::{
     SessionRuntimeResolution, resolve_and_commit,
 };
 use forskscope_core::persist::schema::session::{
     PersistedComparePair, PersistedSession, SessionRepository,
 };
+use forskscope_core::persist::schema::{PersistenceCommitError, PersistenceIoError};
 use forskscope_ui_logic::SessionRecoveryView;
 
 use crate::state::compare::open_compare;
@@ -22,7 +22,11 @@ fn repository() -> SessionRepository {
 /// Persist the current open tabs for restoration on next launch. A no-op
 /// when `store.session_write_disabled` is set — a future/corrupt/unwritable
 /// source this run could not establish is safe to overwrite (RFC-076
-/// "persistence_write_disabled").
+/// "persistence_write_disabled"). F62: a write failure is shown to the user
+/// as an error toast rather than discarded — the same treatment whether the
+/// call came from an explicit action (`close_tab`) or the startup/tab-change
+/// reactive effect, since either way the user's session may now not survive
+/// a restart and silence about that is exactly F62's defect.
 pub fn save_session(store: &Store) {
     let pairs: Vec<(Option<PathBuf>, Option<PathBuf>)> = store
         .tabs
@@ -30,11 +34,15 @@ pub fn save_session(store: &Store) {
         .iter()
         .map(|tab| (tab.left_path.clone(), tab.right_path.clone()))
         .collect();
-    save_session_if_allowed(
+    let result = save_session_if_allowed(
         *store.session_write_disabled.read(),
         &build_save_payload(&pairs),
         &repository(),
     );
+    if let Err(e) = result {
+        let mut store = *store;
+        store.notify(format!("Could not save session: {e}"));
+    }
 }
 
 /// The write-disable gate itself, exposed for direct testing (review 041
@@ -44,11 +52,11 @@ pub fn save_session_if_allowed(
     write_disabled: bool,
     payload: &PersistedSession,
     repo: &SessionRepository,
-) {
+) -> Result<(), PersistenceIoError> {
     if write_disabled {
-        return;
+        return Ok(());
     }
-    persist_session(payload, repo);
+    persist_session(payload, repo)
 }
 
 /// The Store-independent half of [`save_session`]: what gets written. Split
@@ -74,8 +82,14 @@ pub fn build_save_payload(pairs: &[(Option<PathBuf>, Option<PathBuf>)]) -> Persi
 /// Writes `payload` via `repo` — the exact repository call `save_session`
 /// makes, exposed for direct testing (handoff §6: "targeted tests proving
 /// the actual UI startup and save functions use the new repositories").
-pub fn persist_session(payload: &PersistedSession, repo: &SessionRepository) {
-    let _ = repo.save(payload);
+/// F62: returns the write's `Result` instead of discarding it — `Result`
+/// is `#[must_use]` in `std`, so a caller that ignores this now gets a
+/// compiler warning, not silence.
+pub fn persist_session(
+    payload: &PersistedSession,
+    repo: &SessionRepository,
+) -> Result<(), PersistenceIoError> {
+    repo.save(payload)
 }
 
 /// Loads the last-saved session via the RFC-076 repository, durably

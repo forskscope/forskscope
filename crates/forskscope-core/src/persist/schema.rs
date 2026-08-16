@@ -49,6 +49,12 @@ pub mod settings;
 /// and [`session::SessionRepository::commit_migration`]'s public signatures.
 pub use repository::PersistenceCommitError;
 
+/// Re-exported because it appears in [`settings::SettingsRepository::save`]
+/// and [`session::SessionRepository::save`]'s public signatures (F62: callers
+/// must be able to name this type to handle a save failure instead of
+/// discarding it).
+pub use repository::PersistenceIoError;
+
 /// The outcome of loading one persisted file, distinguishing every case RFC-076
 /// requires the caller to handle differently. Never collapses a distinguishable
 /// failure into a default.

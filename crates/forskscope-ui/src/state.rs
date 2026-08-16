@@ -257,9 +257,24 @@ pub fn advance_recovery_queue(store: &mut Store) {
 /// resulting `Signal` values, the same as any other unit test. It does not
 /// touch rendering, event dispatch, or visual correctness — those stay
 /// outside this helper's scope (F34's territory, not F36's).
+/// Serializes every test that constructs a `VirtualDom` — `with_test_store`
+/// below, and `app::tests`'s F61 regression test, which renders the real
+/// `App()`. Confirmed empirically (F61 handoff work) that two `VirtualDom`s
+/// rendering concurrently on different test threads genuinely interfere
+/// with each other (a test that passed reliably alone or serial flaked
+/// under default parallel `cargo test`); Dioxus's runtime state is not
+/// documented as safe for concurrent instances, so treat it as unsafe
+/// rather than as a timing bug in either test.
+#[cfg(test)]
+pub(crate) static DIOXUS_VDOM_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[cfg(test)]
 pub(crate) fn with_test_store<R>(f: impl FnOnce(&mut Store) -> R) -> R {
     use std::cell::RefCell;
+
+    let _guard = DIOXUS_VDOM_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
 
     thread_local! {
         static CAPTURED: RefCell<Option<Store>> = const { RefCell::new(None) };

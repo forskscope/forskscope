@@ -54,7 +54,7 @@ fn persist_settings_writes_through_the_real_repository() {
         ..PersistedSettings::default()
     };
 
-    persist_settings(&payload, &repo);
+    persist_settings(&payload, &repo).expect("persist_settings must succeed");
 
     match repo.load() {
         PersistenceLoad::Current { value } => assert_eq!(value.context_lines, 11),
@@ -86,7 +86,7 @@ fn load_settings_round_trips_through_persist_settings() {
         explorer_compact: true,
         ..PersistedSettings::default()
     };
-    persist_settings(&payload, &repo);
+    persist_settings(&payload, &repo).expect("persist_settings must succeed");
 
     let (settings, _resolution) = load_settings(&repo);
 

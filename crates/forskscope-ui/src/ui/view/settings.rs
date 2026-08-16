@@ -7,11 +7,11 @@ pub mod modal;
 pub mod profile;
 
 use dioxus::prelude::*;
-use forskscope_core::persist::schema::PersistenceCommitError;
 use forskscope_core::persist::schema::settings::runtime::{
     SettingsRuntimeResolution, resolve_and_commit,
 };
 use forskscope_core::persist::schema::settings::{PersistedSettings, SettingsRepository};
+use forskscope_core::persist::schema::{PersistenceCommitError, PersistenceIoError};
 use forskscope_ui_logic::SettingsRecoveryView;
 
 use crate::state::{AppSettings, Lang, Modal, Notice, Store, Theme, config_file_path};
@@ -35,14 +35,17 @@ fn repository() -> SettingsRepository {
 /// Merges `store.settings`'s UI-editable fields onto the cached canonical
 /// value and writes it, unless `store.settings_write_disabled` is set — a
 /// future/corrupt/unwritable source this run could not establish is safe to
-/// overwrite (RFC-076 "persistence_write_disabled").
+/// overwrite (RFC-076 "persistence_write_disabled"). F62: a write failure is
+/// shown to the user as an error toast rather than discarded.
 pub fn persist(mut store: Store) {
     if *store.settings_write_disabled.read() {
         return;
     }
     let merged = build_save_payload(&store.settings.read(), &store.settings_v2_base.read());
     store.settings_v2_base.set(merged.clone());
-    persist_settings(&merged, &repository());
+    if let Err(e) = persist_settings(&merged, &repository()) {
+        store.notify(format!("Could not save settings: {e}"));
+    }
 }
 
 /// The Store-independent half of [`persist`]: what gets written and where.
@@ -54,9 +57,13 @@ pub fn build_save_payload(settings: &AppSettings, base: &PersistedSettings) -> P
 
 /// Writes `payload` via `repo` — the exact repository call `persist` makes,
 /// exposed for direct testing (handoff §6: "targeted tests proving the
-/// actual UI startup and save functions use the new repositories").
-pub fn persist_settings(payload: &PersistedSettings, repo: &SettingsRepository) {
-    let _ = repo.save(payload);
+/// actual UI startup and save functions use the new repositories"). F62:
+/// returns the write's `Result` instead of discarding it.
+pub fn persist_settings(
+    payload: &PersistedSettings,
+    repo: &SettingsRepository,
+) -> Result<(), PersistenceIoError> {
+    repo.save(payload)
 }
 
 /// Loads settings via the RFC-076 repository, durably committing any legacy
