@@ -120,6 +120,18 @@ import tempfile
 import time
 from pathlib import Path
 
+# PowerShell's default console codepage on windows-latest is cp1252, not
+# UTF-8 - a plain print() of accessible text containing a non-cp1252
+# character (e.g. an icon glyph or the "↔" this module's own
+# rowprobe hit on its first CI run) raises UnicodeEncodeError and aborts
+# the whole case before its real output prints. Reconfigured once, up
+# front, for every case - not just rowprobe - since any case's
+# debug_dump()/collect_texts() could hit the same wall on accessible text
+# this harness doesn't control the content of.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 LAUNCH_TIMEOUT_S = 60
