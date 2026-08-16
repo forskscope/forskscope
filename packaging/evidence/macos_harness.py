@@ -2065,19 +2065,51 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: Explorer never showed any rows at $HOME (last: {r!r})", file=sys.stderr)
                 return 1
 
-            # A real dispatch found the per-file copy buttons (below) never
-            # rendering at all: `DeepRow` (deep_compare.rs) gates them on
+            # Two real dispatches found the per-file copy buttons (below)
+            # never rendering at all, and settings.json never getting
+            # written despite several `navigate_to` calls. `DeepRow`
+            # (deep_compare.rs) gates the per-row copy buttons on
             # `store.settings.read().last_left_dir`/`last_right_dir` being
-            # `Some(...)`, which `navigate_to` (dir_pane.rs) only sets when
-            # `remember_explorer_dirs` is on (the actual shipping default,
-            # per `PersistedSettings::default()` - the recon-era comment
-            # elsewhere in this harness claiming it defaults off predates
-            # that and is now wrong). The navigation dance below only ever
-            # touches the LEFT pane, so `last_right_dir` stays `None`
-            # regardless - `has_right_root` alone was enough to hide every
-            # per-row button. One harmless click of each pane's own "⌂"
-            # (Home) button - a real navigate_to(home) to the SAME path
-            # already showing, so nothing visibly changes - sets both.
+            # `Some(...)`, which `navigate_to` (dir_pane.rs) only sets (and
+            # only persists) when `remember_explorer_dirs` is on - current
+            # repo HEAD's `PersistedSettings::default()` sets this `true`,
+            # but the empirical evidence (settings.json genuinely never
+            # created) shows the PUBLISHED 0.167.0 artifact this harness is
+            # constrained to test against defaults it to `false` - the repo
+            # has moved on since that release was cut, and the current
+            # source is not a reliable guide to what 0.167.0 actually does
+            # (the recon-era comment elsewhere in this harness claiming
+            # "off by default" was empirically right about 0.167.0 all
+            # along, not stale). Enables it via the real Settings dialog
+            # checkbox (`settings/modal.rs`'s "Remember Explorer
+            # directories", role AXCheckBox - not AXButton, the same
+            # aria-driven role difference already seen for P03's word-wrap
+            # toggle - `perform_action`'s `AXPress`, matching the technique
+            # `select_popup_item` already established for this dialog's
+            # other WebKit-custom controls). It is the ONLY checkbox
+            # present without opening "Advanced" first, so index "1" is
+            # unambiguous.
+            r = click_wait("Settings")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not open Settings: {r}", file=sys.stderr)
+                return 1
+            time.sleep(0.3)
+            r = ui("perform_action", "AXCheckBox", "1", "AXPress", timeout=20)
+            if not r.startswith("DONE"):
+                print(f"FAIL: could not toggle 'Remember Explorer directories': {r}", file=sys.stderr)
+                return 1
+            r = click_wait("Close")
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not close Settings: {r}", file=sys.stderr)
+                return 1
+
+            # With remember_explorer_dirs now on, one harmless click of
+            # each pane's own "⌂" (Home) button - a real navigate_to(home)
+            # to the SAME path already showing, so nothing visibly changes
+            # - sets both last_left_dir and last_right_dir. The navigation
+            # dance below only ever touches the LEFT pane on its own, so
+            # the right pane's own Home click is what makes has_right_root
+            # true.
             r = ui("click_button_nth", "⌂", "1", timeout=20)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click the left pane's Home ('⌂') button: {r}", file=sys.stderr)
