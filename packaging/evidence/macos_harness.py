@@ -2130,10 +2130,21 @@ def p07(binary, break_mode=False):
                     file=sys.stderr,
                 )
                 return 1
+            print(
+                f"DEBUG: field value right before Return: "
+                f"{ui('get_value', 'AXTextField', '1', timeout=20)!r}",
+                flush=True,
+            )
             r = ui("send_key", "36", "1", timeout=20)  # Return
             if not r.startswith("DONE"):
                 print(f"FAIL: could not send Return to submit the path edit: {r}", file=sys.stderr)
                 return 1
+            time.sleep(0.5)
+            print(
+                f"DEBUG: field presence/value after Return: "
+                f"{ui('get_value', 'AXTextField', '1', timeout=20)!r}",
+                flush=True,
+            )
             r = find_wait("left-only.txt", timeout=15)
             if not r.startswith("FOUND"):
                 print(
@@ -2486,6 +2497,144 @@ def p11_modal_focus(binary, break_mode=False):
         "outstanding (mirroring F45's shape), not silently skipped. "
         "Consequence: the documented keyboard interface has no automated "
         "runtime coverage on any platform."
+    )
+    return 0
+
+
+# ── P03 — Compare layout and scrolling (basic layout observation) ──────────
+
+
+def p03(binary, break_mode=False):
+    """RFC-078's P03 is mandatory in full on WebKitGTK; macOS WebKit gets
+    "a basic layout observation" per RFC-078's own text and
+    `matrix-plan.md`'s Spot-check depth for this row.
+
+    **Horizontal-scroll-mirror investigation (handoff M5-C §3 - the item
+    with no precedent anywhere in this program).** `recon_p03_scroll` (two
+    real dispatches) established that macOS's WKWebView accessibility
+    mapping exposes NO scroll-position information at all for `.diff-
+    scroll`/`.diff-col-left`/`.diff-col-right`'s CSS-based scroll regions,
+    via either technique tried:
+
+    1. A plain child-tree walk (`list_roles`, the same `safeContents` walk
+       `count_rows`/`find_text` already rely on) found `AXScrollArea=1` but
+       `AXScrollBar=0` - no ordinary AXScrollBar children at all, and only
+       ONE AXScrollArea total (not two - so even distinguishing per-pane
+       scroll state structurally is unclear from this alone).
+    2. The standard NSAccessibility fallback - a scroll area's bars exposed
+       as ATTRIBUTE-valued references (`AXHorizontalScrollBar`/
+       `AXVerticalScrollBar`), not ordinary children - resolved to
+       `missing value` for BOTH orientations on the one AXScrollArea that
+       does exist (`scroll_area_bars`).
+
+    **This is a genuine platform/technique limitation, not a weakened
+    check**: no accessibility-exposed scroll-position property was found
+    for this content on macOS, via any technique this harness's
+    established AppleScript/System Events approach can reach, after two
+    dedicated recon rounds. Consistent with the handoff's own framing
+    ("Linux and Windows may or may not have solved it yet - don't
+    assume"), this is recorded as attempted-and-unresolved on this
+    platform, not silently skipped - **the horizontal-scroll-mirror
+    assertion itself is NOT executed on macOS.**
+
+    What IS executed, matching RFC-078's "basic layout observation" for
+    this row:
+
+    1. A multi-hunk fixture (F34's `all_hunk_kinds` pair - the same one
+       P02/P04/P05/P09 already rely on) renders the expected row count
+       across multiple hunks.
+    2. Word wrap toggles (`aria_label: "Toggle word wrap"`, `diff/
+       toolbar.rs`) without the view breaking - rows remain present and
+       correctly counted after the toggle, and after toggling back off.
+    3. A narrow window (480x500, well below the fixture's natural content
+       width) still renders the same row count - the view remains usable,
+       not blank, at a narrow width.
+
+    `--break`: asserts an impossible row count (99) immediately after the
+    word-wrap toggle, proving the check reads the real post-toggle row
+    count, not a vacuous "the toggle button exists and was clickable".
+    """
+    left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = launch(binary, [left, right], scratch)
+        try:
+            try:
+                wait_for_window(time.monotonic() + LAUNCH_TIMEOUT_S)
+            except (PermissionWall, TimeoutError) as exc:
+                print(f"FAIL: {exc}", file=sys.stderr)
+                return 1
+
+            rows = wait_rows(14)
+            if rows != "14":
+                print(
+                    f"FAIL: compare view never reached 14 AXRow elements across "
+                    f"multiple hunks (last: {rows!r})",
+                    file=sys.stderr,
+                )
+                return 1
+
+            r = click_wait("Toggle word wrap", timeout=10)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not click 'Toggle word wrap': {r}", file=sys.stderr)
+                return 1
+
+            expected_after_wrap = 99 if break_mode else 14
+            rows_after_wrap = wait_rows(expected_after_wrap, timeout=15)
+            if rows_after_wrap != str(expected_after_wrap):
+                print(
+                    f"FAIL: after toggling word wrap, row count is {rows_after_wrap!r}, "
+                    f"expected {expected_after_wrap}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            if break_mode:
+                # The --break assertion above already failed as required;
+                # nothing further to check.
+                return 1
+
+            r = click_wait("Toggle word wrap", timeout=10)
+            if not r.startswith("CLICKED"):
+                print(f"FAIL: could not toggle word wrap back off: {r}", file=sys.stderr)
+                return 1
+            rows_unwrapped = wait_rows(14, timeout=15)
+            if rows_unwrapped != "14":
+                print(
+                    f"FAIL: after toggling word wrap back off, row count is "
+                    f"{rows_unwrapped!r}, expected 14",
+                    file=sys.stderr,
+                )
+                return 1
+
+            r = ui("resize_window", "480", "500", timeout=20)
+            if not r.startswith("RESIZED"):
+                print(f"FAIL: could not resize the window narrow: {r}", file=sys.stderr)
+                return 1
+            rows_narrow = wait_rows(14, timeout=15)
+            if rows_narrow != "14":
+                print(
+                    f"FAIL: after narrowing the window, row count is {rows_narrow!r}, "
+                    "expected 14 (view should remain usable, not blank)",
+                    file=sys.stderr,
+                )
+                return 1
+        except (PermissionWall, TimeoutError, RuntimeError) as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: multi-hunk fixture rendered 14 AXRow elements; word wrap toggled on "
+        "(rows remained present, correctly counted) and off again; a narrow "
+        "(480x500) window still rendered all 14 rows, not blank. Horizontal-"
+        "scroll-mirror was NOT executed on macOS - two dedicated recon rounds "
+        "(list_roles/scroll_area_bars) found no accessibility-exposed scroll-"
+        "position property for this content on this platform via any technique "
+        "this harness's AppleScript/System Events approach can reach (a real, "
+        "evidenced platform/technique limitation, not a skipped or weakened "
+        "check - see this case's docstring)."
     )
     return 0
 
