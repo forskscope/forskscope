@@ -394,6 +394,242 @@ something to settle **before** P03 in M5-C, not discover during it.
   async loading, a wrong expected value, real UI-automation flakiness —
   never a wrong result from the application itself.
 
+## M5-C — P03, P07, P11
+
+**Test date (UTC):** 2026-08-16. Same host/harness/artifact as M5-A/M5-B
+above (`windows-latest`, digest-verified `0.167.0`) — see that section
+for the resolved runner image.
+
+| Case | Result | Evidence |
+|---|---|---|
+| P03 — Compare layout and scrolling | **Pass** | CI run [`31937225763`](https://github.com/forskscope/forskscope/actions/runs/31937225763) |
+| P07 — Explorer and directory report | **Fail — candidate product defect, blocks the whole case (see below)** | CI run [`31938459272`](https://github.com/forskscope/forskscope/actions/runs/31938459272) |
+| P11 — Keyboard and modal safety | **Fail — candidate product defect (see below)** | CI run [`31938755692`](https://github.com/forskscope/forskscope/actions/runs/31938755692) |
+
+Harness: `packaging/evidence/windows_harness.py` (same file as M5-A/M5-B),
+same `workflow_dispatch` mechanism, `p03`/`p07`/`p11` cases added to the
+existing `m5-evidence-windows.yml` choice list.
+
+### Prerequisite B — resolved favorably
+
+The M5-C handoff's §3 Prerequisite B: M5-A's Windows readiness check
+waits for distinguishing text tokens rather than row counts, because the
+UIA control type WebView2 maps a table-less `role="row"` div to was never
+established. Settled **before** writing any P03 case code, via two
+committed, real-CI-run diagnostics (`rowprobe`, CI runs
+[`31936262847`](https://github.com/forskscope/forskscope/actions/runs/31936262847)/
+[`31936284361`](https://github.com/forskscope/forskscope/actions/runs/31936284361)):
+`hunk.rs`'s `div.diff-row[role="row"]` maps to UIA control type
+**`DataItem`**, disambiguated from the identically-typed content-cell
+child by `ClassName` (UIA's `ClassName` property mirrors the DOM `class`
+attribute directly on this WebView2 build — confirmed empirically, not
+assumed: `class="diff-row"` reads back as `class_name='diff-row'`,
+`class="cell"` as `class_name='cell'`). This is **more** precise than
+Linux's AT-SPI "table row" role match (a literal CSS class, not an
+ARIA-role-derived label), and resolves Prerequisite B favorably: row
+count and per-row geometry are both checkable on Windows, matching (not
+merely approximating) Linux F34/`render_check.py`'s `check_pane` — even
+though RFC-078 only requires "a basic layout observation" here. P03 below
+does the fuller check rather than stopping at that floor.
+
+### P03 — full Linux-parity geometry check, plus a first-of-its-kind horizontal-scroll-mirror check
+
+Three separate launches, mirroring `p05`'s multi-launch shape (each
+against the fixture its own sub-check needs):
+
+1. **Row shape and alignment** (`left_all_hunk_kinds.txt`/`right_*`):
+   exactly 7 `diff-row`s per pane (the pinned fixture shape), uniform
+   accessible child count (2 per row — a gutter `DataItem` then a
+   content-cell `DataItem`; the `aria-hidden` +/− mark span between them
+   is correctly absent from the tree), uniform content-cell x-origin, and
+   uniform row extents (left/right) regardless of whether the row's own
+   content is short or long — the Windows-observable proxy for "short-row
+   backgrounds span the full widest-line area." Covers "action rows align
+   with left/right rows across multiple hunks" and "vertical rows remain
+   aligned" together, the same way Linux's single F34 check covers
+   several RFC-078 bullets at once.
+2. **Horizontal scroll mirroring — no precedent anywhere in this program
+   on any platform, built here for the first time.** Real investigation
+   across five committed diagnostic CI runs (`scrollprobe` v1–v5,
+   [`31936889265`](https://github.com/forskscope/forskscope/actions/runs/31936889265),
+   [`31936958119`](https://github.com/forskscope/forskscope/actions/runs/31936958119)
+   among them) established, in order:
+   - `.diff-col-left`/`.diff-col-right` (the actual `overflow-x:auto`
+     scroll containers `install_hscroll_sync` mirrors `scrollLeft`
+     between) carry no ARIA role and are **absent from the UIA tree
+     entirely** — `rowprobe`'s own ancestor walk skips straight from a
+     row to `.diff-wrap`, a real Chromium accessibility-tree
+     simplification (a "non-interesting" single-child wrapper collapsed
+     out, its children reparented), not a lookup bug.
+   - A whole-tree capability scan for `IScrollProvider`
+     (`CurrentHorizontallyScrollable`) found **zero** matches anywhere —
+     there is no `ScrollPattern` to invoke, on any element, for this
+     container.
+   - What does work: a native `WM_MOUSEHWHEEL` event (`send_horizontal_wheel`,
+     real `SendInput` via stdlib `ctypes` — the same input-synthesis
+     escalation `invoke()`/`set_value_text()` already use as a last
+     resort when no pattern is available). Confirmed moving a
+     2,000-character line's row rectangle by a clean, repeatable 1,000px,
+     **with the paired pane's row rectangle moving by the identical delta
+     at the same time** — real, observed proof `install_hscroll_sync`'s
+     mirror works: `(33,15453)`/`(572,15991)` before →
+     `(-967,14453)`/`(-428,14991)` after one wheel event,
+     `(-1967,…)`/`(-1428,…)` after a second.
+   P03 scrolls the left pane this way, polls the right pane's own row
+   rectangle (found by its fixture anchor text, not a midline-x
+   classification the scroll itself would perturb) until it has moved by
+   the identical delta, then samples it six more times to confirm it
+   *settles* rather than merely touching the target once — "without
+   feedback/jitter" (RFC-078) means an oscillation is itself a failure.
+3. **Narrow window, basic usability**: resizes the real OS window to
+   480px wide (`IUIAutomationTransformPattern.Resize`, falling back to a
+   raw `SetWindowPos` on the real `HWND` — `HwndWrapper.move_window` is a
+   Win32-backend-only method that does not exist on this UIA-backend
+   wrapper, confirmed on CI, not assumed) and confirms the fixture's
+   content tokens are still present afterward.
+
+`--break`: three independent impossible-value assertions, one per
+numbered check. Unlike Linux's `inject_geometry_defect.py`, this harness
+cannot inject a real layout defect into a published, digest-verified
+black-box artifact (no local rebuild, per this slice's constraints), so
+`--break` follows this file's own established pattern instead: assert
+against a value the real, correct app can never produce. Confirmed on CI
+run [`31937274686`](https://github.com/forskscope/forskscope/actions/runs/31937274686)
+— `FAIL(geometry --break): row geometry required an impossible
+misalignment to be present, and correctly found none`.
+
+### P07 — Fail: Explorer's directory listing never renders on this environment
+
+**Candidate product defect, blocking this entire case, registered not
+fixed.** Confirmed across five real CI runs and four independent trigger
+mechanisms — restoring `last_left_dir`/`last_right_dir` from
+`settings.json` at launch
+([`31937800743`](https://github.com/forskscope/forskscope/actions/runs/31937800743)),
+a real PathBar "edit path, commit" re-navigation to the identical path
+([`31938065443`](https://github.com/forskscope/forskscope/actions/runs/31938065443)),
+clicking Home (`⌂`) to navigate to the real `C:\Users\<runner>` directory
+([`31938290605`](https://github.com/forskscope/forskscope/actions/runs/31938290605)),
+and — to rule out mere slowness rather than never-happens — polling for
+up to 150s
+([`31938459272`](https://github.com/forskscope/forskscope/actions/runs/31938459272),
+final/authoritative run): the accessible-text-node count never moved off
+the empty state's 54, not once, across the full budget. `aligned.is_empty()`
+(`explorer/tree.rs`) is what actually renders the empty-state message
+seen in every run's diagnostic dump. `compute_aligned_rows` genuinely
+receives zero rows from both `DirectoryTree`s, on every attempt, for
+directories proven (by `mkdir`/a real, populated home directory) to have
+real content.
+
+Root cause narrowed no further than: something in `dioxus-swdir-tree`'s
+lazy-scan pipeline (`on_toggled` → `ScanRequest` → `use_scan_driver`'s
+executor → `on_loaded` merge) never completes or never delivers a result
+back into `tree_l`/`tree_r`, specifically on this Windows CI environment.
+This could be a genuine cross-platform product defect Windows CI simply
+never exercised before now (Explorer navigation was not touched by any
+M5-A/M5-B case), or an environment-specific limitation (a background scan
+thread/executor this sandboxed runner blocks or never schedules);
+distinguishing the two needs a rebuild with added instrumentation, which
+this slice's "published artifacts only, no rebuild" constraint forbids.
+Linux's equivalent P07 pass is recorded elsewhere as CI-confirmed
+working — this looks like a real, platform-specific difference, not a
+harness artifact common to all three platforms.
+
+Every sub-check below the initial listing (statuses, filters, deep-compare
+progress, per-file/batch copy, including the wrong-base-directory defect
+the code is written to demonstrate) is **unreached and unverified on
+Windows** as a direct consequence — the code exists in
+`windows_harness.py`, written and believed correct against a *rendered*
+listing (the equivalent Linux/macOS flow exercises it), but nothing past
+the initial listing has been, or currently can be, verified on this
+platform. "Focused-pane keyboard behaviour" would in any case be
+manual-outstanding here too, mirroring F45's shape, independent of this
+blocker.
+
+### P11 — Fail: `autofocus` does not move keyboard focus on this environment
+
+RFC-078's four keyboard/modal-safety items decompose the same way M5-B
+§3 already established: three (the keyboard checklist, global shortcuts
+staying inert behind a modal, Escape behaviour) need a real keystroke no
+accessibility API can synthesize for a listener bound to no UI element —
+recorded manual-outstanding, mirroring F45's shape, not attempted.
+
+The fourth — **modal focus starts on the safe/cancel action for
+destructive operations** — is CI-verifiable with nothing synthesized:
+`HasKeyboardFocus` is a plain UIA property, read via
+`has_keyboard_focus()`. This is what found the defect. Reusing P05's own
+conflict setup (apply a hunk, modify the target externally, Save) to
+reach `OverwriteModal` — every one of this app's destructive-action
+modals (`OverwriteModal`, `BatchCopyModal`, `ConfirmDirOpModal`,
+`ReloadModal`, `SwapModal`, `ConfirmDiffOptionChangeModal`,
+`ConfirmSaveAsOverwriteModal`) carries `autofocus: true` on its
+Cancel-equivalent button, confirmed by reading every one, not sampled —
+after polling the full readiness budget, a whole-tree scan for any
+element reporting `CurrentHasKeyboardFocus` found exactly two: the
+top-level OS window itself, and the toolbar's **"Save merge result"**
+button — the control that was focused *before* the modal opened, from
+clicking it to trigger the conflict. Focus never moved to either modal
+action button. Confirmed on two independent runs, normal mode
+([`31938755692`](https://github.com/forskscope/forskscope/actions/runs/31938755692))
+and `--break` mode
+([`31938879519`](https://github.com/forskscope/forskscope/actions/runs/31938879519)) —
+both fail identically, for the same underlying reason.
+
+**Candidate product defect, registered not fixed.** Linux's equivalent
+check is recorded elsewhere as CI-confirmed working both directions
+(Cancel focused, the destructive control not), so this looks like a real
+Chromium/WebView2-specific difference in how the HTML `autofocus`
+attribute is handled for an element mounted *after* initial page load (a
+dynamically-inserted modal), not a harness defect — the check is
+corroborated by finding a real, different, specific element (Save)
+holding focus instead of an absence of any signal. This is real
+data-safety-relevant behaviour, exactly the shape RFC-078's own text
+warns a destructive-modal focus check should catch.
+
+**`--break` limitation, noted rather than hidden:** because the real
+app's actual state is "neither button focused" (not "Cancel focused,
+correctly"), both normal and `--break` mode currently fail at the same
+earlier branch for the same underlying reason, before `--break`'s own
+"requires the impossible" branch is ever reached — so `--break` does not
+currently demonstrate this specific case's falsifiability in isolation
+while the defect persists. The check's liveness is still evidenced a
+different way: it reads real, specific, corroborated state (which exact
+control holds focus) and reports a genuine mismatch against what is
+required, not a tautological or unconditional failure.
+
+**Keyboard-coverage statement (handoff §6, stated plainly per its
+instruction):** across the manual-outstanding items here, P04's
+Enter-apply path (M5-B), and P06's double-reload, the documented keyboard
+interface has no automated runtime coverage on any platform this program
+has evidence for. Keyboard operability is a claim this project's README
+and accessibility RFCs make; this decomposition makes that gap explicit
+rather than leaving it implied by an unqualified "Pass."
+
+## M5-C falsifiability
+
+| Case | Break-mode run | Result |
+|---|---|---|
+| P03 | [`31937274686`](https://github.com/forskscope/forskscope/actions/runs/31937274686) | Fail (expected) — row geometry required an impossible misalignment, correctly found none |
+| P07 | Not reached — the case fails before any `--break`-gated assertion (the initial listing blocker above) | N/A |
+| P11 | [`31938879519`](https://github.com/forskscope/forskscope/actions/runs/31938879519) | Fail — but for the same real-defect reason as normal mode, not `--break`'s own impossible-value branch; see P11's note above |
+
+## M5-C failures and issue links
+
+- **Candidate defect — Windows Explorer's directory listing never
+  renders any row, on this CI environment, for any directory** (P07
+  above). Not fixed (no product behaviour changes, this slice).
+  Registered for the reviewer to disposition — a new ROADMAP finding or
+  not is a judgment call this evidence doesn't make for them.
+- **Candidate defect — `autofocus` does not move keyboard focus to a
+  destructive modal's Cancel button on this environment** (P11 above).
+  Not fixed. Real data-safety relevance per RFC-078's own framing.
+- Prerequisite B is resolved favorably (see above) — not a limitation,
+  a settled dependency this slice needed to close before P03 could be
+  written correctly.
+
+## M5-C waivers
+
+None.
+
 ## Waivers
 
 None.

@@ -116,6 +116,42 @@ nonexistent paths pruned by `restore_tabs` + auto-save) apply identically
 here, since this row runs the identical CI evidence — recorded under
 `windows-11.md` to avoid duplication, not omitted.
 
+## M5-C — P03, P07, P11
+
+Same CI runs as `windows-11.md`, since both rows share one CI host
+(`windows-latest`) per `matrix-plan.md`. See `windows-11.md`'s M5-C
+section for the full per-case narrative (Prerequisite B resolution,
+falsifiability demonstrations, and both candidate defects) — reproduced
+here would be a verbatim duplicate of the same runs' logs.
+
+| Case | Result | Evidence |
+|---|---|---|
+| P03 — Compare layout and scrolling | **Pass** | CI run [`31937225763`](https://github.com/forskscope/forskscope/actions/runs/31937225763) |
+| P07 — Explorer and directory report | **Fail — candidate product defect, blocks the whole case (see `windows-11.md`)** | CI run [`31938459272`](https://github.com/forskscope/forskscope/actions/runs/31938459272) |
+| P11 — Keyboard and modal safety | **Fail — candidate product defect (see `windows-11.md`)** | CI run [`31938755692`](https://github.com/forskscope/forskscope/actions/runs/31938755692) |
+
+## M5-C falsifiability
+
+Same runs as `windows-11.md`, since both rows share one CI host:
+
+| Case | Break-mode run | Result |
+|---|---|---|
+| P03 | [`31937274686`](https://github.com/forskscope/forskscope/actions/runs/31937274686) | Fail (expected) — row geometry required an impossible misalignment, correctly found none |
+| P07 | Not reached — the case fails before any `--break`-gated assertion | N/A |
+| P11 | [`31938879519`](https://github.com/forskscope/forskscope/actions/runs/31938879519) | Fail — same real-defect reason as normal mode, not `--break`'s own branch — see `windows-11.md` |
+
+## M5-C failures and issue links
+
+Both candidate defects noted under `windows-11.md`'s M5-C section (the
+Explorer directory-listing blocker, and the `autofocus` focus-position
+defect) apply identically here, since this row runs the identical CI
+evidence — recorded under `windows-11.md` to avoid duplication, not
+omitted.
+
+## M5-C waivers
+
+None.
+
 ## Waivers
 
 None.
