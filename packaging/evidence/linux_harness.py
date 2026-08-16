@@ -1750,12 +1750,19 @@ def p03(binary, break_mode=False):
        action - there is no AT-SPI action for "scroll", and
        `Atspi.Component.scroll_to_point` was tried first and confirmed to
        report success without moving anything - a fourth instance of this
-       program's shadow-AT-SPI-state family), then the right pane's
-       content-cell x is sampled three times over a settling window and
-       required to (a) have moved from its pre-scroll position and (b) be
-       stable across all three samples - "without feedback or jitter"
-       means an oscillating value is itself a failure, not just an
-       unmirrored one.
+       program's shadow-AT-SPI-state family). Tries button-7 (the GTK
+       horizontal-wheel convention) first, falling back to shift+button-4
+       and shift+button-5 (shifted vertical wheel, the more portable
+       convention) within the same run - a virtual pointer commonly only
+       defines 5 buttons, silently swallowing 6/7 with no error, and this
+       sandbox's own local X11 routing cannot validate any of the three in
+       advance (even a plain vertical scroll no-ops here), so which one
+       actually works can only be settled by CI. Once movement is seen,
+       the right pane's content-cell x is sampled three times over a
+       settling window and required to (a) have moved from its pre-scroll
+       position and (b) be stable across all three samples - "without
+       feedback or jitter" means an oscillating value is itself a
+       failure, not just an unmirrored one.
     5. Word wrap remains usable: toggling wrap on does not lose the row
        count or crash the view.
 
@@ -1860,9 +1867,49 @@ def p03(binary, break_mode=False):
             row_ext = extents(left_rows[0])
             cx, cy = row_ext.x + 100, row_ext.y + row_ext.height // 2
             subprocess.run(["xdotool", "mousemove", "--sync", str(cx), str(cy)], check=True, timeout=15)
-            for _ in range(20):
-                subprocess.run(["xdotool", "click", "7"], check=False, timeout=15)
-            time.sleep(0.5)
+
+            # A synthesized horizontal wheel click (button 6/7) is the GTK
+            # convention, but a virtual pointer (Xvfb's default included)
+            # commonly only defines 5 buttons - silently swallowing 6/7
+            # with no error, indistinguishable from "nothing listens to
+            # this event." Shift+vertical-wheel (buttons 4/5, universally
+            # present) is the far more portable convention GTK/WebKit also
+            # honor for horizontal scroll, so it's tried as a fallback
+            # within the same run rather than assumed away - confirmed
+            # unusable to synthesize *at all* from this local dev sandbox
+            # (even a plain vertical scroll no-ops here), so which method
+            # actually moves the pane can only be settled by CI itself.
+            def button_7():
+                for _ in range(20):
+                    subprocess.run(["xdotool", "click", "7"], check=False, timeout=15)
+
+            def shift_button_4():
+                for _ in range(20):
+                    subprocess.run(["xdotool", "keydown", "shift"], check=False, timeout=15)
+                    subprocess.run(["xdotool", "click", "4"], check=False, timeout=15)
+                    subprocess.run(["xdotool", "keyup", "shift"], check=False, timeout=15)
+
+            def shift_button_5():
+                for _ in range(20):
+                    subprocess.run(["xdotool", "keydown", "shift"], check=False, timeout=15)
+                    subprocess.run(["xdotool", "click", "5"], check=False, timeout=15)
+                    subprocess.run(["xdotool", "keyup", "shift"], check=False, timeout=15)
+
+            method_used = None
+            for method_name, method_fn in [
+                ("button-7 (horizontal wheel)", button_7),
+                ("shift+button-4 (shifted vertical wheel)", shift_button_4),
+                ("shift+button-5 (shifted vertical wheel)", shift_button_5),
+            ]:
+                method_fn()
+                time.sleep(0.5)
+                if right_cell_x() != before:
+                    method_used = method_name
+                    break
+                if break_mode:
+                    # Falsifiability doesn't need a working method - one
+                    # synthesis attempt establishing "unchanged" is enough.
+                    break
 
             samples = []
             for _ in range(3):
@@ -1873,9 +1920,10 @@ def p03(binary, break_mode=False):
             moved = samples[0] != before
             settled = samples[0] == samples[1] == samples[2]
             if moved != required_moved:
+                tried = "button-7, shift+button-4, shift+button-5" if method_used is None else method_used
                 print(
                     f"FAIL: right pane content x {'moved' if moved else 'did not move'} "
-                    f"after scrolling the left pane (before={before}, after={samples[0]}) "
+                    f"after scrolling the left pane via {tried} (before={before}, after={samples[0]}) "
                     f"- required {'unchanged (break mode)' if break_mode else 'to move (mirrored)'}",
                     file=sys.stderr,
                 )
@@ -1931,7 +1979,8 @@ def p03(binary, break_mode=False):
     print(
         "OK: rows are full-width regardless of content length; action buttons align with "
         "their left/right rows; geometry/alignment holds across a multi-hunk fixture; "
-        "horizontal scroll mirrors and settles; word wrap keeps the view usable."
+        f"horizontal scroll mirrors (via {method_used}) and settles; word wrap keeps the "
+        "view usable."
     )
     return 0
 
@@ -2005,6 +2054,25 @@ def p07(binary, break_mode=False):
             app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
             if app is None:
                 print("FAIL: forskscope never registered on the accessibility bus", file=sys.stderr)
+                return 1
+
+            # F57-class race: the window registers on the a11y bus before
+            # the WebView paints, and navigate_pane_to's "Edit path" (✎)
+            # button lookup is a single unretried tree walk - confirmed by
+            # CI run 31936719013's "expected 2 'Edit path' buttons, found
+            # 0". P06 (navigate_pane_to's other caller) already polls for
+            # this same Explorer-rendered marker before calling it; P07
+            # launches straight into the Explorer view (no tab click
+            # needed) but still needs the same wait.
+            explorer_ready = False
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                if find_by_name_containing(app, "Select a file or directory") is not None:
+                    explorer_ready = True
+                    break
+                time.sleep(0.3)
+            if not explorer_ready:
+                print("FAIL: Explorer view did not render (0-arg launch)", file=sys.stderr)
                 return 1
 
             navigate_pane_to(app, 0, data_dir)
@@ -2140,11 +2208,16 @@ def p07(binary, break_mode=False):
             if app is None:
                 print("FAIL: forskscope never registered (navigation-history launch)", file=sys.stderr)
                 return 1
-            time.sleep(1)
-            up_buttons = []
-            find_all_by_name_containing(app, "Go up one directory", up_buttons)
-            home_buttons = []
-            find_all_by_name_containing(app, "Home directory", home_buttons)
+            up_buttons, home_buttons = [], []
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                up_buttons = []
+                find_all_by_name_containing(app, "Go up one directory", up_buttons)
+                home_buttons = []
+                find_all_by_name_containing(app, "Home directory", home_buttons)
+                if up_buttons and home_buttons:
+                    break
+                time.sleep(0.3)
             if not up_buttons or not home_buttons:
                 print("FAIL: could not find the left pane's Up/Home navigation buttons", file=sys.stderr)
                 return 1
