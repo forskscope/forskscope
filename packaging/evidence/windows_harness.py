@@ -823,6 +823,143 @@ def p02(binary, break_mode=False):
     return 0
 
 
+# ── M5-C Prerequisite B probe — Windows UIA control type for row divs ───────
+
+
+def rowprobe(binary, break_mode=False):
+    """NOT an evidence case (no matrix-plan.md case ID) - a one-shot,
+    committed-and-run diagnostic for RFC-078 M5-C's Prerequisite B: does
+    a UIA control type exist that reliably, countably identifies
+    `hunk.rs`'s `div.diff-row[role="row"]` elements on Windows the way
+    AT-SPI's "table row" role does on Linux (`render_check.py`'s
+    `check_pane`)? `role="row"` here has no `role="table"`/`role="grid"`
+    ancestor (the app renders its own flex/grid CSS layout, not a
+    semantic HTML/ARIA table) - WAI-ARIA's "required context role" rule
+    says a user agent MAY drop a row role with no table/grid/treegrid
+    ancestor entirely, and WebKitGTK (Linux) and Chromium/WebView2
+    (Windows) are different engines with no obligation to resolve that
+    the same way; F57/AT-SPI confirms WebKitGTK keeps it, this probe is
+    what confirms or refutes the Chromium/WebView2 side empirically
+    instead of assuming parity.
+
+    Method: launch against the pinned `left_all_hunk_kinds.txt`/
+    `right_all_hunk_kinds.txt` fixture pair (the same one `render_check.py`
+    and `p02` use - 7 rows/pane, `EXPECTED_ROWS_PER_PANE` on Linux), wait
+    for the fixture tokens, then for a set of leaf line-content strings
+    that are never inline-char-diffed (so each is one leaf, not split
+    across spans - `old-line`/`new-line`, the one Replace-kind pair, are
+    deliberately excluded for this reason) find the smallest-area
+    descendant whose own text contains that string and walk its
+    `parent()` chain, printing each ancestor's UIA control type,
+    automation id, class name, rectangle, and own child count. Also
+    tallies every control type present anywhere in the tree. All of this
+    goes to stdout for a human (the reviewer, or this harness's own
+    author reading the CI log) to read - there is no pass/fail assertion
+    here, because there is nothing to assert yet; that is the point of a
+    prerequisite probe.
+    """
+    del break_mode  # no falsifiability mode - this is not an evidence case
+    left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+    # Deliberately excludes "old-line"/"new-line" (the one Replace-kind
+    # pair, at risk of inline char-diff span splitting) and "alpha"
+    # (appears identically on both sides/panes, so it cannot anchor a
+    # single element unambiguously).
+    anchors = ["gamma", "delete-line", "epsilon", "zeta", "insert-line"]
+
+    def area(elem):
+        try:
+            r = elem.rectangle()
+            return max(0, r.width()) * max(0, r.height())
+        except Exception:  # noqa: BLE001
+            return float("inf")
+
+    def describe(elem, indent):
+        try:
+            ei = elem.element_info
+            ctrl = ei.control_type
+        except Exception as exc:  # noqa: BLE001
+            print(f"{indent}<error reading control_type: {exc!r}>")
+            return
+        try:
+            aid = ei.automation_id
+        except Exception:  # noqa: BLE001
+            aid = "<err>"
+        try:
+            cls = ei.class_name
+        except Exception:  # noqa: BLE001
+            cls = "<err>"
+        try:
+            r = elem.rectangle()
+            rect = f"({r.left},{r.top})-({r.right},{r.bottom}) {r.width()}x{r.height()}"
+        except Exception:  # noqa: BLE001
+            rect = "<err>"
+        try:
+            txt = elem.window_text()
+            txt = (txt[:70] + "...") if txt and len(txt) > 70 else txt
+        except Exception:  # noqa: BLE001
+            txt = "<err>"
+        try:
+            nchildren = len(elem.children())
+        except Exception:  # noqa: BLE001
+            nchildren = "<err>"
+        print(
+            f"{indent}control_type={ctrl!r} automation_id={aid!r} class_name={cls!r} "
+            f"children={nchildren} rect={rect} text={txt!r}"
+        )
+
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = launch(binary, [left, right], scratch)
+        try:
+            app, win = connect(proc.pid, timeout_s=LAUNCH_TIMEOUT_S)
+            ok, texts, missing = wait_for_tokens(win, FIXTURE_TOKENS, timeout_s=READY_TIMEOUT_S)
+            if not ok:
+                print(f"FAIL: compare view never rendered expected tokens: {missing}", file=sys.stderr)
+                debug_dump(texts)
+                return 1
+
+            print("=== control type tally across the whole window ===")
+            tally = {}
+            for d in win.descendants():
+                try:
+                    ct = d.element_info.control_type
+                except Exception:  # noqa: BLE001
+                    ct = "<error>"
+                tally[ct] = tally.get(ct, 0) + 1
+            for ct, n in sorted(tally.items(), key=lambda kv: -kv[1]):
+                print(f"  {ct!r}: {n}")
+
+            for anchor in anchors:
+                print(f"\n=== anchor {anchor!r} ===")
+                candidates = [d for d in win.descendants() if anchor in (d.window_text() or "")]
+                if not candidates:
+                    print(f"  (no descendant found containing {anchor!r})")
+                    continue
+                leaf = min(candidates, key=area)
+                print("  leaf:")
+                describe(leaf, "    ")
+                cur = leaf
+                for level in range(1, 7):
+                    try:
+                        cur = cur.parent()
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"  parent level {level}: <error: {exc!r}>")
+                        break
+                    if cur is None:
+                        print(f"  parent level {level}: <none>")
+                        break
+                    print(f"  parent level {level}:")
+                    describe(cur, "    ")
+        except RuntimeError as exc:
+            print(f"FAIL: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            terminate(proc)
+
+    print("\nOK: rowprobe dump complete (diagnostic only - no assertion).")
+    return 0
+
+
 # ── P09 — Mergetool ──────────────────────────────────────────────────────────
 
 
@@ -2208,6 +2345,7 @@ def p12(binary, break_mode=False):
 CASES = {
     "p01": p01,
     "p02": p02,
+    "rowprobe": rowprobe,
     "p04": p04,
     "p05": p05,
     "p06": p06,
