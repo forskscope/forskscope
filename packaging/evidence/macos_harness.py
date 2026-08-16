@@ -2267,7 +2267,10 @@ def p07(binary, break_mode=False):
                 return 1
 
             # ── Per-file copy: confirmation modal, backup ─────────────────
-            r = ui("click_button_exact", "Copy to right", timeout=20)
+            # Polled rather than a single raw call - the filter switch just
+            # before this triggers a re-render, and a real dispatch showed
+            # a single immediate `click_button_exact` racing it (NOT_FOUND).
+            r = click_wait("Copy to right", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click the per-file 'Copy to right' button: {r}", file=sys.stderr)
                 return 1
