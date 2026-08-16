@@ -2369,6 +2369,12 @@ def p07(binary, break_mode=False):
             if not r.startswith("FOUND"):
                 print(f"FAIL: per-file copy confirmation modal never appeared: {r}", file=sys.stderr)
                 return 1
+            print(
+                f"DEBUG: confirmation modal target check - "
+                f"aaa-changed.txt={ui('find_text', 'aaa-changed.txt', timeout=20)!r} "
+                f"left-only.txt={ui('find_text', 'left-only.txt', timeout=20)!r}",
+                flush=True,
+            )
             r = ui("click_button_exact", "Copy file", timeout=20)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not confirm the per-file copy: {r}", file=sys.stderr)
@@ -2383,6 +2389,13 @@ def p07(binary, break_mode=False):
                     break
                 time.sleep(0.5)
             if per_file_bak_bytes is None:
+                print(
+                    "DEBUG: post-copy disk state - "
+                    f"root_b/aaa-changed.txt={(root_b / 'aaa-changed.txt').read_bytes()!r} "
+                    f"root_b/left-only.txt exists={(root_b / 'left-only.txt').exists()} "
+                    f"root_a/left-only.txt exists={(root_a / 'left-only.txt').exists()}",
+                    flush=True,
+                )
                 print(f"FAIL: per-file copy did not create a .bak backup at {per_file_bak}", file=sys.stderr)
                 return 1
             if per_file_bak_bytes != b"right per-file version - PRE-EXISTING\n":
