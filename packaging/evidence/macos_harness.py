@@ -3193,6 +3193,7 @@ CASES = {
     "p08_fs": p08_fs,
     "p12": p12,
     "p06": p06,
+    "p03": p03,
     "p07": p07,
     "p11_modal_focus": p11_modal_focus,
     "recon_settings": recon_settings,
