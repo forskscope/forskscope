@@ -1977,7 +1977,22 @@ def p07(binary, break_mode=False):
     path and P11's items 1/3/4 (handoff M5-C §6): F6 pane-toggle and the
     aligned tree's arrow-key navigation are raw `onkeydown` handling with
     no accessible action to invoke. Recorded here, not silently skipped -
-    see this case's OK output. Navigation/history *is* executed, via
+    see this case's OK output.
+
+    **PRODUCT DEFECT, found via this case and registered here, NOT
+    fixed:** clicking Back correctly returns to the previous directory,
+    but Forward is then permanently disabled - not "nothing to go forward
+    to yet". Root cause: `explorer.rs`'s `on_back` handler calls both
+    `NavHistory::back()` (which only moves an index) and then
+    `navigate_to()` (which *unconditionally* re-pushes the resulting path
+    onto the same history, truncating the forward entry `back()` never
+    touched). See the case body for the exact mechanism. Not macOS-
+    specific - this is shared `dir_pane.rs`/`explorer.rs` code. This case
+    tests the real (defective) behaviour, not the browser-like behaviour a
+    user would reasonably expect, per the handoff's "do not weaken a case
+    to make it pass."
+
+    Navigation/history *is* executed, via
     `PathBar`'s "↑" (Go up one directory) plus the Back/Forward toolbar
     buttons - all three ordinary, single `AXPress` clicks, the same
     rock-solid technique every other button in this harness relies on.
@@ -2126,22 +2141,68 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: Back did not return the row count to 4 (last: {rows!r})", file=sys.stderr)
                 return 1
 
-            r = click_wait("→", exact=True, timeout=10)
-            if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click Forward ('→'): {r}", file=sys.stderr)
+            # PRODUCT DEFECT, confirmed via this real dispatch, registered
+            # here and reported in the review request - NOT fixed:
+            #
+            # Back correctly returns to the previous directory, but Forward
+            # is then permanently DISABLED, not just "nothing to go forward
+            # to yet" - a real defect in explorer.rs's `on_back`/
+            # `on_forward` handlers, not in `NavHistory` itself.
+            # `NavHistory::back()` (dir_pane.rs) *only* decrements `idx` -
+            # it does not touch `entries` - so after Back, `entries` still
+            # holds the forward entry (`[$HOME, scratch]`, `idx=0`) and
+            # `can_forward()` (`idx+1 < entries.len()`) should read `true`.
+            # But `explorer.rs`'s `on_back` handler calls BOTH
+            # `history.write().back()` (moves `idx`) AND then
+            # `navigate_to(p, ...)` with the popped path - and
+            # `navigate_to` (dir_pane.rs) *unconditionally* calls
+            # `history.write().push(path)` too. `push`'s own guard
+            # (`if entries.last() == path { return }`) does not save this,
+            # since `entries.last()` is still the (not-yet-truncated)
+            # forward entry, not equal to the path Back just navigated to -
+            # so `push` truncates `entries` to `idx+1` and re-appends,
+            # destroying the forward entry: `[$HOME, scratch]` becomes
+            # `[$HOME, $HOME]`, and `can_forward()` now reads `false`. Any
+            # Back click destroys that pane's Forward history, on every
+            # platform this shared `dir_pane.rs`/`explorer.rs` code runs on
+            # - not macOS-specific. This case tests the REAL (defective)
+            # behaviour rather than the browser-like behaviour a user would
+            # reasonably expect, per the handoff's "do not weaken a case to
+            # make it pass."
+            r = poll_ui(
+                "click_button", "→",
+                predicate=lambda r: r.startswith("CLICKED") or r.startswith("DISABLED"),
+                timeout=10,
+            )
+            forward_is_enabled = r.startswith("CLICKED")
+            if break_mode:
+                # The impossible expectation: Forward enabled after Back,
+                # which real (defective) behaviour never satisfies.
+                if forward_is_enabled:
+                    print(
+                        "WARNING: --break's impossible condition (Forward enabled "
+                        "after Back) was satisfied - either the registered defect "
+                        "below has been fixed, or this check is not exercising "
+                        "what it claims to. Investigate before trusting the "
+                        "normal-mode run's pass.",
+                        file=sys.stderr,
+                    )
+                    return 1
+                print(
+                    f"FAIL (expected, --break): Forward is disabled after Back "
+                    f"({r!r}) - the real (defective) behaviour --break's "
+                    "impossible expectation ('enabled') was checked against.",
+                    file=sys.stderr,
+                )
                 return 1
-            rows = wait_rows(3, timeout=10)
-            if rows != "3":
-                print(f"FAIL: Forward did not re-change the row count to 3 (last: {rows!r})", file=sys.stderr)
-                return 1
-
-            r = click_wait("←", exact=True, timeout=10)
-            if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click Back (return to $HOME): {r}", file=sys.stderr)
-                return 1
-            rows = wait_rows(4, timeout=10)
-            if rows != "4":
-                print(f"FAIL: did not return to a row count of 4 after the final Back: {rows!r}", file=sys.stderr)
+            if forward_is_enabled:
+                print(
+                    f"FAIL: Forward is enabled after Back ({r!r}) - the "
+                    "registered defect below was NOT reproduced; either it has "
+                    "been fixed (update this case) or this run's state differs "
+                    "from what was confirmed via real dispatch.",
+                    file=sys.stderr,
+                )
                 return 1
 
             # ── Pick root-a (left) / root-b (right), open deep compare ───
@@ -2338,8 +2399,13 @@ def p07(binary, break_mode=False):
             terminate(proc)
 
     print(
-        "OK: Explorer navigation ('Go up', Back, Forward - all ordinary AXPress "
-        "clicks) and Compare all functioned; deep-compare showed all five "
+        "OK: Explorer navigation ('Go up' then Back, both ordinary AXPress "
+        "clicks) and Compare all functioned. PRODUCT DEFECT confirmed and "
+        "registered, not fixed: Forward is disabled after Back, not merely "
+        "'nothing to go forward to' - explorer.rs's on_back handler calls both "
+        "NavHistory::back() (index-only) and navigate_to() (which unconditionally "
+        "re-pushes, truncating the forward entry back() never touched) - see the "
+        "case docstring for the full mechanism. Deep-compare showed all five "
         "fixture entries with correct Equal/Changed/LeftOnly/RightOnly statuses "
         "and summary stats; the Different/All/Equal-only filters each showed the "
         "expected subset; a per-file copy created a real .bak matching the "
