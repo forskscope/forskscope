@@ -3214,13 +3214,17 @@ def p12(binary, break_mode=False):
 
 def _seed_explorer_settings(config_dir, browse_dir, remember=True):
     """Writes a v2 settings.json envelope based on the project's own
-    `settings-v2.json` fixture (same fixture P08 uses), overriding only
+    `settings-v2.json` fixture (same fixture P08 uses), overriding
     `last_left_dir`/`last_right_dir` (both panes' remembered browse root -
-    `browse_dir`) and `remember_explorer_dirs` - so Explorer opens both
-    panes directly on `browse_dir` with no path-typing/tree-navigation
-    needed to get there (mirrors P12's direct-envelope-construction
-    reasoning: `restore_tabs`/Explorer's own init don't care how the file
-    describing the starting state came to exist, only that it does)."""
+    `browse_dir`), `remember_explorer_dirs`, and two fields the fixture's
+    own values would otherwise silently break this harness's text-based
+    element lookups against: `language` (the fixture sets `"ja"` - the
+    first real CI run of `p07` rendered the entire UI in Japanese as a
+    result, and every English-text lookup below failed) and
+    `explorer_compact` (the fixture sets `true`, selecting `CompactTree`
+    over `AlignedTree` - untested by this harness, so this pins the
+    tree view this harness's row-finding logic was actually built and
+    verified against)."""
     fixture = json.loads(
         (
             REPO_ROOT
@@ -3230,6 +3234,8 @@ def _seed_explorer_settings(config_dir, browse_dir, remember=True):
     fixture["payload"]["last_left_dir"] = str(browse_dir)
     fixture["payload"]["last_right_dir"] = str(browse_dir)
     fixture["payload"]["remember_explorer_dirs"] = remember
+    fixture["payload"]["language"] = "en"
+    fixture["payload"]["explorer_compact"] = False
     now = int(time.time())
     fixture["created_unix"] = now
     fixture["updated_unix"] = now
@@ -3689,28 +3695,53 @@ def p11(binary, break_mode=False):
                 print('FAIL: the "File changed on disk" conflict modal never appeared', file=sys.stderr)
                 return 1
 
-            cancel_button = modal_action_button(win, "Cancel")
-            overwrite_button = modal_action_button(win, "Overwrite")
-            if cancel_button is None or overwrite_button is None:
+            if modal_action_button(win, "Cancel") is None or modal_action_button(win, "Overwrite") is None:
                 print("FAIL: could not find both the Cancel and Overwrite buttons in the conflict modal", file=sys.stderr)
                 return 1
 
-            # Poll briefly - autofocus lands the moment the modal mounts,
-            # but the modal's own appearance (already awaited above via
+            # Poll briefly, re-finding both buttons fresh each iteration
+            # (not reusing the first lookup above) - the same
+            # stale-UIA-reference precaution `wait_button_enabled`/
+            # `wait_for_exact` already take elsewhere in this harness,
+            # since autofocus lands the moment the modal mounts but the
+            # modal's own appearance (already awaited above via
             # wait_for_tokens) and its focus assignment are not
             # necessarily the same React/Dioxus tick.
             deadline = time.monotonic() + READY_TIMEOUT_S
             cancel_focused = overwrite_focused = None
-            required_button = overwrite_button if break_mode else cancel_button
             while time.monotonic() < deadline:
-                cancel_focused = has_keyboard_focus(cancel_button)
-                overwrite_focused = has_keyboard_focus(overwrite_button)
-                if has_keyboard_focus(required_button):
+                cancel_button = modal_action_button(win, "Cancel")
+                overwrite_button = modal_action_button(win, "Overwrite")
+                cancel_focused = has_keyboard_focus(cancel_button) if cancel_button else None
+                overwrite_focused = has_keyboard_focus(overwrite_button) if overwrite_button else None
+                required = overwrite_focused if break_mode else cancel_focused
+                if required:
                     break
                 time.sleep(POLL_INTERVAL_S)
 
+            if not cancel_focused and not overwrite_focused:
+                # Neither reports focus - find out what actually does,
+                # rather than just reporting a bare "no".
+                focused_elsewhere = []
+                for d in win.descendants():
+                    try:
+                        if d.element_info.element.CurrentHasKeyboardFocus:
+                            focused_elsewhere.append(
+                                f"control_type={d.element_info.control_type!r} "
+                                f"name={d.window_text()!r} class_name={d.element_info.class_name!r}"
+                            )
+                    except Exception:  # noqa: BLE001
+                        continue
+                print(
+                    f"FAIL: neither 'Cancel' nor 'Overwrite' holds keyboard focus when the "
+                    f"conflict modal opens. Elements that DO report HasKeyboardFocus: "
+                    f"{focused_elsewhere!r}",
+                    file=sys.stderr,
+                )
+                return 1
+
             if break_mode:
-                if not has_keyboard_focus(overwrite_button):
+                if not overwrite_focused:
                     print(
                         "FAIL(--break): the destructive 'Overwrite' button never held focus "
                         "(Cancel does, correctly) - the impossible requirement was correctly "
@@ -3732,6 +3763,8 @@ def p11(binary, break_mode=False):
             if overwrite_focused:
                 print("FAIL: 'Overwrite' (the destructive action) also reports holding focus - ambiguous/wrong initial focus", file=sys.stderr)
                 return 1
+
+            cancel_button = modal_action_button(win, "Cancel")
 
             # Real consequence check, not just a focus-property reading:
             # Cancel actually being the safe default is only meaningful if
