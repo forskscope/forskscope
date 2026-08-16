@@ -1595,7 +1595,22 @@ def scrollprobe(binary, break_mode=False):
                 pt_rect = baseline_lc
 
             if pt_rect is not None:
-                pt = (pt_rect.left + max(1, pt_rect.width() // 2), pt_rect.top + max(1, pt_rect.height() // 2))
+                # BUG on the previous CI run (fixed here): pt_rect (the
+                # cell's own accessible rectangle) is NOT clipped to the
+                # scroll viewport - its reported width matched the full
+                # 2,000-character fixture line (right - left in the
+                # thousands of px), so the naive "rectangle midpoint" this
+                # used to compute landed at screen x=7743 on a runner whose
+                # actual window is ~1044px wide: off-screen, on nothing,
+                # explaining why every wheel attempt below observed no
+                # change. Clamp the target point into the real, on-screen
+                # window rectangle instead - the cell's *top* (218 on the
+                # prior run, consistent between both cells) is used as-is,
+                # since only the horizontal axis was ever suspect.
+                win_rect = win.rectangle()
+                x = min(max(pt_rect.left + 40, win_rect.left + 10), win_rect.right - 10)
+                y = min(max(pt_rect.top + max(1, min(pt_rect.height(), 20) // 2), win_rect.top + 10), win_rect.bottom - 10)
+                pt = (x, y)
 
                 def plain_wheel():
                     from pywinauto import mouse  # noqa: PLC0415
@@ -1615,6 +1630,23 @@ def scrollprobe(binary, break_mode=False):
                         send_keys("{VK_SHIFT up}")
 
                 try_attempt(f"attempt 5: Shift+MouseWheel at {pt}", shift_wheel)
+
+                def raw_hwheel():
+                    # Native WM_MOUSEHWHEEL via SendInput, bypassing the
+                    # Shift+vertical-wheel convention entirely (stdlib
+                    # ctypes only - no new dependency) - the most
+                    # input-synthesis-heavy attempt this probe has, used
+                    # only because every accessibility-pattern approach
+                    # above was verified not to work.
+                    import ctypes  # noqa: PLC0415
+
+                    user32 = ctypes.windll.user32
+                    user32.SetCursorPos(int(pt[0]), int(pt[1]))
+                    MOUSEEVENTF_HWHEEL = 0x01000
+                    WHEEL_DELTA = 120
+                    user32.mouse_event(MOUSEEVENTF_HWHEEL, 0, 0, 10 * WHEEL_DELTA, 0)
+
+                try_attempt(f"attempt 6: raw WM_MOUSEHWHEEL (SendInput) at {pt}", raw_hwheel)
             else:
                 print(
                     "\n(no screen point available at all - baseline row-cell "
