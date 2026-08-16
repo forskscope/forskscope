@@ -2102,19 +2102,33 @@ def p07(binary, break_mode=False):
             if not r.startswith("VALUE:"):
                 print(f"FAIL: path-edit text field never appeared: {r}", file=sys.stderr)
                 return 1
-            print(
-                f"DEBUG: AXTextField focus before type_into: "
-                f"{ui('find_focused', 'AXTextField', timeout=20)!r}",
-                flush=True,
-            )
-            r = ui("type_into", "AXTextField", "1", str(root_a), timeout=20)
-            print(
-                f"DEBUG: type_into result={r!r} focus after: "
-                f"{ui('find_focused', 'AXTextField', timeout=20)!r}",
-                flush=True,
-            )
-            if not r.startswith("TYPED:") or str(root_a) not in r:
-                print(f"FAIL: could not type root-a's path into the path-edit field: {r}", file=sys.stderr)
+            # A real dispatch showed the field genuinely had OS/AX focus
+            # (find_focused reported an AXTextField with AXFocused=true,
+            # both before AND after type_into's own click) yet the
+            # keystroke-typed text never actually landed - unlike Save As's
+            # path field (P05), where `set_value`'s direct AXValue write was
+            # what actually worked (`type_into` was only ever a documented
+            # fallback there, never exercised as the thing that succeeded).
+            # This is the first real exercise of type_into's keystroke path
+            # against this specific field, and it does not work - use
+            # `set_value` first, mirroring P05's exact established
+            # fallback chain, instead of leading with the technique that
+            # just failed a real dispatch.
+            root_a_str = str(root_a)
+            r = ui("set_value", "AXTextField", "1", root_a_str, timeout=20)
+            wrote_value = r.startswith("SET:") and r.endswith(f"-> {root_a_str}")
+            if not wrote_value:
+                r2 = ui("get_value", "AXTextField", "1", timeout=20)
+                wrote_value = r2 == f"VALUE: {root_a_str}"
+            if not wrote_value:
+                r = ui("type_into", "AXTextField", "1", root_a_str, timeout=20)
+                wrote_value = r == f"TYPED: {root_a_str}"
+            if not wrote_value:
+                print(
+                    f"FAIL: could not get the path-edit field to read back "
+                    f"{root_a_str!r} via set_value or type_into (last result: {r})",
+                    file=sys.stderr,
+                )
                 return 1
             r = ui("send_key", "36", "1", timeout=20)  # Return
             if not r.startswith("DONE"):
