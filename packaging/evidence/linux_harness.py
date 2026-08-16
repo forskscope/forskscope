@@ -152,6 +152,17 @@ def is_enabled(node):
     return node.get_state_set().contains(Atspi.StateType.SENSITIVE)
 
 
+def is_focused(node):
+    """True if `node` carries the FOCUSED state - used by P11 to confirm
+    a destructive-confirmation modal's initial focus lands on its safe
+    (Cancel) control rather than the destructive one, with no input
+    synthesized: Dioxus's `autofocus: true` sets DOM focus itself on
+    mount, so reading AT-SPI's own FOCUSED state observes the real
+    post-mount outcome instead of asserting anything about how it got
+    there."""
+    return node.get_state_set().contains(Atspi.StateType.FOCUSED)
+
+
 def find_text_containing(node, substring, depth=0, max_depth=60):
     """Walk the tree for any accessible whose name, description, or Text
     interface content contains `substring`. Used for message-presence
@@ -2151,6 +2162,119 @@ def p07(binary, break_mode=False):
     return 0
 
 
+# ── P11 — Keyboard interface ──────────────────────────────────────────────
+
+
+def p11(binary, break_mode=False):
+    """RFC-078 P11, the one sub-item of the four this program's keyboard
+    coverage decomposes into (see the M5-C review request) that is
+    CI-verifiable without synthesizing keystrokes: "a destructive
+    operation's confirmation modal starts focus on the safe/cancel
+    control, not the destructive one." The other three - the manual
+    keyboard checklist, global shortcuts staying inert behind an open
+    modal, and Escape closing a modal - all need real keyboard input no
+    accessibility action can produce (the same limit this program hit for
+    every other keyboard-only interaction all session, e.g. P07's
+    docstring); they are recorded as manual-outstanding, mirroring F45's
+    shape, not attempted here.
+
+    Reuses P03's `left_all_hunk_kinds.txt`/`right_*` fixture (already
+    pinned to produce a multi-hunk, 7-row shape) to reach a real
+    dirty-merge state: applies one hunk via "Use this change" (the same
+    action P03's sub-check 2 finds by name), which is what actually gates
+    `ConfirmSwap` behind `toolbar.rs`'s `dirty` check - triggering the
+    modal via a genuinely dirty tab, not a stub. Opens the modal through
+    the advanced disclosure panel's real "Swap sides" button, then reads
+    AT-SPI's own FOCUSED state on both the modal's Cancel and "Discard
+    and Swap" controls - no input is synthesized for the focus check
+    itself; `autofocus: true` sets DOM focus on mount, and this reads
+    that outcome directly.
+
+    `--break`: requires the impossible - that the destructive control
+    ("Discard and Swap") holds focus instead of Cancel.
+    """
+    left = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
+    right = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
+
+    with tempfile.TemporaryDirectory() as scratch:
+        proc = launch(binary, [left, right], Path(scratch))
+        try:
+            app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
+            if app is None:
+                print("FAIL: forskscope never registered on the accessibility bus", file=sys.stderr)
+                return 1
+            landmark, _frame, _left_rows, _right_rows = wait_for_ready(app, 7, timeout_s=LAUNCH_TIMEOUT_S)
+            if landmark is None:
+                print("FAIL: compare view did not reach the expected 7 rows/pane shape", file=sys.stderr)
+                return 1
+
+            act_buttons = find_all_by_name_containing(app, "Use this change")
+            if not act_buttons:
+                print("FAIL: no 'Use this change' action buttons found - cannot dirty the tab", file=sys.stderr)
+                return 1
+            click(act_buttons[0])
+            time.sleep(0.3)
+
+            more_btn = find_by_exact_name(app, "More ▼")
+            if more_btn is None:
+                print("FAIL: could not find the 'More ▼' disclosure toggle", file=sys.stderr)
+                return 1
+            click(more_btn)
+            time.sleep(0.3)
+
+            swap_btn = None
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                swap_btn = find_by_name_containing(app, "Swap sides")
+                if swap_btn is not None:
+                    break
+                time.sleep(0.3)
+            if swap_btn is None:
+                print("FAIL: could not find the 'Swap sides' toolbar button", file=sys.stderr)
+                return 1
+            click(swap_btn)
+            time.sleep(0.3)
+
+            dialog = None
+            deadline = time.monotonic() + LAUNCH_TIMEOUT_S
+            while time.monotonic() < deadline:
+                dialog = find_by_role(app, "dialog", deadline)
+                if dialog is not None:
+                    break
+                time.sleep(0.3)
+            if dialog is None:
+                print("FAIL: applying a hunk did not leave the tab dirty enough to trigger ConfirmSwap", file=sys.stderr)
+                return 1
+
+            cancel_btn = find_by_exact_name(dialog, "Cancel")
+            discard_btn = find_by_exact_name(dialog, "Discard and Swap")
+            if cancel_btn is None or discard_btn is None:
+                print("FAIL: ConfirmSwap modal is missing its Cancel or Discard and Swap control", file=sys.stderr)
+                return 1
+
+            cancel_focused = is_focused(cancel_btn)
+            discard_focused = is_focused(discard_btn)
+            required = discard_focused and not cancel_focused if break_mode else cancel_focused and not discard_focused
+            if not required:
+                print(
+                    f"FAIL: modal focus state is Cancel={cancel_focused}, Discard and Swap={discard_focused} "
+                    f"- required {'the destructive control focused (break mode)' if break_mode else 'Cancel focused, not the destructive control'}",
+                    file=sys.stderr,
+                )
+                return 1
+        finally:
+            terminate(proc)
+
+    print(
+        "OK: applying a hunk dirties the tab and gates ConfirmSwap behind it as designed; the "
+        "modal's initial AT-SPI focus lands on Cancel, not the destructive Discard and Swap "
+        "control. The remaining three RFC-078 keyboard items (manual checklist, shortcuts "
+        "inert behind a modal, Escape-closes-modal) need real keystroke synthesis no "
+        "accessibility action can produce and are recorded as manual-outstanding."
+    )
+    return 0
+
+
 CASES = {
     "p01": p01,
     "p02": p02,
@@ -2162,6 +2286,7 @@ CASES = {
     "p08": p08,
     "p09": p09,
     "p10": p10,
+    "p11": p11,
     "p12": p12,
 }
 
