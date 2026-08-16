@@ -1386,38 +1386,47 @@ def rowprobe(binary, break_mode=False):
 def scrollprobe(binary, break_mode=False):
     """NOT an evidence case, like `rowprobe` above - a one-shot diagnostic
     for P03's horizontal-scroll-mirroring requirement, which has no
-    precedent anywhere in this program on any platform. `diff.rs`'s
-    `.diff-col-left`/`.diff-col-right` (`#diff-col-left-{index}`/
-    `#diff-col-right-{index}`) are plain `overflow-x:auto` divs, not
-    native scrollbars - `install_hscroll_sync`'s JS mirrors `scrollLeft`
-    between them on a `scroll` event. Nothing in this harness has yet
-    established whether Windows UIA exposes `IScrollProvider`
-    (`ScrollPattern`) on a Chromium/WebView2 overflow container, or
-    whether scrolling one from outside the DOM requires falling back to
-    synthesized input the way `set_value_text` ultimately had to for the
-    font-size field. This probe launches against the repo's existing
-    `left_long_line.txt`/`right_long_line.txt` fixture pair (a single
-    2,000-character line per side - already tracked, not invented for
-    this), locates both pane containers by automation id (rowprobe
-    already established Chromium/WebView2's UIA `AutomationId` mirrors
-    the HTML `id` attribute directly), and tries, in ascending order of
-    how much each relies on an accessibility pattern versus raw input
-    synthesis, reporting which one actually moved `HorizontalScrollPercent`
-    (read back independently, not trusted on a clean return - the same
-    discipline `select_dropdown`/`set_value_text` already established):
+    precedent anywhere in this program on any platform.
 
-    1. `IUIAutomationScrollPattern.SetScrollPercent` via pywinauto's
-       `iface_scroll` (the ScrollPattern's direct value-set entry point).
-    2. `IUIAutomationScrollPattern.Scroll` with a `LargeIncrement` amount
-       (the discrete-step entry point some UIA providers implement even
-       when `SetScrollPercent` is unsupported).
-    3. `UIAWrapper.scroll('right', 'page')` (pywinauto's own high-level
-       helper over the same pattern, in case it exercises the pattern
-       differently than calling the COM methods directly).
-    4. A real synthesized mouse wheel at the pane's on-screen coordinates
-       (`pywinauto.mouse.scroll`) - the last-resort, most
-       input-synthesis-heavy path, used only to establish whether it is
-       even necessary.
+    First CI run (this function's original form): located
+    `.diff-col-left`/`.diff-col-right` by AutomationId
+    (`#diff-col-left-{index}`/`#diff-col-right-{index}`), on the theory
+    that rowprobe's confirmed `id` -> AutomationId mapping would extend to
+    them. It did not find them - zero matches. Second CI run: fell back to
+    a class_name search (`diff-col-left`/`diff-col-right`, no index
+    suffix, per `diff.rs`) across the *entire* tree, and still found
+    nothing, even though the compare view had rendered correctly (the
+    fixture tokens were present). Conclusion, confirmed rather than
+    assumed: unlike `.diff-row`/`.diff-wrap` (both explicit ARIA
+    `role="row"`/`role="region"`), `.diff-col-left`/`.diff-col-right` carry
+    no ARIA role at all - just `overflow-x:auto` CSS - and Chromium's
+    accessibility tree does not keep a plain, role-less scroll container as
+    its own AX node here; there is no `IScrollProvider`/`ScrollPattern` to
+    invoke because there is no UIA element for it at all, on any control
+    type or class_name.
+
+    This third form works around that absence rather than assuming it
+    forecloses P03's scroll check entirely: it locates the *row content*
+    inside each pane (which does have AX nodes - `collect_diff_rows`,
+    already established) against the `left_long_line.txt`/
+    `right_long_line.txt` fixture pair (a single 2,000-character line per
+    side, guaranteed to overflow), and treats a change in that row's own
+    on-screen rectangle as the readback signal instead of
+    `HorizontalScrollPercent`: if UIA reports screen coordinates that
+    account for the current `scrollLeft` transform (as they should for a
+    correctly-implemented accessibility tree), scrolling the pane should
+    move the row's reported rectangle left, independent of whether the
+    scroll container itself is reachable. Tries, in ascending order of
+    input-synthesis reliance:
+
+    1. `Shift+MouseWheel` (`pywinauto.keyboard.send_keys('{VK_SHIFT down}')`
+       bracketing `pywinauto.mouse.scroll`) - the standard Windows/Chromium
+       convention for turning a vertical wheel gesture into horizontal
+       scroll, using only pywinauto's own vetted input primitives (no
+       hand-rolled `SendInput` struct).
+    2. A plain vertical `pywinauto.mouse.scroll` at the same point, in case
+       this container answers vertical wheel input with horizontal motion
+       for some other reason (checked as a control, not expected to work).
 
     No assertion, no `--break` mode - this exists to produce a real,
     observed answer for P03's own docstring/evidence writeup to cite.
@@ -1426,18 +1435,36 @@ def scrollprobe(binary, break_mode=False):
     left = REPO_ROOT / "tests/fixtures/text/left_long_line.txt"
     right = REPO_ROOT / "tests/fixtures/text/right_long_line.txt"
 
-    def scroll_state(elem, label):
+    def cell_rects(win):
+        """(left_cell_rect, right_cell_rect) of the fixture's one row per
+        pane, or (None, None) if the row shape isn't the expected 1+1."""
+        frame = find_diff_wrap(win)
+        if frame is None:
+            return None, None
+        rows = collect_diff_rows(win)
         try:
-            sc = elem.iface_scroll
-            state = {
-                "HorizontallyScrollable": sc.CurrentHorizontallyScrollable,
-                "HorizontalScrollPercent": sc.CurrentHorizontalScrollPercent,
-                "HorizontalViewSize": sc.CurrentHorizontalViewSize,
-            }
+            fr = frame.rectangle()
+            midline_x = fr.left + fr.width() / 2
+        except Exception:  # noqa: BLE001
+            return None, None
+        left_rows = [r for r in rows if _row_left_x(r) < midline_x]
+        right_rows = [r for r in rows if _row_left_x(r) >= midline_x]
+        if len(left_rows) != 1 or len(right_rows) != 1:
+            print(
+                f"  (unexpected row shape: {len(left_rows)} left, "
+                f"{len(right_rows)} right - expected 1 each)"
+            )
+            return None, None
+        try:
+            lc = left_rows[0].children()[-1].rectangle()
+            rc = right_rows[0].children()[-1].rectangle()
         except Exception as exc:  # noqa: BLE001
-            state = {"error": repr(exc)}
-        print(f"  {label}: {state}")
-        return state
+            print(f"  (could not read cell rectangles: {exc!r})")
+            return None, None
+        return lc, rc
+
+    def fmt_rect(r):
+        return "None" if r is None else f"(left={r.left}, right={r.right}, top={r.top})"
 
     with tempfile.TemporaryDirectory() as scratch:
         proc = launch(binary, [left, right], scratch)
@@ -1462,118 +1489,139 @@ def scrollprobe(binary, break_mode=False):
             if not any_aid:
                 print("  (none found anywhere in the tree)", flush=True)
 
-            print("=== every non-empty class_name in the tree containing 'diff-col' ===", flush=True)
-            panes = {}
+            print("=== capability scan: every descendant with CurrentHorizontallyScrollable == True ===", flush=True)
+            # Neither AutomationId nor class_name found `.diff-col-left`/
+            # `.diff-col-right` on the first two CI runs (see the docstring) -
+            # this looks for the ScrollPattern *capability* directly instead
+            # of assuming the wrapper node survives Chromium's accessibility
+            # tree under some identity this harness hasn't guessed yet.
+            scrollable = []
             for d in win.descendants():
                 try:
-                    cls = d.element_info.class_name
+                    if bool(d.iface_scroll.CurrentHorizontallyScrollable):
+                        scrollable.append(d)
                 except Exception:  # noqa: BLE001
-                    cls = ""
-                if cls and "diff-col-left" in cls:
-                    panes["left"] = d
-                    print(f"  left  -> class_name={cls!r} control_type={d.element_info.control_type!r}", flush=True)
-                elif cls and "diff-col-right" in cls:
-                    panes["right"] = d
-                    print(f"  right -> class_name={cls!r} control_type={d.element_info.control_type!r}", flush=True)
-                elif cls and "diff-col" in cls:
-                    print(f"  other diff-col class_name={cls!r} control_type={d.element_info.control_type!r}", flush=True)
-
-            if "left" not in panes or "right" not in panes:
-                print(
-                    "  could not locate both diff-col-left/diff-col-right by "
-                    "class_name - falling back to a capability scan: every "
-                    "descendant whose ScrollPattern reports "
-                    "CurrentHorizontallyScrollable == True (a bare wrapper div "
-                    "with no distinguishing role/attributes is a real Chromium "
-                    "pruning candidate - collapsed out of the platform tree "
-                    "with its content reparented to the nearest 'interesting' "
-                    "ancestor, per Chromium's own AX tree-simplification "
-                    "behavior - so this looks for the capability directly "
-                    "instead of assuming the wrapper survives)",
-                    flush=True,
-                )
-                scrollable = []
-                for d in win.descendants():
-                    try:
-                        if bool(d.iface_scroll.CurrentHorizontallyScrollable):
-                            scrollable.append(d)
-                    except Exception:  # noqa: BLE001
-                        continue
-                print(f"  found {len(scrollable)} horizontally-scrollable descendant(s)", flush=True)
-                for d in scrollable:
-                    try:
-                        ei = d.element_info
-                        r = d.rectangle()
-                        print(
-                            f"    control_type={ei.control_type!r} automation_id={ei.automation_id!r} "
-                            f"class_name={ei.class_name!r} rect=({r.left},{r.top})-({r.right},{r.bottom}) "
-                            f"HorizontalScrollPercent={d.iface_scroll.CurrentHorizontalScrollPercent!r}",
-                            flush=True,
-                        )
-                    except Exception as exc:  # noqa: BLE001
-                        print(f"    <error describing candidate: {exc!r}>", flush=True)
-                if len(scrollable) >= 2:
-                    # Left/right disambiguated by on-screen position, same as
-                    # collect_diff_rows's midline split elsewhere in this module.
-                    scrollable.sort(key=lambda d: d.rectangle().left)
-                    panes["left"], panes["right"] = scrollable[0], scrollable[-1]
+                    continue
+            print(f"  found {len(scrollable)} horizontally-scrollable descendant(s)", flush=True)
+            for d in scrollable:
+                try:
+                    ei = d.element_info
+                    r = d.rectangle()
                     print(
-                        f"  using leftmost/rightmost by rect.left as left/right pane "
-                        f"for the remaining attempts below",
+                        f"    control_type={ei.control_type!r} automation_id={ei.automation_id!r} "
+                        f"class_name={ei.class_name!r} rect=({r.left},{r.top})-({r.right},{r.bottom}) "
+                        f"HorizontalScrollPercent={d.iface_scroll.CurrentHorizontalScrollPercent!r}",
                         flush=True,
                     )
-                else:
-                    print(
-                        "FAIL: could not locate two horizontally-scrollable panes "
-                        "by class_name or by ScrollPattern capability",
-                        file=sys.stderr,
-                    )
-                    return 1
+                except Exception as exc:  # noqa: BLE001
+                    print(f"    <error describing candidate: {exc!r}>", flush=True)
 
-            left_pane, right_pane = panes["left"], panes["right"]
-            print("\n=== initial scroll state ===")
-            scroll_state(left_pane, "left")
-            scroll_state(right_pane, "right")
+            left_pane = right_pane = None
+            if len(scrollable) >= 2:
+                scrollable.sort(key=lambda d: d.rectangle().left)
+                left_pane, right_pane = scrollable[0], scrollable[-1]
+                print("  using leftmost/rightmost by rect.left as left/right pane", flush=True)
+            else:
+                print(
+                    "  could not locate two horizontally-scrollable elements by "
+                    "capability either - proceeding with row-rectangle readback "
+                    "only (see below); pattern-based attempts that need a pane "
+                    "element are skipped",
+                    flush=True,
+                )
 
-            print("\n=== attempt 1: iface_scroll.SetScrollPercent(50, -1) on left ===")
-            try:
-                left_pane.iface_scroll.SetScrollPercent(50, -1)
-                print("  call did not raise")
-            except Exception as exc:  # noqa: BLE001
-                print(f"  raised: {exc!r}")
-            scroll_state(left_pane, "left after attempt 1")
-            scroll_state(right_pane, "right after attempt 1")
+            def scroll_state(elem, label):
+                try:
+                    sc = elem.iface_scroll
+                    state = {
+                        "HorizontallyScrollable": sc.CurrentHorizontallyScrollable,
+                        "HorizontalScrollPercent": sc.CurrentHorizontalScrollPercent,
+                        "HorizontalViewSize": sc.CurrentHorizontalViewSize,
+                    }
+                except Exception as exc:  # noqa: BLE001
+                    state = {"error": repr(exc)}
+                print(f"  {label}: {state}", flush=True)
+                return state
 
-            print("\n=== attempt 2: iface_scroll.Scroll(NoAmount=2, LargeIncrement=3) on left (horizontal=3, vertical=2) ===")
-            try:
-                left_pane.iface_scroll.Scroll(3, 2)
-                print("  call did not raise")
-            except Exception as exc:  # noqa: BLE001
-                print(f"  raised: {exc!r}")
-            scroll_state(left_pane, "left after attempt 2")
-            scroll_state(right_pane, "right after attempt 2")
+            def report_cells(label):
+                lc, rc = cell_rects(win)
+                print(f"  {label}: left cell {fmt_rect(lc)}, right cell {fmt_rect(rc)}", flush=True)
+                return lc, rc
 
-            print("\n=== attempt 3: UIAWrapper.scroll('right', 'page') on left ===")
-            try:
-                left_pane.scroll("right", "page")
-                print("  call did not raise")
-            except Exception as exc:  # noqa: BLE001
-                print(f"  raised: {exc!r}")
-            scroll_state(left_pane, "left after attempt 3")
-            scroll_state(right_pane, "right after attempt 3")
+            print("\n=== initial state ===")
+            if left_pane is not None:
+                scroll_state(left_pane, "left pane (ScrollPattern)")
+                scroll_state(right_pane, "right pane (ScrollPattern)")
+            baseline_lc, baseline_rc = report_cells("initial row-cell rectangles")
 
-            print("\n=== attempt 4: synthesized mouse wheel on left ===")
-            try:
-                from pywinauto import mouse  # noqa: PLC0415
+            def try_attempt(label, fn):
+                print(f"\n=== {label} ===", flush=True)
+                try:
+                    fn()
+                    print("  call did not raise", flush=True)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"  raised: {exc!r}", flush=True)
+                if left_pane is not None:
+                    scroll_state(left_pane, "left pane (ScrollPattern)")
+                    scroll_state(right_pane, "right pane (ScrollPattern)")
+                lc, rc = report_cells("row-cell rectangles")
+                moved = (
+                    baseline_lc is not None
+                    and lc is not None
+                    and (lc.left != baseline_lc.left or lc.right != baseline_lc.right)
+                )
+                print(f"  left cell rectangle moved from baseline: {moved}", flush=True)
+                return lc, rc
 
-                r = left_pane.rectangle()
-                pt = (r.left + r.width() // 2, r.top + r.height() // 2)
-                mouse.scroll(coords=pt, wheel_dist=-10)
-                print(f"  call did not raise (coords={pt})")
-            except Exception as exc:  # noqa: BLE001
-                print(f"  raised: {exc!r}")
-            scroll_state(left_pane, "left after attempt 4")
-            scroll_state(right_pane, "right after attempt 4")
+            if left_pane is not None:
+                try_attempt(
+                    "attempt 1: iface_scroll.SetScrollPercent(50, -1) on left pane",
+                    lambda: left_pane.iface_scroll.SetScrollPercent(50, -1),
+                )
+                try_attempt(
+                    "attempt 2: iface_scroll.Scroll(horizontal=LargeIncrement, vertical=NoAmount) on left pane",
+                    lambda: left_pane.iface_scroll.Scroll(3, 2),
+                )
+                try_attempt(
+                    "attempt 3: UIAWrapper.scroll('right', 'page') on left pane",
+                    lambda: left_pane.scroll("right", "page"),
+                )
+                pt_rect = left_pane.rectangle()
+            else:
+                # No pane element at all - derive a screen point from the
+                # left row's own cell rectangle instead, so the
+                # input-synthesis attempts below still have somewhere real
+                # on screen to target.
+                pt_rect = baseline_lc
+
+            if pt_rect is not None:
+                pt = (pt_rect.left + max(1, pt_rect.width() // 2), pt_rect.top + max(1, pt_rect.height() // 2))
+
+                def plain_wheel():
+                    from pywinauto import mouse  # noqa: PLC0415
+
+                    mouse.scroll(coords=pt, wheel_dist=-10)
+
+                try_attempt(f"attempt 4: plain vertical mouse wheel at {pt}", plain_wheel)
+
+                def shift_wheel():
+                    from pywinauto import mouse  # noqa: PLC0415
+                    from pywinauto.keyboard import send_keys  # noqa: PLC0415
+
+                    send_keys("{VK_SHIFT down}")
+                    try:
+                        mouse.scroll(coords=pt, wheel_dist=-10)
+                    finally:
+                        send_keys("{VK_SHIFT up}")
+
+                try_attempt(f"attempt 5: Shift+MouseWheel at {pt}", shift_wheel)
+            else:
+                print(
+                    "\n(no screen point available at all - baseline row-cell "
+                    "rectangle could not be read - skipping the input-synthesis "
+                    "attempts)",
+                    file=sys.stderr,
+                )
         except RuntimeError as exc:
             print(f"FAIL: {exc}", file=sys.stderr)
             return 1
