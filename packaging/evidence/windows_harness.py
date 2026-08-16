@@ -3795,9 +3795,39 @@ def p11(binary, break_mode=False):
     modal's focus behaviour is representative of the pattern, not a
     special case picked to pass.
 
-    `--break`: requires the *destructive* ("Overwrite") button to hold
-    focus instead of Cancel - false on the real, correctly-behaving app,
-    proving the focus read is a live property check and not vacuous.
+    **CANDIDATE DEFECT, CONFIRMED ON REAL CI, NOT FIXED:** on this
+    Windows/WebView2 environment, `autofocus: true` does not move
+    keyboard focus to the modal's Cancel button at all. Confirmed across
+    two independent real CI runs (31938755692 normal mode, 31938879519
+    `--break` mode - both fail identically): after polling the full
+    `READY_TIMEOUT_S` budget, a whole-tree scan for any element
+    reporting `CurrentHasKeyboardFocus` finds exactly two - the top-level
+    OS window itself, and the toolbar's **"Save merge result"** button
+    (the control that was focused *before* the modal opened, from
+    clicking it to trigger the conflict) - focus never moved to either
+    modal action button. `explorer/tree.rs`'s Linux/macOS counterparts
+    for this same check are recorded elsewhere as CI-confirmed working
+    both directions, so this looks like an engine-specific difference in
+    how Chromium/WebView2 handles the HTML `autofocus` attribute on an
+    element mounted *after* initial page load (a dynamically-inserted
+    modal), not a harness defect - `has_keyboard_focus()` reads UIA's
+    `HasKeyboardFocus` property directly and is corroborated by the
+    whole-tree scan finding a real, different, specific element (Save)
+    holding focus instead, not an absence of any signal at all. This is
+    real data-safety-relevant behaviour, exactly the shape RFC-078's own
+    text warns about, and is registered here, not fixed, per this
+    slice's "no product behaviour changes" constraint. A direct
+    consequence for `--break`, noted rather than hidden: because the real
+    app's actual state is "neither button focused" (not "Cancel focused,
+    correctly"), both normal and `--break` mode currently fail at the
+    same earlier check (the "neither holds focus" branch) for the same
+    underlying reason, before `--break`'s own "requires the impossible"
+    branch is ever reached - so `--break` does not currently demonstrate
+    this specific case's falsifiability in isolation while the defect
+    persists. The check's liveness is still evidenced a different way:
+    it reads real, specific, corroborated state (which exact control
+    holds focus) and reports a real mismatch against what is required,
+    not a tautological or unconditional failure.
 
     **Keyboard-coverage statement (handoff §6, stated plainly per its
     instruction):** across items (1)/(3)/(4) here and P04's Enter-apply
