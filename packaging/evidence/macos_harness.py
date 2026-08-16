@@ -2038,6 +2038,14 @@ def p07(binary, break_mode=False):
     with tempfile.TemporaryDirectory() as scratch:
         home = Path(scratch) / "home"
         home.mkdir()
+        # Pre-create the config directory, matching P08/P12's own
+        # established caution (M5-B) - a real dispatch found settings.json
+        # never getting written at all despite several navigate_to calls
+        # and (later) direct checkbox clicks in Settings, and a missing
+        # parent directory (as opposed to a missing file within an
+        # existing one) is the one variable neither of those earlier
+        # cases' own settings-write paths ever isolated for certain.
+        _config_dir(home).mkdir(parents=True, exist_ok=True)
         root_a = home / "root-a"
         root_b = home / "root-b"
         root_a.mkdir()
