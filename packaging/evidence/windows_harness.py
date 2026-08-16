@@ -3423,11 +3423,29 @@ def p07(binary, break_mode=False):
                             return 1
                     ok, texts, missing = wait_for_tokens(win, ["left_root", "right_root"], timeout_s=READY_TIMEOUT_S)
                     if not ok:
+                        # One more, cheap diagnostic before giving up:
+                        # click Home ('⌂') on the left pane and see whether
+                        # a REAL, pre-existing directory (not a freshly
+                        # created fixture) shows any row at all - if even
+                        # the home directory renders nothing, that rules
+                        # out anything specific to this fixture (freshly
+                        # created temp dirs, their permissions, etc.) and
+                        # points at the directory-scan mechanism itself.
+                        home_buttons = [
+                            b for b in win.descendants(control_type="Button") if (b.window_text() or "") == "⌂"
+                        ]
+                        home_diag = "no '⌂' button found"
+                        if home_buttons:
+                            invoke(home_buttons[0])
+                            time.sleep(3.0)
+                            home_texts = collect_texts(win)
+                            home_diag = f"{len(home_texts)} accessible text nodes after Home; sample: {home_texts[:40]!r}"
                         print(
                             f"FAIL: Explorer never listed the seeded browse dir, even after a real "
                             f"PathBar re-navigation to the identical path: missing {missing}",
                             file=sys.stderr,
                         )
+                        print(f"  diagnostic (real home directory, not the fixture): {home_diag}", file=sys.stderr)
                         debug_dump(texts)
                         return 1
                     print("  real PathBar navigation succeeded where the settings-restored initial listing did not", file=sys.stderr)
