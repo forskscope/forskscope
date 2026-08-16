@@ -159,13 +159,25 @@
 --                                      trigger Explorer's directory-navigate
 --                                      double-click handler, for P07's
 --                                      navigation/history check.
---   focused_element <proc>         -> "FOCUSED: role=<r> desc=<d>
---                                      title=<t>" or "ERROR: ..." - reads
+--   focused_element <proc>         -> "FOCUSED: source=<process|window>
+--                                      class=<c> role=<r> desc=<d>
+--                                      title=<t> value=<v>", "FOCUSED:
+--                                      MISSING ...", or "ERROR: ..." - reads
 --                                      back which element currently holds
---                                      keyboard focus via
---                                      AXFocusedUIElement, with no input
---                                      synthesized at all. For P11's modal-
---                                      focus-on-safe-action check.
+--                                      keyboard focus via the aggregate
+--                                      AXFocusedUIElement pointer (process-
+--                                      level, falling back to window-level),
+--                                      with no input synthesized at all.
+--   find_focused <proc> <role>     -> "FOCUSED: <desc>" or "NONE_FOCUSED" -
+--                                      per-element AXFocused boolean walk
+--                                      over every element of the given role
+--                                      (e.g. "AXButton") - the technique
+--                                      that actually works for P11's modal-
+--                                      focus-on-safe-action check, since
+--                                      focused_element's aggregate pointer
+--                                      resolved to `missing value` for this
+--                                      WKWebView-hosted content on real
+--                                      dispatch.
 --
 -- Every command returns a plain string on stdout; a System Events
 -- permission failure (e.g. "not allowed assistive access") surfaces as an
@@ -573,6 +585,47 @@ on runOnce(argv)
                     return "ERROR: double-click-at-coords: " & errMsg
                 end try
                 return "CLICKED: occurrence=" & seenN & " at={" & cx & "," & cy & "}"
+
+            else if cmdName is "find_focused" then
+                -- M5-C / P11's modal-focus check, attempt 2: `focused_element`
+                -- (below) queries the aggregate `AXFocusedUIElement` pointer
+                -- at the process/window level - two real dispatches showed
+                -- that resolves to `missing value` at the process level and
+                -- errors outright at the window level for this app, on this
+                -- WKWebView-hosted content. Standard NSAccessibility also
+                -- exposes focus PER-ELEMENT, as a plain boolean `AXFocused`
+                -- attribute (`focused of e` in System Events terms) - this
+                -- walks the given role's matching elements (typically
+                -- "AXButton" for a modal's actions) and returns whichever
+                -- one reports `focused of e = true`, without relying on any
+                -- aggregate app/window-level pointer at all.
+                set roleWanted to item 3 of argv
+                set allEl to my safeContents(w)
+                repeat with e in allEl
+                    set isMatch to false
+                    try
+                        if role of e is roleWanted then set isMatch to true
+                    end try
+                    if isMatch then
+                        set isFocused to false
+                        try
+                            set isFocused to (focused of e)
+                        end try
+                        if isFocused then
+                            set d to ""
+                            try
+                                set d to description of e
+                            end try
+                            if d is "" then
+                                try
+                                    set d to title of e
+                                end try
+                            end if
+                            return "FOCUSED: " & d
+                        end if
+                    end if
+                end repeat
+                return "NONE_FOCUSED"
 
             else if cmdName is "focused_element" then
                 -- M5-C / P11's modal-focus check: reads back WHICH element

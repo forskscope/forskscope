@@ -2078,9 +2078,21 @@ def p07(binary, break_mode=False):
             # situation from P04's Enter-apply-hunk path or P11's global
             # shortcuts, which is why this one is not treated as
             # structurally unreachable).
-            r = click_wait("Edit path", timeout=10)
+            # PathBar's icon buttons (dir_pane.rs) have no aria_label and no
+            # meaningful inner text either - their only human-readable label
+            # is an HTML `title=` tooltip attribute, which a real dispatch
+            # showed click_button's description-then-title fallback does
+            # NOT surface for this button family (a genuine dispatch
+            # against "Edit path" returned NOT_FOUND) - WebKit's computed
+            # accessible name for these evidently derives from the glyph
+            # inner text ("✎"/"←"/"→"), not the tooltip.
+            # Search for the glyph itself instead, established here for
+            # this button family specifically (M5-B's finding that inner-
+            # text buttons are findable via the same fallback still holds
+            # for buttons whose meaningful label IS their inner text).
+            r = click_wait("✎", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click 'Edit path': {r}", file=sys.stderr)
+                print(f"FAIL: could not click the path-edit ('✎') button: {r}", file=sys.stderr)
                 return 1
             r = poll_ui(
                 "get_value", "AXTextField", "1",
@@ -2107,25 +2119,25 @@ def p07(binary, break_mode=False):
                 )
                 return 1
 
-            r = click_wait("Back", timeout=10)
+            r = click_wait("←", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click Back: {r}", file=sys.stderr)
+                print(f"FAIL: could not click Back ('←'): {r}", file=sys.stderr)
                 return 1
             r = find_wait("left-only.txt", timeout=10, want_found=False)
             if r.startswith("FOUND"):
                 print(f"FAIL: Back did not leave root-a: {r}", file=sys.stderr)
                 return 1
 
-            r = click_wait("Forward", timeout=10)
+            r = click_wait("→", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click Forward: {r}", file=sys.stderr)
+                print(f"FAIL: could not click Forward ('→'): {r}", file=sys.stderr)
                 return 1
             r = find_wait("left-only.txt", timeout=10)
             if not r.startswith("FOUND"):
                 print(f"FAIL: Forward did not return to root-a: {r}", file=sys.stderr)
                 return 1
 
-            r = click_wait("Back", timeout=10)
+            r = click_wait("←", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Back (return to $HOME): {r}", file=sys.stderr)
                 return 1
@@ -2364,8 +2376,8 @@ def p11_modal_focus(binary, break_mode=False):
     4. Escape behaviour is consistent - **NOT executed, manual** (same).
 
     Item 2 is checkable with NO input synthesized at all: focus position is
-    exposed through `AXFocusedUIElement` (`focused_element`) the instant a
-    modal's `autofocus` element mounts - a real, load-bearing product
+    exposed through the accessibility tree the instant a modal's
+    `autofocus` element mounts - a real, load-bearing product
     behaviour (`ui/overlay/modals/file.rs`'s `OverwriteModal`: `button {
     autofocus: true, ... "Cancel" }` on the safe action, no autofocus on
     "Overwrite"), not a harness convenience. Uses P05's technique (external
@@ -2400,13 +2412,20 @@ def p11_modal_focus(binary, break_mode=False):
             # accessibility tree reflecting it can lag the DOM slightly
             # (same lesson as M5-B's "Settings button lagged the DOM right
             # after mount" finding) - poll, don't sample once.
+            #
+            # `focused_element` (the aggregate AXFocusedUIElement pointer)
+            # was tried first - two real dispatches showed it resolves to
+            # `missing value` at the process level and errors outright at
+            # the window level for this WKWebView-hosted content. Falls
+            # back to `find_focused`'s per-element AXFocused boolean walk,
+            # which does not depend on any aggregate pointer.
             r = poll_ui(
-                "focused_element",
+                "find_focused", "AXButton",
                 predicate=lambda r: r.startswith("FOCUSED:"),
                 timeout=10,
             )
             if not r.startswith("FOCUSED:"):
-                print(f"FAIL: could not read AXFocusedUIElement: {r}", file=sys.stderr)
+                print(f"FAIL: no AXButton reported AXFocused=true in the modal: {r}", file=sys.stderr)
                 return 1
 
             expected = "Overwrite" if break_mode else "Cancel"
@@ -2435,8 +2454,8 @@ def p11_modal_focus(binary, break_mode=False):
     print(
         "OK: destructive-operation modal ('File changed on disk') opened with "
         "keyboard focus on the safe/cancel action ('Cancel'), not the "
-        "destructive one ('Overwrite'), confirmed via AXFocusedUIElement with "
-        "no input synthesized. Items 1/3/4 of P11 (keyboard checklist, global-"
+        "destructive one ('Overwrite'), confirmed via a per-element AXFocused "
+        "boolean walk with no input synthesized. Items 1/3/4 of P11 (keyboard checklist, global-"
         "shortcut inertness behind a modal, Escape consistency) all require a "
         "real keystroke and are NOT executed here - structurally not CI-"
         "verifiable on any platform, recorded as owner-executed/manual-"
