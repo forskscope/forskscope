@@ -64,7 +64,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 | 076 | [Versioned Runtime Settings and Session Persistence](./done/076-versioned-runtime-persistence.md) | post-v0.165.1 stabilization |
 | 077 | [Git Mergetool Save-Target Model](./done/077-mergetool-save-target-model.md) | post-v0.165.1 stabilization |
 
-## Proposed (15)
+## Proposed (16)
 
 RFC-004–040 are editor-adapter track, platform/packaging, or governance/documentation.
 RFC-026 and RFC-030 are substantially implemented; their remaining items require GTK or are deferred.
@@ -93,6 +93,7 @@ remains No-Go.
 | 072 | [UI Component Extraction (Phase 4)](./proposed/072-ui-component-extraction.md) | Structural | **Partially shipped** v0.160.0 — `Notice` extracted; `EmptyState`/`PathLabel`/`IconButton` deferred |
 | 074 | [v1 Release Stabilization Program](./proposed/074-v1-release-stabilization-program.md) | Release stabilization | Program schedule, milestones, gates, and final go/no-go package |
 | 078 | [Platform Runtime Acceptance and Release Evidence](./proposed/078-platform-runtime-acceptance.md) | Release QA | Audit B4 — exact-artifact runtime matrix after RFC-075–077 |
+| 079 | [Microsoft Store Submission Automation](./proposed/079-microsoft-store-submission-automation.md) | Release pipeline | No MSIX is built anywhere today; automate submission on `release: published`, federated credentials, no stored secret |
 
 ## Archive (1)
 
