@@ -42,7 +42,7 @@ from pathlib import Path
 import gi
 
 gi.require_version("Atspi", "2.0")
-from gi.repository import Atspi  # noqa: E402
+from gi.repository import Atspi, GLib  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LEFT_FIXTURE = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
@@ -84,13 +84,44 @@ def find_app(name, timeout_s=APP_TIMEOUT_S):
     return None
 
 
+# F57 held that a tree caught mid-render yields a partial-but-consistent
+# row set (fixed by waiting for the pinned shape); it did not anticipate
+# a tree caught mid-*mutation*, where a proxy for a node that the DOM has
+# already torn down raises GLib.GError ("Object does not exist at path
+# ...") the instant a walk touches it - not just here, at any depth, at
+# any of get_role_name/get_child_count/get_child_at_index. That crashes
+# the whole script instead of retrying, unlike every other partial-tree
+# case wait_for_ready already tolerates. Treating a GError node as simply
+# absent from this walk lets the outer poll loop retry once the tree
+# settles, exactly like any other not-ready-yet state.
+def _role_name_or_none(node):
+    try:
+        return node.get_role_name()
+    except GLib.GError:
+        return None
+
+
+def _child_count_or_zero(node):
+    try:
+        return node.get_child_count()
+    except GLib.GError:
+        return 0
+
+
+def _child_at_or_none(node, i):
+    try:
+        return node.get_child_at_index(i)
+    except GLib.GError:
+        return None
+
+
 def find_by_role(node, role, limit=None):
-    if node.get_role_name() == role:
+    if _role_name_or_none(node) == role:
         return node
-    for i in range(node.get_child_count()):
+    for i in range(_child_count_or_zero(node)):
         if limit is not None and time.monotonic() > limit:
             return None
-        child = node.get_child_at_index(i)
+        child = _child_at_or_none(node, i)
         if child is not None:
             found = find_by_role(child, role, limit)
             if found is not None:
@@ -99,10 +130,10 @@ def find_by_role(node, role, limit=None):
 
 
 def collect_rows(node, rows):
-    if node.get_role_name() == "table row":
+    if _role_name_or_none(node) == "table row":
         rows.append(node)
-    for i in range(node.get_child_count()):
-        child = node.get_child_at_index(i)
+    for i in range(_child_count_or_zero(node)):
+        child = _child_at_or_none(node, i)
         if child is not None:
             collect_rows(child, rows)
 
