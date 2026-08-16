@@ -2093,40 +2093,55 @@ def p07(binary, break_mode=False):
             # scratch tempdir, which does not) gives Back/Forward a real,
             # observable state change with no double-click, no text input,
             # and no keystroke anywhere in the sequence.
+            # `find_text`/`find_wait` search the WHOLE window, not a single
+            # pane - since only the LEFT pane ever navigates here (the
+            # right stays at $HOME throughout), "root-a" would always still
+            # be FOUND via the right pane's own unchanged copy regardless
+            # of whether the left pane's navigation actually worked. Uses
+            # `count_rows`'s aggregate total instead, which does change
+            # predictably: $HOME lists 2 directories (`root-a`/`root-b`) in
+            # each of the two panes (4 total); `scratch` (`$HOME`'s own
+            # parent) contains exactly one entry (`home` itself), so a
+            # correct "Go up" changes the total from 4 to 3 (1 left + 2
+            # right), and Back/Forward should toggle between the two.
             r = click_wait("↑", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click 'Go up one directory' ('↑'): {r}", file=sys.stderr)
                 return 1
-            r = find_wait("root-a", timeout=10, want_found=False)
-            if r.startswith("FOUND"):
-                print(f"FAIL: 'Go up' did not leave $HOME (root-a still listed): {r}", file=sys.stderr)
+            rows = wait_rows(3, timeout=10)
+            if rows != "3":
+                print(
+                    f"FAIL: 'Go up' did not change the aggregate row count to 3 "
+                    f"(1 left + 2 right unchanged) - last count: {rows!r}",
+                    file=sys.stderr,
+                )
                 return 1
 
             r = click_wait("←", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Back ('←'): {r}", file=sys.stderr)
                 return 1
-            r = find_wait("root-a", timeout=10)
-            if not r.startswith("FOUND"):
-                print(f"FAIL: Back did not return to $HOME (root-a not listed): {r}", file=sys.stderr)
+            rows = wait_rows(4, timeout=10)
+            if rows != "4":
+                print(f"FAIL: Back did not return the row count to 4 (last: {rows!r})", file=sys.stderr)
                 return 1
 
             r = click_wait("→", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Forward ('→'): {r}", file=sys.stderr)
                 return 1
-            r = find_wait("root-a", timeout=10, want_found=False)
-            if r.startswith("FOUND"):
-                print(f"FAIL: Forward did not re-leave $HOME (root-a still listed): {r}", file=sys.stderr)
+            rows = wait_rows(3, timeout=10)
+            if rows != "3":
+                print(f"FAIL: Forward did not re-change the row count to 3 (last: {rows!r})", file=sys.stderr)
                 return 1
 
             r = click_wait("←", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Back (return to $HOME): {r}", file=sys.stderr)
                 return 1
-            r = find_wait("root-a", timeout=10)
-            if not r.startswith("FOUND"):
-                print(f"FAIL: did not return to $HOME after the final Back: {r}", file=sys.stderr)
+            rows = wait_rows(4, timeout=10)
+            if rows != "4":
+                print(f"FAIL: did not return to a row count of 4 after the final Back: {rows!r}", file=sys.stderr)
                 return 1
 
             # ── Pick root-a (left) / root-b (right), open deep compare ───
