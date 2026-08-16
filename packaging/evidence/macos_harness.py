@@ -1977,16 +1977,15 @@ def p07(binary, break_mode=False):
     path and P11's items 1/3/4 (handoff M5-C §6): F6 pane-toggle and the
     aligned tree's arrow-key navigation are raw `onkeydown` handling with
     no accessible action to invoke. Recorded here, not silently skipped -
-    see this case's OK output. Navigation/history *is* executed: a real
-    double-click (two positioned `click at {x,y}` events, System Events has
-    no AXDoublePress-equivalent action) was tried first for directory
-    descent and did not register with WebKit's own dblclick detection (a
-    real dispatch showed no navigation at all) - `PathBar`'s edit-path mode
-    reaches the same `navigate_to` through a different, already-proven
-    path instead (click "Edit path", `type_into` the target path, a real
-    Return keystroke to a specific focused text input - see the case body
-    for why this differs from P04/P11's structurally-unreachable global
-    handlers), plus the Back/Forward toolbar buttons (AXPress).
+    see this case's OK output. Navigation/history *is* executed, via
+    `PathBar`'s "↑" (Go up one directory) plus the Back/Forward toolbar
+    buttons - all three ordinary, single `AXPress` clicks, the same
+    rock-solid technique every other button in this harness relies on.
+    Directory-descent via a directory row (double-click, or typing a path
+    into `PathBar`'s edit mode and submitting via Return/blur) was tried
+    first and real dispatches ruled out every variant - see the case body
+    for the full account, kept rather than silently dropped since it rules
+    out entire technique families for any future work on this control.
 
     Fixture: `$HOME` contains two sibling directories, `root-a` and
     `root-b`, picked as the deep-compare roots via the same
@@ -2054,129 +2053,80 @@ def p07(binary, break_mode=False):
             # ── Navigation/history (mouse-driven; the keyboard sub-part is
             # NOT executed - see this case's OK output) ───────────────────
             #
-            # `double_click_row_side` (two positioned `click at {x,y}`
-            # events) was tried first and did NOT trigger `tree.rs`'s
-            # `ondoubleclick` - a real dispatch showed the row count and
-            # both "root-a"/"root-b" strings completely unchanged after the
-            # attempted double-click, meaning no navigation happened at
-            # all. AppleScript's `click at` is a high-level convenience
-            # wrapper with no documented guarantee it stamps the OS-level
-            # click-count metadata a genuine double-click needs for
-            # WebKit's own dblclick detection - a known-unreliable
-            # technique, not pursued further. `PathBar`'s edit-path mode
-            # (dir_pane.rs) reaches the same `navigate_to` through a
-            # completely different, already-proven path instead: click the
-            # "Edit path" button (AXPress, same technique as every other
-            # button in this harness) to reveal a real `<input
-            # type="text">`, `type_into` it (the same click+Cmd-A+keystroke
-            # technique already established for Save As's path field) with
-            # root-a's absolute path, then a real `key code 36` (Return) -
-            # the SAME kind of genuine keystroke `type_into` already relies
-            # on, delivered to a specific, currently-focused, single
-            # `onkeydown`-bound text input (not a raw global/document
-            # handler bound to no UI element - a materially different
-            # situation from P04's Enter-apply-hunk path or P11's global
-            # shortcuts, which is why this one is not treated as
-            # structurally unreachable).
-            # PathBar's icon buttons (dir_pane.rs) have no aria_label and no
-            # meaningful inner text either - their only human-readable label
-            # is an HTML `title=` tooltip attribute, which a real dispatch
-            # showed click_button's description-then-title fallback does
-            # NOT surface for this button family (a genuine dispatch
-            # against "Edit path" returned NOT_FOUND) - WebKit's computed
-            # accessible name for these evidently derives from the glyph
-            # inner text ("✎"/"←"/"→"), not the tooltip.
-            # Search for the glyph itself instead, established here for
-            # this button family specifically (M5-B's finding that inner-
-            # text buttons are findable via the same fallback still holds
-            # for buttons whose meaningful label IS their inner text).
-            r = click_wait("✎", exact=True, timeout=10)
+            # Real, extensive iteration (six real dispatches) preceded
+            # this final design and is recorded here rather than silently
+            # dropped, since it rules out entire technique families for any
+            # future work on this same control family:
+            #
+            # 1. `double_click_row_side` (two positioned `click at {x,y}`
+            #    events at a directory row) did not trigger `tree.rs`'s
+            #    `ondoubleclick` at all - row count and both "root-a"/
+            #    "root-b" strings were completely unchanged afterward.
+            #    AppleScript's `click at` has no documented guarantee it
+            #    stamps the OS-level click-count metadata a genuine double-
+            #    click needs for WebKit's own dblclick detection.
+            # 2. `PathBar`'s edit-path mode (click "✎", write the target
+            #    path into the revealed `<input>`, submit) was tried next:
+            #    `type_into`'s Cmd+A/keystroke path left the field's value
+            #    completely unchanged (not merely slow) despite
+            #    `find_focused` confirming the field genuinely had
+            #    AXFocused=true. `set_value`'s direct AXValue write DID
+            #    change the field's own readable value - but neither a real
+            #    `key code 36` (Return, read back byte-for-byte unchanged
+            #    before/after the keypress) nor a real mouse click outside
+            #    all web content (`click_title_bar`, to drive the field's
+            #    `onblur` handler) ever produced the navigation the app's
+            #    own logic would trigger from a genuinely-updated value -
+            #    consistent with the raw AXValue write never reaching
+            #    Dioxus's own `input_val` signal for this specific control
+            #    (unlike Save As's path field in P05, where the identical
+            #    `set_value` technique demonstrably did propagate all the
+            #    way through to the app's own save logic).
+            #
+            # What actually works, avoiding every input-synthesis problem
+            # above entirely: PathBar's own "↑" (Go up one directory)
+            # button is a single, ordinary `AXPress` - the same rock-solid
+            # technique every other button in this harness already relies
+            # on - and it drives the identical `navigate_to`/`NavHistory`
+            # machinery "history" is actually about. Going up from `$HOME`
+            # (which contains `root-a`/`root-b`) to its own parent (the
+            # scratch tempdir, which does not) gives Back/Forward a real,
+            # observable state change with no double-click, no text input,
+            # and no keystroke anywhere in the sequence.
+            r = click_wait("↑", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click the path-edit ('✎') button: {r}", file=sys.stderr)
+                print(f"FAIL: could not click 'Go up one directory' ('↑'): {r}", file=sys.stderr)
                 return 1
-            r = poll_ui(
-                "get_value", "AXTextField", "1",
-                predicate=lambda r: r.startswith("VALUE:"),
-                timeout=10,
-            )
-            if not r.startswith("VALUE:"):
-                print(f"FAIL: path-edit text field never appeared: {r}", file=sys.stderr)
-                return 1
-            # A real dispatch showed the field genuinely had OS/AX focus
-            # (find_focused reported an AXTextField with AXFocused=true,
-            # both before AND after type_into's own click) yet the
-            # keystroke-typed text never actually landed - unlike Save As's
-            # path field (P05), where `set_value`'s direct AXValue write was
-            # what actually worked (`type_into` was only ever a documented
-            # fallback there, never exercised as the thing that succeeded).
-            # This is the first real exercise of type_into's keystroke path
-            # against this specific field, and it does not work - use
-            # `set_value` first, mirroring P05's exact established
-            # fallback chain, instead of leading with the technique that
-            # just failed a real dispatch.
-            root_a_str = str(root_a)
-            r = ui("set_value", "AXTextField", "1", root_a_str, timeout=20)
-            wrote_value = r.startswith("SET:") and r.endswith(f"-> {root_a_str}")
-            if not wrote_value:
-                r2 = ui("get_value", "AXTextField", "1", timeout=20)
-                wrote_value = r2 == f"VALUE: {root_a_str}"
-            if not wrote_value:
-                r = ui("type_into", "AXTextField", "1", root_a_str, timeout=20)
-                wrote_value = r == f"TYPED: {root_a_str}"
-            if not wrote_value:
-                print(
-                    f"FAIL: could not get the path-edit field to read back "
-                    f"{root_a_str!r} via set_value or type_into (last result: {r})",
-                    file=sys.stderr,
-                )
-                return 1
-            # Two real dispatches proved `key code 36` (Return) does not
-            # reach this field at all: its value, read back immediately
-            # before and after the keypress, was byte-for-byte identical -
-            # not slow, simply never delivered. Rather than chase keyboard-
-            # event delivery into this WKWebView further, submit via the
-            # field's `onblur` handler instead (dir_pane.rs's PathBar also
-            # navigates on blur for a valid typed path) - driven by a real
-            # mouse click OUTSIDE any web content (the native title bar),
-            # not a keystroke at all.
-            r = ui("click_title_bar", timeout=20)
-            if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click the title bar to blur the path field: {r}", file=sys.stderr)
-                return 1
-            r = find_wait("left-only.txt", timeout=15)
-            if not r.startswith("FOUND"):
-                print(
-                    f"FAIL: left pane did not navigate into root-a via the path-edit "
-                    f"field (left-only.txt not visible): {r}",
-                    file=sys.stderr,
-                )
+            r = find_wait("root-a", timeout=10, want_found=False)
+            if r.startswith("FOUND"):
+                print(f"FAIL: 'Go up' did not leave $HOME (root-a still listed): {r}", file=sys.stderr)
                 return 1
 
             r = click_wait("←", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Back ('←'): {r}", file=sys.stderr)
                 return 1
-            r = find_wait("left-only.txt", timeout=10, want_found=False)
-            if r.startswith("FOUND"):
-                print(f"FAIL: Back did not leave root-a: {r}", file=sys.stderr)
+            r = find_wait("root-a", timeout=10)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: Back did not return to $HOME (root-a not listed): {r}", file=sys.stderr)
                 return 1
 
             r = click_wait("→", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Forward ('→'): {r}", file=sys.stderr)
                 return 1
-            r = find_wait("left-only.txt", timeout=10)
-            if not r.startswith("FOUND"):
-                print(f"FAIL: Forward did not return to root-a: {r}", file=sys.stderr)
+            r = find_wait("root-a", timeout=10, want_found=False)
+            if r.startswith("FOUND"):
+                print(f"FAIL: Forward did not re-leave $HOME (root-a still listed): {r}", file=sys.stderr)
                 return 1
 
             r = click_wait("←", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click Back (return to $HOME): {r}", file=sys.stderr)
                 return 1
-            r = find_wait("left-only.txt", timeout=10, want_found=False)
-            if r.startswith("FOUND"):
-                print(f"FAIL: did not return to $HOME after Back: {r}", file=sys.stderr)
+            r = find_wait("root-a", timeout=10)
+            if not r.startswith("FOUND"):
+                print(f"FAIL: did not return to $HOME after the final Back: {r}", file=sys.stderr)
                 return 1
 
             # ── Pick root-a (left) / root-b (right), open deep compare ───
@@ -2373,8 +2323,8 @@ def p07(binary, break_mode=False):
             terminate(proc)
 
     print(
-        "OK: Explorer navigation (double-click into root-a, Back, Forward - all "
-        "mouse-driven) and Compare all functioned; deep-compare showed all five "
+        "OK: Explorer navigation ('Go up', Back, Forward - all ordinary AXPress "
+        "clicks) and Compare all functioned; deep-compare showed all five "
         "fixture entries with correct Equal/Changed/LeftOnly/RightOnly statuses "
         "and summary stats; the Different/All/Equal-only filters each showed the "
         "expected subset; a per-file copy created a real .bak matching the "
@@ -2581,9 +2531,25 @@ def p03(binary, break_mode=False):
                 print(f"FAIL: could not open the advanced panel ('More ▼'): {r}", file=sys.stderr)
                 return 1
 
-            r = click_wait("Toggle word wrap", timeout=10)
+            # A real dispatch found this button NOT_FOUND via click_button
+            # (role "AXButton" only) searching either its aria_label
+            # ("Toggle word wrap") or its inner text ("Wrap") - this button
+            # (unlike Redo, which has neither aria-pressed nor aria-label)
+            # also carries `aria_pressed`, which WebKit's accessibility
+            # mapping plausibly maps to a toggle-specific role distinct
+            # from plain "AXButton" (the same class of ARIA-state-changes-
+            # the-mapped-role behaviour already seen elsewhere in this
+            # program, e.g. `<select>` mapping to AXPopUpButton, not
+            # AXComboBox). `click_any` has no role filter at all - reused
+            # here via `poll_ui` directly since `click_wait` is hardcoded
+            # to the button-only commands.
+            r = poll_ui(
+                "click_any", "Wrap",
+                predicate=lambda r: r.startswith("CLICKED"),
+                timeout=10,
+            )
             if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click 'Toggle word wrap': {r}", file=sys.stderr)
+                print(f"FAIL: could not click the word-wrap toggle ('Wrap: ...'): {r}", file=sys.stderr)
                 return 1
 
             expected_after_wrap = 99 if break_mode else 14
@@ -2601,7 +2567,11 @@ def p03(binary, break_mode=False):
                 # nothing further to check.
                 return 1
 
-            r = click_wait("Toggle word wrap", timeout=10)
+            r = poll_ui(
+                "click_any", "Wrap",
+                predicate=lambda r: r.startswith("CLICKED"),
+                timeout=10,
+            )
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not toggle word wrap back off: {r}", file=sys.stderr)
                 return 1
