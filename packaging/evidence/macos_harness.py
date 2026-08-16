@@ -2217,13 +2217,31 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: left pane's 'Go up' did not leave root-a: {r}", file=sys.stderr)
                 return 1
 
-            r = ui("click_button_nth", "↑", "2", timeout=20)
-            if not r.startswith("CLICKED"):
-                print(f"FAIL: could not click 'Go up one directory' on the right ('↑'): {r}", file=sys.stderr)
-                return 1
-            r = find_wait("right-only-1.txt", timeout=10, want_found=False)
-            if r.startswith("FOUND"):
-                print(f"FAIL: right pane's 'Go up' did not leave root-b: {r}", file=sys.stderr)
+            # Occurrence 2 was a real dispatch's own most-likely guess (the
+            # left pane's own "↑" is occurrence 1, so the right's should be
+            # 2) but did not produce the expected navigation - tries a
+            # small range of nearby occurrence indices, verifying each
+            # against the real, independent effect (right-only.txt leaving
+            # view) rather than trusting "CLICKED" alone, matching the same
+            # verify-against-ground-truth discipline this case already
+            # applies to the checkbox toggle attempt.
+            moved_right = False
+            tried = []
+            for occ in ("2", "3"):
+                r = ui("click_button_nth", "↑", occ, timeout=20)
+                tried.append(f"{occ}={r!r}")
+                if not r.startswith("CLICKED"):
+                    continue
+                r2 = find_wait("right-only-1.txt", timeout=6, want_found=False)
+                if not r2.startswith("FOUND"):
+                    moved_right = True
+                    break
+            if not moved_right:
+                print(
+                    f"FAIL: could not get the right pane to leave root-b via any "
+                    f"tried '↑' occurrence: {'; '.join(tried)}",
+                    file=sys.stderr,
+                )
                 return 1
 
             # Both panes now show $HOME (root-a/root-b/Library each) -
