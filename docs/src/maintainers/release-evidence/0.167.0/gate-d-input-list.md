@@ -68,6 +68,13 @@ judgment, not an oversight:
   comparison) — a dependency-adoption decision explicitly sequenced to run
   *after* Gate D clears ("adopt when your acceptance matrix clears, not
   before" — their own words), not an input to the decision itself.
+- **F49b** (`AppxManifest.xml`'s `MaxVersionTested` stays `10.0.19041.0`
+  pending M5's Windows evidence) — that evidence now exists (M5-A/B/C ran
+  on NT 10.0.26100), so this is **an action M5's evidence just enabled**
+  (bump `MaxVersionTested` to the build actually tested), not a question
+  bearing on the go/no-go itself. F60 (the Windows floor) is listed above
+  because it *is* a decision input; F49b is the ceiling half of the same
+  manifest and does not carry the same weight.
 
 ## Case-result summary (context, not a separate input)
 

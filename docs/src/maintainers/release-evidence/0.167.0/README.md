@@ -15,7 +15,11 @@ See `matrix-plan.md` for the full frozen plan this run executes against.
 ## Verdict for this evidence
 
 **This evidence cannot support a Gate D pass, and nothing below changes
-that — for three independent, un-waivable reasons.**
+that.** **F44, F61, and F73 are each independently un-waivable** — the
+**[Gate D input list](gate-d-input-list.md)** is the authoritative,
+up-to-date record of the full blocker set and every other open input; if
+that list's blocker count ever changes, this paragraph may lag it and the
+list wins.
 
 **F44** fails Linux P01 un-waivably on a supported platform (libxdo-4
 distributions) — reproduced directly on a real host, not simulated.
