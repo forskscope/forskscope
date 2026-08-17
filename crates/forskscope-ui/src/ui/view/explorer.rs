@@ -380,8 +380,8 @@ pub fn Explorer() -> Element {
                         path: left_dir.read().cloned(),
                         can_back:    left_hist.read().can_back(),
                         can_forward: left_hist.read().can_forward(),
-                        on_back:    move |_| { let p = left_hist.write().back();    if let Some(p) = p { crate::ui::view::dir_pane::navigate_to(p, true,  store, left_hist,  left_dir); } },
-                        on_forward: move |_| { let p = left_hist.write().forward(); if let Some(p) = p { crate::ui::view::dir_pane::navigate_to(p, true,  store, left_hist,  left_dir); } },
+                        on_back:    move |_| { let p = left_hist.write().back();    if let Some(p) = p { crate::ui::view::dir_pane::navigate_to_from_history(p, true,  store, left_dir); } },
+                        on_forward: move |_| { let p = left_hist.write().forward(); if let Some(p) = p { crate::ui::view::dir_pane::navigate_to_from_history(p, true,  store, left_dir); } },
                         on_navigate: move |p| crate::ui::view::dir_pane::navigate_to(p, true, store, left_hist, left_dir),
                         lang,
                     }
@@ -389,8 +389,8 @@ pub fn Explorer() -> Element {
                         path: right_dir.read().cloned(),
                         can_back:    right_hist.read().can_back(),
                         can_forward: right_hist.read().can_forward(),
-                        on_back:    move |_| { let p = right_hist.write().back();    if let Some(p) = p { crate::ui::view::dir_pane::navigate_to(p, false, store, right_hist, right_dir); } },
-                        on_forward: move |_| { let p = right_hist.write().forward(); if let Some(p) = p { crate::ui::view::dir_pane::navigate_to(p, false, store, right_hist, right_dir); } },
+                        on_back:    move |_| { let p = right_hist.write().back();    if let Some(p) = p { crate::ui::view::dir_pane::navigate_to_from_history(p, false, store, right_dir); } },
+                        on_forward: move |_| { let p = right_hist.write().forward(); if let Some(p) = p { crate::ui::view::dir_pane::navigate_to_from_history(p, false, store, right_dir); } },
                         on_navigate: move |p| crate::ui::view::dir_pane::navigate_to(p, false, store, right_hist, right_dir),
                         lang,
                     }

@@ -10,6 +10,7 @@ use std::path::{Component, Path, PathBuf};
 
 use dioxus::html::input_data::keyboard_types::Key;
 use dioxus::prelude::*;
+use dioxus_core::spawn_forever;
 
 use crate::i18n::t;
 use crate::state::Lang;
@@ -329,12 +330,14 @@ pub fn short_name(p: &Path) -> String {
         .unwrap_or_else(|| p.display().to_string())
 }
 
-/// Persist the new root in settings, push history, and update current_dir.
-pub fn navigate_to(
+/// Persist the new root in settings and update current_dir - the part of a
+/// navigation that is the same whether the path is a fresh destination or a
+/// history replay. Does **not** touch `history`: pushing is only correct for
+/// a fresh destination (F72 - see `navigate_to`/`navigate_to_from_history`).
+fn apply_navigation(
     path: PathBuf,
     is_left: bool,
     mut store: crate::state::Store,
-    mut history: Signal<NavHistory>,
     mut current_dir: Signal<PathBuf>,
 ) {
     {
@@ -354,13 +357,91 @@ pub fn navigate_to(
     if store.settings.read().remember_explorer_dirs {
         crate::ui::view::settings::persist(store);
     }
-    history.write().push(path.clone());
     current_dir.set(path);
-    // Scroll the aligned tree to top after navigation.
-    spawn(async move {
+    // Scroll the aligned tree to top after navigation. `spawn_forever`, not
+    // `spawn`: this one-shot eval has no dependency on the calling scope's
+    // lifetime, and `spawn` requires a "current scope" only real event
+    // dispatch provides (same constraint `with_test_store`'s Store signals
+    // sidestep via `ScopeId::ROOT` - F36/F61) - calling `apply_navigation`
+    // outside of one, as F72's regression test does, would otherwise panic
+    // on a concern this function's actual behavior does not depend on.
+    spawn_forever(async move {
         let _ = dioxus::document::eval(
             "var t = document.getElementById('aligned-tree'); if(t) t.scrollTop = 0;",
         )
         .await;
     });
+}
+
+/// Persist the new root in settings, push history, and update current_dir -
+/// for a **fresh** destination (a click on a folder, a typed path, Home,
+/// Up). Every navigation site except Back/Forward wants this.
+pub fn navigate_to(
+    path: PathBuf,
+    is_left: bool,
+    store: crate::state::Store,
+    mut history: Signal<NavHistory>,
+    current_dir: Signal<PathBuf>,
+) {
+    history.write().push(path.clone());
+    apply_navigation(path, is_left, store, current_dir);
+}
+
+/// Re-visits a path Back/Forward already found in `history` - everything
+/// `navigate_to` does except the push. F72: `path` here *is* a `history`
+/// entry, so pushing it back in is not a no-op the way it looks - `push`'s
+/// duplicate guard compares against `entries.last()`, which after
+/// `NavHistory::back()` is still the not-yet-truncated forward entry, not
+/// `path`. `push` truncates from the current index and re-appends `path`,
+/// destroying whatever was ahead of it. Back/Forward navigating through
+/// history must never call `push` at all, not just avoid duplicating the
+/// current entry.
+pub fn navigate_to_from_history(
+    path: PathBuf,
+    is_left: bool,
+    store: crate::state::Store,
+    current_dir: Signal<PathBuf>,
+) {
+    apply_navigation(path, is_left, store, current_dir);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::with_test_store;
+
+    // F72: navigate A → B, press Back (expect a return to A with Forward to
+    // B still available), then Forward (expect a return to B). Exercises
+    // the real `navigate_to`/`navigate_to_from_history` functions, not just
+    // `NavHistory` in isolation - `NavHistory` itself was never the bug;
+    // `navigate_to`'s unconditional `history.write().push(...)` on every
+    // call, including a Back/Forward replay, was.
+    #[test]
+    fn back_then_forward_returns_to_the_page_that_was_left() {
+        with_test_store(|store| {
+            let mut history = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let current_dir = Signal::new_in_scope(PathBuf::from("/a"), ScopeId::ROOT);
+            history.write().push(PathBuf::from("/a"));
+
+            navigate_to(PathBuf::from("/b"), true, *store, history, current_dir);
+            assert_eq!(*current_dir.read(), PathBuf::from("/b"));
+            assert!(!history.read().can_forward());
+
+            let back_target = history.write().back();
+            assert_eq!(back_target, Some(PathBuf::from("/a")));
+            navigate_to_from_history(back_target.unwrap(), true, *store, current_dir);
+            assert_eq!(*current_dir.read(), PathBuf::from("/a"));
+
+            assert!(
+                history.read().can_forward(),
+                "F72: Back must not destroy the Forward entry"
+            );
+            let fwd_target = history.write().forward();
+            assert_eq!(
+                fwd_target,
+                Some(PathBuf::from("/b")),
+                "Forward must return to the page Back just left"
+            );
+        });
+    }
 }
