@@ -21,7 +21,7 @@ pub fn OverwriteModal(index: usize, target: PathBuf) -> Element {
     let lang = store.lang();
     let path_display = target.display().to_string();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "File changed on disk"),
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "File changed on disk"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
                 h2 { {t(lang, "File changed on disk")} }
                 p { {t(lang, "The target file was modified after it was loaded. Overwrite anyway?")} }
@@ -94,7 +94,7 @@ pub fn ConfirmSaveAsOverwriteModal(index: usize, target: PathBuf) -> Element {
     let lang = store.lang();
     let path_display = target.display().to_string();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Save As"),
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Save As"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
                 h2 { {t(lang, "Overwrite existing file?")} }
                 p { {t(lang, "A file already exists at this path.")} }
@@ -121,7 +121,7 @@ pub fn ConfirmDiffOptionChangeModal(index: usize, options: DiffOptions) -> Eleme
     let mut store = use_context::<Store>();
     let lang = store.lang();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Change diff options"),
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Change diff options"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
                 h2 { {t(lang, "Change diff options?")} }
                 p { {t(lang, "Unsaved merge changes will be discarded when diff options change.")} }
@@ -145,7 +145,7 @@ pub fn ReloadModal(index: usize) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Reload files"),
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Reload files"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
                 h2 { {t(lang, "Reload files?")} }
                 p { {t(lang, "Unsaved merge changes will be discarded.")} }
@@ -166,7 +166,7 @@ pub fn SwapModal(index: usize) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Swap sides"),
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Swap sides"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
                 h2 { {t(lang, "Swap sides?")} }
                 p { {t(lang, "Unsaved merge changes will be discarded when sides are swapped.")} }

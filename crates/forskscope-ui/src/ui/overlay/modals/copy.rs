@@ -13,7 +13,7 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
     let src = op.src.display().to_string();
     let dst = op.dst.display().to_string();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Copy file"),
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Copy file"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
                 h2 { {t(lang, "Copy this file?")} }
                 div { class: "field", span { {t(lang, "From")} } code { class: "path-display", "{src}" } }
@@ -79,7 +79,7 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
     let count = spec.items.len();
     let label = spec.label.clone();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Batch copy"),
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Batch copy"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
                 h2 { {format!("{} {count} {}?", t(lang, "Copy"), t(lang, "files"))} }
                 p { "{label}" }
