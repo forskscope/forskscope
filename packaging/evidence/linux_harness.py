@@ -1070,7 +1070,23 @@ def p12(binary, break_mode=False):
             terminate(proc)
 
         # ── Sub-test 2: tab restore only with no explicit CLI paths ────
-        proc = launch(binary, [left, right], scratch_path)
+        #
+        # Uses a raw `subprocess.Popen(..., env=env)` here, not the shared
+        # `launch()` helper - `launch()` does not accept `env` at all, so
+        # using it here silently launched against the real environment's
+        # default XDG_CONFIG_HOME (inherited, unset `env` -> the calling
+        # process's own environment) instead of this test's scratch
+        # `config_home`, not the isolated one this whole sub-test exists to
+        # exercise. Found via a real CI dispatch against 0.167.1 (diagnostic
+        # commits 8b0a2d5/temporary): `session.json` never appeared under
+        # the scratch config dir at all, even after a launch that (per
+        # every other platform's same dispatch, and per F61's fix being
+        # read directly at the tag) does write it - it was writing
+        # somewhere else the diagnostic wasn't looking. Every other
+        # `env`-isolated case in this file already uses a raw `Popen(...,
+        # env=env)` for exactly this reason; this sub-test was the one
+        # place still going through `launch()`.
+        proc = subprocess.Popen([binary, str(left), str(right)], cwd=str(scratch_path), env=env)
         try:
             app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
             if app is None:
@@ -1080,18 +1096,9 @@ def p12(binary, break_mode=False):
             if landmark is None:
                 print("FAIL: first compare did not render (tab-restore sub-test)", file=sys.stderr)
                 return 1
-            time.sleep(1)  # let the reactive session-save effect run
+            time.sleep(1)  # let the session-save write complete
         finally:
             terminate(proc)
-
-        # DIAGNOSTIC (temporary, review 070 follow-up): dump session.json's
-        # actual state before the relaunch, to distinguish "F61's write
-        # never happened" from "it wrote, but restore/render failed".
-        session_path = config_home / "forskscope" / "session.json"
-        if session_path.exists():
-            print(f"DIAGNOSTIC: session.json exists, content: {session_path.read_text()!r}", file=sys.stderr)
-        else:
-            print(f"DIAGNOSTIC: session.json does NOT exist at {session_path}", file=sys.stderr)
 
         proc = subprocess.Popen([binary], cwd=str(scratch_path), env=env)
         try:
@@ -1101,22 +1108,12 @@ def p12(binary, break_mode=False):
                 return 1
             landmark, _f, left_rows, _r = wait_for_ready(app, 7, timeout_s=LAUNCH_TIMEOUT_S)
             if landmark is None:
-                # DIAGNOSTIC (temporary): dump what IS present instead of
-                # the expected 7-row diff, and re-check session.json after
-                # the relaunch too (in case something rewrote/cleared it).
-                if session_path.exists():
-                    print(f"DIAGNOSTIC: session.json after relaunch attempt: {session_path.read_text()!r}", file=sys.stderr)
-                else:
-                    print("DIAGNOSTIC: session.json GONE after relaunch attempt", file=sys.stderr)
-                names = []
-                find_all_by_name_containing(app, "", names)
-                print(f"DIAGNOSTIC: {len(names)} named accessibles present; sample: {[n.get_name() for n in names[:20]]!r}", file=sys.stderr)
                 print("FAIL: no-args relaunch did not restore the compare tab (expected 7 rows/pane)", file=sys.stderr)
                 return 1
         finally:
             terminate(proc)
 
-        proc = launch(binary, [other_left, other_right], scratch_path)
+        proc = subprocess.Popen([binary, str(other_left), str(other_right)], cwd=str(scratch_path), env=env)
         try:
             app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
             if app is None:
