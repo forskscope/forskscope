@@ -204,6 +204,19 @@ executor owner/role, and host-access status per row are owner-dependent and
 recorded as open questions rather than guessed. M5 cannot begin until those
 are answered.
 
+**Progress (2026-08-17): `0.167.1` is published.** A fix release, deliberately
+not a v1 candidate: F73/F68 (per-file copy writing to the wrong folder,
+silently), F61 (a CLI-opened comparison never saved), F72 (Back destroying
+Forward history) and F69 (destructive dialogs not focusing the safe action on
+Windows). Those four were all found by *running* the application during M5, not
+by reading it — which is the return on the platform-acceptance work even though
+Gate D itself cannot pass.
+
+**Gate D is unchanged: F44 blocks it**, and the owner's decision is to wait for
+an upstream release rather than fork. F68, F72 and F73 are fixed on `main` but
+stay open in the register until re-verified against this candidate; F69 stays
+open until the Windows P11 check flips on real CI.
+
 **Progress (2026-08-16): M5's CI-verified rows are complete; Gate D's verdict is
 determined but the matrix is not.** M5-A (launch/CLI), M5-B (interaction) and
 M5-C (visual/navigation, plus assembly) all landed and were reviewed. The Gate D

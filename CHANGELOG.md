@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.167.2] — Unreleased
+
 ## [0.167.1] — 2026-08-16
 
 Four fixes for defects found by running the application on Linux, Windows and
