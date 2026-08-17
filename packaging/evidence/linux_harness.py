@@ -1084,6 +1084,15 @@ def p12(binary, break_mode=False):
         finally:
             terminate(proc)
 
+        # DIAGNOSTIC (temporary, review 070 follow-up): dump session.json's
+        # actual state before the relaunch, to distinguish "F61's write
+        # never happened" from "it wrote, but restore/render failed".
+        session_path = config_home / "forskscope" / "session.json"
+        if session_path.exists():
+            print(f"DIAGNOSTIC: session.json exists, content: {session_path.read_text()!r}", file=sys.stderr)
+        else:
+            print(f"DIAGNOSTIC: session.json does NOT exist at {session_path}", file=sys.stderr)
+
         proc = subprocess.Popen([binary], cwd=str(scratch_path), env=env)
         try:
             app = find_app("forskscope", timeout_s=LAUNCH_TIMEOUT_S)
@@ -1092,6 +1101,16 @@ def p12(binary, break_mode=False):
                 return 1
             landmark, _f, left_rows, _r = wait_for_ready(app, 7, timeout_s=LAUNCH_TIMEOUT_S)
             if landmark is None:
+                # DIAGNOSTIC (temporary): dump what IS present instead of
+                # the expected 7-row diff, and re-check session.json after
+                # the relaunch too (in case something rewrote/cleared it).
+                if session_path.exists():
+                    print(f"DIAGNOSTIC: session.json after relaunch attempt: {session_path.read_text()!r}", file=sys.stderr)
+                else:
+                    print("DIAGNOSTIC: session.json GONE after relaunch attempt", file=sys.stderr)
+                names = []
+                find_all_by_name_containing(app, "", names)
+                print(f"DIAGNOSTIC: {len(names)} named accessibles present; sample: {[n.get_name() for n in names[:20]]!r}", file=sys.stderr)
                 print("FAIL: no-args relaunch did not restore the compare tab (expected 7 rows/pane)", file=sys.stderr)
                 return 1
         finally:
