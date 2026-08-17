@@ -204,6 +204,21 @@ executor owner/role, and host-access status per row are owner-dependent and
 recorded as open questions rather than guessed. M5 cannot begin until those
 are answered.
 
+**Progress (2026-08-16): M5's CI-verified rows are complete; Gate D's verdict is
+determined but the matrix is not.** M5-A (launch/CLI), M5-B (interaction) and
+M5-C (visual/navigation, plus assembly) all landed and were reviewed. The Gate D
+input list is at `docs/src/maintainers/release-evidence/0.167.0/gate-d-input-list.md`.
+
+**Three un-waivable blockers** stand against `0.167.0`: **F44** (cannot launch on
+libxdo-4 distributions — upstream, the only one nobody here can act on), **F61**
+(silent session loss — fixed on `main`, not in this candidate) and **F73**
+(wrong-file copy — not fixed). Under RFC-078's waiver policy none can be waived
+into a pass, so **Gate D's outcome is already known**. It is not yet formally
+assessable, because the matrix still lacks `linux-wayland` and F45's Windows
+sub-case. Completing it remains worthwhile: the fixes need re-verification
+against a new candidate anyway, and a matrix complete except for the fixed rows
+is far cheaper to re-run.
+
 **Progress (2026-08-14): `0.167.0` is published and M5 has begun.** The
 candidate carries F44 knowingly — the upstream `dioxus-desktop` fix is merged
 but unreleased, and only a `0.8.0-alpha` exists. Publishing rather than holding
