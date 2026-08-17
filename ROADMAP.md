@@ -1,6 +1,6 @@
 # ForskScope Roadmap
 
-**Last updated:** 0.167.0 cut (2026-08-13); M4 complete, Gate C passed
+**Last updated:** 0.167.1 cut (2026-08-16); M5 CI rows complete, Gate D blocked on F44
 **Current phase:** v1 release stabilization — release-baseline reconciliation,
 then correctness workstreams, then runtime/platform acceptance and a new
 architecture go/no-go review.

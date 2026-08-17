@@ -5,7 +5,65 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.167.1] — Unreleased
+## [0.167.1] — 2026-08-16
+
+Four fixes for defects found by running the application on Linux, Windows and
+macOS rather than by reading its code. Two of them could lose or misplace your
+work; the other two affect navigation and keyboard accessibility.
+
+If you use the directory comparison view, **this release is worth taking** — see
+the first item.
+
+### Fixed
+
+**Per-file copy in the Directory Report could write to the wrong folder,
+silently.**
+
+The per-row **Copy to right** / **Copy to left** buttons took their source and
+destination from the folder each Explorer pane last remembered, rather than from
+the two folders actually being compared. When those differed — which happens
+easily, since choosing a comparison root never requires browsing into it first —
+a copy landed somewhere other than the folder shown, overwriting whatever was
+already there, with no error shown. The file you were looking at stayed
+untouched.
+
+Both buttons now use the compared folders themselves. Batch copy was never
+affected.
+
+The same fix restores those buttons for anyone who had turned **remember
+explorer directories** off: the buttons had been hidden entirely in that case,
+which was a side effect of the same defect rather than an intended behaviour.
+
+**A comparison opened from the command line was not saved.**
+
+`forskscope <left> <right>` — the ordinary command-line and `git difftool`
+route — opened a tab that was never written to the session file, so quitting
+lost it and the next launch came up empty. Only comparisons opened through the
+Explorer were kept. Sessions are now saved on every path.
+
+Persistence failures are also no longer silent: if a session or settings file
+cannot be written, the app now says so instead of discarding the error.
+
+**Explorer's Back button destroyed that pane's Forward history.** Going back
+made Forward unavailable, in both panes. Back and Forward now behave as
+expected.
+
+**Confirmation dialogs did not always start on the safe choice.** On Windows,
+keyboard focus stayed on the control behind the dialog rather than moving to
+**Cancel**, so a keyboard or screen-reader user could act on a destructive
+confirmation without focus ever entering it. All confirmation dialogs — reload,
+swap, overwrite, discard-and-close, batch copy, directory operations — now place
+focus on the safe action explicitly.
+
+### Known limitation — unchanged from 0.167.0
+
+**The prebuilt Linux binary still does not start on distributions shipping
+libxdo 4** (Arch and other rolling releases), failing with
+`error while loading shared libraries: libxdo.so.3`. Build from source on those
+systems; see the installation guide. The cause is fixed upstream
+([DioxusLabs/dioxus#5749](https://github.com/DioxusLabs/dioxus/pull/5749)) but
+is not yet in any released version of that dependency, so it cannot be picked up
+here.
 
 ## [0.167.0] — 2026-08-13
 
