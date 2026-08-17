@@ -1,6 +1,6 @@
 name: M5 Evidence - Linux
 
-# M5-A: runs P01/P02/P09/P10 against the *published* 0.167.0 Linux artifact
+# M5-A: runs P01/P02/P09/P10 against the *published* 0.167.1 Linux artifact
 # (downloaded from the release, digest-verified - never built from source,
 # per RFC-078 §5: the evidence is about what users actually have) on
 # ubuntu-latest, representing the linux-x11 CI row per matrix-plan.md.
@@ -40,21 +40,21 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq libwebkit2gtk-4.1-0 libgtk-3-0
 
-      - name: Download published 0.167.0 Linux artifact
+      - name: Download published 0.167.1 Linux artifact
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download 0.167.0 -R "${{ github.repository }}" \
-            -p "forskscope-v0.167.0-linux-x86_64.tar.gz"
+          gh release download 0.167.1 -R "${{ github.repository }}" \
+            -p "forskscope-v0.167.1-linux-x86_64.tar.gz"
 
       # RFC-078 §5: verify after download, never trust the release page.
       - name: Verify digest
         run: |
-          echo "e17baa26abbb91e5e8e046d3812b08203f0d1ddfd6f8dc9fb9182326ed04bf09  forskscope-v0.167.0-linux-x86_64.tar.gz" \
+          echo "0d2b2fdcb185b8d9cdfe89f320474898a4c53eca7f144d2307a7a63e9a071787  forskscope-v0.167.1-linux-x86_64.tar.gz" \
             | sha256sum -c -
 
       - name: Extract
-        run: tar -xzf forskscope-v0.167.0-linux-x86_64.tar.gz
+        run: tar -xzf forskscope-v0.167.1-linux-x86_64.tar.gz
 
       # Registered separately (see the review request/ROADMAP): a fresh
       # ubuntu-latest host with exactly installation.md's documented
