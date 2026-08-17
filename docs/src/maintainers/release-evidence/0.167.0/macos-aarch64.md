@@ -478,13 +478,7 @@ window` AppleScript technique (tens of seconds, scaling with content), and
 this program's default per-call timeouts (15–45s) were too short to let a
 correct enumeration finish — the first query after a fresh window
 sometimes returns fast-but-incomplete rather than blocking until genuinely
-done. **This resolution is offered with one honest caveat, not verified
-here:** VoiceOver's own real navigation model queries the tree
-incrementally (one focused element at a time), not via a single blanket
-bulk fetch the way this harness's technique does — so this program has no
-direct evidence about whether an actual screen-reader user experiences
-comparable latency on the same content. That remains an open, unverified
-question, not a finding either way.
+done.
 
 **Practical consequence for this slice:** P03/P07 do not need this
 large-fixture workaround at all. P03's multi-hunk requirement is already
@@ -633,6 +627,21 @@ is kept genuinely correct via the left pane's own reliable navigation
 (exercising Finding 1 for real in the process); `last_right_dir` is seeded
 to `$HOME` and never navigated, which is exactly what exercises Finding 2
 for real rather than working around it.
+
+**Open item, not resolved here (review 068 §6):** this harness cannot
+currently distinguish "AppleScript's synthesized `click` doesn't reach the
+right pane's buttons" from a genuine accessibility gap in that pane — if a
+real VoiceOver user also cannot operate those controls, that is a product
+defect in an area this project makes explicit accessibility claims about,
+not a harness quirk. (Separately, and for the same underlying reason —
+this program's AppleScript/System Events techniques exercise a different
+query/interaction path than VoiceOver's own incremental navigation model —
+F63's resolution above, based on bulk `entire contents of window` fetches,
+says nothing about whether a real screen-reader user experiences
+comparable enumeration latency on a large view; that is likewise an
+unmeasured question, not a finding either way.) Neither is something this
+slice's constraints allow resolving; both are recorded so a future macOS
+slice does not read "harness/technique limitation" as "product is fine."
 
 Normal-mode CI run: [`31941623347`](https://github.com/forskscope/forskscope/actions/runs/31941623347) — **Pass** (for what this case's decomposition actually verifies — both defects and the technique limitation are registered, not hidden inside a passing result). `--break`: flips the batch's existing-destination backup-bytes check to an impossible expected value; CI run [`31941706567`](https://github.com/forskscope/forskscope/actions/runs/31941706567) correctly failed on the *earlier*, more fundamental Forward-disabled-after-Back assertion first (the same real defect Finding 1 registers) — `FAIL (expected, --break): Forward is disabled after Back ('DISABLED: →') - the real (defective) behaviour --break's impossible expectation ('enabled') was checked against.`
 
