@@ -1,18 +1,21 @@
-# Release Evidence — 0.167.0 (M5-A + M5-B)
+# Release Evidence — 0.167.0 (M5-A + M5-B + M5-C)
 
 **Candidate:** `0.167.0`, published 2026-08-14, source commit `cb6f5b6`.
 **Slices:** M5-A — P01 (Install and cold launch), P02 (CLI file compare),
 P09 (Mergetool), P10 (Binary/XLSX fail-closed policy). M5-B — P04
 (Merge/undo/redo/safe save), P05 (External modification), P06 (Async
 identity), P08 (Persistence migration), P12 (Session/settings restart).
-P03, P07, P11, and the two owner manual passes are M5-C, not started
-here; see `matrix-plan.md` for the full frozen plan this run executes
-against.
+M5-C — P03 (Visual/navigation), P07 (Explorer and directory report), P11
+(Keyboard interface, CI-verifiable item only). All three slices' CI-verified
+cases are now complete on every automated row; the two owner manual passes
+(`linux-wayland`, and the manual sub-cases within F45/F46) remain outstanding
+— see the **Gate D input list** (`gate-d-input-list.md`) for their status.
+See `matrix-plan.md` for the full frozen plan this run executes against.
 
 ## Verdict for this evidence
 
 **This evidence cannot support a Gate D pass, and nothing below changes
-that — for two independent, un-waivable reasons.**
+that — for three independent, un-waivable reasons.**
 
 **F44** fails Linux P01 un-waivably on a supported platform (libxdo-4
 distributions) — reproduced directly on a real host, not simulated.
@@ -28,95 +31,77 @@ settings/session loss**, one of the five things RFC-078's Waiver policy
 names explicitly as un-waivable into a release pass. Confirmed
 independently by three genuinely different M5-B harness implementations
 (Linux, Windows, macOS) and reproduced a fourth time directly on a real
-desktop during review 064. Unlike F44, **this is a defect this project
-can fix** — it is not a schedule dependency on anything external, and its
-fix is now on the v1 critical path as its own slice (review 064 §7).
+desktop during review 064. **Fixed on `main` for real** (review 066,
+2026-08-16) — but the fix is **not in the published `0.167.0` candidate**;
+a new candidate build is required before M5's P12 rows can be re-run
+against it and this input clears.
 
-While either is open, v1 cannot go regardless of how clean the rest of
-this evidence is.
+**F73** — `DeepRow`'s per-row copy buttons in the Directory Report silently
+write to the wrong location: they source their destination from Explorer's
+remembered pane directory instead of the deep-compare view's actual compare
+root, with no error surfaced. Confirmed with a real backup and overwrite,
+not a reported "success" — this is **wrong-file/stale-load behavior**, one
+of the same five un-waivable categories F61 falls under. Found
+**independently on both Windows and macOS** during M5-C's P07 work
+(review 068 §4) — the same underlying code, not a platform quirk. **Not
+fixed in this candidate.** Shares its root cause with F68, so one fix
+(passing the compare roots into `DeepRow`) closes both.
 
-**Within that constraint, every case both slices cover passes on every
-CI-verified row it was exercised on, except P12 — which fails for real,
-on every row, because of F61** (Windows's P12 row initially read Pass by
-seeding around the CLI-launch path rather than exercising it; corrected
-to Fail per review 064 §5.4, since a passing row would misrepresent a
-cross-platform defect as platform-specific). Recording an accurately-
-failing case is a successful outcome for this program, not a gap in it —
-see the M5-A handoff §1: "A case that fails, recorded accurately with its
-cause, is a successful outcome for this milestone." Further findings
-surfaced along the way, all recorded rather than fixed or laundered, per
-both slices' explicit constraint:
+**While any of the three is open, v1 cannot go regardless of how clean the
+rest of this evidence is.** This is not a gap in M5's evidence-gathering —
+per the M5-A handoff §1, a case or input that fails, recorded accurately
+with its cause, is a successful outcome for this milestone.
 
-- **F45** (already known, confirmed structurally invisible to CI as
-  expected) — Windows P01's "prerequisites missing" sub-case cannot run
-  on `windows-latest`, which already ships both dependencies. Owner-
-  executed, outstanding.
-- **F46** (already known, confirmed structurally invisible to CI as
-  expected) — macOS Gatekeeper cannot engage against a `gh release
-  download`ed artifact; no manual macOS host exists to test it for real.
-  Recorded as Blocked, not Pass.
-- **F59** (new, found while building this slice) — `installation.md`'s
-  documented Debian/Ubuntu runtime prerequisites are missing `libxdo3`,
-  distinct from F44. A one-line documentation fix, not a schedule
-  dependency; registered, and — now unblocked per review 063 — fixed in
-  `installation.md` directly.
-- **F60** (found by review 063, not by this slice): the declared Windows
-  floor (`AppxManifest.xml`'s `MinVersion` 1809, matching
-  `installation.md`) has no runtime evidence and none is planned — the
-  `windows-10` row's CI host is NT 10.0.26100, seven years newer, and no
-  Windows 10 host exists anywhere in the execution model. Not a defect in
-  this slice; a Gate D input the owner needs to see before the go/no-go,
-  not discover while reading a verdict.
-- **F61** (new, found independently by all three M5-B harnesses,
-  reproduced a fourth time in review 064) — see the verdict above. A
-  second un-waivable Gate D blocker, and one consequence worth stating
-  plainly: `README.md`'s own top-level feature list claims "Session
-  persistence — open tabs are restored on next launch," which is false
-  for a CLI-opened tab. F16's earlier feature-claim audit passed all
-  seventeen bullets correctly — its method (auditing against the UI
-  crate) could not have caught a claim that holds on one path and fails
-  on another; not a mistake in that slice, a real limit of it. Also
-  found in the same area: `persist_session`/`persist_settings` discard
-  their save `Result` with `let _ =`, making any write failure —
-  F61's or a future one — silent by construction; tracked separately
-  (see `ROADMAP.md`).
-- **Enter-to-apply has no automated runtime coverage on any platform**
-  (review 064 §5.1) — P04's keyboard shortcut (`app.rs`'s global
-  `Key::Enter` handler) is bound to no actionable UI element, so no
-  accessibility API on any platform has anything to invoke for it. The
-  mouse path is fully CI-verified on all three rows; the keyboard path is
-  manual-outstanding, mirroring F45's shape. Keyboard operability is an
-  accessibility claim this project makes, so this belongs among the Gate
-  D inputs, not only in each row's fine print.
-- **macOS's P06 fixture-size accessibility question is unresolved, not
-  dismissed** (review 064 §5.3): building macOS's M5-B evidence found
-  that a generated diff pair's content stops reaching the accessibility
-  tree once the file crosses a size threshold between 30 and 100 lines,
-  which is why P06 there runs a reduced (sequential, non-overlapping)
-  scope instead of RFC-078's concurrent design. Whether this is a real
-  macOS accessibility defect in the product (the class RFC-061/RFC-019
-  exist for) or a harness artifact (a timeout, a lazily-rendered virtual
-  list) is not yet known — tracked separately (see `ROADMAP.md`) so it
-  doesn't stay a footnote to a fixture-sizing choice.
+**Within that constraint, every CI-verified case across all three slices
+passes on every row it was exercised on, except:**
+
+- **P12** (Session/settings restart) — fails on every row, for real,
+  because of F61 (Windows's P12 row initially read Pass by seeding around
+  the CLI-launch path rather than exercising it; corrected to Fail per
+  review 064 §5.4, since a passing row would misrepresent a cross-platform
+  defect as platform-specific).
+- **P07** (Explorer and directory report) — fails outright on Windows
+  because of F70 (Explorer never renders a single directory row on that
+  CI environment — product defect or CI-environment limitation is
+  undetermined). Passes as a case on Linux and macOS, where the assertions
+  genuinely hold — F68/F72/F73 are registered separately from that Pass,
+  not folded into it, per review 068 §4's distinction between what a case
+  result measures and what a finding means for Gate D.
+- **P11** (Keyboard interface, CI-verifiable item only) — fails on Windows
+  because of F69 (a destructive modal's `autofocus` never moves keyboard
+  focus into the modal at all on WebView2; Linux/WebKitGTK is confirmed
+  correct for the same modal pattern). Passes on Linux and macOS.
+
+**The full list of everything bearing on the go/no-go — the three blockers
+above plus every other open input, each with its current status — is the
+[Gate D input list](gate-d-input-list.md).** That is the document Gate D is
+actually assessed against; this section is a summary, not a substitute for
+it.
 
 ## Rows in this evidence set
 
-| Row | Verification method (per `matrix-plan.md`) | M5-A cases | M5-B cases | File |
-|---|---|---|---|---|
-| `linux-x11` | CI (`ubuntu-latest` + Xvfb) | P01 (two sub-results), P02, P09, P10 — all Pass | P04, P05, P06, P08 — Pass; P12 — **Fail (F61)** | `linux-x11.md` |
-| `linux-wayland` | Manual (owner) | Not executed | Not executed | `linux-wayland.md` |
-| `windows-11` | CI (`windows-latest`), F45 sub-case manual | P01 (CI Pass; F45 sub-case outstanding), P02, P09, P10 — all Pass | P04, P05, P06, P08 — Pass; P12 — **Fail (F61), real path not exercised** | `windows-11.md` |
-| `windows-10` | CI (`windows-latest`, same host as `windows-11`) | Same four cases, same runs | Same five cases, same runs | `windows-10.md` |
-| `macos-aarch64` | CI (`macos-latest`); F46 unverifiable at all | P01, P02, P09, P10 — all Pass; Gatekeeper Blocked | P04, P05, P08 — Pass; P06 — Pass (reduced scope, see below); P12 — **Fail (F61)** | `macos-aarch64.md` |
+| Row | Verification method (per `matrix-plan.md`) | M5-A cases | M5-B cases | M5-C cases | File |
+|---|---|---|---|---|---|
+| `linux-x11` | CI (`ubuntu-latest` + Xvfb) | P01 (two sub-results), P02, P09, P10 — all Pass | P04, P05, P06, P08 — Pass; P12 — **Fail (F61)** | P03, P07, P11 — all Pass | `linux-x11.md` |
+| `linux-wayland` | Manual (owner) | Not executed | Not executed | Not executed | `linux-wayland.md` |
+| `windows-11` | CI (`windows-latest`), F45 sub-case manual | P01 (CI Pass; F45 sub-case outstanding), P02, P09, P10 — all Pass | P04, P05, P06, P08 — Pass; P12 — **Fail (F61), real path not exercised** | P03 — Pass; P07 — **Fail (F70)**; P11 — **Fail (F69)** | `windows-11.md` |
+| `windows-10` | CI (`windows-latest`, same host as `windows-11`) | Same four cases, same runs | Same five cases, same runs | Same three cases, same runs | `windows-10.md` |
+| `macos-aarch64` | CI (`macos-latest`); F46 unverifiable at all | P01, P02, P09, P10 — all Pass; Gatekeeper Blocked | P04, P05, P08 — Pass; P06 — Pass (reduced scope, see below); P12 — **Fail (F61)** | P03, P07, P11 — all Pass (P07 carries F68/F72/F73, registered not fixed) | `macos-aarch64.md` |
 
 ## Harnesses
 
 Each CI row has its own on-demand `workflow_dispatch` entry point,
 matching the shape F34's `render-check.yml` established — every case
 runnable without a tag, and every case has a `--break` mode proving the
-assertion isn't vacuous (handoff §7; all 24 combinations — 4 cases × 2
-modes × 3 CI rows — were run for real and confirmed, not just written and
-trusted):
+assertion isn't vacuous. Across M5-A/B/C, every case's normal and `--break`
+modes were run for real and their results read from the actual CI run log —
+none inferred from reading harness code alone. Two exceptions on Windows,
+both noted in their own row file: **P07's `--break` is not reached at all**
+(the case fails before any `--break`-gated assertion, on the same F70
+initial-listing blocker as normal mode); **P11's `--break` fails for the
+same real-defect reason as normal mode**, not its own impossible-value
+branch, so it cannot currently demonstrate falsifiability in isolation
+while F69 persists.
 
 - **Linux:** `packaging/evidence/linux_harness.py` +
   `.github/workflows/m5-evidence-linux.yml`. AT-SPI (`Atspi.Action.do_action`)
@@ -148,16 +133,33 @@ source.
   `matrix-plan.md` already recorded before M5-A; nothing here changes
   their disposition, only confirms the CI-observable portions around
   them.
-- P03, P07, P11, and the two owner manual passes are M5-C, per the
-  handoffs' explicit scope boundaries — not started here.
-- P04's Enter-key path (see F61's bullet above) has no automated coverage
-  on any of the three CI rows — manual-outstanding, not executed.
+- **The documented keyboard interface has no automated runtime coverage on
+  any platform** — P04's Enter-apply path, P06's double-reload, and three
+  of P11's four items all need a real synthesized keystroke no
+  accessibility API on any of the three platforms can produce. See the
+  Gate D input list's "Keyboard interface" row for the full statement.
 - macOS's P06 runs a reduced (sequential, non-overlapping) scope, not
-  RFC-078's concurrent design — see the fixture-size finding above.
-- **Dependency for M5-C, not a limitation here (review 063 §5.3):**
-  Windows's P02 readiness check uses content-token presence, not an
-  exact row count like Linux's. Sufficient for P02; P03 (compare layout
-  and scrolling) needs row-level precision the same way F34 does on
-  Linux, so the UIA control-type mapping this slice didn't need to
-  establish should be settled before M5-C's P03 work starts — see
-  `windows-11.md`.
+  RFC-078's concurrent design. **This is now known to be unnecessary**
+  (F63 closed as a harness artifact, review 068 §3) but was not retrofitted
+  here — out of scope for M5-C, and `matrix-plan.md`'s freeze does not
+  reopen a completed row mid-matrix.
+- **Linux's local development sandbox cannot validate any X11-dependent
+  harness behavior** — even a plain vertical mouse-wheel scroll no-ops
+  there. Every M5-C Linux harness fix needed a real CI round-trip to
+  confirm; nothing here was iterated locally first. Worth knowing before
+  attempting to reproduce a Linux harness failure outside CI.
+- **P03's horizontal-scroll-mirror check on Linux tries three X11 wheel
+  conventions in sequence** (button-7, then two shift-modified fallbacks)
+  and records whichever one moved the pane, rather than asserting one in
+  advance — button-7 (the GTK convention) was confirmed silently swallowed
+  by Xvfb's default virtual pointer on the first real dispatch. Whether the
+  working method stays stable across future CI runner-image changes is not
+  yet known.
+- **P03's horizontal-scroll-mirror check is not executed on macOS at all**
+  — a disclosed, evidenced platform/technique limitation (no
+  accessibility-exposed scroll-position property was found for this
+  content on macOS), not a skipped check.
+- **The right Explorer pane's controls do not respond to macOS's
+  `click`-technique for navigation** — a harness/technique limitation, not
+  confirmed as a product defect; see `macos-aarch64.md`'s Finding 3 for the
+  open question this leaves about real VoiceOver operability.
