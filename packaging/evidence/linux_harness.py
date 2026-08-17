@@ -57,16 +57,61 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 LAUNCH_TIMEOUT_S = 45
 
 
+# render_check.py's find_by_role/collect_rows hit a GLib.GError crash class
+# (CI run 31936218182: "Object does not exist at path ...") from a stale
+# AT-SPI proxy for a node the DOM has already torn down mid-render-mutation
+# - not the F57 "tree caught mid-render" case wait_for_ready already
+# tolerates, but a live tree changing *under* a walk in progress. Review 068
+# §6 (Linux Q3) confirmed this is the same bug class in whichever walker
+# happens to run longest against a mutating tree, not specific to the two
+# functions that happened to crash first (find_by_role, then
+# find_text_containing under --break's longer retry) - so every recursive
+# walker below is hardened the same way pre-emptively, rather than waiting
+# for each to crash during an evidence run.
+def _name_or_empty(node):
+    try:
+        return node.get_name() or ""
+    except GLib.GError:
+        return ""
+
+
+def _role_name_or_empty(node):
+    try:
+        return node.get_role_name()
+    except GLib.GError:
+        return ""
+
+
+def _attributes_or_empty(node):
+    try:
+        return dict(Atspi.Accessible.get_attributes(node) or {})
+    except GLib.GError:
+        return {}
+
+
+def _child_count_or_zero(node):
+    try:
+        return node.get_child_count()
+    except GLib.GError:
+        return 0
+
+
+def _child_at_or_none(node, i):
+    try:
+        return node.get_child_at_index(i)
+    except GLib.GError:
+        return None
+
+
 def find_by_name_containing(node, substring, depth=0, max_depth=60):
     """Walk the tree for the first descendant whose accessible name
     contains `substring` - buttons expose their `aria_label` here."""
     if depth > max_depth:
         return None
-    name = node.get_name() or ""
-    if substring in name:
+    if substring in _name_or_empty(node):
         return node
-    for i in range(node.get_child_count()):
-        child = node.get_child_at_index(i)
+    for i in range(_child_count_or_zero(node)):
+        child = _child_at_or_none(node, i)
         if child is not None:
             found = find_by_name_containing(child, substring, depth + 1, max_depth)
             if found is not None:
@@ -81,10 +126,10 @@ def find_by_exact_name(node, exact_name, depth=0, max_depth=60):
     (Ctrl+S)" button, which contains "Save" as a substring)."""
     if depth > max_depth:
         return None
-    if (node.get_name() or "") == exact_name:
+    if _name_or_empty(node) == exact_name:
         return node
-    for i in range(node.get_child_count()):
-        child = node.get_child_at_index(i)
+    for i in range(_child_count_or_zero(node)):
+        child = _child_at_or_none(node, i)
         if child is not None:
             found = find_by_exact_name(child, exact_name, depth + 1, max_depth)
             if found is not None:
@@ -871,10 +916,10 @@ def find_combo_boxes(node, out=None):
     (2), per `settings/modal.rs`."""
     if out is None:
         out = []
-    if node.get_role_name() == "combo box":
+    if _role_name_or_empty(node) == "combo box":
         out.append(node)
-    for i in range(node.get_child_count()):
-        child = node.get_child_at_index(i)
+    for i in range(_child_count_or_zero(node)):
+        child = _child_at_or_none(node, i)
         if child is not None:
             find_combo_boxes(child, out)
     return out
@@ -1103,11 +1148,10 @@ def find_app_root(node):
     """The outer `<div id="app-root">` - located by its DOM id via
     `Accessible.get_attributes` rather than by name, since (like
     Explorer's tab bar and tree rows) it exposes no accessible name."""
-    attrs = dict(Atspi.Accessible.get_attributes(node) or {})
-    if attrs.get("id") == "app-root":
+    if _attributes_or_empty(node).get("id") == "app-root":
         return node
-    for i in range(node.get_child_count()):
-        child = node.get_child_at_index(i)
+    for i in range(_child_count_or_zero(node)):
+        child = _child_at_or_none(node, i)
         if child is not None:
             found = find_app_root(child)
             if found is not None:
@@ -1123,10 +1167,10 @@ def explorer_rows_by_pane(app):
     rows = []
 
     def collect(node):
-        if node.get_role_name() == "table row":
+        if _role_name_or_empty(node) == "table row":
             rows.append(node)
-        for i in range(node.get_child_count()):
-            child = node.get_child_at_index(i)
+        for i in range(_child_count_or_zero(node)):
+            child = _child_at_or_none(node, i)
             if child is not None:
                 collect(child)
 
@@ -1151,10 +1195,10 @@ def navigate_pane_to(app, pane_index, target_dir):
     edit_buttons = []
 
     def collect(node):
-        if (node.get_name() or "") == "✎":
+        if _name_or_empty(node) == "✎":
             edit_buttons.append(node)
-        for i in range(node.get_child_count()):
-            child = node.get_child_at_index(i)
+        for i in range(_child_count_or_zero(node)):
+            child = _child_at_or_none(node, i)
             if child is not None:
                 collect(child)
 
@@ -1722,10 +1766,10 @@ def p08(binary, break_mode=False):
 def collect_all_rows(node, out=None):
     if out is None:
         out = []
-    if node.get_role_name() == "table row":
+    if _role_name_or_empty(node) == "table row":
         out.append(node)
-    for i in range(node.get_child_count()):
-        child = node.get_child_at_index(i)
+    for i in range(_child_count_or_zero(node)):
+        child = _child_at_or_none(node, i)
         if child is not None:
             collect_all_rows(child, out)
     return out
@@ -1734,10 +1778,10 @@ def collect_all_rows(node, out=None):
 def find_all_by_name_containing(node, substring, out=None):
     if out is None:
         out = []
-    if substring in (node.get_name() or ""):
+    if substring in _name_or_empty(node):
         out.append(node)
-    for i in range(node.get_child_count()):
-        child = node.get_child_at_index(i)
+    for i in range(_child_count_or_zero(node)):
+        child = _child_at_or_none(node, i)
         if child is not None:
             find_all_by_name_containing(child, substring, out)
     return out
