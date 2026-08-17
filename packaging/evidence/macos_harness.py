@@ -1979,18 +1979,17 @@ def p07(binary, break_mode=False):
     no accessible action to invoke. Recorded here, not silently skipped -
     see this case's OK output.
 
-    **PRODUCT DEFECT, found via this case and registered here, NOT
-    fixed:** clicking Back correctly returns to the previous directory,
-    but Forward is then permanently disabled - not "nothing to go forward
-    to yet". Root cause: `explorer.rs`'s `on_back` handler calls both
-    `NavHistory::back()` (which only moves an index) and then
-    `navigate_to()` (which *unconditionally* re-pushes the resulting path
-    onto the same history, truncating the forward entry `back()` never
-    touched). See the case body for the exact mechanism. Not macOS-
-    specific - this is shared `dir_pane.rs`/`explorer.rs` code. This case
-    tests the real (defective) behaviour, not the browser-like behaviour a
-    user would reasonably expect, per the handoff's "do not weaken a case
-    to make it pass."
+    **F72, FIXED (verified against 0.167.1, review 070; found via this
+    case and registered here against 0.167.0).** Back correctly returns to
+    the previous directory, and Forward now correctly stays available
+    rather than the permanent-disable defect this case originally found:
+    `explorer.rs`'s `on_back` handler used to call both `NavHistory::back()`
+    (which only moves an index) and then `navigate_to()`, whose
+    *unconditional* re-push onto the same history truncated the forward
+    entry `back()` never touched. Fixed by routing Back/Forward through a
+    non-pushing `navigate_to_from_history` instead. Not macOS-specific -
+    shared `dir_pane.rs`/`explorer.rs` code; Linux and Windows confirm the
+    same fix independently.
 
     Navigation/history *is* executed, via
     `PathBar`'s "↑" (Go up one directory) plus the Back/Forward toolbar
@@ -2009,41 +2008,39 @@ def p07(binary, break_mode=False):
     the right-hand pane specifically. Only the left pane's button clicks
     and plain row picks (`click_row_side`, both sides) proved reliable.
 
-    **A second PRODUCT DEFECT, found via this case and registered here,
-    NOT fixed:** `DeepRow`'s PER-ROW copy buttons (deep_compare.rs) compute
-    their src/dst paths from `store.settings.read().last_left_dir`/
-    `last_right_dir` (Explorer's own "remembered pane directory" setting)
-    - NOT from the deep-compare view's own `left_root`/`right_root` props
-    (the actual roots being compared). `BatchCopyButtons` does NOT share
-    this defect - a real dispatch confirmed its manifest entries' `src`
-    genuinely came from `right_root` (`root-b`), not `last_right_dir` -
-    so only the per-row path is affected. Concretely demonstrated in the
-    case body: with `last_right_dir` unable to track `root-b` (the
-    harness/technique limitation above means the right pane can never be
-    navigated there), a per-row copy lands at `$HOME/aaa-changed.txt` -
-    verified via a real backup and overwrite - while
-    `root-b/aaa-changed.txt`, the file the deep-compare view is actually
-    showing as "Changed", is verified untouched. No error surfaces to the
-    user - the per-row copy simply writes to the wrong place, silently.
-    Not fixed, and only partially worked around: `last_left_dir` is kept
-    correctly pointed at `root-a` (the left pane's navigation is
-    reliable), but `last_right_dir` cannot be, which is exactly what
-    exercises this defect for real rather than working around it entirely.
+    **F73/F68, FIXED (verified against 0.167.1, review 070; found via this
+    case and registered here against 0.167.0).** `DeepRow`'s PER-ROW copy
+    buttons (deep_compare.rs) used to compute their src/dst paths from
+    `store.settings.read().last_left_dir`/`last_right_dir` (Explorer's own
+    "remembered pane directory" setting) instead of the deep-compare view's
+    own `left_root`/`right_root` props (the actual roots being compared).
+    `BatchCopyButtons` never shared this defect - a real dispatch confirmed
+    its manifest entries' `src` genuinely came from `right_root` (`root-b`),
+    not `last_right_dir` - so only the per-row path needed the fix. `DeepRow`
+    now takes `left_root`/`right_root` as props directly, the same as
+    `BatchCopyButtons` always did; `last_left_dir`/`last_right_dir` no
+    longer have any influence on where a per-row copy lands. Concretely
+    verified in the case body: even with `last_right_dir` still seeded to
+    `$HOME` rather than `root-b` (the harness/technique limitation below
+    means the right pane can never be navigated there to correct it), a
+    per-row copy now lands at `root-b/aaa-changed.txt` - verified via a real
+    backup and overwrite - while the old wrong location, `$HOME/aaa-
+    changed.txt`, is verified untouched.
 
     Fixture: `$HOME` contains two sibling directories, `root-a` and
     `root-b`, plus a placeholder `aaa-changed.txt` at `$HOME`'s own top
-    level (see defect (2) - this is where the per-file copy's real,
-    wrong-location write actually lands, so its `.bak` check stays
-    meaningful rather than vacuous). `last_left_dir` is seeded to
-    `root-a` directly; `last_right_dir` is seeded to (and stays at)
-    `$HOME` itself, never `root-b` - Explorer opens with the left pane
-    already inside `root-a`, the right pane at `$HOME`. Both `root-a` and
-    `root-b` are picked as deep-compare targets by going "↑" once on the
-    LEFT pane only (revealing `$HOME`'s listing, which the right pane
-    already shows) and using the same `click_row_side` technique M5-B's
-    P06 recon established for each side, then "←" on the left pane back
-    into `root-a` - which, via the Back/Forward defect above, also
-    restores `last_left_dir` to `root-a` exactly:
+    level - the old wrong-location write's target before F73's fix, kept
+    seeded so its continued absence of any change is itself part of what
+    this case verifies. `last_left_dir` is seeded to `root-a` directly;
+    `last_right_dir` is seeded to (and stays at) `$HOME` itself, never
+    `root-b` - Explorer opens with the left pane already inside `root-a`,
+    the right pane at `$HOME`. Both `root-a` and `root-b` are picked as
+    deep-compare targets by going "↑" once on the LEFT pane only (revealing
+    `$HOME`'s listing, which the right pane already shows) and using the
+    same `click_row_side` technique M5-B's P06 recon established for each
+    side, then "←" on the left pane back into `root-a` - which, now that
+    F72 is fixed, also leaves Forward correctly available and restores
+    `last_left_dir` to `root-a` exactly:
 
     - `aaa-changed.txt` - differs on both sides (Changed). Named to sort
       alphabetically first (`recursive_diff`'s `BTreeMap<PathBuf, _>` is
@@ -2054,7 +2051,7 @@ def p07(binary, break_mode=False):
     - `left-only.txt` - only in `root-a` (LeftOnly).
     - `right-only-1.txt`, `right-only-2.txt` - only in `root-b`
       (RightOnly x2) - the "Copy to left" batch's real, multi-item content.
-      Batch copy is NOT affected by defect (2) (it reads `right_root`, not
+      Batch copy was never affected by F73 (it reads `right_root`, not
       `last_right_dir` - see above), so both succeed genuinely.
       `aaa-changed.txt` also lands in this batch (Changed contributes to
       both directions, and the per-file copy above doesn't refresh the
@@ -2099,46 +2096,18 @@ def p07(binary, break_mode=False):
         (root_b / "right-only-1.txt").write_text("only in right one\n")
         (root_b / "right-only-2.txt").write_text("only in right two\n")
         # Placeholder at $HOME's own top level, same name as the per-file
-        # copy target below - see the "second PRODUCT DEFECT" note: three
-        # real dispatches conclusively showed the RIGHT Explorer pane's
-        # PathBar controls do not respond to this harness's established
-        # click techniques (tried at two occurrence indices, in both
-        # click orderings) - only the LEFT pane's navigation is reliable.
-        # `last_right_dir` is therefore seeded to (and stays at) $HOME
-        # itself, not `root-b`, for the entire case - real evidence of
-        # exactly the defect this case already found: the copy buttons
-        # write to Explorer's remembered directory, not the compare root.
-        # This placeholder gives that wrong-location write a real pre-
-        # existing file to overwrite, so the resulting `.bak` check stays
-        # meaningful instead of vacuous.
+        # copy target below - the old wrong-location write's target before
+        # F73's fix (see the case docstring). `last_right_dir` is seeded to
+        # (and stays at) $HOME itself, not `root-b`, for the entire case -
+        # deliberately never corrected to `root-b`, since the RIGHT
+        # Explorer pane's PathBar controls don't respond to this harness's
+        # click technique the way the left pane's do (a harness/technique
+        # limitation, not a product defect - see the docstring). This is
+        # what proves F73's fix actually holds rather than merely not being
+        # exercised: `last_right_dir` staying wrong is exactly the
+        # condition that produced the original defect, and the per-row
+        # copy below must still land correctly despite it.
         (home / "aaa-changed.txt").write_text("stale content at the WRONG location - PRE-EXISTING\n")
-
-        # PRODUCT DEFECT, found via this case and registered here, NOT
-        # fixed: `DeepRow` (deep_compare.rs)'s per-row/batch copy buttons
-        # compute their src/dst paths from `store.settings.read().
-        # last_left_dir`/`last_right_dir` (Explorer's own "remembered pane
-        # directory" setting) - NOT from the deep-compare view's own
-        # `left_root`/`right_root` props (the actual roots being compared).
-        # A real dispatch demonstrated this concretely: with
-        # last_left_dir/last_right_dir seeded to plain `$HOME` while
-        # comparing `root-a`/`root-b`, the confirmation modal displayed
-        # (and the copy attempted) `$HOME/aaa-changed.txt` - a path that
-        # does not exist - not `root-a/aaa-changed.txt`, the file the
-        # deep-compare view was actually showing as "Changed". The copy
-        # silently no-oped (no error surfaced, no file written) rather than
-        # failing loudly. Whenever a user's Explorer pane's remembered
-        # directory differs even slightly from the roots they are deep-
-        # comparing - trivially easy given the aligned-view picker doesn't
-        # require navigating INTO a root at all - copy silently targets the
-        # wrong location. Seeds `last_left_dir`/`last_right_dir` to
-        # `root-a`/`root-b` directly below so the copy buttons this case
-        # needs to test actually operate on real files, and separately
-        # exercises real Explorer navigation (`↑`/`←`, matching the
-        # already-proven Back/Forward technique) to pick them as deep-
-        # compare targets - not a workaround for the defect, since the
-        # navigation below genuinely re-lands on `root-a`/`root-b` and
-        # keeps `last_left_dir`/`last_right_dir` pointed at them; it is
-        # what a real user's normal Explorer browsing would produce too.
         now_ts = int(time.time())
         settings_envelope = {
             "schema_name": "settings",
@@ -2275,32 +2244,19 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: Back did not return the left pane to root-a: {r}", file=sys.stderr)
                 return 1
 
-            # PRODUCT DEFECT, confirmed via a real dispatch, registered
-            # here and reported in the review request - NOT fixed:
-            #
-            # Back correctly returns to the previous directory, but Forward
-            # is then permanently DISABLED, not just "nothing to go forward
-            # to yet" - a real defect in explorer.rs's `on_back`/
-            # `on_forward` handlers, not in `NavHistory` itself.
-            # `NavHistory::back()` (dir_pane.rs) *only* decrements `idx` -
-            # it does not touch `entries` - so after Back, `entries` still
-            # holds the forward entry and `can_forward()`
-            # (`idx+1 < entries.len()`) should read `true`. But
-            # `explorer.rs`'s `on_back` handler calls BOTH
-            # `history.write().back()` (moves `idx`) AND then
-            # `navigate_to(p, ...)` with the popped path - and
-            # `navigate_to` (dir_pane.rs) *unconditionally* calls
-            # `history.write().push(path)` too. `push`'s own guard
-            # (`if entries.last() == path { return }`) does not save this,
-            # since `entries.last()` is still the (not-yet-truncated)
-            # forward entry, not equal to the path Back just navigated to -
-            # so `push` truncates `entries` and re-appends, destroying the
-            # forward entry. Any Back click destroys that pane's Forward
-            # history, on every platform this shared `dir_pane.rs`/
-            # `explorer.rs` code runs on - not macOS-specific. This case
-            # tests the REAL (defective) behaviour rather than the
-            # browser-like behaviour a user would reasonably expect, per
-            # the handoff's "do not weaken a case to make it pass."
+            # F72, FIXED (verified against 0.167.1, review 070 - previously
+            # a registered product defect against 0.167.0, not fixed at
+            # that time). Back correctly returns to the previous directory;
+            # Forward now correctly stays enabled, not permanently disabled
+            # the way `explorer.rs`'s `on_back` handler used to leave it -
+            # `on_back` called both `history.write().back()` (moves `idx`
+            # only, per `NavHistory`) and then `navigate_to(p, ...)`, whose
+            # unconditional `history.write().push(path)` truncated and
+            # destroyed the still-live forward entry `back()` never touched.
+            # Fixed by routing Back/Forward through a non-pushing
+            # `navigate_to_from_history` instead. Shared `dir_pane.rs`/
+            # `explorer.rs` code, not macOS-specific - Linux/Windows confirm
+            # the same fix independently.
             r = poll_ui(
                 "click_button", "→",
                 predicate=lambda r: r.startswith("CLICKED") or r.startswith("DISABLED"),
@@ -2308,31 +2264,29 @@ def p07(binary, break_mode=False):
             )
             forward_is_enabled = r.startswith("CLICKED")
             if break_mode:
-                # The impossible expectation: Forward enabled after Back,
-                # which real (defective) behaviour never satisfies.
-                if forward_is_enabled:
+                # The impossible expectation: Forward disabled after Back,
+                # which the real (fixed) behaviour never satisfies.
+                if not forward_is_enabled:
                     print(
-                        "WARNING: --break's impossible condition (Forward enabled "
-                        "after Back) was satisfied - either the registered defect "
-                        "below has been fixed, or this check is not exercising "
-                        "what it claims to. Investigate before trusting the "
-                        "normal-mode run's pass.",
+                        "WARNING: --break's impossible condition (Forward disabled "
+                        "after Back) was satisfied - either F72 has regressed, or "
+                        "this check is not exercising what it claims to. "
+                        "Investigate before trusting the normal-mode run's pass.",
                         file=sys.stderr,
                     )
                     return 1
                 print(
-                    f"FAIL (expected, --break): Forward is disabled after Back "
-                    f"({r!r}) - the real (defective) behaviour --break's "
-                    "impossible expectation ('enabled') was checked against.",
+                    f"FAIL (expected, --break): Forward is enabled after Back "
+                    f"({r!r}) - the real (fixed) behaviour --break's impossible "
+                    "expectation ('disabled') was checked against.",
                     file=sys.stderr,
                 )
                 return 1
-            if forward_is_enabled:
+            if not forward_is_enabled:
                 print(
-                    f"FAIL: Forward is enabled after Back ({r!r}) - the "
-                    "registered defect below was NOT reproduced; either it has "
-                    "been fixed (update this case) or this run's state differs "
-                    "from what was confirmed via real dispatch.",
+                    f"FAIL: Forward is disabled after Back ({r!r}) - F72 has "
+                    "regressed: this run's state does not match the fix "
+                    "confirmed against 0.167.1.",
                     file=sys.stderr,
                 )
                 return 1
@@ -2391,19 +2345,22 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: could not restore the 'Different' filter: {r}", file=sys.stderr)
                 return 1
 
-            # ── Per-file copy: confirmation modal, backup - and the SECOND
-            # PRODUCT DEFECT's concrete, on-disk consequence ───────────────
+            # ── Per-file copy: confirmation modal, backup - and F73's fix
+            # verified by its concrete, on-disk consequence ─────────────────
             #
-            # Because `last_right_dir` is `$HOME` (not `root-b` - see the
-            # fixture-setup comment), this button's real destination is
-            # `$HOME/aaa-changed.txt`, not `root-b/aaa-changed.txt` - the
-            # file the deep-compare view is actually showing as "Changed".
-            # Both are checked: the real (wrong) destination gets a
-            # genuine, verified backup and overwrite (proving the copy/
-            # backup mechanism itself works correctly, satisfying the
-            # handoff's manifest/backup-content requirement), and the
-            # intended (correct) destination is confirmed UNTOUCHED - the
-            # concrete, on-disk proof of the defect, not just an inference.
+            # F73, FIXED (verified against 0.167.1, review 070). Before the
+            # fix, `last_right_dir` being `$HOME` (not `root-b`) made this
+            # button's real destination `$HOME/aaa-changed.txt`, not
+            # `root-b/aaa-changed.txt` - the file the deep-compare view is
+            # actually showing as "Changed". `DeepRow` now takes `left_root`/
+            # `right_root` as props instead of reading `last_left_dir`/
+            # `last_right_dir` at all, so the seeded (and deliberately
+            # never-updated) `last_right_dir` can no longer influence this -
+            # both are checked: the correct destination (`root-b`) gets a
+            # genuine, verified backup and overwrite, and the old wrong
+            # location (`$HOME`) is confirmed UNTOUCHED - the concrete,
+            # on-disk proof the fix holds, not just an inference from the
+            # confirmation modal's displayed path.
             r = click_wait("Copy to right", exact=True, timeout=10)
             if not r.startswith("CLICKED"):
                 print(f"FAIL: could not click the per-file 'Copy to right' button: {r}", file=sys.stderr)
@@ -2417,7 +2374,7 @@ def p07(binary, break_mode=False):
                 print(f"FAIL: could not confirm the per-file copy: {r}", file=sys.stderr)
                 return 1
 
-            per_file_bak = home / "aaa-changed.txt.bak"
+            per_file_bak = root_b / "aaa-changed.txt.bak"
             deadline = time.monotonic() + LAUNCH_TIMEOUT_S
             per_file_bak_bytes = None
             while time.monotonic() < deadline:
@@ -2426,9 +2383,13 @@ def p07(binary, break_mode=False):
                     break
                 time.sleep(0.5)
             if per_file_bak_bytes is None:
-                print(f"FAIL: per-file copy did not create a .bak backup at {per_file_bak}", file=sys.stderr)
+                print(
+                    f"FAIL: per-file copy did not create a .bak backup at {per_file_bak} "
+                    "- F73 has regressed: the copy did not land at the compare root",
+                    file=sys.stderr,
+                )
                 return 1
-            if per_file_bak_bytes != b"stale content at the WRONG location - PRE-EXISTING\n":
+            if per_file_bak_bytes != b"right per-file version - PRE-EXISTING\n":
                 print(
                     f"FAIL: per-file .bak content {per_file_bak_bytes!r} != the "
                     "pre-copy destination content",
@@ -2443,7 +2404,7 @@ def p07(binary, break_mode=False):
             deadline = time.monotonic() + LAUNCH_TIMEOUT_S
             after_per_file = b""
             while time.monotonic() < deadline:
-                after_per_file = (home / "aaa-changed.txt").read_bytes()
+                after_per_file = (root_b / "aaa-changed.txt").read_bytes()
                 if after_per_file == b"left per-file version\n":
                     break
                 time.sleep(0.5)
@@ -2453,21 +2414,20 @@ def p07(binary, break_mode=False):
                     file=sys.stderr,
                 )
                 return 1
-            # The defect's concrete consequence: root-b (the file the
-            # deep-compare view actually showed as "Changed") is untouched.
-            if (root_b / "aaa-changed.txt.bak").exists():
+            # F73's fix, concretely: the old wrong location ($HOME, from the
+            # still-seeded but now-irrelevant last_right_dir) is untouched.
+            if (home / "aaa-changed.txt.bak").exists():
                 print(
-                    "FAIL: root-b/aaa-changed.txt.bak unexpectedly exists - the copy "
-                    "landed at the intended location after all; the defect this case "
-                    "registers was not reproduced",
+                    "FAIL: home/aaa-changed.txt.bak unexpectedly exists - the copy "
+                    "landed at the old wrong (last_right_dir) location; F73 has "
+                    "regressed",
                     file=sys.stderr,
                 )
                 return 1
-            if (root_b / "aaa-changed.txt").read_bytes() != b"right per-file version - PRE-EXISTING\n":
+            if (home / "aaa-changed.txt").read_bytes() != b"stale content at the WRONG location - PRE-EXISTING\n":
                 print(
-                    "FAIL: root-b/aaa-changed.txt changed - the copy landed at the "
-                    "intended location after all; the defect this case registers was "
-                    "not reproduced",
+                    "FAIL: home/aaa-changed.txt changed - the copy landed at the old "
+                    "wrong (last_right_dir) location; F73 has regressed",
                     file=sys.stderr,
                 )
                 return 1
@@ -2512,13 +2472,12 @@ def p07(binary, break_mode=False):
             # A real dispatch corrected an earlier hypothesis here:
             # `BatchCopyButtons` (deep_compare.rs) builds its `to_right`/
             # `to_left` paths from the `left_root`/`right_root` PROPS the
-            # deep-compare view was actually opened with - NOT from
+            # deep-compare view was actually opened with - never from
             # `store.settings.last_left_dir`/`last_right_dir` the way
-            # `DeepRow`'s PER-ROW buttons do (see this case's second
-            # PRODUCT DEFECT, above). Batch copy is therefore NOT affected
-            # by that defect and genuinely operates on `root-a`/`root-b` -
-            # confirmed by the manifest's own `src` field. All 3 entries
-            # succeed for real.
+            # `DeepRow`'s PER-ROW buttons used to (F73, fixed - see the case
+            # docstring). Batch copy was never affected by that defect and
+            # genuinely operates on `root-a`/`root-b` - confirmed by the
+            # manifest's own `src` field. All 3 entries succeed for real.
             entries = manifest_json.get("entries", [])
             if len(entries) != 3:
                 print(
@@ -2540,10 +2499,14 @@ def p07(binary, break_mode=False):
                     )
                     return 1
 
-            # aaa-changed.txt: root-b's own copy is untouched (the per-file
-            # copy above operated on the wrong, $HOME location instead, per
-            # the registered defect) - a real, pre-existing destination
-            # (root-a/aaa-changed.txt) gets a real backup.
+            # aaa-changed.txt: this batch is "Copy to left" (root-b → root-a),
+            # so its destination is root-a/aaa-changed.txt - a real,
+            # pre-existing file (never touched by the per-file copy above,
+            # which wrote to root-b) gets a real backup. Its source, root-b's
+            # copy, was itself just overwritten by the per-file "Copy to
+            # right" above (F73's fix landing it at the compare root); the
+            # batch reads whatever is on disk at copy time, so this remains a
+            # real, currently-existing-destination backup either way.
             changed_entry = by_name["aaa-changed.txt"]
             backup_path = changed_entry.get("backup_path")
             if not backup_path:
@@ -2592,30 +2555,33 @@ def p07(binary, break_mode=False):
 
     print(
         "OK: Explorer navigation ('Go up' then Back on the left pane, ordinary "
-        "AXPress clicks) picked root-a/root-b and Compare functioned. THREE "
-        "findings confirmed and registered, not fixed: (1) PRODUCT DEFECT - "
-        "Forward is disabled after Back, not merely 'nothing to go forward to' "
-        "- explorer.rs's on_back handler calls both NavHistory::back() (index-"
-        "only) and navigate_to() (which unconditionally re-pushes, truncating "
-        "the forward entry back() never touched); (2) PRODUCT DEFECT - "
-        "DeepRow's PER-ROW copy buttons (not BatchCopyButtons, confirmed via "
-        "real dispatch - its manifest src genuinely came from right_root) "
-        "compute src/dst from Explorer's own last_left_dir/last_right_dir, not "
-        "the deep-compare view's own left_root/right_root - concretely "
-        "demonstrated here: a per-row copy landed at $HOME/aaa-changed.txt "
-        "(verified via a real backup and overwrite) while root-b/aaa-changed.txt "
-        "- the file actually shown as 'Changed' - was verified untouched; (3) "
-        "HARNESS/TECHNIQUE LIMITATION - the right Explorer pane's PathBar "
-        "buttons do not respond to this harness's established `click` (AXPress) "
-        "technique the way the left pane's do, confirmed via three real "
-        "dispatches (two occurrence indices, both click orderings); only the "
-        "left pane's navigation and plain row picks (click_row_side, both "
+        "AXPress clicks) picked root-a/root-b and Compare functioned. TWO fixes "
+        "confirmed against 0.167.1, ONE limitation still recorded: (1) F72, "
+        "FIXED - Forward correctly stays available after Back (previously "
+        "permanently disabled - explorer.rs's on_back handler used to call both "
+        "NavHistory::back() (index-only) and navigate_to() (which unconditionally "
+        "re-pushed, truncating the forward entry back() never touched); now "
+        "routed through a non-pushing navigate_to_from_history instead); (2) "
+        "F73/F68, FIXED - DeepRow's PER-ROW copy buttons (not BatchCopyButtons, "
+        "confirmed via real dispatch - its manifest src genuinely came from "
+        "right_root, unaffected either before or after) now take left_root/"
+        "right_root as props instead of reading Explorer's own "
+        "last_left_dir/last_right_dir - concretely verified here: even with "
+        "last_right_dir still seeded to $HOME (never corrected to root-b, see "
+        "(3) below), a per-row copy correctly landed at root-b/aaa-changed.txt "
+        "(verified via a real backup and overwrite) while the old wrong "
+        "location, $HOME/aaa-changed.txt, was verified untouched; (3) "
+        "HARNESS/TECHNIQUE LIMITATION, still open - the right Explorer pane's "
+        "PathBar buttons do not respond to this harness's established `click` "
+        "(AXPress) technique the way the left pane's do, confirmed via three "
+        "real dispatches (two occurrence indices, both click orderings); only "
+        "the left pane's navigation and plain row picks (click_row_side, both "
         "sides) proved reliable. See the case docstring for all three "
         "mechanisms. Deep-compare showed all five fixture entries with correct "
         "Equal/Changed/LeftOnly/RightOnly statuses and summary stats; the "
         "Different/All/Equal-only filters each showed the expected subset; a "
-        "per-row copy's real (wrong-location) backup/overwrite was verified, "
-        "and a genuinely correct 3-item batch copy (unaffected by defect (2)) "
+        "per-row copy's real (correct-location) backup/overwrite was verified, "
+        "and a genuinely correct 3-item batch copy (never affected by F73) "
         "had its manifest JSON read from disk and all 3 entries verified by "
         "name, outcome, and real backup/content bytes; a result summary "
         "appeared. "
