@@ -16,7 +16,7 @@ pub fn CloseTabModal(index: usize) -> Element {
         .map(|t| t.title.clone())
         .unwrap_or_default();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Close comparison"),
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Close comparison"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
                 h2 { {t(lang, "Close comparison?")} }
                 p { {format!("\"{}\" {}",

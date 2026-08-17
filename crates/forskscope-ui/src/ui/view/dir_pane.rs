@@ -365,6 +365,13 @@ fn apply_navigation(
     // sidestep via `ScopeId::ROOT` - F36/F61) - calling `apply_navigation`
     // outside of one, as F72's regression test does, would otherwise panic
     // on a concern this function's actual behavior does not depend on.
+    // Review 070 §4.2: `spawn_forever` means this task is NOT cancelled if
+    // the calling component unmounts mid-flight - harmless *here* only
+    // because this eval is one-shot and completes immediately, a property
+    // of this particular eval, not a guarantee `spawn_forever` gives in
+    // general. Do not copy this call site's choice for a task that does
+    // real, possibly-long-running work without re-checking that it stays
+    // safe to outlive whatever triggered it.
     spawn_forever(async move {
         let _ = dioxus::document::eval(
             "var t = document.getElementById('aligned-tree'); if(t) t.scrollTop = 0;",
