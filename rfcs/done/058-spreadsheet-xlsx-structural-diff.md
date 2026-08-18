@@ -17,6 +17,44 @@ and shipped; it is simply not reachable at runtime right now. Re-enabling
 requires the dependency path to be remediated first (tracked in
 `docs/src/maintainers/release-evidence/*/advisories.md`).
 
+**Lifting condition (added 2026-08-17, F65).** The dependency condition is
+now **met**: `sheets-diff` 2.5.0 resolves `calamine 0.36.1 -> quick-xml
+0.41.0` and `zip 8.6.0`, with `cargo audit` exiting 0 — verified from a
+scratch resolve, not from upstream's lockfile or their word. Their MSRV
+(1.88) is below this workspace's 1.91 floor.
+
+**That is necessary and not sufficient.** Remediating the advisories removes
+the reason the suspension was imposed; it does not by itself discharge the
+suspension, because lifting it re-opens a parser to user-supplied archives —
+this project's stated threat model. Four conditions must be met, and **none
+of them depends on any other milestone**:
+
+1. **This suspension is lifted here, deliberately, with reasoning** — not by
+   a `Cargo.toml` edit. The threat-model entry moves with it: what the parser
+   now defends against, and what it does not.
+2. **`cargo xtask audit-deps` denies `sheets-diff` by name.** That deny is
+   the mechanism by which the suspension is enforced, and it must be removed
+   as an explicit act. It exists so re-adoption cannot happen incidentally.
+3. **Platform case P10 inverts.** It currently asserts that the fail-closed
+   message reaches the user; with `.xlsx` re-enabled it no longer tests what
+   it claims. Changing it is a change to a **frozen** `matrix-plan.md`, so it
+   requires the freeze to be lifted or the plan re-cut — not an edit in place.
+4. **New evidence is required**, not inherited: a deliberately chosen
+   `Limits::max_cells_compared` (upstream's `hardened()` preset bounded
+   nothing before 2.4.0, and the value should be ours rather than theirs);
+   mid-sheet cancellation observed rather than assumed, which this project
+   told upstream it would test; and an `AlignmentMode` decision, since
+   non-`Positional` alignment is what a diff tool wants and is the mode whose
+   per-cell clone upstream removed in 2.5.0.
+
+**Architect recommendation (2026-08-17): do not lift during v1
+stabilization.** Not because the dependency is doubtful — it is not — but
+because when the outstanding upstream blocker (F44) clears, this project
+should be one dependency bump and one platform re-run away from a Gate D
+verdict. Lifting first replaces that with a new runtime dependency, an
+inverted platform case and a re-frozen matrix plan. The owner may decide
+otherwise; the cost is a longer path to Gate D, not a safety one.
+
 ## Status
 Implemented (v0.45.0). The core-layer deliverables from RFC-058 are shipped:
 
