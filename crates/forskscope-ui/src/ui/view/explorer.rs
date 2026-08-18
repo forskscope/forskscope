@@ -67,6 +67,24 @@ pub enum DigestKey {
     RightOnly(PathBuf),
 }
 
+/// F74: the state for a directory row that exists on the left side, given
+/// whether a same-named entry on the right is *also* a directory.
+/// `counterpart_is_dir` true means both sides have a same-named directory -
+/// this says nothing about whether their *contents* match (the Explorer
+/// never examines directory contents; that verdict is Deep Compare's job,
+/// design decision handoff 002 §2), so the only honest state is
+/// `NotCompared`, never `Equal`. `counterpart_is_dir` false means the
+/// right side has no directory here at all (either nothing, or a file of
+/// the same name - a type mismatch, not a match) - correctly `Unique`,
+/// unchanged from before F74.
+fn dir_common_state(counterpart_is_dir: bool) -> DigestState {
+    if counterpart_is_dir {
+        DigestState::NotCompared
+    } else {
+        DigestState::Unique
+    }
+}
+
 /// Which pane currently receives keyboard events (RFC-061).
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum FocusedPane {
@@ -250,11 +268,7 @@ pub fn Explorer() -> Element {
             }
             let cp = r_root.join(&rel);
             if is_dir {
-                let state = if cp.is_dir() {
-                    DigestState::Equal
-                } else {
-                    DigestState::Unique
-                };
+                let state = dir_common_state(cp.is_dir());
                 digest_map.write().insert(DigestKey::Common(rel), state);
             } else {
                 if !cp.is_file() {
@@ -445,5 +459,32 @@ pub fn Explorer() -> Element {
                 ExplorerFooter { lang, left_pick, right_pick }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // F74: a same-named directory on both sides must never be reported
+    // `Equal` - its contents were never examined. Two directories with
+    // differing contents (the exact false-positive the bug report hit) end
+    // up with `counterpart_is_dir == true` here (the right side genuinely
+    // is a directory, differing contents notwithstanding - the Explorer
+    // has no way to know they differ without recursing, which is
+    // deliberately not this function's job), so this asserts the honest
+    // state rather than a claimed one.
+    #[test]
+    fn a_same_named_directory_on_both_sides_is_never_reported_equal() {
+        let state = dir_common_state(true);
+        assert_eq!(state, DigestState::NotCompared);
+        assert_ne!(state, DigestState::Equal);
+    }
+
+    #[test]
+    fn a_directory_with_no_directory_counterpart_is_unique() {
+        // Either nothing on the other side, or a file of the same name -
+        // a type mismatch, not a match. Unchanged behavior from before F74.
+        assert_eq!(dir_common_state(false), DigestState::Unique);
     }
 }

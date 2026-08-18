@@ -23,6 +23,12 @@ fn ja(key: &str) -> Option<&'static str> {
         "Select a file or directory on each side to compare" => {
             "両側でファイルまたはディレクトリを選択してください"
         }
+        "Comparing…" => "比較中…",
+        "Identical" => "同一",
+        "Only on this side" => "この側にのみ存在",
+        "Directory contents not compared — use Deep Compare" => {
+            "ディレクトリの中身は比較されていません — ディープ比較を使用してください"
+        }
         "Filter items" => "アイテムをフィルター",
         "Filter by name…" => "名前でフィルター…",
         "Hide binary" => "バイナリを非表示",

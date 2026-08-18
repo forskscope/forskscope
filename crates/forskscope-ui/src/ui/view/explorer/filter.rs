@@ -134,8 +134,17 @@ pub fn apply_filter(
                 true
             };
 
-            // Hide-identical filter.
-            let eq_ok = if hide_eq {
+            // Hide-identical filter. F74: a directory row is never proven
+            // identical here - the Explorer doesn't examine directory
+            // contents, so its `DigestState` (now `NotCompared`, never
+            // `Equal`) can't earn hiding either way. Checking `is_dir`
+            // directly, not just the state, keeps this exemption correct
+            // even if some future state ever misrepresented a directory as
+            // `Equal` again - hiding is for rows *proven* identical, and a
+            // directory never is, regardless of what its map entry says.
+            let is_dir_row = lr.as_ref().map(|r| r.is_dir).unwrap_or(false)
+                || rr.as_ref().map(|r| r.is_dir).unwrap_or(false);
+            let eq_ok = if hide_eq && !is_dir_row {
                 let rel = lr.as_ref().or(rr.as_ref()).map(|r| r.rel_path.clone());
                 rel.map(|rel| {
                     !matches!(
@@ -151,4 +160,64 @@ pub fn apply_filter(
             name_ok && bin_ok && eq_ok
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use forskscope_ui_logic::RowData;
+
+    use super::*;
+    use crate::state::with_test_store;
+
+    fn dir_row(name: &str) -> RowData {
+        RowData {
+            abs_path: PathBuf::from(format!("/root/{name}")),
+            rel_path: PathBuf::from(name),
+            is_dir: true,
+            is_expanded: false,
+            is_selected: false,
+            depth: 0,
+        }
+    }
+
+    // F74: hide-identical must never hide a directory row, whatever its
+    // `DigestState` says - a directory is never *proven* identical by this
+    // Explorer, since its contents are never examined. Checks the
+    // exemption against `Equal` specifically (not just `NotCompared`,
+    // which can no longer be produced at all) because the guard is meant
+    // to hold regardless of what the map entry says, not because
+    // `NotCompared` happens to differ from `Equal`.
+    #[test]
+    fn hide_identical_never_hides_a_directory_row_even_if_marked_equal() {
+        with_test_store(|_store| {
+            let mut binary_cache: Signal<HashMap<PathBuf, bool>> =
+                Signal::new_in_scope(HashMap::new(), ScopeId::ROOT);
+            let mut digest_map = HashMap::new();
+            digest_map.insert(
+                DigestKey::Common(PathBuf::from("same-name-dir")),
+                DigestState::Equal,
+            );
+            let rows = vec![(
+                Some(dir_row("same-name-dir")),
+                Some(dir_row("same-name-dir")),
+            )];
+
+            let visible = apply_filter(
+                rows,
+                "",
+                false,
+                true, // hide_eq
+                true,
+                &digest_map,
+                &mut binary_cache,
+            );
+
+            assert_eq!(
+                visible.len(),
+                1,
+                "a directory row must stay visible under hide-identical, \
+                 regardless of its recorded state"
+            );
+        });
+    }
 }

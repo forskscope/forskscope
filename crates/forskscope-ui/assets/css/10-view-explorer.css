@@ -39,6 +39,10 @@
 .st-diff      { color: var(--warn, #c90); }
 .st-unique    { color: var(--muted); }
 .st-computing { color: var(--muted); animation: spin .8s linear infinite; }
+/* F74: a directory row's contents were never examined - deliberately not
+   var(--ins-mark)/st-equal's green, which would repeat the false-equal
+   claim this state exists to replace. */
+.st-not-compared { color: var(--muted); }
 @keyframes spin {
   from { display: inline-block; transform: rotate(0deg); }
   to   { display: inline-block; transform: rotate(360deg); }
