@@ -14,7 +14,7 @@ pub mod footer;
 pub mod tree;
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use dioxus::prelude::*;
@@ -82,6 +82,42 @@ fn dir_common_state(counterpart_is_dir: bool) -> DigestState {
         DigestState::NotCompared
     } else {
         DigestState::Unique
+    }
+}
+
+/// F74 review 072: what a left-side entry's classification will be, before
+/// any async work starts. `Final` is inserted immediately; `NeedsDigest`
+/// means the caller inserts `Computing` and starts the real digest
+/// comparison - a file present on both sides is the one case this
+/// function cannot resolve synchronously.
+#[derive(Debug, PartialEq)]
+enum EntryClassification {
+    Final(DigestState),
+    NeedsDigest {
+        left_abs: PathBuf,
+        right_abs: PathBuf,
+    },
+}
+
+/// F74 review 072: the per-entry classification, extracted from the
+/// `use_effect` below so a test can drive it against real directories -
+/// this is the exact call site `9f355c6` got wrong (`if cp.is_dir() {
+/// DigestState::Equal }`), now `dir_common_state`-backed and reachable
+/// without a `VirtualDom`. Takes only plain values - no signal reads here,
+/// per the extraction risk `dir_pane.rs`'s `apply_navigation` split
+/// already established (keep signal reads in the closure, pass plain
+/// values in).
+fn classify_entry(rel: &Path, is_dir: bool, l_root: &Path, r_root: &Path) -> EntryClassification {
+    let cp = r_root.join(rel);
+    if is_dir {
+        EntryClassification::Final(dir_common_state(cp.is_dir()))
+    } else if !cp.is_file() {
+        EntryClassification::Final(DigestState::Unique)
+    } else {
+        EntryClassification::NeedsDigest {
+            left_abs: l_root.join(rel),
+            right_abs: cp,
+        }
     }
 }
 
@@ -266,37 +302,34 @@ pub fn Explorer() -> Element {
             {
                 continue;
             }
-            let cp = r_root.join(&rel);
-            if is_dir {
-                let state = dir_common_state(cp.is_dir());
-                digest_map.write().insert(DigestKey::Common(rel), state);
-            } else {
-                if !cp.is_file() {
-                    digest_map
-                        .write()
-                        .insert(DigestKey::Common(rel.clone()), DigestState::Unique);
-                    continue;
+            match classify_entry(&rel, is_dir, &l_root, &r_root) {
+                EntryClassification::Final(state) => {
+                    digest_map.write().insert(DigestKey::Common(rel), state);
                 }
-                let lp = l_root.join(&rel);
-                let key = rel.clone();
-                let mut dmap = digest_map;
-                dmap.write()
-                    .insert(DigestKey::Common(key.clone()), DigestState::Computing);
-                spawn(async move {
-                    let eq = tokio::task::spawn_blocking(move || {
-                        file_digest_equal(&lp, &cp).unwrap_or(false)
-                    })
-                    .await
-                    .unwrap_or(false);
-                    dmap.write().insert(
-                        DigestKey::Common(key),
-                        if eq {
-                            DigestState::Equal
-                        } else {
-                            DigestState::Different
-                        },
-                    );
-                });
+                EntryClassification::NeedsDigest {
+                    left_abs,
+                    right_abs,
+                } => {
+                    let key = rel.clone();
+                    let mut dmap = digest_map;
+                    dmap.write()
+                        .insert(DigestKey::Common(key.clone()), DigestState::Computing);
+                    spawn(async move {
+                        let eq = tokio::task::spawn_blocking(move || {
+                            file_digest_equal(&left_abs, &right_abs).unwrap_or(false)
+                        })
+                        .await
+                        .unwrap_or(false);
+                        dmap.write().insert(
+                            DigestKey::Common(key),
+                            if eq {
+                                DigestState::Equal
+                            } else {
+                                DigestState::Different
+                            },
+                        );
+                    });
+                }
             }
         }
 
@@ -486,5 +519,42 @@ mod tests {
         // Either nothing on the other side, or a file of the same name -
         // a type mismatch, not a match. Unchanged behavior from before F74.
         assert_eq!(dir_common_state(false), DigestState::Unique);
+    }
+
+    fn temp_dir(tag: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("fsk-ui-explorer-f74-{tag}-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        dir
+    }
+
+    // F74 review 072: drives `classify_entry` - the real call site, not
+    // just `dir_common_state` in isolation - against two real directories
+    // that share a name and genuinely differ. Confirmed to fail with the
+    // original `9f355c6` defect restored (see the commit message/review
+    // request for the observed failure output).
+    #[test]
+    fn real_directories_with_the_same_name_and_differing_contents_are_not_compared() {
+        let base = temp_dir("real-path-not-equal");
+        let l_root = base.join("left");
+        let r_root = base.join("right");
+        std::fs::create_dir_all(l_root.join("sub")).unwrap();
+        std::fs::create_dir_all(r_root.join("sub")).unwrap();
+        std::fs::write(l_root.join("sub/a.txt"), "left content").unwrap();
+        std::fs::write(
+            r_root.join("sub/a.txt"),
+            "right content, genuinely different",
+        )
+        .unwrap();
+
+        let rel = std::path::PathBuf::from("sub");
+        let result = classify_entry(&rel, true, &l_root, &r_root);
+
+        assert_eq!(
+            result,
+            EntryClassification::Final(DigestState::NotCompared),
+            "a same-named directory whose contents differ must never be \
+             classified Equal - see 9f355c6's original defect"
+        );
     }
 }

@@ -318,11 +318,28 @@ pub fn TreeRow(
             span { class: "tree-icon",  "{icon}" }
             span { class: "tree-label", "{name}" }
             if binary_blocked {
-                span { class: "tree-status st-binary", title: t(lang, "Binary file. Binary comparison is off — enable it in Settings → Advanced."),
+                // F74 review 072 §3: `title` on a bare `span` (role
+                // `generic`) is not reliably surfaced as accessible text -
+                // a screen reader announces the text content ("bin")
+                // instead. `role: "img"` exposes the span as a named node
+                // whose `aria_label` replaces that content, which is what
+                // actually substitutes the label. `title` kept for the
+                // mouse tooltip.
+                span {
+                    class: "tree-status st-binary",
+                    role: "img",
+                    aria_label: t(lang, "Binary file. Binary comparison is off — enable it in Settings → Advanced."),
+                    title: t(lang, "Binary file. Binary comparison is off — enable it in Settings → Advanced."),
                     "bin"
                 }
             } else if !st_icon.is_empty() {
-                span { class: "tree-status {st_cls}", title: "{st_label}", "{st_icon}" }
+                span {
+                    class: "tree-status {st_cls}",
+                    role: "img",
+                    aria_label: "{st_label}",
+                    title: "{st_label}",
+                    "{st_icon}"
+                }
             }
         }
     }
