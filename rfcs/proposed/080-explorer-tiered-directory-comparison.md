@@ -64,10 +64,19 @@ thirty directories would fan out into thirty tree walks with full content reads.
 On a home directory, a network mount, or a repository with a large build output,
 that is seconds to minutes of I/O the user did not ask for and cannot see.
 
-Nobody has ever decided the Explorer should do that. It would arrive as a side
-effect of fixing a status glyph, which is how performance decisions get made by
-accident. This RFC exists so the decision is taken deliberately, with the cost
-stated.
+**Correction, 2026-08-21, prompted by the owner asking why only directories are
+treated as costly.** The paragraph above was written as though the Explorer does
+not already do this. It does — for files. `file_digest_equal` is called on every
+common file in the listed directory, on navigation, with no size cap and no
+cancellation. Its worst case is two identical large files read in full. So
+"browsing must not start unbounded reads" is not a principle this RFC is
+introducing; it is a principle the product **already violates**, which nobody had
+registered. That is now **F77**, and it changes this RFC's shape rather than
+merely adding to it — see §2a.
+
+What remains true is the difference in *bound*, not in kind: a file row's cost is
+capped by one pair of files, while a directory row's is the whole subtree. Both
+need the control; only one of them has ever been described as needing it.
 
 ## Design
 
@@ -93,6 +102,39 @@ sets `Computing` without comparing them. Core does **not** flag a size mismatch
 for you. Tier 1's verdict in §2 is therefore caller-side logic over the returned
 `Vec<RecEntry>`, not a status core hands back. An implementer who reads
 `Computing` as "undetermined" and stops there gets no tier-1 answer at all.
+
+### 2a. The tiers are a property of comparison, not of directories
+
+The owner's question — *if thorough file comparison also costs much, could
+directory comparison be names and sizes only?* — points at a real inconsistency,
+and resolving it downward would be the wrong repair.
+
+**Files already have both tiers; the cheap one is just not named.**
+`file_digest_equal` returns `false` immediately when the two sizes differ, before
+opening either file. That is precisely tier 1's logic — a free, definitive
+*different* — already implemented and already correct. What follows it, the
+streamed content comparison, is tier 2.
+
+So the model is not "directories are special". It is:
+
+| | Tier 1 — metadata | Tier 2 — contents |
+|---|---|---|
+| **File** | sizes differ → **Different** (free) | streamed compare → **Identical** / **Different** |
+| **Directory** | names or sizes differ → **Different** (walk, no reads) | recursive compare → **Identical** / **Different** |
+
+Same asymmetry in both rows: tier 1 can prove *different*, never *identical*.
+
+**Making file comparison names-and-sizes only is rejected**, and the reason is
+the product's purpose. A one-character edit preserves file size, so a size-only
+file verdict would report *identical* for the single most common edit a diff tool
+exists to find. That is a false negative in the direction this project has twice
+ruled un-waivable. The consistency the owner is asking for is real and should be
+achieved by **raising directories to the file model, not lowering files to the
+directory one** — the same five states, meaning the same thing on both row kinds,
+so a glyph does not silently change strength depending on what it sits beside.
+
+**The cost control in §5 therefore applies to file rows as well**, which is new to
+this RFC and is the substance of what the owner's question changed.
 
 ### 2. Tier 1 — the cheap pass, and exactly what it can conclude
 
@@ -156,6 +198,8 @@ ones.
 
 ### 5. Cost control and invalidation
 
+- **Applies to file rows too (§2a).** Today's eager, uncancellable, uncapped file
+  comparison is F77; the same token and the same bound cover both row kinds.
 - **One tier-1 pass per directory row, on demand — never a fan-out across every
   visible row.** Trigger is the owner's call (§8 Q3): on selection, on expand,
   or on an explicit control.
@@ -242,6 +286,9 @@ about not knowing, which is a correct state to ship, not a placeholder.
   than a probability.
 - **Q3 — tier-1 trigger.** On row selection, on expand, or on an explicit
   control? This decides whether browsing costs anything at all.
-- **Q4 — ordering against F75/F76.** Do these three land as one change after
-  Gate D, or separately? One change is cheaper; three are individually
-  reviewable.
+- **Q4 — ordering against F75/F76/F77.** Do these land as one change after
+  Gate D, or separately? One change is cheaper; separate ones are individually
+  reviewable. **F77 is different from the other two: it is a defect, not a
+  design item, and it exists in shipped code.** It should not wait for this RFC
+  — the cancellation token it needs is a small change and closes a wrong-status
+  path today.
