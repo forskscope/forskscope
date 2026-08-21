@@ -3,9 +3,10 @@
 **Status.** Proposed
 **Accepted.** 2026-08-22 by the project owner — Gate A cleared. Stays in
 `proposed/` until implemented, per the 4-folder lifecycle; it moves to `done/`
-when the work ships. **Four items in §9 remain open and must be settled before
-implementation** — Q1 timing, Q3/F60, Q4 app registration, Q5 listing scope —
-plus recording the client secret's expiry.
+when the work ships. **§9 is down to one open question — Q4, the app
+registration — plus recording the client secret's expiry. Q1 and Q5 were
+decided 2026-08-22; Q3 was withdrawn as never having been a question and moved
+to Dependencies, where F60 blocks implementation.**
 **Tracks.** Release pipeline; Windows distribution; credential handling.
 **Touches.** A new MSIX build, a new submission workflow, `AppxManifest.xml`'s
 version claims, `release.md`, and the threat model.
@@ -246,22 +247,25 @@ makes unsettled claims recurring").
 
 ## Open questions for the owner
 
-1. **Timing.** Implement after Gate D as §8 proposes, or sooner? A separate
-   workflow keeps the risk low either way; the cost of "sooner" is re-running
-   M5's Windows rows.
+1. **Timing. CLOSED 2026-08-22 — after Gate D**, as §8 proposes. Implementing
+   sooner would mean a new artifact, new digests, and a re-run of M5's Windows
+   rows for a change that alters no product behaviour.
 2. ~~**Signing.**~~ **Closed (2026-08-16).** `Publisher="CN=C4BA37E8-8670-4C82-8365-5ECB57373921"`
    is a Store-assigned publisher identity: Microsoft signs the package on
    submission, and no code-signing certificate of the project's own is
    involved. Nothing further to handle.
-3. **F60.** Still open. The owner's direction (2026-08-16) is that Windows
-   release verification in CI should improve before automation — right on its
-   own merits, but it **cannot close F60**: GitHub Actions offers no Windows 10
-   runner, and `windows-latest` is a Server-2025-based image at kernel
-   NT 10.0.26100. The gap is a machine nobody has, not a check nobody wrote, so
-   no amount of CI improvement evidences Windows 10 1809. F60's three
-   resolutions stand — narrow the floor to what is evidenced, obtain a Windows
-   10 host (a VM is the cheap version), or state openly that 1809 is a declared
-   compatibility floor carrying no runtime evidence.
+3. ~~**F60.**~~ **Withdrawn as a question 2026-08-22 — it never was one.**
+   Asked what the owner had to decide here, the honest answer is *nothing*:
+   this item states a dependency and then restates F60's three resolutions,
+   which are F60's to make and are already recorded there. Nothing about this
+   RFC changes them, and no answer given here would close anything. Listing a
+   dependency among the open questions made the decision list look longer than
+   it was and invited an answer that could not exist. Moved to **Dependencies**
+   below, which is where it belonged. The substance is unchanged and still
+   true: no amount of CI improvement can evidence Windows 10 1809, because
+   GitHub offers no Windows 10 runner and `windows-latest` is a Server-2025
+   image at NT 10.0.26100 — the gap is a machine nobody has, not a check nobody
+   wrote.
 4. **Entra ID app registration.** Does the existing registration already have
    the Partner Center permissions this needs — or is a separate registration
    preferable, so publishing rights are isolated from whatever else it does?
@@ -271,13 +275,48 @@ makes unsettled claims recurring").
    §2's body and the README index row were corrected on 2026-08-21.)*
    **Whichever is chosen, record the secret's expiry** — 24 months maximum,
    often less, and a lapsed secret breaks releases silently.
-5. **Store listing metadata.** This RFC automates the *package*. Listing text,
-   screenshots and store descriptions stay manual unless you want them in scope,
-   which would be a materially larger design.
+5. **Store listing metadata. CLOSED 2026-08-22 — package only, with one
+   condition added.** Automation stays out of scope. But the owner asked whether
+   that recommendation is safe against future technical debt, and the honest
+   answer is that **as first given it was incomplete**: "keep it manual" is not a
+   null decision, and the debt it risks is not *"not automated"* — it is
+   *"not owned"*.
+
+   **What checking found.** Listing-adjacent content is **already partly
+   version-controlled and nobody has said so**: `AppxManifest.xml` carries
+   `DisplayName`, a `Description`, `PublisherDisplayName` and the tile/logo
+   assets. What is *not* tracked is the Store listing proper — long description,
+   screenshots, search terms, per-market copy. So a split already exists, and
+   **nothing records which side wins when the manifest's `Description` and the
+   Store listing disagree.** Automating the package while leaving that undefined
+   means every automated release ships one half of a description whose other
+   half nobody is tracking.
+
+   **Also worth stating plainly, because it is easy to assume otherwise:** there
+   is **no screenshot machinery today**. `packaging/render_check.py` walks the
+   AT-SPI accessible tree and asserts geometry; it captures no images. Automating
+   screenshots later is real work, not a small extension of something existing.
+
+   **So the decision is: do not automate listing metadata, and do not leave it
+   unowned either.** Before this RFC is implemented:
+
+   - the Store listing content gets a tracked home in the repository, as data,
+     even while publishing it stays a manual step;
+   - screenshots are committed assets, not promises to regenerate;
+   - the manifest-versus-listing precedence is written down.
+
+   That converts a debt into a deferred implementation: manual publication of
+   version-controlled content is a step someone can automate later from a source
+   that exists. Manual publication of content living only in Partner Center is
+   the debt — unreviewable, undated, and with nothing to automate *from*.
 
 ## Dependencies
 
 - Gate D sequencing (§8).
-- F60, F49b — the manifest's version claims.
+- **F60 — blocking.** The manifest's `MinVersion` claim is a live Store
+  constraint, and automation would ship it unattended on every release, so it
+  must be settled before this RFC is implemented rather than alongside it.
+  Moved here from §9 Q3 on 2026-08-22 — see there for why it was never a
+  question. F49b — the manifest's other version claims — rides with it.
 - No dependency on RFC-078's outcome beyond timing; this changes no product
   behaviour and no artifact M5 tests.
