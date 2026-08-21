@@ -1,0 +1,391 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>RFC directory</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-9f326576.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-1897328b.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title"></h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="forskscope-rfcs"><a class="header" href="#forskscope-rfcs">ForskScope RFCs</a></h1>
+<p>Lifecycle: <a href="./done/000-rfc-lifecycle-policy.html">RFC 000</a>. Numbers never reused.</p>
+<blockquote>
+<p>Numbering note: RFCs 043–053 are reserved for the packaging, accessibility,
+documentation, and product-boundary themes sketched in the migration roadmap
+(RFC 042) and the non-goals addendum. New feature work introduced after the
+v0.34 audit is numbered from RFC 054 onward.</p>
+</blockquote>
+<h2 id="implemented-52"><a class="header" href="#implemented-52">Implemented (52)</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>ID</th><th>Title</th><th>Shipped in</th></tr>
+</thead>
+<tbody>
+<tr><td>000</td><td><a href="./done/000-rfc-lifecycle-policy.html">RFC lifecycle policy</a></td><td>Implemented</td></tr>
+<tr><td>001</td><td><a href="./done/001-core-extraction-and-domain-model.html">Core Extraction and Domain Model</a></td><td>v0.23.0</td></tr>
+<tr><td>002</td><td><a href="./done/002-similar-v3-diff-engine.html">Diff Engine: <code>similar</code> v3 + Normalized Diff Model</a></td><td>v0.23.0</td></tr>
+<tr><td>003</td><td><a href="./done/003-dioxus-application-shell.html">Dioxus Application Shell and State Runtime</a></td><td>v0.23.0</td></tr>
+<tr><td>005</td><td><a href="./done/005-explorer-workspace.html">Explorer Workspace and Paired Directory Workflow</a></td><td>v0.25.0</td></tr>
+<tr><td>006</td><td><a href="./done/006-diff-merge-workspace.html">Diff/Merge Workspace and Merge Transaction Model</a></td><td>v0.26.0</td></tr>
+<tr><td>007</td><td><a href="./done/007-save-session-file-safety.html">Save, Session, and File Safety Policy</a></td><td>v0.27.0</td></tr>
+<tr><td>008</td><td><a href="./done/008-directory-comparison-background-jobs.html">Directory Comparison and Background Job Model</a></td><td>v0.58.0 + v0.68.0 (runner UI deferred)</td></tr>
+<tr><td>009</td><td><a href="./done/009-settings-theme-localization-accessibility.html">Settings, Theme, Localization, and Accessibility</a></td><td>v0.60.0 (settings dialog UI deferred)</td></tr>
+<tr><td>011</td><td><a href="./done/011-workspace-session-persistence.html">Workspace Session Persistence</a></td><td>v0.56.0 (tab list restore deferred to schema v2)</td></tr>
+<tr><td>012</td><td><a href="./done/012-text-encoding-newline-binary-policy.html">Text Encoding, Newline, and Binary Policy</a></td><td>v0.50.0 + v0.69.0 (footer display UI deferred)</td></tr>
+<tr><td>013</td><td><a href="./done/013-large-file-performance-virtualization.html">Large File, Performance, and Virtualization Strategy</a></td><td>v0.46.0 + v0.59.0 (row virtualization UI deferred)</td></tr>
+<tr><td>014</td><td><a href="./done/014-search-filter-navigation.html">Search, Filter, and Navigation</a></td><td>v0.43.0 (explorer filter UI deferred)</td></tr>
+<tr><td>015</td><td><a href="./done/015-undo-redo-transaction-log.html">Undo/Redo Transaction Log</a></td><td>v0.47.0 (history panel UI deferred)</td></tr>
+<tr><td>017</td><td><a href="./done/017-error-taxonomy-diagnostics-ux.html">Error Taxonomy and Diagnostics UX</a></td><td>v0.67.0 (diagnostics panel UI deferred)</td></tr>
+<tr><td>019</td><td><a href="./done/019-command-shortcut-palette-accessibility.html">Command Registry, Keyboard Shortcuts, and Command Palette</a></td><td>v0.63.0 (command palette UI deferred)</td></tr>
+<tr><td>020</td><td><a href="./done/020-developer-architecture-ci-test-gates.html">Developer Architecture, CI, and Test Gates</a></td><td>v0.48.0 + v0.73.0</td></tr>
+<tr><td>021</td><td><a href="./done/021-document-and-result-buffer-model.html">Document and Result Buffer Model</a></td><td>v0.28.0</td></tr>
+<tr><td>022</td><td><a href="./done/022-directory-merge-and-batch-operations.html">Directory Merge and Batch Operations</a></td><td>v0.52.0 (batch preview UI deferred)</td></tr>
+<tr><td>023</td><td><a href="./done/023-atomic-file-operations-backup-restore.html">Atomic File Operations, Backup, and Restore</a></td><td>v0.44.0 (restore picker UI deferred)</td></tr>
+<tr><td>024</td><td><a href="./done/024-diff-visual-semantics-decoration-contract.html">Diff Visual Semantics and Decoration Contract</a></td><td>v0.61.0 (renderer wiring deferred)</td></tr>
+<tr><td>027</td><td><a href="./done/027-report-export-and-session-evidence.html">Report Export and Session Evidence</a></td><td>v0.49.0 (HTML export dialog deferred)</td></tr>
+<tr><td>028</td><td><a href="./done/028-preferences-profiles-and-compare-options.html">Preferences, Profiles, and Compare Options</a></td><td>v0.50.0 + v0.66.0 (toolbar selector UI deferred)</td></tr>
+<tr><td>029</td><td><a href="./done/029-integration-with-external-tools-and-open-with.html">Integration with External Tools and Open With</a></td><td>v0.55.0 + v0.70.0 (settings UI deferred)</td></tr>
+<tr><td>031</td><td><a href="./done/031-release-channel-migration-and-data-compatibility.html">Release Channel, Migration, and Data Compatibility</a></td><td>v0.51.0</td></tr>
+<tr><td>032</td><td><a href="./done/032-text-editing-operation-model-and-editor-truth-boundary.html">Text Editing Operation Model and Editor Truth Boundary</a></td><td>v0.62.0 (EditBuffer dispatch deferred)</td></tr>
+<tr><td>033</td><td><a href="./done/033-three-way-merge-model.html">Three-Way Merge Model</a></td><td>v0.40.0 (conflict workspace UI deferred)</td></tr>
+<tr><td>034</td><td><a href="./done/034-conflict-resolution-workspace.html">Conflict Resolution Workspace</a></td><td>v0.64.0 (workspace UI deferred)</td></tr>
+<tr><td>035</td><td><a href="./done/035-scroll-sync-line-mapping-and-diff-decoration-engine.html">Scroll Sync, Line Mapping, and Diff Decoration Engine</a></td><td>v0.61.0 (scroll-sync wiring deferred)</td></tr>
+<tr><td>036</td><td><a href="./done/036-live-reload-file-watcher-and-external-modification-handling.html">Live Reload, File Watcher, and External Modification Handling</a></td><td>v0.53.0 + v0.71.0 (platform watcher deferred)</td></tr>
+<tr><td>037</td><td><a href="./done/037-scalable-directory-compare-index-and-incremental-refresh.html">Scalable Directory Compare Index and Incremental Refresh</a></td><td>v0.42.0 + v0.58.0 (persistent cache deferred)</td></tr>
+<tr><td>038</td><td><a href="./done/038-vcs-context-integration-boundary.html">VCS Context Integration Boundary</a></td><td>v0.54.0 (UI panel and JJ provider deferred)</td></tr>
+<tr><td>039</td><td><a href="./done/039-patch-export-apply-and-review-workflow.html">Patch Export, Apply, and Review Workflow</a></td><td>v0.39.0 (export only; apply deferred)</td></tr>
+<tr><td>054</td><td><a href="./done/054-explorer-tree-view-and-interaction-model.html">Explorer Tree-View and Interaction Model</a></td><td>v0.36.0</td></tr>
+<tr><td>055</td><td><a href="./done/055-breadcrumb-path-navigation.html">Breadcrumb Path Navigation</a></td><td>v0.36.0</td></tr>
+<tr><td>056</td><td><a href="./done/056-ignore-patterns-for-files-and-directories.html">Ignore Patterns for Files and Directories</a></td><td>v0.36.0</td></tr>
+<tr><td>057</td><td><a href="./done/057-settings-dialog-layout-refinements.html">Settings Dialog Layout Refinements</a></td><td>v0.36.0</td></tr>
+<tr><td>058</td><td><a href="./done/058-spreadsheet-xlsx-structural-diff.html">Spreadsheet (<code>.xlsx</code>) Structural Diff and Adapter Contract</a></td><td>v0.57.0 (aligned view deferred)</td></tr>
+<tr><td>059</td><td><a href="./done/059-explorer-and-compare-uiux-audit-remediation.html">Explorer and Compare UI/UX Audit Remediation</a></td><td>v0.41.0 (UI keyboard items deferred)</td></tr>
+<tr><td>062</td><td><a href="./done/062-safe-batch-copy-ux-and-restore-manifest.html">Safe Batch Copy UX and Restore Manifest Integration</a></td><td>v0.145.3</td></tr>
+<tr><td>064</td><td><a href="./done/064-compare-view-scroll-and-coloring-fixes.html">Compare View — Per-Pane Scroll and All-Different Coloring</a></td><td>v0.147.0</td></tr>
+<tr><td>065</td><td><a href="./done/065-async-comparison-and-loading-state-tabs.html">Asynchronous Comparison and Loading-State Tabs</a></td><td>v0.148.0</td></tr>
+<tr><td>066</td><td><a href="./done/066-binary-comparison-policy.html">Binary Comparison Policy — Off by Default</a></td><td>v0.149.0</td></tr>
+<tr><td>067</td><td><a href="./done/067-explorer-name-filter-and-checkboxes.html">Explorer Name-Pattern Filter and Filter Checkboxes</a></td><td>v0.150.0</td></tr>
+<tr><td>068</td><td><a href="./done/068-explorer-unaligned-compact-view-mode.html">Explorer Unaligned (Compact) View Mode</a></td><td>v0.151.0</td></tr>
+<tr><td>069</td><td><a href="./done/069-explorer-layout-compare-action-and-header-footer.html">Explorer Layout — Compare Action and Header/Footer</a></td><td>v0.152.0</td></tr>
+<tr><td>070</td><td><a href="./done/070-font-family-selector.html">Font Family Selector in Settings</a></td><td>v0.152.0</td></tr>
+<tr><td>071</td><td><a href="./done/071-ui-module-structural-redesign.html">UI Module Structural Redesign (Rust 2024 Hierarchy)</a></td><td>v0.152.0–v0.158.0</td></tr>
+<tr><td>073</td><td><a href="./done/073-bridge-minimisation.html">Bridge Minimisation (Phase 5)</a></td><td>v0.161.0</td></tr>
+<tr><td>075</td><td><a href="./done/075-async-compare-identity-and-generation.html">Async Compare Identity and Load Generations</a></td><td>post-v0.164.0 stabilization</td></tr>
+<tr><td>076</td><td><a href="./done/076-versioned-runtime-persistence.html">Versioned Runtime Settings and Session Persistence</a></td><td>post-v0.165.1 stabilization</td></tr>
+<tr><td>077</td><td><a href="./done/077-mergetool-save-target-model.html">Git Mergetool Save-Target Model</a></td><td>post-v0.165.1 stabilization</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="proposed-16"><a class="header" href="#proposed-16">Proposed (16)</a></h2>
+<p>RFC-004–040 are editor-adapter track, platform/packaging, or governance/documentation.
+RFC-026 and RFC-030 are substantially implemented; their remaining items require GTK or are deferred.
+RFC-060, 061, and 063 are the remaining UI/UX architect review remediation track (shipped across v0.145.0–v0.145.3); RFC-062, the fourth, is fully shipped and filed under Implemented.
+RFC-072 is the remaining phase of the UI structural redesign (RFC-071).
+RFC-074 and RFC-078 are the remaining release-stabilization program created
+from the 2026-07-15 architecture audit; they are release-blocking in
+dependency order. RFC-075, RFC-076, and RFC-077 are implemented and close
+audit findings B1, B2, and B3 respectively, but the overall v1 release
+remains No-Go.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>ID</th><th>Title</th><th>Category</th><th>Progress</th></tr>
+</thead>
+<tbody>
+<tr><td>004</td><td><a href="./proposed/004-editor-adapter-and-codemirror-bridge.html">Editor Adapter and CodeMirror Bridge</a></td><td>Editor adapter</td><td>Not started — requires GTK/WebView</td></tr>
+<tr><td>010</td><td><a href="./proposed/010-packaging-diagnostics-qa.html">Packaging, Diagnostics, QA, and Release Gates</a></td><td>Platform/packaging</td><td>Not started — requires cross-platform CI</td></tr>
+<tr><td>016</td><td><a href="./proposed/016-editor-bridge-security-and-contract.html">Editor Bridge Security and Contract</a></td><td>Editor adapter</td><td>Blocked on RFC-004</td></tr>
+<tr><td>025</td><td><a href="./proposed/025-editor-adapter-prototype-and-kill-switch.html">Editor Adapter Prototype and Kill Switch</a></td><td>Editor adapter</td><td>Blocked on RFC-004</td></tr>
+<tr><td>026</td><td><a href="./proposed/026-cross-platform-webview-and-linux-desktop-compatibility.html">Cross-Platform WebView and Linux Desktop Compatibility</a></td><td>Platform/packaging</td><td><strong>Partially shipped</strong> — PlatformInfo, –diagnostics, troubleshooting.md</td></tr>
+<tr><td>030</td><td><a href="./proposed/030-user-documentation-onboarding-and-help-system.html">User Documentation, Onboarding, and Help System</a></td><td>Documentation</td><td><strong>Substantially shipped</strong> — 18 doc files; in-app help panel deferred</td></tr>
+<tr><td>040</td><td><a href="./proposed/040-editor-adapter-verification-harness-and-golden-corpus.html">Editor Adapter Verification Harness and Golden Corpus</a></td><td>Editor adapter</td><td>Blocked on RFC-004</td></tr>
+<tr><td>041</td><td><a href="./proposed/041-v1-product-stabilization-and-rfc-governance.html">v1.0 Product Stabilization and RFC Governance</a></td><td>Governance</td><td>12/16 checklist items done; 4 require GTK or deferred</td></tr>
+<tr><td>042</td><td><a href="./proposed/042-roadmap-and-rfc-execution-plan.html">Roadmap and RFC Execution Plan</a></td><td>Governance</td><td>Living document — pre-GTK verification phase</td></tr>
+<tr><td>060</td><td><a href="./proposed/060-global-keyboard-scope-and-modal-input-safety.html">Global Keyboard Scope and Modal/Input Safety</a></td><td>UX review remediation</td><td><strong>Partially shipped</strong> v0.145.0–.1 — modal guard + per-surface propagation; W2/W3 tests remain</td></tr>
+<tr><td>061</td><td><a href="./proposed/061-explorer-pane-focus-and-keyboard-completeness.html">Explorer Pane Focus and Keyboard Completeness</a></td><td>UX review remediation</td><td><strong>Partially implemented</strong> v0.145.2 — focused pane, F6, per-pane Alt+↑; row ARIA remains</td></tr>
+<tr><td>063</td><td><a href="./proposed/063-trust-clarity-and-calm-ui-hardening.html">Trust, Clarity, and Calm UI Hardening</a></td><td>UX review remediation</td><td><strong>Mostly shipped</strong> v0.145.1–.3 — C1/C2/C3/C5/C6/C7/C9/C10 done; C4 audited; C8 rejected</td></tr>
+<tr><td>072</td><td><a href="./proposed/072-ui-component-extraction.html">UI Component Extraction (Phase 4)</a></td><td>Structural</td><td><strong>Partially shipped</strong> v0.160.0 — <code>Notice</code> extracted; <code>EmptyState</code>/<code>PathLabel</code>/<code>IconButton</code> deferred</td></tr>
+<tr><td>074</td><td><a href="./proposed/074-v1-release-stabilization-program.html">v1 Release Stabilization Program</a></td><td>Release stabilization</td><td>Program schedule, milestones, gates, and final go/no-go package</td></tr>
+<tr><td>078</td><td><a href="./proposed/078-platform-runtime-acceptance.html">Platform Runtime Acceptance and Release Evidence</a></td><td>Release QA</td><td>Audit B4 — exact-artifact runtime matrix after RFC-075–077</td></tr>
+<tr><td>079</td><td><a href="./proposed/079-microsoft-store-submission-automation.html">Microsoft Store Submission Automation</a></td><td>Release pipeline</td><td><strong>Accepted 2026-08-22.</strong> No MSIX is built anywhere today; automate submission on <code>release: published</code>, using a stored Entra ID client secret (owner decision, §2)</td></tr>
+<tr><td>080</td><td><a href="./proposed/080-explorer-tiered-directory-comparison.html">Tiered Directory Comparison in the Explorer</a></td><td>Explorer</td><td><strong>Accepted 2026-08-21.</strong> A cheap scan can prove directories differ but never that they match; two tiers, honest labels, after Gate D</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="archive-1"><a class="header" href="#archive-1">Archive (1)</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>ID</th><th>Title</th><th>Reason</th></tr>
+</thead>
+<tbody>
+<tr><td>018</td><td><a href="./archive/018-migration-compatibility-parity-plan.html">Migration Compatibility and Parity Plan</a></td><td>Withdrawn — migration complete; superseded by delivered implementation</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="notes"><a class="header" href="#notes">Notes</a></h2>
+<ul>
+<li><a href="./notes/acceptance-test-corpus-plan.html">acceptance-test-corpus-plan</a></li>
+<li><a href="./notes/core-completion-summary-v0.72.html">core-completion-summary-v0.72</a></li>
+<li><a href="./notes/editor-adapter-risk-register.html">editor-adapter-risk-register</a></li>
+<li><a href="./notes/editor-risk-decision-record.html">editor-risk-decision-record</a></li>
+<li><a href="./notes/endringer-evaluation-v0.22.0.html">endringer-evaluation-v0.22.0</a></li>
+<li><a href="./notes/feature-completion-scope-control.html">feature-completion-scope-control</a></li>
+<li><a href="./notes/implementation-checklist.html">implementation-checklist</a></li>
+<li><a href="./notes/implementation-gate-checklist-v0.2.html">implementation-gate-checklist-v0.2</a></li>
+<li><a href="./notes/known-ui-issues.html">known-ui-issues</a></li>
+<li><a href="./notes/modern-diff-merge-tools-feature-candidates.html">modern-diff-merge-tools-feature-candidates</a></li>
+<li><a href="./notes/post-v1-theme-candidates-evaluation.html">post-v1-theme-candidates-evaluation</a></li>
+<li><a href="./notes/proposed-rfc-backlog-writeup-v0.40.html">proposed-rfc-backlog-writeup-v0.40</a></li>
+<li><a href="./notes/release-readiness-checklist-v0.3.html">release-readiness-checklist-v0.3</a></li>
+<li><a href="./notes/rfc-cross-reference-matrix.html">rfc-cross-reference-matrix</a></li>
+<li><a href="./notes/rfc-dependency-map-v0.2.html">rfc-dependency-map-v0.2</a></li>
+<li><a href="./notes/roadmap-v0.2-refinement.html">roadmap-v0.2-refinement</a></li>
+<li><a href="./notes/roadmap-v0.3-feature-completion.html">roadmap-v0.3-feature-completion</a></li>
+<li><a href="./notes/roadmap-v0.4-winmerge-class-hardening.html">roadmap-v0.4-winmerge-class-hardening</a></li>
+<li><a href="./notes/sheets-diff-upstream-request-2026-08.html">sheets-diff-upstream-request-2026-08</a></li>
+<li><a href="./notes/sheets-diff-v2-migration.html">sheets-diff-v2-migration</a></li>
+<li><a href="./notes/sheets-diff-v2-questions.html">sheets-diff-v2-questions</a></li>
+<li><a href="./notes/v0.4-implementation-gate-checklist.html">v0.4-implementation-gate-checklist</a></li>
+<li><a href="./notes/winmerge-parity-risk-matrix.html">winmerge-parity-risk-matrix</a></li>
+</ul>
+<h2 id="developer-handoffs"><a class="header" href="#developer-handoffs">Developer handoffs</a></h2>
+<p>Handoffs inherit the lifecycle state of their matching RFC and do not override
+RFC design decisions.</p>
+<ul>
+<li><a href="./handoffs/074-v1-release-stabilization-program/r0-stabilization-baseline-handoff.html">RFC-074 R0 stabilization-baseline handoff</a></li>
+<li><a href="./handoffs/074-v1-release-stabilization-program/m2a-release-mechanics-handoff.html">RFC-074 M2-A release-mechanics handoff</a></li>
+<li><a href="./handoffs/074-v1-release-stabilization-program/f32-compare-view-alignment-handoff.html">RFC-074 F32 compare-view alignment handoff</a></li>
+<li><a href="./handoffs/075-async-compare-identity-and-generation/implementation-handoff.html">RFC-075 implementation handoff</a></li>
+<li><a href="./handoffs/076-versioned-runtime-persistence/implementation-handoff.html">RFC-076 implementation handoff</a></li>
+<li><a href="./handoffs/076-versioned-runtime-persistence/convergence-cleanup-handoff.html">RFC-076 convergence-cleanup handoff (patch 5)</a></li>
+<li><a href="./handoffs/076-versioned-runtime-persistence/recovery-ui-and-docs-handoff.html">RFC-076 recovery-UI and documentation handoff (patch 6)</a></li>
+<li><a href="./handoffs/077-mergetool-save-target-model/implementation-handoff.html">RFC-077 implementation handoff</a></li>
+<li><a href="./handoffs/078-platform-runtime-acceptance/acceptance-handoff.html">RFC-078 acceptance handoff</a></li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../maintainers/threat-model.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../maintainers/local-dev.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../maintainers/threat-model.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../maintainers/local-dev.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

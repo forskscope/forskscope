@@ -1,6 +1,11 @@
 # RFC 079: Microsoft Store Submission Automation
 
 **Status.** Proposed
+**Accepted.** 2026-08-22 by the project owner — Gate A cleared. Stays in
+`proposed/` until implemented, per the 4-folder lifecycle; it moves to `done/`
+when the work ships. **Four items in §9 remain open and must be settled before
+implementation** — Q1 timing, Q3/F60, Q4 app registration, Q5 listing scope —
+plus recording the client secret's expiry.
 **Tracks.** Release pipeline; Windows distribution; credential handling.
 **Touches.** A new MSIX build, a new submission workflow, `AppxManifest.xml`'s
 version claims, `release.md`, and the threat model.
@@ -258,9 +263,14 @@ makes unsettled claims recurring").
    10 host (a VM is the cheap version), or state openly that 1809 is a declared
    compatibility floor carrying no runtime evidence.
 4. **Entra ID app registration.** Does the existing registration already have
-   the Partner Center permissions this needs, and can a federated credential be
-   added to it — or is a separate registration preferable so that publishing
-   rights are isolated from whatever else it does?
+   the Partner Center permissions this needs — or is a separate registration
+   preferable, so publishing rights are isolated from whatever else it does?
+   *(Corrected 2026-08-22: this question previously asked whether a federated
+   credential could be added, which contradicts the owner's §2 decision to use a
+   stored client secret. Third and last stale federated-credential reference;
+   §2's body and the README index row were corrected on 2026-08-21.)*
+   **Whichever is chosen, record the secret's expiry** — 24 months maximum,
+   often less, and a lapsed secret breaks releases silently.
 5. **Store listing metadata.** This RFC automates the *package*. Listing text,
    screenshots and store descriptions stay manual unless you want them in scope,
    which would be a materially larger design.
