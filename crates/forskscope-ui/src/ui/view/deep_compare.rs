@@ -1,17 +1,23 @@
 //! Recursive directory comparison with incremental digest progress (RFC-037, RFC-038, RFC-040).
 //!
-//! Phase 1 (fast): `list_recursive_for_display` walks both trees; common files
-//! get `RecStatus::Computing`.  Phase 2: per-file digest tasks update entries
-//! in-place so the table refreshes as results arrive.
+//! Phase 1 (fast): `list_recursive_for_display_with_cancel` walks both trees;
+//! common files get `RecStatus::Computing`.  Phase 2: per-file digest tasks
+//! update entries in-place so the table refreshes as results arrive. Both
+//! phases share one `DigestEpoch` (F78) — a root change cancels and
+//! supersedes whichever phase is in flight.
 
 use std::path::{Path, PathBuf};
 
 use dioxus::prelude::*;
 
-use forskscope_core::dir::{RecEntry, RecStatus, file_digest_equal, list_recursive_for_display};
+use forskscope_core::dir::{
+    DigestOutcome, RecEntry, RecStatus, file_digest_equal_with_cancel,
+    list_recursive_for_display_with_cancel,
+};
 
 use crate::i18n::t;
 use crate::state::{DirOp, Lang, Modal, Store, open_compare};
+use crate::ui::view::digest_epoch::{DigestEpoch, EpochStamp};
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub enum DeepFilter {
@@ -35,9 +41,19 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
     #[allow(unused_mut)]
     let mut total_common: Signal<usize> = use_signal(|| 0);
     let mut filter: Signal<DeepFilter> = use_signal(DeepFilter::default);
+    // F78: tracks the roots this view last (re)started a scan for, so a
+    // `use_effect` re-run that isn't an actual root change (this component
+    // has no reactive signal dependencies of its own) doesn't spawn a
+    // second, redundant scan on top of one already in flight.
+    let mut scan_roots: Signal<Option<(PathBuf, PathBuf)>> = use_signal(|| None);
+    // F78: owns the generation guard, the cancellation token shared by
+    // both phases, and the concurrency bound this view already had -
+    // replacing the ad hoc per-effect-run `Semaphore` below with one that
+    // survives `restart()`, matching `explorer.rs`.
+    let mut digest_epoch: Signal<DigestEpoch> =
+        use_signal(|| DigestEpoch::new(forskscope_core::DIGEST_CONCURRENCY_LIMIT));
 
     use_effect(move || {
-        // Phase 1: fast listing (no I/O-heavy digests).
         let lr1 = lr.clone();
         let rr1 = rr.clone();
         let lr2 = lr.clone(); // for phase-2 absolute-path construction
@@ -45,13 +61,39 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
         let mut ent = entries;
         let mut scan = scanning;
         let mut tc = total_common;
-        let comp = computed;
+        let mut comp = computed;
+
+        let roots_changed = *scan_roots.read() != Some((lr1.clone(), rr1.clone()));
+        if !roots_changed {
+            return;
+        }
+        scan_roots.set(Some((lr1.clone(), rr1.clone())));
+        // Cancel outstanding work under the old roots (both phases share
+        // this token) before anything else observes the new ones.
+        digest_epoch.write().restart();
+        scan.set(true);
+        comp.set(0);
+        tc.set(0);
+
+        // Phase 1: fast listing (no I/O-heavy digests), cancellable so a
+        // root change on a large tree doesn't have to wait it out.
+        let (_, phase1_token, _) = digest_epoch.read().begin_task();
 
         spawn(async move {
-            let initial =
-                tokio::task::spawn_blocking(move || list_recursive_for_display(&lr1, &rr1))
-                    .await
-                    .unwrap_or_default();
+            let list_token = phase1_token.clone();
+            let initial = tokio::task::spawn_blocking(move || {
+                list_recursive_for_display_with_cancel(&lr1, &rr1, &list_token)
+            })
+            .await
+            .unwrap_or_default();
+
+            if phase1_token.is_cancelled() {
+                // Superseded before phase 1 finished - the run that
+                // superseded us already reset `scanning`/`entries` for its
+                // own roots; leave them alone rather than showing this
+                // run's partial listing.
+                return;
+            }
 
             // Build the list of (rel, abs_left, abs_right) for common pairs.
             let pairs: Vec<(PathBuf, PathBuf, PathBuf)> = initial
@@ -70,31 +112,38 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
             ent.set(initial);
             scan.set(false);
 
-            // Phase 2: digest tasks, limited to DIGEST_CONCURRENCY_LIMIT
-            // concurrent blocking operations to avoid overwhelming the
-            // thread pool on large directory trees.
-            let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(
-                forskscope_core::DIGEST_CONCURRENCY_LIMIT,
-            ));
+            // Phase 2: digest tasks, bounded by the epoch's semaphore
+            // (DIGEST_CONCURRENCY_LIMIT concurrent blocking operations) to
+            // avoid overwhelming the thread pool on large directory trees.
             for (rel, lp, rp) in pairs {
                 let mut e2 = ent;
                 let mut cp2 = comp;
-                let sem2 = sem.clone();
+                let (stamp, token, sem) = digest_epoch.read().begin_task();
+                let epoch_signal = digest_epoch;
                 spawn(async move {
-                    let _permit = sem2.acquire_owned().await;
-                    let equal = tokio::task::spawn_blocking(move || file_digest_equal(&lp, &rp))
-                        .await
-                        .ok()
-                        .and_then(|r| r.ok())
-                        .unwrap_or(false);
-                    let status = if equal {
-                        RecStatus::Equal
-                    } else {
-                        RecStatus::Changed
+                    // Acquired here, inside the task, after the
+                    // `begin_task()` read guard above has already been
+                    // dropped - never held across an await.
+                    let _permit = sem.acquire_owned().await;
+                    let outcome = tokio::task::spawn_blocking(move || {
+                        file_digest_equal_with_cancel(&lp, &rp, &token)
+                    })
+                    .await
+                    // A join error (the blocking task panicked) has no
+                    // real verdict either - same fallback the old code
+                    // used for any failure.
+                    .unwrap_or(Ok(DigestOutcome::Different));
+                    let status = match outcome {
+                        Ok(DigestOutcome::Equal) => RecStatus::Equal,
+                        Ok(DigestOutcome::Different) => RecStatus::Changed,
+                        Err(_) => RecStatus::Changed,
+                        Ok(DigestOutcome::Cancelled) => {
+                            // Established nothing - the root change that
+                            // cancelled this already superseded this run.
+                            return;
+                        }
                     };
-                    if let Some(entry) = e2.write().iter_mut().find(|e| e.rel_path == rel) {
-                        entry.status = status;
-                    }
+                    apply_epoch_result(&mut e2.write(), &rel, status, stamp, &epoch_signal.read());
                     let next = *cp2.read() + 1;
                     cp2.set(next);
                 });
@@ -272,6 +321,33 @@ fn DeepRow(entry: RecEntry, lang: Lang, left_root: PathBuf, right_root: PathBuf)
     }
 }
 
+/// F78: applies a completed phase-2 digest result to `entries` only if
+/// `stamp` is still current for `epoch`. Locating the entry by `rel_path`
+/// happens after `ent.set(initial)` may already have replaced the whole
+/// list with a later run's listing - without this guard, a stale result
+/// would either land on an unrelated entry that now occupies the same
+/// `rel_path`, or (once the map is keyed correctly) silently resurrect a
+/// verdict from superseded roots. `can_copy_left_to_right`/
+/// `BatchCopyButtons`/`can_cmp` all key off `entry.status`, so a stale
+/// `Equal` here is a real data-safety defect (F78 §2), not a display glitch.
+/// Takes `entries` and `epoch` directly (not `Signal`s) so a test can drive
+/// it without a Dioxus runtime, mirroring `explorer.rs`'s
+/// `apply_epoch_result`.
+fn apply_epoch_result(
+    entries: &mut [RecEntry],
+    rel: &Path,
+    status: RecStatus,
+    stamp: EpochStamp,
+    epoch: &DigestEpoch,
+) {
+    if !epoch.is_current(stamp) {
+        return;
+    }
+    if let Some(entry) = entries.iter_mut().find(|e| e.rel_path == rel) {
+        entry.status = status;
+    }
+}
+
 /// `(entry`'s path under `left_root`, under `right_root)` - used for both
 /// the Compare button and "Copy to right" (whose destination is the second
 /// element). Takes the compare roots as plain parameters, never reads
@@ -410,6 +486,15 @@ mod tests {
         }
     }
 
+    fn entry_with_status(rel: &str, status: RecStatus) -> RecEntry {
+        RecEntry {
+            rel_path: PathBuf::from(rel),
+            status,
+            left_size: None,
+            right_size: None,
+        }
+    }
+
     // F73: a per-row copy or Compare must land under the actual compare
     // roots, never under Explorer's remembered pane directory -
     // `last_left_dir`/`last_right_dir` can silently differ from these, and
@@ -490,5 +575,51 @@ mod tests {
         assert!(!can_copy_right_to_left(RecStatus::Equal));
         assert!(!can_copy_right_to_left(RecStatus::Computing));
         assert!(!can_copy_right_to_left(RecStatus::Symlink));
+    }
+
+    // F78 §8.1: drives `apply_epoch_result` directly against a real
+    // `Vec<RecEntry>` and a real `DigestEpoch` - no Dioxus runtime needed.
+    // This is the guard `deep_compare.rs` lacked entirely before F78: a
+    // phase-2 result located its entry by `rel_path` after `ent.set(initial)`
+    // may already have replaced the whole list with a later run's listing,
+    // and nothing stopped a superseded verdict from landing on whatever now
+    // occupies that path. Given `can_copy_left_to_right`/`BatchCopyButtons`/
+    // `can_cmp` all key off `entry.status` (F78 §2), a stale `Equal` here
+    // silently drops a genuinely-differing file from "copy all changed".
+    //
+    // Falsified by temporarily removing the `if !epoch.is_current(stamp) {
+    // return; }` guard in `apply_epoch_result` - the first assertion below
+    // then fails (the stale `Equal` lands). Restored.
+    #[test]
+    fn a_stale_stamp_result_does_not_mutate_deep_compares_entries() {
+        let mut epoch = DigestEpoch::new(4);
+        let (stale_stamp, _, _) = epoch.begin_task();
+        // The roots changed after `stale_stamp` was taken.
+        epoch.restart();
+        let (current_stamp, _, _) = epoch.begin_task();
+
+        let mut entries = vec![entry_with_status("a.txt", RecStatus::Computing)];
+
+        apply_epoch_result(
+            &mut entries,
+            Path::new("a.txt"),
+            RecStatus::Equal,
+            stale_stamp,
+            &epoch,
+        );
+        assert_eq!(
+            entries[0].status,
+            RecStatus::Computing,
+            "a stale-stamp result must not mutate the entry"
+        );
+
+        apply_epoch_result(
+            &mut entries,
+            Path::new("a.txt"),
+            RecStatus::Equal,
+            current_stamp,
+            &epoch,
+        );
+        assert_eq!(entries[0].status, RecStatus::Equal);
     }
 }

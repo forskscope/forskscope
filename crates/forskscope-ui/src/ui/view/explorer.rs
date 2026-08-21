@@ -20,11 +20,11 @@ use std::sync::Arc;
 use dioxus::prelude::*;
 use dioxus_swdir_tree::{DirectoryTree, use_scan_driver};
 
-use forskscope_core::CancellationToken;
 use forskscope_core::dir::{DigestOutcome, file_digest_equal_with_cancel};
 
 use crate::i18n::t;
 use crate::state::Store;
+use crate::ui::view::digest_epoch::{DigestEpoch, EpochStamp};
 use crate::ui::view::dir_pane::{
     DigestState, FilteringExecutor, NavHistory, PathBar, home_dir, short_name,
 };
@@ -122,24 +122,26 @@ fn classify_entry(rel: &Path, is_dir: bool, l_root: &Path, r_root: &Path) -> Ent
     }
 }
 
-/// F77(a): applies a completed async digest result to `digest_map` only if
-/// `result_generation` still matches `current_generation` - a comparison
-/// spawned under one pair of roots that finishes after the roots changed
-/// must not land on whatever entry now occupies that key. This is required
-/// even with `file_digest_equal_with_cancel`'s own token: cancellation is
-/// inherently racy (a comparison can finish in the window between the root
-/// change and the token being observed), so the token stops wasted work
-/// while this guard stops a wrong result from reaching a live key - neither
-/// substitutes for the other. Takes the map directly (not a `Signal`) so a
-/// test can drive it without a Dioxus runtime.
-fn apply_digest_result(
+/// F78: applies a completed async digest result to `digest_map` only if
+/// `stamp` is still current for `epoch` - a comparison spawned under one
+/// pair of roots that finishes after the roots changed must not land on
+/// whatever entry now occupies that key. This is required even with the
+/// epoch's own cancellation token: cancellation is inherently racy (a
+/// comparison can finish in the window between the root change and the
+/// token being observed), so the token stops wasted work while this guard
+/// stops a wrong result from reaching a live key - neither substitutes for
+/// the other. Takes the map and epoch directly (not `Signal`s) so a test
+/// can drive it without a Dioxus runtime - the same reason F77's
+/// `apply_digest_result` took the map by value, now backed by
+/// `DigestEpoch::is_current` instead of a raw generation-number compare.
+fn apply_epoch_result(
     digest_map: &mut HashMap<DigestKey, DigestState>,
     key: DigestKey,
     state: DigestState,
-    result_generation: u64,
-    current_generation: u64,
+    stamp: EpochStamp,
+    epoch: &DigestEpoch,
 ) {
-    if result_generation == current_generation {
+    if epoch.is_current(stamp) {
         digest_map.insert(key, state);
     }
 }
@@ -287,13 +289,14 @@ pub fn Explorer() -> Element {
     let mut digest_map: Signal<HashMap<DigestKey, DigestState>> = use_signal(HashMap::new);
     let mut digest_roots: Signal<(PathBuf, PathBuf)> =
         use_signal(|| (PathBuf::new(), PathBuf::new()));
-    // F77(a)/(b): `digest_generation` guards a result against landing on
-    // the wrong roots' entry; `digest_token` lets an in-flight comparison
-    // actually stop instead of just being ignored on arrival. Both change
-    // together, at the same place `digest_map` is cleared - see the
-    // `changed` block below.
-    let mut digest_generation: Signal<u64> = use_signal(|| 0u64);
-    let mut digest_token: Signal<CancellationToken> = use_signal(CancellationToken::new);
+    // F78: `digest_epoch` owns the generation guard, the cancellation
+    // token, and (new for the Explorer) the concurrency bound that
+    // `deep_compare.rs` already had and this view didn't - one
+    // `spawn_blocking` per common file, unbounded, before this change.
+    // `restart()` is called at the same place `digest_map` is cleared -
+    // see the `changed` block below.
+    let mut digest_epoch: Signal<DigestEpoch> =
+        use_signal(|| DigestEpoch::new(forskscope_core::DIGEST_CONCURRENCY_LIMIT));
 
     use_effect(move || {
         let l_root = left_dir.read().cloned();
@@ -310,10 +313,7 @@ pub fn Explorer() -> Element {
                 // Cancel outstanding comparisons under the old roots
                 // before anything else observes the new ones - stops
                 // wasted work for whatever hasn't finished yet.
-                digest_token.read().cancel();
-                digest_token.set(CancellationToken::new());
-                let next_generation = *digest_generation.read() + 1;
-                digest_generation.set(next_generation);
+                digest_epoch.write().restart();
                 digest_map.write().clear();
                 digest_roots.set((l_root.clone(), r_root.clone()));
             }
@@ -351,13 +351,18 @@ pub fn Explorer() -> Element {
                     let mut dmap = digest_map;
                     dmap.write()
                         .insert(DigestKey::Common(key.clone()), DigestState::Computing);
-                    // F77: captured now, at spawn time - the generation
-                    // this comparison belongs to, and the token that can
-                    // stop it if the roots change before it finishes.
-                    let my_generation = *digest_generation.read();
-                    let token = digest_token.read().clone();
-                    let gen_signal = digest_generation;
+                    // F78: captured now, at spawn time - the stamp this
+                    // comparison belongs to, the token that can stop it if
+                    // the roots change before it finishes, and the
+                    // semaphore permit that bounds how many of these run
+                    // at once (new for the Explorer - see digest_epoch.rs).
+                    let (stamp, token, sem) = digest_epoch.read().begin_task();
+                    let epoch_signal = digest_epoch;
                     spawn(async move {
+                        // Acquired here, inside the task, after the
+                        // `begin_task()` read guard above has already been
+                        // dropped - never held across an await.
+                        let _permit = sem.acquire_owned().await;
                         let outcome = tokio::task::spawn_blocking(move || {
                             file_digest_equal_with_cancel(&left_abs, &right_abs, &token)
                         })
@@ -379,12 +384,12 @@ pub fn Explorer() -> Element {
                                 return;
                             }
                         };
-                        apply_digest_result(
+                        apply_epoch_result(
                             &mut dmap.write(),
                             DigestKey::Common(key),
                             state,
-                            my_generation,
-                            *gen_signal.read(),
+                            stamp,
+                            &epoch_signal.read(),
                         );
                     });
                 }
@@ -616,36 +621,54 @@ mod tests {
         );
     }
 
-    // F77(a): drives `apply_digest_result` directly against a real
-    // `HashMap` - no Dioxus runtime needed, since the function takes the
-    // map by value rather than a `Signal`. Per handoff 004 §14: the race
-    // that makes this defect *reachable* is timing-dependent, but the
-    // guard itself is not - it is a plain generation comparison, tested
+    // F78: drives `apply_epoch_result` directly against a real `HashMap`
+    // and a real `DigestEpoch` - no Dioxus runtime needed, since the
+    // function takes both by value/reference rather than as `Signal`s.
+    // Per handoff 004 §14 (still true here): the race that makes this
+    // defect *reachable* is timing-dependent, but the guard itself is
+    // not - it is a plain stamp/generation comparison, tested
     // deterministically by constructing the stale case directly rather
     // than trying to race a real root change against a real spawn.
+    //
+    // This replaces F77's `a_stale_generation_result_does_not_mutate_the_map`
+    // / `a_current_generation_result_is_applied`, which drove the removed
+    // `apply_digest_result` - review 074's falsification was re-run against
+    // this converted call site by temporarily short-circuiting the
+    // `if epoch.is_current(stamp)` check above to always insert, and
+    // confirming the first assertion below then fails; restored.
     #[test]
-    fn a_stale_generation_result_does_not_mutate_the_map() {
+    fn a_stale_stamp_result_does_not_mutate_the_map() {
+        let mut epoch = DigestEpoch::new(4);
+        let (stale_stamp, _, _) = epoch.begin_task();
+        // The roots changed after `stale_stamp` was taken.
+        epoch.restart();
+
         let mut map: HashMap<DigestKey, DigestState> = HashMap::new();
         let key = DigestKey::Common(PathBuf::from("a.txt"));
 
-        // The comparison started under generation 1 (the roots at spawn
-        // time); the roots have since changed to generation 2. Applying
-        // its result now would land generation 1's verdict on whatever
-        // entry generation 2 now has at this key.
-        apply_digest_result(&mut map, key.clone(), DigestState::Equal, 1, 2);
+        apply_epoch_result(
+            &mut map,
+            key.clone(),
+            DigestState::Equal,
+            stale_stamp,
+            &epoch,
+        );
 
         assert!(
             !map.contains_key(&key),
-            "a stale-generation result must not mutate the map"
+            "a stale-stamp result must not mutate the map"
         );
     }
 
     #[test]
-    fn a_current_generation_result_is_applied() {
+    fn a_current_stamp_result_is_applied() {
+        let epoch = DigestEpoch::new(4);
+        let (stamp, _, _) = epoch.begin_task();
+
         let mut map: HashMap<DigestKey, DigestState> = HashMap::new();
         let key = DigestKey::Common(PathBuf::from("a.txt"));
 
-        apply_digest_result(&mut map, key.clone(), DigestState::Equal, 2, 2);
+        apply_epoch_result(&mut map, key.clone(), DigestState::Equal, stamp, &epoch);
 
         assert_eq!(map.get(&key), Some(&DigestState::Equal));
     }
