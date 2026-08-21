@@ -192,8 +192,10 @@ Partner Center for the outcome.
 always current." Once this lands, that warning becomes false and must be
 narrowed to certification lag rather than manual-submission lag.
 
-The threat model gains the publishing-credential path: what the federated
-credential can do, its scope, and what compromise would mean.
+The threat model gains the publishing-credential path: what the **stored client
+secret** can do, its scope, what compromise would mean, and its expiry date —
+per the owner decision in §2, which chose a stored secret over a federated
+credential with the costs recorded there.
 
 ## Acceptance criteria
 
