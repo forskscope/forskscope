@@ -13,7 +13,9 @@ pub use batch::{
     batch_copy, restore_from_manifest,
 };
 pub use copy::{CopyOutcome, copy_file};
-pub use digest::{dir_digest_equal, file_digest_equal};
+pub use digest::{
+    DigestOutcome, dir_digest_equal, file_digest_equal, file_digest_equal_with_cancel,
+};
 pub use index::{
     ContentDigest, DirectoryEntryRecord, DirectoryIndex, EntryType, EqualityEvidence,
     IndexRevision, PairedEntry, PairedEntrySet, pair_entries,

@@ -20,7 +20,8 @@ use std::sync::Arc;
 use dioxus::prelude::*;
 use dioxus_swdir_tree::{DirectoryTree, use_scan_driver};
 
-use forskscope_core::dir::file_digest_equal;
+use forskscope_core::CancellationToken;
+use forskscope_core::dir::{DigestOutcome, file_digest_equal_with_cancel};
 
 use crate::i18n::t;
 use crate::state::Store;
@@ -118,6 +119,28 @@ fn classify_entry(rel: &Path, is_dir: bool, l_root: &Path, r_root: &Path) -> Ent
             left_abs: l_root.join(rel),
             right_abs: cp,
         }
+    }
+}
+
+/// F77(a): applies a completed async digest result to `digest_map` only if
+/// `result_generation` still matches `current_generation` - a comparison
+/// spawned under one pair of roots that finishes after the roots changed
+/// must not land on whatever entry now occupies that key. This is required
+/// even with `file_digest_equal_with_cancel`'s own token: cancellation is
+/// inherently racy (a comparison can finish in the window between the root
+/// change and the token being observed), so the token stops wasted work
+/// while this guard stops a wrong result from reaching a live key - neither
+/// substitutes for the other. Takes the map directly (not a `Signal`) so a
+/// test can drive it without a Dioxus runtime.
+fn apply_digest_result(
+    digest_map: &mut HashMap<DigestKey, DigestState>,
+    key: DigestKey,
+    state: DigestState,
+    result_generation: u64,
+    current_generation: u64,
+) {
+    if result_generation == current_generation {
+        digest_map.insert(key, state);
     }
 }
 
@@ -264,6 +287,13 @@ pub fn Explorer() -> Element {
     let mut digest_map: Signal<HashMap<DigestKey, DigestState>> = use_signal(HashMap::new);
     let mut digest_roots: Signal<(PathBuf, PathBuf)> =
         use_signal(|| (PathBuf::new(), PathBuf::new()));
+    // F77(a)/(b): `digest_generation` guards a result against landing on
+    // the wrong roots' entry; `digest_token` lets an in-flight comparison
+    // actually stop instead of just being ignored on arrival. Both change
+    // together, at the same place `digest_map` is cleared - see the
+    // `changed` block below.
+    let mut digest_generation: Signal<u64> = use_signal(|| 0u64);
+    let mut digest_token: Signal<CancellationToken> = use_signal(CancellationToken::new);
 
     use_effect(move || {
         let l_root = left_dir.read().cloned();
@@ -277,6 +307,13 @@ pub fn Explorer() -> Element {
             let changed = roots.0 != l_root || roots.1 != r_root;
             drop(roots);
             if changed {
+                // Cancel outstanding comparisons under the old roots
+                // before anything else observes the new ones - stops
+                // wasted work for whatever hasn't finished yet.
+                digest_token.read().cancel();
+                digest_token.set(CancellationToken::new());
+                let next_generation = *digest_generation.read() + 1;
+                digest_generation.set(next_generation);
                 digest_map.write().clear();
                 digest_roots.set((l_root.clone(), r_root.clone()));
             }
@@ -314,19 +351,40 @@ pub fn Explorer() -> Element {
                     let mut dmap = digest_map;
                     dmap.write()
                         .insert(DigestKey::Common(key.clone()), DigestState::Computing);
+                    // F77: captured now, at spawn time - the generation
+                    // this comparison belongs to, and the token that can
+                    // stop it if the roots change before it finishes.
+                    let my_generation = *digest_generation.read();
+                    let token = digest_token.read().clone();
+                    let gen_signal = digest_generation;
                     spawn(async move {
-                        let eq = tokio::task::spawn_blocking(move || {
-                            file_digest_equal(&left_abs, &right_abs).unwrap_or(false)
+                        let outcome = tokio::task::spawn_blocking(move || {
+                            file_digest_equal_with_cancel(&left_abs, &right_abs, &token)
                         })
                         .await
-                        .unwrap_or(false);
-                        dmap.write().insert(
+                        // A join error (the blocking task panicked) has no
+                        // real verdict either - same fallback the old code
+                        // used for any failure, preserved as-is (a separate,
+                        // already-tracked finding, not this handoff's scope).
+                        .unwrap_or(Ok(DigestOutcome::Different));
+                        let state = match outcome {
+                            Ok(DigestOutcome::Equal) => DigestState::Equal,
+                            Ok(DigestOutcome::Different) => DigestState::Different,
+                            Err(_) => DigestState::Different,
+                            Ok(DigestOutcome::Cancelled) => {
+                                // Established nothing - there is no verdict
+                                // to (conditionally or not) apply. The root
+                                // change that cancelled this also cleared
+                                // digest_map already.
+                                return;
+                            }
+                        };
+                        apply_digest_result(
+                            &mut dmap.write(),
                             DigestKey::Common(key),
-                            if eq {
-                                DigestState::Equal
-                            } else {
-                                DigestState::Different
-                            },
+                            state,
+                            my_generation,
+                            *gen_signal.read(),
                         );
                     });
                 }
@@ -556,5 +614,39 @@ mod tests {
             "a same-named directory whose contents differ must never be \
              classified Equal - see 9f355c6's original defect"
         );
+    }
+
+    // F77(a): drives `apply_digest_result` directly against a real
+    // `HashMap` - no Dioxus runtime needed, since the function takes the
+    // map by value rather than a `Signal`. Per handoff 004 §14: the race
+    // that makes this defect *reachable* is timing-dependent, but the
+    // guard itself is not - it is a plain generation comparison, tested
+    // deterministically by constructing the stale case directly rather
+    // than trying to race a real root change against a real spawn.
+    #[test]
+    fn a_stale_generation_result_does_not_mutate_the_map() {
+        let mut map: HashMap<DigestKey, DigestState> = HashMap::new();
+        let key = DigestKey::Common(PathBuf::from("a.txt"));
+
+        // The comparison started under generation 1 (the roots at spawn
+        // time); the roots have since changed to generation 2. Applying
+        // its result now would land generation 1's verdict on whatever
+        // entry generation 2 now has at this key.
+        apply_digest_result(&mut map, key.clone(), DigestState::Equal, 1, 2);
+
+        assert!(
+            !map.contains_key(&key),
+            "a stale-generation result must not mutate the map"
+        );
+    }
+
+    #[test]
+    fn a_current_generation_result_is_applied() {
+        let mut map: HashMap<DigestKey, DigestState> = HashMap::new();
+        let key = DigestKey::Common(PathBuf::from("a.txt"));
+
+        apply_digest_result(&mut map, key.clone(), DigestState::Equal, 2, 2);
+
+        assert_eq!(map.get(&key), Some(&DigestState::Equal));
     }
 }

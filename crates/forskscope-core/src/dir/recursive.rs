@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::digest::file_digest_equal;
+use super::digest::{DigestOutcome, file_digest_equal_with_cancel};
 use crate::cancel::CancellationToken;
 use crate::error::{CoreError, IoOperation, Result};
 
@@ -30,8 +30,11 @@ pub enum RecStatus {
     LeftOnly,
     RightOnly,
     /// Exists on both sides; digest comparison not yet complete.
-    /// Used by the incremental UI path; never returned by
-    /// `recursive_diff` or `recursive_diff_with_cancel`.
+    /// Used by the incremental UI path, and never returned by
+    /// `recursive_diff` (a fresh, uncancellable token). `recursive_diff_with_cancel`
+    /// can also return it (F77) - a per-file comparison cancelled mid-flight
+    /// leaves that entry here rather than asserting `Equal`/`Changed`
+    /// for a comparison that was interrupted before it established either.
     Computing,
     /// One or both sides of this path is a symlink.
     /// ForskScope does not follow cross-root symlinks to avoid cycles;
@@ -207,12 +210,21 @@ fn walk_and_merge(
             if let Some(existing) = map.get_mut(&rel) {
                 let left_path = left_root.join(&rel);
                 let right_path = path;
-                let equal = file_digest_equal(&left_path, &right_path).unwrap_or(false);
-                existing.status = if equal {
-                    RecStatus::Equal
-                } else {
-                    RecStatus::Changed
-                };
+                // F77: a per-file comparison is now itself cancellable
+                // (defect (b) reaching this, the one caller that runs a
+                // full blocking comparison rather than the fast/display
+                // listing). `Cancelled` leaves the entry at `Computing`
+                // rather than asserting a verdict nothing established -
+                // the same reasoning as `DigestOutcome`'s own doc comment.
+                // An I/O error still collapses to `Changed`, unchanged
+                // from before this handoff (a different, already-tracked
+                // finding - F76 - not this one; see the review request).
+                match file_digest_equal_with_cancel(&left_path, &right_path, token) {
+                    Ok(DigestOutcome::Equal) => existing.status = RecStatus::Equal,
+                    Ok(DigestOutcome::Different) => existing.status = RecStatus::Changed,
+                    Ok(DigestOutcome::Cancelled) => existing.status = RecStatus::Computing,
+                    Err(_) => existing.status = RecStatus::Changed,
+                }
                 existing.right_size = Some(right_size);
             } else {
                 map.insert(

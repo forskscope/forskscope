@@ -5,7 +5,10 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::CancellationToken;
-use crate::dir::{RecStatus, list_recursive_for_display_with_cancel, recursive_diff_with_cancel};
+use crate::dir::{
+    DigestOutcome, RecStatus, file_digest_equal_with_cancel,
+    list_recursive_for_display_with_cancel, recursive_diff_with_cancel,
+};
 
 fn tmp(tag: &str) -> PathBuf {
     let d = std::env::temp_dir().join(format!("fsk-dircancel-{tag}-{}", std::process::id()));
@@ -132,6 +135,38 @@ fn cancel_during_scan_produces_partial_results_without_panic() {
     // This must return (not block forever), even if only partially done.
     let result = recursive_diff_with_cancel(&left, &right, &token);
     assert!(result.len() <= 50, "no extra entries");
+    let _ = fs::remove_dir_all(&base);
+}
+
+// ── F77: a file comparison is itself cancellable ─────────────────────────────
+
+#[test]
+fn file_digest_equal_with_cancel_stops_early_and_says_so() {
+    let base = tmp("file-cancel");
+    let a = base.join("a.bin");
+    let b = base.join("b.bin");
+    // Several BUFFER (8 KiB) chunks' worth of content, matching the
+    // handoff's "large enough to span several BUFFER chunks" - a
+    // completed comparison of this pair would need multiple read
+    // iterations, which is exactly what a removed in-loop poll would run
+    // through uninterrupted. Pre-cancelling (permitted: "before or
+    // during") keeps this deterministic rather than racing a background
+    // thread against disk I/O, the way `cancel_during_scan_produces_
+    // partial_results_without_panic` above accepts doing for a coarser,
+    // per-file (not per-chunk) cancellation granularity.
+    let content = "x".repeat(8 * 1024 * 5);
+    fs::write(&a, &content).unwrap();
+    fs::write(&b, &content).unwrap();
+
+    let token = CancellationToken::new();
+    token.cancel();
+    let outcome = file_digest_equal_with_cancel(&a, &b, &token).unwrap();
+
+    assert_eq!(
+        outcome,
+        DigestOutcome::Cancelled,
+        "a cancelled comparison must report Cancelled, not a completed verdict"
+    );
     let _ = fs::remove_dir_all(&base);
 }
 
