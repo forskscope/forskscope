@@ -1,6 +1,6 @@
 # ForskScope Roadmap
 
-**Last updated:** F78 fully closed (2026-08-21, `895dd9e`); **Gate D blocked on F44 alone** — upstream, open-ended
+**Last updated:** F78 fully closed (2026-08-21, `895dd9e`); **Gate D blocked on F44 and F60** — F44 upstream and open-ended, F60 an owner decision. *(Correction: reviews 073–075 and the reports to the owner said “F44 alone”. F60 has been recorded since review 063 as “a Gate D input that should be visible before the go/no-go”, disposition “owner decision, before Gate D”. F44 is the only outstanding **defect**; it was never the only thing Gate D waits on. Verified 2026-08-21 by re-reading the register rather than the running summary.)*
 **Current phase:** v1 release stabilization — release-baseline reconciliation,
 then correctness workstreams, then runtime/platform acceptance and a new
 architecture go/no-go review.
