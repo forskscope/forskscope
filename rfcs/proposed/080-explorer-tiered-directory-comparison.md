@@ -171,30 +171,53 @@ Run `recursive_diff_with_cancel`. This reads contents and returns a definitive
   the budget becomes a claim of its own.
 - **(c) Automatic always** — the thing §"Why this is not simply" argues against.
 
-### 4. Status vocabulary
+### 4. Status vocabulary — settled
 
-Five states, each naming what was measured rather than what is probably true:
+**Decided by the owner, 2026-08-21 (§8 Q2 closed).** Five states. Each names what
+was measured, and the tier-1 state names it outright rather than summarising it.
 
-| State | Meaning | From |
-|---|---|---|
-| **Not compared** | Nothing was examined | current post-F74 default |
-| **Comparing…** | A tier is running | either tier |
-| **Different** | Proven — names or sizes differ, or digests differ | tier 1 or 2 |
-| **No difference found** | Names and sizes match; contents unread | tier 1 only |
-| **Identical** | Proven — contents compared | tier 2 only |
+The status column renders **only a glyph**; the wording below is the `title` and
+`aria_label`, so there is no column width to economise against and no reason to
+compress the truth into two words. F74's existing label is already a full
+sentence, which is the precedent.
 
-**On the owner's proposed "Maybe equal".** The intent is right — the label must
-be weaker than `Equal` — and the wording is worth one more turn. "Maybe equal"
-describes a probability the app has not computed; *"no difference found"*
-describes what the app did. The distinction matters here more than it usually
-would, because this project has spent a program's worth of effort on markers
-credited with more than they measure, and this is the same failure at the
-product surface. Final wording is the owner's call (§8 Q2); the requirement is
-that the label describes a measurement.
+| State | Label (file row) | Label (directory row) | From |
+|---|---|---|---|
+| **Not compared** | Contents not compared | Directory contents not compared — use Deep Compare | post-F74 default |
+| **Comparing…** | Comparing… | Comparing… | either tier |
+| **Different** | Different | Different | tier 1 or 2 |
+| **Tier-1 match** | Size matches; contents not compared | Names and sizes match; contents not compared | tier 1 only |
+| **Identical** | Identical — contents compared | Identical — contents compared | tier 2 only |
 
-**A tier-1 "Different" and a tier-2 "Different" are the same claim** and should
-render identically. Certainty differs between *equal* verdicts, not *different*
-ones.
+**Why not "no difference found", which this RFC previously recommended.** It is
+the phrasing of a *completed* search: it implies something looked and came back
+empty. Tier 1 compared names and sizes and never opened a file, so the phrase
+claims a thoroughness the check did not have — the same defect this program has
+been cataloguing as *a marker credited with more than it measures*, arriving at
+the product surface. The axis that matters to a user is **complete versus
+incomplete**, not *measurement versus probability*, which is the axis the earlier
+recommendation argued on and got wrong.
+
+**Why not "Maybe equal", the owner's first proposal.** It carries the
+uncertainty, which is the important half, and it was a better answer than the one
+this RFC originally preferred. It was set aside only because "maybe" reads as an
+estimate nobody computed. Stating the evidence outright does the same job without
+implying an assessment.
+
+**Two consequences of stating the evidence, both deliberate:**
+
+- **The two row kinds carry different words for the same state.** A file pair is
+  already matched by name, so only its size was checked; a directory pair had
+  both names and sizes compared. The *state* is identical and the glyph is
+  identical — the label differs because the evidence differs.
+- **"Identical" is a statement about the moment of comparison, not a property.**
+  It is invalidated by §5's rules on navigation and refresh, and is never
+  persisted across sessions. A label outliving its evidence is the same failure
+  in slow motion.
+
+**A tier-1 "Different" and a tier-2 "Different" are the same claim** and render
+identically. Certainty differs between *equal* verdicts, not *different* ones —
+which is why only one row in the table above splits by tier.
 
 ### 5. Cost control and invalidation
 
@@ -281,9 +304,9 @@ about not knowing, which is a correct state to ship, not a placeholder.
 
 - **Q1 — tier-2 trigger.** (a) user-initiated per row, (b) automatic under a
   budget, or (c) automatic always? Recommendation: (a).
-- **Q2 — the tier-1 label.** "No difference found", the owner's "Maybe equal",
-  or another wording? The requirement is that it describe a measurement rather
-  than a probability.
+- **Q2 — the tier-1 label. CLOSED 2026-08-21** — state the evidence outright;
+  see §4 for the settled vocabulary and the reasoning that replaced the
+  earlier recommendation.
 - **Q3 — tier-1 trigger.** On row selection, on expand, or on an explicit
   control? This decides whether browsing costs anything at all.
 - **Q4 — ordering against F75/F76/F77.** Do these land as one change after
