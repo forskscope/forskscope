@@ -75,19 +75,26 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
         comp.set(0);
         tc.set(0);
 
-        // Phase 1: fast listing (no I/O-heavy digests), cancellable so a
-        // root change on a large tree doesn't have to wait it out.
-        let (_, phase1_token, _) = digest_epoch.read().begin_task();
+        // Taken once, here, before phase 1 starts - not re-minted per
+        // phase-2 task after the `await` below. Review 075 §4: re-minting
+        // inside the spawned task (after phase 1's await) is only correct
+        // because nothing currently awaits between a `restart()` and the
+        // last `begin_task()`; that invariant is easy to break silently
+        // (a future progress update, a yield, a chunked build) and nothing
+        // enforces it. Taking the stamp/token/semaphore up front removes
+        // the dependency on that invariant entirely - phase 2 always
+        // applies against the generation phase 1 itself ran under.
+        let (stamp, token, sem) = digest_epoch.read().begin_task();
 
         spawn(async move {
-            let list_token = phase1_token.clone();
+            let list_token = token.clone();
             let initial = tokio::task::spawn_blocking(move || {
                 list_recursive_for_display_with_cancel(&lr1, &rr1, &list_token)
             })
             .await
             .unwrap_or_default();
 
-            if phase1_token.is_cancelled() {
+            if token.is_cancelled() {
                 // Superseded before phase 1 finished - the run that
                 // superseded us already reset `scanning`/`entries` for its
                 // own roots; leave them alone rather than showing this
@@ -118,15 +125,15 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
             for (rel, lp, rp) in pairs {
                 let mut e2 = ent;
                 let mut cp2 = comp;
-                let (stamp, token, sem) = digest_epoch.read().begin_task();
+                let file_token = token.clone();
+                let sem2 = sem.clone();
                 let epoch_signal = digest_epoch;
                 spawn(async move {
-                    // Acquired here, inside the task, after the
-                    // `begin_task()` read guard above has already been
-                    // dropped - never held across an await.
-                    let _permit = sem.acquire_owned().await;
+                    // Acquired here, inside the task, never held across an
+                    // await beforehand.
+                    let _permit = sem2.acquire_owned().await;
                     let outcome = tokio::task::spawn_blocking(move || {
-                        file_digest_equal_with_cancel(&lp, &rp, &token)
+                        file_digest_equal_with_cancel(&lp, &rp, &file_token)
                     })
                     .await
                     // A join error (the blocking task panicked) has no
