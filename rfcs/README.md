@@ -94,7 +94,7 @@ remains No-Go.
 | 074 | [v1 Release Stabilization Program](./proposed/074-v1-release-stabilization-program.md) | Release stabilization | Program schedule, milestones, gates, and final go/no-go package |
 | 078 | [Platform Runtime Acceptance and Release Evidence](./proposed/078-platform-runtime-acceptance.md) | Release QA | Audit B4 — exact-artifact runtime matrix after RFC-075–077 |
 | 079 | [Microsoft Store Submission Automation](./proposed/079-microsoft-store-submission-automation.md) | Release pipeline | No MSIX is built anywhere today; automate submission on `release: published`, using a stored Entra ID client secret (owner decision, §2) |
-| 080 | [Tiered Directory Comparison in the Explorer](./proposed/080-explorer-tiered-directory-comparison.md) | Explorer | A cheap scan can prove directories differ but never that they match; two tiers, honest labels, after Gate D |
+| 080 | [Tiered Directory Comparison in the Explorer](./proposed/080-explorer-tiered-directory-comparison.md) | Explorer | **Accepted 2026-08-21.** A cheap scan can prove directories differ but never that they match; two tiers, honest labels, after Gate D |
 
 ## Archive (1)
 

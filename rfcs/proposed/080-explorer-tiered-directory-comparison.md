@@ -1,10 +1,13 @@
 # RFC 080: Tiered Directory Comparison in the Explorer
 
 **Status.** Proposed
+**Accepted.** 2026-08-21 by the project owner — Gate A cleared. Stays in
+`proposed/` until implemented, per the 4-folder lifecycle (RFC-000 §Folder
+layout); it moves to `done/` when the work ships, as RFC-078 does.
 **Tracks.** Explorer status column; directory comparison cost model.
 **Touches.** `explorer.rs`'s digest effect, `DigestState` (or its F75
 replacement), `forskscope-core::dir::recursive`, the status legend in user docs.
-**Depends on.** Owner acceptance (Gate A). F74's fix, already on `main`, is the
+**Depends on.** F74's fix, already on `main`, is the
 floor this builds on. Interacts with F75 and F76 — see §7.
 **Origin.** Owner proposal, 2026-08-21, after re-testing F70 on Windows 11.
 
