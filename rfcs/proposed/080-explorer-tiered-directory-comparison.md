@@ -1,7 +1,9 @@
 # RFC 080: Tiered Directory Comparison in the Explorer
 
 **Status.** Proposed
-**Accepted.** 2026-08-21 by the project owner — Gate A cleared. Stays in
+**Accepted.** 2026-08-21 by the project owner — Gate A cleared; **all four
+design questions closed 2026-08-22, so the design is settled and only Gate D
+stands between it and implementation.** Stays in
 `proposed/` until implemented, per the 4-folder lifecycle (RFC-000 §Folder
 layout); it moves to `done/` when the work ships, as RFC-078 does.
 **Tracks.** Explorer status column; directory comparison cost model.
@@ -161,15 +163,24 @@ is the expected state of two directories that differ by one edited character.
 Run `recursive_diff_with_cancel`. This reads contents and returns a definitive
 `Identical` or `Different`.
 
-**Trigger.** Owner decision, §8 Q1. The options, with my recommendation:
+**Trigger — decided by the owner, 2026-08-22 (§8 Q1 closed): user-initiated per
+row.** A control appears only on a row already sitting at the tier-1 state. Zero
+surprise I/O, and the cost is always attributable to something the user asked
+for.
 
-- **(a) User-initiated per row** — a control on a row already at *no difference
-  found*. Cheapest to build, most predictable, zero surprise I/O.
-  **Recommended.**
-- **(b) Automatic when tier 1 finds nothing, under a size/count budget** —
-  answers more without asking, but needs a budget nobody has calibrated, and
-  the budget becomes a claim of its own.
-- **(c) Automatic always** — the thing §"Why this is not simply" argues against.
+Two consequences to build to, not to rediscover:
+
+- **The control appears only where tier 1 finished and found nothing.** A row
+  proven *Different* needs no verification, and a row still at *Not compared*
+  has no tier-1 result to escalate from. Offering it everywhere would invite the
+  expensive pass exactly where it is least useful.
+- **Tier 2 is per row, so several may run at once.** They must share the same
+  bound and cancellation as everything else — see §5. A user clicking *verify* on
+  six directories has asked for six answers, not for six unbounded fan-outs.
+
+The alternatives were an automatic pass under a size budget (rejected: nobody has
+calibrated the budget, and the budget becomes a claim of its own) and automatic
+always (rejected for the reason in §"Why this is not simply").
 
 ### 4. Status vocabulary — settled
 
@@ -223,9 +234,17 @@ which is why only one row in the table above splits by tier.
 
 - **Applies to file rows too (§2a).** Today's eager, uncancellable, uncapped file
   comparison is F77; the same token and the same bound cover both row kinds.
-- **One tier-1 pass per directory row, on demand — never a fan-out across every
-  visible row.** Trigger is the owner's call (§8 Q3): on selection, on expand,
-  or on an explicit control.
+- **One tier-1 pass per directory row — never a fan-out across every visible
+  row.** **Trigger decided by the owner, 2026-08-22 (§8 Q3 closed): on selection,
+  debounced and cancellable.** Selecting a directory row starts a timer; the walk
+  begins only if the row is still selected when it expires, and is cancelled the
+  moment selection moves or the pane navigates.
+
+  **The debounce is not a nicety and must not be dropped as one.** Selection
+  changes on every keypress during keyboard navigation, so without it, arrowing
+  down twenty directories starts twenty recursive walks. With it, only the row
+  the user rests on costs anything. Choose the interval deliberately and record
+  it; it is the difference between this feature being free and being a hazard.
 - **Cancellable, and cancelled on navigation.** Both core entry points take a
   token. A pane that navigates away must cancel outstanding work rather than let
   it complete into a discarded view.
@@ -300,18 +319,27 @@ answers by another route.
 Nothing is lost by waiting: F74's fix means the Explorer is currently *honest*
 about not knowing, which is a correct state to ship, not a placeholder.
 
-## Open questions for the owner
+## Open questions — all closed
 
-- **Q1 — tier-2 trigger.** (a) user-initiated per row, (b) automatic under a
-  budget, or (c) automatic always? Recommendation: (a).
-- **Q2 — the tier-1 label. CLOSED 2026-08-21** — state the evidence outright;
-  see §4 for the settled vocabulary and the reasoning that replaced the
-  earlier recommendation.
-- **Q3 — tier-1 trigger.** On row selection, on expand, or on an explicit
-  control? This decides whether browsing costs anything at all.
-- **Q4 — ordering against F75/F76/F77.** Do these land as one change after
-  Gate D, or separately? One change is cheaper; separate ones are individually
-  reviewable. **F77 is different from the other two: it is a defect, not a
-  design item, and it exists in shipped code.** It should not wait for this RFC
-  — the cancellation token it needs is a small change and closes a wrong-status
-  path today.
+- **Q1 — tier-2 trigger. CLOSED 2026-08-22** — user-initiated per row. See §3.
+- **Q2 — the tier-1 label. CLOSED 2026-08-21** — state the evidence outright.
+  See §4 for the settled vocabulary and the reasoning that replaced the earlier
+  recommendation.
+- **Q3 — tier-1 trigger. CLOSED 2026-08-22** — on selection, debounced and
+  cancellable. See §5.
+- **Q4 — ordering. CLOSED 2026-08-22** — **F76, then F75, then this RFC.** Each
+  makes the next smaller: F76 stops the statuses overstating their evidence and
+  brings `TypeMismatch` and `Error` across from core; F75 then wires
+  `RowStatusKind` and deletes `DigestState`; this RFC then adds the tiers to a
+  status type that already has the vocabulary for them. Three independently
+  reviewable units rather than one diff spanning three crates.
+
+  **F77 and F78 are no longer part of this question.** Both were defects rather
+  than design items, both were fixed ahead of this RFC (reviews 074 and 075), and
+  the `DigestEpoch` they produced is the mechanism §5's cost control now
+  assumes — one shared generation guard, cancellation token and concurrency
+  bound, already used by both views. That is why §5 can require cancellation
+  without specifying how.
+
+**Nothing in this RFC is open.** The design is settled; only Gate D stands
+between it and implementation.
