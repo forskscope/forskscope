@@ -15,7 +15,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::CancellationToken;
-use crate::dir::{RecStatus, recursive_diff_with_cancel};
+use crate::dir::{RecStatus, list_recursive_for_display_with_cancel, recursive_diff_with_cancel};
 
 fn tmp(tag: &str) -> PathBuf {
     let d = std::env::temp_dir().join(format!("fsk-dirunreadable-{tag}-{}", std::process::id()));
@@ -145,6 +145,58 @@ fn an_unreadable_left_file_is_not_reclassified_by_a_readable_right_counterpart()
         Some(RecStatus::Unreadable),
         "a left-side Unreadable entry must not be silently reclassified \
          just because the right side has a normal, readable counterpart: {:?}",
+        scan.entries
+    );
+
+    restore_perms(&left.join("blocked"), 0o755);
+    let _ = fs::remove_dir_all(&base);
+}
+
+// Review 076 §3: the sibling guard in `walk_and_merge_fast` was fixed by
+// inspection alongside `walk_and_merge`'s (same shape, same reasoning) but
+// only the latter was independently falsified - and the reviewer checked
+// rather than trusted that reasoning: removing `walk_and_merge_fast`'s
+// guard left the whole workspace suite green. That matters because
+// `walk_and_merge_fast` is reached through
+// `list_recursive_for_display_with_cancel` - Deep Compare's phase 1, the
+// interactive path a user actually sees - while `walk_and_merge` (the one
+// that was falsified) is reached through `recursive_diff`, whose consumers
+// are `patch/directory.rs` and `merge_plan.rs`. The guard protecting what a
+// user sees was the unprotected one. This test closes that gap directly.
+
+#[cfg(unix)]
+#[test]
+fn an_unreadable_left_file_is_not_reclassified_in_the_fast_listing_either() {
+    let base = tmp("merge-guard-fast");
+    let left = base.join("l");
+    let right = base.join("r");
+    fs::create_dir_all(left.join("blocked")).unwrap();
+    fs::create_dir_all(right.join("blocked")).unwrap();
+    write(&left, "blocked/file.txt", "left content");
+    write(&right, "blocked/file.txt", "right content");
+
+    if !make_child_metadata_unreadable(&left.join("blocked"), &left.join("blocked/file.txt")) {
+        eprintln!(
+            "skipping an_unreadable_left_file_is_not_reclassified_in_the_fast_listing_either: \
+             chmod had no effect (running as root?)"
+        );
+        restore_perms(&left.join("blocked"), 0o755);
+        let _ = fs::remove_dir_all(&base);
+        return;
+    }
+
+    let scan = list_recursive_for_display_with_cancel(&left, &right, &CancellationToken::new());
+    let entry = scan
+        .entries
+        .iter()
+        .find(|e| e.rel_path == std::path::Path::new("blocked/file.txt"));
+
+    assert_eq!(
+        entry.map(|e| e.status),
+        Some(RecStatus::Unreadable),
+        "a left-side Unreadable entry must not be silently promoted to Computing \
+         by the fast listing just because the right side has a normal, \
+         readable counterpart: {:?}",
         scan.entries
     );
 
