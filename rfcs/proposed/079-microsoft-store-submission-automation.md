@@ -1,7 +1,10 @@
 # RFC 079: Microsoft Store Submission Automation
 
 **Status.** Proposed
-**Accepted.** 2026-08-22 by the project owner — Gate A cleared. Stays in
+**Accepted.** 2026-08-22 by the project owner — Gate A cleared, and
+**re-confirmed the same day after a self-review found two defects**, including
+an acceptance criterion that contradicted the owner's own §2 credential
+decision and would have failed by construction. Stays in
 `proposed/` until implemented, per the 4-folder lifecycle; it moves to `done/`
 when the work ships. **§9 is down to one open question — Q4, the app
 registration — plus recording the client secret's expiry. Q1 and Q5 were

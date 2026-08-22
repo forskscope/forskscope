@@ -1,7 +1,12 @@
 # RFC 080: Tiered Directory Comparison in the Explorer
 
 **Status.** Proposed
-**Accepted.** 2026-08-21 by the project owner — Gate A cleared; **all four
+**Accepted.** 2026-08-21 by the project owner — Gate A cleared, and
+**re-confirmed 2026-08-22 after a self-review found nine defects in it**, one of
+which (§1's “no new engine work”) was load-bearing and false. The corrections
+changed this RFC's scope — core must gain an error state first, now registered
+as **F79** — so the re-confirmation is an acceptance of the amended design, not
+a restatement of the original; **all four
 design questions closed 2026-08-22, so the design is settled and only Gate D
 stands between it and implementation.** Stays in
 `proposed/` until implemented, per the 4-folder lifecycle (RFC-000 §Folder
