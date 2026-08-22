@@ -7,8 +7,10 @@ stands between it and implementation.** Stays in
 `proposed/` until implemented, per the 4-folder lifecycle (RFC-000 §Folder
 layout); it moves to `done/` when the work ships, as RFC-078 does.
 **Tracks.** Explorer status column; directory comparison cost model.
-**Touches.** `explorer.rs`'s digest effect, `DigestState` (or its F75
-replacement), `forskscope-core::dir::recursive`, the status legend in user docs.
+**Touches.** `explorer.rs`'s digest effect, `RowStatusKind` (F75 lands first —
+see §7), **`forskscope-core::dir::recursive`, which needs an error state before
+this RFC's error handling is expressible (§1)**, and the status legend in user
+docs.
 **Depends on.** F74's fix, already on `main`, is the
 floor this builds on. Interacts with F75 and F76 — see §7.
 **Origin.** Owner proposal, 2026-08-21, after re-testing F70 on Windows 11.
@@ -82,9 +84,45 @@ need the control; only one of them has ever been described as needing it.
 
 ## Design
 
-### 1. What core already provides
+### 1. What core already provides — and the one thing it does not
 
-No new engine work. `forskscope-core::dir::recursive` already exports both
+**Correction, 2026-08-22, found while re-reviewing this RFC.** An earlier draft
+of this section opened "No new engine work." **That is false**, and the reason
+matters more than the sentence: this RFC's error handling rests on an assumption
+about core that does not hold.
+
+**`RecStatus` has no error variant.** Its five states are `Equal`, `Changed`,
+`LeftOnly`, `RightOnly`, `Computing`, `Symlink` — and nothing else. A file the
+walk cannot read is not marked; it is `continue`d past and **absent from the
+result entirely**. A *directory* the walk cannot open is worse: every recursive
+call is made as `let _ = walk_and_merge_fast(..)`, so the error is discarded and
+that entire subtree silently vanishes. **This holds at the top level too**
+(`recursive.rs:99` and `:121`): if the right root itself cannot be opened, the
+walk returns a result containing only left-side entries.
+
+The consequences for the tiers, stated plainly because each is a defect this RFC
+would otherwise ship:
+
+- **An unreadable file makes a differing pair look matching.** It vanishes, so
+  tier 1 sees matching names and sizes among what remains and reports the
+  tier-1 match state — a false "no difference" *caused by* the error.
+- **An unreadable subdirectory removes its whole subtree from consideration**,
+  with the same result and a larger blast radius.
+- **An unreadable right root reports every left entry as `LeftOnly`**, which
+  tier 1 reads as a confident **Different** — a definite verdict produced by a
+  failed read.
+
+So core work **is** required, and it is a precondition rather than a nicety:
+`RecStatus` needs an error state, per-entry errors must populate it instead of
+being skipped, and the discarded `let _ =` results must be surfaced. Core's
+`EqualityEvidence::Error { message }` already exists as the vocabulary; the
+recursive walk simply does not use it.
+
+**This is F76's family a third time** — a status asserting more than was
+measured — and it is why §"Relationship" now says F76 comes first rather than
+merely making this RFC smaller.
+
+Otherwise core provides both tiers already. `forskscope-core::dir::recursive` already exports both
 tiers, with cancellation:
 
 - `list_recursive_for_display(left, right)` — walks both trees, pairs entries by
@@ -104,6 +142,35 @@ sets `Computing` without comparing them. Core does **not** flag a size mismatch
 for you. Tier 1's verdict in §2 is therefore caller-side logic over the returned
 `Vec<RecEntry>`, not a status core hands back. An implementer who reads
 `Computing` as "undetermined" and stops there gets no tier-1 answer at all.
+
+### 2. Tier 1 — the cheap pass, and exactly what it can conclude
+
+Run `list_recursive_for_display_with_cancel`. Reading only the result's shape
+and sizes, three outcomes are possible:
+
+| Observation | Conclusion | Certain? |
+|---|---|---|
+| Any entry present on one side only | **Different** | Yes |
+| Any common file whose `left_size` ≠ `right_size` | **Different** | Yes |
+| Any entry that could not be read | **Unknown** — never a verdict | — *(requires the core change in §1; not expressible today)* |
+| Any entry reported `Symlink` on either side | **Unknown** — never a verdict | — |
+| Otherwise | **No difference found without reading contents** | No |
+
+The first two are free certainty and they cover the case that prompted this
+RFC: the owner's test directories differed in file *content*, and content edits
+usually move the size. Tier 1 would very likely have answered correctly, at the
+cost of a directory walk and no reads.
+
+**On symlinks.** Core reports `RecStatus::Symlink` and does not follow the link,
+so tier 1 knows a link exists and nothing about what it points at. A symlink and
+a regular file of the same name are neither proven equal nor proven different by
+anything the walk did, so the honest tier-1 answer is *unknown* — not
+*different*, which would be a verdict, and not silence, which would let a
+symlink-versus-file mismatch pass as a tier-1 match. This was unaddressed until
+the 2026-08-22 re-review.
+
+The last row is the one that must not be overstated. Same names and same sizes
+is the expected state of two directories that differ by one edited character.
 
 ### 2a. The tiers are a property of comparison, not of directories
 
@@ -137,26 +204,6 @@ so a glyph does not silently change strength depending on what it sits beside.
 
 **The cost control in §5 therefore applies to file rows as well**, which is new to
 this RFC and is the substance of what the owner's question changed.
-
-### 2. Tier 1 — the cheap pass, and exactly what it can conclude
-
-Run `list_recursive_for_display_with_cancel`. Reading only the result's shape
-and sizes, three outcomes are possible:
-
-| Observation | Conclusion | Certain? |
-|---|---|---|
-| Any entry present on one side only | **Different** | Yes |
-| Any common file whose `left_size` ≠ `right_size` | **Different** | Yes |
-| Any entry with an error status | **Unknown** — not "different" | — |
-| Otherwise | **No difference found without reading contents** | No |
-
-The first two are free certainty and they cover the case that prompted this
-RFC: the owner's test directories differed in file *content*, and content edits
-usually move the size. Tier 1 would very likely have answered correctly, at the
-cost of a directory walk and no reads.
-
-The fourth row is the one that must not be overstated. Same names and same sizes
-is the expected state of two directories that differ by one edited character.
 
 ### 3. Tier 2 — the certain pass
 
@@ -232,8 +279,11 @@ which is why only one row in the table above splits by tier.
 
 ### 5. Cost control and invalidation
 
-- **Applies to file rows too (§2a).** Today's eager, uncancellable, uncapped file
-  comparison is F77; the same token and the same bound cover both row kinds.
+- **Applies to file rows too (§2a).** F77 and F78 have since given both views a
+  shared `DigestEpoch` carrying the cancellation token and the concurrency
+  bound, so those two halves are done. **What remains for this RFC is the size
+  cap** — deliberately deferred here because a file exceeding it needs somewhere
+  to rest, and the only honest resting state is the tier-1 state §4 defines.
 - **One tier-1 pass per directory row — never a fan-out across every visible
   row.** **Trigger decided by the owner, 2026-08-22 (§8 Q3 closed): on selection,
   debounced and cancellable.** Selecting a directory row starts a timer; the walk
@@ -272,30 +322,50 @@ who has no reason to re-read the row.
   honest *not compared* was holding the place for. **It does not depend on this
   RFC**, and shipping this RFC is not a precondition for anything in v1.
 - **F75** — nine unwired `ui-logic` view-models, `explore/status.rs` among them.
-  `RowStatusKind` needs the states in §4 whichever order these land in. **If F75
-  is done first, this RFC targets `RowStatusKind`; if this lands first, it adds
-  variants to `DigestState` and F75's wiring absorbs them.** Either order works;
-  doing them in one change is cheaper than either.
-- **F76** — statuses that overstate their evidence (type mismatch labelled
-  "only on this side"; unreadable file labelled "different"). §5's error state
-  is the same requirement at directory level. **Fixing F76 first would make this
-  RFC smaller**, since `EqualityEvidence` already carries `TypeMismatch` and
-  `Error`.
+  **Ordering decided (Q4): F75 lands before this RFC**, so this RFC targets
+  `RowStatusKind` and `DigestState` is already gone by then. An earlier draft
+  said "either order works; doing them in one change is cheaper than either" —
+  superseded by the owner's decision, and left stale until the 2026-08-22
+  re-review.
+- **F76** — statuses that overstate their evidence. **Decided (Q4): F76 lands
+  first**, and §1 raises the stake: F76 is no longer only *"would make this RFC
+  smaller"*, it is the entry under which core's walk learns to report an error at
+  all. Without that, this RFC's §2 error row and acceptance criterion 4 cannot be
+  implemented.
+- **F77 and F78** — both fixed (reviews 074 and 075), and together they produced
+  `DigestEpoch`: one shared generation guard, cancellation token and concurrency
+  bound, already used by both views. §5's cost control is written against it,
+  which is why §5 can require cancellation and bounding without specifying the
+  mechanism.
 
 ## Acceptance criteria
 
 1. A directory pair differing only in a file's **size** is reported *Different*
    by tier 1, with no file contents read.
 2. A directory pair differing only in a file's **contents at identical size** is
-   reported *no difference found* by tier 1, and *Different* by tier 2.
-3. An identical pair is *no difference found* after tier 1 and *Identical* after
-   tier 2 — and **never `Identical` from tier 1 alone**.
-4. A subtree containing an unreadable entry reports *unknown*, not a verdict.
+   reported at the **tier-1 match** state by tier 1 — *“Names and sizes match;
+   contents not compared”* — and *Different* by tier 2.
+3. An identical pair is at the **tier-1 match** state after tier 1 and
+   *Identical* after tier 2 — and **never `Identical` from tier 1 alone**.
+   *(Criteria 2 and 3 said “no difference found” until the 2026-08-22
+   re-review — the exact phrasing §4 rejects, left behind when the label was
+   settled. Acceptance criteria are what get implemented and tested, so the
+   contradiction would have shipped the rejected wording.)*
+4. A subtree containing an unreadable entry, an unreadable subdirectory, or an
+   unreadable root reports *unknown*, not a verdict — in particular **not** a
+   tier-1 match and **not** `Different`. **Requires the core change in §1**; it
+   is not satisfiable against `RecStatus` as it stands.
 5. Navigating away cancels an in-flight comparison; no result lands in a view
    the user has left.
 6. Every state has a non-empty localised accessible label, and completion is
    announced.
-7. No comparison is triggered by browsing alone beyond what §5 permits.
+7. Browsing costs nothing beyond §5: **moving through rows starts no walk** —
+   only resting on one past the debounce interval does — and no tier-2 pass
+   ever starts without a click. *(This criterion read “no comparison is
+   triggered by browsing alone” before the 2026-08-22 re-review, which
+   contradicted Q3's decision to trigger tier 1 on selection: selecting a row
+   **is** browsing. The debounce is what makes the two compatible, so the
+   criterion has to name it.)*
 
 ## Testing
 
@@ -311,8 +381,8 @@ accessibility tree is a P07 assertion, as recorded for F74.
 
 ## Sequencing
 
-**After Gate D.** This is a feature, and v1 stabilization is blocked on F44
-alone. Adding an Explorer feature now would put new code into the candidate that
+**After Gate D.** This is a feature, and Gate D is blocked on **F44** (upstream)
+and **F60** (an owner decision). Adding an Explorer feature now would put new code into the candidate that
 the acceptance matrix has not covered, for a question Deep Compare already
 answers by another route.
 

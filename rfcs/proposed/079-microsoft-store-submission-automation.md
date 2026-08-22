@@ -10,7 +10,8 @@ to Dependencies, where F60 blocks implementation.**
 **Tracks.** Release pipeline; Windows distribution; credential handling.
 **Touches.** A new MSIX build, a new submission workflow, `AppxManifest.xml`'s
 version claims, `release.md`, and the threat model.
-**Depends on.** Owner decisions in §9. Sequencing relative to Gate D in §8.
+**Depends on.** **F60 — blocking** (see Dependencies). One remaining owner
+decision, §9 Q4. Sequencing relative to Gate D in §8.
 
 ## Summary
 
@@ -83,7 +84,13 @@ entirely). Two open register items bear on those values:
 - **F60** — the declared floor has no runtime evidence and none is planned; the
   oldest Windows the project claims to support has never been observed running
   the application.
-- **F49b** — `MaxVersionTested` is deferred until M5's Windows evidence exists.
+- **F49b** — `MaxVersionTested` claims Windows 10 2004, predating Windows 11.
+  **M5's Windows evidence now exists** (M5-A on NT 10.0.26100; the owner's manual
+  runs on Windows 11 build 10.0.26200, 2026-08-21), so the precondition this item
+  was waiting on is met and the value can be raised on evidence. *(This read
+  “deferred until M5's Windows evidence exists” until the 2026-08-22 re-review.)*
+  Note the asymmetry with F60: M5 evidences the **ceiling**, and says nothing
+  whatever about the **floor**.
 
 Today those claims reach the Store only when a human submits. Automated, they
 ship on every release with nobody looking. **F60 should be settled before this
@@ -150,7 +157,15 @@ A submission that fails certification costs days. Cheap local checks first:
 - the MSIX's manifest version equals the released tag;
 - `Identity`, `Publisher`, and `PublisherDisplayName` match the Store listing;
 - the package contains the executable and every asset the manifest references;
-- the package installs and the application launches (see §7).
+- the package installs and the application launches. *(This read “see §7” until
+  the 2026-08-22 re-review; **there is no §7** — the Design sections run 1, 2,
+  2a, 3, 4, 5, 6. The pointer was dangling.)* **This is the expensive check and
+  the one most likely to be quietly dropped:** installing an MSIX on a runner
+  needs the package trusted for sideloading, which a Store-signed package is not
+  until Microsoft signs it — so this step must either use a temporary
+  self-signed layout for validation only, or be honestly recorded as not
+  performed. **Do not report it as done if the runner merely unpacked the
+  package.**
 
 A failure here fails the workflow **before** anything reaches Partner Center.
 
@@ -210,7 +225,17 @@ credential with the costs recorded there.
 - Validation (§3) fails the workflow before submission when any check fails —
   demonstrated by a deliberately broken package, per this project's standing
   falsifiability requirement.
-- The submission authenticates with no long-lived secret in repository settings.
+- The submission authenticates with the **stored Entra ID client secret** the
+  owner chose in §2, held in GitHub Actions Secrets, scoped to the minimum
+  Partner Center permissions the submission API needs — **and its expiry date is
+  recorded somewhere that surfaces before it lapses.**
+  *(This criterion read “authenticates with no long-lived secret in repository
+  settings” until the 2026-08-22 re-review. That is the opposite of the owner's
+  §2 decision — a stored client secret is precisely a long-lived secret in
+  repository settings — and it survived from the original federated-credential
+  draft. An implementation satisfying §2 would have failed this criterion by
+  construction. Fourth and last stale federated reference; the §2 body, the
+  README index row and §9 Q4 were corrected on 2026-08-21 and 2026-08-22.)*
 - The workflow triggers on `release: published` and never on tag push.
 - The workflow reports a submission identifier and status, and claims no more.
 - Re-running against the same release does not create a duplicate submission.
