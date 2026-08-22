@@ -106,7 +106,7 @@ fn recursive_diff_classifies_equal_changed_left_only_right_only() {
     // right-only
     fs::write(right.join("right_only.txt"), "r").unwrap();
 
-    let entries = crate::dir::recursive_diff(&left, &right);
+    let entries = crate::dir::recursive_diff(&left, &right).entries;
     let status = |name: &str| {
         entries
             .iter()
@@ -131,7 +131,7 @@ fn recursive_diff_descends_into_subdirectories() {
     fs::write(left.join("sub").join("a.rs"), "old").unwrap();
     fs::write(right.join("sub").join("a.rs"), "new").unwrap();
 
-    let entries = crate::dir::recursive_diff(&left, &right);
+    let entries = crate::dir::recursive_diff(&left, &right).entries;
     assert!(
         entries
             .iter()
@@ -188,7 +188,7 @@ fn recursive_diff_returns_empty_for_two_empty_directories() {
     let right = root.join("r");
     fs::create_dir_all(&left).unwrap();
     fs::create_dir_all(&right).unwrap();
-    let entries = crate::dir::recursive_diff(&left, &right);
+    let entries = crate::dir::recursive_diff(&left, &right).entries;
     assert!(
         entries.is_empty(),
         "two empty directories have no diff entries"

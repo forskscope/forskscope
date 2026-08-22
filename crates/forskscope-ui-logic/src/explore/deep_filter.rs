@@ -118,6 +118,9 @@ pub fn apply_filter(entries: &[RecEntry], filter: DeepFilter) -> Vec<&RecEntry> 
 }
 
 fn is_different(status: &RecStatus) -> bool {
+    // F79: `RecStatus::Unreadable` is deliberately absent from this list -
+    // nothing was measured for it, so it is not a verdict and must not be
+    // counted as "different" alongside entries that were actually compared.
     matches!(
         status,
         RecStatus::Changed | RecStatus::LeftOnly | RecStatus::RightOnly
@@ -281,5 +284,37 @@ mod tests {
         let visible = apply_filter(&ents, DeepFilter::Equal);
         assert_eq!(visible.len(), 1);
         assert_eq!(visible[0].status, RecStatus::Equal);
+    }
+
+    // ── F79: RecStatus::Unreadable ────────────────────────────────────────────
+    //
+    // A one-off entry vec rather than adding `Unreadable` to `entries()` -
+    // that fixture backs every count assertion above (`total == 6`,
+    // `different == 3`, etc.), and changing its shape would mean re-deriving
+    // every one of those numbers for a variant this file's tests don't
+    // otherwise need shared fixture data for.
+
+    #[test]
+    fn is_different_does_not_count_unreadable_it_is_not_a_verdict() {
+        assert!(!is_different(&RecStatus::Unreadable));
+    }
+
+    #[test]
+    fn different_filter_includes_unreadable() {
+        assert!(DeepFilter::Different.matches(&entry(RecStatus::Unreadable)));
+    }
+
+    #[test]
+    fn equal_filter_excludes_unreadable() {
+        assert!(!DeepFilter::Equal.matches(&entry(RecStatus::Unreadable)));
+    }
+
+    #[test]
+    fn summary_does_not_count_unreadable_as_different_or_equal() {
+        let ents = vec![entry(RecStatus::Unreadable), entry(RecStatus::Changed)];
+        let s = DeepCompareSummary::from_entries(&ents, DeepFilter::All);
+        assert_eq!(s.total, 2);
+        assert_eq!(s.different, 1, "only the Changed entry is different");
+        assert_eq!(s.equal, 0);
     }
 }

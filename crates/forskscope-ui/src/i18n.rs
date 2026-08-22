@@ -95,6 +95,8 @@ fn ja(key: &str) -> Option<&'static str> {
         "equal" => "同一",
         "left only" => "左のみ",
         "right only" => "右のみ",
+        "unreadable" => "読み取り不可",
+        "Unreadable" => "読み取り不可",
         "checking" => "確認中",
         "Copy" => "コピー",
         "Back" => "戻る",

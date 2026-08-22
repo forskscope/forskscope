@@ -88,11 +88,23 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
 
         spawn(async move {
             let list_token = token.clone();
+            // F79: `list_recursive_for_display_with_cancel` now returns a
+            // `RecursiveScan` - `entries` plus `left_root_unreadable`/
+            // `right_root_unreadable`, so a root that cannot even be opened
+            // is distinguishable from an empty tree at the type level. The
+            // flags are not yet surfaced in this view - there is no
+            // existing error-banner affordance here to route them through,
+            // and inventing one is beyond this handoff's scope (state this
+            // plainly rather than silently dropping the signal - review
+            // request §7c). Per-entry `RecStatus::Unreadable` results,
+            // which is what this handoff requires this view to display,
+            // are unaffected and flow through `initial` normally.
             let initial = tokio::task::spawn_blocking(move || {
                 list_recursive_for_display_with_cancel(&lr1, &rr1, &list_token)
             })
             .await
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .entries;
 
             if token.is_cancelled() {
                 // Superseded before phase 1 finished - the run that
@@ -173,6 +185,13 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
         .iter()
         .filter(|e| e.status == RecStatus::RightOnly)
         .count();
+    // F79: counted separately from `different`/`equal`/etc. rather than
+    // folded into either - it is not a verdict, so it must not be
+    // presented as one.
+    let unreadable = snap
+        .iter()
+        .filter(|e| e.status == RecStatus::Unreadable)
+        .count();
     let computing = snap
         .iter()
         .filter(|e| e.status == RecStatus::Computing)
@@ -221,6 +240,11 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                         equal,      t(lang, "equal"),
                         left_only,  t(lang, "left only"),
                         right_only, t(lang, "right only"))}
+                    if unreadable > 0 {
+                        span { class: "deep-progress",
+                            {format!(" · {} {}", unreadable, t(lang, "unreadable"))}
+                        }
+                    }
                     if computing > 0 || in_flight {
                         span { class: "deep-progress",
                             {format!(" · {} {}/{}…", t(lang, "checking"), done, tc)}
@@ -258,11 +282,18 @@ fn DeepRow(entry: RecEntry, lang: Lang, left_root: PathBuf, right_root: PathBuf)
         RecStatus::Equal => ("✓", "status-equal"),
         RecStatus::Computing => ("⊙", "status-cmp"),
         RecStatus::Symlink => ("↗", "status-symlink"),
+        // F79: distinct glyph/class - not a verdict, so it must not share
+        // Changed's "⚠"/status-changed, which would visually claim a
+        // comparison was actually made.
+        RecStatus::Unreadable => ("⊘", "status-unreadable"),
     };
     let path_str = entry.rel_path.display().to_string();
+    // F79: nothing was measured for an unreadable entry, so it can be
+    // neither compared nor (per `can_copy_left_to_right`/
+    // `can_copy_right_to_left` below) copied in either direction.
     let can_cmp = !matches!(
         entry.status,
-        RecStatus::Equal | RecStatus::Computing | RecStatus::Symlink
+        RecStatus::Equal | RecStatus::Computing | RecStatus::Symlink | RecStatus::Unreadable
     );
     // Copy direction: LeftOnly/Changed → copy left→right; RightOnly → copy right→left.
     // Changed entries show both directions (RFC-062 B3). F68: this is now
@@ -276,7 +307,23 @@ fn DeepRow(entry: RecEntry, lang: Lang, left_root: PathBuf, right_root: PathBuf)
     let rr_cmp = right_root.clone();
     rsx! {
         div { class: "deep-row",
-            span { class: "dir-status {cls}", "{icon}" }
+            // F79: this status needs an accessible label - it is new, and
+            // unlike the other glyphs here (none of which carry one today;
+            // out of scope to retrofit as part of this handoff) a bare
+            // "⊘" gives a screen reader nothing to announce. `role: "img"`
+            // + `aria_label` is the pattern F74 established for exactly
+            // this in `dir_pane.rs`; `title` kept for the mouse tooltip.
+            if entry.status == RecStatus::Unreadable {
+                span {
+                    class: "dir-status {cls}",
+                    role: "img",
+                    aria_label: t(lang, "Unreadable"),
+                    title: t(lang, "Unreadable"),
+                    "{icon}"
+                }
+            } else {
+                span { class: "dir-status {cls}", "{icon}" }
+            }
             span { class: "deep-path", "{path_str}" }
             span { class: "dir-size", {size_label(&entry)} }
             if can_cmp {
@@ -432,16 +479,21 @@ fn BatchCopyButtons(
     let lr2 = left_root;
     let rr2 = right_root;
 
-    // "Copy all →" = copy left-only and changed files to the right tree
+    // "Copy all →" = copy left-only and changed files to the right tree.
+    // F79: shares `can_copy_left_to_right` with `DeepRow`'s per-row button
+    // rather than re-deriving the same status set inline - the previous
+    // duplication meant "not copyable" had to be kept correct in two
+    // places by hand; a single source of truth is what actually makes
+    // `RecStatus::Unreadable`'s exclusion from this manifest provable.
     let to_right: Vec<(PathBuf, PathBuf)> = snap
         .iter()
-        .filter(|e| matches!(e.status, RecStatus::Changed | RecStatus::LeftOnly))
+        .filter(|e| can_copy_left_to_right(e.status))
         .map(|e| (lr.join(&e.rel_path), rr.join(&e.rel_path)))
         .collect();
     // "Copy all ←" = copy right-only and changed files to the left tree
     let to_left: Vec<(PathBuf, PathBuf)> = snap
         .iter()
-        .filter(|e| matches!(e.status, RecStatus::Changed | RecStatus::RightOnly))
+        .filter(|e| can_copy_right_to_left(e.status))
         .map(|e| (rr2.join(&e.rel_path), lr2.join(&e.rel_path)))
         .collect();
     drop(snap);
@@ -572,6 +624,9 @@ mod tests {
         assert!(!can_copy_left_to_right(RecStatus::Equal));
         assert!(!can_copy_left_to_right(RecStatus::Computing));
         assert!(!can_copy_left_to_right(RecStatus::Symlink));
+        // F79 §8.4: nothing was measured for an unreadable entry - it must
+        // never be copyable.
+        assert!(!can_copy_left_to_right(RecStatus::Unreadable));
     }
 
     #[test]
@@ -582,7 +637,17 @@ mod tests {
         assert!(!can_copy_right_to_left(RecStatus::Equal));
         assert!(!can_copy_right_to_left(RecStatus::Computing));
         assert!(!can_copy_right_to_left(RecStatus::Symlink));
+        assert!(!can_copy_right_to_left(RecStatus::Unreadable));
     }
+
+    // F79 §8.4: `BatchCopyButtons` builds its manifest by filtering on
+    // `can_copy_left_to_right`/`can_copy_right_to_left` (not a separate,
+    // re-derived predicate - see the comment at its call site), so the two
+    // tests above are also the proof that an `Unreadable` entry can never
+    // appear in "copy all changed"'s manifest, closing the exact defect
+    // F78 §2 described for a stale `Equal`: a genuinely different but
+    // unreadable file silently dropped from a batch copy the user is told
+    // succeeded.
 
     // F78 §8.1: drives `apply_epoch_result` directly against a real
     // `Vec<RecEntry>` and a real `DigestEpoch` - no Dioxus runtime needed.

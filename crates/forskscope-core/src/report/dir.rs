@@ -18,6 +18,9 @@ pub struct DirComparisonReport {
     pub left_only: usize,
     pub right_only: usize,
     pub symlinks: usize,
+    /// Entries that could not be read (F79) - not a verdict, counted
+    /// separately from `changed`/`equal`/etc.
+    pub unreadable: usize,
     pub file_rows: Vec<DirFileRow>,
     pub batch_summary: Option<BatchSummary>,
     pub options: ReportOptions,
@@ -60,6 +63,7 @@ impl DirComparisonReport {
         let mut left_only = 0usize;
         let mut right_only = 0usize;
         let mut symlinks = 0usize;
+        let mut unreadable = 0usize;
 
         let file_rows: Vec<DirFileRow> = entries
             .iter()
@@ -84,6 +88,10 @@ impl DirComparisonReport {
                     RecStatus::Symlink => {
                         symlinks += 1;
                         "symlink".into()
+                    }
+                    RecStatus::Unreadable => {
+                        unreadable += 1;
+                        "unreadable".into()
                     }
                     RecStatus::Computing => "computing".into(),
                 };
@@ -120,6 +128,7 @@ impl DirComparisonReport {
             left_only,
             right_only,
             symlinks,
+            unreadable,
             file_rows,
             batch_summary,
             options: opts,
@@ -143,6 +152,9 @@ impl DirComparisonReport {
         let _ = writeln!(s, "| Right only    | {} |", self.right_only);
         if self.symlinks > 0 {
             let _ = writeln!(s, "| Symlinks      | {} |", self.symlinks);
+        }
+        if self.unreadable > 0 {
+            let _ = writeln!(s, "| Unreadable    | {} |", self.unreadable);
         }
         let _ = writeln!(s);
 
@@ -200,7 +212,8 @@ impl DirComparisonReport {
         let _ = writeln!(s, "    \"changed\": {},", self.changed);
         let _ = writeln!(s, "    \"left_only\": {},", self.left_only);
         let _ = writeln!(s, "    \"right_only\": {},", self.right_only);
-        let _ = writeln!(s, "    \"symlinks\": {}", self.symlinks);
+        let _ = writeln!(s, "    \"symlinks\": {},", self.symlinks);
+        let _ = writeln!(s, "    \"unreadable\": {}", self.unreadable);
         let _ = writeln!(s, "  }},");
 
         // changed files

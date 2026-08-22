@@ -12,7 +12,7 @@ use std::path::Path;
 use crate::diff::{DiffOptions, compute_diff};
 use crate::dir::{RecStatus, recursive_diff};
 use crate::document::{LoadOptions, load_path};
-use crate::error::Result;
+use crate::error::{CoreError, IoOperation, Result};
 use crate::file_kind::FileKind;
 
 use super::build::{PatchOptions, Side, hunks_from_diff, whole_side_lines};
@@ -23,19 +23,51 @@ use super::model::{PatchDocument, PatchFileChange, PatchFormat, PatchSummary};
 /// `diff_options` controls the text diff for modified files; `patch_options`
 /// controls context size and whether creation/deletion and binary entries
 /// are included.
+///
+/// F79: a patch document claims to be a complete, trustworthy record of the
+/// difference between two trees, and (unlike Deep Compare) has no reader
+/// surface to carry a per-entry caveat through to whatever consumes the
+/// patch. Rather than silently omitting content a reader cannot know is
+/// missing - the defect this handoff exists to close - an unreadable root
+/// or entry fails patch generation outright, through the `Result` this
+/// function already returns for every other failure mode here.
 pub fn patch_from_directories(
     left_root: &Path,
     right_root: &Path,
     diff_options: DiffOptions,
     patch_options: PatchOptions,
 ) -> Result<PatchDocument> {
-    let entries = recursive_diff(left_root, right_root);
+    let scan = recursive_diff(left_root, right_root);
+    if scan.left_root_unreadable {
+        return Err(CoreError::Io {
+            path: Some(left_root.to_path_buf()),
+            operation: IoOperation::ListDir,
+            message: "left root could not be read; the patch would be incomplete".to_string(),
+        });
+    }
+    if scan.right_root_unreadable {
+        return Err(CoreError::Io {
+            path: Some(right_root.to_path_buf()),
+            operation: IoOperation::ListDir,
+            message: "right root could not be read; the patch would be incomplete".to_string(),
+        });
+    }
+
     let mut files = Vec::new();
 
-    for entry in entries {
+    for entry in scan.entries {
         let rel = entry.rel_path;
         match entry.status {
             RecStatus::Equal | RecStatus::Computing => {}
+            RecStatus::Unreadable => {
+                return Err(CoreError::Io {
+                    path: Some(rel),
+                    operation: IoOperation::Read,
+                    message:
+                        "entry could not be read during the directory scan; the patch would be incomplete"
+                            .to_string(),
+                });
+            }
             RecStatus::Symlink => {
                 // Symlinks are not text-diffable; emit a notice if requested.
                 if patch_options.include_binary_notices {

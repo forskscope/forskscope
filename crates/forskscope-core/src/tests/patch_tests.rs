@@ -219,6 +219,95 @@ fn directory_patch_covers_modify_add_and_delete() {
     let _ = fs::remove_dir_all(&base);
 }
 
+// F79 §7c: an unreadable entry must fail patch generation rather than be
+// silently omitted from a document that claims to be a complete record of
+// the difference between two trees.
+#[cfg(unix)]
+#[test]
+fn directory_patch_fails_rather_than_silently_omit_an_unreadable_entry() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let base = temp_dir("dir-unreadable-entry");
+    let left = base.join("left");
+    let right = base.join("right");
+    let _ = fs::remove_dir_all(&left);
+    let _ = fs::remove_dir_all(&right);
+    fs::create_dir_all(left.join("blocked")).unwrap();
+    fs::create_dir_all(&right).unwrap();
+    fs::write(left.join("blocked/file.txt"), "secret").unwrap();
+
+    // Remove execute on `blocked/` so `read_dir` still lists "file.txt" but
+    // `metadata()` on it fails - same technique as
+    // `dir_unreadable_tests.rs::make_child_metadata_unreadable`.
+    let _ = fs::set_permissions(left.join("blocked"), fs::Permissions::from_mode(0o400));
+    if fs::metadata(left.join("blocked/file.txt")).is_ok() {
+        eprintln!(
+            "skipping directory_patch_fails_rather_than_silently_omit_an_unreadable_entry: \
+             chmod had no effect (running as root?)"
+        );
+        let _ = fs::set_permissions(left.join("blocked"), fs::Permissions::from_mode(0o755));
+        let _ = fs::remove_dir_all(&base);
+        return;
+    }
+
+    let result = patch_from_directories(
+        &left,
+        &right,
+        DiffOptions::default(),
+        PatchOptions::default(),
+    );
+
+    assert!(
+        result.is_err(),
+        "an unreadable entry must fail patch generation, not be silently omitted"
+    );
+
+    let _ = fs::set_permissions(left.join("blocked"), fs::Permissions::from_mode(0o755));
+    let _ = fs::remove_dir_all(&base);
+}
+
+// F79 §7c: same reasoning, for a root that cannot be opened at all.
+#[cfg(unix)]
+#[test]
+fn directory_patch_fails_rather_than_silently_treat_an_unreadable_root_as_empty() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let base = temp_dir("dir-unreadable-root");
+    let left = base.join("left");
+    let right = base.join("right");
+    let _ = fs::remove_dir_all(&left);
+    let _ = fs::remove_dir_all(&right);
+    fs::create_dir_all(&left).unwrap();
+    fs::create_dir_all(&right).unwrap();
+    fs::write(left.join("a.txt"), "content").unwrap();
+
+    let _ = fs::set_permissions(&right, fs::Permissions::from_mode(0o000));
+    if fs::read_dir(&right).is_ok() {
+        eprintln!(
+            "skipping directory_patch_fails_rather_than_silently_treat_an_unreadable_root_as_empty: \
+             chmod had no effect (running as root?)"
+        );
+        let _ = fs::set_permissions(&right, fs::Permissions::from_mode(0o755));
+        let _ = fs::remove_dir_all(&base);
+        return;
+    }
+
+    let result = patch_from_directories(
+        &left,
+        &right,
+        DiffOptions::default(),
+        PatchOptions::default(),
+    );
+
+    assert!(
+        result.is_err(),
+        "an unreadable right root must fail patch generation, not be silently treated as empty"
+    );
+
+    let _ = fs::set_permissions(&right, fs::Permissions::from_mode(0o755));
+    let _ = fs::remove_dir_all(&base);
+}
+
 #[test]
 fn directory_patch_treats_xlsx_entries_as_binary_notices() {
     let base = temp_dir("dir-xlsx");

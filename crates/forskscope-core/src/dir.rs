@@ -27,6 +27,6 @@ pub use merge_plan::{
     execute_plan, plan_operations,
 };
 pub use recursive::{
-    RecEntry, RecStatus, list_recursive_for_display, list_recursive_for_display_with_cancel,
-    recursive_diff, recursive_diff_with_cancel,
+    RecEntry, RecStatus, RecursiveScan, list_recursive_for_display,
+    list_recursive_for_display_with_cancel, recursive_diff, recursive_diff_with_cancel,
 };

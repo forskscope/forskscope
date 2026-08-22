@@ -65,8 +65,8 @@ fn uncancelled_token_produces_same_result_as_non_cancellable_api() {
     write(&right, "only_r.txt", "y");
 
     let token = CancellationToken::new();
-    let cancellable = recursive_diff_with_cancel(&left, &right, &token);
-    let standard = crate::dir::recursive_diff(&left, &right);
+    let cancellable = recursive_diff_with_cancel(&left, &right, &token).entries;
+    let standard = crate::dir::recursive_diff(&left, &right).entries;
 
     assert_eq!(cancellable.len(), standard.len());
     for (a, b) in cancellable.iter().zip(standard.iter()) {
@@ -92,7 +92,7 @@ fn pre_cancelled_token_returns_empty_or_partial() {
 
     let token = CancellationToken::new();
     token.cancel(); // cancel BEFORE the scan starts
-    let result = recursive_diff_with_cancel(&left, &right, &token);
+    let result = recursive_diff_with_cancel(&left, &right, &token).entries;
 
     // The result may be empty or partial, but must not be the full 20-file
     // set with all digests computed (because we cancelled before any work).
@@ -133,7 +133,7 @@ fn cancel_during_scan_produces_partial_results_without_panic() {
     });
 
     // This must return (not block forever), even if only partially done.
-    let result = recursive_diff_with_cancel(&left, &right, &token);
+    let result = recursive_diff_with_cancel(&left, &right, &token).entries;
     assert!(result.len() <= 50, "no extra entries");
     let _ = fs::remove_dir_all(&base);
 }
@@ -184,7 +184,7 @@ fn symlinks_reported_as_symlink_status_not_silently_skipped() {
     // Create a symlink on the left side.
     std::os::unix::fs::symlink("/etc/hostname", left.join("link.txt")).unwrap();
 
-    let result = crate::dir::recursive_diff(&left, &right);
+    let result = crate::dir::recursive_diff(&left, &right).entries;
     let statuses: Vec<_> = result
         .iter()
         .map(|e| (e.rel_path.to_str().unwrap(), e.status))
@@ -216,7 +216,7 @@ fn symlink_in_fast_listing_also_gets_symlink_status() {
     std::os::unix::fs::symlink("/etc/hostname", left.join("link.txt")).unwrap();
 
     let token = CancellationToken::new();
-    let result = list_recursive_for_display_with_cancel(&left, &right, &token);
+    let result = list_recursive_for_display_with_cancel(&left, &right, &token).entries;
     let link = result
         .iter()
         .find(|e| e.rel_path.ends_with("link.txt"))

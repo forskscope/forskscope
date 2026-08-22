@@ -41,6 +41,7 @@
 .status-cmp     { color: var(--muted); opacity: .6; }
 .status-err     { color: var(--err); }
 .status-symlink { color: var(--muted); font-style: italic; }
+.status-unreadable { color: var(--err); }
 
 /* ── Filter buttons ── */
 .filter-btn { padding: .2rem .5rem; border-radius: 6px; font-size: 12px; background: var(--surface-3); border: 1px solid var(--border); cursor: pointer; }
