@@ -364,15 +364,14 @@ code.path-display {
 .tree-status.status-left-only  { color: var(--muted); }
 .tree-status.status-right-only { color: var(--muted); }
 .tree-status.status-error      { color: var(--err); }
-.tree-status.status-computing  { color: var(--muted); animation: spin .8s linear infinite; }
+/* Review 077 §4a: this was written for the old spinner glyph ("⟳"); a
+   rotating "…" (RowStatusKind::Computing's glyph, handoff 007) reads as a
+   rendering fault, not progress. No animation for this glyph. */
+.tree-status.status-computing  { color: var(--muted); }
 /* F74: a directory row's contents were never examined - deliberately not
    status-equal's green, which would repeat the false-equal claim this
    state exists to replace. */
 .tree-status.status-not-compared { color: var(--muted); }
-@keyframes spin {
-  from { display: inline-block; transform: rotate(0deg); }
-  to   { display: inline-block; transform: rotate(360deg); }
-}
 
 /* ── Binary-blocked row (RFC-066) ── */
 .tree-row.binary-blocked { opacity: .5; cursor: default; }

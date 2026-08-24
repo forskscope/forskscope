@@ -25,7 +25,8 @@ fn ja(key: &str) -> Option<&'static str> {
         }
         "Comparing…" => "比較中…",
         "Identical" => "同一",
-        "Only on this side" => "この側にのみ存在",
+        "Only on the left" => "左側にのみ存在",
+        "Only on the right" => "右側にのみ存在",
         "Directory contents not compared — use Deep Compare" => {
             "ディレクトリの中身は比較されていません — ディープ比較を使用してください"
         }

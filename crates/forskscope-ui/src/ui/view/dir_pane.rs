@@ -29,11 +29,18 @@ use forskscope_ui_logic::RowStatusKind;
 /// `aria_label()` is fixed English (`ui-logic` has no i18n system); this is
 /// the `Lang`-aware layer above it, replacing `dir_pane.rs`'s old
 /// `status_label` over the now-deleted `DigestState`.
+///
+/// Review 077 §4b: `LeftOnly`/`RightOnly` render distinct glyphs (`←`/`→`)
+/// but used to share one label ("Only on this side") - not a regression
+/// (the old `·` glyph never distinguished direction either), but a newly
+/// opened gap between what a sighted user sees and what a screen reader
+/// announces, which RFC-009 §7 exists to close. Distinct labels now.
 fn status_kind_label(kind: RowStatusKind, lang: Lang) -> String {
     match kind {
         RowStatusKind::Equal => t(lang, "Identical"),
         RowStatusKind::Different => t(lang, "Different"),
-        RowStatusKind::LeftOnly | RowStatusKind::RightOnly => t(lang, "Only on this side"),
+        RowStatusKind::LeftOnly => t(lang, "Only on the left"),
+        RowStatusKind::RightOnly => t(lang, "Only on the right"),
         RowStatusKind::Computing => t(lang, "Comparing…"),
         RowStatusKind::Error => t(lang, "Comparison failed"),
         RowStatusKind::NotCompared => t(lang, "Directory contents not compared — use Deep Compare"),
@@ -527,5 +534,22 @@ mod tests {
     fn not_compared_has_a_distinct_label_from_equal() {
         let label = status_kind_label(RowStatusKind::NotCompared, Lang::En);
         assert_ne!(label, status_kind_label(RowStatusKind::Equal, Lang::En));
+    }
+
+    // Review 077 §4b: `LeftOnly`/`RightOnly` render distinct glyphs
+    // (`←`/`→`) and must announce distinct labels too - RFC-009 §7
+    // requires symbol and screen-reader text to carry the same meaning,
+    // and a shared "only on this side" label for both left this direction
+    // sighted-only.
+    #[test]
+    fn left_only_and_right_only_have_distinct_labels() {
+        for lang in [Lang::En, Lang::Ja] {
+            let left = status_kind_label(RowStatusKind::LeftOnly, lang);
+            let right = status_kind_label(RowStatusKind::RightOnly, lang);
+            assert_ne!(
+                left, right,
+                "LeftOnly and RightOnly must have distinct labels for {lang:?}"
+            );
+        }
     }
 }
