@@ -417,8 +417,15 @@ about not knowing, which is a correct state to ship, not a placeholder.
   recommendation.
 - **Q3 — tier-1 trigger. CLOSED 2026-08-22** — on selection, debounced and
   cancellable. See §5.
-- **Q4 — ordering. CLOSED 2026-08-22** — **F76, then F75, then this RFC.** Each
-  makes the next smaller: F76 stops the statuses overstating their evidence and
+- **Q4 — ordering. CLOSED 2026-08-22, and its first half corrected the same day.**
+  **Decided: F75's wiring (with F76 folded into it), then this RFC.** The
+  original answer was *F76, then F75, then this RFC*, on the architect's advice
+  that F76 would bring `TypeMismatch` and `Error` across from core. That is
+  incoherent — it would bring them into `DigestState`, the enum F75 deletes.
+  **F76 is a consequence of the wiring, not a predecessor:** making the Explorer
+  emit `EqualityEvidence` fixes both F76 instances by construction. The owner's
+  decision to do this work now stands; only the internal order changed.
+  The superseded reasoning, kept because it is what was decided against: F76 stops the statuses overstating their evidence and
   brings `TypeMismatch` and `Error` across from core; F75 then wires
   `RowStatusKind` and deletes `DigestState`; this RFC then adds the tiers to a
   status type that already has the vocabulary for them. Three independently
