@@ -30,6 +30,14 @@ pub enum RowStatusKind {
     Computing,
     /// An error prevented comparison.
     Error,
+    /// Comparison was never attempted for this entry (handoff 007 §4/§7a) -
+    /// distinct from `Computing`: *not attempted* and *in progress* are
+    /// different claims, and rendering `Computing` for `Unknown` gives a
+    /// row a spinner that never resolves. This is also the state a
+    /// same-named directory pair must show (F74, `16c35f1`) - the Explorer
+    /// never examines directory contents, so it can prove neither equality
+    /// nor difference for one.
+    NotCompared,
 }
 
 impl RowStatusKind {
@@ -42,6 +50,7 @@ impl RowStatusKind {
             Self::RightOnly => '→',
             Self::Computing => '…',
             Self::Error => '!',
+            Self::NotCompared => '–',
         }
     }
 
@@ -54,6 +63,7 @@ impl RowStatusKind {
             Self::RightOnly => "status-right-only",
             Self::Computing => "status-computing",
             Self::Error => "status-error",
+            Self::NotCompared => "status-not-compared",
         }
     }
 
@@ -66,6 +76,7 @@ impl RowStatusKind {
             Self::RightOnly => "right only",
             Self::Computing => "computing",
             Self::Error => "error",
+            Self::NotCompared => "not compared",
         }
     }
 
@@ -92,7 +103,7 @@ impl RowStatusKind {
             EqualityEvidence::LeftOnly => Self::LeftOnly,
             EqualityEvidence::RightOnly => Self::RightOnly,
             EqualityEvidence::Error { .. } => Self::Error,
-            EqualityEvidence::Unknown => Self::Computing,
+            EqualityEvidence::Unknown => Self::NotCompared,
         }
     }
 }
@@ -211,11 +222,42 @@ mod tests {
         assert_eq!(RowStatusKind::from_evidence(&e), RowStatusKind::Error);
     }
 
+    // Handoff 007 §4: "not attempted" and "in progress" are different
+    // claims. Mapping `Unknown` to `Computing` renders a spinner that
+    // never resolves - this was the defect found while checking whether
+    // wiring this module was mechanical (it was not).
     #[test]
-    fn unknown_maps_to_computing() {
+    fn unknown_maps_to_not_compared_not_computing() {
         assert_eq!(
             RowStatusKind::from_evidence(&EqualityEvidence::Unknown),
+            RowStatusKind::NotCompared
+        );
+        assert_ne!(
+            RowStatusKind::from_evidence(&EqualityEvidence::Unknown),
             RowStatusKind::Computing
+        );
+    }
+
+    // F74 (`16c35f1`): a same-named directory pair must render as
+    // not-compared, sharing neither `Computing`'s glyph/label (a spinner
+    // that never resolves) nor `Equal`'s (the false-equal claim F74 fixed).
+    #[test]
+    fn not_compared_has_its_own_distinct_glyph_and_label() {
+        assert_ne!(
+            RowStatusKind::NotCompared.glyph(),
+            RowStatusKind::Equal.glyph()
+        );
+        assert_ne!(
+            RowStatusKind::NotCompared.glyph(),
+            RowStatusKind::Computing.glyph()
+        );
+        assert_ne!(
+            RowStatusKind::NotCompared.aria_label(),
+            RowStatusKind::Equal.aria_label()
+        );
+        assert_ne!(
+            RowStatusKind::NotCompared.aria_label(),
+            RowStatusKind::Computing.aria_label()
         );
     }
 
@@ -230,6 +272,7 @@ mod tests {
             RowStatusKind::RightOnly,
             RowStatusKind::Computing,
             RowStatusKind::Error,
+            RowStatusKind::NotCompared,
         ] {
             assert!(
                 kind.css_class().starts_with("status-"),
@@ -247,6 +290,7 @@ mod tests {
             RowStatusKind::RightOnly,
             RowStatusKind::Computing,
             RowStatusKind::Error,
+            RowStatusKind::NotCompared,
         ];
         let glyphs: std::collections::HashSet<char> = kinds.iter().map(|k| k.glyph()).collect();
         assert_eq!(glyphs.len(), kinds.len(), "all glyphs must be distinct");
@@ -261,6 +305,7 @@ mod tests {
             RowStatusKind::RightOnly,
             RowStatusKind::Computing,
             RowStatusKind::Error,
+            RowStatusKind::NotCompared,
         ] {
             assert!(
                 !kind.aria_label().is_empty(),
@@ -277,6 +322,7 @@ mod tests {
         assert!(RowStatusKind::LeftOnly.needs_action());
         assert!(RowStatusKind::RightOnly.needs_action());
         assert!(RowStatusKind::Error.needs_action());
+        assert!(!RowStatusKind::NotCompared.needs_action());
     }
 
     #[test]

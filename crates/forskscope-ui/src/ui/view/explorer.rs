@@ -20,14 +20,15 @@ use std::sync::Arc;
 use dioxus::prelude::*;
 use dioxus_swdir_tree::{DirectoryTree, use_scan_driver};
 
-use forskscope_core::dir::{DigestOutcome, file_digest_equal_with_cancel};
+use forskscope_core::dir::{
+    DigestOutcome, EntryType, EqualityEvidence, file_digest_equal_with_cancel,
+};
+use forskscope_core::error::Result as CoreResult;
 
 use crate::i18n::t;
 use crate::state::Store;
 use crate::ui::view::digest_epoch::{DigestEpoch, EpochStamp};
-use crate::ui::view::dir_pane::{
-    DigestState, FilteringExecutor, NavHistory, PathBar, home_dir, short_name,
-};
+use crate::ui::view::dir_pane::{FilteringExecutor, NavHistory, PathBar, home_dir, short_name};
 use forskscope_ui_logic::compute_aligned_rows;
 
 use compact::CompactTree;
@@ -68,57 +69,81 @@ pub enum DigestKey {
     RightOnly(PathBuf),
 }
 
-/// F74: the state for a directory row that exists on the left side, given
-/// whether a same-named entry on the right is *also* a directory.
-/// `counterpart_is_dir` true means both sides have a same-named directory -
-/// this says nothing about whether their *contents* match (the Explorer
-/// never examines directory contents; that verdict is Deep Compare's job,
-/// design decision handoff 002 §2), so the only honest state is
-/// `NotCompared`, never `Equal`. `counterpart_is_dir` false means the
-/// right side has no directory here at all (either nothing, or a file of
-/// the same name - a type mismatch, not a match) - correctly `Unique`,
-/// unchanged from before F74.
-fn dir_common_state(counterpart_is_dir: bool) -> DigestState {
-    if counterpart_is_dir {
-        DigestState::NotCompared
-    } else {
-        DigestState::Unique
-    }
-}
-
 /// F74 review 072: what a left-side entry's classification will be, before
 /// any async work starts. `Final` is inserted immediately; `NeedsDigest`
-/// means the caller inserts `Computing` and starts the real digest
-/// comparison - a file present on both sides is the one case this
+/// means the caller inserts a pending placeholder and starts the real
+/// digest comparison - a file present on both sides is the one case this
 /// function cannot resolve synchronously.
 #[derive(Debug, PartialEq)]
 enum EntryClassification {
-    Final(DigestState),
+    Final(EqualityEvidence),
     NeedsDigest {
         left_abs: PathBuf,
         right_abs: PathBuf,
     },
 }
 
-/// F74 review 072: the per-entry classification, extracted from the
-/// `use_effect` below so a test can drive it against real directories -
-/// this is the exact call site `9f355c6` got wrong (`if cp.is_dir() {
-/// DigestState::Equal }`), now `dir_common_state`-backed and reachable
-/// without a `VirtualDom`. Takes only plain values - no signal reads here,
-/// per the extraction risk `dir_pane.rs`'s `apply_navigation` split
-/// already established (keep signal reads in the closure, pass plain
-/// values in).
+/// F74 review 072 / handoff 007 §7b: the per-entry classification,
+/// extracted from the `use_effect` below so a test can drive it against
+/// real directories - this is the exact call site `9f355c6` got wrong
+/// (`if cp.is_dir() { DigestState::Equal }`), reachable without a
+/// `VirtualDom`. Takes only plain values - no signal reads here, per the
+/// extraction risk `dir_pane.rs`'s `apply_navigation` split already
+/// established (keep signal reads in the closure, pass plain values in).
+///
+/// Emits `EqualityEvidence` (core's vocabulary), not a display state - F76's
+/// two instances fall out of getting this right:
+/// - a directory whose counterpart is a directory → `Unknown` (the
+///   Explorer never examines directory contents; that verdict is Deep
+///   Compare's job, design decision handoff 002 §2 - `RowStatusKind`
+///   renders `Unknown` as `NotCompared`, never a claimed `Equal`);
+/// - a directory whose counterpart is a **file**, or the mirror (a file
+///   whose counterpart is a directory) → `TypeMismatch` - both sides have
+///   *something* at this path, so `LeftOnly`/`RightOnly` would be false;
+/// - neither a directory nor a file counterpart exists → `LeftOnly`,
+///   genuinely one-sided.
 fn classify_entry(rel: &Path, is_dir: bool, l_root: &Path, r_root: &Path) -> EntryClassification {
     let cp = r_root.join(rel);
     if is_dir {
-        EntryClassification::Final(dir_common_state(cp.is_dir()))
-    } else if !cp.is_file() {
-        EntryClassification::Final(DigestState::Unique)
-    } else {
+        if cp.is_dir() {
+            EntryClassification::Final(EqualityEvidence::Unknown)
+        } else if cp.is_file() {
+            EntryClassification::Final(EqualityEvidence::TypeMismatch {
+                left: EntryType::Directory,
+                right: EntryType::File,
+            })
+        } else {
+            EntryClassification::Final(EqualityEvidence::LeftOnly)
+        }
+    } else if cp.is_dir() {
+        EntryClassification::Final(EqualityEvidence::TypeMismatch {
+            left: EntryType::File,
+            right: EntryType::Directory,
+        })
+    } else if cp.is_file() {
         EntryClassification::NeedsDigest {
             left_abs: l_root.join(rel),
             right_abs: cp,
         }
+    } else {
+        EntryClassification::Final(EqualityEvidence::LeftOnly)
+    }
+}
+
+/// F76's second instance: `file_digest_equal_with_cancel`'s outcome, mapped
+/// to the evidence it actually establishes. A read failure (`Err`) becomes
+/// `Error`, not a fabricated `DigestDifferent` - the pre-existing defect
+/// this handoff closes was asserting a verdict nothing measured. `None`
+/// means "establish nothing, apply nothing" (`Cancelled` - the root change
+/// that cancelled this already cleared the map).
+fn classify_digest_outcome(outcome: CoreResult<DigestOutcome>) -> Option<EqualityEvidence> {
+    match outcome {
+        Ok(DigestOutcome::Equal) => Some(EqualityEvidence::DigestEqual),
+        Ok(DigestOutcome::Different) => Some(EqualityEvidence::DigestDifferent),
+        Ok(DigestOutcome::Cancelled) => None,
+        Err(e) => Some(EqualityEvidence::Error {
+            message: e.to_string(),
+        }),
     }
 }
 
@@ -135,9 +160,9 @@ fn classify_entry(rel: &Path, is_dir: bool, l_root: &Path, r_root: &Path) -> Ent
 /// `apply_digest_result` took the map by value, now backed by
 /// `DigestEpoch::is_current` instead of a raw generation-number compare.
 fn apply_epoch_result(
-    digest_map: &mut HashMap<DigestKey, DigestState>,
+    digest_map: &mut HashMap<DigestKey, EqualityEvidence>,
     key: DigestKey,
-    state: DigestState,
+    state: EqualityEvidence,
     stamp: EpochStamp,
     epoch: &DigestEpoch,
 ) {
@@ -286,7 +311,7 @@ pub fn Explorer() -> Element {
     });
 
     // ── Digest map ────────────────────────────────────────────────────────────
-    let mut digest_map: Signal<HashMap<DigestKey, DigestState>> = use_signal(HashMap::new);
+    let mut digest_map: Signal<HashMap<DigestKey, EqualityEvidence>> = use_signal(HashMap::new);
     let mut digest_roots: Signal<(PathBuf, PathBuf)> =
         use_signal(|| (PathBuf::new(), PathBuf::new()));
     // F78: `digest_epoch` owns the generation guard, the cancellation
@@ -349,8 +374,10 @@ pub fn Explorer() -> Element {
                 } => {
                     let key = rel.clone();
                     let mut dmap = digest_map;
-                    dmap.write()
-                        .insert(DigestKey::Common(key.clone()), DigestState::Computing);
+                    dmap.write().insert(
+                        DigestKey::Common(key.clone()),
+                        EqualityEvidence::MetadataOnly,
+                    );
                     // F78: captured now, at spawn time - the stamp this
                     // comparison belongs to, the token that can stop it if
                     // the roots change before it finishes, and the
@@ -363,31 +390,31 @@ pub fn Explorer() -> Element {
                         // `begin_task()` read guard above has already been
                         // dropped - never held across an await.
                         let _permit = sem.acquire_owned().await;
-                        let outcome = tokio::task::spawn_blocking(move || {
+                        let joined = tokio::task::spawn_blocking(move || {
                             file_digest_equal_with_cancel(&left_abs, &right_abs, &token)
                         })
-                        .await
-                        // A join error (the blocking task panicked) has no
-                        // real verdict either - same fallback the old code
-                        // used for any failure, preserved as-is (a separate,
-                        // already-tracked finding, not this handoff's scope).
-                        .unwrap_or(Ok(DigestOutcome::Different));
-                        let state = match outcome {
-                            Ok(DigestOutcome::Equal) => DigestState::Equal,
-                            Ok(DigestOutcome::Different) => DigestState::Different,
-                            Err(_) => DigestState::Different,
-                            Ok(DigestOutcome::Cancelled) => {
-                                // Established nothing - there is no verdict
-                                // to (conditionally or not) apply. The root
-                                // change that cancelled this also cleared
-                                // digest_map already.
-                                return;
-                            }
+                        .await;
+                        let evidence = match joined {
+                            Ok(outcome) => classify_digest_outcome(outcome),
+                            // A join error (the blocking task panicked) has
+                            // no real verdict either - F76's second
+                            // instance applies here too: establish nothing,
+                            // don't fabricate one.
+                            Err(_) => Some(EqualityEvidence::Error {
+                                message: "digest comparison task panicked".to_string(),
+                            }),
+                        };
+                        let Some(evidence) = evidence else {
+                            // Cancelled - established nothing, there is no
+                            // verdict to (conditionally or not) apply. The
+                            // root change that cancelled this also cleared
+                            // digest_map already.
+                            return;
                         };
                         apply_epoch_result(
                             &mut dmap.write(),
                             DigestKey::Common(key),
-                            state,
+                            evidence,
                             stamp,
                             &epoch_signal.read(),
                         );
@@ -416,7 +443,7 @@ pub fn Explorer() -> Element {
                 continue;
             }
             if !l_root2.join(&rel).exists() {
-                digest_map.write().insert(key, DigestState::Unique);
+                digest_map.write().insert(key, EqualityEvidence::RightOnly);
             }
         }
     });
@@ -562,28 +589,6 @@ pub fn Explorer() -> Element {
 mod tests {
     use super::*;
 
-    // F74: a same-named directory on both sides must never be reported
-    // `Equal` - its contents were never examined. Two directories with
-    // differing contents (the exact false-positive the bug report hit) end
-    // up with `counterpart_is_dir == true` here (the right side genuinely
-    // is a directory, differing contents notwithstanding - the Explorer
-    // has no way to know they differ without recursing, which is
-    // deliberately not this function's job), so this asserts the honest
-    // state rather than a claimed one.
-    #[test]
-    fn a_same_named_directory_on_both_sides_is_never_reported_equal() {
-        let state = dir_common_state(true);
-        assert_eq!(state, DigestState::NotCompared);
-        assert_ne!(state, DigestState::Equal);
-    }
-
-    #[test]
-    fn a_directory_with_no_directory_counterpart_is_unique() {
-        // Either nothing on the other side, or a file of the same name -
-        // a type mismatch, not a match. Unchanged behavior from before F74.
-        assert_eq!(dir_common_state(false), DigestState::Unique);
-    }
-
     fn temp_dir(tag: &str) -> std::path::PathBuf {
         let dir =
             std::env::temp_dir().join(format!("fsk-ui-explorer-f74-{tag}-{}", std::process::id()));
@@ -591,11 +596,10 @@ mod tests {
         dir
     }
 
-    // F74 review 072: drives `classify_entry` - the real call site, not
-    // just `dir_common_state` in isolation - against two real directories
-    // that share a name and genuinely differ. Confirmed to fail with the
-    // original `9f355c6` defect restored (see the commit message/review
-    // request for the observed failure output).
+    // F74 review 072: drives `classify_entry` - the real call site - against
+    // two real directories that share a name and genuinely differ.
+    // Confirmed to fail with the original `9f355c6` defect restored (see
+    // the commit message/review request for the observed failure output).
     #[test]
     fn real_directories_with_the_same_name_and_differing_contents_are_not_compared() {
         let base = temp_dir("real-path-not-equal");
@@ -615,9 +619,148 @@ mod tests {
 
         assert_eq!(
             result,
-            EntryClassification::Final(DigestState::NotCompared),
+            EntryClassification::Final(EqualityEvidence::Unknown),
             "a same-named directory whose contents differ must never be \
              classified Equal - see 9f355c6's original defect"
+        );
+    }
+
+    // Handoff 007 §8.4: F74's behaviour must survive the refactor -
+    // end-to-end, not just at `classify_entry`'s own boundary. Drives the
+    // real directory-pair classification THROUGH `RowStatusKind::from_evidence`
+    // and confirms the row a user would see is `NotCompared`, never a
+    // claimed verdict. Falsify by temporarily reverting status.rs's
+    // `Unknown => NotCompared` back to `Unknown => Computing` - the
+    // assertion below then fails (confirmed; restored - see the review
+    // request for the observed output, shared with §8.3's falsification
+    // in status.rs since both exercise the same mapping).
+    #[test]
+    fn a_same_named_directory_pair_still_shows_not_compared_end_to_end() {
+        let base = temp_dir("dir-pair-not-compared");
+        let l_root = base.join("left");
+        let r_root = base.join("right");
+        std::fs::create_dir_all(l_root.join("sub")).unwrap();
+        std::fs::create_dir_all(r_root.join("sub")).unwrap();
+
+        let rel = std::path::PathBuf::from("sub");
+        let evidence = match classify_entry(&rel, true, &l_root, &r_root) {
+            EntryClassification::Final(e) => e,
+            EntryClassification::NeedsDigest { .. } => {
+                panic!("a directory pair must never need a digest")
+            }
+        };
+
+        assert_eq!(
+            forskscope_ui_logic::RowStatusKind::from_evidence(&evidence),
+            forskscope_ui_logic::RowStatusKind::NotCompared,
+            "F74: a same-named directory pair must render as not-compared, \
+             never a claimed verdict"
+        );
+    }
+
+    // Handoff 007 §8.1 / F76's first instance: a directory on one side and
+    // a same-named FILE on the other is not "only on this side" - it exists
+    // on both sides, just as different types. Falsify by restoring the old
+    // `Unique`/one-sided classification (temporarily collapse the
+    // `cp.is_file()` branch into the final `LeftOnly` arm) - confirmed to
+    // fail; restored.
+    #[test]
+    fn a_directory_with_a_same_named_file_counterpart_is_a_type_mismatch_not_one_sided() {
+        let base = temp_dir("type-mismatch-dir-file");
+        let l_root = base.join("left");
+        let r_root = base.join("right");
+        std::fs::create_dir_all(l_root.join("x")).unwrap();
+        std::fs::create_dir_all(&r_root).unwrap();
+        std::fs::write(r_root.join("x"), "a file, not a directory").unwrap();
+
+        let rel = std::path::PathBuf::from("x");
+        let result = classify_entry(&rel, true, &l_root, &r_root);
+
+        assert_eq!(
+            result,
+            EntryClassification::Final(EqualityEvidence::TypeMismatch {
+                left: EntryType::Directory,
+                right: EntryType::File,
+            }),
+            "a directory whose counterpart is a same-named file must be a \
+             type mismatch, not falsely reported as present on one side only"
+        );
+    }
+
+    // The mirror of the case above: a file whose counterpart is a
+    // same-named directory. Same defect family, opposite sides.
+    #[test]
+    fn a_file_with_a_same_named_directory_counterpart_is_a_type_mismatch() {
+        let base = temp_dir("type-mismatch-file-dir");
+        let l_root = base.join("left");
+        let r_root = base.join("right");
+        std::fs::create_dir_all(&l_root).unwrap();
+        std::fs::write(l_root.join("x"), "a file").unwrap();
+        std::fs::create_dir_all(r_root.join("x")).unwrap();
+
+        let rel = std::path::PathBuf::from("x");
+        let result = classify_entry(&rel, false, &l_root, &r_root);
+
+        assert_eq!(
+            result,
+            EntryClassification::Final(EqualityEvidence::TypeMismatch {
+                left: EntryType::File,
+                right: EntryType::Directory,
+            })
+        );
+    }
+
+    // A directory with no counterpart at all (nothing at that path on the
+    // right) is genuinely one-sided - unchanged behaviour, renamed from the
+    // pre-F76 `Unique` vocabulary to `LeftOnly`.
+    #[test]
+    fn a_directory_with_no_counterpart_at_all_is_left_only() {
+        let base = temp_dir("dir-no-counterpart");
+        let l_root = base.join("left");
+        let r_root = base.join("right");
+        std::fs::create_dir_all(l_root.join("only-here")).unwrap();
+        std::fs::create_dir_all(&r_root).unwrap();
+
+        let rel = std::path::PathBuf::from("only-here");
+        let result = classify_entry(&rel, true, &l_root, &r_root);
+
+        assert_eq!(
+            result,
+            EntryClassification::Final(EqualityEvidence::LeftOnly)
+        );
+    }
+
+    // Handoff 007 §8.2 / F76's second instance: a failed digest comparison
+    // establishes nothing and must not be reported as `Different`. Drives
+    // `classify_digest_outcome` with a REAL `Err` produced by
+    // `file_digest_equal_with_cancel` against a path that does not exist
+    // (portable, no permission tricks needed - `fs::metadata` fails the
+    // same way on every platform) rather than a hand-constructed error
+    // value, so this is the real call site's output, not a synthetic
+    // stand-in. Falsify by temporarily changing the `Err(e) => ...` arm to
+    // `Err(_) => Some(EqualityEvidence::DigestDifferent)` - confirmed to
+    // fail; restored.
+    #[test]
+    fn a_failed_comparison_is_reported_as_error_not_different() {
+        let missing_a = std::path::Path::new("/nonexistent/fsk-explorer-f76/a");
+        let missing_b = std::path::Path::new("/nonexistent/fsk-explorer-f76/b");
+        let outcome = forskscope_core::dir::file_digest_equal_with_cancel(
+            missing_a,
+            missing_b,
+            &forskscope_core::CancellationToken::new(),
+        );
+        assert!(outcome.is_err(), "a nonexistent path must fail to compare");
+
+        let evidence = classify_digest_outcome(outcome);
+
+        assert!(
+            matches!(evidence, Some(EqualityEvidence::Error { .. })),
+            "a failed comparison must be reported as Error, not a fabricated \
+             verdict: {evidence:?}"
+        );
+        assert!(
+            !matches!(evidence, Some(EqualityEvidence::DigestDifferent)),
+            "must never collapse a read failure into Different"
         );
     }
 
@@ -643,13 +786,13 @@ mod tests {
         // The roots changed after `stale_stamp` was taken.
         epoch.restart();
 
-        let mut map: HashMap<DigestKey, DigestState> = HashMap::new();
+        let mut map: HashMap<DigestKey, EqualityEvidence> = HashMap::new();
         let key = DigestKey::Common(PathBuf::from("a.txt"));
 
         apply_epoch_result(
             &mut map,
             key.clone(),
-            DigestState::Equal,
+            EqualityEvidence::DigestEqual,
             stale_stamp,
             &epoch,
         );
@@ -665,11 +808,17 @@ mod tests {
         let epoch = DigestEpoch::new(4);
         let (stamp, _, _) = epoch.begin_task();
 
-        let mut map: HashMap<DigestKey, DigestState> = HashMap::new();
+        let mut map: HashMap<DigestKey, EqualityEvidence> = HashMap::new();
         let key = DigestKey::Common(PathBuf::from("a.txt"));
 
-        apply_epoch_result(&mut map, key.clone(), DigestState::Equal, stamp, &epoch);
+        apply_epoch_result(
+            &mut map,
+            key.clone(),
+            EqualityEvidence::DigestEqual,
+            stamp,
+            &epoch,
+        );
 
-        assert_eq!(map.get(&key), Some(&DigestState::Equal));
+        assert_eq!(map.get(&key), Some(&EqualityEvidence::DigestEqual));
     }
 }

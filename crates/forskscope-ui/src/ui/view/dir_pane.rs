@@ -18,49 +18,25 @@ use dioxus_swdir_tree::ThreadExecutor;
 use dioxus_swdir_tree::{LoadPayload, ScanExecutor, ScanFuture, ScanJob};
 
 use forskscope_core::IgnoreRules;
+use forskscope_core::dir::EqualityEvidence;
+use forskscope_ui_logic::RowStatusKind;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
-/// Per-entry comparison status shown in tree rows.
-#[derive(Clone, PartialEq, Debug)]
-pub enum DigestState {
-    Computing,
-    Equal,
-    Different,
-    Unique,
-    /// F74: a directory row whose contents were never examined - a
-    /// directory of the same name exists on the other side, but that says
-    /// nothing about whether its contents match. Distinct from `Equal`
-    /// (which would be a false claim of identity) and from `Unique` (which
-    /// means present on only one side - still true and unchanged for a
-    /// directory that genuinely has no counterpart). The Explorer does not
-    /// recurse or digest subtrees - that verdict is Deep Compare's job.
-    NotCompared,
-}
-
-/// The tree-row glyph and CSS class for `status` - no `Lang` dependency,
-/// kept separate from `status_label` below so the glyph mapping is
-/// directly testable without constructing one.
-fn status_glyph(status: &DigestState) -> (&'static str, &'static str) {
-    match status {
-        DigestState::Computing => ("⟳", "st-computing"),
-        DigestState::Equal => ("✓", "st-equal"),
-        DigestState::Different => ("⚠", "st-diff"),
-        DigestState::Unique => ("·", "st-unique"),
-        DigestState::NotCompared => ("–", "st-not-compared"),
-    }
-}
-
-/// F74/RFC-009 §7: the accessible label for `status`, in `lang` - every
-/// variant must yield a non-empty string, since a bare glyph with no
-/// `title` gives a screen reader nothing to announce.
-fn status_label(status: &DigestState, lang: Lang) -> String {
-    match status {
-        DigestState::Computing => t(lang, "Comparing…"),
-        DigestState::Equal => t(lang, "Identical"),
-        DigestState::Different => t(lang, "Different"),
-        DigestState::Unique => t(lang, "Only on this side"),
-        DigestState::NotCompared => t(lang, "Directory contents not compared — use Deep Compare"),
+/// Handoff 007/RFC-009 §7: the accessible label for `kind`, in `lang` -
+/// every variant must yield a non-empty string, since a bare glyph with no
+/// `title` gives a screen reader nothing to announce. `RowStatusKind`'s own
+/// `aria_label()` is fixed English (`ui-logic` has no i18n system); this is
+/// the `Lang`-aware layer above it, replacing `dir_pane.rs`'s old
+/// `status_label` over the now-deleted `DigestState`.
+fn status_kind_label(kind: RowStatusKind, lang: Lang) -> String {
+    match kind {
+        RowStatusKind::Equal => t(lang, "Identical"),
+        RowStatusKind::Different => t(lang, "Different"),
+        RowStatusKind::LeftOnly | RowStatusKind::RightOnly => t(lang, "Only on this side"),
+        RowStatusKind::Computing => t(lang, "Comparing…"),
+        RowStatusKind::Error => t(lang, "Comparison failed"),
+        RowStatusKind::NotCompared => t(lang, "Directory contents not compared — use Deep Compare"),
     }
 }
 
@@ -257,7 +233,7 @@ pub fn TreeRow(
     is_expanded: bool,
     is_selected: bool,
     depth: u32,
-    status: Option<DigestState>,
+    status: Option<EqualityEvidence>,
     /// `true` when this file was sniffed as binary (RFC-066).
     #[props(default = false)]
     is_binary: bool,
@@ -297,17 +273,16 @@ pub fn TreeRow(
         "tree-row"
     };
 
-    // F74: every status carries an accessible label, routed through
-    // `t(lang, …)` like the `bin` badge three lines below - RFC-009 §7
-    // forbids status by styling/glyph alone, and a bare glyph with no
-    // `title` gave a screen reader nothing to announce. Split into two
-    // plain, `Lang`-independent-where-possible functions below so both the
-    // glyph mapping and the label text are directly unit-testable.
-    let (st_icon, st_cls) = status.as_ref().map(status_glyph).unwrap_or(("", ""));
-    let st_label = status
-        .as_ref()
-        .map(|s| status_label(s, lang))
-        .unwrap_or_default();
+    // F74/handoff 007: every status carries an accessible label, routed
+    // through `t(lang, …)` like the `bin` badge three lines below -
+    // RFC-009 §7 forbids status by styling/glyph alone, and a bare glyph
+    // with no `title` gave a screen reader nothing to announce. Rendered
+    // through `RowStatusKind` (core's `EqualityEvidence`, mapped by
+    // `ui-logic`) rather than the deleted ad-hoc `DigestState` - its
+    // `glyph()`/`css_class()` are directly unit-tested in `status.rs`;
+    // `status_kind_label` above is the `Lang`-aware layer this file still
+    // owns.
+    let status_kind = status.as_ref().map(RowStatusKind::from_evidence);
     rsx! {
         div {
             class: "{rc}", role: "row", style: "padding-left: {indent}px",
@@ -332,13 +307,20 @@ pub fn TreeRow(
                     title: t(lang, "Binary file. Binary comparison is off — enable it in Settings → Advanced."),
                     "bin"
                 }
-            } else if !st_icon.is_empty() {
-                span {
-                    class: "tree-status {st_cls}",
-                    role: "img",
-                    aria_label: "{st_label}",
-                    title: "{st_label}",
-                    "{st_icon}"
+            } else if let Some(kind) = status_kind {
+                {
+                    let label = status_kind_label(kind, lang);
+                    let cls = kind.css_class();
+                    let glyph = kind.glyph();
+                    rsx! {
+                        span {
+                            class: "tree-status {cls}",
+                            role: "img",
+                            aria_label: "{label}",
+                            title: "{label}",
+                            "{glyph}"
+                        }
+                    }
                 }
             }
         }
@@ -507,39 +489,43 @@ mod tests {
         });
     }
 
-    // F74/RFC-009 §7: every `DigestState` variant must yield a non-empty
-    // accessible label, in every supported language - a bare glyph with
-    // no `title` gives a screen reader nothing to announce.
+    // F74/RFC-009 §7/handoff 007: every `RowStatusKind` variant must yield
+    // a non-empty accessible label, in every supported language - a bare
+    // glyph with no `title` gives a screen reader nothing to announce.
+    // `RowStatusKind` itself has no `Lang` concept (`ui-logic` has no i18n
+    // system); this exercises `dir_pane.rs`'s own `Lang`-aware layer over
+    // it.
     #[test]
-    fn every_digest_state_has_a_non_empty_label_in_every_language() {
-        let states = [
-            DigestState::Computing,
-            DigestState::Equal,
-            DigestState::Different,
-            DigestState::Unique,
-            DigestState::NotCompared,
+    fn every_row_status_kind_has_a_non_empty_label_in_every_language() {
+        let kinds = [
+            RowStatusKind::Computing,
+            RowStatusKind::Equal,
+            RowStatusKind::Different,
+            RowStatusKind::LeftOnly,
+            RowStatusKind::RightOnly,
+            RowStatusKind::Error,
+            RowStatusKind::NotCompared,
         ];
-        for state in &states {
+        for kind in kinds {
             for lang in [Lang::En, Lang::Ja] {
-                let label = status_label(state, lang);
+                let label = status_kind_label(kind, lang);
                 assert!(
                     !label.is_empty(),
-                    "{state:?} has an empty accessible label for {lang:?}"
+                    "{kind:?} has an empty accessible label for {lang:?}"
                 );
             }
         }
     }
 
-    // F74: `NotCompared` must use its own glyph/class - not silently
-    // fall back to `Equal`'s (which would recreate the false-equal claim
-    // this state exists to replace) or to an empty string (which would
-    // hide the row's status entirely, same failure mode as before F74).
+    // F74: `NotCompared` must use its own glyph/class - not silently fall
+    // back to `Equal`'s (which would recreate the false-equal claim this
+    // state exists to replace) or to `Computing`'s (a spinner that never
+    // resolves, handoff 007 §4's first defect). The glyph/class contract
+    // itself is `status.rs`'s (tested there); this confirms `dir_pane.rs`'s
+    // label layer keeps `NotCompared` distinct from `Equal` too.
     #[test]
-    fn not_compared_has_its_own_distinct_glyph_and_label() {
-        let (icon, cls) = status_glyph(&DigestState::NotCompared);
-        assert!(!icon.is_empty());
-        assert_ne!((icon, cls), status_glyph(&DigestState::Equal));
-        let label = status_label(&DigestState::NotCompared, Lang::En);
-        assert_ne!(label, status_label(&DigestState::Equal, Lang::En));
+    fn not_compared_has_a_distinct_label_from_equal() {
+        let label = status_kind_label(RowStatusKind::NotCompared, Lang::En);
+        assert_ne!(label, status_kind_label(RowStatusKind::Equal, Lang::En));
     }
 }

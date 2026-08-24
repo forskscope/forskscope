@@ -5,12 +5,12 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
+use forskscope_core::dir::EqualityEvidence;
 use forskscope_ui_logic::AlignedRow;
 
 use super::DigestKey;
 use crate::i18n::t;
 use crate::state::Lang;
-use crate::ui::view::dir_pane::DigestState;
 
 // ── Filter bar component ──────────────────────────────────────────────────────
 
@@ -73,7 +73,8 @@ pub fn FilterBar(
 ///
 /// - `query`: lowercase name substring (empty = no filter).
 /// - `hide_bin`: hide pairs where all present file sides are binary.
-/// - `hide_eq`: hide pairs whose digest is `DigestState::Equal`.
+/// - `hide_eq`: hide pairs whose evidence is conclusively equal
+///   (`EqualityEvidence::is_equal`).
 /// - `binary_enabled`: when `true`, the binary gate is open; hide_bin has no effect.
 pub fn apply_filter(
     rows: Vec<AlignedRow>,
@@ -81,7 +82,7 @@ pub fn apply_filter(
     hide_bin: bool,
     hide_eq: bool,
     binary_enabled: bool,
-    digest_map: &HashMap<DigestKey, DigestState>,
+    digest_map: &HashMap<DigestKey, EqualityEvidence>,
     binary_cache: &mut Signal<HashMap<PathBuf, bool>>,
 ) -> Vec<AlignedRow> {
     rows.into_iter()
@@ -136,21 +137,21 @@ pub fn apply_filter(
 
             // Hide-identical filter. F74: a directory row is never proven
             // identical here - the Explorer doesn't examine directory
-            // contents, so its `DigestState` (now `NotCompared`, never
-            // `Equal`) can't earn hiding either way. Checking `is_dir`
-            // directly, not just the state, keeps this exemption correct
-            // even if some future state ever misrepresented a directory as
-            // `Equal` again - hiding is for rows *proven* identical, and a
-            // directory never is, regardless of what its map entry says.
+            // contents, so its evidence (`Unknown`, rendered as
+            // `NotCompared`, never `Equal`) can't earn hiding either way.
+            // Checking `is_dir` directly, not just the evidence, keeps this
+            // exemption correct even if some future evidence ever
+            // misrepresented a directory as equal again - hiding is for
+            // rows *proven* identical, and a directory never is, regardless
+            // of what its map entry says.
             let is_dir_row = lr.as_ref().map(|r| r.is_dir).unwrap_or(false)
                 || rr.as_ref().map(|r| r.is_dir).unwrap_or(false);
             let eq_ok = if hide_eq && !is_dir_row {
                 let rel = lr.as_ref().or(rr.as_ref()).map(|r| r.rel_path.clone());
                 rel.map(|rel| {
-                    !matches!(
-                        digest_map.get(&DigestKey::Common(rel)),
-                        Some(DigestState::Equal)
-                    )
+                    !digest_map
+                        .get(&DigestKey::Common(rel))
+                        .is_some_and(EqualityEvidence::is_equal)
                 })
                 .unwrap_or(true)
             } else {
@@ -181,12 +182,13 @@ mod tests {
     }
 
     // F74: hide-identical must never hide a directory row, whatever its
-    // `DigestState` says - a directory is never *proven* identical by this
+    // evidence says - a directory is never *proven* identical by this
     // Explorer, since its contents are never examined. Checks the
-    // exemption against `Equal` specifically (not just `NotCompared`,
-    // which can no longer be produced at all) because the guard is meant
-    // to hold regardless of what the map entry says, not because
-    // `NotCompared` happens to differ from `Equal`.
+    // exemption against `DigestEqual` specifically (not `Unknown`, which
+    // is what `classify_entry` actually produces for a directory pair and
+    // is never treated as equal anyway) because the guard is meant to hold
+    // regardless of what the map entry says, not because `Unknown` happens
+    // to differ from an equal verdict.
     #[test]
     fn hide_identical_never_hides_a_directory_row_even_if_marked_equal() {
         with_test_store(|_store| {
@@ -195,7 +197,7 @@ mod tests {
             let mut digest_map = HashMap::new();
             digest_map.insert(
                 DigestKey::Common(PathBuf::from("same-name-dir")),
-                DigestState::Equal,
+                EqualityEvidence::DigestEqual,
             );
             let rows = vec![(
                 Some(dir_row("same-name-dir")),

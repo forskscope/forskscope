@@ -29,6 +29,7 @@ fn ja(key: &str) -> Option<&'static str> {
         "Directory contents not compared — use Deep Compare" => {
             "ディレクトリの中身は比較されていません — ディープ比較を使用してください"
         }
+        "Comparison failed" => "比較に失敗しました",
         "Filter items" => "アイテムをフィルター",
         "Filter by name…" => "名前でフィルター…",
         "Hide binary" => "バイナリを非表示",

@@ -9,12 +9,13 @@ use std::path::PathBuf;
 use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
 use dioxus_swdir_tree::{DirectoryTree, DirectoryTreeEvent, ScanRequest, SelectionMode};
+use forskscope_core::dir::EqualityEvidence;
 use forskscope_ui_logic::AlignedRow;
 
 use super::{DigestKey, FocusedPane, PickKind};
 use crate::i18n::t;
 use crate::state::{Lang, Store, open_compare};
-use crate::ui::view::dir_pane::{DigestState, NavHistory, TreeRow, navigate_to};
+use crate::ui::view::dir_pane::{NavHistory, TreeRow, navigate_to};
 
 #[allow(clippy::too_many_arguments)]
 #[component]
@@ -32,7 +33,7 @@ pub fn AlignedTree(
     mut left_pick: Signal<Option<PickKind>>,
     mut right_pick: Signal<Option<PickKind>>,
     mut focused_pane: Signal<FocusedPane>,
-    mut digest_map: Signal<HashMap<DigestKey, DigestState>>,
+    mut digest_map: Signal<HashMap<DigestKey, EqualityEvidence>>,
     mut binary_cache: Signal<HashMap<PathBuf, bool>>,
     binary_enabled: bool,
 ) -> Element {

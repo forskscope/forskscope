@@ -6,10 +6,11 @@ use std::path::PathBuf;
 
 use dioxus::prelude::*;
 use dioxus_swdir_tree::{DirectoryTree, ScanRequest, SelectionMode};
+use forskscope_core::dir::EqualityEvidence;
 
 use super::{DigestKey, PickKind};
 use crate::state::{Lang, Store, open_compare};
-use crate::ui::view::dir_pane::{DigestState, NavHistory, TreeRow, navigate_to};
+use crate::ui::view::dir_pane::{NavHistory, TreeRow, navigate_to};
 
 type FlatRow = (PathBuf, bool, bool, bool, u32);
 
@@ -31,7 +32,7 @@ pub fn CompactTree(
     right_hist: Signal<NavHistory>,
     mut left_pick: Signal<Option<PickKind>>,
     mut right_pick: Signal<Option<PickKind>>,
-    mut digest_map: Signal<HashMap<DigestKey, DigestState>>,
+    mut digest_map: Signal<HashMap<DigestKey, EqualityEvidence>>,
     mut binary_cache: Signal<HashMap<PathBuf, bool>>,
     binary_enabled: bool,
     filter_query: Signal<String>,

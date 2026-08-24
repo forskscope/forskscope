@@ -33,16 +33,22 @@
 .pane-half:last-child { border-right: none; }
 .row-spacer { height: var(--row-h); }
 
-/* ── Digest status icons ── */
+/* ── Digest status icons (handoff 007: RowStatusKind, not DigestState) ──
+   Compound `.tree-status.status-*` selectors, not bare `.status-*` - Deep
+   Compare (12-view-directory-report.css) defines its own bare `.status-equal`
+   etc. for a different row shape (`.dir-status`); the compound form keeps
+   these two views' rules from depending on file concatenation order. */
 .tree-status { margin-left: auto; padding-right: .4rem; font-size: 11px; flex-shrink: 0; }
-.st-equal     { color: var(--ins-mark, #4a6); }
-.st-diff      { color: var(--warn, #c90); }
-.st-unique    { color: var(--muted); }
-.st-computing { color: var(--muted); animation: spin .8s linear infinite; }
+.tree-status.status-equal      { color: var(--ins-mark, #4a6); }
+.tree-status.status-different  { color: var(--warn, #c90); }
+.tree-status.status-left-only  { color: var(--muted); }
+.tree-status.status-right-only { color: var(--muted); }
+.tree-status.status-error      { color: var(--err); }
+.tree-status.status-computing  { color: var(--muted); animation: spin .8s linear infinite; }
 /* F74: a directory row's contents were never examined - deliberately not
-   var(--ins-mark)/st-equal's green, which would repeat the false-equal
-   claim this state exists to replace. */
-.st-not-compared { color: var(--muted); }
+   status-equal's green, which would repeat the false-equal claim this
+   state exists to replace. */
+.tree-status.status-not-compared { color: var(--muted); }
 @keyframes spin {
   from { display: inline-block; transform: rotate(0deg); }
   to   { display: inline-block; transform: rotate(360deg); }
