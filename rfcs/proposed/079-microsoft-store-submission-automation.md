@@ -264,11 +264,17 @@ submission. Two mitigations, and the choice belongs to implementation:
 
 **Design now; implement after Gate D.**
 
-The reasoning is timing, not risk. M5 is currently gathering platform evidence
-against `0.167.0`'s exact artifacts. Adding a Windows artifact mid-matrix means
-new digests and re-run rows, and RFC-078 is explicit that evidence from an older
-hash cannot approve a newer artifact. The design costs nothing to settle now and
-the implementation is cheap to defer.
+The reasoning is timing, not risk — but **the timing argument as first written
+has expired, corrected 2026-08-22.** It said M5 was *currently* gathering evidence
+against `0.167.0`'s exact artifacts, so a new Windows artifact would mean new
+digests and re-run rows. M5's CI rows are complete, the evidence is tied to
+`0.167.1`, and seven code commits have landed since — so the re-run is already
+mandatory and this RFC cannot avoid it by waiting.
+
+**What actually holds this back is F60**, which blocks implementation on its own
+(see Dependencies) and would otherwise be shipped unattended on every release.
+The design still costs nothing to settle now and the implementation is still
+cheap to defer — for that reason rather than the original one.
 
 **F60 should be decided before the first automated submission** (§"Automation
 makes unsettled claims recurring").

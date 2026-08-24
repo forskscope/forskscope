@@ -387,9 +387,24 @@ accessibility tree is a P07 assertion, as recorded for F74.
 ## Sequencing
 
 **After Gate D.** This is a feature, and Gate D is blocked on **F44** (upstream)
-and **F60** (an owner decision). Adding an Explorer feature now would put new code into the candidate that
-the acceptance matrix has not covered, for a question Deep Compare already
-answers by another route.
+and **F60** (an owner decision). Adding an Explorer *feature* now would put new code into a
+stabilization program for a question Deep Compare already answers by another
+route.
+
+**One of this section's two original reasons is void, corrected 2026-08-22.** It
+also said adding code now "would put new code into the candidate that the
+acceptance matrix has not covered". **The matrix already does not cover `main`:**
+M5's evidence is tied to `0.167.1`, and seven code commits have landed since it
+(F74, F77, F78, F79), spanning all three crates. A re-cut and a full matrix
+re-run are therefore **already mandatory** and are not a cost this RFC can avoid
+by waiting. F44's fix will force the same re-run again when it lands, since a
+`dioxus-desktop` bump changes every artifact's digest.
+
+What survives is the other reason, and it is the one that matters: **this is a
+feature, and defect work and feature work carry different risk during a
+stabilization program.** Deferring RFC-080 is still right. Deferring the *defect*
+entries it depends on — F76, and F75's wiring — no longer has the evidence
+argument behind it.
 
 Nothing is lost by waiting: F74's fix means the Explorer is currently *honest*
 about not knowing, which is a correct state to ship, not a placeholder.
