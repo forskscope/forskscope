@@ -233,12 +233,93 @@ be waiting on the very thing that makes this path valuable.
 - **Q1 — maintainer rights. CLOSED 2026-08-22** — the owner confirms the account
   that published `0.22.13` still holds them, with its configuration unchanged.
   The package was not orphaned or adopted.
-- **Q2 — the `0.22.13 → 0.167.2` jump.** Publishing current is assumed. Say so
-  if you want an intermediate step; I see no reason for one.
-- **Q3 — `pkgrel` policy.** A new upstream version resets `pkgrel=1`. Packaging-only
-  fixes bump it. Who decides, and does automation ever bump it unattended?
-  Recommendation: never — a `pkgrel` bump means the recipe changed, which is a
-  human change.
+### Q2 — the `0.22.13 → 0.167.2` jump
+
+**The only real risk was version ordering, and it is checked and absent.** Arch
+compares version segments numerically, not lexically, so `167` sorts above `22`
+despite being shorter as a string. Verified with the real tool:
+
+```
+vercmp 0.167.2 0.22.13  ->  1     (first is newer)
+vercmp 0.22.13 0.167.2  -> -1     (first is older)
+```
+
+So existing installs see a normal upgrade and **no `epoch=` is needed**. An
+`epoch` is the escape hatch for versions that sort wrongly, it is permanent once
+added, and adding one unnecessarily would be a scar on the package forever.
+
+**Option A — publish straight to current. (Recommended.)**
+*Pros:* one push; the AUR only ever carries one version, so intermediate ones
+would be visible to nobody; nothing to maintain afterwards.
+*Cons:* the AUR git history shows a 145-version gap. That is an accurate record
+of what happened.
+
+**Option B — publish one or more intermediate versions first.**
+*Pros:* a tidier-looking history.
+*Cons:* every intermediate would have to build, which means resurrecting old
+`PKGBUILD`s against today's toolchain — real work with a real failure mode, in
+service of a history no user reads. **Nobody can install an intermediate**: the
+AUR serves HEAD only.
+
+**Option C — delete and re-request the package.**
+*Pros:* none that apply. This exists for renames and for packages that should not
+exist.
+*Cons:* discards the package's history and its existing users' upgrade path, and
+re-requesting invites a review that Option A does not need.
+
+### Q3 — `pkgrel` policy, and the gap it exposes
+
+**`pkgrel` counts packaging revisions within one upstream version.** It resets to
+`1` when `pkgver` changes and increments when the *recipe* changes but upstream
+does not.
+
+**Two facts make this less academic than it sounds.**
+
+**(1) Nothing checks `pkgrel` today.** `cargo xtask version-sync` covers `pkgver`
+(`xtask/src/main.rs:290`) and nothing covers `pkgrel`; it is a bare literal in the
+file. So it can drift: leave it at `2` after a recipe fix, bump `pkgver`, and the
+AUR gets `0.168.0-2` when no `0.168.0-1` ever existed. Harmless to users,
+incorrect as a record, and invisible.
+
+**(2) A recipe-only fix has no route to users under §4's trigger.** Today's
+`xdotool` fix (`b8163c0`) is exactly that case: it fixes an install that
+completes and then fails to start, it changes no source code, and under
+"publish on `release: published`" it cannot reach an Arch user **until the next
+release happens for unrelated reasons.** That is the gap this question is really
+about.
+
+**Option A — automation never bumps `pkgrel`; publish only on release.**
+*Pros:* simplest; exactly one path to the AUR; the release approval gate is the
+only gate there is.
+*Cons:* **recipe-only fixes are stranded** until an unrelated release. A
+packaging defect that breaks startup would sit unpublished while the code it
+packages is fine. That is the case in front of us right now.
+
+**Option B — automation detects a recipe change and bumps `pkgrel` itself.**
+*Pros:* fixes reach users promptly with no human step.
+*Cons:* **a second trigger path that bypasses the release approval gate**, which
+is the property §4 was written to protect. It also means automation deciding
+*what counts as a recipe change* — a comment edit, a whitespace change — and
+inventing a version number nobody approved. **Not recommended.**
+
+**Option C — two paths: automatic on release, manual dispatch for recipe fixes.
+(Recommended.)**
+On `release: published`, publish with `pkgrel=1`. For a recipe-only fix, a
+`workflow_dispatch` the owner triggers, publishing the in-repo `PKGBUILD` with
+whatever `pkgrel` the owner committed.
+*Pros:* fixes reach users without waiting for a release; **the gate survives,
+because a human still acts in both paths**; automation never invents a version
+number, in either path.
+*Cons:* one more documented path in `release.md`.
+
+**One refinement that applies whichever is chosen, and closes fact (1):**
+**automation never *bumps* `pkgrel`, but it does *verify* it.** If `pkgver`
+differs from what the AUR currently carries, `pkgrel` must be `1`; if `pkgver` is
+unchanged, `pkgrel` must be **greater** than what is published. Both are cheap
+checks against the AUR's own `.SRCINFO`, and they catch the drift nothing catches
+today. This is a check, not a decision — it never writes a value, it refuses a
+wrong one.
+
 - **Q4 — a dedicated SSH key, or the one already registered?** The owner's
   existing configuration works, which makes reuse tempting. **Recommendation:
   add a dedicated key**, and for a narrower reason than “least privilege” —
