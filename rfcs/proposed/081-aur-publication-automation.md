@@ -269,6 +269,40 @@ re-requesting invites a review that Option A does not need.
 
 ### Q3 — `pkgrel` policy, and the gap it exposes
 
+**Why there are two version fields at all**, since the question came up and will
+come up again.
+
+`pkgver-pkgrel` separates **two different authorities**, not two halves of one
+number:
+
+- **`pkgver` belongs to upstream.** It is not the packager's to invent. Other
+  packages express constraints against it (`forskscope>=0.167.2`), users match it
+  against release notes, and upstream will eventually publish the next value
+  itself.
+- **`pkgrel` belongs to the packager.** It is a namespace the packager owns,
+  which cannot collide with anything upstream will later choose.
+
+Aggregating them — publishing a recipe fix as `0.167.2.1` or `0.167.3` — means
+**writing into upstream's namespace**: claiming a release that does not exist,
+and colliding with the real one when it arrives. Every major distribution makes
+the same split for the same reason (Debian's `1.2.3-4`, RPM's `Version` /
+`Release`).
+
+**What makes it feel redundant here is that this project is both parties.** The
+usual packager is a third party who *cannot* change `pkgver`, so the split is
+self-evident. We can change it, which makes one number look sufficient — and it
+is not, because the two still change at different times for different reasons
+even when one person holds both roles.
+
+**The aggregating option, named so it is rejected on cost rather than
+overlooked:** we *could* cut a real upstream release for every packaging fix, and
+never use `pkgrel` at all. In most projects that is merely wasteful. Here it is
+expensive: under RFC-078 a version is an evidence obligation — new artifacts, new
+digests, matrix rows re-run — so a one-word `depends` change would drag a full
+platform-acceptance cycle behind it. The cheap field exists precisely to avoid
+that, and this project has more reason to use it than most.
+
+
 **`pkgrel` counts packaging revisions within one upstream version.** It resets to
 `1` when `pkgver` changes and increments when the *recipe* changes but upstream
 does not.
