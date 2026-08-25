@@ -99,6 +99,7 @@ fn ja(key: &str) -> Option<&'static str> {
         "right only" => "右のみ",
         "unreadable" => "読み取り不可",
         "Unreadable" => "読み取り不可",
+        "Symlink not followed" => "シンボリックリンク（未追跡）",
         "checking" => "確認中",
         "Copy" => "コピー",
         "Back" => "戻る",

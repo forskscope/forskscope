@@ -272,6 +272,28 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
 // `left_root`/`right_root` as props here removes the substitution and the
 // gate it required - the roots are now always present, so there is nothing
 // left to gate on.
+/// F80/RFC-009 §7: the accessible label for `status`, in `lang` - every
+/// variant must yield a non-empty string, since a bare glyph with no
+/// `title` gives a screen reader nothing to announce. Reuses the six keys
+/// the Explorer work already added (handoff 007) rather than inventing
+/// near-duplicates - only `Symlink` is new here.
+fn status_label(status: RecStatus, lang: Lang) -> String {
+    match status {
+        RecStatus::Changed => t(lang, "Different"),
+        RecStatus::LeftOnly => t(lang, "Only on the left"),
+        RecStatus::RightOnly => t(lang, "Only on the right"),
+        RecStatus::Equal => t(lang, "Identical"),
+        RecStatus::Computing => t(lang, "Comparing…"),
+        RecStatus::Unreadable => t(lang, "Unreadable"),
+        // F80: core does not follow cross-root symlinks (the entry is
+        // reported, not compared, per `RecStatus::Symlink`'s own doc
+        // comment) - the honest label says the link was not followed, not
+        // merely that one exists, so it does not read as a verdict about
+        // the target.
+        RecStatus::Symlink => t(lang, "Symlink not followed"),
+    }
+}
+
 #[component]
 fn DeepRow(entry: RecEntry, lang: Lang, left_root: PathBuf, right_root: PathBuf) -> Element {
     let mut store = use_context::<Store>();
@@ -305,24 +327,20 @@ fn DeepRow(entry: RecEntry, lang: Lang, left_root: PathBuf, right_root: PathBuf)
     let e2 = entry.clone();
     let lr_cmp = left_root.clone();
     let rr_cmp = right_root.clone();
+    // F80: one span for every status, not a per-status branch (review 076
+    // recorded that a second special case, added later, would be worse
+    // than the uniform absence F79 started from). `role: "img"` +
+    // `aria_label` is the pattern F74 established in `dir_pane.rs`;
+    // `title` kept for the mouse tooltip.
+    let label = status_label(entry.status, lang);
     rsx! {
         div { class: "deep-row",
-            // F79: this status needs an accessible label - it is new, and
-            // unlike the other glyphs here (none of which carry one today;
-            // out of scope to retrofit as part of this handoff) a bare
-            // "⊘" gives a screen reader nothing to announce. `role: "img"`
-            // + `aria_label` is the pattern F74 established for exactly
-            // this in `dir_pane.rs`; `title` kept for the mouse tooltip.
-            if entry.status == RecStatus::Unreadable {
-                span {
-                    class: "dir-status {cls}",
-                    role: "img",
-                    aria_label: t(lang, "Unreadable"),
-                    title: t(lang, "Unreadable"),
-                    "{icon}"
-                }
-            } else {
-                span { class: "dir-status {cls}", "{icon}" }
+            span {
+                class: "dir-status {cls}",
+                role: "img",
+                aria_label: "{label}",
+                title: "{label}",
+                "{icon}"
             }
             span { class: "deep-path", "{path_str}" }
             span { class: "dir-size", {size_label(&entry)} }
@@ -693,5 +711,74 @@ mod tests {
             &epoch,
         );
         assert_eq!(entries[0].status, RecStatus::Equal);
+    }
+
+    // F80 §7.1: every `RecStatus` variant must yield a non-empty
+    // accessible label, in every supported language - the same shape as
+    // `dir_pane.rs`'s `every_row_status_kind_has_a_non_empty_label_in_every_language`.
+    // A bare glyph with no `title`/`aria_label` gives a screen reader
+    // nothing to announce, and this view's statuses gate the copy
+    // controls (`can_copy_left_to_right`/`can_copy_right_to_left`/
+    // `can_cmp`), so a screen-reader user currently cannot tell *why* a
+    // row offers no copy button.
+    #[test]
+    fn every_rec_status_has_a_non_empty_label_in_every_language() {
+        let statuses = [
+            RecStatus::Changed,
+            RecStatus::LeftOnly,
+            RecStatus::RightOnly,
+            RecStatus::Equal,
+            RecStatus::Computing,
+            RecStatus::Unreadable,
+            RecStatus::Symlink,
+        ];
+        for status in statuses {
+            for lang in [Lang::En, Lang::Ja] {
+                let label = status_label(status, lang);
+                assert!(
+                    !label.is_empty(),
+                    "{status:?} has an empty accessible label for {lang:?}"
+                );
+            }
+        }
+    }
+
+    // F80 §7.2: no two statuses share a label - each of the seven must be
+    // announceable as a distinct thing. (Explorer's `LeftOnly`/`RightOnly`
+    // needed the same fix in review 077 §4b - checked here from the start
+    // rather than discovered later.)
+    #[test]
+    fn no_two_statuses_share_a_label() {
+        let statuses = [
+            RecStatus::Changed,
+            RecStatus::LeftOnly,
+            RecStatus::RightOnly,
+            RecStatus::Equal,
+            RecStatus::Computing,
+            RecStatus::Unreadable,
+            RecStatus::Symlink,
+        ];
+        let labels: std::collections::HashSet<String> = statuses
+            .iter()
+            .map(|s| status_label(*s, Lang::En))
+            .collect();
+        assert_eq!(
+            labels.len(),
+            statuses.len(),
+            "every RecStatus must have a distinct label"
+        );
+    }
+
+    // F80: a symlink is reported, not compared - core does not follow
+    // cross-root symlinks. The label must say the link was not followed,
+    // not merely that one exists, so it does not read as a verdict about
+    // the (unexamined) target.
+    #[test]
+    fn symlink_label_says_not_followed_not_a_verdict() {
+        let label = status_label(RecStatus::Symlink, Lang::En);
+        assert!(
+            label.to_lowercase().contains("not followed"),
+            "the symlink label must say the link was not followed: {label:?}"
+        );
     }
 }
