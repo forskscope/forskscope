@@ -248,7 +248,7 @@ So existing installs see a normal upgrade and **no `epoch=` is needed**. An
 `epoch` is the escape hatch for versions that sort wrongly, it is permanent once
 added, and adding one unnecessarily would be a scar on the package forever.
 
-**Option A — publish straight to current. (Recommended.)**
+**Option A — publish straight to current. CHOSEN 2026-08-22 by the owner.**
 *Pros:* one push; the AUR only ever carries one version, so intermediate ones
 would be visible to nobody; nothing to maintain afterwards.
 *Cons:* the AUR git history shows a 145-version gap. That is an accurate record
@@ -288,37 +288,73 @@ completes and then fails to start, it changes no source code, and under
 release happens for unrelated reasons.** That is the gap this question is really
 about.
 
-**Option A — automation never bumps `pkgrel`; publish only on release.**
-*Pros:* simplest; exactly one path to the AUR; the release approval gate is the
-only gate there is.
-*Cons:* **recipe-only fixes are stranded** until an unrelated release. A
-packaging defect that breaks startup would sit unpublished while the code it
-packages is fine. That is the case in front of us right now.
+**The governing rule, corrected 2026-08-22 after the owner rejected the first
+version of Option C:**
+
+> **Automation never writes a version component. `pkgver` and `pkgrel` both come
+> from a human commit; automation verifies them and refuses to publish when they
+> are wrong.**
+
+The first draft of Option C said *"on `release: published`, publish with
+`pkgrel=1`"*, and put "verify, never write" below as a refinement. The owner's
+objection is exact: **that is Option B's defect in a different place.**
+Automation asserting `1` is automation inventing a value, even when `1` is the
+value a human would have chosen. Verification is not a refinement of this
+design; it **is** the design.
+
+**Option A — publish only on release; no other path.**
+*Pros:* one trigger, one gate, nothing to misuse.
+*Cons:* **recipe-only fixes are stranded** until an unrelated release. Today's
+`xdotool` fix is that case — it repairs an install that completes and then fails
+to start, and would wait on a code release it has nothing to do with.
 
 **Option B — automation detects a recipe change and bumps `pkgrel` itself.**
-*Pros:* fixes reach users promptly with no human step.
-*Cons:* **a second trigger path that bypasses the release approval gate**, which
-is the property §4 was written to protect. It also means automation deciding
-*what counts as a recipe change* — a comment edit, a whitespace change — and
-inventing a version number nobody approved. **Not recommended.**
+*Pros:* fixes ship with no human step.
+*Cons:* automation decides what counts as a recipe change and **writes a version
+nobody approved**, on a trigger outside the release gate. **Rejected.**
 
-**Option C — two paths: automatic on release, manual dispatch for recipe fixes.
+**Option C — two triggers, and automation writes no version in either.
 (Recommended.)**
-On `release: published`, publish with `pkgrel=1`. For a recipe-only fix, a
-`workflow_dispatch` the owner triggers, publishing the in-repo `PKGBUILD` with
-whatever `pkgrel` the owner committed.
-*Pros:* fixes reach users without waiting for a release; **the gate survives,
-because a human still acts in both paths**; automation never invents a version
-number, in either path.
-*Cons:* one more documented path in `release.md`.
 
-**One refinement that applies whichever is chosen, and closes fact (1):**
-**automation never *bumps* `pkgrel`, but it does *verify* it.** If `pkgver`
-differs from what the AUR currently carries, `pkgrel` must be `1`; if `pkgver` is
-unchanged, `pkgrel` must be **greater** than what is published. Both are cheap
-checks against the AUR's own `.SRCINFO`, and they catch the drift nothing catches
-today. This is a check, not a decision — it never writes a value, it refuses a
-wrong one.
+| | Trigger | What is published | What automation verifies |
+|---|---|---|---|
+| Release | `release: published` | the committed `PKGBUILD`, unmodified | `pkgver` equals the released tag; `pkgrel` is `1` |
+| Recipe fix | `workflow_dispatch`, owner-triggered | the committed `PKGBUILD`, unmodified | `pkgver` equals what the AUR carries; `pkgrel` is **greater** than it |
+
+Every value in the published file came from a commit. Automation's job is to
+**refuse**, not to fill in: a release whose `PKGBUILD` says `pkgrel=2` fails, and
+so does a recipe fix that forgot to bump it. Both checks read the AUR's own
+`.SRCINFO`, so they compare against what is actually published rather than what
+anyone believes is published.
+
+*Pros:* fixes ship without waiting for a release; a human acts in both paths;
+automation invents nothing.
+*Cons:* two documented paths instead of one.
+
+**Option D — automate the release path only; the owner pushes recipe fixes by
+hand.**
+*Pros:* the strongest reading of the rule — no dispatch surface at all, and a
+recipe fix is human end to end.
+*Cons:* **it skips the validation, which is the entire value of the workflow.** A
+hand-push publishes an unbuilt, un-`namcap`-ed recipe straight to users — which
+is exactly how F81's `xdotool` omission would have shipped again. It also
+requires the AUR repository and the signing key on the owner's machine.
+
+### One field automation does write, and why it is not the same
+
+**The source hash.** §1 establishes it cannot be committed: `pkgver` names an
+untagged version for almost all of the repository's life, so there is no tarball
+to hash. The workflow computes it from the tag the owner published.
+
+Stated plainly so it is a decision rather than an oversight — this **is**
+automation writing into the published file. It differs from a version number in
+two ways. It is **derived, not decided**: a measurement of an artifact the owner
+already approved, with exactly one correct value. And it **fails closed on the
+user's machine** — a wrong hash makes `makepkg` refuse, loudly, before building,
+whereas a wrong version number misrepresents silently and permanently.
+
+If the owner disagrees, the alternative is supplying the hash by hand at dispatch
+time, trading a derived value for a transcription step.
 
 - **Q4 — a dedicated SSH key, or the one already registered?** The owner's
   existing configuration works, which makes reuse tempting. **Recommendation:
