@@ -12,7 +12,11 @@ pkgdesc="Local-first cross-platform diff and merge tool"
 arch=('x86_64')
 url="https://github.com/forskscope/forskscope"
 license=('Apache-2.0')
-depends=('webkit2gtk-4.1' 'gtk3')
+# F81: xdotool provides libxdo, which the binary links (see F44) - without it
+# the package builds and installs cleanly and then fails to start. Temporary:
+# the upstream dioxus fix (DioxusLabs/dioxus#5749) drops the libxdo linkage
+# entirely, and this dependency should be removed once that release is taken.
+depends=('webkit2gtk-4.1' 'gtk3' 'xdotool')
 makedepends=('cargo' 'pkg-config' 'openssl')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/forskscope/forskscope/archive/refs/tags/$pkgver.tar.gz")
 # SKIP is a real gap, not an oversight: F43 switched this from a local file

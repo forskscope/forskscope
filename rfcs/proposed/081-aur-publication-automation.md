@@ -1,6 +1,9 @@
 # RFC 081: AUR Publication Automation
 
 **Status.** Proposed
+**Accepted.** 2026-08-22 by the project owner — Gate A cleared. Q1 closed: the
+owner confirms maintainer rights are intact and the AUR account configuration is
+unchanged since `0.22.13`. Stays in `proposed/` until implemented.
 **Tracks.** Release pipeline; Linux distribution; credential handling.
 **Touches.** `packaging/linux/PKGBUILD`, a new publish workflow, `release.md`,
 `installation.md`, the threat model.
@@ -80,18 +83,36 @@ it is three lines from being trustworthy.
 
 ## Design
 
-### 1. F81 first — this RFC cannot ship before it
+### 1. The source hash — this RFC's work, not a precondition
 
-Two defects, both in the file this RFC would publish:
+**Corrected 2026-08-22.** An earlier draft listed `sha256sums=('SKIP')` as an F81
+defect this RFC waits on. Checking *why* it had never been refreshed showed the
+instruction to refresh it is unperformable for almost all of the repository's
+life, and the fix belongs here.
 
-- `sha256sums=('SKIP')` — never refreshed, so `makepkg` verifies nothing on a
-  network fetch. **Automating publication of an unverified fetch would make a
-  supply-chain gap recurring and unattended**, which is exactly the reasoning
-  RFC-079 §"Automation makes unsettled claims recurring" applies to the Store
-  manifest.
-- `depends` omits `xdotool` — see above.
+`cargo xtask version-sync` requires `pkgver` to equal the workspace version, and
+the workspace bumps immediately **after** each release. So `pkgver` names an
+**unreleased** version nearly always — today it is `0.167.2`, and the newest tag
+is `0.167.1`. There is no tarball to hash. The hash is computable only between
+tagging and the post-release bump, and committing it in that window puts a value
+in the tree that is right for about one commit and wrong afterwards.
 
-Neither is this RFC's work; both are its precondition.
+**So the hash is computed at publish time and never committed.** The workflow
+runs after `release: published`, when the tag certainly exists, fetches that
+tag's archive, computes the hash, and writes it into the `PKGBUILD` it pushes.
+The in-tree file stays a template.
+
+Two consequences worth stating:
+
+- **`sha256sums=('SKIP')` must never reach the AUR.** §3 checks that explicitly,
+  and it is the check most likely to be skipped as obvious.
+- **The in-tree file is no longer something a user should copy.** §6's
+  `installation.md` change is what makes that true rather than merely intended.
+
+**What F81 does still contribute:** its second defect, `depends` omitting
+`xdotool`, was fixed on 2026-08-22 — the binary links `libxdo` (F44) and the
+package installed cleanly and then failed to start without it. That one was a
+real precondition and it is closed.
 
 ### 2. What publishing actually is
 
@@ -209,14 +230,22 @@ be waiting on the very thing that makes this path valuable.
 
 ## Open questions for the owner
 
-- **Q1 — maintainer rights.** Does the account that published `0.22.13` still
-  hold them? An AUR package unmaintained for that long may have been **orphaned**
-  or adopted. **Nothing in this RFC is actionable until that is known**, and it
-  is the one question no design decision can route around.
+- **Q1 — maintainer rights. CLOSED 2026-08-22** — the owner confirms the account
+  that published `0.22.13` still holds them, with its configuration unchanged.
+  The package was not orphaned or adopted.
 - **Q2 — the `0.22.13 → 0.167.2` jump.** Publishing current is assumed. Say so
   if you want an intermediate step; I see no reason for one.
 - **Q3 — `pkgrel` policy.** A new upstream version resets `pkgrel=1`. Packaging-only
   fixes bump it. Who decides, and does automation ever bump it unattended?
   Recommendation: never — a `pkgrel` bump means the recipe changed, which is a
   human change.
-- **Q4 — a dedicated SSH key** (recommended) or an existing one with AUR access?
+- **Q4 — a dedicated SSH key, or the one already registered?** The owner's
+  existing configuration works, which makes reuse tempting. **Recommendation:
+  add a dedicated key**, and for a narrower reason than “least privilege” —
+  **the AUR scopes permissions per account, not per key**, so a second key grants
+  exactly the same rights and does *not* limit what CI could publish. What it
+  does buy is real but specific: it is **independently revocable** without
+  locking the owner out of their own account, and it keeps a personal key — one
+  that may reach other packages the owner maintains — off a CI system. Stating
+  that precisely matters, because “use a dedicated key” usually implies a scope
+  reduction that is not available here.
