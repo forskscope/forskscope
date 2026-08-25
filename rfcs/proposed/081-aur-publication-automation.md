@@ -144,6 +144,28 @@ In an Arch container, before any push:
 
 A failure here fails the workflow, and nothing reaches the AUR.
 
+**Why this is not gold-plating, measured against how AUR packages are normally
+maintained.** Building the package in CI and running `namcap` are both uncommon;
+most AUR packages are published by hand with no CI at all. That comparison looks
+unfavourable until you notice what the manual process contains: **a maintainer
+publishing by hand builds the package locally first** — not as a discipline, but
+because that is how they check their own work. That build *is* the validation. It
+is implicit, unwritten, and it catches exactly this defect class: a missing
+`depends` surfaces the moment you install what you built on a machine that lacks
+it.
+
+**Automating the push deletes that step.** Nobody would build the Arch package at
+any point in our process — not a maintainer, not CI, nobody. This is not a
+hypothesis: `depends` omitted `xdotool` through **three releases**, on a path
+`installation.md` tells Arch users to follow, and it was found by reading the file
+rather than by anything running. The ordinary manual process would have caught it
+on the first build.
+
+So §3 does not add safety above normal practice. It **restores** safety that
+automation removes. Automating the push without it would leave this project worse
+than the hand-maintained baseline — faster at shipping something nobody
+verified.
+
 **What this still cannot prove:** that the built binary *runs*. A container has
 no display server. Launch remains RFC-078's business, and it has no row for this
 path — see §6.
@@ -348,7 +370,13 @@ to start, and would wait on a code release it has nothing to do with.
 nobody approved**, on a trigger outside the release gate. **Rejected.**
 
 **Option C — two triggers, and automation writes no version in either.
-(Recommended.)**
+CHOSEN 2026-08-22 by the owner.**
+
+**The second path exists to give recipe fixes the same validation the release
+path gets — not to add convenience.** That distinction is the whole reason C
+beats D, and it should survive into the implementation: if the dispatch path
+ever skips a check the release path runs, it has become the thing it was chosen
+instead of.
 
 | | Trigger | What is published | What automation verifies |
 |---|---|---|---|
