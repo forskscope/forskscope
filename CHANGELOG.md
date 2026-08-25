@@ -7,6 +7,84 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.167.2] — Unreleased
 
+Seven fixes, again all found by *running* the application rather than reading
+it. **Four of them are cases where the tool told you two things matched when it
+had not established that** — and in a comparison tool, a wrong "identical" is the
+dangerous direction, because it is the one that stops you looking.
+
+**If you compare directories, this release is worth taking.** Three of the four
+could silently leave a differing file out of a copy.
+
+### Fixed
+
+**Files and folders the application could not read were dropped from
+comparisons entirely — and from *Copy all changed*.**
+
+If a file or folder could not be read — a permissions restriction is the usual
+cause — it was skipped silently. It did not appear as a row, so there was nothing
+to notice, and it was absent from the batch copy list, so *Copy all changed*
+passed over it without a word. An unreadable folder took its **whole subtree**
+with it. If the folder on one side could not be opened at all, every entry on the
+other side was reported as existing on one side only — a confident answer
+produced by a failed read.
+
+Such entries now appear with their own status and are never treated as a verdict.
+Directory patch generation now fails rather than emit a patch it knows is
+incomplete.
+
+**The Directory Report could apply a comparison result to the wrong file.**
+
+Starting a comparison and then switching to a different pair of folders left the
+earlier comparison running. When it finished, it wrote its result into whatever
+row now occupied that position — so a file could be marked identical when nothing
+had compared it. Marked identical, it was then left out of *Copy all changed*,
+and its per-file copy button disappeared.
+
+Results from a superseded comparison are now discarded rather than applied.
+
+**The Explorer claimed two folders were identical without looking inside them.**
+
+A folder showed a check mark whenever a folder of the same name existed on the
+other side. Nothing examined the contents. Two folders differing in several files
+both appeared identical.
+
+A folder now shows *contents not compared*, which is what the Explorer actually
+knows. Use the Directory Report for a real verdict.
+
+**A file that could not be read was reported as "different", and a folder facing
+a same-named file was reported as "only on this side".**
+
+Neither was true. The first asserted a difference nothing had measured; the
+second said an entry existed on one side while it existed on both, as different
+kinds of thing. Both now report what was actually found, and a failed comparison
+says so — the first time the application could distinguish *this comparison
+failed* from *these files differ*.
+
+### Changed
+
+**Comparisons can now be interrupted.**
+
+A comparison of two large files ran to completion no matter what you did.
+Navigating away now stops outstanding work instead of letting it finish into a
+view you have left, and a directory scan can be interrupted part-way through a
+file rather than only between files. The Explorer also now limits how many
+comparisons run at once, which it previously did not.
+
+**The Explorer's status symbols changed** — `=`, `≠`, `←`, `→`, `…` in place of
+`✓`, `⚠`, `·`, `⟳`. The old marks read as judgements (*verified*, *warning*)
+rather than as comparison outcomes, and a single dot could not distinguish
+*only on the left* from *only on the right*. The new set does.
+
+### Accessibility
+
+**Every comparison status now carries screen-reader text.**
+
+Status was previously conveyed by a symbol and colour alone, in both the Explorer
+and the Directory Report. Since these statuses decide which copy buttons appear,
+a screen-reader user had no way to tell why a row offered none. Each status now
+announces what it means, in English and Japanese.
+
+
 ## [0.167.1] — 2026-08-16
 
 Four fixes for defects found by running the application on Linux, Windows and

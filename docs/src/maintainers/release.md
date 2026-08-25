@@ -116,6 +116,38 @@ annotated tag object (`git tag -l <tag>`) and re-push.
    before the release workflow finishes. `sha256sums=('SKIP')` is committed
    in the tree between releases because no real tag exists to hash yet; it
    must not stay `SKIP` once one does.
+5a. **Publish to the AUR, by hand, on an Arch-family machine.** The AUR package
+   is `forskscope`; publishing is a `git push` to
+   `ssh://aur@aur.archlinux.org/forskscope.git` of a repository containing only
+   `PKGBUILD` and a generated `.SRCINFO`.
+
+   ```sh
+   git clone ssh://aur@aur.archlinux.org/forskscope.git aur-forskscope
+   cp packaging/linux/PKGBUILD aur-forskscope/
+   cd aur-forskscope
+   updpkgsums                                   # replaces SKIP with the real tag hash
+   makepkg --printsrcinfo > .SRCINFO
+   makepkg -si                                  # BUILD AND INSTALL IT — see below
+   git commit -am "${VER}" && git push
+   ```
+
+   **`makepkg -si` is not optional.** A hand-published recipe has no CI behind
+   it, and building it locally is the only thing that catches a packaging defect
+   before every Arch user compiles it. `depends` omitted `xdotool` for three
+   releases — the package installed cleanly and then failed to start — and no
+   check would have found it, because nothing builds this package but you.
+
+   **`sha256sums` must not be `SKIP` in what you push.** The committed template
+   carries `SKIP` because `pkgver` names an untagged version between releases;
+   `updpkgsums` fills it in against the tag you just pushed. RFC-081 §"What
+   `sha256sums` is for" explains why it matters — briefly, it is the only
+   integrity mechanism the AUR has.
+
+   **`pkgrel` is `1` for a new version.** Bump it only when the recipe changes
+   without a new release, and publish that the same way.
+
+   Automating this is RFC-081, deferred.
+
 5. **Publish is a separate, explicit owner action — this is the approval gate,
    not a formality.** Inspect the draft release artifacts and composed notes,
    then publish:

@@ -1,7 +1,16 @@
 # RFC 081: AUR Publication Automation
 
 **Status.** Proposed
-**Accepted.** 2026-08-22 by the project owner — Gate A cleared. Q1 closed: the
+**Accepted.** 2026-08-22 by the project owner — Gate A cleared.
+**Disposition, 2026-08-22:** the owner accepted separating the two halves this
+RFC ran together. **Recovering the package and automating the publish are not
+the same task.** The automation is **deferred** — nothing about it is urgent, and
+the two remaining questions (the source hash, and the credential's home) can be
+answered whenever. **The recovery is not deferred:** it rides the next release,
+published to the AUR **by hand**, which needs none of those answers. The owner
+works on an Arch-family system, so building the package locally before pushing
+*is* §3's validation — the ordinary practice this RFC exists to preserve once
+automation removes it. Q1 closed: the
 owner confirms maintainer rights are intact and the AUR account configuration is
 unchanged since `0.22.13`. Stays in `proposed/` until implemented.
 **Tracks.** Release pipeline; Linux distribution; credential handling.
