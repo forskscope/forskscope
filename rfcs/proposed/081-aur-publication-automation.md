@@ -402,7 +402,56 @@ hand-push publishes an unbuilt, un-`namcap`-ed recipe straight to users — whic
 is exactly how F81's `xdotool` omission would have shipped again. It also
 requires the AUR repository and the signing key on the owner's machine.
 
-### One field automation does write, and why it is not the same
+### What `sha256sums` is for, since the question came up
+
+`source=()` names what `makepkg` downloads — for us, a GitHub per-tag archive,
+fetched **on the user's machine, at build time**, possibly long after we
+published the recipe. `sha256sums=()` is the expected hash of that download.
+`makepkg` verifies it **before** building; `SKIP` means it does not verify at
+all.
+
+**The AUR has no other integrity mechanism.** Packages are not signed, recipes
+are not reviewed, and there is no server-side check of anything. The
+`sha256sums` line is the only thing tying our recipe to specific bytes. Without
+it, whatever arrives is compiled and then installed by `pacman` **as root**.
+
+The bytes can differ without anyone attacking anything:
+
+- **GitHub's auto-generated archives are not guaranteed byte-stable.** GitHub
+  changed archive generation in 2023 and checksums shifted for tags that already
+  existed, breaking packages across many distributions. A recorded hash turns
+  that into a loud failure; `SKIP` turns it into a silent difference.
+- **A moved or re-pushed tag** changes the archive. We control our tags, and the
+  hash is what makes an accident visible.
+
+So the hash provides two things: **tamper-evidence**, and **proof the user is
+compiling the same bytes the project tested**. RFC-078 ties every other artifact
+to an exact digest; this path currently has no such tie at all.
+
+**The cost of having one, stated honestly:** if GitHub regenerates an archive,
+installs break until the package is republished. That is the correct behaviour —
+failing beats silently building different bytes — but it is a maintenance
+obligation `SKIP` does not carry, and it is the real reason `SKIP` is tempting.
+
+### Who computes it — automation, or the owner by hand
+
+**Recommendation: automation, and the distinction is whether a human can
+meaningfully approve the value.**
+
+`pkgver` and `pkgrel` are **decisions**. A person can read `pkgrel=2` and judge
+it right or wrong. That is why automation must not write them.
+
+A hash is **not a decision**. Nobody inspects 64 hex characters and forms a
+view; the only way to check one is to recompute it, which is what automation
+would be doing. Requiring the owner to transcribe it adds ceremony without
+adding judgement — and a typo fails closed at the user's machine, wasting a
+publish cycle to catch a mistake that only manual entry could introduce.
+
+It is also **derived from something the owner already approved**: the tag they
+published. There is exactly one correct value and it is a measurement of an
+approved artifact, not a claim about one.
+
+
 
 **The source hash.** §1 establishes it cannot be committed: `pkgver` names an
 untagged version for almost all of the repository's life, so there is no tarball
@@ -418,13 +467,27 @@ whereas a wrong version number misrepresents silently and permanently.
 If the owner disagrees, the alternative is supplying the hash by hand at dispatch
 time, trading a derived value for a transcription step.
 
-- **Q4 — a dedicated SSH key, or the one already registered?** The owner's
-  existing configuration works, which makes reuse tempting. **Recommendation:
-  add a dedicated key**, and for a narrower reason than “least privilege” —
-  **the AUR scopes permissions per account, not per key**, so a second key grants
-  exactly the same rights and does *not* limit what CI could publish. What it
-  does buy is real but specific: it is **independently revocable** without
-  locking the owner out of their own account, and it keeps a personal key — one
-  that may reach other packages the owner maintains — off a CI system. Stating
-  that precisely matters, because “use a dedicated key” usually implies a scope
-  reduction that is not available here.
+- **Q4 — a dedicated SSH key, or the one already registered?**
+  **Recommendation: a dedicated key — but do not accept it as a security
+  control, because it is not one.**
+
+  **What it does not do.** The AUR scopes permissions **per account, not per
+  key**. A dedicated key has exactly the same rights as the owner's personal
+  one: it can push to every package that account maintains. Blast radius on
+  compromise is **identical**. Anyone who can run the workflow, read the secret,
+  or modify the workflow file on the default branch can publish to any of those
+  packages under the project's identity.
+
+  **What it does do**, and it is worth having: **independent revocation** — if CI
+  is compromised, that key is revoked without the owner losing access to their
+  own account — and the owner's personal key never sits in a third party's
+  secret store.
+
+  **What would actually constrain the risk**, and is the thing to decide rather
+  than the key: **hold the secret in a GitHub Environment with protection
+  rules.** Environment secrets are available only to jobs that reference that
+  environment, and the environment can require a reviewer and restrict which
+  branches may reach it. That gates *use of the credential* rather than
+  possession of it, and it survives a workflow file being changed. **The same
+  applies to RFC-079's Store credential**, and the two should be decided
+  together rather than one at a time.
