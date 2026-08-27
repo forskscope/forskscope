@@ -95,6 +95,16 @@ pub enum Modal {
     /// Confirming resumes `target` with `opts` already suppressed as the
     /// guard demands; cancelling discards the prompt and loads nothing.
     ConfirmLargeLoad(LargeLoadPrompt),
+    /// F52: a non-conflict save failure (`diff_actions::handle_result`'s
+    /// `Err(e)` arm, excluding `CoreError::Conflict` — that stays
+    /// `ConfirmOverwrite`, RFC-077/review 048 C1). `target` is the exact
+    /// path the failed save attempted; `view` is the recovery dialog to
+    /// render.
+    SaveError(
+        usize,
+        std::path::PathBuf,
+        forskscope_ui_logic::SaveErrorView,
+    ),
 }
 
 // ── Toast / notice ────────────────────────────────────────────────────────────

@@ -19,7 +19,7 @@ use crate::ui::overlay::keybindings::KeyboardRefModal;
 use crate::ui::overlay::modals::{
     AboutModal, BatchCopyModal, BatchResultModal, CloseTabModal, ConfirmDiffOptionChangeModal,
     ConfirmDirOpModal, ConfirmSaveAsOverwriteModal, LargeLoadModal, OverwriteModal, ReloadModal,
-    SaveAsModal, SessionRecoveryModal, SettingsRecoveryModal, SwapModal,
+    SaveAsModal, SaveErrorModal, SessionRecoveryModal, SettingsRecoveryModal, SwapModal,
 };
 use modal::SettingsModal;
 
@@ -152,6 +152,9 @@ pub fn ModalLayer() -> Element {
         Modal::SettingsRecovery(resolution) => rsx! { SettingsRecoveryModal { resolution } },
         Modal::SessionRecovery(resolution) => rsx! { SessionRecoveryModal { resolution } },
         Modal::ConfirmLargeLoad(prompt) => rsx! { LargeLoadModal { prompt } },
+        Modal::SaveError(i, target, view) => rsx! {
+            SaveErrorModal { index: i, target, view }
+        },
     }
 }
 

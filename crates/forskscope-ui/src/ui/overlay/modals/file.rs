@@ -1,12 +1,14 @@
 //! File and merge-state safety modals: overwrite confirmation, save-as,
-//! reload, swap sides, diff-option changes, and the large-file load prompt
-//! — each guards an action that would otherwise discard unsaved merge work,
-//! or start an expensive load, without asking.
+//! reload, swap sides, diff-option changes, the large-file load prompt, and
+//! the save-error recovery dialog — each guards an action that would
+//! otherwise discard unsaved merge work, start an expensive load, or leave
+//! a failed save unexplained, without asking.
 
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
 use forskscope_core::DiffOptions;
+use forskscope_ui_logic::SaveErrorView;
 
 use crate::i18n::t;
 use crate::state::{
@@ -14,6 +16,7 @@ use crate::state::{
     reload_tab_with_options, set_diff_options, swap_sides,
 };
 use crate::ui::view::diff::{SaveAsPrecheck, confirm_overwrite, precheck_save_as_target, save_as};
+use crate::ui::view::diff_actions::handle_save_recovery_action;
 
 /// `target` is the exact path the conflicting save attempted — the tab's own
 /// save target for a plain save conflict, or the Save As destination for a
@@ -222,6 +225,44 @@ pub fn LargeLoadModal(prompt: LargeLoadPrompt) -> Element {
                             }
                         },
                         "{confirm_label}"
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// F52: confirmed via `Modal::SaveError` — a non-conflict save failure
+/// (`diff_actions::handle_result`'s `Err(e)` arm; a `CoreError::Conflict`
+/// never reaches this dialog, see `OverwriteModal`). `view.buttons` is
+/// already in the order and primary-button selection `SaveErrorView`
+/// decided; this component renders it as-is rather than re-deriving which
+/// action is "first". Not run through `t()`: `SaveErrorView`'s text comes
+/// from `UserMessage`/`action_label`, English-only by the same precedent
+/// `handle_result`'s old `Err(e) => store.notify(e.to_string())` arm set.
+#[component]
+pub fn SaveErrorModal(index: usize, target: PathBuf, view: SaveErrorView) -> Element {
+    let mut store = use_context::<Store>();
+    rsx! {
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "{view.title}", onmounted: super::focus_autofocus_button,
+            div { class: "modal",
+                h2 { "{view.title}" }
+                p { "{view.body}" }
+                if let Some(path) = &view.path {
+                    code { class: "path-display", "{path}" }
+                }
+                div { class: "actions",
+                    for button in view.buttons.iter() {
+                        button {
+                            key: "{button.action:?}",
+                            autofocus: button.is_primary,
+                            onclick: {
+                                let target = target.clone();
+                                let action = button.action;
+                                move |_| handle_save_recovery_action(&mut store, index, target.clone(), action)
+                            },
+                            "{button.label}"
+                        }
                     }
                 }
             }

@@ -10,9 +10,11 @@ use forskscope_core::compare_prep::{
     SaveTargetBlockReason, SaveTargetSnapshot, SaveTargetState, TargetExpectation,
     inspect_save_target,
 };
+use forskscope_core::error::{AppError, RecoveryAction};
 use forskscope_core::save::{
     BackupPolicy, SaveOutcome, SaveRequest, TargetPrecondition, save_text,
 };
+use forskscope_ui_logic::SaveErrorView;
 
 use crate::i18n::t;
 use crate::state::tab::CompareTab;
@@ -323,7 +325,53 @@ fn handle_result(
                 .modal
                 .set(Modal::ConfirmOverwrite(index, request.target.clone()));
         }
-        Err(e) => store.notify(e.to_string()),
+        Err(e) => {
+            let app_err = AppError::from_core(&e);
+            let view =
+                SaveErrorView::from_error(&app_err, Some(request.target.display().to_string()));
+            store
+                .modal
+                .set(Modal::SaveError(index, request.target.clone(), view));
+        }
+    }
+}
+
+/// Exhaustive handler for every button [`SaveErrorModal`](crate::ui::overlay::modals::SaveErrorModal)
+/// can show. Only [`RecoveryAction::ChooseAnotherFile`], [`RecoveryAction::Dismiss`],
+/// and [`RecoveryAction::SaveAs`] are reachable here — the only `CoreError`
+/// variants `save_text` can produce (`Conflict` aside, which never reaches
+/// this dialog — see [`handle_result`]) are `Io { Metadata | Write | Rename
+/// | CreateBackup }`, which map through `AppErrorKind::from_core` to
+/// `FileReadFailed | FileWriteFailed | BackupFailed`, and through
+/// `default_recovery_actions()` to exactly this set (F52 review request has
+/// the full trace). The other nine variants are named explicitly rather than
+/// matched with `_` so that a future thirteenth `RecoveryAction` variant is a
+/// compile error here, not a silently swallowed button — the same principle
+/// `file_digest_equal`'s `unreachable!()` established for F77 (review 074 §5).
+pub fn handle_save_recovery_action(
+    store: &mut Store,
+    index: usize,
+    target: PathBuf,
+    action: RecoveryAction,
+) {
+    match action {
+        RecoveryAction::Dismiss => store.modal.set(Modal::None),
+        RecoveryAction::ChooseAnotherFile | RecoveryAction::SaveAs => {
+            store
+                .modal
+                .set(Modal::SaveAs(index, target.display().to_string()));
+        }
+        RecoveryAction::Reload
+        | RecoveryAction::OverwriteAnyway
+        | RecoveryAction::OpenLimitedDiff
+        | RecoveryAction::OpenAsBinary
+        | RecoveryAction::Retry
+        | RecoveryAction::RetryWithoutInline
+        | RecoveryAction::Cancel
+        | RecoveryAction::StartFresh
+        | RecoveryAction::ReportBug => unreachable!(
+            "{action:?} is not in save_text's reachable CoreError set — see F52 review request"
+        ),
     }
 }
 
@@ -469,5 +517,132 @@ mod tests {
             message: "permission denied".into(),
         };
         assert!(describe_block(&reason).contains("permission denied"));
+    }
+
+    // ── F52: save-error recovery dialog (handoff 012) ──────────────────────
+
+    fn save_request(target: PathBuf, precondition: TargetPrecondition) -> SaveRequest {
+        SaveRequest {
+            target,
+            content: "content\n".into(),
+            encoding_label: "UTF-8".into(),
+            precondition,
+            backup: BackupPolicy::None,
+        }
+    }
+
+    /// Drives the real `save_text` against a target whose parent path is a
+    /// plain file, not a directory — a genuine `CoreError::Io` from the
+    /// exact function `handle_result` is wired to, not a hand-built error
+    /// (the "review 077 fed `classify_digest_outcome` a real `Err`"
+    /// precedent).
+    #[test]
+    fn a_real_non_conflict_save_failure_opens_the_save_error_dialog_not_a_toast() {
+        let dir = std::env::temp_dir().join(format!(
+            "fsk-diff-actions-save-error-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::create_dir_all(&dir);
+        let blocker = dir.join("blocker");
+        std::fs::write(&blocker, "not a directory").unwrap();
+        let target = blocker.join("output.txt");
+
+        let request = save_request(target, TargetPrecondition::MustBeAbsent);
+        let result = save_text(&request);
+        assert!(
+            matches!(result, Err(CoreError::Io { .. })),
+            "test setup must produce a real Io failure, got {result:?}"
+        );
+
+        crate::state::with_test_store(|store| {
+            handle_result(store, 0, &request, result);
+            match &*store.modal.read() {
+                Modal::SaveError(index, path, view) => {
+                    assert_eq!(*index, 0);
+                    assert_eq!(path, &request.target);
+                    assert!(!view.buttons.is_empty());
+                }
+                Modal::None => panic!(
+                    "expected Modal::SaveError — the old notify(...) toast path must be gone"
+                ),
+                other_modal => panic!(
+                    "expected Modal::SaveError, got a different modal: {:?}",
+                    std::mem::discriminant(other_modal)
+                ),
+            }
+        });
+    }
+
+    /// The exact case that matters more than the one above: a real
+    /// `CoreError::Conflict` (target already exists under `MustBeAbsent`)
+    /// must still raise `Modal::ConfirmOverwrite`, never the new F52 dialog
+    /// — RFC-077/review 048 C1 machinery is untouched by this handoff.
+    #[test]
+    fn a_real_conflict_still_opens_confirm_overwrite_not_the_save_error_dialog() {
+        let dir =
+            std::env::temp_dir().join(format!("fsk-diff-actions-conflict-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let target = dir.join("existing.txt");
+        std::fs::write(&target, "already here\n").unwrap();
+
+        let request = save_request(target.clone(), TargetPrecondition::MustBeAbsent);
+        let result = save_text(&request);
+        assert!(
+            matches!(result, Err(CoreError::Conflict { .. })),
+            "test setup must produce a real Conflict, got {result:?}"
+        );
+
+        crate::state::with_test_store(|store| {
+            handle_result(store, 3, &request, result);
+            match &*store.modal.read() {
+                Modal::ConfirmOverwrite(index, path) => {
+                    assert_eq!(*index, 3);
+                    assert_eq!(path, &target);
+                }
+                _ => panic!(
+                    "a save conflict must still raise Modal::ConfirmOverwrite, not the F52 dialog"
+                ),
+            }
+        });
+    }
+
+    /// Every button `SaveErrorView` can actually produce for a save error
+    /// (`{ChooseAnotherFile, Dismiss, SaveAs}` — see F52 review request for
+    /// the full reachability trace) must have a real, non-panicking handler.
+    #[test]
+    fn every_reachable_recovery_action_has_a_working_non_panicking_handler() {
+        let target = PathBuf::from("/some/target.txt");
+
+        crate::state::with_test_store(|store| {
+            handle_save_recovery_action(store, 2, target.clone(), RecoveryAction::Dismiss);
+            assert!(matches!(&*store.modal.read(), Modal::None));
+        });
+
+        crate::state::with_test_store(|store| {
+            handle_save_recovery_action(store, 2, target.clone(), RecoveryAction::SaveAs);
+            match &*store.modal.read() {
+                Modal::SaveAs(index, path) => {
+                    assert_eq!(*index, 2);
+                    assert_eq!(path, &target.display().to_string());
+                }
+                _ => panic!("SaveAs must open Modal::SaveAs"),
+            }
+        });
+
+        crate::state::with_test_store(|store| {
+            handle_save_recovery_action(
+                store,
+                2,
+                target.clone(),
+                RecoveryAction::ChooseAnotherFile,
+            );
+            match &*store.modal.read() {
+                Modal::SaveAs(index, path) => {
+                    assert_eq!(*index, 2);
+                    assert_eq!(path, &target.display().to_string());
+                }
+                _ => panic!("ChooseAnotherFile must open Modal::SaveAs"),
+            }
+        });
     }
 }
