@@ -97,6 +97,13 @@ jobs:
       - name: i18n coverage check
         run: cargo xtask i18n
 
+      # F83: ROADMAP.md's "Remaining proposed RFCs" table and
+      # rfcs/proposed/ had drifted apart in both directions with nothing
+      # catching it. This check fails on either direction of drift, and on
+      # a missing/renamed table heading rather than passing vacuously.
+      - name: RFC schedule sync check
+        run: cargo xtask rfc-sync
+
       # F55: cargo audit itself moved to a daily scheduled workflow
       # (audit.yml) — it reads a mutable external database, so a per-push
       # result is a property of the commit and the clock, not just the

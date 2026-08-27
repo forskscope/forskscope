@@ -6,10 +6,13 @@
 //!   cargo xtask audit-deps    — verify reviewed security dependency paths
 //!   cargo xtask i18n          — verify Japanese translations cover UI keys
 //!   cargo xtask version-sync [expected] — verify version metadata is in sync (no-arg mode also rejects an already-published version; [expected] mode additionally requires non-empty CHANGELOG content, F24)
+//!   cargo xtask rfc-sync      — verify ROADMAP.md's RFC table agrees with rfcs/proposed/ (F83)
 //!
 //! CSS source files under assets/css/ are assembled in alphabetical order.
 //! The numeric prefix on each filename (00-, 01-, …) encodes the cascade order.
 //! To add a file: create it with the appropriate prefix; run `cargo xtask css`.
+
+mod rfc_sync;
 
 use std::{
     collections::BTreeSet,
@@ -30,6 +33,7 @@ fn main() {
         Some("version-sync") if args.len() <= 2 => {
             run_version_sync(args.get(1).map(String::as_str))
         }
+        Some("rfc-sync") if args.len() == 1 => rfc_sync::run(&workspace_root()),
         Some(cmd) => {
             eprintln!("unknown command: {cmd}");
             print_usage();
@@ -47,9 +51,10 @@ fn print_usage() {
     eprintln!("       cargo xtask audit-deps");
     eprintln!("       cargo xtask i18n");
     eprintln!("       cargo xtask version-sync [expected]");
+    eprintln!("       cargo xtask rfc-sync");
 }
 
-fn workspace_root() -> PathBuf {
+pub(crate) fn workspace_root() -> PathBuf {
     // CARGO_MANIFEST_DIR is xtask/; workspace root is one level up.
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
