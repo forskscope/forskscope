@@ -7,7 +7,7 @@
 RFC ran together. **Recovering the package and automating the publish are not
 the same task.** The automation is **deferred** — nothing about it is urgent, and
 the two remaining questions (the source hash, and the credential's home) can be
-answered whenever. **The recovery is done (2026-08-25):** published by hand at
+answered whenever. **The recovery is done (2026-08-27):** published by hand at
 `0.167.2`, AUR commit `d6ca5f6` — verified against the AUR repository itself:
 real source hash, `.SRCINFO` regenerated, `xdotool` present. The package is
 current for the first time since `0.22.13`, 145 versions back. **What remains
