@@ -1,6 +1,7 @@
 //! File and merge-state safety modals: overwrite confirmation, save-as,
-//! reload, swap sides, and diff-option changes — each guards an action that
-//! would otherwise discard unsaved merge work without asking.
+//! reload, swap sides, diff-option changes, and the large-file load prompt
+//! — each guards an action that would otherwise discard unsaved merge work,
+//! or start an expensive load, without asking.
 
 use std::path::PathBuf;
 
@@ -8,7 +9,10 @@ use dioxus::prelude::*;
 use forskscope_core::DiffOptions;
 
 use crate::i18n::t;
-use crate::state::{Modal, Store, reload_tab, set_diff_options, swap_sides};
+use crate::state::{
+    LargeLoadPrompt, LargeLoadTarget, Modal, Store, open_compare_request_with_options, reload_tab,
+    reload_tab_with_options, set_diff_options, swap_sides,
+};
 use crate::ui::view::diff::{SaveAsPrecheck, confirm_overwrite, precheck_save_as_target, save_as};
 
 /// `target` is the exact path the conflicting save attempted — the tab's own
@@ -175,6 +179,49 @@ pub fn SwapModal(index: usize) -> Element {
                     button {
                         onclick: move |_| { swap_sides(&mut store, index); store.modal.set(Modal::None); },
                         {t(lang, "Discard and Swap")}
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// F84: confirmed via `Modal::ConfirmLargeLoad` (`LoadGuard::ConfirmPrompt`,
+/// RFC-013 §"Large file prompt") — nothing has been loaded yet. Confirming
+/// resumes `prompt.target` with `prompt.opts`, calling the `_with_options`
+/// entry points directly rather than the checked `open_compare_request`/
+/// `reload_tab` — the guard already ran once to produce these exact
+/// (inline-suppressed) options; running it again here would either repeat
+/// this same prompt or silently discard the suppression the user just
+/// accepted.
+#[component]
+pub fn LargeLoadModal(prompt: LargeLoadPrompt) -> Element {
+    let mut store = use_context::<Store>();
+    let lang = store.lang();
+    let title = prompt.title.clone();
+    let body = prompt.body.clone();
+    let confirm_label = prompt.confirm_label.clone();
+    rsx! {
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "{title}", onmounted: super::focus_autofocus_button,
+            div { class: "modal",
+                h2 { "{title}" }
+                p { "{body}" }
+                div { class: "actions",
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button {
+                        onclick: move |_| {
+                            let prompt = prompt.clone();
+                            store.modal.set(Modal::None);
+                            match prompt.target {
+                                LargeLoadTarget::Open(request) => {
+                                    open_compare_request_with_options(&mut store, request, prompt.opts);
+                                }
+                                LargeLoadTarget::Reload(index) => {
+                                    reload_tab_with_options(&mut store, index, prompt.opts);
+                                }
+                            }
+                        },
+                        "{confirm_label}"
                     }
                 }
             }

@@ -18,11 +18,12 @@ pub mod types;
 pub use compare::{
     close_dir_tab, open_compare, open_compare_request, open_dir_compare, reload_tab,
 };
+pub(crate) use compare::{open_compare_request_with_options, reload_tab_with_options};
 pub use profile::{add_profile, remove_profile};
 pub use session::{close_tab, resolve_session, restore_tabs, save_session};
 pub use settings::{AppSettings, BatchCopySpec, DiffAlgorithmSetting, DiffFontFamily, Lang, Theme};
 pub use tab::{CompareTab, TabState, change_diff_options, set_diff_options, swap_sides};
-pub use types::{BatchResultSpec, DirOp};
+pub use types::{BatchResultSpec, DirOp, LargeLoadPrompt, LargeLoadTarget};
 
 use dioxus::prelude::*;
 use forskscope_core::persist::schema::session::runtime::SessionRuntimeResolution;
@@ -89,6 +90,11 @@ pub enum Modal {
     SettingsRecovery(SettingsRuntimeResolution),
     /// Session mirror of [`Self::SettingsRecovery`].
     SessionRecovery(SessionRuntimeResolution),
+    /// F84: the file pair is large enough to require confirmation before
+    /// loading (`LoadGuard::ConfirmPrompt`) — nothing has been loaded yet.
+    /// Confirming resumes `target` with `opts` already suppressed as the
+    /// guard demands; cancelling discards the prompt and loads nothing.
+    ConfirmLargeLoad(LargeLoadPrompt),
 }
 
 // ── Toast / notice ────────────────────────────────────────────────────────────
@@ -224,7 +230,6 @@ impl Store {
     pub fn notify_info(&mut self, msg: impl Into<String>) {
         self.toast.set(Some(Notice::info(msg)));
     }
-    #[allow(dead_code)]
     pub fn notify_warning(&mut self, msg: impl Into<String>) {
         self.toast.set(Some(Notice::warning(msg)));
     }

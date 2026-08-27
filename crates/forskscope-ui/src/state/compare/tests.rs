@@ -493,3 +493,126 @@ fn opening_a_tab_persists_the_session_without_any_further_render() {
         other => panic!("session.json was written but does not parse as current: {other:?}"),
     }
 }
+
+// ── F84: pre-load size guard (RFC-013 §"Large file prompt", handoff 011) ───
+
+/// Comfortably past the default 4 MiB medium threshold and comfortably under
+/// the 64 MiB large threshold — classifies as `Large`, producing
+/// `LoadGuard::ConfirmPrompt { too_large: false, .. }` under
+/// `PerformanceLimits::default()` (`forskscope-core/src/job/limits.rs`).
+const LARGE_FILE_BYTES: usize = 5 * 1024 * 1024;
+
+#[test]
+fn decide_load_dispatches_through_the_real_guard_for_every_size_class() {
+    let small = decide_load(1_024, 1_024, DiffOptions::default());
+    assert!(
+        matches!(small, LoadDecision::Go { banner: None, .. }),
+        "a small pair must proceed silently"
+    );
+
+    let confirm = decide_load(LARGE_FILE_BYTES as u64, 1_024, DiffOptions::default());
+    assert!(
+        matches!(
+            confirm,
+            LoadDecision::Confirm {
+                too_large: false,
+                ..
+            }
+        ),
+        "a 5 MiB file must block on confirmation, not proceed"
+    );
+
+    let very_large = decide_load(65 * 1024 * 1024, 1_024, DiffOptions::default());
+    assert!(
+        matches!(
+            very_large,
+            LoadDecision::Confirm {
+                too_large: true,
+                ..
+            }
+        ),
+        "a 65 MiB file must be flagged too_large"
+    );
+}
+
+#[test]
+fn confirm_prompt_suppresses_inline_diff_on_the_resumed_options() {
+    let opts = DiffOptions::default();
+    assert_eq!(
+        opts.inline_mode,
+        InlineMode::Lazy,
+        "test assumes a non-None starting point, or suppression would be unobservable"
+    );
+
+    let decision = decide_load(LARGE_FILE_BYTES as u64, 1_024, opts);
+    match decision {
+        LoadDecision::Confirm { opts, .. } => {
+            assert_eq!(
+                opts.inline_mode,
+                InlineMode::None,
+                "ConfirmPrompt always implies suppress_inline() — the resumed \
+                 options must reflect it, not just the banner text"
+            );
+        }
+        LoadDecision::Go { .. } => panic!("expected ConfirmPrompt for a 5 MiB file"),
+    }
+}
+
+#[test]
+fn both_load_call_sites_stop_at_the_guard_for_a_large_pair() {
+    let dir = temp_dir("f84-large-load-guard");
+    let left = dir.join("left.txt");
+    let right = dir.join("right.txt");
+    fs::write(&left, vec![b'a'; LARGE_FILE_BYTES]).unwrap();
+    fs::write(&right, "small\n").unwrap();
+
+    // open_compare_request: a ConfirmPrompt pair must not allocate a tab —
+    // there is nothing to clean up if the user cancels.
+    crate::state::with_test_store(|store| {
+        open_compare_request(store, normal_request(left.clone(), right.clone()));
+
+        assert!(
+            store.tabs.read().is_empty(),
+            "a ConfirmPrompt pair must not allocate a tab before confirmation"
+        );
+        match &*store.modal.read() {
+            Modal::ConfirmLargeLoad(prompt) => {
+                assert!(
+                    matches!(prompt.target, LargeLoadTarget::Open(_)),
+                    "expected a LargeLoadTarget::Open prompt"
+                );
+            }
+            _ => panic!("expected Modal::ConfirmLargeLoad from open_compare_request"),
+        }
+    });
+
+    // reload_tab: an existing tab must be left exactly as it was — still
+    // Loading, not re-entered into a fresh load — until confirmed.
+    crate::state::with_test_store(|store| {
+        store.tabs.write().push(loading_tab(1, 1));
+        {
+            let mut tabs = store.tabs.write();
+            tabs[0].left_path = Some(left.clone());
+            tabs[0].right_path = Some(right.clone());
+        }
+
+        reload_tab(store, 0);
+
+        assert_eq!(
+            store.tabs.read()[0].state,
+            TabState::Loading,
+            "reload_tab must not touch the tab's state before confirmation"
+        );
+        match &*store.modal.read() {
+            Modal::ConfirmLargeLoad(prompt) => {
+                assert!(
+                    matches!(prompt.target, LargeLoadTarget::Reload(0)),
+                    "expected a LargeLoadTarget::Reload(0) prompt"
+                );
+            }
+            _ => panic!("expected Modal::ConfirmLargeLoad from reload_tab"),
+        }
+    });
+
+    let _ = fs::remove_dir_all(&dir);
+}

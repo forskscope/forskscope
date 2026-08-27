@@ -1,24 +1,94 @@
 //! Comparison lifecycle: open, reload, load_and_diff, and directory tabs.
 
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use dioxus::prelude::*;
 use dioxus_core::spawn_forever;
 use forskscope_core::compare_prep::{
     PreparedCompare, inspect_save_target, save_target_from_loaded,
 };
-use forskscope_core::diff::DiffDocument;
+use forskscope_core::diff::{DiffDocument, InlineMode};
 use forskscope_core::document::{LoadOptions, LoadedDocument, load_path};
 use forskscope_core::file_kind::FileKind;
 use forskscope_core::{DiffOptions, MergeSession, compute_diff};
 use forskscope_ui_logic::{
-    CompareRequest, CompletionDecision, LoadGeneration, LoadIdentitySnapshot, LoadToken,
-    SaveDestination, completion_decision,
+    CompareRequest, CompletionDecision, LoadGeneration, LoadGuard, LoadIdentitySnapshot, LoadToken,
+    SaveDestination, completion_decision, guard_for_sizes,
 };
 
 use crate::i18n::t;
 use crate::state::tab::{CompareLaunchMode, CompareTab, TabState, tab_title};
-use crate::state::{Store, save_session, settings::Lang};
+use crate::state::types::{LargeLoadPrompt, LargeLoadTarget};
+use crate::state::{Modal, Store, save_session, settings::Lang};
+
+// ── F84: pre-load size guard (RFC-013 §"Large file prompt") ────────────────────
+
+/// Byte size of the file at `path`, or `0` if it cannot be read. A side may
+/// legitimately be absent (`LoadOptions { allow_missing: true }` — the
+/// existing missing-file handling in `load_and_diff` reports that on its
+/// own), so a failed `metadata` call must not be turned into a guard
+/// failure; treating it as `0` bytes always classifies as `Small` and lets
+/// that entry alone decide the outcome.
+fn size_or_zero(path: &Path) -> u64 {
+    fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+}
+
+/// What a call site should do about one file pair, given their sizes and
+/// the `DiffOptions` it would otherwise use. Pure — no I/O, no `Store` — so
+/// both the guard's own reachability and `suppress_inline`'s effect on
+/// `opts` are directly testable without a Dioxus runtime (handoff 011 §7:
+/// the same reasoning `classify_entry`/`apply_epoch_result` already
+/// established in this codebase).
+enum LoadDecision {
+    /// Proceed now with `opts` (inline-suppressed if the guard demanded
+    /// it). `banner` is the non-blocking notice to show first, if any.
+    Go {
+        opts: DiffOptions,
+        banner: Option<String>,
+    },
+    /// Block: nothing has been loaded. `opts` is the inline-suppressed
+    /// options a confirmed resume must use (`ConfirmPrompt` always implies
+    /// `suppress_inline()`).
+    Confirm {
+        opts: DiffOptions,
+        title: String,
+        body: String,
+        confirm_label: String,
+        too_large: bool,
+    },
+}
+
+fn decide_load(left_bytes: u64, right_bytes: u64, opts: DiffOptions) -> LoadDecision {
+    let guard = guard_for_sizes(left_bytes, right_bytes);
+    let mut adjusted = opts;
+    if guard.suppress_inline() {
+        adjusted.inline_mode = InlineMode::None;
+    }
+    match guard {
+        LoadGuard::Proceed => LoadDecision::Go {
+            opts: adjusted,
+            banner: None,
+        },
+        LoadGuard::WarnBanner { message, .. } => LoadDecision::Go {
+            opts: adjusted,
+            banner: Some(message),
+        },
+        LoadGuard::ConfirmPrompt {
+            title,
+            body,
+            confirm_label,
+            too_large,
+            ..
+        } => LoadDecision::Confirm {
+            opts: adjusted,
+            title,
+            body,
+            confirm_label,
+            too_large,
+        },
+    }
+}
 
 enum LoadResult {
     Ready(Box<PreparedCompare>),
@@ -73,8 +143,59 @@ fn prepared_result(result: Result<PreparedCompare, String>) -> LoadResult {
     }
 }
 
+/// Checked entry point — every existing caller (the `ReloadModal` unsaved-
+/// work confirmation included) goes through this, so the size guard is
+/// consulted on every reload, not just the first load (handoff 011 §5: "a
+/// user re-opens the file they were warned about" is exactly the hole a
+/// one-sided check would leave). Reads the tab without mutating anything;
+/// a `ConfirmPrompt` outcome leaves the tab exactly as it was.
 pub fn reload_tab(store: &mut Store, index: usize) {
-    let (request, opts, token) = {
+    let (left_path, right_path, opts) = {
+        let tabs = store.tabs.read();
+        let Some(tab) = tabs.get(index) else {
+            return;
+        };
+        (
+            tab.left_path.clone().unwrap_or_default(),
+            tab.right_path.clone().unwrap_or_default(),
+            tab.diff_options,
+        )
+    };
+    let decision = decide_load(size_or_zero(&left_path), size_or_zero(&right_path), opts);
+    match decision {
+        LoadDecision::Go { opts, banner } => {
+            if let Some(message) = banner {
+                store.notify_warning(message);
+            }
+            reload_tab_with_options(store, index, opts);
+        }
+        LoadDecision::Confirm {
+            opts,
+            title,
+            body,
+            confirm_label,
+            too_large,
+        } => {
+            store.modal.set(Modal::ConfirmLargeLoad(LargeLoadPrompt {
+                target: LargeLoadTarget::Reload(index),
+                opts,
+                title,
+                body,
+                confirm_label,
+                too_large,
+            }));
+        }
+    }
+}
+
+/// The actual reload, unconditional — used by [`reload_tab`] once the guard
+/// says `Go`, and by `LargeLoadModal`'s confirm handler directly (the guard
+/// already ran once to produce `opts`; running it again here would either
+/// repeat the same prompt the user just dismissed, or silently re-derive a
+/// fresh "current" `opts` that discards the suppression they already
+/// accepted).
+pub(crate) fn reload_tab_with_options(store: &mut Store, index: usize, opts: DiffOptions) {
+    let (request, token) = {
         let mut tabs = store.tabs.write();
         let Some(tab) = tabs.get_mut(index) else {
             return;
@@ -100,11 +221,7 @@ pub fn reload_tab(store: &mut Store, index: usize) {
             right_input: tab.right_path.clone().unwrap_or_default(),
             save_destination,
         };
-        (
-            request,
-            tab.diff_options,
-            LoadToken::new(tab.id, generation),
-        )
+        (request, LoadToken::new(tab.id, generation))
     };
     let enable_binary = store.settings.read().enable_binary_comparison;
 
@@ -146,8 +263,57 @@ pub fn open_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
 /// understands both normal compare and Git mergetool mode (RFC-077).
 /// `app.rs`'s startup wiring is the only caller that constructs a
 /// `MergeTool`-derived request directly; everything else goes through
-/// [`open_compare`].
+/// [`open_compare`]. Checked: the size guard is consulted before anything
+/// is allocated — a `ConfirmPrompt` outcome creates no tab at all, so
+/// cancelling leaves nothing to clean up (handoff 011 §5).
 pub fn open_compare_request(store: &mut Store, request: CompareRequest) {
+    let opts = {
+        let settings = store.settings.read();
+        settings
+            .profiles
+            .get(settings.active_profile)
+            .map(|p| p.to_diff_options())
+            .unwrap_or_default()
+    };
+    let decision = decide_load(
+        size_or_zero(&request.left_input),
+        size_or_zero(&request.right_input),
+        opts,
+    );
+    match decision {
+        LoadDecision::Go { opts, banner } => {
+            if let Some(message) = banner {
+                store.notify_warning(message);
+            }
+            open_compare_request_with_options(store, request, opts);
+        }
+        LoadDecision::Confirm {
+            opts,
+            title,
+            body,
+            confirm_label,
+            too_large,
+        } => {
+            store.modal.set(Modal::ConfirmLargeLoad(LargeLoadPrompt {
+                target: LargeLoadTarget::Open(request),
+                opts,
+                title,
+                body,
+                confirm_label,
+                too_large,
+            }));
+        }
+    }
+}
+
+/// The actual open, unconditional — used by [`open_compare_request`] once
+/// the guard says `Go`, and by `LargeLoadModal`'s confirm handler directly,
+/// for the same reason [`reload_tab_with_options`] exists.
+pub(crate) fn open_compare_request_with_options(
+    store: &mut Store,
+    request: CompareRequest,
+    opts: DiffOptions,
+) {
     let id = match store.allocate_compare_tab_id() {
         Ok(id) => id,
         Err(error) => {
@@ -155,15 +321,7 @@ pub fn open_compare_request(store: &mut Store, request: CompareRequest) {
             return;
         }
     };
-    let (opts, enable_binary) = {
-        let settings = store.settings.read();
-        let opts = settings
-            .profiles
-            .get(settings.active_profile)
-            .map(|p| p.to_diff_options())
-            .unwrap_or_default();
-        (opts, settings.enable_binary_comparison)
-    };
+    let enable_binary = store.settings.read().enable_binary_comparison;
 
     let left = request.left_input.clone();
     let right = request.right_input.clone();
