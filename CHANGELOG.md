@@ -5,7 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.167.2] — Unreleased
+## [0.167.3] — Unreleased
+
+## [0.167.2] — 2026-08-25
 
 Seven fixes, again all found by *running* the application rather than reading
 it. **Four of them are cases where the tool told you two things matched when it
