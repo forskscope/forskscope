@@ -1,6 +1,7 @@
 # RFC-003 — Dioxus Application Shell, State Runtime, and Workspace Model
 
 **Status.** Implemented (v0.23.0)
+**Note (2026-08-27).** The `CompareStatusSummary`/`DiffNavigationState` view-model (`forskscope-ui-logic::compare::summary`) was removed as obsolete (F75(b), handoff 010): change counts and tab titles are derived directly at their use sites (`diff.rs`, `state/tab.rs::tab_title`), both jobs the view-model existed to do.
 
 ---toml
 project = "ForskScope"

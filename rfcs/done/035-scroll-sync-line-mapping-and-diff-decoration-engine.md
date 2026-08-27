@@ -1,6 +1,7 @@
 # RFC 035: Scroll Sync, Line Mapping, and Diff Decoration Engine
 
 **Status.** Implemented (v0.61.0) — core complete; scroll-sync wiring in Dioxus panes, mini-map rendering deferred to UI layer
+**Note (2026-08-27).** The `ScrollAnchor` view-model (`forskscope-ui-logic::compare::scroll_sync`) was removed as obsolete (F75(b), handoff 010): the shipped UI achieves vertical sync with a single scroll container plus horizontal sync via `install_hscroll_sync` (mirroring `scrollLeft` between panes), so the two-independently-scrolling-panes model this view-model presumed is superseded, not outstanding.
 
 ## Status
 Proposed. (Originally proposed in RFC package v0.4.)

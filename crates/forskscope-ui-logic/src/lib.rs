@@ -9,18 +9,14 @@
 //!   - `deep_filter`: `DeepFilter` + `DeepCompareSummary` for recursive compare.
 //!   - `status`: `RowStatusKind`/`StatusRow` from `EqualityEvidence`.
 //! - [`compare`] — diff/compare logic:
-//!   - `command_bar`: `ToolbarSection` list from `CommandRegistry` + `CommandContext`.
 //!   - `conflict_nav_view`: `ConflictNavView` rail snapshot for three-way merge.
 //!   - `load_guard`: pre-diff `LoadGuard` from `FileSizeClass`.
 //!   - `load_identity`: runtime tab/load tokens and completion validation.
 //!   - `palette_view`: `PaletteRow` list for the command palette.
 //!   - `save_error`: `SaveErrorView` — `AppError` → dialog content.
-//!   - `scroll_sync`: `ScrollSyncState` for synchronized pane scrolling.
 //!   - `search_index`: in-diff match index (`advance`/`retreat`).
 //!   - `startup`: `StartupRequest` CLI parsing and mergetool-to-`CompareRequest`
 //!     conversion (RFC-077).
-//!   - `summary`: `CompareStatusSummary` and `DiffNavigationState`.
-//!   - `tab_state`: `TabStateSnapshot` → `CommandContext` bridge.
 //! - [`settings`] — settings form logic:
 //!   - `settings_view`: picker choices and validators for the settings dialog.
 //!   - `persistence_recovery`: `SettingsRecoveryView` — RFC-076 migration/
@@ -37,9 +33,6 @@ pub mod session;
 pub mod settings;
 
 // compare
-pub use compare::command_bar::{
-    ToolbarItem, ToolbarSection, build_toolbar, enabled_count, find_item,
-};
 pub use compare::conflict_nav_view::{ConflictNavView, ConflictRailRow};
 pub use compare::load_guard::{LoadGuard, guard_for_sizes, guard_for_sizes_with_limits};
 pub use compare::load_identity::{
@@ -50,13 +43,10 @@ pub use compare::palette_view::{
     PaletteRow, build_palette, enabled_count as palette_enabled_count,
 };
 pub use compare::save_error::{RecoveryButton, SaveErrorView, action_label};
-pub use compare::scroll_sync::ScrollSyncState;
 pub use compare::search_index::{MatchIndex, MatchPosition, MatchSide};
 pub use compare::startup::{
     CompareRequest, SaveDestination, StartupArgError, StartupRequest, parse_startup_args,
 };
-pub use compare::summary::{CompareStatusSummary, DiffNavigationState};
-pub use compare::tab_state::{TabStateSnapshot, context_from_snapshot};
 
 // explore
 pub use explore::align::{AlignedRow, FlatRow, RowData, compute_aligned_rows};

@@ -4,8 +4,11 @@
 //! evaluates availability from the current [`CommandContext`], returning a
 //! [`Vec<PaletteRow>`] ready for the palette component to render.
 //!
-//! This is the search-filtered complement to `command_bar` (which produces
-//! the fixed toolbar); `palette_view` produces the dynamic filtered list.
+//! This produces the dynamic, search-filtered command list for the palette.
+//! The fixed toolbar is a separate, unrelated presentation built directly in
+//! `ui/view/diff/toolbar.rs` (handoff 010, F75(b) part 1 — the toolbar's own
+//! former view-model, `command_bar`, was deleted as obsolete; see RFC-019's
+//! note).
 
 use forskscope_core::command::{
     Availability, CommandContext, CommandDangerLevel, CommandRegistry, UnavailableReason,

@@ -1,6 +1,7 @@
 # RFC-019 — Command Registry, Keyboard Shortcuts, Command Palette, and Accessibility
 
 **Status.** Implemented (v0.63.0) — core complete; command palette UI component, context-menu generation deferred to UI layer
+**Note (2026-08-27).** The `ToolbarSection`/`ToolbarItem` view-model (`forskscope-ui-logic::compare::command_bar`) was removed as obsolete (F75(b), handoff 010): the toolbar is built directly in `ui/view/diff/toolbar.rs`, nothing adopted the parallel representation. The command palette's own view-model (`palette_view`) is unaffected and remains deferred.
 
 ## 1. Summary
 
