@@ -1,6 +1,7 @@
 # RFC 041: v1.0 Product Stabilization and RFC Governance
 
 **Status.** Proposed — checklist updated v0.144.0; §1a confirmed
+**Scheduling.** Post-v1. RFC-074 §32 records that this remains the product-stabilization policy while RFC-074 is its executable form. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 
 ## Current state (v0.135.0) — final pre-GTK state
 

@@ -1,6 +1,7 @@
 # RFC 030 — User Documentation, Onboarding, and Help System
 
 **Status.** Proposed — substantially implemented v0.96.0–v0.98.0; remaining items are in-app help and troubleshooting depth.
+**Scheduling.** Post-slice-5. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 
 ## Status
 

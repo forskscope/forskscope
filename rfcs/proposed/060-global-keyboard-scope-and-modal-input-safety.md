@@ -1,6 +1,7 @@
 # RFC 060: Global Keyboard Scope and Modal/Input Safety
 
 **Status.** Proposed
+**Scheduling.** **Disposition needed** — referenced in shipped code, so partially implemented; the remainder is undecided. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 **Tracks.** Keyboard event ownership; modal and text-input safety; prevention
 of accidental merge/save/close actions.
 **Touches.** `crates/forskscope-ui/src/app.rs` (root `onkeydown`),

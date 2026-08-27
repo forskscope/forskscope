@@ -1,6 +1,7 @@
 # RFC 063: Trust, Clarity, and Calm UI Hardening
 
 **Status.** Proposed
+**Scheduling.** **Disposition needed** — referenced in shipped code; the remainder is undecided. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 **Tracks.** Non-defect UX hardening: empty/first-run states, control density and
 hit targets, labeled vs icon-only actions, destructive-modal focus policy,
 severity-based notice/toast policy, plain-language settings with progressive

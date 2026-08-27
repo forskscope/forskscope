@@ -1,6 +1,7 @@
 # RFC 025 — Editor Adapter Prototype and Kill Switch
 
 **Status.** Proposed
+**Scheduling.** Slice 8 (post-v1). See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 
 ## Status
 

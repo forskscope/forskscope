@@ -1,6 +1,7 @@
 # RFC 061: Explorer Pane Focus and Keyboard Completeness
 
 **Status.** Proposed — partially implemented in v0.145.2
+**Scheduling.** **Disposition needed** — its own status says partially implemented in v0.145.2. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 **Tracks.** Explorer keyboard accessibility; left/right pane focus model;
 making the stated keyboard-only path real for the Explorer's core
 select-and-compare loop.

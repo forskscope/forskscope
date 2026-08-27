@@ -1,6 +1,7 @@
 # RFC-072 — UI Component Extraction (Phase 4)
 
 **Status.** Proposed
+**Scheduling.** **Disposition needed** — referenced in shipped code; the remainder is undecided. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 **Tracks.** `crates/forskscope-ui/src/ui/` — reusable visual primitives.
 **Touches.** `ui/view/`, `ui/overlay/`, new `ui/component/`.
 

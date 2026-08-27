@@ -1,6 +1,7 @@
 # RFC 026 — Cross-Platform WebView and Linux Desktop Compatibility
 
 **Status.** Proposed — core diagnostics shipped (v0.93.0, v0.100.0, v0.112.0); platform smoke tests and packaging QA deferred to RFC-010.
+**Scheduling.** Post-slice-3. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 
 ## Status
 

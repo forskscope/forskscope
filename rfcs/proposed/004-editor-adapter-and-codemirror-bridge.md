@@ -1,6 +1,7 @@
 # RFC-004 — Editor Adapter and CodeMirror Bridge
 
 **Status.** Proposed
+**Scheduling.** Slice 8 (post-v1) — gated on a stable editor integration. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 
 ---toml
 project = "ForskScope"

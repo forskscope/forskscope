@@ -1,6 +1,7 @@
 # RFC 079: Microsoft Store Submission Automation
 
 **Status.** Proposed
+**Scheduling.** Post-Gate-D — accepted; implementation blocked on F60. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 **Accepted.** 2026-08-22 by the project owner — Gate A cleared, and
 **re-confirmed the same day after a self-review found two defects**, including
 an acceptance criterion that contradicted the owner's own §2 credential

@@ -1,6 +1,7 @@
 # RFC-042 — Roadmap and RFC Execution Plan
 
 **Status.** Proposed — living document; updated for v0.141.0 (§4a extended through v0.140.0)
+**Scheduling.** Ongoing — this RFC describes `ROADMAP.md` itself. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 
 > **v0.141.0 update (2026-06-13).** UI polish and correctness pass complete
 > (v0.111.0–v0.140.0). i18n: 158 active translation keys, zero missing,

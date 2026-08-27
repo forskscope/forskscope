@@ -1,6 +1,7 @@
 # RFC 040: Editor Adapter Verification Harness and Golden Corpus
 
 **Status.** Proposed
+**Scheduling.** Slice 8 (post-v1). See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 
 ## Status
 Proposed. (Originally proposed in RFC package v0.4.)

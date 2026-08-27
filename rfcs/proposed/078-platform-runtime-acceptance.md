@@ -1,6 +1,7 @@
 # RFC 078: Platform Runtime Acceptance and Release Evidence
 
 **Status.** Proposed
+**Scheduling.** Milestone M5 — **defines Gate D**, the current v1 blocker. Executed from `proposed/` by design. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 **Tracks.** Release-stabilization audit finding B4.
 **Touches.** Release candidate artifacts, GTK/WebKitGTK smoke tests, Windows
 and macOS runtime tests, save semantics, evidence records, and v1 go/no-go.

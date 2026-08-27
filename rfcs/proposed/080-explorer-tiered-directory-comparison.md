@@ -1,6 +1,7 @@
 # RFC 080: Tiered Directory Comparison in the Explorer
 
 **Status.** Proposed
+**Scheduling.** Post-Gate-D — accepted; design settled, all four questions closed. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 **Accepted.** 2026-08-21 by the project owner — Gate A cleared, and
 **re-confirmed 2026-08-22 after a self-review found nine defects in it**, one of
 which (§1's “no new engine work”) was load-bearing and false. The corrections

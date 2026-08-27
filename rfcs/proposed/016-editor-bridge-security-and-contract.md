@@ -1,6 +1,7 @@
 # RFC-016 — Editor Bridge Security and Contract
 
 **Status.** Proposed
+**Scheduling.** Slice 8 (post-v1). See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 
 ## 1. Summary
 

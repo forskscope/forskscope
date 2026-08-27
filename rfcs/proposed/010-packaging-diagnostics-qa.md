@@ -1,6 +1,7 @@
 # RFC-010 — Packaging, Diagnostics, QA, and Release Gates
 
 **Status.** Proposed
+**Scheduling.** Post-slice-5. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 
 ---toml
 project = "ForskScope"
