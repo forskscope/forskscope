@@ -645,4 +645,41 @@ mod tests {
             }
         });
     }
+
+    /// Review 083 §4: naming all twelve `RecoveryAction` variants in
+    /// `handle_save_recovery_action` means a *thirteenth* variant is a
+    /// compile error — but it does not catch `forskscope-core` changing
+    /// which actions an *existing* `AppErrorKind` emits. If
+    /// `default_recovery_actions()` ever grows to include, say, `Retry` for
+    /// `FileWriteFailed`, the button would render and panic on click, with
+    /// no compile error and no failing test in this crate. This closes that
+    /// gap from this crate's side: for every `AppErrorKind` a save error can
+    /// actually produce (§3 of the F52 review request's reachability
+    /// trace), `default_recovery_actions()` must stay a subset of what
+    /// `handle_save_recovery_action` handles. A cross-crate change that
+    /// violates this now fails here instead of panicking in the GUI.
+    #[test]
+    fn every_save_reachable_kind_only_emits_handled_recovery_actions() {
+        use forskscope_core::error::AppErrorKind;
+
+        const HANDLED: [RecoveryAction; 3] = [
+            RecoveryAction::ChooseAnotherFile,
+            RecoveryAction::Dismiss,
+            RecoveryAction::SaveAs,
+        ];
+        for kind in [
+            AppErrorKind::FileReadFailed,
+            AppErrorKind::FileWriteFailed,
+            AppErrorKind::BackupFailed,
+        ] {
+            for action in kind.default_recovery_actions() {
+                assert!(
+                    HANDLED.contains(action),
+                    "{kind:?} can emit {action:?}, which handle_save_recovery_action \
+                     does not handle — it would hit unreachable!() if a save ever \
+                     produced this kind"
+                );
+            }
+        }
+    }
 }
