@@ -100,9 +100,10 @@ merge-tool = ["forskscope", "$left", "$right", "$output"]
 
 A missing file path is **not** a startup error: one side of a comparison may
 be absent (e.g. a newly-added or deleted file), so `forskscope <left> <right>`
-opens normally with the missing side shown as empty. The exit code does not
-indicate whether changes were saved, either — git determines that by
-inspecting whether `$MERGED` was written.
+opens normally with the missing side shown as empty — and saving can create
+it, restoring a deleted file. The exit code does not indicate whether changes
+were saved, either — git determines that by inspecting whether `$MERGED` was
+written.
 
 ### Print platform diagnostics
 

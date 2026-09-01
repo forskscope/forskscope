@@ -26,7 +26,7 @@ Files are classified in this order:
 | **Text** | No NUL byte in first 8 KB | ✓ | ✓ | ✓ |
 | **Binary** | NUL byte found | Hex preview | — | — |
 | **Excel `.xlsx`** | `.xlsx` / `.XLSX` extension | Temporarily disabled | — | — |
-| **Missing** | Path not found | One-sided | — | — |
+| **Missing** | Path not found | One-sided | — | ✓ (creates the file) |
 | **Unsupported** | Not a regular file | — | — | — |
 
 ---
@@ -43,10 +43,20 @@ The detected encoding label is shown in the status bar (e.g. `UTF-8`,
 `Shift_JIS`). **Save preserves the original encoding by default.** A non-UTF-8
 file saves as that same encoding.
 
-**Limitation:** if you add characters that the saved encoding cannot
-represent, they are currently written as numeric character references
-instead of being rejected or flagged — for example, saving `😀` into a
-`Shift_JIS` file writes the literal text `&#128512;`.
+If you add characters that the saved encoding cannot represent — for example,
+typing an emoji into a `Shift_JIS` file — the save is **refused**, not
+written. The dialog names the characters that cannot be represented and the
+target encoding. Choosing **Save as UTF-8** writes the file in UTF-8 instead;
+the file's tracked encoding then becomes UTF-8, so later saves of it stay in
+UTF-8 too.
+
+A separate, unrelated case: if a file could not be fully decoded when it was
+*opened* — some of its bytes were not valid in the detected encoding and were
+replaced with the substitution character (�) — saving that file is refused
+entirely, with no offer to save as UTF-8. The bytes those substitutions stood
+for were already lost when the file was read, before any edit happened, so no
+encoding choice at save time can restore them. **There is no in-app recovery
+for this file** — to save its original bytes, use a different tool.
 
 UTF-8 BOM is preserved: a file that has a BOM when loaded will have a BOM when
 saved.
