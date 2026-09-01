@@ -41,8 +41,12 @@ Text files may be encoded in any charset. ForskScope:
 
 The detected encoding label is shown in the status bar (e.g. `UTF-8`,
 `Shift_JIS`). **Save preserves the original encoding by default.** A non-UTF-8
-file saves as that same encoding. If you add characters outside the charset,
-a save guard warns you before writing.
+file saves as that same encoding.
+
+**Limitation:** if you add characters that the saved encoding cannot
+represent, they are currently written as numeric character references
+instead of being rejected or flagged — for example, saving `😀` into a
+`Shift_JIS` file writes the literal text `&#128512;`.
 
 UTF-8 BOM is preserved: a file that has a BOM when loaded will have a BOM when
 saved.

@@ -63,8 +63,9 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
   supplies the paths explicitly, so this is within normal OS file-permission
   semantics. No escalation beyond the user's own permissions is possible.
 - Very large files: the diff engine has a deadline policy (RFC-012) that may
-  produce approximate results; a warning banner is shown. No crash or panic
-  path exists from oversized input (fuzzing confirmed in test suite).
+  produce approximate results; a warning banner is shown. Whether a crash or
+  panic path exists from oversized input is unverified — no fuzzing or
+  property-based testing exists in this repository.
 
 ### 2. Directory listing and binary sniff (`list_dir`, `classify`)
 
