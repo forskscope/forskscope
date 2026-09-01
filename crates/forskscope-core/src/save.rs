@@ -99,14 +99,36 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
     })
 }
 
-/// Writes `bytes` to a sibling temp file, then renames it onto `target`.
-/// Atomic *visibility* on POSIX (`rename` within the same volume): a
-/// concurrent reader sees the old file or the new one, never a partial
-/// write. On failure the temp file is removed and the original at `target`
-/// is left untouched. This is not a power-loss durability guarantee — no
-/// `fsync`/`sync_all` is called on the temp file or the parent directory
-/// (F9/N2) — only that no reader ever observes a torn write while the
-/// process keeps running.
+/// Writes `bytes` to a same-directory temp file, then renames it onto
+/// `target`, overwriting whatever is there. Atomic *visibility* on POSIX
+/// (`rename` within the same volume): a concurrent reader sees the old file
+/// or the new one, never a partial write. This is not a power-loss
+/// durability guarantee — no `fsync`/`sync_all` is called on the temp file
+/// or the parent directory (F9/N2) — only that no reader ever observes a
+/// torn write while the process keeps running.
+///
+/// F89/RFC-082 §D5: the temp file is created via `tempfile::Builder`, the
+/// same primitive [`persist_noclobber_with_hook`] already uses below — a
+/// random `O_EXCL` name, not the predictable `.{filename}.fsk-tmp` this
+/// function used to hand-roll. A predictable sibling path is a symlink
+/// target an attacker can pre-create: this function used to `fs::write`
+/// straight through a pre-existing symlink at that path, silently
+/// overwriting whatever the link pointed at and leaving `target` itself
+/// replaced by a symlink after the rename (CWE-59/CWE-378). The random name
+/// also removes the multi-writer collision a predictable shared path
+/// invited — two concurrent saves of the same `target` no longer race on
+/// the same temp file.
+///
+/// Deliberately **not** `persist_noclobber`: `atomic_replace` overwrites an
+/// existing `target` by contract — that's its whole job, and the caller
+/// (`save_text`'s `MustMatch`/`Force` arm) has already run its own
+/// precondition check. Deliberately **not** creating `target`'s parent
+/// directory either, unlike [`persist_noclobber_with_hook`] — that call
+/// belongs to `save_text` (Save As to a new nested path) and to
+/// `atomic_write_envelope` (`persist::schema`'s first-write-on-fresh-install
+/// case, F61/F62); folding it in here would make Save As's own
+/// `create_dir_all` redundant and would change plain-save semantics
+/// (writing into a missing directory would start silently succeeding).
 ///
 /// `pub(crate)` so `persist::schema`'s repositories (RFC-076) can reuse this
 /// primitive for settings/session writes instead of hand-rolling their own
@@ -114,12 +136,24 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
 /// behavior (no fingerprint check, no `.bak` backup) — those stay in
 /// [`save_text`]; callers needing them apply their own policy.
 pub(crate) fn atomic_replace(target: &Path, bytes: &[u8]) -> Result<()> {
-    let temp = temp_path_for(target);
-    fs::write(&temp, bytes).map_err(|e| CoreError::io(&temp, IoOperation::Write, &e))?;
-    if let Err(e) = fs::rename(&temp, target) {
-        let _ = fs::remove_file(&temp);
-        return Err(CoreError::io(target, IoOperation::Rename, &e));
+    let dir = target.parent().unwrap_or_else(|| Path::new("."));
+    // See persist_noclobber_with_hook's comment: 0o666 (kernel applies the
+    // umask), not NamedTempFile's 0600 default — this temp file becomes the
+    // permanent target file and must end up with the same permissions a
+    // plain fs::write would have produced.
+    let mut builder = tempfile::Builder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(fs::Permissions::from_mode(0o666));
     }
+    let mut tmp = builder
+        .tempfile_in(dir)
+        .map_err(|e| CoreError::io(dir, IoOperation::Write, &e))?;
+    std::io::Write::write_all(&mut tmp, bytes)
+        .map_err(|e| CoreError::io(target, IoOperation::Write, &e))?;
+    tmp.persist(target)
+        .map_err(|e| CoreError::io(target, IoOperation::Rename, &e.error))?;
     Ok(())
 }
 
@@ -260,11 +294,6 @@ fn file_name_string(path: &Path) -> String {
 
 fn backup_path_for(target: &Path) -> PathBuf {
     let name = format!("{}.bak", file_name_string(target));
-    sibling(target, &name)
-}
-
-fn temp_path_for(target: &Path) -> PathBuf {
-    let name = format!(".{}.fsk-tmp", file_name_string(target));
     sibling(target, &name)
 }
 

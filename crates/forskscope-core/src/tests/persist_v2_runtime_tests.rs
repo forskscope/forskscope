@@ -33,11 +33,32 @@ fn temp_path(tag: &str, file_name: &str) -> PathBuf {
     dir.join(file_name)
 }
 
-fn temp_write_path_for(path: &std::path::Path) -> PathBuf {
+fn backup_path_for(path: &std::path::Path) -> PathBuf {
     path.with_file_name(format!(
-        ".{}.fsk-tmp",
+        "{}.pre-v2.bak",
         path.file_name().unwrap().to_string_lossy()
     ))
+}
+
+/// Strips write permission from `dir` so a *new* file cannot be created in
+/// it — `atomic_replace`'s `tempfile_in(dir)` step, specifically — while a
+/// read of an existing file inside it still succeeds (read+execute is kept).
+/// Returns `false` (skip, don't assert) if the change had no effect, e.g.
+/// running as root — the same verify-before-assert pattern
+/// `dir_unreadable_tests.rs` established for handoff 006's permission tests.
+#[cfg(unix)]
+fn make_dir_readonly(dir: &std::path::Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    let probe = dir.join(".fsk-writability-probe");
+    let _ = fs::remove_file(&probe);
+    fs::set_permissions(dir, fs::Permissions::from_mode(0o555)).unwrap();
+    fs::write(&probe, b"x").is_err()
+}
+
+#[cfg(unix)]
+fn restore_dir_writable(dir: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = fs::set_permissions(dir, fs::Permissions::from_mode(0o755));
 }
 
 fn fixture(name: &str) -> String {
@@ -158,19 +179,37 @@ fn settings_resolve_corrupt_disables_writes_and_preserves_bytes() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn settings_resolve_surfaces_a_failed_commit_and_disables_writes() {
-    // Obstructs the sibling temp path `atomic_replace` writes to (same
-    // technique as the repository failure-window test), so the commit's
-    // final write fails after its backup already succeeded — a persistent
-    // failure (review 038 C1), not the benign N1 conflict race.
+    // F89/RFC-082 §D5: used to obstruct the sibling temp path
+    // `atomic_replace` wrote to — no longer possible once that path became
+    // a random `tempfile`-generated name (see the repository failure-window
+    // test's comment for the full account). Obstructed at the directory
+    // level instead: the backup this flow would create is pre-created here
+    // so `ensure_pre_v2_backup` finds it already present and never needs to
+    // write, then the directory is made read-only so `atomic_replace`'s
+    // `tempfile_in` cannot create its temp file — a persistent failure
+    // (review 038 C1), not the benign N1 conflict race.
     let path = temp_path("settings-migrate-failed", "settings.json");
     let legacy_raw = fixture("settings-v0.json");
     fs::write(&path, &legacy_raw).unwrap();
-    fs::create_dir_all(temp_write_path_for(&path)).unwrap();
-    let repo = SettingsRepository::new(path.clone());
+    fs::write(backup_path_for(&path), &legacy_raw).unwrap();
+    let dir = path.parent().unwrap();
 
+    if !make_dir_readonly(dir) {
+        restore_dir_writable(dir);
+        eprintln!(
+            "skipping settings_resolve_surfaces_a_failed_commit_and_disables_writes: \
+             the directory permission change had no effect (running as root?)"
+        );
+        return;
+    }
+
+    let repo = SettingsRepository::new(path.clone());
     let resolved = resolve_settings(&repo);
+    restore_dir_writable(dir);
+
     match resolved.outcome {
         SettingsRuntimeOutcome::Migrated(SettingsMigrationCommitOutcome::Failed { detail }) => {
             assert!(!detail.is_empty());
@@ -225,15 +264,31 @@ fn session_resolve_migrates_legacy_v0_and_commits_durably() {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn session_resolve_surfaces_a_failed_commit_and_disables_writes() {
+    // Session mirror of the settings test above — see its comment for why
+    // this is a directory-level obstruction rather than the pre-F89
+    // predictable-temp-path one.
     let path = temp_path("session-migrate-failed", "session.json");
     let legacy_raw = fixture("session-v0.json");
     fs::write(&path, &legacy_raw).unwrap();
-    fs::create_dir_all(temp_write_path_for(&path)).unwrap();
-    let repo = SessionRepository::new(path.clone());
+    fs::write(backup_path_for(&path), &legacy_raw).unwrap();
+    let dir = path.parent().unwrap();
 
+    if !make_dir_readonly(dir) {
+        restore_dir_writable(dir);
+        eprintln!(
+            "skipping session_resolve_surfaces_a_failed_commit_and_disables_writes: \
+             the directory permission change had no effect (running as root?)"
+        );
+        return;
+    }
+
+    let repo = SessionRepository::new(path.clone());
     let resolved = resolve_session(&repo);
+    restore_dir_writable(dir);
+
     match resolved.outcome {
         SessionRuntimeOutcome::Migrated(SessionMigrationCommitOutcome::Failed { detail }) => {
             assert!(!detail.is_empty());

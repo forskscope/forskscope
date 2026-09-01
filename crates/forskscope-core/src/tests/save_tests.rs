@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::document::FileFingerprint;
 use crate::error::CoreError;
-use crate::save::{BackupPolicy, SaveRequest, TargetPrecondition, save_text};
+use crate::save::{BackupPolicy, SaveRequest, TargetPrecondition, atomic_replace, save_text};
 
 fn temp_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("fsk-save-{tag}-{}", std::process::id()));
@@ -289,5 +289,93 @@ fn must_be_absent_precondition_conflicts_and_leaves_an_existing_target_untouched
     assert!(
         !bak.exists(),
         "no backup should be attempted for a save that never wrote anything"
+    );
+}
+
+// ── F89/RFC-082 §D5: atomic_replace uses an unpredictable temp file ────────
+
+#[cfg(unix)]
+#[test]
+fn atomic_replace_does_not_follow_a_pre_created_symlink_at_the_old_predictable_temp_path() {
+    // CWE-59/CWE-378, reproduced by the architect against the old
+    // `fs::write(temp_path_for(target), …)` implementation: pre-creating
+    // `.doc.txt.fsk-tmp` as a symlink to an unrelated file caused that
+    // file to be silently overwritten with the user's new content, and
+    // left the user's own document replaced by a symlink
+    // (`doc.txt -> victim.txt`). No root-skip: this test creates its own
+    // symlink, and root changes nothing about link-following behavior.
+    use std::os::unix::fs::symlink;
+
+    let dir = temp_dir("atomic-replace-symlink-attack");
+    let doc = dir.join("doc.txt");
+    let victim = dir.join("victim.txt");
+    fs::write(&doc, "original document content\n").unwrap();
+    fs::write(&victim, "victim's own content\n").unwrap();
+
+    let predictable_temp = dir.join(".doc.txt.fsk-tmp");
+    symlink(&victim, &predictable_temp).unwrap();
+
+    atomic_replace(&doc, b"user's new content\n").unwrap();
+
+    assert_eq!(
+        fs::read_to_string(&victim).unwrap(),
+        "victim's own content\n",
+        "the unrelated file must be untouched — atomic_replace must never \
+         write through a pre-existing symlink at any predictable path"
+    );
+    assert!(
+        !fs::symlink_metadata(&doc).unwrap().file_type().is_symlink(),
+        "doc.txt must remain a regular file, never replaced by a symlink"
+    );
+    assert_eq!(
+        fs::read_to_string(&doc).unwrap(),
+        "user's new content\n",
+        "the actual target must receive the new content"
+    );
+    assert!(
+        fs::symlink_metadata(&predictable_temp)
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false),
+        "test setup sanity check: the pre-created symlink must still be \
+         exactly what it was — never touched, because atomic_replace's \
+         real (randomly-named) temp file never has this name"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn atomic_replace_output_is_not_left_with_tempfiles_narrow_default_permissions() {
+    // Same property persist_noclobber_with_hook's own permissions test
+    // protects (see its comment in save_target_tests.rs) — NamedTempFile
+    // defaults to 0600, but atomic_replace's output must have the
+    // permissions an ordinary fs::write would have produced under the
+    // process umask, not something more restrictive. Compared against a
+    // same-directory reference file created the same way in the same
+    // process, so this is correct under any umask — not a hardcoded mode
+    // (F38, review 051 §3.3). Also exercises "an ordinary overwrite still
+    // works" (handoff 016 §5.2): the target already exists and is
+    // genuinely replaced.
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = temp_dir("atomic-replace-permissions");
+    let target = dir.join("out.txt");
+    fs::write(&target, "original\n").unwrap();
+    let reference_path = dir.join("reference-output.txt");
+    fs::write(&reference_path, b"reference\n").unwrap();
+    let expected_mode = fs::metadata(&reference_path).unwrap().permissions().mode() & 0o777;
+
+    atomic_replace(&target, b"new content\n").unwrap();
+
+    assert_eq!(
+        fs::read_to_string(&target).unwrap(),
+        "new content\n",
+        "the overwrite must actually take effect"
+    );
+    let mode = fs::metadata(&target).unwrap().permissions().mode() & 0o777;
+    assert_eq!(
+        mode, expected_mode,
+        "expected {expected_mode:o} (a plain fs::write's mode in the same directory), \
+         got {mode:o} — atomic_replace's output must not be more restrictive \
+         than an ordinary save"
     );
 }

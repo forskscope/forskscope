@@ -30,18 +30,32 @@ fn backup_path_for(path: &std::path::Path) -> PathBuf {
     ))
 }
 
-fn temp_write_path_for(path: &std::path::Path) -> PathBuf {
-    path.with_file_name(format!(
-        ".{}.fsk-tmp",
-        path.file_name().unwrap().to_string_lossy()
-    ))
-}
-
 fn reset_backup_path_for(path: &std::path::Path) -> PathBuf {
     path.with_file_name(format!(
         "{}.reset.bak",
         path.file_name().unwrap().to_string_lossy()
     ))
+}
+
+/// Strips write permission from `dir` so a *new* file cannot be created in
+/// it — `atomic_replace`'s `tempfile_in(dir)` step, specifically — while a
+/// read of an existing file inside it still succeeds (read+execute is kept).
+/// Returns `false` (skip, don't assert) if the change had no effect, e.g.
+/// running as root — the same verify-before-assert pattern
+/// `dir_unreadable_tests.rs` established for handoff 006's permission tests.
+#[cfg(unix)]
+fn make_dir_readonly(dir: &std::path::Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    let probe = dir.join(".fsk-writability-probe");
+    let _ = fs::remove_file(&probe);
+    fs::set_permissions(dir, fs::Permissions::from_mode(0o555)).unwrap();
+    fs::write(&probe, b"x").is_err()
+}
+
+#[cfg(unix)]
+fn restore_dir_writable(dir: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = fs::set_permissions(dir, fs::Permissions::from_mode(0o755));
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────
@@ -75,21 +89,61 @@ fn settings_save_then_load_round_trips() {
     }
 }
 
+/// F89/RFC-082 §D5 §3a: `atomic_replace` itself must not create parent
+/// directories — that stays `atomic_write_envelope`'s job, deliberately
+/// (F61/F62: the first write a fresh install makes, into
+/// `~/.config/forskscope`, which nothing else creates beforehand). This is
+/// the caller-level proof that the split still holds: a settings write into
+/// a directory that does not exist yet — not even created by `temp_path`'s
+/// usual `create_dir_all` — must still succeed, via the repository's own
+/// parent-creation call.
+#[test]
+fn settings_save_into_a_missing_parent_directory_still_succeeds() {
+    let dir = std::env::temp_dir().join(format!(
+        "fsk-persist-v2-settings-fresh-install-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&dir);
+    assert!(
+        !dir.exists(),
+        "test setup: the directory must not exist yet"
+    );
+
+    let path = dir.join("settings.json");
+    let repo = SettingsRepository::new(path.clone());
+    repo.save(&PersistedSettings::default())
+        .expect("save into a missing parent directory must still succeed");
+
+    match repo.load() {
+        PersistenceLoad::Current { value } => assert_eq!(value, PersistedSettings::default()),
+        other => panic!("expected Current, got {other:?}"),
+    }
+}
+
 #[test]
 fn settings_save_leaves_no_stray_temp_file() {
+    // F89/RFC-082 §D5: filtering by name for "fsk-tmp" would now be
+    // vacuous — `atomic_replace`'s temp file has a random `tempfile`-
+    // generated name (verified empirically: a real save's directory
+    // listing mid-flight shows no "fsk-tmp" substring anywhere), so that
+    // filter would always find nothing regardless of whether a stray file
+    // is actually left behind. Assert against every entry that isn't the
+    // target file instead — a check that doesn't depend on knowing the
+    // implementation's temp-naming scheme.
     let path = temp_path("settings-notemp", "settings.json");
     let repo = SettingsRepository::new(path.clone());
     repo.save(&PersistedSettings::default()).unwrap();
     let dir = path.parent().unwrap();
+    let target_name = path.file_name().unwrap().to_string_lossy().into_owned();
     let stray: Vec<_> = fs::read_dir(dir)
         .unwrap()
         .filter_map(|e| e.ok())
         .map(|e| e.file_name().to_string_lossy().into_owned())
-        .filter(|name| name.contains("fsk-tmp"))
+        .filter(|name| *name != target_name)
         .collect();
     assert!(
         stray.is_empty(),
-        "stray temp file(s) left behind: {stray:?}"
+        "stray file(s) left behind besides the target: {stray:?}"
     );
 }
 
@@ -179,24 +233,44 @@ fn settings_commit_migration_rejects_stale_bytes_after_external_change() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn settings_commit_migration_survives_failure_between_backup_and_replace() {
     // Review 037 §4.4: exercise the actual failure window (backup succeeds,
-    // then the write fails) using only ordinary filesystem behaviour —
-    // obstruct the sibling temp path `atomic_replace` writes to, so its
-    // `fs::write` fails, without needing OS-level fault injection.
+    // then the write fails), without needing OS-level fault injection.
+    //
+    // F89/RFC-082 §D5: this used to obstruct the sibling temp path
+    // `atomic_replace` wrote to (`temp_write_path_for`) with a directory —
+    // that stopped working once `atomic_replace` moved to a random O_EXCL
+    // name (a different name is simply tried next). Forced at the
+    // *directory* level instead: the backup is pre-created so
+    // `ensure_pre_v2_backup` finds it already there and never needs to
+    // write (no directory permission required for that branch), then the
+    // directory is made read-only so `atomic_replace`'s `tempfile_in`
+    // cannot create its new temp file at all, regardless of its name.
     let path = temp_path("settings-migrate-failwindow", "settings.json");
     let original = br#"{"theme":"dark"}"#;
     fs::write(&path, original).unwrap();
-    fs::create_dir_all(temp_write_path_for(&path)).unwrap();
+    fs::write(backup_path_for(&path), original).unwrap();
+    let dir = path.parent().unwrap();
+
+    if !make_dir_readonly(dir) {
+        restore_dir_writable(dir);
+        eprintln!(
+            "skipping settings_commit_migration_survives_failure_between_backup_and_replace: \
+             the directory permission change had no effect (running as root?)"
+        );
+        return;
+    }
 
     let repo = SettingsRepository::new(path.clone());
     let result = repo.commit_migration(&PersistedSettings::default(), original);
+    restore_dir_writable(dir);
+
     assert!(
         result.is_err(),
-        "the write must fail because its temp path is a directory"
+        "the write must fail because the directory cannot accept a new file"
     );
-
     assert_eq!(
         fs::read(backup_path_for(&path)).unwrap(),
         original,
@@ -394,20 +468,35 @@ fn session_commit_migration_rejects_stale_bytes_after_external_change() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn session_commit_migration_survives_failure_between_backup_and_replace() {
+    // Session mirror of the settings test above — see its comment for why
+    // this is a directory-level obstruction rather than the pre-F89
+    // predictable-temp-path one.
     let path = temp_path("session-migrate-failwindow", "session.json");
     let original = br#"{"tabs":[]}"#;
     fs::write(&path, original).unwrap();
-    fs::create_dir_all(temp_write_path_for(&path)).unwrap();
+    fs::write(backup_path_for(&path), original).unwrap();
+    let dir = path.parent().unwrap();
+
+    if !make_dir_readonly(dir) {
+        restore_dir_writable(dir);
+        eprintln!(
+            "skipping session_commit_migration_survives_failure_between_backup_and_replace: \
+             the directory permission change had no effect (running as root?)"
+        );
+        return;
+    }
 
     let repo = SessionRepository::new(path.clone());
     let result = repo.commit_migration(&PersistedSession::default(), original);
+    restore_dir_writable(dir);
+
     assert!(
         result.is_err(),
-        "the write must fail because its temp path is a directory"
+        "the write must fail because the directory cannot accept a new file"
     );
-
     assert_eq!(
         fs::read(backup_path_for(&path)).unwrap(),
         original,
