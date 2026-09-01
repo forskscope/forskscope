@@ -1,6 +1,6 @@
 # ForskScope Roadmap
 
-**Last updated:** independent audit 2026-09-01; **B5 opened** — v1 No-Go now rests on write-path defects as well as platform evidence
+**Last updated:** RFC-082 accepted (2026-09-01); **M7 is live** — B5 remediation in progress, in parallel with M5's upstream wait
 **Current phase:** v1 release stabilization — release-baseline reconciliation,
 then correctness workstreams, then runtime/platform acceptance and a new
 architecture go/no-go review.
@@ -217,6 +217,42 @@ sub-requirements — but the plan is **not yet frozen**: exact OS versions,
 executor owner/role, and host-access status per row are owner-dependent and
 recorded as open questions rather than guessed. M5 cannot begin until those
 are answered.
+
+**Progress (2026-09-01): RFC-082 accepted; M7 begins.**
+
+Gate A cleared with **all three design questions closed before acceptance**, so
+implementation waits on nothing. Two of the three answers changed under the
+owner's added criterion — that the design be *friendly and in harmony with the
+user's instinct* — and one of them reversed a recommendation of mine:
+
+- **Mergetool swap is no longer refused.** `save_target` derives from
+  `save_destination`, not from `right_path`, so a single invariant covers every
+  mode: re-derive when the inputs it derives from change. Refusing would have
+  added a restriction to cover a missing invariant, and forbidden something
+  legitimate. The blunt version also had a trap — an unconditional re-derive
+  would refresh `$MERGED`'s fingerprint against a file never re-read, destroying
+  external-modification detection for the one file the mergetool contract exists
+  to protect.
+- **A lossy encode blocks, names the characters it cannot write, and offers
+  UTF-8.** Blocking alone is safe; it is not usable by someone who has never
+  thought about charsets.
+- **F88 split**, on the owner's decision: the unwired guard blocks, the
+  missing-side restriction does not — a feature gap, not a data-loss path.
+  Blocking it would delay v1 without making it safer.
+
+**One addition the instinct criterion produced, and it is preventive rather than
+corrective.** `save_target` reaches the UI in exactly one place — prefilling Save
+As — and is **never displayed**. So a wrong destination looks identical to a right
+one until the file is overwritten, which is why F85 could exist *and stay silent*
+in a codebase that had already built RFC-077 to prevent exactly that. RFC-082 §D6
+surfaces it, and it is now the eleventh release-blocking outcome.
+
+**Sequencing.** Handoffs 013 (the two false control claims — documentation only,
+blocking, no code) and 014 (F86, content-identity dirty state) are written. Then
+F85 with §D2 and §D6, then F89's secure atomic write, then F87/F88a with the
+encoding guard. **F86 is first among the code fixes** because its trigger —
+apply, save, undo, apply — is an ordinary correction workflow, where F85's needs
+a deliberate click on Swap sides.
 
 **Progress (2026-09-01): a second independent audit opened blocker B5, and it
 corrected this document's account of why v1 is No-Go.**

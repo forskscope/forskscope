@@ -1,6 +1,10 @@
 # RFC 082: Write-Path Integrity
 
 **Status.** Proposed
+**Accepted.** 2026-09-01 by the project owner — Gate A cleared. All three design
+questions were closed before acceptance, so nothing here awaits a decision;
+implementation may begin. Stays in `proposed/` until implemented, per the
+4-folder lifecycle.
 **Scheduling.** Pre-v1 — **audit blocker B5**, the release-blocking cluster from
 the 2026-09-01 independent audit. See `ROADMAP.md` § "Remaining proposed RFCs",
 which must list every file in this folder and nothing else (F83).

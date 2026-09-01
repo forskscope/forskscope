@@ -95,6 +95,9 @@ remains No-Go.
 | 078 | [Platform Runtime Acceptance and Release Evidence](./proposed/078-platform-runtime-acceptance.md) | Release QA | Audit B4 — exact-artifact runtime matrix after RFC-075–077 |
 | 079 | [Microsoft Store Submission Automation](./proposed/079-microsoft-store-submission-automation.md) | Release pipeline | **Accepted 2026-08-22.** No MSIX is built anywhere today; automate submission on `release: published`, using a stored Entra ID client secret (owner decision, §2) |
 | 080 | [Tiered Directory Comparison in the Explorer](./proposed/080-explorer-tiered-directory-comparison.md) | Explorer | **Accepted 2026-08-21.** A cheap scan can prove directories differ but never that they match; two tiers, honest labels, after Gate D |
+| 082 | [Write-Path Integrity](./proposed/082-write-path-integrity.md) | Correctness / security | **Accepted 2026-09-01.** Audit blocker B5 — the release-blocking cluster: save-target authority, content-identity dirty state, lossy-encode guard, save capability, secure atomic write |
+| 083 | [Text Encoding Breadth](./proposed/083-text-encoding-breadth.md) | Encoding | UTF-16, BOM wiring, encoding override — post-v1, documentation corrections immediate |
+| 084 | [Patch Export Conformance](./proposed/084-patch-export-conformance.md) | Patch export | CRLF terminators, path quoting, context lines — post-v1, documentation corrections immediate |
 | 081 | [AUR Publication Automation](./proposed/081-aur-publication-automation.md) | Release pipeline | AUR stopped at 0.22.13; the PKGBUILD is maintained but never pushed. Blocked on F81, and the only Linux channel that works on Arch while F44 holds |
 
 ## Archive (1)
