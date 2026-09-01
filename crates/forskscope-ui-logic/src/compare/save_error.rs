@@ -48,6 +48,7 @@ pub fn action_label(action: RecoveryAction) -> &'static str {
         RecoveryAction::ChooseAnotherFile => "Choose another file",
         RecoveryAction::Reload => "Reload",
         RecoveryAction::SaveAs => "Save As…",
+        RecoveryAction::SaveAsUtf8 => "Save as UTF-8",
         RecoveryAction::OverwriteAnyway => "Overwrite anyway",
         RecoveryAction::OpenLimitedDiff => "Open with limits",
         RecoveryAction::OpenAsBinary => "Open as binary",
@@ -132,6 +133,7 @@ mod tests {
             RecoveryAction::ChooseAnotherFile,
             RecoveryAction::Reload,
             RecoveryAction::SaveAs,
+            RecoveryAction::SaveAsUtf8,
             RecoveryAction::OverwriteAnyway,
             RecoveryAction::OpenLimitedDiff,
             RecoveryAction::OpenAsBinary,
@@ -199,6 +201,17 @@ mod tests {
         let v = SaveErrorView::from_error(&e, None);
         assert!(v.has_action(RecoveryAction::SaveAs));
         assert!(!v.has_action(RecoveryAction::OverwriteAnyway));
+    }
+
+    #[test]
+    fn encode_lossy_view_offers_save_as_utf8_as_primary() {
+        let e = err(AppErrorKind::EncodeLossy);
+        let v = SaveErrorView::from_error(&e, None);
+        assert!(v.has_action(RecoveryAction::SaveAsUtf8));
+        assert!(v.has_action(RecoveryAction::Dismiss));
+        assert!(!v.has_action(RecoveryAction::OverwriteAnyway));
+        let primary = v.primary_button().expect("must have primary button");
+        assert_eq!(primary.action, RecoveryAction::SaveAsUtf8);
     }
 
     #[test]

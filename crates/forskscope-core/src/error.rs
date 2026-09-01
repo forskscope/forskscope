@@ -109,6 +109,20 @@ pub enum CoreError {
         path: Option<PathBuf>,
         message: String,
     },
+    /// A save could not represent its content in the target encoding
+    /// without loss (RFC-082 §D4) — nothing was written. Distinct from
+    /// `Decode`: this is the write direction, and it names the specific
+    /// unmappable characters rather than a generic message.
+    Encode {
+        path: Option<PathBuf>,
+        encoding_label: String,
+        /// The first few distinct unmappable characters, in order of first
+        /// appearance, capped (see `encoding::MAX_REPORTED_UNMAPPABLE_CHARS`).
+        sample_characters: Vec<char>,
+        /// How many *additional* distinct unmappable characters exist
+        /// beyond `sample_characters`, if the cap was reached.
+        additional_count: usize,
+    },
     /// The requested operation is not supported for this input.
     Unsupported { message: String },
     /// A safety conflict, e.g. the target file changed on disk after load.
@@ -146,6 +160,7 @@ impl CoreError {
             },
             Self::InvalidPath { .. } => ErrorSeverity::Recoverable,
             Self::Decode { .. } => ErrorSeverity::Warning,
+            Self::Encode { .. } => ErrorSeverity::Blocking,
             Self::Unsupported { .. } => ErrorSeverity::Warning,
             Self::InternalInvariant { .. } => ErrorSeverity::Blocking,
         }
@@ -165,6 +180,7 @@ impl CoreError {
             },
             Self::InvalidPath { .. } => RecoveryHint::ChooseAnotherFile,
             Self::Decode { .. } => RecoveryHint::Dismiss,
+            Self::Encode { .. } => RecoveryHint::SaveAs,
             Self::Unsupported { .. } => RecoveryHint::ChooseAnotherFile,
             Self::InternalInvariant { .. } => RecoveryHint::ReportBug,
         }
@@ -193,6 +209,27 @@ impl fmt::Display for CoreError {
                 Some(p) => write!(f, "decode failed for `{}`: {message}", p.display()),
                 None => write!(f, "decode failed: {message}"),
             },
+            Self::Encode {
+                path,
+                encoding_label,
+                sample_characters,
+                additional_count,
+            } => {
+                let chars: Vec<String> =
+                    sample_characters.iter().map(|c| format!("{c:?}")).collect();
+                let mut listed = chars.join(", ");
+                if *additional_count > 0 {
+                    listed = format!("{listed} (+{additional_count} more)");
+                }
+                match path {
+                    Some(p) => write!(
+                        f,
+                        "cannot encode `{}` as {encoding_label}: {listed}",
+                        p.display()
+                    ),
+                    None => write!(f, "cannot encode as {encoding_label}: {listed}"),
+                }
+            }
             Self::Unsupported { message } => write!(f, "unsupported: {message}"),
             Self::Conflict { message } => write!(f, "conflict: {message}"),
             Self::InternalInvariant { message } => write!(f, "internal invariant: {message}"),

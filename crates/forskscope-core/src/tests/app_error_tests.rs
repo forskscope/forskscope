@@ -150,6 +150,7 @@ fn all_recovery_action_tokens_are_non_empty_and_unique() {
         RecoveryAction::ChooseAnotherFile,
         RecoveryAction::Reload,
         RecoveryAction::SaveAs,
+        RecoveryAction::SaveAsUtf8,
         RecoveryAction::OverwriteAnyway,
         RecoveryAction::OpenLimitedDiff,
         RecoveryAction::OpenAsBinary,
@@ -205,6 +206,7 @@ fn for_kind_produces_non_empty_short_for_all_variants() {
         AppErrorKind::FileWriteFailed,
         AppErrorKind::EncodingDetectionFailed,
         AppErrorKind::DecodeLossy,
+        AppErrorKind::EncodeLossy,
         AppErrorKind::BinaryNotComparable,
         AppErrorKind::FileTooLarge,
         AppErrorKind::DiffFailed,
@@ -259,6 +261,60 @@ fn app_error_from_core_conflict_has_external_modification_kind() {
             .recovery
             .contains(&crate::error::RecoveryAction::Reload)
     );
+}
+
+/// F87/RFC-082 §D4: `AppError::from_core` must not fall back to the
+/// generic `UserMessage::for_kind` template for `CoreError::Encode` — the
+/// dialog body has to name the actual characters and encoding, per §5.
+#[test]
+fn app_error_from_core_encode_names_characters_and_encoding_in_the_detail() {
+    let core_err = CoreError::Encode {
+        path: Some(std::path::PathBuf::from("/some/doc.txt")),
+        encoding_label: "shift_jis".into(),
+        sample_characters: vec!['😀', '🎉'],
+        additional_count: 3,
+    };
+    let app_err = crate::error::AppError::from_core(&core_err);
+    assert_eq!(app_err.kind, AppErrorKind::EncodeLossy);
+    assert!(
+        app_err.message.detail.contains('😀') && app_err.message.detail.contains('🎉'),
+        "the dialog body must name the actual characters, got: {:?}",
+        app_err.message.detail
+    );
+    assert!(
+        app_err.message.detail.contains("shift_jis"),
+        "the dialog body must say what the file's encoding is, got: {:?}",
+        app_err.message.detail
+    );
+    assert!(
+        app_err.message.detail.contains('3'),
+        "the 3 additional unmappable characters beyond the sample must be \
+         summarized, got: {:?}",
+        app_err.message.detail
+    );
+    assert_eq!(
+        app_err.recovery,
+        vec![
+            crate::error::RecoveryAction::SaveAsUtf8,
+            crate::error::RecoveryAction::Dismiss
+        ]
+    );
+}
+
+#[test]
+fn app_error_from_core_encode_with_no_sample_falls_back_gracefully() {
+    // Defensive: an Encode error with an empty sample (shouldn't happen in
+    // practice — save_text always populates it when lossy is true) must
+    // still produce a non-empty, sane message rather than panicking or
+    // rendering an empty dialog body.
+    let core_err = CoreError::Encode {
+        path: None,
+        encoding_label: "shift_jis".into(),
+        sample_characters: vec![],
+        additional_count: 0,
+    };
+    let app_err = crate::error::AppError::from_core(&core_err);
+    assert!(!app_err.message.detail.is_empty());
 }
 
 #[test]

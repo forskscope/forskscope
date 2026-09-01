@@ -379,3 +379,74 @@ fn atomic_replace_output_is_not_left_with_tempfiles_narrow_default_permissions()
          than an ordinary save"
     );
 }
+
+// ── F87/RFC-082 §D4: a save that cannot represent its content must not
+// happen — refused before the backup step, nothing on disk touched ────────
+
+#[test]
+fn a_lossy_save_writes_nothing_and_never_touches_the_backup() {
+    let dir = temp_dir("encode-lossy-refusal");
+    let target = dir.join("doc.txt");
+    fs::write(&target, "original content\n").unwrap();
+    let bak = dir.join("doc.txt.bak");
+    fs::write(&bak, "a prior backup that must survive untouched\n").unwrap();
+    let fp = FileFingerprint::capture(&target, None).unwrap();
+
+    let request = SaveRequest {
+        target: target.clone(),
+        content: "hi 😀\n".into(),
+        encoding_label: "shift_jis".into(),
+        precondition: TargetPrecondition::MustMatch(fp),
+        backup: BackupPolicy::SiblingBak,
+    };
+    let err = save_text(&request).unwrap_err();
+
+    assert!(
+        matches!(err, CoreError::Encode { .. }),
+        "expected CoreError::Encode, got {err:?}"
+    );
+    assert_eq!(
+        fs::read(&target).unwrap(),
+        b"original content\n",
+        "§3's ordering requirement: nothing on disk may be touched when a \
+         save is refused for this reason"
+    );
+    assert_eq!(
+        fs::read(&bak).unwrap(),
+        b"a prior backup that must survive untouched\n",
+        "the backup step must never run for a refused save — a later \
+         refusal would already have destroyed the user's prior backup \
+         for a save that never happens"
+    );
+}
+
+#[test]
+fn a_lossy_save_names_the_offending_character() {
+    let dir = temp_dir("encode-lossy-names-character");
+    let target = dir.join("doc.txt");
+    fs::write(&target, "original\n").unwrap();
+    let fp = FileFingerprint::capture(&target, None).unwrap();
+
+    let request = SaveRequest {
+        target: target.clone(),
+        content: "hi 😀\n".into(),
+        encoding_label: "shift_jis".into(),
+        precondition: TargetPrecondition::MustMatch(fp),
+        backup: BackupPolicy::None,
+    };
+    match save_text(&request).unwrap_err() {
+        CoreError::Encode {
+            sample_characters,
+            encoding_label,
+            ..
+        } => {
+            assert_eq!(
+                sample_characters,
+                vec!['😀'],
+                "the actual character must be named, not merely \"lossy\""
+            );
+            assert_eq!(encoding_label, "shift_jis");
+        }
+        other => panic!("expected CoreError::Encode, got {other:?}"),
+    }
+}

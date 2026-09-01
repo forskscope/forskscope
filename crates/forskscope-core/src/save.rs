@@ -17,7 +17,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::document::{ExternalFileState, FileFingerprint, check_external_state};
-use crate::encoding::encode_text;
+use crate::encoding::{MAX_REPORTED_UNMAPPABLE_CHARS, encode_text, unmappable_characters};
 use crate::error::{CoreError, IoOperation, Result};
 
 /// Backup behavior for a save.
@@ -61,12 +61,34 @@ pub struct SaveOutcome {
 /// (`atomic_replace`) otherwise. RFC-077: a save whose target must not
 /// exist never falls back to an overwriting write, even if no-clobber
 /// commit fails for some other reason — the error propagates instead.
+///
+/// F87/RFC-082 §D4: a save whose content the target encoding cannot
+/// represent without loss is refused — `CoreError::Encode` — **before**
+/// the backup step. That ordering is load-bearing, not incidental: the
+/// backup step clobbers any existing `<name>.bak`, so refusing one line
+/// later would already have destroyed the user's prior backup for a save
+/// that never happens. Nothing on disk is touched by a refusal.
 pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
     let target = request.target.as_path();
 
     check_precondition(target, &request.precondition)?;
 
-    let (bytes, fallback) = encode_text(&request.content, &request.encoding_label);
+    let encoded = encode_text(&request.content, &request.encoding_label);
+    if encoded.lossy {
+        let (sample_characters, additional_count) = unmappable_characters(
+            &request.content,
+            &request.encoding_label,
+            MAX_REPORTED_UNMAPPABLE_CHARS,
+        );
+        return Err(CoreError::Encode {
+            path: Some(target.to_path_buf()),
+            encoding_label: request.encoding_label.clone(),
+            sample_characters,
+            additional_count,
+        });
+    }
+    let bytes = encoded.bytes;
+    let fallback = encoded.unknown_label_fallback;
 
     let backup_path = if request.backup == BackupPolicy::SiblingBak && target.exists() {
         let bak = backup_path_for(target);

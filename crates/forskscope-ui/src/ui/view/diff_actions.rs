@@ -318,7 +318,19 @@ fn handle_result(
             }
             drop(tabs);
             store.modal.set(Modal::None);
-            store.notify_success(t(store.lang(), "Saved."));
+            // F87 §4e: this flag has existed since SaveOutcome was written,
+            // documented as "the UI should warn", and was read by nobody
+            // until now. Distinct from EncodeLossy (which blocks the save
+            // entirely): here the write succeeded, but the requested label
+            // wasn't recognized, so UTF-8 was silently substituted for it.
+            if outcome.encoding_fallback_to_utf8 {
+                store.notify_warning(t(
+                    store.lang(),
+                    "Saved, but the requested encoding was not recognized — used UTF-8 instead.",
+                ));
+            } else {
+                store.notify_success(t(store.lang(), "Saved."));
+            }
         }
         Err(CoreError::Conflict { .. }) => {
             store
@@ -338,15 +350,17 @@ fn handle_result(
 
 /// Exhaustive handler for every button [`SaveErrorModal`](crate::ui::overlay::modals::SaveErrorModal)
 /// can show. Only [`RecoveryAction::ChooseAnotherFile`], [`RecoveryAction::Dismiss`],
-/// and [`RecoveryAction::SaveAs`] are reachable here — the only `CoreError`
-/// variants `save_text` can produce (`Conflict` aside, which never reaches
-/// this dialog — see [`handle_result`]) are `Io { Metadata | Write | Rename
-/// | CreateBackup }`, which map through `AppErrorKind::from_core` to
-/// `FileReadFailed | FileWriteFailed | BackupFailed`, and through
-/// `default_recovery_actions()` to exactly this set (F52 review request has
-/// the full trace). The other nine variants are named explicitly rather than
-/// matched with `_` so that a future thirteenth `RecoveryAction` variant is a
-/// compile error here, not a silently swallowed button — the same principle
+/// [`RecoveryAction::SaveAs`], and (F87) [`RecoveryAction::SaveAsUtf8`] are
+/// reachable here — the only `CoreError` variants `save_text` can produce
+/// (`Conflict` aside, which never reaches this dialog — see
+/// [`handle_result`]) are `Io { Metadata | Write | Rename | CreateBackup }`
+/// and (F87) `Encode`, which map through `AppErrorKind::from_core` to
+/// `FileReadFailed | FileWriteFailed | BackupFailed | EncodeLossy`, and
+/// through `default_recovery_actions()` to exactly this set (F52 review
+/// request has the full trace; F87's extends it with `EncodeLossy`). The
+/// other eight variants are named explicitly rather than matched with `_`
+/// so that a future thirteenth `RecoveryAction` variant is a compile error
+/// here, not a silently swallowed button — the same principle
 /// `file_digest_equal`'s `unreachable!()` established for F77 (review 074 §5).
 pub fn handle_save_recovery_action(
     store: &mut Store,
@@ -361,6 +375,7 @@ pub fn handle_save_recovery_action(
                 .modal
                 .set(Modal::SaveAs(index, target.display().to_string()));
         }
+        RecoveryAction::SaveAsUtf8 => retry_save_as_utf8(store, index),
         RecoveryAction::Reload
         | RecoveryAction::OverwriteAnyway
         | RecoveryAction::OpenLimitedDiff
@@ -370,9 +385,26 @@ pub fn handle_save_recovery_action(
         | RecoveryAction::Cancel
         | RecoveryAction::StartFresh
         | RecoveryAction::ReportBug => unreachable!(
-            "{action:?} is not in save_text's reachable CoreError set — see F52 review request"
+            "{action:?} is not in save_text's reachable CoreError set — see F52/F87 review requests"
         ),
     }
+}
+
+/// F87/RFC-082 §D4 §4d: re-runs the save at the *same* target with
+/// `encoding_label` forced to `"UTF-8"` — reuses [`build_request`]'s normal
+/// (non-explicit-target) path so the target and precondition are re-derived
+/// fresh from the tab, exactly as any other save would, then overrides only
+/// the encoding. No new plumbing needed for "update the tab's save target
+/// to match": [`handle_result`]'s success arm already builds the new
+/// `save_target` from `request.encoding_label`, so once that field reads
+/// `"UTF-8"` here, a save immediately following this one inherits it and
+/// does not block again.
+fn retry_save_as_utf8(store: &mut Store, index: usize) {
+    let mut outcome = build_request(store, index, false, None);
+    if let RequestOutcome::Ready(request) = &mut outcome {
+        request.encoding_label = "UTF-8".into();
+    }
+    dispatch(store, index, outcome);
 }
 
 pub(crate) fn trunc(s: &str) -> String {
@@ -655,22 +687,25 @@ mod tests {
     /// no compile error and no failing test in this crate. This closes that
     /// gap from this crate's side: for every `AppErrorKind` a save error can
     /// actually produce (§3 of the F52 review request's reachability
-    /// trace), `default_recovery_actions()` must stay a subset of what
+    /// trace, extended by F87/handoff 017 with `EncodeLossy`),
+    /// `default_recovery_actions()` must stay a subset of what
     /// `handle_save_recovery_action` handles. A cross-crate change that
     /// violates this now fails here instead of panicking in the GUI.
     #[test]
     fn every_save_reachable_kind_only_emits_handled_recovery_actions() {
         use forskscope_core::error::AppErrorKind;
 
-        const HANDLED: [RecoveryAction; 3] = [
+        const HANDLED: [RecoveryAction; 4] = [
             RecoveryAction::ChooseAnotherFile,
             RecoveryAction::Dismiss,
             RecoveryAction::SaveAs,
+            RecoveryAction::SaveAsUtf8,
         ];
         for kind in [
             AppErrorKind::FileReadFailed,
             AppErrorKind::FileWriteFailed,
             AppErrorKind::BackupFailed,
+            AppErrorKind::EncodeLossy,
         ] {
             for action in kind.default_recovery_actions() {
                 assert!(
@@ -681,5 +716,111 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// A minimal, savable tab whose `save_target` names an encoding —
+    /// standing in for the tab F87's `EncodeLossy` dialog was raised
+    /// against, now retrying via `SaveAsUtf8`.
+    fn tab_with_encoding(
+        target: std::path::PathBuf,
+        content: &str,
+        encoding_label: &str,
+    ) -> CompareTab {
+        use crate::state::tab::{CompareLaunchMode, TabState};
+        use forskscope_core::document::{FileFingerprint, LoadedDocument, TextDocument};
+        use forskscope_core::encoding::{NewlineStyle, TextEncoding};
+        use forskscope_core::file_kind::FileKind;
+        use forskscope_core::{DiffOptions, MergeSession, compute_diff};
+        use forskscope_ui_logic::{CompareTabId, LoadGeneration};
+
+        let fp = FileFingerprint::capture(&target, None).unwrap();
+        let doc = LoadedDocument {
+            file_id: None,
+            fingerprint_at_load: Some(fp),
+            kind: FileKind::Text,
+            bytes_len: content.len() as u64,
+            text: Some(TextDocument {
+                content: content.to_string(),
+                encoding: TextEncoding {
+                    label: encoding_label.into(),
+                },
+                newline_style: NewlineStyle::Lf,
+                had_decode_errors: false,
+            }),
+            warnings: Vec::new(),
+        };
+        // Identical left/right: result_text() reconstructs to exactly
+        // `content`, with no applied-hunk plumbing needed for this test.
+        let diff = compute_diff(content, content, DiffOptions::default());
+        let merge = MergeSession::from_diff(&diff);
+
+        CompareTab {
+            id: CompareTabId::new(1).unwrap(),
+            load_generation: LoadGeneration::new(1).unwrap(),
+            title: "t".into(),
+            left_path: Some(target.clone()),
+            right_path: Some(target.clone()),
+            state: TabState::Ready,
+            left_doc: doc.clone(),
+            right_doc: doc,
+            diff,
+            merge,
+            diff_options: DiffOptions::default(),
+            can_save: true,
+            char_mode: false,
+            word_wrap: false,
+            focused_change: 0,
+            save_target: Some(SaveTargetSnapshot {
+                path: target,
+                state: SaveTargetState::Writable {
+                    expectation: TargetExpectation::MustMatch(fp),
+                    encoding_label: encoding_label.into(),
+                },
+            }),
+            launch_mode: CompareLaunchMode::Normal,
+        }
+    }
+
+    /// F87/RFC-082 §D4: `SaveAsUtf8` must actually write the file and
+    /// update the tab's `save_target` to the new encoding, so a save
+    /// immediately following does not revert to the original encoding and
+    /// block again (§4d).
+    #[test]
+    fn save_as_utf8_writes_the_file_and_updates_the_save_targets_encoding() {
+        let dir = std::env::temp_dir().join(format!(
+            "fsk-diff-actions-save-as-utf8-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::create_dir_all(&dir);
+        let target = dir.join("output.sjis.txt");
+        std::fs::write(&target, "placeholder\n").unwrap();
+
+        crate::state::with_test_store(|store| {
+            let tab = tab_with_encoding(target.clone(), "hi 😀\n", "shift_jis");
+            store.tabs.write().push(tab);
+
+            handle_save_recovery_action(store, 0, target.clone(), RecoveryAction::SaveAsUtf8);
+
+            assert!(
+                matches!(&*store.modal.read(), Modal::None),
+                "a successful SaveAsUtf8 must close the dialog, not reopen it"
+            );
+            let tabs = store.tabs.read();
+            let save_target = tabs[0].save_target.as_ref().expect("save must have run");
+            match &save_target.state {
+                SaveTargetState::Writable { encoding_label, .. } => assert_eq!(
+                    encoding_label, "UTF-8",
+                    "the tab's save target must record UTF-8, or the next save \
+                     reverts to the original encoding and blocks again"
+                ),
+                other => panic!("expected Writable, got {other:?}"),
+            }
+        });
+
+        assert_eq!(
+            std::fs::read_to_string(&target).unwrap(),
+            "hi 😀\n",
+            "the emoji must actually be written now that the encoding is UTF-8"
+        );
     }
 }

@@ -21,6 +21,11 @@ pub enum AppErrorKind {
     // ── Encoding ─────────────────────────────────────────────────────────
     EncodingDetectionFailed,
     DecodeLossy,
+    /// A save could not represent its content in the target encoding
+    /// without loss (RFC-082 §D4). Symmetric with `DecodeLossy` (the read
+    /// direction), but the write direction is a refusal, not a warning —
+    /// nothing is written.
+    EncodeLossy,
     // ── Comparison ────────────────────────────────────────────────────────
     BinaryNotComparable,
     FileTooLarge,
@@ -75,7 +80,8 @@ impl AppErrorKind {
             | Self::SaveConflict
             | Self::BackupFailed
             | Self::ExternalModificationDetected
-            | Self::BackgroundJobFailed => ErrorSeverity::Blocking,
+            | Self::BackgroundJobFailed
+            | Self::EncodeLossy => ErrorSeverity::Blocking,
 
             Self::InternalFault => ErrorSeverity::Blocking,
         }
@@ -120,6 +126,8 @@ impl AppErrorKind {
                 &[RecoveryAction::SaveAs, RecoveryAction::Dismiss]
             }
 
+            Self::EncodeLossy => &[RecoveryAction::SaveAsUtf8, RecoveryAction::Dismiss],
+
             Self::BackgroundJobCancelled => &[RecoveryAction::Retry, RecoveryAction::Dismiss],
             Self::BackgroundJobFailed => &[RecoveryAction::Retry, RecoveryAction::Dismiss],
 
@@ -145,6 +153,7 @@ impl AppErrorKind {
             },
             CoreError::InvalidPath { .. } => Self::PathNotFound,
             CoreError::Decode { .. } => Self::DecodeLossy,
+            CoreError::Encode { .. } => Self::EncodeLossy,
             CoreError::Unsupported { .. } => Self::BinaryNotComparable,
             CoreError::Conflict { .. } => Self::ExternalModificationDetected,
             CoreError::InternalInvariant { .. } => Self::InternalFault,
@@ -166,6 +175,9 @@ pub enum RecoveryAction {
     Reload,
     /// Open a Save As dialog rather than overwriting.
     SaveAs,
+    /// Re-save the same target with encoding forced to UTF-8, so content
+    /// the original encoding could not represent is preserved exactly.
+    SaveAsUtf8,
     /// Overwrite despite the conflict, after explicit user confirmation.
     OverwriteAnyway,
     /// Open a limited diff (e.g. disable inline diff for a large file).
@@ -192,6 +204,7 @@ impl RecoveryAction {
             Self::ChooseAnotherFile => "choose_another_file",
             Self::Reload => "reload",
             Self::SaveAs => "save_as",
+            Self::SaveAsUtf8 => "save_as_utf8",
             Self::OverwriteAnyway => "overwrite_anyway",
             Self::OpenLimitedDiff => "open_limited_diff",
             Self::OpenAsBinary => "open_as_binary",
@@ -273,6 +286,13 @@ impl UserMessage {
                 "Decoding may be lossy",
                 "Some characters could not be decoded in the detected encoding.",
             ),
+            AppErrorKind::EncodeLossy => (
+                "Cannot save: unsupported characters",
+                // Generic fallback only — AppError::from_core replaces this
+                // with the actual characters and encoding (RFC-082 §D4)
+                // whenever a real CoreError::Encode is available.
+                "Some characters in this file cannot be represented in the target encoding.",
+            ),
             AppErrorKind::BinaryNotComparable => {
                 ("Binary file", "This file cannot be compared as text.")
             }
@@ -333,6 +353,51 @@ impl UserMessage {
         };
         Self::new(short, detail)
     }
+
+    /// Like [`for_kind`](Self::for_kind), but uses `err`'s own dynamic
+    /// detail where the `CoreError` carries per-instance data the static
+    /// template cannot (RFC-082 §D4: naming the actual unmappable
+    /// characters and target encoding, not a generic "some characters"
+    /// sentence) — falls back to [`for_kind`](Self::for_kind) for every
+    /// other case, including every other `CoreError` variant.
+    fn for_core_error(kind: AppErrorKind, err: &CoreError) -> Self {
+        if let CoreError::Encode {
+            encoding_label,
+            sample_characters,
+            additional_count,
+            ..
+        } = err
+        {
+            return Self::new(
+                "Cannot save: unsupported characters",
+                describe_unmappable_characters(
+                    encoding_label,
+                    sample_characters,
+                    *additional_count,
+                ),
+            );
+        }
+        Self::for_kind(kind)
+    }
+}
+
+/// §5's three requirements in one sentence: name the characters, name the
+/// encoding, offer the escape (save as UTF-8, or go back and edit) —
+/// deliberately not "some characters will be replaced" with silent
+/// substitution as a fourth, unstated option.
+fn describe_unmappable_characters(
+    encoding_label: &str,
+    sample_characters: &[char],
+    additional_count: usize,
+) -> String {
+    let mut listed: Vec<String> = sample_characters.iter().map(|c| format!("'{c}'")).collect();
+    if additional_count > 0 {
+        listed.push(format!("{additional_count} more"));
+    }
+    let characters = listed.join(", ");
+    format!(
+        "{characters} cannot be represented in {encoding_label}. Save as UTF-8 to keep them, or go back and edit the file to remove them."
+    )
 }
 
 // ── AppError — structured error envelope (RFC-017 §5) ────────────────────────
@@ -399,7 +464,7 @@ impl AppError {
     pub fn from_core(err: &CoreError) -> Self {
         let kind = AppErrorKind::from_core(err);
         let severity = kind.default_severity();
-        let message = UserMessage::for_kind(kind);
+        let message = UserMessage::for_core_error(kind, err);
         let recovery = kind.default_recovery_actions().to_vec();
         let technical = TechnicalDetail::new(
             format!("{kind:?}").to_lowercase().replace(' ', "_"),

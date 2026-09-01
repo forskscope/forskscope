@@ -1,4 +1,7 @@
-use crate::encoding::{NewlineStyle, decode_bytes, detect_newline_style, encode_text};
+use crate::encoding::{
+    MAX_REPORTED_UNMAPPABLE_CHARS, NewlineStyle, decode_bytes, detect_newline_style, encode_text,
+    unmappable_characters,
+};
 
 #[test]
 fn utf8_decodes_as_utf8_without_errors() {
@@ -20,16 +23,111 @@ fn legacy_bytes_are_decoded_via_detection() {
 
 #[test]
 fn encode_round_trips_utf8() {
-    let (bytes, fallback) = encode_text("data", "UTF-8");
-    assert_eq!(bytes, b"data");
-    assert!(!fallback);
+    let outcome = encode_text("data", "UTF-8");
+    assert_eq!(outcome.bytes, b"data");
+    assert!(!outcome.unknown_label_fallback);
+    assert!(!outcome.lossy);
 }
 
 #[test]
 fn unknown_encoding_label_falls_back_to_utf8() {
-    let (bytes, fallback) = encode_text("data", "not-a-real-encoding");
-    assert_eq!(bytes, b"data");
-    assert!(fallback);
+    let outcome = encode_text("data", "not-a-real-encoding");
+    assert_eq!(outcome.bytes, b"data");
+    assert!(outcome.unknown_label_fallback);
+    assert!(!outcome.lossy);
+}
+
+// ── F87/RFC-082 §D4: encode_text reports lossy encodes, and the
+// unmappable characters can be named on the failure path ──────────────────
+
+#[test]
+fn encoding_an_emoji_into_shift_jis_is_reported_lossy() {
+    let outcome = encode_text("hi 😀\n", "shift_jis");
+    assert!(
+        outcome.lossy,
+        "Shift_JIS cannot represent U+1F600 — encode_text must report this, \
+         not silently write the numeric character reference"
+    );
+    assert!(
+        !outcome.unknown_label_fallback,
+        "shift_jis is a recognized label — this is not the unknown-label case"
+    );
+}
+
+#[test]
+fn a_representable_string_is_never_reported_lossy() {
+    let outcome = encode_text("hello\n", "shift_jis");
+    assert!(!outcome.lossy);
+}
+
+#[test]
+fn unmappable_characters_names_the_emoji_shift_jis_cannot_represent() {
+    let (sample, additional) = unmappable_characters("hi 😀\n", "shift_jis", 5);
+    assert_eq!(
+        sample,
+        vec!['😀'],
+        "the actual offending character must be named, not merely \"lossy\""
+    );
+    assert_eq!(additional, 0);
+}
+
+#[test]
+fn unmappable_characters_caps_the_list_and_counts_the_rest() {
+    // 6 distinct emoji, cap of 5 — the first 5 (in order of first
+    // appearance) are named, and the 6th is folded into the count.
+    let content = "😀😁😂😃😄😅";
+    let (sample, additional) = unmappable_characters(content, "shift_jis", 5);
+    assert_eq!(sample, vec!['😀', '😁', '😂', '😃', '😄']);
+    assert_eq!(additional, 1);
+}
+
+#[test]
+fn unmappable_characters_deduplicates_repeated_occurrences() {
+    let content = "😀😀😀 and 😁";
+    let (sample, additional) = unmappable_characters(content, "shift_jis", 5);
+    assert_eq!(
+        sample,
+        vec!['😀', '😁'],
+        "each distinct character must be named once, not once per occurrence"
+    );
+    assert_eq!(additional, 0);
+}
+
+#[test]
+fn unmappable_characters_unknown_label_reports_nothing() {
+    // encode_text already treats an unknown label as a fallback, not a
+    // loss — unmappable_characters must agree, not invent a false report.
+    let (sample, additional) = unmappable_characters("😀", "not-a-real-encoding", 5);
+    assert!(sample.is_empty());
+    assert_eq!(additional, 0);
+}
+
+/// F87 §4a, handoff 017 §7 test 3: the fast path must not run the
+/// per-character identification scan. Proven, not argued — a thread-local
+/// call counter (test-only) around `unmappable_characters`, reset then
+/// checked immediately around a clean `encode_text` call.
+#[test]
+fn encode_text_success_path_never_calls_the_unmappable_scan() {
+    use crate::encoding::UNMAPPABLE_SCAN_CALLS;
+
+    UNMAPPABLE_SCAN_CALLS.with(|c| c.set(0));
+    let outcome = encode_text("hello, world\n", "UTF-8");
+    assert!(
+        !outcome.lossy,
+        "test setup: this content must encode cleanly"
+    );
+    UNMAPPABLE_SCAN_CALLS.with(|c| {
+        assert_eq!(
+            c.get(),
+            0,
+            "encode_text's success path must never call unmappable_characters"
+        )
+    });
+}
+
+#[test]
+fn default_unmappable_char_cap_is_five() {
+    assert_eq!(MAX_REPORTED_UNMAPPABLE_CHARS, 5);
 }
 
 #[test]

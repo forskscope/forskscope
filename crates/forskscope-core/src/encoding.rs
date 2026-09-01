@@ -58,18 +58,92 @@ pub fn decode_bytes(bytes: &[u8]) -> (String, TextEncoding, bool) {
     )
 }
 
+/// Result of encoding text for saving.
+#[derive(Debug, Clone)]
+pub struct EncodeOutcome {
+    pub bytes: Vec<u8>,
+    /// `true` when `label` was not a recognized encoding name and UTF-8 was
+    /// used in its place. A different condition from `lossy`: this is about
+    /// the *label* being unrecognized, not the *content* being
+    /// unrepresentable in a label that was understood.
+    pub unknown_label_fallback: bool,
+    /// `true` when one or more characters in `content` could not be
+    /// represented in the target encoding and `encoding_rs` substituted
+    /// numeric character references (e.g. `&#128512;`) in their place
+    /// (RFC-082 §D4). The save path must treat this as a refusal, not a
+    /// warning — see `save::save_text`.
+    pub lossy: bool,
+}
+
 /// Encode text for saving using the given encoding label.
 ///
-/// Unknown labels fall back to UTF-8; the boolean reports whether the
-/// fallback was taken so the caller can warn instead of failing silently.
-pub fn encode_text(content: &str, label: &str) -> (Vec<u8>, bool) {
+/// Unknown labels fall back to UTF-8. This is the fast path: exactly one
+/// `encoding_rs` encode pass, no per-character scanning — that only happens
+/// in [`unmappable_characters`], called by the caller *only* when
+/// `lossy` comes back `true` (F87/RFC-082 §D4 §4a).
+pub fn encode_text(content: &str, label: &str) -> EncodeOutcome {
     match Encoding::for_label(label.as_bytes()) {
         Some(enc) => {
-            let (bytes, _, _) = enc.encode(content);
-            (bytes.into_owned(), false)
+            let (bytes, _, had_errors) = enc.encode(content);
+            EncodeOutcome {
+                bytes: bytes.into_owned(),
+                unknown_label_fallback: false,
+                lossy: had_errors,
+            }
         }
-        None => (content.as_bytes().to_vec(), true),
+        None => EncodeOutcome {
+            bytes: content.as_bytes().to_vec(),
+            unknown_label_fallback: true,
+            lossy: false,
+        },
     }
+}
+
+/// Default cap on how many distinct unmappable characters
+/// [`unmappable_characters`] reports by name before summarizing the rest as
+/// a count — a file with hundreds of them must not produce a dialog with
+/// hundreds of character glyphs in it.
+pub const MAX_REPORTED_UNMAPPABLE_CHARS: usize = 5;
+
+#[cfg(test)]
+thread_local! {
+    /// Test-only call counter for [`unmappable_characters`] (F87 §4a's "the
+    /// fast path does not scan" requirement) — a `thread_local`, not a
+    /// process-global `AtomicUsize`, so concurrently running tests on other
+    /// threads can never make a reset-then-check test flaky.
+    pub(crate) static UNMAPPABLE_SCAN_CALLS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+/// Distinct characters in `content` that `label`'s encoding cannot
+/// represent, in order of first appearance, capped at `cap` — plus how many
+/// *additional* distinct unmappable characters exist beyond the cap.
+/// Returns `(Vec::new(), 0)` for an unrecognized label (nothing to report;
+/// [`encode_text`] already handles that case as a fallback, not a loss).
+///
+/// Walks `content` character-by-character re-encoding each one — real cost,
+/// deliberately paid only here, never on [`encode_text`]'s success path
+/// (F87/RFC-082 §D4 §4a): call this only after `encode_text` has already
+/// reported `lossy: true`.
+pub fn unmappable_characters(content: &str, label: &str, cap: usize) -> (Vec<char>, usize) {
+    #[cfg(test)]
+    UNMAPPABLE_SCAN_CALLS.with(|c| c.set(c.get() + 1));
+
+    let Some(enc) = Encoding::for_label(label.as_bytes()) else {
+        return (Vec::new(), 0);
+    };
+
+    let mut seen = std::collections::HashSet::new();
+    let mut sample = Vec::new();
+    let mut buf = [0u8; 4];
+    for ch in content.chars() {
+        let (_, _, had_errors) = enc.encode(ch.encode_utf8(&mut buf));
+        if had_errors && seen.insert(ch) && sample.len() < cap {
+            sample.push(ch);
+        }
+    }
+    let additional_count = seen.len().saturating_sub(sample.len());
+    (sample, additional_count)
 }
 
 /// Detect the dominant newline style of a text document.

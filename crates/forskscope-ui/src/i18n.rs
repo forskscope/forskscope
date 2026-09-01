@@ -245,6 +245,9 @@ fn ja(key: &str) -> Option<&'static str> {
         "Serif" => "セリフ",
         "Diff font size" => "差分フォントサイズ",
         "Saved." => "保存しました。",
+        "Saved, but the requested encoding was not recognized — used UTF-8 instead." => {
+            "保存しましたが、指定されたエンコーディングが認識されなかったため、UTF-8を使用しました。"
+        }
         "Reloaded." => "再読み込みしました。",
         "The target file was modified after it was loaded. Overwrite anyway?" => {
             "ファイルが読み込み後に変更されました。上書きしますか？"
