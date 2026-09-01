@@ -94,7 +94,11 @@ pub struct ThreeWayStats {
 ///
 /// Dirty state is content identity, not undo-stack depth (F86/RFC-082 §D1)
 /// — see [`MergeSession`](super::MergeSession)'s doc comment for the full
-/// rationale, which applies identically here.
+/// rationale, which applies identically here, including keeping
+/// `current_hash` maintained incrementally by every mutator (`set_status`,
+/// which all six resolvers funnel through, and `swap_in`, shared by `undo`
+/// and `redo`) so `is_dirty()` stays O(1) on the per-render read path
+/// (review 086 §3).
 #[derive(Debug, Clone)]
 pub struct ThreeWayMergeSession {
     segments: Vec<ResultSegment>,
@@ -103,9 +107,12 @@ pub struct ThreeWayMergeSession {
     regions_total: usize,
     undo_stack: Vec<ResolutionTransaction>,
     redo_stack: Vec<ResolutionTransaction>,
-    /// FNV-1a 64-bit hash of [`result_text`](Self::result_text) at the last
-    /// save baseline (or at construction, if never saved) — content
-    /// identity, not undo-stack depth.
+    /// FNV-1a 64-bit hash of [`result_text`](Self::result_text) as it
+    /// stands right now — kept in sync by every mutator.
+    current_hash: u64,
+    /// `current_hash`'s value at the last save baseline (or at
+    /// construction, if never saved) — content identity, not undo-stack
+    /// depth.
     saved_hash: u64,
 }
 
@@ -154,9 +161,11 @@ impl ThreeWayMergeSession {
             regions_total,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
+            current_hash: 0,
             saved_hash: 0,
         };
-        session.saved_hash = session.content_hash();
+        session.current_hash = session.content_hash();
+        session.saved_hash = session.current_hash;
         session
     }
 
@@ -208,8 +217,9 @@ impl ThreeWayMergeSession {
     }
 
     /// `true` when the working result differs from the last saved state.
+    /// O(1): compares two stored hashes, never walks `segments`/`conflicts`.
     pub fn is_dirty(&self) -> bool {
-        self.content_hash() != self.saved_hash
+        self.current_hash != self.saved_hash
     }
 
     /// Resolve a conflict by choosing the left side.
@@ -265,6 +275,7 @@ impl ThreeWayMergeSession {
         conflict.manual = manual;
         self.undo_stack.push(txn);
         self.redo_stack.clear();
+        self.current_hash = self.content_hash();
         Ok(())
     }
 
@@ -290,6 +301,9 @@ impl ThreeWayMergeSession {
         Ok(id)
     }
 
+    /// Shared by [`undo`](Self::undo) and [`redo`](Self::redo) — both
+    /// mutate `conflicts` only through here, so refreshing `current_hash`
+    /// in this one place keeps it in sync for both callers.
     fn swap_in(&mut self, txn: ResolutionTransaction) -> crate::Result<ResolutionTransaction> {
         let conflict = self
             .conflicts
@@ -303,12 +317,15 @@ impl ThreeWayMergeSession {
             previous_status: std::mem::replace(&mut conflict.status, txn.previous_status),
             previous_manual: std::mem::replace(&mut conflict.manual, txn.previous_manual),
         };
+        self.current_hash = self.content_hash();
         Ok(inverse)
     }
 
     /// Mark the current state as saved.
     pub fn mark_saved(&mut self) {
-        self.saved_hash = self.content_hash();
+        // O(1): a save doesn't itself change the content, so current_hash
+        // is already correct — no need to recompute it from result_text().
+        self.saved_hash = self.current_hash;
         // F86: kept unchanged — see MergeSession::mark_saved's doc comment
         // for why this is left alone rather than folded into this fix.
         self.redo_stack.clear();

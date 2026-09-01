@@ -33,34 +33,45 @@ impl MergeHunk {
 /// The canonical owner of merge state for one compare session.
 ///
 /// Dirty state is content identity, not undo-stack depth (F86/RFC-082 §D1):
-/// `is_dirty()` compares the current [`result_text`](Self::result_text)
+/// `is_dirty()` compares a hash of the current [`result_text`](Self::result_text)
 /// against a hash of what was last saved, so an undo that lands the buffer
 /// back on the saved text reports clean, and a save-then-undo-then-different-
 /// edit reports dirty, in both cases regardless of how deep the stack is.
+///
+/// Review 086 §3: `is_dirty()` is read once per tab on every render
+/// (`ui/layout/tabs.rs`, `ui/layout/statusbar.rs`), so it must be O(1) — the
+/// hash of the *current* content is therefore maintained incrementally by
+/// every mutator (`apply_left_to_right`, and `swap_in`, which both `undo`
+/// and `redo` route through), not recomputed from `result_text()` on read.
 #[derive(Debug, Clone)]
 pub struct MergeSession {
     diff_id: u64,
     hunks: Vec<MergeHunk>,
     undo_stack: Vec<MergeTransaction>,
     redo_stack: Vec<MergeTransaction>,
-    /// FNV-1a 64-bit hash of [`result_text`](Self::result_text) at the
-    /// moment of the last successful save (or at construction, if never
-    /// saved) — content identity, not undo-stack depth. Same hash this
-    /// module's sibling already trusts for conflict identity
-    /// (`three_way::session::conflict_id_for`); a hash costs 8 bytes
-    /// regardless of file size, versus a stored copy of the full text.
+    /// FNV-1a 64-bit hash of [`result_text`](Self::result_text) as it
+    /// stands right now — kept in sync by every mutator, so `is_dirty()`
+    /// never needs to walk the hunks. Same hash this module's sibling
+    /// already trusts for conflict identity
+    /// (`three_way::session::conflict_id_for`).
+    current_hash: u64,
+    /// `current_hash`'s value at the moment of the last successful save (or
+    /// at construction, if never saved) — content identity, not
+    /// undo-stack depth.
     saved_hash: u64,
 }
 
 impl MergeSession {
     /// An empty placeholder used while a tab is in the Loading state (RFC-065).
     pub fn empty() -> Self {
+        let hash = fnv1a64(b"");
         Self {
             diff_id: 0,
             hunks: Vec::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
-            saved_hash: fnv1a64(b""),
+            current_hash: hash,
+            saved_hash: hash,
         }
     }
 
@@ -81,9 +92,11 @@ impl MergeSession {
             hunks,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
+            current_hash: 0,
             saved_hash: 0,
         };
-        session.saved_hash = session.content_hash();
+        session.current_hash = session.content_hash();
+        session.saved_hash = session.current_hash;
         session
     }
 
@@ -100,8 +113,9 @@ impl MergeSession {
     }
 
     /// `true` when the working result differs from the last saved state.
+    /// O(1): compares two stored hashes, never walks `hunks`.
     pub fn is_dirty(&self) -> bool {
-        self.content_hash() != self.saved_hash
+        self.current_hash != self.saved_hash
     }
 
     pub fn can_undo(&self) -> bool {
@@ -167,6 +181,7 @@ impl MergeSession {
         hunk.state = HunkState::AppliedLeftToRight;
         self.undo_stack.push(transaction);
         self.redo_stack.clear();
+        self.current_hash = self.content_hash();
         Ok(())
     }
 
@@ -193,6 +208,9 @@ impl MergeSession {
     }
 
     /// Install a transaction's stored hunk state, returning the inverse.
+    /// Shared by [`undo`](Self::undo) and [`redo`](Self::redo) — both
+    /// mutate `hunks` only through here, so refreshing `current_hash` in
+    /// this one place keeps it in sync for both callers.
     fn swap_in(&mut self, transaction: MergeTransaction) -> Result<MergeTransaction> {
         let hunk = self
             .hunks
@@ -207,12 +225,15 @@ impl MergeSession {
             previous_kind: std::mem::replace(&mut hunk.kind, transaction.previous_kind),
             previous_state: std::mem::replace(&mut hunk.state, transaction.previous_state),
         };
+        self.current_hash = self.content_hash();
         Ok(inverse)
     }
 
     /// Mark the current state as saved; dirty becomes `false`.
     pub fn mark_saved(&mut self) {
-        self.saved_hash = self.content_hash();
+        // O(1): a save doesn't itself change the content, so current_hash
+        // is already correct — no need to recompute it from result_text().
+        self.saved_hash = self.current_hash;
         // F86: the baseline is content now, so a redo across this boundary
         // would no longer desynchronize it the way it did against a depth
         // counter — replaying a redone transaction still lands on the same
