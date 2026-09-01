@@ -24,17 +24,40 @@ pub fn StatusBar() -> Element {
             } else {
                 String::new()
             };
-            (format!("{left} ↔ {right}"), enc, stat_str, dirty)
+            // F85/RFC-082 §D6: shown unconditionally, not only when it
+            // differs from the right pane — an absence would carry meaning
+            // the user has to know to read, and this is the only place
+            // $MERGED (mergetool mode) is visible at all.
+            let save_target = tab.save_target.as_ref().map(|st| {
+                let short = st
+                    .path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "—".into());
+                (short, st.path.display().to_string())
+            });
+            (
+                format!("{left} ↔ {right}"),
+                enc,
+                stat_str,
+                dirty,
+                save_target,
+            )
         })
     });
 
     rsx! {
         div { class: "statusbar", role: "status",
-            if let Some((pair, enc, stats, dirty)) = context {
+            if let Some((pair, enc, stats, dirty, save_target)) = context {
                 span { "{pair}" }
                 if !enc.is_empty() { span { "{enc}" } }
                 if !stats.is_empty() { span { class: "stats", "{stats}" } }
                 if dirty { span { class: "dirty", {t(lang, "unsaved")} } }
+                if let Some((short, full)) = save_target {
+                    span { class: "save-target", title: "{full}",
+                        {format!("{}: {short}", t(lang, "Save target"))}
+                    }
+                }
             }
             span { class: "spacer" }
             span { class: "local-only", title: t(lang, "Files stay on this computer. ForskScope does not upload them."),

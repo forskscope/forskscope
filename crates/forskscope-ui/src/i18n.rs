@@ -199,6 +199,7 @@ fn ja(key: &str) -> Option<&'static str> {
         "Undo" => "元に戻す",
         "Redo" => "やり直す",
         "Save" => "保存",
+        "Save target" => "保存先",
         "More ▼" => "詳細 ▼",
         "Less ▲" => "簡略 ▲",
         "Inline diff" => "文字単位差分",

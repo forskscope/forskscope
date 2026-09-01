@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
-use forskscope_core::compare_prep::SaveTargetSnapshot;
+use forskscope_core::compare_prep::{SaveTargetSnapshot, save_target_from_loaded};
 use forskscope_core::diff::DiffDocument;
 use forskscope_core::document::LoadedDocument;
 use forskscope_core::{DiffOptions, MergeSession, compute_diff};
@@ -102,11 +102,54 @@ pub fn swap_sides(store: &mut crate::state::Store, index: usize) {
         tab.can_save =
             tab.left_doc.kind.is_mergeable_text() && tab.right_doc.kind.is_mergeable_text();
         recompute_diff(tab);
+        refresh_save_target(tab);
     }
     // F61: swap_sides changes left_path/right_path, which is exactly what
     // session persistence needs to reflect - see open_compare_request's
     // save_session call for why this is now explicit rather than reactive.
     save_session(store);
+}
+
+/// F85/RFC-082 §D2: `save_target` is a function of `save_destination`
+/// (`launch_mode`), re-derived exactly when the inputs it derives from
+/// change — never left stale after a mutation of the compared panes.
+///
+/// `Normal` mode's destination *is* the right input, already loaded — the
+/// same `save_target_from_loaded` call `load_and_diff` uses, re-run here
+/// against the (now swapped) `right_path`/`right_doc`, no extra I/O.
+///
+/// `MergeTool` mode's destination is `$MERGED`, independent of both panes —
+/// deliberately a no-op here, not "re-derive unconditionally" (§3a): calling
+/// `inspect_save_target($MERGED)` on every swap would refresh its
+/// `MustMatch` fingerprint against a file this tab has not re-read, so an
+/// external change to `$MERGED` between load and swap would be silently
+/// adopted as expected — destroying the external-modification detection
+/// mergetool mode exists to provide for that file.
+fn refresh_save_target(tab: &mut CompareTab) {
+    if let CompareLaunchMode::Normal = tab.launch_mode {
+        let right_path = tab.right_path.clone().unwrap_or_default();
+        tab.save_target = Some(save_target_from_loaded(&right_path, &tab.right_doc));
+    }
+}
+
+/// The F85/RFC-082 §D2 invariant in `Normal` launch mode: `save_target`
+/// equals what `save_target_from_loaded` derives from the tab's *current*
+/// `right_path`/`right_doc` — the exact formula both `refresh_save_target`
+/// (above) and the load path (`compare::load_and_diff`) use. Shared by the
+/// swap test (`tab::tests`) and the load/reload test (`compare::tests`), so
+/// a regression in either path is caught by the same assertion, per the
+/// handoff's "write the test against the invariant, not against
+/// `swap_sides`" (§3b).
+#[cfg(test)]
+pub(crate) fn assert_save_target_matches_right_input(tab: &CompareTab) {
+    let right_path = tab.right_path.clone().unwrap_or_default();
+    let expected = save_target_from_loaded(&right_path, &tab.right_doc);
+    assert_eq!(
+        tab.save_target.as_ref(),
+        Some(&expected),
+        "save_target must equal save_target_from_loaded(right_path, right_doc) \
+         in Normal launch mode"
+    );
 }
 
 /// Installs `next` and recomputes the diff immediately, discarding any

@@ -420,6 +420,68 @@ fn mergetool_compares_local_and_remote_not_local_and_merged() {
     );
 }
 
+// ── F85 (RFC-082 §D2): save_target invariant on the load path ─────────────
+
+/// The same invariant `swap_sides`'s tests assert (`tab::tests`), applied
+/// here to the load path — `load_and_diff` is the function both
+/// `open_compare_request` and `reload_tab` ultimately call, so exercising
+/// it twice (once per distinct content, standing in for "load" then
+/// "reload") covers both call sites without needing to drive the async load
+/// task to completion through a full `Store`. Handoff 015 §6.3: "these
+/// should already pass" — proven here with the identical assertion helper
+/// the swap tests use, not an equivalent hand-rolled one.
+#[test]
+fn save_target_matches_right_input_after_load_and_reload() {
+    let dir = temp_dir("f85-load-reload-invariant");
+    let left = dir.join("left.txt");
+    let right = dir.join("right.txt");
+    fs::write(&left, "left\n").unwrap();
+
+    let build_tab = |right_content: &str| -> CompareTab {
+        fs::write(&right, right_content).unwrap();
+        let prepared = load_and_diff(
+            normal_request(left.clone(), right.clone()),
+            DiffOptions::default(),
+            Lang::En,
+            false,
+        )
+        .unwrap();
+        CompareTab {
+            id: id(1),
+            load_generation: generation(1),
+            title: "t".into(),
+            left_path: Some(left.clone()),
+            right_path: Some(right.clone()),
+            state: TabState::Ready,
+            left_doc: prepared.left,
+            right_doc: prepared.right,
+            diff: prepared.diff,
+            merge: prepared.merge,
+            diff_options: DiffOptions::default(),
+            can_save: prepared.can_save,
+            char_mode: false,
+            word_wrap: false,
+            focused_change: 0,
+            save_target: Some(prepared.save_target),
+            launch_mode: CompareLaunchMode::Normal,
+        }
+    };
+
+    // "After a load."
+    let loaded = build_tab("right\n");
+    crate::state::tab::assert_save_target_matches_right_input(&loaded);
+
+    // "After a reload" — right.txt changed on disk between the two loads,
+    // so this is not vacuously true because nothing moved.
+    let reloaded = build_tab("right changed on reload\n");
+    assert_ne!(
+        reloaded.right_doc.diff_text(),
+        loaded.right_doc.diff_text(),
+        "test setup: the reload must actually observe different content"
+    );
+    crate::state::tab::assert_save_target_matches_right_input(&reloaded);
+}
+
 // ── F61 regression: a CLI-opened tab must persist without waiting for any
 // reactive effect ────────────────────────────────────────────────────────
 //

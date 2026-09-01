@@ -97,6 +97,7 @@ select option { background: var(--surface); color: var(--text); }
 }
 .statusbar .dirty { color: var(--warn); }
 .statusbar .stats { color: var(--ok); font-size: 11px; }
+.statusbar .save-target { color: var(--muted); }
 .local-only { cursor: default; user-select: none; }
 
 /* Accessible-only labels must not participate in grid or flex layout. */

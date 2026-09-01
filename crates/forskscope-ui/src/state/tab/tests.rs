@@ -1,12 +1,17 @@
-use super::{CompareLaunchMode, CompareTab, TabState, recompute_diff, tab_title};
+use super::{
+    CompareLaunchMode, CompareTab, TabState, assert_save_target_matches_right_input,
+    recompute_diff, save_target_from_loaded, swap_sides, tab_title,
+};
 use crate::state::settings::Lang;
 use dioxus::prelude::{ReadableExt, WritableExt};
+use forskscope_core::compare_prep::{SaveTargetSnapshot, SaveTargetState, TargetExpectation};
+use forskscope_core::document::FileFingerprint;
 use forskscope_core::{
     DiffOptions, FileKind, LoadedDocument, MergeSession, NewlineStyle, TextDocument, TextEncoding,
     compute_diff,
 };
 use forskscope_ui_logic::{CompareTabId, LoadGeneration};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 fn text_doc(content: &str) -> LoadedDocument {
     LoadedDocument {
@@ -85,6 +90,129 @@ fn dirty_tab() -> CompareTab {
         save_target: None,
         launch_mode: CompareLaunchMode::Normal,
     }
+}
+
+fn text_doc_with_fingerprint(content: &str, fp: FileFingerprint) -> LoadedDocument {
+    let mut doc = text_doc(content);
+    doc.fingerprint_at_load = Some(fp);
+    doc
+}
+
+fn fp(seed: u64) -> FileFingerprint {
+    FileFingerprint {
+        len: seed,
+        modified_unix_nanos: None,
+        digest: Some(seed),
+    }
+}
+
+/// A `Normal`-mode tab with distinguishable left/right paths, docs, and
+/// fingerprints — for F85's swap tests, where "did the right thing actually
+/// get re-derived" must be checkable, not just "did something change".
+fn normal_mode_tab() -> CompareTab {
+    let left_path = PathBuf::from("/tmp/f85-left.txt");
+    let right_path = PathBuf::from("/tmp/f85-right.txt");
+    let left = text_doc_with_fingerprint("left content\n", fp(1));
+    let right = text_doc_with_fingerprint("right content\n", fp(2));
+    let diff_options = DiffOptions::default();
+    let diff = compute_diff(left.diff_text(), right.diff_text(), diff_options);
+    let merge = MergeSession::from_diff(&diff);
+    let save_target = Some(save_target_from_loaded(&right_path, &right));
+
+    CompareTab {
+        id: CompareTabId::new(1).unwrap(),
+        load_generation: LoadGeneration::new(1).unwrap(),
+        title: "t".into(),
+        left_path: Some(left_path),
+        right_path: Some(right_path),
+        state: TabState::Ready,
+        left_doc: left,
+        right_doc: right,
+        merge,
+        diff,
+        diff_options,
+        can_save: true,
+        char_mode: false,
+        word_wrap: false,
+        focused_change: 0,
+        save_target,
+        launch_mode: CompareLaunchMode::Normal,
+    }
+}
+
+/// F85/RFC-082 §D2: after `swap_sides`, `save_target` must be re-derived
+/// from the *new* right input, not left pointing at the pre-swap one. The
+/// exact defect (handoff 015 §2): the old target's `MustMatch` fingerprint
+/// still matched disk because that file was never touched by the swap, so
+/// no conflict fired — Save silently wrote A's content over B.
+#[test]
+fn swap_sides_rederives_save_target_from_the_new_right_input() {
+    use crate::state::with_test_store;
+
+    let tab = normal_mode_tab();
+    let original_right_path = tab.right_path.clone().unwrap();
+    let original_left_path = tab.left_path.clone().unwrap();
+
+    with_test_store(|store| {
+        store.tabs.write().push(tab);
+        swap_sides(store, 0);
+
+        let tabs = store.tabs.read();
+        let swapped = &tabs[0];
+
+        assert_eq!(
+            swapped.right_path.as_deref(),
+            Some(original_left_path.as_path()),
+            "test setup: swap must actually swap the paths"
+        );
+        assert_eq!(
+            swapped.save_target.as_ref().map(|st| &st.path),
+            Some(&original_left_path),
+            "save_target.path must follow the swap to the new right input, \
+             not remain pinned to {}",
+            original_right_path.display()
+        );
+        assert_save_target_matches_right_input(swapped);
+    });
+}
+
+/// F85/RFC-082 §D2 + §3a: in Git mergetool mode, `$MERGED` is independent
+/// of both compared panes, so a swap must leave `save_target` completely
+/// untouched — path *and* the exact `MustMatch` fingerprint, not just the
+/// path. Asserting only the path would pass even if the fingerprint were
+/// silently refreshed against a `$MERGED` this tab never re-read (§3a's
+/// trap: that would destroy external-modification detection for the one
+/// file the mergetool contract exists to protect).
+#[test]
+fn swap_sides_leaves_save_target_untouched_in_mergetool_mode() {
+    use crate::state::with_test_store;
+
+    let mut tab = normal_mode_tab();
+    let merged = PathBuf::from("/tmp/f85-merged.txt");
+    let original_save_target = SaveTargetSnapshot {
+        path: merged.clone(),
+        state: SaveTargetState::Writable {
+            expectation: TargetExpectation::MustMatch(fp(99)),
+            encoding_label: "UTF-8".into(),
+        },
+    };
+    tab.launch_mode = CompareLaunchMode::MergeTool {
+        merged: merged.clone(),
+    };
+    tab.save_target = Some(original_save_target.clone());
+
+    with_test_store(|store| {
+        store.tabs.write().push(tab);
+        swap_sides(store, 0);
+
+        let tabs = store.tabs.read();
+        assert_eq!(
+            tabs[0].save_target.as_ref(),
+            Some(&original_save_target),
+            "mergetool mode: swap must not touch save_target at all — path, \
+             expectation, and fingerprint must all stay byte-identical"
+        );
+    });
 }
 
 /// F40's guard, tested directly against a real `Store` (F36) rather than
