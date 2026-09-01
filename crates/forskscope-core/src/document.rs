@@ -10,7 +10,7 @@ use std::time::UNIX_EPOCH;
 
 use crate::encoding::{NewlineStyle, TextEncoding, decode_bytes, detect_newline_style};
 use crate::error::{CoreError, IoOperation, Result};
-use crate::file_kind::{FileKind, classify};
+use crate::file_kind::{EditabilityClass, FileKind, classify};
 use crate::path::{canonicalize_lenient, display};
 use crate::{fnv1a64, xlsx};
 
@@ -120,6 +120,23 @@ impl LoadedDocument {
     /// Text content for diffing, or `""` when absent.
     pub fn diff_text(&self) -> &str {
         self.text.as_ref().map(|t| t.content.as_str()).unwrap_or("")
+    }
+
+    /// `true` when decoding this document required replacement characters
+    /// (RFC-082 §D3 — F88a's fixture). `false` for a side with no `text`
+    /// (never reached: every `FileKind` this crate produces sets `text`).
+    pub fn had_decode_errors(&self) -> bool {
+        self.text.as_ref().is_some_and(|t| t.had_decode_errors)
+    }
+
+    /// This document's [`EditabilityClass`], derived from its `kind` and
+    /// what was observed while decoding it.
+    pub fn editability(&self) -> EditabilityClass {
+        let (had_decode_errors, encoding_label) = match &self.text {
+            Some(t) => (t.had_decode_errors, t.encoding.label.as_str()),
+            None => (false, ""),
+        };
+        self.kind.editability(had_decode_errors, encoding_label)
     }
 }
 

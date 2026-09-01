@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 
 use crate::diff::DiffDocument;
 use crate::document::{FileFingerprint, LoadOptions, LoadedDocument, load_path};
-use crate::file_kind::{FileKind, classify};
+use crate::file_kind::{EditabilityClass, FileKind, classify};
 use crate::merge::MergeSession;
 
 /// The result of blocking comparison preparation: loaded documents, the
@@ -36,7 +36,7 @@ pub struct PreparedCompare {
     pub diff: DiffDocument,
     pub merge: MergeSession,
     pub save_target: SaveTargetSnapshot,
-    pub can_save: bool,
+    pub save_capability: SaveCapability,
 }
 
 /// Where a save will go, and whether it's currently possible.
@@ -179,4 +179,120 @@ pub fn inspect_save_target(path: &Path, fallback_encoding_label: &str) -> SaveTa
 
 fn blocked(reason: SaveTargetBlockReason) -> SaveTargetState {
     SaveTargetState::Blocked { reason }
+}
+
+// ── F88/RFC-082 §D3: one source of truth for whether a save is possible ───
+
+/// Whether the merge result derived from two loaded sides can be written to
+/// the resolved save target — composed from the sides' [`FileKind`], their
+/// [`EditabilityClass`], and the target's [`SaveTargetState`]. Never
+/// assembled as a boolean at the call site; [`save_capability`] is the one
+/// function that answers it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SaveCapability {
+    /// The merge result can be written directly.
+    Saveable,
+    /// At least one loaded side needed replacement characters at decode
+    /// time — the merge result in memory cannot reproduce that side's
+    /// original bytes, and no save-time encoding choice can fix it (unlike
+    /// a merely non-UTF-8 encoding with a *clean* decode, which
+    /// `save::save_text` already checks precisely at save time —
+    /// F87/RFC-082 §D4). Saving must be blocked and explained, never
+    /// attempted silently.
+    SaveableWithGuard,
+    /// Cannot be saved at all, and why.
+    Blocked(SaveCapabilityBlockReason),
+}
+
+impl SaveCapability {
+    /// `true` for `Saveable` and `SaveableWithGuard` — a save can be
+    /// attempted (edited, toolbar shown) either way; only `Blocked` means no.
+    pub fn is_saveable(&self) -> bool {
+        !matches!(self, Self::Blocked(_))
+    }
+
+    /// `true` only for `SaveableWithGuard` — the caller must block the
+    /// write and explain, rather than calling `save_text`.
+    pub fn requires_guard(&self) -> bool {
+        matches!(self, Self::SaveableWithGuard)
+    }
+}
+
+/// Why [`SaveCapability::Blocked`] applies.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SaveCapabilityBlockReason {
+    /// One or both sides cannot be represented as mergeable text at all
+    /// (binary, spreadsheet, or otherwise unsupported). `Missing` is not
+    /// this — it is empty text, not an unsupported kind (RFC-082 §D3 §3).
+    NotMergeableText,
+    /// The resolved save target itself cannot be written to.
+    Target(SaveTargetBlockReason),
+}
+
+/// Composes the three facts (RFC-082 §D3): both sides' [`FileKind`] decide
+/// whether a text merge is possible at all; both sides' [`EditabilityClass`]
+/// — together with the `had_decode_errors` each was derived from — decide
+/// whether saving must be blocked and explained; `target_state` decides
+/// whether the resolved destination can be written to at all.
+///
+/// `EditabilityClass::from_kind` maps `Missing -> ReadOnly` — correct for a
+/// document (there is nothing to edit), but wrong for this question, and
+/// that mapping is not changed here. A missing side is empty text: it
+/// contributes no content and needs no guard, carved out explicitly below
+/// rather than by touching `from_kind`.
+///
+/// **Why `had_decode_errors` is checked directly, not just
+/// `requires_save_guard()`:** that predicate is `true` for two situations
+/// `from_kind` deliberately does not distinguish — decode substitution
+/// (`had_decode_errors`, unrecoverable: the original bytes are already gone
+/// from memory, and no save-time choice restores them) and a merely
+/// non-UTF-8 encoding that decoded *cleanly* (recoverable per-character,
+/// already checked precisely at save time by `save::save_text` — F87). Both
+/// map to the same `ReadWriteWithGuard` value, so using `requires_save_guard()`
+/// alone here would also block the second case — the common case for
+/// nearly every legacy-encoded file that decoded without error — always,
+/// unconditionally, with no escape, even when a save of it would round-trip
+/// perfectly. Only the first is this function's concern. The
+/// `debug_assert!` below documents (and checks, in every debug build and
+/// test run) that `had_decode_errors` is always a genuine subset of
+/// `requires_save_guard()` — not an unrelated condition smuggled in instead
+/// of it.
+pub fn save_capability(
+    left_kind: &FileKind,
+    right_kind: &FileKind,
+    left_editability: EditabilityClass,
+    right_editability: EditabilityClass,
+    left_had_decode_errors: bool,
+    right_had_decode_errors: bool,
+    target_state: &SaveTargetState,
+) -> SaveCapability {
+    if let SaveTargetState::Blocked { reason } = target_state {
+        return SaveCapability::Blocked(SaveCapabilityBlockReason::Target(reason.clone()));
+    }
+
+    let mergeable = |kind: &FileKind| kind.is_mergeable_text() || matches!(kind, FileKind::Missing);
+    if !mergeable(left_kind) || !mergeable(right_kind) {
+        return SaveCapability::Blocked(SaveCapabilityBlockReason::NotMergeableText);
+    }
+
+    let needs_guard = |kind: &FileKind, editability: EditabilityClass, had_decode_errors: bool| {
+        if matches!(kind, FileKind::Missing) {
+            // Empty text: nothing was decoded, so nothing could have
+            // needed a replacement character.
+            return false;
+        }
+        debug_assert!(
+            !had_decode_errors || editability.requires_save_guard(),
+            "had_decode_errors=true must always imply requires_save_guard()"
+        );
+        had_decode_errors
+    };
+
+    if needs_guard(left_kind, left_editability, left_had_decode_errors)
+        || needs_guard(right_kind, right_editability, right_had_decode_errors)
+    {
+        SaveCapability::SaveableWithGuard
+    } else {
+        SaveCapability::Saveable
+    }
 }

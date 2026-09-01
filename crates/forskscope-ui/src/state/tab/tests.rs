@@ -4,7 +4,9 @@ use super::{
 };
 use crate::state::settings::Lang;
 use dioxus::prelude::{ReadableExt, WritableExt};
-use forskscope_core::compare_prep::{SaveTargetSnapshot, SaveTargetState, TargetExpectation};
+use forskscope_core::compare_prep::{
+    SaveCapability, SaveTargetSnapshot, SaveTargetState, TargetExpectation,
+};
 use forskscope_core::document::FileFingerprint;
 use forskscope_core::{
     DiffOptions, FileKind, LoadedDocument, MergeSession, NewlineStyle, TextDocument, TextEncoding,
@@ -84,6 +86,7 @@ fn dirty_tab() -> CompareTab {
         diff,
         diff_options,
         can_save: true,
+        save_capability: SaveCapability::Saveable,
         char_mode: false,
         word_wrap: false,
         focused_change: 0,
@@ -132,6 +135,7 @@ fn normal_mode_tab() -> CompareTab {
         diff,
         diff_options,
         can_save: true,
+        save_capability: SaveCapability::Saveable,
         char_mode: false,
         word_wrap: false,
         focused_change: 0,

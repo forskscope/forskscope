@@ -10,7 +10,7 @@ use forskscope_core::compare_prep::{
     SaveTargetBlockReason, SaveTargetSnapshot, SaveTargetState, TargetExpectation,
     inspect_save_target,
 };
-use forskscope_core::error::{AppError, RecoveryAction};
+use forskscope_core::error::{AppError, AppErrorKind, RecoveryAction};
 use forskscope_core::save::{
     BackupPolicy, SaveOutcome, SaveRequest, TargetPrecondition, save_text,
 };
@@ -152,8 +152,9 @@ pub fn confirm_overwrite(store: &mut Store, index: usize, target: PathBuf) {
 }
 
 /// Common tail for every save entry point: run the request (if any) through
-/// `save_text` and `handle_result`, or report a blocked destination
-/// (review 048 C2 — a blocked target used to fail silently).
+/// `save_text` and `handle_result`, report a blocked destination (review
+/// 048 C2 — a blocked target used to fail silently), or show F88a's guard
+/// dialog without ever calling `save_text` at all.
 fn dispatch(store: &mut Store, index: usize, outcome: RequestOutcome) {
     match outcome {
         RequestOutcome::Ready(request) => {
@@ -162,17 +163,31 @@ fn dispatch(store: &mut Store, index: usize, outcome: RequestOutcome) {
         }
         RequestOutcome::NotSaveable => {}
         RequestOutcome::Blocked(reason) => store.notify(describe_block(&reason)),
+        RequestOutcome::RequiresGuard(target) => {
+            // F88a/RFC-082 §D3 §4: known purely from already-loaded state
+            // (unlike F87's lossy-encode check, which needs the actual
+            // content), so this never reaches save_text at all — no write
+            // is even attempted, let alone refused mid-flight.
+            let app_err = AppError::new(
+                AppErrorKind::UnsavableAfterDecodeLoss,
+                "one or both loaded sides required decode substitutions",
+            );
+            let view = SaveErrorView::from_error(&app_err, Some(target.display().to_string()));
+            store.modal.set(Modal::SaveError(index, target, view));
+        }
     }
 }
 
 /// What [`build_request`] found, distinguishing an ordinary "nothing to do"
 /// (no tab, tab isn't saveable) from a destination that exists but cannot be
 /// written to — the two used to be conflated into one silent `None`
-/// (review 048 C2).
+/// (review 048 C2) — and (F88a) a save that must be blocked and explained
+/// because of what happened at *load* time, not at this write attempt.
 enum RequestOutcome {
     Ready(SaveRequest),
     NotSaveable,
     Blocked(SaveTargetBlockReason),
+    RequiresGuard(PathBuf),
 }
 
 /// Builds the exact write that will be attempted, using only `tab.save_target`
@@ -193,6 +208,15 @@ fn build_request(
     };
     if !tab.can_save {
         return RequestOutcome::NotSaveable;
+    }
+    if tab.save_capability.requires_guard() {
+        let guard_target = target.clone().unwrap_or_else(|| {
+            tab.save_target
+                .as_ref()
+                .map(|st| st.path.clone())
+                .unwrap_or_default()
+        });
+        return RequestOutcome::RequiresGuard(guard_target);
     }
 
     let (tgt, precondition, encoding_label) = match target {
@@ -357,11 +381,14 @@ fn handle_result(
 /// and (F87) `Encode`, which map through `AppErrorKind::from_core` to
 /// `FileReadFailed | FileWriteFailed | BackupFailed | EncodeLossy`, and
 /// through `default_recovery_actions()` to exactly this set (F52 review
-/// request has the full trace; F87's extends it with `EncodeLossy`). The
-/// other eight variants are named explicitly rather than matched with `_`
-/// so that a future thirteenth `RecoveryAction` variant is a compile error
-/// here, not a silently swallowed button — the same principle
-/// `file_digest_equal`'s `unreachable!()` established for F77 (review 074 §5).
+/// request has the full trace; F87's extends it with `EncodeLossy`). (F88a)
+/// `AppErrorKind::UnsavableAfterDecodeLoss` is built directly via
+/// `AppError::new` in [`dispatch`], never through a `CoreError` at all — its
+/// only action is `Dismiss`, already in this set. The other eight
+/// `RecoveryAction` variants are named explicitly rather than matched with
+/// `_` so that a future thirteenth variant is a compile error here, not a
+/// silently swallowed button — the same principle `file_digest_equal`'s
+/// `unreachable!()` established for F77 (review 074 §5).
 pub fn handle_save_recovery_action(
     store: &mut Store,
     index: usize,
@@ -706,6 +733,7 @@ mod tests {
             AppErrorKind::FileWriteFailed,
             AppErrorKind::BackupFailed,
             AppErrorKind::EncodeLossy,
+            AppErrorKind::UnsavableAfterDecodeLoss,
         ] {
             for action in kind.default_recovery_actions() {
                 assert!(
@@ -727,6 +755,7 @@ mod tests {
         encoding_label: &str,
     ) -> CompareTab {
         use crate::state::tab::{CompareLaunchMode, TabState};
+        use forskscope_core::compare_prep::SaveCapability;
         use forskscope_core::document::{FileFingerprint, LoadedDocument, TextDocument};
         use forskscope_core::encoding::{NewlineStyle, TextEncoding};
         use forskscope_core::file_kind::FileKind;
@@ -767,6 +796,7 @@ mod tests {
             merge,
             diff_options: DiffOptions::default(),
             can_save: true,
+            save_capability: SaveCapability::Saveable,
             char_mode: false,
             word_wrap: false,
             focused_change: 0,

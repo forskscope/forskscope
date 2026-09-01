@@ -6,7 +6,8 @@ use std::path::{Path, PathBuf};
 use dioxus::prelude::*;
 use dioxus_core::spawn_forever;
 use forskscope_core::compare_prep::{
-    PreparedCompare, inspect_save_target, save_target_from_loaded,
+    PreparedCompare, SaveCapability, SaveCapabilityBlockReason, inspect_save_target,
+    save_capability, save_target_from_loaded,
 };
 use forskscope_core::diff::{DiffDocument, InlineMode};
 use forskscope_core::document::{LoadOptions, LoadedDocument, load_path};
@@ -96,10 +97,10 @@ enum LoadResult {
 }
 
 /// Install a prepared load only when its complete runtime token is still live.
-/// `PreparedCompare` commits `left_doc`/`right_doc`/`diff`/`merge`/`can_save`/
-/// `save_target` together (RFC-077) — the same atomicity RFC-075 already gave
-/// tab identity, extended so a save target is never installed from a
-/// different load than the documents it was derived from.
+/// `PreparedCompare` commits `left_doc`/`right_doc`/`diff`/`merge`/
+/// `save_capability`/`save_target` together (RFC-077) — the same atomicity
+/// RFC-075 already gave tab identity, extended so a save target is never
+/// installed from a different load than the documents it was derived from.
 fn commit_load_result(
     tabs: &mut [CompareTab],
     token: LoadToken,
@@ -124,7 +125,8 @@ fn commit_load_result(
             tab.right_doc = prepared.right;
             tab.diff = prepared.diff;
             tab.merge = prepared.merge;
-            tab.can_save = prepared.can_save;
+            tab.can_save = prepared.save_capability.is_saveable();
+            tab.save_capability = prepared.save_capability;
             tab.save_target = Some(prepared.save_target);
             tab.char_mode = false;
             tab.focused_change = 0;
@@ -351,6 +353,7 @@ pub(crate) fn open_compare_request_with_options(
         merge: MergeSession::empty(),
         diff_options: opts,
         can_save: false,
+        save_capability: SaveCapability::Blocked(SaveCapabilityBlockReason::NotMergeableText),
         char_mode: false,
         word_wrap: false,
         focused_change: 0,
@@ -472,7 +475,6 @@ pub(super) fn load_and_diff(
 
     let diff = compute_diff(ld.diff_text(), rd.diff_text(), opts);
     let merge = MergeSession::from_diff(&diff);
-    let can_save = ld.kind.is_mergeable_text() && rd.kind.is_mergeable_text();
     let save_target = match &save_destination {
         SaveDestination::RightInput => save_target_from_loaded(&right, &rd),
         SaveDestination::Explicit(merged) => {
@@ -484,13 +486,25 @@ pub(super) fn load_and_diff(
             inspect_save_target(merged, &fallback_encoding)
         }
     };
+    // F88/RFC-082 §D3: one source of truth for whether a save is possible —
+    // composed from both sides' FileKind/EditabilityClass and the resolved
+    // target's state, never a pair-wide `is_mergeable_text()` expression.
+    let save_capability = save_capability(
+        &ld.kind,
+        &rd.kind,
+        ld.editability(),
+        rd.editability(),
+        ld.had_decode_errors(),
+        rd.had_decode_errors(),
+        &save_target.state,
+    );
     Ok(PreparedCompare {
         left: ld,
         right: rd,
         diff,
         merge,
         save_target,
-        can_save,
+        save_capability,
     })
 }
 

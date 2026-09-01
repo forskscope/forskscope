@@ -26,6 +26,14 @@ pub enum AppErrorKind {
     /// direction), but the write direction is a refusal, not a warning —
     /// nothing is written.
     EncodeLossy,
+    /// The *load* already substituted replacement characters for bytes it
+    /// could not decode (RFC-082 §D3, F88a) — distinct from `EncodeLossy`:
+    /// the in-memory content is valid UTF-8 and re-encodes losslessly, so
+    /// nothing about *this* save is lossy; the original file's bytes were
+    /// already unrecoverably lost at load time, before any edit happened.
+    /// No save-time encoding choice fixes that, so there is no "save as
+    /// UTF-8" escape here the way `EncodeLossy` has one.
+    UnsavableAfterDecodeLoss,
     // ── Comparison ────────────────────────────────────────────────────────
     BinaryNotComparable,
     FileTooLarge,
@@ -81,7 +89,8 @@ impl AppErrorKind {
             | Self::BackupFailed
             | Self::ExternalModificationDetected
             | Self::BackgroundJobFailed
-            | Self::EncodeLossy => ErrorSeverity::Blocking,
+            | Self::EncodeLossy
+            | Self::UnsavableAfterDecodeLoss => ErrorSeverity::Blocking,
 
             Self::InternalFault => ErrorSeverity::Blocking,
         }
@@ -127,6 +136,12 @@ impl AppErrorKind {
             }
 
             Self::EncodeLossy => &[RecoveryAction::SaveAsUtf8, RecoveryAction::Dismiss],
+
+            // No "save as UTF-8" here (§4): the in-memory content is
+            // already valid UTF-8 and re-encodes losslessly — the original
+            // bytes were lost at load time, before this save was ever
+            // attempted, and no encoding choice at save time restores them.
+            Self::UnsavableAfterDecodeLoss => &[RecoveryAction::Dismiss],
 
             Self::BackgroundJobCancelled => &[RecoveryAction::Retry, RecoveryAction::Dismiss],
             Self::BackgroundJobFailed => &[RecoveryAction::Retry, RecoveryAction::Dismiss],
@@ -292,6 +307,11 @@ impl UserMessage {
                 // with the actual characters and encoding (RFC-082 §D4)
                 // whenever a real CoreError::Encode is available.
                 "Some characters in this file cannot be represented in the target encoding.",
+            ),
+            AppErrorKind::UnsavableAfterDecodeLoss => (
+                "Cannot save: file was read with substitutions",
+                "This file was read with replacement characters for bytes that could not \
+                 be decoded. Saving it now will not reproduce the original file exactly.",
             ),
             AppErrorKind::BinaryNotComparable => {
                 ("Binary file", "This file cannot be compared as text.")

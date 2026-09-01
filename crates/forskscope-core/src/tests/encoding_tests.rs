@@ -130,6 +130,42 @@ fn default_unmappable_char_cap_is_five() {
     assert_eq!(MAX_REPORTED_UNMAPPABLE_CHARS, 5);
 }
 
+// ── F88a/RFC-082 §D3: why the load-time decode-substitution guard exists —
+// F87's save-time check alone does not catch this ──────────────────────────
+
+/// §2a's exact fixture and the reasoning behind it: a UTF-8 BOM forces the
+/// UTF-8 interpretation, so decoding cannot fall back to a lossless
+/// single-byte encoding the way it would for a bare invalid byte with no
+/// BOM — the replacement character is the only option, and it is valid
+/// UTF-8, so F87's own lossy check (`encode_text`) stays silent on the
+/// re-encode. This documents *why* F88a's guard exists, not only that it
+/// fires: the bytes a save would actually write are provably not the
+/// file's original bytes.
+#[test]
+fn a_decode_substituted_reencode_would_differ_from_the_original_bytes() {
+    let original: &[u8] = &[0xEF, 0xBB, 0xBF, 0xFF, b'a', b'\n'];
+    let (text, encoding, had_errors) = decode_bytes(original);
+    assert!(
+        had_errors,
+        "test setup: this fixture must decode with replacement characters"
+    );
+
+    let encoded = encode_text(&text, &encoding.label);
+    assert!(
+        !encoded.lossy,
+        "test setup: F87's own guard must stay silent here — the decoded \
+         text is valid UTF-8 and re-encodes losslessly, which is exactly \
+         the gap F88a's guard exists to close"
+    );
+
+    assert_ne!(
+        encoded.bytes, original,
+        "the bytes a save would actually write differ from the file's \
+         original bytes — this is why the save must be blocked before it \
+         happens, not merely warned about afterward"
+    );
+}
+
 #[test]
 fn newline_style_detection_covers_all_cases() {
     assert_eq!(detect_newline_style("a\nb\n"), NewlineStyle::Lf);

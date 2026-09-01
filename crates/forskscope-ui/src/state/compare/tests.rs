@@ -27,6 +27,7 @@ fn loading_tab(id_value: u64, generation_value: u64) -> CompareTab {
         merge: MergeSession::empty(),
         diff_options: DiffOptions::default(),
         can_save: false,
+        save_capability: SaveCapability::Blocked(SaveCapabilityBlockReason::NotMergeableText),
         char_mode: true,
         word_wrap: false,
         focused_change: 9,
@@ -43,13 +44,18 @@ fn ready_result(can_save: bool) -> LoadResult {
     let right = PathBuf::from("right");
     let save_target =
         forskscope_core::compare_prep::save_target_from_loaded(&right, &LoadedDocument::empty());
+    let save_capability = if can_save {
+        SaveCapability::Saveable
+    } else {
+        SaveCapability::Blocked(SaveCapabilityBlockReason::NotMergeableText)
+    };
     LoadResult::Ready(Box::new(PreparedCompare {
         left: LoadedDocument::empty(),
         right: LoadedDocument::empty(),
         diff: DiffDocument::empty(),
         merge: MergeSession::empty(),
         save_target,
-        can_save,
+        save_capability,
     }))
 }
 
@@ -253,7 +259,7 @@ fn normal_compare_can_save_and_diff_are_unaffected_by_the_prepared_compare_refac
     .unwrap();
 
     assert!(
-        prepared.can_save,
+        prepared.save_capability.is_saveable(),
         "both sides are plain text — must remain saveable"
     );
     assert!(
@@ -458,7 +464,8 @@ fn save_target_matches_right_input_after_load_and_reload() {
             diff: prepared.diff,
             merge: prepared.merge,
             diff_options: DiffOptions::default(),
-            can_save: prepared.can_save,
+            can_save: prepared.save_capability.is_saveable(),
+            save_capability: prepared.save_capability,
             char_mode: false,
             word_wrap: false,
             focused_change: 0,
@@ -677,4 +684,280 @@ fn both_load_call_sites_stop_at_the_guard_for_a_large_pair() {
     });
 
     let _ = fs::remove_dir_all(&dir);
+}
+
+// ── F88a (RFC-082 §D3): a decode-substituted file must not be saved
+// without the guard firing first ────────────────────────────────────────────
+
+/// §2a's exact fixture: a UTF-8 BOM followed by an invalid byte. The BOM
+/// forces the UTF-8 interpretation, so detection cannot fall back to a
+/// lossless single-byte encoding the way it does for a bare invalid byte
+/// with no BOM.
+const F88A_FIXTURE_BYTES: &[u8] = &[0xEF, 0xBB, 0xBF, 0xFF, b'a', b'\n'];
+
+#[test]
+fn a_file_that_decoded_with_replacement_characters_cannot_be_saved_without_the_guard() {
+    let dir = temp_dir("f88a-decode-guard");
+    let left = dir.join("left.txt");
+    let right = dir.join("legacy.txt");
+    fs::write(&left, "left\n").unwrap();
+    fs::write(&right, F88A_FIXTURE_BYTES).unwrap();
+
+    let prepared = load_and_diff(
+        normal_request(left.clone(), right.clone()),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    )
+    .unwrap();
+    assert_eq!(
+        prepared.save_capability,
+        forskscope_core::compare_prep::SaveCapability::SaveableWithGuard,
+        "test setup: the right side must have decoded with replacement characters"
+    );
+
+    let tab = CompareTab {
+        id: id(1),
+        load_generation: generation(1),
+        title: "t".into(),
+        left_path: Some(left),
+        right_path: Some(right.clone()),
+        state: TabState::Ready,
+        left_doc: prepared.left,
+        right_doc: prepared.right,
+        diff: prepared.diff,
+        merge: prepared.merge,
+        diff_options: DiffOptions::default(),
+        can_save: prepared.save_capability.is_saveable(),
+        save_capability: prepared.save_capability,
+        char_mode: false,
+        word_wrap: false,
+        focused_change: 0,
+        save_target: Some(prepared.save_target),
+        launch_mode: CompareLaunchMode::Normal,
+    };
+
+    crate::state::with_test_store(|store| {
+        store.tabs.write().push(tab);
+        crate::ui::view::diff_actions::save_tab(store, 0);
+
+        match &*store.modal.read() {
+            Modal::SaveError(index, path, view) => {
+                assert_eq!(*index, 0);
+                assert_eq!(path, &right);
+                assert!(!view.buttons.is_empty());
+            }
+            other_modal => panic!(
+                "expected Modal::SaveError, got a different modal: {:?}",
+                std::mem::discriminant(other_modal)
+            ),
+        }
+    });
+
+    assert_eq!(
+        fs::read(&right).unwrap(),
+        F88A_FIXTURE_BYTES,
+        "a save that would not reproduce the original bytes must write nothing at all"
+    );
+}
+
+/// F88b (RFC-082 §D3 §3): `Missing` is empty text, not an unsupported kind
+/// — a deleted right side must not disappear the merge/save toolbar, and
+/// saving must be able to *create* it.
+#[test]
+fn a_missing_right_side_can_be_created_by_saving() {
+    let dir = temp_dir("f88b-restore-deleted");
+    let left = dir.join("left.txt");
+    let right = dir.join("right.txt");
+    fs::write(&left, "restored content\n").unwrap();
+    let _ = fs::remove_file(&right);
+
+    let prepared = load_and_diff(
+        normal_request(left.clone(), right.clone()),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    )
+    .unwrap();
+    assert_eq!(
+        prepared.save_capability,
+        forskscope_core::compare_prep::SaveCapability::Saveable,
+        "a missing side must not block saving, and must not require a guard"
+    );
+
+    // The right side is empty/missing, so result_text() starts as "" —
+    // apply the pending hunk to bring the left content into the merge
+    // result, simulating the user restoring the deleted file's content.
+    let mut merge = prepared.merge;
+    let hunk_id = merge
+        .hunks()
+        .iter()
+        .find(|h| h.is_pending_change())
+        .expect("fixture must contain a pending change")
+        .hunk_id;
+    merge.apply_left_to_right(hunk_id).unwrap();
+    assert_eq!(merge.result_text(), "restored content\n");
+
+    let tab = CompareTab {
+        id: id(1),
+        load_generation: generation(1),
+        title: "t".into(),
+        left_path: Some(left),
+        right_path: Some(right.clone()),
+        state: TabState::Ready,
+        left_doc: prepared.left,
+        right_doc: prepared.right,
+        diff: prepared.diff,
+        merge,
+        diff_options: DiffOptions::default(),
+        can_save: prepared.save_capability.is_saveable(),
+        save_capability: prepared.save_capability,
+        char_mode: false,
+        word_wrap: false,
+        focused_change: 0,
+        save_target: Some(prepared.save_target),
+        launch_mode: CompareLaunchMode::Normal,
+    };
+    assert!(
+        tab.can_save,
+        "the merge/save toolbar must be available for a missing side"
+    );
+
+    crate::state::with_test_store(|store| {
+        store.tabs.write().push(tab);
+        crate::ui::view::diff_actions::save_tab(store, 0);
+    });
+
+    assert_eq!(
+        fs::read_to_string(&right).unwrap(),
+        "restored content\n",
+        "saving must be able to create a side that was missing"
+    );
+}
+
+/// F88a/§4 acceptance criterion: the capability composition must not have
+/// widened into permitting what `is_mergeable_text` already correctly
+/// refused — a binary or spreadsheet side stays unsaveable regardless of
+/// the other side's editability.
+#[test]
+fn a_binary_or_spreadsheet_side_is_still_not_saveable() {
+    let dir = temp_dir("f88-binary-still-blocked");
+
+    // Both sides binary: load_and_diff's own binary-vs-text mismatch check
+    // (a separate, earlier refusal) only fires for a *mixed* pair, so this
+    // is what actually reaches save_capability's own classification.
+    let left_bin = dir.join("left.bin");
+    let right_bin = dir.join("right.bin");
+    fs::write(&left_bin, [0u8, 4, 5, 6]).unwrap();
+    fs::write(&right_bin, [0u8, 1, 2, 3]).unwrap();
+    let prepared = load_and_diff(
+        normal_request(left_bin, right_bin),
+        DiffOptions::default(),
+        Lang::En,
+        true, // enable_binary — otherwise load_and_diff refuses earlier for a different reason
+    )
+    .unwrap();
+    assert!(
+        !prepared.save_capability.is_saveable(),
+        "a binary side must still block saving: {:?}",
+        prepared.save_capability
+    );
+
+    let left = dir.join("left.txt");
+    fs::write(&left, "left\n").unwrap();
+
+    let xlsx = dir.join("right.xlsx");
+    fs::write(&xlsx, b"not a real workbook").unwrap();
+    let result = load_and_diff(
+        normal_request(left, xlsx),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    );
+    assert!(
+        result.is_err(),
+        "spreadsheet comparison is refused earlier, before save_capability is even computed \
+         — confirming it never becomes reachable as Saveable either way"
+    );
+}
+
+/// F88a's own review request states a deliberate narrowing, and this pins
+/// it as a falsifiable claim rather than just an assertion in prose:
+/// `EditabilityClass::requires_save_guard()` is `true` both for decode
+/// substitution *and* for a non-UTF-8 encoding that decoded cleanly — RFC-012's
+/// original table treats these differently ("Save guarded / must show
+/// warning" vs. "Warn on lossy save"), and F87's own save-time check
+/// already handles the second precisely (no loss, no block, real
+/// `SaveAsUtf8` escape when it *is* lossy). A file that merely uses a
+/// non-UTF-8 encoding, with zero decode errors, must not be swept into
+/// F88a's Dismiss-only, no-escape guard — that would make ordinary
+/// legacy-encoded editing permanently unsaveable. `save_capability` blocks
+/// only on `had_decode_errors`, not on `requires_save_guard()` alone.
+#[test]
+fn a_cleanly_decoded_non_utf8_file_is_not_swept_into_the_new_guard() {
+    let dir = temp_dir("f88a-clean-non-utf8-not-guarded");
+    let left = dir.join("left.txt");
+    let right = dir.join("right.txt");
+    fs::write(&left, "あいう\n").unwrap();
+    // Shift_JIS bytes for "あいう" (no trailing newline in this fixture,
+    // matching legacy_bytes_are_decoded_via_detection) — decodes cleanly,
+    // confirmed empirically: had_decode_errors == false.
+    let sjis: &[u8] = &[0x82, 0xA0, 0x82, 0xA2, 0x82, 0xA4];
+    fs::write(&right, sjis).unwrap();
+
+    let prepared = load_and_diff(
+        normal_request(left.clone(), right.clone()),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    )
+    .unwrap();
+    assert!(
+        !prepared.right.had_decode_errors(),
+        "test setup: this fixture must decode cleanly"
+    );
+    assert_eq!(
+        prepared.save_capability,
+        forskscope_core::compare_prep::SaveCapability::Saveable,
+        "a clean non-UTF-8 decode must not require F88a's guard — only \
+         had_decode_errors does"
+    );
+
+    let tab = CompareTab {
+        id: id(1),
+        load_generation: generation(1),
+        title: "t".into(),
+        left_path: Some(left),
+        right_path: Some(right.clone()),
+        state: TabState::Ready,
+        left_doc: prepared.left,
+        right_doc: prepared.right,
+        diff: prepared.diff,
+        merge: prepared.merge,
+        diff_options: DiffOptions::default(),
+        can_save: prepared.save_capability.is_saveable(),
+        save_capability: prepared.save_capability,
+        char_mode: false,
+        word_wrap: false,
+        focused_change: 0,
+        save_target: Some(prepared.save_target),
+        launch_mode: CompareLaunchMode::Normal,
+    };
+
+    crate::state::with_test_store(|store| {
+        store.tabs.write().push(tab);
+        crate::ui::view::diff_actions::save_tab(store, 0);
+
+        assert!(
+            matches!(&*store.modal.read(), Modal::None),
+            "a save that round-trips cleanly must not show any dialog at all"
+        );
+    });
+
+    assert_eq!(
+        fs::read(&right).unwrap(),
+        sjis,
+        "the file must actually be saveable — identical content re-saved \
+         must round-trip byte for byte"
+    );
 }

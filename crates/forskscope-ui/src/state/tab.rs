@@ -3,7 +3,9 @@
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
-use forskscope_core::compare_prep::{SaveTargetSnapshot, save_target_from_loaded};
+use forskscope_core::compare_prep::{
+    SaveCapability, SaveTargetSnapshot, save_capability, save_target_from_loaded,
+};
 use forskscope_core::diff::DiffDocument;
 use forskscope_core::document::LoadedDocument;
 use forskscope_core::{DiffOptions, MergeSession, compute_diff};
@@ -53,7 +55,15 @@ pub struct CompareTab {
     pub diff: DiffDocument,
     pub merge: MergeSession,
     pub diff_options: DiffOptions,
+    /// Derived from `save_capability.is_saveable()` — kept as its own field
+    /// since most call sites only need this yes/no answer (F88/RFC-082 §D3).
     pub can_save: bool,
+    /// One source of truth for whether, and how, a save is possible
+    /// (F88/RFC-082 §D3) — `can_save` above is this collapsed to a bool for
+    /// the many call sites that only need that; `build_request` reads this
+    /// field directly to decide whether a save must be blocked and
+    /// explained instead of attempted.
+    pub save_capability: SaveCapability,
     pub char_mode: bool,
     pub word_wrap: bool,
     pub focused_change: usize,
@@ -99,10 +109,11 @@ pub fn swap_sides(store: &mut crate::state::Store, index: usize) {
         };
         std::mem::swap(&mut tab.left_doc, &mut tab.right_doc);
         std::mem::swap(&mut tab.left_path, &mut tab.right_path);
-        tab.can_save =
-            tab.left_doc.kind.is_mergeable_text() && tab.right_doc.kind.is_mergeable_text();
         recompute_diff(tab);
+        // save_target must be refreshed before recomputing save_capability
+        // — the capability's third input is the *current* target state.
         refresh_save_target(tab);
+        refresh_save_capability(tab);
     }
     // F61: swap_sides changes left_path/right_path, which is exactly what
     // session persistence needs to reflect - see open_compare_request's
@@ -130,6 +141,29 @@ fn refresh_save_target(tab: &mut CompareTab) {
         let right_path = tab.right_path.clone().unwrap_or_default();
         tab.save_target = Some(save_target_from_loaded(&right_path, &tab.right_doc));
     }
+}
+
+/// F88/RFC-082 §D3: recomputes `save_capability` (and the `can_save` bool
+/// derived from it) from the tab's *current* `left_doc`/`right_doc`/
+/// `save_target` — the same composed function `load_and_diff` uses, so a
+/// mutation of the compared panes never leaves either field stale. A no-op
+/// if `save_target` is `None` (not expected for a `Ready` tab, the only
+/// state this is ever called from, but left both fields exactly as they
+/// were rather than guessing at a value if it somehow were).
+fn refresh_save_capability(tab: &mut CompareTab) {
+    let Some(save_target) = tab.save_target.clone() else {
+        return;
+    };
+    tab.save_capability = save_capability(
+        &tab.left_doc.kind,
+        &tab.right_doc.kind,
+        tab.left_doc.editability(),
+        tab.right_doc.editability(),
+        tab.left_doc.had_decode_errors(),
+        tab.right_doc.had_decode_errors(),
+        &save_target.state,
+    );
+    tab.can_save = tab.save_capability.is_saveable();
 }
 
 /// The F85/RFC-082 §D2 invariant in `Normal` launch mode: `save_target`
