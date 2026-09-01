@@ -137,6 +137,27 @@ defeats the module's own headline promise of never exposing a partial write.
 careful comment about requesting `0o666` and letting the umask apply. `tempfile`
 is already a `forskscope-core` dependency.
 
+## Design principles
+
+Three, in priority order. The owner set the bar as *"finally clean, safe and
+secure, and robust and sophisticated"*, and added that the design must be
+**friendly and in harmony with the user's instinct**. Where those pull in
+different directions this RFC says so rather than pretending they agree.
+
+**P1 — Never write something the user did not ask for.** All five defects violate
+this. It outranks convenience everywhere below.
+
+**P2 — The user's instinct is the specification.** A diff tool's user believes:
+the right pane is the file I am editing; a dot means I have unsaved work; Save
+writes what I see. Every defect here is a place where the code and that belief
+disagree — and in each case **the belief is correct and the code is wrong.** That
+is a useful test: where a fix has options, prefer the one a user would predict.
+
+**P3 — Prefer preventing the class over patching the instance.** F85 could exist
+silently because nothing in the UI shows where Save will write; a wrong
+destination is indistinguishable from a right one until the file is gone. D6
+addresses that directly.
+
 ## Design
 
 ### D1 — Dirty state is content identity, not stack depth
@@ -144,46 +165,106 @@ is already a `forskscope-core` dependency.
 Record what was saved, not how deep the stack was. **Decision: hash
 `result_text()` at `mark_saved()` and compare on `is_dirty()`.**
 
-A monotonic revision counter is the obvious alternative and is **rejected**: it
-reports *dirty* after undoing back to the saved state. That is the safe
-direction, so it would be acceptable — but it makes the dirty dot lie in the
-other direction, and this project has spent a program's effort on markers that
-claim more than they measure. Content identity is exact.
+A monotonic revision counter is the obvious alternative and is **rejected**, on
+P2. It reports *dirty* after the user undoes back to exactly the state they
+saved — the buffer on screen is byte-identical to the file on disk and the app
+insists there is unsaved work. That is the safe direction, so it would be
+*acceptable*; it is not what the user's eye says. **Content identity matches the
+screen**, in both directions, which is the whole job of a dirty indicator.
 
 Both `MergeSession` and `ThreeWayMergeSession` get the same treatment. The
 project's own `TransactionLog` already compares revisions (`merge/log.rs:235`);
 this RFC does not adopt that shape, for the reason above.
 
-### D2 — One source of truth for the save target
+### D2 — `save_target` is a function of `save_destination`, re-derived when its inputs change
 
-**`save_target` is authoritative and every mutation of `right_path` must
-maintain it.** RFC-077 established the first half; this RFC closes the second.
+**Corrected 2026-09-01, before acceptance. An earlier draft of this RFC said
+"refuse the swap in mergetool mode." That was wrong**, and reading
+`load_and_diff` shows why: `save_target` does not derive from `right_path`. It
+derives from **`save_destination`**, which is fixed at launch:
 
-- `swap_sides` re-derives `tab.save_target` from the new right side.
-- **In `CompareLaunchMode::MergeTool`, swap is refused outright** — the save
-  destination is a third path (`$MERGED`) that swapping cannot express, and
-  silently keeping it while the panes swap is worse than declining.
-- A regression test asserts the invariant after **every** mutation of
-  `right_path`, not just after swap.
+- `SaveDestination::RightInput` → `save_target_from_loaded(&right, &rd)`
+- `SaveDestination::Explicit(merged)` → `inspect_save_target(merged, …)` — a
+  third path, **independent of both panes**
 
-### D3 — One source of truth for save capability
+So there is one invariant and it needs no special case:
+
+> **`save_target` is re-derived from `save_destination` exactly when the inputs
+> it derives from change.**
+
+Under it, `swap_sides` re-derives in `RightInput` mode (closing F85) and does
+nothing in mergetool mode, because `$MERGED` did not change. **No refusal, no
+mode check at the call site.**
+
+Refusing the swap would also have been unfriendly on P2: swapping in mergetool
+mode is a legitimate thing to want — *resolve using LOCAL as the base* — and
+nothing about the merged output makes it unsafe.
+
+**One trap the blunt version would have walked into, recorded so nobody
+reintroduces it.** Re-deriving *unconditionally* would call
+`inspect_save_target($MERGED)` on a tab whose merged file has **not been
+re-read**, refreshing its `MustMatch` fingerprint against whatever is on disk
+now — silently destroying external-modification detection for the one file the
+mergetool contract cares about. Deriving only when the input changed avoids it;
+patching the call site would not have.
+
+A regression test asserts the invariant after **every** mutation of the compared
+inputs, not only after swap.
+
+### D3 — One source of truth for save capability, and F88 splits in two
 
 Replace the pair-wide `can_save` expression with a single `save_capability()`
-derived from **`EditabilityClass` of the editable side** and the target's
-`SaveTargetState`. That is one change closing three defects: the unguarded lossy
-save, the missing-side restriction, and one of the two drifts that produced D2's
-defect.
+derived from the **`EditabilityClass` of the editable side** and the target's
+`SaveTargetState`.
 
-### D4 — A lossy encode must not be silent
+**F88 splits, and only half of it blocks** (owner decision, 2026-09-01):
+
+- **F88a — the unwired guard blocks.** `requires_save_guard()` is D4's
+  mitigation; shipping D4 without consulting it would leave the same hole in a
+  different shape.
+- **F88b — the missing-side restriction does not block.** Being unable to restore
+  a deleted file is a **feature gap**, not a data-loss path. It is fixed in the
+  same change because it is the same expression, but it must not hold the
+  release. Blocking things that need not block delays v1 without making it safer.
+
+F88b is nonetheless the clearest P2 case in this RFC. The user opens a deleted
+file against its old version, sees both panes, and expects to save the left side
+back — `cli.md` even advertises it — and instead the entire merge and save
+toolbar disappears with no explanation. `inspect_save_target` already reports
+that path as `Writable` with `MustBeAbsent`; the machinery is ready and only the
+gate is wrong.
+
+### D4 — A lossy encode blocks, names what it cannot write, and offers a way out
 
 `encode_text` returns `encoding_rs`'s unmappable flag; `SaveOutcome` carries it;
-the save path **blocks with a confirmation** before writing. `AppErrorKind` and
-`RecoveryAction` already carry the taxonomy for that dialog, and F52 has just
-wired the dialog itself.
+the save path **refuses to write** and raises a dialog.
 
-Also required, and separate: **consume `SaveOutcome.encoding_fallback_to_utf8`**,
-which is produced today and read by nobody, though its own doc says the UI must
-warn.
+Blocking is P1. What the dialog *says* is P2, and it is the part worth
+specifying, because "cannot encode" is meaningless to someone who has never
+thought about charsets. The dialog must:
+
+- **name the characters it cannot write**, not merely report that some exist —
+  the user needs to find them;
+- **say what the file's encoding is**, since that is the fact they are missing;
+- **offer the two escapes that preserve their data**: save as UTF-8, which is an
+  encoding change they are choosing deliberately, or go back and edit.
+
+Substituting `&#128512;` is none of those things: it is a fourth option nobody
+would pick, taken silently.
+
+`RecoveryAction` has no "save as UTF-8" variant. Adding one is in scope; review
+083 established that the twelve variants are matched exhaustively with no
+catch-all, so a thirteenth is a compile error at every site — the addition is
+safe by construction.
+
+**Separately, and already produced:** `SaveOutcome.encoding_fallback_to_utf8` is
+set today and read by nobody, though its own doc says the UI must warn. Consume
+it.
+
+**Out of scope, noted as the better long-term answer:** marking unmappable
+characters in the editor as they are introduced, so the problem is visible before
+Save. That is prevention (P3) and it is a larger change; it should not delay this
+one.
 
 ### D5 — `atomic_replace` uses the primitive already in the file
 
@@ -191,6 +272,25 @@ warn.
 Random `O_EXCL` name; no symlink vector; no collision between concurrent saves.
 **Do not write a second implementation** — reuse `persist_noclobber`'s shape,
 including its permissions reasoning.
+
+### D6 — Show the user where Save will write
+
+`save_target` reaches the UI in exactly one place: prefilling the Save As dialog
+(`diff/toolbar.rs`). **It is never displayed.** So a wrong destination looks
+identical to a right one until the file is overwritten — which is why F85 could
+exist, and stay silent, in a codebase that had already built RFC-077 to prevent
+exactly that.
+
+**Surface the resolved save target in the workspace** — the toolbar or the status
+line — so the answer to *"where does Save go?"* is on screen rather than inferred.
+
+This is P3, and it is the only item here that is not a defect fix. It earns its
+place because it is the one change that makes the *class* visible: in mergetool
+mode the destination is a third file the user never sees in either pane, and
+today nothing tells them what it is.
+
+Scope discipline: display only. No new control, no editing of the target from the
+status line — Save As already exists for that.
 
 ## Acceptance criteria
 
@@ -236,13 +336,28 @@ Documentation-only corrections — `file-types.md`'s false save-guard sentence a
 a document asserting a control that does not exist is worse than no document, and
 neither correction depends on any code change.
 
-## Open questions for the owner
+## Open questions — all closed 2026-09-01
 
-- **Q1 — mergetool swap.** Refusing the swap is this RFC's recommendation.
-  The alternative is to allow it and re-derive `$MERGED` — but nothing in the
-  mergetool contract says the merged path follows the panes, so refusing is the
-  honest reading. Confirm.
-- **Q2 — lossy-encode default.** Block with confirmation (recommended), or warn
-  after writing? Confirmation is the only option that keeps the file intact.
-- **Q3 — B5's standing.** This RFC assumes B5 joins B4 as a release blocker, and
-  that the release-blocking outcomes list gains a write-path outcome. Confirm.
+- **Q1 — mergetool swap. CLOSED.** Not refused. **The RFC's own first answer was
+  wrong** and is replaced by D2's invariant: `save_target` derives from
+  `save_destination`, so re-deriving when its inputs change is correct in every
+  mode and needs no special case. Refusing would have added a restriction to
+  cover a missing invariant, and would have masked external-modification
+  detection on `$MERGED` if applied as an unconditional re-derive.
+- **Q2 — lossy encode. CLOSED: block, name, offer.** See D4. Blocking alone is
+  safe; naming the characters and offering UTF-8 is what makes it usable by
+  someone who has never thought about charsets.
+- **Q3 — B5's standing. CLOSED: five blocking outcomes, not six.** F85, F86, F87,
+  F88a and F89 block, each being data loss, corruption or a security defect, as
+  do F92's two false **control** claims — documentation-only edits that land
+  first. **F88b does not block.**
+
+## What this RFC deliberately does not do
+
+- **It does not mark unmappable characters as they are typed.** That is the
+  prevention D4 gestures at and it is a larger change; it must not delay this one.
+- **It does not add an encoding picker.** RFC-083. D4's dialog must work against
+  whatever label the file already has.
+- **It does not touch the diff engine, the concurrency design or the persistence
+  layer.** The audit examined all three and found them sound; the concentration
+  of defects in one subsystem is the finding, and widening scope would blur it.
