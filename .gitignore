@@ -15,6 +15,10 @@ target/
 
 # Custom
 docs/book
+# Generated RFC index (mdbook output, same class as docs/book). F64 recorded
+# it as build output that should be ignored; leaving it neither tracked nor
+# ignored got it committed by accident twice, in e6fe8e6 and b79d9d0.
+rfcs/index.html
 /.git-exclude/
 *.local.json
 
