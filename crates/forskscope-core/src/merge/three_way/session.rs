@@ -91,6 +91,10 @@ pub struct ThreeWayStats {
 }
 
 /// The canonical owner of three-way merge state for one session.
+///
+/// Dirty state is content identity, not undo-stack depth (F86/RFC-082 §D1)
+/// — see [`MergeSession`](super::MergeSession)'s doc comment for the full
+/// rationale, which applies identically here.
 #[derive(Debug, Clone)]
 pub struct ThreeWayMergeSession {
     segments: Vec<ResultSegment>,
@@ -99,8 +103,10 @@ pub struct ThreeWayMergeSession {
     regions_total: usize,
     undo_stack: Vec<ResolutionTransaction>,
     redo_stack: Vec<ResolutionTransaction>,
-    /// `undo_stack.len()` at the last save baseline.
-    saved_baseline: usize,
+    /// FNV-1a 64-bit hash of [`result_text`](Self::result_text) at the last
+    /// save baseline (or at construction, if never saved) — content
+    /// identity, not undo-stack depth.
+    saved_hash: u64,
 }
 
 impl ThreeWayMergeSession {
@@ -141,15 +147,21 @@ impl ThreeWayMergeSession {
             }
         }
 
-        Self {
+        let mut session = Self {
             segments,
             conflicts,
             auto_merged,
             regions_total,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
-            saved_baseline: 0,
-        }
+            saved_hash: 0,
+        };
+        session.saved_hash = session.content_hash();
+        session
+    }
+
+    fn content_hash(&self) -> u64 {
+        fnv1a64(self.result_text().as_bytes())
     }
 
     pub fn conflicts(&self) -> &[MergeConflict] {
@@ -195,8 +207,9 @@ impl ThreeWayMergeSession {
         !self.redo_stack.is_empty()
     }
 
+    /// `true` when the working result differs from the last saved state.
     pub fn is_dirty(&self) -> bool {
-        self.undo_stack.len() != self.saved_baseline
+        self.content_hash() != self.saved_hash
     }
 
     /// Resolve a conflict by choosing the left side.
@@ -295,7 +308,9 @@ impl ThreeWayMergeSession {
 
     /// Mark the current state as saved.
     pub fn mark_saved(&mut self) {
-        self.saved_baseline = self.undo_stack.len();
+        self.saved_hash = self.content_hash();
+        // F86: kept unchanged — see MergeSession::mark_saved's doc comment
+        // for why this is left alone rather than folded into this fix.
         self.redo_stack.clear();
     }
 

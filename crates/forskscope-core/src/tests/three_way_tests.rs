@@ -159,6 +159,68 @@ fn multiple_conflicts_have_distinct_ids() {
     assert_ne!(ids[0], ids[1]);
 }
 
+// ── F86 (RFC-082 §D1): dirty state is content identity, not undo-stack
+// depth — same predicate as `MergeSession`, must not be left behind ────────
+
+fn two_conflict_session() -> ThreeWayMergeSession {
+    session("a\nb\nc\nd\ne\n", "a\nL1\nc\nL2\ne\n", "a\nR1\nc\nR2\ne\n")
+}
+
+/// The exact defect, reproduced against `ThreeWayMergeSession`: resolve
+/// conflict A, save, undo, resolve a *different* conflict B. Undo-stack
+/// depth returns to exactly the save point, but the content differs.
+#[test]
+fn f86_same_depth_as_save_point_but_different_content_is_dirty() {
+    let mut s = two_conflict_session();
+    let ids: Vec<_> = s.conflicts().iter().map(|c| c.id).collect();
+    assert_eq!(
+        ids.len(),
+        2,
+        "fixture must produce two independent conflicts"
+    );
+
+    s.resolve_left(ids[0]).unwrap();
+    let saved = s.result_text();
+    s.mark_saved();
+    assert!(!s.is_dirty());
+
+    s.undo().unwrap();
+    assert!(s.is_dirty(), "undo below the saved depth must be dirty");
+
+    s.resolve_left(ids[1]).unwrap();
+    assert_ne!(
+        s.result_text(),
+        saved,
+        "test setup: resolving the other conflict must actually change the content"
+    );
+    assert!(
+        s.is_dirty(),
+        "undo-stack depth matches the save point again, but the content \
+         differs — depth is not identity"
+    );
+}
+
+/// The case a revision counter fails, for `ThreeWayMergeSession`.
+#[test]
+fn f86_undo_back_to_exact_saved_content_is_clean() {
+    let mut s = two_conflict_session();
+    let ids: Vec<_> = s.conflicts().iter().map(|c| c.id).collect();
+
+    s.resolve_left(ids[0]).unwrap();
+    s.mark_saved();
+    assert!(!s.is_dirty());
+
+    s.resolve_left(ids[1]).unwrap();
+    assert!(s.is_dirty());
+
+    s.undo().unwrap();
+    assert!(
+        !s.is_dirty(),
+        "the result is back to exactly what was saved — a revision counter \
+         would report dirty here, which contradicts what the user sees (P2)"
+    );
+}
+
 #[test]
 fn crlf_line_endings_are_preserved_through_merge() {
     let base = "a\r\nb\r\nc\r\n";

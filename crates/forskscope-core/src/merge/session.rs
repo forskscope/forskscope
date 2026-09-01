@@ -2,6 +2,7 @@
 
 use crate::diff::{DiffDocument, DiffRow, HunkId, HunkKind, SideLine};
 use crate::error::{CoreError, Result};
+use crate::fnv1a64;
 
 use super::transaction::MergeTransaction;
 
@@ -31,16 +32,24 @@ impl MergeHunk {
 
 /// The canonical owner of merge state for one compare session.
 ///
-/// Dirty state is derived from the number of net transactions since the
-/// last save baseline; it is never inferred from rendered UI content.
+/// Dirty state is content identity, not undo-stack depth (F86/RFC-082 §D1):
+/// `is_dirty()` compares the current [`result_text`](Self::result_text)
+/// against a hash of what was last saved, so an undo that lands the buffer
+/// back on the saved text reports clean, and a save-then-undo-then-different-
+/// edit reports dirty, in both cases regardless of how deep the stack is.
 #[derive(Debug, Clone)]
 pub struct MergeSession {
     diff_id: u64,
     hunks: Vec<MergeHunk>,
     undo_stack: Vec<MergeTransaction>,
     redo_stack: Vec<MergeTransaction>,
-    /// `undo_stack.len()` at the moment of the last successful save.
-    saved_baseline: usize,
+    /// FNV-1a 64-bit hash of [`result_text`](Self::result_text) at the
+    /// moment of the last successful save (or at construction, if never
+    /// saved) — content identity, not undo-stack depth. Same hash this
+    /// module's sibling already trusts for conflict identity
+    /// (`three_way::session::conflict_id_for`); a hash costs 8 bytes
+    /// regardless of file size, versus a stored copy of the full text.
+    saved_hash: u64,
 }
 
 impl MergeSession {
@@ -51,7 +60,7 @@ impl MergeSession {
             hunks: Vec::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
-            saved_baseline: 0,
+            saved_hash: fnv1a64(b""),
         }
     }
 
@@ -67,13 +76,19 @@ impl MergeSession {
                 rows: h.rows.clone(),
             })
             .collect();
-        Self {
+        let mut session = Self {
             diff_id: diff.diff_id,
             hunks,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
-            saved_baseline: 0,
-        }
+            saved_hash: 0,
+        };
+        session.saved_hash = session.content_hash();
+        session
+    }
+
+    fn content_hash(&self) -> u64 {
+        fnv1a64(self.result_text().as_bytes())
     }
 
     pub fn diff_id(&self) -> u64 {
@@ -86,7 +101,7 @@ impl MergeSession {
 
     /// `true` when the working result differs from the last saved state.
     pub fn is_dirty(&self) -> bool {
-        self.undo_stack.len() != self.saved_baseline
+        self.content_hash() != self.saved_hash
     }
 
     pub fn can_undo(&self) -> bool {
@@ -197,8 +212,16 @@ impl MergeSession {
 
     /// Mark the current state as saved; dirty becomes `false`.
     pub fn mark_saved(&mut self) {
-        self.saved_baseline = self.undo_stack.len();
-        // Redo across a save boundary would desynchronize the baseline.
+        self.saved_hash = self.content_hash();
+        // F86: the baseline is content now, so a redo across this boundary
+        // would no longer desynchronize it the way it did against a depth
+        // counter — replaying a redone transaction still lands on the same
+        // content it always would have. Left unchanged anyway: this handoff
+        // is about what "dirty" means, not about redo-after-save behavior,
+        // and removing the clear is its own user-visible change with its
+        // own risk (e.g. a *different* edit made after this save, then
+        // undone, then an old redo entry reapplied out of the edit's
+        // context) that deserves its own review rather than riding along.
         self.redo_stack.clear();
     }
 

@@ -286,3 +286,78 @@ fn session_from_identical_diff_has_zero_pending_changes() {
     assert_eq!(s.pending_changes(), 0);
     assert!(!s.is_dirty());
 }
+
+// ── F86 (RFC-082 §D1): dirty state is content identity, not undo-stack
+// depth ────────────────────────────────────────────────────────────────────
+
+fn two_hunk_session() -> MergeSession {
+    let diff = crate::compute_diff(
+        "a\nX\nb\nY\nc\n",
+        "a\nX2\nb\nY2\nc\n",
+        crate::DiffOptions::default(),
+    );
+    MergeSession::from_diff(&diff)
+}
+
+/// The exact defect (handoff 014 §2): apply hunk A, save, undo, apply a
+/// *different* hunk B. `undo_stack.len()` is back to exactly what it was at
+/// save time (1), but the content is not what was saved — it must be dirty.
+#[test]
+fn f86_same_depth_as_save_point_but_different_content_is_dirty() {
+    let mut s = two_hunk_session();
+    let ids: Vec<u64> = s
+        .hunks()
+        .iter()
+        .filter(|h| h.is_pending_change())
+        .map(|h| h.hunk_id)
+        .collect();
+    assert_eq!(ids.len(), 2, "fixture must produce two independent hunks");
+
+    s.apply_left_to_right(ids[0]).unwrap();
+    let saved = s.result_text();
+    s.mark_saved();
+    assert!(!s.is_dirty());
+
+    s.undo().unwrap();
+    assert!(s.is_dirty(), "undo below the saved depth must be dirty");
+
+    s.apply_left_to_right(ids[1]).unwrap();
+    assert_ne!(
+        s.result_text(),
+        saved,
+        "test setup: applying the other hunk must actually change the content"
+    );
+    assert!(
+        s.is_dirty(),
+        "undo-stack depth matches the save point again, but the content \
+         differs — depth is not identity"
+    );
+}
+
+/// The case a revision counter fails (handoff 014 §3, §6): undoing back to
+/// exactly the saved content must report clean, regardless of how many
+/// operations happened in between.
+#[test]
+fn f86_undo_back_to_exact_saved_content_is_clean() {
+    let mut s = two_hunk_session();
+    let ids: Vec<u64> = s
+        .hunks()
+        .iter()
+        .filter(|h| h.is_pending_change())
+        .map(|h| h.hunk_id)
+        .collect();
+
+    s.apply_left_to_right(ids[0]).unwrap();
+    s.mark_saved();
+    assert!(!s.is_dirty());
+
+    s.apply_left_to_right(ids[1]).unwrap();
+    assert!(s.is_dirty());
+
+    s.undo().unwrap();
+    assert!(
+        !s.is_dirty(),
+        "the buffer is back to exactly what was saved — a revision counter \
+         would report dirty here, which contradicts what the user sees (P2)"
+    );
+}
