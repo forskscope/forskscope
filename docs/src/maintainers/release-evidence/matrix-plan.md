@@ -43,8 +43,8 @@ executable under current resourcing. One row, matching the one real host.
 |---|---|---|---|---|---|---|
 | `linux-wayland` | Linux x86_64, Wayland, WebKitGTK 4.1 | Unqualified — no per-distribution floor (owner, 2026-08-13; §1a below) | x86_64 | **Manual** — CI's Xvfb is X11-family, not real Wayland | Owner | Available — owner-executed |
 | `linux-x11` | Linux x86_64, X11, WebKitGTK 4.1 | Unqualified — no per-distribution floor (owner, 2026-08-13; §1a below) | x86_64 | **CI** — `ubuntu-latest` + `xvfb-run`/`dbus-run-session` (F34's mechanism) stands in for this row reasonably | GitHub Actions (CI) | CI — available now |
-| `windows-11` | Windows 11 with WebView2 | Windows 11, any build GitHub's `windows-latest` currently backs | x86_64 | **CI** for most cases, **Manual** for F45's prerequisite sub-case (§3) | CI: GitHub Actions; Manual (F45 sub-case): Owner | CI available now; Manual: available — owner-executed |
-| `windows-10` | Windows 10, version 1809+ | **1809** — settled (F49b, owner 2026-08-13: `AppxManifest.xml`'s `MinVersion` stays unchanged) | x86_64 | **CI** — `windows-latest` is a Server-based image, not a literal retail Win10/11 install, but stands in reasonably for save/filesystem/WebView2 behavior | GitHub Actions (CI) | CI — available now |
+| `windows-11` | Windows 11 with WebView2 | Windows 11, any build GitHub's `windows-latest` currently backs | x86_64 | **CI** for most cases, **Manual (owner)** for P01 and for F45's prerequisite sub-case (§3). **CI is not sufficient for P01**: `windows-latest` resolves to a Server image (`win25-vs2026`, kernel NT 10.0.26100), so it cannot demonstrate a cold launch on a retail Windows client — F60's finding, generalized. P01 was executed manually on a real Windows 11 client for `0.167.2`. | CI: GitHub Actions; Manual (F45 sub-case): Owner | CI available now; Manual P01 done for `0.167.2` (build `10.0.26200`); F45 sub-case outstanding |
+| `windows-10` | **WITHDRAWN 2026-09-02 — not a supported platform** | Windows 10 reached end of support 2025-10-14; the owner declined to spend time testing it. `installation.md` no longer claims it. **`MinVersion` still stays `10.0.17763.0`** (F49b, confirmed) — an installability floor, not a support claim: the app installs there, untested. | x86_64 | **None.** No evidence is required for a platform the project does not claim. | — | n/a — row retired |
 | `macos-aarch64` | macOS 13.0+ | **13.0** — settled (owner, 2026-08-13: already enforced by `Info.plist` and `MACOSX_DEPLOYMENT_TARGET`) | aarch64 | **CI only** — `macos-latest`; **F46 (Gatekeeper) cannot be verified under this model at all** (§3) | GitHub Actions (CI) | CI — available now |
 
 **§1a — supported platforms versus test hosts (owner, 2026-08-13).**
@@ -325,7 +325,8 @@ what was asked and why, not just the resulting numbers.
 1. ~~Exact OS versions per row.~~ **Resolved.**
    `macos-aarch64`: **13.0**, matching `Info.plist`'s
    `LSMinimumSystemVersion`, already enforced on every DMG-installed copy —
-   confirmed, no widening. `windows-10`/`windows-11`: **1809** stays,
+   confirmed, no widening. `windows-11`: **1809** stays as an installability
+   floor (`windows-10` was withdrawn as a claimed platform on 2026-09-02),
    matching `AppxManifest.xml`'s current `MinVersion`; `MaxVersionTested`
    stays unchanged too, pending real M5 evidence rather than a
    speculative bump (F49b — the architect's own earlier recommendation to

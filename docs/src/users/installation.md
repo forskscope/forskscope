@@ -92,11 +92,15 @@ Download `forskscope-vX.Y.Z-windows-x64.zip` from the
 run `forskscope.exe`. The archive also contains the README, license, notice, and
 changelog.
 
-**Windows 10, version 1809, or later** (matches the Store manifest's
-declared `MinVersion`; see this slice's review request for an open question
-on whether this floor should change). ForskScope renders through the
-**WebView2 runtime**, which is preinstalled on Windows 11 and on current
-Windows 10; if the window opens blank or fails to start, install the
+**Tested on Windows 11.** ForskScope will *install* on Windows 10 version
+1809 or later — that is the Store manifest's declared `MinVersion`, and the
+zip has no floor at all — but it is **not tested there**, and Windows 10
+reached end of support on 2025-10-14. Treat it as unsupported.
+
+ForskScope renders through the **WebView2 runtime**, which Windows 11
+preinstalls. It also needs the **Visual C++ redistributable**, which a clean
+Windows install does not always have. If the window opens blank, or the app
+fails to start with a message about `VCRUNTIME140.dll`, install the
 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) and
 the [Visual C++ redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe).
 
