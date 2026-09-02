@@ -38,7 +38,7 @@ pub fn FilterBar(
                     placeholder: t(lang, "Filter by name…"),
                     value: "{filter_query}",
                     oninput: move |e| filter_query.set(e.value()),
-                    onkeydown: move |e| { e.stop_propagation(); },
+                    onkeydown: move |e| filter_input_keydown(&e),
                 }
                 label { class: "filter-check",
                     input { r#type: "checkbox", checked: *filter_hide_bin.read(),
@@ -65,6 +65,15 @@ pub fn FilterBar(
             }
         }
     }
+}
+
+/// RFC-060/handoff 020 §5: the filter input's whole keyboard obligation is
+/// swallowing every key so it cannot reach the global handler behind it
+/// (e.g. Ctrl+S while typing a filter query must not save the active tab).
+/// The one line this delegates to is exactly what the falsification test
+/// below exercises directly, through this function — not a copy of it.
+fn filter_input_keydown(e: &Event<KeyboardData>) {
+    crate::keyboard::swallow_when_typing(e);
 }
 
 // ── Filter predicate ──────────────────────────────────────────────────────────
@@ -165,10 +174,27 @@ pub fn apply_filter(
 
 #[cfg(test)]
 mod tests {
+    use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
     use forskscope_ui_logic::RowData;
 
     use super::*;
+    use crate::keyboard::test_support::key_event;
     use crate::state::with_test_store;
+
+    /// Handoff 020 §6 test 3: `filter_input_keydown` is the exact function
+    /// `FilterBar`'s `onkeydown` calls — not a copy of it — so removing its
+    /// `swallow_when_typing` call must make this fail.
+    #[test]
+    fn filter_input_keydown_swallows_every_key() {
+        let e = key_event(Key::Character("s".into()), Modifiers::CONTROL);
+        assert!(e.propagates(), "test setup: a fresh event must propagate");
+        filter_input_keydown(&e);
+        assert!(
+            !e.propagates(),
+            "typing in the filter input must not let Ctrl+S (or any other \
+             key) reach the global keyboard handler behind it"
+        );
+    }
 
     fn dir_row(name: &str) -> RowData {
         RowData {

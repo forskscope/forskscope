@@ -84,19 +84,18 @@ pub fn SearchBar() -> Element {
                     // (it reads `ctx.read().query` in its snapshot computation).
                 },
                 onkeydown: move |e| {
+                    // RFC-060/handoff 020 §5: swallow every key first, not just
+                    // Enter/Escape — e.g. a Ctrl+S typed while searching must not
+                    // save the active tab behind it.
+                    crate::keyboard::swallow_when_typing(&e);
                     match e.key() {
                         Key::Escape => {
-                            // Prevent the app-root handler from also acting on this key (P0-2).
-                            e.stop_propagation();
                             let mut c = ctx.write();
                             c.active = false;
                             c.query.clear();
                             c.index = MatchIndex::default();
                         }
                         Key::Enter => {
-                            // Prevent Enter from bubbling to the app root, where it would
-                            // apply the focused merge hunk (P0-2).
-                            e.stop_propagation();
                             if e.modifiers().shift() {
                                 ctx.write().index.retreat();
                             } else {

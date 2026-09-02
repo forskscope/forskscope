@@ -23,8 +23,13 @@ pub fn SettingsModal() -> Element {
             tabindex: "-1",
             onclick: move |_| store.modal.set(Modal::None),
             onkeydown: move |e: Event<KeyboardData>| {
+                // RFC-060/handoff 020 §5: swallow every key, not just Escape — this
+                // wrapper's own Escape-close is redundant with app.rs's generic
+                // modal-Escape handling (`modal_open` is already true for any open
+                // modal, including this one), but the blanket swallow is what keeps
+                // that true for a future key added here without its own guard.
+                crate::keyboard::swallow_when_typing(&e);
                 if e.key() == dioxus::html::input_data::keyboard_types::Key::Escape {
-                    e.stop_propagation(); // RFC-060 W1: prevent bubbling to app root
                     store.modal.set(Modal::None);
                 }
             },

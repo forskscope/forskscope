@@ -182,14 +182,16 @@ pub fn PathBar(
                         r#type: "text", value: "{input_val}", autofocus: true,
                         oninput:  move |e| { input_val.set(e.value()); input_err.set(false); },
                         onkeydown: move |e| {
+                            // RFC-060/handoff 020 §5: swallow every key first, not just
+                            // Enter/Escape — a Ctrl+S typed while editing this path must
+                            // not save the active tab behind it either.
+                            crate::keyboard::swallow_when_typing(&e);
                             if e.key() == Key::Enter {
-                                e.stop_propagation(); // prevent app-root from acting (RFC-060 W1)
                                 let v = PathBuf::from(input_val.read().cloned());
                                 if v.is_dir() { edit_mode.set(false); on_navigate.call(v); }
                                 else { input_err.set(true); }
                             }
                             if e.key() == Key::Escape {
-                                e.stop_propagation(); // prevent app-root from acting (RFC-060 W1)
                                 input_val.set(path_str_reset.clone());
                                 edit_mode.set(false); input_err.set(false);
                             }

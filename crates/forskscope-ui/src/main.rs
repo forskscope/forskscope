@@ -16,6 +16,7 @@
 
 mod app;
 mod i18n;
+mod keyboard;
 mod state;
 mod ui;
 

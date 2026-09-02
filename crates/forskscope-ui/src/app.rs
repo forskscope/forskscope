@@ -1,6 +1,5 @@
 //! Application root with global keyboard shortcuts and accessibility (RFC-003, RFC-019, RFC-046).
 
-use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
 use forskscope_ui_logic::StartupRequest;
 
@@ -114,73 +113,79 @@ pub fn App() -> Element {
                     ).await;
                 });
             },
+            // RFC-060/handoff 020: the decision of what a global keypress
+            // should do lives in `crate::keyboard::global_key_action`, a
+            // pure function this closure calls into — this stays a thin
+            // dispatcher over its result so the decision itself (including
+            // the modal-swallow and RFC-076 patch 6's recovery exclusion)
+            // is testable without a Dioxus event closure in the loop.
             onkeydown: move |e: Event<KeyboardData>| {
-                let modal_open = !matches!(*store.modal.read(), crate::state::Modal::None);
-                // RFC-076 patch 6: a recovery dialog is never dismissible by
-                // Escape — every one of its actions must be an explicit,
-                // considered choice (Exit/Continue/Reset), not an accidental
-                // keypress that silently picks "continue" on the user's behalf.
-                let recovery_open = matches!(
-                    *store.modal.read(),
-                    crate::state::Modal::SettingsRecovery(_) | crate::state::Modal::SessionRecovery(_)
-                );
-                // Escape closes any open modal regardless of whether a tab is active.
-                if e.key() == Key::Escape {
-                    if modal_open && !recovery_open {
-                        store.modal.set(crate::state::Modal::None);
-                    }
-                    return;
-                }
-                // While a modal is open, swallow all other global shortcuts so they
-                // cannot fire on the tab behind the modal (e.g. Ctrl+S writing the
-                // file behind an overwrite dialog, Enter applying a hunk). (P0-1)
-                if modal_open { return; }
-                let Some(index) = *store.active.read() else { return };
+                use crate::keyboard::{GlobalKeyAction, ModalState, global_key_action};
+
+                let modal = ModalState::from_modal(&store.modal.read());
                 let mods = e.modifiers();
-                match e.key() {
-                    Key::F7 => move_focus(&mut store, index, -1),
-                    Key::F8 => move_focus(&mut store, index,  1),
-                    // F3 / Shift+F3: next / previous search match
-                    Key::F3 => {
-                        let shift = mods.contains(Modifiers::SHIFT);
+                let active = *store.active.read();
+                let action = global_key_action(&e.key(), mods, modal, active.is_some());
+
+                match action {
+                    GlobalKeyAction::Ignore => {}
+                    GlobalKeyAction::CloseModal => store.modal.set(crate::state::Modal::None),
+                    GlobalKeyAction::MoveFocus(delta) => {
+                        if let Some(index) = active { move_focus(&mut store, index, delta); }
+                    }
+                    GlobalKeyAction::SearchNext => {
                         spawn(async move {
-                            let id = if shift { "search-prev-btn" } else { "search-next-btn" };
                             let _ = dioxus::document::eval(
-                                &format!("document.getElementById('{id}')?.click();")
+                                "document.getElementById('search-next-btn')?.click();"
                             ).await;
                         });
                     }
-                    Key::Enter => apply_focused_hunk(&mut store, index),
-                    Key::Character(ref s) if mods.contains(Modifiers::CONTROL) => {
-                        match s.to_ascii_lowercase().as_str() {
-                            "s" => save_tab(&mut store, index),
-                            "z" => { let _ = store.tabs.write().get_mut(index).map(|t| t.merge.undo()); }
-                            "y" => { let _ = store.tabs.write().get_mut(index).map(|t| t.merge.redo()); }
-                            "w" => {
-                                // Ctrl+W: close the active tab, with dirty-state guard.
-                                let dirty = store.tabs.read().get(index)
-                                    .map(|t| t.can_save && t.merge.is_dirty())
-                                    .unwrap_or(false);
-                                if dirty {
-                                    store.modal.set(crate::state::Modal::ConfirmClose(index));
-                                } else {
-                                    crate::state::close_tab(&mut store, index);
-                                }
-                            }
-                            "/" => store.modal.set(crate::state::Modal::KeyboardRef),
-                            // Ctrl+F: the search bar inside DiffWorkspace handles its own
-                            // context; we use document::eval to click the search button.
-                            "f" => {
-                                spawn(async move {
-                                    let _ = dioxus::document::eval(
-                                        "document.getElementById('search-open-btn')?.click();"
-                                    ).await;
-                                });
-                            }
-                            _ => {}
+                    GlobalKeyAction::SearchPrev => {
+                        spawn(async move {
+                            let _ = dioxus::document::eval(
+                                "document.getElementById('search-prev-btn')?.click();"
+                            ).await;
+                        });
+                    }
+                    GlobalKeyAction::ApplyFocusedHunk => {
+                        if let Some(index) = active { apply_focused_hunk(&mut store, index); }
+                    }
+                    GlobalKeyAction::Save => {
+                        if let Some(index) = active { save_tab(&mut store, index); }
+                    }
+                    GlobalKeyAction::Undo => {
+                        if let Some(index) = active {
+                            let _ = store.tabs.write().get_mut(index).map(|t| t.merge.undo());
                         }
                     }
-                    _ => {}
+                    GlobalKeyAction::Redo => {
+                        if let Some(index) = active {
+                            let _ = store.tabs.write().get_mut(index).map(|t| t.merge.redo());
+                        }
+                    }
+                    GlobalKeyAction::RequestCloseTab => {
+                        if let Some(index) = active {
+                            // Ctrl+W: close the active tab, with dirty-state guard.
+                            let dirty = store.tabs.read().get(index)
+                                .map(|t| t.can_save && t.merge.is_dirty())
+                                .unwrap_or(false);
+                            if dirty {
+                                store.modal.set(crate::state::Modal::ConfirmClose(index));
+                            } else {
+                                crate::state::close_tab(&mut store, index);
+                            }
+                        }
+                    }
+                    GlobalKeyAction::OpenKeyboardRef => store.modal.set(crate::state::Modal::KeyboardRef),
+                    GlobalKeyAction::OpenSearch => {
+                        // Ctrl+F: the search bar inside DiffWorkspace handles its own
+                        // context; we use document::eval to click the search button.
+                        spawn(async move {
+                            let _ = dioxus::document::eval(
+                                "document.getElementById('search-open-btn')?.click();"
+                            ).await;
+                        });
+                    }
                 }
             },
             Header {}
