@@ -83,29 +83,7 @@ pub fn SearchBar() -> Element {
                     // Index rebuilt by DiffWorkspace on the next render cycle
                     // (it reads `ctx.read().query` in its snapshot computation).
                 },
-                onkeydown: move |e| {
-                    // RFC-060/handoff 020 §5: swallow every key first, not just
-                    // Enter/Escape — e.g. a Ctrl+S typed while searching must not
-                    // save the active tab behind it.
-                    crate::keyboard::swallow_when_typing(&e);
-                    match e.key() {
-                        Key::Escape => {
-                            let mut c = ctx.write();
-                            c.active = false;
-                            c.query.clear();
-                            c.index = MatchIndex::default();
-                        }
-                        Key::Enter => {
-                            if e.modifiers().shift() {
-                                ctx.write().index.retreat();
-                            } else {
-                                ctx.write().index.advance();
-                            }
-                            scroll_to_focused(&ctx.read());
-                        }
-                        _ => {}
-                    }
-                },
+                onkeydown: move |e| search_input_keydown(&e, ctx),
             }
 
             // Prev / Next buttons
@@ -158,6 +136,32 @@ pub fn SearchBar() -> Element {
     }
 }
 
+/// Review 092 §2: `SearchBar`'s `onkeydown` calls this exact function, so a
+/// falsification against it (deleting the `swallow_when_typing` call) tests
+/// the shipped path, not a copy. RFC-060/handoff 020 §5: swallow every key
+/// first, not just Enter/Escape — e.g. a Ctrl+S typed while searching must
+/// not save the active tab behind it.
+fn search_input_keydown(e: &Event<KeyboardData>, mut ctx: Signal<SearchCtx>) {
+    crate::keyboard::swallow_when_typing(e);
+    match e.key() {
+        Key::Escape => {
+            let mut c = ctx.write();
+            c.active = false;
+            c.query.clear();
+            c.index = MatchIndex::default();
+        }
+        Key::Enter => {
+            if e.modifiers().shift() {
+                ctx.write().index.retreat();
+            } else {
+                ctx.write().index.advance();
+            }
+            scroll_to_focused(&ctx.read());
+        }
+        _ => {}
+    }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /// Scroll the focused match's hunk element into view via document.eval.
@@ -181,4 +185,49 @@ pub fn line_matches(ctx: &SearchCtx, content: &str) -> bool {
     content
         .to_ascii_lowercase()
         .contains(&ctx.query.to_ascii_lowercase())
+}
+
+#[cfg(test)]
+mod tests {
+    use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
+
+    use super::*;
+    use crate::keyboard::test_support::key_event;
+    use crate::state::with_test_store;
+
+    /// Review 092 §2: `search_input_keydown` is the exact function
+    /// `SearchBar`'s `onkeydown` calls — falsified by deleting its
+    /// `swallow_when_typing` call, not by re-implementing this check.
+    #[test]
+    fn search_input_keydown_swallows_every_key() {
+        with_test_store(|_store| {
+            let ctx = Signal::new_in_scope(SearchCtx::default(), ScopeId::ROOT);
+            let e = key_event(Key::Character("s".into()), Modifiers::CONTROL);
+            assert!(e.propagates(), "test setup: a fresh event must propagate");
+            search_input_keydown(&e, ctx);
+            assert!(
+                !e.propagates(),
+                "typing in the search input must not let Ctrl+S (or any \
+                 other key) reach the global keyboard handler behind it"
+            );
+        });
+    }
+
+    #[test]
+    fn escape_closes_the_search_bar_and_clears_the_query() {
+        with_test_store(|_store| {
+            let ctx = Signal::new_in_scope(
+                SearchCtx {
+                    query: "needle".into(),
+                    active: true,
+                    index: MatchIndex::default(),
+                },
+                ScopeId::ROOT,
+            );
+            let e = key_event(Key::Escape, Modifiers::empty());
+            search_input_keydown(&e, ctx);
+            assert!(!ctx.read().active);
+            assert!(ctx.read().query.is_empty());
+        });
+    }
 }

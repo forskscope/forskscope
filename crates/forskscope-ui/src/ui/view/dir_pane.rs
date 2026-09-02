@@ -181,21 +181,9 @@ pub fn PathBar(
                         class: if *input_err.read() { "path-input error" } else { "path-input" },
                         r#type: "text", value: "{input_val}", autofocus: true,
                         oninput:  move |e| { input_val.set(e.value()); input_err.set(false); },
-                        onkeydown: move |e| {
-                            // RFC-060/handoff 020 §5: swallow every key first, not just
-                            // Enter/Escape — a Ctrl+S typed while editing this path must
-                            // not save the active tab behind it either.
-                            crate::keyboard::swallow_when_typing(&e);
-                            if e.key() == Key::Enter {
-                                let v = PathBuf::from(input_val.read().cloned());
-                                if v.is_dir() { edit_mode.set(false); on_navigate.call(v); }
-                                else { input_err.set(true); }
-                            }
-                            if e.key() == Key::Escape {
-                                input_val.set(path_str_reset.clone());
-                                edit_mode.set(false); input_err.set(false);
-                            }
-                        },
+                        onkeydown: move |e| path_input_keydown(
+                            &e, edit_mode, input_val, input_err, on_navigate, &path_str_reset,
+                        ),
                         onblur: move |_| {
                             let v = PathBuf::from(input_val.read().cloned());
                             if v.is_dir() { edit_mode.set(false); on_navigate.call(v); }
@@ -229,6 +217,36 @@ pub fn PathBar(
                 }
             }
         }
+    }
+}
+
+/// Review 092 §2: `PathBar`'s `onkeydown` calls this exact function, so a
+/// falsification against it (deleting the `swallow_when_typing` call) tests
+/// the shipped path, not a copy. RFC-060/handoff 020 §5: swallow every key
+/// first, not just Enter/Escape — a Ctrl+S typed while editing this path
+/// must not save the active tab behind it either.
+fn path_input_keydown(
+    e: &Event<KeyboardData>,
+    mut edit_mode: Signal<bool>,
+    mut input_val: Signal<String>,
+    mut input_err: Signal<bool>,
+    on_navigate: EventHandler<PathBuf>,
+    path_str_reset: &str,
+) {
+    crate::keyboard::swallow_when_typing(e);
+    if e.key() == Key::Enter {
+        let v = PathBuf::from(input_val.read().cloned());
+        if v.is_dir() {
+            edit_mode.set(false);
+            on_navigate.call(v);
+        } else {
+            input_err.set(true);
+        }
+    }
+    if e.key() == Key::Escape {
+        input_val.set(path_str_reset.to_string());
+        edit_mode.set(false);
+        input_err.set(false);
     }
 }
 
@@ -553,5 +571,66 @@ mod tests {
                 "LeftOnly and RightOnly must have distinct labels for {lang:?}"
             );
         }
+    }
+
+    // ── path_input_keydown (review 092 §2) ──────────────────────────────────
+
+    /// `PathBar`'s `onkeydown` calls this exact function, so a falsification
+    /// against it (deleting the `swallow_when_typing` call) tests the
+    /// shipped path, not a copy.
+    #[test]
+    fn path_input_keydown_swallows_every_key() {
+        with_test_store(|_store| {
+            let edit_mode = Signal::new_in_scope(true, ScopeId::ROOT);
+            let input_val = Signal::new_in_scope(String::from("/some/path"), ScopeId::ROOT);
+            let input_err = Signal::new_in_scope(false, ScopeId::ROOT);
+            // `Callback::new` needs an active scope on the stack, which
+            // `with_test_store`'s `in_runtime` alone does not push (unlike
+            // `Signal::new_in_scope`, which takes the scope explicitly) —
+            // `Runtime::in_scope` supplies one just for this construction.
+            let on_navigate: EventHandler<PathBuf> = dioxus_core::Runtime::current()
+                .in_scope(ScopeId::ROOT, || EventHandler::new(|_: PathBuf| {}));
+            let e = crate::keyboard::test_support::key_event(
+                Key::Character("s".into()),
+                dioxus::html::input_data::keyboard_types::Modifiers::CONTROL,
+            );
+            assert!(e.propagates(), "test setup: a fresh event must propagate");
+            path_input_keydown(&e, edit_mode, input_val, input_err, on_navigate, "/reset");
+            assert!(
+                !e.propagates(),
+                "typing in the path input must not let Ctrl+S (or any \
+                 other key) reach the global keyboard handler behind it"
+            );
+        });
+    }
+
+    #[test]
+    fn escape_resets_the_path_input_to_the_value_it_had_before_editing() {
+        with_test_store(|_store| {
+            let edit_mode = Signal::new_in_scope(true, ScopeId::ROOT);
+            let input_val = Signal::new_in_scope(String::from("/typed/garbage"), ScopeId::ROOT);
+            let input_err = Signal::new_in_scope(true, ScopeId::ROOT);
+            // `Callback::new` needs an active scope on the stack, which
+            // `with_test_store`'s `in_runtime` alone does not push (unlike
+            // `Signal::new_in_scope`, which takes the scope explicitly) —
+            // `Runtime::in_scope` supplies one just for this construction.
+            let on_navigate: EventHandler<PathBuf> = dioxus_core::Runtime::current()
+                .in_scope(ScopeId::ROOT, || EventHandler::new(|_: PathBuf| {}));
+            let e = crate::keyboard::test_support::key_event(
+                Key::Escape,
+                dioxus::html::input_data::keyboard_types::Modifiers::empty(),
+            );
+            path_input_keydown(
+                &e,
+                edit_mode,
+                input_val,
+                input_err,
+                on_navigate,
+                "/original",
+            );
+            assert_eq!(*input_val.read(), "/original");
+            assert!(!*edit_mode.read());
+            assert!(!*input_err.read());
+        });
     }
 }
