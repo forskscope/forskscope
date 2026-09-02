@@ -7,6 +7,19 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
+## Accepted (5)
+
+Review complete; the implementer may start. Distinct from **Proposed**, which
+is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
+
+| RFC | Title | State |
+|-----|-------|-------|
+| 074 | [v1 Release Stabilization Program](./accepted/074-v1-release-stabilization-program.md) | Accepted |
+| 078 | [Platform Runtime Acceptance and Release Evidence](./accepted/078-platform-runtime-acceptance.md) | Accepted |
+| 079 | [Microsoft Store Submission Automation](./accepted/079-microsoft-store-submission-automation.md) | Accepted |
+| 080 | [Tiered Directory Comparison in the Explorer](./accepted/080-explorer-tiered-directory-comparison.md) | Accepted |
+| 081 | [AUR Publication Automation](./accepted/081-aur-publication-automation.md) | Accepted |
+
 ## Implemented (52)
 
 | ID | Title | Shipped in |
@@ -91,14 +104,9 @@ remains No-Go.
 | 061 | [Explorer Pane Focus and Keyboard Completeness](./proposed/061-explorer-pane-focus-and-keyboard-completeness.md) | UX review remediation | **Partially implemented** v0.145.2 — focused pane, F6, per-pane Alt+↑; row ARIA remains |
 | 063 | [Trust, Clarity, and Calm UI Hardening](./proposed/063-trust-clarity-and-calm-ui-hardening.md) | UX review remediation | **Mostly shipped** v0.145.1–.3 — C1/C2/C3/C5/C6/C7/C9/C10 done; C4 audited; C8 rejected |
 | 072 | [UI Component Extraction (Phase 4)](./proposed/072-ui-component-extraction.md) | Structural | **Partially shipped** v0.160.0 — `Notice` extracted; `EmptyState`/`PathLabel`/`IconButton` deferred |
-| 074 | [v1 Release Stabilization Program](./proposed/074-v1-release-stabilization-program.md) | Release stabilization | Program schedule, milestones, gates, and final go/no-go package |
-| 078 | [Platform Runtime Acceptance and Release Evidence](./proposed/078-platform-runtime-acceptance.md) | Release QA | Audit B4 — exact-artifact runtime matrix after RFC-075–077 |
-| 079 | [Microsoft Store Submission Automation](./proposed/079-microsoft-store-submission-automation.md) | Release pipeline | **Accepted 2026-08-22.** No MSIX is built anywhere today; automate submission on `release: published`, using a stored Entra ID client secret (owner decision, §2) |
-| 080 | [Tiered Directory Comparison in the Explorer](./proposed/080-explorer-tiered-directory-comparison.md) | Explorer | **Accepted 2026-08-21.** A cheap scan can prove directories differ but never that they match; two tiers, honest labels, after Gate D |
 | 082 | [Write-Path Integrity](./proposed/082-write-path-integrity.md) | Correctness / security | **Accepted 2026-09-01.** Audit blocker B5 — the release-blocking cluster: save-target authority, content-identity dirty state, lossy-encode guard, save capability, secure atomic write |
 | 083 | [Text Encoding Breadth](./proposed/083-text-encoding-breadth.md) | Encoding | UTF-16, BOM wiring, encoding override — post-v1, documentation corrections immediate |
 | 084 | [Patch Export Conformance](./proposed/084-patch-export-conformance.md) | Patch export | CRLF terminators, path quoting, context lines — post-v1, documentation corrections immediate |
-| 081 | [AUR Publication Automation](./proposed/081-aur-publication-automation.md) | Release pipeline | AUR stopped at 0.22.13; the PKGBUILD is maintained but never pushed. Blocked on F81, and the only Linux channel that works on Arch while F44 holds |
 
 ## Archive (1)
 

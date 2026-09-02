@@ -1,7 +1,7 @@
 # RFC 081: AUR Publication Automation
 
-**Status.** Proposed
-**Scheduling.** Deferred — accepted; the automation waits, the package recovery rides each release by hand. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
+**Status.** Accepted — review complete; implementer may start. Moves to `done/` when the work ships (RFC-000, 5-folder variant, adopted 2026-09-02).
+**Scheduling.** Deferred — accepted; the automation waits, the package recovery rides each release by hand. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in `proposed/` and `accepted/` and nothing else (F83).
 **Accepted.** 2026-08-22 by the project owner — Gate A cleared.
 **Disposition, 2026-08-22:** the owner accepted separating the two halves this
 RFC ran together. **Recovering the package and automating the publish are not

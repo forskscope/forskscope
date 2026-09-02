@@ -1,6 +1,12 @@
 //! F83: `cargo xtask rfc-sync` — verifies that `ROADMAP.md`'s "Remaining
-//! proposed RFCs" table and `rfcs/proposed/` name exactly the same RFCs
-//! (handoff 009).
+//! proposed RFCs" table and the *unshipped* RFC folders name exactly the
+//! same RFCs (handoff 009).
+//!
+//! **5-folder variant, adopted 2026-09-02.** RFC-000 offers a fifth folder,
+//! `accepted/` ("review complete; implementer may start"), between
+//! `proposed/` and `done/`. The owner adopted it, so "unshipped" is now
+//! `proposed/` ∪ `accepted/` — both are work the register must still list,
+//! and neither has shipped. Only `done/` and `archive/` remove a row.
 //!
 //! RFC-000 (`.git-exclude/rules/000-rfc-lifecycle-policy.md`) makes the
 //! folder the source of truth for an RFC's lifecycle state. This check
@@ -11,10 +17,12 @@
 //! (not just the first — a maintainer who moved three RFCs wants all
 //! three named in one run):
 //!
-//! 1. An RFC file exists in `rfcs/proposed/` with no row in the table.
+//! 1. An RFC file exists in `rfcs/proposed/` or `rfcs/accepted/` with no
+//!    row in the table.
 //! 2. A table row names an RFC that is in `rfcs/done/` or `rfcs/archive/`.
 //! 3. A table row names an RFC that exists nowhere under `rfcs/`.
-//! 4. A file in `rfcs/proposed/` has no `**Scheduling.**` line.
+//! 4. A file in `rfcs/proposed/` or `rfcs/accepted/` has no
+//!    `**Scheduling.**` line.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -22,6 +30,9 @@ use std::path::Path;
 use std::process;
 
 const TABLE_HEADING: &str = "## Remaining proposed RFCs";
+/// The folders holding RFCs that have not shipped. Both are listed in the
+/// register's table; `done/` and `archive/` are not.
+const UNSHIPPED_FOLDERS: [&str; 2] = ["proposed", "accepted"];
 const SCHEDULING_MARKER: &str = "**Scheduling.**";
 
 pub fn run(root: &Path) {
@@ -37,29 +48,42 @@ pub fn run(root: &Path) {
         }
     };
 
-    let proposed_dir = root.join("rfcs/proposed");
-    let proposed_numbers = list_numbered_md_files(&proposed_dir);
+    // Unshipped = proposed/ + accepted/ (5-folder variant). `accepted/` is
+    // optional: a project mid-migration may not have created it yet, so a
+    // missing directory reads as empty rather than failing the gate.
+    let mut unshipped_numbers = BTreeSet::new();
+    let mut unshipped_files: Vec<(String, String, &'static str)> = Vec::new();
+    for folder in UNSHIPPED_FOLDERS {
+        let dir = root.join("rfcs").join(folder);
+        if !dir.is_dir() {
+            continue;
+        }
+        unshipped_numbers.extend(list_numbered_md_files(&dir));
+        let entries = fs::read_dir(&dir)
+            .unwrap_or_else(|e| panic!("cannot read {}: {e}", dir.display()))
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("md"));
+        for path in entries {
+            let name = path.file_name().unwrap().to_string_lossy().into_owned();
+            let content = fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+            unshipped_files.push((name, content, folder));
+        }
+    }
 
-    let mut violations = diff_violations(&table_numbers, &proposed_numbers, |number| {
-        locate_outside_proposed(root, number)
+    let mut violations = diff_violations(&table_numbers, &unshipped_numbers, |number| {
+        locate_outside_unshipped(root, number)
     });
 
-    let proposed_files: Vec<(String, String)> = fs::read_dir(&proposed_dir)
-        .unwrap_or_else(|e| panic!("cannot read {}: {e}", proposed_dir.display()))
-        .filter_map(|e| e.ok())
-        .map(|e| e.path())
-        .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("md"))
-        .map(|p| {
-            let name = p.file_name().unwrap().to_string_lossy().into_owned();
-            let content = fs::read_to_string(&p)
-                .unwrap_or_else(|e| panic!("cannot read {}: {e}", p.display()));
-            (name, content)
-        })
+    let for_scheduling: Vec<(String, String)> = unshipped_files
+        .iter()
+        .map(|(name, content, folder)| (format!("{folder}/{name}"), content.clone()))
         .collect();
     violations.extend(
-        missing_scheduling_line(&proposed_files)
+        missing_scheduling_line(&for_scheduling)
             .into_iter()
-            .map(|name| format!("rfcs/proposed/{name} has no \"{SCHEDULING_MARKER}\" line")),
+            .map(|name| format!("rfcs/{name} has no \"{SCHEDULING_MARKER}\" line")),
     );
 
     if !violations.is_empty() {
@@ -71,7 +95,8 @@ pub fn run(root: &Path) {
     }
 
     println!(
-        "RFC schedule sync check passed: {} RFCs agree between ROADMAP.md and rfcs/proposed/.",
+        "RFC schedule sync check passed: {} RFCs agree between ROADMAP.md and \
+         rfcs/proposed/ + rfcs/accepted/.",
         table_numbers.len()
     );
 }
@@ -149,10 +174,10 @@ fn leading_digits(filename: &str) -> Option<String> {
     (!digits.is_empty()).then_some(digits)
 }
 
-/// Where `number` actually lives, if not `rfcs/proposed/` - `rfcs/done/`
-/// or `rfcs/archive/` (the `020`/`077` shape), or `None` if it exists
-/// nowhere under `rfcs/`.
-fn locate_outside_proposed(root: &Path, number: &str) -> Option<&'static str> {
+/// Where `number` actually lives, if not in an unshipped folder -
+/// `rfcs/done/` or `rfcs/archive/` (the `020`/`077` shape), or `None` if it
+/// exists nowhere under `rfcs/`.
+fn locate_outside_unshipped(root: &Path, number: &str) -> Option<&'static str> {
     for (label, rel) in [("done", "rfcs/done"), ("archive", "rfcs/archive")] {
         let dir = root.join(rel);
         let Ok(entries) = fs::read_dir(&dir) else {
@@ -172,30 +197,30 @@ fn locate_outside_proposed(root: &Path, number: &str) -> Option<&'static str> {
 // ── Pure violation logic (fixture-testable) ─────────────────────────────────
 
 /// §7b.1-3: every RFC present in exactly one of `table_numbers` /
-/// `proposed_numbers` is a violation - which one determines the message.
-/// `locate` answers "if not in `proposed/`, where (if anywhere) does this
+/// `unshipped_numbers` is a violation - which one determines the message.
+/// `locate` answers "if not unshipped, where (if anywhere) does this
 /// number actually live?" - injected so this stays a pure function over
 /// two sets and a lookup, testable with fixtures rather than real
 /// directories.
 fn diff_violations(
     table_numbers: &BTreeSet<String>,
-    proposed_numbers: &BTreeSet<String>,
+    unshipped_numbers: &BTreeSet<String>,
     locate: impl Fn(&str) -> Option<&'static str>,
 ) -> Vec<String> {
     let mut violations = Vec::new();
 
-    for number in proposed_numbers.difference(table_numbers) {
+    for number in unshipped_numbers.difference(table_numbers) {
         violations.push(format!(
-            "RFC {number} exists in rfcs/proposed/ but has no row in ROADMAP.md's \
-             \"{TABLE_HEADING}\" table"
+            "RFC {number} exists in rfcs/proposed/ or rfcs/accepted/ but has no row in \
+             ROADMAP.md's \"{TABLE_HEADING}\" table"
         ));
     }
 
-    for number in table_numbers.difference(proposed_numbers) {
+    for number in table_numbers.difference(unshipped_numbers) {
         match locate(number) {
             Some(label) => violations.push(format!(
                 "RFC {number} has a row in ROADMAP.md's \"{TABLE_HEADING}\" table but is in \
-                 rfcs/{label}/, not rfcs/proposed/"
+                 rfcs/{label}/, not rfcs/proposed/ or rfcs/accepted/"
             )),
             None => violations.push(format!(
                 "RFC {number} has a row in ROADMAP.md's \"{TABLE_HEADING}\" table but does not \

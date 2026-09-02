@@ -1,7 +1,7 @@
 # RFC 074: v1 Release Stabilization Program
 
-**Status.** Proposed
-**Scheduling.** Pre-v1 stabilization — **the program currently being executed.** Milestones M0–M6 and Gates A–E come from here. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
+**Status.** Accepted — review complete; implementer may start. Moves to `done/` when the work ships (RFC-000, 5-folder variant, adopted 2026-09-02).
+**Scheduling.** Pre-v1 stabilization — **the program currently being executed.** Milestones M0–M6 and Gates A–E come from here. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in `proposed/` and `accepted/` and nothing else (F83).
 **Tracks.** Architect audit blockers B1–B4; v1 release sequencing and evidence.
 **Touches.** RFC-041, RFC-075–RFC-078, `ROADMAP.md`, release gates, and the
 next project handoff.

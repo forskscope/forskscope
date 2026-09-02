@@ -1033,7 +1033,12 @@ buffer can be write-only in v1), but is required for full manual-edit support.
 
 ## Remaining proposed RFCs
 
-**This table and `rfcs/proposed/` must contain exactly the same RFC numbers.**
+**This table and `rfcs/proposed/` + `rfcs/accepted/` must contain exactly the
+same RFC numbers.** *(2026-09-02: the owner adopted RFC-000's **5-folder
+variant**, adding `accepted/` — "review complete; implementer may start" —
+between `proposed/` and `done/`. Both folders hold unshipped work, so both are
+listed here; only `done/` and `archive/` remove a row. `cargo xtask rfc-sync`
+was extended to match and falsified against the new folder.)*
 Reconciled 2026-08-27 after they had drifted in both directions: it listed 020
 and 077 as remaining when both are in `rfcs/done/`, and omitted seven RFCs that
 were in `proposed/`. Nothing checks this — see **F83**.
