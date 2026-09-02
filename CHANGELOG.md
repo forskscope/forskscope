@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.168.0] — Unreleased
+## [0.168.0] — 2026-09-02
 
 **This release is about saving.** Five ways ForskScope could lose, corrupt, or
 misdirect your work when you pressed Save — all found by an independent audit of
