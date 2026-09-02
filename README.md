@@ -41,8 +41,12 @@ also on the [Microsoft Store](https://apps.microsoft.com/detail/9p63f7npc3mh)
 
 ```sh
 # Linux — prebuilt (Debian/Ubuntu-family; see note below)
-curl -LO https://github.com/forskscope/forskscope/releases/latest/download/forskscope-v0.166.0-linux-x86_64.tar.gz
-tar -xzf forskscope-v0.166.0-linux-x86_64.tar.gz && ./forskscope
+# Resolves the newest release automatically -- no version to keep in step.
+url=$(curl -s https://api.github.com/repos/forskscope/forskscope/releases/latest \
+  | grep -o 'https://[^"]*-linux-x86_64\.tar\.gz')
+curl -LO "$url"
+tar -xzf forskscope-v*-linux-x86_64.tar.gz
+./forskscope
 
 # Any distribution — build from source (Rust 1.91+)
 sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev pkg-config libssl-dev
