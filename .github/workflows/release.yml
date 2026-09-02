@@ -231,6 +231,19 @@ jobs:
           ' CHANGELOG.md > release-notes.md
           grep -q '[^[:space:]]' release-notes.md || { echo "::error::CHANGELOG section for ${GITHUB_REF_NAME} is missing or empty"; exit 1; }
 
+          # The prebuilt Linux tarball is built on Ubuntu and records
+          # libxdo.so.3, so it is a Debian/Ubuntu-family artifact (matrix-plan
+          # §1a, amended 2026-09-02). The Releases page is where people
+          # download, so the qualification belongs here and not only in the
+          # docs -- that gap is what let F44 read as an unqualified claim.
+          {
+            echo ""
+            echo "### Platform notes"
+            echo ""
+            echo "- **Linux (\`*-linux-x86_64.tar.gz\`)** is built on Ubuntu and is a **Debian/Ubuntu-family** binary. On Arch and other distributions shipping \`libxdo.so.4\` it will not start; install from the [AUR package](https://aur.archlinux.org/packages/forskscope) or build from source, both of which link your own \`libxdo\`."
+            echo "- **Windows** is tested on Windows 11. It installs on Windows 10 1809+ but is untested there; Windows 10 reached end of support on 2025-10-14."
+          } >> release-notes.md
+
           PREV_TAG=$(git tag --sort=-creatordate | awk -v cur="${GITHUB_REF_NAME}" 'found{print; exit} $0==cur{found=1}')
           if [ -n "$PREV_TAG" ]; then
             {

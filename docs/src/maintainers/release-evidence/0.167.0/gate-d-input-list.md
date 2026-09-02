@@ -95,3 +95,13 @@ row it was run against, **except**:
   because of F69 (already listed above).
 
 See `README.md`'s verdict and each row file for the full per-case detail.
+
+> **Appended 2026-09-02 — this verdict is not rewritten, and it still stands
+> for the claim as it was written then.** F44's un-waivable status followed
+> from `matrix-plan.md` §1a's *"Linux, unqualified"*. The owner amended §1a on
+> 2026-09-02: Linux remains supported unqualified **as a platform** — served
+> by source build and the AUR source `PKGBUILD`, both of which link the host's
+> own `libxdo` — while the **prebuilt tarball** is documented as a
+> Debian/Ubuntu-family artifact. **F44 is therefore no longer a Gate D
+> blocker.** Nothing about the defect changed; the claim it was measured
+> against did.

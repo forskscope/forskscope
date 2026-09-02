@@ -47,8 +47,27 @@ executable under current resourcing. One row, matching the one real host.
 | `windows-10` | **WITHDRAWN 2026-09-02 — not a supported platform** | Windows 10 reached end of support 2025-10-14; the owner declined to spend time testing it. `installation.md` no longer claims it. **`MinVersion` still stays `10.0.17763.0`** (F49b, confirmed) — an installability floor, not a support claim: the app installs there, untested. | x86_64 | **None.** No evidence is required for a platform the project does not claim. | — | n/a — row retired |
 | `macos-aarch64` | macOS 13.0+ | **13.0** — settled (owner, 2026-08-13: already enforced by `Info.plist` and `MACOSX_DEPLOYMENT_TARGET`) | aarch64 | **CI only** — `macos-latest`; **F46 (Gatekeeper) cannot be verified under this model at all** (§3) | GitHub Actions (CI) | CI — available now |
 
-**§1a — supported platforms versus test hosts (owner, 2026-08-13).**
-ForskScope supports **Windows, macOS, and Linux, unqualified** — there is
+**§1a — supported platforms versus test hosts (owner, 2026-08-13;
+**amended 2026-09-02**).**
+
+> **Amendment (owner, 2026-09-02) — the claim is now per-artifact, not
+> per-platform.** Linux support is unchanged and remains unqualified *as a
+> platform*: every distribution is supported, via source build and via the
+> AUR source `PKGBUILD`, both of which compile against the host's own
+> `libxdo` and work everywhere. What is narrowed is the **prebuilt tarball**,
+> which is built on Ubuntu, records `libxdo.so.3`, and is therefore a
+> **Debian/Ubuntu-family artifact**. It is documented as such in `README.md`
+> and `installation.md`, and the release notes carry the same qualification.
+>
+> **Consequence for F44, stated explicitly because it changes a Gate D
+> verdict:** F44 was un-waivable under the pre-amendment reading — *"we only
+> tested Ubuntu" does not satisfy a claim of Linux support*. That reasoning
+> was correct and is not being reinterpreted; the **claim itself changed**.
+> A libxdo-4 distribution is still a supported platform, and it is served by
+> a working install path. What no longer exists is a claim that *the prebuilt
+> tarball* runs there. See F44 in `ROADMAP.md`.
+
+ForskScope supports **Windows, macOS, and Linux** — there is
 no per-distribution Linux floor, and this plan does not imply one by naming
 a test distribution. Support breadth and test hosts are different things:
 the *test* hosts remain `ubuntu-latest` (CI), `windows-latest` (CI),
@@ -228,6 +247,15 @@ not yet released as of this freeze. Because §1a establishes Linux support as
 (Arch/CachyOS-family) is a supported platform like any other, not an
 out-of-scope one. "We only tested Ubuntu" does not satisfy a claim of Linux
 support, and P01 cannot pass on a libxdo-4 host while F44 is open.
+
+> **Superseded 2026-09-02 by §1a's amendment.** The paragraph above remains
+> correct about the *platform*; it is the *artifact* claim that narrowed. P01
+> for the prebuilt tarball is now scoped to the Debian/Ubuntu family it is
+> built for, and a libxdo-4 host is covered by the source paths — the AUR
+> `PKGBUILD` (a source package, so it links the host's `libxdo.so.4`) and
+> `cargo build`. **F44 is no longer a Gate D blocker**, and the 0.167.0 and
+> 0.167.1 input lists carry appended notes recording that their verdicts
+> stand for the claim as it was written then.
 
 **How this plan represents it (the one judgment call this freeze makes,
 per the handoff's explicit instruction to decide rather than default):**
