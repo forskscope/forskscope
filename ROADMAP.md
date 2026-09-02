@@ -259,8 +259,17 @@ than the product evidences (F92) — and the reflex to correct it in code rather
 than in words is the same error wearing different clothes. **The cheapest honest
 fix is usually to stop claiming the thing.**
 
-**Gate D now rests on F44 alone** — upstream `sheets-diff`, which nobody here
-can act on.
+**Gate D now rests on F44 alone.** *(Corrected 2026-09-02, same day: this
+sentence first read "upstream `sheets-diff`, which nobody here can act on."
+Both halves were wrong. F44 is the **`libxdo.so.3`** defect — the published
+`linux-x86_64` binary does not start on any distro shipping libxdo 4, including
+the owner's own CachyOS — and `sheets-diff` is F65/F11, an unrelated finding.
+And F44's own row documents a **controllable alternative**: fork the pinned
+dioxus `0.7.9`, cherry-pick the merged two-line change, `[patch.crates-io]` it
+in. So it is gated on an upstream **release**, not on upstream **action**, and
+the project is not powerless. Recording the error rather than editing it away:
+"nobody can act on it" is the most expensive sentence a register can contain,
+and it was written here without reading the row.)*
 
 **Progress (2026-09-01): B5 is closed — all five blocking defects and three
 documentation corrections, in one day.**
