@@ -12,7 +12,15 @@
 8. Release tag matches the workspace version: `cargo xtask version-sync "${GITHUB_REF_NAME}"`
 9. Japanese localization covers `t(...)` UI keys: `cargo xtask i18n`
 10. `CHANGELOG.md` updated with the new version and date.
-11. `version` bumped in the workspace `Cargo.toml` (`[workspace.package]`).
+11. `version` bumped in the workspace `Cargo.toml` (`[workspace.package]`),
+    and **`xtask/Cargo.lock` staged with it** (F64). `xtask` has no
+    dependencies, so that lock pins nothing and its only content is the
+    version — but it is tracked, and any `cargo xtask` invocation after a
+    bump rewrites it. Leave it out of the bump commit and the working tree
+    goes dirty immediately, which is how a generated file gets swept into an
+    unrelated commit. **This cannot be gated:** a `version-sync` check was
+    written and removed, because running `cargo xtask` rebuilds xtask and
+    repairs the lock *before* the check reads it — the gate could never fail.
 12. Completed RFCs moved from `rfcs/proposed/` to `rfcs/done/`; `rfcs/README.md` updated.
 13. `ROADMAP.md` current state paragraph updated if the milestone is significant.
 
