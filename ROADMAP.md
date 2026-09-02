@@ -1,6 +1,6 @@
 # ForskScope Roadmap
 
-**Last updated:** 2026-09-02. **B5 closed**; **F60 closed** (Windows 10 withdrawn as a claimed platform, Windows 11 P01 evidenced on a real client); **F44 downgraded** to documented-only. v1 No-Go rests on **B4 alone — the exact-artifact runtime matrix**, which no longer has a named blocker behind it, only unperformed work.
+**Last updated:** 2026-09-02. **`0.168.0` published** — the first minor bump since the audits, carrying B5's five save-integrity fixes and the behaviour changes they imply. **B5 closed**; **F60 closed** (Windows 10 withdrawn as a claimed platform, Windows 11 P01 evidenced on a real client); **F44 downgraded** to documented-only. v1 No-Go rests on **B4 alone — the exact-artifact runtime matrix**, which no longer has a named blocker behind it, only unperformed work.
 **Current phase:** v1 release stabilization — release-baseline reconciliation,
 then correctness workstreams, then runtime/platform acceptance and a new
 architecture go/no-go review.
@@ -291,6 +291,40 @@ line — and every file in every folder is listed in `rfcs/README.md`.
 **Noted, not swept in:** RFC-066, 067, 068 and 069 in `done/` still name
 `ui/explorer.rs`, a path RFC-071's restructure removed. Same staleness as
 RFC-061's, outside this change's scope.
+
+**Progress (2026-09-02): `0.168.0` published.**
+
+Minor rather than patch, because the range changes what the application *does*
+in front of a user: saves that cannot represent their content are refused
+instead of silently written, files read with substitutions cannot be saved at
+all, a deleted file can be recreated by saving, keys typed into the search and
+path boxes no longer reach global shortcuts, and very large pairs warn or refuse
+instead of loading. The changelog leads with that, because **a user meeting a
+new refusal without explanation reads it as a regression.**
+
+Preflight was falsified rather than trusted: blanking the changelog section made
+`version-sync 0.168.0` fail with *"release notes would ship blank"*, then the
+real section restored it. `cargo audit` exits 0 with every advisory
+dispositioned. 1204 workspace tests green.
+
+**The one piece of untested machinery worked.** `release.yml`'s *Platform notes*
+block — added the same afternoon to close F44, never executed until this cut,
+and positioned **after** the three platform builds where a failure costs a
+re-cut — rendered correctly on the release page. The Linux and Windows
+qualifications now appear where people actually download, which was the whole
+substance of narrowing those claims.
+
+**Post-release bump done in the same session as the tag.** After `0.167.2` it
+was not, and `main` went red for five commits. The mechanism, checked rather
+than recalled: `check_version_not_already_published` passes while the tag points
+at HEAD and fails on the first commit past it — so the damage starts at the
+*next* commit, not at the tag.
+
+**AUR is prepared but not pushed:** this machine has no key for
+`aur.archlinux.org`. `PKGBUILD` and `.SRCINFO` for `0.168.0` are staged with a
+hash **validated by `makepkg --verifysource` against the real tarball**, and
+`depends` carries `xdotool` (F81). See
+`.git-exclude/tasks/owner/aur-publish-0.168.0.md`.
 
 **Progress (2026-09-02): F44 downgraded, and the front door was found broken
 while checking it.**
