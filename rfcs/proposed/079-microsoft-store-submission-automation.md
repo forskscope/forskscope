@@ -1,7 +1,7 @@
 # RFC 079: Microsoft Store Submission Automation
 
 **Status.** Proposed
-**Scheduling.** Post-Gate-D — accepted; implementation blocked on F60. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
+**Scheduling.** Post-Gate-D — accepted; **F60 is closed (2026-09-02), so implementation is no longer blocked on it.** See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
 **Accepted.** 2026-08-22 by the project owner — Gate A cleared, and
 **re-confirmed the same day after a self-review found two defects**, including
 an acceptance criterion that contradicted the owner's own §2 credential
@@ -10,7 +10,7 @@ decision and would have failed by construction. Stays in
 when the work ships. **§9 is down to one open question — Q4, the app
 registration — plus recording the client secret's expiry. Q1 and Q5 were
 decided 2026-08-22; Q3 was withdrawn as never having been a question and moved
-to Dependencies, where F60 blocks implementation.**
+to Dependencies, where F60 blocked implementation — **F60 closed 2026-09-02** (Windows 10 withdrawn as a claimed platform; Windows 11 P01 evidenced on a real client), so that dependency is discharged and only Q4 and the secret expiry remain.**
 **Tracks.** Release pipeline; Windows distribution; credential handling.
 **Touches.** A new MSIX build, a new submission workflow, `AppxManifest.xml`'s
 version claims, `release.md`, and the threat model.
