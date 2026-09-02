@@ -20,10 +20,14 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 080 | [Tiered Directory Comparison in the Explorer](./accepted/080-explorer-tiered-directory-comparison.md) | Accepted |
 | 081 | [AUR Publication Automation](./accepted/081-aur-publication-automation.md) | Accepted |
 
-## Implemented (52)
+## Implemented (56)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
+| 060 | [Global Keyboard Scope and Modal/Input Safety](./done/060-global-keyboard-scope-and-modal-input-safety.md) | Implemented — guards ship; regression tests deferred |
+| 061 | [Explorer Pane Focus and Keyboard Completeness](./done/061-explorer-pane-focus-and-keyboard-completeness.md) | Implemented — fully (v0.145.2 + pane-focus model) |
+| 063 | [Trust, Clarity, and Calm UI Hardening](./done/063-trust-clarity-and-calm-ui-hardening.md) | Implemented — as a triage record; per-item delivery unaudited |
+| 072 | [UI Component Extraction (Phase 4)](./done/072-ui-component-extraction.md) | Implemented — layer + threshold; extraction ongoing by design |
 | 000 | [RFC lifecycle policy](./done/000-rfc-lifecycle-policy.md) | Implemented |
 | 001 | [Core Extraction and Domain Model](./done/001-core-extraction-and-domain-model.md) | v0.23.0 |
 | 002 | [Diff Engine: `similar` v3 + Normalized Diff Model](./done/002-similar-v3-diff-engine.md) | v0.23.0 |
@@ -100,10 +104,6 @@ remains No-Go.
 | 040 | [Editor Adapter Verification Harness and Golden Corpus](./proposed/040-editor-adapter-verification-harness-and-golden-corpus.md) | Editor adapter | Blocked on RFC-004 |
 | 041 | [v1.0 Product Stabilization and RFC Governance](./proposed/041-v1-product-stabilization-and-rfc-governance.md) | Governance | 12/16 checklist items done; 4 require GTK or deferred |
 | 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) | Governance | Living document — pre-GTK verification phase |
-| 060 | [Global Keyboard Scope and Modal/Input Safety](./proposed/060-global-keyboard-scope-and-modal-input-safety.md) | UX review remediation | **Partially shipped** v0.145.0–.1 — modal guard + per-surface propagation; W2/W3 tests remain |
-| 061 | [Explorer Pane Focus and Keyboard Completeness](./proposed/061-explorer-pane-focus-and-keyboard-completeness.md) | UX review remediation | **Partially implemented** v0.145.2 — focused pane, F6, per-pane Alt+↑; row ARIA remains |
-| 063 | [Trust, Clarity, and Calm UI Hardening](./proposed/063-trust-clarity-and-calm-ui-hardening.md) | UX review remediation | **Mostly shipped** v0.145.1–.3 — C1/C2/C3/C5/C6/C7/C9/C10 done; C4 audited; C8 rejected |
-| 072 | [UI Component Extraction (Phase 4)](./proposed/072-ui-component-extraction.md) | Structural | **Partially shipped** v0.160.0 — `Notice` extracted; `EmptyState`/`PathLabel`/`IconButton` deferred |
 | 082 | [Write-Path Integrity](./proposed/082-write-path-integrity.md) | Correctness / security | **Accepted 2026-09-01.** Audit blocker B5 — the release-blocking cluster: save-target authority, content-identity dirty state, lossy-encode guard, save capability, secure atomic write |
 | 083 | [Text Encoding Breadth](./proposed/083-text-encoding-breadth.md) | Encoding | UTF-16, BOM wiring, encoding override — post-v1, documentation corrections immediate |
 | 084 | [Patch Export Conformance](./proposed/084-patch-export-conformance.md) | Patch export | CRLF terminators, path quoting, context lines — post-v1, documentation corrections immediate |

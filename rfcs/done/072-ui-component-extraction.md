@@ -1,7 +1,12 @@
 # RFC-072 — UI Component Extraction (Phase 4)
 
-**Status.** Proposed
-**Scheduling.** **Disposition needed** — referenced in shipped code; the remainder is undecided. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
+**Status.** Implemented — the layer and its admission rule ship.
+`ui/component.rs` exists and states the criterion verbatim: *used by at least
+two views, or one view plus one overlay; components here must not import from
+`crate::state`*.
+**Deferred by design, not outstanding:** only `notice.rs` currently qualifies.
+That is the threshold working — it exists to prevent speculative extraction.
+Further components are extracted opportunistically as they meet it.
 **Tracks.** `crates/forskscope-ui/src/ui/` — reusable visual primitives.
 **Touches.** `ui/view/`, `ui/overlay/`, new `ui/component/`.
 

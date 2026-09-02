@@ -221,6 +221,41 @@ executor owner/role, and host-access status per row are owner-dependent and
 recorded as open questions rather than guessed. M5 cannot begin until those
 are answered.
 
+**Progress (2026-09-02): the four undisposed RFCs are closed, and `proposed/`
+now means what it says.**
+
+RFC-060, 061, 063 and 072 moved to `done/` under RFC-000's *Granularity of
+transitions* rule — *"don't keep an RFC in `proposed/` indefinitely just because
+one open question remains"*. Each carries an explicit deferred note. **Every
+claim was checked against the code**, which mattered: the architect's first
+summary told the owner RFC-061's right pane had no keyboard path, having read
+the RFC's *problem statement* as current state. It ships in full —
+`FocusedPane`, **F6** to switch, `handle_key` dispatching by focus, and a
+`.pane-focused` outline. **RFC-061 was finished and simply never moved.**
+
+**One deferral is real work, not bookkeeping.** RFC-060's guards ship across six
+input surfaces, but the **regression tests it existed to produce were never
+written** — its stated purpose was *"so the class of bug cannot reappear as new
+shortcuts or new input surfaces are added"*, and nothing stops a seventh surface
+from omitting the guard. That is F54's *"what stops the sixth?"* again, in the
+keyboard layer.
+
+**RFC-063 moves as a triage record, and the note says so** rather than letting
+`done/` imply delivery: its dispositions are complete, its per-item delivery was
+not audited. **RFC-072's single component is the admission threshold working**,
+not the RFC failing.
+
+With the 5-folder variant adopted the same day, the folders now carry the
+distinction F83 asked for and could not get: **`proposed/` holds 12 RFCs, every
+one genuinely open for review; `accepted/` holds 5 live commitments; `done/`
+holds 56.** `rfc-sync` was re-falsified after the moves — restoring one file to
+`proposed/` reports both its missing table row and its missing `Scheduling`
+line — and every file in every folder is listed in `rfcs/README.md`.
+
+**Noted, not swept in:** RFC-066, 067, 068 and 069 in `done/` still name
+`ui/explorer.rs`, a path RFC-071's restructure removed. Same staleness as
+RFC-061's, outside this change's scope.
+
 **Progress (2026-09-02): F44 downgraded, and the front door was found broken
 while checking it.**
 
@@ -1054,10 +1089,6 @@ were in `proposed/`. Nothing checks this — see **F83**.
 | 040 | Slice 8 | Editor adapter verification harness |
 | 041 | Post-v1 | v1.0 product stabilization |
 | 042 | Ongoing | Roadmap (this document) |
-| 060 | **Disposition needed** | Global keyboard scope and modal/input safety — referenced in shipped code (`dir_pane.rs`, `settings/modal.rs`), so partially implemented; whether the remainder is still wanted is undecided |
-| 061 | **Disposition needed** | Explorer pane focus and keyboard completeness — its own status says "partially implemented in v0.145.2"; referenced in `explorer.rs`, `explorer/tree.rs` |
-| 063 | **Disposition needed** | Trust, clarity and calm UI hardening — referenced in `state.rs`, `settings/modal.rs` |
-| 072 | **Disposition needed** | UI component extraction (Phase 4) — referenced in `ui.rs`, `ui/component.rs` |
 | 074 | Pre-v1 stabilization | Umbrella schedule, milestones, gates, and final go/no-go package |
 | 078 | Milestone M5 | Platform runtime acceptance and retained release evidence |
 | 079 | Post-Gate-D | Microsoft Store submission automation — **accepted**; implementation blocked on F60 |

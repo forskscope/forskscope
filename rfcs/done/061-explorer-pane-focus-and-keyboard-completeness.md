@@ -1,11 +1,15 @@
 # RFC 061: Explorer Pane Focus and Keyboard Completeness
 
-**Status.** Proposed — partially implemented in v0.145.2
-**Scheduling.** **Disposition needed** — its own status says partially implemented in v0.145.2. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
+**Status.** Implemented — fully; this RFC was finished and never moved.
+All three requirements ship: the `FocusedPane` model with `toggle()`/`is_left()`
+(`view/explorer/tree.rs`), **F6** to switch panes, `handle_key` dispatching to
+`tree_l` **or** `tree_r` by focus, and a visible indicator
+(`.pane-root-cell.pane-focused`, `10-view-explorer.css`).
+**Deferred:** nothing found.
 **Tracks.** Explorer keyboard accessibility; left/right pane focus model;
 making the stated keyboard-only path real for the Explorer's core
 select-and-compare loop.
-**Touches.** `crates/forskscope-ui/src/ui/explorer.rs` (keydown handler, pane
+**Touches.** `crates/forskscope-ui/src/ui/view/explorer/tree.rs` (keydown handler, pane
 state), `crates/forskscope-ui/src/ui/dir_pane.rs` (tree row focus/aria),
 `crates/forskscope-ui-logic` (any pure focus-resolution logic + tests),
 `crates/forskscope-ui/assets/main.css` (pane focus ring).

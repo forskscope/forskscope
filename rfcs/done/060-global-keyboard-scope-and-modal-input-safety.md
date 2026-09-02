@@ -1,11 +1,17 @@
 # RFC 060: Global Keyboard Scope and Modal/Input Safety
 
-**Status.** Proposed
-**Scheduling.** **Disposition needed** — referenced in shipped code, so partially implemented; the remainder is undecided. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
+**Status.** Implemented — the ownership rule ships; the regression tests do not.
+The global handler yields to modals (`app.rs`'s `modal_open` guard) and to text
+inputs (`stop_propagation` in `view/search.rs`), across six surfaces:
+`app.rs`, `overlay/keybindings.rs`, `view/dir_pane.rs`, `view/search.rs`,
+`view/explorer/filter.rs`, `view/settings/modal.rs`.
+**Deferred:** the regression tests this RFC asked for were never written, so
+nothing stops a seventh input surface from omitting the guard — which was this
+RFC's stated purpose. Tracked as open work, not as part of this RFC.
 **Tracks.** Keyboard event ownership; modal and text-input safety; prevention
 of accidental merge/save/close actions.
 **Touches.** `crates/forskscope-ui/src/app.rs` (root `onkeydown`),
-`crates/forskscope-ui/src/ui/search.rs`, modal components in
+`crates/forskscope-ui/src/ui/view/search.rs`, modal components in
 `crates/forskscope-ui/src/ui/modals.rs` and `settings.rs`, plus UI-logic
 regression tests.
 

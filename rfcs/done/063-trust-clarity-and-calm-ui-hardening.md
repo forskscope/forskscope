@@ -1,7 +1,14 @@
 # RFC 063: Trust, Clarity, and Calm UI Hardening
 
-**Status.** Proposed
-**Scheduling.** **Disposition needed** — referenced in shipped code; the remainder is undecided. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in this folder and nothing else (F83).
+**Status.** Implemented — as a triage record, which is what this RFC is.
+Every item C1–C6+ carries a disposition (**Adopt**, **Adopt (downscoped)**, or
+**Reject (with rationale)**), including where a recommendation conflicted with
+the product constitution. Two adopted items were spot-checked and ship: C2's
+density variables (`--control-h`, `--row-h`) and C5's severity model
+(`ui/component/notice.rs`).
+**Deferred, and stated rather than implied:** per-item delivery was **not**
+audited. `done/` here records that the *decisions* are made — not that every
+adopted item shipped.
 **Tracks.** Non-defect UX hardening: empty/first-run states, control density and
 hit targets, labeled vs icon-only actions, destructive-modal focus policy,
 severity-based notice/toast policy, plain-language settings with progressive
