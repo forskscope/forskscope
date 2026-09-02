@@ -1,6 +1,6 @@
 # ForskScope Roadmap
 
-**Last updated:** **B5 closed** (2026-09-01); v1 No-Go rests on B4 alone — F44 upstream, F60 with the owner
+**Last updated:** 2026-09-02. **B5 closed**; **F60 closed** (Windows 10 withdrawn as a claimed platform, Windows 11 P01 evidenced on a real client); **F44 downgraded** to documented-only. v1 No-Go rests on **B4 alone — the exact-artifact runtime matrix**, which no longer has a named blocker behind it, only unperformed work.
 **Current phase:** v1 release stabilization — release-baseline reconciliation,
 then correctness workstreams, then runtime/platform acceptance and a new
 architecture go/no-go review.
