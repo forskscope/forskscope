@@ -32,16 +32,59 @@ use forskscope_core::persist::schema::settings::runtime::SettingsRuntimeResoluti
 use forskscope_ui_logic::{CompareTabId, CompareTabIdAllocator, LoadIdentityError};
 use std::path::PathBuf;
 
+thread_local! {
+    /// F95: a per-thread override of the config root, consulted by
+    /// [`config_file_path`] before it falls back to `dirs_next::config_dir()`.
+    /// Thread-local rather than a process-global `XDG_CONFIG_HOME` behind a
+    /// mutex — the mutex only ever serialized the tests that took it, never
+    /// the tests that resolved a config path *without* naming the env var
+    /// (any settings/session test, transitively, through this function) — so
+    /// concurrent test threads raced on one process-global value regardless.
+    /// A thread-local override removes the race instead of narrowing it:
+    /// each test thread resolves its own root, with nothing to serialize.
+    static CONFIG_ROOT_OVERRIDE: std::cell::RefCell<Option<PathBuf>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 /// Resolves `settings.json`/`session.json`'s explicit path (RFC-076: the
 /// repositories never resolve a platform config directory themselves — that
 /// stays a UI/infrastructure concern). Falls back to the current directory
 /// if the platform config directory cannot be determined, matching
-/// `app-json-settings`'s previous behavior.
+/// `app-json-settings`'s previous behavior. Production resolution is
+/// unchanged by F95: [`CONFIG_ROOT_OVERRIDE`] is only ever set by
+/// [`ConfigRootOverrideGuard`], a `#[cfg(test)]`-only type.
 pub(crate) fn config_file_path(file_name: &str) -> PathBuf {
-    dirs_next::config_dir()
+    CONFIG_ROOT_OVERRIDE
+        .with(|o| o.borrow().clone())
+        .or_else(dirs_next::config_dir)
         .unwrap_or_else(|| PathBuf::from("."))
         .join("forskscope")
         .join(file_name)
+}
+
+/// F95: a test-only, thread-local override of the root [`config_file_path`]
+/// resolves against. RAII rather than a manual set/reset pair: cargo test's
+/// default harness reuses worker threads across tests, so a test that
+/// panicked between setting and clearing an override by hand would leak it
+/// onto whatever test the runtime schedules next on that same thread. `Drop`
+/// restores exactly what was there before `set` — nesting-safe, though
+/// nothing in this crate nests it.
+#[cfg(test)]
+pub(crate) struct ConfigRootOverrideGuard(Option<PathBuf>);
+
+#[cfg(test)]
+impl ConfigRootOverrideGuard {
+    pub(crate) fn set(root: PathBuf) -> Self {
+        let previous = CONFIG_ROOT_OVERRIDE.with(|o| o.borrow_mut().replace(root));
+        Self(previous)
+    }
+}
+
+#[cfg(test)]
+impl Drop for ConfigRootOverrideGuard {
+    fn drop(&mut self) {
+        CONFIG_ROOT_OVERRIDE.with(|o| *o.borrow_mut() = self.0.take());
+    }
 }
 
 // ── Modal variants ────────────────────────────────────────────────────────────
@@ -306,7 +349,7 @@ pub(crate) fn with_test_store<R>(f: impl FnOnce(&mut Store) -> R) -> R {
 
 #[cfg(test)]
 mod tests {
-    use super::with_test_store;
+    use super::{ConfigRootOverrideGuard, config_file_path, with_test_store};
     use dioxus::prelude::ReadableExt;
 
     #[test]
@@ -318,5 +361,40 @@ mod tests {
                 Some("hi".to_string())
             );
         });
+    }
+
+    // ── F95: config_file_path honors the override, not just the ambient
+    // XDG_CONFIG_HOME the production fallback still reads ─────────────────
+
+    /// The seam itself, tested directly and without touching any real
+    /// filesystem path: falsify by having `config_file_path` skip
+    /// `CONFIG_ROOT_OVERRIDE` (fall straight to `dirs_next::config_dir()`)
+    /// and this must fail — proving the injection point is exercised,
+    /// not merely present (handoff 021 §4.2).
+    #[test]
+    fn config_file_path_honors_the_override() {
+        let root = std::path::PathBuf::from("/f95-override-root");
+        let _guard = ConfigRootOverrideGuard::set(root.clone());
+        assert_eq!(
+            config_file_path("session.json"),
+            root.join("forskscope").join("session.json")
+        );
+    }
+
+    #[test]
+    fn config_file_path_falls_back_once_the_override_guard_drops() {
+        let root = std::path::PathBuf::from("/f95-override-root");
+        {
+            let _guard = ConfigRootOverrideGuard::set(root.clone());
+            assert_eq!(
+                config_file_path("session.json"),
+                root.join("forskscope").join("session.json")
+            );
+        }
+        assert_ne!(
+            config_file_path("session.json"),
+            root.join("forskscope").join("session.json"),
+            "the override must not outlive its guard"
+        );
     }
 }

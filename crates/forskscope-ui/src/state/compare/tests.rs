@@ -508,14 +508,8 @@ fn save_target_matches_right_input_after_load_and_reload() {
 // rendering, no waiting on a scheduler, and so nothing here can diverge
 // from production timing the way the deleted harness did.
 
-static XDG_CONFIG_HOME_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
 #[test]
 fn opening_a_tab_persists_the_session_without_any_further_render() {
-    let _guard = XDG_CONFIG_HOME_LOCK
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
-
     let dir = temp_dir("f61-open-compare-persists");
     let left = dir.join("left.txt");
     let right = dir.join("right.txt");
@@ -524,24 +518,16 @@ fn opening_a_tab_persists_the_session_without_any_further_render() {
     let config_home = dir.join("config");
     fs::create_dir_all(&config_home).unwrap();
 
-    let previous_xdg = std::env::var("XDG_CONFIG_HOME").ok();
-    // SAFETY: serialized by XDG_CONFIG_HOME_LOCK; no other test in this
-    // suite reads or writes this env var.
-    unsafe {
-        std::env::set_var("XDG_CONFIG_HOME", &config_home);
-    }
+    // F95: a thread-local override, not a process-global `XDG_CONFIG_HOME`
+    // behind a mutex — `open_compare_request`'s `save_session` call (the
+    // thing this test proves runs synchronously) resolves `config_file_path`
+    // on this calling thread, never from a spawned task, so the override
+    // covers exactly the work this test needs it to.
+    let _config_root = crate::state::ConfigRootOverrideGuard::set(config_home.clone());
 
     crate::state::with_test_store(|store| {
         open_compare_request(store, normal_request(left.clone(), right.clone()));
     });
-
-    // SAFETY: still serialized by XDG_CONFIG_HOME_LOCK.
-    unsafe {
-        match &previous_xdg {
-            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
-            None => std::env::remove_var("XDG_CONFIG_HOME"),
-        }
-    }
 
     let session_path = config_home.join("forskscope").join("session.json");
     assert!(
