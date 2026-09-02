@@ -5,7 +5,82 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.167.3] — Unreleased
+## [0.168.0] — Unreleased
+
+**This release is about saving.** Five ways ForskScope could lose, corrupt, or
+misdirect your work when you pressed Save — all found by an independent audit of
+the code, then reproduced by running the application.
+
+**If you edit and save files in ForskScope, take this one.** Two of the five
+wrote to the wrong place or wrote content that was not what you typed, with no
+error shown.
+
+Some of these changes make ForskScope **refuse** things it used to do silently.
+That is the point: the old behaviour looked like success.
+
+### Changed
+
+**A save that cannot represent your text is now refused.** Typing an emoji into
+a `Shift_JIS` file used to write the literal text `&#128512;` into your file
+without telling you. ForskScope now stops, names the characters that cannot be
+represented and the target encoding, and offers **Save as UTF-8** — after which
+the file stays UTF-8 for later saves.
+
+**A file that could not be fully read can no longer be saved.** If some bytes
+were invalid in the detected encoding when the file was *opened*, they were
+replaced with `�` before you ever saw them. Saving would have written those
+replacements over your original bytes. There is **no in-app recovery** for such
+a file — the bytes were lost at read time — so ForskScope refuses and says so.
+
+**A deleted file can be restored by saving.** If the right-hand file is missing,
+you can now merge into it and save to recreate it. Previously saving was
+disabled.
+
+**Keys typed into the search and path boxes no longer trigger shortcuts.**
+Pressing Ctrl+S while typing in the diff search box, or while editing a folder
+path, used to save the file behind it. Only Enter and Escape were protected.
+
+**Very large comparisons now warn instead of silently working.** A pair past
+4 MiB shows a banner; past 64 MiB the load is refused rather than started. The
+size policy existed and was never consulted.
+
+**A failed save now opens a dialog with choices**, not a passing toast — you can
+pick another file, Save As, or dismiss. Overwrite conflicts are unchanged.
+
+### Fixed
+
+**Save after Swap sides wrote to the other file.** Swapping left and right left
+the save destination pointing at the pre-swap file, so the next save overwrote
+the wrong one.
+
+**Unsaved work was reported as clean, with Save greyed out.** Dirty state now
+follows the content itself rather than how many edits you made — so undoing back
+to the saved state correctly reports clean, and any real difference correctly
+reports unsaved, however you got there.
+
+### Security
+
+**Temporary files written during saves and settings updates were predictable and
+followed symlinks** (CWE-59, CWE-378). Every atomic write now uses a
+randomly-named temporary file created with restrictive permissions in the target
+directory.
+
+### Documentation
+
+Installation guidance corrected on both platforms. The prebuilt **Linux** tarball
+is documented as a Debian/Ubuntu-family binary — on Arch and other
+`libxdo.so.4` distributions use the AUR package or build from source. **Windows**
+is documented as tested on Windows 11; it installs on Windows 10 1809+ but is
+untested there, and Windows 10 reached end of support on 2025-10-14. The Linux
+install command in the README and the installation guide returned **404** and now
+resolves the current release automatically.
+
+### Internal
+
+Test and tooling work with no user-visible effect: a race in the session
+persistence suite, a check that the RFC index and the roadmap agree, removal of
+four unused view-models, and regression tests pinning the keyboard rules above.
+
 
 ## [0.167.2] — 2026-08-25
 
