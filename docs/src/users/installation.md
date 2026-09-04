@@ -56,10 +56,45 @@ the other two packages installed.
 
 ### Arch Linux
 
-A [PKGBUILD](https://github.com/forskscope/forskscope/blob/main/packaging/linux/PKGBUILD)
-ships in the repository. Copy it into a directory and run `makepkg -si` —
-`makepkg` downloads the matching source directly from GitHub's own per-tag
-archive.
+ForskScope is on the AUR: **[`forskscope`](https://aur.archlinux.org/packages/forskscope)**.
+
+```sh
+paru -S forskscope      # or: yay -S forskscope
+```
+
+It is a **source** package — it compiles on your machine and links your own
+system libraries, so unlike the prebuilt tarball above it works on Arch and
+other `libxdo.so.4` distributions.
+
+> **You will be asked to choose a `cargo` provider, even if you already have
+> Rust.**
+>
+> ```text
+> :: There are 2 providers available for cargo:
+> :: Repository extra:
+>    1) rust  2) rustup
+> ```
+>
+> This is normal and is not specific to ForskScope — it affects every Rust
+> package on the AUR. `cargo` is a *virtual* dependency that both the `rust`
+> and `rustup` packages provide, so `pacman` has to be told which one to
+> install.
+>
+> **It appears even if you installed Rust through `rustup.sh`**, because that
+> installs into `~/.cargo/` and `pacman` has no record of it. Nothing is
+> broken; `pacman` simply cannot see a toolchain it did not install.
+>
+> **Choose `rustup` (option 2)** if you already use `rustup`. It reads the same
+> `~/.rustup` toolchains you already have, so you do not end up with a second,
+> separate Rust installation — only a second `rustup` binary in
+> `/usr/bin`, which is harmless.
+>
+> Choose `rust` if you have no Rust toolchain and do not want to manage one.
+
+The [`PKGBUILD`](https://github.com/forskscope/forskscope/blob/main/packaging/linux/PKGBUILD)
+also ships in the repository if you prefer to build it by hand with
+`makepkg -si`. **Note this path is not covered by the project's automated
+tests** — the AUR package is what receives attention on each release.
 
 ### Build from source
 
