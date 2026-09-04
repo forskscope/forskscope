@@ -98,10 +98,35 @@ navigation.
 The crate is this project's own (`github.com/forskscope/sheets-diff-rs`), so
 these are proposals to a sibling team, not requests to an upstream we wait on.
 
-**Q1 — model alignment.** Would `sheets-diff` consider exposing a result shaped
-like our `SpreadsheetDiff` (sheet-level change kinds plus addressed cell changes
-with separate value/formula deltas)? If so, `convert()` largely disappears.
-**Recommended: ask.**
+**Q1 — model alignment. ASKED AND ANSWERED: no (2026-09-04). `convert()`
+stays, and their reasoning is better than a yes would have been.**
+
+Everything this RFC listed, their model already provides — *the gap is shape,
+not capability*:
+
+| We need | They already have |
+|---|---|
+| Sheet change kinds | `SheetChange`: `Added`, `Removed`, `Renamed`, `Moved`, `Modified`, **plus `Unchanged` and `RenamedAndMoved`** |
+| 1-based addressing | `CellAddress` — 1-based `row`/`col` plus the `a1` label, bounded to Excel's limits |
+| Separate value/formula flags | `CellDiff.value` and `CellDiff.formula` are each `Option`; `is_some()` **is** the flag, and they move independently |
+| Old/new strings for both | `ValueChange` and `FormulaChange` each carry `old`/`new`; `CellValue::display_string()` renders either side |
+
+Their argument for declining: the part of `convert()` that would disappear is
+the part mapping their names onto ours — **which is the insulation this RFC says
+the adapter exists to provide**. Shipping a type in our shape would replace a
+boundary we control with a dependency on a second type of theirs, coupling us to
+their naming exactly where we deliberately decoupled. Accepted without
+reservation.
+
+**Two consequences for implementation, from their answer rather than guesswork:**
+
+1. `convert()` must handle **`Unchanged` and `RenamedAndMoved`**, which our
+   `SheetChange` does not model. The pre-suspension code had
+   `#[allow(unreachable_patterns)] _ => {}` for forward compatibility; those two
+   are now known, not hypothetical, and must be decided rather than swallowed.
+2. The traversal is already written: *"Flattening v2 output into a v1-style
+   list"* in their migration guide, **compiled and executed as a doctest in
+   their CI** since 2.4.1. Start there rather than deriving it.
 
 **Q2 — the text projection stays here.** `build_side_text`'s `+`/`-`/`~`
 prefixes exist so *our* diff engine aligns the two sides, and `(empty)`/`(none)`
@@ -109,11 +134,24 @@ are our wording. It is a presentation choice tuned to one application's UI.
 Proposing it upstream would couple a general-purpose library to our view.
 **Recommended: do not ask.**
 
-**Q3 — a correction we owe them.** The unsent 2.4.1 reply tells them
-cancellation is *"not load-bearing, do not reprioritise"*. That was true only
-while `.xlsx` was disabled. **This RFC reverses it**, and they should be told,
-because they may have deprioritised work on our answer.
+**Q3 — the correction we owed them. SENT, and the outcome was benign
+(2026-09-04).** They had **not** deprioritised anything: the owner's instruction
+had been to ship cancellation with the milestone rather than cut a release for
+it, so the fix was already in 2.5.0. Their cancellation tests drive
+`compare_bytes_with_options` — our entry point — and each was demonstrated
+failing before the fix, not merely passing after.
+
+**One disclosure of theirs belongs in this RFC, because it is this project's own
+catalogued pattern arriving from outside.** Cancellation had been described in
+their doc comment and an RFC status as a **latency** limitation for four
+releases. It was not latency: on a single-sheet workbook there was no second
+checkpoint, so a cancel request was never observed at all. In their words —
+*"nobody noticed because the wrong word was in the record and everyone believed
+the record."* That is F92's shape exactly, and it is the reason this RFC targets
+2.5.0 rather than trusting a version's description of itself.
 
 ## Open questions
 
-None blocking. Q1 and Q3 are correspondence, not preconditions.
+**None.** Q1 was asked and answered *no*; Q3 was sent and the outcome was benign.
+Nothing in this RFC waits on the sheets-diff team, and they have confirmed they
+have no open questions for us. They ask only to be told what breaks.
