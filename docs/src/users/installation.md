@@ -66,8 +66,8 @@ It is a **source** package — it compiles on your machine and links your own
 system libraries, so unlike the prebuilt tarball above it works on Arch and
 other `libxdo.so.4` distributions.
 
-> **You will be asked to choose a `cargo` provider, even if you already have
-> Rust.**
+> **You may be asked to choose a `cargo` provider, even with Rust already
+> installed.**
 >
 > ```text
 > :: There are 2 providers available for cargo:
@@ -75,21 +75,26 @@ other `libxdo.so.4` distributions.
 >    1) rust  2) rustup
 > ```
 >
-> This is normal and is not specific to ForskScope — it affects every Rust
-> package on the AUR. `cargo` is a *virtual* dependency that both the `rust`
-> and `rustup` packages provide, so `pacman` has to be told which one to
-> install.
+> **Nothing is wrong, and you do not need to change how you installed Rust.**
+> This affects every Rust package on the AUR, not just ForskScope. `cargo` is a
+> *virtual* dependency that both the `rust` and `rustup` packages provide, so
+> `pacman` has to be told which package to use.
 >
-> **It appears even if you installed Rust through `rustup.sh`**, because that
-> installs into `~/.cargo/` and `pacman` has no record of it. Nothing is
-> broken; `pacman` simply cannot see a toolchain it did not install.
+> It appears even when Rust is already installed **through `rustup.sh`**,
+> because that installs into `~/.cargo/` and `pacman` keeps no record of it.
+> `pacman` is not ignoring your toolchain — it cannot see it.
 >
-> **Choose `rustup` (option 2)** if you already use `rustup`. It reads the same
-> `~/.rustup` toolchains you already have, so you do not end up with a second,
-> separate Rust installation — only a second `rustup` binary in
-> `/usr/bin`, which is harmless.
+> **If you installed Rust with `rustup.sh` and want nothing extra installed,**
+> tell `pacman` the dependency is already met:
 >
-> Choose `rust` if you have no Rust toolchain and do not want to manage one.
+> ```sh
+> paru -S --assume-installed cargo forskscope
+> ```
+>
+> **If you would rather just answer the prompt,** either option builds
+> ForskScope correctly. `rustup` reads the same `~/.rustup` toolchains you
+> already have; `rust` is a self-contained toolchain managed by `pacman`.
+> Neither replaces or interferes with an existing `rustup.sh` installation.
 
 The [`PKGBUILD`](https://github.com/forskscope/forskscope/blob/main/packaging/linux/PKGBUILD)
 also ships in the repository if you prefer to build it by hand with
