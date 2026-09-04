@@ -1,7 +1,8 @@
 # RFC 085: Spreadsheet (.xlsx) Comparison Resumption
 
-**Status.** Proposed
-**Scheduling.** Ready to start on acceptance — the owner directed the dependency be added (2026-09-02). See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in `proposed/` and `accepted/` and nothing else (F83).
+**Status.** Accepted — review complete; implementer may start. Moves to `done/`
+when the work ships (RFC-000, 5-folder variant).
+**Scheduling.** **Accepted by the owner 2026-09-04.** Handed off as handoff 022. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in `proposed/` and `accepted/` and nothing else (F83).
 **Tracks.** Lifting RFC-058's security suspension; restoring structural `.xlsx`
 comparison; gate coverage for a returning dependency.
 **Touches.** `crates/forskscope-core/src/xlsx.rs`, `forskscope-core/Cargo.toml`,

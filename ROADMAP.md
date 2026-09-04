@@ -1153,7 +1153,7 @@ were in `proposed/`. Nothing checks this — see **F83**.
 
 | RFC | When | What |
 |-----|------|------|
-| 085 | On acceptance | Spreadsheet (.xlsx) comparison resumption — re-adds `sheets-diff` at **2.5.0**, lifting RFC-058's security suspension. The blocker (`quick-xml 0.39` XML DoS against user-supplied archives) is verified gone on the current version. Not a rebuild: two functions and one call body return behind a seam left standing. **2.5.0 specifically** — the first release where cancellation works mid-sheet, which `diff_xlsx`'s unused `_cancel` parameter has been waiting for. Read-only; merge explicitly out of scope. Two gates pass today only because the dependency is absent — `audit-deps`' reviewed set and RFC-078 P10 must both move in the same change |
+| 085 | **Accepted 2026-09-04** — handoff 022 | Spreadsheet (.xlsx) comparison resumption — re-adds `sheets-diff` at **2.5.0**, lifting RFC-058's security suspension. The blocker (`quick-xml 0.39` XML DoS against user-supplied archives) is verified gone on the current version. Not a rebuild: two functions and one call body return behind a seam left standing. **2.5.0 specifically** — the first release where cancellation works mid-sheet, which `diff_xlsx`'s unused `_cancel` parameter has been waiting for. Read-only; merge explicitly out of scope. Two gates pass today only because the dependency is absent — `audit-deps`' reviewed set and RFC-078 P10 must both move in the same change |
 | 004 | Slice 8 | Editor adapter and CodeMirror bridge |
 | 010 | Post-slice-5 | Packaging, diagnostics, QA |
 | 016 | Slice 8 | Editor bridge security and contract |
