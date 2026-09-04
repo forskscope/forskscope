@@ -7,24 +7,24 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Accepted (6)
+## Accepted (5)
 
 Review complete; the implementer may start. Distinct from **Proposed**, which
 is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 
 | RFC | Title | State |
 |-----|-------|-------|
-| 085 | [Spreadsheet (.xlsx) Comparison Resumption](./accepted/085-spreadsheet-comparison-resumption.md) | Accepted |
 | 074 | [v1 Release Stabilization Program](./accepted/074-v1-release-stabilization-program.md) | Accepted |
 | 078 | [Platform Runtime Acceptance and Release Evidence](./accepted/078-platform-runtime-acceptance.md) | Accepted |
 | 079 | [Microsoft Store Submission Automation](./accepted/079-microsoft-store-submission-automation.md) | Accepted |
 | 080 | [Tiered Directory Comparison in the Explorer](./accepted/080-explorer-tiered-directory-comparison.md) | Accepted |
 | 081 | [AUR Publication Automation](./accepted/081-aur-publication-automation.md) | Accepted |
 
-## Implemented (56)
+## Implemented (57)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
+| 085 | [Spreadsheet (.xlsx) Comparison Resumption](./done/085-spreadsheet-comparison-resumption.md) | Implemented — `d492557` |
 | 060 | [Global Keyboard Scope and Modal/Input Safety](./done/060-global-keyboard-scope-and-modal-input-safety.md) | Implemented — guards ship; regression tests deferred |
 | 061 | [Explorer Pane Focus and Keyboard Completeness](./done/061-explorer-pane-focus-and-keyboard-completeness.md) | Implemented — fully (v0.145.2 + pane-focus model) |
 | 063 | [Trust, Clarity, and Calm UI Hardening](./done/063-trust-clarity-and-calm-ui-hardening.md) | Implemented — as a triage record; per-item delivery unaudited |
