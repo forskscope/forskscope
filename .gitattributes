@@ -1,0 +1,19 @@
+# GitHub Linguist: language statistics.
+#
+# `packaging/` holds build, release and platform-evidence tooling — Python
+# harnesses, shell build scripts, an AppleScript UI driver, manifests and
+# store assets. None of it ships: no file here appears in a release artifact.
+# It is driven by the `m5-evidence-*` workflows and the release workflow.
+#
+# `linguist-detectable=false` is used deliberately in preference to
+# `linguist-vendored` or `linguist-generated`. Those would be false: this is
+# our own code, neither third-party nor generated. This attribute claims only
+# that the directory should not be counted in the repository's language
+# statistics, which is true — the shipped product is Rust.
+#
+# Stated plainly because the effect is real: `packaging/` is roughly 20% of
+# the repository by line count (about 10,300 lines, mostly the three platform
+# evidence harnesses). Excluding it makes the language bar describe what
+# ForskScope *is*, not everything the repository *contains*. That is a
+# presentation choice, made on purpose.
+packaging/** linguist-detectable=false
