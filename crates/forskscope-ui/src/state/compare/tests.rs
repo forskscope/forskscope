@@ -310,24 +310,70 @@ fn binary_vs_text_mismatch_error_message_is_unchanged() {
     );
 }
 
+/// RFC-085: a mixed pair (one `.xlsx` side, one text side) is no longer
+/// refused outright — only a pair where *both* sides are `.xlsx` gets the
+/// derived-text projection (`load_and_diff`'s own `&&` gate, matching the
+/// pre-suspension behavior this restores). The xlsx side's `diff_text()`
+/// stays empty, same as before RFC-085, so this compares "text\n" against
+/// "" rather than erroring.
 #[test]
-fn xlsx_target_error_message_is_unchanged() {
-    let dir = temp_dir("xlsx");
+fn a_mixed_text_and_xlsx_pair_compares_the_xlsx_side_as_empty() {
+    let dir = temp_dir("xlsx-mixed");
     let left = dir.join("left.txt");
     let right = dir.join("right.xlsx");
     fs::write(&left, "text\n").unwrap();
     fs::write(&right, b"not a real workbook").unwrap();
 
-    let result = load_and_diff(
+    let prepared = load_and_diff(
         normal_request(left, right),
         DiffOptions::default(),
         Lang::En,
         false,
-    );
+    )
+    .unwrap();
 
-    assert_eq!(
-        result.unwrap_err(),
-        "Spreadsheet comparison is temporarily disabled for security."
+    assert_eq!(prepared.left.diff_text(), "text\n");
+    assert_eq!(prepared.right.diff_text(), "");
+}
+
+/// RFC-085: both sides `.xlsx` restores the real structural comparison —
+/// `load_and_diff` derives per-side text from the actual workbook diff, not
+/// an empty placeholder, so a genuine cell change is visible in the diff
+/// text on both sides (`+`/`-`/`~` prefixes are `build_side_text`'s, out of
+/// this handoff's scope — this only proves *some* real content reached the
+/// diff engine, not that its formatting is a specific string).
+#[test]
+fn both_sides_xlsx_produces_a_real_structural_diff_not_an_empty_one() {
+    // Shared with forskscope-core's own xlsx tests (handoff 022's review
+    // request explains why these are real workbooks, not hand-built bytes:
+    // built once with rust_xlsxwriter, committed as binary fixtures, not a
+    // project dependency).
+    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../forskscope-core/src/tests/fixtures/xlsx/basic");
+    let left = fixtures.join("old.xlsx");
+    let right = fixtures.join("new.xlsx");
+
+    let prepared = load_and_diff(
+        normal_request(left, right),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    )
+    .unwrap();
+
+    assert!(
+        !prepared.left.diff_text().is_empty(),
+        "the xlsx pair's left side must derive real diff text, not stay empty"
+    );
+    assert!(
+        !prepared.right.diff_text().is_empty(),
+        "the xlsx pair's right side must derive real diff text, not stay empty"
+    );
+    assert_ne!(
+        prepared.left.diff_text(),
+        prepared.right.diff_text(),
+        "the fixture's A1 cell differs (\"hello\" vs \"world\") — the two \
+         sides' derived text must not be identical"
     );
 }
 
@@ -849,21 +895,29 @@ fn a_binary_or_spreadsheet_side_is_still_not_saveable() {
         prepared.save_capability
     );
 
+    // RFC-085: a text/xlsx mixed pair is no longer refused outright (see
+    // `a_mixed_text_and_xlsx_pair_compares_the_xlsx_side_as_empty`) — the
+    // load now succeeds, so this asserts what F88a actually needs: even
+    // though it loads, `FileKind::ExcelXlsx` still isn't mergeable text
+    // (`is_mergeable_text()` is unchanged by RFC-085 — merge/save for
+    // `.xlsx` stays a separate, out-of-scope RFC), so save_capability still
+    // blocks it.
     let left = dir.join("left.txt");
     fs::write(&left, "left\n").unwrap();
 
     let xlsx = dir.join("right.xlsx");
     fs::write(&xlsx, b"not a real workbook").unwrap();
-    let result = load_and_diff(
+    let prepared = load_and_diff(
         normal_request(left, xlsx),
         DiffOptions::default(),
         Lang::En,
         false,
-    );
+    )
+    .unwrap();
     assert!(
-        result.is_err(),
-        "spreadsheet comparison is refused earlier, before save_capability is even computed \
-         — confirming it never becomes reachable as Saveable either way"
+        !prepared.save_capability.is_saveable(),
+        "a spreadsheet side must still block saving: {:?}",
+        prepared.save_capability
     );
 }
 

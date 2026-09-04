@@ -121,12 +121,22 @@ fn run_css(check: bool) {
 }
 
 fn run_audit_deps() {
-    assert_package_absent("sheets-diff");
-    assert_package_absent("calamine");
     assert_package_inactive("dioxus-devtools");
     assert_external_network_crates_absent();
     assert_quick_xml_path_is_reviewed();
     assert_network_paths_are_reviewed();
+    // RFC-085: sheets-diff -> calamine -> quick-xml/zip is a deliberately
+    // re-added, reviewed path — RFC-058 suspended it (quick-xml 0.39 XML
+    // DoS advisories); sheets-diff 2.5.0's chain (quick-xml 0.41.0, zip
+    // 8.6.0) carries none, verified against the versions actually
+    // resolved here, not inherited from an earlier check (xlsx.rs's
+    // module doc has the full account). Each assertion below replaces
+    // this pair's old `assert_package_absent` — a gate that passed
+    // because the dependency was absent, not because the path was
+    // reviewed, is exactly the failure mode F65 records.
+    assert_immediate_dependents("sheets-diff", &["forskscope-core "]);
+    assert_immediate_dependents("calamine", &["sheets-diff "]);
+    assert_immediate_dependents("zip", &["calamine "]);
     println!("security dependency path check passed.");
 }
 
@@ -483,38 +493,13 @@ fn assert_package_inactive(package: &str) {
     process::exit(1);
 }
 
+/// RFC-085: `wayland-scanner` (pre-existing, reviewed) and `calamine <-
+/// sheets-diff` (re-added by RFC-085) now depend on two different quick-xml
+/// majors at once, so `cargo tree -i quick-xml` is ambiguous by package name
+/// alone — `assert_immediate_dependents`'s version resolution handles that;
+/// this just supplies both accepted paths.
 fn assert_quick_xml_path_is_reviewed() {
-    let output = cargo_tree(&["tree", "--prefix", "depth", "-i", "quick-xml"]);
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("did not match any packages") {
-            println!("quick-xml is absent.");
-            return;
-        }
-
-        eprintln!("could not inspect quick-xml dependency path");
-        eprintln!("{stderr}");
-        process::exit(1);
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let immediate_dependents: Vec<&str> = stdout
-        .lines()
-        .filter_map(depth_prefixed_package)
-        .filter_map(|(depth, package)| (depth == 1).then_some(package))
-        .collect();
-
-    if immediate_dependents.is_empty()
-        || immediate_dependents
-            .iter()
-            .any(|package| !package.starts_with("wayland-scanner "))
-    {
-        eprintln!("quick-xml has an unreviewed immediate dependency path:");
-        eprintln!("{stdout}");
-        process::exit(1);
-    }
-
-    println!("quick-xml path is limited to wayland-scanner.");
+    assert_immediate_dependents("quick-xml", &["wayland-scanner ", "calamine "]);
 }
 
 fn assert_external_network_crates_absent() {
@@ -529,10 +514,56 @@ fn assert_network_paths_are_reviewed() {
     println!("network-capable dependency paths are reviewed.");
 }
 
+/// Resolves `package` to every fully-versioned spec `cargo tree` currently
+/// has for it. A single unambiguous match returns the bare name unchanged
+/// (cargo already accepts it as-is); two or more resolved versions in the
+/// graph at once (e.g. quick-xml 0.39 via `wayland-scanner` alongside 0.41
+/// via `calamine`, RFC-085) return one `name@version` spec per version, so a
+/// caller checking dependency paths inspects every version present instead
+/// of whichever one `cargo tree -i <bare name>` would otherwise fail to pick
+/// between. Empty means the package is absent from the graph entirely.
+fn resolve_specs(package: &str) -> Vec<String> {
+    let output = cargo_tree(&["tree", "-i", package]);
+    if output.status.success() {
+        return vec![package.to_string()];
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if stderr.contains("did not match any packages") {
+        return Vec::new();
+    }
+    if stderr.contains("is ambiguous") {
+        let prefix = format!("{package}@");
+        return stderr
+            .lines()
+            .map(str::trim)
+            .filter(|line| line.starts_with(&prefix))
+            .map(str::to_string)
+            .collect();
+    }
+
+    eprintln!("could not resolve {package}'s position in the dependency graph");
+    eprintln!("{stderr}");
+    process::exit(1);
+}
+
 fn assert_immediate_dependents(package: &str, accepted_prefixes: &[&str]) {
-    let output = cargo_tree(&["tree", "--prefix", "depth", "-i", package]);
+    let specs = resolve_specs(package);
+    if specs.is_empty() {
+        println!("{package} is absent.");
+        return;
+    }
+    for spec in &specs {
+        assert_immediate_dependents_for_spec(spec, accepted_prefixes);
+    }
+    let labels: Vec<&str> = accepted_prefixes.iter().map(|p| p.trim()).collect();
+    println!("{package} path is limited to {}.", labels.join(" / "));
+}
+
+fn assert_immediate_dependents_for_spec(spec: &str, accepted_prefixes: &[&str]) {
+    let output = cargo_tree(&["tree", "--prefix", "depth", "-i", spec]);
     if !output.status.success() {
-        eprintln!("could not inspect {package} dependency path");
+        eprintln!("could not inspect {spec} dependency path");
         eprintln!("{}", String::from_utf8_lossy(&output.stderr));
         process::exit(1);
     }
@@ -551,7 +582,7 @@ fn assert_immediate_dependents(package: &str, accepted_prefixes: &[&str]) {
                 .any(|accepted| package.starts_with(accepted))
         })
     {
-        eprintln!("{package} has an unreviewed immediate dependency path:");
+        eprintln!("{spec} has an unreviewed immediate dependency path:");
         eprintln!("{stdout}");
         process::exit(1);
     }

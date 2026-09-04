@@ -371,10 +371,9 @@ impl TabSnapshot {
                 (FileKind::Binary, _) | (_, FileKind::Binary) => {
                     t(lang, "Binary file — read-only comparison (hex preview).")
                 }
-                (FileKind::ExcelXlsx, _) | (_, FileKind::ExcelXlsx) => t(
-                    lang,
-                    "Spreadsheet comparison is temporarily disabled for security.",
-                ),
+                (FileKind::ExcelXlsx, _) | (_, FileKind::ExcelXlsx) => {
+                    t(lang, "Spreadsheet comparison is read-only.")
+                }
                 (FileKind::Missing, _) | (_, FileKind::Missing) => {
                     t(lang, "One side is missing — read-only.")
                 }

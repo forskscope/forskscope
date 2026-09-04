@@ -226,9 +226,7 @@ fn ja(key: &str) -> Option<&'static str> {
         "Binary file. Binary comparison is off — enable it in Settings → Advanced." => {
             "バイナリファイルです。バイナリ比較はオフです — 設定 → 詳細設定で有効にできます。"
         }
-        "Spreadsheet comparison is temporarily disabled for security." => {
-            "セキュリティ上の理由により、スプレッドシート比較は一時的に無効化されています。"
-        }
+        "Spreadsheet comparison is read-only." => "スプレッドシート比較は読み取り専用です。",
         "Advanced" => "詳細設定",
         "Hide advanced" => "詳細設定を隠す",
         "Compare profiles" => "比較プロファイル",

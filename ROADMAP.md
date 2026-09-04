@@ -25,9 +25,10 @@ and release-gate CSS freshness checks.
 
 Release-readiness hardening completed after v0.140.0:
 
-- XLSX parsing was security-disabled: `.xlsx` files are recognized but
-  comparison fails closed until the `sheets-diff -> calamine -> quick-xml`
-  dependency path is remediated.
+- XLSX comparison, security-disabled since v0.140.0 pending a
+  `sheets-diff -> calamine -> quick-xml` remediation, is restored (RFC-085,
+  `sheets-diff` 2.5.0): `.xlsx` files compare structurally (sheets/cells),
+  read-only.
 - Dioxus desktop network-capable transitive dependencies were reviewed. Default
   Dioxus features/devtools are disabled, and the accepted loopback WebSocket IPC
   path is enforced by `cargo xtask audit-deps`.

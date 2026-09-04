@@ -33,6 +33,10 @@ chardetng                   = "0.1"
 dirs-next                   = "2"
 encoding_rs                 = "0.8"
 rfd                         = { version = "0.17", default-features = true }
+# RFC-085: default features off deliberately - chrono/cli/serde are all
+# optional and unused here; audit-deps' reviewed set assumes exactly the
+# calamine -> quick-xml -> zip chain this default-features build pulls.
+sheets-diff                 = "2.5.0"
 similar                     = "3.1"
 
 chrono                      = "0.4"

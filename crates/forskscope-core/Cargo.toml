@@ -16,6 +16,10 @@ chardetng                   = { workspace = true }
 chrono                      = { workspace = true }
 serde                       = { workspace = true }
 serde_json                  = { workspace = true }
+# RFC-085: restores .xlsx structural comparison (RFC-058's suspension is
+# lifted at 2.5.0 - see xlsx.rs's module doc for the security/cancellation
+# reasoning).
+sheets-diff                 = { workspace = true }
 similar                     = { workspace = true }
 # RFC-077: promoted from dev-dependency for the mergetool save target's
 # no-clobber commit (`save::persist_noclobber`), which needs

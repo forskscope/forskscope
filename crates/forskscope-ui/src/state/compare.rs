@@ -419,7 +419,7 @@ pub(super) fn load_and_diff(
         allow_missing: true,
     };
 
-    let ld = load_path(&left, options).map_err(|e| {
+    let mut ld = load_path(&left, options).map_err(|e| {
         format!(
             "{} \"{}\" — {e}. {}",
             t(lang, "Could not open"),
@@ -433,7 +433,7 @@ pub(super) fn load_and_diff(
         )
     })?;
 
-    let rd = load_path(&right, options).map_err(|e| {
+    let mut rd = load_path(&right, options).map_err(|e| {
         format!(
             "{} \"{}\" — {e}. {}",
             t(lang, "Could not open"),
@@ -466,11 +466,17 @@ pub(super) fn load_and_diff(
         ));
     }
 
-    if ld.kind == FileKind::ExcelXlsx || rd.kind == FileKind::ExcelXlsx {
-        return Err(t(
-            lang,
-            "Spreadsheet comparison is temporarily disabled for security.",
-        ));
+    // RFC-085: only a pair where *both* sides are spreadsheets gets the
+    // derived text projection — one .xlsx side against a text/missing side
+    // falls through with that side's `diff_text()` staying empty, same as
+    // the pre-suspension behavior this restores. Comparison stays read-only
+    // either way: `FileKind::ExcelXlsx -> EditabilityClass::ReadOnly` and
+    // `save_capability`'s NotMergeableText refusal are unchanged (RFC-085
+    // scope boundary — merge/save for .xlsx is a separate RFC).
+    if ld.kind == FileKind::ExcelXlsx && rd.kind == FileKind::ExcelXlsx {
+        let (lt, rt) = forskscope_core::xlsx::derive_pair_text(&left, &right);
+        ld.text = Some(lt);
+        rd.text = Some(rt);
     }
 
     let diff = compute_diff(ld.diff_text(), rd.diff_text(), opts);

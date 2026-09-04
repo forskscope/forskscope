@@ -315,12 +315,13 @@ runtime integration.
 - externally changed merged target blocks normal save;
 - UI continues to show remote input separately from result destination.
 
-### P10 — Binary/XLSX fail-closed policy
+### P10 — Binary permission / XLSX read-only policy
 
 - binary comparison disabled shows localized guidance;
 - enabling binary permits read-only preview but not merge/save;
-- XLSX shows the current security-disabled message and does not parse workbook
-  content.
+- XLSX structurally compares two workbooks (sheet and cell changes shown in
+  the ordinary diff view, RFC-085) and never permits merge/save — comparison
+  is restored, read-only is not lifted with it.
 
 ### P11 — Keyboard and modal safety
 

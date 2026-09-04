@@ -25,7 +25,7 @@ Files are classified in this order:
 |------|-------------|-----------|-------------|--------------|
 | **Text** | No NUL byte in first 8 KB | ✓ | ✓ | ✓ |
 | **Binary** | NUL byte found | Hex preview | — | — |
-| **Excel `.xlsx`** | `.xlsx` / `.XLSX` extension | Temporarily disabled | — | — |
+| **Excel `.xlsx`** | `.xlsx` / `.XLSX` extension | Structural (sheets/cells) | — | — |
 | **Missing** | Path not found | One-sided | — | ✓ (creates the file) |
 | **Unsupported** | Not a regular file | — | — | — |
 
@@ -72,10 +72,15 @@ read-only; merge and save are not available for binary files.
 
 ## Excel `.xlsx` comparison
 
-Excel files are recognized by extension, but workbook comparison is temporarily
-disabled for security while the XLSX parser dependency path is remediated.
-ForskScope fails closed with a user-visible error instead of parsing workbook
-XML from user-supplied `.xlsx` files.
+Excel files are recognized by extension and compared structurally: added,
+removed, renamed, moved, and modified sheets, and — within a modified sheet —
+which cells changed value or formula. The result is projected into the same
+diff view as a text comparison, so it scrolls, searches, and navigates hunks
+the same way; there is no separate spreadsheet view.
+
+**Comparison is read-only.** Merge and save are not available for `.xlsx`
+files, and this does not change with the above — restoring comparison did
+not lift that restriction.
 
 This applies to `.xlsx` / `.XLSX` only. `.xls`, `.csv`, and `.ods` are not
 spreadsheet-comparison inputs.

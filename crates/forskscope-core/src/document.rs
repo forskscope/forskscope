@@ -75,7 +75,11 @@ pub struct TextDocument {
 pub enum LoadWarning {
     DecodeReplacementsEmitted,
     BinaryRenderedAsHexPreview,
-    ExcelComparisonDisabled,
+    /// RFC-085: the comparable text for an `.xlsx` side is derived pairwise
+    /// (`xlsx::derive_pair_text`), not the file's literal content — this
+    /// document's own `text` is `None`. Named for what's true regardless of
+    /// whether comparison is enabled, unlike its RFC-058-era name.
+    ExcelRenderedAsDerivedText,
 }
 
 /// Loading options.
