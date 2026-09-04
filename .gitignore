@@ -24,3 +24,7 @@ rfcs/index.html
 
 # packaging/render_check.py (F34) is run directly with python3, not installed
 __pycache__/
+
+# F66: outbound correspondence never belongs in the tracked tree.
+# Drafts live in .git-exclude/correspondence/ (untracked).
+rfcs/notes/*-upstream-request-*.md

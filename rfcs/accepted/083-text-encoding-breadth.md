@@ -1,8 +1,12 @@
 # RFC 083: Text Encoding Breadth — UTF-16, BOM, and Override
 
-**Status.** Proposed
-**Scheduling.** Post-v1 for the features; **the documentation corrections are
-immediate**. Not release-blocking — see §Sequencing. See `ROADMAP.md` §
+**Status.** Accepted — review complete; implementer may start. Moves to `done/`
+when the work ships (RFC-000, 5-folder variant).
+**Scheduling.** **0.169.0** — authorized by the owner 2026-09-05 as the release's
+lead item. *Supersedes this RFC's original "post-v1" scheduling*, which was
+written while Gate D was being treated as the organizing axis; the owner
+corrected that framing, and F90 is scheduled on user impact instead: UTF-16 is a
+whole encoding family the product cannot open at all. See `ROADMAP.md` §
 "Remaining proposed RFCs", which must list every file in this folder and nothing
 else (F83).
 **Tracks.** Register F90. Audit 2026-09-01 findings A8, A11, A12, docs #15, #18.
@@ -100,11 +104,19 @@ corrected today, regardless of whether the features are ever built.
 That proviso is the binding half. Shipping the limitation is fine; shipping it
 while the docs are silent is not.
 
-## Open questions for the owner
+## Open questions — both closed 2026-09-05
 
-- **Q1 — BOM-less UTF-16.** Heuristic, or BOM-only? Recommendation: BOM-only,
-  because a NUL-density heuristic can misfire on genuine binaries and the BOM
-  case covers the files Windows tools actually produce.
-- **Q2 — order.** The BOM wiring (§2) is small and fixes a diff that currently
-  lies. It could ship before v1 on its own merits. Do you want it separated from
-  the rest of this RFC?
+Closed by the architect under the role division the owner stated on 2026-09-05:
+**scheduling and design are the architect's; authorization is the owner's.** Both
+had been parked as owner decisions that did not need to be.
+
+- **Q1 — BOM-less UTF-16: BOM-only. Closed, no heuristic.** A NUL-density
+  heuristic misfires on genuine binaries, and mistaking a binary for text is the
+  more damaging direction in a tool that opens files for editing. The BOM case
+  covers what Windows tools actually emit. `known-limitations.md` must then say
+  plainly that BOM-less UTF-16 is unsupported — an honest limitation, not a
+  silent gap. **Override this if you want the heuristic; it is a behaviour
+  change, not a correction.**
+- **Q2 — order: not separated. Closed.** The question only existed under the
+  original "post-v1" scheduling. The whole RFC ships in 0.169.0, so there is
+  nothing to sequence apart.
