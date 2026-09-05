@@ -1,6 +1,6 @@
 # ForskScope Roadmap
 
-**Last updated:** 2026-09-02. **`0.168.0` published** — the first minor bump since the audits, carrying B5's five save-integrity fixes and the behaviour changes they imply. **B5 closed**; **F60 closed** (Windows 10 withdrawn as a claimed platform, Windows 11 P01 evidenced on a real client); **F44 downgraded** to documented-only. v1 No-Go rests on **B4 alone — the exact-artifact runtime matrix**, which no longer has a named blocker behind it, only unperformed work.
+**Last updated:** 2026-09-05. **`0.169.0` published** — `.xlsx` comparison restored, UTF-16 files open, CRLF patches apply. **`0.168.0` published** — the first minor bump since the audits, carrying B5's five save-integrity fixes and the behaviour changes they imply. **B5 closed**; **F60 closed** (Windows 10 withdrawn as a claimed platform, Windows 11 P01 evidenced on a real client); **F44 downgraded** to documented-only. v1 No-Go rests on **B4 alone — the exact-artifact runtime matrix**, which no longer has a named blocker behind it, only unperformed work.
 **Current phase:** v1 release stabilization — release-baseline reconciliation,
 then correctness workstreams, then runtime/platform acceptance and a new
 architecture go/no-go review.
@@ -292,6 +292,37 @@ line — and every file in every folder is listed in `rfcs/README.md`.
 **Noted, not swept in:** RFC-066, 067, 068 and 069 in `done/` still name
 `ui/explorer.rs`, a path RFC-071's restructure removed. Same staleness as
 RFC-061's, outside this change's scope.
+
+**Progress (2026-09-05): `0.169.0` published — and it nearly did not happen.**
+
+Three completed features sat unreleased on `main`: RFC-085's `.xlsx` restoration
+(landed 2026-09-04), RFC-083's UTF-16/BOM/encoding-override work, and RFC-084's
+patch conformance. **The owner noticed; the architect did not.** Scheduling and
+release cycles are the architect's role — the owner said so explicitly on
+2026-09-05 — and the architect had been labelling work *"0.169.0"* and
+*"0.170.0"* while cutting neither, letting planning labels stand in for releases
+that never happened.
+
+Cut as **`0.169.0`, not `0.170.0`**: a label the architect invented should not
+become a version number that skips one. Two RFC status lines naming releases
+that will never exist (*"Ships in 0.170.0"*, *"the next cut after 0.168.0"*)
+were corrected in the same commit.
+
+**The macOS Platform note ran for the first time and rendered correctly** — the
+one added on 2026-09-04 after the architect found he had covered Linux and
+Windows and omitted macOS, three days after arguing that the Releases page is
+precisely where such qualifications belong. All three platforms now carry their
+caveat where people download rather than only in the manual.
+
+Preflight falsified rather than trusted: blanking the changelog section made
+`version-sync 0.169.0` fail with *"release notes would ship blank"*. 1233 tests,
+`cargo audit` exit 0. Post-release bump to `0.169.1` in the same session as the
+tag — 0.167.2's lesson, where omitting it left `main` red for five commits.
+
+**AUR prepared, not pushed** (no key on this machine): `PKGBUILD` and `.SRCINFO`
+staged with a hash **validated by `makepkg --verifysource`**, at
+`.git-exclude/tasks/owner/aur-publish-0.169.0.md`. This is the first AUR package
+that will build `.xlsx` comparison.
 
 **Progress (2026-09-02): `0.168.0` published.**
 
