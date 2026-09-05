@@ -489,7 +489,8 @@ pub(super) fn load_and_diff(
                 .as_ref()
                 .map(|t| t.encoding.label.clone())
                 .unwrap_or_else(|| "UTF-8".into());
-            inspect_save_target(merged, &fallback_encoding)
+            let fallback_bom = rd.text.as_ref().map(|t| t.bom).unwrap_or_default();
+            inspect_save_target(merged, &fallback_encoding, fallback_bom)
         }
     };
     // F88/RFC-082 §D3: one source of truth for whether a save is possible —

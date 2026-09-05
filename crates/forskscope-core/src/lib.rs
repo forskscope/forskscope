@@ -78,6 +78,10 @@ pub use document::{
     load_path,
 };
 pub use encoding::{
+    // RFC-083
+    BomPolicy,
+    BomPresence,
+    COMMON_ENCODING_LABELS,
     // RFC-012
     NewlinePolicy,
     NewlineStyle,

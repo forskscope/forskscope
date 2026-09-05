@@ -22,7 +22,10 @@ pub(crate) use compare::{open_compare_request_with_options, reload_tab_with_opti
 pub use profile::{add_profile, remove_profile};
 pub use session::{close_tab, resolve_session, restore_tabs, save_session};
 pub use settings::{AppSettings, BatchCopySpec, DiffAlgorithmSetting, DiffFontFamily, Lang, Theme};
-pub use tab::{CompareTab, TabState, change_diff_options, set_diff_options, swap_sides};
+pub use tab::{
+    CompareTab, TabState, change_diff_options, change_encoding, set_diff_options, set_encoding,
+    swap_sides,
+};
 pub use types::{BatchResultSpec, DirOp, LargeLoadPrompt, LargeLoadTarget};
 
 use dioxus::prelude::*;
@@ -121,6 +124,11 @@ pub enum Modal {
     /// rule 4 (see `change_diff_options`'s doc comment and RFC-015's
     /// recorded gap).
     ConfirmDiffOptionChange(usize, forskscope_core::DiffOptions),
+    /// RFC-083 §3: choosing a new encoding re-decodes the right side and
+    /// discards applied merge work and the undo/redo stack, the same
+    /// `recompute_diff` hazard `ConfirmDiffOptionChange` guards — see
+    /// `change_encoding`'s doc comment. `String` is the chosen label.
+    ConfirmEncodingChange(usize, String),
     ConfirmDirOp(DirOp),
     ConfirmClose(usize),
     ConfirmBatchCopy(BatchCopySpec),

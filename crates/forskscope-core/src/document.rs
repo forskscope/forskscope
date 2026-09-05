@@ -8,7 +8,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use crate::encoding::{NewlineStyle, TextEncoding, decode_bytes, detect_newline_style};
+use crate::encoding::{
+    BomPresence, NewlineStyle, TextEncoding, decode_body, detect_bom, detect_newline_style,
+};
 use crate::error::{CoreError, IoOperation, Result};
 use crate::file_kind::{EditabilityClass, FileKind, classify};
 use crate::path::{canonicalize_lenient, display};
@@ -68,6 +70,22 @@ pub struct TextDocument {
     pub encoding: TextEncoding,
     pub newline_style: NewlineStyle,
     pub had_decode_errors: bool,
+    /// Whether a BOM was present at the start of the loaded file, and
+    /// which kind (RFC-083 §2). Stripped from `content`; `save::save_text`
+    /// re-applies it per `BomPolicy` so the round-trip is a mechanism, not
+    /// an accident. `Absent` for `Binary`/`Missing`/`ExcelXlsx` documents —
+    /// the concept doesn't apply to a hex preview or a document with no
+    /// bytes.
+    pub bom: BomPresence,
+    /// The bytes actually decoded to produce `content` — after BOM
+    /// stripping, before any encoding is chosen — retained so RFC-083 §3's
+    /// encoding override can re-decode with a user-chosen label without
+    /// re-reading the file. Empty for `Binary`/`Missing`/`ExcelXlsx`
+    /// documents, where there is nothing to re-decode. This doubles a
+    /// loaded text document's memory footprint (bytes plus decoded
+    /// `String`) for the lifetime of the tab — the deliberate cost of "no
+    /// re-read" (RFC-083 §3's acceptance criterion), not an oversight.
+    pub raw_bytes: Vec<u8>,
 }
 
 /// A non-fatal observation made while loading.
@@ -116,6 +134,8 @@ impl LoadedDocument {
                 encoding: TextEncoding::utf8(),
                 newline_style: NewlineStyle::None,
                 had_decode_errors: false,
+                bom: BomPresence::Absent,
+                raw_bytes: Vec::new(),
             }),
             warnings: Vec::new(),
         }
@@ -164,7 +184,14 @@ pub fn load_path(path: &Path, options: LoadOptions) -> Result<LoadedDocument> {
         FileKind::Text => {
             let bytes = read_all(path)?;
             let fingerprint = FileFingerprint::capture(path, Some(&bytes))?;
-            let (content, encoding, had_errors) = decode_bytes(&bytes);
+            // RFC-083 §2: strip the BOM before decoding, and keep the
+            // remainder around (unread from disk again) both for §3's
+            // encoding override and for `newline_style` below — a BOM must
+            // never survive into `content`, or a BOM'd file diffed against
+            // a non-BOM'd one reports a phantom line-1 change.
+            let (bom, rest) = detect_bom(&bytes);
+            let raw_bytes = rest.to_vec();
+            let (content, encoding, had_errors) = decode_body(bom, rest);
             let newline_style = detect_newline_style(&content);
             let mut warnings = Vec::new();
             if had_errors {
@@ -180,6 +207,8 @@ pub fn load_path(path: &Path, options: LoadOptions) -> Result<LoadedDocument> {
                     encoding,
                     newline_style,
                     had_decode_errors: had_errors,
+                    bom,
+                    raw_bytes,
                 }),
                 warnings,
             })
@@ -199,6 +228,8 @@ pub fn load_path(path: &Path, options: LoadOptions) -> Result<LoadedDocument> {
                     },
                     newline_style: NewlineStyle::Lf,
                     had_decode_errors: false,
+                    bom: BomPresence::Absent,
+                    raw_bytes: Vec::new(),
                 }),
                 warnings: vec![LoadWarning::BinaryRenderedAsHexPreview],
             })

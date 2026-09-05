@@ -10,6 +10,7 @@ use forskscope_core::compare_prep::{
     SaveTargetBlockReason, SaveTargetSnapshot, SaveTargetState, TargetExpectation,
     inspect_save_target,
 };
+use forskscope_core::encoding::BomPresence;
 use forskscope_core::error::{AppError, AppErrorKind, RecoveryAction};
 use forskscope_core::save::{
     BackupPolicy, SaveOutcome, SaveRequest, TargetPrecondition, save_text,
@@ -125,7 +126,8 @@ pub fn precheck_save_as_target(
         return SaveAsPrecheck::New;
     };
     let fallback_encoding = current_encoding_label(tab);
-    match inspect_save_target(target, &fallback_encoding).state {
+    let fallback_bom = current_bom(tab);
+    match inspect_save_target(target, &fallback_encoding, fallback_bom).state {
         SaveTargetState::Writable {
             expectation: TargetExpectation::MustBeAbsent,
             ..
@@ -219,21 +221,23 @@ fn build_request(
         return RequestOutcome::RequiresGuard(guard_target);
     }
 
-    let (tgt, precondition, encoding_label) = match target {
+    let (tgt, precondition, encoding_label, bom) = match target {
         Some(explicit) => {
             let fallback_encoding = current_encoding_label(tab);
-            let snapshot = inspect_save_target(&explicit, &fallback_encoding);
+            let fallback_bom = current_bom(tab);
+            let snapshot = inspect_save_target(&explicit, &fallback_encoding, fallback_bom);
             match snapshot.state {
                 SaveTargetState::Writable {
                     expectation,
                     encoding_label,
+                    bom,
                 } => {
                     let precondition = if force {
                         TargetPrecondition::Force
                     } else {
                         to_precondition(expectation)
                     };
-                    (explicit, precondition, encoding_label)
+                    (explicit, precondition, encoding_label, bom)
                 }
                 // Force still rejects an unsupported target kind (RFC-077:
                 // "Force... still rejects unsupported target kinds unless
@@ -250,6 +254,7 @@ fn build_request(
                 SaveTargetState::Writable {
                     expectation,
                     encoding_label,
+                    bom,
                 } => {
                     let precondition = if force {
                         TargetPrecondition::Force
@@ -260,6 +265,7 @@ fn build_request(
                         save_target.path.clone(),
                         precondition,
                         encoding_label.clone(),
+                        *bom,
                     )
                 }
                 SaveTargetState::Blocked { reason } => {
@@ -273,6 +279,7 @@ fn build_request(
         target: tgt,
         content: tab.merge.result_text(),
         encoding_label,
+        bom,
         precondition,
         backup: BackupPolicy::SiblingBak,
     })
@@ -293,6 +300,20 @@ fn current_encoding_label(tab: &CompareTab) -> String {
             SaveTargetState::Blocked { .. } => None,
         })
         .unwrap_or_else(|| "UTF-8".into())
+}
+
+/// RFC-083 §2: the BOM fallback mirroring [`current_encoding_label`] — both
+/// describe "what this target's bytes currently look like," so a Save As
+/// destination that doesn't exist yet inherits both from the tab's current
+/// save target, not just the encoding.
+fn current_bom(tab: &CompareTab) -> BomPresence {
+    tab.save_target
+        .as_ref()
+        .and_then(|st| match &st.state {
+            SaveTargetState::Writable { bom, .. } => Some(*bom),
+            SaveTargetState::Blocked { .. } => None,
+        })
+        .unwrap_or_default()
 }
 
 /// User-facing message for a save destination `build_request` refused
@@ -337,6 +358,7 @@ fn handle_result(
                     state: SaveTargetState::Writable {
                         expectation: TargetExpectation::MustMatch(outcome.new_fingerprint),
                         encoding_label: request.encoding_label.clone(),
+                        bom: request.bom,
                     },
                 });
             }
@@ -585,6 +607,7 @@ mod tests {
             target,
             content: "content\n".into(),
             encoding_label: "UTF-8".into(),
+            bom: BomPresence::Absent,
             precondition,
             backup: BackupPolicy::None,
         }
@@ -775,6 +798,8 @@ mod tests {
                 },
                 newline_style: NewlineStyle::Lf,
                 had_decode_errors: false,
+                bom: BomPresence::Absent,
+                raw_bytes: Vec::new(),
             }),
             warnings: Vec::new(),
         };
@@ -805,6 +830,7 @@ mod tests {
                 state: SaveTargetState::Writable {
                     expectation: TargetExpectation::MustMatch(fp),
                     encoding_label: encoding_label.into(),
+                    bom: BomPresence::Absent,
                 },
             }),
             launch_mode: CompareLaunchMode::Normal,

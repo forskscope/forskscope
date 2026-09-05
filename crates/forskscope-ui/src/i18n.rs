@@ -265,6 +265,15 @@ fn ja(key: &str) -> Option<&'static str> {
             "差分オプション変更時に未保存のマージ変更は破棄されます。"
         }
         "Discard and Change" => "破棄して変更",
+        "Change encoding" => "エンコーディングの変更",
+        "Change encoding?" => "エンコーディングを変更しますか？",
+        "Unsaved merge changes will be discarded when the encoding changes." => {
+            "エンコーディング変更時に未保存のマージ変更は破棄されます。"
+        }
+        "Encoding — re-decode if this looks wrong" => {
+            "エンコーディング — 文字化けしている場合は選び直してください"
+        }
+        "Right-side text encoding" => "右側のテキストエンコーディング",
         "Close comparison?" => "比較を閉じますか？",
         "Discard and close" => "破棄して閉じる",
         "Copy diagnostics" => "診断情報をコピー",

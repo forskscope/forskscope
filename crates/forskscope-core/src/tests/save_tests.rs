@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::document::FileFingerprint;
+use crate::encoding::BomPresence;
 use crate::error::CoreError;
 use crate::save::{BackupPolicy, SaveRequest, TargetPrecondition, atomic_replace, save_text};
 
@@ -19,6 +20,7 @@ fn save_writes_content_and_returns_fingerprint() {
         target: target.clone(),
         content: "merged\nresult\n".into(),
         encoding_label: "UTF-8".into(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::Force,
         backup: BackupPolicy::None,
     };
@@ -26,6 +28,45 @@ fn save_writes_content_and_returns_fingerprint() {
     assert_eq!(fs::read_to_string(&target).unwrap(), "merged\nresult\n");
     assert_eq!(outcome.written_bytes, 14);
     assert!(!outcome.encoding_fallback_to_utf8);
+}
+
+// ── RFC-083 §2: BOM round-trip ────────────────────────────────────────────────
+
+/// Handoff 023 §6 test 3: loaded-with-BOM saves with a BOM. Falsify by
+/// dropping the `BomPolicy::Preserve` prepend in `save_text` — see the
+/// review request for the real failing output.
+#[test]
+fn a_document_loaded_with_a_bom_is_saved_with_a_bom() {
+    let dir = temp_dir("bom-round-trip-in");
+    let target = dir.join("out.txt");
+    let request = SaveRequest {
+        target: target.clone(),
+        content: "hi\n".into(),
+        encoding_label: "UTF-8".into(),
+        bom: BomPresence::Utf8,
+        precondition: TargetPrecondition::Force,
+        backup: BackupPolicy::None,
+    };
+    save_text(&request).unwrap();
+    let bytes = fs::read(&target).unwrap();
+    assert_eq!(bytes, [0xEFu8, 0xBB, 0xBF, b'h', b'i', b'\n']);
+}
+
+#[test]
+fn a_document_loaded_without_a_bom_is_saved_without_a_bom() {
+    let dir = temp_dir("bom-round-trip-out");
+    let target = dir.join("out.txt");
+    let request = SaveRequest {
+        target: target.clone(),
+        content: "hi\n".into(),
+        encoding_label: "UTF-8".into(),
+        bom: BomPresence::Absent,
+        precondition: TargetPrecondition::Force,
+        backup: BackupPolicy::None,
+    };
+    save_text(&request).unwrap();
+    let bytes = fs::read(&target).unwrap();
+    assert_eq!(bytes, b"hi\n");
 }
 
 #[test]
@@ -38,6 +79,7 @@ fn save_creates_sibling_backup_when_requested() {
         target: target.clone(),
         content: "updated\n".into(),
         encoding_label: "UTF-8".into(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::MustMatch(fingerprint),
         backup: BackupPolicy::SiblingBak,
     };
@@ -62,6 +104,7 @@ fn external_modification_is_detected_as_conflict() {
         target: target.clone(),
         content: "our-merge\n".into(),
         encoding_label: "UTF-8".into(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::MustMatch(stale),
         backup: BackupPolicy::None,
     };
@@ -81,6 +124,7 @@ fn save_creates_nested_parent_dirs() {
         target: target.clone(),
         content: "nested\n".to_string(),
         encoding_label: "UTF-8".to_string(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::Force,
         backup: crate::save::BackupPolicy::None,
     };
@@ -97,6 +141,7 @@ fn save_without_backup_does_not_create_bak_file() {
         target: target.clone(),
         content: "overwritten\n".to_string(),
         encoding_label: "UTF-8".to_string(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::Force,
         backup: crate::save::BackupPolicy::None,
     };
@@ -125,6 +170,7 @@ fn conflict_error_contains_path_info() {
         target: target.clone(),
         content: "v3-ours\n".to_string(),
         encoding_label: "UTF-8".to_string(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::MustMatch(fp),
         backup: crate::save::BackupPolicy::None,
     };
@@ -145,6 +191,7 @@ fn save_with_none_fingerprint_always_succeeds() {
         target: target.clone(),
         content: "new\n".to_string(),
         encoding_label: "UTF-8".to_string(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::Force,
         backup: crate::save::BackupPolicy::None,
     };
@@ -163,6 +210,7 @@ fn backup_path_is_none_when_policy_is_none() {
         target: target.clone(),
         content: "data\n".into(),
         encoding_label: "UTF-8".into(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::Force,
         backup: BackupPolicy::None,
     };
@@ -185,6 +233,7 @@ fn new_fingerprint_reflects_written_content() {
         target: target.clone(),
         content: "updated content here\n".into(),
         encoding_label: "UTF-8".into(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::Force,
         backup: BackupPolicy::None,
     };
@@ -210,6 +259,7 @@ fn encoding_fallback_to_utf8_is_true_for_unknown_encoding() {
         target: target.clone(),
         content: "hello world\n".into(),
         encoding_label: "DEFINITELY-NOT-A-REAL-ENCODING-LABEL".into(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::Force,
         backup: BackupPolicy::None,
     };
@@ -232,6 +282,7 @@ fn written_bytes_matches_content_length() {
         target: target.clone(),
         content: content.into(),
         encoding_label: "UTF-8".into(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::Force,
         backup: BackupPolicy::None,
     };
@@ -253,6 +304,7 @@ fn must_be_absent_precondition_creates_a_missing_target_through_save_text() {
         target: target.clone(),
         content: "merged result\n".into(),
         encoding_label: "UTF-8".into(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::MustBeAbsent,
         backup: BackupPolicy::SiblingBak,
     };
@@ -272,6 +324,7 @@ fn must_be_absent_precondition_conflicts_and_leaves_an_existing_target_untouched
         target: target.clone(),
         content: "our merge result\n".into(),
         encoding_label: "UTF-8".into(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::MustBeAbsent,
         backup: BackupPolicy::SiblingBak,
     };
@@ -396,6 +449,7 @@ fn a_lossy_save_writes_nothing_and_never_touches_the_backup() {
         target: target.clone(),
         content: "hi 😀\n".into(),
         encoding_label: "shift_jis".into(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::MustMatch(fp),
         backup: BackupPolicy::SiblingBak,
     };
@@ -431,6 +485,7 @@ fn a_lossy_save_names_the_offending_character() {
         target: target.clone(),
         content: "hi 😀\n".into(),
         encoding_label: "shift_jis".into(),
+        bom: BomPresence::Absent,
         precondition: TargetPrecondition::MustMatch(fp),
         backup: BackupPolicy::None,
     };

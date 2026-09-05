@@ -58,6 +58,96 @@ pub fn decode_bytes(bytes: &[u8]) -> (String, TextEncoding, bool) {
     )
 }
 
+/// Decode already-BOM-stripped bytes, given what BOM (if any) preceded
+/// them (RFC-083 §2). A BOM is an explicit, authoritative encoding
+/// declaration — present, it selects that encoding directly, the same way
+/// it did before this RFC when a BOM'd file happened to reach
+/// [`decode_bytes`] with the BOM still attached (`encoding_rs::Encoding::decode`
+/// sniffs a leading BOM itself and overrides the detected encoding to
+/// match). Stripping the BOM first and then falling through to
+/// [`decode_bytes`]'s `chardetng` guess on the *remainder alone* would
+/// throw that signal away: a bare invalid byte with no BOM can legitimately
+/// decode losslessly under some single-byte legacy encoding, but the same
+/// byte immediately after a UTF-8 BOM must not silently reinterpret as one
+/// — the BOM already said what this is. Absent a BOM, `decode_bytes` runs
+/// exactly as before, untouched by this function.
+pub fn decode_body(bom: BomPresence, rest: &[u8]) -> (String, TextEncoding, bool) {
+    match bom {
+        BomPresence::Utf8 => {
+            let (text, had_errors) = encoding_rs::UTF_8.decode_without_bom_handling(rest);
+            (text.into_owned(), TextEncoding::utf8(), had_errors)
+        }
+        BomPresence::Utf16Le => {
+            let (text, had_errors) = encoding_rs::UTF_16LE.decode_without_bom_handling(rest);
+            (
+                text.into_owned(),
+                TextEncoding {
+                    label: encoding_rs::UTF_16LE.name().to_string(),
+                },
+                had_errors,
+            )
+        }
+        BomPresence::Utf16Be => {
+            let (text, had_errors) = encoding_rs::UTF_16BE.decode_without_bom_handling(rest);
+            (
+                text.into_owned(),
+                TextEncoding {
+                    label: encoding_rs::UTF_16BE.name().to_string(),
+                },
+                had_errors,
+            )
+        }
+        BomPresence::Absent => decode_bytes(rest),
+    }
+}
+
+/// Encoding labels offered by the toolbar's override control (RFC-083 §3) —
+/// a curated subset of what `encoding_rs`/`Encoding::for_label` actually
+/// accepts, not the full ~40-encoding WHATWG list. Each is a canonical
+/// `encoding_rs` name, so it round-trips through [`decode_with_label`] and
+/// [`encode_text`] unchanged. Ordered as a user would scan it: UTF, then
+/// the legacy families the audit's own misdetection example (Shift_JIS) and
+/// this project's stated legacy-encoding-preservation goal are about.
+pub const COMMON_ENCODING_LABELS: &[&str] = &[
+    "UTF-8",
+    "UTF-16LE",
+    "UTF-16BE",
+    "Shift_JIS",
+    "EUC-JP",
+    "GBK",
+    "GB18030",
+    "Big5",
+    "EUC-KR",
+    "windows-1252",
+    "windows-1251",
+    "KOI8-R",
+    "macintosh",
+];
+
+/// Re-decode bytes already held in memory with an explicit, user-chosen
+/// encoding label — no `chardetng` guess (RFC-083 §3: the user has already
+/// told us what it is). `bytes` should already be BOM-stripped, same as
+/// [`decode_body`]'s `rest` — the override changes which charset
+/// interprets the body, not whether a BOM is present, which stays tracked
+/// separately (`TextDocument::bom`) and round-trips regardless of the
+/// chosen label.
+///
+/// An unrecognized `label` falls back to UTF-8, matching [`encode_text`]'s
+/// same-shaped fallback on the write side — defensive only: the toolbar
+/// control offers a fixed, always-valid list, so this path is not expected
+/// to be reached in practice.
+pub fn decode_with_label(bytes: &[u8], label: &str) -> (String, TextEncoding, bool) {
+    let enc = Encoding::for_label(label.as_bytes()).unwrap_or(UTF_8);
+    let (text, had_errors) = enc.decode_without_bom_handling(bytes);
+    (
+        text.into_owned(),
+        TextEncoding {
+            label: enc.name().to_string(),
+        },
+        had_errors,
+    )
+}
+
 /// Result of encoding text for saving.
 #[derive(Debug, Clone)]
 pub struct EncodeOutcome {

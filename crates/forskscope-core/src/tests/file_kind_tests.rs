@@ -96,6 +96,41 @@ fn classify_rust_source_returns_text() {
     assert_eq!(classify(&path).unwrap(), FileKind::Text);
 }
 
+// ── classify: UTF-16 BOM (RFC-083 §1) ─────────────────────────────────────────
+//
+// UTF-16-encoded ASCII is roughly half NUL bytes; without the BOM check
+// running first, every one of these would classify as `Binary`. Falsify by
+// moving the NUL-byte check ahead of the BOM check in `classify` — both
+// must then fail.
+
+#[test]
+fn classify_utf16le_bom_file_returns_text() {
+    // "hi\n" as UTF-16LE, preceded by the UTF-16LE BOM (FF FE): each ASCII
+    // byte is followed by a NUL high byte — exactly the pattern that would
+    // misclassify as Binary without the BOM check running first.
+    let content = [0xFFu8, 0xFE, b'h', 0, b'i', 0, b'\n', 0];
+    let (_f, path) = with_temp_file("txt", &content);
+    assert_eq!(classify(&path).unwrap(), FileKind::Text);
+}
+
+#[test]
+fn classify_utf16be_bom_file_returns_text() {
+    let content = [0xFEu8, 0xFF, 0, b'h', 0, b'i', 0, b'\n'];
+    let (_f, path) = with_temp_file("txt", &content);
+    assert_eq!(classify(&path).unwrap(), FileKind::Text);
+}
+
+#[test]
+fn classify_bom_less_utf16_still_returns_binary() {
+    // RFC-083 Q1: deliberately unsupported, not an oversight — a NUL-density
+    // heuristic can misfire on genuine binaries, and misclassifying a binary
+    // as text is the more damaging direction in a tool that opens files for
+    // editing. Same bytes as the UTF-16LE case above, minus the BOM.
+    let content = [b'h', 0u8, b'i', 0, b'\n', 0];
+    let (_f, path) = with_temp_file("txt", &content);
+    assert_eq!(classify(&path).unwrap(), FileKind::Binary);
+}
+
 // ── classify: directory (not a regular file) ──────────────────────────────────
 
 #[test]

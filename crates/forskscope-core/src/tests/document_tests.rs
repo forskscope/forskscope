@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::document::{LoadOptions, hex_preview, load_path};
+use crate::encoding::BomPresence;
 use crate::error::CoreError;
 use crate::file_kind::{FileKind, classify};
 
@@ -141,5 +142,60 @@ fn allow_missing_loads_empty_document_for_absent_path() {
     assert!(
         doc.diff_text().is_empty(),
         "missing file with allow_missing yields empty document"
+    );
+}
+
+// ── RFC-083 §2: BOM stripped at load, recorded, never left in content ────────
+
+#[test]
+fn a_utf8_bom_is_stripped_from_content_and_recorded() {
+    let dir = temp_dir("bom-utf8");
+    let path = dir.join("bommed.txt");
+    fs::write(&path, [0xEFu8, 0xBB, 0xBF, b'h', b'i', b'\n']).unwrap();
+    let doc = load_path(&path, LoadOptions::default()).unwrap();
+    assert_eq!(
+        doc.diff_text(),
+        "hi\n",
+        "the BOM must not survive into content"
+    );
+    assert_eq!(doc.text.as_ref().unwrap().bom, BomPresence::Utf8);
+}
+
+#[test]
+fn a_utf16le_bom_decodes_to_the_right_text() {
+    let dir = temp_dir("bom-utf16le");
+    let path = dir.join("bommed.txt");
+    // UTF-16LE BOM + "hi\n"
+    fs::write(&path, [0xFFu8, 0xFE, b'h', 0, b'i', 0, b'\n', 0]).unwrap();
+    let doc = load_path(&path, LoadOptions::default()).unwrap();
+    assert_eq!(doc.diff_text(), "hi\n");
+    assert_eq!(doc.text.as_ref().unwrap().bom, BomPresence::Utf16Le);
+    assert_eq!(doc.text.as_ref().unwrap().encoding.label, "UTF-16LE");
+}
+
+/// Handoff 023 §6 test 2 — the one that proves §3 rather than merely
+/// exercising it: a BOM'd file compared against an otherwise identical
+/// non-BOM'd file must report **no difference on line 1**. Before RFC-083,
+/// the BOM survived into `content` as a literal U+FEFF, so line 1 differed
+/// with nothing visibly different. Falsify by reverting `load_path`'s
+/// `FileKind::Text` branch to decode the raw bytes directly (no BOM strip)
+/// — see the review request for the real failing output.
+#[test]
+fn a_bommed_file_diffs_identically_to_its_non_bommed_twin() {
+    let dir = temp_dir("bom-diff-lie");
+    let bommed = dir.join("bommed.txt");
+    let plain = dir.join("plain.txt");
+    fs::write(&bommed, [0xEFu8, 0xBB, 0xBF, b'h', b'i', b'\n']).unwrap();
+    fs::write(&plain, b"hi\n").unwrap();
+
+    let a = load_path(&bommed, LoadOptions::default()).unwrap();
+    let b = load_path(&plain, LoadOptions::default()).unwrap();
+
+    assert_eq!(
+        a.diff_text(),
+        b.diff_text(),
+        "a BOM'd file and its non-BOM'd twin must produce identical \
+         comparable text — otherwise the diff reports a line-1 change \
+         with nothing visibly different"
     );
 }

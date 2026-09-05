@@ -322,6 +322,13 @@ pub struct TabSnapshot {
     pub algorithm: forskscope_core::DiffAlgorithm,
     pub warnings: Vec<String>,
     pub readonly_notice: String,
+    /// RFC-083 §3: whether the right side is `FileKind::Text` — the
+    /// encoding override control only makes sense where there's a decoded
+    /// text with a possibly-wrong label. Independent of `can_save`: a
+    /// target-writability problem shouldn't hide the ability to fix a
+    /// misdetected encoding on a side that is genuinely text.
+    pub right_is_text: bool,
+    pub right_encoding_label: String,
 }
 
 impl TabSnapshot {
@@ -403,6 +410,8 @@ impl TabSnapshot {
             hunks,
             warnings,
             readonly_notice,
+            right_is_text: matches!(tab.right_doc.kind, FileKind::Text),
+            right_encoding_label: tab.right_label(),
         }
     }
 }

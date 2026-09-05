@@ -1,8 +1,8 @@
 //! File and merge-state safety modals: overwrite confirmation, save-as,
-//! reload, swap sides, diff-option changes, the large-file load prompt, and
-//! the save-error recovery dialog — each guards an action that would
-//! otherwise discard unsaved merge work, start an expensive load, or leave
-//! a failed save unexplained, without asking.
+//! reload, swap sides, diff-option and encoding changes, the large-file
+//! load prompt, and the save-error recovery dialog — each guards an action
+//! that would otherwise discard unsaved merge work, start an expensive
+//! load, or leave a failed save unexplained, without asking.
 
 use std::path::PathBuf;
 
@@ -13,7 +13,7 @@ use forskscope_ui_logic::SaveErrorView;
 use crate::i18n::t;
 use crate::state::{
     LargeLoadPrompt, LargeLoadTarget, Modal, Store, open_compare_request_with_options, reload_tab,
-    reload_tab_with_options, set_diff_options, swap_sides,
+    reload_tab_with_options, set_diff_options, set_encoding, swap_sides,
 };
 use crate::ui::view::diff::{SaveAsPrecheck, confirm_overwrite, precheck_save_as_target, save_as};
 use crate::ui::view::diff_actions::handle_save_recovery_action;
@@ -137,6 +137,32 @@ pub fn ConfirmDiffOptionChangeModal(index: usize, options: DiffOptions) -> Eleme
                     button {
                         onclick: move |_| {
                             set_diff_options(&mut store, index, options);
+                            store.modal.set(Modal::None);
+                        },
+                        {t(lang, "Discard and Change")}
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// RFC-083 §3: guards `set_encoding`'s own `recompute_diff` call, the same
+/// discard-and-proceed pattern as [`ConfirmDiffOptionChangeModal`].
+#[component]
+pub fn ConfirmEncodingChangeModal(index: usize, label: String) -> Element {
+    let mut store = use_context::<Store>();
+    let lang = store.lang();
+    rsx! {
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Change encoding"), onmounted: super::focus_autofocus_button,
+            div { class: "modal",
+                h2 { {t(lang, "Change encoding?")} }
+                p { {t(lang, "Unsaved merge changes will be discarded when the encoding changes.")} }
+                div { class: "actions",
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button {
+                        onclick: move |_| {
+                            set_encoding(&mut store, index, label.clone());
                             store.modal.set(Modal::None);
                         },
                         {t(lang, "Discard and Change")}

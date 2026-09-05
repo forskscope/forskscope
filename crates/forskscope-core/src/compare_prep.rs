@@ -21,6 +21,7 @@ use std::path::{Path, PathBuf};
 
 use crate::diff::DiffDocument;
 use crate::document::{FileFingerprint, LoadOptions, LoadedDocument, load_path};
+use crate::encoding::BomPresence;
 use crate::file_kind::{EditabilityClass, FileKind, classify};
 use crate::merge::MergeSession;
 
@@ -53,6 +54,11 @@ pub enum SaveTargetState {
     Writable {
         expectation: TargetExpectation,
         encoding_label: String,
+        /// The BOM to preserve on save (RFC-083 §2) — tracked alongside
+        /// `encoding_label` for the same reason: both are properties of
+        /// "what this target's bytes currently look like," re-derived
+        /// whenever the target is (re-)inspected.
+        bom: BomPresence,
     },
     Blocked {
         reason: SaveTargetBlockReason,
@@ -98,6 +104,7 @@ pub fn save_target_from_loaded(path: &Path, doc: &LoadedDocument) -> SaveTargetS
             .map(|t| t.encoding.label.clone())
             .unwrap_or_else(|| "UTF-8".into())
     };
+    let bom = || doc.text.as_ref().map(|t| t.bom).unwrap_or_default();
     let state = match &doc.kind {
         FileKind::Text => SaveTargetState::Writable {
             expectation: match doc.fingerprint_at_load {
@@ -105,10 +112,12 @@ pub fn save_target_from_loaded(path: &Path, doc: &LoadedDocument) -> SaveTargetS
                 None => TargetExpectation::MustBeAbsent,
             },
             encoding_label: encoding_label(),
+            bom: bom(),
         },
         FileKind::Missing => SaveTargetState::Writable {
             expectation: TargetExpectation::MustBeAbsent,
             encoding_label: encoding_label(),
+            bom: bom(),
         },
         FileKind::Binary => blocked(SaveTargetBlockReason::Binary),
         FileKind::ExcelXlsx => blocked(SaveTargetBlockReason::Spreadsheet),
@@ -126,9 +135,15 @@ pub fn save_target_from_loaded(path: &Path, doc: &LoadedDocument) -> SaveTargetS
 /// enough to classify, decode, and fingerprint it — without ever feeding its
 /// content into the left/right comparison (RFC-077 "Mergetool target
 /// preparation": "Do not use its content as the right-side comparison
-/// input"). `fallback_encoding_label` is the remote input's encoding, used
-/// as the initial output encoding when the target doesn't exist yet.
-pub fn inspect_save_target(path: &Path, fallback_encoding_label: &str) -> SaveTargetSnapshot {
+/// input"). `fallback_encoding_label`/`fallback_bom` are the remote input's
+/// encoding and BOM presence, used as the initial output values when the
+/// target doesn't exist yet — the same fallback relationship for both,
+/// since both describe "what this target's bytes currently look like."
+pub fn inspect_save_target(
+    path: &Path,
+    fallback_encoding_label: &str,
+    fallback_bom: BomPresence,
+) -> SaveTargetSnapshot {
     // Classify first, rather than going through `load_path` alone: its
     // `Unsupported` case (e.g. a directory) surfaces as `Err`, which would
     // otherwise collapse into the same generic `Unreadable` block reason as
@@ -138,6 +153,7 @@ pub fn inspect_save_target(path: &Path, fallback_encoding_label: &str) -> SaveTa
         Ok(FileKind::Missing) => SaveTargetState::Writable {
             expectation: TargetExpectation::MustBeAbsent,
             encoding_label: fallback_encoding_label.to_string(),
+            bom: fallback_bom,
         },
         Ok(FileKind::Text) => {
             match load_path(
@@ -156,6 +172,7 @@ pub fn inspect_save_target(path: &Path, fallback_encoding_label: &str) -> SaveTa
                         .as_ref()
                         .map(|t| t.encoding.label.clone())
                         .unwrap_or_else(|| fallback_encoding_label.to_string()),
+                    bom: doc.text.as_ref().map(|t| t.bom).unwrap_or(fallback_bom),
                 },
                 Err(e) => blocked(SaveTargetBlockReason::Unreadable {
                     message: e.to_string(),

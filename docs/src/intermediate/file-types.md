@@ -14,8 +14,13 @@ Files are classified in this order:
 2. **Not a regular file** — directories, FIFOs, device nodes → `Unsupported`.
    Symlinks are followed; a symlink to a regular file is treated as that file.
 3. **`.xlsx` extension** (case-insensitive) → `ExcelXlsx`.
-4. **NUL byte in the first 8 KB** → `Binary`.
-5. **Everything else** → `Text`. Encoding is detected separately.
+4. **UTF-16 byte-order mark** in the first 8 KB → `Text`. Checked *before* the
+   NUL-byte rule below — UTF-16-encoded ASCII is roughly half NUL bytes, and
+   would otherwise always be misclassified as binary. A UTF-16 file with no
+   BOM is not detected this way and falls through to the rules below (see
+   [Known limitations](../users/known-limitations.md)).
+5. **NUL byte in the first 8 KB** → `Binary`.
+6. **Everything else** → `Text`. Encoding is detected separately.
 
 ---
 
@@ -23,7 +28,7 @@ Files are classified in this order:
 
 | Type | Detected by | Line diff | Inline diff | Merge / Save |
 |------|-------------|-----------|-------------|--------------|
-| **Text** | No NUL byte in first 8 KB | ✓ | ✓ | ✓ |
+| **Text** | UTF-16 BOM, or no NUL byte in first 8 KB | ✓ | ✓ | ✓ |
 | **Binary** | NUL byte found | Hex preview | — | — |
 | **Excel `.xlsx`** | `.xlsx` / `.XLSX` extension | Structural (sheets/cells) | — | — |
 | **Missing** | Path not found | One-sided | — | ✓ (creates the file) |
@@ -35,13 +40,24 @@ Files are classified in this order:
 
 Text files may be encoded in any charset. ForskScope:
 
-1. Tries UTF-8 first (most files on modern systems).
-2. If UTF-8 fails, runs `chardetng` byte-pattern detection.
-3. Decodes using `encoding_rs` with the detected charset.
+1. Checks for a byte-order mark (BOM). A UTF-8, UTF-16LE, or UTF-16BE BOM
+   selects that encoding directly and is stripped before decoding.
+2. Otherwise tries UTF-8 (most files on modern systems).
+3. If that fails, runs `chardetng` byte-pattern detection.
+4. Decodes using `encoding_rs` with the detected (or BOM-selected) charset.
 
 The detected encoding label is shown in the status bar (e.g. `UTF-8`,
-`Shift_JIS`). **Save preserves the original encoding by default.** A non-UTF-8
-file saves as that same encoding.
+`Shift_JIS`) and in the diff toolbar's **Encoding** control. **Save preserves
+the original encoding by default.** A non-UTF-8 file saves as that same
+encoding.
+
+If detection guessed wrong — the toolbar shows a label but the text renders
+as mojibake — open the diff toolbar's advanced panel (**More ▼**) and pick
+the correct encoding from the **Encoding** dropdown. This re-decodes the
+file's bytes in place (no re-read from disk) and updates the tracked save
+label to match, the same way choosing **Save as UTF-8** does below. Choosing
+an encoding discards any unsaved merge changes, the same as toggling a diff
+option — a confirmation is shown if the tab has unsaved edits.
 
 If you add characters that the saved encoding cannot represent — for example,
 typing an emoji into a `Shift_JIS` file — the save is **refused**, not
@@ -58,8 +74,12 @@ for were already lost when the file was read, before any edit happened, so no
 encoding choice at save time can restore them. **There is no in-app recovery
 for this file** — to save its original bytes, use a different tool.
 
-UTF-8 BOM is preserved: a file that has a BOM when loaded will have a BOM when
-saved.
+A byte-order mark is preserved: a file that has a BOM when loaded (UTF-8 or
+UTF-16) is stripped at load, tracked, and re-added at save; a file loaded
+without one stays without one. Choosing a different encoding for a file that
+had a BOM clears the tracked BOM — a BOM is a specific encoding's marker,
+and carrying an old one forward after switching encodings would prepend
+bytes that no longer describe what follows them.
 
 ---
 

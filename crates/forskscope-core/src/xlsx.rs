@@ -377,6 +377,8 @@ fn excel_doc(content: String) -> TextDocument {
         },
         newline_style: NewlineStyle::Lf,
         had_decode_errors: false,
+        bom: crate::encoding::BomPresence::Absent,
+        raw_bytes: Vec::new(),
     }
 }
 

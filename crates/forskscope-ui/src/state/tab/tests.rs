@@ -1,6 +1,6 @@
 use super::{
     CompareLaunchMode, CompareTab, TabState, assert_save_target_matches_right_input,
-    recompute_diff, save_target_from_loaded, swap_sides, tab_title,
+    change_encoding, recompute_diff, save_target_from_loaded, set_encoding, swap_sides, tab_title,
 };
 use crate::state::settings::Lang;
 use dioxus::prelude::{ReadableExt, WritableExt};
@@ -9,8 +9,8 @@ use forskscope_core::compare_prep::{
 };
 use forskscope_core::document::FileFingerprint;
 use forskscope_core::{
-    DiffOptions, FileKind, LoadedDocument, MergeSession, NewlineStyle, TextDocument, TextEncoding,
-    compute_diff,
+    BomPresence, DiffOptions, FileKind, LoadedDocument, MergeSession, NewlineStyle, TextDocument,
+    TextEncoding, compute_diff,
 };
 use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 use std::path::{Path, PathBuf};
@@ -26,6 +26,8 @@ fn text_doc(content: &str) -> LoadedDocument {
             encoding: TextEncoding::utf8(),
             newline_style: NewlineStyle::Lf,
             had_decode_errors: false,
+            bom: BomPresence::Absent,
+            raw_bytes: Vec::new(),
         }),
         warnings: Vec::new(),
     }
@@ -198,6 +200,7 @@ fn swap_sides_leaves_save_target_untouched_in_mergetool_mode() {
         state: SaveTargetState::Writable {
             expectation: TargetExpectation::MustMatch(fp(99)),
             encoding_label: "UTF-8".into(),
+            bom: BomPresence::Absent,
         },
     };
     tab.launch_mode = CompareLaunchMode::MergeTool {
@@ -338,4 +341,120 @@ fn deeply_nested_same_filename_shows_single_name() {
         ),
         "mod.rs"
     );
+}
+
+// ── RFC-083 §3/§4: encoding override ────────────────────────────────────────
+
+/// A tab whose right side was loaded as if `windows-1252` had been
+/// (mis)detected for genuinely Shift_JIS bytes — `windows-1252` decodes any
+/// byte sequence without error, so this is exactly the shape a real
+/// misdetection produces: no decode errors, wrong text. `raw_bytes` is the
+/// undecoded body `set_encoding` re-decodes from.
+fn misdetected_tab() -> CompareTab {
+    // Shift_JIS for "あいう" (the same fixture bytes `encoding_tests.rs`
+    // already uses for a legitimate Shift_JIS decode).
+    let sjis_bytes: Vec<u8> = vec![0x82, 0xA0, 0x82, 0xA2, 0x82, 0xA4];
+    let (misdetected_content, _, _) =
+        forskscope_core::encoding::decode_with_label(&sjis_bytes, "windows-1252");
+
+    let right_path = PathBuf::from("/tmp/f90-right.txt");
+    let mut right_doc = text_doc(&misdetected_content);
+    {
+        let text = right_doc.text.as_mut().unwrap();
+        text.raw_bytes = sjis_bytes;
+        text.encoding = TextEncoding {
+            label: "windows-1252".into(),
+        };
+    }
+    let left_doc = text_doc("left\n");
+    let diff_options = DiffOptions::default();
+    let diff = compute_diff(left_doc.diff_text(), right_doc.diff_text(), diff_options);
+    let merge = MergeSession::from_diff(&diff);
+    let save_target = Some(save_target_from_loaded(&right_path, &right_doc));
+
+    CompareTab {
+        id: CompareTabId::new(1).unwrap(),
+        load_generation: LoadGeneration::new(1).unwrap(),
+        title: "t".into(),
+        left_path: Some(PathBuf::from("/tmp/f90-left.txt")),
+        right_path: Some(right_path),
+        state: TabState::Ready,
+        left_doc,
+        right_doc,
+        merge,
+        diff,
+        diff_options,
+        can_save: true,
+        save_capability: SaveCapability::Saveable,
+        char_mode: false,
+        word_wrap: false,
+        focused_change: 0,
+        save_target,
+        launch_mode: CompareLaunchMode::Normal,
+    }
+}
+
+/// Handoff 023 §6 test 4: choosing an encoding re-decodes without re-reading
+/// (`raw_bytes` never leaves memory) and the save label follows the choice
+/// — the same relationship F87 established for Save-as-UTF-8.
+#[test]
+fn set_encoding_redecodes_and_updates_the_save_label() {
+    use crate::state::with_test_store;
+
+    let tab = misdetected_tab();
+    assert_ne!(
+        tab.right_doc.diff_text(),
+        "あいう",
+        "test setup: windows-1252 must actually misdecode these bytes"
+    );
+
+    with_test_store(|store| {
+        store.tabs.write().push(tab);
+        set_encoding(store, 0, "Shift_JIS".into());
+
+        let tabs = store.tabs.read();
+        let tab = &tabs[0];
+        assert_eq!(tab.right_doc.diff_text(), "あいう");
+        assert_eq!(tab.right_label(), "Shift_JIS");
+        match tab.save_target.as_ref().map(|st| &st.state) {
+            Some(forskscope_core::compare_prep::SaveTargetState::Writable {
+                encoding_label,
+                ..
+            }) => {
+                assert_eq!(
+                    encoding_label, "Shift_JIS",
+                    "the save label must follow the chosen encoding"
+                );
+            }
+            other => panic!("expected Writable, got {other:?}"),
+        }
+    });
+}
+
+#[test]
+fn change_encoding_on_a_dirty_tab_shows_a_confirmation_instead_of_applying() {
+    use crate::state::with_test_store;
+
+    let tab = dirty_tab();
+    assert!(tab.merge.is_dirty(), "test setup: fixture must be dirty");
+    let original_content = tab.right_doc.diff_text().to_string();
+
+    with_test_store(|store| {
+        store.tabs.write().push(tab);
+        change_encoding(store, 0, "Shift_JIS".into());
+
+        assert!(
+            matches!(
+                &*store.modal.read(),
+                crate::state::Modal::ConfirmEncodingChange(0, label) if label == "Shift_JIS"
+            ),
+            "a dirty tab must defer to confirmation, not apply immediately"
+        );
+        let tabs = store.tabs.read();
+        assert_eq!(
+            tabs[0].right_doc.diff_text(),
+            original_content,
+            "nothing must change until the user confirms"
+        );
+    });
 }

@@ -7,6 +7,7 @@
 use std::fs;
 use std::path::Path;
 
+use crate::encoding::{BomPresence, detect_bom};
 use crate::error::{CoreError, IoOperation, Result};
 use crate::path::has_extension;
 
@@ -108,8 +109,16 @@ const SAMPLE_LEN: usize = 8 * 1024;
 /// 2. Not a regular file (directory, fifo, ...) -> `Unsupported`.
 ///    Symlinks are followed; a symlink to a regular file is that file.
 /// 3. `.xlsx` extension -> `ExcelXlsx`.
-/// 4. NUL byte in the leading sample -> `Binary`.
-/// 5. Otherwise -> `Text` (decoding decides the encoding later).
+/// 4. UTF-16 BOM in the leading sample -> `Text` (RFC-083 §1 — checked
+///    *before* the NUL sniff below, since UTF-16-encoded ASCII is roughly
+///    half NUL bytes and would otherwise always misclassify as `Binary`).
+///    BOM-less UTF-16 is not detected here and stays `Binary`/unsupported —
+///    a deliberate choice (RFC-083 Q1), not an oversight: a NUL-density
+///    heuristic can misfire on genuine binaries, and treating a binary as
+///    text is the more damaging direction in a tool that opens files for
+///    editing.
+/// 5. NUL byte in the leading sample -> `Binary`.
+/// 6. Otherwise -> `Text` (decoding decides the encoding later).
 pub fn classify(path: &Path) -> Result<FileKind> {
     let meta = match fs::metadata(path) {
         Ok(m) => m,
@@ -125,6 +134,10 @@ pub fn classify(path: &Path) -> Result<FileKind> {
         return Ok(FileKind::ExcelXlsx);
     }
     let bytes = read_sample(path)?;
+    let (bom, _) = detect_bom(&bytes);
+    if matches!(bom, BomPresence::Utf16Le | BomPresence::Utf16Be) {
+        return Ok(FileKind::Text);
+    }
     if bytes.contains(&0u8) {
         Ok(FileKind::Binary)
     } else {

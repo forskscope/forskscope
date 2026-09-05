@@ -77,11 +77,17 @@ for v1 (non-goal NG-004 in the product policy).
 
 ## File types
 
-### Excel comparison is temporarily disabled
+### BOM-less UTF-16 is not detected
 
-`.xlsx` files are recognized, but workbook comparison is temporarily disabled
-for security while the parser dependency path is remediated. The app shows a
-clear error instead of parsing workbook XML from user-supplied files.
+UTF-16 files are supported when they carry a byte-order mark (BOM) — the
+common case for files produced by Windows tools. A UTF-16 file with **no**
+BOM is not detected as text and is treated as binary instead.
+
+This is a deliberate limitation, not an oversight: distinguishing BOM-less
+UTF-16 from a genuine binary file requires a heuristic, and a wrong guess in
+that direction — treating a binary file as editable text — is worse than
+refusing a legitimate one. If you have a BOM-less UTF-16 file to compare, add
+a BOM to it first with another tool, or convert it to UTF-8.
 
 ---
 

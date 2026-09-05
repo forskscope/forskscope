@@ -5,7 +5,9 @@ use dioxus::prelude::*;
 
 use super::TabSnapshot;
 use crate::i18n::t;
-use crate::state::{Lang, Modal, Store, change_diff_options, reload_tab, swap_sides};
+use crate::state::{
+    Lang, Modal, Store, change_diff_options, change_encoding, reload_tab, swap_sides,
+};
 use crate::ui::view::diff_actions::{algo_val, export_patch, save_tab};
 use crate::ui::view::search::SearchCtx;
 
@@ -185,6 +187,25 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     aria_label: t(lang, "Export patch"),
                     onclick: move |_| { export_patch(&store, index); },
                     {t(lang, "Export patch")}
+                }
+                if snap.right_is_text {
+                    select {
+                        title: t(lang, "Encoding — re-decode if this looks wrong"),
+                        aria_label: t(lang, "Right-side text encoding"),
+                        value: "{snap.right_encoding_label}",
+                        onchange: move |e| change_encoding(&mut store, index, e.value()),
+                        // The current label may not be one of the curated
+                        // options (e.g. an unusual chardetng guess) — an
+                        // extra selected option keeps the control showing
+                        // the true current state rather than silently
+                        // snapping to the list's first entry.
+                        if !forskscope_core::COMMON_ENCODING_LABELS.contains(&snap.right_encoding_label.as_str()) {
+                            option { value: "{snap.right_encoding_label}", selected: true, "{snap.right_encoding_label}" }
+                        }
+                        for label in forskscope_core::COMMON_ENCODING_LABELS {
+                            option { value: "{label}", "{label}" }
+                        }
+                    }
                 }
             }
         }

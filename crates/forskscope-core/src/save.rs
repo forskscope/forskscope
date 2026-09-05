@@ -17,7 +17,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::document::{ExternalFileState, FileFingerprint, check_external_state};
-use crate::encoding::{MAX_REPORTED_UNMAPPABLE_CHARS, encode_text, unmappable_characters};
+use crate::encoding::{
+    BomPolicy, BomPresence, MAX_REPORTED_UNMAPPABLE_CHARS, encode_text, unmappable_characters,
+};
 use crate::error::{CoreError, IoOperation, Result};
 
 /// Backup behavior for a save.
@@ -37,6 +39,13 @@ pub struct SaveRequest {
     pub content: String,
     /// Encoding label to encode with; unknown labels fall back to UTF-8.
     pub encoding_label: String,
+    /// The BOM that was present when this content's source was loaded
+    /// (RFC-083 §2). Always resolved through [`BomPolicy::Preserve`] —
+    /// loaded-with-BOM saves with a BOM, loaded-without saves without.
+    /// `BomPolicy`'s other variants exist for a possible future
+    /// user-facing setting; nothing constructs a `SaveRequest` with
+    /// anything but `Preserve` semantics today.
+    pub bom: BomPresence,
     /// What must be true about `target` immediately before writing
     /// (RFC-077). Replaces the older `Option<FileFingerprint>`, which could
     /// not distinguish "skip the check" from "the path must be absent."
@@ -87,7 +96,11 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
             additional_count,
         });
     }
-    let bytes = encoded.bytes;
+    // RFC-083 §2: the BOM round-trips by mechanism now, not by nobody
+    // stripping it — a loaded-with-BOM file saves with a BOM, one loaded
+    // without saves without, regardless of which encoding label was used.
+    let mut bytes = BomPolicy::Preserve.resolve_bytes(request.bom).to_vec();
+    bytes.extend_from_slice(&encoded.bytes);
     let fallback = encoded.unknown_label_fallback;
 
     let backup_path = if request.backup == BackupPolicy::SiblingBak && target.exists() {

@@ -10,6 +10,7 @@ use crate::compare_prep::{
     save_target_from_loaded,
 };
 use crate::document::{FileFingerprint, LoadOptions, LoadedDocument, load_path};
+use crate::encoding::BomPresence;
 use crate::file_kind::FileKind;
 
 fn temp_dir(tag: &str) -> PathBuf {
@@ -34,6 +35,7 @@ fn text_document_yields_must_match_with_its_own_fingerprint() {
         SaveTargetState::Writable {
             expectation,
             encoding_label,
+            ..
         } => {
             assert_eq!(
                 expectation,
@@ -88,13 +90,14 @@ fn existing_merged_target_is_must_match_and_does_not_leak_content_into_state() {
     let path = dir.join("merged.txt");
     fs::write(&path, "already merged\n").unwrap();
 
-    let snapshot = inspect_save_target(&path, "UTF-8");
+    let snapshot = inspect_save_target(&path, "UTF-8", BomPresence::Absent);
 
     let expected_fp = FileFingerprint::capture(&path, None).unwrap();
     match snapshot.state {
         SaveTargetState::Writable {
             expectation,
             encoding_label,
+            ..
         } => {
             // Fingerprint compares len + mtime, not digest, so this is a
             // structural check that we captured the target's own metadata
@@ -118,12 +121,13 @@ fn missing_merged_target_is_must_be_absent_with_remote_encoding_as_fallback() {
     let path = dir.join("does-not-exist-yet.txt");
     let _ = fs::remove_file(&path);
 
-    let snapshot = inspect_save_target(&path, "Shift_JIS");
+    let snapshot = inspect_save_target(&path, "Shift_JIS", BomPresence::Absent);
 
     match snapshot.state {
         SaveTargetState::Writable {
             expectation,
             encoding_label,
+            ..
         } => {
             assert_eq!(expectation, TargetExpectation::MustBeAbsent);
             assert_eq!(
@@ -141,7 +145,7 @@ fn binary_merged_target_is_blocked_not_replaced() {
     let path = dir.join("merged.bin");
     fs::write(&path, [0u8, 1, 2, 3]).unwrap();
 
-    let snapshot = inspect_save_target(&path, "UTF-8");
+    let snapshot = inspect_save_target(&path, "UTF-8", BomPresence::Absent);
 
     assert_eq!(
         snapshot.state,
@@ -157,7 +161,7 @@ fn xlsx_merged_target_is_blocked() {
     let path = dir.join("merged.xlsx");
     fs::write(&path, b"not a real workbook").unwrap();
 
-    let snapshot = inspect_save_target(&path, "UTF-8");
+    let snapshot = inspect_save_target(&path, "UTF-8", BomPresence::Absent);
 
     assert_eq!(
         snapshot.state,
@@ -174,7 +178,7 @@ fn directory_merged_target_is_blocked_as_not_a_plain_file() {
     let _ = fs::remove_dir_all(&path);
     fs::create_dir(&path).unwrap();
 
-    let snapshot = inspect_save_target(&path, "UTF-8");
+    let snapshot = inspect_save_target(&path, "UTF-8", BomPresence::Absent);
 
     match snapshot.state {
         SaveTargetState::Blocked {
@@ -197,7 +201,7 @@ fn conflict_marker_content_is_still_an_ordinary_text_target() {
     )
     .unwrap();
 
-    let snapshot = inspect_save_target(&path, "UTF-8");
+    let snapshot = inspect_save_target(&path, "UTF-8", BomPresence::Absent);
 
     assert!(matches!(
         snapshot.state,
@@ -216,7 +220,7 @@ fn fallback_encoding_is_used_only_when_the_target_is_actually_missing() {
     let path = dir.join("merged.txt");
     fs::write(&path, "ascii content\n").unwrap();
 
-    let snapshot = inspect_save_target(&path, "Shift_JIS");
+    let snapshot = inspect_save_target(&path, "Shift_JIS", BomPresence::Absent);
 
     match snapshot.state {
         SaveTargetState::Writable { encoding_label, .. } => {

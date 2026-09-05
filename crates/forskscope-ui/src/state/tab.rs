@@ -231,6 +231,68 @@ pub fn change_diff_options(store: &mut crate::state::Store, index: usize, next: 
     }
 }
 
+/// Re-decodes the right side's already-loaded bytes with an explicit,
+/// user-chosen encoding label (RFC-083 §3) — no re-read: `right_doc.raw_bytes`
+/// is exactly what was decoded at load time, kept in memory for this. A
+/// no-op if the right side isn't `Text` (e.g. Binary/Missing/ExcelXlsx have
+/// no meaningful "wrong encoding" to correct) or has no `text` at all.
+///
+/// The chosen label replaces whatever `chardetng` guessed; BOM presence is
+/// reset to `Absent` rather than carried forward — a BOM is an assertion
+/// about a *specific* encoding (a UTF-16LE BOM implies UTF-16LE content),
+/// and keeping a stale one after overriding to an unrelated encoding would
+/// prepend bytes that no longer describe what follows them. `save_target`
+/// is re-derived from the tab's current `right_doc` afterward — the same
+/// `save_target_from_loaded` call `load_and_diff` and `swap_sides` use — so
+/// the save label follows the choice (F87's Save-as-UTF-8 established the
+/// same relationship); `save_capability` follows for the same reason
+/// `swap_sides` refreshes it: `had_decode_errors`/`encoding_label` are two
+/// of its own inputs, and a mutation of the compared panes must never leave
+/// it stale.
+pub fn set_encoding(store: &mut crate::state::Store, index: usize, label: String) {
+    let mut tabs = store.tabs.write();
+    let Some(tab) = tabs.get_mut(index) else {
+        return;
+    };
+    if !matches!(tab.right_doc.kind, forskscope_core::FileKind::Text) {
+        return;
+    }
+    let Some(text) = tab.right_doc.text.as_mut() else {
+        return;
+    };
+    let (content, encoding, had_errors) =
+        forskscope_core::encoding::decode_with_label(&text.raw_bytes, &label);
+    text.content = content;
+    text.newline_style = forskscope_core::encoding::detect_newline_style(&text.content);
+    text.encoding = encoding;
+    text.had_decode_errors = had_errors;
+    text.bom = forskscope_core::BomPresence::Absent;
+    recompute_diff(tab);
+    refresh_save_target(tab);
+    refresh_save_capability(tab);
+}
+
+/// Changes the right side's encoding, guarding against silently discarding
+/// applied merge work and the undo/redo stack (F40) — the same hazard
+/// `change_diff_options` guards, since `set_encoding` also calls
+/// `recompute_diff`. `next_label` is the value read from the toolbar's
+/// `<select>` at click time.
+pub fn change_encoding(store: &mut crate::state::Store, index: usize, next_label: String) {
+    let dirty = store
+        .tabs
+        .read()
+        .get(index)
+        .map(|t| t.merge.is_dirty())
+        .unwrap_or(false);
+    if dirty {
+        store.modal.set(crate::state::Modal::ConfirmEncodingChange(
+            index, next_label,
+        ));
+    } else {
+        set_encoding(store, index, next_label);
+    }
+}
+
 /// Derive a human-readable tab title from the two file paths.
 pub(crate) fn tab_title(l: &std::path::Path, r: &std::path::Path, lang: Lang) -> String {
     use crate::i18n::t;
