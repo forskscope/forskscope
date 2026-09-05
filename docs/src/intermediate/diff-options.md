@@ -62,7 +62,7 @@ collapses. A collapsible divider (···) marks the hidden region; click it to e
 
 | Value | Effect |
 |-------|--------|
-| `0`   | Collapse all equal hunks — show only the changed lines and no context |
+| `0`   | **Never collapse** — show the entire file, every equal line included |
 | `3`   | Default — 3 lines of context above and below each change |
 | `5`   | More context, useful for reviewing function-level changes |
 | `10`  | Maximum context, useful for auditing intent in long stable sections |

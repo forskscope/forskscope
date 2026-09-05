@@ -29,7 +29,9 @@ against.
 
 ### Very large files may produce approximate diffs
 
-Files over 64 MiB trigger a time-bounded diff with a shortened deadline.
+Files over 4 MiB show a warning banner, and files over 64 MiB ask for
+confirmation before loading. The diff itself is time-bounded at 5 seconds
+regardless of file size — there is no shortened deadline for large files.
 The result is correct for the differences found but may miss some changes
 deep in a very large file. A warning is shown in the diff view when this
 occurs. Files over 4 MiB disable inline character diff automatically.

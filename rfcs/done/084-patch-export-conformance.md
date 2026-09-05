@@ -1,14 +1,6 @@
 # RFC 084: Patch Export Conformance
 
-**Status.** Accepted — review complete; implementer may start. Moves to `done/`
-when the work ships (RFC-000, 5-folder variant).
-**Scheduling.** **0.170.0** — authorized by the owner 2026-09-05. *Supersedes
-this RFC's original "post-v1" scheduling*, written while Gate D was being treated
-as the organizing axis. The documentation corrections are **not** separable from
-the fixes here: `patch-export.md`'s compatibility claim is false *because of* the
-CRLF and space defects, so correcting the prose alone would document a defect
-instead of fixing it. See `ROADMAP.md` § "Remaining proposed RFCs",
-which must list every file in this folder and nothing else (F83).
+**Status.** Implemented — `e2dd55d`, review 097 (2026-09-05). Ships in 0.170.0.
 **Tracks.** Register F91. Audit 2026-09-01 findings A9, A17, A18, docs #4, #5, #6.
 **Touches.** `core/src/patch/unified.rs`, `core/src/patch/build.rs`,
 `ui/src/ui/view/diff_actions.rs`, `crates/forskscope-core/tests/patch_apply.rs`,
