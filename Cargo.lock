@@ -1505,7 +1505,7 @@ dependencies = [
 
 [[package]]
 name = "forskscope-core"
-version = "0.169.0"
+version = "0.169.1"
 dependencies = [
  "chardetng",
  "chrono",
@@ -1519,7 +1519,7 @@ dependencies = [
 
 [[package]]
 name = "forskscope-ui"
-version = "0.169.0"
+version = "0.169.1"
 dependencies = [
  "app-json-settings",
  "dioxus",
@@ -1538,7 +1538,7 @@ dependencies = [
 
 [[package]]
 name = "forskscope-ui-logic"
-version = "0.169.0"
+version = "0.169.1"
 dependencies = [
  "forskscope-core",
 ]
