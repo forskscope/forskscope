@@ -1,7 +1,7 @@
 # RFC 085: Spreadsheet (.xlsx) Comparison Resumption
 
 **Status.** Implemented — `d492557`, review 095 (2026-09-04). Shipped on `main`;
-first released in the next cut after 0.168.0.
+first released in 0.169.0.
 **Tracks.** Lifting RFC-058's security suspension; restoring structural `.xlsx`
 comparison; gate coverage for a returning dependency.
 **Touches.** `crates/forskscope-core/src/xlsx.rs`, `forskscope-core/Cargo.toml`,

@@ -5,7 +5,68 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.168.1] — Unreleased
+## [0.169.0] — 2026-09-05
+
+**Three things ForskScope could not do, and now can.** Spreadsheet comparison
+comes back, UTF-16 files open, and patches exported from Windows files actually
+apply.
+
+### Added
+
+**Spreadsheet (`.xlsx`) comparison is restored.** It was disabled in July as a
+security measure — the parser chain reached a version of `quick-xml` with active
+denial-of-service advisories, and `.xlsx` files are archives full of untrusted
+XML, so ForskScope failed closed rather than parse them. That chain is clean
+again. Workbooks compare structurally: sheets added, removed, renamed and moved,
+and cell-level value and formula changes, shown in the ordinary side-by-side
+view. **Spreadsheets remain read-only** — comparison only, no merging or saving.
+
+**UTF-16 files can be compared.** Previously every UTF-16 file was treated as
+binary and refused, even though the decoder handled them correctly the whole
+time. Files with a byte-order mark now open as text. BOM-less UTF-16 is still
+not detected and is documented as unsupported.
+
+**You can override the detected encoding.** If ForskScope guesses wrong, choose
+the right encoding from the diff toolbar; the file re-decodes immediately and
+the chosen encoding is what a later save uses. If you have unsaved merge work,
+you are asked before it is discarded.
+
+### Fixed
+
+**Patches exported from CRLF files now apply.** Every patch exported from a file
+with Windows line endings was rejected by both `patch` and `git apply` — the
+exporter wrote Unix line endings into the patch regardless of the file. Mixed
+line endings round-trip correctly too.
+
+**Patches for paths containing spaces or special characters now apply.** File
+names with a space, quote, tab or backslash are quoted the way `git` itself
+quotes them.
+
+**A file name that is not valid UTF-8 is no longer silently shortened** in an
+exported patch. It previously produced a patch naming a *different* file than
+the one compared.
+
+**Exported patches use your context-lines setting.** They were always using the
+built-in default of three.
+
+**Exporting with no changes now tells you so**, instead of appearing to succeed
+and writing nothing.
+
+**A BOM no longer shows as a phantom first-line difference.** Comparing a file
+that has a byte-order mark against an otherwise identical file without one
+reported line 1 as changed with nothing visibly different. A BOM present when a
+file is loaded is now preserved when it is saved, by mechanism rather than by
+accident.
+
+### Documentation
+
+Corrected claims that were not true: the CLI does not accept directories (the
+Explorer does), patch export does not cover directory trees, `context_lines = 0`
+never collapses rather than collapsing everything, and large files show a
+warning at 4 MiB and ask for confirmation at 64 MiB rather than getting a
+shortened deadline. Arch Linux installation now points at the AUR package and
+explains the `cargo` provider prompt.
+
 
 ## [0.168.0] — 2026-09-02
 

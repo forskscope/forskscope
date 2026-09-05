@@ -1,6 +1,6 @@
 # RFC 084: Patch Export Conformance
 
-**Status.** Implemented — `e2dd55d`, review 097 (2026-09-05). Ships in 0.170.0.
+**Status.** Implemented — `e2dd55d`, review 097 (2026-09-05). Ships in 0.169.0.
 **Tracks.** Register F91. Audit 2026-09-01 findings A9, A17, A18, docs #4, #5, #6.
 **Touches.** `core/src/patch/unified.rs`, `core/src/patch/build.rs`,
 `ui/src/ui/view/diff_actions.rs`, `crates/forskscope-core/tests/patch_apply.rs`,
