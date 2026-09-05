@@ -1,14 +1,6 @@
 # RFC 083: Text Encoding Breadth — UTF-16, BOM, and Override
 
-**Status.** Accepted — review complete; implementer may start. Moves to `done/`
-when the work ships (RFC-000, 5-folder variant).
-**Scheduling.** **0.169.0** — authorized by the owner 2026-09-05 as the release's
-lead item. *Supersedes this RFC's original "post-v1" scheduling*, which was
-written while Gate D was being treated as the organizing axis; the owner
-corrected that framing, and F90 is scheduled on user impact instead: UTF-16 is a
-whole encoding family the product cannot open at all. See `ROADMAP.md` §
-"Remaining proposed RFCs", which must list every file in this folder and nothing
-else (F83).
+**Status.** Implemented — `bc3fd7f`, review 096 (2026-09-05). Ships in 0.169.0.
 **Tracks.** Register F90. Audit 2026-09-01 findings A8, A11, A12, docs #15, #18.
 **Touches.** `core/src/file_kind.rs`, `core/src/encoding.rs`, the diff toolbar,
 `intermediate/file-types.md`, `users/known-limitations.md`.
