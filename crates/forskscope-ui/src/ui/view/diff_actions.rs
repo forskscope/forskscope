@@ -475,15 +475,27 @@ pub(crate) fn algo_val(a: forskscope_core::DiffAlgorithm) -> &'static str {
     }
 }
 
+/// `PatchOptions` for an export, with `context_lines` following the user's
+/// settings rather than the library default — the wiring this function
+/// exists to make directly testable (RFC-084 §3).
+fn export_patch_options(store: &Store) -> forskscope_core::patch::PatchOptions {
+    forskscope_core::patch::PatchOptions {
+        context_lines: store.settings.read().context_lines,
+        ..forskscope_core::patch::PatchOptions::default()
+    }
+}
+
 /// Export the current comparison as a unified-diff patch file.
 /// Opens a native save dialog, then writes the patch text to the chosen path.
 /// Does nothing if the diff is identical (no changes to export).
-pub fn export_patch(store: &Store, index: usize) {
-    use forskscope_core::patch::{PatchOptions, patch_from_file_diff, to_unified};
+pub fn export_patch(store: &mut Store, index: usize) {
+    use forskscope_core::patch::{patch_from_file_diff, to_unified};
+
+    let options = export_patch_options(store);
 
     // Collect what we need from the tab before spawning.
-    let tab = store.tabs.read();
-    let Some(tab) = tab.get(index) else { return };
+    let tabs = store.tabs.read();
+    let Some(tab) = tabs.get(index) else { return };
 
     let patch_doc = {
         // Use the relative filename as the patch path, falling back to "file".
@@ -494,12 +506,13 @@ pub fn export_patch(store: &Store, index: usize) {
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| std::path::PathBuf::from("file"));
 
-        patch_from_file_diff(rel, &tab.diff, PatchOptions::default())
+        patch_from_file_diff(rel, &tab.diff, options)
     };
 
     let Some(patch) = patch_doc else {
         // Identical files — nothing to export. Notify but don't error.
-        let _ = tab;
+        drop(tabs);
+        store.notify_info(t(store.lang(), "Files are identical — nothing to export."));
         return;
     };
 
@@ -513,7 +526,7 @@ pub fn export_patch(store: &Store, index: usize) {
         .map(|n| format!("{}.patch", n.to_string_lossy()))
         .unwrap_or_else(|| "changes.patch".into());
 
-    let _ = tab;
+    drop(tabs);
 
     // Spawn an async task to open the save dialog and write the file.
     spawn(async move {
@@ -878,5 +891,108 @@ mod tests {
             "hi 😀\n",
             "the emoji must actually be written now that the encoding is UTF-8"
         );
+    }
+
+    // ── RFC-084 §3, §5: export_patch's context-lines wiring and its
+    // identical-files notice ────────────────────────────────────────────
+
+    /// A minimal `Normal`-mode tab reflecting `left`/`right`, with
+    /// `right_path` supplying the exported patch's filename. Only
+    /// `export_patch`'s pre-spawn logic is under test here (the settings
+    /// read and the identical-files branch), both of which return before
+    /// any file I/O or dialog, so the tab's save-related fields are unused
+    /// placeholders.
+    fn tab_for_export(
+        right_path: Option<std::path::PathBuf>,
+        left: &str,
+        right: &str,
+    ) -> CompareTab {
+        use crate::state::tab::{CompareLaunchMode, TabState};
+        use forskscope_core::compare_prep::SaveCapability;
+        use forskscope_core::document::{LoadedDocument, TextDocument};
+        use forskscope_core::encoding::{NewlineStyle, TextEncoding};
+        use forskscope_core::file_kind::FileKind;
+        use forskscope_core::{DiffOptions, MergeSession, compute_diff};
+        use forskscope_ui_logic::{CompareTabId, LoadGeneration};
+
+        fn doc(content: &str) -> LoadedDocument {
+            LoadedDocument {
+                file_id: None,
+                fingerprint_at_load: None,
+                kind: FileKind::Text,
+                bytes_len: content.len() as u64,
+                text: Some(TextDocument {
+                    content: content.to_string(),
+                    encoding: TextEncoding {
+                        label: "UTF-8".into(),
+                    },
+                    newline_style: NewlineStyle::Lf,
+                    had_decode_errors: false,
+                    bom: BomPresence::Absent,
+                    raw_bytes: Vec::new(),
+                }),
+                warnings: Vec::new(),
+            }
+        }
+
+        let diff = compute_diff(left, right, DiffOptions::default());
+        let merge = MergeSession::from_diff(&diff);
+
+        CompareTab {
+            id: CompareTabId::new(1).unwrap(),
+            load_generation: LoadGeneration::new(1).unwrap(),
+            title: "t".into(),
+            left_path: None,
+            right_path,
+            state: TabState::Ready,
+            left_doc: doc(left),
+            right_doc: doc(right),
+            diff,
+            merge,
+            diff_options: DiffOptions::default(),
+            can_save: false,
+            save_capability: SaveCapability::Saveable,
+            char_mode: false,
+            word_wrap: false,
+            focused_change: 0,
+            save_target: None,
+            launch_mode: CompareLaunchMode::Normal,
+        }
+    }
+
+    /// Falsify by reverting `export_patch_options` to `PatchOptions::default()`
+    /// (the shipped defect): `context_lines` would stay 3 regardless of the
+    /// setting, and this assertion (set to 1) fails.
+    #[test]
+    fn export_patch_options_honors_the_context_lines_setting() {
+        crate::state::with_test_store(|store| {
+            store.settings.write().context_lines = 1;
+            let options = export_patch_options(store);
+            assert_eq!(
+                options.context_lines, 1,
+                "exported context must follow the user's setting, not the library default"
+            );
+        });
+    }
+
+    /// Falsify by reverting the `None` branch to its shipped form (`let _ =
+    /// tab; return;`, no notify call): this assertion fails with no toast at
+    /// all.
+    #[test]
+    fn export_patch_notifies_when_there_is_nothing_to_export() {
+        crate::state::with_test_store(|store| {
+            let tab = tab_for_export(Some(std::path::PathBuf::from("f.txt")), "same\n", "same\n");
+            store.tabs.write().push(tab);
+
+            export_patch(store, 0);
+
+            match &*store.toast.read() {
+                Some(notice) => {
+                    assert_eq!(notice.severity, crate::state::NoticeSeverity::Info);
+                    assert_eq!(notice.message, "Files are identical — nothing to export.");
+                }
+                None => panic!("exporting identical files must notify the user, not do nothing"),
+            }
+        });
     }
 }

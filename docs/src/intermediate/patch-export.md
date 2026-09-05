@@ -12,15 +12,17 @@ After opening a file comparison, click **More ▼** in the toolbar to expand
 the advanced section, then click **Export patch**. A save dialog opens;
 choose the output path. The default filename is `<filename>.patch`.
 
-If the two files are identical, the **Export patch** button does nothing
-(there are no changes to export).
+If the two files are identical, the **Export patch** button shows a
+notice that there is nothing to export.
 
 ---
 
 ## Applying the patch
 
-The generated file is a standard POSIX unified diff with `git`-compatible
-headers. Apply it with the system `patch` tool:
+The generated file uses the unified-diff format with `git`-compatible
+headers, including git's own path-quoting conventions for names
+containing spaces or special characters. Apply it with the system `patch`
+tool:
 
 ```sh
 patch -p1 < changes.patch

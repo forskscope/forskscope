@@ -185,7 +185,7 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 button {
                     title: t(lang, "Export unified-diff patch file"),
                     aria_label: t(lang, "Export patch"),
-                    onclick: move |_| { export_patch(&store, index); },
+                    onclick: move |_| { export_patch(&mut store, index); },
                     {t(lang, "Export patch")}
                 }
                 if snap.right_is_text {

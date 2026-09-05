@@ -234,6 +234,9 @@ fn ja(key: &str) -> Option<&'static str> {
         "Profile name" => "プロファイル名",
         "Add" => "追加",
         "Files are identical" => "ファイルは同一です",
+        "Files are identical — nothing to export." => {
+            "ファイルは同一です — エクスポートする内容がありません。"
+        }
         "unsaved" => "未保存",
         "Theme" => "テーマ",
         "Language" => "言語",

@@ -379,6 +379,34 @@ fn creation_deletion_can_be_disabled() {
     let _ = fs::remove_dir_all(&base);
 }
 
+// RFC-084 §2: `display_path` must never silently drop a non-UTF-8 path
+// component — a patch naming a different, shorter path than the one
+// compared is a worse failure than a visibly-mangled one.
+#[cfg(unix)]
+#[test]
+fn non_utf8_path_component_is_never_silently_dropped() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    let bytes = b"bad\xffname.txt";
+    let path = PathBuf::from(OsStr::from_bytes(bytes));
+
+    let d = diff("a\nb\n", "a\nB\n");
+    let patch = patch_from_file_diff(path, &d, PatchOptions::default()).unwrap();
+    let text = to_unified(&patch);
+
+    assert!(
+        !text.contains("--- a/\n") && !text.contains("+++ b/\n"),
+        "a non-UTF-8 path component must not be silently dropped, leaving \
+         a bare path header:\n{text}"
+    );
+    assert!(
+        text.contains("bad\u{fffd}name.txt"),
+        "the component must survive lossily (U+FFFD in place of the \
+         invalid byte), keeping its position and the rest of its content:\n{text}"
+    );
+}
+
 #[test]
 fn pure_insertion_uses_zero_old_count() {
     // Insert two lines at the top of a file; the old side of the hunk has

@@ -184,7 +184,6 @@ impl Notice {
             severity: NoticeSeverity::Success,
         }
     }
-    #[allow(dead_code)]
     pub fn info(msg: impl Into<String>) -> Self {
         Self {
             message: msg.into(),
@@ -287,7 +286,6 @@ impl Store {
     pub fn notify_success(&mut self, msg: impl Into<String>) {
         self.toast.set(Some(Notice::success(msg)));
     }
-    #[allow(dead_code)]
     pub fn notify_info(&mut self, msg: impl Into<String>) {
         self.toast.set(Some(Notice::info(msg)));
     }

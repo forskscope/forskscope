@@ -8,6 +8,8 @@
 
 use std::path::PathBuf;
 
+use crate::diff::NewlineMarker;
+
 /// Patch serialization format. Only unified diff is supported in the
 /// v0.39.0 export slice; the enum exists so the apply half (RFC-039) can
 /// extend it without a breaking change.
@@ -118,23 +120,31 @@ impl LineOrigin {
 
 /// One line in a patch, content stored without its terminator.
 ///
-/// `no_newline_at_eof` records that this line was the final line of its
-/// source document and had no trailing newline, so the writer can emit the
-/// standard `\ No newline at end of file` marker.
+/// `newline` records the line's own terminator from the source document, so
+/// the writer can re-emit it faithfully instead of assuming LF. A source
+/// line with no trailing newline (`NewlineMarker::None`) still needs its
+/// terminator in the patch text stream itself — the writer falls back to
+/// `\n` there to separate the content line from the following
+/// `\ No newline at end of file` marker line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PatchLine {
     pub origin: LineOrigin,
     pub content: String,
-    pub no_newline_at_eof: bool,
+    pub newline: NewlineMarker,
 }
 
 impl PatchLine {
-    pub fn new(origin: LineOrigin, content: impl Into<String>, no_newline_at_eof: bool) -> Self {
+    pub fn new(origin: LineOrigin, content: impl Into<String>, newline: NewlineMarker) -> Self {
         Self {
             origin,
             content: content.into(),
-            no_newline_at_eof,
+            newline,
         }
+    }
+
+    /// `true` when this line had no trailing newline in its source document.
+    pub fn no_newline_at_eof(&self) -> bool {
+        self.newline == NewlineMarker::None
     }
 }
 

@@ -12,7 +12,7 @@ Diff and merge through Exploring 🕵️‍♀️ GUI tool, local-first, with cr
 forskscope old/src/main.rs new/src/main.rs
 ```
 
-ForskScope opens two files (or two directories) side by side, highlights every change at line and character level, and lets you apply hunks from left to right with a single keystroke. Everything runs locally — no accounts, no uploads, no telemetry.
+ForskScope opens two files side by side, highlights every change at line and character level, and lets you apply hunks from left to right with a single keystroke. It also compares two directories at once through the Explorer view. Everything runs locally — no accounts, no uploads, no telemetry.
 
 ![Side-by-side diff with per-hunk apply buttons](docs/src/assets/screenshot-diff.png)
 
@@ -98,7 +98,7 @@ git mergetool
 - **Git difftool / mergetool** compatible (`forskscope old new` or `old remote merged`)
 - **Compare profiles** — named presets for ignore-whitespace, ignore-case, and algorithm (Myers / Patience / Histogram)
 - **Session persistence** — open tabs are restored on next launch
-- **Patch export** — export a unified-diff `.patch` file from any file or directory comparison; compatible with `patch -p1` and `git apply`
+- **Patch export** — export a unified-diff `.patch` file from a file comparison; compatible with `patch -p1` and `git apply`
 - **Safe saves** — atomic write (never a partial file; not a power-loss guarantee — see [Merging](docs/src/users/merging.md)), `.bak` backup, external-change detection
 - **Search within diff** — Ctrl+F highlights matching rows across both panes
 - **Navigation history** — back/forward per explorer pane

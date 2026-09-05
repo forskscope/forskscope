@@ -35,12 +35,12 @@ impl Default for PatchOptions {
     }
 }
 
-/// A flattened (origin, content, no-newline) view of one document side,
+/// A flattened (origin, content, newline) view of one document side,
 /// produced by walking the diff rows in order.
 struct FlatLine {
     origin: LineOrigin,
     content: String,
-    no_newline_at_eof: bool,
+    newline: NewlineMarker,
 }
 
 /// Build the unified-diff hunks for a single modified file from its diff.
@@ -87,14 +87,14 @@ pub(crate) fn whole_side_lines(diff: &DiffDocument, side: Side) -> Vec<PatchLine
                 Some(PatchLine {
                     origin: side.whole_file_origin(),
                     content: l.content,
-                    no_newline_at_eof: l.no_newline_at_eof,
+                    newline: l.newline,
                 })
             }
             (Side::Right, LineOrigin::Insert) | (Side::Right, LineOrigin::Context) => {
                 Some(PatchLine {
                     origin: side.whole_file_origin(),
                     content: l.content,
-                    no_newline_at_eof: l.no_newline_at_eof,
+                    newline: l.newline,
                 })
             }
             _ => None,
@@ -139,7 +139,7 @@ fn flatten(diff: &DiffDocument) -> Vec<FlatLine> {
                         out.push(FlatLine {
                             origin: LineOrigin::Delete,
                             content: left.content.clone(),
-                            no_newline_at_eof: left.newline == NewlineMarker::None,
+                            newline: left.newline,
                         });
                     }
                 }
@@ -148,7 +148,7 @@ fn flatten(diff: &DiffDocument) -> Vec<FlatLine> {
                         out.push(FlatLine {
                             origin: LineOrigin::Insert,
                             content: right.content.clone(),
-                            no_newline_at_eof: right.newline == NewlineMarker::None,
+                            newline: right.newline,
                         });
                     }
                 }
@@ -165,13 +165,13 @@ fn push_context(out: &mut Vec<FlatLine>, row: &DiffRow) {
         out.push(FlatLine {
             origin: LineOrigin::Context,
             content: left.content.clone(),
-            no_newline_at_eof: left.newline == NewlineMarker::None,
+            newline: left.newline,
         });
     } else if let Some(right) = &row.right {
         out.push(FlatLine {
             origin: LineOrigin::Context,
             content: right.content.clone(),
-            no_newline_at_eof: right.newline == NewlineMarker::None,
+            newline: right.newline,
         });
     }
 }
@@ -237,7 +237,7 @@ fn coalesce(flat: &[FlatLine], context: usize) -> Vec<PatchHunk> {
             lines.push(PatchLine {
                 origin: fl.origin,
                 content: fl.content.clone(),
-                no_newline_at_eof: fl.no_newline_at_eof,
+                newline: fl.newline,
             });
             advance(fl, &mut old_line, &mut new_line);
         }
