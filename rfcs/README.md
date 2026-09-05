@@ -7,13 +7,14 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Accepted (5)
+## Accepted (6)
 
 Review complete; the implementer may start. Distinct from **Proposed**, which
 is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 
 | RFC | Title | State |
 |-----|-------|-------|
+| 084 | [Patch Export Conformance](./accepted/084-patch-export-conformance.md) | Accepted |
 | 074 | [v1 Release Stabilization Program](./accepted/074-v1-release-stabilization-program.md) | Accepted |
 | 078 | [Platform Runtime Acceptance and Release Evidence](./accepted/078-platform-runtime-acceptance.md) | Accepted |
 | 079 | [Microsoft Store Submission Automation](./accepted/079-microsoft-store-submission-automation.md) | Accepted |
@@ -107,7 +108,6 @@ remains No-Go.
 | 041 | [v1.0 Product Stabilization and RFC Governance](./proposed/041-v1-product-stabilization-and-rfc-governance.md) | Governance | 12/16 checklist items done; 4 require GTK or deferred |
 | 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) | Governance | Living document — pre-GTK verification phase |
 | 082 | [Write-Path Integrity](./proposed/082-write-path-integrity.md) | Correctness / security | **Accepted 2026-09-01.** Audit blocker B5 — the release-blocking cluster: save-target authority, content-identity dirty state, lossy-encode guard, save capability, secure atomic write |
-| 084 | [Patch Export Conformance](./proposed/084-patch-export-conformance.md) | Patch export | CRLF terminators, path quoting, context lines — post-v1, documentation corrections immediate |
 
 ## Archive (1)
 

@@ -1,8 +1,13 @@
 # RFC 084: Patch Export Conformance
 
-**Status.** Proposed
-**Scheduling.** Post-v1 for the fixes; **the documentation corrections are
-immediate**. Not release-blocking. See `ROADMAP.md` § "Remaining proposed RFCs",
+**Status.** Accepted — review complete; implementer may start. Moves to `done/`
+when the work ships (RFC-000, 5-folder variant).
+**Scheduling.** **0.170.0** — authorized by the owner 2026-09-05. *Supersedes
+this RFC's original "post-v1" scheduling*, written while Gate D was being treated
+as the organizing axis. The documentation corrections are **not** separable from
+the fixes here: `patch-export.md`'s compatibility claim is false *because of* the
+CRLF and space defects, so correcting the prose alone would document a defect
+instead of fixing it. See `ROADMAP.md` § "Remaining proposed RFCs",
 which must list every file in this folder and nothing else (F83).
 **Tracks.** Register F91. Audit 2026-09-01 findings A9, A17, A18, docs #4, #5, #6.
 **Touches.** `core/src/patch/unified.rs`, `core/src/patch/build.rs`,
@@ -104,13 +109,19 @@ I: a patch export that fails loudly on CRLF is a limitation, not a data-loss
 path. The proviso is the same as RFC-083's — shipping the limitation is fine only
 if the documents stop claiming otherwise.
 
-## Open questions for the owner
+## Open questions — both closed 2026-09-05
 
-- **Q1 — directory patch export:** wire it, or correct `README.md`?
-  Recommendation: **correct the README**. `patch_from_directories` exists and is
-  tested, but wiring it means a new export surface, a destination picker and a
-  progress story for a large tree — a feature, not a fix, and one nobody has
-  asked for.
-- **Q2 — CRLF priority.** This is post-v1 by the reasoning above, but it affects
-  Windows specifically and Windows is a claimed primary platform. If you would
-  rather it ship with v1, say so; the fix itself is small.
+Closed by the architect under the role division the owner stated on 2026-09-05:
+scheduling and design are the architect's, authorization the owner's.
+
+- **Q1 — directory patch export: correct `README.md`, do not wire it. Closed.**
+  `patch_from_directories` exists and is tested, but wiring it means a new export
+  surface, a destination picker and a progress story for a large tree — a
+  feature, not a conformance fix, and one nobody has asked for. **This RFC is
+  about making exported patches apply**, and a second export path would widen it
+  into something else. *Note the irony deliberately:* `patch_from_directories`
+  is another built-and-tested-and-unwired layer (F75's count), and the correct
+  answer here is still not to wire it — the fix for an unwired layer is a
+  decision about whether it should exist, not reflexive wiring.
+- **Q2 — CRLF priority: 0.170.0. Closed.** The question presupposed the post-v1
+  scheduling the owner has since overruled.

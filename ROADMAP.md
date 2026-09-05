@@ -1169,7 +1169,7 @@ were in `proposed/`. Nothing checks this — see **F83**.
 | 079 | Post-Gate-D | Microsoft Store submission automation — **accepted**; implementation blocked on F60 |
 | 080 | Post-Gate-D | Tiered directory comparison in the Explorer — **accepted**, design settled, all questions closed |
 | 082 | **Pre-v1 — audit blocker B5** | Write-path integrity: the release-blocking cluster from the 2026-09-01 independent audit (F85–F89) |
-| 084 | Post-v1 (docs immediate) | Patch export conformance: CRLF, path quoting, context lines (F91) |
+| 084 | **0.170.0** — authorized 2026-09-05 | Patch export conformance: CRLF, path quoting, context lines (F91) |
 | 081 | Deferred | AUR publication automation — **accepted**; the automation is deferred, the package recovery rides each release by hand (`release.md` step 5a) |
 
 **On the four marked *disposition needed*:** each is referenced in code that
