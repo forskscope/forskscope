@@ -317,9 +317,11 @@ fn current_bom(tab: &CompareTab) -> BomPresence {
 }
 
 /// User-facing message for a save destination `build_request` refused
-/// (review 048 C2). Not run through `t()`: `handle_result`'s own
-/// `Err(e) => store.notify(e.to_string())` arm below is the established
-/// precedent for this function's error messages staying English-only.
+/// (review 048 C2). Not run through `t()`: matches the English-only
+/// precedent `handle_result`'s `Err(e)` arm below originally set (F99:
+/// that arm has since been migrated to route through
+/// `AppError`/`SaveErrorView` rather than a raw `e.to_string()`, but the
+/// English-only convention it established stands).
 fn describe_block(reason: &SaveTargetBlockReason) -> String {
     match reason {
         SaveTargetBlockReason::Binary => "Cannot save here: the target is a binary file.".into(),

@@ -156,16 +156,16 @@ pub fn PathBar(
 
     rsx! {
         div { class: "path-bar",
-            button { class: "path-btn", title: t(lang, "Back"),    disabled: !can_back,    onclick: move |_| on_back.call(()),    "←" }
-            button { class: "path-btn", title: t(lang, "Forward"), disabled: !can_forward, onclick: move |_| on_forward.call(()), "→" }
-            button { class: "path-btn", title: t(lang, "Go up one directory"),
+            button { class: "path-btn", title: t(lang, "Back"), aria_label: t(lang, "Back"), disabled: !can_back,    onclick: move |_| on_back.call(()),    "←" }
+            button { class: "path-btn", title: t(lang, "Forward"), aria_label: t(lang, "Forward"), disabled: !can_forward, onclick: move |_| on_forward.call(()), "→" }
+            button { class: "path-btn", title: t(lang, "Go up one directory"), aria_label: t(lang, "Go up one directory"),
                 onclick: move |_| {
                     let p = path.parent().map(|p| p.to_path_buf());
                     if let Some(p) = p { on_navigate.call(p); }
                 }, "↑" }
-            button { class: "path-btn", title: t(lang, "Home directory"),
+            button { class: "path-btn", title: t(lang, "Home directory"), aria_label: t(lang, "Home directory"),
                 onclick: move |_| on_navigate.call(home_dir()), "⌂" }
-            button { class: "path-btn", title: t(lang, "Open folder…"),
+            button { class: "path-btn", title: t(lang, "Open folder…"), aria_label: t(lang, "Open folder…"),
                 onclick: move |_| {
                     let nav = on_navigate;
                     spawn(async move {
@@ -632,5 +632,64 @@ mod tests {
             assert!(!*edit_mode.read());
             assert!(!*input_err.read());
         });
+    }
+
+    // F99/C3: PathBar's Back/Forward/Up/Home/Open-folder buttons carried a
+    // `title` tooltip but their content was a bare glyph — a screen reader
+    // announces the character, not the action (F74/F80's defect class, in
+    // the one view that hadn't been touched). `aria_label` now reuses the
+    // same translated string `title` already used, so no new i18n key was
+    // needed. Whether the attribute actually reaches the platform
+    // accessibility tree is an AT-SPI/UIA assertion, not a unit test —
+    // F74 recorded that same limit, and it still holds (the same shape as
+    // review 093's disclosed-but-untestable toolbar `<select>`). What this
+    // test can and does assert: the rendered element carries an
+    // `aria-label` attribute with the expected translated text — falsify
+    // by removing any one `aria_label:` from `PathBar` and the
+    // corresponding assertion below fails.
+    #[test]
+    fn path_bar_buttons_carry_the_expected_aria_label() {
+        fn root() -> Element {
+            rsx! {
+                PathBar {
+                    path: PathBuf::from("/tmp"),
+                    can_back: true,
+                    can_forward: true,
+                    on_back: move |_| {},
+                    on_forward: move |_| {},
+                    on_navigate: move |_: PathBuf| {},
+                    lang: Lang::En,
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+
+        let aria_labels: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "aria-label",
+                    value: dioxus_core::AttributeValue::Text(s),
+                    ..
+                } => Some(s.clone()),
+                _ => None,
+            })
+            .collect();
+
+        for expected in [
+            "Back",
+            "Forward",
+            "Go up one directory",
+            "Home directory",
+            "Open folder…",
+        ] {
+            assert!(
+                aria_labels.iter().any(|l| l == expected),
+                "expected an aria-label {expected:?} among the rendered \
+                 attributes {aria_labels:?}"
+            );
+        }
     }
 }

@@ -16,6 +16,8 @@
 
 use dioxus::prelude::*;
 
+use forskscope_core::error::{AppError, AppErrorKind};
+use forskscope_core::persist::schema::PersistenceCommitError;
 use forskscope_core::persist::schema::session::runtime::{
     MigrationCommitOutcome as SessionMigrationCommitOutcome, SessionRuntimeOutcome,
     SessionRuntimeResolution,
@@ -31,6 +33,34 @@ use forskscope_ui_logic::{
 
 use crate::i18n::t;
 use crate::state::{AppSettings, Lang, Store, advance_recovery_queue};
+
+/// F99/C10: a friendly toast message for a `PersistenceCommitError`,
+/// instead of its raw `Display` text — this is the settings/session
+/// "reset and back up the original" failure path, reached only when the
+/// user's configuration is already broken, which makes a raw
+/// `No such file or directory (os error 2)` the worst possible moment to
+/// show one.
+///
+/// `PersistenceCommitError` is deliberately not `CoreError` (see its own
+/// doc comment: its two variants don't map onto `CoreError`'s IO/document
+/// shape), so `AppError::from_core` does not apply here. `AppError::new`
+/// is the sibling constructor built for exactly this — "the kind is known
+/// directly" — rather than a `CoreError`. `Conflict` maps to the existing
+/// `SaveConflict` kind (closest match: the file changed on disk since it
+/// was read) and `Io` to `FileWriteFailed`.
+///
+/// Only `message.short` is used, not `.detail`: `UserMessage`'s own doc
+/// says `short` fits a toast and `detail` fits a dialog body, and
+/// `store.notify` only ever shows a toast here — there is no dialog
+/// surface to put `detail` in without inventing one, which is out of this
+/// handoff's scope.
+fn recovery_failure_message(e: &PersistenceCommitError) -> String {
+    let kind = match e {
+        PersistenceCommitError::Conflict => AppErrorKind::SaveConflict,
+        PersistenceCommitError::Io(_) => AppErrorKind::FileWriteFailed,
+    };
+    AppError::new(kind, e.to_string()).message.short
+}
 
 // ── Settings ────────────────────────────────────────────────────────────────
 
@@ -139,7 +169,7 @@ fn settings_recovery_action(
                         store.settings.set(AppSettings::from_v2(&resolution.value));
                         store.settings_write_disabled.set(false);
                     }
-                    Err(e) => store.notify(e.to_string()),
+                    Err(e) => store.notify(recovery_failure_message(&e)),
                 }
             }
             advance_recovery_queue(store);
@@ -249,10 +279,137 @@ fn session_recovery_action(
                     Ok(()) => {
                         store.session_write_disabled.set(false);
                     }
-                    Err(e) => store.notify(e.to_string()),
+                    Err(e) => store.notify(recovery_failure_message(&e)),
                 }
             }
             advance_recovery_queue(store);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::{ConfigRootOverrideGuard, with_test_store};
+    use forskscope_core::persist::schema::session::PersistedSession;
+    use forskscope_core::persist::schema::settings::PersistedSettings;
+
+    #[test]
+    fn recovery_failure_message_maps_conflict_to_a_friendly_string_not_the_raw_one() {
+        let e = PersistenceCommitError::Conflict;
+        let msg = recovery_failure_message(&e);
+        assert_ne!(
+            msg,
+            e.to_string(),
+            "the raw PersistenceCommitError::Conflict text must not reach the user"
+        );
+        assert!(!msg.is_empty());
+    }
+
+    #[test]
+    fn recovery_failure_message_maps_io_to_a_friendly_string_not_the_raw_one() {
+        let e = PersistenceCommitError::Io("No such file or directory (os error 2)".into());
+        let msg = recovery_failure_message(&e);
+        assert_ne!(
+            msg,
+            e.to_string(),
+            "the raw OS error text must not reach the user"
+        );
+        assert!(!msg.is_empty());
+    }
+
+    // F99/C10 falsification: reverting `settings_recovery_action`'s
+    // `Err(e)` arm back to `store.notify(e.to_string())` must fail this
+    // test. It drives the real function end to end against a genuine
+    // `PersistenceCommitError::Conflict` — the overridden config
+    // directory holds different bytes than `raw_bytes` claims were read,
+    // exactly `verify_unchanged`'s real failure path — not a synthetic
+    // error value, and asserts the toast the user actually sees is the
+    // mapped message, not the raw one.
+    #[test]
+    fn settings_reset_conflict_notifies_the_mapped_message_not_the_raw_one() {
+        let dir = std::env::temp_dir().join(format!(
+            "fsk-recovery-settings-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let settings_dir = dir.join("forskscope");
+        std::fs::create_dir_all(&settings_dir).unwrap();
+        std::fs::write(settings_dir.join("settings.json"), b"{\"on_disk\":true}").unwrap();
+        let _guard = ConfigRootOverrideGuard::set(dir.clone());
+
+        let resolution = SettingsRuntimeResolution {
+            value: PersistedSettings::default(),
+            write_disabled: true,
+            outcome: SettingsRuntimeOutcome::Fresh,
+            raw_bytes: Some(b"{\"read_earlier\":true}".to_vec()),
+        };
+
+        with_test_store(|store| {
+            settings_recovery_action(
+                store,
+                &resolution,
+                SettingsRecoveryDialogAction::ResetAndBackupOriginal,
+            );
+            let toast = store
+                .toast
+                .read()
+                .clone()
+                .expect("a toast must be shown on a genuine reset failure");
+            assert_ne!(
+                toast.message,
+                PersistenceCommitError::Conflict.to_string(),
+                "the raw PersistenceCommitError text must not reach the user"
+            );
+            assert!(!toast.message.is_empty());
+        });
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // Same shape as the settings test above, for `session_recovery_action`
+    // — a separate call site sharing `recovery_failure_message`, and the
+    // handoff named both `recovery.rs:142` and `:252` as needing the fix.
+    #[test]
+    fn session_reset_conflict_notifies_the_mapped_message_not_the_raw_one() {
+        let dir = std::env::temp_dir().join(format!(
+            "fsk-recovery-session-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let session_dir = dir.join("forskscope");
+        std::fs::create_dir_all(&session_dir).unwrap();
+        std::fs::write(session_dir.join("session.json"), b"{\"on_disk\":true}").unwrap();
+        let _guard = ConfigRootOverrideGuard::set(dir.clone());
+
+        let resolution = SessionRuntimeResolution {
+            value: PersistedSession::default(),
+            write_disabled: true,
+            outcome: SessionRuntimeOutcome::Fresh,
+            raw_bytes: Some(b"{\"read_earlier\":true}".to_vec()),
+        };
+
+        with_test_store(|store| {
+            session_recovery_action(
+                store,
+                &resolution,
+                SessionRecoveryDialogAction::ResetAndBackupOriginal,
+            );
+            let toast = store
+                .toast
+                .read()
+                .clone()
+                .expect("a toast must be shown on a genuine reset failure");
+            assert_ne!(
+                toast.message,
+                PersistenceCommitError::Conflict.to_string(),
+                "the raw PersistenceCommitError text must not reach the user"
+            );
+            assert!(!toast.message.is_empty());
+        });
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
