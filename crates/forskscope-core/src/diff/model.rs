@@ -7,9 +7,6 @@ use crate::fnv1a64;
 
 use super::options::DiffOptions;
 
-/// Identity of one diff computation. Hunk IDs derived from a stale
-/// `DiffDocument` must not be used for merge operations (RFC-002 §6).
-pub type DiffId = u64;
 /// Deterministic hunk identity within one `DiffDocument`.
 pub type HunkId = u64;
 
@@ -134,7 +131,6 @@ pub enum DiffWarning {
 /// The normalized result of one diff computation.
 #[derive(Debug, Clone)]
 pub struct DiffDocument {
-    pub diff_id: DiffId,
     pub options: DiffOptions,
     pub hunks: Vec<DiffHunk>,
     pub stats: DiffStats,
@@ -145,7 +141,6 @@ impl DiffDocument {
     /// An empty placeholder used while a tab is in the Loading state (RFC-065).
     pub fn empty() -> Self {
         Self {
-            diff_id: 0,
             options: DiffOptions::default(),
             hunks: Vec::new(),
             stats: DiffStats::default(),
@@ -163,17 +158,23 @@ impl DiffDocument {
     }
 }
 
-/// Deterministic hunk identity (RFC-002 §6):
-/// `hash(diff_id, ordinal, left_range, right_range, kind)`.
+/// Deterministic hunk identity, unique **within the one `DiffDocument`
+/// this hunk belongs to, and nowhere further** (RFC-086 §4):
+/// `hash(ordinal, kind, left_range, right_range)`. Recomputing the same
+/// document with unchanged options therefore yields identical ids — the
+/// property `MergeSession`'s undo/redo log depends on — but two different
+/// documents may legitimately produce equal ids. That is safe only
+/// because ids are ever compared within one `MergeSession`, which owns
+/// exactly one document's hunks (`MergeSession::from_diff` asserts
+/// uniqueness within that scope in debug builds); comparing ids **across**
+/// documents or sessions is not a supported operation.
 pub(super) fn hunk_id_for(
-    diff_id: DiffId,
     ordinal: usize,
     kind: HunkKind,
     left: LineRange,
     right: LineRange,
 ) -> HunkId {
     let mut buf = Vec::with_capacity(64);
-    buf.extend_from_slice(&diff_id.to_le_bytes());
     buf.extend_from_slice(&(ordinal as u64).to_le_bytes());
     buf.push(match kind {
         HunkKind::Equal => 0,

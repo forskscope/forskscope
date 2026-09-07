@@ -115,14 +115,16 @@ pub enum Modal {
     ConfirmSaveAsOverwrite(usize, std::path::PathBuf),
     ConfirmReload(usize),
     ConfirmSwap(usize),
-    /// A diff-option toggle (ignore whitespace/case, algorithm) would
-    /// discard applied merge work and the undo/redo stack — `recompute_diff`
-    /// rebuilds `MergeSession` from scratch (F40). `options` is the new
-    /// value to install on confirm, computed at click time so the toolbar
-    /// doesn't need a second enum describing which control was used. Same
-    /// hazard class as `ConfirmSwap`; this does not implement RFC-015 §8
-    /// rule 4 (see `change_diff_options`'s doc comment and RFC-015's
-    /// recorded gap).
+    /// A diff-option toggle (ignore whitespace/case, algorithm) that
+    /// actually moves a hunk boundary would discard applied merge work and
+    /// the undo/redo stack — `set_diff_options` rebuilds `MergeSession`
+    /// from scratch (F40). `options` is the new value to install on
+    /// confirm, computed at click time so the toolbar doesn't need a
+    /// second enum describing which control was used. Same hazard class as
+    /// `ConfirmSwap`. RFC-086 (amending RFC-015 §8 rule 4): this modal only
+    /// fires when the recompute is *not* hunk-stable — see
+    /// `change_diff_options`'s doc comment for the compatibility check
+    /// that skips it otherwise.
     ConfirmDiffOptionChange(usize, forskscope_core::DiffOptions),
     /// RFC-083 §3: choosing a new encoding re-decodes the right side and
     /// discards applied merge work and the undo/redo stack, the same

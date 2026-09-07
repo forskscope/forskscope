@@ -326,19 +326,21 @@ fn context_lines_warning_absent_for_small_file() {
     );
 }
 
+// RFC-086 §6 falsification 1: identical recompute must preserve hunk ids —
+// falsify by reintroducing a process-global counter into `hunk_id_for`'s
+// hash, and this must fail.
 #[test]
-fn diff_hunk_ids_survive_a_second_diff_call() {
-    // Two successive diffs on the same content should produce different IDs
-    // (IDs encode a generation counter, not content hash).
+fn identical_recompute_produces_identical_hunk_ids() {
     let left = "a\nb\n";
     let right = "a\nc\n";
     let d1 = compute_diff(left, right, DiffOptions::default());
     let d2 = compute_diff(left, right, DiffOptions::default());
     let ids1: Vec<_> = d1.hunks.iter().map(|h| h.hunk_id).collect();
     let ids2: Vec<_> = d2.hunks.iter().map(|h| h.hunk_id).collect();
-    // Different diff calls → different IDs (no global ID collision).
-    assert_ne!(
+    assert_eq!(
         ids1, ids2,
-        "successive diff calls must produce fresh hunk IDs"
+        "recomputing the same document with unchanged options must yield \
+         identical hunk ids, or MergeSession's undo/redo log can never \
+         survive a recompute (F47, RFC-086)"
     );
 }

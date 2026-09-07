@@ -12,7 +12,7 @@ mod options;
 pub use engine::compute_diff;
 pub use inline::{inline_diff_rows, refine_pair};
 pub use model::{
-    DiffDocument, DiffHunk, DiffId, DiffRow, DiffStats, DiffWarning, HunkId, HunkKind, InlineDiff,
+    DiffDocument, DiffHunk, DiffRow, DiffStats, DiffWarning, HunkId, HunkKind, InlineDiff,
     InlineKind, InlineSpan, LineRange, NewlineMarker, SideLine,
 };
 pub use options::{

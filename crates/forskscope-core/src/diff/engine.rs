@@ -5,7 +5,6 @@
 //! round-trip the original line endings. The diff runs over full lines
 //! (terminator included); ignore options apply to a normalized key.
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use similar::{Algorithm, DiffOp, TextDiffConfig};
@@ -16,8 +15,6 @@ use super::model::{
     SideLine, hunk_id_for,
 };
 use super::options::{DiffAlgorithm, DiffOptions, InlineMode};
-
-static DIFF_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// One split source line: content without terminator plus its marker.
 #[derive(Debug, Clone)]
@@ -129,7 +126,6 @@ pub fn compute_diff(left_text: &str, right_text: &str, options: DiffOptions) -> 
         warnings.push(DiffWarning::DeadlineExpired);
     }
 
-    let diff_id = DIFF_COUNTER.fetch_add(1, Ordering::Relaxed);
     let mut hunks = Vec::with_capacity(ops.len());
     let mut stats = DiffStats::default();
 
@@ -146,7 +142,7 @@ pub fn compute_diff(left_text: &str, right_text: &str, options: DiffOptions) -> 
             &mut stats,
         );
         let mut hunk = DiffHunk {
-            hunk_id: hunk_id_for(diff_id, ordinal, kind, left_range, right_range),
+            hunk_id: hunk_id_for(ordinal, kind, left_range, right_range),
             kind,
             left_range,
             right_range,
@@ -166,7 +162,6 @@ pub fn compute_diff(left_text: &str, right_text: &str, options: DiffOptions) -> 
     }
 
     DiffDocument {
-        diff_id,
         options,
         hunks,
         stats,

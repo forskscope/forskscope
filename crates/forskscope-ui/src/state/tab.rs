@@ -200,29 +200,54 @@ pub fn set_diff_options(store: &mut crate::state::Store, index: usize, next: Dif
 }
 
 /// Changes a tab's diff options, guarding against silently discarding
-/// applied merge work and the undo/redo stack (F40): `recompute_diff`
-/// rebuilds `MergeSession` from scratch, so a dirty tab defers to
-/// `Modal::ConfirmDiffOptionChange` instead of applying `next` immediately —
-/// the same class of hazard `swap_sides`'s `ConfirmSwap` guard already
-/// covers for side-swapping. `next` is computed by the caller (at click
-/// time, from the tab's current `diff_options`) so this function stays
-/// agnostic to which control was used.
+/// applied merge work and the undo/redo stack (F40): `set_diff_options`
+/// rebuilds `MergeSession` from scratch, so a dirty tab would otherwise
+/// need to defer to `Modal::ConfirmDiffOptionChange` instead of applying
+/// `next` immediately — the same class of hazard `swap_sides`'s
+/// `ConfirmSwap` guard already covers for side-swapping. `next` is
+/// computed by the caller (at click time, from the tab's current
+/// `diff_options`) so this function stays agnostic to which control was
+/// used.
 ///
-/// This does not implement RFC-015 §8 rule 4 ("recomputing diff after an
-/// edit must not erase undo history"): once the user confirms, applied
-/// merges and the undo stack are discarded, not preserved and reapplied
-/// against the new hunks. Hunk identity is not stable across a recompute
-/// (`DiffId` is a fresh global counter on every `compute_diff` call), so
-/// reapplication would need a rebasing rule this slice does not implement —
-/// see RFC-015's recorded gap.
+/// RFC-086 (amending RFC-015 §8 rule 4): hunk identity is now stable
+/// across a recompute of the *same* document — `hunk_id` no longer
+/// depends on a process-global counter, only on each hunk's own position,
+/// kind, and ranges. So before deciding whether to prompt at all, this
+/// speculatively recomputes with `next` and checks whether every hunk the
+/// tab's session currently tracks still exists by id in the result
+/// (`MergeSession::is_compatible_with`). When it does — the option change
+/// did not move any hunk boundary — the new diff is installed and the
+/// existing session (applied hunks, undo/redo stacks) is left untouched
+/// entirely: no prompt, nothing lost, regardless of whether the tab was
+/// dirty. Only when a hunk boundary actually moved does this fall back to
+/// the original guard: prompt if dirty, apply immediately (discarding,
+/// since there was nothing to lose) if clean.
+///
+/// What this still does not do, per RFC-086 §5's explicit rejection:
+/// rebase the undo/redo log onto hunks that do not match by id. A
+/// structural change always discards rather than guessing which new hunk
+/// a stored transaction was meant for — the amended rule 4 only promises
+/// preservation when the hunks are unchanged, not survival across an edit.
 pub fn change_diff_options(store: &mut crate::state::Store, index: usize, next: DiffOptions) {
-    let dirty = store
-        .tabs
-        .read()
-        .get(index)
-        .map(|t| t.merge.is_dirty())
-        .unwrap_or(false);
-    if dirty {
+    let candidate_state = {
+        let tabs = store.tabs.read();
+        tabs.get(index).map(|tab| {
+            let candidate = compute_diff(tab.left_doc.diff_text(), tab.right_doc.diff_text(), next);
+            let compatible = tab.merge.is_compatible_with(&candidate);
+            (candidate, compatible, tab.merge.is_dirty())
+        })
+    };
+    let Some((candidate, compatible, dirty)) = candidate_state else {
+        return;
+    };
+
+    if compatible {
+        let mut tabs = store.tabs.write();
+        if let Some(tab) = tabs.get_mut(index) {
+            tab.diff_options = next;
+            tab.diff = candidate;
+        }
+    } else if dirty {
         store
             .modal
             .set(crate::state::Modal::ConfirmDiffOptionChange(index, next));

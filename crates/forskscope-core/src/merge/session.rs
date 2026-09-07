@@ -45,7 +45,6 @@ impl MergeHunk {
 /// and `redo` route through), not recomputed from `result_text()` on read.
 #[derive(Debug, Clone)]
 pub struct MergeSession {
-    diff_id: u64,
     hunks: Vec<MergeHunk>,
     undo_stack: Vec<MergeTransaction>,
     redo_stack: Vec<MergeTransaction>,
@@ -66,7 +65,6 @@ impl MergeSession {
     pub fn empty() -> Self {
         let hash = fnv1a64(b"");
         Self {
-            diff_id: 0,
             hunks: Vec::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
@@ -77,7 +75,7 @@ impl MergeSession {
 
     /// Build a working session from a freshly computed diff.
     pub fn from_diff(diff: &DiffDocument) -> Self {
-        let hunks = diff
+        let hunks: Vec<MergeHunk> = diff
             .hunks
             .iter()
             .map(|h| MergeHunk {
@@ -87,8 +85,12 @@ impl MergeSession {
                 rows: h.rows.clone(),
             })
             .collect();
+        debug_assert!(
+            has_unique_hunk_ids(&hunks),
+            "hunk ids must be unique within a session (RFC-086 §4) — two \
+             hunks in the same DiffDocument hashed to the same id"
+        );
         let mut session = Self {
-            diff_id: diff.diff_id,
             hunks,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
@@ -104,12 +106,35 @@ impl MergeSession {
         fnv1a64(self.result_text().as_bytes())
     }
 
-    pub fn diff_id(&self) -> u64 {
-        self.diff_id
-    }
-
     pub fn hunks(&self) -> &[MergeHunk] {
         &self.hunks
+    }
+
+    /// `true` when every hunk this session currently tracks also exists,
+    /// by id, in `diff` (RFC-086 §4/§5's compatibility test). Recomputing
+    /// the *same* document under different `DiffOptions` that happen not
+    /// to move any hunk boundary yields exactly this: identical ids, in
+    /// which case `diff`'s hunks describe the same regions this session's
+    /// working state (applied hunks, undo/redo stacks) already refers to,
+    /// and can be adopted without rebuilding anything.
+    ///
+    /// This is deliberately the *whole*-session check, not just the hunks
+    /// referenced by the undo/redo log: if even one untouched hunk moved,
+    /// `tab.diff` and this session's own `hunks` (which is what actually
+    /// renders — see `ui/view/diff.rs`) would describe different
+    /// structures, which is a hazard independent of whether anything was
+    /// ever applied.
+    ///
+    /// A `false` result means only "do not adopt `diff` as-is" — it is
+    /// never safe to bridge the gap by rebasing the log onto `diff`'s
+    /// hunks (RFC-086 §5 rejects heuristic rebasing outright: a wrong
+    /// match applies stored rows to a hunk the user did not choose).
+    /// Callers that get `false` must discard and rebuild via
+    /// [`from_diff`](Self::from_diff), never patch this session in place.
+    pub fn is_compatible_with(&self, diff: &DiffDocument) -> bool {
+        self.hunks
+            .iter()
+            .all(|h| diff.hunks.iter().any(|d| d.hunk_id == h.hunk_id))
     }
 
     /// `true` when the working result differs from the last saved state.
@@ -211,13 +236,19 @@ impl MergeSession {
     /// Shared by [`undo`](Self::undo) and [`redo`](Self::redo) — both
     /// mutate `hunks` only through here, so refreshing `current_hash` in
     /// this one place keeps it in sync for both callers.
+    ///
+    /// RFC-086 §3: a missing hunk is reported as [`CoreError::Conflict`],
+    /// the same variant [`apply_left_to_right`](Self::apply_left_to_right)
+    /// already uses for "unknown or stale hunk id" — not
+    /// `InternalInvariant`, which should mean "this cannot happen" rather
+    /// than a condition a caller mixing session state could reach.
     fn swap_in(&mut self, transaction: MergeTransaction) -> Result<MergeTransaction> {
         let hunk = self
             .hunks
             .iter_mut()
             .find(|h| h.hunk_id == transaction.hunk_id)
-            .ok_or(CoreError::InternalInvariant {
-                message: "transaction references missing hunk".into(),
+            .ok_or(CoreError::Conflict {
+                message: "unknown or stale hunk id".into(),
             })?;
         let inverse = MergeTransaction {
             hunk_id: transaction.hunk_id,
@@ -260,5 +291,77 @@ impl MergeSession {
             }
         }
         out
+    }
+}
+
+/// `true` when no two hunks share a `hunk_id` — the invariant
+/// [`MergeSession::from_diff`] asserts in debug builds (RFC-086 §4).
+fn has_unique_hunk_ids(hunks: &[MergeHunk]) -> bool {
+    let mut ids: Vec<HunkId> = hunks.iter().map(|h| h.hunk_id).collect();
+    ids.sort_unstable();
+    ids.windows(2).all(|w| w[0] != w[1])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::diff::{DiffHunk, DiffOptions, DiffStats, LineRange};
+
+    fn hunk_doc(ids: &[HunkId]) -> DiffDocument {
+        DiffDocument {
+            options: DiffOptions::default(),
+            hunks: ids
+                .iter()
+                .map(|&hunk_id| DiffHunk {
+                    hunk_id,
+                    kind: HunkKind::Insert,
+                    left_range: LineRange::new(1, 0),
+                    right_range: LineRange::new(1, 1),
+                    rows: Vec::new(),
+                })
+                .collect(),
+            stats: DiffStats::default(),
+            warnings: Vec::new(),
+        }
+    }
+
+    // RFC-086 §6 falsification 2: removing the `debug_assert` in
+    // `from_diff` must let a colliding session through silently; with it
+    // present, constructing one panics instead.
+    #[test]
+    #[should_panic(expected = "hunk ids must be unique")]
+    fn from_diff_panics_on_duplicate_hunk_ids_in_debug_builds() {
+        let doc = hunk_doc(&[1, 1]);
+        let _ = MergeSession::from_diff(&doc);
+    }
+
+    #[test]
+    fn from_diff_accepts_distinct_hunk_ids() {
+        let doc = hunk_doc(&[1, 2, 3]);
+        let session = MergeSession::from_diff(&doc);
+        assert_eq!(session.hunks().len(), 3);
+    }
+
+    // RFC-086 §3: `swap_in` — reached only through `undo`/`redo` — must
+    // report a stale/missing hunk as a real, named `Conflict`, not
+    // `InternalInvariant`. `MergeSession`'s own public API can never
+    // produce this state (hunks are never removed after construction, and
+    // every transaction is only ever pushed after a successful lookup by
+    // id), so this constructs the invalid state directly to test
+    // `swap_in`'s own contract in isolation from what callers currently do.
+    #[test]
+    fn swap_in_reports_a_missing_hunk_as_conflict_not_internal_invariant() {
+        let mut session = MergeSession::empty();
+        let stale = MergeTransaction {
+            hunk_id: 0xdead_beef,
+            previous_rows: Vec::new(),
+            previous_kind: HunkKind::Insert,
+            previous_state: HunkState::Original,
+        };
+        let result = session.swap_in(stale);
+        assert!(
+            matches!(result, Err(CoreError::Conflict { .. })),
+            "expected Conflict, got {result:?}"
+        );
     }
 }

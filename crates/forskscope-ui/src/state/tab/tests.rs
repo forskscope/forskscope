@@ -225,7 +225,13 @@ fn swap_sides_leaves_save_target_untouched_in_mergetool_mode() {
 /// F40's guard, tested directly against a real `Store` (F36) rather than
 /// only through AT-SPI runtime evidence: a dirty tab must defer a diff-
 /// option change to the confirm dialog instead of applying it and
-/// discarding the applied hunk immediately.
+/// discarding the applied hunk immediately — when the option actually
+/// moves a hunk boundary (RFC-086 §5's "structural change still discards"
+/// falsification). `ignore_case` on `dirty_tab()`'s "two"/"TWO" fixture
+/// collapses the only hunk to Equal, a genuine boundary change, not just a
+/// relabeling — falsify by having `change_diff_options` treat any dirty
+/// change as compatible, and this fails because `Modal::None` is set
+/// instead.
 #[test]
 fn change_diff_options_defers_to_confirmation_when_the_tab_is_dirty() {
     use crate::state::Modal;
@@ -238,7 +244,7 @@ fn change_diff_options_defers_to_confirmation_when_the_tab_is_dirty() {
         store.tabs.write().push(tab);
 
         let mut next = diff_options;
-        next.ignore_whitespace = true;
+        next.ignore_case = true;
         change_diff_options(store, 0, next);
 
         assert!(
@@ -248,6 +254,57 @@ fn change_diff_options_defers_to_confirmation_when_the_tab_is_dirty() {
         assert!(
             store.tabs.read()[0].merge.is_dirty(),
             "the guard must not touch merge state before confirmation"
+        );
+    });
+}
+
+/// RFC-086 §4/§5: the other half of the amended rule 4 — a dirty tab whose
+/// option change does *not* move any hunk boundary must apply immediately,
+/// without prompting, and without disturbing the applied hunk or the undo
+/// stack. `inline_mode` never affects hunk classification or ranges (it
+/// only controls inline-span decoration within a hunk), so it is
+/// compatible by construction for any content. Falsify by reverting
+/// `change_diff_options` to always prompt when dirty (the pre-RFC-086
+/// behavior): the confirm modal would appear instead of `Modal::None`, and
+/// this assertion fails.
+#[test]
+fn change_diff_options_applies_without_prompting_when_dirty_but_hunks_are_unchanged() {
+    use crate::state::Modal;
+    use crate::state::tab::change_diff_options;
+    use crate::state::with_test_store;
+    use forskscope_core::diff::InlineMode;
+
+    with_test_store(|store| {
+        let tab = dirty_tab();
+        let diff_options = tab.diff_options;
+        assert!(tab.merge.is_dirty(), "fixture must start dirty");
+        assert!(tab.merge.can_undo(), "fixture must have applied a hunk");
+        let result_before = tab.merge.result_text();
+        store.tabs.write().push(tab);
+
+        let mut next = diff_options;
+        next.inline_mode = if next.inline_mode == InlineMode::Lazy {
+            InlineMode::EagerForSmallHunks
+        } else {
+            InlineMode::Lazy
+        };
+        change_diff_options(store, 0, next);
+
+        assert!(
+            matches!(*store.modal.read(), Modal::None),
+            "hunks are unchanged, so no confirmation should be needed"
+        );
+        let tabs = store.tabs.read();
+        let tab = &tabs[0];
+        assert_eq!(tab.diff_options, next, "the new options must be installed");
+        assert!(
+            tab.merge.is_dirty() && tab.merge.can_undo(),
+            "the existing merge session must be preserved untouched, not rebuilt"
+        );
+        assert_eq!(
+            tab.merge.result_text(),
+            result_before,
+            "the applied hunk's content must survive the recompute"
         );
     });
 }
