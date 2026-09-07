@@ -119,8 +119,12 @@ Rules:
 1. Applying a transaction pushes it to `undo_stack` and clears `redo_stack`.
 2. Undo applies the inverse operation and moves the transaction to `redo_stack`.
 3. Redo reapplies the operation and moves it back to `undo_stack`.
-4. Recomputing diff after an edit must not erase undo history. **Not met** —
-   see the F40 note below.
+4. Recomputing the diff must not erase undo history **when the recomputed
+   hunks are identical to the ones the history references**. When they are
+   not, the history is discarded and the user is told before it happens.
+   **Met** as of RFC-086 (`77666ec`, 2026-09-07). *Amended by RFC-086 §5 — see
+   the amendment note below; the original wording and why it could not be kept
+   are preserved there rather than edited away.*
 5. Save marks a clean baseline revision but does not erase history automatically.
 
 **F40 (2026-08-08).** Rule 4 is unmet in the shipped implementation.
@@ -146,6 +150,31 @@ will be lost, and only recomputes if the user confirms. `is_dirty()` never
 silently becomes `false` while work is discarded out from under the user —
 but the work itself is still discarded, once confirmed. Preserve-and-reapply
 (rule 4 as originally written) remains a follow-up, not implemented here.
+
+**Amendment (RFC-086 §5, 2026-09-07). Rule 4 originally read: *"Recomputing
+diff after an edit must not erase undo history."* It stood recorded **Not met**
+for thirteen months — from F40 (2026-08-08) until this amendment — and it was
+never going to be met, because it cannot be met safely.**
+
+The cause was one input. `hunk_id_for` hashed a **process-global counter**
+alongside the hunk's own content and position, so every recompute changed every
+id and `MergeSession::swap_in` could no longer find the hunk a transaction
+referenced. RFC-086 removed the counter — it had no other consumer — and a
+recompute over unchanged content now preserves every id, so `change_diff_options`
+keeps the undo stack instead of discarding it after a prompt.
+
+**What remains impossible, and why the original wording is withdrawn rather than
+scheduled:** after a genuine *edit*, ranges shift from the applied hunk onward,
+so those hunks are legitimately different and the history refers to hunks that no
+longer exist. The only way to "preserve" it is to rebase stored rows onto
+whichever new hunk looks closest — applying a user's merge to a place they did
+not choose, silently. That is the F73/F85 defect class, and this project fails
+closed rather than guesses.
+
+So the rule now promises what the design can actually deliver. **A rule kept on
+the books as *Not met* against an outcome nobody intends to pursue is worse than
+no rule**: it reads as scheduled work, and it hid a one-line defect for over a
+year.
 
 ## 9. Editor Undo vs Core Undo
 

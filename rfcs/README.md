@@ -7,24 +7,24 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Accepted (6)
+## Accepted (5)
 
 Review complete; the implementer may start. Distinct from **Proposed**, which
 is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 
 | RFC | Title | State |
 |-----|-------|-------|
-| 086 | [Stable Hunk Identity, and an Amendment to RFC-015 Rule 4](./accepted/086-stable-hunk-identity.md) | Accepted |
 | 074 | [v1 Release Stabilization Program](./accepted/074-v1-release-stabilization-program.md) | Accepted |
 | 078 | [Platform Runtime Acceptance and Release Evidence](./accepted/078-platform-runtime-acceptance.md) | Accepted |
 | 079 | [Microsoft Store Submission Automation](./accepted/079-microsoft-store-submission-automation.md) | Accepted |
 | 080 | [Tiered Directory Comparison in the Explorer](./accepted/080-explorer-tiered-directory-comparison.md) | Accepted |
 | 081 | [AUR Publication Automation](./accepted/081-aur-publication-automation.md) | Accepted |
 
-## Implemented (59)
+## Implemented (60)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
+| 086 | [Stable Hunk Identity, and an Amendment to RFC-015 Rule 4](./done/086-stable-hunk-identity.md) | Implemented — `77666ec` |
 | 084 | [Patch Export Conformance](./done/084-patch-export-conformance.md) | Implemented — `e2dd55d` |
 | 083 | [Text Encoding Breadth — UTF-16, BOM, and Override](./done/083-text-encoding-breadth.md) | Implemented — `bc3fd7f` |
 | 085 | [Spreadsheet (.xlsx) Comparison Resumption](./done/085-spreadsheet-comparison-resumption.md) | Implemented — `d492557` |
