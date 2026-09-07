@@ -40,6 +40,8 @@ pub fn KeyboardRefModal() -> Element {
                         KbRow { keys: "Enter",          desc: t(lang, "Open directory / compare same-name file") }
                         KbRow { keys: "Space",          desc: t(lang, "Select file as comparison candidate") }
                         KbRow { keys: "Alt + ↑",        desc: t(lang, "Go up one directory (focused pane)") }
+                        KbRow { keys: "Alt + Home",     desc: t(lang, "Go to home directory (focused pane)") }
+                        KbRow { keys: "Ctrl + O",       desc: t(lang, "Open a folder (focused pane)") }
                         KbRow { keys: "◀ / ▶ buttons",  desc: t(lang, "Back / forward directory history") }
                     }
                 }
@@ -65,6 +67,53 @@ fn KbRow(keys: &'static str, desc: String) -> Element {
         div { class: "kb-row",
             kbd { class: "kb-key", "{keys}" }
             span { class: "kb-desc", "{desc}" }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::AppSettings;
+
+    // F100 falsification 3: this file had no existing test shape for "does
+    // the help modal document a shortcut" — saying so rather than
+    // inventing one silently, per the handoff. Built the same
+    // rendered-output-inspection technique F99's PathBar aria-label test
+    // used (no `dioxus-ssr` in this workspace), extended to text content:
+    // `Mutation::CreateTextNode` instead of `SetAttribute`. Falsify by
+    // removing either new `KbRow` above and the corresponding assertion
+    // fails.
+    #[test]
+    fn help_modal_documents_the_new_pathbar_shortcuts() {
+        fn root() -> Element {
+            use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+            rsx! {
+                KeyboardRefModal {}
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+
+        let texts: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+
+        for expected in [
+            "Alt + Home",
+            "Go to home directory (focused pane)",
+            "Ctrl + O",
+            "Open a folder (focused pane)",
+        ] {
+            assert!(
+                texts.iter().any(|t| t == expected),
+                "expected {expected:?} among the rendered help-modal text {texts:?}"
+            );
         }
     }
 }

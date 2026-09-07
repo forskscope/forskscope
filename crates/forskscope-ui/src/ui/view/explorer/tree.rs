@@ -15,7 +15,7 @@ use forskscope_ui_logic::AlignedRow;
 use super::{DigestKey, FocusedPane, PickKind};
 use crate::i18n::t;
 use crate::state::{Lang, Store, open_compare};
-use crate::ui::view::dir_pane::{NavHistory, TreeRow, navigate_to};
+use crate::ui::view::dir_pane::{NavHistory, TreeRow, home_dir, navigate_to};
 
 #[allow(clippy::too_many_arguments)]
 #[component]
@@ -65,6 +65,11 @@ pub fn AlignedTree(
                     } else if let Some(p) = right_dir.read().parent().map(|p| p.to_path_buf()) {
                         navigate_to(p, false, store, right_hist, right_dir);
                     }
+                    return;
+                }
+                if dispatch_pathbar_shortcut(
+                    &e, focused_pane, store, left_hist, left_dir, right_hist, right_dir,
+                ) {
                     return;
                 }
                 let (tk, is_select_key) = match e.key() {
@@ -266,5 +271,222 @@ pub fn AlignedTree(
                 }
             }
         }
+    }
+}
+
+/// F100: Home directory / Open folder, on `AlignedTree`'s focused pane —
+/// extracted from `onkeydown`'s body for direct testing, the same shape
+/// `path_input_keydown` (`dir_pane.rs`) established. Returns `true` when
+/// `e` was one of these two bindings (already consumed via
+/// `e.prevent_default()`), so the caller's `TreeKey` dispatch is not
+/// reached for them. Bare `Home` (jump to the first row) is `TreeKey::Home`,
+/// handled by that later dispatch, and must not be shadowed here.
+///
+/// The Open-folder binding's native picker cannot run headlessly — the
+/// same limit `export_patch`'s save dialog has (RFC-084) — so this only
+/// captures which pane was focused and dispatches the async task; what a
+/// completed pick *does* is [`apply_picked_folder`], tested directly.
+fn dispatch_pathbar_shortcut(
+    e: &Event<KeyboardData>,
+    focused_pane: Signal<FocusedPane>,
+    store: Store,
+    left_hist: Signal<NavHistory>,
+    left_dir: Signal<PathBuf>,
+    right_hist: Signal<NavHistory>,
+    right_dir: Signal<PathBuf>,
+) -> bool {
+    if e.modifiers().contains(Modifiers::ALT) && e.key() == Key::Home {
+        e.prevent_default();
+        let is_left = focused_pane.read().is_left();
+        apply_picked_folder(
+            home_dir(),
+            is_left,
+            store,
+            left_hist,
+            left_dir,
+            right_hist,
+            right_dir,
+        );
+        return true;
+    }
+    if e.modifiers().contains(Modifiers::CONTROL)
+        && matches!(&e.key(), Key::Character(s) if s.eq_ignore_ascii_case("o"))
+    {
+        e.prevent_default();
+        let is_left = focused_pane.read().is_left();
+        spawn(async move {
+            let picked = tokio::task::spawn_blocking(|| rfd::FileDialog::new().pick_folder())
+                .await
+                .ok()
+                .flatten();
+            if let Some(p) = picked {
+                apply_picked_folder(
+                    p, is_left, store, left_hist, left_dir, right_hist, right_dir,
+                );
+            }
+        });
+        return true;
+    }
+    false
+}
+
+/// Navigates whichever pane `is_left` selects to `picked` — shared by the
+/// Home binding (synchronous) and the Open-folder binding's completed
+/// async pick.
+fn apply_picked_folder(
+    picked: PathBuf,
+    is_left: bool,
+    store: Store,
+    left_hist: Signal<NavHistory>,
+    left_dir: Signal<PathBuf>,
+    right_hist: Signal<NavHistory>,
+    right_dir: Signal<PathBuf>,
+) {
+    if is_left {
+        navigate_to(picked, true, store, left_hist, left_dir);
+    } else {
+        navigate_to(picked, false, store, right_hist, right_dir);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::with_test_store;
+
+    fn key_event(key: Key, modifiers: Modifiers) -> Event<KeyboardData> {
+        crate::keyboard::test_support::key_event(key, modifiers)
+    }
+
+    // F100 falsification 1: removing the Home binding (or hardcoding it to
+    // a no-op) fails this — it asserts the *action* (the focused pane's
+    // directory becomes the home directory), not merely that the key was
+    // consumed.
+    #[test]
+    fn alt_home_navigates_the_focused_pane_to_the_home_directory() {
+        with_test_store(|store| {
+            let focused_pane = Signal::new_in_scope(FocusedPane::Left, ScopeId::ROOT);
+            let left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let left_dir = Signal::new_in_scope(PathBuf::from("/somewhere/deep"), ScopeId::ROOT);
+            let right_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let right_dir = Signal::new_in_scope(PathBuf::from("/other"), ScopeId::ROOT);
+
+            let e = key_event(Key::Home, Modifiers::ALT);
+            let handled = dispatch_pathbar_shortcut(
+                &e,
+                focused_pane,
+                *store,
+                left_hist,
+                left_dir,
+                right_hist,
+                right_dir,
+            );
+
+            assert!(
+                handled,
+                "Alt+Home must be recognized as this view's binding"
+            );
+            assert_eq!(*left_dir.read(), home_dir());
+            assert_eq!(
+                *right_dir.read(),
+                PathBuf::from("/other"),
+                "the unfocused pane must not move"
+            );
+        });
+    }
+
+    // F100 falsification 2 — the one that matters: with the *right* pane
+    // focused, Alt+Home must navigate the right path bar, not the left
+    // one. Falsify by hardcoding `is_left = true` in
+    // `dispatch_pathbar_shortcut` and this fails, the same regression
+    // `Alt+↑` already guards against.
+    #[test]
+    fn alt_home_targets_the_right_pane_when_the_right_pane_is_focused() {
+        with_test_store(|store| {
+            let focused_pane = Signal::new_in_scope(FocusedPane::Right, ScopeId::ROOT);
+            let left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let left_dir = Signal::new_in_scope(PathBuf::from("/left/unmoved"), ScopeId::ROOT);
+            let right_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let right_dir = Signal::new_in_scope(PathBuf::from("/somewhere/deep"), ScopeId::ROOT);
+
+            let e = key_event(Key::Home, Modifiers::ALT);
+            dispatch_pathbar_shortcut(
+                &e,
+                focused_pane,
+                *store,
+                left_hist,
+                left_dir,
+                right_hist,
+                right_dir,
+            );
+
+            assert_eq!(*right_dir.read(), home_dir());
+            assert_eq!(
+                *left_dir.read(),
+                PathBuf::from("/left/unmoved"),
+                "the unfocused left pane must not move"
+            );
+        });
+    }
+
+    #[test]
+    fn ctrl_o_is_recognized_as_this_views_binding() {
+        with_test_store(|store| {
+            let focused_pane = Signal::new_in_scope(FocusedPane::Left, ScopeId::ROOT);
+            let left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let left_dir = Signal::new_in_scope(PathBuf::from("/a"), ScopeId::ROOT);
+            let right_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let right_dir = Signal::new_in_scope(PathBuf::from("/b"), ScopeId::ROOT);
+
+            let e = key_event(Key::Character("o".into()), Modifiers::CONTROL);
+            // `spawn()` inside `dispatch_pathbar_shortcut`'s Ctrl+O branch
+            // needs an active scope on the stack, which `with_test_store`'s
+            // `in_runtime` alone does not push — same reason
+            // `path_input_keydown`'s tests use `Runtime::in_scope` for
+            // `EventHandler::new`.
+            let handled = dioxus_core::Runtime::current().in_scope(ScopeId::ROOT, || {
+                dispatch_pathbar_shortcut(
+                    &e,
+                    focused_pane,
+                    *store,
+                    left_hist,
+                    left_dir,
+                    right_hist,
+                    right_dir,
+                )
+            });
+
+            assert!(handled, "Ctrl+O must be recognized as this view's binding");
+        });
+    }
+
+    // F100 falsification 1/2 for Open-folder, on the half that can run
+    // without a real display: `apply_picked_folder` is what a completed
+    // pick calls — the native `rfd` dialog itself cannot run headlessly
+    // (same limit `export_patch`'s save dialog has, RFC-084), so this
+    // assumes a folder was already picked and asserts the action targets
+    // the focused pane, exactly as `alt_home_targets_the_right_pane_*`
+    // does for Home.
+    #[test]
+    fn apply_picked_folder_targets_the_focused_pane() {
+        with_test_store(|store| {
+            let left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let left_dir = Signal::new_in_scope(PathBuf::from("/left/unmoved"), ScopeId::ROOT);
+            let right_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let right_dir = Signal::new_in_scope(PathBuf::from("/right/unmoved"), ScopeId::ROOT);
+
+            apply_picked_folder(
+                PathBuf::from("/picked"),
+                false,
+                *store,
+                left_hist,
+                left_dir,
+                right_hist,
+                right_dir,
+            );
+
+            assert_eq!(*right_dir.read(), PathBuf::from("/picked"));
+            assert_eq!(*left_dir.read(), PathBuf::from("/left/unmoved"));
+        });
     }
 }

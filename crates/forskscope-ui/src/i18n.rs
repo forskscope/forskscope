@@ -150,6 +150,8 @@ fn ja(key: &str) -> Option<&'static str> {
         "Switch focused pane (left ↔ right)" => "フォーカスペインを切り替え（左↔右）",
         "Go up one directory (focused pane)" => "1階層上に移動（フォーカス中のペイン）",
         "Go up one directory" => "1階層上に移動",
+        "Go to home directory (focused pane)" => "ホームディレクトリに移動（フォーカス中のペイン）",
+        "Open a folder (focused pane)" => "フォルダーを開く（フォーカス中のペイン）",
         "Back / forward directory history" => "ディレクトリ履歴の前 / 次",
         "Close the active comparison tab" => "アクティブな比較タブを閉じる",
         "This keyboard reference" => "キーボードショートカット一覧",
