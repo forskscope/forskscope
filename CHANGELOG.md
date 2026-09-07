@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.170.1] — Unreleased
+
 ## [0.170.0] — 2026-09-08
 
 **Status symbols now mean the same thing everywhere, and changing a compare
