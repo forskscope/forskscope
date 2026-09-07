@@ -34,12 +34,12 @@
 .deep-scanning { padding: 1.5rem; text-align: center; color: var(--muted); }
 .deep-progress { color: var(--muted); }
 
-/* ── Status colours ── */
+/* ── Status colours (F82: glyph/class/label vocabulary shared with the
+   Explorer - see forskscope-ui-logic::explore::status::StatusGlyph) ── */
 .status-equal   { color: var(--ok); }
-.status-changed { color: var(--warn); }
-.status-only    { color: var(--muted); }
-.status-cmp     { color: var(--muted); opacity: .6; }
-.status-err     { color: var(--err); }
+.status-different { color: var(--warn); }
+.status-left-only, .status-right-only { color: var(--muted); }
+.status-computing { color: var(--muted); opacity: .6; }
 .status-symlink { color: var(--muted); font-style: italic; }
 .status-unreadable { color: var(--err); }
 

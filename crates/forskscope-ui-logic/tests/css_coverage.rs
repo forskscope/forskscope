@@ -63,6 +63,32 @@ fn conflict_navigator_css_classes_defined_in_main_css() {
     }
 }
 
+// F82: the shared status vocabulary's CSS class must exist in main.css for
+// every concept — both directory-compare views render exclusively through
+// `StatusGlyph::css_class()` now, so a class missing from the stylesheet
+// would leave a status entirely unstyled in both views at once.
+#[test]
+fn status_glyph_css_classes_defined_in_main_css() {
+    use forskscope_ui_logic::StatusGlyph;
+
+    for concept in [
+        StatusGlyph::Equal,
+        StatusGlyph::Different,
+        StatusGlyph::Computing,
+        StatusGlyph::Unreadable,
+        StatusGlyph::LeftOnly,
+        StatusGlyph::RightOnly,
+        StatusGlyph::NotCompared,
+        StatusGlyph::Symlink,
+    ] {
+        let class = concept.css_class();
+        assert!(
+            css_contains_class(MAIN_CSS, class),
+            "main.css must define CSS class .{class} (from StatusGlyph::{concept:?})"
+        );
+    }
+}
+
 #[test]
 fn row_state_gutter_symbols_are_distinct() {
     // Smoke test: RowState::gutter_symbol must be unique across variants.

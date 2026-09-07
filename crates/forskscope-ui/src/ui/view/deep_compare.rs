@@ -294,21 +294,20 @@ fn status_label(status: RecStatus, lang: Lang) -> String {
     }
 }
 
+/// F82: `(glyph, CSS class)` for `status`, from the shared vocabulary both
+/// this view and the Explorer render through
+/// (`forskscope_ui_logic::StatusGlyph`) — extracted to its own function,
+/// the same reason `status_label` above is one, so the wiring is directly
+/// testable rather than only inspectable inside `DeepRow`'s body.
+fn status_glyph(status: RecStatus) -> (char, &'static str) {
+    let concept = forskscope_ui_logic::StatusGlyph::for_rec_status(status);
+    (concept.glyph(), concept.css_class())
+}
+
 #[component]
 fn DeepRow(entry: RecEntry, lang: Lang, left_root: PathBuf, right_root: PathBuf) -> Element {
     let mut store = use_context::<Store>();
-    let (icon, cls) = match entry.status {
-        RecStatus::Changed => ("⚠", "status-changed"),
-        RecStatus::LeftOnly => ("←", "status-only"),
-        RecStatus::RightOnly => ("→", "status-only"),
-        RecStatus::Equal => ("✓", "status-equal"),
-        RecStatus::Computing => ("⊙", "status-cmp"),
-        RecStatus::Symlink => ("↗", "status-symlink"),
-        // F79: distinct glyph/class - not a verdict, so it must not share
-        // Changed's "⚠"/status-changed, which would visually claim a
-        // comparison was actually made.
-        RecStatus::Unreadable => ("⊘", "status-unreadable"),
-    };
+    let (icon, cls) = status_glyph(entry.status);
     let path_str = entry.rel_path.display().to_string();
     // F79: nothing was measured for an unreadable entry, so it can be
     // neither compared nor (per `can_copy_left_to_right`/
@@ -780,5 +779,51 @@ mod tests {
             label.to_lowercase().contains("not followed"),
             "the symlink label must say the link was not followed: {label:?}"
         );
+    }
+
+    // ── F82: shared status vocabulary ────────────────────────────────────────
+
+    // Falsification 1/2: `status_glyph` is what `DeepRow` actually calls
+    // for its `(icon, cls)` (see its body above) — if it drifted from the
+    // shared table (a hardcoded value re-added here, or one arm out of
+    // sync with `RowStatusKind`'s side in `ui-logic`), this fails, and so
+    // does the cross-view test in `ui-logic` for the six overlapping
+    // concepts.
+    #[test]
+    fn status_glyph_matches_the_shared_vocabulary_for_every_status() {
+        let statuses = [
+            RecStatus::Changed,
+            RecStatus::LeftOnly,
+            RecStatus::RightOnly,
+            RecStatus::Equal,
+            RecStatus::Computing,
+            RecStatus::Unreadable,
+            RecStatus::Symlink,
+        ];
+        for status in statuses {
+            let (icon, cls) = status_glyph(status);
+            let expected = forskscope_ui_logic::StatusGlyph::for_rec_status(status);
+            assert_eq!(
+                icon,
+                expected.glyph(),
+                "{status:?} glyph must match the shared table"
+            );
+            assert_eq!(
+                cls,
+                expected.css_class(),
+                "{status:?} CSS class must match the shared table"
+            );
+        }
+    }
+
+    // F82 §2: Equal/Different/Computing must use the target vocabulary
+    // (`=`/`≠`/`…`), not Deep Compare's old `✓`/`⚠`/`⊙` — a checkmark reads
+    // as approval, a warning triangle claims severity an ordinary diff
+    // does not have, and `…` is universally understood where `⊙` was not.
+    #[test]
+    fn deep_compare_adopts_the_target_glyphs_not_its_old_ones() {
+        assert_eq!(status_glyph(RecStatus::Equal).0, '=');
+        assert_eq!(status_glyph(RecStatus::Changed).0, '≠');
+        assert_eq!(status_glyph(RecStatus::Computing).0, '…');
     }
 }

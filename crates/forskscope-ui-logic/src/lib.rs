@@ -7,7 +7,9 @@
 //! - [`explore`] — explorer-pane logic:
 //!   - `align`: aligned-row merging for the two-pane explorer.
 //!   - `deep_filter`: `DeepFilter` + `DeepCompareSummary` for recursive compare.
-//!   - `status`: `RowStatusKind`/`StatusRow` from `EqualityEvidence`.
+//!   - `status`: `RowStatusKind`/`StatusRow` from `EqualityEvidence`, and
+//!     `StatusGlyph` — the shared glyph/CSS-class/label vocabulary both
+//!     the Explorer and Deep Compare render through (F82).
 //! - [`compare`] — diff/compare logic:
 //!   - `conflict_nav_view`: `ConflictNavView` rail snapshot for three-way merge.
 //!   - `load_guard`: pre-diff `LoadGuard` from `FileSizeClass`.
@@ -51,7 +53,7 @@ pub use compare::startup::{
 // explore
 pub use explore::align::{AlignedRow, FlatRow, RowData, compute_aligned_rows};
 pub use explore::deep_filter::{DeepCompareSummary, DeepFilter, apply_filter};
-pub use explore::status::{RowStatusKind, StatusRow};
+pub use explore::status::{RowStatusKind, StatusGlyph, StatusRow};
 
 // session
 pub use session::persistence_recovery::{

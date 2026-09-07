@@ -354,7 +354,8 @@ code.path-display {
 .pane-half:last-child { border-right: none; }
 .row-spacer { height: var(--row-h); }
 
-/* ── Digest status icons (handoff 007: RowStatusKind, not DigestState) ──
+/* ── Digest status icons (handoff 007: RowStatusKind, not DigestState;
+   F82: glyph/class/label vocabulary shared with Deep Compare) ──
    Compound `.tree-status.status-*` selectors, not bare `.status-*` - Deep
    Compare (12-view-directory-report.css) defines its own bare `.status-equal`
    etc. for a different row shape (`.dir-status`); the compound form keeps
@@ -364,7 +365,9 @@ code.path-display {
 .tree-status.status-different  { color: var(--warn, #c90); }
 .tree-status.status-left-only  { color: var(--muted); }
 .tree-status.status-right-only { color: var(--muted); }
-.tree-status.status-error      { color: var(--err); }
+/* F82: was `.status-error` - `RowStatusKind::Error` now renders as the
+   shared `Unreadable` concept, adopting Deep Compare's glyph and class. */
+.tree-status.status-unreadable { color: var(--err); }
 /* Review 077 §4a: this was written for the old spinner glyph ("⟳"); a
    rotating "…" (RowStatusKind::Computing's glyph, handoff 007) reads as a
    rendering fault, not progress. No animation for this glyph. */
@@ -800,12 +803,12 @@ code.path-display {
 .deep-scanning { padding: 1.5rem; text-align: center; color: var(--muted); }
 .deep-progress { color: var(--muted); }
 
-/* ── Status colours ── */
+/* ── Status colours (F82: glyph/class/label vocabulary shared with the
+   Explorer - see forskscope-ui-logic::explore::status::StatusGlyph) ── */
 .status-equal   { color: var(--ok); }
-.status-changed { color: var(--warn); }
-.status-only    { color: var(--muted); }
-.status-cmp     { color: var(--muted); opacity: .6; }
-.status-err     { color: var(--err); }
+.status-different { color: var(--warn); }
+.status-left-only, .status-right-only { color: var(--muted); }
+.status-computing { color: var(--muted); opacity: .6; }
 .status-symlink { color: var(--muted); font-style: italic; }
 .status-unreadable { color: var(--err); }
 
