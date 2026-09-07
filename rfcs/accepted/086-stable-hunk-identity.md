@@ -1,7 +1,8 @@
 # RFC 086: Stable Hunk Identity, and an Amendment to RFC-015 Rule 4
 
-**Status.** Proposed
-**Scheduling.** 0.171.0 candidate. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in `proposed/` and `accepted/` and nothing else (F83).
+**Status.** Accepted — review complete; implementer may start. Moves to `done/`
+when the work ships (RFC-000, 5-folder variant).
+**Scheduling.** **Accepted by the owner 2026-09-07.** Handed off as handoff 025; ships in 0.170.0. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in `proposed/` and `accepted/` and nothing else (F83).
 **Tracks.** Register F47. RFC-015 §8 rule 4, recorded **Not met** since F40.
 **Touches.** `core/src/diff/model.rs`, `core/src/diff/engine.rs`,
 `core/src/merge/session.rs`, `rfcs/done/015-undo-redo-transaction-log.md`.

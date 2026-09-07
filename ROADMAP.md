@@ -1186,7 +1186,7 @@ were in `proposed/`. Nothing checks this — see **F83**.
 
 | RFC | When | What |
 |-----|------|------|
-| 086 | 0.171.0 candidate | Stable hunk identity (F47) — `hunk_id_for` hashes a **process-global counter** alongside the hunk's own content and position, so every recompute changes every id and `swap_in` then fails with `InternalInvariant`, an internal error reachable by ordinary user action. The counter has **no other consumer** (`MergeSession::diff_id()` has zero callers). Removing it makes a recompute over unchanged content preserve the undo stack. **Also amends RFC-015 §8 rule 4**, which as written cannot be met safely — after an edit the hunks the history references are gone, and rebasing onto new hunks heuristically is the F73/F85 defect class |
+| 086 | **Accepted 2026-09-07** — handoff 025 | Stable hunk identity (F47) — `hunk_id_for` hashes a **process-global counter** alongside the hunk's own content and position, so every recompute changes every id and `swap_in` then fails with `InternalInvariant`, an internal error reachable by ordinary user action. The counter has **no other consumer** (`MergeSession::diff_id()` has zero callers). Removing it makes a recompute over unchanged content preserve the undo stack. **Also amends RFC-015 §8 rule 4**, which as written cannot be met safely — after an edit the hunks the history references are gone, and rebasing onto new hunks heuristically is the F73/F85 defect class |
 | 004 | Slice 8 | Editor adapter and CodeMirror bridge |
 | 010 | Post-slice-5 | Packaging, diagnostics, QA |
 | 016 | Slice 8 | Editor bridge security and contract |
