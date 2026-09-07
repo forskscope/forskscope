@@ -5,7 +5,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.169.1] — Unreleased
+## [0.170.0] — 2026-09-08
+
+**Status symbols now mean the same thing everywhere, and changing a compare
+option no longer costs you your undo history.**
+
+### Changed
+
+**The Explorer and the Directory Report use one set of status symbols.** They
+had drifted apart: the same two folders could show `=` in one view and `✓` in
+the other, `≠` in one and `⚠` in the other. There is now one vocabulary —
+`=` equal, `≠` different, `←`/`→` present on one side only, `…` comparing,
+`⊘` unreadable, `↗` symlink not followed, `–` not compared.
+
+**A differing file is no longer marked with a warning sign.** `⚠` claimed
+something was wrong; two files differing is the ordinary result in a comparison
+tool, and `≠` says exactly that and nothing more.
+
+**Changing a compare option keeps your merge work when it can.** Switching an
+option that does not change how the files are split into hunks — inline
+highlighting, for instance — now leaves applied merges and the undo stack
+intact, instead of asking whether to discard them. Options that genuinely
+re-segment the file still ask first, as before.
+
+### Added
+
+**Two keyboard shortcuts for the Explorer's path bar**, both acting on the
+focused pane: **Alt+Home** goes to your home directory, **Ctrl+O** opens the
+folder picker. Both were previously mouse-only. They are listed in the keyboard
+reference (Ctrl+/).
+
+### Fixed
+
+**Recovery dialogs no longer show raw operating-system errors.** If resetting
+damaged settings or session data failed, the message was whatever the OS
+said — *"No such file or directory (os error 2)"* — at the moment you were
+already trying to recover from a problem. It now explains what happened.
+
+**The path bar's navigation buttons can be read by a screen reader.** Back,
+Forward, Up, Home and Open folder announced their symbol rather than their
+purpose.
+
 
 ## [0.169.0] — 2026-09-05
 
