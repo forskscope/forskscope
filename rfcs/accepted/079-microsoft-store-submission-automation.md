@@ -317,9 +317,22 @@ makes unsettled claims recurring").
    GitHub offers no Windows 10 runner and `windows-latest` is a Server-2025
    image at NT 10.0.26100 — the gap is a machine nobody has, not a check nobody
    wrote.
-4. **Entra ID app registration.** Does the existing registration already have
-   the Partner Center permissions this needs — or is a separate registration
-   preferable, so publishing rights are isolated from whatever else it does?
+4. **Entra ID app registration. CLOSED 2026-09-08 — use the existing one.**
+   The owner has an app registration already created for ForskScope. Since it is
+   already scoped to this project, a second registration would isolate it from
+   nothing; the separation this question imagined does not exist to be made.
+
+   *(The architect misread the owner's answer twice before recording it —
+   first as a statement about the app being published to the Store, which is a
+   different thing: a browser submission needs no app registration at all, which
+   is why one can be absent after six manual publications. The registration
+   exists; the confusion was the architect's.)*
+
+   **Still outstanding, and the only part of this item that remains:** record
+   the client secret's expiry date. Original question, for the record: *does the
+   existing registration already have the Partner Center permissions this needs
+   — or is a separate registration preferable, so publishing rights are isolated
+   from whatever else it does?*
    *(Corrected 2026-08-22: this question previously asked whether a federated
    credential could be added, which contradicts the owner's §2 decision to use a
    stored client secret. Third and last stale federated-credential reference;
