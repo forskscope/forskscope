@@ -1,7 +1,7 @@
 # RFC 079: Microsoft Store Submission Automation
 
 **Status.** Accepted — review complete; implementer may start. Moves to `done/` when the work ships (RFC-000, 5-folder variant, adopted 2026-09-02).
-**Scheduling.** Post-Gate-D — accepted; **F60 is closed (2026-09-02), so implementation is no longer blocked on it.** See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in `proposed/` and `accepted/` and nothing else (F83).
+**Scheduling.** **Now — re-decided 2026-09-08, ahead of Gate D** (§9 Q1: the post-Gate-D deferral had cost six manual submissions while protecting evidence that was never produced). Blocked only on §9 Q4, which needs the owner. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in `proposed/` and `accepted/` and nothing else (F83).
 **Accepted.** 2026-08-22 by the project owner — Gate A cleared, and
 **re-confirmed the same day after a self-review found two defects**, including
 an acceptance criterion that contradicted the owner's own §2 credential
@@ -282,9 +282,25 @@ makes unsettled claims recurring").
 
 ## Open questions for the owner
 
-1. **Timing. CLOSED 2026-08-22 — after Gate D**, as §8 proposes. Implementing
-   sooner would mean a new artifact, new digests, and a re-run of M5's Windows
-   rows for a change that alters no product behaviour.
+1. **Timing. REOPENED AND RE-DECIDED 2026-09-08 — implement now, ahead of
+   Gate D.** It was closed on 2026-08-22 as *after Gate D*, reasoning that
+   *"implementing sooner would mean a new artifact, new digests, and a re-run of
+   M5's Windows rows for a change that alters no product behaviour."*
+
+   **That reasoning assumed a matrix run existed or was imminent. It did not and
+   was not.** Six releases have shipped since — 0.167.0, 0.167.1, 0.167.2,
+   0.168.0, 0.169.0, 0.170.0 — and B4 has still not been executed. So the
+   deferral protected evidence that does not exist, while the owner performed
+   **six manual MSIX submissions**, and reported on 2026-09-08 that it costs.
+
+   **This is the architect's error, and it is F65's shape:** work parked behind a
+   condition that is not moving, where the parking itself becomes the cost. The
+   correct trigger was never *Gate D passes* — it was *the manual step is
+   performed more than once*.
+
+   Nothing about implementing now damages Gate D: there is no frozen candidate
+   to invalidate, and when one is frozen the MSIX path will already be settled
+   rather than being a change made against a matrix mid-run.
 2. ~~**Signing.**~~ **Closed (2026-08-16).** `Publisher="CN=C4BA37E8-8670-4C82-8365-5ECB57373921"`
    is a Store-assigned publisher identity: Microsoft signs the package on
    submission, and no code-signing certificate of the project's own is
