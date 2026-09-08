@@ -83,14 +83,14 @@ jobs:
       - name: Build the MSIX
         id: build
         shell: pwsh
-        run: packaging/windows/store-build.ps1 -Tag "${{ steps.plan.outputs.tag }}" -OutDir "${{ runner.temp }}"
+        run: ./packaging/windows/store-build.ps1 -Tag "${{ steps.plan.outputs.tag }}" -OutDir "${{ runner.temp }}"
 
       # RFC-079 §3/§4: the expensive check, done for real - not unpacked
       # and inspected. See store-validate.ps1's own header for exactly what
       # this does and does not prove.
       - name: Validate the MSIX (contents, identity, install, launch)
         shell: pwsh
-        run: packaging/windows/store-validate.ps1 -MsixPath "${{ steps.build.outputs.msix_path }}" -Tag "${{ steps.plan.outputs.tag }}"
+        run: ./packaging/windows/store-validate.ps1 -MsixPath "${{ steps.build.outputs.msix_path }}" -Tag "${{ steps.plan.outputs.tag }}"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -132,4 +132,4 @@ jobs:
           $tag = "${{ needs.build_and_validate.outputs.tag }}"
           $msixPath = Join-Path "${{ runner.temp }}" "forskscope-$tag.msix"
           $dryRun = "${{ needs.build_and_validate.outputs.dry_run }}" -eq "true"
-          packaging/windows/store-submit.ps1 -MsixPath $msixPath -Tag $tag -DryRun:$dryRun
+          ./packaging/windows/store-submit.ps1 -MsixPath $msixPath -Tag $tag -DryRun:$dryRun
