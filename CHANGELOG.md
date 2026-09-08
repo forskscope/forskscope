@@ -5,7 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.170.1] — Unreleased
+## [0.170.1] — 2026-09-08
+
+Documentation and release-process only. **No application code changed since
+0.170.0** — this release exists so the version number matches what the
+Microsoft Store already carries.
+
+### Documentation
+
+**The Windows packaging guide told you to build the wrong version.** It said to
+package from the working tree, where `AppxManifest.xml` names the *next*
+version rather than the released one — so following it between releases
+produced an MSIX declaring a version that was never published. It now builds
+from the release tag and refuses to continue if the manifest and tag disagree.
+
+It also packed the whole packaging directory, which shipped the build script and
+the guide itself inside the product. It now stages only the executable, the
+manifest and the tile assets.
+
 
 ## [0.170.0] — 2026-09-08
 
