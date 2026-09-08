@@ -112,51 +112,15 @@ annotated tag object (`git tag -l <tag>`) and re-push.
 1. Update `pkgver` in `packaging/linux/PKGBUILD` to match the workspace version.
    A comment in the file notes this requirement; failing to do so causes stale
    Arch packages, and `cargo xtask version-sync` requires this to already match
-   before the release gates pass.
+   before the release gates pass. Leave `pkgrel=1` and `sha256sums=('SKIP')`
+   exactly as they are — both are filled in automatically at publish time (see
+   step 5 below) and neither should ever be edited by hand in this file.
 2. Tag the commit: `git tag -a ${VER} -m "Release ${VER}"`. Tags are unprefixed
    (`X.Y.Z`, no `v`) — the release workflow trigger only matches that form.
 3. Push the tag. The release workflow builds the source and platform artifacts,
    composes release notes from the tag's `CHANGELOG.md` section, and creates a
    **draft** GitHub release. It does not publish anything by itself.
-4. Refresh `PKGBUILD`'s `sha256sums` against the real, now-tagged source:
-   `updpkgsums` (or `sha256sum` the tag tarball directly) once the tag from
-   step 2 is pushed — GitHub's per-tag archive URL is fetchable immediately,
-   before the release workflow finishes. `sha256sums=('SKIP')` is committed
-   in the tree between releases because no real tag exists to hash yet; it
-   must not stay `SKIP` once one does.
-5a. **Publish to the AUR, by hand, on an Arch-family machine.** The AUR package
-   is `forskscope`; publishing is a `git push` to
-   `ssh://aur@aur.archlinux.org/forskscope.git` of a repository containing only
-   `PKGBUILD` and a generated `.SRCINFO`.
-
-   ```sh
-   git clone ssh://aur@aur.archlinux.org/forskscope.git aur-forskscope
-   cp packaging/linux/PKGBUILD aur-forskscope/
-   cd aur-forskscope
-   updpkgsums                                   # replaces SKIP with the real tag hash
-   makepkg --printsrcinfo > .SRCINFO
-   makepkg -si                                  # BUILD AND INSTALL IT — see below
-   git commit -am "${VER}" && git push
-   ```
-
-   **`makepkg -si` is not optional.** A hand-published recipe has no CI behind
-   it, and building it locally is the only thing that catches a packaging defect
-   before every Arch user compiles it. `depends` omitted `xdotool` for three
-   releases — the package installed cleanly and then failed to start — and no
-   check would have found it, because nothing builds this package but you.
-
-   **`sha256sums` must not be `SKIP` in what you push.** The committed template
-   carries `SKIP` because `pkgver` names an untagged version between releases;
-   `updpkgsums` fills it in against the tag you just pushed. RFC-081 §"What
-   `sha256sums` is for" explains why it matters — briefly, it is the only
-   integrity mechanism the AUR has.
-
-   **`pkgrel` is `1` for a new version.** Bump it only when the recipe changes
-   without a new release, and publish that the same way.
-
-   Automating this is RFC-081, deferred.
-
-5. **Publish is a separate, explicit owner action — this is the approval gate,
+4. **Publish is a separate, explicit owner action — this is the approval gate,
    not a formality.** Inspect the draft release artifacts and composed notes,
    then publish:
    ```sh
@@ -164,6 +128,45 @@ annotated tag object (`git tag -l <tag>`) and re-push.
    ```
    Before that command runs, the version is only tagged. After it runs, the
    version is published and immutable per the policy above.
+5. **Publishing the release triggers `.github/workflows/aur-publish.yml`
+   automatically** (RFC-081) — nothing further to do by hand. It checks out
+   `packaging/linux/PKGBUILD` as it existed at the tag (not whatever `main` has
+   moved to since — the post-release bump usually lands within minutes of the
+   tag being pushed, long before the owner publishes the draft), computes the
+   real source hash from the tag's own GitHub archive, and refuses to proceed
+   if `pkgver` does not match the release or `pkgrel` is not `1`. Only then does
+   it build the package (`makepkg --syncdeps`), install it (`pacman -U`), and
+   run `namcap` on both the recipe and the built package — the same check that
+   would have caught F81's missing `xdotool` `depends` entry, which three
+   hand-published releases did not. A failure at any of these steps leaves the
+   AUR untouched. Only `PKGBUILD` and a freshly generated `.SRCINFO` are ever
+   pushed; watch it run under the "AUR Publish" workflow in the Actions tab, or
+   check the [`forskscope` AUR page](https://aur.archlinux.org/packages/forskscope)
+   directly once it finishes.
+
+## A packaging-only fix, with no new release
+
+Bumping `pkgrel` — for a `PKGBUILD` change that does not need a new upstream
+version, exactly F81's `xdotool` fix — has no route through the steps above,
+because nothing in them fires without a release. Run the same workflow by hand
+instead, once the `pkgrel` bump is committed to `main`:
+
+```sh
+gh workflow run aur-publish.yml -f dry_run=false
+```
+
+It runs every check the release path does, against `main`'s current
+`PKGBUILD` — except `pkgver` must equal what the AUR **already** carries (a
+recipe fix never changes the upstream version; cut a release instead if it
+does), and `pkgrel` must be strictly greater than the AUR's. Automation never
+writes either value — only a human commit does, and the workflow's only job is
+to refuse a wrong one (RFC-081 Q3).
+
+**Rehearse first if in doubt**: `gh workflow run aur-publish.yml -f
+dry_run=true` (the default — omitting `-f dry_run` does this) runs the
+identical build, install, and `namcap` checks and stops before the push. It is
+the same code path with one fewer step, not a separate one that could pass
+while the real path fails.
 
 ---
 

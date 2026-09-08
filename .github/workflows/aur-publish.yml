@@ -1,0 +1,191 @@
+name: AUR Publish
+
+# RFC-081: automate publishing packaging/linux/PKGBUILD to the AUR.
+#
+# Two ways in, matching RFC-081 Q3's chosen design (automation never
+# writes pkgver/pkgrel - it only refuses to publish a wrong one):
+#
+#   release (release: published)  - a new upstream version. Requires the
+#     checked-out (tagged) PKGBUILD's pkgver to equal the released tag
+#     and pkgrel to be 1.
+#   workflow_dispatch, owner-triggered - a packaging-only fix with no new
+#     upstream release (e.g. F81's missing `depends`). Requires pkgver to
+#     still equal what the AUR currently carries and pkgrel to be
+#     strictly greater than the AUR's. `dry_run` (default true) runs
+#     every validation step and stops before the push - it is the only
+#     way to rehearse this workflow without touching the real AUR, and
+#     shares every step with the real path; only the final push is
+#     skipped.
+#
+# Never triggers on tag push - the release stays the approval gate the
+# owner controls (RFC-081 §4, the same reasoning RFC-079 §"The approval
+# gate must survive" sets out).
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate and build only - never push to the AUR"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Build, install, and lint the real package. Runs unconditionally -
+  # no environment, no credential - so every trigger (including a plain
+  # rehearsal) gets full validation without needing approval. ───────────
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    outputs:
+      push_needed: ${{ steps.diff.outputs.push_needed }}
+      target_pkgver: ${{ steps.prepare.outputs.target_pkgver }}
+      target_pkgrel: ${{ steps.prepare.outputs.target_pkgrel }}
+    steps:
+      - name: Determine mode
+        id: plan
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "mode=release" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=recipe-fix" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The release path must read the PKGBUILD as it existed at the
+      # tagged commit, not main's current HEAD - main normally moves to
+      # the next (unreleased) version within minutes of the tag being
+      # pushed (the post-release bump), long before the owner publishes
+      # the draft release this workflow actually triggers on.
+      - uses: actions/checkout@v7
+        if: steps.plan.outputs.mode == 'release'
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/checkout@v7
+        if: steps.plan.outputs.mode == 'recipe-fix'
+
+      # A fresh `useradd -m` user has no sudo rights, so `makepkg
+      # --syncdeps` could not install anything missing itself. Pre-install
+      # every real make/run dependency as root instead, by reading the
+      # arrays directly out of the checked-out PKGBUILD (the same way
+      # makepkg itself reads them) rather than hand-duplicating the list
+      # here, where it would silently drift from the file it describes.
+      - name: Install namcap and the package's own build/run dependencies
+        run: |
+          pacman -Sy --noconfirm --needed namcap git
+          # shellcheck disable=SC1091
+          source packaging/linux/PKGBUILD
+          pacman -S --noconfirm --needed "${makedepends[@]}" "${depends[@]}"
+
+      # makepkg refuses to run as root (by design - a malicious PKGBUILD
+      # must not get root during build). The container starts as root.
+      - name: Create an unprivileged build user
+        run: |
+          useradd -m builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+
+      - name: Prepare the real PKGBUILD (RFC-081 - hash computed here, never committed)
+        id: prepare
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          bash packaging/linux/aur-publish.sh "${{ steps.plan.outputs.mode }}" "$GITHUB_WORKSPACE/aur-work"
+          PREPARED="$GITHUB_WORKSPACE/aur-work/PKGBUILD"
+          {
+            echo "target_pkgver=$(awk -F= '/^pkgver=/{print $2; exit}' "$PREPARED")"
+            echo "target_pkgrel=$(awk -F= '/^pkgrel=/{print $2; exit}' "$PREPARED")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Copy build inputs the PKGBUILD's package() step needs
+        run: cp packaging/linux/forskscope.desktop "$GITHUB_WORKSPACE/aur-work/"
+
+      - name: Build the package (makepkg --syncdeps --noconfirm)
+        run: |
+          chown -R builder:builder "$GITHUB_WORKSPACE/aur-work"
+          su builder -c "cd '$GITHUB_WORKSPACE/aur-work' && makepkg --syncdeps --noconfirm"
+
+      - name: Install the built package (pacman -U)
+        run: pacman -U --noconfirm "$GITHUB_WORKSPACE"/aur-work/*.pkg.tar.zst
+
+      # Namcap reports missing library dependencies by design - it is
+      # what would have caught F81's missing `xdotool` without anyone
+      # thinking of it (RFC-081 §3). Both checks run: the recipe, and the
+      # package actually built from it.
+      - name: namcap the recipe
+        run: namcap "$GITHUB_WORKSPACE/aur-work/PKGBUILD"
+
+      - name: namcap the built package
+        run: namcap "$GITHUB_WORKSPACE"/aur-work/*.pkg.tar.zst
+
+      - name: Regenerate .SRCINFO
+        run: su builder -c "cd '$GITHUB_WORKSPACE/aur-work' && makepkg --printsrcinfo > .SRCINFO"
+
+      # Safe to re-run: pushing identical content twice must be a no-op,
+      # never a spurious empty commit (RFC-081 §5). Compares against the
+      # AUR's own current files (fetched by aur-publish.sh into
+      # aur-work/aur-current), not against what this run computed, so a
+      # retry after a partial failure still detects "already published".
+      - name: Check whether anything actually changed
+        id: diff
+        run: |
+          if diff -q "$GITHUB_WORKSPACE/aur-work/PKGBUILD" "$GITHUB_WORKSPACE/aur-work/aur-current/PKGBUILD" >/dev/null 2>&1 \
+             && diff -q "$GITHUB_WORKSPACE/aur-work/.SRCINFO" "$GITHUB_WORKSPACE/aur-work/aur-current/.SRCINFO" >/dev/null 2>&1; then
+            echo "Identical to what the AUR already carries - nothing to push."
+            echo "push_needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "push_needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: aur-recipe
+          path: |
+            aur-work/PKGBUILD
+            aur-work/.SRCINFO
+          retention-days: 7
+
+  # ── Push only PKGBUILD and .SRCINFO to the AUR. Gated on the
+  # `aur-publish` Environment, which is the actual credential boundary
+  # (RFC-081 Q4): the secret is available only to a job that references
+  # this environment, and the environment's own protection rules (not
+  # this workflow) decide whether that requires a reviewer. Skipped
+  # entirely for a dry run or a no-op. ──────────────────────────────────
+  publish:
+    name: Publish to the AUR
+    needs: validate
+    if: needs.validate.outputs.push_needed == 'true' && (github.event_name == 'release' || github.event.inputs.dry_run == 'false')
+    runs-on: ubuntu-latest
+    environment: aur-publish
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: aur-recipe
+          path: aur-work
+
+      - name: Configure the AUR SSH credential
+        run: |
+          install -dm700 "$HOME/.ssh"
+          printf '%s\n' "${{ secrets.AUR_SSH_KEY }}" > "$HOME/.ssh/aur_ed25519"
+          chmod 600 "$HOME/.ssh/aur_ed25519"
+          # Pinned, not fetched at runtime: aur.archlinux.org's published
+          # host key, confirmed live against the real host before this
+          # workflow shipped.
+          echo "aur.archlinux.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLIcN" > "$HOME/.ssh/known_hosts"
+
+      - name: Push PKGBUILD and .SRCINFO only
+        run: |
+          GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur_ed25519 -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
+          export GIT_SSH_COMMAND
+          git clone ssh://aur@aur.archlinux.org/forskscope.git aur-remote
+          cp aur-work/PKGBUILD aur-work/.SRCINFO aur-remote/
+          cd aur-remote
+          git -c user.name="forskscope-ci" -c user.email="ci@users.noreply.github.com" \
+            add PKGBUILD .SRCINFO
+          git -c user.name="forskscope-ci" -c user.email="ci@users.noreply.github.com" \
+            commit -m "${{ needs.validate.outputs.target_pkgver }}-${{ needs.validate.outputs.target_pkgrel }}"
+          git push

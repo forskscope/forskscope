@@ -97,9 +97,12 @@ other `libxdo.so.4` distributions.
 > Neither replaces or interferes with an existing `rustup.sh` installation.
 
 The [`PKGBUILD`](https://github.com/forskscope/forskscope/blob/main/packaging/linux/PKGBUILD)
-also ships in the repository if you prefer to build it by hand with
-`makepkg -si`. **Note this path is not covered by the project's automated
-tests** — the AUR package is what receives attention on each release.
+also ships in the repository, but it is a **template**, not something to copy
+and build directly: `sha256sums=('SKIP')` is permanent there, filled in with a
+real, verified hash only by the automation that publishes to the AUR on each
+release, which also builds the package and runs `namcap` on it before
+publishing — the AUR copy is what is actually checked, not this file. Building
+this exact copy by hand with `makepkg -si` skips that verification entirely.
 
 ### Build from source
 
