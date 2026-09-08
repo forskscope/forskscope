@@ -80,13 +80,6 @@ jobs:
         with:
           ref: ${{ steps.plan.outputs.tag }}
 
-      - name: DEBUG diagnose working directory
-        shell: pwsh
-        run: |
-          Write-Host "PWD: $(Get-Location)"
-          Write-Host "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
-          Get-ChildItem -Path "packaging/windows" | Format-Table Name
-
       - name: Build the MSIX
         id: build
         shell: pwsh
