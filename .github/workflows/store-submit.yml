@@ -1,0 +1,135 @@
+name: Store Submit
+
+# RFC-079: build a Store-ready MSIX and submit it to Partner Center.
+#
+# Triggers on `release: published` - never on tag push, for the same reason
+# aur-publish.yml (RFC-081) does not: the owner's publish click is the
+# approval gate this submission inherits, and packaging from a tag that has
+# only been pushed, not published, would submit a build the owner has not
+# yet approved (RFC-079 "The approval gate must survive").
+#
+# `workflow_dispatch` exists for two things, sharing every step with the
+# release path except which tag is targeted:
+#   - rehearsal (`dry_run: true`, the default) - authenticate and read the
+#     application resource only, never create/upload/commit anything;
+#   - a manual re-submission of an already-published release
+#     (`dry_run: false`) - RFC-079 §5's documented recovery path for a
+#     post-submission failure ("correct the package and submit again,
+#     manually or by re-running the workflow").
+#
+# Unlike aur-publish.yml's dry run, which needs no credential at all, a
+# Store dry run still authenticates and reads Partner Center - the AUR is
+# anonymously readable over HTTPS and Partner Center is not, so there is no
+# credential-free way to prove connectivity (RFC-079 Testing section's own
+# suggested mitigation is exactly this authenticated read). The
+# `store-publish` environment therefore gates both the dry-run and the real
+# path equally, not only the real one.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Released tag to build and (re-)submit, e.g. 0.170.1"
+        required: true
+      dry_run:
+        description: "Authenticate and read only - never create, upload, or commit a submission"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Build and validate the real package. No environment, no credential -
+  # runs unconditionally so every trigger, including a dry run, gets full
+  # build+install+launch validation without needing approval. ─────────────
+  build_and_validate:
+    name: Build and validate
+    runs-on: windows-latest
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      dry_run: ${{ steps.plan.outputs.dry_run }}
+    steps:
+      - name: Determine the target tag and dry-run mode
+        id: plan
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "release") {
+            $tag = "${{ github.event.release.tag_name }}"
+            $dryRun = "false"
+          } else {
+            $tag = "${{ github.event.inputs.tag }}"
+            $dryRun = "${{ github.event.inputs.dry_run }}"
+          }
+          if (-not $tag) {
+            Write-Host "::error::no tag resolved - workflow_dispatch requires the tag input"
+            exit 1
+          }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "dry_run=$dryRun" >> $env:GITHUB_OUTPUT
+
+      # The release path must read the repository as it existed at the
+      # tagged commit, not main's current HEAD - main normally moves to the
+      # next (unreleased) version within minutes of the tag being pushed
+      # (the post-release bump), long before the owner publishes the draft
+      # release this workflow actually triggers on. Same reasoning as
+      # aur-publish.yml (RFC-081) and packaging/windows/README.md (F103).
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.plan.outputs.tag }}
+
+      - name: Build the MSIX
+        id: build
+        shell: pwsh
+        run: packaging/windows/store-build.ps1 -Tag "${{ steps.plan.outputs.tag }}" -OutDir "${{ runner.temp }}"
+
+      # RFC-079 §3/§4: the expensive check, done for real - not unpacked
+      # and inspected. See store-validate.ps1's own header for exactly what
+      # this does and does not prove.
+      - name: Validate the MSIX (contents, identity, install, launch)
+        shell: pwsh
+        run: packaging/windows/store-validate.ps1 -MsixPath "${{ steps.build.outputs.msix_path }}" -Tag "${{ steps.plan.outputs.tag }}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: store-msix
+          path: ${{ steps.build.outputs.msix_path }}
+          retention-days: 7
+
+  # ── Submit to Partner Center, gated on the `store-publish` Environment -
+  # the actual credential boundary (RFC-079 §2, same reasoning as
+  # aur-publish.yml's `aur-publish` environment for RFC-081): the secret is
+  # available only to a job that references this environment, and the
+  # environment's own protection rules decide whether that requires a
+  # reviewer. Runs for both dry-run and real submissions - see the header
+  # comment above for why this one cannot be credential-free the way
+  # aur-publish.yml's dry run is. ────────────────────────────────────────
+  publish:
+    name: Submit to the Microsoft Store
+    needs: build_and_validate
+    runs-on: windows-latest
+    environment: store-publish
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.build_and_validate.outputs.tag }}
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: store-msix
+          path: ${{ runner.temp }}
+
+      - name: Submit (or, in dry-run, authenticate and read only)
+        shell: pwsh
+        env:
+          STORE_TENANT_ID: ${{ secrets.STORE_TENANT_ID }}
+          STORE_CLIENT_ID: ${{ secrets.STORE_CLIENT_ID }}
+          STORE_CLIENT_SECRET: ${{ secrets.STORE_CLIENT_SECRET }}
+          STORE_APP_ID: ${{ secrets.STORE_APP_ID }}
+        run: |
+          $tag = "${{ needs.build_and_validate.outputs.tag }}"
+          $msixPath = Join-Path "${{ runner.temp }}" "forskscope-$tag.msix"
+          $dryRun = "${{ needs.build_and_validate.outputs.dry_run }}" -eq "true"
+          packaging/windows/store-submit.ps1 -MsixPath $msixPath -Tag $tag -DryRun:$dryRun

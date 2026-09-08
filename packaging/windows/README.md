@@ -1,8 +1,14 @@
 # Windows Packaging — MSIX for the Microsoft Store
 
-**Status: manual.** Automating this is RFC-079, accepted and not implemented.
-Until it is, these are the steps, and **three of them exist to avoid mistakes
-this file previously invited.**
+**Status: automated.** `.github/workflows/store-submit.yml` (RFC-079) builds,
+validates, and submits the MSIX on every published release. What follows is
+the manual equivalent — useful for understanding what the workflow does, for
+rehearsing with `workflow_dispatch` + `dry_run: true`, or as a fallback if
+the workflow is broken. **Three of the steps below exist to avoid mistakes
+this file previously invited**, and the workflow avoids the same three by
+construction (`packaging/windows/store-build.ps1` checks out the tag the
+same way "Before you start" says to below, and stages only the four files
+step 2 names — it never packs the whole `packaging/windows/` directory).
 
 ---
 
@@ -94,26 +100,45 @@ is a Store-assigned publisher identity — Microsoft signs the package on
 submission, and no code-signing certificate of this project's own is involved
 (RFC-079 §2a).
 
-> **This section is deliberately thin, and that is a gap, not a style choice.**
-> The Partner Center steps live only in the maintainer's head and in the browser
-> UI. RFC-079 §6 requires them written down; until they are, a second person
-> cannot publish a release. **If you are the maintainer reading this after
-> performing a submission, write what you actually did here.**
+## What the automated workflow does instead
 
-## What automating this would take
+`.github/workflows/store-submit.yml`, triggered by `release: published`:
 
-RFC-079 (accepted, `rfcs/accepted/079-*.md`) submits the package through the
-Partner Center API from CI. It is **not blocked on engineering** — one question
-is open, and it needs the owner:
+1. Checks out the released tag (not `main` — see "Before you start" above)
+   and runs `store-build.ps1`, which does exactly steps 1–3 above.
+2. Runs `store-validate.ps1`: manifest version against the tag,
+   `Identity`/`Publisher`/`PublisherDisplayName` against
+   `store-listing/en-us/identity.toml`, every asset the manifest
+   references is present, **and the package actually installs and
+   launches** — signed with a throwaway validation-only certificate
+   generated on the runner, never the real (unsigned) upload.
+3. Submits through the Microsoft Store submission API: deletes any existing
+   pending submission for this app first (so a re-run replaces rather than
+   duplicates), creates a new submission, replaces only its
+   `applicationPackages` (never listings, pricing, or images —
+   `store-listing/` content is published by hand, RFC-079 §9 Q5), uploads
+   the package, commits, and polls status without waiting for
+   certification to finish.
 
-- **Does the existing Entra ID app registration already carry Partner Center
-  permissions, or is a separate registration preferable** so publishing rights
-  are isolated? (RFC-079 §9 Q4.)
-- **Whichever is chosen, record the client secret's expiry.** Entra ID secrets
-  last 24 months at most and often less; a lapsed one breaks releases silently,
-  at whatever moment it happens.
+**Rehearse it** with `gh workflow run store-submit.yml -f tag=<a released tag>
+-f dry_run=true` (the default). This authenticates against Partner Center and
+reads the application resource — proving the credential and connectivity —
+and stops there. It shares every line of code with the real path up to that
+point; only the create/upload/commit sequence after it is skipped.
 
-RFC-079 §9 Q5 also requires, *before* implementation: the Store listing content
-gets a tracked home in this repository as data, screenshots become committed
-assets, and manifest-versus-listing precedence is written down. That is not
-automation — it is making the manual thing reviewable first.
+**Re-submit an already-published release** (a packaging-only fix, or
+recovering from a rejected submission) with `-f dry_run=false`. Automation
+never re-triggers on its own; this is the same recovery path RFC-079 §5
+documents, run by hand.
+
+Owner setup, once: a GitHub **Environment** named `store-publish`
+(Settings → Environments — add required reviewers there if you want a human
+check before every real submission), holding four secrets:
+`STORE_TENANT_ID`, `STORE_CLIENT_ID`, `STORE_CLIENT_SECRET` (the Entra ID app
+registration's tenant, client, and client secret — RFC-079 §9 Q4: the
+existing ForskScope registration, not a new one), and `STORE_APP_ID` (the
+Partner Center application ID, distinct from the public Store product ID in
+`installation.md`'s link). **Record `STORE_CLIENT_SECRET`'s expiry** in
+`docs/src/maintainers/threat-model.md` when you create it — Entra ID secrets
+last 24 months at most, often less, and a lapsed one breaks silently
+otherwise.

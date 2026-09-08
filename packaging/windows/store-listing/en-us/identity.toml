@@ -1,0 +1,23 @@
+# Fixed Microsoft Store app identity for ForskScope.
+#
+# These three values were registered with Partner Center when the app was
+# first reserved there (the app-identity reservation step, done once, by
+# hand, outside this repository) and Partner Center ties the app's identity
+# to them permanently — none of the three can change without re-reserving
+# under a new identity. They are already tracked in
+# packaging/windows/AppxManifest.xml (Identity/Name, Identity/Publisher,
+# Properties/PublisherDisplayName); this file exists so store-validate.ps1
+# has something local to check the manifest against without needing a live
+# Partner Center credential (RFC-079 §3, §7).
+#
+# This is a self-consistency check, not a live one: it catches an
+# AppxManifest.xml edit that drifts from what this project already recorded
+# as the registered identity. It cannot catch a genuine mismatch against
+# Partner Center's own live record — Partner Center offers no anonymous read
+# for that, unlike the AUR (RFC-081), so that cross-check exists only inside
+# the real submission call, gated on the credential this workflow's
+# `validate` job never has.
+
+identity_name = "nabbisen.forskscope"
+publisher = "CN=C4BA37E8-8670-4C82-8365-5ECB57373921"
+publisher_display_name = "nabbisen"

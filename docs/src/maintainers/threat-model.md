@@ -179,6 +179,58 @@ a `CommandDefinition` with an allowlist of argument templates.
 **Residual concerns:** none beyond the user choosing to launch an untrusted
 external tool, which is outside ForskScope's control.
 
+### 6. Publishing credential: Microsoft Store client secret (CI, not the application)
+
+**This is not an application data flow** — it does not run on a user's
+machine and ships in no release artifact. It is recorded here because it is
+this project's highest-impact credential: its compromise lets someone submit
+a package to the Microsoft Store under ForskScope's own Store listing.
+
+**Flow:** `.github/workflows/store-submit.yml`'s `publish` job (RFC-079)
+authenticates to the Microsoft Store submission API with an Entra ID
+client-credentials flow — tenant ID, client ID, and client secret — then
+creates, uploads to, and commits a Store submission.
+
+**Controls:**
+- The secret (`STORE_CLIENT_SECRET`, alongside `STORE_TENANT_ID`,
+  `STORE_CLIENT_ID`, `STORE_APP_ID`) lives only in the `store-publish` GitHub
+  Environment, never a plain repository secret. Only a job that explicitly
+  references that environment can read it; `build_and_validate` (the job
+  that builds and installs the package) does not, and never requests it, so
+  a validation failure never even touches the credential.
+- **What the environment does *not* narrow, unlike `aur-publish`
+  (RFC-081):** a Store dry run still authenticates and reads Partner
+  Center, because Partner Center has no anonymous read the way the AUR's
+  git remote does. The `store-publish` environment therefore gates the
+  dry-run and real paths equally — a rehearsal is not credential-free here.
+- The Entra ID app registration is the project's existing one (RFC-079 §9
+  Q4, closed 2026-09-08) — scoped to whatever Partner Center permissions
+  submission requires, not broader.
+- A dedicated key was not created for this credential the way RFC-081's AUR
+  key was; the same caveat applies in reverse here by construction — Entra
+  ID app registrations are not shared with any other credential in this
+  project, so there is no separate "dedicated vs. personal" question to
+  raise.
+
+**Residual concerns:**
+- **Compromise impact:** whoever holds this secret can submit arbitrary
+  packages to the Store under ForskScope's listing. Certification is
+  Microsoft's own backstop against a malicious *binary*, but a submission
+  that passes certification would still reach users as an official update.
+  This is the reasoning for the environment gate above, not a claim that
+  gate is sufficient on its own — a compromised secret with no required
+  reviewer on the environment could still submit before anyone notices.
+- **Expiry:** Entra ID client secrets expire at 24 months at the most, often
+  less under tenant policy, and a lapsed secret breaks submission silently
+  at whatever release happens to land after expiry — `store-submit.ps1`
+  reports the auth failure with expiry named as the likely cause, but that
+  is a loud failure *at* expiry, not a warning *before* it.
+  **`STORE_CLIENT_SECRET` expires: `<owner fills in when the secret is
+  created>`.** Nothing in this repository can supply that date — it is
+  known only inside Partner Center at creation time — so this line is the
+  place it must be recorded once it is, and the place to check before
+  assuming a submission failure is a code problem.
+
 ---
 
 ## What ForskScope deliberately does not do
@@ -284,3 +336,4 @@ exception or split the dependency before release.
 | v0.165.0 | Release UI build compatibility with `dioxus-desktop`/`wry` | Enables `wry/devtools` method surface without `dioxus-devtools`; removes default Dioxus menu bar |
 | v0.165.0 | Release archive and CI gates aligned | Archive layout, version sync, i18n coverage, audit policy, and dependency paths are enforced before release artifact creation |
 | v0.165.1 | Versioned settings/session persistence (RFC-076) — closes audit finding B2 | Core owns a schema-versioned envelope; a future-version or corrupt file is preserved untouched and reported via a blocking recovery dialog rather than silently collapsed to defaults; legacy migration and explicit reset both create a non-overwriting backup before any write |
+| v0.170.2 | Microsoft Store submission automation (RFC-079) — publishing credential recorded | New CI-only data flow (§6): `store-submit.yml`'s `publish` job holds an Entra ID client secret in the `store-publish` GitHub Environment, gated the same way RFC-081's AUR key is, except a Store dry run cannot be credential-free (no anonymous Partner Center read exists) |

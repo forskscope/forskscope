@@ -1,0 +1,65 @@
+# Microsoft Store listing content for ForskScope, en-us / neutral market.
+#
+# RFC-079 §9 Q5: tracked here so the Store listing has a reviewable,
+# version-controlled source, even though *publishing* it to Partner Center
+# stays a manual step (RFC-079 is a non-goal for listing-metadata
+# submission). This file is what a maintainer copies from when updating the
+# listing by hand; store-submit.ps1 never reads it — it only ever touches
+# `applicationPackages` (RFC-079 §5, "listing-metadata submission... Q5 keeps
+# manual by decision").
+#
+# See ../README.md for the manifest-versus-listing precedence this file's
+# existence implies.
+
+[product]
+title = "ForskScope"
+publisher_display_name = "nabbisen"
+
+# Partner Center's short/"about" field, ~200 characters.
+short_description = """
+Local-first diff and merge tool with side-by-side file comparison and a \
+two-pane directory explorer. No accounts, no uploads, no telemetry.
+"""
+
+# Partner Center's full description field, up to 10,000 characters.
+long_description = """
+ForskScope opens two files side by side, highlights every change at line \
+and character level, and lets you apply hunks from left to right with a \
+single keystroke. It also compares two directories at once through the \
+Explorer view, showing at a glance which files match, differ, or exist on \
+only one side.
+
+Everything runs locally. ForskScope makes no network requests, has no \
+accounts, and collects no telemetry — your files never leave your machine.
+
+Highlights:
+- Side-by-side diff with per-hunk apply (F7 / F8 to navigate, Enter to apply)
+- Character-level highlighting within changed lines
+- Two-pane directory Explorer for comparing whole folder trees
+- Git difftool and mergetool integration
+- Multiple diff algorithms (Myers, Histogram), ignore-whitespace and \
+ignore-case modes
+- Encoding detection and override, including UTF-16 and BOM handling
+- Dark and light themes, adjustable density and font size
+"""
+
+# Partner Center allows up to 7 search terms.
+search_terms = [
+  "diff",
+  "merge",
+  "compare files",
+  "compare folders",
+  "git difftool",
+]
+
+[screenshots]
+# Captured on Linux (Wayland/niri) against the real, running application —
+# this project's sandbox has no Windows GUI to capture from natively. The
+# rendered UI is the same Dioxus/WebView surface the Windows build ships
+# (same RSX, same CSS), but these are not native Windows captures. Replace
+# with native Windows screenshots if/when available; until then these are
+# real screenshots of the real app, not mockups.
+files = [
+  "screenshots/01-diff-view.png",
+  "screenshots/02-explorer-view.png",
+]

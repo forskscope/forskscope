@@ -143,6 +143,23 @@ annotated tag object (`git tag -l <tag>`) and re-push.
    pushed; watch it run under the "AUR Publish" workflow in the Actions tab, or
    check the [`forskscope` AUR page](https://aur.archlinux.org/packages/forskscope)
    directly once it finishes.
+6. **Publishing the release also triggers `.github/workflows/store-submit.yml`
+   automatically** (RFC-079) — nothing further to do by hand. It checks out
+   the released tag, builds the MSIX, validates it (manifest version against
+   the tag, `Identity`/`Publisher`/`PublisherDisplayName` against the tracked
+   Store identity, every manifest-referenced asset present, and — the
+   expensive check — **installs and launches the package for real**, signed
+   with a throwaway validation-only certificate the workflow generates and
+   discards; the real, unsigned MSIX that gets uploaded is never touched by
+   that signing step), then submits through the Microsoft Store submission
+   API. **This is submission, not publication** — Microsoft's certification
+   runs asynchronously and can take hours to days, so the workflow reports a
+   submission ID and its status at the time polling ended and stops; watch
+   [Partner Center](https://partner.microsoft.com/dashboard) for the
+   certification outcome. A failure before submission leaves Partner Center
+   untouched; a rejection after submission arrives by mail and is a human
+   recovery (see below) — never fixed by editing the published GitHub
+   release, which is immutable.
 
 ## A packaging-only fix, with no new release
 
@@ -167,6 +184,29 @@ dry_run=true` (the default — omitting `-f dry_run` does this) runs the
 identical build, install, and `namcap` checks and stops before the push. It is
 the same code path with one fewer step, not a separate one that could pass
 while the real path fails.
+
+## Resubmitting to the Store, with no new release
+
+Recovering from a rejected Store submission, or a packaging-only fix, has no
+route through the automatic trigger either — nothing in
+`store-submit.yml` fires without a **new** release being published. Run it by
+hand against the already-published tag instead:
+
+```sh
+gh workflow run store-submit.yml -f tag=0.170.1 -f dry_run=false
+```
+
+It builds and validates exactly as the release trigger does, then deletes
+any existing pending submission for the app before creating a new one — a
+second run never leaves two submissions in flight, it replaces the first.
+
+**Rehearse first if in doubt**: `gh workflow run store-submit.yml -f
+tag=0.170.1 -f dry_run=true` (the default) authenticates against Partner
+Center and reads the application's current state — proving the credential
+and connectivity — then stops before creating, uploading, or committing
+anything. Unlike the AUR path, this dry run still needs the real credential:
+Partner Center has no anonymous read the way the AUR's git remote does, so
+there is no zero-credential way to prove the connection works.
 
 ---
 
