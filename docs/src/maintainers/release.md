@@ -161,6 +161,31 @@ annotated tag object (`git tag -l <tag>`) and re-push.
    recovery (see below) — never fixed by editing the published GitHub
    release, which is immutable.
 
+   > ### Do not open an automated submission in Partner Center
+   >
+   > **Once the API creates a submission, change it only through the API.**
+   > This is Microsoft's own constraint, not a project convention:
+   >
+   > > If you use Partner Center to change a submission that you originally
+   > > created by using the API, **you will no longer be able to change or
+   > > commit that submission by using the API**. In some cases, the submission
+   > > could be left in an error state where it cannot proceed … you must
+   > > delete the submission and create a new submission.
+   >
+   > **This is easy to walk into precisely because the manual habit is the
+   > right one everywhere else.** Every release before RFC-079 was published by
+   > opening Partner Center and working there, so opening an automated
+   > submission to adjust one field is the natural reflex — and it strands the
+   > submission, requiring deletion and a fresh one.
+   >
+   > **Reading Partner Center is fine**, and is what step 6 above tells you to
+   > do for the certification outcome. **Editing a submission the API created
+   > is not.** If something needs changing, either re-run the workflow (see
+   > *Resubmitting to the Store*) or delete the submission in Partner Center
+   > first and then create a new one — never edit in place.
+   >
+   > Recorded as **F106(a)**, from Microsoft's submission-API prerequisites.
+
 ## A packaging-only fix, with no new release
 
 Bumping `pkgrel` — for a `PKGBUILD` change that does not need a new upstream
