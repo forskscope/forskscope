@@ -136,9 +136,13 @@ Owner setup, once: a GitHub **Environment** named `store-publish`
 check before every real submission), holding four secrets:
 `STORE_TENANT_ID`, `STORE_CLIENT_ID`, `STORE_CLIENT_SECRET` (the Entra ID app
 registration's tenant, client, and client secret — RFC-079 §9 Q4: the
-existing ForskScope registration, not a new one), and `STORE_APP_ID` (the
-Partner Center application ID, distinct from the public Store product ID in
-`installation.md`'s link). **Record `STORE_CLIENT_SECRET`'s expiry** in
+existing ForskScope registration, not a new one), and `STORE_APP_ID` — which **is** the
+public Store ID, `9P63F7NPC3MH`, the same value `installation.md` links to.
+*(Corrected 2026-09-08: this line previously said the two were distinct. They
+are not. Microsoft's submission-API reference defines the `applicationId` path
+parameter as "**the Store ID of the app**", with `9NBLGGH4R315` as its own
+example — the same 12-character shape. The invented distinction sent the owner
+looking for a second identifier that does not exist.)* **Record `STORE_CLIENT_SECRET`'s expiry** in
 `docs/src/maintainers/threat-model.md` when you create it — Entra ID secrets
 last 24 months at most, often less, and a lapsed one breaks silently
 otherwise.
