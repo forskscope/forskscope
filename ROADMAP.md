@@ -1205,7 +1205,7 @@ were in `proposed/`. Nothing checks this — see **F83**.
 | 079 | **Now** — Q4 closed 2026-09-08; §Q5's listing-content precondition remains | Microsoft Store submission automation — **accepted**; implementation blocked on F60 |
 | 080 | Post-Gate-D | Tiered directory comparison in the Explorer — **accepted**, design settled, all questions closed |
 | 082 | **Pre-v1 — audit blocker B5** | Write-path integrity: the release-blocking cluster from the 2026-09-01 independent audit (F85–F89) |
-| 081 | **Now — re-decided 2026-09-08**; blocked only on the shared credential decision | AUR publication automation — **accepted**; the automation is deferred, the package recovery rides each release by hand (`release.md` step 5a) |
+| 081 | **Implemented `8e54e44`** (review 102); stays **accepted** until the first real push proves the one unexecuted line | AUR publication automation — **accepted**; the automation is deferred, the package recovery rides each release by hand (`release.md` step 5a) |
 
 **On the four marked *disposition needed*:** each is referenced in code that
 ships today, so none is a dormant idea — but none is recorded as finished
