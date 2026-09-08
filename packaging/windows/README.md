@@ -133,16 +133,21 @@ documents, run by hand.
 
 Owner setup, once: a GitHub **Environment** named `store-publish`
 (Settings → Environments — add required reviewers there if you want a human
-check before every real submission), holding four secrets:
+check before every real submission), holding three secrets:
 `STORE_TENANT_ID`, `STORE_CLIENT_ID`, `STORE_CLIENT_SECRET` (the Entra ID app
 registration's tenant, client, and client secret — RFC-079 §9 Q4: the
-existing ForskScope registration, not a new one), and `STORE_APP_ID` — which **is** the
-public Store ID, `9P63F7NPC3MH`, the same value `installation.md` links to.
-*(Corrected 2026-09-08: this line previously said the two were distinct. They
-are not. Microsoft's submission-API reference defines the `applicationId` path
-parameter as "**the Store ID of the app**", with `9NBLGGH4R315` as its own
-example — the same 12-character shape. The invented distinction sent the owner
-looking for a second identifier that does not exist.)* **Record `STORE_CLIENT_SECRET`'s expiry** in
-`docs/src/maintainers/threat-model.md` when you create it — Entra ID secrets
-last 24 months at most, often less, and a lapsed one breaks silently
-otherwise.
+existing ForskScope registration, not a new one). **Record
+`STORE_CLIENT_SECRET`'s expiry** in `docs/src/maintainers/threat-model.md`
+when you create it — Entra ID secrets last 24 months at most, often less,
+and a lapsed one breaks silently otherwise.
+
+The application ID (the Store submission API's `applicationId` — the same
+public Store ID, `9P63F7NPC3MH`, that `installation.md` links to) is **not**
+a secret to set up: it is tracked identity in
+`store-listing/en-us/identity.toml`'s `store_id` field, alongside the app's
+other fixed Partner Center identity, and `store-submit.ps1` reads it from
+there. *(F105, 2026-09-08: this had briefly been a fourth environment
+secret, `STORE_APP_ID`. A public identifier bought nothing from being
+stored as one, and produced the same "not set" refusal as a missing
+credential when left unconfigured. If you set `STORE_APP_ID` while this was
+still true, it is now inert and can be deleted — nothing reads it.)*

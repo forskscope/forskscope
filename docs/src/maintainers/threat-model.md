@@ -192,12 +192,15 @@ client-credentials flow — tenant ID, client ID, and client secret — then
 creates, uploads to, and commits a Store submission.
 
 **Controls:**
-- The secret (`STORE_CLIENT_SECRET`, alongside `STORE_TENANT_ID`,
-  `STORE_CLIENT_ID`, `STORE_APP_ID`) lives only in the `store-publish` GitHub
-  Environment, never a plain repository secret. Only a job that explicitly
-  references that environment can read it; `build_and_validate` (the job
-  that builds and installs the package) does not, and never requests it, so
-  a validation failure never even touches the credential.
+- The secret (`STORE_CLIENT_SECRET`, alongside `STORE_TENANT_ID` and
+  `STORE_CLIENT_ID`) lives only in the `store-publish` GitHub Environment,
+  never a plain repository secret. Only a job that explicitly references
+  that environment can read it; `build_and_validate` (the job that builds
+  and installs the package) does not, and never requests it, so a
+  validation failure never even touches the credential. The application ID
+  the API calls also need is **not** among these — it is the public Store
+  ID, tracked as `store_id` in `store-listing/en-us/identity.toml` (F105),
+  not a credential this environment gates.
 - **What the environment does *not* narrow, unlike `aur-publish`
   (RFC-081):** a Store dry run still authenticates and reads Partner
   Center, because Partner Center has no anonymous read the way the AUR's

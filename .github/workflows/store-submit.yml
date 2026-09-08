@@ -129,7 +129,6 @@ jobs:
           STORE_TENANT_ID: ${{ secrets.STORE_TENANT_ID }}
           STORE_CLIENT_ID: ${{ secrets.STORE_CLIENT_ID }}
           STORE_CLIENT_SECRET: ${{ secrets.STORE_CLIENT_SECRET }}
-          STORE_APP_ID: ${{ secrets.STORE_APP_ID }}
         run: |
           $tag = "${{ needs.build_and_validate.outputs.tag }}"
           $msixPath = Join-Path "${{ runner.temp }}" "forskscope-$tag.msix"

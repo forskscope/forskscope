@@ -18,7 +18,10 @@
 # Usage: store-submit.ps1 -MsixPath <path> -Tag <released-tag> [-DryRun]
 #
 # Required environment: STORE_TENANT_ID, STORE_CLIENT_ID,
-# STORE_CLIENT_SECRET, STORE_APP_ID.
+# STORE_CLIENT_SECRET - the three real credentials. The application ID
+# (F105) is not one of them: it is the public Store ID, already tracked in
+# store-listing/en-us/identity.toml alongside the rest of the app's fixed
+# identity, and read from there below instead of from a secret.
 
 param(
     [Parameter(Mandatory = $true)][string]$MsixPath,
@@ -28,7 +31,26 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-foreach ($name in @("STORE_TENANT_ID", "STORE_CLIENT_ID", "STORE_CLIENT_SECRET", "STORE_APP_ID")) {
+# ── F105: the Store ID is public, tracked identity, not a secret - and
+#    reading it needs no credential, so it is checked first, before ever
+#    touching STORE_TENANT_ID/STORE_CLIENT_ID/STORE_CLIENT_SECRET below.
+#    Same line-based parse store-validate.ps1 already uses for this file. ──
+$RepoRoot = git rev-parse --show-toplevel
+$IdentityTomlPath = Join-Path $RepoRoot "packaging/windows/store-listing/en-us/identity.toml"
+$Identity = @{}
+foreach ($line in Get-Content $IdentityTomlPath) {
+    if ($line -match '^\s*#') { continue }
+    if ($line -match '^\s*(\w+)\s*=\s*"([^"]*)"\s*$') {
+        $Identity[$Matches[1]] = $Matches[2]
+    }
+}
+$AppId = $Identity["store_id"]
+if ([string]::IsNullOrEmpty($AppId)) {
+    Write-Host "::error::store_id is missing from $IdentityTomlPath - this is the Store submission API's applicationId, not a secret, and must be tracked there (F105)"
+    exit 1
+}
+
+foreach ($name in @("STORE_TENANT_ID", "STORE_CLIENT_ID", "STORE_CLIENT_SECRET")) {
     # An unset GitHub Actions secret reaches the runner as an env var that
     # *exists* with an empty value, not one that is absent - Get-Item alone
     # would let an empty secret through to a confusing 404 from the auth
@@ -44,7 +66,6 @@ foreach ($name in @("STORE_TENANT_ID", "STORE_CLIENT_ID", "STORE_CLIENT_SECRET",
 $TenantId = $env:STORE_TENANT_ID
 $ClientId = $env:STORE_CLIENT_ID
 $ClientSecret = $env:STORE_CLIENT_SECRET
-$AppId = $env:STORE_APP_ID
 
 $ApiBase = "https://manage.devcenter.microsoft.com/v1.0/my"
 
