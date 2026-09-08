@@ -29,7 +29,13 @@ param(
 $ErrorActionPreference = "Stop"
 
 foreach ($name in @("STORE_TENANT_ID", "STORE_CLIENT_ID", "STORE_CLIENT_SECRET", "STORE_APP_ID")) {
-    if (-not (Get-Item "env:$name" -ErrorAction SilentlyContinue)) {
+    # An unset GitHub Actions secret reaches the runner as an env var that
+    # *exists* with an empty value, not one that is absent - Get-Item alone
+    # would let an empty secret through to a confusing 404 from the auth
+    # endpoint instead of this clear message (found live, run 34207844616:
+    # this sandbox has none of these secrets configured, and the first
+    # version of this check let that reach Invoke-RestMethod anyway).
+    if ([string]::IsNullOrEmpty((Get-Item "env:$name" -ErrorAction SilentlyContinue).Value)) {
         Write-Host "::error::$name is not set - see docs/src/maintainers/release.md for what the store-publish Environment must contain"
         exit 1
     }
