@@ -113,21 +113,31 @@ save/IO failure reaches the user as raw `CoreError` `Display` text, in
 English, regardless of locale, until it's done — this gate's narrow scope is
 a symptom of that gap, not a separate problem with its own fix.
 
-## Test counts (v0.165.0)
+## Test counts
 
-Observed with `cargo test -p forskscope-core -p forskscope-ui-logic`.
+**Not recorded here as numbers, deliberately.** This section used to carry a
+hand-maintained table (last stamped v0.165.0, total 943). It drifted in both
+directions — `forskscope-ui-logic` unit tests fell from 241 to 204 when F75(b)
+deleted four obsolete view-models, while `forskscope-core` unit tests rose from
+643 to 736 — and nothing checked it (F1). A count that must be updated by hand
+on every change is a claim that will be wrong most of the time.
 
-| Suite | Count |
+To see the current counts per suite:
+
+```sh
+cargo test --workspace 2>&1 | grep -E '^\s+Running|^test result'
+```
+
+The suites, for orientation:
+
+| Suite | Where |
 |-------|-------|
-| `forskscope-core` unit | 643 |
-| `forskscope-core` integration (`diff_corpus`) | 27 |
-| `forskscope-core` integration (`merge_corpus`) | 16 |
-| `forskscope-core` integration (`patch_apply`) | 2 |
-| `forskscope-ui-logic` unit | 241 |
-| `forskscope-ui-logic` integration (`css_coverage`) | 6 |
-| `forskscope-core` doctests | 7 |
-| `forskscope-ui-logic` doctests | 1 |
-| **Total** | **943** |
+| `forskscope-core` unit | `crates/forskscope-core/src/tests/` |
+| `forskscope-core` integration | `crates/forskscope-core/tests/` — `diff_corpus`, `merge_corpus`, `patch_apply` (shells out to real `git apply` and `patch -p1`) |
+| `forskscope-ui-logic` unit | inline `#[cfg(test)]` modules |
+| `forskscope-ui-logic` integration | `crates/forskscope-ui-logic/tests/css_coverage.rs` |
+| `forskscope-ui` lib and bin | inline `#[cfg(test)]` modules, compiled twice (library and binary targets) |
+| doctests | `forskscope-core` |
 
 ## `forskscope-core` test modules
 
