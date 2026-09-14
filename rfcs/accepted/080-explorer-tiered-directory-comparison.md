@@ -1,7 +1,7 @@
 # RFC 080: Tiered Directory Comparison in the Explorer
 
 **Status.** Accepted — review complete; implementer may start. Moves to `done/` when the work ships (RFC-000, 5-folder variant, adopted 2026-09-02).
-**Scheduling.** Post-Gate-D — accepted; design settled, all four questions closed. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in `proposed/` and `accepted/` and nothing else (F83).
+**Scheduling.** **Tier 1 in `0.172.0`, tier 2 in `0.173.0`** — set 2026-09-15 in `ROADMAP.md` § *Release plan*, superseding *Post-Gate-D*. Every stated reason for waiting had lapsed: F44 no longer blocks Gate D, F60 is closed, and the owner corrected the premise that releases are organized around v1. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in `proposed/` and `accepted/` and nothing else (F83).
 **Accepted.** 2026-08-21 by the project owner — Gate A cleared, and
 **re-confirmed 2026-08-22 after a self-review found nine defects in it**, one of
 which (§1's “no new engine work”) was load-bearing and false. The corrections
@@ -324,6 +324,14 @@ who has no reason to re-read the row.
 
 ### 7. Relationship to F74, F75, F76
 
+> **Verified 2026-09-15: every dependency below is done.** F76 — resolved
+> (`163a548`, `ee38581`); a same-named file and directory now maps to
+> `TypeMismatch`. F75(a) — resolved in the same work; `DigestState` is deleted and
+> `RowStatusKind` is wired. §1's core requirement — the recursive walk reporting
+> errors — was delivered by F79 (`42a9ccb`): `RecStatus::Unreadable` and
+> `RecursiveScan`'s root-unreadable flags. F75's *remainder* (unconnected
+> exports) is scheduled ahead of this RFC in `0.171.0`, per Q4's ordering.
+
 - **F74** — fixed, on `main`, unreleased. This RFC is the feature that F74's
   honest *not compared* was holding the place for. **It does not depend on this
   RFC**, and shipping this RFC is not a precondition for anything in v1.
@@ -360,7 +368,7 @@ who has no reason to re-read the row.
 4. A subtree containing an unreadable entry, an unreadable subdirectory, or an
    unreadable root reports *unknown*, not a verdict — in particular **not** a
    tier-1 match and **not** `Different`. **Requires the core change in §1**; it
-   is not satisfiable against `RecStatus` as it stands.
+   is not satisfiable against `RecStatus` as it stands. *(Satisfiable since F79, `42a9ccb` — noted 2026-09-15.)*
 5. Navigating away cancels an in-flight comparison; no result lands in a view
    the user has left.
 6. Every state has a non-empty localised accessible label, and completion is
