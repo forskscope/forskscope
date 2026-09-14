@@ -1,11 +1,10 @@
 # RFC 082: Write-Path Integrity
 
-**Status.** Proposed
+**Status.** Implemented — audit blocker B5, closed 2026-09-01 (`ad2f162`); F85–F89 all resolved. *Moved to `done/` 2026-09-15 — it had sat in `proposed/` for two weeks after shipping.*
 **Accepted.** 2026-09-01 by the project owner — Gate A cleared. All three design
 questions were closed before acceptance, so nothing here awaits a decision;
 implementation may begin. Stays in `proposed/` until implemented, per the
 4-folder lifecycle.
-**Scheduling.** Pre-v1 — **audit blocker B5**, the release-blocking cluster from
 the 2026-09-01 independent audit. See `ROADMAP.md` § "Remaining proposed RFCs",
 which must list every file in this folder and nothing else (F83).
 **Tracks.** Audit finding B5. Register F85–F89.

@@ -20,10 +20,11 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 080 | [Tiered Directory Comparison in the Explorer](./accepted/080-explorer-tiered-directory-comparison.md) | Accepted |
 | 081 | [AUR Publication Automation](./accepted/081-aur-publication-automation.md) | Accepted |
 
-## Implemented (60)
+## Implemented (61)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
+| 082 | [Write-Path Integrity](./done/082-write-path-integrity.md) | Implemented — B5, `ad2f162` |
 | 086 | [Stable Hunk Identity, and an Amendment to RFC-015 Rule 4](./done/086-stable-hunk-identity.md) | Implemented — `77666ec` |
 | 084 | [Patch Export Conformance](./done/084-patch-export-conformance.md) | Implemented — `e2dd55d` |
 | 083 | [Text Encoding Breadth — UTF-16, BOM, and Override](./done/083-text-encoding-breadth.md) | Implemented — `bc3fd7f` |
@@ -85,7 +86,7 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 076 | [Versioned Runtime Settings and Session Persistence](./done/076-versioned-runtime-persistence.md) | post-v0.165.1 stabilization |
 | 077 | [Git Mergetool Save-Target Model](./done/077-mergetool-save-target-model.md) | post-v0.165.1 stabilization |
 
-## Proposed (16)
+## Proposed (15)
 
 RFC-004–040 are editor-adapter track, platform/packaging, or governance/documentation.
 RFC-026 and RFC-030 are substantially implemented; their remaining items require GTK or are deferred.
@@ -108,7 +109,6 @@ remains No-Go.
 | 040 | [Editor Adapter Verification Harness and Golden Corpus](./proposed/040-editor-adapter-verification-harness-and-golden-corpus.md) | Editor adapter | Blocked on RFC-004 |
 | 041 | [v1.0 Product Stabilization and RFC Governance](./proposed/041-v1-product-stabilization-and-rfc-governance.md) | Governance | 12/16 checklist items done; 4 require GTK or deferred |
 | 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) | Governance | Living document — pre-GTK verification phase |
-| 082 | [Write-Path Integrity](./proposed/082-write-path-integrity.md) | Correctness / security | **Accepted 2026-09-01.** Audit blocker B5 — the release-blocking cluster: save-target authority, content-identity dirty state, lossy-encode guard, save capability, secure atomic write |
 
 ## Archive (1)
 
