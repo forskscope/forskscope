@@ -214,6 +214,25 @@ def check_pane(rows, pane_name):
     return failures
 
 
+def tail_lines(path, n=20):
+    """Last `n` lines of the file at `path`, or "" if it doesn't exist or
+    is empty. Review 105 §2: a pipe (`subprocess.PIPE`) is wrong for this -
+    nothing drains it on the success path (the app's own stderr writes
+    eventually block once the pipe buffer fills, stalling the app and
+    turning a live process into a false `wait_for_ready` timeout), and on
+    the crash path `.read()` blocks until every process still holding the
+    write end closes it - which, for a crashed app, is however long its
+    WebKitNetworkProcess/WebKitWebProcess children take to notice their
+    IPC peer is gone, not until forskscope itself exits. A plain file has
+    no reader to stall and no EOF to wait for.
+    """
+    try:
+        with open(path, "r", errors="replace") as f:
+            return "\n".join(f.read().splitlines()[-n:])
+    except OSError:
+        return ""
+
+
 def launch_until_registered(binary, scratch, max_attempts=STARTUP_MAX_ATTEMPTS):
     """Launch `binary` and wait for it to register on the accessibility bus,
     retrying only a start-up crash - the process exiting before it ever
@@ -226,20 +245,28 @@ def launch_until_registered(binary, scratch, max_attempts=STARTUP_MAX_ATTEMPTS):
     mismatch (retrying a real render defect until it happens to pass is
     the one outcome this whole check exists to prevent).
 
-    Returns (proc, app) on success - the caller owns `proc` from here.
-    Returns (None, None) on failure, having already printed a FAIL message
-    and cleaned up any process it started.
+    Returns (proc, app, stderr_path) on success - the caller owns `proc`
+    from here, and `stderr_path` is where the app's stderr keeps landing
+    for the rest of the run, so a later failure (wait_for_ready timeout,
+    geometry FAIL) can still show its tail.
+    Returns (None, None, None) on failure, having already printed a FAIL
+    message and cleaned up any process it started.
     """
     for attempt in range(1, max_attempts + 1):
-        proc = subprocess.Popen(
-            [binary, str(LEFT_FIXTURE), str(RIGHT_FIXTURE)],
-            cwd=scratch,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        stderr_path = Path(scratch) / f"forskscope-stderr-{attempt}.log"
+        with open(stderr_path, "w") as stderr_handle:
+            proc = subprocess.Popen(
+                [binary, str(LEFT_FIXTURE), str(RIGHT_FIXTURE)],
+                cwd=scratch,
+                stderr=stderr_handle,
+            )
+        # The file handle above is closed as soon as Popen returns - the
+        # child keeps writing through its own duplicated descriptor, and
+        # this process holds no reference that could ever need draining.
+
         app = find_app("forskscope")
         if app is not None:
-            return proc, app
+            return proc, app, stderr_path
 
         exit_code = proc.poll()
         if exit_code is None:
@@ -256,25 +283,28 @@ def launch_until_registered(binary, scratch, max_attempts=STARTUP_MAX_ATTEMPTS):
                 "not a start-up crash, so this was not retried)",
                 file=sys.stderr,
             )
-            return None, None
+            tail = tail_lines(stderr_path)
+            if tail:
+                print(f"  stderr tail:\n{tail}", file=sys.stderr)
+            return None, None, None
 
         # Exited before registering: F102's start-up flake. Retry.
-        stderr_tail = "\n".join((proc.stderr.read() or "").splitlines()[-20:])
         print(
             f"attempt {attempt}/{max_attempts}: forskscope exited during "
             f"start-up (exit code {exit_code}) before registering on the "
             "accessibility bus",
             file=sys.stderr,
         )
-        if stderr_tail:
-            print(f"  stderr tail:\n{stderr_tail}", file=sys.stderr)
+        tail = tail_lines(stderr_path)
+        if tail:
+            print(f"  stderr tail:\n{tail}", file=sys.stderr)
 
     print(
         f"FAIL: forskscope exited during start-up on all {max_attempts} "
         "attempts",
         file=sys.stderr,
     )
-    return None, None
+    return None, None, None
 
 
 def main():
@@ -284,7 +314,7 @@ def main():
     binary = str(Path(sys.argv[1]).resolve())
 
     with tempfile.TemporaryDirectory() as scratch:
-        proc, app = launch_until_registered(binary, scratch)
+        proc, app, stderr_path = launch_until_registered(binary, scratch)
         if app is None:
             return 1
         try:
@@ -298,6 +328,9 @@ def main():
                     f"{READY_TIMEOUT_S}s",
                     file=sys.stderr,
                 )
+                tail = tail_lines(stderr_path)
+                if tail:
+                    print(f"  stderr tail:\n{tail}", file=sys.stderr)
                 return 1
 
             failures = check_pane(left_rows, "left pane") + check_pane(right_rows, "right pane")
@@ -306,6 +339,9 @@ def main():
                 print("FAIL: F34 rendering check found misalignment:", file=sys.stderr)
                 for f in failures:
                     print(f"  - {f}", file=sys.stderr)
+                tail = tail_lines(stderr_path)
+                if tail:
+                    print(f"  stderr tail:\n{tail}", file=sys.stderr)
                 return 1
 
             print(
