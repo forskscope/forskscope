@@ -206,39 +206,6 @@ impl RowStatusKind {
     }
 }
 
-// ── Status row ────────────────────────────────────────────────────────────────
-
-/// Fully-resolved display data for one explorer row's status badge.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StatusRow {
-    pub kind: RowStatusKind,
-    pub glyph: char,
-    pub css_class: &'static str,
-    pub aria_label: &'static str,
-}
-
-impl StatusRow {
-    pub fn from_evidence(evidence: &EqualityEvidence) -> Self {
-        let kind = RowStatusKind::from_evidence(evidence);
-        Self {
-            kind,
-            glyph: kind.glyph(),
-            css_class: kind.css_class(),
-            aria_label: kind.aria_label(),
-        }
-    }
-
-    pub fn computing() -> Self {
-        let kind = RowStatusKind::Computing;
-        Self {
-            kind,
-            glyph: kind.glyph(),
-            css_class: kind.css_class(),
-            aria_label: kind.aria_label(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -421,20 +388,6 @@ mod tests {
         assert!(RowStatusKind::RightOnly.needs_action());
         assert!(RowStatusKind::Error.needs_action());
         assert!(!RowStatusKind::NotCompared.needs_action());
-    }
-
-    #[test]
-    fn status_row_from_evidence_matches_kind() {
-        let row = StatusRow::from_evidence(&EqualityEvidence::DigestEqual);
-        assert_eq!(row.kind, RowStatusKind::Equal);
-        assert_eq!(row.glyph, RowStatusKind::Equal.glyph());
-        assert_eq!(row.css_class, RowStatusKind::Equal.css_class());
-    }
-
-    #[test]
-    fn status_row_computing_is_computing() {
-        let row = StatusRow::computing();
-        assert_eq!(row.kind, RowStatusKind::Computing);
     }
 
     // ── F82: shared status vocabulary ────────────────────────────────────────

@@ -2,6 +2,7 @@
 //! (RFC-009, RFC-057, RFC-063 C6).
 
 use dioxus::prelude::*;
+use forskscope_ui_logic::{clamp_font_size, theme_choices};
 
 use super::profile::AddProfileInline;
 use super::{lf, lv, tf, tv};
@@ -58,9 +59,9 @@ pub fn SettingsModal() -> Element {
                             store.settings.write().theme = tf(&e.value());
                             super::persist(store);
                         },
-                        option { value: "dark",  "Dark"  }
-                        option { value: "light", "Light" }
-                        option { value: "night", "Night" }
+                        for choice in theme_choices() {
+                            option { value: choice.value, {choice.label} }
+                        }
                     }
                 }
                 div { class: "field",
@@ -82,7 +83,7 @@ pub fn SettingsModal() -> Element {
                         value: "{cur.diff_font_size}",
                         onchange: move |e| {
                             if let Ok(n) = e.value().parse::<u32>() {
-                                store.settings.write().diff_font_size = n.clamp(8, 32);
+                                store.settings.write().diff_font_size = u32::from(clamp_font_size(n));
                                 super::persist(store);
                             }
                         }

@@ -14,18 +14,11 @@ use forskscope_core::dir::{
     DigestOutcome, RecEntry, RecStatus, file_digest_equal_with_cancel,
     list_recursive_for_display_with_cancel,
 };
+use forskscope_ui_logic::{DeepCompareSummary, DeepFilter, apply_filter};
 
 use crate::i18n::t;
 use crate::state::{DirOp, Lang, Modal, Store, open_compare};
 use crate::ui::view::digest_epoch::{DigestEpoch, EpochStamp};
-
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
-pub enum DeepFilter {
-    #[default]
-    Different,
-    All,
-    Equal,
-}
 
 #[component]
 pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> Element {
@@ -172,43 +165,23 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
 
     let f = *filter.read();
     let snap = entries.read();
-    let changed = snap
-        .iter()
-        .filter(|e| e.status == RecStatus::Changed)
-        .count();
-    let equal = snap.iter().filter(|e| e.status == RecStatus::Equal).count();
-    let left_only = snap
-        .iter()
-        .filter(|e| e.status == RecStatus::LeftOnly)
-        .count();
-    let right_only = snap
-        .iter()
-        .filter(|e| e.status == RecStatus::RightOnly)
-        .count();
+    // F75: one source of truth for these counts, replacing six separate
+    // inline `.filter().count()` passes over the same slice.
+    let summary = DeepCompareSummary::from_entries(&snap, f);
+    let changed = summary.changed;
+    let equal = summary.equal;
+    let left_only = summary.left_only;
+    let right_only = summary.right_only;
     // F79: counted separately from `different`/`equal`/etc. rather than
     // folded into either - it is not a verdict, so it must not be
     // presented as one.
-    let unreadable = snap
-        .iter()
-        .filter(|e| e.status == RecStatus::Unreadable)
-        .count();
-    let computing = snap
-        .iter()
-        .filter(|e| e.status == RecStatus::Computing)
-        .count();
+    let unreadable = summary.unreadable;
+    let computing = summary.computing;
     let done = *computed.read();
     let tc = *total_common.read();
     let is_scan = *scanning.read();
     let in_flight = !is_scan && tc > 0 && done < tc;
-    let visible: Vec<RecEntry> = snap
-        .iter()
-        .filter(|e| match f {
-            DeepFilter::Different => e.status != RecStatus::Equal,
-            DeepFilter::All => true,
-            DeepFilter::Equal => e.status == RecStatus::Equal,
-        })
-        .cloned()
-        .collect();
+    let visible: Vec<RecEntry> = apply_filter(&snap, f).into_iter().cloned().collect();
     drop(snap);
 
     rsx! {
@@ -222,11 +195,11 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
             }
             div { class: "deep-compare-toolbar",
                 span { class: "deep-label", {t(lang, "Deep compare")} }
-                button { class: if f==DeepFilter::Different {"filter-btn active"} else {"filter-btn"},
+                button { class: DeepFilter::Different.button_class(f),
                     onclick: move |_| filter.set(DeepFilter::Different), {t(lang, "Different")} }
-                button { class: if f==DeepFilter::All {"filter-btn active"} else {"filter-btn"},
+                button { class: DeepFilter::All.button_class(f),
                     onclick: move |_| filter.set(DeepFilter::All), {t(lang, "All")} }
-                button { class: if f==DeepFilter::Equal {"filter-btn active"} else {"filter-btn"},
+                button { class: DeepFilter::Equal.button_class(f),
                     onclick: move |_| filter.set(DeepFilter::Equal), {t(lang, "Equal only")} }
                 span { class: "spacer" }
                 BatchCopyButtons { entries, left_root: left_root.clone(), right_root: right_root.clone() }

@@ -57,10 +57,22 @@ impl DeepFilter {
 pub struct DeepCompareSummary {
     /// Total entries (including Computing/Symlink).
     pub total: usize,
-    /// Entries with `Changed | LeftOnly | RightOnly`.
+    /// Entries with `Changed | LeftOnly | RightOnly` — any non-equal verdict.
     pub different: usize,
+    /// Entries with `Changed` specifically (present on both sides, content
+    /// differs) — the shipped stats line breaks this out from
+    /// `left_only`/`right_only` rather than folding all three into one
+    /// number (F75).
+    pub changed: usize,
+    /// Entries with `LeftOnly`.
+    pub left_only: usize,
+    /// Entries with `RightOnly`.
+    pub right_only: usize,
     /// Entries with `Equal`.
     pub equal: usize,
+    /// Entries with `Unreadable` — not a verdict, counted separately from
+    /// `different`/`equal` (F79).
+    pub unreadable: usize,
     /// Entries still being hashed.
     pub computing: usize,
     /// Number of visible entries under the current filter.
@@ -72,33 +84,19 @@ pub struct DeepCompareSummary {
 impl DeepCompareSummary {
     /// Build from a slice of entries and the current filter.
     pub fn from_entries(entries: &[RecEntry], filter: DeepFilter) -> Self {
-        let total = entries.len();
-        let different = entries.iter().filter(|e| is_different(&e.status)).count();
-        let equal = entries
-            .iter()
-            .filter(|e| e.status == RecStatus::Equal)
-            .count();
-        let computing = entries
-            .iter()
-            .filter(|e| e.status == RecStatus::Computing)
-            .count();
-        let visible = entries.iter().filter(|e| filter.matches(e)).count();
+        let count = |pred: &dyn Fn(&RecEntry) -> bool| entries.iter().filter(|e| pred(e)).count();
         Self {
-            total,
-            different,
-            equal,
-            computing,
-            visible,
+            total: entries.len(),
+            different: count(&|e| is_different(&e.status)),
+            changed: count(&|e| e.status == RecStatus::Changed),
+            left_only: count(&|e| e.status == RecStatus::LeftOnly),
+            right_only: count(&|e| e.status == RecStatus::RightOnly),
+            equal: count(&|e| e.status == RecStatus::Equal),
+            unreadable: count(&|e| e.status == RecStatus::Unreadable),
+            computing: count(&|e| e.status == RecStatus::Computing),
+            visible: count(&|e| filter.matches(e)),
             filter,
         }
-    }
-
-    /// Footer text, e.g. `"3 different · 12 equal · 15 total"`.
-    pub fn footer_text(&self) -> String {
-        format!(
-            "{} different · {} equal · {} total",
-            self.different, self.equal, self.total
-        )
     }
 
     /// `true` when all common entries have been hashed (no Computing entries).
@@ -214,6 +212,9 @@ mod tests {
         let s = DeepCompareSummary::from_entries(&entries(), DeepFilter::All);
         assert_eq!(s.total, 6);
         assert_eq!(s.different, 3); // Changed + LeftOnly + RightOnly
+        assert_eq!(s.changed, 1);
+        assert_eq!(s.left_only, 1);
+        assert_eq!(s.right_only, 1);
         assert_eq!(s.equal, 1);
         assert_eq!(s.computing, 1);
     }
@@ -235,24 +236,6 @@ mod tests {
     fn visible_count_matches_filter_all() {
         let s = DeepCompareSummary::from_entries(&entries(), DeepFilter::All);
         assert_eq!(s.visible, s.total);
-    }
-
-    #[test]
-    fn footer_text_contains_counts() {
-        let s = DeepCompareSummary::from_entries(&entries(), DeepFilter::All);
-        let text = s.footer_text();
-        assert!(
-            text.contains('3'),
-            "footer must contain diff count 3: {text}"
-        );
-        assert!(
-            text.contains('1'),
-            "footer must contain equal count 1: {text}"
-        );
-        assert!(
-            text.contains('6'),
-            "footer must contain total count 6: {text}"
-        );
     }
 
     #[test]
@@ -316,5 +299,6 @@ mod tests {
         assert_eq!(s.total, 2);
         assert_eq!(s.different, 1, "only the Changed entry is different");
         assert_eq!(s.equal, 0);
+        assert_eq!(s.unreadable, 1);
     }
 }

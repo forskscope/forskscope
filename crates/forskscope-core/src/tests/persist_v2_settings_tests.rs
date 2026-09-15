@@ -329,11 +329,14 @@ fn out_of_range_appearance_font_size_clamps() {
 
 #[test]
 fn out_of_range_diff_font_size_clamps() {
+    // F53: 8-32, matching the settings modal's own <input min="8" max="32">
+    // - not the wider 6-50 range `appearance_font_size` (a different,
+    // UI-less setting) still uses above.
     let mut too_large = sample_v2();
     too_large.diff_font_size = 9999;
     let raw = envelope_for(2, &serde_json::to_value(&too_large).unwrap());
     match load_settings(&raw) {
-        PersistenceLoad::Current { value } => assert_eq!(value.diff_font_size, 50),
+        PersistenceLoad::Current { value } => assert_eq!(value.diff_font_size, 32),
         other => panic!("expected Current, got {other:?}"),
     }
 
@@ -341,7 +344,7 @@ fn out_of_range_diff_font_size_clamps() {
     too_small.diff_font_size = 0;
     let raw = envelope_for(2, &serde_json::to_value(&too_small).unwrap());
     match load_settings(&raw) {
-        PersistenceLoad::Current { value } => assert_eq!(value.diff_font_size, 6),
+        PersistenceLoad::Current { value } => assert_eq!(value.diff_font_size, 8),
         other => panic!("expected Current, got {other:?}"),
     }
 }

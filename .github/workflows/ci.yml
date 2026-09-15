@@ -104,6 +104,16 @@ jobs:
       - name: RFC schedule sync check
         run: cargo xtask rfc-sync
 
+      # F54/F75: forskscope-ui-logic accumulated five build-tested-documented-
+      # never-connected view-models before anyone noticed. Fails when a
+      # crate-root export has no consumer in forskscope-ui, or when a glob
+      # import of forskscope_ui_logic appears (which would let a future
+      # revision of this check go blind silently) — see
+      # xtask/src/ui_logic_connectivity.rs's own doc comment for exactly
+      # what counts as a consumer.
+      - name: ui-logic connectivity check
+        run: cargo xtask ui-logic-connectivity
+
       # F55: cargo audit itself moved to a daily scheduled workflow
       # (audit.yml) — it reads a mutable external database, so a per-push
       # result is a property of the commit and the clock, not just the

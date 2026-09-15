@@ -38,6 +38,17 @@ pub const SETTINGS_SCHEMA_VERSION_V2: u32 = 2;
 
 const FONT_SIZE_MIN: u8 = 6;
 const FONT_SIZE_MAX: u8 = 50;
+// F53: `diff_font_size` is UI-owned, and the settings modal's own
+// <input min="8" max="32"> is the bound the product actually ships (the
+// modal clamps every edit to this range in Rust, not just the HTML hint).
+// Before this, persistence's own sanitization used the wider, unrelated
+// FONT_SIZE_MIN/MAX above (shared with `appearance_font_size`, which has
+// no UI control and no evidence 6-50 is even the right range for it) - a
+// value between 33 and 50 could reach disk without ever being rejected by
+// this function, only to be silently re-clamped the next time the modal's
+// own onchange handler ran. Persistence and the modal now agree.
+const DIFF_FONT_SIZE_MIN: u32 = 8;
+const DIFF_FONT_SIZE_MAX: u32 = 32;
 const CONTEXT_LINES_MAX: usize = 20;
 
 // ── Canonical v2 payload ────────────────────────────────────────────────────
@@ -374,7 +385,7 @@ fn normalize(mut v2: PersistedSettings) -> PersistedSettings {
     v2.appearance_font_size = v2.appearance_font_size.clamp(FONT_SIZE_MIN, FONT_SIZE_MAX);
     v2.diff_font_size = v2
         .diff_font_size
-        .clamp(u32::from(FONT_SIZE_MIN), u32::from(FONT_SIZE_MAX));
+        .clamp(DIFF_FONT_SIZE_MIN, DIFF_FONT_SIZE_MAX);
     v2.context_lines = v2.context_lines.min(CONTEXT_LINES_MAX);
     if v2.profiles.is_empty() {
         v2.profiles = ui_builtin_profiles();
