@@ -48,36 +48,33 @@ could be added as a fourth crate without touching core.
 | `watcher` | `FileChangeMonitor` trait, `WatchToken`, `FileChangeEvent`, `WatchError`, `MockFileChangeMonitor` — file-watcher boundary (RFC-036). |
 | `xlsx` | Fail-closed spreadsheet comparison boundary; `.xlsx` parsing is temporarily disabled while the parser dependency path is remediated (RFC-058). |
 
-## `ui-logic` modules (13)
+## `ui-logic` modules (11)
 
 Framework-independent view-model logic. All modules are testable with
 `cargo test -p forskscope-ui-logic` — no GTK or display server required.
 
-F93/handoff 023: this table previously listed 15 modules, four of which
-(`command_bar`, `scroll_sync`, `summary`, `tab_state`) were deleted in
-`d69c83b` (F75(b) part 1) and a fifth (`hunk_decorations`) in `8f1af77`
-(F48) — neither deletion was ever reflected here, and the second wasn't
-caught by F93's own count either. Corrected against the actual module tree
-(`find crates/forskscope-ui-logic/src -name '*.rs'`), not the prior table:
-three modules it never listed (`compare::startup`,
-`session::persistence_recovery`, `settings::persistence_recovery`) are
-genuinely present and are added below.
+F93, third time (review 106 §4, handoff 034): this table has now drifted
+twice after being corrected — once when `d69c83b`/`8f1af77` deleted five
+modules and neither deletion reached here, once when handoff 033's
+`ui-logic` connectivity cleanup deleted `conflict_nav_view` and
+`palette_view` (deferred post-v1 view-models, never wired) and this table
+was not updated alongside the code. `cargo xtask ui-logic-docs` now checks
+this table (and `testing.md`'s) against the module tree on every push, so a
+third silent drift is not possible.
 
 | Module | Purpose |
 |---|---|
 | `explore::align` | `compute_aligned_rows` — merges two flat tree row lists into an aligned two-pane sequence (RFC-059). |
 | `explore::deep_filter` | `DeepFilter`, `DeepCompareSummary`, `apply_filter` — filter state and counts for recursive directory compare (RFC-037, RFC-038). |
-| `explore::status` | `RowStatusKind`, `StatusRow` — maps `EqualityEvidence` to CSS class, glyph, and aria label for tree row badges (RFC-054). |
-| `compare::conflict_nav_view` | `ConflictNavView::from_navigator(nav, can_save)` — complete navigator rail snapshot: rows with glyphs/CSS, progress text, prev/next IDs (RFC-034, Slice 6). |
+| `explore::status` | `RowStatusKind`, `StatusGlyph` — maps `EqualityEvidence` to CSS class, glyph, and aria label for tree row badges (RFC-054). |
 | `compare::load_guard` | `guard_for_sizes(left, right)` → `LoadGuard` — pre-diff decision: Proceed / WarnBanner / ConfirmPrompt derived from `FileSizeClass` thresholds (RFC-013, Slice 1). |
 | `compare::load_identity` | Process-local `CompareTabId` allocation, monotonic `LoadGeneration`, and pure async completion validation; runtime tokens are never persisted (RFC-075). |
-| `compare::palette_view` | `build_palette(registry, ctx, query)` → `Vec<PaletteRow>` — filtered, availability-evaluated, sorted palette results (RFC-019, Slice 7). |
 | `compare::save_error` | `SaveErrorView::from_error(err, path)` — maps `AppError` to dialog title, body, and ordered `Vec<RecoveryButton>` (RFC-007, RFC-017, Slice 3). |
 | `compare::search_index` | `MatchIndex` — in-diff search match navigation with `advance()`/`retreat()` (RFC-014). |
 | `compare::startup` | `StartupRequest`, `parse_startup_args`, `CompareRequest`, `SaveDestination` — CLI startup argument parsing and mergetool-to-compare conversion (RFC-077). |
 | `session::persistence_recovery` | `SessionRecoveryView::from_resolution` — maps a session `SessionRuntimeResolution` to a recovery dialog's one-time notice and ordered actions (RFC-076). |
 | `settings::persistence_recovery` | `SettingsRecoveryView::from_resolution` — maps a settings `SettingsRuntimeResolution` to a recovery dialog's one-time notice and ordered actions (RFC-076). |
-| `settings::settings_view` | `theme_choices`, `density_choices`, `font_family_choices`, `profile_presets` — picker metadata and validators (`validate_font_size`, `validate_context_lines`, `find_active`) for the settings dialog (RFC-009, Slice 5). |
+| `settings::settings_view` | `theme_choices` — theme picker options; `clamp_font_size` — the diff-pane font-size bound the settings modal enforces (F53) (RFC-009, Slice 5). |
 
 ## UI modules
 

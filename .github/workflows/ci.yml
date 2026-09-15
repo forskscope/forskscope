@@ -114,6 +114,15 @@ jobs:
       - name: ui-logic connectivity check
         run: cargo xtask ui-logic-connectivity
 
+      # F93: fixed by hand twice and each fix missed a document (review 106
+      # §4) - once when two 2026-08 deletions never reached
+      # architecture.md, once more when handoff 033's ui-logic cleanup
+      # deleted two modules and neither doc table was updated. Fails when
+      # architecture.md's or testing.md's ui-logic module table disagrees
+      # with the module tree on disk, in either direction.
+      - name: ui-logic docs check
+        run: cargo xtask ui-logic-docs
+
       # F55: cargo audit itself moved to a daily scheduled workflow
       # (audit.yml) — it reads a mutable external database, so a per-push
       # result is a property of the commit and the clock, not just the

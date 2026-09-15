@@ -190,9 +190,17 @@ impl CompareProfile {
     /// profile-selector preset set, not the profiles the shipped Settings
     /// dialog uses.** RFC-028's own status line already records that the
     /// toolbar profile selector these presets were designed for was
-    /// deferred post-v1 and never built — no `forskscope-ui` file calls
-    /// this or `ui-logic::settings_view::profile_presets()`, its only
-    /// bridge. The four presets a user actually sees and persists today are
+    /// deferred post-v1 and never built. Its `ui-logic` bridge,
+    /// `settings_view::profile_presets()`, was itself deleted by handoff
+    /// 033's connectivity cleanup (F75) — genuinely unwireable while the
+    /// toolbar selector stays unbuilt, the same "deferred post-v1, deleted
+    /// rather than left unwired" call made for RFC-028's other view-models
+    /// that handoff. **`all_presets` therefore has no non-test caller at
+    /// all today** — kept anyway, deliberately: F25's decision that this is
+    /// real core surface stands regardless of who currently calls it, and
+    /// it is what the toolbar selector's author reaches for if that
+    /// selector is ever built. The four presets a user actually sees and
+    /// persists today are
     /// `persist::schema::settings::ui_builtin_profiles()`'s ("Exact
     /// (default)", "Ignore whitespace", "Ignore case", "Histogram"),
     /// authoritative for schema v2. The two sets are deliberately not kept

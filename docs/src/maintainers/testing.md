@@ -194,25 +194,32 @@ Integration tests in `tests/`:
 
 ## `forskscope-ui-logic` test modules
 
-All tests are inline (`#[cfg(test)]` inside each module file).
+All tests are inline (`#[cfg(test)]` inside each module file), except
+`compare/load_identity`, which keeps its tests in a sibling `tests.rs`
+(`mod tests;`) because of the fixture setup its fifteen cases share.
 Integration tests live in `tests/css_coverage.rs`.
+
+**Rebuilt against the module tree (`cargo xtask ui-logic-docs`, F93,
+review 106 §4), not the prior table**: `command_bar`, `hunk_decorations`,
+`scroll_sync`, `summary` and `tab_state` were deleted in `d69c83b`/`8f1af77`
+and never removed here; `conflict_nav_view` and `palette_view` were deleted
+by handoff 033's connectivity cleanup; `compare/load_identity`,
+`compare/startup`, `session/persistence_recovery` and
+`settings/persistence_recovery` existed but were never listed.
 
 | File | Covers | RFC |
 |---|---|---|
 | `explore/align` | `compute_aligned_rows`: pairing, ordering, one-sided entries, recursion depth, selection state; field propagation (`is_selected` left/right, `depth`, `abs_path`/`rel_path`, `is_expanded`); both-sides-selected merges into one row. | RFC-059 |
-| `explore/deep_filter` | `DeepFilter::matches` for all `RecStatus` variants, `DeepCompareSummary` counts, footer text, `is_fully_computed`, `apply_filter`. | RFC-037, RFC-038 |
-| `explore/status` | `RowStatusKind::from_evidence` for all 10 `EqualityEvidence` variants, CSS prefix, glyph distinctness, aria labels, `needs_action`, `StatusRow` constructors. | RFC-054 |
-| `compare/command_bar` | `build_toolbar` section structure, `Save` enabled/disabled, `Undo`/`Redo` asymmetry, `CommandPalette` always enabled, shortcut hint, `find_item`; `ToolbarItem.disabled_reason` Some/None; `shortcut_hint` Some for Save; `enabled_count` nonzero in diff context. | RFC-019 |
-| `compare/conflict_nav_view` | `ConflictNavView::from_navigator`: non-empty with conflicts, empty without, `display_num` ≥ 1, `!` glyph for unresolved, CSS prefix, progress text, `can_save` predicate, `len`; focus propagation (`focused_row` None/Some, `is_focused` set on exactly one row); resolved-state glyphs (`L`, `R`, `-`); `status_text` non-empty; progress text with partial resolution. | RFC-034 |
-| `compare/hunk_decorations` | `DecorationIndex::from_set`: added/deleted/modified kinds, gutter symbols, CSS prefix, aria labels, multi-hunk coverage, out-of-bounds safety, `RowDecoration` field invariants. | RFC-024, RFC-035 |
+| `explore/deep_filter` | `DeepFilter::matches` for all `RecStatus` variants; `DeepCompareSummary::from_entries` counts (`total`/`changed`/`left_only`/`right_only`/`equal`/`unreadable`/`computing`/`visible`), including that `Unreadable` is excluded from both `different` and `equal`; `apply_filter`; `is_fully_computed`/`is_empty`. | RFC-037, RFC-038 |
+| `explore/status` | `RowStatusKind::from_evidence` for all 10 `EqualityEvidence` variants; CSS prefix; glyph distinctness; aria labels; `needs_action`; `StatusGlyph` parity with `RowStatusKind` for every variant (F82). | RFC-054 |
 | `compare/load_guard` | `guard_for_sizes` / `guard_for_sizes_with_limits`: all four `FileSizeClass` branches, worst-of-pair logic, boundary values (at-limit and one-over), message non-empty, distinct large/very-large labels, default-limit smoke tests. | RFC-013 |
-| `compare/palette_view` | `build_palette`: empty query returns all; query matches label; nonsense empty; case-insensitive; enabled before disabled; Save disabled in empty context; `enabled_count`; all labels/IDs/descriptions non-empty; `shortcut_hint` non-empty for Save; `disabled_reason` Some/None; `enabled_count` in diff context. | RFC-019 |
+| `compare/load_identity` | `CompareTabIdAllocator`/`LoadGeneration` monotonicity and no-reuse; `completion_decision` acceptance and every rejection case (wrong tab, stale/future generation, wrong state); zero values reserved; exhaustion never wraps. | RFC-075 |
 | `compare/save_error` | `action_label` all variants non-empty; `SaveErrorView::from_error`: external-mod action set, primary ≠ Overwrite, `FileWriteFailed`/`InternalFault` actions; path passthrough; title/body non-empty; button labels non-empty; exactly one primary. | RFC-007, RFC-017 |
-| `compare/scroll_sync` | `ScrollSyncState`: at-top, pixel→anchor→pixel round-trip, mid-row fraction, negative clamping, `scroll_to_row`, past-end clamping, `max_scroll_px`, zero row-height guard. | RFC-035 |
 | `compare/search_index` | `MatchIndex` build/advance/retreat/wrap, `matching_hunk_ids`, empty index; `len`/`is_empty` consistency; `focused()` returns correct `hunk_id` and `row_index`; `focused_number` at start and after advance; `advance`/`retreat` return `None` on empty index. | RFC-014 |
-| `compare/summary` | `CompareStatusSummary` for identical/changed/whitespace-only/single-hunk, dirty marker, `DiffNavigationState` position labels and aria wrap cases. | RFC-006 |
-| `compare/tab_state` | `context_from_snapshot` field mapping, `AvailabilityRule` inverse verification, end-to-end `TabStateSnapshot → CommandContext → build_toolbar`; conflict flags (ActiveConflict, AnyConflictUnresolved), redo flag, read-only tab, focused-hunk guard, all-flags-true exhaustive check. | RFC-003, RFC-019 |
-| `settings/settings_view` | `theme_choices` round-trip via `ThemeId::from_id`; density/font round-trips; `profile_presets` count and name; font-size validation boundaries; `clamp_font_size` extremes; context-lines boundary; `find_active` hit/miss; no duplicate values. | RFC-009 |
+| `compare/startup` | `parse_startup_args` for 0/2/3-argument forms and the rejected 1/4-argument cases (with a non-empty, count-naming error); `into_compare_request`'s `SaveDestination` per mode, including that mergetool mode never saves to the compared `remote` input. | RFC-077 |
+| `session/persistence_recovery` | `SessionRecoveryView::from_resolution` for Fresh/Current (no notice, no dialog), committed migration (notice, no dialog), deferred-by-conflict (neither), failed-commit/Incompatible/Corrupt (each dialog's exact action set); every `RecoveryDialogAction` has a non-empty label. | RFC-076 |
+| `settings/persistence_recovery` | Same shape as `session/persistence_recovery`, for `SettingsRuntimeResolution`/`SettingsRecoveryView`. | RFC-076 |
+| `settings/settings_view` | `theme_choices`: covers all three themes, round-trips via `ThemeId::from_id`, non-empty labels, no duplicate values; `clamp_font_size` stays within the shipped 8-32 bound at both extremes (F53). | RFC-009 |
 
 Doctest in `watcher.rs` (`MockFileChangeMonitor` usage example): 1 test.
 

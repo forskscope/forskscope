@@ -29,10 +29,13 @@
 //! this list is checked by `cargo xtask ui-logic-connectivity` — every name
 //! here must be referenced by `forskscope-ui`, or it does not belong at the
 //! crate root (see that command's own doc comment for exactly what counts).
-//! `conflict_nav_view` and `palette_view` (RFC-028's toolbar profile picker,
-//! the command-palette and three-way-merge conflict-workspace view-models)
-//! were deleted outright, not merely un-exported — deferred post-v1 UI that
-//! was never built; they return from git history with their features.
+//! `conflict_nav_view` (the three-way-merge conflict-workspace rail,
+//! RFC-034) and `palette_view` (the command palette, RFC-019) were deleted
+//! outright, not merely un-exported — deferred post-v1 UI that was never
+//! built; they return from git history with their features. (RFC-028's
+//! toolbar profile picker was a separate deletion, `settings_view`'s
+//! `ProfileChoice`/`profile_presets` — corrected here, review 106 §4: an
+//! earlier version of this comment misattributed it to these two instead.)
 
 pub mod compare;
 pub mod explore;

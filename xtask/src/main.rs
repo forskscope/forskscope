@@ -8,6 +8,7 @@
 //!   cargo xtask version-sync [expected] — verify version metadata is in sync (no-arg mode also rejects an already-published version; [expected] mode additionally requires non-empty CHANGELOG content, F24)
 //!   cargo xtask rfc-sync      — verify ROADMAP.md's RFC table agrees with rfcs/proposed/ (F83)
 //!   cargo xtask ui-logic-connectivity — verify every forskscope-ui-logic crate-root export has a consumer in forskscope-ui (F54)
+//!   cargo xtask ui-logic-docs — verify architecture.md/testing.md's ui-logic module tables match disk (F93)
 //!
 //! CSS source files under assets/css/ are assembled in alphabetical order.
 //! The numeric prefix on each filename (00-, 01-, …) encodes the cascade order.
@@ -15,6 +16,7 @@
 
 mod rfc_sync;
 mod ui_logic_connectivity;
+mod ui_logic_docs;
 
 use std::{
     collections::BTreeSet,
@@ -39,6 +41,7 @@ fn main() {
         Some("ui-logic-connectivity") if args.len() == 1 => {
             ui_logic_connectivity::run(&workspace_root())
         }
+        Some("ui-logic-docs") if args.len() == 1 => ui_logic_docs::run(&workspace_root()),
         Some(cmd) => {
             eprintln!("unknown command: {cmd}");
             print_usage();
@@ -58,6 +61,7 @@ fn print_usage() {
     eprintln!("       cargo xtask version-sync [expected]");
     eprintln!("       cargo xtask rfc-sync");
     eprintln!("       cargo xtask ui-logic-connectivity");
+    eprintln!("       cargo xtask ui-logic-docs");
 }
 
 pub(crate) fn workspace_root() -> PathBuf {
