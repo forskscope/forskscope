@@ -120,6 +120,24 @@ annotated tag object (`git tag -l <tag>`) and re-push.
 3. Push the tag. The release workflow builds the source and platform artifacts,
    composes release notes from the tag's `CHANGELOG.md` section, and creates a
    **draft** GitHub release. It does not publish anything by itself.
+
+   **If the tag is pushed and no draft appears, do not re-cut the tag.** A
+   pushed tag with no draft means one of `release.yml`'s jobs failed —
+   `release.md`'s other recovery advice assumes a draft already exists,
+   which is not this state. Check which job failed:
+   ```sh
+   gh run rerun <run-id> --failed
+   ```
+   re-runs only the failed jobs, keeping the platform builds that already
+   succeeded — a full re-cut would rebuild everything and burn a second
+   tag for a problem that was never in the code. **Re-cut the tag only if
+   the fix requires a code change** — `F102` (0.170.0's cut: `render.yml`'s
+   F34 step launched the app while `xvfb`'s X server was still starting,
+   and the check reported "never registered" for a process that had
+   already exited) established this exact shape as environmental rather
+   than a regression, and `render_check.py` now retries a start-up crash
+   itself (a small, bounded number of attempts, logging each one) — so a
+   plain re-run is the first thing to try, not a last resort.
 4. **Publish is a separate, explicit owner action — this is the approval gate,
    not a formality.** Inspect the draft release artifacts and composed notes,
    then publish:

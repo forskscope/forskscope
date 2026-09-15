@@ -49,6 +49,13 @@ LEFT_FIXTURE = REPO_ROOT / "tests/fixtures/text/left_all_hunk_kinds.txt"
 RIGHT_FIXTURE = REPO_ROOT / "tests/fixtures/text/right_all_hunk_kinds.txt"
 
 APP_TIMEOUT_S = 30
+# F102: a start-up crash (the process exits before ever registering on the
+# accessibility bus - e.g. 0.170.0's release cut, "Failed to initialize
+# GTK" under xvfb) is an infrastructure flake, not a render defect, and
+# this is the only phase retried. A small fixed bound, not a policy knob:
+# see main()'s docstring-adjacent comment on launch_until_registered for
+# why nothing past this phase is ever retried.
+STARTUP_MAX_ATTEMPTS = 3
 # F57: the app registering on the accessibility bus (APP_TIMEOUT_S, above)
 # happens as soon as its window exists - well before the WebView's DOM
 # exists, let alone paints. READY_TIMEOUT_S is the separate budget for
@@ -207,6 +214,69 @@ def check_pane(rows, pane_name):
     return failures
 
 
+def launch_until_registered(binary, scratch, max_attempts=STARTUP_MAX_ATTEMPTS):
+    """Launch `binary` and wait for it to register on the accessibility bus,
+    retrying only a start-up crash - the process exiting before it ever
+    registers (F102: an infrastructure flake, distinct from a slow but
+    live process, which is `find_app`'s existing, unretried timeout).
+
+    Nothing past this function is ever retried: not `wait_for_ready`'s own
+    timeout (a process that registered but whose WebView never reaches the
+    expected render shape is not a start-up flake), and not a geometry
+    mismatch (retrying a real render defect until it happens to pass is
+    the one outcome this whole check exists to prevent).
+
+    Returns (proc, app) on success - the caller owns `proc` from here.
+    Returns (None, None) on failure, having already printed a FAIL message
+    and cleaned up any process it started.
+    """
+    for attempt in range(1, max_attempts + 1):
+        proc = subprocess.Popen(
+            [binary, str(LEFT_FIXTURE), str(RIGHT_FIXTURE)],
+            cwd=scratch,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        app = find_app("forskscope")
+        if app is not None:
+            return proc, app
+
+        exit_code = proc.poll()
+        if exit_code is None:
+            # Still running: a genuine slow-registration timeout, not a
+            # start-up crash. Not retried - reported and killed as before.
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            print(
+                "FAIL: forskscope never registered on the accessibility bus "
+                f"within {APP_TIMEOUT_S}s (the process was still running - "
+                "not a start-up crash, so this was not retried)",
+                file=sys.stderr,
+            )
+            return None, None
+
+        # Exited before registering: F102's start-up flake. Retry.
+        stderr_tail = "\n".join((proc.stderr.read() or "").splitlines()[-20:])
+        print(
+            f"attempt {attempt}/{max_attempts}: forskscope exited during "
+            f"start-up (exit code {exit_code}) before registering on the "
+            "accessibility bus",
+            file=sys.stderr,
+        )
+        if stderr_tail:
+            print(f"  stderr tail:\n{stderr_tail}", file=sys.stderr)
+
+    print(
+        f"FAIL: forskscope exited during start-up on all {max_attempts} "
+        "attempts",
+        file=sys.stderr,
+    )
+    return None, None
+
+
 def main():
     if len(sys.argv) != 2:
         print(f"usage: {sys.argv[0]} <path-to-forskscope-binary>", file=sys.stderr)
@@ -214,17 +284,10 @@ def main():
     binary = str(Path(sys.argv[1]).resolve())
 
     with tempfile.TemporaryDirectory() as scratch:
-        proc = subprocess.Popen([binary, str(LEFT_FIXTURE), str(RIGHT_FIXTURE)], cwd=scratch)
+        proc, app = launch_until_registered(binary, scratch)
+        if app is None:
+            return 1
         try:
-            app = find_app("forskscope")
-            if app is None:
-                print(
-                    "FAIL: forskscope never registered on the accessibility bus "
-                    f"within {APP_TIMEOUT_S}s",
-                    file=sys.stderr,
-                )
-                return 1
-
             landmark, _frame, left_rows, right_rows = wait_for_ready(
                 app, EXPECTED_ROWS_PER_PANE
             )
