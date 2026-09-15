@@ -42,6 +42,24 @@
 //! name.** Breaking that invariant is what would make this check start
 //! producing false failures — not a bug in the check itself.
 //!
+//! ## Comments and string literals do not count (review 106 §3)
+//!
+//! The first version of this check searched raw file text, which meant a
+//! name mentioned only in a comment or a string literal counted as
+//! "consumed" — the opposite of what the check exists to catch: a layer
+//! that is *talked about* but not *called*. `strip_comments_and_strings`
+//! runs over both `lib.rs` and every `forskscope-ui` source file before
+//! any of `extract_root_exports`, `contains_glob_import`, or
+//! `contains_word` sees them. It removes line comments (`//`, `///`,
+//! `//!`), block comments (nesting `/* /* */ */` correctly), and string
+//! literals (`"..."` and raw `r#"..."#` with any number of `#`s),
+//! replacing each with a single space so tokens on either side never
+//! fuse into one word. A lifetime (`'a`) is not a char literal and is
+//! left untouched — the two are told apart by what follows the closing
+//! position: a char literal (`'x'`, `'\n'`) is closed by another `'`
+//! within a few characters, and valid Rust never places a `'` right after
+//! a lifetime name.
+//!
 //! ## The glob-import guard
 //!
 //! A `use forskscope_ui_logic::*;` (or `forskscope_ui_logic::some_module::*`)
@@ -64,7 +82,7 @@ pub fn run(root: &Path) {
     let lib_path = root.join("crates/forskscope-ui-logic/src/lib.rs");
     let lib_src = fs::read_to_string(&lib_path)
         .unwrap_or_else(|e| panic!("cannot read {}: {e}", lib_path.display()));
-    let exports = extract_root_exports(&lib_src);
+    let exports = extract_root_exports(&strip_comments_and_strings(&lib_src));
 
     let ui_src_dir = root.join("crates/forskscope-ui/src");
     let ui_files = collect_rs_files(&ui_src_dir);
@@ -73,7 +91,7 @@ pub fn run(root: &Path) {
         .map(|p| {
             let content = fs::read_to_string(&p)
                 .unwrap_or_else(|e| panic!("cannot read {}: {e}", p.display()));
-            (p, content)
+            (p, strip_comments_and_strings(&content))
         })
         .collect();
 
@@ -121,6 +139,135 @@ pub fn run(root: &Path) {
         "ui-logic connectivity check passed: {} crate-root exports all have a consumer in forskscope-ui.",
         exports.len()
     );
+}
+
+/// Removes line comments, block comments (nested), and string literals
+/// (normal and raw) from Rust source, replacing each with a single space.
+/// Leaves lifetimes (`'a`) untouched — see this module's doc comment for
+/// how a char literal is told apart from one. Written by hand, on
+/// purpose: review 106 §3 asked for no new parser dependency.
+fn strip_comments_and_strings(src: &str) -> String {
+    let chars: Vec<char> = src.chars().collect();
+    let n = chars.len();
+    let mut out = String::with_capacity(src.len());
+    let mut i = 0;
+    while i < n {
+        let c = chars[i];
+
+        if let Some(hashes) = raw_string_hashes(&chars, i) {
+            let prefix_len = usize::from(chars[i] == 'b') + 1 + hashes + 1; // (b)? r #* "
+            let mut j = i + prefix_len;
+            loop {
+                if j >= n {
+                    break;
+                }
+                if chars[j] == '"' && chars[j + 1..].iter().take(hashes).all(|&h| h == '#') {
+                    j += 1 + hashes;
+                    break;
+                }
+                j += 1;
+            }
+            i = j;
+            out.push(' ');
+            continue;
+        }
+
+        if c == '/' && chars.get(i + 1) == Some(&'/') {
+            let mut j = i + 2;
+            while j < n && chars[j] != '\n' {
+                j += 1;
+            }
+            i = j;
+            out.push(' ');
+            continue;
+        }
+
+        if c == '/' && chars.get(i + 1) == Some(&'*') {
+            let mut depth = 1usize;
+            let mut j = i + 2;
+            while j < n && depth > 0 {
+                if chars[j] == '/' && chars.get(j + 1) == Some(&'*') {
+                    depth += 1;
+                    j += 2;
+                } else if chars[j] == '*' && chars.get(j + 1) == Some(&'/') {
+                    depth -= 1;
+                    j += 2;
+                } else {
+                    j += 1;
+                }
+            }
+            i = j;
+            out.push(' ');
+            continue;
+        }
+
+        if c == '"' {
+            let mut j = i + 1;
+            while j < n {
+                if chars[j] == '\\' && j + 1 < n {
+                    j += 2;
+                    continue;
+                }
+                if chars[j] == '"' {
+                    j += 1;
+                    break;
+                }
+                j += 1;
+            }
+            i = j;
+            out.push(' ');
+            continue;
+        }
+
+        if c == '\'' {
+            // A one-character escape ('\n', '\'', '\\', ...): closed by
+            // another `'` three positions later.
+            if chars.get(i + 1) == Some(&'\\') && chars.get(i + 3) == Some(&'\'') {
+                i += 4;
+                out.push(' ');
+                continue;
+            }
+            // A plain single-character literal ('x', '0', ' '): closed by
+            // another `'` two positions later.
+            if chars.get(i + 1).is_some_and(|&next| next != '\\') && chars.get(i + 2) == Some(&'\'')
+            {
+                i += 3;
+                out.push(' ');
+                continue;
+            }
+            // Anything else starting with `'` - a lifetime, or a char
+            // literal form this scanner does not special-case (`'\x41'`,
+            // `'\u{1F600}'`) - is left as ordinary text rather than risk
+            // treating a lifetime as a string delimiter.
+        }
+
+        out.push(c);
+        i += 1;
+    }
+    out
+}
+
+/// `Some(hash_count)` if `chars[i..]` starts a raw (optionally byte)
+/// string: `r"`, `r#"`, `r##"`, ..., or the `b`-prefixed forms.
+fn raw_string_hashes(chars: &[char], i: usize) -> Option<usize> {
+    let mut j = i;
+    if chars.get(j) == Some(&'b') {
+        j += 1;
+    }
+    if chars.get(j) != Some(&'r') {
+        return None;
+    }
+    j += 1;
+    let mut hashes = 0;
+    while chars.get(j) == Some(&'#') {
+        hashes += 1;
+        j += 1;
+    }
+    if chars.get(j) == Some(&'"') {
+        Some(hashes)
+    } else {
+        None
+    }
 }
 
 fn extract_root_exports(lib_src: &str) -> Vec<String> {
@@ -271,5 +418,104 @@ mod tests {
         assert!(!contains_glob_import(
             "use forskscope_ui_logic::{DeepFilter, apply_filter};"
         ));
+    }
+
+    // ── strip_comments_and_strings (review 106 §3) ─────────────────────────────
+
+    #[test]
+    fn strips_line_comments() {
+        let stripped = strip_comments_and_strings("let x = 1; // Foo lives here\n");
+        assert!(!contains_word(&stripped, "Foo"));
+        assert!(contains_word(&stripped, "x"));
+    }
+
+    #[test]
+    fn strips_doc_comments() {
+        let stripped = strip_comments_and_strings("/// Foo does a thing.\nfn f() {}");
+        assert!(!contains_word(&stripped, "Foo"));
+        assert!(contains_word(&stripped, "f"));
+
+        let stripped2 = strip_comments_and_strings("//! Crate-level mention of Foo.\n");
+        assert!(!contains_word(&stripped2, "Foo"));
+    }
+
+    #[test]
+    fn strips_block_comments_including_nested() {
+        let stripped = strip_comments_and_strings("a /* Foo /* nested Bar */ still comment */ b");
+        assert!(!contains_word(&stripped, "Foo"));
+        assert!(!contains_word(&stripped, "Bar"));
+        // The comment closes with the *outer* `*/`, not the inner one -
+        // "still" and "comment" (between the nested close and the outer
+        // one) must also have been stripped, and code on both sides of
+        // the whole comment must survive.
+        assert!(!contains_word(&stripped, "still"));
+        assert!(!contains_word(&stripped, "comment"));
+        assert!(contains_word(&stripped, "a"));
+        assert!(contains_word(&stripped, "b"));
+    }
+
+    #[test]
+    fn strips_normal_strings() {
+        let stripped = strip_comments_and_strings(r#"let s = "Foo lives here";"#);
+        assert!(!contains_word(&stripped, "Foo"));
+        assert!(contains_word(&stripped, "s"));
+    }
+
+    #[test]
+    fn strips_normal_strings_with_escaped_quote() {
+        // The escaped `"` inside the string must not end it early.
+        let stripped = strip_comments_and_strings(r#"let s = "a \" Foo \" b"; c"#);
+        assert!(!contains_word(&stripped, "Foo"));
+        assert!(contains_word(&stripped, "c"));
+    }
+
+    #[test]
+    fn strips_raw_strings_with_hashes() {
+        let stripped = strip_comments_and_strings(r####"let s = r###"Foo "# still inside"###;"####);
+        assert!(!contains_word(&stripped, "Foo"));
+        assert!(!contains_word(&stripped, "inside"));
+        assert!(contains_word(&stripped, "s"));
+        assert!(stripped.trim_end().ends_with(';'));
+    }
+
+    #[test]
+    fn lifetime_next_to_identifier_is_not_stripped() {
+        let src = "fn f<'a>(x: &'a Foo) -> &'a Foo { x }";
+        let stripped = strip_comments_and_strings(src);
+        // Nothing should be removed at all - no comment or string exists.
+        assert_eq!(stripped, src);
+        assert!(contains_word(&stripped, "Foo"));
+    }
+
+    #[test]
+    fn char_literal_is_stripped_without_eating_following_lifetime() {
+        let src = "let c = 'x'; fn f<'a>(v: &'a Foo) {}";
+        let stripped = strip_comments_and_strings(src);
+        assert!(!contains_word(&stripped, "x"));
+        assert!(contains_word(&stripped, "Foo"));
+        assert!(contains_word(&stripped, "a") || stripped.contains("'a"));
+    }
+
+    #[test]
+    fn a_name_that_appears_only_in_a_comment_does_not_count_as_consumed() {
+        // The exact shape review 106's falsification planted: a symbol
+        // mentioned only in a `//` comment must not satisfy the search.
+        let ui_file = "// f54_probe_symbol (architect probe: comment-only mention)\n";
+        let stripped = strip_comments_and_strings(ui_file);
+        assert!(!contains_word(&stripped, "f54_probe_symbol"));
+    }
+
+    #[test]
+    fn a_name_in_real_code_still_counts_once_stripped() {
+        let ui_file = "// f54_probe_symbol is unrelated\nlet _ = f54_probe_symbol();\n";
+        let stripped = strip_comments_and_strings(ui_file);
+        assert!(contains_word(&stripped, "f54_probe_symbol"));
+    }
+
+    #[test]
+    fn extract_root_exports_ignores_pub_use_mentioned_in_a_doc_comment() {
+        let src = "//! Example: `pub use foo::Bar;`\npub use compare::save_error::SaveErrorView;\n";
+        let stripped = strip_comments_and_strings(src);
+        assert_eq!(extract_root_exports(&stripped), vec!["SaveErrorView"]);
     }
 }
