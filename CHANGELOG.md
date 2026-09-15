@@ -19,6 +19,16 @@ when settings loaded, if it came from a hand-edited settings file or an older
 build and fell within 6–50. That value is now brought into range at start-up:
 33–50 becomes 32, and 6–7 becomes 8.
 
+### Security
+
+**The bundled TLS library `rustls` is updated from 0.23.41 to 0.23.45**
+(RUSTSEC-2026-0285, published 2026-09-14). The old version accepted some TLS 1.3
+handshake messages that should have been encrypted when a peer sent them in
+plaintext. The handshake stayed authenticated, so an attacker could not use this
+to alter a connection. `rustls` is present only through the desktop framework's
+WebSocket dependency, not through anything ForskScope uses to read, compare or
+save files.
+
 ### Internal
 
 **Unused interface code was connected or removed.** About twenty pieces of UI
