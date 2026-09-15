@@ -5,7 +5,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.170.2] — Unreleased
+## [0.171.0] — 2026-09-15
+
+**Mostly behind the scenes: less unused code, release builds that recover from
+a start-up hiccup, and checks that keep the maintainer guides accurate.** One
+setting behaves differently; it is described under *Changed*.
+
+### Changed
+
+**The diff font size stays within 8–32 when settings load.** The Settings dialog
+has always limited it to 8–32. A value outside that range was still accepted
+when settings loaded, if it came from a hand-edited settings file or an older
+build and fell within 6–50. That value is now brought into range at start-up:
+33–50 becomes 32, and 6–7 becomes 8.
+
+### Internal
+
+**Unused interface code was connected or removed.** About twenty pieces of UI
+logic were never used by anything on screen. Some were wired into the views
+that had been duplicating them: Deep Compare's counts and filter, and the theme
+list and font-size limit in Settings. The rest were deleted. Nothing on screen
+changes, and a new CI check fails the build if unused exports come back.
+
+**Release builds retry a crash during start-up.** The automated rendering check
+that runs before each release now relaunches the app, up to three times, when it
+exits before it finishes starting. That was the failure that stopped 0.170.0's
+first build. A genuine rendering failure is still never retried, and the app's
+error output is now shown under any failure.
+
+**The maintainer guides are checked against the source tree.** A new CI check
+fails when the module tables in the architecture and testing guides stop
+matching the modules that exist.
+
+**Microsoft Store and AUR publication can be automated.** Workflows for both
+are in place. Neither has been used for a real release yet, so publication
+stays manual until they have.
 
 ## [0.170.1] — 2026-09-08
 
