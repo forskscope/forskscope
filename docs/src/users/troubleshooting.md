@@ -135,12 +135,17 @@ not help, reinstall from the latest release.
 
 ## Windows: app does not start — WebView2 missing
 
-**Symptom:** An error dialog mentions `WebView2` or `msedgewebview2.exe`.
+**Symptom:** ForskScope shows a message box titled "ForskScope" saying the
+Microsoft Edge WebView2 Runtime is not installed, and offering to open the
+download page. Either button closes ForskScope (exit code 3) — there is
+nothing to render into without the runtime.
 
 **Cause:** Dioxus Desktop uses the Microsoft Edge WebView2 runtime on
-Windows.
+Windows. ForskScope checks for it at every startup and reports this
+specific case, rather than failing silently or opening a blank window.
 
-**Fix:** Download and install the WebView2 Evergreen Runtime from
+**Fix:** Choose "Yes" on the message box, or download and install the
+WebView2 Evergreen Runtime directly from
 [Microsoft](https://developer.microsoft.com/en-us/microsoft-edge/webview2/).
 The "Evergreen Standalone Installer" is the easiest option.
 

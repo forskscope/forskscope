@@ -349,6 +349,13 @@ fn ja(key: &str) -> Option<&'static str> {
         // RFC-077 patch 5: Save As to an existing destination.
         "Overwrite existing file?" => "既存のファイルを上書きしますか？",
         "A file already exists at this path." => "このパスには既にファイルが存在します。",
+        // F109: Windows WebView2 Runtime missing-at-startup check.
+        "forskscope: the Microsoft Edge WebView2 Runtime is not installed" => {
+            "forskscope: Microsoft Edge WebView2 ランタイムがインストールされていません"
+        }
+        "ForskScope needs the Microsoft Edge WebView2 Runtime, which is not installed on this computer. Open the download page?" => {
+            "ForskScope には Microsoft Edge WebView2 ランタイムが必要ですが、このコンピューターにはインストールされていません。ダウンロードページを開きますか？"
+        }
         _ => return None,
     };
     Some(v)

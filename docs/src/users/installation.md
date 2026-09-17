@@ -148,9 +148,13 @@ zip has no floor at all — but it is **not tested there**, and Windows 10
 reached end of support on 2025-10-14. Treat it as unsupported.
 
 ForskScope renders through the **WebView2 runtime**, which Windows 11
-preinstalls. It also needs the **Visual C++ redistributable**, which a clean
-Windows install does not always have. If the window opens blank, or the app
-fails to start with a message about `VCRUNTIME140.dll`, install the
+preinstalls. If it is missing, ForskScope detects this at startup and shows a
+message box offering to open the download page; choosing not to still closes
+the app (exit code 3), since there is nothing to render into otherwise. It
+also needs the **Visual C++ redistributable**, which a clean Windows install
+does not always have — that failure looks different: the app fails to start
+with a message about `VCRUNTIME140.dll`, before ForskScope's own code can run
+at all. Install the
 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) and
 the [Visual C++ redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe).
 
