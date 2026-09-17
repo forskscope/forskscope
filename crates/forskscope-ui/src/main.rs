@@ -58,6 +58,12 @@ fn saved_lang_no_side_effects() -> state::Lang {
     }
 }
 
+// Falsification for review 109 §3 / handoff 037 §A.3: a deliberate
+// cfg(windows) type error, to prove the new Windows-GNU clippy step in
+// ci.yml actually fails on one. Never merged to main.
+#[cfg(windows)]
+const F109_FALSIFICATION_TYPE_ERROR: u32 = "this is not a u32";
+
 /// Windows-only WebView2 presence check, run after argument parsing and
 /// before the window is created (F109). Wires the OS calls to
 /// [`webview2::decide`]: reads the runtime version, on failure prints to
