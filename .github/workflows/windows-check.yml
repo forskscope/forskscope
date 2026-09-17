@@ -1,0 +1,87 @@
+name: Windows Check
+
+# F109 (review 109 §4): dispatchable on demand, so the WebView2 detection
+# check (crates/forskscope-ui/src/webview2.rs, wired in main.rs) is proven
+# against a real windows-latest runner before it ships in a release, not
+# for the first time inside release.yml itself. workflow_dispatch only -
+# no push trigger, so nothing runs unless someone asks for it, and no
+# rehearsal tag is ever needed (review 108 §5).
+#
+# Builds the same release binary release.yml's Windows job builds, then
+# runs `--diagnostics` twice: once as-is (WebView2 present on this
+# runner), once with WEBVIEW2_BROWSER_EXECUTABLE_FOLDER pointed at a
+# fresh empty directory (the WebView2 loader's own env var, which the
+# F109 handoff expects to make detection fail even though the runtime is
+# actually installed). Both outputs are printed regardless of outcome.
+
+on:
+  workflow_dispatch: {}
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: WebView2 detection (F109)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: windows-check-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release binary
+        run: cargo build --release --locked -p forskscope-ui
+
+      # The binary is windows_subsystem = "windows" in a release build, so
+      # the first thing this step must confirm is that its stdout actually
+      # reaches this log at all - a GUI-subsystem exe has no console of its
+      # own, but a CI runner invokes it with its stdout piped/redirected,
+      # which is what actually determines whether a write to the stdout
+      # handle goes anywhere, independent of console attachment. Checked
+      # empirically below, not assumed either way.
+      - name: Run --diagnostics and assert WebView2 detection
+        shell: pwsh
+        run: |
+          $normal = & ./target/release/forskscope.exe --diagnostics 2>&1 | Out-String
+          Write-Host "--- diagnostics: WebView2 present (this runner's real install) ---"
+          Write-Host $normal
+
+          if ([string]::IsNullOrWhiteSpace($normal)) {
+            Write-Error "no stdout was captured at all from the release (windows_subsystem = 'windows') binary - this is a GUI-subsystem stdout-capture problem, not a WebView2 detection problem, and it means the assertions below would test nothing."
+            exit 1
+          }
+
+          $empty = Join-Path $env:RUNNER_TEMP "empty-webview2-dir"
+          New-Item -ItemType Directory -Path $empty -Force | Out-Null
+          $env:WEBVIEW2_BROWSER_EXECUTABLE_FOLDER = $empty
+          $forced = & ./target/release/forskscope.exe --diagnostics 2>&1 | Out-String
+          Remove-Item Env:WEBVIEW2_BROWSER_EXECUTABLE_FOLDER
+          Write-Host "--- diagnostics: WEBVIEW2_BROWSER_EXECUTABLE_FOLDER pointed at an empty directory ---"
+          Write-Host $forced
+
+          $ok = $true
+
+          if ($normal -notmatch '(?m)^WebView2 runtime: \d') {
+            Write-Error "expected a line matching '^WebView2 runtime: \d' (a version) in the normal run - got:`n$normal"
+            $ok = $false
+          }
+
+          if ($forced -notmatch '(?m)^WebView2 runtime: not found \(') {
+            Write-Error "WEBVIEW2_BROWSER_EXECUTABLE_FOLDER pointed at an empty directory did not produce a 'not found' line - it may not actually simulate a missing runtime on this runner. Got:`n$forced"
+            $ok = $false
+          }
+
+          if (-not $ok) {
+            exit 1
+          }
+          Write-Host "Both assertions passed."

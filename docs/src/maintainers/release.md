@@ -23,6 +23,10 @@
     repairs the lock *before* the check reads it — the gate could never fail.
 12. Completed RFCs moved from `rfcs/proposed/` to `rfcs/done/`; `rfcs/README.md` updated.
 13. `ROADMAP.md` current state paragraph updated if the milestone is significant.
+14. F109: dispatch `windows-check.yml` (`gh workflow run windows-check.yml`)
+    for the release commit and confirm the run is green — proves the
+    WebView2 detection check on a real `windows-latest` runner before the
+    release build ships it.
 
 ---
 

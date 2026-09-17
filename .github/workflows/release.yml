@@ -183,24 +183,6 @@ jobs:
       - name: Build release binary
         run: cargo build --release --locked -p forskscope-ui
 
-      # F109: shows both `--diagnostics` outcomes on a real windows-latest
-      # runner - the normal one (WebView2 present), and the one a user with
-      # a missing runtime would see, forced via the loader's own
-      # WEBVIEW2_BROWSER_EXECUTABLE_FOLDER env var pointed at an empty
-      # directory. No test-only switch in the product - this exercises the
-      # real `wry::webview_version()` call.
-      - name: Confirm WebView2 detection (F109)
-        shell: pwsh
-        run: |
-          Write-Host "--- diagnostics: WebView2 present (this runner's real install) ---"
-          ./target/release/forskscope.exe --diagnostics
-
-          $empty = Join-Path $env:RUNNER_TEMP "empty-webview2-dir"
-          New-Item -ItemType Directory -Path $empty | Out-Null
-          $env:WEBVIEW2_BROWSER_EXECUTABLE_FOLDER = $empty
-          Write-Host "--- diagnostics: WEBVIEW2_BROWSER_EXECUTABLE_FOLDER pointed at an empty directory ---"
-          ./target/release/forskscope.exe --diagnostics
-
       - name: Package
         shell: bash
         run: |

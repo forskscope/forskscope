@@ -64,6 +64,7 @@ mod tests {
 
     #[test]
     fn absent_stops_with_a_non_empty_bilingual_message() {
+        let mut dialog_texts = Vec::new();
         for lang in [Lang::En, Lang::Ja] {
             match decide(Err("not found".to_string()), lang) {
                 Decision::Stop {
@@ -73,9 +74,18 @@ mod tests {
                     assert!(!stderr_line.is_empty());
                     assert!(!dialog_text.is_empty());
                     assert!(stderr_line.contains("not found"));
+                    dialog_texts.push(dialog_text);
                 }
                 Decision::Proceed => panic!("expected Stop when the runtime is absent"),
             }
         }
+        // Review 109 §5: a missing `ja()` entry would make `t` fall back to
+        // the English key, and the assertions above would still pass. The
+        // two languages' text must actually differ, not merely both be
+        // non-empty.
+        assert_ne!(
+            dialog_texts[0], dialog_texts[1],
+            "the Ja dialog text must differ from the En one — a missing i18n.rs entry would silently fall back to English"
+        );
     }
 }
