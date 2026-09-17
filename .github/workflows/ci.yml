@@ -186,5 +186,20 @@ jobs:
       - name: cargo clippy (workspace, all targets)
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      # F109 review 109 §3: cfg(windows) code (main.rs/webview2.rs today)
+      # had never been compiled anywhere before a release tag build. This
+      # is a **type-check only**: it lints and type-checks every
+      # `cfg(windows)` path against the real `wry`/`rfd` APIs on Ubuntu,
+      # with no linker involved, so it needs no MinGW toolchain. It does
+      # **not** cover the MSVC target, linking, or runtime behavior on
+      # real Windows — release.yml's Windows job builds for real, and
+      # windows-check.yml (F109 review 109 §4) exercises the WebView2
+      # check against a real windows-latest runner.
+      - name: Add the Windows GNU target
+        run: rustup target add x86_64-pc-windows-gnu
+
+      - name: cargo clippy (workspace, all targets, Windows GNU target)
+        run: cargo clippy --workspace --all-targets --target x86_64-pc-windows-gnu -- -D warnings
+
       - name: cargo build (UI — ensures it compiles)
         run: cargo build -p forskscope-ui

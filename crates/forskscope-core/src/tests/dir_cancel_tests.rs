@@ -5,9 +5,10 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::CancellationToken;
+#[cfg(unix)]
+use crate::dir::list_recursive_for_display_with_cancel;
 use crate::dir::{
-    DigestOutcome, RecStatus, file_digest_equal_with_cancel,
-    list_recursive_for_display_with_cancel, recursive_diff_with_cancel,
+    DigestOutcome, RecStatus, file_digest_equal_with_cancel, recursive_diff_with_cancel,
 };
 
 fn tmp(tag: &str) -> PathBuf {

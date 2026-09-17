@@ -15,7 +15,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::CancellationToken;
-use crate::dir::{RecStatus, list_recursive_for_display_with_cancel, recursive_diff_with_cancel};
+use crate::dir::recursive_diff_with_cancel;
+#[cfg(unix)]
+use crate::dir::{RecStatus, list_recursive_for_display_with_cancel};
 
 fn tmp(tag: &str) -> PathBuf {
     let d = std::env::temp_dir().join(format!("fsk-dirunreadable-{tag}-{}", std::process::id()));

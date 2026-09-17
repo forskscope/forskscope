@@ -4,7 +4,9 @@ use std::path::PathBuf;
 use crate::document::FileFingerprint;
 use crate::encoding::BomPresence;
 use crate::error::CoreError;
-use crate::save::{BackupPolicy, SaveRequest, TargetPrecondition, atomic_replace, save_text};
+#[cfg(unix)]
+use crate::save::atomic_replace;
+use crate::save::{BackupPolicy, SaveRequest, TargetPrecondition, save_text};
 
 fn temp_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("fsk-save-{tag}-{}", std::process::id()));

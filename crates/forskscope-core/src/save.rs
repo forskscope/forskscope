@@ -170,18 +170,34 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
 /// temp-then-rename logic. This function carries no document-save-specific
 /// behavior (no fingerprint check, no `.bak` backup) — those stay in
 /// [`save_text`]; callers needing them apply their own policy.
+/// A [`tempfile::Builder`] set to create the temp file with 0o666
+/// permissions (kernel-umask-applied) on unix, or the crate default
+/// elsewhere — split out so the `mut` binding needed to call
+/// [`tempfile::Builder::permissions`] exists only on the platform that
+/// calls it (review 109 §2: `-D warnings` fails a Windows clippy run
+/// otherwise, since `builder` would never be mutated there).
+#[cfg(unix)]
+fn unix_tempfile_builder() -> tempfile::Builder<'static, 'static> {
+    use std::os::unix::fs::PermissionsExt;
+    let mut builder = tempfile::Builder::new();
+    builder.permissions(fs::Permissions::from_mode(0o666));
+    builder
+}
+
+#[cfg(not(unix))]
+fn unix_tempfile_builder() -> tempfile::Builder<'static, 'static> {
+    tempfile::Builder::new()
+}
+
 pub(crate) fn atomic_replace(target: &Path, bytes: &[u8]) -> Result<()> {
     let dir = target.parent().unwrap_or_else(|| Path::new("."));
     // See persist_noclobber_with_hook's comment: 0o666 (kernel applies the
     // umask), not NamedTempFile's 0600 default — this temp file becomes the
     // permanent target file and must end up with the same permissions a
-    // plain fs::write would have produced.
-    let mut builder = tempfile::Builder::new();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        builder.permissions(fs::Permissions::from_mode(0o666));
-    }
+    // plain fs::write would have produced. The builder is only ever mutated
+    // on unix, so the `mut` binding lives in unix_tempfile_builder alone —
+    // otherwise a Windows build sees a binding that is never mutated.
+    let builder = unix_tempfile_builder();
     let mut tmp = builder
         .tempfile_in(dir)
         .map_err(|e| CoreError::io(dir, IoOperation::Write, &e))?;
@@ -295,12 +311,7 @@ pub(crate) fn persist_noclobber_with_hook(
     // property without querying or touching the process-wide umask
     // ourselves. No Windows equivalent (no POSIX mode bits); its default
     // ACL behavior is unaffected.
-    let mut builder = tempfile::Builder::new();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        builder.permissions(fs::Permissions::from_mode(0o666));
-    }
+    let builder = unix_tempfile_builder();
     let mut tmp = builder
         .tempfile_in(dir)
         .map_err(|e| CoreError::io(dir, IoOperation::Write, &e))?;

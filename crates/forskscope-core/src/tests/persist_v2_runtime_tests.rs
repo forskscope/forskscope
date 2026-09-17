@@ -33,6 +33,7 @@ fn temp_path(tag: &str, file_name: &str) -> PathBuf {
     dir.join(file_name)
 }
 
+#[cfg(unix)]
 fn backup_path_for(path: &std::path::Path) -> PathBuf {
     path.with_file_name(format!(
         "{}.pre-v2.bak",
