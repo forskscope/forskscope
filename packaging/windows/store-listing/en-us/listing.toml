@@ -40,7 +40,8 @@ Highlights:
 - Multiple diff algorithms (Myers, Histogram), ignore-whitespace and \
 ignore-case modes
 - Encoding detection and override, including UTF-16 and BOM handling
-- Dark and light themes, adjustable density and font size
+- Dark, light and night themes, and adjustable font size
+- English and Japanese interface (starts in English; switch in Settings → Language)
 """
 
 # Partner Center allows up to 7 search terms.

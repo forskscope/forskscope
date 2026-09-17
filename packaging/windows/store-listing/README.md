@@ -6,20 +6,28 @@ nothing here is read by `store-submit.ps1` or any workflow. This exists so
 that manual step has something version-controlled to copy from, instead of
 text that only ever existed inside Partner Center.
 
-- `en-us/listing.toml` — title, short/long description, search terms, and
-  which screenshots represent the listing.
+- `en-us/listing.toml`, `ja-jp/listing.toml` — title, short/long
+  description, search terms, and which screenshots represent the listing,
+  one per market.
 - `en-us/identity.toml` — the fixed `Identity`/`Publisher`/
   `PublisherDisplayName` triple Partner Center has on file, so
   `store-validate.ps1` can catch a manifest edit that drifts from it (see
-  that file's own comment for what this check can and cannot catch).
-- `en-us/screenshots/` — committed PNGs, not a promise to regenerate them.
-  `packaging/render_check.py` walks the AT-SPI tree and asserts geometry; it
-  captures no images, so there is no machinery to generate these from. They
-  were captured by hand against the real, running application.
+  that file's own comment for what this check can and cannot catch). This
+  is language-neutral package identity, not listing content — it stays in
+  `en-us/` only; `store-submit.ps1` and `store-validate.ps1` read it from
+  that exact path, and a second market does not get its own copy.
+- `en-us/screenshots/`, `ja-jp/screenshots/` — committed PNGs, not a
+  promise to regenerate them. `packaging/render_check.py` walks the AT-SPI
+  tree and asserts geometry; it captures no images, so there is no
+  machinery to generate these from. They were captured by hand against the
+  real, running application.
 
-Only one market (`en-us`) exists today, matching `AppxManifest.xml`'s single
-`<Resource Language="en-US" />`. A second market gets its own `<lang>/`
-sibling directory with the same three pieces.
+Two markets exist today, matching `AppxManifest.xml`'s two `<Resource>`
+entries (`en-US`, `ja-JP`, F108). A further market gets its own `<lang>/`
+sibling directory holding `listing.toml` and `screenshots/` — not
+`identity.toml`, which is not per-market. Every market's `listing.toml`
+must make the same claims about the product; a difference in wording is
+expected, a difference in what the app can do is not.
 
 ## Manifest versus listing: which wins
 
