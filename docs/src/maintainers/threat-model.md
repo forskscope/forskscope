@@ -1,8 +1,16 @@
 # Threat Model and Security Notes
 
-This document records the security posture of ForskScope at v0.165.0, the
+This document records the security posture of ForskScope at **v0.171.1**, the
 data flows that carry risk, the controls in place, and the known residual
 concerns. It is a living document; update it when a new data flow is added.
+
+**Review stamp.** Last full revision 2026-09-24, against commit `2bb7ca8`
+(the previous stamp was v0.165.0, 2026-08-01). That revision corrected the
+`.xlsx` sections, the script-evaluation claim, the transport dependency chain,
+and added the write path (§7), script evaluation (§9) and distribution (§8).
+**Sections 2, 3, 4, 5 and 6 were not re-audited in that revision**; they are
+as they stood at v0.165.x–v0.170.2. Where this document says a property was
+"verified", the date and the method are stated next to it.
 
 ---
 
@@ -20,6 +28,11 @@ below. The threat surface is therefore limited to:
 4. **Batch-copy manifest** — a JSON file in the platform data dir.
 5. **Background task safety** — async load+diff tasks writing back to UI state.
 6. **Local WebView transport** — Dioxus desktop loopback WebSocket IPC.
+7. **Parsing user-supplied `.xlsx` archives** — the one third-party parser that
+   reads file content (below, under "Enabled third-party parser").
+8. **Saving files** — the only operation that can destroy user data (§7).
+9. **Script evaluation in the WebView** — `document::eval` (§9).
+10. **Distribution** — how a build reaches a user (§8).
 
 There is no product/user authentication surface, no session tokens, no cookies,
 no persisted user secrets, and no user-account data.
@@ -50,10 +63,13 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
   hex diffs.
 - Text vs. binary cross-comparison (one side text, other binary) is blocked with
   a clear error message.
-- `.xlsx` files are recognized as spreadsheet inputs, but spreadsheet
-  comparison currently fails closed before parsing workbook XML. The runtime
-  parser dependency path was removed until `sheets-diff` can move away from the
-  vulnerable `calamine -> quick-xml` chain.
+- `.xlsx` files are **parsed** since v0.169.0 (`d492557`, RFC-085): a pair of
+  workbooks goes through `sheets-diff` 2.5.0 (`calamine 0.36.1`,
+  `quick-xml 0.41.0`, `zip 8.6.0`) under the bounds set in
+  `crates/forskscope-core/src/xlsx.rs`. A comparison that cannot finish — a
+  corrupt workbook, or one that reaches a size bound — is shown as an error,
+  never as an identical result. What the parser defends against and what it
+  does not is under "Enabled third-party parser" below.
 - No user-supplied path is ever executed as a shell command or passed through
   `sh -c`. Paths are opened with `std::fs::File::open`, not via a shell.
 
@@ -234,6 +250,160 @@ creates, uploads to, and commits a Store submission.
   place it must be recorded once it is, and the place to check before
   assuming a submission failure is a code problem.
 
+### 7. Saving: the write path
+
+This is the one place the tool can destroy user data, and it carries the
+strongest controls in the codebase. Everything below is `crates/forskscope-core/
+src/save.rs` unless stated, checked against the code and against a probe run
+on 2026-09-24 (Linux, `umask 022`; **Windows and macOS behaviour was not
+probed**).
+
+**Flow:** the UI builds a `SaveRequest` (target, content, encoding, BOM,
+`TargetPrecondition`, `BackupPolicy`) → `save_text` → precondition check →
+encode → optional `.bak` copy → commit. Settings and session files reuse the
+same `atomic_replace` primitive (§4).
+
+**Controls:**
+- **The temp file is created unpredictably.** `atomic_replace` and
+  `persist_noclobber` create their temp file with `tempfile::Builder` in the
+  target's directory: a random name opened exclusively, never a predictable
+  sibling. The earlier `.{name}.fsk-tmp` scheme let a pre-created symlink at
+  that name redirect the write (CWE-59/CWE-378, F89/RFC-082 §D5; the reasoning
+  is in `save.rs`'s doc comment on `atomic_replace`). A dedicated
+  attack-regression test,
+  `atomic_replace_does_not_follow_a_pre_created_symlink_at_the_old_predictable_temp_path`
+  (`tests/save_tests.rs`), reproduces the attack and asserts the victim file is
+  untouched and the target stays a regular file.
+- **The commit is a rename.** A reader sees the old file or the new one, never
+  a torn write. This is *visibility* atomicity, not durability: no `fsync` is
+  called on the file or its directory (F9/N2).
+- **A save that must not overwrite cannot.** `MustBeAbsent` checks with
+  `symlink_metadata`, not `exists()`, so a dangling symlink counts as present and
+  a genuine read failure propagates instead of reading as "absent" (review 046
+  N1); the commit is `persist_noclobber`, and if the platform cannot provide it
+  the error propagates — there is no fallback to an overwriting write (RFC-077).
+- **A lossy save is refused before anything is touched.** If the target encoding
+  cannot represent the content, `save_text` returns `CoreError::Encode` *before*
+  the backup step, because the backup clobbers an existing `<name>.bak` (F87).
+- **A stale save is refused.** `MustMatch` compares the on-disk fingerprint with
+  the one captured at load (missing / changed / replaced are all conflicts).
+- **`.xlsx` is never written.** Spreadsheet comparison is read-only.
+
+**What the guarantee does not cover** — each of these was observed, not
+inferred:
+- **The backup path follows a symlink.** `BackupPolicy::SiblingBak` (the default)
+  does `fs::copy(target, "<name>.bak")`. If `<name>.bak` already exists as a
+  symlink, the copy writes *through* it. Probe: a symlink `doc.txt.bak ->
+  victim.txt` beside `doc.txt`; after a save, `victim.txt` contained
+  `doc.txt`'s previous content. This is the same class as the temp-file defect
+  above, on a predictable name the F89 fix did not reach. It needs an attacker
+  who can create files in the target's directory.
+- **A save widens a private file's permissions.** The replacement is created with
+  mode `0666` filtered by the process umask (deliberately: F38 — a saved file must not be left with the temp file's
+  `0600` default). Probe: a `0600` file was `0644`
+  after a save. Saving a merge result over a secrets file leaves it readable by
+  the group and others. Ownership, ACLs and extended attributes were not probed.
+- **Saving through a symlink replaces the link.** Probe: after a save to
+  `link.txt -> real.txt`, `link.txt` was a regular file and `real.txt` was
+  unchanged. Safe against write-through, and not what a user editing "the file
+  the link points to" expects.
+- **A hard link is split.** Probe: after a save to `a.txt`, its hard link
+  `b.txt` still held the old content.
+- **`MustMatch` and `Force` are check-then-rename, not atomic.** The
+  fingerprint is checked once, at the start of `save_text`; a write by another
+  process between that check and the rename is overwritten. Only `MustBeAbsent`
+  has a race-free commit, and it is the only path with a deterministic race test.
+- **No durability** (above): a power loss after a save can lose it, because
+  nothing is flushed.
+
+### 8. Distribution
+
+How a build reaches a user is part of the threat surface: the project's
+publishing credentials (§6 for the Store, and the AUR key below) let someone
+substitute a build. Checked 2026-09-24.
+
+| Channel | What the user receives | What vouches for it |
+|---|---|---|
+| Microsoft Store | An MSIX the project submits **unsigned**; Microsoft signs it after certification. No code-signing certificate of this project's own exists (`packaging/windows/README.md`, RFC-079 §2a). | Microsoft's certification and signature. |
+| GitHub release, Windows zip | `forskscope.exe` in a zip. **No signing step exists in any workflow** (no `signtool`, GPG, cosign or attestation anywhere under `.github/`). | Only the release's own digest. |
+| GitHub release, macOS DMG | Not signed with an Apple Developer ID and not notarized (`installation.md`). | Only the release's own digest. |
+| GitHub release, Linux tarball | Unsigned. | Only the release's own digest. |
+| AUR | A `PKGBUILD` (and `.SRCINFO`) pushed by `aur-publish.yml`. `sha256sums=('SKIP')` in the repository; the real source hash is computed at publish time from GitHub's own archive of the tag. | The workflow, then the AUR account holding the SSH key. |
+
+**Controls:**
+- A release is created as a **draft** by the tag-triggered `release.yml`; it does
+  nothing user-visible until the owner publishes it, and both the Store and AUR
+  workflows trigger on *publication*, never on the tag push. A published version
+  is immutable by policy (`release.md`).
+- The AUR key lives in the `aur-publish` GitHub Environment; only `PKGBUILD` and
+  a regenerated `.SRCINFO` are pushed, after the package has been built,
+  installed and run through `namcap`; the AUR host key is pinned in the
+  workflow, not fetched.
+- Each release asset carries a SHA-256 digest that GitHub computes on upload
+  (`gh release view <tag> --json assets`).
+
+**Residual concerns:**
+- **Integrity and origin are the same anchor.** The only digest a Windows-zip,
+  DMG or tarball user can compare against is published by the same GitHub
+  account that publishes the file; nothing independent signs a build. Anyone who
+  can replace a release asset can replace its digest. The digest is on the
+  release's asset list, **not in the release notes**, which `installation.md`
+  ("listed with their digests in each release's notes") had said.
+- **Unsigned binaries teach users to click through warnings.** macOS users are
+  told to clear the quarantine attribute (`installation.md`), which removes the
+  operating system's check for that build entirely.
+- **The AUR hash is derived, not verified.** Because the source hash is computed
+  from the tag's own archive at publish time, it detects a later change to that
+  archive, not a substituted one.
+- **Compromise of the AUR key, the Store credential (§6), or the GitHub
+  repository each reaches users as an official update.** §6 records the Store
+  case; this document does not record whether the `aur-publish` environment
+  requires a reviewer, and this revision did not check.
+
+### 9. Script evaluation in the WebView (`document::eval`)
+
+`forskscope-ui` calls `dioxus::document::eval` at **11 sites** (counted
+2026-09-24). Nothing renders untrusted HTML (no `dangerous_inner_html`, no
+`innerHTML`); this is the only way application code makes the WebView run
+JavaScript it composed at runtime.
+
+| Sites | Argument | Runtime data? |
+|---|---|---|
+| `app.rs` (×4), `modals.rs`, `dir_pane.rs` | A fixed string (focus an element, click a button, scroll to top). | None. |
+| `diff.rs` (scroll-sync installer) | `format!` with the tab index. | An integer (`usize`). |
+| `diff_actions.rs` (scroll to a hunk) | `format!` with `h-{hunk_id}`. | An integer (`u64`). |
+| `app.rs` (window title) | `format!("document.title = {:?}", title)` | **A string derived from the file names the user opened.** |
+| `search.rs` (scroll to a match) | `format!("…getElementById({id:?})…")` | A string, but `h-{u64}` built in `forskscope-ui-logic`. |
+| `about.rs` (copy diagnostics) | `format!("navigator.clipboard?.writeText({:?})", d)` | The platform report (`PlatformInfo::to_report`): version, OS, architecture, CPU count. No file data. |
+
+**The one that matters** is the window title, because file names are chosen by
+whoever made the file — including a third party whose directory the user opens.
+Its argument is quoted with Rust's `{:?}` (`Debug`), which is not a JavaScript
+escaper; it works because the two languages' string-literal escapes largely
+coincide. That was **tested, not assumed** (2026-09-24): 21 strings —
+quotes, backslashes, CR/LF, tab, U+2028/2029, other control characters, an emoji,
+combining marks, a zero-width joiner, a bidi override, a BOM, `</script><img
+onerror=…>`, a template-literal `` `${…}` ``, a literal that tries to close the
+string (`";alert(1);//`), a single quote, private-use and non-characters,
+Japanese — were formatted with `{:?}` and evaluated in a JavaScript engine in
+both sloppy and strict mode. **Every one round-tripped to the identical
+string**, except one: a NUL followed by an ASCII digit is written `\01`, a legacy
+octal escape (a different character in sloppy mode, a `SyntaxError` in strict
+mode). A NUL cannot occur in a path on Linux, macOS or Windows, so this is not
+reachable from a file name.
+
+**What was not established:**
+- The result is an experiment over the classes above, not a proof, and the
+  project has no fuzzing.
+- `Debug`'s output format is **not a documented, stable contract**. Nothing in
+  the repository pins this behaviour with a test, so a change in a future Rust
+  release would not be noticed here.
+- The tab title and clipboard write are inert sinks (`document.title`, a text
+  clipboard write), which limits what a successful injection could do; that
+  reasoning was not tested.
+- The two non-string interpolations are integers by construction and were not
+  examined further.
+
 ---
 
 ## What ForskScope deliberately does not do
@@ -247,8 +417,12 @@ by defensive programming:
 - **No telemetry or analytics** — no beacon calls, no usage counters written
   to any remote endpoint.
 - **No code execution from diff content** — diffs are rendered as text with
-  HTML-escaped content inside Dioxus RSX; there is no `innerHTML` injection
-  or `eval()` surface.
+  HTML-escaped content inside Dioxus RSX. Checked 2026-09-24: there is no
+  `dangerous_inner_html` and no `innerHTML` anywhere under `crates/`.
+  **This is not a claim that there is no `eval` surface.** The application
+  does evaluate JavaScript in its WebView (`document::eval`, 11 call sites),
+  and three of them interpolate runtime strings. §9 records what they are and
+  what was and was not examined.
 - **No privilege escalation** — ForskScope runs as the invoking user. It never
   calls `sudo`, `pkexec`, or platform privilege APIs.
 - **No plugin loading** — no dynamic library loading, no WASM sandbox, no
@@ -273,7 +447,12 @@ Key crates touching file I/O or process execution:
 | `dioxus` | 0.7.9 | UI framework | Default features disabled; no devtools |
 | `dioxus-desktop` | 0.7.9 | Desktop WebView host | Uses authenticated loopback WebSocket IPC between WebView and host |
 | `tungstenite` / `native-tls` | 0.28 / 0.2 | Dioxus desktop transport dependency | Accepted only via `dioxus-desktop`; no app-authored remote connections |
-| `quick-xml` | 0.39.x | Wayland protocol code generation through GTK/Dioxus stack | Build-time/proc-macro path; not reachable from user-supplied files |
+| `quick-xml` | 0.39.4 | Wayland protocol code generation through GTK/Dioxus stack | Build-time/proc-macro path; not reachable from user-supplied files. Carries the two advisories ignored in `.cargo/audit.toml` |
+| `sheets-diff` | 2.5.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0); this project's own crate | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-core` only (`audit-deps` asserts it) |
+| `calamine` | 0.36.1 | Workbook reader under `sheets-diff` | **Parses user-supplied XML and archives.** Materialises a whole sheet before any bound counts a cell. Immediate dependent: `sheets-diff` only |
+| `quick-xml` | 0.41.0 | XML parsing under `calamine` | **Reachable from user-supplied files.** Not covered by the `.cargo/audit.toml` ignore list (which names 0.39 only) |
+| `zip` | 8.6.0 | Archive reading under `calamine` | **Reachable from user-supplied files.** Compressed size is bounded (50 MiB); expansion is not |
+| `rustls` | 0.23.45 | TLS library compiled into `tungstenite` (v0.171.0: RUSTSEC-2026-0285) | Framework transport only, see "Accepted local WebView transport"; not reachable from file content |
 | `tempfile` | 3.27.0 | RFC-077: promoted from a `forskscope-core` dev-dependency to a normal one for the Git mergetool save target's no-clobber commit (`save::persist_noclobber`, using `NamedTempFile::persist_noclobber`) | Local filesystem only — creates a same-directory temp file and commits or discards it; no network data flow; re-audited with `cargo xtask audit-deps` and `cargo audit` after promotion, no new advisories |
 
 ### Accepted local WebView transport
@@ -289,35 +468,78 @@ directly without its default `devtools` feature. `wry/devtools` is enabled only
 to provide the WebView method surface required by `dioxus-desktop` release
 builds; `dioxus-devtools` remains inactive and ForskScope removes the default
 Dioxus menu bar so the framework devtools toggle is not exposed as product UI.
-The reviewed residual path is:
+`tungstenite` 0.28.0 compiles in **both** TLS backends, so there are two
+reviewed residual paths (checked 2026-09-24 with `cargo tree -i`):
 
 ```text
 native-tls -> tungstenite -> dioxus-desktop -> forskscope-ui
+rustls     -> tungstenite -> dioxus-desktop -> forskscope-ui
 ```
+
+(`rustls-webpki` sits under `rustls` on the same path.) v0.171.0 updated
+`rustls` from 0.23.41 to 0.23.45 for RUSTSEC-2026-0285, published 2026-09-14: the
+old version accepted some TLS 1.3 handshake messages that should have been
+encrypted when a peer sent them in plaintext. The handshake stayed
+authenticated. The path is framework transport, not file content.
 
 The release gate `cargo xtask audit-deps` asserts that `dioxus-devtools` is not
 active, that `tungstenite`/`native-tls` remain limited to the reviewed
 `dioxus-desktop` path, and that common external HTTP client/server crates
-(`reqwest`, `hyper`, `ureq`) are absent. If a future dependency introduces
+(`reqwest`, `hyper`, `ureq`) are absent. **It asserts nothing about `rustls`**:
+`xtask/src/main.rs` checks the `native-tls` and `tungstenite` dependents only, so
+a second crate depending on `rustls` would not fail the gate. If a future dependency introduces
 another network-capable path, update this threat model under S-001 before
 release.
 
-### Known third-party risk: XLSX parser dependency path disabled
+### Enabled third-party parser: `.xlsx`
 
-XLSX comparison previously depended on `sheets-diff -> calamine -> quick-xml`.
-`quick-xml 0.39` has active denial-of-service advisories for XML input, and
-`sheets-diff 2.2.3` cannot yet move to a fixed `calamine`/`quick-xml` path.
-ForskScope therefore removes the runtime XLSX parser dependency and fails
-closed for `.xlsx` comparison with a user-visible error. The remaining
-`quick-xml 0.39` path is through `wayland-scanner`, a GTK/Dioxus build-time
-protocol code-generation dependency, not workbook content parsing.
+**This replaces the section that said the parser was disabled.** That text was
+true from v0.165.0 until `d492557` (v0.169.0, 2026-09-05) and was wrong for the
+three releases after it. The lift is recorded, with its four conditions, in the
+2026-09-24 amendment to `rfcs/done/058-spreadsheet-xlsx-structural-diff.md`.
 
-The reviewed `quick-xml` advisory exceptions are recorded in
-`.cargo/audit.toml`. The release gate `cargo xtask audit-deps` asserts that
-`sheets-diff` and `calamine` remain absent and that `quick-xml` is reachable
-only through the reviewed `wayland-scanner` path. If a future dependency
-reintroduces `quick-xml 0.39` on a runtime user-input path, remove the
-exception or split the dependency before release.
+**What it parses.** Two user-selected `.xlsx` files: a ZIP container of XML
+parts (sheets, shared strings, workbook metadata), through
+`sheets-diff -> calamine -> quick-xml, zip`. Formula text is read as text and
+never evaluated. `.xlsx` is read-only in every path.
+
+**What defends it:**
+- The dependency chain (`quick-xml 0.41.0`, `zip 8.6.0`) carries no advisory
+  known to `cargo audit` today; `audit.yml` re-checks daily. `quick-xml 0.39`
+  remains only through `wayland-scanner`, and `cargo xtask audit-deps` asserts
+  both facts (the immediate dependents of `sheets-diff`, `calamine`, `zip` and
+  both `quick-xml` versions).
+- **Bounds** (`CellBounds` and `Limits::hardened()` in `xlsx.rs`): input file
+  50 MiB, checked before any read; 256 sheets; 1,000,000 differences;
+  **2,000,000 cells compared and 4,000,000 cells read**. The cell bounds were
+  measured (release build, two identical single-sheet numeric workbooks,
+  unbounded): 1.6 s and 0.95 GB at 1,000,000 coordinates, 2.7 s and 1.9 GB at
+  2,000,000, 7.1 s and 4.8 GB at 5,000,000 — about 1 KB of peak memory per
+  coordinate. `Limits::hardened()`'s own 5,000,000 would admit ~4.8 GB and was
+  not used.
+- **A bound that is reached is an error.** The comparison stops and the tab shows
+  it. Until F117, an error in this path was turned into two empty documents and
+  displayed as "identical".
+- **Cancellation**, polled every 50,000 cells in `sheets-diff`'s read and compare
+  loops, is tested mid-comparison and falsified.
+- `AlignmentMode` is `Positional`, the default and the cheapest.
+
+**What it does not defend against:**
+- **Expansion before any count.** `calamine` materialises a whole sheet before
+  `sheets-diff` counts a cell, so the cell bounds cap the comparison, not the
+  parser. The only bound ahead of parsing is the 50 MiB compressed size, which
+  says nothing about how far an archive expands. A small hostile workbook whose
+  sheet declares a huge used range is **not** bounded by this work and was not
+  tested.
+- **An uninterruptible parse.** Cancellation is not polled inside `calamine`'s
+  parse of one sheet.
+- **A refusal is not free.** Over-bound pairs measured 2026-09-24 were refused
+  after 2.1–2.3 s at about 2 GB peak, because the read phase runs first.
+- **Advisories published later** against `quick-xml`, `zip` or `calamine`.
+
+The reviewed `quick-xml 0.39` advisory exceptions are recorded in
+`.cargo/audit.toml`; they do not cover `0.41.0`, which `cargo audit` reports on
+its own merits.
 
 ---
 
@@ -339,4 +561,8 @@ exception or split the dependency before release.
 | v0.165.0 | Release UI build compatibility with `dioxus-desktop`/`wry` | Enables `wry/devtools` method surface without `dioxus-devtools`; removes default Dioxus menu bar |
 | v0.165.0 | Release archive and CI gates aligned | Archive layout, version sync, i18n coverage, audit policy, and dependency paths are enforced before release artifact creation |
 | v0.165.1 | Versioned settings/session persistence (RFC-076) — closes audit finding B2 | Core owns a schema-versioned envelope; a future-version or corrupt file is preserved untouched and reported via a blocking recovery dialog rather than silently collapsed to defaults; legacy migration and explicit reset both create a non-overwriting backup before any write |
+| v0.169.0 | `.xlsx` comparison re-enabled (`d492557`, RFC-085) on `sheets-diff` 2.5.0 | **Re-opens a parser to user-supplied archives** (`calamine 0.36.1`, `quick-xml 0.41.0`, `zip 8.6.0`); the suspension's lifting was not recorded here or in RFC-058 until 2026-09-24. `audit-deps` changed from asserting the chain absent to asserting it present |
 | v0.170.2 | Microsoft Store submission automation (RFC-079) — publishing credential recorded | New CI-only data flow (§6): `store-submit.yml`'s `publish` job holds an Entra ID client secret in the `store-publish` GitHub Environment, gated the same way RFC-081's AUR key is, except a Store dry run cannot be credential-free (no anonymous Partner Center read exists) |
+| v0.171.0 | `rustls` 0.23.41 → 0.23.45 (RUSTSEC-2026-0285, published 2026-09-14) | Framework WebSocket transport only; a peer could send some TLS 1.3 handshake messages in plaintext, and the handshake stayed authenticated |
+| v0.171.1 | F117: `.xlsx` cell bounds set (2,000,000 compared / 4,000,000 read); an uncomparable workbook pair is an error, not "identical" | Closes the unbounded comparison RFC-058 condition 4 required be bounded; removes a path that displayed a failed or refused comparison as a match |
+| v0.171.1 | Threat-model revision (F116): write path (§7), distribution (§8), script evaluation (§9) added; `.xlsx` and transport sections corrected | Records three write-path behaviours the F89 fix did not cover (backup symlink write-through, permission widening, non-atomic `MustMatch`), all observed on Linux and **not fixed** |
