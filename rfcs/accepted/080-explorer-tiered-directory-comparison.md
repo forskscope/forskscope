@@ -1,7 +1,7 @@
 # RFC 080: Tiered Directory Comparison in the Explorer
 
 **Status.** Accepted — review complete; implementer may start. Moves to `done/` when the work ships (RFC-000, 5-folder variant, adopted 2026-09-02).
-**Scheduling.** **Tier 1 in `0.172.0`, tier 2 in `0.173.0`** — set 2026-09-15 in `ROADMAP.md` § *Release plan*, superseding *Post-Gate-D*. Every stated reason for waiting had lapsed: F44 no longer blocks Gate D, F60 is closed, and the owner corrected the premise that releases are organized around v1. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in `proposed/` and `accepted/` and nothing else (F83).
+**Scheduling.** **Tier 1 in `0.173.0`, tier 2 in `0.174.0`** (re-levelled 2026-09-24 when F117 made the corrections release a minor; previously 0.172.0 and 0.173.0) — set 2026-09-15 in `ROADMAP.md` § *Release plan*, superseding *Post-Gate-D*. Every stated reason for waiting had lapsed: F44 no longer blocks Gate D, F60 is closed, and the owner corrected the premise that releases are organized around v1. See `ROADMAP.md` § "Remaining proposed RFCs", which must list every file in `proposed/` and `accepted/` and nothing else (F83).
 **Accepted.** 2026-08-21 by the project owner — Gate A cleared, and
 **re-confirmed 2026-08-22 after a self-review found nine defects in it**, one of
 which (§1's “no new engine work”) was load-bearing and false. The corrections
