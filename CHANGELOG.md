@@ -5,7 +5,59 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.171.1] — Unreleased
+## [0.172.0] — 2026-09-24
+
+**A comparison that failed no longer looks like a match, and a very long line no
+longer kills the app.**
+
+### Fixed
+
+**A spreadsheet comparison that fails is no longer shown as *identical*.** Any
+`.xlsx` pair ForskScope could not read — corrupt, not a workbook, or refused —
+was turned into two empty documents, and two empty documents compare as
+identical. A comparison that never happened was presented as a match. It now
+shows an error explaining what went wrong.
+
+**A very long line no longer freezes or ends the program.** Character-level
+highlighting had no length limit at all. A pair of lines of about 100,000
+characters took eleven seconds; at 400,000 characters the program ran out of
+memory and stopped, taking unsaved merge work with it. A minified file was
+enough to trigger it. Highlighting now skips a line pair longer than 2,000
+characters on either side, and those rows are marked **Long line** so a skipped
+pair is visible rather than looking like a pair with no differences.
+
+### Changed
+
+**Spreadsheet comparison refuses workbooks beyond a size limit.** Comparing
+costs roughly a kilobyte of memory per compared cell, and nothing limited it:
+a large pair could consume several gigabytes from a file you opened but did not
+write. Comparison now stops at two million compared cells and says so, rather
+than continuing without limit.
+
+**Character-level highlighting is unavailable for large files, as the notice
+always said.** For files between 512 KiB and 4 MiB, the *inline diff disabled*
+notice now matches what happens: the toggle is switched off. Until now the
+notice said highlighting was disabled while the toggle still worked — and that
+was the case most likely to reach the line-length problem above. If you relied
+on turning it on for files that size, that is a capability this release removes.
+
+### Documentation
+
+**The user guide now describes the product that ships.** The status symbols
+shown in the Explorer and directory reports were documented as symbols the app
+no longer uses; two documented commands did not work at all — a git mergetool
+line and passing two folders on the command line; and several settings, limits
+and exit codes were wrong or missing. A test now fails if the documented status
+symbols and the code disagree.
+
+**The threat model was six versions out of date.** It described spreadsheet
+comparison as disabled for security when it had been restored weeks earlier. It
+now describes the parser that actually runs, and gained three sections it never
+had: the file-save path, how releases are distributed and signed, and script
+evaluation inside the application window.
+
+
+## [0.172.1] — Unreleased
 
 ## [0.171.0] — 2026-09-15
 
