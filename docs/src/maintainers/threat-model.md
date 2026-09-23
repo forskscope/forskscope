@@ -80,8 +80,18 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
   semantics. No escalation beyond the user's own permissions is possible.
 - Very large files: the diff engine has a deadline policy (RFC-012) that may
   produce approximate results; a warning banner is shown. Whether a crash or
-  panic path exists from oversized input is unverified — no fuzzing or
-  property-based testing exists in this repository.
+  panic path exists from oversized input is unverified in general — no fuzzing
+  or property-based testing exists in this repository — **but one was found on
+  2026-09-24**: the Inline diff toggle (`char_mode`, `hunk.rs`) calls
+  `forskscope_core::diff::refine_pair` on every changed line pair with no length
+  bound. Calling that function directly (release build), a 400,000-character
+  pair aborted the process ("memory allocation of 518405760016 bytes failed"),
+  100,000 characters took 11 s and 20,000 took 0.4 s. The UI path was not driven
+  end to end; it calls the same function. `max_inline_chars_per_hunk` and the
+  `InlineSkippedHunkTooLarge` warning exist in core but only apply in
+  `InlineMode::EagerForSmallHunks`, which nothing in the UI selects. A file whose
+  content is chosen by someone else can therefore end the process, and any unsaved
+  merge with it, when the user switches Inline diff on.
 
 ### 2. Directory listing and binary sniff (`list_dir`, `classify`)
 
