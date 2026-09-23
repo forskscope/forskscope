@@ -75,6 +75,11 @@ request for anything beyond a one-line fix.
    splitting is required.
 5. **Update docs** if the change affects user-visible behaviour or the
    public API.
+6. **Record what must survive.** A reason, a limit you discovered, or
+   evidence that a check can actually fail belongs in a tracked document —
+   an RFC, the register in `ROADMAP.md`, the maintainer documentation, or a
+   comment at the line it explains. See
+   [What gets recorded, and where](docs/src/maintainers/what-gets-recorded.md).
 
 ---
 

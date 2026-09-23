@@ -68,8 +68,11 @@ run anywhere Rust is installed.
   future security bump like F50's own fix still gets audited on the
   commit that makes it, not just the next day), and **`workflow_dispatch`**
   (on-demand runs against any ref — how the workflow's fail/pass behavior
-  was verified without waiting a day; see F55's review request for the
-  falsifiability demonstration). Unrelated pushes match none of the
+  was verified without waiting a day). **Both outcomes were demonstrated by
+  dispatch, not assumed:** against `main`, run `31699200117` completed
+  `success`; against a throwaway branch that downgraded `webbrowser` to
+  `1.2.1`, reproducing F50's exact advisory, run `31699489630` completed
+  `failure` with that advisory in the log. The branch was deleted. Unrelated pushes match none of the
   path-filtered triggers, so the non-determinism removed from `ci.yml`
   stays removed for the common case.
 
