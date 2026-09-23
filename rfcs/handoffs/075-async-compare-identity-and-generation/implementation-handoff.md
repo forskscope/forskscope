@@ -97,9 +97,9 @@ diagnostic points to RFC-075 implementation files.
 
 Ignored workspace-local review evidence (not committed/public links):
 
-- `.git-exclude/reviewed/028-rfc075-load-identity-types-checkpoint-review.md`
+- `dev-record/reviews/028-rfc075-load-identity-types-checkpoint-review.md`
   — Accept with notes; no blocking findings.
-- `.git-exclude/reviewed/029-rfc075-store-token-wiring-checkpoint-review.md`
+- `dev-record/reviews/029-rfc075-store-token-wiring-checkpoint-review.md`
   — Accept with notes; no blocking findings; runtime integrity boundary
   accepted.
 

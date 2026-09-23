@@ -291,7 +291,7 @@ Security:
 
 ## 12. Required review-request content
 
-Submit under `.git-exclude/review-request/` with:
+Submit under `dev-record/review-requests/` with:
 
 1. implementation summary;
 2. addressed items (RFC-076 acceptance criteria, audit finding B2);

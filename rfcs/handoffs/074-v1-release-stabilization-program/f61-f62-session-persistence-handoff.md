@@ -136,7 +136,7 @@ leave a claim that is true only when the user arrives one particular way.
 
 ## 7. Required review-request content
 
-Submit under `.git-exclude/review-request/` with:
+Submit under `dev-record/review-requests/` with:
 
 1. **F61's established mechanism** — what actually prevented the write, and how
    you established it, before any fix is described;

@@ -97,7 +97,7 @@ waiting a day; use it to show a failing run and a passing one.
 
 ## 6. Required review-request content
 
-Submit under `.git-exclude/review-request/` with:
+Submit under `dev-record/review-requests/` with:
 
 1. implementation summary;
 2. addressed items (F55, and reviews 057/058's corrections);

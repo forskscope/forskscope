@@ -120,7 +120,7 @@ begins invalidates the evidence gathered under the previous plan.
 
 ## 8. Required review-request content
 
-Submit under `.git-exclude/review-request/` with:
+Submit under `dev-record/review-requests/` with:
 
 1. implementation summary;
 2. addressed items (F56, the plan's remaining fields, the freeze);

@@ -145,14 +145,39 @@ remains No-Go.
 ## Developer handoffs
 
 Handoffs inherit the lifecycle state of their matching RFC and do not override
-RFC design decisions.
+RFC design decisions. This list is every file under `handoffs/`.
 
-- [RFC-074 R0 stabilization-baseline handoff](./handoffs/074-v1-release-stabilization-program/r0-stabilization-baseline-handoff.md)
-- [RFC-074 M2-A release-mechanics handoff](./handoffs/074-v1-release-stabilization-program/m2a-release-mechanics-handoff.md)
-- [RFC-074 F32 compare-view alignment handoff](./handoffs/074-v1-release-stabilization-program/f32-compare-view-alignment-handoff.md)
+- [RFC-060 keyboard ownership tests (handoff 020)](./handoffs/060-global-keyboard-scope-and-modal-input-safety/020-rfc060-keyboard-ownership-tests.md)
+- [RFC-074 F23 workflow linting handoff](./handoffs/074-v1-release-stabilization-program/f23-workflow-linting-handoff.md)
+- [RFC-074 F32 compare view alignment handoff](./handoffs/074-v1-release-stabilization-program/f32-compare-view-alignment-handoff.md)
+- [RFC-074 F57 render check readiness and recut handoff](./handoffs/074-v1-release-stabilization-program/f57-render-check-readiness-and-recut-handoff.md)
+- [RFC-074 F61 F62 session persistence handoff](./handoffs/074-v1-release-stabilization-program/f61-f62-session-persistence-handoff.md)
+- [RFC-074 M2-A release mechanics handoff](./handoffs/074-v1-release-stabilization-program/m2a-release-mechanics-handoff.md)
+- [RFC-074 M4-A residual correctness handoff](./handoffs/074-v1-release-stabilization-program/m4a-residual-correctness-handoff.md)
+- [RFC-074 M4-B gate integrity handoff](./handoffs/074-v1-release-stabilization-program/m4b-gate-integrity-handoff.md)
+- [RFC-074 M4-C1 dispositions and matrix freeze handoff](./handoffs/074-v1-release-stabilization-program/m4c1-dispositions-and-matrix-freeze-handoff.md)
+- [RFC-074 M4-C2 documentation and code truth handoff](./handoffs/074-v1-release-stabilization-program/m4c2-documentation-and-code-truth-handoff.md)
+- [RFC-074 M4-C3 audit cadence and cleanup handoff](./handoffs/074-v1-release-stabilization-program/m4c3-audit-cadence-and-cleanup-handoff.md)
+- [RFC-074 M4-C4 matrix freeze handoff](./handoffs/074-v1-release-stabilization-program/m4c4-matrix-freeze-handoff.md)
+- [RFC-074 R0 stabilization baseline handoff](./handoffs/074-v1-release-stabilization-program/r0-stabilization-baseline-handoff.md)
 - [RFC-075 implementation handoff](./handoffs/075-async-compare-identity-and-generation/implementation-handoff.md)
+- [RFC-076 convergence cleanup handoff](./handoffs/076-versioned-runtime-persistence/convergence-cleanup-handoff.md)
 - [RFC-076 implementation handoff](./handoffs/076-versioned-runtime-persistence/implementation-handoff.md)
-- [RFC-076 convergence-cleanup handoff (patch 5)](./handoffs/076-versioned-runtime-persistence/convergence-cleanup-handoff.md)
-- [RFC-076 recovery-UI and documentation handoff (patch 6)](./handoffs/076-versioned-runtime-persistence/recovery-ui-and-docs-handoff.md)
+- [RFC-076 recovery UI and docs handoff](./handoffs/076-versioned-runtime-persistence/recovery-ui-and-docs-handoff.md)
 - [RFC-077 implementation handoff](./handoffs/077-mergetool-save-target-model/implementation-handoff.md)
 - [RFC-078 acceptance handoff](./handoffs/078-platform-runtime-acceptance/acceptance-handoff.md)
+- [RFC-078 M5 defect fixes handoff](./handoffs/078-platform-runtime-acceptance/m5-defect-fixes-handoff.md)
+- [RFC-078 M5-A harness and launch cases handoff](./handoffs/078-platform-runtime-acceptance/m5a-harness-and-launch-cases-handoff.md)
+- [RFC-078 M5-B interaction cases handoff](./handoffs/078-platform-runtime-acceptance/m5b-interaction-cases-handoff.md)
+- [RFC-078 M5-C visual navigation and assembly handoff](./handoffs/078-platform-runtime-acceptance/m5c-visual-navigation-and-assembly-handoff.md)
+- [RFC-079 store submission automation (handoff 030)](./handoffs/079-microsoft-store-submission-automation/030-rfc079-store-submission-automation.md)
+- [RFC-080 tier 1 (handoff 039)](./handoffs/080-explorer-tiered-directory-comparison/039-rfc080-tier1.md)
+- [RFC-081 AUR publication automation (handoff 029)](./handoffs/081-aur-publication-automation/029-rfc081-aur-publication-automation.md)
+- [RFC-083 encoding breadth (handoff 023)](./handoffs/083-text-encoding-breadth/023-rfc083-encoding-breadth.md)
+- [RFC-084 patch conformance (handoff 024)](./handoffs/084-patch-export-conformance/024-rfc084-patch-conformance.md)
+- [RFC-085 XLSX resumption (handoff 022)](./handoffs/085-spreadsheet-comparison-resumption/022-rfc085-xlsx-resumption.md)
+- [RFC-086 stable hunk identity (handoff 025)](./handoffs/086-stable-hunk-identity/025-rfc086-stable-hunk-identity.md)
+
+Handoffs for work that comes from the **register** in `ROADMAP.md` rather than
+from an RFC are not here; they live in [`dev-record/handoffs/`](../dev-record/),
+alongside the review requests and reviews for every change.

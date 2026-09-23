@@ -150,7 +150,7 @@ Do this on a scratch commit or in the working tree; do not push the mutations.
 
 ## 9. Required review-request content
 
-Submit under `.git-exclude/review-request/` with:
+Submit under `dev-record/review-requests/` with:
 
 1. implementation summary;
 2. addressed items (F23, F41);

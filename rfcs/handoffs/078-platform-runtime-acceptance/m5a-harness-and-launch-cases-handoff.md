@@ -143,7 +143,7 @@ reviewed, and still not detect anything on a real runner.
 
 ## 9. Required review-request content
 
-Submit under `.git-exclude/review-request/` with:
+Submit under `dev-record/review-requests/` with:
 
 1. implementation summary — the harness, and how to run each case on demand;
 2. cases executed, per row, with results;

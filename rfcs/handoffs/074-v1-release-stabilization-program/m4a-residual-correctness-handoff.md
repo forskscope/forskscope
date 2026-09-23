@@ -163,7 +163,7 @@ Do not simply move the fixtures somewhere else that happens to work here.
 
 ## 8. Required review-request content
 
-Submit under `.git-exclude/review-request/` with:
+Submit under `dev-record/review-requests/` with:
 
 1. implementation summary;
 2. addressed items (F40, F8, F35, F10);

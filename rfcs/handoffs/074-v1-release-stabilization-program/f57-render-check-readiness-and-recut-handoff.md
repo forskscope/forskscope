@@ -129,7 +129,7 @@ Once §4 and §5 are done, on `main`:
 
 ## 8. Required review-request content
 
-Submit under `.git-exclude/review-request/` with:
+Submit under `dev-record/review-requests/` with:
 
 1. implementation summary;
 2. the readiness condition chosen, and why (§3);
