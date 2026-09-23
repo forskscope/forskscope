@@ -27,6 +27,19 @@ against.
 
 ---
 
+### Inline diff has no length limit
+
+Turning **Inline diff** on refines every changed line pair, however long the
+lines are, and the cost grows steeply with line length: measured by calling the
+routine directly (release build, 2026-09-24), a 20,000-character pair took about
+0.4 s, a 100,000-character pair about 11 s, and a 400,000-character pair
+exhausted memory and ended the process, which loses any unsaved merge. Minified
+files — one enormous line — are the case to avoid. The toggle is not disabled
+for large files either: the "inline diff disabled" wording shown for files over
+512 KiB describes an internal setting the toggle does not consult.
+
+---
+
 ### Very large files may produce approximate diffs
 
 Files over 4 MiB show a warning banner, and files over 64 MiB ask for
@@ -34,7 +47,7 @@ confirmation before loading. The diff itself is time-bounded at 5 seconds
 regardless of file size — there is no shortened deadline for large files.
 The result is correct for the differences found but may miss some changes
 deep in a very large file. A warning is shown in the diff view when this
-occurs. Files over 4 MiB disable inline character diff automatically.
+occurs.
 
 ---
 
@@ -56,6 +69,8 @@ are unreliable, try installing or restarting a clipboard manager such as
 `xclip`, `xsel`, or `wl-clipboard` (Wayland).
 
 ---
+
+### Digest computation restarts when you navigate
 
 Background digest computation restarts when you navigate to a new directory.
 There is no persistent cache across sessions. For large directory trees,

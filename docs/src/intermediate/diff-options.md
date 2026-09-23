@@ -78,9 +78,13 @@ ForskScope can show exactly which characters changed within the line.
 
 Toggle: **Inline: off/on** in the advanced toolbar.
 
-The inline diff is computed lazily — it only runs when you enable it.
-For very long lines, inline diff may be skipped (a notice appears in the toolbar).
-The threshold is configurable in the core (default: 16 KB per hunk).
+The inline diff is computed only when you enable it, for every changed line pair
+on screen. **There is no length limit and no skipping**: nothing in the app
+declines to refine a long line, and no notice appears. The cost grows steeply
+with line length — calling the inline routine directly (release build,
+2026-09-24), a 20,000-character line pair took about 0.4 s, a 100,000-character
+pair about 11 s, and a 400,000-character pair exhausted memory and ended the
+process. See [Known limitations](../users/known-limitations.md#inline-diff-has-no-length-limit).
 
 ---
 

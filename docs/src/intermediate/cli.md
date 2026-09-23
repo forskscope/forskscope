@@ -97,6 +97,9 @@ merge-tool = ["forskscope", "$left", "$right", "$output"]
 |------|---------|
 | `0`  | Normal exit |
 | `1`  | Unsupported argument count — anything other than 0, 2, or 3 positional arguments (`--diagnostics` is handled separately, before this check). An error naming the argument count is printed to stderr. |
+| `3`  | **Windows only.** The Microsoft Edge WebView2 Runtime is not installed. ForskScope shows a message box offering the download page and exits with `3` whichever button is pressed. |
+
+Code `2` is not used by ForskScope itself.
 
 A missing file path is **not** a startup error: one side of a comparison may
 be absent (e.g. a newly-added or deleted file), so `forskscope <left> <right>`
@@ -115,16 +118,26 @@ Prints platform information (OS, architecture, CPU count, app version, Rust
 version, config directory) and exits without launching the UI. Useful for
 diagnosing startup failures and for including in bug reports.
 
-Example output:
+Example output (Linux, 0.171.1):
 
 ```
-ForskScope 0.112.0
-OS:       linux
-Arch:     x86_64
-CPUs:     8
-Rust:     1.91.0
-Home:     ***
-Config:   /home/user/.config/forskscope
+ForskScope 0.171.1
+Rust: unknown
+OS: linux (unix)
+Arch: x86_64
+CPUs: 32
+Home: /home/***
+Config: ~/.config (default)
 ```
 
-The home directory is redacted (`***`) for privacy when copying into bug reports.
+The home directory's user name is redacted (`***`) for privacy when copying
+into bug reports. `Rust:` currently reads `unknown` in release builds.
+
+On Windows one more line follows, reporting the WebView2 Runtime the window is
+drawn with (from a release build on a CI runner):
+
+```
+WebView2 runtime: 152.0.4191.66
+```
+
+or, when it is missing, `WebView2 runtime: not found (<reason>)`.

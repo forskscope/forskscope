@@ -78,6 +78,12 @@ Controls how entries are displayed in the two-pane Explorer.
 | **Aligned (default)** | Same-name entries share a row across panes; spacer rows fill gaps where one side is missing. Vertical scrolling implicitly keeps panes in sync. |
 | **Compact (independent panes)** | No spacer rows. Each pane packs its own entries and scrolls independently. Cross-pane row alignment is intentionally absent. Best for directories where many files exist only on one side. |
 
+### Remember Explorer directories
+
+**On** (the default): the Explorer reopens the last directory shown in each
+pane. **Off**: it always starts at your home directory, and turning the setting
+off forgets the stored locations so they are not kept on disk.
+
 ### Context lines
 
 Number of unchanged lines shown above and below each change before the rest

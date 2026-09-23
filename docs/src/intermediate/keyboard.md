@@ -1,15 +1,23 @@
 # Keyboard Reference
 
-All keyboard shortcuts are global unless noted. Shortcuts in the **Diff view** section only
-take effect when a comparison tab is active.
+Every shortcut below except **Escape** and the **Explorer** and **Modals** sections needs a
+**file-comparison tab to be active**. In the Explorer (the screen ForskScope starts on) and in
+a Directory Report tab, **Ctrl+/**, **Ctrl+W** and every Diff-view shortcut do nothing.
 
-## Global
+## Needs an active comparison tab
 
 | Shortcut | Action |
 |----------|--------|
 | **Ctrl+/**   | Open this keyboard reference |
 | **Ctrl+W**   | Close the active comparison tab |
-| **Escape**   | Close open modal, search bar, or menu |
+
+The **?** button in the header opens the same reference from any screen.
+
+## Anywhere
+
+| Shortcut | Action |
+|----------|--------|
+| **Escape**   | Close an open dialog — except a startup recovery dialog, which needs an explicit choice. (The search bar has its own **Esc**; see Tips.) |
 
 ## Diff view
 
@@ -46,6 +54,8 @@ take effect when a comparison tab is active.
 | **Space**     | Select focused file as left or right comparison candidate |
 | **F6**        | Switch focused pane (left ↔ right) |
 | **Alt+↑**     | Go up one directory level (focused pane only) |
+| **Alt+Home**  | Go to your home directory (focused pane only) |
+| **Ctrl+O**    | Choose a folder to open (focused pane only) |
 
 ## Modals and dialogs
 

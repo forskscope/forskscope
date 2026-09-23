@@ -11,11 +11,10 @@ and **Right / New** (target).
 **From the path bar:** type or paste a path and press **Enter**, or click the
 folder icon to open a directory picker dialog.
 
-**From the command line:** pass two directory paths as arguments:
-
-```sh
-forskscope /path/to/old-version/ /path/to/new-version/
-```
+**From the command line:** you cannot. Two arguments always mean two *files*:
+`forskscope <dirA> <dirB>` does not open the Explorer, and opens a tab that
+fails with "Could not open … not a regular file". Start ForskScope with no
+arguments and choose the folders here.
 
 ---
 
@@ -78,19 +77,29 @@ it on both sides.
 
 ---
 
-## Digest equality indicators
+## Status icons
 
-When both panes are showing directories, ForskScope computes a digest for each
-file that appears on both sides:
+Every row that has a counterpart on the other side, or none, carries a
+one-character status icon. When both panes show directories, ForskScope
+computes a digest for each same-named file in the background, so an icon may
+first read `…` and then change.
 
+<!-- status-glyphs:begin -->
 | Icon | Meaning |
 |------|---------|
-| ✓ | File is byte-for-byte identical on both sides |
-| ⚠ | File exists on both sides but differs |
-| *(no icon)* | File exists only on this side, or digest not yet computed |
+| `=` | **Equal** — same name on both sides, with identical content |
+| `≠` | **Different** — the content differs (in the Explorer, also when one side is a file and the other a folder) |
+| `…` | **Computing** — the comparison is still running |
+| `⊘` | **Unreadable** — something could not be read, so nothing was compared. This is not a verdict: the two sides may or may not match |
+| `←` | **Left only** — present only on the left |
+| `→` | **Right only** — present only on the right |
+| `–` | **Not compared** — a same-named folder pair. The Explorer never looks inside folders; use a Directory Report to compare their contents (Explorer only) |
+| `↗` | **Symlink**, not followed — a symbolic link is listed, and its target is not compared (Directory Report only) |
+<!-- status-glyphs:end -->
 
-Digest computation runs in the background. Large directories may take a moment
-before all icons appear.
+Hover an icon for its name. Files detected as binary show a `bin` badge instead
+while binary comparison is off (see below). Large directories may take a moment
+before every icon has settled.
 
 ---
 
@@ -115,7 +124,7 @@ the filter bar.
 |---|---|
 | **Name input** | Narrows visible rows live — case-insensitive substring match. A pair is shown if either side's filename matches. |
 | **Hide binary** checkbox | Hides rows where all present file sides are binary (only effective when binary comparison is off). |
-| **Hide identical** checkbox | Hides rows whose digest status is ✓ (byte-for-byte identical). |
+| **Hide identical** checkbox | Hides rows whose status is `=` (equal). |
 | **✕ Clear** | Resets all filters in one click (appears when any filter is active). |
 
 Filter state is not persisted — it resets when you restart the app.

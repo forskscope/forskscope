@@ -178,8 +178,10 @@ ForskScope to Applications. Requires **macOS 13.0 or later** (matches
 
 ## Verifying a download
 
-Release artifacts are listed with their digests in each release's notes. To
-check one:
+Each file on a release's page shows a SHA-256 digest, which GitHub computes
+when the file is uploaded; the release notes do not list them. Nothing signs a
+build independently of that page, so a digest confirms the file arrived intact,
+not who made it. To check one:
 
 ```sh
 sha256sum forskscope-v*-linux-x86_64.tar.gz

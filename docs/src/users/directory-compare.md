@@ -20,17 +20,24 @@ When you launch ForskScope without arguments, the Explorer workspace opens with 
 
 **Status icons per file:**
 
+<!-- status-glyphs:begin -->
 | Icon | Meaning |
 |------|---------|
-| `✓`  | Same name on both sides; content is identical |
-| `⚠`  | Same name on both sides; content differs |
-| `←`  | File exists only on the left side |
-| `→`  | File exists only on the right side |
-| `⊙`  | Digest comparison is running |
+| `=` | **Equal** — same name on both sides, with identical content |
+| `≠` | **Different** — the content differs (in the Explorer, also when one side is a file and the other a folder) |
+| `…` | **Computing** — the comparison is still running |
+| `⊘` | **Unreadable** — something could not be read, so nothing was compared. This is not a verdict: the two sides may or may not match |
+| `←` | **Left only** — present only on the left |
+| `→` | **Right only** — present only on the right |
+| `–` | **Not compared** — a same-named folder pair. The Explorer never looks inside folders; use a Directory Report to compare their contents (Explorer only) |
+| `↗` | **Symlink**, not followed — a symbolic link is listed, and its target is not compared (Directory Report only) |
+<!-- status-glyphs:end -->
+
+The Directory Report below uses the same icons.
 
 **Opening a comparison:**
 
-- **Double-click** a file that appears on both sides (✓ or ⚠) to open a file comparison.
+- **Double-click** a file that appears on both sides (`=` or `≠`) to open a file comparison.
 - **Click** a file on one side, **click** a file on the other side, then press **Compare** to compare two differently-named files.
 
 ---
@@ -49,7 +56,7 @@ Clicking a button opens a confirmation dialog showing the full source and destin
 
 ## Deep compare mode
 
-Open a Directory Report tab by selecting two directories in the Explorer and clicking **Compare**, or by passing two directory paths on the command line.
+Open a Directory Report tab by selecting two directories in the Explorer and clicking **Compare**. It cannot be opened from the command line: two arguments always mean two files.
 
 ForskScope walks both directory trees in the background and builds a flat report. The scan runs in two phases:
 
@@ -60,7 +67,7 @@ ForskScope walks both directory trees in the background and builds a flat report
 
 | Column | Content |
 |--------|---------|
-| Status icon | ⚠ changed, ← left-only, → right-only, ✓ equal, ⊙ computing |
+| Status icon | One of the [status icons](#explorer-panes) above: `=` equal, `≠` different, `←` left only, `→` right only, `…` computing, `⊘` unreadable, `↗` symlink not followed |
 | Path | Relative path from the root |
 | Size | File size (or `old → new` if sizes differ) |
 | Compare button | Opens a file comparison for differing files |
@@ -76,5 +83,5 @@ After a batch copy completes, a **result summary** shows the number of files suc
 ## Tips
 
 - **Compare profiles** affect the file comparison that opens when you click Compare in the explorer. Set "Ignore whitespace" as the active profile if you're comparing generated files with inconsistent formatting.
-- The last-used left and right directories are remembered across launches.
+- The last-used left and right directories are remembered across launches **when Settings → Advanced → Remember Explorer directories is on** (the default). When it is off, the Explorer always starts at your home directory, and turning it off forgets the stored locations.
 - The deep compare report resets when you click ⟳ Deep compare again with different directory paths.

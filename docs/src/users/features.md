@@ -27,7 +27,7 @@
 
 - Two directory panes with lazy-loading tree views.
 - Path bar, directory picker dialog, history ◀▶, and Alt+↑ to go up.
-- Digest equality icons: **✓** identical, **⚠** different, *(none)* one-sided.
+- Status icons on every row: equal, different, computing, unreadable, left only, right only, not compared (see the table below).
 - Full keyboard navigation: arrows to move, Space to select, Enter to
   open/compare, **F6** to switch focused pane.
 - **Alt+↑** navigates the focused pane up one level.
@@ -45,13 +45,28 @@
   diff run in the background so the app never freezes.
 - Multiple comparisons open as independent tabs; switch freely.
 
+### Status icons
+
+<!-- status-glyphs:begin -->
+| Icon | Meaning |
+|------|---------|
+| `=` | **Equal** — same name on both sides, with identical content |
+| `≠` | **Different** — the content differs (in the Explorer, also when one side is a file and the other a folder) |
+| `…` | **Computing** — the comparison is still running |
+| `⊘` | **Unreadable** — something could not be read, so nothing was compared. This is not a verdict: the two sides may or may not match |
+| `←` | **Left only** — present only on the left |
+| `→` | **Right only** — present only on the right |
+| `–` | **Not compared** — a same-named folder pair. The Explorer never looks inside folders; use a Directory Report to compare their contents (Explorer only) |
+| `↗` | **Symlink**, not followed — a symbolic link is listed, and its target is not compared (Directory Report only) |
+<!-- status-glyphs:end -->
+
 ---
 
 ## Directory compare (Deep compare)
 
 - **Directory Report** mode recursively scans both directory trees.
 - Two-phase scan: fast listing first, then background digest comparison.
-- Status per file: ⚠ changed, ← left-only, → right-only, ✓ equal, ⊙ scanning.
+- Status per file: the same icons as the Explorer, plus a symlink that is not followed.
 - Filter results: **Different** / **All** / **Equal**.
 - **Per-file copy** — explicit `Copy to right` / `Copy to left` buttons; confirmation shows full source and destination paths; `.bak` backup created when destination exists.
 - **Batch copy** — explicit direction buttons (`Copy to right N` / `Copy to left N`); confirmation and result summary; restore manifest written to `$XDG_DATA_DIR/forskscope/manifests/`.
@@ -85,9 +100,9 @@ Store a named combination of diff options as a profile. Built-in profiles:
 | Type | Diff | Merge / Save |
 |------|------|--------------|
 | Text (any encoding) | Line + inline | ✓ |
-| Excel `.xlsx` | Temporarily disabled for security | — |
+| Excel `.xlsx` | Structural (sheet and cell) comparison, read-only. A pair too large to compare, or that cannot be read, is reported as an error | — |
 | Binary | Hex preview | — |
-| Missing (one side) | One-sided diff | — |
+| Missing (one side) | One-sided diff | Saving creates the file |
 
 Encoding is detected automatically (`chardetng`/`encoding_rs`). Save preserves
 the original encoding. UTF-8 BOM is round-tripped.
@@ -108,7 +123,7 @@ Use ForskScope as a `git mergetool` to resolve conflicts:
 
 ```sh
 git config merge.tool forskscope
-git config mergetool.forskscope.cmd 'forskscope "$LOCAL" "$REMOTE" --merged "$MERGED"'
+git config mergetool.forskscope.cmd 'forskscope "$LOCAL" "$REMOTE" "$MERGED"'
 ```
 
 See [Git integration](../intermediate/git-integration.md) for full setup.

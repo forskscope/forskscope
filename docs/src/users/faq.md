@@ -160,18 +160,24 @@ See [File type support](../intermediate/file-types.md) for the complete list.
 
 ---
 
-## What do the ✓ and ⚠ icons in the Explorer mean?
+## What do the status icons in the Explorer mean?
 
-These are **digest comparison** indicators shown when the same filename exists
-in both the left and right panes:
+When the same filename exists in both the left and right panes, ForskScope
+compares the two in the background and shows a one-character icon:
 
+<!-- status-glyphs:begin -->
 | Icon | Meaning |
 |------|---------|
-| **✓** | Identical — the file content is byte-for-byte the same on both sides |
-| **⚠** | Different — the file content differs |
-| *(no icon)* | File exists only on one side, or the digest has not yet been computed |
-| **⊙** | Comparison is still running in the background |
+| `=` | **Equal** — same name on both sides, with identical content |
+| `≠` | **Different** — the content differs (in the Explorer, also when one side is a file and the other a folder) |
+| `…` | **Computing** — the comparison is still running |
+| `⊘` | **Unreadable** — something could not be read, so nothing was compared. This is not a verdict: the two sides may or may not match |
+| `←` | **Left only** — present only on the left |
+| `→` | **Right only** — present only on the right |
+| `–` | **Not compared** — a same-named folder pair. The Explorer never looks inside folders; use a Directory Report to compare their contents (Explorer only) |
+| `↗` | **Symlink**, not followed — a symbolic link is listed, and its target is not compared (Directory Report only) |
+<!-- status-glyphs:end -->
 
-Digest comparison runs in the background; on large directories the icons
-appear progressively as files are scanned. Double-click any file showing **⚠**
-to open an immediate comparison.
+Comparison runs in the background; on large directories the icons appear
+progressively as files are scanned. Double-click any file showing `≠` to open
+an immediate comparison.
