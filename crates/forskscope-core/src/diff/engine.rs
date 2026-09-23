@@ -150,7 +150,7 @@ pub fn compute_diff(left_text: &str, right_text: &str, options: DiffOptions) -> 
         };
         if kind == HunkKind::Replace
             && effective.inline_mode == InlineMode::EagerForSmallHunks
-            && !inline_diff_rows(&mut hunk, effective.max_inline_chars_per_hunk)
+            && !inline_diff_rows(&mut hunk)
         {
             warnings.push(DiffWarning::InlineSkippedHunkTooLarge);
         }

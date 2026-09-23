@@ -84,7 +84,7 @@ fn inline_spans_are_unicode_safe_for_multibyte_text() {
         .iter_mut()
         .find(|h| h.kind == HunkKind::Replace)
         .unwrap();
-    inline_diff_rows(hunk, 4096);
+    inline_diff_rows(hunk);
     let inline = hunk.rows[0].inline.as_ref().unwrap();
     // The shared prefix/suffix must remain intact, proving char-boundary safety.
     let left_equal: String = inline
@@ -342,5 +342,103 @@ fn identical_recompute_produces_identical_hunk_ids() {
         "recomputing the same document with unchanged options must yield \
          identical hunk ids, or MergeSession's undo/redo log can never \
          survive a recompute (F47, RFC-086)"
+    );
+}
+
+// ── F120: the one character-level limit ──────────────────────────────────────
+
+use crate::diff::{
+    MAX_INLINE_CHARS_PER_SIDE, pair_over_inline_limit, refine_pair, skipped_inline_pairs,
+};
+
+fn line_of(n: usize, ch: char) -> String {
+    std::iter::repeat_n(ch, n).collect()
+}
+
+/// The case that matters (handoff 043 §Verification 1): without the guard a
+/// pair over the limit is not merely slow, it **produces spans it must not
+/// have produced**. Deliberately only 3x the limit (about 30 ms in a release
+/// build) — the 400,000-character case that aborted the process is not run
+/// here, or anywhere in CI. Falsified for real: making `refine_pair` skip the
+/// `pair_over_inline_limit` check returns `Some` with spans and this fails.
+#[test]
+fn a_pair_over_the_limit_is_not_refined_and_produces_no_spans() {
+    let left = line_of(3 * MAX_INLINE_CHARS_PER_SIDE, 'a');
+    let right = format!("{}X", &left[1..]);
+    assert!(
+        refine_pair(&left, &right).is_none(),
+        "a pair three times the limit must not be refined"
+    );
+}
+
+/// The bound is on the assertion, not on wall-clock, so it cannot be flaky:
+/// the limit is exact and asserted at the boundary, in characters (not bytes).
+#[test]
+fn the_limit_is_exact_per_side_and_counts_characters_not_bytes() {
+    let at = line_of(MAX_INLINE_CHARS_PER_SIDE, 'a');
+    let over = line_of(MAX_INLINE_CHARS_PER_SIDE + 1, 'a');
+    assert!(
+        refine_pair(&at, &at).is_some(),
+        "exactly at the limit is refined"
+    );
+    assert!(refine_pair(&over, &at).is_none(), "left one over");
+    assert!(refine_pair(&at, &over).is_none(), "right one over");
+    assert!(pair_over_inline_limit(&at, &over));
+    assert!(!pair_over_inline_limit(&at, &at));
+
+    // 2,000 three-byte characters are 6,000 bytes but 2,000 characters.
+    let wide = line_of(MAX_INLINE_CHARS_PER_SIDE, 'あ');
+    assert!(wide.len() > MAX_INLINE_CHARS_PER_SIDE);
+    assert!(refine_pair(&wide, &wide).is_some());
+}
+
+#[test]
+fn an_ordinary_source_line_still_gets_character_level_highlighting() {
+    let d = refine_pair(
+        "let total = price * quantity;",
+        "let total = price * quantity + tax;",
+    )
+    .expect("a normal line is refined");
+    assert!(d.right_spans.iter().any(|s| s.kind == InlineKind::Insert));
+    assert!(d.left_spans.iter().any(|s| s.kind == InlineKind::Equal));
+}
+
+#[test]
+fn a_hunk_with_one_over_limit_row_is_left_untouched_by_inline_diff_rows() {
+    let long = line_of(MAX_INLINE_CHARS_PER_SIDE + 1, 'a');
+    let left = format!("short one\n{long}\n");
+    let right = format!("short two\n{long}b\n");
+    let mut doc = compute_diff(&left, &right, DiffOptions::default());
+    let hunk = doc
+        .hunks
+        .iter_mut()
+        .find(|h| h.kind == HunkKind::Replace)
+        .unwrap();
+    assert!(!inline_diff_rows(hunk), "must report that it skipped");
+    assert!(
+        hunk.rows.iter().all(|r| r.inline.is_none()),
+        "and must not have refined any row of the hunk"
+    );
+}
+
+#[test]
+fn skipped_inline_pairs_counts_only_over_limit_two_sided_pairs() {
+    let long = line_of(MAX_INLINE_CHARS_PER_SIDE + 1, 'a');
+    let left = format!("short one\n{long}\nkeep\n");
+    let right = format!("short two\n{long}b\nkeep\n");
+    let doc = compute_diff(&left, &right, DiffOptions::default());
+    let over = skipped_inline_pairs(&doc);
+    assert_eq!(over, 1, "the long pair is counted, the short one is not");
+
+    let short = compute_diff("a\nb\n", "a\nc\n", DiffOptions::default());
+    assert_eq!(skipped_inline_pairs(&short), 0);
+}
+
+/// Three numbers existed and none was in force (F120). There is one.
+#[test]
+fn the_persisted_inline_limit_defaults_to_the_one_the_renderer_obeys() {
+    assert_eq!(
+        crate::job::PerformanceLimits::default().max_inline_diff_chars_per_hunk,
+        MAX_INLINE_CHARS_PER_SIDE
     );
 }

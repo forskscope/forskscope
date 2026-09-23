@@ -27,16 +27,19 @@ against.
 
 ---
 
-### Inline diff has no length limit
+### Inline diff skips long lines, and is off for large files
 
-Turning **Inline diff** on refines every changed line pair, however long the
-lines are, and the cost grows steeply with line length: measured by calling the
-routine directly (release build, 2026-09-24), a 20,000-character pair took about
-0.4 s, a 100,000-character pair about 11 s, and a 400,000-character pair
-exhausted memory and ended the process, which loses any unsaved merge. Minified
-files — one enormous line — are the case to avoid. The toggle is not disabled
-for large files either: the "inline diff disabled" wording shown for files over
-512 KiB describes an internal setting the toggle does not consult.
+Character-level highlighting is skipped for a changed line pair when either side
+is over 2,000 characters; such a row shows a **Long line** badge and the toolbar
+warns that some hunks were too large. This is a bound, not a fix: minified files
+(one enormous line) get no character-level highlighting at all, only the line
+diff. Refining cost is quadratic in line length (about 3 ms per 2,000-character
+pair in a release build), and the view refines every changed pair it renders, so
+a file with thousands of pairs *near* the limit can still make turning the
+toggle on slow.
+
+For files over 512 KiB the **Inline diff** button is disabled and the load shows
+"Large file — inline diff disabled."
 
 ---
 

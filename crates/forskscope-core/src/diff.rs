@@ -10,7 +10,10 @@ mod model;
 mod options;
 
 pub use engine::compute_diff;
-pub use inline::{inline_diff_rows, refine_pair};
+pub use inline::{
+    MAX_INLINE_CHARS_PER_SIDE, inline_diff_rows, pair_over_inline_limit, refine_pair,
+    skipped_inline_pairs,
+};
 pub use model::{
     DiffDocument, DiffHunk, DiffRow, DiffStats, DiffWarning, HunkId, HunkKind, InlineDiff,
     InlineKind, InlineSpan, LineRange, NewlineMarker, SideLine,

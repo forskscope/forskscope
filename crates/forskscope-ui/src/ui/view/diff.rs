@@ -301,11 +301,23 @@ fn DiffHeader(index: usize) -> Element {
 
 // ── Tab snapshot ──────────────────────────────────────────────────────────────
 
+/// Whether the toolbar's Inline diff toggle may be used on a tab with these
+/// options. The load guard sets `inline_mode = None` for a file over the size
+/// it warns about (`decide_load`), and every profile the app builds is `Lazy`,
+/// so `None` here means exactly "the guard turned inline diff off" (F120).
+pub(crate) fn inline_available(opts: &forskscope_core::DiffOptions) -> bool {
+    opts.inline_mode != forskscope_core::diff::InlineMode::None
+}
+
 #[derive(Clone, PartialEq)]
 pub struct TabSnapshot {
     pub hunks: Vec<forskscope_core::merge::MergeHunk>,
     pub identical: bool,
     pub char_mode: bool,
+    /// `false` when the load guard turned inline diff off for this tab (a
+    /// file over the size the guard warns about): the toolbar toggle is then
+    /// disabled, so the "inline diff disabled" wording is true (F120).
+    pub inline_available: bool,
     pub word_wrap: bool,
     pub can_save: bool,
     pub is_dirty: bool,
@@ -349,7 +361,7 @@ impl TabSnapshot {
             .filter(|h| h.kind.is_change())
             .map(|h| h.hunk_id)
             .collect();
-        let warnings = tab
+        let mut warnings: Vec<String> = tab
             .diff
             .warnings
             .iter()
@@ -366,6 +378,15 @@ impl TabSnapshot {
                 }
             })
             .collect();
+        // F120: character mode skips a pair over the length limit. Say so
+        // here as well as on the row, or a skipped pair reads as "no
+        // character-level differences".
+        if tab.char_mode && forskscope_core::diff::skipped_inline_pairs(&tab.diff) > 0 {
+            warnings.push(t(
+                lang,
+                "Some hunks were too large for character-level diff.",
+            ));
+        }
         let both_missing = matches!(tab.left_doc.kind, FileKind::Missing)
             && matches!(tab.right_doc.kind, FileKind::Missing);
         let readonly_notice = if tab.can_save {
@@ -393,6 +414,7 @@ impl TabSnapshot {
         Self {
             identical: tab.diff.is_identical() && !both_missing,
             char_mode: tab.char_mode,
+            inline_available: inline_available(&tab.diff_options),
             word_wrap: tab.word_wrap,
             can_save: tab.can_save,
             is_dirty: tab.merge.is_dirty(),

@@ -47,7 +47,10 @@ Changed characters inside replaced lines become highlighted at the character
 level. Toggle **Inline diff: off** to return to the plain line view.
 
 Inline diff is only available for **Replace** hunks (lines that exist on both
-sides but differ). Pure insertions and deletions are shown as whole lines.
+sides but differ). Pure insertions and deletions are shown as whole lines. A
+line over 2,000 characters is not highlighted; it carries a **Long line** badge
+instead. Files over 512 KiB have the button disabled. See
+[Inline diff options](../intermediate/diff-options.md#inline-character-level-diff).
 
 ---
 

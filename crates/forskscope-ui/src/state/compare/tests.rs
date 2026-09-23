@@ -674,6 +674,37 @@ fn decide_load_dispatches_through_the_real_guard_for_every_size_class() {
     );
 }
 
+/// F120: the "Large file — inline diff disabled." banner must be true. The
+/// banner used to set an engine option the toolbar toggle never read, so a
+/// user in the 512 KiB–4 MiB band saw the banner and could still turn
+/// character mode on. The toggle now obeys the tab's options
+/// (`inline_available`); this pins that a banner-showing load produces
+/// options that disable it. Falsified by dropping `suppress_inline`'s effect
+/// on `adjusted.inline_mode`.
+#[test]
+fn the_large_file_banner_is_true_the_toggle_is_unavailable() {
+    use crate::ui::view::diff::inline_available;
+
+    let medium = 1024 * 1024; // 1 MiB: past the 512 KiB small limit, under 4 MiB
+    match decide_load(medium, 1_024, DiffOptions::default()) {
+        LoadDecision::Go {
+            opts,
+            banner: Some(message),
+        } => {
+            assert!(message.contains("inline diff disabled"), "{message}");
+            assert!(
+                !inline_available(&opts),
+                "the banner says inline diff is disabled, so the toggle must be"
+            );
+        }
+        _ => panic!("a 1 MiB file must show the banner"),
+    }
+    assert!(
+        inline_available(&DiffOptions::default()),
+        "small files keep it"
+    );
+}
+
 #[test]
 fn confirm_prompt_suppresses_inline_diff_on_the_resumed_options() {
     let opts = DiffOptions::default();

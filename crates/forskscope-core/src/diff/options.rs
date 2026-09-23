@@ -44,8 +44,6 @@ pub struct DiffOptions {
     pub ignore_newlines: bool,
     pub inline_mode: InlineMode,
     pub algorithm: DiffAlgorithm,
-    /// Hunks whose combined text exceeds this are skipped by inline diff.
-    pub max_inline_chars_per_hunk: usize,
     /// Files larger than this fall back to the large-file policy
     /// (line diff with inline disabled + `DiffWarning::LargeFilePolicyApplied`).
     pub max_file_bytes_for_full_diff: u64,
@@ -62,7 +60,6 @@ impl Default for DiffOptions {
             ignore_newlines: false,
             inline_mode: InlineMode::Lazy,
             algorithm: DiffAlgorithm::Myers,
-            max_inline_chars_per_hunk: 16 * 1024,
             max_file_bytes_for_full_diff: 16 * 1024 * 1024,
             deadline_ms: Some(5_000),
         }

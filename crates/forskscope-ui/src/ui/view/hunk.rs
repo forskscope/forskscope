@@ -10,7 +10,7 @@
 
 use dioxus::prelude::*;
 
-use forskscope_core::diff::{HunkKind, InlineKind, refine_pair};
+use forskscope_core::diff::{HunkKind, InlineDiff, InlineKind, refine_pair};
 use forskscope_core::merge::{HunkState, MergeHunk};
 
 use crate::i18n::t;
@@ -179,13 +179,10 @@ fn RowLeft(
             .unwrap_or(false);
     drop(ctx);
 
-    let inline_left = if char_mode && kind == HunkKind::Replace {
-        match (&left, &right) {
-            (Some(l), Some(r)) => Some(refine_pair(l, r).left_spans),
-            _ => None,
-        }
-    } else {
-        None
+    let (inline_left, skipped) = match pair_inline(char_mode, kind, &left, &right) {
+        PairInline::Spans(d) => (Some(d.left_spans), false),
+        PairInline::Skipped => (None, true),
+        PairInline::NotApplicable => (None, false),
     };
 
     let gutter_class = match kind {
@@ -221,6 +218,7 @@ fn RowLeft(
             span { class: "diff-mark", aria_hidden: "true", "{mark}" }
             div { class: "cell",
                 if let Some(ref lbl) = sr_label { span { class: "sr-only", "{lbl}: " } }
+                if skipped { SkippedBadge { lang } }
                 if let Some(ref spans) = inline_left {
                     for s in spans.iter() { span { class: icls(s.kind), "{s.text}" } }
                 } else if let Some(ref l) = left { "{l}" }
@@ -250,13 +248,10 @@ fn RowRight(
             .unwrap_or(false);
     drop(ctx);
 
-    let inline_right = if char_mode && kind == HunkKind::Replace {
-        match (&left, &right) {
-            (Some(l), Some(r)) => Some(refine_pair(l, r).right_spans),
-            _ => None,
-        }
-    } else {
-        None
+    let (inline_right, skipped) = match pair_inline(char_mode, kind, &left, &right) {
+        PairInline::Spans(d) => (Some(d.right_spans), false),
+        PairInline::Skipped => (None, true),
+        PairInline::NotApplicable => (None, false),
     };
 
     let gutter_class = match kind {
@@ -288,6 +283,7 @@ fn RowRight(
             span { class: "diff-mark", aria_hidden: "true", "{mark}" }
             div { class: "cell",
                 if let Some(ref lbl) = sr_label { span { class: "sr-only", "{lbl}: " } }
+                if skipped { SkippedBadge { lang } }
                 if let Some(ref spans) = inline_right {
                     for s in spans.iter() { span { class: icls(s.kind), "{s.text}" } }
                 } else if let Some(ref r) = right { "{r}" }
@@ -332,6 +328,52 @@ fn ActCell(
     }
 }
 
+/// What a changed line pair shows while character mode is on (F120).
+///
+/// `Skipped` is not `NotApplicable`: a pair too long to refine must say so.
+/// Rendering it as plain text would read as "these lines have no
+/// character-level differences", a claim about a comparison never attempted.
+#[derive(Debug, PartialEq)]
+enum PairInline {
+    /// Character mode is off, or this is not a two-sided changed pair.
+    NotApplicable,
+    Spans(InlineDiff),
+    Skipped,
+}
+
+fn pair_inline(
+    char_mode: bool,
+    kind: HunkKind,
+    left: &Option<String>,
+    right: &Option<String>,
+) -> PairInline {
+    if !(char_mode && kind == HunkKind::Replace) {
+        return PairInline::NotApplicable;
+    }
+    match (left, right) {
+        (Some(l), Some(r)) => match refine_pair(l, r) {
+            Some(d) => PairInline::Spans(d),
+            None => PairInline::Skipped,
+        },
+        _ => PairInline::NotApplicable,
+    }
+}
+
+/// The marker on a row whose pair was too long to refine.
+#[component]
+fn SkippedBadge(lang: Lang) -> Element {
+    let label = t(lang, "Too long for character-level highlighting");
+    rsx! {
+        span {
+            class: "inline-skipped",
+            role: "img",
+            aria_label: "{label}",
+            title: "{label}",
+            {t(lang, "Long line")}
+        }
+    }
+}
+
 fn icls(k: InlineKind) -> &'static str {
     match k {
         InlineKind::Equal => "",
@@ -364,6 +406,53 @@ mod tests {
     #[test]
     fn replace_row_without_content_is_a_blank_counterpart_and_wants_no_label() {
         assert!(!wants_replace_label(HunkKind::Replace, false));
+    }
+
+    fn some(s: &str) -> Option<String> {
+        Some(s.to_string())
+    }
+
+    /// F120: a pair too long to refine is `Skipped`, never `NotApplicable`,
+    /// which the row would render as plain text ("no character-level
+    /// differences"). Falsified by making `refine_pair` unbounded: the long
+    /// pair then comes back `Spans` and this fails.
+    #[test]
+    fn a_pair_too_long_to_refine_is_skipped_not_silently_plain() {
+        let long = "a".repeat(forskscope_core::diff::MAX_INLINE_CHARS_PER_SIDE + 1);
+        assert_eq!(
+            pair_inline(true, HunkKind::Replace, &some(&long), &some("b")),
+            PairInline::Skipped
+        );
+    }
+
+    #[test]
+    fn an_ordinary_pair_is_refined_when_character_mode_is_on() {
+        assert!(matches!(
+            pair_inline(
+                true,
+                HunkKind::Replace,
+                &some("let a = 1;"),
+                &some("let a = 2;")
+            ),
+            PairInline::Spans(_)
+        ));
+    }
+
+    #[test]
+    fn nothing_is_refined_when_character_mode_is_off_or_the_pair_is_one_sided() {
+        let long = "a".repeat(forskscope_core::diff::MAX_INLINE_CHARS_PER_SIDE + 1);
+        assert_eq!(
+            pair_inline(false, HunkKind::Replace, &some(&long), &some("b")),
+            PairInline::NotApplicable
+        );
+        assert_eq!(
+            pair_inline(true, HunkKind::Replace, &some("x"), &None),
+            PairInline::NotApplicable
+        );
+        assert_eq!(
+            pair_inline(true, HunkKind::Insert, &some("x"), &some("y")),
+            PairInline::NotApplicable
+        );
     }
 
     #[test]

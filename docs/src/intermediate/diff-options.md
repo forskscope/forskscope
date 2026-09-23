@@ -78,13 +78,20 @@ ForskScope can show exactly which characters changed within the line.
 
 Toggle: **Inline: off/on** in the advanced toolbar.
 
-The inline diff is computed only when you enable it, for every changed line pair
-on screen. **There is no length limit and no skipping**: nothing in the app
-declines to refine a long line, and no notice appears. The cost grows steeply
-with line length — calling the inline routine directly (release build,
-2026-09-24), a 20,000-character line pair took about 0.4 s, a 100,000-character
-pair about 11 s, and a 400,000-character pair exhausted memory and ended the
-process. See [Known limitations](../users/known-limitations.md#inline-diff-has-no-length-limit).
+The inline diff is computed only when you enable it.
+
+**Long lines are skipped, and say so.** A changed line pair is refined only when
+neither side is over **2,000 characters**. Longer pairs are shown as plain text
+with a **Long line** badge, and the toolbar warns "Some hunks were too large for
+character-level diff." — so a line without highlighting is either identical
+character for character or carries that badge, never silently unexamined. The
+cost of refining a pair grows with the square of its length (about 3 ms at
+2,000 characters, 0.4 s at 20,000), and the view refines every changed pair it
+shows.
+
+**Large files have it switched off.** For files over 512 KiB ForskScope shows
+"Large file — inline diff disabled." and the **Inline diff** button is
+disabled. See [Known limitations](../users/known-limitations.md#inline-diff-skips-long-lines-and-is-off-for-large-files).
 
 ---
 

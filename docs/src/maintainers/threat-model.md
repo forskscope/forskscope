@@ -81,17 +81,18 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
 - Very large files: the diff engine has a deadline policy (RFC-012) that may
   produce approximate results; a warning banner is shown. Whether a crash or
   panic path exists from oversized input is unverified in general — no fuzzing
-  or property-based testing exists in this repository — **but one was found on
-  2026-09-24**: the Inline diff toggle (`char_mode`, `hunk.rs`) calls
+  or property-based testing exists in this repository. **One was found and fixed
+  (F120, 2026-09-24):** the Inline diff toggle called
   `forskscope_core::diff::refine_pair` on every changed line pair with no length
-  bound. Calling that function directly (release build), a 400,000-character
-  pair aborted the process ("memory allocation of 518405760016 bytes failed"),
-  100,000 characters took 11 s and 20,000 took 0.4 s. The UI path was not driven
-  end to end; it calls the same function. `max_inline_chars_per_hunk` and the
-  `InlineSkippedHunkTooLarge` warning exist in core but only apply in
-  `InlineMode::EagerForSmallHunks`, which nothing in the UI selects. A file whose
-  content is chosen by someone else can therefore end the process, and any unsaved
-  merge with it, when the user switches Inline diff on.
+  bound, and a 400,000-character pair aborted the process ("memory allocation of
+  518405760016 bytes failed"; 100,000 characters took 11 s, 20,000 took 0.4 s;
+  measured by calling the function directly). `refine_pair` now returns `None`
+  for a side over `MAX_INLINE_CHARS_PER_SIDE` (2,000), the row shows a **Long
+  line** badge, and the toggle is disabled for files over 512 KiB. **Not
+  bounded:** the aggregate. Cost is quadratic per pair (about 3 ms at the limit)
+  and the view renders every changed pair, so thousands of pairs just under the
+  limit still make the toggle slow; that is a freeze, not a crash, and was not
+  measured end to end.
 
 ### 2. Directory listing and binary sniff (`list_dir`, `classify`)
 
@@ -576,3 +577,4 @@ its own merits.
 | v0.171.0 | `rustls` 0.23.41 → 0.23.45 (RUSTSEC-2026-0285, published 2026-09-14) | Framework WebSocket transport only; a peer could send some TLS 1.3 handshake messages in plaintext, and the handshake stayed authenticated |
 | v0.171.1 | F117: `.xlsx` cell bounds set (2,000,000 compared / 4,000,000 read); an uncomparable workbook pair is an error, not "identical" | Closes the unbounded comparison RFC-058 condition 4 required be bounded; removes a path that displayed a failed or refused comparison as a match |
 | v0.171.1 | Threat-model revision (F116): write path (§7), distribution (§8), script evaluation (§9) added; `.xlsx` and transport sections corrected | Records three write-path behaviours the F89 fix did not cover (backup symlink write-through, permission widening, non-atomic `MustMatch`), all observed on Linux and **not fixed** |
+| v0.172.0 | F120: character-level refinement bounded (`MAX_INLINE_CHARS_PER_SIDE` = 2,000), skipped pairs shown, Inline toggle disabled for files over 512 KiB | Closes a file-content-triggered process abort reachable from a user toggle; the aggregate cost of many near-limit pairs is not bounded |

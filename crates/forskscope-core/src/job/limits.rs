@@ -63,7 +63,13 @@ pub struct PerformanceLimits {
     /// Upper bound (inclusive) for `FileSizeClass::Large` (bytes).
     /// Files above this are `VeryLarge`.
     pub large_text_threshold_bytes: u64,
-    /// Maximum number of characters in a hunk for eager inline diff.
+    /// Most characters either side of one changed line pair may have and
+    /// still be refined character by character. **Despite the name this is
+    /// per side of a line pair, not per hunk**: the name is a persisted key
+    /// (RFC-076), so it stays. Defaults to
+    /// [`crate::diff::MAX_INLINE_CHARS_PER_SIDE`], which is the number the
+    /// renderer obeys; like every field of this block, the app reads the
+    /// default, not a stored value.
     pub max_inline_diff_chars_per_hunk: usize,
     /// Maximum directory entries to compare without backgrounding.
     pub max_directory_entries_eager: usize,
@@ -77,7 +83,7 @@ impl Default for PerformanceLimits {
             max_eager_text_bytes: 512 * 1024,             //  512 KiB
             medium_text_threshold_bytes: 4 * 1024 * 1024, //    4 MiB
             large_text_threshold_bytes: 64 * 1024 * 1024, //   64 MiB
-            max_inline_diff_chars_per_hunk: 2_000,
+            max_inline_diff_chars_per_hunk: crate::diff::MAX_INLINE_CHARS_PER_SIDE,
             max_directory_entries_eager: 500,
             max_eager_lines: 50_000,
         }

@@ -696,6 +696,18 @@ code.path-display {
 .in-del { background: color-mix(in srgb, var(--del-mark) 30%, transparent); text-decoration: line-through; }
 .in-ins { background: color-mix(in srgb, var(--ins-mark) 30%, transparent); }
 
+/* A changed pair too long for character-level highlighting (F120): a badge,
+   so a skipped pair never reads as "no character-level differences". */
+.inline-skipped {
+  display: inline-block;
+  margin-right: 0.8ch;
+  padding: 0 0.5ch;
+  font-size: 10px;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 3px;
+}
+
 /* Search match highlight */
 .diff-row.match { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .diff-row.match .cell { background: color-mix(in srgb, var(--accent) 12%, transparent); }

@@ -98,8 +98,14 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 button {
                     aria_pressed: if snap.char_mode { "true" } else { "false" },
                     aria_label: t(lang, "Toggle character-level inline diff"),
+                    disabled: !snap.inline_available,
+                    title: if snap.inline_available { String::new() } else { t(lang, "Inline diff is off for large files.") },
                     onclick: move |_| {
-                        if let Some(tab) = store.tabs.write().get_mut(index) { tab.char_mode ^= true; }
+                        if let Some(tab) = store.tabs.write().get_mut(index)
+                            && crate::ui::view::diff::inline_available(&tab.diff_options)
+                        {
+                            tab.char_mode ^= true;
+                        }
                     },
                     {format!("{}: {}", t(lang, "Inline diff"), t(lang, if snap.char_mode { "on" } else { "off" }))}
                 }

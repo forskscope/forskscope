@@ -358,6 +358,12 @@ fn ja(key: &str) -> Option<&'static str> {
         }
         // F117: a spreadsheet comparison that failed or hit the size bound.
         "Could not compare the spreadsheets" => "スプレッドシートを比較できませんでした",
+        // F120: a changed line pair too long for character-level highlighting.
+        "Too long for character-level highlighting" => {
+            "長すぎるため文字単位のハイライトを行いません"
+        }
+        "Long line" => "長い行",
+        "Inline diff is off for large files." => "大きなファイルではインライン差分は無効です。",
         _ => return None,
     };
     Some(v)
