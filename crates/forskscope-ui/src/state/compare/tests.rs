@@ -409,6 +409,10 @@ fn an_uncomparable_xlsx_pair_is_an_error_not_an_identical_result() {
         message.starts_with("Could not compare the spreadsheets"),
         "the error must say what failed: {message}"
     );
+    assert!(
+        !message.contains("unsupported:"),
+        "the core error's own \"unsupported:\" prefix is noise to a user: {message}"
+    );
 }
 
 // ── load_and_diff: Git mergetool save destination (RFC-077 patch 4a) ──────

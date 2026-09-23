@@ -478,8 +478,16 @@ pub(super) fn load_and_diff(
         // reach the user as an error. Falling through with two empty sides
         // would diff as identical and report "these workbooks match" for a
         // pair that was never fully compared.
-        let (lt, rt) = forskscope_core::xlsx::derive_pair_text(&left, &right)
-            .map_err(|e| format!("{} — {e}", t(lang, "Could not compare the spreadsheets")))?;
+        let (lt, rt) = forskscope_core::xlsx::derive_pair_text(&left, &right).map_err(|e| {
+            let detail = match e {
+                forskscope_core::CoreError::Unsupported { message } => message,
+                other => other.to_string(),
+            };
+            format!(
+                "{} — {detail}",
+                t(lang, "Could not compare the spreadsheets")
+            )
+        })?;
         ld.text = Some(lt);
         rd.text = Some(rt);
     }
