@@ -523,7 +523,7 @@ never evaluated. `.xlsx` is read-only in every path.
   50 MiB, checked before any read; 256 sheets; 1,000,000 differences;
   **2,000,000 cells compared and 4,000,000 cells read**. The cell bounds were
   measured (release build, two identical single-sheet numeric workbooks,
-  unbounded): 1.6 s and 0.95 GB at 1,000,000 coordinates, 2.7 s and 1.9 GB at
+  unbounded): 1.6 s and 0.97 GB at 1,000,000 coordinates, 2.7 s and 1.9 GB at
   2,000,000, 7.1 s and 4.8 GB at 5,000,000 — about 1 KB of peak memory per
   coordinate. `Limits::hardened()`'s own 5,000,000 would admit ~4.8 GB and was
   not used.

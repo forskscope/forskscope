@@ -141,7 +141,7 @@ impl SpreadsheetDiff {
 ///
 /// | compared coordinates | wall time | peak RSS |
 /// |---|---|---|
-/// | 1,000,000 | 1.6 s | 0.95 GB |
+/// | 1,000,000 | 1.6 s | 0.97 GB |
 /// | 2,000,000 | 2.7 s | 1.9 GB |
 /// | 5,000,000 | 7.1 s | 4.8 GB |
 ///

@@ -97,7 +97,7 @@ values overridden, all set in `crates/forskscope-core/src/xlsx.rs`
 not the differences found, which is the correction F65 recorded against
 2.3.0. The value is measured, not taken from `hardened()`'s 5,000,000: an
 unbounded comparison of two identical single-sheet workbooks used 1.6 s and
-0.95 GB at 1,000,000 coordinates, 2.7 s and 1.9 GB at 2,000,000, and 7.1 s and
+0.97 GB at 1,000,000 coordinates, 2.7 s and 1.9 GB at 2,000,000, and 7.1 s and
 4.8 GB at 5,000,000 (release build, 2026-09-24). Cost is linear at about 1 KB
 of peak memory per coordinate, so `hardened()`'s value would admit ~4.8 GB
 from a file the user opened and did not write. 2,000,000 admits about 200
