@@ -55,6 +55,90 @@ verdict. Lifting first replaces that with a new runtime dependency, an
 inverted platform case and a re-frozen matrix plan. The owner may decide
 otherwise; the cost is a longer path to Gate D, not a safety one.
 
+## Amendment — 2026-09-24: the suspension is lifted (F117)
+
+The security suspension above was lifted on 2026-09-04 by commit `d492557`
+(RFC-085, `sheets-diff` 2.5.0). The lifting condition names **this document**
+as the place where that is recorded, with reasoning; it was not, for three
+weeks. This amendment does that. The text above is left as written: it is the
+record of what was decided then, and its present-tense statements ("fails
+closed", "re-enabling requires…") were true until `d492557` and are **not true
+now**.
+
+**Where the four conditions stand**
+
+1. *Lifted here, deliberately.* This amendment. What the parser now defends
+   against and what it does not is set out below; the threat model's `.xlsx`
+   sections describe the same (handoff 042).
+2. *`audit-deps` denies `sheets-diff` by name.* Removed by `d492557`.
+   `xtask/src/main.rs` now asserts the reviewed chain is **present**:
+   `sheets-diff` under `forskscope-core`, `calamine` under `sheets-diff`,
+   `zip` under `calamine`.
+3. *P10 inverts.* RFC-085 names this as its own item; this amendment neither
+   changes nor verifies it.
+4. *New evidence.* The bound, the cancellation evidence and the alignment
+   decision are below.
+
+**What the parser now defends against.** The advisories that motivated the
+suspension are gone from the resolved chain (`calamine 0.36.1 → quick-xml
+0.41.0`, `zip 8.6.0`). A comparison runs under `Limits::hardened()` with two
+values overridden, all set in `crates/forskscope-core/src/xlsx.rs`
+(`CellBounds`):
+
+| Bound | Value | Source |
+|---|---|---|
+| `max_input_bytes` | 50 MiB | `hardened()`, checked before any read |
+| `max_sheets` | 256 | `hardened()` |
+| `max_diffs_returned` | 1,000,000 | `hardened()` |
+| `max_cells_compared` | **2,000,000** | chosen here |
+| `max_cells_read` | **4,000,000** | chosen here (both sides, cumulative) |
+
+`sheets-diff` 2.5.0's `max_cells_compared` counts the coordinates visited,
+not the differences found, which is the correction F65 recorded against
+2.3.0. The value is measured, not taken from `hardened()`'s 5,000,000: an
+unbounded comparison of two identical single-sheet workbooks used 1.6 s and
+0.95 GB at 1,000,000 coordinates, 2.7 s and 1.9 GB at 2,000,000, and 7.1 s and
+4.8 GB at 5,000,000 (release build, 2026-09-24). Cost is linear at about 1 KB
+of peak memory per coordinate, so `hardened()`'s value would admit ~4.8 GB
+from a file the user opened and did not write. 2,000,000 admits about 200
+columns by 10,000 rows on each side at ~1.9 GB.
+
+**A bound that is reached is an error, not a shorter diff.** Every
+`sheets-diff` limit returns `Err(LimitExceeded)`; `diff_xlsx` reports it as
+`CoreError::Unsupported` naming the bound, and the comparison view shows an
+error tab. Until F117, `derive_pair_text` turned *every* error into two empty
+documents, which diff as identical: a workbook pair that was corrupt, or that
+stopped at a bound, was displayed as "these workbooks match". That path now
+returns the error.
+
+**Cancellation** is observed, not assumed: `diff_xlsx` is cancelled from
+another thread while a 51,000-cell comparison runs
+(`cancellation_still_interrupts_mid_comparison_under_the_bound`), and before it
+starts, and both were falsified by removing the wiring.
+
+**`AlignmentMode`: `Positional`, kept.** It is `sheets-diff`'s default, the
+cheapest mode and the one measured above. Row-key and row-signature alignment
+add an `m × n` table (bounded by `max_alignment_product`, 25,000,000) that
+nothing in the UI selects. A future aligned-view RFC should revisit this with
+its own measurement.
+
+**What it does not defend against.**
+
+- **`calamine` materialises a whole sheet before any bound counts a cell.**
+  The cell bounds cap the comparison's cost, not the parser's. The only bound
+  ahead of parsing is `max_input_bytes`, which limits compressed size, not
+  expansion. An archive whose sheet expands enormously from a small file is
+  **not** bounded by this work.
+- **Cancellation is not polled inside `calamine`'s parse of one sheet**; it is
+  polled every 50,000 cells in `sheets-diff`'s own read and compare loops,
+  after `worksheet_range` returns. A slow parse of a single sheet cannot be
+  interrupted.
+- **A refusal is not free.** The over-bound pairs measured on 2026-09-24 were
+  refused after 2.1 s and 2.3 s at ~2 GB peak, because the read phase runs
+  before the bound is reached.
+- Advisories published after 2026-09-24 against `quick-xml`, `zip` or
+  `calamine`. `audit.yml` reports them daily; nothing here prevents them.
+
 ## Status
 Implemented (v0.45.0). The core-layer deliverables from RFC-058 are shipped:
 

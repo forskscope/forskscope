@@ -13,6 +13,14 @@
 //! *inside* a sheet (every 50,000 cells, in both the read and compare
 //! phases) rather than only between sheets — see [`diff_xlsx`]'s doc.
 //!
+//! ## The size bound (F117, RFC-058 condition 4)
+//!
+//! [`CellBounds::PRODUCT`] caps a comparison at 2,000,000 compared
+//! coordinates and 4,000,000 cells read, on top of `Limits::hardened()`'s
+//! other dimensions. A comparison that reaches a bound **fails** with
+//! [`CoreError::Unsupported`]; it never returns a truncated diff. The value
+//! and its measured basis are on [`CellBounds`].
+//!
 //! ## Two entry points
 //!
 //! - [`diff_xlsx`] — returns a structured [`SpreadsheetDiff`] from two paths.
@@ -125,6 +133,57 @@ impl SpreadsheetDiff {
 
 // ── Adapter (RFC-058 §"v2 migration") ────────────────────────────────────────
 
+/// The cell bounds one `.xlsx` comparison runs under (F117).
+///
+/// **Basis, measured on `sheets-diff` 2.5.0 in a release build**, two
+/// identical single-sheet workbooks of numeric cells (one differing cell),
+/// unbounded, on the 2026-09-24 audit machine:
+///
+/// | compared coordinates | wall time | peak RSS |
+/// |---|---|---|
+/// | 1,000,000 | 1.6 s | 0.95 GB |
+/// | 2,000,000 | 2.7 s | 1.9 GB |
+/// | 5,000,000 | 7.1 s | 4.8 GB |
+///
+/// Cost is linear at roughly 1 KB of peak memory per compared coordinate,
+/// so the bound is a memory decision. **2,000,000 compared coordinates**
+/// admits a workbook of about 200 columns by 10,000 rows on each side —
+/// larger than an ordinary office workbook — at about 2 GB and under 3
+/// seconds. It refuses anything larger, which includes a full-height
+/// sheet of more than two columns. `Limits::hardened()`'s own 5,000,000
+/// was rejected: it would admit ~4.8 GB from a file the user opened but did
+/// not write.
+///
+/// `max_cells_read` counts the *dense used range* of both sides
+/// cumulatively, so a symmetric pair at the compared bound reads exactly
+/// twice as many cells: it is set to `2 * max_cells_compared`. It fires
+/// first on a sparse sheet whose used range is far larger than its
+/// populated cells, and it fires mid-read, before the compare phase.
+///
+/// **What this does not bound:** `calamine` materialises a whole sheet
+/// before `sheets-diff` counts anything, so these bounds cap the comparison's
+/// own cost, not the parser's. `max_input_bytes` (50 MiB, from `hardened()`)
+/// is the only pre-parse ceiling, and it limits compressed size, not
+/// expansion.
+///
+/// **`AlignmentMode` (RFC-058 condition 4): `Positional`, kept.** It is
+/// `sheets-diff`'s default, the cheapest mode, and the one measured above.
+/// The row-key and row-signature modes add an `m × n` alignment table
+/// (bounded separately by `max_alignment_product`) that this product does
+/// not need: nothing in the UI selects an alignment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CellBounds {
+    pub max_cells_read: u64,
+    pub max_cells_compared: u64,
+}
+
+impl CellBounds {
+    pub const PRODUCT: CellBounds = CellBounds {
+        max_cells_read: 2 * 2_000_000,
+        max_cells_compared: 2_000_000,
+    };
+}
+
 /// Compute the structured diff of two `.xlsx` files.
 ///
 /// `cancel`, when given, is polled by `sheets-diff` 2.5.0 every 50,000 cells
@@ -132,37 +191,79 @@ impl SpreadsheetDiff {
 /// between sheets, which is all earlier `sheets-diff` releases offered. A
 /// sheet under 50,000 cells still runs to completion uninterrupted; it also
 /// completes in well under the ~100ms worst-case checkpoint interval, so
-/// there is nothing to interrupt. Passing `None` (as [`derive_pair_text`]
-/// does) runs the comparison uncancellable, same as no token at all.
+/// there is nothing to interrupt. Passing `None` runs the comparison
+/// uncancellable, same as no token at all.
+///
+/// Runs under [`CellBounds::PRODUCT`]. A comparison that reaches a bound
+/// returns `Err`, never a partial diff: see [`diff_xlsx_with_bounds`].
 pub fn diff_xlsx(
     old_path: &Path,
     new_path: &Path,
     cancel: Option<&CancellationToken>,
 ) -> Result<SpreadsheetDiff> {
-    let opts = build_options(cancel);
+    diff_xlsx_with_bounds(old_path, new_path, cancel, CellBounds::PRODUCT)
+}
+
+/// [`diff_xlsx`] with explicit bounds, so a test can exercise the bound on a
+/// small fixture instead of a multi-million-cell workbook.
+///
+/// A bound that is reached is an `Err(CoreError::Unsupported)` whose message
+/// names the bound and says the comparison was stopped. It is never an
+/// `Ok` with fewer differences: that would report "these sheets match" for
+/// a file that was not finished being read.
+pub fn diff_xlsx_with_bounds(
+    old_path: &Path,
+    new_path: &Path,
+    cancel: Option<&CancellationToken>,
+    bounds: CellBounds,
+) -> Result<SpreadsheetDiff> {
+    let opts = build_options(cancel, bounds)?;
 
     let workbook_diff =
-        sheets_diff::compare_paths_with_options(old_path, new_path, opts).map_err(|e| {
-            CoreError::Unsupported {
-                message: format!("could not diff workbook '{}': {}", old_path.display(), e),
+        sheets_diff::compare_paths_with_options(old_path, new_path, opts).map_err(|e| match e {
+            sheets_diff::SheetsDiffError::LimitExceeded { limit, observed } => {
+                CoreError::Unsupported {
+                    message: format!(
+                        "{} is too large to compare: it exceeded the size bound ({limit}, \
+                         reached {observed}). The comparison was stopped, not completed, so no \
+                         result is shown",
+                        display_name(old_path)
+                    ),
+                }
             }
+            e => CoreError::Unsupported {
+                message: format!("could not diff workbook '{}': {}", old_path.display(), e),
+            },
         })?;
 
     Ok(convert(workbook_diff))
 }
 
-fn build_options(cancel: Option<&CancellationToken>) -> sheets_diff::DiffOptions {
-    let mut builder = sheets_diff::DiffOptions::builder();
+fn display_name(path: &Path) -> String {
+    path.file_name()
+        .map(|n| format!("'{}'", n.to_string_lossy()))
+        .unwrap_or_else(|| format!("'{}'", path.display()))
+}
+
+fn build_options(
+    cancel: Option<&CancellationToken>,
+    bounds: CellBounds,
+) -> Result<sheets_diff::DiffOptions> {
+    let mut limits = sheets_diff::Limits::hardened();
+    limits.max_cells_read = Some(bounds.max_cells_read);
+    limits.max_cells_compared = Some(bounds.max_cells_compared);
+    let mut builder = sheets_diff::DiffOptions::builder().limits(limits);
     if let Some(token) = cancel {
         let tok = token.clone();
         builder = builder.cancellation(move || tok.is_cancelled());
     }
-    // The only option this ever sets is cancellation — `validate()` only
-    // rejects a `formula_compare`/`format_compare` combination neither of
-    // which this builder touches, so `build()` cannot fail here; falling
-    // back to `default()` on an error that cannot occur is safe rather than
-    // silently dropping a real one.
-    builder.build().unwrap_or_default()
+    // `validate()` only rejects a `formula_compare`/`format_compare`
+    // combination neither of which this builder touches, so this should not
+    // fail. If it ever does, refuse the comparison: falling back to
+    // `default()` would silently drop the bound.
+    builder.build().map_err(|e| CoreError::InternalInvariant {
+        message: format!("could not build spreadsheet comparison options: {e}"),
+    })
 }
 
 /// Maps `sheets-diff`'s v2 model onto our own (RFC-085 Q1: upstream declined
@@ -308,11 +409,15 @@ pub fn derive_pair_text_from_diff(diff: &SpreadsheetDiff) -> (TextDocument, Text
 }
 
 /// Entry point for callers that don't yet hold a `SpreadsheetDiff`.
-pub fn derive_pair_text(old_path: &Path, new_path: &Path) -> (TextDocument, TextDocument) {
-    match diff_xlsx(old_path, new_path, None) {
-        Ok(diff) => derive_pair_text_from_diff(&diff),
-        Err(_) => (excel_doc(String::new()), excel_doc(String::new())),
-    }
+///
+/// An `Err` is returned to the caller, never turned into two empty
+/// documents: two empty sides diff as identical, so swallowing the error
+/// would show "these workbooks match" for a pair that was corrupt, or that
+/// stopped at the size bound (F117).
+pub fn derive_pair_text(old_path: &Path, new_path: &Path) -> Result<(TextDocument, TextDocument)> {
+    Ok(derive_pair_text_from_diff(&diff_xlsx(
+        old_path, new_path, None,
+    )?))
 }
 
 #[derive(Clone, Copy)]
@@ -519,7 +624,7 @@ mod tests {
     /// Handoff 022 §4: cancellation must actually interrupt a comparison
     /// large enough to cross sheets-diff 2.5.0's 50,000-cell checkpoint —
     /// not merely accept a token that does nothing. The "large" fixture is
-    /// 60,000 cells in one sheet; cancelling before comparing even starts
+    /// 51,000 cells per side in one sheet; cancelling before comparing even starts
     /// means the very first checkpoint must observe it. Falsified for real
     /// (see the review request): reverting `build_options` to ignore
     /// `cancel` made this fail, taking ~1.3s and returning `Ok` instead of
@@ -548,5 +653,134 @@ mod tests {
         let diff = diff_xlsx(&old, &new, None).unwrap();
         // Identical fixtures on both sides: no sheet or cell differences.
         assert!(diff.is_empty());
+    }
+
+    // ── F117: the size bound ─────────────────────────────────────────────
+    //
+    // The `large` fixture is 51,000 populated cells per side (found by
+    // bisecting the bound; the earlier "60,000" in this file was never
+    // measured). `PRODUCT`'s 2,000,000 is too large to reach from a
+    // committed fixture, so these tests pass smaller bounds through
+    // `diff_xlsx_with_bounds`; the real value's basis is on `CellBounds`.
+
+    const BIG: u64 = 100_000_000;
+
+    fn large() -> (PathBuf, PathBuf) {
+        (fixture("large", "old.xlsx"), fixture("large", "new.xlsx"))
+    }
+
+    /// The bound is on coordinates *compared*, and the boundary is exact:
+    /// the fixture's 51,000 coordinates pass at 51,000 and are refused at
+    /// 50,999. Falsify by dropping `max_cells_compared` from `build_options`
+    /// (the tight case then returns `Ok`) — see the review request.
+    #[test]
+    fn the_compared_bound_is_exact_at_the_fixtures_cell_count() {
+        let (old, new) = large();
+        let at = CellBounds {
+            max_cells_read: BIG,
+            max_cells_compared: 51_000,
+        };
+        diff_xlsx_with_bounds(&old, &new, None, at)
+            .expect("a comparison exactly at the bound is admitted");
+
+        let under = CellBounds {
+            max_cells_read: BIG,
+            max_cells_compared: 50_999,
+        };
+        let err = diff_xlsx_with_bounds(&old, &new, None, under)
+            .expect_err("one coordinate over the bound must be refused");
+        let message = err.to_string();
+        assert!(
+            message.contains("max_cells_compared") && message.contains("too large"),
+            "the refusal must name the bound: {message}"
+        );
+    }
+
+    /// F117 §3: reaching the bound is an `Err`, never an `Ok` carrying fewer
+    /// differences. The fixture pair is identical, so a truncating (or
+    /// unbounded) implementation returns `Ok` with an empty diff — which the
+    /// view renders as "these workbooks match", for a file it did not
+    /// finish reading. Falsified for real: removing the limits made this
+    /// return exactly that `Ok`.
+    #[test]
+    fn a_bounded_comparison_is_an_error_never_a_partial_diff() {
+        let (old, new) = large();
+        let bounds = CellBounds {
+            max_cells_read: BIG,
+            max_cells_compared: 1_000,
+        };
+        let result = diff_xlsx_with_bounds(&old, &new, None, bounds);
+        assert!(
+            matches!(result, Err(CoreError::Unsupported { .. })),
+            "a bounded comparison must not produce a diff: {result:?}"
+        );
+    }
+
+    /// The read bound fires mid-read, before the compare phase, and counts
+    /// both sides cumulatively (51,000 + 51,000).
+    #[test]
+    fn the_read_bound_counts_both_sides_and_fires_first() {
+        let (old, new) = large();
+        let ok = CellBounds {
+            max_cells_read: 102_000,
+            max_cells_compared: BIG,
+        };
+        diff_xlsx_with_bounds(&old, &new, None, ok).expect("102,000 reads are admitted");
+
+        let tight = CellBounds {
+            max_cells_read: 101_999,
+            max_cells_compared: BIG,
+        };
+        let message = diff_xlsx_with_bounds(&old, &new, None, tight)
+            .expect_err("one read over the bound must be refused")
+            .to_string();
+        assert!(message.contains("max_cells_read"), "{message}");
+    }
+
+    /// Ordinary workbooks are untouched by the product bound: every small
+    /// fixture, and the 51,000-cell one, run to completion under `PRODUCT`
+    /// (they all go through `diff_xlsx`, which uses it).
+    #[test]
+    fn the_product_bound_admits_the_ordinary_and_the_large_fixture() {
+        for case in [
+            "basic",
+            "formula",
+            "renamed",
+            "renamed_and_moved",
+            "unchanged_sheet",
+        ] {
+            diff(case);
+        }
+        let (old, new) = large();
+        diff_xlsx(&old, &new, None).expect("51,000 cells is far under the bound");
+        assert_eq!(CellBounds::PRODUCT.max_cells_compared, 2_000_000);
+        assert_eq!(
+            CellBounds::PRODUCT.max_cells_read,
+            2 * CellBounds::PRODUCT.max_cells_compared
+        );
+    }
+
+    /// Cancellation still interrupts *during* a comparison, not only before
+    /// one starts (F65 records that the mid-sheet case was the defect we
+    /// reported upstream). The token is cancelled from another thread while
+    /// the 51,000-cell comparison is running; the error must be the
+    /// cancellation, not the size bound and not `Ok`.
+    #[test]
+    fn cancellation_still_interrupts_mid_comparison_under_the_bound() {
+        let (old, new) = large();
+        let token = CancellationToken::new();
+        let canceller = token.clone();
+        let handle = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(1));
+            canceller.cancel();
+        });
+        let result = diff_xlsx(&old, &new, Some(&token));
+        handle.join().unwrap();
+
+        let message = result
+            .expect_err("a comparison cancelled mid-run must not complete")
+            .to_string();
+        assert!(message.contains("cancelled"), "{message}");
+        assert!(!message.contains("too large"), "{message}");
     }
 }

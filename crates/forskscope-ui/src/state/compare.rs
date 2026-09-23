@@ -474,7 +474,12 @@ pub(super) fn load_and_diff(
     // `save_capability`'s NotMergeableText refusal are unchanged (RFC-085
     // scope boundary — merge/save for .xlsx is a separate RFC).
     if ld.kind == FileKind::ExcelXlsx && rd.kind == FileKind::ExcelXlsx {
-        let (lt, rt) = forskscope_core::xlsx::derive_pair_text(&left, &right);
+        // F117: an error here (corrupt workbook, or the size bound) must
+        // reach the user as an error. Falling through with two empty sides
+        // would diff as identical and report "these workbooks match" for a
+        // pair that was never fully compared.
+        let (lt, rt) = forskscope_core::xlsx::derive_pair_text(&left, &right)
+            .map_err(|e| format!("{} — {e}", t(lang, "Could not compare the spreadsheets")))?;
         ld.text = Some(lt);
         rd.text = Some(rt);
     }

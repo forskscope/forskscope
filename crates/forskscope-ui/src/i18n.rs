@@ -356,6 +356,8 @@ fn ja(key: &str) -> Option<&'static str> {
         "ForskScope needs the Microsoft Edge WebView2 Runtime, which is not installed on this computer. Open the download page?" => {
             "ForskScope には Microsoft Edge WebView2 ランタイムが必要ですが、このコンピューターにはインストールされていません。ダウンロードページを開きますか？"
         }
+        // F117: a spreadsheet comparison that failed or hit the size bound.
+        "Could not compare the spreadsheets" => "スプレッドシートを比較できませんでした",
         _ => return None,
     };
     Some(v)

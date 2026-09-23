@@ -377,6 +377,40 @@ fn both_sides_xlsx_produces_a_real_structural_diff_not_an_empty_one() {
     );
 }
 
+/// F117: a workbook pair that cannot be compared (corrupt here; the size
+/// bound takes the same path, since both are an `Err` from
+/// `xlsx::derive_pair_text`) must reach the user as an error. Before F117
+/// this returned `Ok` with two empty sides, which diff as identical and
+/// render as "these workbooks match". Falsified by restoring that `Err(_)`
+/// swallow: `load_and_diff` then returns `Ok` and this fails.
+#[test]
+fn an_uncomparable_xlsx_pair_is_an_error_not_an_identical_result() {
+    let dir = temp_dir("f117-uncomparable-xlsx");
+    let left = dir.join("left.xlsx");
+    let right = dir.join("right.xlsx");
+    fs::write(&left, b"not a real workbook").unwrap();
+    fs::write(&right, b"also not a real workbook").unwrap();
+
+    let result = load_and_diff(
+        normal_request(left, right),
+        DiffOptions::default(),
+        Lang::En,
+        false,
+    );
+
+    let message = match result {
+        Ok(prepared) => panic!(
+            "an uncomparable pair must not load; got identical={}",
+            prepared.diff.is_identical()
+        ),
+        Err(message) => message,
+    };
+    assert!(
+        message.starts_with("Could not compare the spreadsheets"),
+        "the error must say what failed: {message}"
+    );
+}
+
 // ── load_and_diff: Git mergetool save destination (RFC-077 patch 4a) ──────
 
 #[test]

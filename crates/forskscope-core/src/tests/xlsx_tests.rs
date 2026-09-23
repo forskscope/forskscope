@@ -21,20 +21,20 @@ fn diff_xlsx_fails_closed_without_parsing_workbook_content() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+/// F117: an unreadable pair must be an error, not two empty documents. Two
+/// empty sides diff as identical, so the old behaviour (asserted here until
+/// F117) showed "these workbooks match" for a file that was never read.
 #[test]
-fn derive_pair_text_returns_empty_documents_when_xlsx_is_disabled() {
-    let dir = std::env::temp_dir().join(format!("fsk-xlsx-pair-disabled-{}", std::process::id()));
+fn derive_pair_text_reports_an_unreadable_pair_instead_of_two_empty_sides() {
+    let dir = std::env::temp_dir().join(format!("fsk-xlsx-pair-corrupt-{}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     let old = dir.join("old.xlsx");
     let new = dir.join("new.xlsx");
     fs::write(&old, b"old").unwrap();
     fs::write(&new, b"new").unwrap();
 
-    let (left, right) = derive_pair_text(&old, &new);
-    assert!(left.content.is_empty());
-    assert!(right.content.is_empty());
-    assert_eq!(left.encoding.label, "(Excel)");
-    assert_eq!(right.encoding.label, "(Excel)");
+    let err = derive_pair_text(&old, &new).expect_err("a corrupt pair must not derive empty text");
+    assert!(matches!(err, CoreError::Unsupported { .. }));
 
     let _ = fs::remove_dir_all(&dir);
 }
