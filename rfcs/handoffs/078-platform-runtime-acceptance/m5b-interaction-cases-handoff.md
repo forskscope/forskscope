@@ -135,7 +135,7 @@ whether the process died).
 
 ## 8. Required review-request content
 
-Submit under `dev-record/review-requests/` with:
+Submit under `.git-exclude/review-request/` with:
 
 1. **§3's resolution and reasoning** — before anything else, since everything
    about P04 depends on it;

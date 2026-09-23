@@ -239,7 +239,7 @@ either way.
 
 ## 12. Required review-request content
 
-Submit under `dev-record/review-requests/` — split at the §4/§5 boundary if
+Submit under `.git-exclude/review-request/` — split at the §4/§5 boundary if
 large — with:
 
 1. implementation summary;

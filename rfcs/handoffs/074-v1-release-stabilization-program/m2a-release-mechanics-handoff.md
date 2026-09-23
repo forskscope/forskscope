@@ -298,7 +298,7 @@ never install legacy persisted IDs as runtime `CompareTabId` values.
 
 ## 12. Required review-request content
 
-Submit under `dev-record/review-requests/` with:
+Submit under `.git-exclude/review-request/` with:
 
 1. implementation summary;
 2. addressed items (F19–F22, N5, N6);

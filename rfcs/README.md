@@ -178,6 +178,8 @@ RFC design decisions. This list is every file under `handoffs/`.
 - [RFC-085 XLSX resumption (handoff 022)](./handoffs/085-spreadsheet-comparison-resumption/022-rfc085-xlsx-resumption.md)
 - [RFC-086 stable hunk identity (handoff 025)](./handoffs/086-stable-hunk-identity/025-rfc086-stable-hunk-identity.md)
 
-Handoffs for work that comes from the **register** in `ROADMAP.md` rather than
-from an RFC are not here; they live in [`dev-record/handoffs/`](../dev-record/),
-alongside the review requests and reviews for every change.
+Only current, reviewed, implementation-useful companion documents for an RFC
+belong here, and each directory corresponds to an existing RFC number (RFC-000
+§ *Companion handoffs*, § *Optional CI invariants*). Handoffs for register
+findings, review notes and in-progress coordination are working documents and
+are kept outside the repository.

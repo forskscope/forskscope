@@ -235,7 +235,7 @@ become verified or refuted.
 
 ## 8. Required review-request content
 
-Submit under `dev-record/review-requests/` with:
+Submit under `.git-exclude/review-request/` with:
 
 1. implementation summary;
 2. addressed items (F7/N5, F9/N2, F37, `matrix-plan.md`);

@@ -130,6 +130,6 @@ note, it does not reopen the RFC. Do not move the file.
 
 ## 9. Reporting
 
-Usual review request under `dev-record/review-requests/`. Tell me if §5's
+Usual review request under `.git-exclude/review-request/`. Tell me if §5's
 shared helper turns out to be the wrong shape; that is the judgement call in
 this handoff, and it is yours to make.

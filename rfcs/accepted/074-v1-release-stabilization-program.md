@@ -25,7 +25,7 @@ replace the detailed RFCs.
 ## Source and authority
 
 The triggering evidence is the architect-reviewed package
-`dev-record/reviews/027-project-readiness-architecture-review.md`. That file
+`.git-exclude/reviewed/027-project-readiness-architecture-review.md`. That file
 is review evidence; this RFC and its child RFCs are the durable design source
 of truth. If implementation evidence changes a design assumption, amend the
 relevant RFC before changing scope.
