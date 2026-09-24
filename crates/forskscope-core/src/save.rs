@@ -114,14 +114,19 @@ pub(crate) fn save_text_with_commit_hook(
     bytes.extend_from_slice(&encoded.bytes);
     let fallback = encoded.unknown_label_fallback;
 
-    let backup_path = if request.backup == BackupPolicy::SiblingBak && target.exists() {
-        let bak = backup_path_for(target);
-        write_backup(target, &bak)
-            .map_err(|e| CoreError::io(target, IoOperation::CreateBackup, &e))?;
-        Some(bak)
-    } else {
-        None
-    };
+    // The backup is only *staged* here: a copy in a temp file beside the
+    // target, made before the final check so the copy stays outside the race
+    // window. It becomes `<name>.bak` inside the commit, after the check has
+    // passed; a save the check refuses drops it and `<name>.bak` is untouched.
+    let (backup_path, staged_backup) =
+        if request.backup == BackupPolicy::SiblingBak && target.exists() {
+            let bak = backup_path_for(target);
+            let staged = stage_backup(target)
+                .map_err(|e| CoreError::io(target, IoOperation::CreateBackup, &e))?;
+            (Some(bak), Some(staged))
+        } else {
+            (None, None)
+        };
 
     // Test seam: runs after the first precondition check and the backup, so a
     // test can change the target where only the re-check inside the commit
@@ -129,6 +134,7 @@ pub(crate) fn save_text_with_commit_hook(
     commit_hook();
 
     match request.precondition {
+        // The target must not exist, so there was nothing to stage.
         TargetPrecondition::MustBeAbsent => persist_noclobber(target, &bytes)?,
         TargetPrecondition::MustMatch(_) | TargetPrecondition::Force => {
             // Create parent directories for Save As to new nested paths.
@@ -143,8 +149,13 @@ pub(crate) fn save_text_with_commit_hook(
             // rename, so the window a concurrent writer can fall into is the
             // gap between that check and the rename, not the whole save. It
             // is narrowed, not closed: see `atomic_replace_checked`.
-            atomic_replace_checked(target, &bytes, || {
-                check_precondition(target, &request.precondition)
+            let bak_to_commit = backup_path.clone();
+            atomic_replace_checked(target, &bytes, move || {
+                check_precondition(target, &request.precondition)?;
+                if let (Some(staged), Some(bak)) = (staged_backup, bak_to_commit.as_ref()) {
+                    commit_backup(staged, bak, target)?;
+                }
+                Ok(())
             })?;
         }
     }
@@ -158,38 +169,55 @@ pub(crate) fn save_text_with_commit_hook(
     })
 }
 
-/// Copies `target` to `bak` without ever writing **through** a link at `bak`
-/// (F121 A). `fs::copy` opens its destination with `O_TRUNC`, which follows a
-/// symlink: with `<name>.bak` pre-created as a link to a victim file, the
-/// backup landed in the victim (CWE-59, the class F89 closed for the temp
-/// file, on a predictable name).
+/// The builder for a staged backup: created with the source's mode on unix (so
+/// it is never wider than its source, even briefly), the crate default
+/// elsewhere. A separate function so the `mut` binding exists only where it is
+/// used (the same reason as [`temp_builder`]).
+#[cfg(unix)]
+fn staging_builder(meta: &fs::Metadata) -> tempfile::Builder<'static, 'static> {
+    use std::os::unix::fs::PermissionsExt;
+    let mut builder = tempfile::Builder::new();
+    builder.permissions(fs::Permissions::from_mode(
+        meta.permissions().mode() & 0o7777,
+    ));
+    builder
+}
+
+#[cfg(not(unix))]
+fn staging_builder(_meta: &fs::Metadata) -> tempfile::Builder<'static, 'static> {
+    tempfile::Builder::new()
+}
+
+/// Copies `target` into a fresh temp file in the same directory — the backup,
+/// *staged* (handoff 050) — and returns it without touching `<name>.bak`.
 ///
-/// An existing `bak` — file or link — is removed first (`remove_file` removes a
-/// symlink itself, not its target), which keeps the documented behaviour that a
-/// save clobbers the previous backup. It is then created with `create_new`
-/// (`O_EXCL`), which refuses any existing entry, including a link an attacker
-/// re-creates in the gap: that fails the save instead of writing through it.
-/// The backup keeps the source's mode, as `fs::copy` did, and is created with
-/// that mode so it is never briefly wider than the file it copies.
-fn write_backup(target: &Path, bak: &Path) -> std::io::Result<()> {
+/// The temp file is created with `O_EXCL` under a random name (F121 A: nothing
+/// predictable to pre-create as a symlink) and holds the source's mode, made
+/// before any byte is written so it is never briefly wider than its source.
+/// [`commit_backup`] later renames it onto `<name>.bak`; if the save is refused
+/// first, dropping it removes it and the previous backup was never touched.
+fn stage_backup(target: &Path) -> std::io::Result<tempfile::NamedTempFile> {
     let mut src = fs::File::open(target)?;
     let meta = src.metadata()?;
-    match fs::symlink_metadata(bak) {
-        Ok(_) => fs::remove_file(bak)?,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => return Err(e),
-    }
-    let mut options = fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-        options.mode(meta.permissions().mode() & 0o7777);
-    }
-    let mut dst = options.open(bak)?;
-    std::io::copy(&mut src, &mut dst)?;
-    dst.set_permissions(meta.permissions())?;
-    Ok(())
+    let dir = target.parent().unwrap_or_else(|| Path::new("."));
+    let builder = staging_builder(&meta);
+    let mut staged = builder.tempfile_in(dir)?;
+    std::io::copy(&mut src, &mut staged)?;
+    staged.as_file().set_permissions(meta.permissions())?;
+    Ok(staged)
+}
+
+/// Renames a staged backup onto `bak`, replacing whatever is there. `rename`
+/// replaces the directory entry itself and never follows a link at the
+/// destination, so a symlink pre-created at `<name>.bak` is *replaced* by the
+/// backup and its target is untouched — the F121 A protection, without the
+/// `remove_file`-then-`create_new` the earlier code needed to get it (that pair
+/// existed only because `fs::copy` opens its destination and follows links).
+fn commit_backup(staged: tempfile::NamedTempFile, bak: &Path, target: &Path) -> Result<()> {
+    staged
+        .persist(bak)
+        .map(|_| ())
+        .map_err(|e| CoreError::io(target, IoOperation::CreateBackup, &e.error))
 }
 
 /// Writes `bytes` to a same-directory temp file, then renames it onto

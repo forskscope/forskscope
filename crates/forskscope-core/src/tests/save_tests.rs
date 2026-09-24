@@ -676,3 +676,55 @@ fn a_change_after_the_first_check_is_caught_by_the_recheck_before_the_rename() {
         "no temp file may be left behind: {leftovers:?}"
     );
 }
+
+// ── F121 (handoff 050): a refused save leaves the backup alone ───────────────
+
+/// F87: "nothing on disk is touched by a refusal". Moving the precondition
+/// check to just before the rename put the backup *before* it, so a save the
+/// re-check refused had already replaced `<name>.bak` with the file's current
+/// content — destroying the previous backup for a save that never happened.
+/// Falsified against the code as it stood at `43b3e5a`: `.bak` was replaced.
+#[test]
+fn a_save_refused_by_the_recheck_leaves_the_previous_backup_untouched() {
+    let dir = temp_dir("refused-save-keeps-backup");
+    let target = dir.join("file.txt");
+    let bak = dir.join("file.txt.bak");
+    fs::write(&target, "v1\n").unwrap();
+    fs::write(&bak, "the previous backup, from an earlier save\n").unwrap();
+    let fingerprint = FileFingerprint::capture(&target, None).unwrap();
+
+    let request = SaveRequest {
+        target: target.clone(),
+        content: "our save\n".into(),
+        encoding_label: "UTF-8".into(),
+        bom: BomPresence::Absent,
+        precondition: TargetPrecondition::MustMatch(fingerprint),
+        backup: BackupPolicy::SiblingBak,
+    };
+    let racing = target.clone();
+    let err = crate::save::save_text_with_commit_hook(&request, move || {
+        fs::write(&racing, "written by another process, longer than v1\n").unwrap();
+    })
+    .unwrap_err();
+
+    assert!(matches!(err, CoreError::Conflict { .. }), "got {err:?}");
+    assert_eq!(
+        fs::read(&bak).unwrap(),
+        b"the previous backup, from an earlier save\n",
+        "a refused save must leave <name>.bak byte for byte unchanged"
+    );
+    assert_eq!(
+        fs::read_to_string(&target).unwrap(),
+        "written by another process, longer than v1\n"
+    );
+    let mut names: Vec<String> = fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        ["file.txt", "file.txt.bak"],
+        "no content temp and no staged backup may be left behind"
+    );
+}

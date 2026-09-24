@@ -303,12 +303,17 @@ same `atomic_replace` primitive (§4).
   the one captured at load (missing / changed / replaced are all conflicts).
 - **`.xlsx` is never written.** Spreadsheet comparison is read-only.
 
-- **The backup is never written through a link** (F121 A, 2026-09-24).
-  `BackupPolicy::SiblingBak` (the default) removes an existing `<name>.bak` — a
-  file, or a symlink itself, never its target — and creates the backup with
-  `create_new` (`O_EXCL`), which refuses any existing entry, including a link
-  re-created in the gap: that fails the save instead of following it. Before
-  this, `fs::copy` opened the backup path with `O_TRUNC` and wrote through a
+- **The backup is never written through a link, and a refused save does not
+  touch it** (F121 A, and handoff 050). `BackupPolicy::SiblingBak` (the default)
+  first *stages* the backup: a copy of the target in a temp file beside it,
+  created with `O_EXCL` under a random name and the source's mode, made before
+  the final check so the copy stays outside the race window. Only after the final
+  check passes is it renamed onto `<name>.bak` — `rename` replaces the directory
+  entry and never follows a link at the destination, so a symlink pre-created at
+  `<name>.bak` is replaced and its target untouched. If the check refuses the
+  save, the staged copy is dropped (removed) and the previous `<name>.bak` was
+  never touched: F87's "nothing on disk is touched by a refusal" holds again.
+  Before F121 A, `fs::copy` opened the backup path with `O_TRUNC` and wrote through a
   symlink (the F89 class on a predictable name): with `doc.txt.bak ->
   victim.txt` beside `doc.txt`, `victim.txt` ended up holding `doc.txt`'s
   previous content. Regression test:
@@ -321,8 +326,10 @@ same `atomic_replace` primitive (§4).
   save.
 - **The precondition is checked again inside the commit** (F121 C): after the
   temp file is written and immediately before the rename, so the window is the
-  gap between that check and `rename(2)` rather than the whole span of encoding,
-  backup and temp write.
+  gap between that check and the renames rather than the whole span of encoding,
+  backup copy and temp write. The commit is now two renames (the staged backup,
+  then the content) instead of one; a rename is not a copy and adds no
+  meaningful width.
 
 **What the guarantee does not cover.** Observed on Linux (`umask 022`) unless
 marked; **Windows and macOS were not probed**, so none of the below is claimed
@@ -349,10 +356,6 @@ Windows target but never run on macOS.
   not seen. `Force` has no precondition by definition. Only `MustBeAbsent` has a
   race-free commit. A real fix (a lock or a platform primitive) is a design
   decision that was not made.
-- **A conflict found by the final check can leave a fresher `.bak`.** The backup
-  runs before the commit, so when the final check refuses the save the backup has
-  already replaced the previous one — with the file's *current* content, which is
-  the data the refusal protected.
 - **No durability** (above): a power loss after a save can lose it, because
   nothing is flushed.
 
