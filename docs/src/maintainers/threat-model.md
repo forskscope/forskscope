@@ -300,30 +300,56 @@ same `atomic_replace` primitive (§4).
   the one captured at load (missing / changed / replaced are all conflicts).
 - **`.xlsx` is never written.** Spreadsheet comparison is read-only.
 
-**What the guarantee does not cover** — each of these was observed, not
-inferred:
-- **The backup path follows a symlink.** `BackupPolicy::SiblingBak` (the default)
-  does `fs::copy(target, "<name>.bak")`. If `<name>.bak` already exists as a
-  symlink, the copy writes *through* it. Probe: a symlink `doc.txt.bak ->
-  victim.txt` beside `doc.txt`; after a save, `victim.txt` contained
-  `doc.txt`'s previous content. This is the same class as the temp-file defect
-  above, on a predictable name the F89 fix did not reach. It needs an attacker
-  who can create files in the target's directory.
-- **A save widens a private file's permissions.** The replacement is created with
-  mode `0666` filtered by the process umask (deliberately: F38 — a saved file must not be left with the temp file's
-  `0600` default). Probe: a `0600` file was `0644`
-  after a save. Saving a merge result over a secrets file leaves it readable by
-  the group and others. Ownership, ACLs and extended attributes were not probed.
+- **The backup is never written through a link** (F121 A, 2026-09-24).
+  `BackupPolicy::SiblingBak` (the default) removes an existing `<name>.bak` — a
+  file, or a symlink itself, never its target — and creates the backup with
+  `create_new` (`O_EXCL`), which refuses any existing entry, including a link
+  re-created in the gap: that fails the save instead of following it. Before
+  this, `fs::copy` opened the backup path with `O_TRUNC` and wrote through a
+  symlink (the F89 class on a predictable name): with `doc.txt.bak ->
+  victim.txt` beside `doc.txt`, `victim.txt` ended up holding `doc.txt`'s
+  previous content. Regression test:
+  `backup_does_not_write_through_a_pre_created_symlink_at_the_bak_path`. The
+  backup keeps the source's mode.
+- **A save keeps an existing file's permission bits** (F121 B, unix). The
+  replacement is created `0666 & ~umask` (F38: right for a *new* file) and, when
+  the target exists, gets the target's mode — including setuid, setgid and
+  sticky — before the rename. Before this a `0600` file was `0644` after a
+  save.
+- **The precondition is checked again inside the commit** (F121 C): after the
+  temp file is written and immediately before the rename, so the window is the
+  gap between that check and `rename(2)` rather than the whole span of encoding,
+  backup and temp write.
+
+**What the guarantee does not cover.** Observed on Linux (`umask 022`) unless
+marked; **Windows and macOS were not probed**, so none of the below is claimed
+for them, and the mode carry is `cfg(unix)` code that has type-checked for the
+Windows target but never run on macOS.
+- **Ownership, ACLs and extended attributes are lost on every save.** The
+  replacement is a new file: it is owned by the saving user and takes the
+  directory's default group; POSIX ACLs and xattrs (including SELinux contexts,
+  and on macOS quarantine and Finder tags) are not carried. Probe: a file with
+  `user.f121=keepme` had no xattr after a save. Carrying them needs privileges
+  or a dependency, and was not attempted; the mode is carried because it is the
+  one that decides who can read the file.
 - **Saving through a symlink replaces the link.** Probe: after a save to
   `link.txt -> real.txt`, `link.txt` was a regular file and `real.txt` was
   unchanged. Safe against write-through, and not what a user editing "the file
   the link points to" expects.
 - **A hard link is split.** Probe: after a save to `a.txt`, its hard link
   `b.txt` still held the old content.
-- **`MustMatch` and `Force` are check-then-rename, not atomic.** The
-  fingerprint is checked once, at the start of `save_text`; a write by another
-  process between that check and the rename is overwritten. Only `MustBeAbsent`
-  has a race-free commit, and it is the only path with a deterministic race test.
+- **`MustMatch` and `Force` are still check-then-rename, narrowed but not
+  closed.** A path has no compare-and-swap. After F121 C a process that writes
+  the target between the final check and the rename is still overwritten — that
+  gap is microseconds rather than the whole save. The check compares length and
+  modification time (`check_external_state`), so an edit that preserves both is
+  not seen. `Force` has no precondition by definition. Only `MustBeAbsent` has a
+  race-free commit. A real fix (a lock or a platform primitive) is a design
+  decision that was not made.
+- **A conflict found by the final check can leave a fresher `.bak`.** The backup
+  runs before the commit, so when the final check refuses the save the backup has
+  already replaced the previous one — with the file's *current* content, which is
+  the data the refusal protected.
 - **No durability** (above): a power loss after a save can lose it, because
   nothing is flushed.
 
@@ -496,9 +522,12 @@ authenticated. The path is framework transport, not file content.
 The release gate `cargo xtask audit-deps` asserts that `dioxus-devtools` is not
 active, that `tungstenite`/`native-tls` remain limited to the reviewed
 `dioxus-desktop` path, and that common external HTTP client/server crates
-(`reqwest`, `hyper`, `ureq`) are absent. **It asserts nothing about `rustls`**:
-`xtask/src/main.rs` checks the `native-tls` and `tungstenite` dependents only, so
-a second crate depending on `rustls` would not fail the gate. If a future dependency introduces
+(`reqwest`, `hyper`, `ureq`) are absent. Since F121 D (2026-09-24) it also asserts that `rustls`'s only immediate dependent
+is `tungstenite` and `rustls-webpki`'s is `rustls`. **It now queries every
+target's graph** (`cargo tree --target all`): before, it saw only the host's,
+and `rustls` — compiled for the Windows and macOS builds that ship — was not
+in the Linux graph at all, so a crate that appeared only in a shipped-platform
+build would have passed every assertion. If a future dependency introduces
 another network-capable path, update this threat model under S-001 before
 release.
 
@@ -578,3 +607,4 @@ its own merits.
 | v0.171.1 | F117: `.xlsx` cell bounds set (2,000,000 compared / 4,000,000 read); an uncomparable workbook pair is an error, not "identical" | Closes the unbounded comparison RFC-058 condition 4 required be bounded; removes a path that displayed a failed or refused comparison as a match |
 | v0.171.1 | Threat-model revision (F116): write path (§7), distribution (§8), script evaluation (§9) added; `.xlsx` and transport sections corrected | Records three write-path behaviours the F89 fix did not cover (backup symlink write-through, permission widening, non-atomic `MustMatch`), all observed on Linux and **not fixed** |
 | v0.172.0 | F120: character-level refinement bounded (`MAX_INLINE_CHARS_PER_SIDE` = 2,000), skipped pairs shown, Inline toggle disabled for files over 512 KiB | Closes a file-content-triggered process abort reachable from a user toggle; the aggregate cost of many near-limit pairs is not bounded |
+| v0.173.0 | F121: backup no longer written through a symlink; a save keeps an existing file's mode; precondition re-checked before the rename; `audit-deps` asserts the `rustls` path and queries all targets | Closes the F89 class on the `.bak` path and a private-file exposure; narrows (does not close) the `MustMatch`/`Force` race; extends a dependency gate from the host graph to the shipped platforms' |

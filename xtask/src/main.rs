@@ -521,6 +521,12 @@ fn assert_external_network_crates_absent() {
 fn assert_network_paths_are_reviewed() {
     assert_immediate_dependents("tungstenite", &["dioxus-desktop "]);
     assert_immediate_dependents("native-tls", &["tungstenite "]);
+    // F121 D: `tungstenite` compiles in both TLS backends, so the transport
+    // has two reviewed paths, not one — and RUSTSEC-2026-0285 (0.171.0) was a
+    // `rustls` advisory. Without these, a second crate pulling `rustls` would
+    // pass a gate that reads as covering the transport.
+    assert_immediate_dependents("rustls", &["tungstenite "]);
+    assert_immediate_dependents("rustls-webpki", &["rustls "]);
     println!("network-capable dependency paths are reviewed.");
 }
 
@@ -609,9 +615,15 @@ fn depth_prefixed_package(line: &str) -> Option<(usize, &str)> {
     Some((depth, &line[prefix_len..]))
 }
 
+/// Runs `cargo tree` over **every** target's dependency graph (`--target
+/// all`), not just the host's. Without it the gate only saw the Linux graph:
+/// `tungstenite`'s `rustls` dependency is compiled for the Windows and macOS
+/// builds that ship, and was invisible here (F121 D) — a Windows-only crate
+/// would have passed every assertion below.
 fn cargo_tree(args: &[&str]) -> Output {
     Command::new("cargo")
         .args(args)
+        .args(["--target", "all"])
         .current_dir(workspace_root())
         .output()
         .unwrap_or_else(|e| panic!("failed to run cargo {}: {e}", args.join(" ")))
