@@ -33,10 +33,11 @@ Character-level highlighting is skipped for a changed line pair when either side
 is over 2,000 characters; such a row shows a **Long line** badge and the toolbar
 warns that some hunks were too large. This is a bound, not a fix: minified files
 (one enormous line) get no character-level highlighting at all, only the line
-diff. Refining cost is quadratic in line length (about 3 ms per 2,000-character
-pair in a release build), and the view refines every changed pair it renders, so
-a file with thousands of pairs *near* the limit can still make turning the
-toggle on slow.
+diff. Refining cost is quadratic in line length (release build: about 1–2 ms for a
+200-character pair, 45 ms at 1,000, 225 ms at 2,000), and the view refines every
+changed pair it renders, so a file with hundreds of changed lines near the limit
+can freeze the window for many seconds when the toggle is turned on (250 pairs of
+1,900 characters: 49 s). Lines under about 200 characters are unaffected.
 
 For files over 512 KiB the **Inline diff** button is disabled and the load shows
 "Large file — inline diff disabled."

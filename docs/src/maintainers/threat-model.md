@@ -85,14 +85,17 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
   (F120, 2026-09-24):** the Inline diff toggle called
   `forskscope_core::diff::refine_pair` on every changed line pair with no length
   bound, and a 400,000-character pair aborted the process ("memory allocation of
-  518405760016 bytes failed"; 100,000 characters took 11 s, 20,000 took 0.4 s;
-  measured by calling the function directly). `refine_pair` now returns `None`
+  518405760016 bytes failed" — measured by calling the function directly,
+  **against `similar` 3.2.0, not the 3.1.1 the workspace locks; not re-run on
+  3.1.1**; the timings first quoted here, 11 s at 100,000 and 0.4 s at 20,000,
+  were 3.2.0's too and are superseded below). `refine_pair` now returns `None`
   for a side over `MAX_INLINE_CHARS_PER_SIDE` (2,000), the row shows a **Long
   line** badge, and the toggle is disabled for files over 512 KiB. **Not
-  bounded:** the aggregate. Cost is quadratic per pair (about 3 ms at the limit)
-  and the view renders every changed pair, so thousands of pairs just under the
-  limit still make the toggle slow; that is a freeze, not a crash, and was not
-  measured end to end.
+  bounded:** the aggregate. On the locked `similar` 3.1.1 a pair costs about
+  225 ms at the 2,000-character limit (release build; 45 ms at 1,000, 11 ms at
+  500), the view renders every changed pair, and 250 pairs of 1,900 characters
+  took 49 s from the toggle to the first paint (F124, measured end to end). That
+  is a freeze, not a crash.
 
 ### 2. Directory listing and binary sniff (`list_dir`, `classify`)
 

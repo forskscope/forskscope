@@ -85,9 +85,11 @@ neither side is over **2,000 characters**. Longer pairs are shown as plain text
 with a **Long line** badge, and the toolbar warns "Some hunks were too large for
 character-level diff." — so a line without highlighting is either identical
 character for character or carries that badge, never silently unexamined. The
-cost of refining a pair grows with the square of its length (about 3 ms at
-2,000 characters, 0.4 s at 20,000), and the view refines every changed pair it
-shows.
+cost of refining a pair grows with the square of its length — measured in a
+release build, about 1–2 ms for a 200-character pair, 45 ms at 1,000 and
+225 ms at 2,000 — and the view refines every changed pair it shows, so a file
+with hundreds of changed lines near the limit can freeze the window for many
+seconds (250 pairs of 1,900 characters took 49 s to appear).
 
 **Large files have it switched off.** For files over 512 KiB ForskScope shows
 "Large file — inline diff disabled." and the **Inline diff** button is

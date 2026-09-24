@@ -13,23 +13,28 @@ use super::model::{DiffDocument, DiffHunk, HunkKind, InlineDiff, InlineKind, Inl
 /// The one limit on character-level refinement (F120): the most characters
 /// either side of one changed line pair may have.
 ///
-/// **Basis, measured on a release build** (two lines of the stated length, ten
-/// edits; unrelated lines cost the same to within 10%):
+/// **Basis, measured on a release build with the `similar` this workspace
+/// locks (3.1.1)**, two lines of the stated length with a few edits (random,
+/// periodic and two-letter text cost the same to within 10%):
 ///
 /// | characters per side | time per pair |
 /// |---|---|
-/// | 200 | 0.09 ms |
-/// | 1,000 | 0.96 ms |
-/// | 2,000 | 3.3 ms |
-/// | 4,000 | 13 ms |
-/// | 20,000 | 0.38 s |
-/// | 100,000 | 11 s |
-/// | 400,000 | aborts the process (a 518 GB allocation request) |
+/// | 100 | 0.3–0.4 ms |
+/// | 200 | 1.2–1.6 ms |
+/// | 500 | 11 ms |
+/// | 1,000 | 45 ms |
+/// | 2,000 | 225 ms |
+/// | 4,000 | 0.95 s |
 ///
-/// Cost is quadratic in the line length, and the diff view refines every
-/// changed pair it renders (nothing in it is virtualised), so the limit has to
-/// be survivable for a screenful, not for one pair. An ordinary source line
-/// (under 200 characters) is far below it. A pair over the limit is **not
+/// **These replace an earlier table on this constant (F120) that was measured
+/// against `similar` 3.2.0** — about 70× faster at these sizes (2,000
+/// characters: 4.4 ms) — and so understated the shipped cost. Cost is quadratic
+/// in the line length, and the diff view refines every changed pair it renders
+/// (nothing in it is virtualised), so what matters is the sum over a document:
+/// 250 pairs of 1,900 characters took 49 s from the toggle to the first paint.
+/// **2,000 is therefore generous for the shipped `similar`**; it is kept here
+/// because choosing it is the architect's (F124 report). An ordinary source line
+/// (under 200 characters) is 1–2 ms. A pair over the limit is **not
 /// refined**: [`refine_pair`] returns `None` and callers must show that the
 /// pair was skipped, never render it as "no character-level differences".
 ///

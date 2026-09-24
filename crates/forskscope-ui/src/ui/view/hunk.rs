@@ -10,7 +10,9 @@
 
 use dioxus::prelude::*;
 
-use forskscope_core::diff::{HunkKind, InlineDiff, InlineKind, refine_pair};
+use forskscope_core::diff::{
+    HunkKind, InlineDiff, InlineKind, pair_over_inline_limit, refine_pair,
+};
 use forskscope_core::merge::{HunkState, MergeHunk};
 
 use crate::i18n::t;
@@ -351,12 +353,55 @@ fn pair_inline(
         return PairInline::NotApplicable;
     }
     match (left, right) {
-        (Some(l), Some(r)) => match refine_pair(l, r) {
+        (Some(l), Some(r)) => match refine_once(l, r) {
             Some(d) => PairInline::Spans(d),
             None => PairInline::Skipped,
         },
         _ => PairInline::NotApplicable,
     }
+}
+
+thread_local! {
+    /// Refinements already done, keyed by the exact pair (F124). `RowLeft` and
+    /// `RowRight` each ask for the same pair, and a re-render asks again; the
+    /// result is a pure function of the two strings, so it is computed once.
+    static REFINED: std::cell::RefCell<std::collections::HashMap<(String, String), InlineDiff>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// Entries kept before the cache is emptied. A pair is at most
+/// `MAX_INLINE_CHARS_PER_SIDE` per side, so this bounds the cache to a few
+/// tens of MB whatever the file.
+const REFINED_CACHE_MAX: usize = 2048;
+
+#[cfg(test)]
+thread_local! {
+    /// How many times a pair was actually refined (cache misses) — the
+    /// observable the once-per-pair test asserts on, not wall-clock.
+    static REFINEMENTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// [`refine_pair`], memoised. A pair over the limit is not cached: rejecting
+/// it costs nothing.
+fn refine_once(left: &str, right: &str) -> Option<InlineDiff> {
+    if pair_over_inline_limit(left, right) {
+        return None;
+    }
+    let key = (left.to_string(), right.to_string());
+    if let Some(hit) = REFINED.with(|c| c.borrow().get(&key).cloned()) {
+        return Some(hit);
+    }
+    #[cfg(test)]
+    REFINEMENTS.with(|n| n.set(n.get() + 1));
+    let refined = refine_pair(left, right)?;
+    REFINED.with(|c| {
+        let mut cache = c.borrow_mut();
+        if cache.len() >= REFINED_CACHE_MAX {
+            cache.clear();
+        }
+        cache.insert(key, refined.clone());
+    });
+    Some(refined)
 }
 
 /// The marker on a row whose pair was too long to refine.
@@ -453,6 +498,43 @@ mod tests {
             pair_inline(true, HunkKind::Insert, &some("x"), &some("y")),
             PairInline::NotApplicable
         );
+    }
+
+    /// F124 §1: `RowLeft` and `RowRight` both resolve the same pair; it must
+    /// be refined once. Asserted on the count of actual refinements, not on
+    /// time. Falsify by making `refine_once` skip its cache lookup: the second
+    /// call refines again and the count is 2.
+    #[test]
+    fn a_pair_is_refined_once_however_many_rows_ask() {
+        REFINEMENTS.with(|n| n.set(0));
+        let (l, r) = (some("let a = 1;"), some("let a = 2;"));
+        let left_row = pair_inline(true, HunkKind::Replace, &l, &r);
+        let right_row = pair_inline(true, HunkKind::Replace, &l, &r);
+        let re_render = pair_inline(true, HunkKind::Replace, &l, &r);
+        assert_eq!(REFINEMENTS.with(|n| n.get()), 1);
+        assert_eq!(left_row, right_row);
+        assert_eq!(left_row, re_render);
+
+        let other = pair_inline(true, HunkKind::Replace, &some("x = 1"), &some("x = 2"));
+        assert!(matches!(other, PairInline::Spans(_)));
+        assert_eq!(
+            REFINEMENTS.with(|n| n.get()),
+            2,
+            "a different pair is refined"
+        );
+    }
+
+    #[test]
+    fn a_skipped_pair_is_never_refined_or_cached() {
+        REFINEMENTS.with(|n| n.set(0));
+        let long = "a".repeat(forskscope_core::diff::MAX_INLINE_CHARS_PER_SIDE + 1);
+        for _ in 0..3 {
+            assert_eq!(
+                pair_inline(true, HunkKind::Replace, &some(&long), &some("b")),
+                PairInline::Skipped
+            );
+        }
+        assert_eq!(REFINEMENTS.with(|n| n.get()), 0);
     }
 
     #[test]
