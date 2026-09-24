@@ -160,11 +160,15 @@ impl SpreadsheetDiff {
 /// first on a sparse sheet whose used range is far larger than its
 /// populated cells, and it fires mid-read, before the compare phase.
 ///
-/// **What this does not bound:** `calamine` materialises a whole sheet
-/// before `sheets-diff` counts anything, so these bounds cap the comparison's
-/// own cost, not the parser's. `max_input_bytes` (50 MiB, from `hardened()`)
-/// is the only pre-parse ceiling, and it limits compressed size, not
-/// expansion.
+/// **What this does not bound (measured, F123):** `calamine` builds a dense
+/// range over the bounding box of the *populated* cells before `sheets-diff`
+/// counts one, at about 31 bytes per box cell. These bounds fire after that
+/// memory is spent, so a 5 KB workbook with one cell at `A1` and one far away
+/// costs 3.1 GB at 100M box cells, and at Excel's maximum sheet size aborts the
+/// process. No check in this crate can see the box first (`forskscope-core` has
+/// no `calamine` access); the fix belongs in `sheets-diff`. The table is in
+/// RFC-058's amendment. `max_input_bytes` (50 MiB, from `hardened()`) limits
+/// compressed size only.
 ///
 /// **`AlignmentMode` (RFC-058 condition 4): `Positional`, kept.** It is
 /// `sheets-diff`'s default, the cheapest mode, and the one measured above.

@@ -124,18 +124,46 @@ its own measurement.
 
 **What it does not defend against.**
 
-- **`calamine` materialises a whole sheet before any bound counts a cell.**
-  The cell bounds cap the comparison's cost, not the parser's. The only bound
-  ahead of parsing is `max_input_bytes`, which limits compressed size, not
-  expansion. An archive whose sheet expands enormously from a small file is
-  **not** bounded by this work.
-- **Cancellation is not polled inside `calamine`'s parse of one sheet**; it is
-  polled every 50,000 cells in `sheets-diff`'s own read and compare loops,
-  after `worksheet_range` returns. A slow parse of a single sheet cannot be
-  interrupted.
-- **A refusal is not free.** The over-bound pairs measured on 2026-09-24 were
-  refused after 2.1 s and 2.3 s at ~2 GB peak, because the read phase runs
-  before the bound is reached.
+- **The parse phase is not bounded, and a 5 KB file can abort the process
+  (measured 2026-09-24, F123).** `calamine`'s `worksheet_range` builds a
+  **dense** `Range` covering the bounding box of the populated cells
+  (`Range::from_sparse` allocates `rows × cols` values) before `sheets-diff`
+  counts a cell, so a workbook with one cell at `A1` and one far away costs
+  memory in proportion to the *area between them*, about 31 bytes a cell. F117's
+  bounds do fire, but only after that memory is spent. Release build, this
+  machine, address space limited to 20 GB:
+
+| Declared area (a real cell at A1 and one far away; **5.4 KB** file) | Peak memory | Time to the bound's refusal |
+|---|---|---|
+| 1,000 × 1,000 = 1M | 35 MB | 16 ms (compared normally) |
+| 10,000 × 1,000 = 10M | 316 MB | 79 ms |
+| 50,000 × 1,000 = 50M | 1.57 GB | 444 ms |
+| 100,000 × 1,000 = 100M | 3.13 GB | 1.22 s |
+| 300,000 × 1,000 = 300M | 9.38 GB | 3.12 s |
+| 1,048,576 × 16,384 (Excel's maximum sheet, 17.2 billion) | **process aborted:** `memory allocation of 549755813888 bytes failed` | — |
+
+  Cost is linear in the declared area until the allocation itself fails; at
+  Excel's maximum sheet size the request (512 GiB) cannot be satisfied and Rust
+  aborts, which takes any unsaved work in other tabs with it. A single stray
+  populated cell far from the data does this: it does not need a hostile file.
+  A declared `<dimension ref="A1:XFD1048576"/>` with no far cell is harmless
+  (0.2 ms): only populated cells set the box.
+- **A large, densely populated sheet costs its parse before the bound refuses
+  it.** 20,000 × 1,000 = 20M populated cells in a 51.5 MB file (just under the
+  50 MiB input bound): refused after 5.9 s at 2.58 GB. That is the cost of the
+  bound firing late, not of a defect in the bound.
+- **The parse cannot be cancelled.** Cancelling 1 ms into the 300M-area case
+  returned after 3.33 s (the case takes 3.12 s uncancelled); 100 ms into the
+  100M case returned at 0.89 s. `sheets-diff` polls every 50,000 cells only
+  after the dense range exists.
+- **The cheap route does not exist in this crate.** A pre-parse check of the
+  populated bounding box needs `calamine`'s streaming reader
+  (`Xlsx::worksheet_cells_reader`, which exposes `dimensions()`), and
+  `forskscope-core` does not depend on `calamine` (`audit-deps` asserts
+  `sheets-diff` is its only dependent). The fix belongs in `sheets-diff`, this
+  project's own crate: read cells through that streaming reader into the sparse
+  map it already builds, enforcing `max_cells_read` and the cancellation poll
+  inside the loop. Proposed, not built (F123).
 - Advisories published after 2026-09-24 against `quick-xml`, `zip` or
   `calamine`. `audit.yml` reports them daily; nothing here prevents them.
 

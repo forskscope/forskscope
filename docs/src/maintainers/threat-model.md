@@ -568,16 +568,24 @@ never evaluated. `.xlsx` is read-only in every path.
 - `AlignmentMode` is `Positional`, the default and the cheapest.
 
 **What it does not defend against:**
-- **Expansion before any count.** `calamine` materialises a whole sheet before
-  `sheets-diff` counts a cell, so the cell bounds cap the comparison, not the
-  parser. The only bound ahead of parsing is the 50 MiB compressed size, which
-  says nothing about how far an archive expands. A small hostile workbook whose
-  sheet declares a huge used range is **not** bounded by this work and was not
-  tested.
-- **An uninterruptible parse.** Cancellation is not polled inside `calamine`'s
-  parse of one sheet.
-- **A refusal is not free.** Over-bound pairs measured 2026-09-24 were refused
-  after 2.1–2.3 s at about 2 GB peak, because the read phase runs first.
+- **A 5 KB workbook can abort the process (measured 2026-09-24, F123).**
+  `calamine` builds a dense range over the bounding box of the *populated* cells
+  before `sheets-diff` counts a cell, at about 31 bytes per box cell. A workbook
+  with one cell at `A1` and one far away — hostile or an accidental stray
+  cell — costs memory in proportion to the area between them: 100M cells took
+  3.13 GB and 1.2 s before F117's bound refused it; 300M took 9.38 GB and 3.1 s;
+  Excel's maximum sheet (1,048,576 × 16,384) makes the allocator request 512 GiB
+  and **aborts the process** (`memory allocation of 549755813888 bytes failed`),
+  losing unsaved work in other tabs. The full table is in the RFC-058
+  amendment. A declared `<dimension>` with no far cell is harmless. **Open:** the
+  fix belongs in `sheets-diff` (stream cells into its sparse map, bound and poll
+  inside the loop); there is no in-crate route, since `forskscope-core` has no
+  direct `calamine` access.
+- **A densely populated sheet costs its parse before refusal.** 20M populated
+  cells in a 51.5 MB file (under the 50 MiB input bound) were refused after
+  5.9 s at 2.58 GB.
+- **An uninterruptible parse.** Cancelling 1 ms into the 300M-area case returned
+  after 3.33 s, its full uncancelled duration.
 - **Advisories published later** against `quick-xml`, `zip` or `calamine`.
 
 The reviewed `quick-xml 0.39` advisory exceptions are recorded in
