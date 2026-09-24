@@ -104,7 +104,9 @@ pub fn guard_for_sizes_with_limits(
             title: "File is large".into(),
             body: format!(
                 "One or both files exceed the recommended diff limit ({} MiB). \
-                 Diffing may be slow or produce an approximate result.",
+                 Diffing may be slow. The line diff stops after 5 seconds and \
+                 says so if its result is approximate, and character-level \
+                 highlighting is switched off.",
                 limits.medium_text_threshold_bytes / (1024 * 1024)
             ),
             confirm_label: "Diff anyway".into(),

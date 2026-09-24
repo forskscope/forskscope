@@ -56,12 +56,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
                 };
             }
             Some(crate::state::TabState::Error(msg)) => {
-                return rsx! {
-                    div { class: "diff-error",
-                        Notice { kind: NoticeKind::Error, "⚠ " {msg} }
-                        Notice { kind: NoticeKind::Info, {t(lang, "Check that the file exists and you have read permission.")} }
-                    }
-                };
+                return rsx! { TabError { msg } };
             }
             Some(crate::state::TabState::Ready) => {}
         }
@@ -299,6 +294,20 @@ fn DiffHeader(index: usize) -> Element {
     }
 }
 
+/// The error tab (F122): the message, and nothing else. It used to append
+/// "Check that the file exists and you have read permission." to every error —
+/// under a size refusal, a binary-versus-text error, and a workbook that exists
+/// and is readable. Guidance belongs to the error that earns it and is part of
+/// its message (`compare.rs`'s `open_error`), so a bare message stays bare.
+#[component]
+pub(crate) fn TabError(msg: String) -> Element {
+    rsx! {
+        div { class: "diff-error",
+            Notice { kind: NoticeKind::Error, "⚠ " {msg} }
+        }
+    }
+}
+
 // ── Tab snapshot ──────────────────────────────────────────────────────────────
 
 /// Whether the toolbar's Inline diff toggle may be used on a tab with these
@@ -435,5 +444,42 @@ impl TabSnapshot {
             right_is_text: matches!(tab.right_doc.kind, FileKind::Text),
             right_encoding_label: tab.right_label(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tab_error_tests {
+    use super::*;
+
+    fn rendered_text(root: fn() -> Element) -> Vec<String> {
+        let mut vdom = VirtualDom::new(root);
+        vdom.rebuild_to_vec()
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// F122: the error tab shows the message and nothing else. Falsify by
+    /// putting the old unconditional advice `Notice` back into `TabError`
+    /// (the one that rendered the "check that the file exists" sentence
+    /// through `t`). The text nodes collected here are the *dynamic* ones — the
+    /// message and anything passed through `t` — which is how the old advice
+    /// was written; a bare string literal would sit in the static template
+    /// and not be seen.
+    #[test]
+    fn the_error_tab_shows_the_message_and_no_advice_of_its_own() {
+        fn root() -> Element {
+            rsx! { TabError { msg: "Could not compare the spreadsheets — too large".to_string() } }
+        }
+        let text = rendered_text(root).join("|");
+        assert!(text.contains("too large"), "{text}");
+        assert!(
+            !text.contains("Check that the file exists"),
+            "advice belongs to the error, not the tab: {text}"
+        );
     }
 }

@@ -35,6 +35,13 @@ fn size_or_zero(path: &Path) -> u64 {
     fs::metadata(path).map(|m| m.len()).unwrap_or(0)
 }
 
+/// Whether both sides are `.xlsx` workbooks, so the large-file prompt can say
+/// what a spreadsheet comparison does instead of what a text one does.
+fn is_spreadsheet_pair(left: &Path, right: &Path) -> bool {
+    forskscope_core::path::has_extension(left, "xlsx")
+        && forskscope_core::path::has_extension(right, "xlsx")
+}
+
 /// What a call site should do about one file pair, given their sizes and
 /// the `DiffOptions` it would otherwise use. Pure — no I/O, no `Store` — so
 /// both the guard's own reachability and `suppress_inline`'s effect on
@@ -185,6 +192,7 @@ pub fn reload_tab(store: &mut Store, index: usize) {
                 body,
                 confirm_label,
                 too_large,
+                spreadsheet: is_spreadsheet_pair(&left_path, &right_path),
             }));
         }
     }
@@ -296,6 +304,7 @@ pub fn open_compare_request(store: &mut Store, request: CompareRequest) {
             confirm_label,
             too_large,
         } => {
+            let spreadsheet = is_spreadsheet_pair(&request.left_input, &request.right_input);
             store.modal.set(Modal::ConfirmLargeLoad(LargeLoadPrompt {
                 target: LargeLoadTarget::Open(request),
                 opts,
@@ -303,6 +312,7 @@ pub fn open_compare_request(store: &mut Store, request: CompareRequest) {
                 body,
                 confirm_label,
                 too_large,
+                spreadsheet,
             }));
         }
     }
@@ -398,6 +408,40 @@ pub(crate) fn open_compare_request_with_options(
     });
 }
 
+/// Whether advice about the file's existence or permissions fits `error`
+/// (F122): only a failed read or stat does. A directory given as a file, an
+/// unsupported kind or a decode failure is not cured by checking that the file
+/// exists, so it gets none — the default is no guidance, not wrong guidance.
+fn wants_access_guidance(error: &forskscope_core::CoreError) -> bool {
+    use forskscope_core::{CoreError, IoOperation};
+    matches!(
+        error,
+        CoreError::Io {
+            operation: IoOperation::Read | IoOperation::Metadata | IoOperation::ListDir,
+            ..
+        } | CoreError::InvalidPath { .. }
+    )
+}
+
+/// The text for a side that could not be opened. Guidance is appended here,
+/// by the error's class, and nowhere else: the error tab shows this message
+/// as it is.
+fn open_error(lang: Lang, path: &Path, error: &forskscope_core::CoreError) -> String {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string());
+    let mut message = format!("{} \"{name}\" — {error}.", t(lang, "Could not open"));
+    if wants_access_guidance(error) {
+        message.push(' ');
+        message.push_str(&t(
+            lang,
+            "Check that the file exists and you have read permission.",
+        ));
+    }
+    message
+}
+
 /// Load, classify, diff, and derive the save target for one comparison off
 /// the UI thread (RFC-065, RFC-077). Normal compare's save target *is* the
 /// already-loaded right document (`compare_prep::save_target_from_loaded`,
@@ -419,34 +463,9 @@ pub(super) fn load_and_diff(
         allow_missing: true,
     };
 
-    let mut ld = load_path(&left, options).map_err(|e| {
-        format!(
-            "{} \"{}\" — {e}. {}",
-            t(lang, "Could not open"),
-            left.file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_else(|| left.display().to_string()),
-            t(
-                lang,
-                "Check that the file exists and you have read permission."
-            )
-        )
-    })?;
+    let mut ld = load_path(&left, options).map_err(|e| open_error(lang, &left, &e))?;
 
-    let mut rd = load_path(&right, options).map_err(|e| {
-        format!(
-            "{} \"{}\" — {e}. {}",
-            t(lang, "Could not open"),
-            right
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_else(|| right.display().to_string()),
-            t(
-                lang,
-                "Check that the file exists and you have read permission."
-            )
-        )
-    })?;
+    let mut rd = load_path(&right, options).map_err(|e| open_error(lang, &right, &e))?;
 
     let l_bin = matches!(ld.kind, FileKind::Binary);
     let r_bin = matches!(rd.kind, FileKind::Binary);

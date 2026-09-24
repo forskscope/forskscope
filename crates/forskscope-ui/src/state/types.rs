@@ -29,6 +29,9 @@ pub struct LargeLoadPrompt {
     pub body: String,
     pub confirm_label: String,
     pub too_large: bool,
+    /// Both sides are `.xlsx`: the prompt then describes a spreadsheet
+    /// comparison (exact, or refused by F117's bound — never approximate).
+    pub spreadsheet: bool,
 }
 
 /// Summary of a completed batch copy operation, shown in the result modal.

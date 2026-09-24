@@ -1070,3 +1070,139 @@ fn a_cleanly_decoded_non_utf8_file_is_not_swept_into_the_new_guard() {
          must round-trip byte for byte"
     );
 }
+
+// ── F122: guidance belongs to the error, not to the tab ──────────────────────
+
+const ACCESS_GUIDANCE: &str = "Check that the file exists and you have read permission.";
+
+/// The error text `load_and_diff` returns; panics with `why` if it succeeds.
+fn load_error(request: CompareRequest, enable_binary: bool, why: &str) -> String {
+    match load_and_diff(request, DiffOptions::default(), Lang::En, enable_binary) {
+        Err(message) => message,
+        Ok(_) => panic!("{why}"),
+    }
+}
+
+fn io_error(operation: forskscope_core::IoOperation) -> forskscope_core::CoreError {
+    forskscope_core::CoreError::Io {
+        path: None,
+        operation,
+        message: "boom".into(),
+    }
+}
+
+/// Falsify by making `wants_access_guidance` return `true` unconditionally
+/// (the old behaviour, where every error got the advice): the `Unsupported`
+/// and `Decode` cases then carry it and this fails.
+#[test]
+fn access_guidance_is_appended_only_to_errors_about_existence_or_permission() {
+    use forskscope_core::{CoreError, IoOperation};
+    let path = Path::new("/some/dir/report.txt");
+
+    for op in [
+        IoOperation::Read,
+        IoOperation::Metadata,
+        IoOperation::ListDir,
+    ] {
+        let message = open_error(Lang::En, path, &io_error(op));
+        assert!(message.contains(ACCESS_GUIDANCE), "{op:?}: {message}");
+        assert!(
+            message.contains("Could not open \"report.txt\""),
+            "{message}"
+        );
+    }
+
+    for error in [
+        CoreError::Unsupported {
+            message: "not a regular file".into(),
+        },
+        CoreError::Decode {
+            path: None,
+            message: "bad bytes".into(),
+        },
+        io_error(IoOperation::Write),
+    ] {
+        let message = open_error(Lang::En, path, &error);
+        assert!(
+            !message.contains(ACCESS_GUIDANCE),
+            "the file is fine, so no advice about it: {message}"
+        );
+    }
+}
+
+/// The live case from the register: two directories on the command line (a
+/// path that exists and is readable, but is not a regular file) got the advice
+/// to check that it exists.
+#[test]
+fn a_directory_given_as_a_file_gets_no_existence_advice() {
+    let dir = temp_dir("f122-directory-as-file");
+    let sub_a = dir.join("a");
+    let sub_b = dir.join("b");
+    fs::create_dir_all(&sub_a).unwrap();
+    fs::create_dir_all(&sub_b).unwrap();
+
+    let message = load_error(
+        normal_request(sub_a, sub_b),
+        false,
+        "a directory is not a comparable file",
+    );
+    assert!(message.starts_with("Could not open"), "{message}");
+    assert!(!message.contains(ACCESS_GUIDANCE), "{message}");
+}
+
+/// Errors that never had anything to do with the file's existence carry none.
+#[test]
+fn a_binary_versus_text_error_and_an_uncomparable_workbook_carry_no_advice() {
+    let dir = temp_dir("f122-no-advice");
+    let text = dir.join("t.txt");
+    let bin = dir.join("b.bin");
+    fs::write(&text, "text\n").unwrap();
+    fs::write(&bin, [0u8, 1, 2, 3]).unwrap();
+    let mixed = load_error(
+        normal_request(text, bin),
+        true,
+        "binary against text is refused",
+    );
+    assert!(!mixed.contains(ACCESS_GUIDANCE), "{mixed}");
+
+    let left = dir.join("l.xlsx");
+    let right = dir.join("r.xlsx");
+    fs::write(&left, b"not a workbook").unwrap();
+    fs::write(&right, b"not a workbook either").unwrap();
+    let workbook = load_error(
+        normal_request(left, right),
+        false,
+        "two non-workbooks are an error",
+    );
+    assert!(
+        workbook.starts_with("Could not compare the spreadsheets"),
+        "{workbook}"
+    );
+    assert!(!workbook.contains(ACCESS_GUIDANCE), "{workbook}");
+}
+
+/// The advice is still given where it fits: a file that exists but cannot be
+/// read. Skipped when `chmod` has no effect (running as root).
+#[cfg(unix)]
+#[test]
+fn an_unreadable_file_still_gets_the_permission_advice() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = temp_dir("f122-unreadable");
+    let locked = dir.join("locked.txt");
+    let other = dir.join("other.txt");
+    fs::write(&locked, "secret\n").unwrap();
+    fs::write(&other, "other\n").unwrap();
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+    if fs::File::open(&locked).is_ok() {
+        return;
+    }
+
+    let message = load_error(
+        normal_request(locked.clone(), other),
+        false,
+        "an unreadable file cannot be opened",
+    );
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o644)).unwrap();
+    assert!(message.contains(ACCESS_GUIDANCE), "{message}");
+}

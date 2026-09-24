@@ -11,6 +11,7 @@ use forskscope_core::DiffOptions;
 use forskscope_ui_logic::SaveErrorView;
 
 use crate::i18n::t;
+use crate::state::Lang;
 use crate::state::{
     LargeLoadPrompt, LargeLoadTarget, Modal, Store, open_compare_request_with_options, reload_tab,
     reload_tab_with_options, set_diff_options, set_encoding, swap_sides,
@@ -215,6 +216,43 @@ pub fn SwapModal(index: usize) -> Element {
     }
 }
 
+/// The title, body and confirm label of the large-file prompt (F122).
+///
+/// The "File is large" tier is localised here and says what the product does
+/// for the kind of pair: a text pair may be slow, its line diff is bounded at
+/// five seconds and says so when approximate, and character highlighting is
+/// off; a spreadsheet pair is exact or refused by the size bound, never
+/// approximate. The "File too large" tier (over 64 MiB, metadata only) keeps
+/// `ui-logic`'s English text unchanged.
+pub(crate) fn large_load_text(lang: Lang, prompt: &LargeLoadPrompt) -> (String, String, String) {
+    if prompt.too_large {
+        return (
+            prompt.title.clone(),
+            prompt.body.clone(),
+            prompt.confirm_label.clone(),
+        );
+    }
+    let mib = (forskscope_core::job::PerformanceLimits::default().medium_text_threshold_bytes
+        / (1024 * 1024))
+        .to_string();
+    let body = if prompt.spreadsheet {
+        t(
+            lang,
+            "One or both workbooks exceed the recommended comparison size ({n} MiB). Comparing them may be slow. The comparison is exact, or it is refused if a workbook is too large to compare; it is never approximate.",
+        )
+    } else {
+        t(
+            lang,
+            "One or both files exceed the recommended diff limit ({n} MiB). Diffing may be slow. The line diff stops after 5 seconds and says so if its result is approximate, and character-level highlighting is switched off.",
+        )
+    };
+    (
+        t(lang, "File is large"),
+        body.replace("{n}", &mib),
+        t(lang, "Diff anyway"),
+    )
+}
+
 /// F84: confirmed via `Modal::ConfirmLargeLoad` (`LoadGuard::ConfirmPrompt`,
 /// RFC-013 §"Large file prompt") — nothing has been loaded yet. Confirming
 /// resumes `prompt.target` with `prompt.opts`, calling the `_with_options`
@@ -227,9 +265,7 @@ pub fn SwapModal(index: usize) -> Element {
 pub fn LargeLoadModal(prompt: LargeLoadPrompt) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
-    let title = prompt.title.clone();
-    let body = prompt.body.clone();
-    let confirm_label = prompt.confirm_label.clone();
+    let (title, body, confirm_label) = large_load_text(lang, &prompt);
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "{title}", onmounted: super::focus_autofocus_button,
             div { class: "modal",
@@ -293,5 +329,84 @@ pub fn SaveErrorModal(index: usize, target: PathBuf, view: SaveErrorView) -> Ele
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod large_load_text_tests {
+    use super::*;
+    use crate::state::LargeLoadTarget;
+
+    fn prompt(spreadsheet: bool, too_large: bool) -> LargeLoadPrompt {
+        LargeLoadPrompt {
+            target: LargeLoadTarget::Reload(0),
+            opts: DiffOptions::default(),
+            title: "ui-logic title".into(),
+            body: "ui-logic body".into(),
+            confirm_label: "ui-logic label".into(),
+            too_large,
+            spreadsheet,
+        }
+    }
+
+    /// F122 B: the prompt must not promise an approximation for a workbook —
+    /// the comparison is exact or refused (F117) — and must not for text
+    /// either: what actually happens is a slow diff whose line diff is bounded
+    /// at five seconds and says so.
+    #[test]
+    fn the_prompt_says_what_the_product_does_for_each_kind() {
+        let (_, text, _) = large_load_text(Lang::En, &prompt(false, false));
+        assert!(!text.contains("produce an approximate result"), "{text}");
+        assert!(
+            text.contains("5 seconds") && text.contains("highlighting"),
+            "{text}"
+        );
+
+        let (_, book, _) = large_load_text(Lang::En, &prompt(true, false));
+        assert!(book.contains("never approximate"), "{book}");
+        assert!(!book.contains("line diff"), "{book}");
+        assert_ne!(text, book);
+    }
+
+    #[test]
+    fn the_size_in_the_prompt_is_the_guard_threshold_and_both_languages_differ() {
+        let mib = (forskscope_core::job::PerformanceLimits::default().medium_text_threshold_bytes
+            / (1024 * 1024))
+            .to_string();
+        for spreadsheet in [false, true] {
+            let (t_en, en, l_en) = large_load_text(Lang::En, &prompt(spreadsheet, false));
+            let (t_ja, ja, l_ja) = large_load_text(Lang::Ja, &prompt(spreadsheet, false));
+            assert!(
+                en.contains(&format!("({mib} MiB)")) && !en.contains("{n}"),
+                "{en}"
+            );
+            assert!(
+                ja.contains(&format!("（{mib} MiB）")) && !ja.contains("{n}"),
+                "{ja}"
+            );
+            assert_ne!(en, ja, "the Japanese text must actually be used");
+            assert_ne!(t_en, t_ja);
+            assert_ne!(l_en, l_ja);
+        }
+    }
+
+    /// A drift guard: the English text here and `ui-logic`'s own text for a
+    /// text pair must stay the same sentence, or the two would say different
+    /// things about the same prompt.
+    #[test]
+    fn the_localised_text_pair_body_matches_ui_logic_s_english() {
+        let guard = forskscope_ui_logic::guard_for_sizes(5 * 1024 * 1024, 1024);
+        let forskscope_ui_logic::LoadGuard::ConfirmPrompt { body, .. } = guard else {
+            panic!("a 5 MiB file must prompt");
+        };
+        let (_, mine, _) = large_load_text(Lang::En, &prompt(false, false));
+        assert_eq!(mine, body);
+    }
+
+    #[test]
+    fn the_over_64_mib_prompt_is_ui_logic_s_text_unchanged() {
+        let p = prompt(false, true);
+        let (title, body, label) = large_load_text(Lang::Ja, &p);
+        assert_eq!((title, body, label), (p.title, p.body, p.confirm_label));
     }
 }

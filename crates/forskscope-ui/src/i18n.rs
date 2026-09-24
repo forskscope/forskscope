@@ -364,6 +364,15 @@ fn ja(key: &str) -> Option<&'static str> {
         }
         "Long line" => "長い行",
         "Inline diff is off for large files." => "大きなファイルではインライン差分は無効です。",
+        // F122: the large-file prompt says what the product does.
+        "File is large" => "ファイルが大きいです",
+        "Diff anyway" => "それでも比較する",
+        "One or both files exceed the recommended diff limit ({n} MiB). Diffing may be slow. The line diff stops after 5 seconds and says so if its result is approximate, and character-level highlighting is switched off." => {
+            "一方または両方のファイルが推奨される比較サイズ（{n} MiB）を超えています。比較に時間がかかることがあります。行単位の差分は5秒で打ち切られ、結果が近似の場合はその旨が表示されます。文字単位のハイライトは無効になります。"
+        }
+        "One or both workbooks exceed the recommended comparison size ({n} MiB). Comparing them may be slow. The comparison is exact, or it is refused if a workbook is too large to compare; it is never approximate." => {
+            "一方または両方のブックが推奨される比較サイズ（{n} MiB）を超えています。比較に時間がかかることがあります。比較は正確に行われるか、大きすぎる場合は拒否されます。近似の結果が表示されることはありません。"
+        }
         _ => return None,
     };
     Some(v)
