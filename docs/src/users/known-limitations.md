@@ -112,6 +112,20 @@ a BOM to it first with another tool, or convert it to UTF-8.
 
 ---
 
+### A spreadsheet with a stray cell far from its data can close ForskScope
+
+A workbook that has a populated cell far below or to the right of its data —
+even one stray value at the bottom of the sheet — can make ForskScope use memory
+in proportion to the empty area between them, and close the program if that
+runs out. The file's size does not show the risk: a workbook of a few kilobytes
+can do it. While it happens the comparison cannot be cancelled.
+
+If a spreadsheet comparison hangs or ForskScope closes, look for a stray cell
+far from the data (press **Ctrl+End** in the spreadsheet program to jump to the
+last used cell) and compare a cleaned copy.
+
+---
+
 ### Binary merge is not available
 
 Binary files (files with NUL bytes in the first 8 KB) show a hex preview diff
