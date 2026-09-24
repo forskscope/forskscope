@@ -507,3 +507,172 @@ fn a_lossy_save_names_the_offending_character() {
         other => panic!("expected CoreError::Encode, got {other:?}"),
     }
 }
+
+// ── F121: three write-path residuals ─────────────────────────────────────────
+
+#[cfg(unix)]
+fn force_request(target: &std::path::Path, content: &str, backup: BackupPolicy) -> SaveRequest {
+    SaveRequest {
+        target: target.to_path_buf(),
+        content: content.into(),
+        encoding_label: "UTF-8".into(),
+        bom: BomPresence::Absent,
+        precondition: TargetPrecondition::Force,
+        backup,
+    }
+}
+
+/// F121 A — the attack-regression shape F89 established: a predictable
+/// sibling path pre-created as a symlink to an unrelated file. Before the fix
+/// `fs::copy(target, "<name>.bak")` wrote **through** the link, and
+/// `victim.txt` held `doc.txt`'s previous content. Now the link itself is
+/// replaced by a real backup and the victim is untouched.
+#[cfg(unix)]
+#[test]
+fn backup_does_not_write_through_a_pre_created_symlink_at_the_bak_path() {
+    use std::os::unix::fs::symlink;
+
+    let dir = temp_dir("backup-symlink-attack");
+    let doc = dir.join("doc.txt");
+    let victim = dir.join("victim.txt");
+    let bak = dir.join("doc.txt.bak");
+    fs::write(&doc, "original document content\n").unwrap();
+    fs::write(&victim, "victim's own content\n").unwrap();
+    symlink(&victim, &bak).unwrap();
+
+    save_text(&force_request(
+        &doc,
+        "new content\n",
+        BackupPolicy::SiblingBak,
+    ))
+    .unwrap();
+
+    assert_eq!(
+        fs::read_to_string(&victim).unwrap(),
+        "victim's own content\n",
+        "the unrelated file must be untouched — the backup must never be written through a link"
+    );
+    assert!(
+        !fs::symlink_metadata(&bak).unwrap().file_type().is_symlink(),
+        "the link must have been replaced by a real backup file"
+    );
+    assert_eq!(
+        fs::read_to_string(&bak).unwrap(),
+        "original document content\n",
+        "the backup must hold the previous content"
+    );
+    assert_eq!(fs::read_to_string(&doc).unwrap(), "new content\n");
+}
+
+/// The documented behaviour survives the fix: a save still clobbers a
+/// previous ordinary backup, and the backup keeps the source's mode (as
+/// `fs::copy` did), so a `0600` file's backup is not wider than the file.
+#[cfg(unix)]
+#[test]
+fn backup_still_replaces_an_existing_backup_and_keeps_the_sources_mode() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = temp_dir("backup-replaces-and-keeps-mode");
+    let doc = dir.join("doc.txt");
+    let bak = dir.join("doc.txt.bak");
+    fs::write(&doc, "current\n").unwrap();
+    fs::set_permissions(&doc, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::write(&bak, "an older backup\n").unwrap();
+
+    save_text(&force_request(&doc, "next\n", BackupPolicy::SiblingBak)).unwrap();
+
+    assert_eq!(fs::read_to_string(&bak).unwrap(), "current\n");
+    let mode = fs::metadata(&bak).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600, "the backup must not be wider than its source");
+}
+
+/// F121 B — a `0600` file was `0644` after a save. Falsify by removing the
+/// `carry_mode` call from `atomic_replace_checked`.
+#[cfg(unix)]
+#[test]
+fn saving_an_existing_file_keeps_its_permission_bits() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = temp_dir("save-keeps-mode");
+    for mode in [0o600u32, 0o640, 0o755] {
+        let doc = dir.join(format!("doc-{mode:o}.txt"));
+        fs::write(&doc, "before\n").unwrap();
+        fs::set_permissions(&doc, fs::Permissions::from_mode(mode)).unwrap();
+
+        save_text(&force_request(&doc, "after\n", BackupPolicy::None)).unwrap();
+
+        assert_eq!(fs::read_to_string(&doc).unwrap(), "after\n");
+        let got = fs::metadata(&doc).unwrap().permissions().mode() & 0o7777;
+        assert_eq!(
+            got, mode,
+            "a {mode:o} file must still be {mode:o} after a save"
+        );
+    }
+}
+
+/// The other half of B: a **new** file still gets the umask default, as F38
+/// decided (compared against a same-directory reference, so any umask works).
+#[cfg(unix)]
+#[test]
+fn saving_a_new_file_still_gets_the_umask_default() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = temp_dir("save-new-file-umask-default");
+    let reference = dir.join("reference.txt");
+    fs::write(&reference, "r\n").unwrap();
+    let expected = fs::metadata(&reference).unwrap().permissions().mode() & 0o777;
+
+    let fresh = dir.join("fresh.txt");
+    save_text(&force_request(&fresh, "new\n", BackupPolicy::None)).unwrap();
+
+    let got = fs::metadata(&fresh).unwrap().permissions().mode() & 0o777;
+    assert_eq!(got, expected, "a new file keeps the plain-write default");
+}
+
+/// F121 C — the precondition is re-checked inside the commit. `MustMatch` is
+/// satisfied at the start of `save_text`; the hook then changes the target
+/// (after the first check and the backup, before the commit), and only the
+/// re-check can catch it. Falsify by replacing the closure passed to
+/// `atomic_replace_checked` with `|| Ok(())`: the external content is then
+/// overwritten and this fails.
+#[test]
+fn a_change_after_the_first_check_is_caught_by_the_recheck_before_the_rename() {
+    let dir = temp_dir("recheck-before-rename");
+    let target = dir.join("file.txt");
+    fs::write(&target, "v1\n").unwrap();
+    let fingerprint = FileFingerprint::capture(&target, None).unwrap();
+
+    let request = SaveRequest {
+        target: target.clone(),
+        content: "our save\n".into(),
+        encoding_label: "UTF-8".into(),
+        bom: BomPresence::Absent,
+        precondition: TargetPrecondition::MustMatch(fingerprint),
+        backup: BackupPolicy::None,
+    };
+    let racing_target = target.clone();
+    let err = crate::save::save_text_with_commit_hook(&request, move || {
+        fs::write(
+            &racing_target,
+            "written by another process, longer than v1\n",
+        )
+        .unwrap();
+    })
+    .unwrap_err();
+
+    assert!(matches!(err, CoreError::Conflict { .. }), "got {err:?}");
+    assert_eq!(
+        fs::read_to_string(&target).unwrap(),
+        "written by another process, longer than v1\n",
+        "the other process's content must survive the refused save"
+    );
+    let leftovers: Vec<_> = fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert_eq!(
+        leftovers.len(),
+        1,
+        "no temp file may be left behind: {leftovers:?}"
+    );
+}

@@ -78,6 +78,17 @@ pub struct SaveOutcome {
 /// later would already have destroyed the user's prior backup for a save
 /// that never happens. Nothing on disk is touched by a refusal.
 pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
+    save_text_with_commit_hook(request, || {})
+}
+
+/// [`save_text`] with a hook that runs after the first precondition check and
+/// the backup, before the commit — the seam a test uses to change the target
+/// while a save is in flight (compare [`persist_noclobber_with_hook`]).
+/// `pub(crate)`: nothing else needs it.
+pub(crate) fn save_text_with_commit_hook(
+    request: &SaveRequest,
+    commit_hook: impl FnOnce(),
+) -> Result<SaveOutcome> {
     let target = request.target.as_path();
 
     check_precondition(target, &request.precondition)?;
@@ -105,11 +116,17 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
 
     let backup_path = if request.backup == BackupPolicy::SiblingBak && target.exists() {
         let bak = backup_path_for(target);
-        fs::copy(target, &bak).map_err(|e| CoreError::io(target, IoOperation::CreateBackup, &e))?;
+        write_backup(target, &bak)
+            .map_err(|e| CoreError::io(target, IoOperation::CreateBackup, &e))?;
         Some(bak)
     } else {
         None
     };
+
+    // Test seam: runs after the first precondition check and the backup, so a
+    // test can change the target where only the re-check inside the commit
+    // (below) can still catch it.
+    commit_hook();
 
     match request.precondition {
         TargetPrecondition::MustBeAbsent => persist_noclobber(target, &bytes)?,
@@ -121,7 +138,14 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
                 fs::create_dir_all(parent)
                     .map_err(|e| CoreError::io(parent, IoOperation::Write, &e))?;
             }
-            atomic_replace(target, &bytes)?;
+            // The precondition is checked once more inside the commit,
+            // after the temp file is written and immediately before the
+            // rename, so the window a concurrent writer can fall into is the
+            // gap between that check and the rename, not the whole save. It
+            // is narrowed, not closed: see `atomic_replace_checked`.
+            atomic_replace_checked(target, &bytes, || {
+                check_precondition(target, &request.precondition)
+            })?;
         }
     }
 
@@ -132,6 +156,40 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
         backup_path,
         encoding_fallback_to_utf8: fallback,
     })
+}
+
+/// Copies `target` to `bak` without ever writing **through** a link at `bak`
+/// (F121 A). `fs::copy` opens its destination with `O_TRUNC`, which follows a
+/// symlink: with `<name>.bak` pre-created as a link to a victim file, the
+/// backup landed in the victim (CWE-59, the class F89 closed for the temp
+/// file, on a predictable name).
+///
+/// An existing `bak` — file or link — is removed first (`remove_file` removes a
+/// symlink itself, not its target), which keeps the documented behaviour that a
+/// save clobbers the previous backup. It is then created with `create_new`
+/// (`O_EXCL`), which refuses any existing entry, including a link an attacker
+/// re-creates in the gap: that fails the save instead of writing through it.
+/// The backup keeps the source's mode, as `fs::copy` did, and is created with
+/// that mode so it is never briefly wider than the file it copies.
+fn write_backup(target: &Path, bak: &Path) -> std::io::Result<()> {
+    let mut src = fs::File::open(target)?;
+    let meta = src.metadata()?;
+    match fs::symlink_metadata(bak) {
+        Ok(_) => fs::remove_file(bak)?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
+    }
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        options.mode(meta.permissions().mode() & 0o7777);
+    }
+    let mut dst = options.open(bak)?;
+    std::io::copy(&mut src, &mut dst)?;
+    dst.set_permissions(meta.permissions())?;
+    Ok(())
 }
 
 /// Writes `bytes` to a same-directory temp file, then renames it onto
@@ -170,14 +228,22 @@ pub fn save_text(request: &SaveRequest) -> Result<SaveOutcome> {
 /// temp-then-rename logic. This function carries no document-save-specific
 /// behavior (no fingerprint check, no `.bak` backup) — those stay in
 /// [`save_text`]; callers needing them apply their own policy.
+///
+/// F121 B: when `target` already exists its permission bits are carried onto
+/// the replacement before the rename (unix). See [`carry_mode`].
+pub(crate) fn atomic_replace(target: &Path, bytes: &[u8]) -> Result<()> {
+    atomic_replace_checked(target, bytes, || Ok(()))
+}
+
 /// A [`tempfile::Builder`] set to create the temp file with 0o666
 /// permissions (kernel-umask-applied) on unix, or the crate default
 /// elsewhere — split out so the `mut` binding needed to call
 /// [`tempfile::Builder::permissions`] exists only on the platform that
 /// calls it (review 109 §2: `-D warnings` fails a Windows clippy run
-/// otherwise, since `builder` would never be mutated there).
+/// otherwise, since `builder` would never be mutated there). Used for a
+/// target that did not exist; an existing target's mode is carried instead.
 #[cfg(unix)]
-fn unix_tempfile_builder() -> tempfile::Builder<'static, 'static> {
+fn temp_builder() -> tempfile::Builder<'static, 'static> {
     use std::os::unix::fs::PermissionsExt;
     let mut builder = tempfile::Builder::new();
     builder.permissions(fs::Permissions::from_mode(0o666));
@@ -185,24 +251,71 @@ fn unix_tempfile_builder() -> tempfile::Builder<'static, 'static> {
 }
 
 #[cfg(not(unix))]
-fn unix_tempfile_builder() -> tempfile::Builder<'static, 'static> {
+fn temp_builder() -> tempfile::Builder<'static, 'static> {
     tempfile::Builder::new()
 }
 
-pub(crate) fn atomic_replace(target: &Path, bytes: &[u8]) -> Result<()> {
+/// Carries `target`'s permission bits onto `tmp` (unix), so saving an existing
+/// file does not change who can read it: the temp file is created `0666 &
+/// ~umask` (F38, deliberate, right for a **new** file), which turned a `0600`
+/// file into `0644` (F121 B). A missing target — or one that is not a plain
+/// file — changes nothing, keeping the umask default.
+///
+/// **What is carried:** the mode bits including setuid/setgid/sticky.
+/// **What is not, and cannot be by an unprivileged process or without a new
+/// dependency:** owner and group (the replacement is owned by the saving user
+/// and takes the directory's default group), POSIX ACLs and extended
+/// attributes (including SELinux contexts and, on macOS, quarantine and Finder
+/// tags), and the file's identity (hard links are split, birth time is new).
+/// Not narrowed to "mode" by accident: they were lost before this change too.
+#[cfg(unix)]
+fn carry_mode(target: &Path, tmp: &fs::File) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    match fs::metadata(target) {
+        Ok(meta) if meta.is_file() => tmp
+            .set_permissions(fs::Permissions::from_mode(
+                meta.permissions().mode() & 0o7777,
+            ))
+            .map_err(|e| CoreError::io(target, IoOperation::Write, &e)),
+        _ => Ok(()),
+    }
+}
+
+#[cfg(not(unix))]
+fn carry_mode(_target: &Path, _tmp: &fs::File) -> Result<()> {
+    Ok(())
+}
+
+/// [`atomic_replace`] with a check that runs after the temp file is fully
+/// written and its mode set, **immediately before the rename**. If it errors,
+/// nothing is renamed and the temp file is discarded.
+///
+/// This narrows the check-then-rename window (F121 C), it does not close it: a
+/// path has no compare-and-swap, so a process that writes `target` in the gap
+/// between this check returning and `rename(2)` — microseconds, not the
+/// backup-and-encode span the first check used to leave open — is still
+/// overwritten. And the check itself compares length and modification time
+/// (`check_external_state`), so an edit that keeps both is not seen.
+pub(crate) fn atomic_replace_checked(
+    target: &Path,
+    bytes: &[u8],
+    before_commit: impl FnOnce() -> Result<()>,
+) -> Result<()> {
     let dir = target.parent().unwrap_or_else(|| Path::new("."));
     // See persist_noclobber_with_hook's comment: 0o666 (kernel applies the
     // umask), not NamedTempFile's 0600 default — this temp file becomes the
     // permanent target file and must end up with the same permissions a
     // plain fs::write would have produced. The builder is only ever mutated
-    // on unix, so the `mut` binding lives in unix_tempfile_builder alone —
+    // on unix, so the `mut` binding lives in temp_builder alone —
     // otherwise a Windows build sees a binding that is never mutated.
-    let builder = unix_tempfile_builder();
+    let builder = temp_builder();
     let mut tmp = builder
         .tempfile_in(dir)
         .map_err(|e| CoreError::io(dir, IoOperation::Write, &e))?;
     std::io::Write::write_all(&mut tmp, bytes)
         .map_err(|e| CoreError::io(target, IoOperation::Write, &e))?;
+    carry_mode(target, tmp.as_file())?;
+    before_commit()?;
     tmp.persist(target)
         .map_err(|e| CoreError::io(target, IoOperation::Rename, &e.error))?;
     Ok(())
@@ -311,7 +424,7 @@ pub(crate) fn persist_noclobber_with_hook(
     // property without querying or touching the process-wide umask
     // ourselves. No Windows equivalent (no POSIX mode bits); its default
     // ACL behavior is unaffected.
-    let builder = unix_tempfile_builder();
+    let builder = temp_builder();
     let mut tmp = builder
         .tempfile_in(dir)
         .map_err(|e| CoreError::io(dir, IoOperation::Write, &e))?;
