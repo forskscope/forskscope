@@ -32,7 +32,7 @@ The **?** button in the header opens the same reference from any screen.
 
 | Shortcut | Action |
 |----------|--------|
-| **Enter**   | Apply the focused change (left → right) and advance |
+| **Enter**   | Apply the focused change (left → right) and advance. With a toolbar button, tab or *Use* button focused, Enter activates that control instead and applies nothing else |
 | **Ctrl+Z**  | Undo last merge action |
 | **Ctrl+Y**  | Redo last undone merge action |
 | **Ctrl+S**  | Save the merge result |

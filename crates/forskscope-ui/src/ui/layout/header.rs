@@ -12,7 +12,7 @@ pub fn Header() -> Element {
     let lang = store.lang();
 
     rsx! {
-        div { class: "header",
+        crate::keyboard::ControlZone { class: "header",
             span { class: "brand", "ForskScope" }
             span { class: "spacer" }
             button {

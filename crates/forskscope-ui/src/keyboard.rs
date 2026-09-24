@@ -132,6 +132,45 @@ pub(crate) fn swallow_when_typing(e: &Event<KeyboardData>) {
     e.stop_propagation();
 }
 
+// ── Part C: a focused control keeps its own Enter (F125) ───────────────────
+
+/// Stops **Enter** from reaching the global handler; every other key
+/// continues to it, so F7/F8, Ctrl+S and the rest still work with a control
+/// focused.
+///
+/// Enter activates a focused button, and it is *also* the global "apply the
+/// focused change" key (RFC-060). Both fired: pressing Enter on *More ▼*,
+/// *Wrap*, *Settings* or a hunk's *Use* button applied the focused hunk as
+/// well (F125, reproduced in the real app; Space, which activates a button
+/// the same way but is not a global key, was clean). A focused control is the
+/// same argument `swallow_when_typing` makes for a text field: it takes
+/// priority. The Enter binding itself is untouched — with nothing focused
+/// but the app root, Enter still applies the focused hunk.
+pub(crate) fn controls_keep_enter(e: &Event<KeyboardData>) {
+    if e.key() == Key::Enter {
+        e.stop_propagation();
+    }
+}
+
+/// A region whose descendants are the app's focusable controls (the header,
+/// the tab bar, and the body holding the diff toolbar, the hunk *Use*
+/// buttons and the search bar). Wrapping them here, rather than wiring each
+/// button, discharges [`controls_keep_enter`] for a control added later.
+///
+/// The app root (`#app-root`, which holds focus when nothing else does) is
+/// deliberately **not** inside one, so Enter pressed with focus on the root
+/// still reaches the global handler.
+#[component]
+pub(crate) fn ControlZone(class: String, children: Element) -> Element {
+    rsx! {
+        div {
+            class: "{class}",
+            onkeydown: move |e| controls_keep_enter(&e),
+            {children}
+        }
+    }
+}
+
 // ── Test support shared across the surfaces converted in §5 ────────────────
 
 #[cfg(test)]
@@ -404,5 +443,93 @@ mod tests {
         assert!(e.propagates(), "test setup: a fresh event must propagate");
         swallow_when_typing(&e);
         assert!(!e.propagates());
+    }
+
+    // ── F125: a focused control keeps its own Enter ─────────────────────────
+
+    /// Falsify by making `controls_keep_enter` a no-op: Enter then propagates
+    /// to the global handler, where it is `ApplyFocusedHunk` — the bug.
+    #[test]
+    fn enter_on_a_control_does_not_reach_the_global_handler() {
+        let e = key_event(Key::Enter, Modifiers::empty());
+        assert!(e.propagates(), "test setup");
+        controls_keep_enter(&e);
+        assert!(!e.propagates());
+    }
+
+    /// Precedence, not removal: every other key still reaches the global
+    /// handler with a control focused, so F7/F8, Ctrl+S and Ctrl+Z work from
+    /// the toolbar. Space activates a button too but is not a global key.
+    #[test]
+    fn other_keys_still_reach_the_global_handler_from_a_control() {
+        for (key, mods) in [
+            (Key::F8, Modifiers::empty()),
+            (Key::F3, Modifiers::empty()),
+            (Key::Escape, Modifiers::empty()),
+            (Key::Character(" ".into()), Modifiers::empty()),
+            (Key::Character("s".into()), Modifiers::CONTROL),
+            (Key::Character("z".into()), Modifiers::CONTROL),
+        ] {
+            let e = key_event(key.clone(), mods);
+            controls_keep_enter(&e);
+            assert!(e.propagates(), "{key:?} must still propagate");
+        }
+    }
+
+    /// The designed route survives: Enter with nothing but the app root
+    /// focused is still `ApplyFocusedHunk` (RFC-060; the keyboard reference
+    /// documents it).
+    #[test]
+    fn enter_still_applies_the_focused_hunk_when_no_control_owns_it() {
+        assert_eq!(
+            global_key_action(&Key::Enter, Modifiers::empty(), ModalState::None, true),
+            GlobalKeyAction::ApplyFocusedHunk,
+        );
+    }
+
+    fn keydown_listeners(root: fn() -> Element) -> usize {
+        let mut vdom = VirtualDom::new(root);
+        vdom.rebuild_to_vec()
+            .edits
+            .iter()
+            .filter(|m| {
+                matches!(
+                    m,
+                    dioxus_core::Mutation::NewEventListener { name, .. } if *name == "keydown"
+                )
+            })
+            .count()
+    }
+
+    fn with_store<F: FnOnce() -> Element>(f: F) -> Element {
+        use_context_provider(|| {
+            crate::state::Store::new(
+                crate::state::AppSettings::default(),
+                Default::default(),
+                false,
+            )
+        });
+        f()
+    }
+
+    /// The wiring, not just the helper: the header, the tab bar and a bare
+    /// `ControlZone` each render a `keydown` listener. Neither the header's
+    /// nor the tab bar's own buttons register one (only `click`), so the
+    /// listener is `ControlZone`'s. Falsify by deleting `onkeydown` from
+    /// `ControlZone`: all three counts drop to zero.
+    #[test]
+    fn the_header_the_tab_bar_and_control_zone_carry_the_enter_guard() {
+        fn zone() -> Element {
+            rsx! { ControlZone { class: "z", button { "x" } } }
+        }
+        fn header() -> Element {
+            with_store(|| rsx! { crate::ui::layout::header::Header {} })
+        }
+        fn tabbar() -> Element {
+            with_store(|| rsx! { crate::ui::layout::tabs::TabBar {} })
+        }
+        assert_eq!(keydown_listeners(zone), 1, "ControlZone");
+        assert_eq!(keydown_listeners(header), 1, "Header");
+        assert_eq!(keydown_listeners(tabbar), 1, "TabBar");
     }
 }

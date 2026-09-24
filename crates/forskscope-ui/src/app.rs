@@ -190,7 +190,7 @@ pub fn App() -> Element {
             },
             Header {}
             TabBar {}
-            div { class: "body",
+            crate::keyboard::ControlZone { class: "body",
                 match (active, *store.active_dir.read()) {
                     (_, Some(dir_idx)) => {
                         let dir_tabs = store.dir_tabs.read();

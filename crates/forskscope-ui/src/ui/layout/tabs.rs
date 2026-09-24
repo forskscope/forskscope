@@ -17,7 +17,7 @@ pub fn TabBar() -> Element {
     let explorer_active = active_file.is_none() && active_dir.is_none();
 
     rsx! {
-        div { class: "tabbar",
+        crate::keyboard::ControlZone { class: "tabbar",
             // Permanent Explorer tab.
             {
                 let cls = if explorer_active { "tab active" } else { "tab" };
