@@ -116,16 +116,39 @@ pub struct SpreadsheetDiffStats {
     pub formulas_changed: usize,
 }
 
+/// Where one sheet sits among the tabs of each workbook (0-based), for the
+/// sheet it is reported under. `None` on the side it does not exist on.
+///
+/// This is what the model lacked when a reorder-only pair rendered as two
+/// identical documents (F129): [`SheetChange::Moved`] said *that* a sheet moved
+/// and neither side said *where*.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SheetTab {
+    pub old: Option<usize>,
+    pub new: Option<usize>,
+}
+
 /// The complete, app-owned diff of two `.xlsx` workbooks.
 /// Kept as the app-owned model for a future fixed parser.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpreadsheetDiff {
     pub sheets: Vec<SheetChange>,
+    /// `tabs[i]` is where `sheets[i]` sits on each side. Same length as
+    /// `sheets`, built beside it in [`convert`]; read them together through
+    /// [`SpreadsheetDiff::sheet_entries`].
+    pub tabs: Vec<SheetTab>,
+    /// How many tabs each workbook has: `(old, new)`.
+    pub tab_counts: (usize, usize),
     pub cells: Vec<SheetCellChanges>,
     pub stats: SpreadsheetDiffStats,
 }
 
 impl SpreadsheetDiff {
+    /// Each reported sheet change with its tab position on both sides.
+    pub fn sheet_entries(&self) -> impl Iterator<Item = (&SheetChange, SheetTab)> {
+        self.sheets.iter().zip(self.tabs.iter().copied())
+    }
+
     pub fn is_empty(&self) -> bool {
         self.sheets.is_empty() && self.cells.iter().all(|s| s.cells.is_empty())
     }
@@ -277,6 +300,7 @@ fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
     use sheets_diff::SheetChange as UpSheetChange;
 
     let mut sheets = Vec::new();
+    let mut tabs = Vec::new();
     let mut cells: Vec<SheetCellChanges> = Vec::new();
 
     for sd in &wb.sheets {
@@ -318,6 +342,10 @@ fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
             _ => continue,
         };
         sheets.push(entry);
+        tabs.push(SheetTab {
+            old: sd.old_sheet.as_ref().map(|s| s.index),
+            new: sd.new_sheet.as_ref().map(|s| s.index),
+        });
 
         if sd.cell_diffs.is_empty() {
             continue;
@@ -398,6 +426,8 @@ fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
 
     SpreadsheetDiff {
         sheets,
+        tabs,
+        tab_counts: (wb.old.sheet_count, wb.new.sheet_count),
         cells,
         stats,
     }
@@ -433,24 +463,44 @@ enum Side {
 fn build_side_text(diff: &SpreadsheetDiff, side: Side) -> String {
     let mut out = String::new();
 
-    for sc in &diff.sheets {
-        match (sc, side) {
-            (SheetChange::Added(name), Side::New) => out.push_str(&format!("+ Sheet: {name}\n")),
-            (SheetChange::Added(name), Side::Old) => out.push_str(&format!("  Sheet: {name}\n")),
-            (SheetChange::Removed(name), Side::Old) => out.push_str(&format!("- Sheet: {name}\n")),
-            (SheetChange::Removed(name), Side::New) => out.push_str(&format!("  Sheet: {name}\n")),
+    // The sheet list is each side's own: ordered by that side's tab position.
+    // A sheet with no tab on this side (added, on the old side) is a placeholder
+    // line that keeps the panes aligned; it sorts where it sits on the other
+    // side, so it lands next to its neighbours rather than at an end.
+    let mut lines: Vec<(usize, String)> = Vec::new();
+    for (sc, tab) in diff.sheet_entries() {
+        let (own, other, count) = match side {
+            Side::Old => (tab.old, tab.new, diff.tab_counts.0),
+            Side::New => (tab.new, tab.old, diff.tab_counts.1),
+        };
+        let line = match (sc, side) {
+            (SheetChange::Added(name), Side::New) => format!("+ Sheet: {name}\n"),
+            (SheetChange::Added(name), Side::Old) => format!("  Sheet: {name}\n"),
+            (SheetChange::Removed(name), Side::Old) => format!("- Sheet: {name}\n"),
+            (SheetChange::Removed(name), Side::New) => format!("  Sheet: {name}\n"),
             (SheetChange::Renamed { old_name, new_name }, _) => {
                 let label = match side {
                     Side::Old => old_name.as_str(),
                     Side::New => new_name.as_str(),
                 };
-                out.push_str(&format!("~ Sheet: {label}\n"));
+                format!("~ Sheet: {label}\n")
             }
-            (SheetChange::Moved(name), _) => out.push_str(&format!("  Sheet: {name} (moved)\n")),
-            (SheetChange::Modified(name), _) => out.push_str(&format!("  Sheet: {name}\n")),
+            // Where the sheet is on *this* side, so the two panes differ by
+            // exactly the fact that changed. Without it both sides said the same
+            // thing and a reorder-only pair compared as identical (F129).
+            (SheetChange::Moved(name), _) => match own {
+                Some(tab) => format!("  Sheet: {name} (moved: tab {} of {count})\n", tab + 1),
+                None => format!("  Sheet: {name} (moved)\n"),
+            },
+            (SheetChange::Modified(name), _) => format!("  Sheet: {name}\n"),
             #[allow(unreachable_patterns)]
-            _ => {} // forward compat: new SheetChange variants
-        }
+            _ => continue, // forward compat: new SheetChange variants
+        };
+        lines.push((own.or(other).unwrap_or(usize::MAX), line));
+    }
+    lines.sort_by_key(|(key, _)| *key); // stable: ties keep the diff's order
+    for (_, line) in lines {
+        out.push_str(&line);
     }
 
     for scd in &diff.cells {
@@ -786,5 +836,152 @@ mod tests {
             .to_string();
         assert!(message.contains("cancelled"), "{message}");
         assert!(!message.contains("too large"), "{message}");
+    }
+
+    // ── The rendered pair (F129) ─────────────────────────────────────────────
+    //
+    // The tests above assert the *model*, and the model was right when a
+    // reorder-only pair shipped as two byte-identical documents. What the user
+    // sees is the pair `derive_pair_text_from_diff` renders, so that is what
+    // these assert.
+
+    fn rendered(case: &str) -> (String, String) {
+        let (l, r) =
+            derive_pair_text(&fixture(case, "old.xlsx"), &fixture(case, "new.xlsx")).unwrap();
+        (l.content, r.content)
+    }
+
+    /// For every fixture case, in either direction: a pair of workbooks that
+    /// differ renders two different sides, and a pair that does not renders two
+    /// equal ones. "Differ" is decided by the files' bytes, independently of the
+    /// model under test. It walks the directory, so a new fixture is covered by
+    /// construction, with no exception list.
+    ///
+    /// The `large` case is byte-identical by design (it exists to size the
+    /// bounds and to be cancelled), so it takes the second branch: its sides are
+    /// legitimately equal, which is what a first draft of this test that assumed
+    /// "every fixture differs" tripped over.
+    #[test]
+    fn every_fixture_pair_renders_two_different_sides_in_both_directions() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/tests/fixtures/xlsx");
+        let mut cases: Vec<String> = std::fs::read_dir(&root)
+            .unwrap()
+            .map(|e| e.unwrap())
+            .filter(|e| e.path().is_dir())
+            .map(|e| e.file_name().into_string().unwrap())
+            .collect();
+        cases.sort();
+        assert!(
+            cases.len() >= 9,
+            "fixture directory not found or emptied: {cases:?}"
+        );
+        for case in &cases {
+            let (old, new) = (fixture(case, "old.xlsx"), fixture(case, "new.xlsx"));
+            let workbooks_differ = std::fs::read(&old).unwrap() != std::fs::read(&new).unwrap();
+            for (from, to, direction) in [(&old, &new, "old→new"), (&new, &old, "new→old")] {
+                let (l, r) = derive_pair_text(from, to).unwrap();
+                if workbooks_differ {
+                    assert_ne!(
+                        l.content, r.content,
+                        "{case} ({direction}): the workbooks differ, but both sides render as:\n{}",
+                        l.content
+                    );
+                } else {
+                    assert_eq!(
+                        l.content, r.content,
+                        "{case} ({direction}): identical files"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The control that keeps the test above honest: a pair that does not
+    /// differ renders identical sides, so "the sides differ" is a real claim.
+    #[test]
+    fn a_pair_that_does_not_differ_renders_identical_sides() {
+        let same = fixture("unchanged_sheet", "old.xlsx");
+        let (l, r) = derive_pair_text(&same, &same).unwrap();
+        assert_eq!(l.content, r.content);
+        assert!(l.content.is_empty(), "{:?}", l.content);
+    }
+
+    /// A reorder-only pair: same sheets, same cells, tabs swapped. The model
+    /// says both sheets moved and — new in F129 — where each one is on each
+    /// side, and each side's sheet list is in its own tab order. Falsify by
+    /// restoring the old `Moved` arm (`"  Sheet: {name} (moved)"` on both
+    /// sides): the sides become identical and the first assertion fails.
+    #[test]
+    fn a_reorder_only_pair_shows_where_each_sheet_is_on_each_side() {
+        let diff = diff("reorder_only");
+        assert_eq!(
+            diff.sheets,
+            vec![
+                SheetChange::Moved("Same".into()),
+                SheetChange::Moved("Other".into())
+            ]
+        );
+        assert!(diff.cells.is_empty(), "no cell changed");
+        assert_eq!(diff.tab_counts, (2, 2));
+
+        let (old, new) = rendered("reorder_only");
+        assert_ne!(old, new, "a reorder must not render as no difference");
+        assert_eq!(
+            old,
+            "  Sheet: Same (moved: tab 1 of 2)\n  Sheet: Other (moved: tab 2 of 2)\n"
+        );
+        assert_eq!(
+            new,
+            "  Sheet: Other (moved: tab 1 of 2)\n  Sheet: Same (moved: tab 2 of 2)\n"
+        );
+    }
+
+    /// A pure rename, end to end: each pane names the sheet as *its* workbook
+    /// does. (Upstream reported that their own renderer showed nothing for
+    /// this; the sheet list is ours, so it is checked here.)
+    #[test]
+    fn a_pure_rename_renders_each_sides_own_name() {
+        let (old, new) = rendered("renamed");
+        assert_eq!(old, "~ Sheet: Original\n");
+        assert_eq!(new, "~ Sheet: Renamed\n");
+    }
+
+    /// The sheet list is each side's own order, so a renamed-and-moved pair
+    /// puts the sheets in different places on the two sides.
+    #[test]
+    fn the_sheet_list_follows_each_sides_own_tab_order() {
+        let (old, new) = rendered("renamed_and_moved");
+        assert_eq!(
+            old,
+            "  Sheet: Anchor (moved: tab 1 of 2)\n~ Sheet: ToRename\n"
+        );
+        assert_eq!(
+            new,
+            "~ Sheet: RenamedSheet\n  Sheet: Anchor (moved: tab 2 of 2)\n"
+        );
+    }
+
+    /// F129 found no fixture for an added or a removed sheet, and their
+    /// rendering arms have the shape of the one that was wrong.
+    #[test]
+    fn an_added_sheet_is_reported_and_marked_on_the_new_side_only() {
+        let diff = diff("sheet_added");
+        assert_eq!(diff.sheets, vec![SheetChange::Added("Added".into())]);
+        assert_eq!(diff.stats.sheets_added, 1);
+        let (old, new) = rendered("sheet_added");
+        assert!(new.starts_with("+ Sheet: Added\n"), "{new}");
+        assert!(old.starts_with("  Sheet: Added\n"), "{old}");
+        assert!(old.contains("A1 [value]: (empty)") && new.contains("A1 [value]: other content"));
+    }
+
+    #[test]
+    fn a_removed_sheet_is_reported_and_marked_on_the_old_side_only() {
+        let diff = diff("sheet_removed");
+        assert_eq!(diff.sheets, vec![SheetChange::Removed("Removed".into())]);
+        assert_eq!(diff.stats.sheets_removed, 1);
+        let (old, new) = rendered("sheet_removed");
+        assert!(old.starts_with("- Sheet: Removed\n"), "{old}");
+        assert!(new.starts_with("  Sheet: Removed\n"), "{new}");
+        assert!(old.contains("A1 [value]: other content") && new.contains("A1 [value]: (empty)"));
     }
 }

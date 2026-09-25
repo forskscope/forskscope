@@ -98,6 +98,10 @@ which cells changed value or formula. The result is projected into the same
 diff view as a text comparison, so it scrolls, searches, and navigates hunks
 the same way; there is no separate spreadsheet view.
 
+Each side lists the sheets in its own tab order, and a moved sheet is shown with its
+position on that side (`moved: tab 1 of 2` against `moved: tab 2 of 2`), so a
+workbook whose only change is the order of its tabs still shows a difference.
+
 **Comparison is read-only.** Merge and save are not available for `.xlsx`
 files, and this does not change with the above — restoring comparison did
 not lift that restriction.
