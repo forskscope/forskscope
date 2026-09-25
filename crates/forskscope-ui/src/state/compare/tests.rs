@@ -28,6 +28,7 @@ fn loading_tab(id_value: u64, generation_value: u64) -> CompareTab {
         diff_options: DiffOptions::default(),
         can_save: false,
         save_capability: SaveCapability::Blocked(SaveCapabilityBlockReason::NotMergeableText),
+        spreadsheet_warnings: Vec::new(),
         char_mode: true,
         word_wrap: false,
         focused_change: 9,
@@ -56,6 +57,7 @@ fn ready_result(can_save: bool) -> LoadResult {
         merge: MergeSession::empty(),
         save_target,
         save_capability,
+        spreadsheet_warnings: Vec::new(),
     }))
 }
 
@@ -377,6 +379,36 @@ fn both_sides_xlsx_produces_a_real_structural_diff_not_an_empty_one() {
     );
 }
 
+/// F131: what the spreadsheet parser doubted travels with the loaded pair to
+/// the tab, and a pair with nothing to doubt carries nothing. Falsify by
+/// dropping `spreadsheet_warnings` from `PreparedCompare`'s construction in
+/// `load_and_diff`: the first assertion fails.
+#[test]
+fn a_spreadsheet_warning_reaches_the_prepared_comparison() {
+    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../forskscope-core/src/tests/fixtures/xlsx");
+    let load = |case: &str| {
+        load_and_diff(
+            normal_request(
+                fixtures.join(case).join("old.xlsx"),
+                fixtures.join(case).join("new.xlsx"),
+            ),
+            DiffOptions::default(),
+            Lang::En,
+            false,
+        )
+        .unwrap()
+    };
+
+    let warned = load("chart_sheet_not_compared");
+    assert_eq!(warned.spreadsheet_warnings.len(), 1);
+    assert_eq!(
+        warned.spreadsheet_warnings[0].sheets,
+        vec!["Chart1".to_string()]
+    );
+    assert!(load("basic").spreadsheet_warnings.is_empty());
+}
+
 /// F117: a workbook pair that cannot be compared (corrupt here; the size
 /// bound takes the same path, since both are an `Err` from
 /// `xlsx::derive_pair_text`) must reach the user as an error. Before F117
@@ -550,6 +582,7 @@ fn save_target_matches_right_input_after_load_and_reload() {
             diff_options: DiffOptions::default(),
             can_save: prepared.save_capability.is_saveable(),
             save_capability: prepared.save_capability,
+            spreadsheet_warnings: Vec::new(),
             char_mode: false,
             word_wrap: false,
             focused_change: 0,
@@ -831,6 +864,7 @@ fn a_file_that_decoded_with_replacement_characters_cannot_be_saved_without_the_g
         diff_options: DiffOptions::default(),
         can_save: prepared.save_capability.is_saveable(),
         save_capability: prepared.save_capability,
+        spreadsheet_warnings: Vec::new(),
         char_mode: false,
         word_wrap: false,
         focused_change: 0,
@@ -913,6 +947,7 @@ fn a_missing_right_side_can_be_created_by_saving() {
         diff_options: DiffOptions::default(),
         can_save: prepared.save_capability.is_saveable(),
         save_capability: prepared.save_capability,
+        spreadsheet_warnings: Vec::new(),
         char_mode: false,
         word_wrap: false,
         focused_change: 0,
@@ -1046,6 +1081,7 @@ fn a_cleanly_decoded_non_utf8_file_is_not_swept_into_the_new_guard() {
         diff_options: DiffOptions::default(),
         can_save: prepared.save_capability.is_saveable(),
         save_capability: prepared.save_capability,
+        spreadsheet_warnings: Vec::new(),
         char_mode: false,
         word_wrap: false,
         focused_change: 0,

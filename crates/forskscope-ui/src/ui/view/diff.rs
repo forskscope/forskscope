@@ -352,6 +352,59 @@ pub struct TabSnapshot {
     pub right_encoding_label: String,
 }
 
+/// At most this many sheet names are listed in one warning; the rest are a count.
+const MAX_SHEETS_NAMED: usize = 5;
+
+/// One localised line for a spreadsheet warning: what may be wrong, then the
+/// sheets it concerns (F131).
+fn spreadsheet_warning_text(
+    lang: crate::state::Lang,
+    warning: &forskscope_core::xlsx::SpreadsheetWarning,
+) -> String {
+    use crate::i18n::t;
+    use forskscope_core::xlsx::SpreadsheetWarningKind as K;
+
+    let sentence = match warning.kind {
+        K::DuplicateAlignmentKey => t(
+            lang,
+            "Some rows share an alignment key, so rows may be paired wrongly.",
+        ),
+        K::AlignmentFellBack => t(
+            lang,
+            "A sheet was too large to align rows and was compared position by position, so an inserted row may appear as many changes.",
+        ),
+        K::AmbiguousSheetMatch => t(
+            lang,
+            "Several sheets could have been renamed, so none was matched; they appear as added and removed.",
+        ),
+        K::SheetNotCompared => t(lang, "Not compared (not a worksheet):"),
+        K::Other => t(lang, "The comparison reported a warning:"),
+    };
+    let mut names: Vec<String> = warning
+        .sheets
+        .iter()
+        .take(MAX_SHEETS_NAMED)
+        .map(|s| format!("‘{s}’"))
+        .collect();
+    if warning.sheets.len() > MAX_SHEETS_NAMED {
+        names.push(format!("(+{})", warning.sheets.len() - MAX_SHEETS_NAMED));
+    }
+    let mut out = sentence;
+    if let Some(detail) = &warning.detail {
+        out.push(' ');
+        out.push_str(detail);
+    }
+    if !names.is_empty() {
+        if !matches!(warning.kind, K::SheetNotCompared) {
+            out.push(' ');
+            out.push_str(&t(lang, "Sheets:"));
+        }
+        out.push(' ');
+        out.push_str(&names.join(", "));
+    }
+    out
+}
+
 impl TabSnapshot {
     pub fn from_tab(
         tab: &crate::state::CompareTab,
@@ -396,6 +449,14 @@ impl TabSnapshot {
                 "Some hunks were too large for character-level diff.",
             ));
         }
+        // F131: what the spreadsheet parser doubted, in the strip that already
+        // sits above the panes and reads as "this result may be wrong", not as
+        // a row of the diff. One line per kind, naming its sheets.
+        warnings.extend(
+            tab.spreadsheet_warnings
+                .iter()
+                .map(|w| spreadsheet_warning_text(lang, w)),
+        );
         let both_missing = matches!(tab.left_doc.kind, FileKind::Missing)
             && matches!(tab.right_doc.kind, FileKind::Missing);
         let readonly_notice = if tab.can_save {
@@ -421,7 +482,11 @@ impl TabSnapshot {
             }
         };
         Self {
-            identical: tab.diff.is_identical() && !both_missing,
+            // A green "Files are identical" beside "a sheet was not compared" is
+            // a claim the comparison cannot make, so a warned pair never says it.
+            identical: tab.diff.is_identical()
+                && !both_missing
+                && tab.spreadsheet_warnings.is_empty(),
             char_mode: tab.char_mode,
             inline_available: inline_available(&tab.diff_options),
             word_wrap: tab.word_wrap,
@@ -480,6 +545,119 @@ mod tab_error_tests {
         assert!(
             !text.contains("Check that the file exists"),
             "advice belongs to the error, not the tab: {text}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod spreadsheet_warning_tests {
+    use super::*;
+    use crate::state::Lang;
+    use forskscope_core::xlsx::{SpreadsheetWarning, SpreadsheetWarningKind as K};
+
+    fn warning(kind: K, sheets: &[&str]) -> SpreadsheetWarning {
+        SpreadsheetWarning {
+            kind,
+            sheets: sheets.iter().map(|s| s.to_string()).collect(),
+            detail: None,
+        }
+    }
+
+    /// A present (not `Missing`) side, so "identical" is decided by the diff.
+    fn text_doc() -> forskscope_core::document::LoadedDocument {
+        let mut d = forskscope_core::document::LoadedDocument::empty();
+        d.kind = forskscope_core::file_kind::FileKind::Text;
+        d
+    }
+
+    fn snapshot_with(warnings: Vec<SpreadsheetWarning>, lang: Lang) -> TabSnapshot {
+        use crate::state::tab::{CompareLaunchMode, TabState};
+        use forskscope_core::compare_prep::{SaveCapability, SaveCapabilityBlockReason};
+        use forskscope_core::{DiffDocument, DiffOptions, MergeSession};
+        use forskscope_ui_logic::{CompareTabId, LoadGeneration};
+
+        let tab = crate::state::CompareTab {
+            id: CompareTabId::new(1).unwrap(),
+            load_generation: LoadGeneration::new(1).unwrap(),
+            title: "t".into(),
+            left_path: None,
+            right_path: None,
+            state: TabState::Ready,
+            left_doc: text_doc(),
+            right_doc: text_doc(),
+            diff: DiffDocument::empty(),
+            merge: MergeSession::empty(),
+            diff_options: DiffOptions::default(),
+            can_save: false,
+            save_capability: SaveCapability::Blocked(SaveCapabilityBlockReason::NotMergeableText),
+            spreadsheet_warnings: warnings,
+            char_mode: false,
+            word_wrap: false,
+            focused_change: 0,
+            save_target: None,
+            launch_mode: CompareLaunchMode::Normal,
+        };
+        TabSnapshot::from_tab(&tab, 14, "monospace", 3, lang)
+    }
+
+    /// The warning is in the strip that renders above the panes (the same one
+    /// as "Diff timed out"), one line per kind, with the sheets named; and a
+    /// warned pair never claims to be identical. Falsify by dropping the
+    /// `warnings.extend` in `from_tab`: the first assertion fails; by dropping
+    /// the `is_empty()` test on `identical`: the second fails.
+    #[test]
+    fn a_spreadsheet_warning_is_in_the_warning_strip_and_a_warned_pair_is_not_identical() {
+        let snap = snapshot_with(
+            vec![
+                warning(K::AmbiguousSheetMatch, &["Gamma", "Delta"]),
+                warning(K::SheetNotCompared, &["Chart1"]),
+            ],
+            Lang::En,
+        );
+        assert_eq!(
+            snap.warnings,
+            vec![
+                "Several sheets could have been renamed, so none was matched; they appear as added and removed. Sheets: ‘Gamma’, ‘Delta’".to_string(),
+                "Not compared (not a worksheet): ‘Chart1’".to_string(),
+            ]
+        );
+        // An empty DiffDocument is identical; the warning is what stops the
+        // green "Files are identical".
+        assert!(!snap.identical);
+        assert!(snapshot_with(vec![], Lang::En).identical);
+    }
+
+    #[test]
+    fn the_warning_is_localised() {
+        let snap = snapshot_with(vec![warning(K::SheetNotCompared, &["Chart1"])], Lang::Ja);
+        assert_eq!(
+            snap.warnings,
+            vec!["比較されていません（ワークシートではありません）: ‘Chart1’".to_string()]
+        );
+    }
+
+    /// Fifty sheets is one line naming five and counting the rest, not fifty.
+    #[test]
+    fn many_sheets_are_one_line_with_a_count() {
+        let names: Vec<String> = (1..=50).map(|n| format!("S{n}")).collect();
+        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        let snap = snapshot_with(vec![warning(K::AlignmentFellBack, &refs)], Lang::En);
+        assert_eq!(snap.warnings.len(), 1);
+        let line = &snap.warnings[0];
+        assert!(
+            line.ends_with("‘S1’, ‘S2’, ‘S3’, ‘S4’, ‘S5’, (+45)"),
+            "{line}"
+        );
+    }
+
+    #[test]
+    fn an_unknown_warning_shows_the_parsers_own_message() {
+        let mut w = warning(K::Other, &[]);
+        w.detail = Some("something new upstream".into());
+        let snap = snapshot_with(vec![w], Lang::En);
+        assert_eq!(
+            snap.warnings,
+            vec!["The comparison reported a warning: something new upstream".to_string()]
         );
     }
 }

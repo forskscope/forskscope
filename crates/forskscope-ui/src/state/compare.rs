@@ -134,6 +134,7 @@ fn commit_load_result(
             tab.merge = prepared.merge;
             tab.can_save = prepared.save_capability.is_saveable();
             tab.save_capability = prepared.save_capability;
+            tab.spreadsheet_warnings = prepared.spreadsheet_warnings;
             tab.save_target = Some(prepared.save_target);
             tab.char_mode = false;
             tab.focused_change = 0;
@@ -364,6 +365,7 @@ pub(crate) fn open_compare_request_with_options(
         diff_options: opts,
         can_save: false,
         save_capability: SaveCapability::Blocked(SaveCapabilityBlockReason::NotMergeableText),
+        spreadsheet_warnings: Vec::new(),
         char_mode: false,
         word_wrap: false,
         focused_change: 0,
@@ -492,12 +494,13 @@ pub(super) fn load_and_diff(
     // either way: `FileKind::ExcelXlsx -> EditabilityClass::ReadOnly` and
     // `save_capability`'s NotMergeableText refusal are unchanged (RFC-085
     // scope boundary — merge/save for .xlsx is a separate RFC).
+    let mut spreadsheet_warnings = Vec::new();
     if ld.kind == FileKind::ExcelXlsx && rd.kind == FileKind::ExcelXlsx {
         // F117: an error here (corrupt workbook, or the size bound) must
         // reach the user as an error. Falling through with two empty sides
         // would diff as identical and report "these workbooks match" for a
         // pair that was never fully compared.
-        let (lt, rt) = forskscope_core::xlsx::derive_pair_text(&left, &right).map_err(|e| {
+        let pair = forskscope_core::xlsx::compare_pair(&left, &right).map_err(|e| {
             let detail = match e {
                 forskscope_core::CoreError::Unsupported { message } => message,
                 other => other.to_string(),
@@ -507,8 +510,9 @@ pub(super) fn load_and_diff(
                 t(lang, "Could not compare the spreadsheets")
             )
         })?;
-        ld.text = Some(lt);
-        rd.text = Some(rt);
+        ld.text = Some(pair.left);
+        rd.text = Some(pair.right);
+        spreadsheet_warnings = pair.warnings;
     }
 
     let diff = compute_diff(ld.diff_text(), rd.diff_text(), opts);
@@ -544,6 +548,7 @@ pub(super) fn load_and_diff(
         merge,
         save_target,
         save_capability,
+        spreadsheet_warnings,
     })
 }
 

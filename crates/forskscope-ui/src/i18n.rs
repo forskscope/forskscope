@@ -295,6 +295,18 @@ fn ja(key: &str) -> Option<&'static str> {
         "Diff timed out — result may be approximate." => {
             "差分処理がタイムアウトしました — 結果は概算の可能性があります。"
         }
+        "Some rows share an alignment key, so rows may be paired wrongly." => {
+            "一部の行が同じ整列キーを持つため、行が誤って対応付けられている可能性があります。"
+        }
+        "A sheet was too large to align rows and was compared position by position, so an inserted row may appear as many changes." => {
+            "シートが大きすぎて行を整列できず、位置ごとに比較しました。挿入された行が多数の変更として表示される場合があります。"
+        }
+        "Several sheets could have been renamed, so none was matched; they appear as added and removed." => {
+            "名前が変更された可能性のあるシートが複数あり、どれも対応付けられませんでした。追加と削除として表示されています。"
+        }
+        "Not compared (not a worksheet):" => "比較されていません（ワークシートではありません）:",
+        "The comparison reported a warning:" => "比較で警告が報告されました:",
+        "Sheets:" => "シート:",
         "Some hunks were too large for character-level diff." => {
             "一部のハンクが大きすぎるため、文字単位の差分を省略しました。"
         }

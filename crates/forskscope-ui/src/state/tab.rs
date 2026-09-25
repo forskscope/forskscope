@@ -64,6 +64,11 @@ pub struct CompareTab {
     /// field directly to decide whether a save must be blocked and
     /// explained instead of attempted.
     pub save_capability: SaveCapability,
+    /// What the spreadsheet parser doubted about this comparison (F131): every
+    /// `Warning`-level diagnostic, grouped. Empty for anything but `.xlsx`. Kept
+    /// on the tab, not in the diff, because the diff is recomputed when options
+    /// change and these belong to the load.
+    pub spreadsheet_warnings: Vec<forskscope_core::xlsx::SpreadsheetWarning>,
     pub char_mode: bool,
     pub word_wrap: bool,
     pub focused_change: usize,

@@ -102,6 +102,13 @@ Each side lists the sheets in its own tab order, and a moved sheet is shown with
 position on that side (`moved: tab 1 of 2` against `moved: tab 2 of 2`), so a
 workbook whose only change is the order of its tabs still shows a difference.
 
+**A warning above the panes means the result may be incomplete or wrong in a way the
+diff itself does not show** — a sheet that is not a worksheet (a chart sheet) and so
+was not compared, or several sheets that could have been renamed and so were not
+matched. It is one line per kind, naming the sheets, and a pair with a warning is
+never reported as "Files are identical". Notes that carry no doubt (for example that
+charts and images are not compared) are counted by the parser and not shown.
+
 **Comparison is read-only.** Merge and save are not available for `.xlsx`
 files, and this does not change with the above — restoring comparison did
 not lift that restriction.

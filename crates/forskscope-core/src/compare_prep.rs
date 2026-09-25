@@ -38,6 +38,9 @@ pub struct PreparedCompare {
     pub merge: MergeSession,
     pub save_target: SaveTargetSnapshot,
     pub save_capability: SaveCapability,
+    /// The spreadsheet parser's warnings (F131); empty unless both sides are
+    /// `.xlsx`. Committed with the documents they qualify.
+    pub spreadsheet_warnings: Vec<crate::xlsx::SpreadsheetWarning>,
 }
 
 /// Where a save will go, and whether it's currently possible.

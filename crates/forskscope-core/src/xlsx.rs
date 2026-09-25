@@ -130,10 +130,51 @@ pub struct SheetTab {
     pub new: Option<usize>,
 }
 
+/// What a warning from the parser says is uncertain about the comparison,
+/// in the order of urgency (F131). A `Warning` severity means "the answer you
+/// are looking at may be wrong or incomplete in a way the diff itself does not
+/// show"; the kind says which way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SpreadsheetWarningKind {
+    /// Rows share an alignment key, so they may have been **paired wrongly**.
+    DuplicateAlignmentKey,
+    /// A sheet was too large to align and fell back to position-by-position
+    /// comparison, so an inserted row may show as a long cascade.
+    AlignmentFellBack,
+    /// Several sheets could have been renamed, so none was matched: the user
+    /// sees an add and a remove where they may expect a rename.
+    AmbiguousSheetMatch,
+    /// A sheet that is not a worksheet (a chart sheet, say) was **not
+    /// compared at all**: a coverage gap.
+    SheetNotCompared,
+    /// A warning this crate does not know by name. Surfaced anyway: the match
+    /// is on severity, so a warning `sheets-diff` adds later is inherited, not
+    /// dropped. `detail` carries the parser's own (English) message.
+    Other,
+}
+
+/// One warning, all its sheets gathered: a condition that hit fifty sheets is
+/// one message naming them, not fifty.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpreadsheetWarning {
+    pub kind: SpreadsheetWarningKind,
+    /// The sheets it concerns, in the order the parser reported them. Empty
+    /// when the parser named none.
+    pub sheets: Vec<String>,
+    /// The parser's own message; set only for [`SpreadsheetWarningKind::Other`].
+    pub detail: Option<String>,
+}
+
 /// The complete, app-owned diff of two `.xlsx` workbooks.
 /// Kept as the app-owned model for a future fixed parser.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpreadsheetDiff {
+    /// Everything at `Severity::Warning` or above, grouped by kind and ordered
+    /// by urgency (F131). Empty means the parser had no doubt to report.
+    pub warnings: Vec<SpreadsheetWarning>,
+    /// How many `Info` diagnostics there were, **counted, never listed**: one
+    /// of them (`FormulaUnavailable`) is emitted per numeric cell.
+    pub info_notes: usize,
     pub sheets: Vec<SheetChange>,
     /// `tabs[i]` is where `sheets[i]` sits on each side. Same length as
     /// `sheets`, built beside it in [`convert`]; read them together through
@@ -419,6 +460,7 @@ fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
     // `sheets_renamed` and `sheets_moved` — a sheet-count mismatch against
     // our single collapsed `sheets` entry for it that already existed in
     // their own aggregate semantics, not one this adapter introduces.
+    let (warnings, info_notes) = summarize_notes(collect_notes(&wb));
     let s = &wb.summary;
     let stats = SpreadsheetDiffStats {
         sheets_added: s.sheets_added,
@@ -432,12 +474,116 @@ fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
     };
 
     SpreadsheetDiff {
+        warnings,
+        info_notes,
         sheets,
         tabs,
         tab_counts: (wb.old.sheet_count, wb.new.sheet_count),
         cells,
         stats,
     }
+}
+
+// ── Diagnostics (F131) ───────────────────────────────────────────────────────
+//
+// `sheets-diff` reports doubt in two places — `WorkbookDiff::diagnostics` and
+// each `SheetDiff::diagnostics` — and it is easy to read one. Two of its four
+// warnings are sheet-level, so reading only the workbook vector surfaces
+// neither; that is the defect its own CLI shipped for six releases. Both are
+// read here, in one function, and the match is on **severity**, never on the
+// variant.
+
+/// One diagnostic reduced to what the summary needs. Built from upstream's
+/// type by [`note_from`]; kept separate because `sheets_diff::Diagnostic` is
+/// `#[non_exhaustive]` and cannot be constructed in a test, and the grouping
+/// rules (an unknown warning is surfaced; `Info` is only counted) are worth
+/// asserting directly.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Note {
+    is_warning: bool,
+    kind: SpreadsheetWarningKind,
+    sheets: Vec<String>,
+    message: String,
+}
+
+fn note_from(d: &sheets_diff::Diagnostic) -> Note {
+    use sheets_diff::DiagnosticKind as K;
+
+    // The severity, not the kind, decides whether this is heard about. `Ord`
+    // means a level added above `Warning` is inherited too.
+    let is_warning = d.severity >= sheets_diff::Severity::Warning;
+    let own_sheet: Vec<String> = d.location.sheet_name.iter().cloned().collect();
+    let (kind, sheets) = match &d.kind {
+        K::DuplicateAlignmentKey { .. } => {
+            (SpreadsheetWarningKind::DuplicateAlignmentKey, own_sheet)
+        }
+        K::AlignmentBoundExceeded { .. } => (SpreadsheetWarningKind::AlignmentFellBack, own_sheet),
+        K::AmbiguousSheetMatch { candidates } => (
+            SpreadsheetWarningKind::AmbiguousSheetMatch,
+            candidates.iter().map(|c| c.name.clone()).collect(),
+        ),
+        // A warning-level `UnsupportedWorkbookFeature` is a sheet that was
+        // skipped; the blanket "non-cell objects" note is `Info`, and is only
+        // counted.
+        K::UnsupportedWorkbookFeature { .. } => {
+            (SpreadsheetWarningKind::SheetNotCompared, own_sheet)
+        }
+        // `DiagnosticKind` is `#[non_exhaustive]`; so is anything else a
+        // warning-level metadata note says.
+        _ => (SpreadsheetWarningKind::Other, own_sheet),
+    };
+    Note {
+        is_warning,
+        kind,
+        sheets,
+        message: d.message.clone(),
+    }
+}
+
+/// Every diagnostic of the comparison, workbook-level **and** sheet-level.
+fn collect_notes(wb: &sheets_diff::WorkbookDiff) -> Vec<Note> {
+    let mut notes: Vec<Note> = wb.diagnostics.iter().map(note_from).collect();
+    for sd in &wb.sheets {
+        notes.extend(sd.diagnostics.iter().map(note_from));
+    }
+    notes
+}
+
+/// Group warnings by kind (one message naming every sheet), order them by
+/// urgency, and count the rest.
+fn summarize_notes(notes: Vec<Note>) -> (Vec<SpreadsheetWarning>, usize) {
+    let mut info = 0;
+    let mut warnings: Vec<SpreadsheetWarning> = Vec::new();
+    for note in notes {
+        if !note.is_warning {
+            info += 1;
+            continue;
+        }
+        let existing = warnings.iter_mut().find(|w| {
+            w.kind == note.kind
+                && (note.kind != SpreadsheetWarningKind::Other
+                    || w.detail.as_ref() == Some(&note.message))
+        });
+        let warning = match existing {
+            Some(w) => w,
+            None => {
+                warnings.push(SpreadsheetWarning {
+                    kind: note.kind,
+                    sheets: Vec::new(),
+                    detail: (note.kind == SpreadsheetWarningKind::Other)
+                        .then(|| note.message.clone()),
+                });
+                warnings.last_mut().unwrap()
+            }
+        };
+        for sheet in note.sheets {
+            if !warning.sheets.contains(&sheet) {
+                warning.sheets.push(sheet);
+            }
+        }
+    }
+    warnings.sort_by_key(|w| w.kind); // stable: reported order within a kind
+    (warnings, info)
 }
 
 // ── Per-side text projection (RFC-058 §"Presentation") ──────────────────────
@@ -447,6 +593,30 @@ pub fn derive_pair_text_from_diff(diff: &SpreadsheetDiff) -> (TextDocument, Text
     let old_text = build_side_text(diff, Side::Old);
     let new_text = build_side_text(diff, Side::New);
     (excel_doc(old_text), excel_doc(new_text))
+}
+
+/// Both sides' comparable text and what the parser doubted, from one
+/// comparison (F131).
+#[derive(Debug, Clone)]
+pub struct SpreadsheetPair {
+    pub left: TextDocument,
+    pub right: TextDocument,
+    pub warnings: Vec<SpreadsheetWarning>,
+    pub info_notes: usize,
+}
+
+/// [`derive_pair_text`] plus the warnings the comparison raised. This is what
+/// the comparison view uses: a result that "may be wrong" has to arrive with
+/// the text it qualifies.
+pub fn compare_pair(old_path: &Path, new_path: &Path) -> Result<SpreadsheetPair> {
+    let diff = diff_xlsx(old_path, new_path, None)?;
+    let (left, right) = derive_pair_text_from_diff(&diff);
+    Ok(SpreadsheetPair {
+        left,
+        right,
+        warnings: diff.warnings,
+        info_notes: diff.info_notes,
+    })
 }
 
 /// Entry point for callers that don't yet hold a `SpreadsheetDiff`.
@@ -1010,5 +1180,178 @@ mod tests {
         assert!(old.starts_with("- Sheet: Removed\n"), "{old}");
         assert!(new.starts_with("  Sheet: Removed\n"), "{new}");
         assert!(old.contains("A1 [value]: other content") && new.contains("A1 [value]: (empty)"));
+    }
+
+    // ── Diagnostics (F131) ───────────────────────────────────────────────────
+
+    fn warnings_of(case: &str) -> Vec<SpreadsheetWarning> {
+        diff(case).warnings
+    }
+
+    /// A chart sheet is not compared at all, and the parser says so at `Warning`
+    /// (workbook-level). Falsify by dropping the warning from `convert`: the
+    /// list is empty and this fails.
+    #[test]
+    fn a_sheet_that_was_not_compared_is_a_warning_naming_it() {
+        assert_eq!(
+            warnings_of("chart_sheet_not_compared"),
+            vec![SpreadsheetWarning {
+                kind: SpreadsheetWarningKind::SheetNotCompared,
+                sheets: vec!["Chart1".into()],
+                detail: None,
+            }]
+        );
+    }
+
+    /// Several removed and several added sheets, none matchable: one message
+    /// naming the candidates, not one per sheet.
+    #[test]
+    fn an_ambiguous_sheet_match_is_one_warning_naming_the_candidates() {
+        assert_eq!(
+            warnings_of("ambiguous_rename"),
+            vec![SpreadsheetWarning {
+                kind: SpreadsheetWarningKind::AmbiguousSheetMatch,
+                sheets: vec!["Gamma".into(), "Delta".into()],
+                detail: None,
+            }]
+        );
+    }
+
+    /// The defect `sheets-diff` shipped for six releases: warnings live in
+    /// `WorkbookDiff::diagnostics` **and** in each `SheetDiff::diagnostics`, and
+    /// reading one hides the other. Two of its four warnings are sheet-level.
+    /// The product never selects a keyed alignment, so through `diff_xlsx` a
+    /// sheet-level warning cannot arise; this drives `convert` with the options
+    /// that produce one. Falsify by removing the per-sheet loop from
+    /// `collect_notes`: this fails, and the workbook-level tests above still
+    /// pass, which is why it is a test of its own.
+    #[test]
+    fn a_sheet_level_warning_is_read_as_well_as_the_workbook_level_ones() {
+        let opts = sheets_diff::DiffOptions::builder()
+            .alignment(sheets_diff::AlignmentMode::RowKey { columns: vec![1] })
+            .build()
+            .unwrap();
+        let wb = sheets_diff::compare_paths_with_options(
+            fixture("duplicate_row_keys", "old.xlsx"),
+            fixture("duplicate_row_keys", "new.xlsx"),
+            opts,
+        )
+        .unwrap();
+        assert!(
+            wb.diagnostics
+                .iter()
+                .all(|d| d.severity < sheets_diff::Severity::Warning),
+            "the premise: no workbook-level warning, so any warning found is sheet-level"
+        );
+        let warnings = convert(wb).warnings;
+        assert_eq!(
+            warnings,
+            vec![SpreadsheetWarning {
+                kind: SpreadsheetWarningKind::DuplicateAlignmentKey,
+                sheets: vec!["Keyed".into()],
+                detail: None,
+            }]
+        );
+    }
+
+    fn note(
+        is_warning: bool,
+        kind: SpreadsheetWarningKind,
+        sheets: &[&str],
+        message: &str,
+    ) -> Note {
+        Note {
+            is_warning,
+            kind,
+            sheets: sheets.iter().map(|s| s.to_string()).collect(),
+            message: message.into(),
+        }
+    }
+
+    /// The match is on severity: a warning this crate has no name for is
+    /// surfaced, with the parser's own message. (`sheets_diff::Diagnostic` is
+    /// `#[non_exhaustive]`, so a future variant cannot be built here; the
+    /// grouping is tested on our own `Note`, and `note_from`'s severity test is
+    /// exercised by the real warnings above.) Falsify by keeping only the kinds
+    /// this crate knows: this fails.
+    #[test]
+    fn an_unknown_warning_is_surfaced_not_dropped() {
+        let (warnings, info) = summarize_notes(vec![note(
+            true,
+            SpreadsheetWarningKind::Other,
+            &[],
+            "something new upstream",
+        )]);
+        assert_eq!(info, 0);
+        assert_eq!(
+            warnings,
+            vec![SpreadsheetWarning {
+                kind: SpreadsheetWarningKind::Other,
+                sheets: vec![],
+                detail: Some("something new upstream".into()),
+            }]
+        );
+    }
+
+    /// One warning across many sheets is one message; kinds are ordered by
+    /// urgency whatever order the parser reported them in; `Info` is counted.
+    #[test]
+    fn warnings_are_grouped_by_kind_ordered_by_urgency_and_info_is_counted() {
+        use SpreadsheetWarningKind::*;
+        let (warnings, info) = summarize_notes(vec![
+            note(true, SheetNotCompared, &["Chart1"], ""),
+            note(false, Other, &[], "info"),
+            note(true, DuplicateAlignmentKey, &["A"], ""),
+            note(false, Other, &[], "info"),
+            note(true, DuplicateAlignmentKey, &["B"], ""),
+            note(true, DuplicateAlignmentKey, &["A"], ""),
+        ]);
+        assert_eq!(info, 2);
+        let shape: Vec<(SpreadsheetWarningKind, Vec<&str>)> = warnings
+            .iter()
+            .map(|w| (w.kind, w.sheets.iter().map(String::as_str).collect()))
+            .collect();
+        assert_eq!(
+            shape,
+            vec![
+                (DuplicateAlignmentKey, vec!["A", "B"]),
+                (SheetNotCompared, vec!["Chart1"])
+            ]
+        );
+    }
+
+    /// `FormulaUnavailable` is `Info` and is emitted per numeric cell. On the
+    /// `large` fixture (tens of thousands of numeric cells) it is counted and
+    /// nothing per-item reaches the model or the rendered text. Falsify by
+    /// turning the `Info` branch of `summarize_notes` into a push onto
+    /// `warnings`: the assertion on `warnings` fails.
+    #[test]
+    fn formula_unavailable_at_scale_is_counted_never_listed() {
+        let (old, new) = large();
+        let diff = diff_xlsx(&old, &new, None).unwrap();
+        assert!(diff.warnings.is_empty(), "{:?}", diff.warnings);
+        assert!(
+            diff.info_notes > 10_000,
+            "the premise: this fixture emits a diagnostic per cell, got {}",
+            diff.info_notes
+        );
+        let (left, right) = derive_pair_text_from_diff(&diff);
+        for text in [&left.content, &right.content] {
+            assert!(!text.contains("unavailable"), "{text}");
+            assert!(text.lines().count() < 10, "{} lines", text.lines().count());
+        }
+    }
+
+    /// The pair the comparison view receives carries the warnings with the text
+    /// they qualify.
+    #[test]
+    fn compare_pair_returns_the_warnings_with_the_text() {
+        let pair = compare_pair(
+            &fixture("chart_sheet_not_compared", "old.xlsx"),
+            &fixture("chart_sheet_not_compared", "new.xlsx"),
+        )
+        .unwrap();
+        assert_eq!(pair.warnings.len(), 1);
+        assert!(pair.left.content.contains("A1 [value]: before"));
     }
 }
