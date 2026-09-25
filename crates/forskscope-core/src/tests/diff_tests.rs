@@ -442,3 +442,102 @@ fn the_persisted_inline_limit_defaults_to_the_one_the_renderer_obeys() {
         MAX_INLINE_CHARS_PER_SIDE
     );
 }
+
+/// Two texts of about a thousand lines each, built so that `similar` 3.2.0's
+/// `Myers` and `RawMyers` disagree (F124). Deterministic; no fixture file.
+///
+/// The disagreement needs an expensive search: none turned up in 200,000
+/// random pairs under a hundred and sixty lines, and the first appeared near a
+/// thousand. On 856 real file pairs from this repository's history the new
+/// `Myers` changed 7, `RawMyers` none.
+fn myers_separating_pair() -> (String, String) {
+    let mut state: u64 = 435 * 7919 + 1;
+    let mut next = move || {
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        state >> 33
+    };
+    let len = 200 + (next() % 1800) as usize;
+    let alphabet = 3 + next() % 20;
+    let a: Vec<u64> = (0..len).map(|_| next() % alphabet).collect();
+    let mut b = a.clone();
+    let edits = 5 + next() % (len as u64 / 2);
+    for _ in 0..edits {
+        let i = (next() as usize) % b.len();
+        match next() % 3 {
+            0 => {
+                b.remove(i);
+            }
+            1 => b.insert(i, next() % alphabet),
+            _ => b[i] = next() % alphabet,
+        }
+        if b.is_empty() {
+            b.push(0);
+        }
+    }
+    let text = |v: &[u64]| v.iter().map(|n| format!("v{n}\n")).collect::<String>();
+    (text(&a), text(&b))
+}
+
+/// The default line diff is `RawMyers`, so a `similar` upgrade cannot change the
+/// hunks users apply and export (F124; F128 is the open question of adopting the
+/// new `Myers` on purpose).
+#[test]
+fn the_myers_line_diff_is_the_shortest_edit_script_not_the_git_style_split() {
+    use similar::{Algorithm, DiffOp, capture_diff_slices};
+
+    let (left, right) = myers_separating_pair();
+    let a: Vec<&str> = left.lines().collect();
+    let b: Vec<&str> = right.lines().collect();
+    // The lines a script edits: old-side indices removed, new-side indices added.
+    let edited = |algorithm| -> (Vec<usize>, Vec<usize>) {
+        let mut lines = (Vec::new(), Vec::new());
+        for op in capture_diff_slices(algorithm, &a, &b) {
+            match op {
+                DiffOp::Equal { .. } => {}
+                DiffOp::Delete {
+                    old_index, old_len, ..
+                } => lines.0.extend(old_index..old_index + old_len),
+                DiffOp::Insert {
+                    new_index, new_len, ..
+                } => lines.1.extend(new_index..new_index + new_len),
+                DiffOp::Replace {
+                    old_index,
+                    old_len,
+                    new_index,
+                    new_len,
+                } => {
+                    lines.0.extend(old_index..old_index + old_len);
+                    lines.1.extend(new_index..new_index + new_len);
+                }
+            }
+        }
+        lines
+    };
+    let raw = edited(Algorithm::RawMyers);
+    // This input is only evidence if it separates the two: the new Myers takes a
+    // non-minimal split here, so it edits *different* lines.
+    assert_ne!(
+        edited(Algorithm::Myers),
+        raw,
+        "the pair no longer separates Myers from RawMyers; find another"
+    );
+
+    let doc = compute_diff(&left, &right, DiffOptions::default());
+    let mut shown: (Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new());
+    for hunk in doc.hunks.iter().filter(|h| h.kind != HunkKind::Equal) {
+        for row in &hunk.rows {
+            if let Some(l) = &row.left {
+                shown.0.push(l.original_line_number.unwrap() as usize - 1);
+            }
+            if let Some(r) = &row.right {
+                shown.1.push(r.original_line_number.unwrap() as usize - 1);
+            }
+        }
+    }
+    assert_eq!(
+        shown, raw,
+        "the default line diff must edit exactly the lines the shortest script edits"
+    );
+}

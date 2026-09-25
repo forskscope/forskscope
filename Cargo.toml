@@ -37,7 +37,7 @@ rfd                         = { version = "0.17", default-features = true }
 # optional and unused here; audit-deps' reviewed set assumes exactly the
 # calamine -> quick-xml -> zip chain this default-features build pulls.
 sheets-diff                 = "2.5.0"
-similar                     = "3.1"
+similar                     = "3.2"
 
 chrono                      = "0.4"
 serde                       = { version = "1", features = ["derive"] }

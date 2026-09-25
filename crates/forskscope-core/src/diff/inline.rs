@@ -14,29 +14,32 @@ use super::model::{DiffDocument, DiffHunk, HunkKind, InlineDiff, InlineKind, Inl
 /// either side of one changed line pair may have.
 ///
 /// **Basis, measured on a release build with the `similar` this workspace
-/// locks (3.1.1)**, two lines of the stated length with a few edits (random,
-/// periodic and two-letter text cost the same to within 10%):
+/// locks (3.2.0)**, two lines of the stated length with several edits spread
+/// through them (an independent, dissimilar pair costs the same to within 10%):
 ///
-/// | characters per side | time per pair |
-/// |---|---|
-/// | 100 | 0.3–0.4 ms |
-/// | 200 | 1.2–1.6 ms |
-/// | 500 | 11 ms |
-/// | 1,000 | 45 ms |
-/// | 2,000 | 225 ms |
-/// | 4,000 | 0.95 s |
+/// | characters per side | time per pair | transient table |
+/// |---|---|---|
+/// | 500 | 0.3–0.4 ms | 1 MB |
+/// | 1,000 | 1.1–1.4 ms | 4 MB |
+/// | 2,000 | 4.3 ms | 16 MB |
+/// | 4,000 | 16–19 ms | 64 MB |
 ///
-/// **These replace an earlier table on this constant (F120) that was measured
-/// against `similar` 3.2.0** — about 70× faster at these sizes (2,000
-/// characters: 4.4 ms) — and so understated the shipped cost. Cost is quadratic
-/// in the line length, and the diff view refines every changed pair it renders
-/// (nothing in it is virtualised), so what matters is the sum over a document:
-/// 250 pairs of 1,900 characters took 49 s from the toggle to the first paint.
-/// **2,000 is therefore generous for the shipped `similar`**; it is kept here
-/// because choosing it is the architect's (F124 report). An ordinary source line
-/// (under 200 characters) is 1–2 ms. A pair over the limit is **not
-/// refined**: [`refine_pair`] returns `None` and callers must show that the
-/// pair was skipped, never render it as "no character-level differences".
+/// A pair with one edit is far cheaper (55 µs at 2,000): cost follows the length
+/// of the differing middle, not of the line. **Both columns are quadratic**, and
+/// they are why the limit is load-bearing on either version of the library — on
+/// 3.1.1, which this workspace locked until F124, the *time* was the problem
+/// (225 ms per pair at 2,000, 250 pairs of 1,900 characters took 49 s from the
+/// toggle to the first paint); on 3.2.0 the time is 50× smaller but the LCS table
+/// is a flat `n × m × 4` bytes, so the *memory* is quadratic (400,000 characters
+/// would ask for hundreds of gigabytes, which is the abort F120 found).
+///
+/// The diff view refines every changed pair it renders (nothing in it is
+/// virtualised), so what matters is the sum over a document: on 3.2.0, 250
+/// pairs of 1,900 characters take 1.3 s from the toggle to the first paint and
+/// 1,000 pairs take 4.9 s. **2,000 is where a pair crosses about 5 ms.** An
+/// ordinary source line (under 200 characters) is 0.1 ms. A pair over the limit
+/// is **not refined**: [`refine_pair`] returns `None` and callers must show that
+/// the pair was skipped, never render it as "no character-level differences".
 ///
 /// This is the only such number. `PerformanceLimits::max_inline_diff_chars_per_hunk`
 /// takes its default from it, and the engine's own bound (there was a second,

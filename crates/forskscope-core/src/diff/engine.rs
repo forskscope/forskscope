@@ -84,7 +84,15 @@ fn line_key(line: &SrcLine, options: &DiffOptions) -> String {
 
 fn map_algorithm(a: DiffAlgorithm) -> Algorithm {
     match a {
-        DiffAlgorithm::Myers => Algorithm::Myers,
+        // `RawMyers`, not `Myers`. `similar` 3.2.0 changed `Myers` on purpose: on an
+        // expensive search it takes git-style bounded, non-minimal splits. `RawMyers`
+        // is what `Myers` was in 3.1.1 (upstream: "the previous shortest-edit-script
+        // behavior without output-changing heuristics"). Measured on 856 real file
+        // pairs, the new `Myers` changed 7 (0.8%), four of them in hunk count; `RawMyers`
+        // changed none. The hunks are what users apply one at a time and export, so the
+        // output does not move under a dependency bump. Whether to adopt the new
+        // `Myers` deliberately is F128; `RawMyers` is upstream's legacy-labelled path.
+        DiffAlgorithm::Myers => Algorithm::RawMyers,
         DiffAlgorithm::Patience => Algorithm::Patience,
         DiffAlgorithm::Lcs => Algorithm::Lcs,
         DiffAlgorithm::Histogram => Algorithm::Histogram,

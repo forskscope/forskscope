@@ -85,17 +85,24 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
   (F120, 2026-09-24):** the Inline diff toggle called
   `forskscope_core::diff::refine_pair` on every changed line pair with no length
   bound, and a 400,000-character pair aborted the process ("memory allocation of
-  518405760016 bytes failed" — measured by calling the function directly,
-  **against `similar` 3.2.0, not the 3.1.1 the workspace locks; not re-run on
-  3.1.1**; the timings first quoted here, 11 s at 100,000 and 0.4 s at 20,000,
-  were 3.2.0's too and are superseded below). `refine_pair` now returns `None`
+  518405760016 bytes failed" — measured by calling the function directly on
+  `similar` 3.2.0, whose LCS table is a flat `n × m × 4` bytes; the workspace
+  then locked 3.1.1, whose table was a `BTreeMap` that would not have requested
+  it, so the abort was observed on a version the product did not yet ship. The
+  workspace has locked 3.2.0 since F124, so it is now the shipped behaviour; the
+  timings first quoted here, 11 s at 100,000 and 0.4 s at 20,000, were 3.2.0's
+  too and are superseded below). `refine_pair` now returns `None`
   for a side over `MAX_INLINE_CHARS_PER_SIDE` (2,000), the row shows a **Long
   line** badge, and the toggle is disabled for files over 512 KiB. **Not
-  bounded:** the aggregate. On the locked `similar` 3.1.1 a pair costs about
-  225 ms at the 2,000-character limit (release build; 45 ms at 1,000, 11 ms at
-  500), the view renders every changed pair, and 250 pairs of 1,900 characters
-  took 49 s from the toggle to the first paint (F124, measured end to end). That
-  is a freeze, not a crash.
+  bounded:** the aggregate. On the locked `similar` 3.2.0 a pair costs about
+  4.3 ms and 16 MB of transient table at the 2,000-character limit (release
+  build; 1.1–1.4 ms at 1,000, 0.3–0.4 ms at 500; 4,000 would be 16–19 ms and
+  64 MB, so the limit is load-bearing for **memory** on this version as it was
+  for **time** on 3.1.1). The view renders every changed pair: 250 pairs of 1,900
+  characters take 1.3 s from the toggle to the first paint and 1,000 pairs 4.9 s
+  (F124, measured end to end; on 3.1.1 the 250 took 49 s). That is a pause, not a
+  crash, and it is why the toggle stays disabled above 512 KiB, where the worst
+  case (about 2,200 such pairs) would be about 11 s.
 
 ### 2. Directory listing and binary sniff (`list_dir`, `classify`)
 
@@ -479,7 +486,7 @@ Key crates touching file I/O or process execution:
 
 | Crate | Version | Role | Risk note |
 |---|---|---|---|
-| `similar` | 3.1.1 | Diff computation | Pure computation; no I/O |
+| `similar` | 3.2.0 | Diff computation | Pure computation; no I/O. The default line algorithm is `RawMyers`, upstream's legacy-labelled path, so a bump does not change the hunks (F128 is the open question of adopting the new `Myers`) |
 | `encoding_rs` | * | Text decoding | No I/O; operates on in-memory bytes |
 | `chardetng` | * | Encoding detection | No I/O |
 | `serde` / `serde_json` | 1.0.228 / 1.0.150 | RFC-076 settings/session schema v2: envelope parsing and payload (de)serialization in `forskscope-core` | Local serialization only; parses/writes local settings and session JSON, never network input; introduces no data flow |
