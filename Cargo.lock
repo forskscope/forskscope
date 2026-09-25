@@ -4027,9 +4027,9 @@ dependencies = [
 
 [[package]]
 name = "sheets-diff"
-version = "2.5.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93a11b5378ae85b6e45d8dafd8def749638c9248dbe3f3aea39c9811eac5f2ec"
+checksum = "1d10395a61933109c0a8788fec1b454329c8ce319c2b6bcd859ded776113d7de"
 dependencies = [
  "calamine",
 ]

@@ -7,11 +7,13 @@
 //! RFC-058 suspended this adapter for one release cycle: `sheets-diff ->
 //! calamine -> quick-xml 0.39` carried active XML denial-of-service
 //! advisories, and `.xlsx` files are user-supplied archives of untrusted
-//! XML. RFC-085 restores it at `sheets-diff` 2.5.0, whose dependency chain
+//! XML. RFC-085 restored it at `sheets-diff` 2.5.0, whose dependency chain
 //! (`calamine 0.36.1 -> quick-xml 0.41.0, zip 8.6.0`) carries no known
 //! advisories, and which is also the first release polling cancellation
 //! *inside* a sheet (every 50,000 cells, in both the read and compare
-//! phases) rather than only between sheets — see [`diff_xlsx`]'s doc.
+//! phases) rather than only between sheets — see [`diff_xlsx`]'s doc. F130
+//! moved it to 3.0.0: the same chain, and a read that streams (2.5.1), so a
+//! sheet costs memory in proportion to its populated cells.
 //!
 //! ## The size bound (F117, RFC-058 condition 4)
 //!
@@ -27,7 +29,7 @@
 //! - [`derive_pair_text_from_diff`] — derives the per-side comparable text
 //!   used by the current diff view, driven from the structured model.
 //!
-//! ## sheets-diff 2.5.0 API notes
+//! ## sheets-diff 3.0.0 API notes
 //!
 //! - `compare_paths_with_options` returns `Result` — no panic risk, no
 //!   `catch_unwind` needed.
@@ -158,15 +160,16 @@ impl SpreadsheetDiff {
 
 /// The cell bounds one `.xlsx` comparison runs under (F117).
 ///
-/// **Basis, measured on `sheets-diff` 2.5.0 in a release build**, two
-/// identical single-sheet workbooks of numeric cells (one differing cell),
-/// unbounded, on the 2026-09-24 audit machine:
+/// **Basis, measured in a release build**, two identical single-sheet
+/// workbooks of numeric cells (one differing cell), unbounded, on the
+/// 2026-09-24 audit machine. The `sheets-diff` 2.5.0 column is the original
+/// basis; the 3.0.0 column is F130's re-run of the same method, and agrees:
 ///
-/// | compared coordinates | wall time | peak RSS |
+/// | compared coordinates | 2.5.0 time, peak RSS | 3.0.0 time, peak RSS |
 /// |---|---|---|
-/// | 1,000,000 | 1.6 s | 0.97 GB |
-/// | 2,000,000 | 2.7 s | 1.9 GB |
-/// | 5,000,000 | 7.1 s | 4.8 GB |
+/// | 1,000,000 | 1.6 s, 0.97 GB | 1.3 s, 0.97 GB |
+/// | 2,000,000 | 2.7 s, 1.9 GB | 2.7 s, 1.9 GB |
+/// | 5,000,000 | 7.1 s, 4.8 GB | 6.7 s, 4.8 GB |
 ///
 /// Cost is linear at roughly 1 KB of peak memory per compared coordinate,
 /// so the bound is a memory decision. **2,000,000 compared coordinates**
@@ -177,21 +180,22 @@ impl SpreadsheetDiff {
 /// was rejected: it would admit ~4.8 GB from a file the user opened but did
 /// not write.
 ///
-/// `max_cells_read` counts the *dense used range* of both sides
-/// cumulatively, so a symmetric pair at the compared bound reads exactly
+/// `max_cells_read` counts the *populated* cells of both sides cumulatively
+/// (`sheets-diff` 3.0.0; through 2.6.0 it counted the area of each sheet's
+/// bounding box), so a symmetric pair at the compared bound reads exactly
 /// twice as many cells: it is set to `2 * max_cells_compared`. It fires
-/// first on a sparse sheet whose used range is far larger than its
-/// populated cells, and it fires mid-read, before the compare phase.
+/// mid-read, before the compare phase and before the cell it counts is kept.
 ///
-/// **What this does not bound (measured, F123):** `calamine` builds a dense
-/// range over the bounding box of the *populated* cells before `sheets-diff`
-/// counts one, at about 31 bytes per box cell. These bounds fire after that
-/// memory is spent, so a 5 KB workbook with one cell at `A1` and one far away
-/// costs 3.1 GB at 100M box cells, and at Excel's maximum sheet size aborts the
-/// process. No check in this crate can see the box first (`forskscope-core` has
-/// no `calamine` access); the fix belongs in `sheets-diff`. The table is in
-/// RFC-058's amendment. `max_input_bytes` (50 MiB, from `hardened()`) limits
-/// compressed size only.
+/// **The parse, measured on 3.0.0 (F123, F130).** Memory follows the populated
+/// cells, not the area between them: a 5 KB workbook with one cell at `A1` and
+/// one at Excel's last position (1,048,576 × 16,384) compares in 4 MB and
+/// 0.2 ms, where on 2.5.0 it asked for 512 GiB and aborted the process, and
+/// 100M box cells cost 3.1 GB. What a bound can still admit is the populated
+/// cells themselves: about **177 bytes each once read** (707 MB at the moment
+/// `max_cells_read` refuses a 20M-cell sheet, which is 4,000,001 cells), and a
+/// comparison that reaches `max_cells_compared` peaks near 1.9 GB (the table
+/// above). The tables for the 2.5.0 defect are in RFC-058's amendment.
+/// `max_input_bytes` (50 MiB, from `hardened()`) limits compressed size only.
 ///
 /// **`AlignmentMode` (RFC-058 condition 4): `Positional`, kept.** It is
 /// `sheets-diff`'s default, the cheapest mode, and the one measured above.
@@ -213,12 +217,15 @@ impl CellBounds {
 
 /// Compute the structured diff of two `.xlsx` files.
 ///
-/// `cancel`, when given, is polled by `sheets-diff` 2.5.0 every 50,000 cells
-/// during both the read and compare phases of *each* sheet — not only
-/// between sheets, which is all earlier `sheets-diff` releases offered. A
-/// sheet under 50,000 cells still runs to completion uninterrupted; it also
-/// completes in well under the ~100ms worst-case checkpoint interval, so
-/// there is nothing to interrupt. Passing `None` runs the comparison
+/// `cancel`, when given, is polled by `sheets-diff` every 50,000 cell records
+/// streamed (blank ones count) during the read, and every 50,000 coordinates
+/// during the compare, of *each* sheet — not only between sheets, which is all
+/// releases before 2.5.0 offered. A sheet under 50,000 cells still runs to
+/// completion uninterrupted; it also completes in well under the ~100ms
+/// worst-case checkpoint interval, so there is nothing to interrupt. Measured
+/// on 3.0.0 against a 20M-cell sheet: a cancel requested at 100 ms is observed
+/// at 112 ms, and one at 500 ms at 547 ms (on 2.5.0, with the dense range in
+/// the way, both returned at 4.7 s). Passing `None` runs the comparison
 /// uncancellable, same as no token at all.
 ///
 /// Runs under [`CellBounds::PRODUCT`]. A comparison that reaches a bound
@@ -562,7 +569,9 @@ pub fn load_placeholder(path: &Path) -> Result<LoadedDocument> {
 // Fixtures under `src/tests/fixtures/xlsx/<case>/{old,new}.xlsx` are real
 // workbooks (built with `rust_xlsxwriter`, not committed as a project
 // dependency — see handoff 022's review request for why) read through the
-// real `sheets-diff` 2.5.0 parser, not hand-constructed `WorkbookDiff`
+// real `sheets-diff` parser (2.5.0 when written, 3.0.0 since F130; the model
+// and both sides' rendered text are identical on every fixture across the two),
+// not hand-constructed `WorkbookDiff`
 // values: `sheets_diff::SheetChange`/`SheetDiff`/`WorkbookDiff` are
 // `#[non_exhaustive]`, so this crate cannot build one via struct-literal
 // syntax at all, and doing so would test a copy of `convert()`'s match arms
@@ -676,7 +685,7 @@ mod tests {
     }
 
     /// Handoff 022 §4: cancellation must actually interrupt a comparison
-    /// large enough to cross sheets-diff 2.5.0's 50,000-cell checkpoint —
+    /// large enough to cross sheets-diff's 50,000-cell checkpoint —
     /// not merely accept a token that does nothing. The "large" fixture is
     /// 51,000 cells per side in one sheet; cancelling before comparing even starts
     /// means the very first checkpoint must observe it. Falsified for real
@@ -958,6 +967,24 @@ mod tests {
         assert_eq!(
             new,
             "~ Sheet: RenamedSheet\n  Sheet: Anchor (moved: tab 2 of 2)\n"
+        );
+    }
+
+    /// F123: a 5 KB workbook with a cell at `A1` and one at Excel's last position
+    /// (`XFD1048576`). Through `sheets-diff` 2.5.0 the read allocated the box
+    /// between them — 512 GiB, which aborts the process, so on that version this
+    /// test does not fail, it takes the test binary down. From 2.5.1 the read
+    /// streams and memory follows the two cells, so it is compared like any
+    /// other pair. The fixture is what keeps the user-facing warning retired.
+    #[test]
+    fn a_stray_cell_at_the_last_position_is_compared_not_refused_or_fatal() {
+        let diff = diff("stray_far_cell");
+        assert_eq!(diff.stats.cells_changed, 1);
+        let cell = &diff.cells[0].cells[0];
+        assert_eq!(cell.addr, "XFD1048576");
+        assert_eq!(
+            (cell.old_value.as_deref(), cell.new_value.as_deref()),
+            (Some("x"), Some("y"))
         );
     }
 

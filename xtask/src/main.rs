@@ -137,10 +137,10 @@ fn run_audit_deps() {
     assert_network_paths_are_reviewed();
     // RFC-085: sheets-diff -> calamine -> quick-xml/zip is a deliberately
     // re-added, reviewed path — RFC-058 suspended it (quick-xml 0.39 XML
-    // DoS advisories); sheets-diff 2.5.0's chain (quick-xml 0.41.0, zip
-    // 8.6.0) carries none, verified against the versions actually
-    // resolved here, not inherited from an earlier check (xlsx.rs's
-    // module doc has the full account). Each assertion below replaces
+    // DoS advisories); sheets-diff's chain (quick-xml 0.41.0, zip 8.6.0;
+    // the same at 2.5.0 and at 3.0.0) carries none, verified against the
+    // versions actually resolved here, not inherited from an earlier check
+    // (xlsx.rs's module doc has the full account). Each assertion below replaces
     // this pair's old `assert_package_absent` — a gate that passed
     // because the dependency was absent, not because the path was
     // reviewed, is exactly the failure mode F65 records.

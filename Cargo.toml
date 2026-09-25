@@ -36,7 +36,7 @@ rfd                         = { version = "0.17", default-features = true }
 # RFC-085: default features off deliberately - chrono/cli/serde are all
 # optional and unused here; audit-deps' reviewed set assumes exactly the
 # calamine -> quick-xml -> zip chain this default-features build pulls.
-sheets-diff                 = "2.5.0"
+sheets-diff                 = "3.0.0"
 similar                     = "3.2"
 
 chrono                      = "0.4"

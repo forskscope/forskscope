@@ -64,7 +64,7 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
 - Text vs. binary cross-comparison (one side text, other binary) is blocked with
   a clear error message.
 - `.xlsx` files are **parsed** since v0.169.0 (`d492557`, RFC-085): a pair of
-  workbooks goes through `sheets-diff` 2.5.0 (`calamine 0.36.1`,
+  workbooks goes through `sheets-diff` 3.0.0 (`calamine 0.36.1`,
   `quick-xml 0.41.0`, `zip 8.6.0`) under the bounds set in
   `crates/forskscope-core/src/xlsx.rs`. A comparison that cannot finish — a
   corrupt workbook, or one that reaches a size bound — is shown as an error,
@@ -498,8 +498,8 @@ Key crates touching file I/O or process execution:
 | `dioxus-desktop` | 0.7.9 | Desktop WebView host | Uses authenticated loopback WebSocket IPC between WebView and host |
 | `tungstenite` / `native-tls` | 0.28 / 0.2 | Dioxus desktop transport dependency | Accepted only via `dioxus-desktop`; no app-authored remote connections |
 | `quick-xml` | 0.39.4 | Wayland protocol code generation through GTK/Dioxus stack | Build-time/proc-macro path; not reachable from user-supplied files. Carries the two advisories ignored in `.cargo/audit.toml` |
-| `sheets-diff` | 2.5.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0); this project's own crate | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-core` only (`audit-deps` asserts it) |
-| `calamine` | 0.36.1 | Workbook reader under `sheets-diff` | **Parses user-supplied XML and archives.** Materialises a whole sheet before any bound counts a cell. Immediate dependent: `sheets-diff` only |
+| `sheets-diff` | 3.0.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0; 3.0.0 since F130) | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-core` only (`audit-deps` asserts it) |
+| `calamine` | 0.36.1 | Workbook reader under `sheets-diff` | **Parses user-supplied XML and archives.** Read as a stream by `sheets-diff` 2.5.1 and later, so memory follows the populated cells (it did not through 2.5.0). Immediate dependent: `sheets-diff` only |
 | `quick-xml` | 0.41.0 | XML parsing under `calamine` | **Reachable from user-supplied files.** Not covered by the `.cargo/audit.toml` ignore list (which names 0.39 only) |
 | `zip` | 8.6.0 | Archive reading under `calamine` | **Reachable from user-supplied files.** Compressed size is bounded (50 MiB); expansion is not |
 | `rustls` | 0.23.45 | TLS library compiled into `tungstenite` (v0.171.0: RUSTSEC-2026-0285) | Framework transport only, see "Accepted local WebView transport"; not reachable from file content |
@@ -578,24 +578,31 @@ never evaluated. `.xlsx` is read-only in every path.
 - `AlignmentMode` is `Positional`, the default and the cheapest.
 
 **What it does not defend against:**
-- **A 5 KB workbook can abort the process (measured 2026-09-24, F123).**
-  `calamine` builds a dense range over the bounding box of the *populated* cells
-  before `sheets-diff` counts a cell, at about 31 bytes per box cell. A workbook
-  with one cell at `A1` and one far away — hostile or an accidental stray
-  cell — costs memory in proportion to the area between them: 100M cells took
-  3.13 GB and 1.2 s before F117's bound refused it; 300M took 9.38 GB and 3.1 s;
-  Excel's maximum sheet (1,048,576 × 16,384) makes the allocator request 512 GiB
-  and **aborts the process** (`memory allocation of 549755813888 bytes failed`),
-  losing unsaved work in other tabs. The full table is in the RFC-058
-  amendment. A declared `<dimension>` with no far cell is harmless. **Open:** the
-  fix belongs in `sheets-diff` (stream cells into its sparse map, bound and poll
-  inside the loop); there is no in-crate route, since `forskscope-core` has no
-  direct `calamine` access.
-- **A densely populated sheet costs its parse before refusal.** 20M populated
-  cells in a 51.5 MB file (under the 50 MiB input bound) were refused after
-  5.9 s at 2.58 GB.
-- **An uninterruptible parse.** Cancelling 1 ms into the 300M-area case returned
-  after 3.33 s, its full uncancelled duration.
+- **Closed in `sheets-diff` 3.0.0 (F123, F130): a 5 KB workbook could abort
+  the process.** Through 2.5.0 the read built a dense range over the bounding box
+  of the *populated* cells before any bound counted a cell, at about 31 bytes per
+  box cell, so a workbook with one cell at `A1` and one far away — hostile or an
+  accidental stray cell — cost memory in proportion to the area between them:
+  100M cells took 3.13 GB, and Excel's maximum sheet (1,048,576 × 16,384) made the
+  allocator request 512 GiB and **aborted the process**, losing unsaved work in
+  other tabs. ForskScope reported it upstream; `sheets-diff` 2.5.1 streams the
+  read, and 3.0.0, which ForskScope adopts in 0.173.0, keeps it. Re-measured with the same method and machine: the same
+  5 KB workbooks now compare in **4 MB and under 2 ms at every size in the
+  table, Excel's maximum included** (the RFC-058 amendment has both columns).
+  A cancel requested 100 ms into a 20M-cell sheet is observed at 112 ms (it took
+  4.7 s). The user-facing warning that covered the window is retired.
+- **What a populated cell costs is now the residual, and it is bounded.** A cell
+  read costs about **177 bytes** (707 MB at the moment `max_cells_read` refuses a
+  20M-cell sheet in a 51.5 MB file, 4,000,001 cells read, 0.97 s), and a
+  comparison that reaches `max_cells_compared` peaks near 1.9 GB (F117's table,
+  unchanged on 3.0.0). Those are proportional to cells the user opened, and the
+  bounds refuse beyond them; whether 4,000,000 read is still the right number on
+  a memory basis is a decision this evidence is for, not one made here.
+- **`max_cells_read` changed meaning in 3.0.0** — it and `DiffMetrics::cells_read`
+  count populated cells, not the area of their bounding box (`sheets-diff`'s
+  changelog). It can only accept more than it did, never less, and
+  `LimitExceeded.observed` is again `max + 1`. `xlsx.rs` reports the message as
+  before.
 - **Advisories published later** against `quick-xml`, `zip` or `calamine`.
 
 The reviewed `quick-xml 0.39` advisory exceptions are recorded in
@@ -623,6 +630,7 @@ its own merits.
 | v0.165.0 | Release archive and CI gates aligned | Archive layout, version sync, i18n coverage, audit policy, and dependency paths are enforced before release artifact creation |
 | v0.165.1 | Versioned settings/session persistence (RFC-076) — closes audit finding B2 | Core owns a schema-versioned envelope; a future-version or corrupt file is preserved untouched and reported via a blocking recovery dialog rather than silently collapsed to defaults; legacy migration and explicit reset both create a non-overwriting backup before any write |
 | v0.169.0 | `.xlsx` comparison re-enabled (`d492557`, RFC-085) on `sheets-diff` 2.5.0 | **Re-opens a parser to user-supplied archives** (`calamine 0.36.1`, `quick-xml 0.41.0`, `zip 8.6.0`); the suspension's lifting was not recorded here or in RFC-058 until 2026-09-24. `audit-deps` changed from asserting the chain absent to asserting it present |
+| v0.173.0 | `sheets-diff` 2.5.0 → 3.0.0 (F130) | The parse no longer allocates the bounding box (2.5.1's streaming read); the F123 abort is closed and the table re-measured. Dependency chain unchanged: `calamine 0.36.1`, `quick-xml 0.41.0`, `zip 8.6.0`, no new transitive crate. `cargo audit` and `audit-deps` clean |
 | v0.170.2 | Microsoft Store submission automation (RFC-079) — publishing credential recorded | New CI-only data flow (§6): `store-submit.yml`'s `publish` job holds an Entra ID client secret in the `store-publish` GitHub Environment, gated the same way RFC-081's AUR key is, except a Store dry run cannot be credential-free (no anonymous Partner Center read exists) |
 | v0.171.0 | `rustls` 0.23.41 → 0.23.45 (RUSTSEC-2026-0285, published 2026-09-14) | Framework WebSocket transport only; a peer could send some TLS 1.3 handshake messages in plaintext, and the handshake stayed authenticated |
 | v0.171.1 | F117: `.xlsx` cell bounds set (2,000,000 compared / 4,000,000 read); an uncomparable workbook pair is an error, not "identical" | Closes the unbounded comparison RFC-058 condition 4 required be bounded; removes a path that displayed a failed or refused comparison as a match |

@@ -93,7 +93,7 @@ values overridden, all set in `crates/forskscope-core/src/xlsx.rs`
 | `max_cells_compared` | **2,000,000** | chosen here |
 | `max_cells_read` | **4,000,000** | chosen here (both sides, cumulative) |
 
-`sheets-diff` 2.5.0's `max_cells_compared` counts the coordinates visited,
+`sheets-diff` 2.5.0's `max_cells_compared` (unchanged in 3.0.0) counts the coordinates visited,
 not the differences found, which is the correction F65 recorded against
 2.3.0. The value is measured, not taken from `hardened()`'s 5,000,000: an
 unbounded comparison of two identical single-sheet workbooks used 1.6 s and
@@ -122,48 +122,58 @@ add an `m × n` table (bounded by `max_alignment_product`, 25,000,000) that
 nothing in the UI selects. A future aligned-view RFC should revisit this with
 its own measurement.
 
-**What it does not defend against.**
+**What it did not defend against, and what changed (F123, F130).**
 
-- **The parse phase is not bounded, and a 5 KB file can abort the process
-  (measured 2026-09-24, F123).** `calamine`'s `worksheet_range` builds a
-  **dense** `Range` covering the bounding box of the populated cells
-  (`Range::from_sparse` allocates `rows × cols` values) before `sheets-diff`
-  counts a cell, so a workbook with one cell at `A1` and one far away costs
-  memory in proportion to the *area between them*, about 31 bytes a cell. F117's
-  bounds do fire, but only after that memory is spent. Release build, this
-  machine, address space limited to 20 GB:
+- **The parse phase was not bounded, and a 5 KB file could abort the process
+  (measured 2026-09-24, F123). Closed by `sheets-diff` 2.5.1 and 3.0.0.**
+  Through 2.5.0, `calamine`'s `worksheet_range` built a **dense** `Range` covering
+  the bounding box of the populated cells (`Range::from_sparse` allocates
+  `rows × cols` values) before `sheets-diff` counted a cell, so a workbook with
+  one cell at `A1` and one far away cost memory in proportion to the *area
+  between them*, about 31 bytes a cell, and F117's bounds fired only after that
+  memory was spent. `sheets-diff` 2.5.1 reads through `calamine`'s streaming
+  reader into its sparse map and checks `max_cells_read` and the cancellation
+  poll inside the loop; 3.0.0 keeps that. Release build, this machine (32
+  logical CPUs, 59 GB), address space limited to 20 GB, **same harness and files
+  in both columns**, re-run 2026-09-26. The 5.4 KB workbook has a real cell at
+  `A1` and one far away:
 
-| Declared area (a real cell at A1 and one far away; **5.4 KB** file) | Peak memory | Time to the bound's refusal |
+| Declared area | 2.5.0: peak memory, result, time | 3.0.0: peak memory, result, time |
 |---|---|---|
-| 1,000 × 1,000 = 1M | 35 MB | 16 ms (compared normally) |
-| 10,000 × 1,000 = 10M | 316 MB | 79 ms |
-| 50,000 × 1,000 = 50M | 1.57 GB | 444 ms |
-| 100,000 × 1,000 = 100M | 3.13 GB | 1.22 s |
-| 300,000 × 1,000 = 300M | 9.38 GB | 3.12 s |
-| 1,048,576 × 16,384 (Excel's maximum sheet, 17.2 billion) | **process aborted:** `memory allocation of 549755813888 bytes failed` | — |
+| 1,000 × 1,000 = 1M | 35 MB, compared, 14 ms | **4 MB**, compared, 0.35 ms |
+| 10,000 × 1,000 = 10M | 316 MB, refused | 4 MB, **compared**, 1.5 ms |
+| 50,000 × 1,000 = 50M | 1.57 GB, refused | 4 MB, compared, 0.17 ms |
+| 100,000 × 1,000 = 100M | 3.13 GB, refused | 4 MB, compared, 0.19 ms |
+| 300,000 × 1,000 = 300M | 9.38 GB, refused, 3.4 s | 4 MB, compared, 0.49 ms |
+| 1,048,576 × 16,384 (Excel's maximum sheet, 17.2 billion) | **process aborted:** `memory allocation of 549755813888 bytes failed` | 4 MB, compared, 0.16 ms |
 
-  Cost is linear in the declared area until the allocation itself fails; at
-  Excel's maximum sheet size the request (512 GiB) cannot be satisfied and Rust
-  aborts, which takes any unsaved work in other tabs with it. A single stray
-  populated cell far from the data does this: it does not need a hostile file.
-  A declared `<dimension ref="A1:XFD1048576"/>` with no far cell is harmless
-  (0.2 ms): only populated cells set the box.
-- **A large, densely populated sheet costs its parse before the bound refuses
-  it.** 20,000 × 1,000 = 20M populated cells in a 51.5 MB file (just under the
-  50 MiB input bound): refused after 5.9 s at 2.58 GB. That is the cost of the
-  bound firing late, not of a defect in the bound.
-- **The parse cannot be cancelled.** Cancelling 1 ms into the 300M-area case
-  returned after 3.33 s (the case takes 3.12 s uncancelled); 100 ms into the
-  100M case returned at 0.89 s. `sheets-diff` polls every 50,000 cells only
-  after the dense range exists.
-- **The cheap route does not exist in this crate.** A pre-parse check of the
-  populated bounding box needs `calamine`'s streaming reader
-  (`Xlsx::worksheet_cells_reader`, which exposes `dimensions()`), and
+  The rows that were "refused" are now **compared**: 3.0.0 counts populated
+  cells against `max_cells_read`, not the area of their box (a workbook the new
+  bound refuses, the old one refused too; some the old one refused are now
+  accepted, and these two-cell workbooks are those). Memory follows the two
+  populated cells. A declared `<dimension ref="A1:XFD1048576"/>` with no far cell
+  was and remains harmless.
+- **What remains is the cost of populated cells, and it is bounded.** 20,000 ×
+  1,000 = 20M populated cells in a 51.5 MB file (just under the 50 MiB input
+  bound): 2.5.0 refused it after 5.8 s at 2.58 GB; 3.0.0 refuses it after
+  **0.97 s at 707 MB**, when `max_cells_read` counts its 4,000,001st cell. That
+  is about **177 bytes per populated cell read**, and it is proportional and
+  bounded by the bound, which is what the earlier "the bound fired late" was
+  not. A comparison that reaches `max_cells_compared` (20,000 × 100 per side,
+  2,000,000 coordinates) is unchanged: 2.5.0 2.7 s at 1.93 GB, 3.0.0 2.6 s at
+  1.93 GB; F117's 1M/2M/5M basis reproduces (1.3 s at 0.97 GB, 2.7 s at 1.9 GB,
+  6.7 s at 4.8 GB on 3.0.0). Whether 4,000,000 cells read is the right bound on
+  a memory basis is open, and this is the evidence for it.
+- **The parse can now be cancelled.** On the 20M-cell file, a cancel requested at
+  100 ms returned at 4.71 s on 2.5.0 and at **112 ms** on 3.0.0; at 500 ms,
+  4.74 s and **547 ms**. On 2.5.0 the first poll came only after the dense range
+  existed.
+- **The cheap route in this crate never had to exist.** A pre-parse check of the
+  populated bounding box needed `calamine`'s streaming reader, and
   `forskscope-core` does not depend on `calamine` (`audit-deps` asserts
-  `sheets-diff` is its only dependent). The fix belongs in `sheets-diff`, this
-  project's own crate: read cells through that streaming reader into the sparse
-  map it already builds, enforcing `max_cells_read` and the cancellation poll
-  inside the loop. Proposed, not built (F123).
+  `sheets-diff` is its only dependent). The fix was in `sheets-diff` — cells read
+  through that streaming reader into the sparse map it already builds — and
+  landed there upstream.
 - Advisories published after 2026-09-24 against `quick-xml`, `zip` or
   `calamine`. `audit.yml` reports them daily; nothing here prevents them.
 
