@@ -28,7 +28,9 @@ use forskscope_core::error::Result as CoreResult;
 use crate::i18n::t;
 use crate::state::Store;
 use crate::ui::view::digest_epoch::{DigestEpoch, EpochStamp};
-use crate::ui::view::dir_pane::{FilteringExecutor, NavHistory, PathBar, home_dir, short_name};
+use crate::ui::view::dir_pane::{
+    FilteringExecutor, NavHistory, PathBar, SharedIgnoreRules, home_dir, short_name,
+};
 use forskscope_ui_logic::compute_aligned_rows;
 
 use compact::CompactTree;
@@ -238,7 +240,13 @@ pub fn Explorer() -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
 
-    let ignore = store.settings.read().ignore_rules();
+    // F112: the rules the scans use are a shared handle the executors read at each
+    // scan request, and a memo that changes only when the rules do. The two tree
+    // effects below read the memo, so a settings change re-runs them — rebuilding
+    // both trees under the new rules — without a restart or a navigation.
+    let settings = store.settings;
+    let ignore_rules = use_memo(move || settings.read().ignore_rules());
+    let shared_rules = use_hook(|| SharedIgnoreRules::new(settings.peek().ignore_rules()));
     let binary_enabled = store.settings.read().enable_binary_comparison;
     let compact_mode = store.settings.read().explorer_compact;
 
@@ -262,12 +270,15 @@ pub fn Explorer() -> Element {
     use_hook(|| left_hist.write().push(init_l.clone()));
 
     let exec_l = Arc::new(FilteringExecutor {
-        rules: ignore.clone(),
+        rules: shared_rules.clone(),
     });
     let mut tree_l: Signal<DirectoryTree> = use_signal(|| DirectoryTree::new(init_l.clone()));
     let scans_l = use_scan_driver(tree_l, exec_l);
 
+    let rules_l = shared_rules.clone();
     use_effect(move || {
+        // Subscribes to the rules: a change re-runs this and rebuilds the tree.
+        rules_l.set(ignore_rules());
         let root = left_dir.read().cloned();
         let mut nt = DirectoryTree::new(root.clone());
         binary_cache.write().clear();
@@ -294,11 +305,15 @@ pub fn Explorer() -> Element {
     let mut right_hist: Signal<NavHistory> = use_signal(NavHistory::default);
     use_hook(|| right_hist.write().push(init_r.clone()));
 
-    let exec_r = Arc::new(FilteringExecutor { rules: ignore });
+    let exec_r = Arc::new(FilteringExecutor {
+        rules: shared_rules.clone(),
+    });
     let mut tree_r: Signal<DirectoryTree> = use_signal(|| DirectoryTree::new(init_r.clone()));
     let scans_r = use_scan_driver(tree_r, exec_r);
 
+    let rules_r = shared_rules.clone();
     use_effect(move || {
+        rules_r.set(ignore_rules());
         let root = right_dir.read().cloned();
         let mut nt = DirectoryTree::new(root.clone());
         binary_cache.write().clear();

@@ -13,6 +13,7 @@ mod conflict_nav_tests;
 mod diff_decoration_tests;
 mod diff_tests;
 mod dir_cancel_tests;
+mod dir_ignore_tests;
 mod dir_index_tests;
 mod dir_tests;
 mod dir_unreadable_tests;

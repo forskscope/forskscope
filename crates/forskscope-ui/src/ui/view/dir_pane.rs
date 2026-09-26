@@ -7,6 +7,7 @@
 
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
+use std::sync::{Arc, RwLock};
 
 use dioxus::html::input_data::keyboard_types::Key;
 use dioxus::prelude::*;
@@ -89,14 +90,42 @@ impl NavHistory {
 
 // ── Filtering executor ────────────────────────────────────────────────────────
 
-pub struct FilteringExecutor {
-    pub rules: IgnoreRules,
+/// The ignore rules a running Explorer scans with (F112).
+///
+/// A handle, not a snapshot. `use_scan_driver` keeps the executor it is given
+/// at mount and drops every later one, so an executor that *owned* the rules
+/// filtered with whatever they were when the tab opened, whatever the settings
+/// said afterwards. The Explorer updates this handle when the settings change,
+/// and the executor reads it each time a scan is requested. Cloning shares the
+/// same rules; the lock is held only to copy them.
+#[derive(Clone, Default)]
+pub struct SharedIgnoreRules(Arc<RwLock<IgnoreRules>>);
+
+impl SharedIgnoreRules {
+    pub fn new(rules: IgnoreRules) -> Self {
+        Self(Arc::new(RwLock::new(rules)))
+    }
+
+    /// The rules in force now.
+    pub fn get(&self) -> IgnoreRules {
+        self.0.read().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+
+    /// Replace the rules; the next scan request sees them.
+    pub fn set(&self, rules: IgnoreRules) {
+        *self.0.write().unwrap_or_else(|e| e.into_inner()) = rules;
+    }
 }
-// IgnoreRules is plain Vec<String>; Send + Sync derive automatically.
+
+pub struct FilteringExecutor {
+    pub rules: SharedIgnoreRules,
+}
 
 impl ScanExecutor for FilteringExecutor {
     fn spawn_blocking(&self, job: ScanJob) -> ScanFuture {
-        let rules = self.rules.clone();
+        // Read at the moment the scan is requested, not when the executor was
+        // built: this is what makes a settings change reach a running tree.
+        let rules = self.rules.get();
         let f: ScanJob = Box::new(move || {
             let mut p: LoadPayload = job();
             if !rules.is_empty()
@@ -691,5 +720,82 @@ mod tests {
                  attributes {aria_labels:?}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod filtering_executor_tests {
+    use super::*;
+    use dioxus_swdir_tree::LoadedEntry;
+
+    fn payload() -> LoadPayload {
+        let entry = |name: &str, is_dir: bool| LoadedEntry {
+            path: PathBuf::from("/root").join(name),
+            is_dir,
+            is_hidden: false,
+        };
+        LoadPayload {
+            path: PathBuf::from("/root"),
+            generation: 1,
+            depth: 0,
+            result: Ok(vec![
+                entry(".git", true),
+                entry("build.log", false),
+                entry("keep.txt", false),
+            ]),
+        }
+    }
+
+    /// Run one scan through the executor and return the names it listed.
+    fn scan(exec: &FilteringExecutor) -> Vec<String> {
+        let fut = exec.spawn_blocking(Box::new(payload));
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        let payload = rt.block_on(fut);
+        payload
+            .result
+            .unwrap()
+            .iter()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect()
+    }
+
+    /// F112: an executor built once — which is what `use_scan_driver` keeps —
+    /// filters by the rules in force *when each scan is requested*, not the ones
+    /// it was built with. Falsify by making `spawn_blocking` read the rules once
+    /// at construction (a snapshot, the old shape): the second and third
+    /// assertions fail.
+    #[test]
+    fn a_settings_change_reaches_the_next_scan_of_an_executor_built_earlier() {
+        let shared = SharedIgnoreRules::new(IgnoreRules::default());
+        let exec = FilteringExecutor {
+            rules: shared.clone(),
+        };
+        assert_eq!(scan(&exec), vec![".git", "build.log", "keep.txt"]);
+
+        shared.set(IgnoreRules::from_settings("", ".git"));
+        assert_eq!(scan(&exec), vec!["build.log", "keep.txt"]);
+
+        shared.set(IgnoreRules::from_settings("log", ".git"));
+        assert_eq!(scan(&exec), vec!["keep.txt"]);
+
+        shared.set(IgnoreRules::default());
+        assert_eq!(scan(&exec), vec![".git", "build.log", "keep.txt"]);
+    }
+
+    /// Both panes' executors share one handle, so one settings change covers both.
+    #[test]
+    fn two_executors_sharing_a_handle_change_together() {
+        let shared = SharedIgnoreRules::new(IgnoreRules::default());
+        let left = FilteringExecutor {
+            rules: shared.clone(),
+        };
+        let right = FilteringExecutor {
+            rules: shared.clone(),
+        };
+        shared.set(IgnoreRules::from_settings("", ".git"));
+        assert!(!scan(&left).contains(&".git".to_string()));
+        assert!(!scan(&right).contains(&".git".to_string()));
     }
 }

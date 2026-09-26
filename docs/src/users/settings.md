@@ -102,8 +102,16 @@ Click any `···` divider in the diff to expand a collapsed region.
 
 ### Ignore patterns
 
-These filters apply to the Explorer tree — files and directories that match are
-hidden from the comparison panes.
+These filters apply to the Explorer tree and to **folder comparison** (Deep
+Compare). A directory that matches is not entered and does not appear; a file that
+matches is not listed. Both sides use the same rules, so an ignored entry that
+exists on one side only is not reported as a difference — two checkouts that
+differ only inside `.git` compare as identical once `.git` is ignored.
+
+A change takes effect immediately: the Explorer panes reload under the new rules
+(an expanded tree collapses back to its root) and an open folder comparison
+re-scans. **Opening a specific file always compares it**, whatever the ignore list
+says.
 
 #### Ignore file extensions
 

@@ -10,9 +10,10 @@ use std::path::{Path, PathBuf};
 
 use dioxus::prelude::*;
 
+use forskscope_core::IgnoreRules;
 use forskscope_core::dir::{
     DigestOutcome, RecEntry, RecStatus, file_digest_equal_with_cancel,
-    list_recursive_for_display_with_cancel,
+    list_recursive_for_display_with_rules,
 };
 use forskscope_ui_logic::{DeepCompareSummary, DeepFilter, apply_filter};
 
@@ -38,7 +39,10 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
     // `use_effect` re-run that isn't an actual root change (this component
     // has no reactive signal dependencies of its own) doesn't spawn a
     // second, redundant scan on top of one already in flight.
-    let mut scan_roots: Signal<Option<(PathBuf, PathBuf)>> = use_signal(|| None);
+    // F111: the ignore rules are part of what a scan was run for, so a settings
+    // change re-scans too (a scan under old rules is a different answer).
+    let mut scan_roots: Signal<Option<(PathBuf, PathBuf, IgnoreRules)>> = use_signal(|| None);
+    let store = use_context::<Store>();
     // F78: owns the generation guard, the cancellation token shared by
     // both phases, and the concurrency bound this view already had -
     // replacing the ad hoc per-effect-run `Semaphore` below with one that
@@ -56,11 +60,15 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
         let mut tc = total_common;
         let mut comp = computed;
 
-        let roots_changed = *scan_roots.read() != Some((lr1.clone(), rr1.clone()));
+        // Read the same way the Explorer reads them (`explorer.rs`), from the
+        // current settings each time, not captured at mount.
+        let rules = store.settings.read().ignore_rules();
+        let key = (lr1.clone(), rr1.clone(), rules.clone());
+        let roots_changed = *scan_roots.read() != Some(key.clone());
         if !roots_changed {
             return;
         }
-        scan_roots.set(Some((lr1.clone(), rr1.clone())));
+        scan_roots.set(Some(key));
         // Cancel outstanding work under the old roots (both phases share
         // this token) before anything else observes the new ones.
         digest_epoch.write().restart();
@@ -93,7 +101,7 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
             // which is what this handoff requires this view to display,
             // are unaffected and flow through `initial` normally.
             let initial = tokio::task::spawn_blocking(move || {
-                list_recursive_for_display_with_cancel(&lr1, &rr1, &list_token)
+                list_recursive_for_display_with_rules(&lr1, &rr1, &list_token, &rules)
             })
             .await
             .unwrap_or_default()

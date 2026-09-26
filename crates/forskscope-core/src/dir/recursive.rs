@@ -11,6 +11,17 @@
 //!
 //! Symlinks are now explicitly reported as `RecStatus::Symlink` rather than
 //! silently skipped. The caller decides how to present them.
+//!
+//! ## Ignore rules (F111, RFC-056)
+//!
+//! `recursive_diff_with_rules` / `list_recursive_for_display_with_rules` take an
+//! [`IgnoreRules`] and apply it **during the walk**, on both sides by the same
+//! rules: an ignored directory is not descended into and does not appear, and an
+//! ignored file is not reported, so an ignored entry present on one side only
+//! never becomes a one-sided difference. The decision is made from the entry's
+//! name and file type *before* its metadata is read, so an ignored entry that
+//! could not be read is neither failed on nor flagged `Unreadable`. The
+//! `*_with_cancel` functions are the same walks with empty rules.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -19,6 +30,7 @@ use std::path::{Path, PathBuf};
 use super::digest::{DigestOutcome, file_digest_equal_with_cancel};
 use crate::cancel::CancellationToken;
 use crate::error::{CoreError, IoOperation, Result};
+use crate::ignore::IgnoreRules;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -116,8 +128,19 @@ pub fn recursive_diff_with_cancel(
     right_root: &Path,
     token: &CancellationToken,
 ) -> RecursiveScan {
+    recursive_diff_with_rules(left_root, right_root, token, &IgnoreRules::default())
+}
+
+/// [`recursive_diff_with_cancel`], skipping what `rules` ignore (see the module
+/// doc). Empty rules give exactly the unfiltered result.
+pub fn recursive_diff_with_rules(
+    left_root: &Path,
+    right_root: &Path,
+    token: &CancellationToken,
+    rules: &IgnoreRules,
+) -> RecursiveScan {
     let mut map: BTreeMap<PathBuf, RecEntry> = BTreeMap::new();
-    let left_root_unreadable = walk(left_root, left_root, &mut map, token, false, |rel, meta| {
+    let left_root_unreadable = walk(left_root, left_root, &mut map, token, rules, |rel, meta| {
         RecEntry {
             rel_path: rel.clone(),
             status: RecStatus::LeftOnly,
@@ -129,7 +152,7 @@ pub fn recursive_diff_with_cancel(
     let right_root_unreadable = if token.is_cancelled() {
         false
     } else {
-        walk_and_merge(right_root, right_root, &mut map, left_root, token, false).is_err()
+        walk_and_merge(right_root, right_root, &mut map, left_root, token, rules).is_err()
     };
     RecursiveScan {
         entries: map.into_values().collect(),
@@ -145,8 +168,19 @@ pub fn list_recursive_for_display_with_cancel(
     right_root: &Path,
     token: &CancellationToken,
 ) -> RecursiveScan {
+    list_recursive_for_display_with_rules(left_root, right_root, token, &IgnoreRules::default())
+}
+
+/// [`list_recursive_for_display_with_cancel`], skipping what `rules` ignore
+/// (see the module doc). Empty rules give exactly the unfiltered result.
+pub fn list_recursive_for_display_with_rules(
+    left_root: &Path,
+    right_root: &Path,
+    token: &CancellationToken,
+    rules: &IgnoreRules,
+) -> RecursiveScan {
     let mut map: BTreeMap<PathBuf, RecEntry> = BTreeMap::new();
-    let left_root_unreadable = walk(left_root, left_root, &mut map, token, false, |rel, meta| {
+    let left_root_unreadable = walk(left_root, left_root, &mut map, token, rules, |rel, meta| {
         RecEntry {
             rel_path: rel.clone(),
             status: RecStatus::LeftOnly,
@@ -158,7 +192,7 @@ pub fn list_recursive_for_display_with_cancel(
     let right_root_unreadable = if token.is_cancelled() {
         false
     } else {
-        walk_and_merge_fast(right_root, right_root, &mut map, token).is_err()
+        walk_and_merge_fast(right_root, right_root, &mut map, token, rules).is_err()
     };
     RecursiveScan {
         entries: map.into_values().collect(),
@@ -184,6 +218,31 @@ fn mark_unreadable(map: &mut BTreeMap<PathBuf, RecEntry>, rel: PathBuf) {
     entry.status = RecStatus::Unreadable;
 }
 
+/// F111: whether `rules` exclude this directory entry. Decided from the name and
+/// the entry's own file type, which needs no `stat` on the common platforms, so
+/// an ignored entry is never read and an unreadable one is never flagged. A
+/// symlink is judged by what it points at (a dangling one is not ignored, so it
+/// is still reported).
+fn is_ignored(rules: &IgnoreRules, entry: &fs::DirEntry) -> bool {
+    if rules.is_empty() {
+        return false;
+    }
+    let name = entry.file_name();
+    let Some(name) = name.to_str() else {
+        return false;
+    };
+    match entry.file_type() {
+        Ok(ft) if ft.is_dir() => rules.is_dir_ignored(name),
+        Ok(ft) if ft.is_file() => rules.is_file_ignored(name),
+        Ok(ft) if ft.is_symlink() => match fs::metadata(entry.path()) {
+            Ok(m) if m.is_dir() => rules.is_dir_ignored(name),
+            Ok(_) => rules.is_file_ignored(name),
+            Err(_) => false,
+        },
+        _ => false,
+    }
+}
+
 /// Walk a directory tree, inserting entries via `make`. Symlinks are
 /// inserted with `RecStatus::Symlink`. Returns `Err` only on unrecoverable
 /// directory-open failures (the caller reports the directory itself as
@@ -194,7 +253,7 @@ fn walk(
     dir: &Path,
     map: &mut BTreeMap<PathBuf, RecEntry>,
     token: &CancellationToken,
-    _fast: bool,
+    rules: &IgnoreRules,
     make: impl Fn(&PathBuf, &fs::Metadata) -> RecEntry + Copy,
 ) -> Result<()> {
     if token.is_cancelled() {
@@ -204,6 +263,9 @@ fn walk(
     for entry in rd.flatten() {
         if token.is_cancelled() {
             break;
+        }
+        if is_ignored(rules, &entry) {
+            continue;
         }
         let path = entry.path();
         let rel = path.strip_prefix(root).unwrap_or(&path).to_path_buf();
@@ -231,7 +293,7 @@ fn walk(
             // A subdirectory that cannot be opened takes its subtree out of
             // the result - unavoidable, nothing read it - but must itself
             // be visible rather than silently absent (F79).
-            if walk(root, &path, map, token, _fast, make).is_err() {
+            if walk(root, &path, map, token, rules, make).is_err() {
                 mark_unreadable(map, rel);
             }
         } else if meta.is_file() {
@@ -248,7 +310,7 @@ fn walk_and_merge(
     map: &mut BTreeMap<PathBuf, RecEntry>,
     left_root: &Path,
     token: &CancellationToken,
-    _fast: bool,
+    rules: &IgnoreRules,
 ) -> Result<()> {
     if token.is_cancelled() {
         return Ok(());
@@ -257,6 +319,9 @@ fn walk_and_merge(
     for entry in rd.flatten() {
         if token.is_cancelled() {
             break;
+        }
+        if is_ignored(rules, &entry) {
+            continue;
         }
         let path = entry.path();
         let rel = path.strip_prefix(right_root).unwrap_or(&path).to_path_buf();
@@ -276,7 +341,7 @@ fn walk_and_merge(
                 right_size: None,
             });
         } else if meta.is_dir() {
-            if walk_and_merge(right_root, &path, map, left_root, token, _fast).is_err() {
+            if walk_and_merge(right_root, &path, map, left_root, token, rules).is_err() {
                 mark_unreadable(map, rel);
             }
         } else if meta.is_file() {
@@ -330,6 +395,7 @@ fn walk_and_merge_fast(
     dir: &Path,
     map: &mut BTreeMap<PathBuf, RecEntry>,
     token: &CancellationToken,
+    rules: &IgnoreRules,
 ) -> Result<()> {
     if token.is_cancelled() {
         return Ok(());
@@ -338,6 +404,9 @@ fn walk_and_merge_fast(
     for entry in rd.flatten() {
         if token.is_cancelled() {
             break;
+        }
+        if is_ignored(rules, &entry) {
+            continue;
         }
         let path = entry.path();
         let rel = path.strip_prefix(right_root).unwrap_or(&path).to_path_buf();
@@ -357,7 +426,7 @@ fn walk_and_merge_fast(
                 right_size: None,
             });
         } else if meta.is_dir() {
-            if walk_and_merge_fast(right_root, &path, map, token).is_err() {
+            if walk_and_merge_fast(right_root, &path, map, token, rules).is_err() {
                 mark_unreadable(map, rel);
             }
         } else if meta.is_file() {
