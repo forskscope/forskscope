@@ -339,7 +339,11 @@ mod tests {
             let section = format!("\n{header}\n|---|---|---|\n| `a/b` | c | d |\n");
             let rows = table_rows_until_next_heading(&section);
             assert_eq!(rows.modules, vec!["a/b"], "{header}");
-            assert!(rows.unreadable.is_empty(), "{header}: {:?}", rows.unreadable);
+            assert!(
+                rows.unreadable.is_empty(),
+                "{header}: {:?}",
+                rows.unreadable
+            );
         }
     }
 
