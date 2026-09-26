@@ -38,6 +38,27 @@
 //! was explicit that wording stays a human judgment. Every mismatch is
 //! reported in one run, in both directions (missing from a doc, and
 //! present in a doc but absent on disk) — not just the first found.
+//!
+//! **A row the check cannot read a module name from is reported, never
+//! skipped (F107).** Every table body row must start with a backticked
+//! module name. A stale row written in a slightly different style —
+//! `| compare/ghost_module | ... |`, no backticks — used to be dropped
+//! silently and the check passed on it; now it is a problem, naming the
+//! document and the row's text. There is no allowlist.
+//!
+//! ## Which table rows are body rows
+//!
+//! A table line is a line starting with `|`. Of those, exactly two kinds are
+//! not body rows, and both are recognised by *structure*, not by wording:
+//!
+//! - the **separator** row (`|---|---|`, `|:--|--:|`): every cell is only
+//!   `-`, `:` and spaces;
+//! - the **header** row: the row immediately *before* a separator row, which
+//!   is what a markdown table header is by definition. Recognising it this
+//!   way (rather than by the words `Module`/`File`) means a differently
+//!   worded header is still skipped, and a body row is never mistaken for one.
+//!
+//! Everything else is a body row.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -68,8 +89,10 @@ pub fn run(root: &Path) {
             arch_path.display()
         )
     });
-    let arch_rows: BTreeSet<String> = table_rows_until_next_heading(arch_section)
-        .into_iter()
+    let arch_table = table_rows_until_next_heading(arch_section);
+    let arch_rows: BTreeSet<String> = arch_table
+        .modules
+        .iter()
         .map(|s| s.replace("::", "/"))
         .collect();
 
@@ -83,9 +106,8 @@ pub fn run(root: &Path) {
                 testing_path.display()
             )
         });
-    let testing_rows: BTreeSet<String> = table_rows_until_next_heading(testing_section)
-        .into_iter()
-        .collect();
+    let testing_table = table_rows_until_next_heading(testing_section);
+    let testing_rows: BTreeSet<String> = testing_table.modules.iter().cloned().collect();
 
     let mut problems = Vec::new();
 
@@ -97,6 +119,8 @@ pub fn run(root: &Path) {
     }
     report_diff(&mut problems, "architecture.md", &arch_rows, &disk_set);
     report_diff(&mut problems, "testing.md", &testing_rows, &disk_set);
+    report_unreadable(&mut problems, "architecture.md", &arch_table);
+    report_unreadable(&mut problems, "testing.md", &testing_table);
 
     if !problems.is_empty() {
         eprintln!("ui-logic-docs check failed:");
@@ -110,6 +134,16 @@ pub fn run(root: &Path) {
         "ui-logic-docs check passed: architecture.md and testing.md both list exactly the {} ui-logic modules on disk.",
         disk_set.len()
     );
+}
+
+/// F107: a row the check cannot read a module name from is a problem, named,
+/// not silently dropped.
+fn report_unreadable(problems: &mut Vec<String>, doc: &str, table: &TableRows) {
+    for row in &table.unreadable {
+        problems.push(format!(
+            "{doc} has a table row with no backticked module name: `{row}`"
+        ));
+    }
 }
 
 fn report_diff(
@@ -200,24 +234,59 @@ fn parse_paren_count(heading_line: &str) -> Option<usize> {
     heading_line[open + 1..close].trim().parse().ok()
 }
 
-/// Collects the first backtick-quoted cell of every markdown table row in
-/// `section`, stopping at the next `## ` heading (or end of `section`).
-/// Header and separator rows are skipped naturally - neither starts with
-/// a backtick immediately after the leading `|`.
-fn table_rows_until_next_heading(section: &str) -> Vec<String> {
-    let mut rows = Vec::new();
+/// What was read from a section's tables: the module names, and every body
+/// row a name could not be read from (F107).
+#[derive(Debug, Default, PartialEq, Eq)]
+struct TableRows {
+    modules: Vec<String>,
+    /// The text of each body row whose first cell has no backticked name.
+    unreadable: Vec<String>,
+}
+
+/// `true` for a markdown table separator row: every cell is only `-`, `:` and
+/// spaces (`|---|---|`, `| :--- | ---: |`), and there is at least one cell.
+fn is_separator_row(line: &str) -> bool {
+    let cells: Vec<&str> = line.trim().trim_matches('|').split('|').collect();
+    !cells.is_empty()
+        && cells
+            .iter()
+            .all(|c| !c.trim().is_empty() && c.chars().all(|ch| matches!(ch, '-' | ':' | ' ')))
+}
+
+/// Reads the markdown table rows of `section`, stopping at the next `## `
+/// heading (or the end of `section`). The separator row and the header row
+/// (the row immediately before a separator) are not body rows; every body
+/// row must yield a backticked module name or is reported in `unreadable`.
+fn table_rows_until_next_heading(section: &str) -> TableRows {
+    let mut out = TableRows::default();
+    let mut body = |line: &str| match first_backtick_cell(line) {
+        Some(name) => out.modules.push(name),
+        None => out.unreadable.push(line.trim().to_string()),
+    };
+    // The last table line seen, not yet known to be a header or a body row.
+    let mut pending: Option<&str> = None;
     for line in section.lines() {
         if line.starts_with("## ") {
             break;
         }
         if !line.starts_with('|') {
+            if let Some(p) = pending.take() {
+                body(p);
+            }
             continue;
         }
-        if let Some(name) = first_backtick_cell(line) {
-            rows.push(name);
+        if is_separator_row(line) {
+            pending = None; // the row before a separator is the header
+            continue;
+        }
+        if let Some(previous) = pending.replace(line) {
+            body(previous);
         }
     }
-    rows
+    if let Some(p) = pending {
+        body(p);
+    }
+    out
 }
 
 fn first_backtick_cell(line: &str) -> Option<String> {
@@ -247,19 +316,76 @@ mod tests {
 \n\
 ## Next section\n\
 | `not::a::module` | must not be counted |\n";
-        assert_eq!(
-            table_rows_until_next_heading(section),
-            vec!["explore::align", "compare::save_error"]
-        );
+        let rows = table_rows_until_next_heading(section);
+        assert_eq!(rows.modules, vec!["explore::align", "compare::save_error"]);
+        assert!(rows.unreadable.is_empty());
     }
 
     #[test]
     fn skips_non_table_prose_lines() {
         let section = "\nAll tests are inline. Integration tests live in `tests/css_coverage.rs`.\n\n| `explore/align` | covers this |\n";
         assert_eq!(
-            table_rows_until_next_heading(section),
+            table_rows_until_next_heading(section).modules,
             vec!["explore/align"]
         );
+    }
+
+    /// F107's unit tests for the row-classification rule: a header row, a
+    /// separator row, a normal row and an unbackticked row.
+    #[test]
+    fn a_header_and_a_separator_are_not_body_rows() {
+        // Both document shapes: architecture.md's and testing.md's headers.
+        for header in ["| Module | Purpose |", "| File | Covers | RFC |"] {
+            let section = format!("\n{header}\n|---|---|---|\n| `a/b` | c | d |\n");
+            let rows = table_rows_until_next_heading(&section);
+            assert_eq!(rows.modules, vec!["a/b"], "{header}");
+            assert!(rows.unreadable.is_empty(), "{header}: {:?}", rows.unreadable);
+        }
+    }
+
+    /// The header is recognised by structure — the row before the separator —
+    /// so a header worded differently is still skipped, and it is *only* that
+    /// row: a body row is never mistaken for one.
+    #[test]
+    fn the_header_is_the_row_before_the_separator_whatever_it_says() {
+        let section = "\n| Anything at all | here |\n| :--- | ---: |\n| `a` | x |\n| `b` | y |\n";
+        let rows = table_rows_until_next_heading(section);
+        assert_eq!(rows.modules, vec!["a", "b"]);
+        assert!(rows.unreadable.is_empty());
+    }
+
+    #[test]
+    fn a_normal_row_yields_its_backticked_name() {
+        let rows = table_rows_until_next_heading("| `explore/align` | covers this |\n");
+        assert_eq!(rows.modules, vec!["explore/align"]);
+        assert!(rows.unreadable.is_empty());
+    }
+
+    /// The F107 probe: a stale row with no backticks is reported, not dropped —
+    /// wherever it sits in the table, including as the last row and without a
+    /// header above it.
+    #[test]
+    fn an_unbackticked_row_is_reported_not_skipped() {
+        let section = "\n| File | Covers |\n|---|---|\n| `a/b` | ok |\n| compare/ghost_module | unbackticked stale row | RFC-000 |\n| `c/d` | ok |\n| trailing/ghost | last row |\n";
+        let rows = table_rows_until_next_heading(section);
+        assert_eq!(rows.modules, vec!["a/b", "c/d"]);
+        assert_eq!(
+            rows.unreadable,
+            vec![
+                "| compare/ghost_module | unbackticked stale row | RFC-000 |",
+                "| trailing/ghost | last row |",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_separator_row_is_recognised_by_its_cells_only() {
+        for sep in ["|---|---|", "| --- | --- |", "|:--|--:|", "| :---: |"] {
+            assert!(is_separator_row(sep), "{sep}");
+        }
+        for not in ["| a | b |", "| `x` | --- |", "|  |  |", "| - a | b |"] {
+            assert!(!is_separator_row(not), "{not}");
+        }
     }
 
     #[test]

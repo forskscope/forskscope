@@ -58,9 +58,11 @@ twice after being corrected — once when `d69c83b`/`8f1af77` deleted five
 modules and neither deletion reached here, once when handoff 033's
 `ui-logic` connectivity cleanup deleted `conflict_nav_view` and
 `palette_view` (deferred post-v1 view-models, never wired) and this table
-was not updated alongside the code. `cargo xtask ui-logic-docs` now checks
-this table (and `testing.md`'s) against the module tree on every push, so a
-third silent drift is not possible.
+was not updated alongside the code. `cargo xtask ui-logic-docs` checks, on
+every push, that the module names listed in this table and in `testing.md`'s,
+and this heading's count, match the leaf modules on disk, and it reports a
+table row it cannot read a module name from instead of ignoring it. It does not
+read what a row says a module does; that stays a judgment.
 
 | Module | Purpose |
 |---|---|
