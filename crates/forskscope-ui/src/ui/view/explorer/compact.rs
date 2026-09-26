@@ -33,6 +33,7 @@ pub fn CompactTree(
     mut left_pick: Signal<Option<PickKind>>,
     mut right_pick: Signal<Option<PickKind>>,
     mut digest_map: Signal<HashMap<DigestKey, EqualityEvidence>>,
+    tier1_map: Signal<super::Tier1Map>,
     mut binary_cache: Signal<HashMap<PathBuf, bool>>,
     binary_enabled: bool,
     filter_query: Signal<String>,
@@ -51,7 +52,10 @@ pub fn CompactTree(
                     {
                         let (abs, is_dir, is_expanded, is_selected, depth) = row.clone();
                         let rel = abs.strip_prefix(&l_root).unwrap_or(&abs).to_path_buf();
-                        let status = digest_map.read().get(&DigestKey::Common(rel)).cloned();
+                        let status = super::row_evidence(
+                            digest_map.read().get(&DigestKey::Common(rel.clone())).cloned(),
+                            &tier1_map.read(), &l_root, &r_root, &rel,
+                        );
                         let p_tgl = abs.clone(); let p_sel = abs.clone();
                         let p_dbl = abs.clone(); let p_nav = abs.clone();
                         let p_bin = abs.clone();
@@ -105,8 +109,11 @@ pub fn CompactTree(
                         let (abs, is_dir, is_expanded, is_selected, depth) = row.clone();
                         let rel = abs.strip_prefix(&r_root).unwrap_or(&abs).to_path_buf();
                         let common    = digest_map.read().get(&DigestKey::Common(rel.clone())).cloned();
-                        let right_only = digest_map.read().get(&DigestKey::RightOnly(rel)).cloned();
-                        let status = common.or(right_only);
+                        let right_only = digest_map.read().get(&DigestKey::RightOnly(rel.clone())).cloned();
+                        let status = super::row_evidence(
+                            common.or(right_only),
+                            &tier1_map.read(), &l_root, &r_root, &rel,
+                        );
                         let p_tgl = abs.clone(); let p_sel = abs.clone();
                         let p_dbl = abs.clone(); let p_nav = abs.clone();
                         let p_bin = abs.clone();

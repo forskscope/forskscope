@@ -12,7 +12,7 @@ use dioxus_swdir_tree::{DirectoryTree, DirectoryTreeEvent, ScanRequest, Selectio
 use forskscope_core::dir::EqualityEvidence;
 use forskscope_ui_logic::AlignedRow;
 
-use super::{DigestKey, FocusedPane, PickKind};
+use super::{DigestKey, FocusedPane, PickKind, Tier1Map, row_evidence};
 use crate::i18n::t;
 use crate::state::{Lang, Store, open_compare};
 use crate::ui::view::dir_pane::{NavHistory, TreeRow, home_dir, navigate_to};
@@ -34,6 +34,7 @@ pub fn AlignedTree(
     mut right_pick: Signal<Option<PickKind>>,
     mut focused_pane: Signal<FocusedPane>,
     mut digest_map: Signal<HashMap<DigestKey, EqualityEvidence>>,
+    tier1_map: Signal<Tier1Map>,
     mut binary_cache: Signal<HashMap<PathBuf, bool>>,
     binary_enabled: bool,
 ) -> Element {
@@ -150,9 +151,12 @@ pub fn AlignedTree(
                             div { class: "pane-half",
                                 if let Some(ref row) = lr {
                                     {
-                                        let status = digest_map.read()
-                                            .get(&DigestKey::Common(row.rel_path.clone()))
-                                            .cloned();
+                                        let status = row_evidence(
+                                            digest_map.read()
+                                                .get(&DigestKey::Common(row.rel_path.clone()))
+                                                .cloned(),
+                                            &tier1_map.read(), &l_root, &r_root, &row.rel_path,
+                                        );
                                         let p_tgl = row.abs_path.clone();
                                         let p_sel = row.abs_path.clone();
                                         let p_dbl = row.abs_path.clone();
@@ -212,7 +216,10 @@ pub fn AlignedTree(
                                     {
                                         let common     = digest_map.read().get(&DigestKey::Common(row.rel_path.clone())).cloned();
                                         let right_only = digest_map.read().get(&DigestKey::RightOnly(row.rel_path.clone())).cloned();
-                                        let status = common.or(right_only);
+                                        let status = row_evidence(
+                                            common.or(right_only),
+                                            &tier1_map.read(), &l_root, &r_root, &row.rel_path,
+                                        );
                                         let p_tgl = row.abs_path.clone();
                                         let p_sel = row.abs_path.clone();
                                         let p_dbl = row.abs_path.clone();

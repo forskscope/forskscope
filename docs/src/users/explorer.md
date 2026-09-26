@@ -84,6 +84,14 @@ one-character status icon. When both panes show directories, ForskScope
 computes a digest for each same-named file in the background, so an icon may
 first read `…` and then change.
 
+A same-named **folder** pair starts as `–`. Select the row and rest on it for a
+moment (arrowing past it does nothing) and ForskScope compares the names and
+sizes inside the two folders, without reading any file: if something is on one
+side only, or a file's size differs, the row becomes `≠`. If nothing differs at
+that level it becomes `≈` — the same names and sizes, contents not compared.
+`≈` is deliberately not `=`: a change that keeps a file's size cannot be seen
+this way. Moving to another row, or navigating, stops the check.
+
 <!-- status-glyphs:begin -->
 | Icon | Meaning |
 |------|---------|
@@ -93,7 +101,8 @@ first read `…` and then change.
 | `⊘` | **Unreadable** — something could not be read, so nothing was compared. This is not a verdict: the two sides may or may not match |
 | `←` | **Left only** — present only on the left |
 | `→` | **Right only** — present only on the right |
-| `–` | **Not compared** — a same-named folder pair. The Explorer never looks inside folders; use a Directory Report to compare their contents (Explorer only) |
+| `–` | **Not compared** — a same-named folder pair that has not been examined. Select the row and rest on it to compare names and sizes; use a Directory Report to compare contents (Explorer only) |
+| `≈` | **Metadata matches; contents not compared** — the two folders have the same names and sizes throughout (a file pair: the same size), and no file was read. This is not "identical": an edit that keeps a file's size goes unnoticed (Explorer only) |
 | `↗` | **Symlink**, not followed — a symbolic link is listed, and its target is not compared (Directory Report only) |
 <!-- status-glyphs:end -->
 

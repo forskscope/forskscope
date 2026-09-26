@@ -20,8 +20,10 @@ use std::sync::Arc;
 use dioxus::prelude::*;
 use dioxus_swdir_tree::{DirectoryTree, use_scan_driver};
 
+use forskscope_core::IgnoreRules;
 use forskscope_core::dir::{
     DigestOutcome, EntryType, EqualityEvidence, file_digest_equal_with_cancel,
+    list_recursive_for_display_with_rules,
 };
 use forskscope_core::error::Result as CoreResult;
 
@@ -31,7 +33,9 @@ use crate::ui::view::digest_epoch::{DigestEpoch, EpochStamp};
 use crate::ui::view::dir_pane::{
     FilteringExecutor, NavHistory, PathBar, SharedIgnoreRules, home_dir, short_name,
 };
-use forskscope_ui_logic::compute_aligned_rows;
+use forskscope_ui_logic::{
+    DirVerdict, Tier1Action, Tier1Trigger, compute_aligned_rows, dir_verdict,
+};
 
 use compact::CompactTree;
 use filter::{FilterBar, apply_filter};
@@ -171,6 +175,171 @@ fn apply_epoch_result(
     if epoch.is_current(stamp) {
         digest_map.insert(key, state);
     }
+}
+
+/// Key of a tier-1 directory verdict (RFC-080 §5): the pair of roots it was
+/// measured under and the directory's path relative to both.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Tier1Key {
+    pub left_root: PathBuf,
+    pub right_root: PathBuf,
+    pub rel: PathBuf,
+}
+
+/// Tier-1 results. **Not** `digest_map`: every tree expand clears that map
+/// wholesale, so a verdict stored there would be destroyed by an unrelated
+/// toggle. This has its own invalidation — cleared when the roots change and
+/// when the ignore rules do — and is never persisted.
+pub type Tier1Map = HashMap<Tier1Key, EqualityEvidence>;
+
+/// The evidence a row renders. A same-named directory pair sits at `Unknown`
+/// ("directory contents not compared") in `digest_map`; if a tier-1 walk has
+/// produced a result for it, that result is shown instead. Nothing else is
+/// overridden — a file row, a one-sided row or a type mismatch keeps its own.
+pub fn row_evidence(
+    base: Option<EqualityEvidence>,
+    tier1: &Tier1Map,
+    l_root: &Path,
+    r_root: &Path,
+    rel: &Path,
+) -> Option<EqualityEvidence> {
+    match base {
+        Some(EqualityEvidence::Unknown) => {
+            let key = Tier1Key {
+                left_root: l_root.to_path_buf(),
+                right_root: r_root.to_path_buf(),
+                rel: rel.to_path_buf(),
+            };
+            tier1.get(&key).cloned().or(base)
+        }
+        other => other,
+    }
+}
+
+/// The directory row a tier-1 walk would be started for: the first selected
+/// directory (left pane's, then right's) whose pair `digest_map` classified as
+/// an unexamined same-named pair, and which has no tier-1 result yet (a cached
+/// verdict, including "no verdict", is never walked again).
+fn tier1_candidate(
+    selected_dirs: &[PathBuf],
+    digest_map: &HashMap<DigestKey, EqualityEvidence>,
+    tier1: &Tier1Map,
+    l_root: &Path,
+    r_root: &Path,
+) -> Option<PathBuf> {
+    selected_dirs.iter().find_map(|rel| {
+        let unexamined = matches!(
+            digest_map.get(&DigestKey::Common(rel.clone())),
+            Some(EqualityEvidence::Unknown)
+        );
+        let key = Tier1Key {
+            left_root: l_root.to_path_buf(),
+            right_root: r_root.to_path_buf(),
+            rel: rel.clone(),
+        };
+        // The in-flight row's own "Comparing…" marker is not a result: it must stay
+        // the candidate, or the effect would cancel the very walk it started.
+        let has_result = tier1
+            .get(&key)
+            .is_some_and(|e| *e != EqualityEvidence::MetadataOnly);
+        (unexamined && !has_result).then(|| rel.clone())
+    })
+}
+
+/// Relative paths of the selected directory rows in one pane's tree.
+fn selected_dirs(tree: &DirectoryTree, root: &Path) -> Vec<PathBuf> {
+    tree.visible_rows()
+        .into_iter()
+        .filter(|(n, _)| n.is_dir && n.is_selected)
+        .filter_map(|(n, _)| n.path.strip_prefix(root).ok().map(Path::to_path_buf))
+        .filter(|rel| !rel.as_os_str().is_empty())
+        .collect()
+}
+
+/// What tier 1 concluded, as the evidence a row renders. `Unknown` is stored
+/// too — it renders as "not compared" and, being cached, stops the selection
+/// effect from walking the same row again forever.
+fn verdict_evidence(verdict: DirVerdict) -> EqualityEvidence {
+    match verdict {
+        DirVerdict::Different => EqualityEvidence::TreeDifferent,
+        DirVerdict::MetadataMatch => EqualityEvidence::MetadataMatch,
+        DirVerdict::Unknown => EqualityEvidence::Unknown,
+    }
+}
+
+/// What a finished tier-1 walk may apply. `None` when the walk was cancelled or
+/// its epoch is no longer current: a cancelled walk returns a *partial* scan,
+/// and a partial scan can read as "names and sizes match" — applying it would be
+/// exactly the false result cancellation exists to prevent. Checked, not assumed
+/// (the F61 pattern).
+fn tier1_outcome(
+    scan: &forskscope_core::dir::RecursiveScan,
+    cancelled: bool,
+    epoch_current: bool,
+) -> Option<EqualityEvidence> {
+    if cancelled || !epoch_current {
+        return None;
+    }
+    Some(verdict_evidence(dir_verdict(scan)))
+}
+
+/// Start the tier-1 walk for `rel` (RFC-080 §3, §5). The row shows "Comparing…"
+/// while it runs. It goes through a `DigestEpoch` of its own (concurrency 1: at
+/// most one walk) — the same mechanism every other comparison uses, so this adds
+/// no second way to cancel. A result is applied only if the epoch is still
+/// current *and* the token was not cancelled: the selection moving or the roots
+/// changing both `restart()` it.
+#[allow(clippy::too_many_arguments)]
+fn start_tier1_walk(
+    rel: PathBuf,
+    l_root: PathBuf,
+    r_root: PathBuf,
+    rules: IgnoreRules,
+    lang: crate::state::Lang,
+    mut tier1_map: Signal<Tier1Map>,
+    tier1_epoch: Signal<DigestEpoch>,
+    mut trigger: Signal<Tier1Trigger<PathBuf>>,
+    mut announcement: Signal<String>,
+) {
+    let key = Tier1Key {
+        left_root: l_root.clone(),
+        right_root: r_root.clone(),
+        rel: rel.clone(),
+    };
+    tier1_map
+        .write()
+        .insert(key.clone(), EqualityEvidence::MetadataOnly);
+    let (stamp, token, sem) = tier1_epoch.read().begin_task();
+    spawn(async move {
+        let _permit = sem.acquire_owned().await;
+        let (left, right) = (l_root.join(&rel), r_root.join(&rel));
+        let walk_token = token.clone();
+        let scan = tokio::task::spawn_blocking(move || {
+            list_recursive_for_display_with_rules(&left, &right, &walk_token, &rules)
+        })
+        .await;
+        trigger.write().finished(&rel);
+        // Cancelled, superseded, or the walk itself panicked: nothing was
+        // established, so nothing is applied. Drop the "Comparing…" marker so a
+        // later rest can walk this row again.
+        let Ok(scan) = scan else {
+            tier1_map.write().remove(&key);
+            return;
+        };
+        let Some(evidence) = tier1_outcome(
+            &scan,
+            token.is_cancelled(),
+            tier1_epoch.read().is_current(stamp),
+        ) else {
+            return;
+        };
+        let kind = forskscope_ui_logic::RowStatusKind::from_evidence(&evidence);
+        tier1_map.write().insert(key, evidence);
+        // Completion is announced, not silently swapped in (§6): a polite live
+        // region, `role="status"`, present in the Explorer at all times.
+        let label = crate::ui::view::dir_pane::status_kind_label(kind, lang, true);
+        announcement.set(format!("{}: {}", short_name(&rel), label));
+    });
 }
 
 /// Which pane currently receives keyboard events (RFC-061).
@@ -338,6 +507,18 @@ pub fn Explorer() -> Element {
     let mut digest_epoch: Signal<DigestEpoch> =
         use_signal(|| DigestEpoch::new(forskscope_core::DIGEST_CONCURRENCY_LIMIT));
 
+    // RFC-080 tier 1. Its own results map (see `Tier1Map`), and its own
+    // `DigestEpoch` — concurrency 1, so at most one walk in flight — restarted
+    // when the selection moves as well as when the roots change. The debounce
+    // is the pure state machine in `ui-logic`; this view supplies the clock and
+    // the spawning.
+    let mut tier1_map: Signal<Tier1Map> = use_signal(HashMap::new);
+    let mut tier1_epoch: Signal<DigestEpoch> = use_signal(|| DigestEpoch::new(1));
+    let mut tier1_trigger: Signal<Tier1Trigger<PathBuf>> =
+        use_signal(Tier1Trigger::<PathBuf>::default);
+    let tier1_announcement: Signal<String> = use_signal(String::new);
+    let clock = use_hook(std::time::Instant::now);
+
     use_effect(move || {
         let l_root = left_dir.read().cloned();
         let r_root = right_dir.read().cloned();
@@ -355,6 +536,10 @@ pub fn Explorer() -> Element {
                 // wasted work for whatever hasn't finished yet.
                 digest_epoch.write().restart();
                 digest_map.write().clear();
+                // Navigation drops tier-1 results too (§5) and stops the walk.
+                tier1_epoch.write().restart();
+                tier1_map.write().clear();
+                tier1_trigger.write().selected(clock.elapsed(), None);
                 digest_roots.set((l_root.clone(), r_root.clone()));
             }
         }
@@ -461,6 +646,68 @@ pub fn Explorer() -> Element {
                 digest_map.write().insert(key, EqualityEvidence::RightOnly);
             }
         }
+    });
+
+    // The ignore rules changing invalidates tier-1 results (a verdict under old
+    // rules is a different answer) and stops any walk.
+    use_effect(move || {
+        let _ = ignore_rules();
+        tier1_epoch.write().restart();
+        tier1_map.write().clear();
+        tier1_trigger.write().selected(clock.elapsed(), None);
+    });
+
+    // ── Tier-1 trigger (RFC-080 §5, criterion 7) ──────────────────────────────
+    // Runs whenever the selection, the rows or the classifications change. A row
+    // starts a walk only after being rested on for `TIER1_DEBOUNCE`; passing over
+    // rows starts none. Reads of `tier1_map` and the trigger are `peek`s: this
+    // effect writes both, and must not subscribe to its own writes.
+    let rules_for_walk = shared_rules.clone();
+    use_effect(move || {
+        let l_root = left_dir.read().cloned();
+        let r_root = right_dir.read().cloned();
+        let mut selected = selected_dirs(&tree_l.read(), &l_root);
+        selected.extend(selected_dirs(&tree_r.read(), &r_root));
+        let candidate = tier1_candidate(
+            &selected,
+            &digest_map.read(),
+            &tier1_map.peek(),
+            &l_root,
+            &r_root,
+        );
+        let now = clock.elapsed();
+        let action = tier1_trigger.write().selected(now, candidate);
+        if let Some(Tier1Action::CancelWalk) = action {
+            // The selection moved off the row being walked: stop it, and drop
+            // its "Comparing…" marker so the row returns to "not compared".
+            tier1_epoch.write().restart();
+            tier1_map
+                .write()
+                .retain(|_, v| *v != EqualityEvidence::MetadataOnly);
+        }
+        let Some(due) = tier1_trigger.peek().due_at() else {
+            return;
+        };
+        let delay = due.saturating_sub(now);
+        let rules = rules_for_walk.clone();
+        let (l, r) = (l_root, r_root);
+        spawn(async move {
+            tokio::time::sleep(delay + std::time::Duration::from_millis(5)).await;
+            let started = tier1_trigger.write().tick(clock.elapsed());
+            if let Some(rel) = started {
+                start_tier1_walk(
+                    rel,
+                    l,
+                    r,
+                    rules.get(),
+                    lang,
+                    tier1_map,
+                    tier1_epoch,
+                    tier1_trigger,
+                    tier1_announcement,
+                );
+            }
+        });
     });
 
     // ── Filter state ──────────────────────────────────────────────────────────
@@ -578,7 +825,7 @@ pub fn Explorer() -> Element {
                         tree_l, tree_r, scans_l, scans_r,
                         left_dir, right_dir, left_hist, right_hist,
                         left_pick, right_pick, focused_pane,
-                        digest_map, binary_cache, binary_enabled,
+                        digest_map, tier1_map, binary_cache, binary_enabled,
                     }
                 } else {
                     CompactTree {
@@ -588,13 +835,25 @@ pub fn Explorer() -> Element {
                         tree_l, tree_r, scans_l, scans_r,
                         left_dir, right_dir, left_hist, right_hist,
                         left_pick, right_pick,
-                        digest_map, binary_cache, binary_enabled,
+                        digest_map, tier1_map, binary_cache, binary_enabled,
                         filter_query,
                     }
                 }
 
                 // ── Footer ────────────────────────────────────────────────
                 ExplorerFooter { lang, left_pick, right_pick }
+
+                // A tier-1 result is announced, not silently swapped in (RFC-080
+                // §6). The app's only other polite region is the toast, which is
+                // rendered only while a toast exists — a live region has to be
+                // in the page before its text changes — so this minimal one is
+                // added, always present and visually hidden.
+                div {
+                    class: "sr-only",
+                    role: "status",
+                    aria_live: "polite",
+                    "{tier1_announcement}"
+                }
             }
         }
     }
@@ -835,5 +1094,315 @@ mod tests {
         );
 
         assert_eq!(map.get(&key), Some(&EqualityEvidence::DigestEqual));
+    }
+
+    // ── RFC-080 tier 1 ───────────────────────────────────────────────────────
+    //
+    // Real temporary trees, the real fast listing (`list_recursive_for_display_*`)
+    // and the real fold (`dir_verdict`) — nothing here is a helper this change
+    // introduces standing in for the thing it tests. Permission-dependent tests
+    // are unix-only and skip, loudly, when `chmod` has no effect (running as root).
+
+    use forskscope_core::CancellationToken;
+    use forskscope_core::dir::RecursiveScan;
+
+    fn tier1_dir(tag: &str) -> std::path::PathBuf {
+        let d = std::env::temp_dir().join(format!("fsk-tier1-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(d.join("l")).unwrap();
+        std::fs::create_dir_all(d.join("r")).unwrap();
+        d
+    }
+
+    fn write(base: &Path, rel: &str, content: &str) {
+        let p = base.join(rel);
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(p, content).unwrap();
+    }
+
+    fn walk(l: &Path, r: &Path) -> RecursiveScan {
+        list_recursive_for_display_with_rules(
+            l,
+            r,
+            &CancellationToken::new(),
+            &IgnoreRules::default(),
+        )
+    }
+
+    fn verdict(l: &Path, r: &Path) -> DirVerdict {
+        dir_verdict(&walk(l, r))
+    }
+
+    /// Criterion 1: differing only in a file's **size** is `Different`.
+    #[test]
+    fn a_pair_differing_only_in_a_files_size_is_different() {
+        let b = tier1_dir("size");
+        write(&b.join("l"), "d/a.txt", "one");
+        write(&b.join("r"), "d/a.txt", "three");
+        write(&b.join("l"), "same.txt", "s");
+        write(&b.join("r"), "same.txt", "s");
+        assert_eq!(verdict(&b.join("l"), &b.join("r")), DirVerdict::Different);
+        let _ = std::fs::remove_dir_all(&b);
+    }
+
+    /// Criteria 2 and 3 (tier-1 halves), and the proof that **no contents are
+    /// read**: the trees hold a file whose contents differ at identical size, and
+    /// the verdict does not move. Were contents read, this would be `Different`.
+    #[test]
+    fn contents_that_differ_at_identical_size_are_a_metadata_match_never_different() {
+        let b = tier1_dir("samesize");
+        write(&b.join("l"), "a.txt", "abcdef");
+        write(&b.join("r"), "a.txt", "abcdeX"); // one character, same size
+        write(&b.join("l"), "sub/b.txt", "same");
+        write(&b.join("r"), "sub/b.txt", "same");
+        let v = verdict(&b.join("l"), &b.join("r"));
+        assert_eq!(v, DirVerdict::MetadataMatch);
+        // ... and it is not equality, on any of the ways a row could read it.
+        let evidence = verdict_evidence(v);
+        assert!(!evidence.is_equal());
+        let kind = forskscope_ui_logic::RowStatusKind::from_evidence(&evidence);
+        assert_eq!(kind, forskscope_ui_logic::RowStatusKind::MetadataMatch);
+        assert_ne!(kind, forskscope_ui_logic::RowStatusKind::Equal);
+        let _ = std::fs::remove_dir_all(&b);
+    }
+
+    /// Criterion 3: an identical pair is a tier-1 match, **never `Identical`** from
+    /// tier 1 alone.
+    #[test]
+    fn an_identical_pair_is_a_metadata_match_never_identical() {
+        let b = tier1_dir("identical");
+        for side in ["l", "r"] {
+            write(&b.join(side), "a.txt", "same");
+            write(&b.join(side), "d/b.txt", "same too");
+        }
+        let v = verdict(&b.join("l"), &b.join("r"));
+        assert_eq!(v, DirVerdict::MetadataMatch);
+        assert!(!verdict_evidence(v).is_equal());
+        let _ = std::fs::remove_dir_all(&b);
+    }
+
+    /// The "no reads" proof, stronger: a file with **no read permission** and the
+    /// same size on both sides. Reading its contents would fail; the metadata-only
+    /// listing does not, so the verdict is still a match.
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_file_is_never_opened_by_tier_1() {
+        use std::os::unix::fs::PermissionsExt;
+        let b = tier1_dir("noread");
+        write(&b.join("l"), "secret.bin", "0123456789");
+        write(&b.join("r"), "secret.bin", "abcdefghij");
+        let f = b.join("l/secret.bin");
+        let _ = std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o000));
+        if std::fs::read(&f).is_ok() {
+            eprintln!("skipping an_unreadable_file_is_never_opened: chmod had no effect (root?)");
+            return;
+        }
+        let v = verdict(&b.join("l"), &b.join("r"));
+        let _ = std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o644));
+        let _ = std::fs::remove_dir_all(&b);
+        assert_eq!(v, DirVerdict::MetadataMatch, "a read would have failed");
+    }
+
+    /// Criterion 4: an unreadable **subdirectory** and an unreadable **root** are
+    /// `Unknown` — neither a verdict nor a tier-1 match.
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_subdirectory_and_an_unreadable_root_are_unknown() {
+        use std::os::unix::fs::PermissionsExt;
+        let b = tier1_dir("unreadable");
+        for side in ["l", "r"] {
+            write(&b.join(side), "ok.txt", "same");
+            write(&b.join(side), "locked/x.txt", "same");
+        }
+        let locked = b.join("l/locked");
+        let _ = std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000));
+        if std::fs::read_dir(&locked).is_ok() {
+            eprintln!("skipping the unreadable test: chmod had no effect (root?)");
+            return;
+        }
+        let sub = verdict(&b.join("l"), &b.join("r"));
+        let _ = std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755));
+
+        let root = b.join("r");
+        let _ = std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o000));
+        let root_verdict = if std::fs::read_dir(&root).is_err() {
+            Some(verdict(&b.join("l"), &root))
+        } else {
+            None
+        };
+        let _ = std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o755));
+        let _ = std::fs::remove_dir_all(&b);
+
+        assert_eq!(sub, DirVerdict::Unknown, "an unreadable subdirectory");
+        assert_eq!(
+            root_verdict,
+            Some(DirVerdict::Unknown),
+            "an unreadable root"
+        );
+    }
+
+    /// Criterion 8: a symlink on either side is `Unknown`, not a verdict.
+    #[cfg(unix)]
+    #[test]
+    fn a_symlink_on_either_side_is_unknown() {
+        let b = tier1_dir("symlink");
+        write(&b.join("l"), "a.txt", "same");
+        write(&b.join("r"), "a.txt", "same");
+        write(&b.join("l"), "target.txt", "t");
+        write(&b.join("r"), "target.txt", "t");
+        std::os::unix::fs::symlink(b.join("l/target.txt"), b.join("l/link")).unwrap();
+        write(&b.join("r"), "link", "a regular file of the same name");
+        assert_eq!(verdict(&b.join("l"), &b.join("r")), DirVerdict::Unknown);
+        assert_eq!(verdict(&b.join("r"), &b.join("l")), DirVerdict::Unknown);
+        let _ = std::fs::remove_dir_all(&b);
+    }
+
+    /// Criterion 5, the applying half: a walk whose token was cancelled returns a
+    /// **partial** scan, and applying it would show a false result. The outcome is
+    /// `None` when cancelled or superseded, however the scan reads. Falsify by
+    /// dropping the `cancelled` test in `tier1_outcome`: the first assertion fails.
+    #[test]
+    fn a_cancelled_or_superseded_walk_applies_nothing() {
+        let b = tier1_dir("cancel");
+        write(&b.join("l"), "a.txt", "same");
+        write(&b.join("r"), "a.txt", "same");
+        // A walk cancelled up front returns whatever it had — here, an empty scan,
+        // which would fold to a match.
+        let token = CancellationToken::new();
+        token.cancel();
+        let partial = list_recursive_for_display_with_rules(
+            &b.join("l"),
+            &b.join("r"),
+            &token,
+            &IgnoreRules::default(),
+        );
+        assert_eq!(
+            dir_verdict(&partial),
+            DirVerdict::MetadataMatch,
+            "the premise"
+        );
+        assert_eq!(tier1_outcome(&partial, token.is_cancelled(), true), None);
+        assert_eq!(tier1_outcome(&partial, false, false), None, "superseded");
+        assert!(tier1_outcome(&partial, false, true).is_some());
+        let _ = std::fs::remove_dir_all(&b);
+    }
+
+    /// Criterion 5, the cancelling half — the token is *observed*, not assumed:
+    /// the protocol the trigger effect follows (a selection that moves off the
+    /// walked row returns `CancelWalk`, and the view `restart()`s the epoch) really
+    /// cancels the token the walk was handed and outdates its stamp.
+    #[test]
+    fn the_selection_moving_cancels_the_token_the_walk_was_given() {
+        let mut trigger: Tier1Trigger<PathBuf> = Tier1Trigger::default();
+        let mut epoch = DigestEpoch::new(1);
+        let t0 = std::time::Duration::ZERO;
+        trigger.selected(t0, Some(PathBuf::from("a")));
+        assert_eq!(
+            trigger.tick(forskscope_ui_logic::TIER1_DEBOUNCE),
+            Some(PathBuf::from("a"))
+        );
+        let (stamp, token, _) = epoch.begin_task();
+        assert!(!token.is_cancelled());
+
+        if let Some(Tier1Action::CancelWalk) = trigger.selected(t0, Some(PathBuf::from("b"))) {
+            epoch.restart();
+        }
+        assert!(
+            token.is_cancelled(),
+            "the walk's token must observe the cancellation"
+        );
+        assert!(!epoch.is_current(stamp), "and its result must be outdated");
+    }
+
+    // The candidate: only an unexamined same-named directory pair that has no
+    // result yet, and the in-flight row keeps being one (or the effect would
+    // cancel the walk it started); a cached "no verdict" is never walked again.
+    #[test]
+    fn only_an_unexamined_directory_pair_without_a_result_is_a_candidate() {
+        let (l, r) = (PathBuf::from("/l"), PathBuf::from("/r"));
+        let dir = PathBuf::from("d");
+        let key = || Tier1Key {
+            left_root: l.clone(),
+            right_root: r.clone(),
+            rel: dir.clone(),
+        };
+        let digest = |e: EqualityEvidence| {
+            let mut m = HashMap::new();
+            m.insert(DigestKey::Common(dir.clone()), e);
+            m
+        };
+        let unexamined = digest(EqualityEvidence::Unknown);
+        let sel = [dir.clone()];
+
+        assert_eq!(
+            tier1_candidate(&sel, &unexamined, &HashMap::new(), &l, &r),
+            Some(dir.clone())
+        );
+        // Not an unexamined directory pair: a file digest, a type mismatch, nothing.
+        for other in [
+            EqualityEvidence::DigestEqual,
+            EqualityEvidence::MetadataOnly,
+            EqualityEvidence::LeftOnly,
+        ] {
+            assert_eq!(
+                tier1_candidate(&sel, &digest(other), &HashMap::new(), &l, &r),
+                None
+            );
+        }
+        assert_eq!(
+            tier1_candidate(&sel, &HashMap::new(), &HashMap::new(), &l, &r),
+            None
+        );
+        // The in-flight marker keeps it a candidate; any result, including "no
+        // verdict", ends it.
+        let mut cache = HashMap::new();
+        cache.insert(key(), EqualityEvidence::MetadataOnly);
+        assert_eq!(
+            tier1_candidate(&sel, &unexamined, &cache, &l, &r),
+            Some(dir.clone())
+        );
+        for done in [
+            EqualityEvidence::TreeDifferent,
+            EqualityEvidence::MetadataMatch,
+            EqualityEvidence::Unknown,
+        ] {
+            cache.insert(key(), done);
+            assert_eq!(tier1_candidate(&sel, &unexamined, &cache, &l, &r), None);
+        }
+    }
+
+    /// A result overrides only the unexamined-directory state, and only under the
+    /// roots it was measured for.
+    #[test]
+    fn a_tier_1_result_overrides_only_the_unexamined_directory_state_under_its_roots() {
+        let (l, r) = (PathBuf::from("/l"), PathBuf::from("/r"));
+        let rel = PathBuf::from("d");
+        let mut cache = HashMap::new();
+        cache.insert(
+            Tier1Key {
+                left_root: l.clone(),
+                right_root: r.clone(),
+                rel: rel.clone(),
+            },
+            EqualityEvidence::MetadataMatch,
+        );
+        let unknown = Some(EqualityEvidence::Unknown);
+        assert_eq!(
+            row_evidence(unknown.clone(), &cache, &l, &r, &rel),
+            Some(EqualityEvidence::MetadataMatch)
+        );
+        // Other roots (navigation): not shown.
+        assert_eq!(
+            row_evidence(unknown, &cache, &PathBuf::from("/elsewhere"), &r, &rel),
+            Some(EqualityEvidence::Unknown)
+        );
+        // A file's digest verdict, or a one-sided row, is never overridden.
+        for base in [
+            Some(EqualityEvidence::DigestEqual),
+            Some(EqualityEvidence::LeftOnly),
+            None,
+        ] {
+            assert_eq!(row_evidence(base.clone(), &cache, &l, &r, &rel), base);
+        }
     }
 }

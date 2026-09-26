@@ -248,4 +248,35 @@ mod tests {
             );
         });
     }
+
+    fn file_row(name: &str) -> RowData {
+        RowData {
+            is_dir: false,
+            ..dir_row(name)
+        }
+    }
+
+    // RFC-080 §2: a tier-1 match is not equality, so *hide identical* keeps it
+    // visible. Falsify by making `EqualityEvidence::is_equal` true for
+    // `MetadataMatch`: the file row below is hidden and this fails.
+    #[test]
+    fn hide_identical_keeps_a_tier_1_match_visible() {
+        with_test_store(|_store| {
+            let mut binary_cache: Signal<HashMap<PathBuf, bool>> =
+                Signal::new_in_scope(HashMap::new(), ScopeId::ROOT);
+            let mut digest_map = HashMap::new();
+            for name in ["dir", "file"] {
+                digest_map.insert(
+                    DigestKey::Common(PathBuf::from(name)),
+                    EqualityEvidence::MetadataMatch,
+                );
+            }
+            let rows = vec![
+                (Some(dir_row("dir")), Some(dir_row("dir"))),
+                (Some(file_row("file")), Some(file_row("file"))),
+            ];
+            let visible = apply_filter(rows, "", false, true, true, &digest_map, &mut binary_cache);
+            assert_eq!(visible.len(), 2, "a tier-1 match must stay visible");
+        });
+    }
 }
