@@ -201,6 +201,19 @@ pub enum EqualityEvidence {
     SizeDifferent { left_size: u64, right_size: u64 },
     /// Both sides have digests that do not match.
     DigestDifferent,
+    /// Tier 1 of RFC-080: the two directories' **names and sizes match**, and
+    /// their contents were never read. This is a completed measurement with an
+    /// incomplete conclusion, so it is **none of** [`is_equal`](Self::is_equal),
+    /// [`is_different`](Self::is_different) or [`is_pending`](Self::is_pending):
+    /// a one-character edit preserves both names and sizes, so this cannot mean
+    /// "identical", and it is not "still working" either. It is deliberately not
+    /// [`MetadataEqual`](Self::MetadataEqual) (which *counts* as equal) nor
+    /// [`MetadataOnly`](Self::MetadataOnly) (the "digest in flight" placeholder).
+    MetadataMatch,
+    /// Tier 1 of RFC-080: the two directory trees **differ** — an entry on one
+    /// side only, or a common file whose size differs — established from the walk
+    /// alone, with no contents read. Certain, unlike [`MetadataMatch`](Self::MetadataMatch).
+    TreeDifferent,
     /// One or both sides had an error; comparison result is unreliable.
     Error { message: String },
     /// Comparison has not been attempted yet.
@@ -219,6 +232,7 @@ impl EqualityEvidence {
             self,
             Self::SizeDifferent { .. }
                 | Self::DigestDifferent
+                | Self::TreeDifferent
                 | Self::TypeMismatch { .. }
                 | Self::LeftOnly
                 | Self::RightOnly

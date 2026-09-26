@@ -225,3 +225,61 @@ fn symlink_in_fast_listing_also_gets_symlink_status() {
     assert_eq!(link.status, RecStatus::Symlink);
     let _ = fs::remove_dir_all(&base);
 }
+
+// ── A symlink against a regular file of the same name ─────────────────────────
+//
+// `RecStatus::Symlink` means "one or both sides of this path is a symlink". A
+// symlink on the right used to leave the left walk's regular-file entry as
+// `LeftOnly` (claiming the right side has nothing there), and a symlink on the
+// left was overwritten to `Computing`/`Changed` by the right walk's file. Found by
+// RFC-080 tier 1, whose verdict called the first pair `Different`.
+
+#[cfg(unix)]
+fn symlink_vs_file(link_on_left: bool) -> [(&'static str, crate::dir::RecursiveScan); 2] {
+    let base = tmp(if link_on_left {
+        "sym-left"
+    } else {
+        "sym-right"
+    });
+    let (left, right) = (base.join("l"), base.join("r"));
+    std::fs::create_dir_all(&left).unwrap();
+    std::fs::create_dir_all(&right).unwrap();
+    std::fs::write(base.join("target.txt"), "t").unwrap();
+    let (link_side, file_side) = if link_on_left {
+        (&left, &right)
+    } else {
+        (&right, &left)
+    };
+    std::os::unix::fs::symlink(base.join("target.txt"), link_side.join("x")).unwrap();
+    std::fs::write(file_side.join("x"), "a regular file").unwrap();
+    let token = CancellationToken::new();
+    let scans = [
+        (
+            "display",
+            list_recursive_for_display_with_cancel(&left, &right, &token),
+        ),
+        ("full", recursive_diff_with_cancel(&left, &right, &token)),
+    ];
+    let _ = std::fs::remove_dir_all(&base);
+    scans
+}
+
+#[cfg(unix)]
+#[test]
+fn a_symlink_against_a_regular_file_is_a_symlink_whichever_side_it_is_on() {
+    for link_on_left in [true, false] {
+        for (label, scan) in symlink_vs_file(link_on_left) {
+            let x = scan
+                .entries
+                .iter()
+                .find(|e| e.rel_path.as_path() == std::path::Path::new("x"));
+            assert_eq!(
+                x.map(|e| e.status),
+                Some(RecStatus::Symlink),
+                "{label}, link on the {}: {:?}",
+                if link_on_left { "left" } else { "right" },
+                scan.entries
+            );
+        }
+    }
+}

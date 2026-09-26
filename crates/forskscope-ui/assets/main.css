@@ -376,6 +376,9 @@ code.path-display {
    status-equal's green, which would repeat the false-equal claim this
    state exists to replace. */
 .tree-status.status-not-compared { color: var(--muted); }
+/* RFC-080 tier 1: names and sizes match, contents never read. Deliberately not
+   status-equal's green: this glyph must not read as "identical". */
+.tree-status.status-metadata-match { color: var(--muted); }
 
 /* ── Binary-blocked row (RFC-066) ── */
 .tree-row.binary-blocked { opacity: .5; cursor: default; }

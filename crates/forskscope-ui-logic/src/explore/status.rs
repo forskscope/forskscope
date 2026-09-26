@@ -53,6 +53,10 @@ pub enum StatusGlyph {
     NotCompared,
     /// One or both sides is a symlink, not followed (Deep Compare only).
     Symlink,
+    /// Names and sizes match; contents were never read (Explorer, RFC-080
+    /// tier 1). Not `Equal`: it is the state a completed but incomplete
+    /// measurement rests at, and its glyph must never read as equality.
+    MetadataMatch,
 }
 
 impl StatusGlyph {
@@ -67,6 +71,7 @@ impl StatusGlyph {
             Self::RightOnly => '→',
             Self::NotCompared => '–',
             Self::Symlink => '↗',
+            Self::MetadataMatch => '≈',
         }
     }
 
@@ -81,6 +86,7 @@ impl StatusGlyph {
             Self::RightOnly => "status-right-only",
             Self::NotCompared => "status-not-compared",
             Self::Symlink => "status-symlink",
+            Self::MetadataMatch => "status-metadata-match",
         }
     }
 
@@ -101,6 +107,7 @@ impl StatusGlyph {
             Self::RightOnly => "right only",
             Self::NotCompared => "not compared",
             Self::Symlink => "symlink",
+            Self::MetadataMatch => "metadata matches; contents not compared",
         }
     }
 
@@ -143,6 +150,10 @@ pub enum RowStatusKind {
     /// never examines directory contents, so it can prove neither equality
     /// nor difference for one.
     NotCompared,
+    /// Names and sizes match; contents were never read (RFC-080 tier 1). A
+    /// completed measurement with an incomplete conclusion: not `Equal` (so
+    /// *hide identical* keeps it visible), not `Different`, not `Computing`.
+    MetadataMatch,
 }
 
 impl RowStatusKind {
@@ -160,6 +171,7 @@ impl RowStatusKind {
             Self::Computing => StatusGlyph::Computing,
             Self::Error => StatusGlyph::Unreadable,
             Self::NotCompared => StatusGlyph::NotCompared,
+            Self::MetadataMatch => StatusGlyph::MetadataMatch,
         }
     }
 
@@ -179,11 +191,16 @@ impl RowStatusKind {
     }
 
     /// `true` when the entry needs user attention (is a change or one-sided).
+    ///
+    /// `MetadataMatch` is **false**, decided explicitly: nothing was found to act
+    /// on, and it is not a claim that nothing exists — the row keeps its "contents
+    /// not compared" wording, and a copy or merge plan must not read it as either
+    /// "equal, skip" or "different, copy".
     pub fn needs_action(self) -> bool {
-        matches!(
-            self,
-            Self::Different | Self::LeftOnly | Self::RightOnly | Self::Error
-        )
+        match self {
+            Self::Different | Self::LeftOnly | Self::RightOnly | Self::Error => true,
+            Self::Equal | Self::Computing | Self::NotCompared | Self::MetadataMatch => false,
+        }
     }
 }
 
@@ -197,7 +214,9 @@ impl RowStatusKind {
             EqualityEvidence::MetadataOnly => Self::Computing,
             EqualityEvidence::DigestDifferent
             | EqualityEvidence::SizeDifferent { .. }
+            | EqualityEvidence::TreeDifferent
             | EqualityEvidence::TypeMismatch { .. } => Self::Different,
+            EqualityEvidence::MetadataMatch => Self::MetadataMatch,
             EqualityEvidence::LeftOnly => Self::LeftOnly,
             EqualityEvidence::RightOnly => Self::RightOnly,
             EqualityEvidence::Error { .. } => Self::Error,
@@ -475,6 +494,74 @@ mod tests {
                 explorer, deep,
                 "{explorer_kind:?} (Explorer) and {deep_status:?} (Deep \
                  Compare) must render the same concept"
+            );
+        }
+    }
+
+    // ── Tier-1 match (RFC-080 §4) ────────────────────────────────────────────
+
+    /// `MetadataMatch` maps to its own kind — not `Equal` (which would assert what
+    /// tier 1 cannot), not `Computing` (a spinner that never resolves).
+    #[test]
+    fn metadata_match_maps_to_its_own_kind_and_tree_different_to_different() {
+        assert_eq!(
+            RowStatusKind::from_evidence(&EqualityEvidence::MetadataMatch),
+            RowStatusKind::MetadataMatch
+        );
+        assert_eq!(
+            RowStatusKind::from_evidence(&EqualityEvidence::TreeDifferent),
+            RowStatusKind::Different
+        );
+    }
+
+    /// The glyph must not read as equality or as any state it is not.
+    #[test]
+    fn the_tier_1_match_glyph_is_distinct_from_every_other() {
+        let kinds = [
+            RowStatusKind::Equal,
+            RowStatusKind::Different,
+            RowStatusKind::LeftOnly,
+            RowStatusKind::RightOnly,
+            RowStatusKind::Computing,
+            RowStatusKind::Error,
+            RowStatusKind::NotCompared,
+        ];
+        let m = RowStatusKind::MetadataMatch;
+        assert_eq!(m.glyph(), '≈');
+        for k in kinds {
+            assert_ne!(m.glyph(), k.glyph(), "{k:?}");
+            assert_ne!(m.css_class(), k.css_class(), "{k:?}");
+            assert_ne!(m.aria_label(), k.aria_label(), "{k:?}");
+        }
+    }
+
+    /// A completed measurement with an incomplete conclusion: it needs no action
+    /// and is not a claim of equality.
+    #[test]
+    fn a_tier_1_match_needs_no_action() {
+        assert!(!RowStatusKind::MetadataMatch.needs_action());
+    }
+
+    /// Every status class token the Explorer can emit is defined in the stylesheet
+    /// (`css_coverage.rs` covers core's tokens; this covers this crate's).
+    #[test]
+    fn every_status_glyph_css_class_is_defined_in_main_css() {
+        const MAIN_CSS: &str = include_str!("../../../forskscope-ui/assets/main.css");
+        for g in [
+            StatusGlyph::Equal,
+            StatusGlyph::Different,
+            StatusGlyph::Computing,
+            StatusGlyph::Unreadable,
+            StatusGlyph::LeftOnly,
+            StatusGlyph::RightOnly,
+            StatusGlyph::NotCompared,
+            StatusGlyph::Symlink,
+            StatusGlyph::MetadataMatch,
+        ] {
+            assert!(
+                MAIN_CSS.contains(&format!(".{}", g.css_class())),
+                "main.css must define .{}",
+                g.css_class()
             );
         }
     }

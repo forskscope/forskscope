@@ -203,6 +203,24 @@ pub fn list_recursive_for_display_with_rules(
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
+/// A symlink on the right-hand side of `rel`. `RecStatus::Symlink` means "one or
+/// both sides of this path is a symlink", so it must **replace** an entry the left
+/// walk already recorded there — a regular file called `link` on the left is not
+/// "left only" when the right has a symlink called `link` — except an
+/// `Unreadable` one, which says less still. (Found by RFC-080 tier 1, whose
+/// verdict would otherwise call that pair `Different`.)
+fn mark_symlink(map: &mut BTreeMap<PathBuf, RecEntry>, rel: PathBuf) {
+    let entry = map.entry(rel.clone()).or_insert(RecEntry {
+        rel_path: rel,
+        status: RecStatus::Symlink,
+        left_size: None,
+        right_size: None,
+    });
+    if entry.status != RecStatus::Unreadable {
+        entry.status = RecStatus::Symlink;
+    }
+}
+
 /// F79: marks `rel` `Unreadable` in `map`, overwriting whatever verdict (if
 /// any) was already recorded there. A metadata or directory-open failure
 /// means nothing was actually established for this path - any prior entry
@@ -334,12 +352,7 @@ fn walk_and_merge(
         };
 
         if meta.is_symlink() {
-            map.entry(rel.clone()).or_insert(RecEntry {
-                rel_path: rel,
-                status: RecStatus::Symlink,
-                left_size: None,
-                right_size: None,
-            });
+            mark_symlink(map, rel);
         } else if meta.is_dir() {
             if walk_and_merge(right_root, &path, map, left_root, token, rules).is_err() {
                 mark_unreadable(map, rel);
@@ -347,6 +360,10 @@ fn walk_and_merge(
         } else if meta.is_file() {
             let right_size = meta.len();
             if let Some(existing) = map.get_mut(&rel) {
+                if existing.status == RecStatus::Symlink {
+                    // A left-side symlink stays `Symlink` (see `mark_symlink`).
+                    continue;
+                }
                 if existing.status == RecStatus::Unreadable {
                     // F79: already known unreadable (e.g. the left side's
                     // metadata failed) - a digest comparison against it
@@ -419,12 +436,7 @@ fn walk_and_merge_fast(
         };
 
         if meta.is_symlink() {
-            map.entry(rel.clone()).or_insert(RecEntry {
-                rel_path: rel,
-                status: RecStatus::Symlink,
-                left_size: None,
-                right_size: None,
-            });
+            mark_symlink(map, rel);
         } else if meta.is_dir() {
             if walk_and_merge_fast(right_root, &path, map, token, rules).is_err() {
                 mark_unreadable(map, rel);
@@ -432,6 +444,9 @@ fn walk_and_merge_fast(
         } else if meta.is_file() {
             let rs = meta.len();
             if let Some(existing) = map.get_mut(&rel) {
+                if existing.status == RecStatus::Symlink {
+                    continue;
+                }
                 if existing.status == RecStatus::Unreadable {
                     // F79: see the matching guard in `walk_and_merge` -
                     // an already-`Unreadable` left entry must not be

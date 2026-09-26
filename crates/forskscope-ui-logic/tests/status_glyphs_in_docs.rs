@@ -41,7 +41,7 @@ const END: &str = "<!-- status-glyphs:end -->";
 /// Every `StatusGlyph` variant. The `match` makes adding a variant a compile
 /// error here, so a new glyph cannot be added without the documents being
 /// checked for it.
-fn all_variants() -> [StatusGlyph; 8] {
+fn all_variants() -> [StatusGlyph; 9] {
     fn exhaustive(g: StatusGlyph) {
         match g {
             StatusGlyph::Equal
@@ -51,7 +51,8 @@ fn all_variants() -> [StatusGlyph; 8] {
             | StatusGlyph::LeftOnly
             | StatusGlyph::RightOnly
             | StatusGlyph::NotCompared
-            | StatusGlyph::Symlink => {}
+            | StatusGlyph::Symlink
+            | StatusGlyph::MetadataMatch => {}
         }
     }
     let all = [
@@ -63,6 +64,7 @@ fn all_variants() -> [StatusGlyph; 8] {
         StatusGlyph::RightOnly,
         StatusGlyph::NotCompared,
         StatusGlyph::Symlink,
+        StatusGlyph::MetadataMatch,
     ];
     all.iter().for_each(|g| exhaustive(*g));
     all

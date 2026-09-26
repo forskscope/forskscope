@@ -30,6 +30,10 @@ fn ja(key: &str) -> Option<&'static str> {
         "Directory contents not compared — use Deep Compare" => {
             "ディレクトリの中身は比較されていません — ディープ比較を使用してください"
         }
+        "Names and sizes match; contents not compared" => {
+            "名前とサイズは一致しています。中身は比較されていません"
+        }
+        "Size matches; contents not compared" => "サイズは一致しています。中身は比較されていません",
         "Comparison failed" => "比較に失敗しました",
         "Filter items" => "アイテムをフィルター",
         "Filter by name…" => "名前でフィルター…",

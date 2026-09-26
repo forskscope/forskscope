@@ -7,6 +7,11 @@
 //! - [`explore`] — explorer-pane logic:
 //!   - `align`: aligned-row merging for the two-pane explorer.
 //!   - `deep_filter`: `DeepFilter` + `DeepCompareSummary` for recursive compare.
+//!   - `dir_verdict`: RFC-080 tier 1 — what a fast recursive listing can
+//!     conclude about a directory pair (`Different` / `MetadataMatch` /
+//!     `Unknown`), and no more.
+//!   - `tier1_trigger`: the debounce state machine that decides when a tier-1
+//!     walk starts (a row must be rested on; moving through rows starts none).
 //!   - `status`: `RowStatusKind` from `EqualityEvidence`, and
 //!     `StatusGlyph` — the shared glyph/CSS-class/label vocabulary both
 //!     the Explorer and Deep Compare render through (F82).
@@ -55,7 +60,9 @@ pub use compare::startup::{CompareRequest, SaveDestination, StartupRequest, pars
 // explore
 pub use explore::align::{AlignedRow, FlatRow, RowData, compute_aligned_rows};
 pub use explore::deep_filter::{DeepCompareSummary, DeepFilter, apply_filter};
+pub use explore::dir_verdict::{DirVerdict, dir_verdict};
 pub use explore::status::{RowStatusKind, StatusGlyph};
+pub use explore::tier1_trigger::{TIER1_DEBOUNCE, Tier1Action, Tier1Trigger};
 
 // session
 pub use session::persistence_recovery::{

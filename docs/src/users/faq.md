@@ -174,7 +174,8 @@ compares the two in the background and shows a one-character icon:
 | `⊘` | **Unreadable** — something could not be read, so nothing was compared. This is not a verdict: the two sides may or may not match |
 | `←` | **Left only** — present only on the left |
 | `→` | **Right only** — present only on the right |
-| `–` | **Not compared** — a same-named folder pair. The Explorer never looks inside folders; use a Directory Report to compare their contents (Explorer only) |
+| `–` | **Not compared** — a same-named folder pair that has not been examined. Select the row and rest on it to compare names and sizes; use a Directory Report to compare contents (Explorer only) |
+| `≈` | **Metadata matches; contents not compared** — the two folders have the same names and sizes throughout (a file pair: the same size), and no file was read. This is not "identical": an edit that keeps a file's size goes unnoticed (Explorer only) |
 | `↗` | **Symlink**, not followed — a symbolic link is listed, and its target is not compared (Directory Report only) |
 <!-- status-glyphs:end -->
 

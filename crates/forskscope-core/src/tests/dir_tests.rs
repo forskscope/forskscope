@@ -194,3 +194,22 @@ fn recursive_diff_returns_empty_for_two_empty_directories() {
         "two empty directories have no diff entries"
     );
 }
+
+/// RFC-080 tier 1: a names-and-sizes match is a completed measurement with an
+/// incomplete conclusion — none of equal, different or pending. Falsify by adding
+/// `MetadataMatch` to `is_equal`: the first assertion fails (it would let *hide
+/// identical* hide it and would assert what tier 1 cannot).
+#[test]
+fn a_tier_1_match_is_neither_equal_nor_different_nor_pending() {
+    use crate::dir::EqualityEvidence as E;
+    let m = E::MetadataMatch;
+    assert!(!m.is_equal());
+    assert!(!m.is_different());
+    assert!(!m.is_pending());
+    assert!(m.present_on_both_sides());
+
+    let d = E::TreeDifferent;
+    assert!(d.is_different());
+    assert!(!d.is_equal());
+    assert!(!d.is_pending());
+}

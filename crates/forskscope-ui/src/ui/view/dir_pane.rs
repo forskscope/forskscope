@@ -36,7 +36,12 @@ use forskscope_ui_logic::RowStatusKind;
 /// (the old `·` glyph never distinguished direction either), but a newly
 /// opened gap between what a sighted user sees and what a screen reader
 /// announces, which RFC-009 §7 exists to close. Distinct labels now.
-fn status_kind_label(kind: RowStatusKind, lang: Lang) -> String {
+///
+/// RFC-080 §4: the same state carries **different words on the two row kinds**,
+/// because the evidence differs — a file pair is already matched by name, so only
+/// its size was checked; a directory pair had names and sizes compared. Hence
+/// `is_dir`. Only `MetadataMatch` reads it.
+pub(crate) fn status_kind_label(kind: RowStatusKind, lang: Lang, is_dir: bool) -> String {
     match kind {
         RowStatusKind::Equal => t(lang, "Identical"),
         RowStatusKind::Different => t(lang, "Different"),
@@ -45,6 +50,10 @@ fn status_kind_label(kind: RowStatusKind, lang: Lang) -> String {
         RowStatusKind::Computing => t(lang, "Comparing…"),
         RowStatusKind::Error => t(lang, "Comparison failed"),
         RowStatusKind::NotCompared => t(lang, "Directory contents not compared — use Deep Compare"),
+        RowStatusKind::MetadataMatch if is_dir => {
+            t(lang, "Names and sizes match; contents not compared")
+        }
+        RowStatusKind::MetadataMatch => t(lang, "Size matches; contents not compared"),
     }
 }
 
@@ -365,7 +374,7 @@ pub fn TreeRow(
                 }
             } else if let Some(kind) = status_kind {
                 {
-                    let label = status_kind_label(kind, lang);
+                    let label = status_kind_label(kind, lang, is_dir);
                     let cls = kind.css_class();
                     let glyph = kind.glyph();
                     rsx! {
@@ -561,16 +570,47 @@ mod tests {
             RowStatusKind::RightOnly,
             RowStatusKind::Error,
             RowStatusKind::NotCompared,
+            RowStatusKind::MetadataMatch,
         ];
         for kind in kinds {
             for lang in [Lang::En, Lang::Ja] {
-                let label = status_kind_label(kind, lang);
+                for is_dir in [true, false] {
+                    let label = status_kind_label(kind, lang, is_dir);
+                    assert!(
+                        !label.is_empty(),
+                        "{kind:?} (dir: {is_dir}) has an empty accessible label for {lang:?}"
+                    );
+                }
+                let label = status_kind_label(kind, lang, true);
                 assert!(
                     !label.is_empty(),
                     "{kind:?} has an empty accessible label for {lang:?}"
                 );
             }
         }
+    }
+
+    // RFC-080 criterion 6: the tier-1 state's wording differs by row kind (the
+    // evidence differs), each is non-empty, and the Japanese differs from the
+    // English so the translation is actually present. Falsify by dropping a
+    // Japanese entry in `i18n.rs`: the `assert_ne!` for it fails.
+    #[test]
+    fn the_tier_1_match_has_kind_specific_localised_labels() {
+        let en_dir = status_kind_label(RowStatusKind::MetadataMatch, Lang::En, true);
+        let en_file = status_kind_label(RowStatusKind::MetadataMatch, Lang::En, false);
+        let ja_dir = status_kind_label(RowStatusKind::MetadataMatch, Lang::Ja, true);
+        let ja_file = status_kind_label(RowStatusKind::MetadataMatch, Lang::Ja, false);
+        assert_eq!(en_dir, "Names and sizes match; contents not compared");
+        assert_eq!(en_file, "Size matches; contents not compared");
+        assert_ne!(en_dir, en_file);
+        assert_ne!(ja_dir, ja_file);
+        assert_ne!(ja_dir, en_dir);
+        assert_ne!(ja_file, en_file);
+        // ...and never the wording of equality.
+        assert_ne!(
+            en_dir,
+            status_kind_label(RowStatusKind::Equal, Lang::En, true)
+        );
     }
 
     // F74: `NotCompared` must use its own glyph/class - not silently fall
@@ -581,8 +621,11 @@ mod tests {
     // label layer keeps `NotCompared` distinct from `Equal` too.
     #[test]
     fn not_compared_has_a_distinct_label_from_equal() {
-        let label = status_kind_label(RowStatusKind::NotCompared, Lang::En);
-        assert_ne!(label, status_kind_label(RowStatusKind::Equal, Lang::En));
+        let label = status_kind_label(RowStatusKind::NotCompared, Lang::En, true);
+        assert_ne!(
+            label,
+            status_kind_label(RowStatusKind::Equal, Lang::En, true)
+        );
     }
 
     // Review 077 §4b: `LeftOnly`/`RightOnly` render distinct glyphs
@@ -593,8 +636,8 @@ mod tests {
     #[test]
     fn left_only_and_right_only_have_distinct_labels() {
         for lang in [Lang::En, Lang::Ja] {
-            let left = status_kind_label(RowStatusKind::LeftOnly, lang);
-            let right = status_kind_label(RowStatusKind::RightOnly, lang);
+            let left = status_kind_label(RowStatusKind::LeftOnly, lang, false);
+            let right = status_kind_label(RowStatusKind::RightOnly, lang, false);
             assert_ne!(
                 left, right,
                 "LeftOnly and RightOnly must have distinct labels for {lang:?}"
