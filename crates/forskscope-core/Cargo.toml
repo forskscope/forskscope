@@ -25,3 +25,10 @@ similar                     = { workspace = true }
 # no-clobber commit (`save::persist_noclobber`), which needs
 # `NamedTempFile::persist_noclobber` at runtime, not only in tests.
 tempfile                    = { workspace = true }
+
+[target.'cfg(unix)'.dev-dependencies]
+# F138: caps this process's own address space before opening a crafted CFB
+# header, so the regression this guards against (a huge allocation instead of
+# a declined file) fails loudly rather than passing unnoticed on a machine
+# with room to spare — see tests/f138_decline_before_delegating.rs.
+libc                         = { workspace = true }

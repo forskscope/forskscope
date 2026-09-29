@@ -22,3 +22,10 @@ timestamp (2026-09-26) so regenerating gives identical files. Sheets and cells:
 
 `large` is byte-identical on both sides on purpose: it sizes the bounds and is
 cancelled, and its rendered sides are correctly equal.
+
+`formula_cached_value_changed` (F138) was written the same way, from the same
+throwaway program: `Sheet1`, `A1` = 1, `A2` = 1, `A3` = the formula `=A1+A2`
+with its cached result set to `2` (`old.xlsx`) or `3` (`new.xlsx`) — the
+formula **text** is identical on both sides; only the cached value differs.
+Proves that `include_formula_cached_values(false)` (F138 Part B) does not stop
+a formula's cached-value change from being reported.

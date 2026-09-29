@@ -1510,6 +1510,7 @@ dependencies = [
  "chardetng",
  "chrono",
  "encoding_rs",
+ "libc",
  "serde",
  "serde_json",
  "sheets-diff",
@@ -4027,9 +4028,9 @@ dependencies = [
 
 [[package]]
 name = "sheets-diff"
-version = "3.0.0"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d10395a61933109c0a8788fec1b454329c8ce319c2b6bcd859ded776113d7de"
+checksum = "2be73fdfeb3c1ead1abacadf4e055e27fa5d20808b2495d638403adda65b0e65"
 dependencies = [
  "calamine",
 ]

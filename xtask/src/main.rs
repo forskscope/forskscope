@@ -3,7 +3,7 @@
 //! Usage:
 //!   cargo xtask css           — regenerate assets/main.css from assets/css/*.css
 //!   cargo xtask css --check   — verify main.css is current (exits non-zero if stale)
-//!   cargo xtask audit-deps    — verify reviewed security dependency paths
+//!   cargo xtask audit-deps    — verify sensitive dependencies are reached only through reviewed paths (dependency *shape*; no vulnerability-database lookup — see F140)
 //!   cargo xtask i18n          — verify Japanese translations cover UI keys
 //!   cargo xtask version-sync [expected] — verify version metadata is in sync (no-arg mode also rejects an already-published version; [expected] mode additionally requires non-empty CHANGELOG content, F24)
 //!   cargo xtask rfc-sync      — verify ROADMAP.md's RFC table agrees with rfcs/proposed/ (F83)
@@ -130,6 +130,16 @@ fn run_css(check: bool) {
     }
 }
 
+/// F140: this check (and its own `println!`) used to claim more than it
+/// verifies. It asserts dependency **shape** — that a named package is
+/// reached only through the specific, reviewed hop(s) listed for it, so an
+/// unreviewed second path to it (a new crate pulling `rustls` directly, say)
+/// fails the build. **It does not consult a vulnerability database.** A path
+/// passing here is not a claim that the crates on it carry no advisories —
+/// that is `cargo audit`'s job, run separately in CI, and Dependabot alerts
+/// (disabled on this repository; enabling them is the owner's call, not
+/// this check's). The comment below used to assert the conclusion
+/// ("carries none") rather than the shape assertion actually made; corrected.
 fn run_audit_deps() {
     assert_package_inactive("dioxus-devtools");
     assert_external_network_crates_absent();
@@ -137,17 +147,22 @@ fn run_audit_deps() {
     assert_network_paths_are_reviewed();
     // RFC-085: sheets-diff -> calamine -> quick-xml/zip is a deliberately
     // re-added, reviewed path — RFC-058 suspended it (quick-xml 0.39 XML
-    // DoS advisories); sheets-diff's chain (quick-xml 0.41.0, zip 8.6.0;
-    // the same at 2.5.0 and at 3.0.0) carries none, verified against the
-    // versions actually resolved here, not inherited from an earlier check
-    // (xlsx.rs's module doc has the full account). Each assertion below replaces
-    // this pair's old `assert_package_absent` — a gate that passed
-    // because the dependency was absent, not because the path was
-    // reviewed, is exactly the failure mode F65 records.
+    // DoS advisories). What is asserted here is that each of the three
+    // packages below is reached only through the single hop named for it —
+    // not that the versions currently resolved carry no advisories, which
+    // this check cannot see and does not claim (see the function doc
+    // comment, F140). Each assertion below replaces this pair's old
+    // `assert_package_absent` — a gate that passed because the dependency
+    // was absent, not because the path was reviewed, is exactly the failure
+    // mode F65 records.
     assert_immediate_dependents("sheets-diff", &["forskscope-core "]);
     assert_immediate_dependents("calamine", &["sheets-diff "]);
     assert_immediate_dependents("zip", &["calamine "]);
-    println!("security dependency path check passed.");
+    println!(
+        "security dependency path check passed: sensitive dependencies are reached only \
+         through their reviewed paths. This checks dependency shape, not advisories — it does \
+         not query a vulnerability database; that is cargo audit's job, run separately."
+    );
 }
 
 /// Checks that every `t(lang, "key")` call site in `forskscope-ui` has a
