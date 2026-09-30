@@ -84,6 +84,15 @@ one-character status icon. When both panes show directories, ForskScope
 computes a digest for each same-named file in the background, so an icon may
 first read `…` and then change.
 
+A **file** pair of the same size, 64 MiB or larger, is not read this way — the
+row settles straight at `≈`, the same "sizes match, contents not compared"
+state a rested-on folder pair can reach, without a `…` step. A pair whose
+sizes differ still becomes `≠` immediately either way; only a same-size, large
+pair is affected, and only because reading both files in full, automatically,
+for every such pair a folder happens to contain, is not something browsing
+should cost you. Compare the pair directly (or use a Directory Report) for a
+byte-for-byte answer.
+
 A same-named **folder** pair starts as `–`. Select the row and rest on it for a
 moment (arrowing past it does nothing) and ForskScope compares the names and
 sizes inside the two folders, without reading any file: if something is on one

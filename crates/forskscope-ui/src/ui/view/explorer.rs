@@ -75,6 +75,49 @@ pub enum DigestKey {
     RightOnly(PathBuf),
 }
 
+/// RFC-080 §5 / F77 (handoff 056): the cap on a file row's **automatic**
+/// content digest — what browsing starts on its own, with no click. Deep
+/// Compare, which a user opens deliberately, stays uncapped (RFC-080's
+/// non-goals: it "remains the place for a full per-file report").
+///
+/// **Basis, measured on this machine, release build, warm page cache**
+/// (`file_digest_equal_with_cancel`, two byte-identical files — the worst
+/// case, since it streams to the first difference and a differing pair of
+/// *any* size returns after its own metadata check, no read at all):
+///
+/// | pair size | time |
+/// |---|---|
+/// | 32 MiB | 2.7 ms |
+/// | 64 MiB | ~10 ms |
+/// | 128 MiB | 21.0 ms |
+/// | 1 GiB | 132.0 ms |
+/// | 4 GiB | 486.8 ms |
+///
+/// Roughly linear, ≈120 ms/GiB warm. **A cold cache or a network mount costs
+/// more than this table admits** — this is a floor, not a worst case, the
+/// same caveat every other measured bound in this codebase carries.
+///
+/// **64 MiB**, chosen to equal
+/// [`forskscope_core::job::PerformanceLimits`]'s existing
+/// `large_text_threshold_bytes` default — the size at which this product
+/// already treats a file as no longer casually cheap, for the diff view's
+/// own prompt-before-diffing threshold. Reusing that number keeps one
+/// meaning of "large" in the app rather than inventing a second; it is a
+/// **separate constant, not a read of that setting** — `PerformanceLimits`
+/// is persisted but never read back (F126, still open), so wiring this cap
+/// to it would add an eighth inert value, not a real one. If F126 is ever
+/// fixed, whether to unify the two is a decision for then, not implied now.
+/// At the cap, a pair costs ≈10 ms; `DIGEST_CONCURRENCY_LIMIT` (32) bounds
+/// how many can run at once, so a directory of many such pairs is bounded
+/// too, not merely each pair within it.
+///
+/// A pair whose sizes already differ costs nothing to resolve either way —
+/// [`EqualityEvidence::SizeDifferent`] is free and certain, capped or not —
+/// so the cap changes exactly one case: a pair with the *same* size, at
+/// least one side of it at or over this bound. That pair rests at
+/// [`EqualityEvidence::MetadataMatch`] instead of being read.
+const AUTO_DIGEST_CAP_BYTES: u64 = 64 * 1024 * 1024;
+
 /// F74 review 072: what a left-side entry's classification will be, before
 /// any async work starts. `Final` is inserted immediately; `NeedsDigest`
 /// means the caller inserts a pending placeholder and starts the real
@@ -127,12 +170,43 @@ fn classify_entry(rel: &Path, is_dir: bool, l_root: &Path, r_root: &Path) -> Ent
             right: EntryType::Directory,
         })
     } else if cp.is_file() {
-        EntryClassification::NeedsDigest {
-            left_abs: l_root.join(rel),
-            right_abs: cp,
-        }
+        classify_two_files(l_root.join(rel), cp, AUTO_DIGEST_CAP_BYTES)
     } else {
         EntryClassification::Final(EqualityEvidence::LeftOnly)
+    }
+}
+
+/// The two-files case of [`classify_entry`], with the cap as a parameter so
+/// tests can exercise the real logic against a small cap instead of writing
+/// real multi-megabyte fixtures. `classify_entry` always calls this with
+/// [`AUTO_DIGEST_CAP_BYTES`].
+///
+/// F77 (handoff 056): only a pair that *would* need an uncapped read has to
+/// be decided here — either side at or over `cap`. A pair that stays under
+/// it is untouched: `NeedsDigest` behaves exactly as it did before this cap
+/// existed. A `metadata` failure on either side also falls through
+/// unchanged, to the read path's own error handling — not this cap's job to
+/// report. Only when both sizes are known and at least one is at or over
+/// `cap`: a mismatch is free and certain regardless (`SizeDifferent`, so the
+/// cap never *hides* a difference), and a match rests at `MetadataMatch`
+/// instead of being read.
+fn classify_two_files(left_abs: PathBuf, right_abs: PathBuf, cap: u64) -> EntryClassification {
+    if let (Ok(lm), Ok(rm)) = (std::fs::metadata(&left_abs), std::fs::metadata(&right_abs)) {
+        let (left_size, right_size) = (lm.len(), rm.len());
+        if left_size.max(right_size) >= cap {
+            return EntryClassification::Final(if left_size != right_size {
+                EqualityEvidence::SizeDifferent {
+                    left_size,
+                    right_size,
+                }
+            } else {
+                EqualityEvidence::MetadataMatch
+            });
+        }
+    }
+    EntryClassification::NeedsDigest {
+        left_abs,
+        right_abs,
     }
 }
 
@@ -1002,6 +1076,107 @@ mod tests {
             result,
             EntryClassification::Final(EqualityEvidence::LeftOnly)
         );
+    }
+
+    // ── F77 / handoff 056: the automatic-digest cap ─────────────────────────
+    //
+    // `classify_two_files` is `classify_entry`'s two-files case with the cap as
+    // a parameter, so these exercise the real logic against a small cap (a few
+    // bytes) instead of writing real multi-megabyte fixtures — `AUTO_DIGEST_CAP_BYTES`
+    // itself is only ever read once, by `classify_entry`, which no test here calls.
+
+    fn cap_dir(tag: &str) -> std::path::PathBuf {
+        let d = temp_dir(&format!("cap-{tag}"));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    /// Falsifies the cap directly: a same-size pair at the cap must not be
+    /// read — proven, not asserted, the tier-1 precedent (criterion 1):
+    /// one side is `chmod 000`, so a real read would fail with `EACCES`.
+    /// `stat(2)` (what `fs::metadata` calls) needs no permission on the file
+    /// itself, only on its parent directory, so classification can still see
+    /// the size. Reaching `Final` at all — not merely `MetadataMatch` — is
+    /// the proof: only `NeedsDigest` ever triggers a read, and this returns
+    /// before that branch is reached.
+    #[cfg(unix)]
+    #[test]
+    fn a_same_size_pair_at_the_cap_is_never_read() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = cap_dir("unread");
+        let (a, b) = (d.join("a.bin"), d.join("b.bin"));
+        std::fs::write(&a, [7u8; 10]).unwrap();
+        std::fs::write(&b, [7u8; 10]).unwrap();
+        let _ = std::fs::set_permissions(&a, std::fs::Permissions::from_mode(0o000));
+        if std::fs::read(&a).is_ok() {
+            eprintln!(
+                "skipping a_same_size_pair_at_the_cap_is_never_read: chmod had no effect (root?)"
+            );
+            let _ = std::fs::set_permissions(&a, std::fs::Permissions::from_mode(0o644));
+            return;
+        }
+
+        let result = classify_two_files(a.clone(), b.clone(), 10);
+
+        let _ = std::fs::set_permissions(&a, std::fs::Permissions::from_mode(0o644));
+        assert_eq!(
+            result,
+            EntryClassification::Final(EqualityEvidence::MetadataMatch),
+            "a real read would have failed with EACCES; classification must \
+             never have attempted one"
+        );
+    }
+
+    /// A size mismatch at the cap is still `Different` — free, certain, and
+    /// the cap must not hide it: `SizeDifferent`, not silently `MetadataMatch`.
+    #[test]
+    fn a_size_mismatch_at_the_cap_is_still_reported_different() {
+        let d = cap_dir("mismatch");
+        let (a, b) = (d.join("a.bin"), d.join("b.bin"));
+        std::fs::write(&a, [1u8; 10]).unwrap();
+        std::fs::write(&b, [1u8; 20]).unwrap();
+
+        assert_eq!(
+            classify_two_files(a, b, 10),
+            EntryClassification::Final(EqualityEvidence::SizeDifferent {
+                left_size: 10,
+                right_size: 20,
+            })
+        );
+    }
+
+    /// Under the cap, nothing changes: the pair still needs a real digest,
+    /// exactly as before this cap existed.
+    #[test]
+    fn under_the_cap_the_pair_still_needs_a_digest() {
+        let d = cap_dir("under");
+        let (a, b) = (d.join("a.bin"), d.join("b.bin"));
+        std::fs::write(&a, [1u8; 5]).unwrap();
+        std::fs::write(&b, [1u8; 5]).unwrap();
+
+        assert_eq!(
+            classify_two_files(a.clone(), b.clone(), 10),
+            EntryClassification::NeedsDigest {
+                left_abs: a,
+                right_abs: b,
+            }
+        );
+    }
+
+    /// A pair at the cap but with unequal sizes needs no digest either —
+    /// `SizeDifferent` above is resolved without ever reaching `NeedsDigest`,
+    /// which this pins directly against the enum variant, not only its payload.
+    #[test]
+    fn a_pair_at_the_cap_never_reaches_needs_digest_whichever_way_it_resolves() {
+        let d = cap_dir("no-digest");
+        let (a, b) = (d.join("a.bin"), d.join("b.bin"));
+        std::fs::write(&a, [1u8; 10]).unwrap();
+        std::fs::write(&b, [1u8; 99]).unwrap();
+        assert!(!matches!(
+            classify_two_files(a, b, 10),
+            EntryClassification::NeedsDigest { .. }
+        ));
     }
 
     // Handoff 007 §8.2 / F76's second instance: a failed digest comparison
