@@ -30,9 +30,14 @@
 
 use std::path::PathBuf;
 
-const CAP_BYTES: u64 = 2 * 1024 * 1024 * 1024; // 2 GB — comfortably under the
-// 9.26 GB the regression would request, comfortably over what an ordinary
-// small-workbook comparison needs.
+// 2 GB — comfortably under the 9.26 GB the regression would request,
+// comfortably over what an ordinary small-workbook comparison needs. Only
+// used by the unix-only test below, which is the only place the cap can be
+// applied (`cap_address_space` is itself `#[cfg(unix)]`); cfg-gated the same
+// way so a non-unix build (checked on the Windows GNU target in CI) does not
+// see it as dead code.
+#[cfg(unix)]
+const CAP_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 fn fixture(rel: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(rel)
