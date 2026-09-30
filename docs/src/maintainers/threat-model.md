@@ -64,7 +64,7 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
 - Text vs. binary cross-comparison (one side text, other binary) is blocked with
   a clear error message.
 - `.xlsx` files are **parsed** since v0.169.0 (`d492557`, RFC-085): a pair of
-  workbooks goes through `sheets-diff` 3.0.0 (`calamine 0.36.1`,
+  workbooks goes through `sheets-diff` 3.2.0 (`calamine 0.36.1`,
   `quick-xml 0.41.0`, `zip 8.6.0`) under the bounds set in
   `crates/forskscope-core/src/xlsx.rs`. A comparison that cannot finish — a
   corrupt workbook, or one that reaches a size bound — is shown as an error,
@@ -498,7 +498,7 @@ Key crates touching file I/O or process execution:
 | `dioxus-desktop` | 0.7.9 | Desktop WebView host | Uses authenticated loopback WebSocket IPC between WebView and host |
 | `tungstenite` / `native-tls` | 0.28 / 0.2 | Dioxus desktop transport dependency | Accepted only via `dioxus-desktop`; no app-authored remote connections |
 | `quick-xml` | 0.39.4 | Wayland protocol code generation through GTK/Dioxus stack | Build-time/proc-macro path; not reachable from user-supplied files. Carries the two advisories ignored in `.cargo/audit.toml` |
-| `sheets-diff` | 3.0.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0; 3.0.0 since F130) | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-core` only (`audit-deps` asserts it) |
+| `sheets-diff` | 3.2.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0; 3.0.0 since F130, 3.2.0 since F138) | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-core` only (`audit-deps` asserts it) |
 | `calamine` | 0.36.1 | Workbook reader under `sheets-diff` | **Parses user-supplied XML and archives.** Read as a stream by `sheets-diff` 2.5.1 and later, so memory follows the populated cells (it did not through 2.5.0). Immediate dependent: `sheets-diff` only |
 | `quick-xml` | 0.41.0 | XML parsing under `calamine` | **Reachable from user-supplied files.** Not covered by the `.cargo/audit.toml` ignore list (which names 0.39 only) |
 | `zip` | 8.6.0 | Archive reading under `calamine` | **Reachable from user-supplied files.** Compressed size is bounded (50 MiB); expansion is not |
@@ -578,6 +578,28 @@ never evaluated. `.xlsx` is read-only in every path.
 - `AlignmentMode` is `Positional`, the default and the cheapest.
 
 **What it does not defend against:**
+- **Closed in `sheets-diff` 3.2.0 (F138): a 512-byte file could abort the
+  process, and neither bound here could see it.** Opening a workbook parsed the
+  input as an OLE container before anything else — the path by which an encrypted
+  workbook is recognised — and a FAT length read from the header reached
+  `Vec::with_capacity` unchecked against the file's actual size
+  (`calamine 0.36.1`, `cfb.rs:122`; `tafia/calamine#714`, open). A 512-byte file
+  could therefore request **9.26 GB in one allocation**. `max_input_bytes` (50 MiB
+  from `Limits::hardened()`) measures the file, while the allocation size comes
+  from a field inside it, and `Limits::hardened()` was confirmed not to cover it;
+  an allocation failure is an abort, not an `Err` any caller can catch.
+  **Reproduced here through `forskscope_core::xlsx::compare_pair`**, not accepted
+  on report, and pinned by a regression test that caps its own address space.
+  **Whether it aborts depends on the host:** where the allocator can satisfy 9.26
+  GB by overcommitting, the same input returns an ordinary *not an xlsx file* —
+  so a clean result on a large development machine is not evidence of safety, and
+  containers with a memory limit, small hosts and CI runners are where it lands.
+  3.2.0 declines any input that does not begin with the ZIP magic bytes before
+  the parser sees it, on the shared open path, so the file and byte-slice entry
+  points are both covered; encrypted workbooks are still carved out by a byte
+  scan and still reported as encrypted. Published as `GHSA-w5x2-6474-pqp4`;
+  **`cargo audit` did not and does not report it**, because it reads RustSec and a
+  GitHub advisory does not propagate there (F140).
 - **Closed in `sheets-diff` 3.0.0 (F123, F130): a 5 KB workbook could abort
   the process.** Through 2.5.0 the read built a dense range over the bounding box
   of the *populated* cells before any bound counted a cell, at about 31 bytes per
@@ -637,3 +659,4 @@ its own merits.
 | v0.171.1 | Threat-model revision (F116): write path (§7), distribution (§8), script evaluation (§9) added; `.xlsx` and transport sections corrected | Records three write-path behaviours the F89 fix did not cover (backup symlink write-through, permission widening, non-atomic `MustMatch`), all observed on Linux and **not fixed** |
 | v0.172.0 | F120: character-level refinement bounded (`MAX_INLINE_CHARS_PER_SIDE` = 2,000), skipped pairs shown, Inline toggle disabled for files over 512 KiB | Closes a file-content-triggered process abort reachable from a user toggle; the aggregate cost of many near-limit pairs is not bounded |
 | v0.173.0 | F121: backup no longer written through a symlink; a save keeps an existing file's mode; precondition re-checked before the rename; `audit-deps` asserts the `rustls` path and queries all targets | Closes the F89 class on the `.bak` path and a private-file exposure; narrows (does not close) the `MustMatch`/`Force` race; extends a dependency gate from the host graph to the shipped platforms' |
+| v0.173.0 | F138: `sheets-diff` 3.0.0 → 3.2.0 — a 512-byte file could make the workbook reader request 9.26 GB in one allocation and abort the process (`GHSA-w5x2-6474-pqp4`, `calamine` `cfb.rs`) | **Closes a file-triggered process abort that both `max_input_bytes` and `Limits::hardened()` failed to bound**, reproduced through `compare_pair` here; 3.2.0 declines non-ZIP input before the parser. Reached us by an upstream letter, not by a scanner: `cargo audit` reads RustSec and the advisory was GitHub-only, and Dependabot alerts were disabled (F140). Also F139: a plain-number sheet no longer builds 400,000 diagnostics |

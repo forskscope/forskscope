@@ -5,6 +5,88 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.173.0] — 2026-09-30
+
+**Selecting a folder now tells you whether it differs, without comparing every
+file in it — and a malformed spreadsheet file can no longer close the
+application.**
+
+### Security
+
+**A malformed spreadsheet file could close ForskScope, losing unsaved work in
+other tabs.** A 512-byte file that claimed to be a workbook could make the
+underlying reader ask the system for 9.26 GB of memory in one allocation. Where
+that request could not be met the application stopped immediately — not an error
+message, an abrupt exit. The file did not have to be large: the size came from a
+number written inside it, so the file-size limit could not see it. Files like
+this are now declined before the reader examines them, and password-protected
+workbooks are still recognised as password-protected.
+
+### Added
+
+**Selecting a folder row says whether the two folders differ.** Moving through a
+directory comparison, a folder now reports one of three answers: they differ,
+their names and sizes match, or it could not be determined — the last when
+something on either side could not be read, rather than guessing. Nothing is
+ever reported as identical on this evidence, because names and sizes matching is
+not the same as contents matching; the label says exactly that. No file contents
+are read for this answer, and moving quickly through a list starts no work at
+all.
+
+**Spreadsheet comparisons now tell you when the result may be unreliable.** The
+reader has always been able to report that a sheet was compared in a degraded
+way — rows that may have been paired wrongly, a sheet it could not compare, an
+added-and-removed pair where a rename was meant. None of it reached you. These
+now appear in the message strip above the comparison. A pair carrying such a
+warning is never labelled *Files are identical*.
+
+### Changed
+
+**Browsing a folder no longer reads large files to compare them.** Opening a
+directory started reading the contents of every file present on both sides, with
+no limit — so two identical 4 GB files were read end to end because you opened
+the folder they were in. Files of 64 MiB or more are now left at *Size matches;
+contents not compared*, or reported as different when their sizes differ. Deep
+Compare is unchanged and still compares in full, because asking for it is asking
+for the work.
+
+**Spreadsheet comparison moved to a newer reader** (`sheets-diff` 3.2.0). Results
+are unchanged. The warning added in the previous release about a stray far-away
+cell closing the application is retired: the cause was fixed upstream.
+
+**A comparison of sheets full of plain numbers uses far less memory.** A 666 KiB
+sheet of numbers with no formulas produced 400,000 internal notices and a result
+of 158.9 MiB. It now produces one.
+
+**Character-level highlighting is computed once per changed line pair**, not
+repeatedly while scrolling.
+
+### Fixed
+
+**Ignored folder and file names now actually take effect** (reported as issue
+#145). Names entered to be ignored — `.git`, `target`, `node_modules` — were
+ignored in the file-by-file report but not in the folder comparison itself, and
+changing them while a comparison was open did nothing until it was reopened.
+Both are fixed: two folders differing only inside `.git` now compare as equal
+when `.git` is ignored.
+
+**A workbook whose sheets were only reordered is no longer shown as identical.**
+Moving a sheet and changing nothing else produced two identical renderings, so
+the comparison reported no difference. The reordering is now visible on each
+side.
+
+**A file's backup is no longer written through a symbolic link, and saving keeps
+the file's existing permissions.** A backup is now prepared alongside the file
+and put in place only after the final check, so a save that is refused leaves any
+existing backup untouched.
+
+**Error messages no longer offer advice that does not apply**, and the prompt
+before comparing a very large file says what will happen.
+
+**Pressing Enter on a button or checkbox no longer also applies the selected
+change.** It activated the control and the hunk at once.
+
+
 ## [0.172.0] — 2026-09-24
 
 **A comparison that failed no longer looks like a match, and a very long line no
@@ -56,8 +138,6 @@ now describes the parser that actually runs, and gained three sections it never
 had: the file-save path, how releases are distributed and signed, and script
 evaluation inside the application window.
 
-
-## [0.172.1] — Unreleased
 
 ## [0.171.0] — 2026-09-15
 
