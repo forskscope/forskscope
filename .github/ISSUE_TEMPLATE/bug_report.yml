@@ -41,24 +41,43 @@ body:
       description: What actually happened?
     validations:
       required: true
-  - type: textarea
-    id: logs
-    attributes:
-      label: Logs / error messages
-      description: Paste relevant logs, stack traces, or error messages.
-      render: shell
   - type: input
     id: version
     attributes:
       label: Version
-      description: Project version / commit hash / release tag.
+      description: |
+        In the app: **Settings** → the **ℹ** button (top-right of the dialog) → **Copy diagnostics**.
+        From a terminal: `forskscope --diagnostics` — it prints the version and your
+        platform, with your home directory redacted so it is safe to paste here.
+      placeholder: "e.g. 0.173.0"
+  - type: dropdown
+    id: install_source
+    attributes:
+      label: How did you install ForskScope?
+      description: Builds from different sources can be at different versions.
+      options:
+        - Downloaded from the GitHub releases page
+        - Microsoft Store
+        - AUR (Arch Linux)
+        - Built from source
+        - Other / not sure
   - type: textarea
     id: environment
     attributes:
       label: Environment
-      description: OS, Rust version, target, and anything else relevant.
+      description: |
+        Your operating system and version. The diagnostics above already include this —
+        pasting them here is enough.
       placeholder: |
-        OS:
-        rustc:
-        cargo:
-        target:
+        Windows 11
+        macOS 14 (Apple silicon)
+        Ubuntu 24.04
+  - type: textarea
+    id: logs
+    attributes:
+      label: Terminal output, if you have any
+      description: |
+        Optional, and often empty — **ForskScope does not write a log file**, so there is
+        nothing to look for on disk. If you happened to start it from a terminal, paste
+        anything it printed there.
+      render: shell

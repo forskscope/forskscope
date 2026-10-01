@@ -19,9 +19,18 @@ body:
     attributes:
       label: Context
       description: What are you trying to do, and what have you already tried?
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: |
+        Helpful whenever the answer depends on which build you have.
+        In the app: **Settings** → the **ℹ** button (top-right of the dialog) →
+        **Copy diagnostics**. From a terminal: `forskscope --diagnostics`.
+      placeholder: "e.g. 0.173.0"
   - type: textarea
     id: logs
     attributes:
-      label: Relevant logs / output
+      label: Relevant commands / output
       description: Paste any relevant commands, error output, or screenshots as text.
       render: shell
