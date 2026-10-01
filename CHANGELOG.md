@@ -5,7 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.173.1] — Unreleased
+## [0.174.0] — 2026-10-01
+
+**Hidden files and folders are no longer left out of comparisons.**
+
+### Fixed
+
+**Dot files and folders are now shown, and were always being compared.** Entries
+like `.gitignore`, `.env` and `.github` were hidden from the Explorer — but the
+comparison underneath had always counted them. Two folders differing only in a
+hidden file were therefore reported as differing while every row you could see
+matched. They are now shown by default, so what the comparison counted is what
+you see. (Reported as issue #146.)
+
+### Added
+
+**A *Hide hidden files* setting**, off by default. Turning it on excludes hidden
+entries from the Explorer **and** from folder comparison together, so a pair that
+differs only in a hidden file compares as identical — rather than one half of the
+app disagreeing with the other. On Windows it also covers entries carrying the
+filesystem's hidden attribute, whether or not the name begins with a dot.
+
+The *Ignore file extensions* and *Ignore directory names* settings are unchanged
+and work independently of it.
+
 
 ## [0.173.0] — 2026-09-30
 
