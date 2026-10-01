@@ -85,7 +85,9 @@ scope before that scope existed.
 
 ## Publication and immutability
 
-> A version is **published** once its GitHub Release leaves draft state.
+> A version is **published** once its GitHub Release exists and is not a
+> draft. While F156 stands, `release.yml` creates it already published, so that
+> is the moment the release workflow finishes.
 > Before that point the tag may be re-cut: delete the remote tag, re-tag the
 > corrected commit, and record the re-cut in that version's CHANGELOG entry.
 > After that point the version is immutable — supersede it with a new patch
@@ -142,14 +144,24 @@ annotated tag object (`git tag -l <tag>`) and re-push.
    than a regression, and `render_check.py` now retries a start-up crash
    itself (a small, bounded number of attempts, logging each one) — so a
    plain re-run is the first thing to try, not a last resort.
-4. **Publish is a separate, explicit owner action — this is the approval gate,
-   not a formality.** Inspect the draft release artifacts and composed notes,
-   then publish:
-   ```sh
-   gh release edit "${VER}" --draft=false
-   ```
-   Before that command runs, the version is only tagged. After it runs, the
-   version is published and immutable per the policy above.
+4. **The release publishes itself — there is no approval gate today (F156).**
+   `release.yml` creates the release already published, so the version becomes
+   immutable the moment the workflow's last job succeeds. Inspect the artifacts
+   and composed notes **after** the fact; if something is wrong, supersede it
+   with a new patch version, because the published release cannot be re-cut.
+
+   > **This is temporary and the owner authorised it as such (2026-10-01.)**
+   > The draft previously held each release until the owner published it, which
+   > is the approval gate RFC-079 and RFC-081 both rest on. It was removed
+   > because a draft is invisible on the repository front page and
+   > `releases/latest` does not resolve to one, so releases were being missed.
+   >
+   > **It is safe only while the AUR and Store workflows cannot complete.** Both
+   > fire on publication, so with no gate a tag push alone will reach the outside
+   > world the moment either is repaired. **Restore the gate in the same change
+   > that fixes F147 or F106** — give those workflows a `workflow_dispatch`
+   > release mode and drop their `release:` trigger, so the gate sits on
+   > distribution rather than on visibility.
 5. **Publishing the release triggers `.github/workflows/aur-publish.yml`
    automatically** (RFC-081). **Its `validate` job works; its `publish` job has
    never completed, so the AUR push is done by hand today — see *Pushing to the

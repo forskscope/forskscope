@@ -22,6 +22,13 @@ name: AUR Publish
 # gate must survive" sets out).
 
 on:
+  # ⚠ F156: the GitHub release now publishes IMMEDIATELY on a tag push — there
+  # is no draft and no human step between tagging and this trigger firing.
+  # This path is harmless today only because it cannot complete. **Do not fix
+  # the credential or the artifact without restoring the approval gate in the
+  # same change** (give this workflow's `workflow_dispatch` a release mode and
+  # drop the `release:` trigger), or a tag push alone will publish to the
+  # outside world unattended, which RFC-081 §4 exists to prevent.
   release:
     types: [published]
   workflow_dispatch:
