@@ -179,10 +179,19 @@ annotated tag object (`git tag -l <tag>`) and re-push.
    `namcap`s the package in an Arch container, which is the part that protects
    the AUR, and the recipe pushed below is the one it validated.
 
-   1. Open the **AUR Publish** run the publication triggered. `validate` will be
+   1. Find the **AUR Publish** run the publication triggered. `validate` will be
       green and `publish` red; that is the expected shape today.
-   2. Download the `aur-recipe` artifact from that run and unpack it. It
-      contains `PKGBUILD` only.
+      ```sh
+      gh run list --workflow=aur-publish.yml --limit 1
+      ```
+   2. Download the `aur-recipe` artifact from that run.
+      **It is a workflow artifact, not a release asset — it is not attached to the
+      GitHub Release and will not appear there.** In the browser it is at the
+      bottom of the run's summary page, under *Artifacts*. From the terminal:
+      ```sh
+      gh run download <run-id> -n aur-recipe -D aur-work
+      cd aur-work        # contains PKGBUILD only - see step 3
+      ```
    3. Regenerate the missing file beside it, with the command CI itself ran:
       ```sh
       makepkg --printsrcinfo > .SRCINFO

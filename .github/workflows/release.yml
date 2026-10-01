@@ -258,6 +258,7 @@ jobs:
           merge-multiple: true
 
       - name: Create release
+        id: create_release
         uses: softprops/action-gh-release@v3
         with:
           draft: true
@@ -266,3 +267,30 @@ jobs:
             forskscope-v*-linux-x86_64.tar.gz
             forskscope-v*-macos-aarch64.dmg
             forskscope-v*-windows-x64.zip
+
+      # The release is a DRAFT on purpose: publishing it is the owner's approval
+      # gate, and it is what triggers distribution (RFC-079, RFC-081). A draft is
+      # invisible on the repository front page and `releases/latest` does not
+      # resolve to it, so a run that ends silently is easy to read as "nothing
+      # happened". This summary says what is left to do, on the page you are
+      # already looking at.
+      - name: Say what is left to do
+        env:
+          VER: ${{ github.ref_name }}
+          URL: ${{ steps.create_release.outputs.url }}
+        run: |
+          {
+            echo "## A draft release was created — it is not published yet"
+            echo
+            echo "**${VER}** is built and attached, and is visible only to"
+            echo "maintainers until it is published. It will not appear on the"
+            echo "repository front page, and \`releases/latest\` will not resolve"
+            echo "to it, until then."
+            echo
+            echo "- Draft: ${URL}"
+            echo "- Publish: \`gh release edit ${VER} --draft=false\`"
+            echo
+            echo "Publishing also starts the AUR and Microsoft Store workflows."
+            echo "Both need manual steps today — see *Release* in the maintainer"
+            echo "guide, under **Pushing to the AUR by hand** (F147, F106)."
+          } >> "$GITHUB_STEP_SUMMARY"
