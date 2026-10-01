@@ -216,6 +216,23 @@ pub fn SettingsModal() -> Element {
                             }
                         }
                     }
+                    // F149: hidden entries are shown by default; this hides them —
+                    // in the Explorer tree and in every comparison that reads a
+                    // directory (recursive compare, Deep Compare, RFC-080 tier 1),
+                    // not only the tree. Title text says so, per the handoff: this
+                    // is not a display-only setting.
+                    div { class: "field",
+                        span { {t(lang, "Hide hidden files")} }
+                        input {
+                            r#type: "checkbox",
+                            checked: cur.hide_dotfiles,
+                            title: t(lang, "Also excludes hidden files and folders from comparisons — recursive compare, Deep Compare, and the Explorer's quick folder check. Off by default, so .gitignore, .env, and similar files are included."),
+                            onchange: move |e| {
+                                store.settings.write().hide_dotfiles = e.checked();
+                                super::persist(store);
+                            }
+                        }
+                    }
 
                     // ── Compare profiles ──────────────────────────────────────
                     div { class: "field",

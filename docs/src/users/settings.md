@@ -103,10 +103,11 @@ Click any `···` divider in the diff to expand a collapsed region.
 ### Ignore patterns
 
 These filters apply to the Explorer tree and to **folder comparison** (Deep
-Compare). A directory that matches is not entered and does not appear; a file that
-matches is not listed. Both sides use the same rules, so an ignored entry that
-exists on one side only is not reported as a difference — two checkouts that
-differ only inside `.git` compare as identical once `.git` is ignored.
+Compare, and the Explorer's quick folder check). A directory that matches is not
+entered and does not appear; a file that matches is not listed. Both sides use
+the same rules, so an ignored entry that exists on one side only is not reported
+as a difference — two checkouts that differ only inside `.git` compare as
+identical once `.git` is ignored.
 
 A change takes effect immediately: the Explorer panes reload under the new rules
 (an expanded tree collapses back to its root) and an open folder comparison
@@ -131,6 +132,18 @@ wildcard) to hide. Example:
 ```
 target, node_modules, *.cache, __pycache__
 ```
+
+#### Hide hidden files
+
+Off by default — hidden entries (dotfiles such as `.gitignore` and `.env`, plus
+folders like `.github`) are shown and are part of every comparison. Turn this on
+to exclude them from the Explorer tree **and** from folder comparison, the same
+way the two filters above do: an entry that matches is treated as absent on both
+sides, so a pair that differs only in a hidden file or folder compares as
+identical once this is on.
+
+On Windows, this also excludes entries carrying the filesystem's own hidden
+attribute, whether or not their name starts with a dot.
 
 ---
 

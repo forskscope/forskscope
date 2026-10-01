@@ -89,6 +89,15 @@ pub struct PersistedSettings {
     pub ignore_extensions: String,
     #[serde(default)]
     pub ignore_dirs: String,
+    /// F149: excludes hidden entries (dotfiles; also the Windows hidden
+    /// attribute) from the Explorer tree **and** from the comparison walk
+    /// (recursive compare, Deep Compare, RFC-080 tier 1) — one setting for
+    /// both halves, so neither answers a question the other does not.
+    /// Default `false`: hidden entries are shown, matching issue #146's
+    /// report that `.gitignore`, `.env` and `.github/` are routinely what is
+    /// being compared.
+    #[serde(default)]
+    pub hide_dotfiles: bool,
     #[serde(default)]
     pub explorer_compact: bool,
     #[serde(default)]
@@ -154,6 +163,7 @@ impl Default for PersistedSettings {
             active_profile: 0,
             ignore_extensions: String::new(),
             ignore_dirs: String::new(),
+            hide_dotfiles: false,
             explorer_compact: false,
             enable_binary_comparison: false,
             remember_explorer_dirs: true,
@@ -323,6 +333,8 @@ fn migrate_from_v0(v0: LegacyAppSettingsV0) -> PersistedSettings {
         active_profile: v0.active_profile,
         ignore_extensions: v0.ignore_extensions,
         ignore_dirs: v0.ignore_dirs,
+        // v0 has no hide_dotfiles concept; the product-wide default applies.
+        hide_dotfiles: false,
         explorer_compact: v0.explorer_compact,
         enable_binary_comparison: v0.enable_binary_comparison,
         remember_explorer_dirs: v0.remember_explorer_dirs,

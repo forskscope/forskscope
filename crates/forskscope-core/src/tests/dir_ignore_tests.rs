@@ -1,5 +1,5 @@
-//! F111: the ignore rules reach the recursive directory walk (RFC-056 §"Where
-//! ignore rules apply": "ignored entries are not walked or reported").
+//! F111/F149: the ignore rules reach the recursive directory walk (RFC-056
+//! §"Where ignore rules apply": "ignored entries are not walked or reported").
 //!
 //! Real temporary trees. Every "not walked" claim is shown by making the ignored
 //! subtree *unreadable*, so a walk that descended would fail or flag it; a walk
@@ -32,6 +32,13 @@ fn write(base: &Path, rel: &str, content: &str) {
 
 fn rules(exts: &str, dirs: &str) -> IgnoreRules {
     IgnoreRules::from_settings(exts, dirs)
+}
+
+fn hide_dotfiles() -> IgnoreRules {
+    IgnoreRules {
+        hide_dotfiles: true,
+        ..Default::default()
+    }
 }
 
 fn names(scan: &RecursiveScan) -> Vec<String> {
@@ -291,4 +298,176 @@ fn a_symlink_to_an_ignored_directory_is_ignored() {
     let ignored = recursive_diff_with_rules(&l, &r, &t, &rules("", "vendor"));
     assert!(entry(&ignored, "vendor").is_none(), "{:?}", ignored.entries);
     let _ = fs::remove_dir_all(&base);
+}
+
+// ── F149: hide_dotfiles ─────────────────────────────────────────────────────
+//
+// Issue #146: core's walk sees dotfiles the Explorer tree does not show, so a
+// pair differing only in a dotfile was reported as differing while every
+// visible row matched. The product's answer is that both halves can be made to
+// agree — the Explorer gets a setting, and `hide_dotfiles` is the walk's half
+// of it, built on the same `IgnoreRules` mechanism F111 already threads through
+// every entry point, not a parallel one.
+
+/// The reproduction itself (before/after in one test, both walks): a pair
+/// differing only in a dotfile reports the difference by default — matching
+/// what core's walk gave before this handoff existed — and reports nothing
+/// once `hide_dotfiles` is set.
+#[test]
+fn a_pair_differing_only_in_a_dotfile_reports_nothing_once_hidden_entries_are_excluded() {
+    let base = tmp("dotfile-diff");
+    let (l, r) = (base.join("l"), base.join("r"));
+    write(&l, "src/main.rs", "same\n");
+    write(&r, "src/main.rs", "same\n");
+    write(&l, ".foo/x.txt", "hi");
+
+    // The premise, unfiltered: this is the exact contradiction issue #146
+    // reports, and it must still be true before the setting is used.
+    let t = CancellationToken::new();
+    let unfiltered = recursive_diff_with_cancel(&l, &r, &t);
+    assert_eq!(
+        entry(&unfiltered, ".foo/x.txt").map(|e| e.status),
+        Some(RecStatus::LeftOnly),
+        "the premise: core's walk sees the dotfile, got {:?}",
+        unfiltered.entries
+    );
+
+    for (label, scan) in both(&l, &r, &hide_dotfiles()) {
+        assert!(
+            names(&scan).iter().all(|n| !n.contains(".foo")),
+            "{label}: a hidden entry was listed: {:?}",
+            scan.entries
+        );
+        assert_eq!(names(&scan), vec!["src/main.rs"], "{label}");
+    }
+    let _ = fs::remove_dir_all(&base);
+}
+
+/// A hidden entry is excluded whatever it is — directory or plain file — not
+/// only the directory shape the reproduction above uses.
+#[test]
+fn a_hidden_file_is_excluded_as_well_as_a_hidden_directory() {
+    let base = tmp("dotfile-kinds");
+    let (l, r) = (base.join("l"), base.join("r"));
+    write(&l, ".env", "SECRET=1");
+    write(&r, ".env", "SECRET=2");
+    write(&l, ".config/x", "a");
+    write(&l, "keep.txt", "k");
+    write(&r, "keep.txt", "k");
+
+    for (label, scan) in both(&l, &r, &hide_dotfiles()) {
+        assert_eq!(
+            names(&scan),
+            vec!["keep.txt"],
+            "{label}: {:?}",
+            scan.entries
+        );
+    }
+    let _ = fs::remove_dir_all(&base);
+}
+
+/// A hidden directory is **not descended into** — same proof as F111's
+/// unreadable-directory test: made unreadable, and the walk neither fails on
+/// it, nor flags it, nor flags a root. Without the setting the same tree
+/// reports it `Unreadable` (the premise).
+#[cfg(unix)]
+#[test]
+fn a_hidden_directory_is_not_walked_not_merely_hidden() {
+    use std::os::unix::fs::PermissionsExt;
+    let base = tmp("dotfile-notwalked");
+    let (l, r) = (base.join("l"), base.join("r"));
+    write(&l, "keep.txt", "k");
+    write(&r, "keep.txt", "k");
+    write(&l, ".git/HEAD", "x");
+    write(&r, ".git/HEAD", "x");
+    let blocked = l.join(".git");
+    let _ = fs::set_permissions(&blocked, fs::Permissions::from_mode(0o000));
+    if fs::read_dir(&blocked).is_ok() {
+        eprintln!("skipping a_hidden_directory_is_not_walked: chmod had no effect (root?)");
+        let _ = fs::set_permissions(&blocked, fs::Permissions::from_mode(0o755));
+        let _ = fs::remove_dir_all(&base);
+        return;
+    }
+
+    let t = CancellationToken::new();
+    let premise = list_recursive_for_display_with_cancel(&l, &r, &t);
+    let flagged = premise
+        .entries
+        .iter()
+        .any(|e| e.status == RecStatus::Unreadable);
+
+    for (label, scan) in both(&l, &r, &hide_dotfiles()) {
+        assert!(
+            scan.entries
+                .iter()
+                .all(|e| e.status != RecStatus::Unreadable),
+            "{label}: a hidden, unreadable directory was flagged: {:?}",
+            scan.entries
+        );
+        assert!(
+            !scan.left_root_unreadable && !scan.right_root_unreadable,
+            "{label}"
+        );
+        assert_eq!(names(&scan), vec!["keep.txt"], "{label}");
+    }
+
+    let _ = fs::set_permissions(&blocked, fs::Permissions::from_mode(0o755));
+    let _ = fs::remove_dir_all(&base);
+    assert!(
+        flagged,
+        "the premise: without hide_dotfiles the unreadable .git is flagged"
+    );
+}
+
+/// Issue #145's exact case, pinned again under F149: name-based ignore and
+/// `hide_dotfiles` are independent mechanisms on the same struct, and must not
+/// interact. `.git` ignored by name alone (hide_dotfiles off, as issue #145's
+/// own fix shipped it) still reports equal; `hide_dotfiles` alone (no name
+/// rule) also reports equal, since `.git` is itself hidden; neither needs the
+/// other.
+#[test]
+fn issue_145s_dot_git_case_is_unaffected_by_hide_dotfiles_either_way() {
+    let base = tmp("issue-145");
+    let (l, r) = (base.join("l"), base.join("r"));
+    write(&l, "src/main.rs", "same\n");
+    write(&r, "src/main.rs", "same\n");
+    write(&l, ".git/HEAD", "ref: refs/heads/main\n");
+    write(&r, ".git/HEAD", "ref: refs/heads/other\n");
+
+    // Named-ignore alone (hide_dotfiles stays off): still reports equal.
+    for (label, scan) in both(&l, &r, &rules("", ".git")) {
+        assert_eq!(
+            names(&scan),
+            vec!["src/main.rs"],
+            "{label}: name rule alone"
+        );
+    }
+    // hide_dotfiles alone (no name rule): also reports equal, independently.
+    for (label, scan) in both(&l, &r, &hide_dotfiles()) {
+        assert_eq!(
+            names(&scan),
+            vec!["src/main.rs"],
+            "{label}: hide_dotfiles alone"
+        );
+    }
+    // Not ignored at all: the difference is reported (today's behaviour,
+    // unchanged by this handoff).
+    let t = CancellationToken::new();
+    let unfiltered = recursive_diff_with_cancel(&l, &r, &t);
+    assert!(
+        unfiltered
+            .entries
+            .iter()
+            .any(|e| e.status != RecStatus::Equal),
+        "the premise: unignored, the difference is reported"
+    );
+    let _ = fs::remove_dir_all(&base);
+}
+
+/// `IgnoreRules::is_empty()` must not let `hide_dotfiles` alone look empty —
+/// the early return in `is_ignored` would silently skip the check it guards.
+#[test]
+fn hide_dotfiles_alone_is_not_an_empty_ruleset() {
+    assert!(!hide_dotfiles().is_empty());
+    assert!(IgnoreRules::default().is_empty());
 }

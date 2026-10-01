@@ -12,16 +12,20 @@
 //! Symlinks are now explicitly reported as `RecStatus::Symlink` rather than
 //! silently skipped. The caller decides how to present them.
 //!
-//! ## Ignore rules (F111, RFC-056)
+//! ## Ignore rules (F111, F149, RFC-056)
 //!
 //! `recursive_diff_with_rules` / `list_recursive_for_display_with_rules` take an
 //! [`IgnoreRules`] and apply it **during the walk**, on both sides by the same
 //! rules: an ignored directory is not descended into and does not appear, and an
 //! ignored file is not reported, so an ignored entry present on one side only
 //! never becomes a one-sided difference. The decision is made from the entry's
-//! name and file type *before* its metadata is read, so an ignored entry that
-//! could not be read is neither failed on nor flagged `Unreadable`. The
-//! `*_with_cancel` functions are the same walks with empty rules.
+//! name and file type *before* its metadata is read on the common platforms, so
+//! an ignored entry that could not be read is neither failed on nor flagged
+//! `Unreadable`. The `*_with_cancel` functions are the same walks with empty
+//! rules. `IgnoreRules::hide_dotfiles` (F149) is the same mechanism: a hidden
+//! entry is excluded from the walk exactly as a named pattern is — see
+//! `ignore.rs`'s module doc for why this flag reaches the walk but not the
+//! Explorer tree's own scan.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -236,11 +240,13 @@ fn mark_unreadable(map: &mut BTreeMap<PathBuf, RecEntry>, rel: PathBuf) {
     entry.status = RecStatus::Unreadable;
 }
 
-/// F111: whether `rules` exclude this directory entry. Decided from the name and
-/// the entry's own file type, which needs no `stat` on the common platforms, so
-/// an ignored entry is never read and an unreadable one is never flagged. A
-/// symlink is judged by what it points at (a dangling one is not ignored, so it
-/// is still reported).
+/// F111/F149: whether `rules` exclude this directory entry. Decided from the
+/// name and the entry's own file type, which needs no `stat` on the common
+/// platforms, so an ignored entry is never read and an unreadable one is never
+/// flagged. A symlink is judged by what it points at (a dangling one is not
+/// ignored, so it is still reported). `hide_dotfiles` is checked first,
+/// independent of file type — a hidden entry is skipped whether it is a file,
+/// a directory, or a symlink.
 fn is_ignored(rules: &IgnoreRules, entry: &fs::DirEntry) -> bool {
     if rules.is_empty() {
         return false;
@@ -249,6 +255,9 @@ fn is_ignored(rules: &IgnoreRules, entry: &fs::DirEntry) -> bool {
     let Some(name) = name.to_str() else {
         return false;
     };
+    if rules.hide_dotfiles && is_hidden(name, entry) {
+        return true;
+    }
     match entry.file_type() {
         Ok(ft) if ft.is_dir() => rules.is_dir_ignored(name),
         Ok(ft) if ft.is_file() => rules.is_file_ignored(name),
@@ -259,6 +268,30 @@ fn is_ignored(rules: &IgnoreRules, entry: &fs::DirEntry) -> bool {
         },
         _ => false,
     }
+}
+
+/// Mirrors `dioxus_swdir_tree_core`'s own hidden-entry rule exactly (F149), so
+/// the walk and the Explorer tree agree on what "hidden" means: Unix, the name
+/// starts with `.`; Windows, that or the filesystem's hidden attribute bit.
+/// Duplicated rather than depended on — that crate does not expose its rule as
+/// a reusable function, only as part of its own scan — and kept byte-for-byte
+/// equivalent to it on purpose, not reinterpreted.
+fn is_hidden(name: &str, entry: &fs::DirEntry) -> bool {
+    name.starts_with('.') || is_hidden_attribute(entry)
+}
+
+#[cfg(windows)]
+fn is_hidden_attribute(entry: &fs::DirEntry) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    entry
+        .metadata()
+        .map(|m| m.file_attributes() & 0x2 != 0)
+        .unwrap_or(false)
+}
+
+#[cfg(not(windows))]
+fn is_hidden_attribute(_entry: &fs::DirEntry) -> bool {
+    false
 }
 
 /// Walk a directory tree, inserting entries via `make`. Symlinks are

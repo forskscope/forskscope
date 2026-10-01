@@ -44,6 +44,7 @@ fn sample_v2() -> PersistedSettings {
         active_profile: 0,
         ignore_extensions: "o, tmp".into(),
         ignore_dirs: "target".into(),
+        hide_dotfiles: true,
         explorer_compact: true,
         enable_binary_comparison: false,
         remember_explorer_dirs: true,
@@ -155,6 +156,7 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
         active_profile: 0,
         ignore_extensions: "o, tmp".into(),
         ignore_dirs: "target".into(),
+        hide_dotfiles: true,
         explorer_compact: true,
         enable_binary_comparison: true,
         remember_explorer_dirs: false,
@@ -200,6 +202,9 @@ fn legacy_v0_fixture_migrates_every_field_exactly() {
             assert!(value.explorer_compact);
             assert!(value.enable_binary_comparison);
             assert!(!value.remember_explorer_dirs);
+            // v0 has no hide_dotfiles concept (F149); falls back to the
+            // product-wide default (hidden entries shown), not v0 data.
+            assert!(!value.hide_dotfiles);
             // Core-only fields not present in v0 fall back to core defaults.
             assert_eq!(value.density, Density::default());
             assert_eq!(value.performance, PerformanceLimits::default());

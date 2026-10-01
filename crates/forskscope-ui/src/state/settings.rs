@@ -177,6 +177,11 @@ pub struct AppSettings {
     pub ignore_extensions: String,
     /// Comma-separated directory-name patterns to ignore (e.g. `"target, node_modules, *.cache"`).
     pub ignore_dirs: String,
+    /// When `true`, hidden entries (dotfiles; the Windows hidden attribute) are
+    /// excluded from the Explorer tree **and** from every comparison that
+    /// reads this directory tree — recursive compare, Deep Compare, RFC-080
+    /// tier 1 (F149). Default `false`: hidden entries are shown.
+    pub hide_dotfiles: bool,
     /// When `true`, the Explorer shows each pane independently (no spacer rows),
     /// breaking cross-pane alignment. Default `false` (aligned mode) (RFC-068).
     pub explorer_compact: bool,
@@ -198,7 +203,10 @@ impl Default for AppSettings {
 impl AppSettings {
     /// Build an [`IgnoreRules`] snapshot from the current settings.
     pub fn ignore_rules(&self) -> forskscope_core::IgnoreRules {
-        forskscope_core::IgnoreRules::from_settings(&self.ignore_extensions, &self.ignore_dirs)
+        let mut rules =
+            forskscope_core::IgnoreRules::from_settings(&self.ignore_extensions, &self.ignore_dirs);
+        rules.hide_dotfiles = self.hide_dotfiles;
+        rules
     }
 
     /// Projects the UI-editable subset of the canonical v2 settings
@@ -230,6 +238,7 @@ impl AppSettings {
             active_profile: v2.active_profile,
             ignore_extensions: v2.ignore_extensions.clone(),
             ignore_dirs: v2.ignore_dirs.clone(),
+            hide_dotfiles: v2.hide_dotfiles,
             explorer_compact: v2.explorer_compact,
             enable_binary_comparison: v2.enable_binary_comparison,
             remember_explorer_dirs: v2.remember_explorer_dirs,
@@ -270,6 +279,7 @@ impl AppSettings {
             active_profile: self.active_profile,
             ignore_extensions: self.ignore_extensions.clone(),
             ignore_dirs: self.ignore_dirs.clone(),
+            hide_dotfiles: self.hide_dotfiles,
             explorer_compact: self.explorer_compact,
             enable_binary_comparison: self.enable_binary_comparison,
             remember_explorer_dirs: self.remember_explorer_dirs,

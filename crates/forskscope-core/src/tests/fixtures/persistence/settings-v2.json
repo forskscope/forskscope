@@ -55,6 +55,7 @@
     "active_profile": 0,
     "ignore_extensions": "o, tmp",
     "ignore_dirs": "target",
+    "hide_dotfiles": true,
     "explorer_compact": true,
     "enable_binary_comparison": true,
     "remember_explorer_dirs": false,

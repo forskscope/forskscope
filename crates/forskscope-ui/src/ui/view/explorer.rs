@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use dioxus::prelude::*;
-use dioxus_swdir_tree::{DirectoryTree, use_scan_driver};
+use dioxus_swdir_tree::{DirectoryTree, DisplayFilter, use_scan_driver};
 
 use forskscope_core::IgnoreRules;
 use forskscope_core::dir::{
@@ -130,6 +130,22 @@ enum EntryClassification {
         left_abs: PathBuf,
         right_abs: PathBuf,
     },
+}
+
+/// F149: the Explorer tree's own display filter, driven by the same
+/// `hide_dotfiles` setting as the comparison walk — see `ignore.rs`'s module
+/// doc for why the tree uses this (`DisplayFilter`, instant, zero I/O) rather
+/// than the `IgnoreRules`-based `FilteringExecutor` the walk uses.
+///
+/// `FoldersOnly` is never selected: nothing in this product has ever had a
+/// reason to hide files while keeping folders, and this setting does not
+/// introduce one.
+fn tree_display_filter(hide_dotfiles: bool) -> DisplayFilter {
+    if hide_dotfiles {
+        DisplayFilter::FilesAndFolders
+    } else {
+        DisplayFilter::AllIncludingHidden
+    }
 }
 
 /// F74 review 072 / handoff 007 §7b: the per-entry classification,
@@ -521,9 +537,16 @@ pub fn Explorer() -> Element {
     let rules_l = shared_rules.clone();
     use_effect(move || {
         // Subscribes to the rules: a change re-runs this and rebuilds the tree.
-        rules_l.set(ignore_rules());
+        // F149: `hide_dotfiles` is part of that same memo, so toggling it also
+        // rebuilds — more than the display-only change strictly needs (the raw
+        // scan is unaffected by it; see `ignore.rs`'s module doc), but it is the
+        // same cost F112 already accepted for every other ignore-rule change,
+        // not a new one, and the filter below applies to the fresh tree either way.
+        let current_rules = ignore_rules();
+        rules_l.set(current_rules.clone());
         let root = left_dir.read().cloned();
-        let mut nt = DirectoryTree::new(root.clone());
+        let mut nt = DirectoryTree::new(root.clone())
+            .with_filter(tree_display_filter(current_rules.hide_dotfiles));
         binary_cache.write().clear();
         if let Some(req) = nt.on_toggled(&root) {
             tree_l.set(nt);
@@ -556,9 +579,11 @@ pub fn Explorer() -> Element {
 
     let rules_r = shared_rules.clone();
     use_effect(move || {
-        rules_r.set(ignore_rules());
+        let current_rules = ignore_rules();
+        rules_r.set(current_rules.clone());
         let root = right_dir.read().cloned();
-        let mut nt = DirectoryTree::new(root.clone());
+        let mut nt = DirectoryTree::new(root.clone())
+            .with_filter(tree_display_filter(current_rules.hide_dotfiles));
         binary_cache.write().clear();
         if let Some(req) = nt.on_toggled(&root) {
             tree_r.set(nt);
@@ -1353,6 +1378,46 @@ mod tests {
         let v = verdict(&b.join("l"), &b.join("r"));
         assert_eq!(v, DirVerdict::MetadataMatch);
         assert!(!verdict_evidence(v).is_equal());
+        let _ = std::fs::remove_dir_all(&b);
+    }
+
+    /// F149: tier 1's verdict follows `hide_dotfiles`, both ways, through the
+    /// same `IgnoreRules` mechanism the Explorer's own scan and Deep Compare
+    /// use — not a parallel one. A pair differing only in a dotfile is
+    /// `Different` by default (issue #146's contradiction: core's walk saw it,
+    /// so tier 1 did too) and `MetadataMatch` once hidden entries are excluded,
+    /// which is also the fix for that contradiction, one level up.
+    #[test]
+    fn tier_1s_verdict_follows_hide_dotfiles_both_ways() {
+        let b = tier1_dir("hide-dotfiles");
+        write(&b.join("l"), "keep.txt", "same");
+        write(&b.join("r"), "keep.txt", "same");
+        write(&b.join("l"), ".foo/x.txt", "hi");
+
+        let t = CancellationToken::new();
+        let shown = list_recursive_for_display_with_rules(
+            &b.join("l"),
+            &b.join("r"),
+            &t,
+            &IgnoreRules::default(),
+        );
+        assert_eq!(
+            dir_verdict(&shown),
+            DirVerdict::Different,
+            "shown by default"
+        );
+
+        let hidden = IgnoreRules {
+            hide_dotfiles: true,
+            ..Default::default()
+        };
+        let excluded =
+            list_recursive_for_display_with_rules(&b.join("l"), &b.join("r"), &t, &hidden);
+        assert_eq!(
+            dir_verdict(&excluded),
+            DirVerdict::MetadataMatch,
+            "excluded once hide_dotfiles is set"
+        );
         let _ = std::fs::remove_dir_all(&b);
     }
 

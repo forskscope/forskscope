@@ -197,6 +197,10 @@ fn ja(key: &str) -> Option<&'static str> {
         }
         "Ignore file extensions" => "除外ファイル拡張子",
         "Ignore directory names" => "除外ディレクトリ名",
+        "Hide hidden files" => "隠しファイルを非表示にする",
+        "Also excludes hidden files and folders from comparisons — recursive compare, Deep Compare, and the Explorer's quick folder check. Off by default, so .gitignore, .env, and similar files are included." => {
+            "隠しファイルやフォルダは、比較(再帰比較・ディープ比較・エクスプローラーのクイックフォルダー確認)からも除外されます。デフォルトではオフになっており、.gitignore や .env などのファイルも比較対象に含まれます。"
+        }
         "Delete profile" => "プロファイルを削除",
         "0 (show all)" => "0（全表示）",
         "3 (default)" => "3（デフォルト）",
