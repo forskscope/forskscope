@@ -5,7 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.174.1] — Unreleased
+## [0.175.0] — 2026-10-01
+
+**Folders can now be checked for certain, when you ask.**
+
+### Added
+
+**A *Verify* button on rows whose names and sizes match.** Browsing tells you
+quickly that two folders *differ* — it compares names and sizes and reads
+nothing. When it finds nothing to report, the row says so honestly: *Names and
+sizes match; contents not compared*. Those rows now offer **Verify**, which reads
+every byte and answers for certain: *Identical — contents compared*, or
+different.
+
+It appears only on rows that reached that state — a row already known to differ
+needs no checking — and only when you click it. Nothing reads your files
+because you opened a folder.
+
+Files work the same way: a file left unread because it is large can be verified
+on request, with no size limit on what you explicitly ask for.
+
+### Fixed
+
+**A folder that could not be opened no longer produces a confident answer.** In
+Deep Compare, when one side's folder could not be read, every file on the other
+side was listed as existing only there — a definite-looking result produced by a
+failed read. Those entries are now marked unreadable, and are offered neither
+for comparison nor for copying.
+
 
 ## [0.174.0] — 2026-10-01
 
