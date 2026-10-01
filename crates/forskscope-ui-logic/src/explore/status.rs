@@ -210,7 +210,14 @@ impl RowStatusKind {
     /// Derive the display kind from core `EqualityEvidence`.
     pub fn from_evidence(evidence: &EqualityEvidence) -> Self {
         match evidence {
-            EqualityEvidence::DigestEqual | EqualityEvidence::MetadataEqual => Self::Equal,
+            // RFC-080 tier 2: `TreeIdentical` renders exactly as a file's
+            // `DigestEqual` does — "a tier-1 `Different` and a tier-2
+            // `Different` are the same claim" (RFC-080 §4) extends to
+            // `Identical`: both row kinds reach it only by having their
+            // contents actually read, so both earn the same display kind.
+            EqualityEvidence::DigestEqual
+            | EqualityEvidence::MetadataEqual
+            | EqualityEvidence::TreeIdentical => Self::Equal,
             EqualityEvidence::MetadataOnly => Self::Computing,
             EqualityEvidence::DigestDifferent
             | EqualityEvidence::SizeDifferent { .. }
@@ -244,6 +251,18 @@ mod tests {
     fn metadata_equal_maps_to_equal() {
         assert_eq!(
             RowStatusKind::from_evidence(&EqualityEvidence::MetadataEqual),
+            RowStatusKind::Equal
+        );
+    }
+
+    /// RFC-080 tier 2: a directory's `TreeIdentical` renders identically to
+    /// a file's `DigestEqual` — same `RowStatusKind`, so the same glyph,
+    /// class and (via `dir_pane.rs`'s label layer) the same wording on both
+    /// row kinds.
+    #[test]
+    fn tree_identical_maps_to_equal() {
+        assert_eq!(
+            RowStatusKind::from_evidence(&EqualityEvidence::TreeIdentical),
             RowStatusKind::Equal
         );
     }

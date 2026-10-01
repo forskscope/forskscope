@@ -23,7 +23,7 @@ use dioxus_swdir_tree::{DirectoryTree, DisplayFilter, use_scan_driver};
 use forskscope_core::IgnoreRules;
 use forskscope_core::dir::{
     DigestOutcome, EntryType, EqualityEvidence, file_digest_equal_with_cancel,
-    list_recursive_for_display_with_rules,
+    list_recursive_for_display_with_rules, recursive_diff_with_rules,
 };
 use forskscope_core::error::Result as CoreResult;
 
@@ -34,7 +34,8 @@ use crate::ui::view::dir_pane::{
     FilteringExecutor, NavHistory, PathBar, SharedIgnoreRules, home_dir, short_name,
 };
 use forskscope_ui_logic::{
-    DirVerdict, Tier1Action, Tier1Trigger, compute_aligned_rows, dir_verdict,
+    DirVerdict, EntryClassification, Tier1Action, Tier1Trigger, Tier2Verdict, classify_two_files,
+    compute_aligned_rows, dir_verdict, tier2_verdict,
 };
 
 use compact::CompactTree;
@@ -118,20 +119,6 @@ pub enum DigestKey {
 /// [`EqualityEvidence::MetadataMatch`] instead of being read.
 const AUTO_DIGEST_CAP_BYTES: u64 = 64 * 1024 * 1024;
 
-/// F74 review 072: what a left-side entry's classification will be, before
-/// any async work starts. `Final` is inserted immediately; `NeedsDigest`
-/// means the caller inserts a pending placeholder and starts the real
-/// digest comparison - a file present on both sides is the one case this
-/// function cannot resolve synchronously.
-#[derive(Debug, PartialEq)]
-enum EntryClassification {
-    Final(EqualityEvidence),
-    NeedsDigest {
-        left_abs: PathBuf,
-        right_abs: PathBuf,
-    },
-}
-
 /// F149: the Explorer tree's own display filter, driven by the same
 /// `hide_dotfiles` setting as the comparison walk — see `ignore.rs`'s module
 /// doc for why the tree uses this (`DisplayFilter`, instant, zero I/O) rather
@@ -189,40 +176,6 @@ fn classify_entry(rel: &Path, is_dir: bool, l_root: &Path, r_root: &Path) -> Ent
         classify_two_files(l_root.join(rel), cp, AUTO_DIGEST_CAP_BYTES)
     } else {
         EntryClassification::Final(EqualityEvidence::LeftOnly)
-    }
-}
-
-/// The two-files case of [`classify_entry`], with the cap as a parameter so
-/// tests can exercise the real logic against a small cap instead of writing
-/// real multi-megabyte fixtures. `classify_entry` always calls this with
-/// [`AUTO_DIGEST_CAP_BYTES`].
-///
-/// F77 (handoff 056): only a pair that *would* need an uncapped read has to
-/// be decided here — either side at or over `cap`. A pair that stays under
-/// it is untouched: `NeedsDigest` behaves exactly as it did before this cap
-/// existed. A `metadata` failure on either side also falls through
-/// unchanged, to the read path's own error handling — not this cap's job to
-/// report. Only when both sizes are known and at least one is at or over
-/// `cap`: a mismatch is free and certain regardless (`SizeDifferent`, so the
-/// cap never *hides* a difference), and a match rests at `MetadataMatch`
-/// instead of being read.
-fn classify_two_files(left_abs: PathBuf, right_abs: PathBuf, cap: u64) -> EntryClassification {
-    if let (Ok(lm), Ok(rm)) = (std::fs::metadata(&left_abs), std::fs::metadata(&right_abs)) {
-        let (left_size, right_size) = (lm.len(), rm.len());
-        if left_size.max(right_size) >= cap {
-            return EntryClassification::Final(if left_size != right_size {
-                EqualityEvidence::SizeDifferent {
-                    left_size,
-                    right_size,
-                }
-            } else {
-                EqualityEvidence::MetadataMatch
-            });
-        }
-    }
-    EntryClassification::NeedsDigest {
-        left_abs,
-        right_abs,
     }
 }
 
@@ -430,6 +383,187 @@ fn start_tier1_walk(
         let label = crate::ui::view::dir_pane::status_kind_label(kind, lang, true);
         announcement.set(format!("{}: {}", short_name(&rel), label));
     });
+}
+
+/// What a tier-2 directory verdict maps to as rendered evidence — the
+/// directory-row counterpart of `verdict_evidence`. `Identical` is
+/// `TreeIdentical`, not `DigestEqual`: see that variant's own doc comment
+/// for why a directory's tier-2 conclusion must not reuse a value that
+/// claims a single file's digest was computed.
+fn tier2_dir_evidence(verdict: Tier2Verdict) -> EqualityEvidence {
+    match verdict {
+        Tier2Verdict::Identical => EqualityEvidence::TreeIdentical,
+        Tier2Verdict::Different => EqualityEvidence::TreeDifferent,
+        Tier2Verdict::Unknown => EqualityEvidence::Unknown,
+    }
+}
+
+/// What a finished tier-2 directory walk may apply. Same cancellation
+/// discipline as `tier1_outcome` (the F61 pattern: checked, not assumed) —
+/// a cancelled walk returns a partial scan, and applying it would repaint a
+/// row with a verdict tier 2 never actually finished establishing.
+fn tier2_dir_outcome(
+    scan: &forskscope_core::dir::RecursiveScan,
+    cancelled: bool,
+    epoch_current: bool,
+) -> Option<EqualityEvidence> {
+    if cancelled || !epoch_current {
+        return None;
+    }
+    Some(tier2_dir_evidence(tier2_verdict(scan)))
+}
+
+/// Start a tier-2 *directory* verify for `rel` (RFC-080 §3, handoff 060):
+/// user-triggered, per row, offered only on a row already at the tier-1
+/// match state (§4's control). Reuses tier 1's own `DigestEpoch`
+/// (concurrency 1) rather than adding a second — handoff 060 §1: "Several
+/// rows may run at once... share the same bound and cancellation as
+/// everything else." Not routed through `Tier1Trigger`: a verify click is
+/// immediate and explicit, not a rested-on selection to debounce.
+#[allow(clippy::too_many_arguments)]
+fn start_tier2_dir_verify(
+    rel: PathBuf,
+    l_root: PathBuf,
+    r_root: PathBuf,
+    rules: IgnoreRules,
+    lang: crate::state::Lang,
+    mut tier1_map: Signal<Tier1Map>,
+    tier1_epoch: Signal<DigestEpoch>,
+    mut announcement: Signal<String>,
+) {
+    let key = Tier1Key {
+        left_root: l_root.clone(),
+        right_root: r_root.clone(),
+        rel: rel.clone(),
+    };
+    tier1_map
+        .write()
+        .insert(key.clone(), EqualityEvidence::MetadataOnly);
+    let (stamp, token, sem) = tier1_epoch.read().begin_task();
+    spawn(async move {
+        let _permit = sem.acquire_owned().await;
+        let (left, right) = (l_root.join(&rel), r_root.join(&rel));
+        let walk_token = token.clone();
+        let scan = tokio::task::spawn_blocking(move || {
+            recursive_diff_with_rules(&left, &right, &walk_token, &rules)
+        })
+        .await;
+        // Cancelled, superseded, or the walk itself panicked: nothing was
+        // established, so nothing is applied. Drop the "Comparing…" marker so
+        // the row returns to the tier-1 match state it started from.
+        let Ok(scan) = scan else {
+            tier1_map.write().remove(&key);
+            return;
+        };
+        let Some(evidence) = tier2_dir_outcome(
+            &scan,
+            token.is_cancelled(),
+            tier1_epoch.read().is_current(stamp),
+        ) else {
+            return;
+        };
+        let kind = forskscope_ui_logic::RowStatusKind::from_evidence(&evidence);
+        tier1_map.write().insert(key, evidence);
+        // Completion is announced into the same live region tier 1 added
+        // (handoff 060 §5.5: "tier 1 added the live region, so announce
+        // into it").
+        let label = crate::ui::view::dir_pane::status_kind_label(kind, lang, true);
+        announcement.set(format!("{}: {}", short_name(&rel), label));
+    });
+}
+
+/// Start a tier-2 verify for a capped *file* pair (RFC-080 §2a, §3): forces
+/// an uncapped digest read, bypassing `AUTO_DIGEST_CAP_BYTES`, on explicit
+/// user request. Reuses `file_digest_equal_with_cancel` and
+/// `classify_digest_outcome` exactly as the automatic under-cap path does —
+/// the classification this produces (`DigestEqual`/`DigestDifferent`/
+/// `Error`) is the same vocabulary either way; only the trigger and the cap
+/// differ. Shares tier 1's `DigestEpoch`, not `digest_map`'s own automatic
+/// one (`DIGEST_CONCURRENCY_LIMIT`), since both halves of tier 2 are the
+/// same deliberate, bounded pass (handoff 060 §1).
+fn start_tier2_file_verify(
+    rel: PathBuf,
+    l_root: PathBuf,
+    r_root: PathBuf,
+    lang: crate::state::Lang,
+    mut digest_map: Signal<HashMap<DigestKey, EqualityEvidence>>,
+    tier1_epoch: Signal<DigestEpoch>,
+    mut announcement: Signal<String>,
+) {
+    let key = DigestKey::Common(rel.clone());
+    digest_map
+        .write()
+        .insert(key.clone(), EqualityEvidence::MetadataOnly);
+    let (stamp, token, sem) = tier1_epoch.read().begin_task();
+    spawn(async move {
+        let _permit = sem.acquire_owned().await;
+        let (left, right) = (l_root.join(&rel), r_root.join(&rel));
+        let file_token = token.clone();
+        let joined = tokio::task::spawn_blocking(move || {
+            file_digest_equal_with_cancel(&left, &right, &file_token)
+        })
+        .await;
+        let evidence = match joined {
+            Ok(outcome) => classify_digest_outcome(outcome),
+            Err(_) => Some(EqualityEvidence::Error {
+                message: "digest comparison task panicked".to_string(),
+            }),
+        };
+        let Some(evidence) = evidence else {
+            // Cancelled - established nothing, there is no verdict to apply.
+            return;
+        };
+        let kind = forskscope_ui_logic::RowStatusKind::from_evidence(&evidence);
+        apply_epoch_result(
+            &mut digest_map.write(),
+            key,
+            evidence,
+            stamp,
+            &tier1_epoch.read(),
+        );
+        let label = crate::ui::view::dir_pane::status_kind_label(kind, lang, false);
+        announcement.set(format!("{}: {}", short_name(&rel), label));
+    });
+}
+
+/// Start a tier-2 verify for `rel` (RFC-080 §3, handoff 060), dispatching to
+/// the file or directory shape — the single entry point the "Verify" control
+/// calls, so callers need not decide which of the two to invoke.
+#[allow(clippy::too_many_arguments)]
+fn start_tier2_verify(
+    rel: PathBuf,
+    is_dir: bool,
+    l_root: PathBuf,
+    r_root: PathBuf,
+    rules: IgnoreRules,
+    lang: crate::state::Lang,
+    tier1_map: Signal<Tier1Map>,
+    digest_map: Signal<HashMap<DigestKey, EqualityEvidence>>,
+    tier1_epoch: Signal<DigestEpoch>,
+    announcement: Signal<String>,
+) {
+    if is_dir {
+        start_tier2_dir_verify(
+            rel,
+            l_root,
+            r_root,
+            rules,
+            lang,
+            tier1_map,
+            tier1_epoch,
+            announcement,
+        );
+    } else {
+        start_tier2_file_verify(
+            rel,
+            l_root,
+            r_root,
+            lang,
+            digest_map,
+            tier1_epoch,
+            announcement,
+        );
+    }
 }
 
 /// Which pane currently receives keyboard events (RFC-061).
@@ -925,6 +1059,7 @@ pub fn Explorer() -> Element {
                         left_dir, right_dir, left_hist, right_hist,
                         left_pick, right_pick, focused_pane,
                         digest_map, tier1_map, binary_cache, binary_enabled,
+                        tier1_epoch, tier1_announcement, rules: shared_rules.get(),
                     }
                 } else {
                     CompactTree {
@@ -936,6 +1071,7 @@ pub fn Explorer() -> Element {
                         left_pick, right_pick,
                         digest_map, tier1_map, binary_cache, binary_enabled,
                         filter_query,
+                        tier1_epoch, tier1_announcement, rules: shared_rules.get(),
                     }
                 }
 
@@ -1103,106 +1239,13 @@ mod tests {
         );
     }
 
-    // ── F77 / handoff 056: the automatic-digest cap ─────────────────────────
-    //
-    // `classify_two_files` is `classify_entry`'s two-files case with the cap as
-    // a parameter, so these exercise the real logic against a small cap (a few
-    // bytes) instead of writing real multi-megabyte fixtures — `AUTO_DIGEST_CAP_BYTES`
-    // itself is only ever read once, by `classify_entry`, which no test here calls.
-
-    fn cap_dir(tag: &str) -> std::path::PathBuf {
-        let d = temp_dir(&format!("cap-{tag}"));
-        let _ = std::fs::remove_dir_all(&d);
-        std::fs::create_dir_all(&d).unwrap();
-        d
-    }
-
-    /// Falsifies the cap directly: a same-size pair at the cap must not be
-    /// read — proven, not asserted, the tier-1 precedent (criterion 1):
-    /// one side is `chmod 000`, so a real read would fail with `EACCES`.
-    /// `stat(2)` (what `fs::metadata` calls) needs no permission on the file
-    /// itself, only on its parent directory, so classification can still see
-    /// the size. Reaching `Final` at all — not merely `MetadataMatch` — is
-    /// the proof: only `NeedsDigest` ever triggers a read, and this returns
-    /// before that branch is reached.
-    #[cfg(unix)]
-    #[test]
-    fn a_same_size_pair_at_the_cap_is_never_read() {
-        use std::os::unix::fs::PermissionsExt;
-        let d = cap_dir("unread");
-        let (a, b) = (d.join("a.bin"), d.join("b.bin"));
-        std::fs::write(&a, [7u8; 10]).unwrap();
-        std::fs::write(&b, [7u8; 10]).unwrap();
-        let _ = std::fs::set_permissions(&a, std::fs::Permissions::from_mode(0o000));
-        if std::fs::read(&a).is_ok() {
-            eprintln!(
-                "skipping a_same_size_pair_at_the_cap_is_never_read: chmod had no effect (root?)"
-            );
-            let _ = std::fs::set_permissions(&a, std::fs::Permissions::from_mode(0o644));
-            return;
-        }
-
-        let result = classify_two_files(a.clone(), b.clone(), 10);
-
-        let _ = std::fs::set_permissions(&a, std::fs::Permissions::from_mode(0o644));
-        assert_eq!(
-            result,
-            EntryClassification::Final(EqualityEvidence::MetadataMatch),
-            "a real read would have failed with EACCES; classification must \
-             never have attempted one"
-        );
-    }
-
-    /// A size mismatch at the cap is still `Different` — free, certain, and
-    /// the cap must not hide it: `SizeDifferent`, not silently `MetadataMatch`.
-    #[test]
-    fn a_size_mismatch_at_the_cap_is_still_reported_different() {
-        let d = cap_dir("mismatch");
-        let (a, b) = (d.join("a.bin"), d.join("b.bin"));
-        std::fs::write(&a, [1u8; 10]).unwrap();
-        std::fs::write(&b, [1u8; 20]).unwrap();
-
-        assert_eq!(
-            classify_two_files(a, b, 10),
-            EntryClassification::Final(EqualityEvidence::SizeDifferent {
-                left_size: 10,
-                right_size: 20,
-            })
-        );
-    }
-
-    /// Under the cap, nothing changes: the pair still needs a real digest,
-    /// exactly as before this cap existed.
-    #[test]
-    fn under_the_cap_the_pair_still_needs_a_digest() {
-        let d = cap_dir("under");
-        let (a, b) = (d.join("a.bin"), d.join("b.bin"));
-        std::fs::write(&a, [1u8; 5]).unwrap();
-        std::fs::write(&b, [1u8; 5]).unwrap();
-
-        assert_eq!(
-            classify_two_files(a.clone(), b.clone(), 10),
-            EntryClassification::NeedsDigest {
-                left_abs: a,
-                right_abs: b,
-            }
-        );
-    }
-
-    /// A pair at the cap but with unequal sizes needs no digest either —
-    /// `SizeDifferent` above is resolved without ever reaching `NeedsDigest`,
-    /// which this pins directly against the enum variant, not only its payload.
-    #[test]
-    fn a_pair_at_the_cap_never_reaches_needs_digest_whichever_way_it_resolves() {
-        let d = cap_dir("no-digest");
-        let (a, b) = (d.join("a.bin"), d.join("b.bin"));
-        std::fs::write(&a, [1u8; 10]).unwrap();
-        std::fs::write(&b, [1u8; 99]).unwrap();
-        assert!(!matches!(
-            classify_two_files(a, b, 10),
-            EntryClassification::NeedsDigest { .. }
-        ));
-    }
+    // F77/F145 (handoff 056, handoff 060 §4): `classify_two_files`'s own
+    // tests (the automatic-digest cap) now live with it in
+    // `forskscope-ui-logic::explore::classify_pair` - a pure decision with
+    // no Dioxus type involved, moved there per handoff 060's instruction.
+    // `classify_entry`'s tests above still exercise it through this file's
+    // own `classify_entry`, which calls the moved function with
+    // `AUTO_DIGEST_CAP_BYTES`.
 
     // Handoff 007 §8.2 / F76's second instance: a failed digest comparison
     // establishes nothing and must not be reported as `Different`. Drives
@@ -1645,4 +1688,139 @@ mod tests {
             assert_eq!(row_evidence(base.clone(), &cache, &l, &r, &rel), base);
         }
     }
+
+    // ── RFC-080 tier 2 (handoff 060) ─────────────────────────────────────────
+    //
+    // Real temporary trees, the real full walk (`recursive_diff_with_rules`) and
+    // the real fold (`tier2_verdict`) — the same discipline tier 1's own tests
+    // above follow, and for the same reason: nothing here is a helper this
+    // change introduces standing in for the thing it tests.
+
+    fn verify(l: &Path, r: &Path) -> Tier2Verdict {
+        tier2_verdict(&recursive_diff_with_rules(
+            l,
+            r,
+            &CancellationToken::new(),
+            &IgnoreRules::default(),
+        ))
+    }
+
+    /// Criterion 2, end to end: a pair differing only in content at identical
+    /// size reads at the tier-1 match state after tier 1 (proven again here,
+    /// not assumed) and `Different` after tier 2 actually reads the bytes.
+    #[test]
+    fn criterion_2_same_size_different_content_is_a_tier_1_match_then_different() {
+        let b = tier1_dir("tier2-criterion-2");
+        write(&b.join("l"), "a.txt", "abcdef");
+        write(&b.join("r"), "a.txt", "abcdeX"); // one character, same size
+        assert_eq!(
+            verdict(&b.join("l"), &b.join("r")),
+            DirVerdict::MetadataMatch,
+            "tier 1: no contents read, so this is as far as it gets"
+        );
+        assert_eq!(
+            verify(&b.join("l"), &b.join("r")),
+            Tier2Verdict::Different,
+            "tier 2: the bytes are actually read, and they differ"
+        );
+        let _ = std::fs::remove_dir_all(&b);
+    }
+
+    /// Criterion 3, end to end, and its permanent clause: an identical pair is
+    /// a tier-1 match after tier 1 and `Identical` after tier 2 — and tier 1's
+    /// own evidence mapping (`verdict_evidence`) can **never** produce
+    /// `TreeIdentical` for any `DirVerdict` it is given, which this checks
+    /// exhaustively over the enum rather than only the one case the
+    /// directories happen to produce. `DirVerdict` itself has no `Identical`
+    /// variant to begin with — a type-level guarantee this test also exercises
+    /// at the value level, so a future refactor that widened the enum would
+    /// still be caught here.
+    #[test]
+    fn criterion_3_identical_pair_is_a_tier_1_match_then_identical_never_from_tier_1_alone() {
+        let b = tier1_dir("tier2-criterion-3");
+        for side in ["l", "r"] {
+            write(&b.join(side), "a.txt", "same");
+            write(&b.join(side), "d/b.txt", "same too");
+        }
+        assert_eq!(
+            verdict(&b.join("l"), &b.join("r")),
+            DirVerdict::MetadataMatch,
+            "tier 1: names and sizes match, nothing read"
+        );
+        assert_eq!(
+            verify(&b.join("l"), &b.join("r")),
+            Tier2Verdict::Identical,
+            "tier 2: every file was actually read and matched"
+        );
+        for v in [
+            DirVerdict::Different,
+            DirVerdict::MetadataMatch,
+            DirVerdict::Unknown,
+        ] {
+            assert_ne!(
+                verdict_evidence(v),
+                EqualityEvidence::TreeIdentical,
+                "{v:?}: tier 1's own mapping must never claim identity"
+            );
+        }
+        let _ = std::fs::remove_dir_all(&b);
+    }
+
+    /// Tier 2's directory fold reaches `RowStatusKind::Equal` through
+    /// `TreeIdentical`, not a value a file row also produces by coincidence —
+    /// `tier2_dir_evidence` is the one place that mapping happens, so this
+    /// pins it directly rather than only through the end-to-end test above.
+    #[test]
+    fn tier2_dir_evidence_maps_identical_to_tree_identical_and_different_to_tree_different() {
+        assert_eq!(
+            tier2_dir_evidence(Tier2Verdict::Identical),
+            EqualityEvidence::TreeIdentical
+        );
+        assert_eq!(
+            tier2_dir_evidence(Tier2Verdict::Different),
+            EqualityEvidence::TreeDifferent
+        );
+        assert_eq!(
+            tier2_dir_evidence(Tier2Verdict::Unknown),
+            EqualityEvidence::Unknown
+        );
+    }
+
+    /// Criterion 5 (tier 2's half), the applying side — same discipline as
+    /// `a_cancelled_or_superseded_walk_applies_nothing` above: a cancelled
+    /// walk returns a partial scan that can read as fully equal, and applying
+    /// it would show an identity tier 2 never actually established.
+    #[test]
+    fn a_cancelled_or_superseded_tier_2_walk_applies_nothing() {
+        let b = tier1_dir("tier2-cancel");
+        write(&b.join("l"), "a.txt", "same");
+        write(&b.join("r"), "a.txt", "same");
+        let token = CancellationToken::new();
+        token.cancel();
+        let partial =
+            recursive_diff_with_rules(&b.join("l"), &b.join("r"), &token, &IgnoreRules::default());
+        assert_eq!(
+            tier2_verdict(&partial),
+            Tier2Verdict::Identical,
+            "the premise: a cancelled-up-front walk returns an empty, falsely-identical scan"
+        );
+        assert_eq!(
+            tier2_dir_outcome(&partial, token.is_cancelled(), true),
+            None
+        );
+        assert_eq!(
+            tier2_dir_outcome(&partial, false, false),
+            None,
+            "superseded"
+        );
+        assert!(tier2_dir_outcome(&partial, false, true).is_some());
+        let _ = std::fs::remove_dir_all(&b);
+    }
+
+    // `start_tier2_verify`/`start_tier2_dir_verify`/`start_tier2_file_verify`
+    // themselves call `spawn`, which needs a live component scope `with_test_store`'s
+    // `in_runtime` does not provide (same reason `start_tier1_walk` above has
+    // no direct unit test either) - their pure decisions
+    // (`tier2_dir_evidence`, `tier2_dir_outcome`) are tested above instead,
+    // and the dispatch itself is checked in the real app (review request).
 }

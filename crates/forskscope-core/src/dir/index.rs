@@ -214,6 +214,17 @@ pub enum EqualityEvidence {
     /// side only, or a common file whose size differs — established from the walk
     /// alone, with no contents read. Certain, unlike [`MetadataMatch`](Self::MetadataMatch).
     TreeDifferent,
+    /// Tier 2 of RFC-080: every file in the two directory trees was read and
+    /// matched — a user-triggered `recursive_diff` found no difference.
+    /// Deliberately not [`DigestEqual`](Self::DigestEqual): that variant
+    /// asserts *one* file's digest was computed, and a directory's tier-2
+    /// conclusion is not that (review 129 §2 made the same call for
+    /// [`TreeDifferent`](Self::TreeDifferent) against
+    /// [`DigestDifferent`](Self::DigestDifferent), for the same reason — an
+    /// enum whose whole job is to say what was measured must not reuse a
+    /// value that claims a different measurement). The only tier-2 state
+    /// entitled to claim identity; tier 1 alone must never reach it.
+    TreeIdentical,
     /// One or both sides had an error; comparison result is unreliable.
     Error { message: String },
     /// Comparison has not been attempted yet.
@@ -223,7 +234,10 @@ pub enum EqualityEvidence {
 impl EqualityEvidence {
     /// `true` when the evidence conclusively shows equality.
     pub fn is_equal(&self) -> bool {
-        matches!(self, Self::DigestEqual | Self::MetadataEqual)
+        matches!(
+            self,
+            Self::DigestEqual | Self::MetadataEqual | Self::TreeIdentical
+        )
     }
 
     /// `true` when the evidence conclusively shows a difference.

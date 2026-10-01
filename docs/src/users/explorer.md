@@ -101,6 +101,17 @@ that level it becomes `≈` — the same names and sizes, contents not compared.
 `≈` is deliberately not `=`: a change that keeps a file's size cannot be seen
 this way. Moving to another row, or navigating, stops the check.
 
+**Verify.** A row at `≈` — a folder pair, or a large file pair at or over the
+64 MiB automatic-comparison size — shows a small **Verify** button next to its
+icon. Clicking it reads every byte: a folder's Verify re-walks the pair's full
+contents, and a file's reads the pair directly, bypassing the size limit for
+that one explicit request. The row shows `…` while this runs and settles at
+`=` or `≠` once it finishes — this is the only way either row kind reaches `=`
+from a `≈` state, and `≈` never becomes `=` on its own. Several rows can be
+verified at once; they complete in turn rather than all at once. Navigating
+away, or selecting elsewhere while a folder's rest-triggered `≈` check is still
+pending, cancels whatever is in flight, including a running Verify.
+
 <!-- status-glyphs:begin -->
 | Icon | Meaning |
 |------|---------|

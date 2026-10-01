@@ -6,10 +6,12 @@ use std::path::PathBuf;
 
 use dioxus::prelude::*;
 use dioxus_swdir_tree::{DirectoryTree, ScanRequest, SelectionMode};
+use forskscope_core::IgnoreRules;
 use forskscope_core::dir::EqualityEvidence;
 
 use super::{DigestKey, PickKind};
 use crate::state::{Lang, Store, open_compare};
+use crate::ui::view::digest_epoch::DigestEpoch;
 use crate::ui::view::dir_pane::{NavHistory, TreeRow, navigate_to};
 
 type FlatRow = (PathBuf, bool, bool, bool, u32);
@@ -37,6 +39,11 @@ pub fn CompactTree(
     mut binary_cache: Signal<HashMap<PathBuf, bool>>,
     binary_enabled: bool,
     filter_query: Signal<String>,
+    /// RFC-080 tier 2 (handoff 060): the "Verify" control's dependencies —
+    /// shared with tier 1 rather than given their own (handoff 060 §1).
+    tier1_epoch: Signal<DigestEpoch>,
+    tier1_announcement: Signal<String>,
+    rules: IgnoreRules,
 ) -> Element {
     let mut store = use_context::<Store>();
     rsx! {
@@ -70,6 +77,10 @@ pub fn CompactTree(
                                 b
                             })
                         };
+                        let verify_rel = rel.clone();
+                        let verify_l_root = l_root.clone();
+                        let verify_r_root = r_root.clone();
+                        let verify_rules = rules.clone();
                         rsx! {
                             TreeRow {
                                 lang,
@@ -91,6 +102,14 @@ pub fn CompactTree(
                                             open_compare(&mut store, p_dbl.clone(), cp);
                                         }
                                     }
+                                },
+                                on_verify: move |_| {
+                                    super::start_tier2_verify(
+                                        verify_rel.clone(), is_dir,
+                                        verify_l_root.clone(), verify_r_root.clone(),
+                                        verify_rules.clone(), lang,
+                                        tier1_map, digest_map, tier1_epoch, tier1_announcement,
+                                    );
                                 },
                             }
                         }
@@ -128,6 +147,10 @@ pub fn CompactTree(
                                 b
                             })
                         };
+                        let verify_rel = rel.clone();
+                        let verify_l_root = l_root.clone();
+                        let verify_r_root = r_root.clone();
+                        let verify_rules = rules.clone();
                         rsx! {
                             TreeRow {
                                 lang,
@@ -149,6 +172,14 @@ pub fn CompactTree(
                                             open_compare(&mut store, cp, p_dbl.clone());
                                         }
                                     }
+                                },
+                                on_verify: move |_| {
+                                    super::start_tier2_verify(
+                                        verify_rel.clone(), is_dir,
+                                        verify_l_root.clone(), verify_r_root.clone(),
+                                        verify_rules.clone(), lang,
+                                        tier1_map, digest_map, tier1_epoch, tier1_announcement,
+                                    );
                                 },
                             }
                         }

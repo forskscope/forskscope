@@ -9,12 +9,14 @@ use std::path::PathBuf;
 use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
 use dioxus_swdir_tree::{DirectoryTree, DirectoryTreeEvent, ScanRequest, SelectionMode};
+use forskscope_core::IgnoreRules;
 use forskscope_core::dir::EqualityEvidence;
 use forskscope_ui_logic::AlignedRow;
 
-use super::{DigestKey, FocusedPane, PickKind, Tier1Map, row_evidence};
+use super::{DigestKey, FocusedPane, PickKind, Tier1Map, row_evidence, start_tier2_verify};
 use crate::i18n::t;
 use crate::state::{Lang, Store, open_compare};
+use crate::ui::view::digest_epoch::DigestEpoch;
 use crate::ui::view::dir_pane::{NavHistory, TreeRow, home_dir, navigate_to};
 
 #[allow(clippy::too_many_arguments)]
@@ -37,6 +39,11 @@ pub fn AlignedTree(
     tier1_map: Signal<Tier1Map>,
     mut binary_cache: Signal<HashMap<PathBuf, bool>>,
     binary_enabled: bool,
+    /// RFC-080 tier 2 (handoff 060): the "Verify" control's dependencies —
+    /// shared with tier 1 rather than given their own (handoff 060 §1).
+    tier1_epoch: Signal<DigestEpoch>,
+    tier1_announcement: Signal<String>,
+    rules: IgnoreRules,
 ) -> Element {
     let mut store = use_context::<Store>();
     let l_root = left_dir.read().cloned();
@@ -174,6 +181,10 @@ pub fn AlignedTree(
                                                 b
                                             })
                                         };
+                                        let verify_rel = row.rel_path.clone();
+                                        let verify_l_root = l_root.clone();
+                                        let verify_r_root = r_root.clone();
+                                        let verify_rules = rules.clone();
                                         rsx! {
                                             TreeRow {
                                                 lang,
@@ -204,6 +215,14 @@ pub fn AlignedTree(
                                                             if cp.is_file() { open_compare(&mut store, p_dbl.clone(), cp); }
                                                         }
                                                     }
+                                                },
+                                                on_verify: move |_| {
+                                                    start_tier2_verify(
+                                                        verify_rel.clone(), is_dir,
+                                                        verify_l_root.clone(), verify_r_root.clone(),
+                                                        verify_rules.clone(), lang,
+                                                        tier1_map, digest_map, tier1_epoch, tier1_announcement,
+                                                    );
                                                 },
                                             }
                                         }
@@ -237,6 +256,10 @@ pub fn AlignedTree(
                                                 b
                                             })
                                         };
+                                        let verify_rel = row.rel_path.clone();
+                                        let verify_l_root = l_root.clone();
+                                        let verify_r_root = r_root.clone();
+                                        let verify_rules = rules.clone();
                                         rsx! {
                                             TreeRow {
                                                 lang,
@@ -267,6 +290,14 @@ pub fn AlignedTree(
                                                             if cp.is_file() { open_compare(&mut store, cp, p_dbl.clone()); }
                                                         }
                                                     }
+                                                },
+                                                on_verify: move |_| {
+                                                    start_tier2_verify(
+                                                        verify_rel.clone(), is_dir,
+                                                        verify_l_root.clone(), verify_r_root.clone(),
+                                                        verify_rules.clone(), lang,
+                                                        tier1_map, digest_map, tier1_epoch, tier1_announcement,
+                                                    );
                                                 },
                                             }
                                         }

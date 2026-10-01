@@ -43,7 +43,11 @@ use forskscope_ui_logic::RowStatusKind;
 /// `is_dir`. Only `MetadataMatch` reads it.
 pub(crate) fn status_kind_label(kind: RowStatusKind, lang: Lang, is_dir: bool) -> String {
     match kind {
-        RowStatusKind::Equal => t(lang, "Identical"),
+        // RFC-080 §3/§4 (handoff 060, settled, not to be re-opened): the same
+        // wording on both row kinds — a file reaches this only via a real
+        // digest read (`DigestEqual`), a directory only via tier 2
+        // (`TreeIdentical`), so both have equal claim to the longer form.
+        RowStatusKind::Equal => t(lang, "Identical — contents compared"),
         RowStatusKind::Different => t(lang, "Different"),
         RowStatusKind::LeftOnly => t(lang, "Only on the left"),
         RowStatusKind::RightOnly => t(lang, "Only on the right"),
@@ -308,6 +312,11 @@ pub fn TreeRow(
     on_toggle: EventHandler<()>,
     on_select: EventHandler<()>,
     on_dblclick: EventHandler<()>,
+    /// RFC-080 tier 2 (handoff 060): starts a tier-2 verify for this row.
+    /// Only called from the "Verify" button, which renders only at the
+    /// tier-1 match state (`RowStatusKind::MetadataMatch`) — see §3's
+    /// placement rule in `start_tier2_verify`'s caller.
+    on_verify: EventHandler<()>,
 ) -> Element {
     let indent = depth * 16;
     let caret = if !is_dir {
@@ -386,6 +395,19 @@ pub fn TreeRow(
                             "{glyph}"
                         }
                     }
+                }
+            }
+            // RFC-080 tier 2 (handoff 060 §3): offered only on a row already
+            // at the tier-1 match state — a row proven `Different` needs no
+            // verification, and a row at `NotCompared` has no tier-1 result
+            // to escalate from. `stop_propagation` so the click starts a
+            // verify rather than also firing the row's own `on_select`.
+            if status_kind == Some(RowStatusKind::MetadataMatch) {
+                button {
+                    class: "tree-verify-btn",
+                    title: t(lang, "Read every byte to find out for certain."),
+                    onclick: move |e| { e.stop_propagation(); on_verify.call(()); },
+                    {t(lang, "Verify")}
                 }
             }
         }

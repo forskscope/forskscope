@@ -25,6 +25,7 @@ fn ja(key: &str) -> Option<&'static str> {
         }
         "Comparing…" => "比較中…",
         "Identical" => "同一",
+        "Identical — contents compared" => "同一 — 中身を比較済み",
         "Only on the left" => "左側にのみ存在",
         "Only on the right" => "右側にのみ存在",
         "Directory contents not compared — use Deep Compare" => {
@@ -35,6 +36,10 @@ fn ja(key: &str) -> Option<&'static str> {
         }
         "Size matches; contents not compared" => "サイズは一致しています。中身は比較されていません",
         "Comparison failed" => "比較に失敗しました",
+        "Verify" => "検証",
+        "Read every byte to find out for certain." => {
+            "確実に判定するため、すべてのバイトを読み込みます。"
+        }
         "Filter items" => "アイテムをフィルター",
         "Filter by name…" => "名前でフィルター…",
         "Hide binary" => "バイナリを非表示",

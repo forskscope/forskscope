@@ -84,8 +84,9 @@ to 32 at a time to avoid overwhelming the system on very large trees.
 
 A file pair of the same size, 64 MiB or larger, is not read for this
 background comparison — see [Status icons](explorer.md#status-icons) for what
-its row shows instead. Deep Compare (Directory Report) is unaffected; it
-reads a file pair of any size when you ask it to.
+its row shows instead. A **Verify** button on that row reads it anyway, on
+request; Deep Compare (Directory Report) is also unaffected, and reads a file
+pair of any size when you ask it to.
 
 ---
 

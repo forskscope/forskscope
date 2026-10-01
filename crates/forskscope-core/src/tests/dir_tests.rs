@@ -213,3 +213,17 @@ fn a_tier_1_match_is_neither_equal_nor_different_nor_pending() {
     assert!(!d.is_equal());
     assert!(!d.is_pending());
 }
+
+/// RFC-080 tier 2: `TreeIdentical` is the only evidence a *directory*
+/// comparison is entitled to call equal — reached by `recursive_diff`
+/// actually reading contents, unlike `MetadataMatch` above. Falsify by
+/// removing it from `is_equal`'s match: the first assertion fails.
+#[test]
+fn tree_identical_is_equal_and_present_on_both_sides() {
+    use crate::dir::EqualityEvidence as E;
+    let i = E::TreeIdentical;
+    assert!(i.is_equal());
+    assert!(!i.is_different());
+    assert!(!i.is_pending());
+    assert!(i.present_on_both_sides());
+}

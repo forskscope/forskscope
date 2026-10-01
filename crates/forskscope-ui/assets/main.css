@@ -380,6 +380,15 @@ code.path-display {
    status-equal's green: this glyph must not read as "identical". */
 .tree-status.status-metadata-match { color: var(--muted); }
 
+/* RFC-080 tier 2 (handoff 060): the "Verify" control, offered only on a
+   row at the tier-1 match state (`status-metadata-match`). Small and muted
+   like `.deep-compare-btn`, not a call to action - verifying is optional,
+   not expected of every row. */
+.tree-verify-btn {
+  margin-left: .4rem; padding: .1rem .4rem; font-size: 10px;
+  border-radius: 4px; flex-shrink: 0;
+}
+
 /* ── Binary-blocked row (RFC-066) ── */
 .tree-row.binary-blocked { opacity: .5; cursor: default; }
 .tree-status.st-binary {

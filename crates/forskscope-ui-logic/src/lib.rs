@@ -6,6 +6,8 @@
 //!
 //! - [`explore`] — explorer-pane logic:
 //!   - `align`: aligned-row merging for the two-pane explorer.
+//!   - `classify_pair`: `classify_two_files` (F145/F77, handoff 056) — a file
+//!     pair's equality classification under the automatic-digest cap.
 //!   - `deep_filter`: `DeepFilter` + `DeepCompareSummary` for recursive compare,
 //!     and `demote_entries_under_an_unreadable_root` (F110) — an unreadable
 //!     root downgrades every entry to `Unreadable`, never a one-sided verdict.
@@ -14,6 +16,9 @@
 //!     `Unknown`), and no more.
 //!   - `tier1_trigger`: the debounce state machine that decides when a tier-1
 //!     walk starts (a row must be rested on; moving through rows starts none).
+//!   - `tier2_verdict`: RFC-080 tier 2 — what a full, content-reading
+//!     recursive comparison can conclude (`Identical` / `Different` /
+//!     `Unknown`), the only tier entitled to claim identity.
 //!   - `status`: `RowStatusKind` from `EqualityEvidence`, and
 //!     `StatusGlyph` — the shared glyph/CSS-class/label vocabulary both
 //!     the Explorer and Deep Compare render through (F82).
@@ -61,12 +66,14 @@ pub use compare::startup::{CompareRequest, SaveDestination, StartupRequest, pars
 
 // explore
 pub use explore::align::{AlignedRow, FlatRow, RowData, compute_aligned_rows};
+pub use explore::classify_pair::{EntryClassification, classify_two_files};
 pub use explore::deep_filter::{
     DeepCompareSummary, DeepFilter, apply_filter, demote_entries_under_an_unreadable_root,
 };
 pub use explore::dir_verdict::{DirVerdict, dir_verdict};
 pub use explore::status::{RowStatusKind, StatusGlyph};
 pub use explore::tier1_trigger::{TIER1_DEBOUNCE, Tier1Action, Tier1Trigger};
+pub use explore::tier2_verdict::{Tier2Verdict, tier2_verdict};
 
 // session
 pub use session::persistence_recovery::{
