@@ -471,3 +471,46 @@ fn hide_dotfiles_alone_is_not_an_empty_ruleset() {
     assert!(!hide_dotfiles().is_empty());
     assert!(IgnoreRules::default().is_empty());
 }
+
+/// Review 133 §1: a dotfile whose name is not valid UTF-8 is still a dotfile —
+/// the tree crate's own rule reasons on the first raw byte, not a decoded
+/// character, and `is_ignored` must check `hide_dotfiles` the same way, before
+/// its `to_str()` guard. Unix-only: Windows paths cannot hold this name.
+#[cfg(unix)]
+#[test]
+fn a_non_utf8_dotfile_is_excluded_once_hidden_entries_are_excluded() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    let base = tmp("dotfile-non-utf8");
+    let (l, r) = (base.join("l"), base.join("r"));
+    fs::create_dir_all(&l).unwrap();
+    fs::create_dir_all(&r).unwrap();
+    write(&l, "keep.txt", "k");
+    write(&r, "keep.txt", "k");
+    // ".\xFFx" - a dotfile whose name is not valid UTF-8.
+    let bad_name = OsStr::from_bytes(b".\xFFx");
+    fs::write(l.join(bad_name), "hi").unwrap();
+
+    // The premise, unfiltered: the walk sees it, by whatever lossy name
+    // `rel_path` renders it as - not asserted on the name, only that *some*
+    // extra entry beyond keep.txt is reported.
+    let t = CancellationToken::new();
+    let unfiltered = recursive_diff_with_cancel(&l, &r, &t);
+    assert_eq!(
+        unfiltered.entries.len(),
+        2,
+        "the premise: the non-UTF-8 dotfile is seen unfiltered, got {:?}",
+        names(&unfiltered)
+    );
+
+    for (label, scan) in both(&l, &r, &hide_dotfiles()) {
+        assert_eq!(
+            names(&scan),
+            vec!["keep.txt"],
+            "{label}: a non-UTF-8 dotfile was still reported: {:?}",
+            scan.entries
+        );
+    }
+    let _ = fs::remove_dir_all(&base);
+}

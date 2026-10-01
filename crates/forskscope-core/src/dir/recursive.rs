@@ -251,13 +251,20 @@ fn is_ignored(rules: &IgnoreRules, entry: &fs::DirEntry) -> bool {
     if rules.is_empty() {
         return false;
     }
-    let name = entry.file_name();
-    let Some(name) = name.to_str() else {
-        return false;
-    };
-    if rules.hide_dotfiles && is_hidden(name, entry) {
+    let raw_name = entry.file_name();
+    // Checked on raw bytes, before the `to_str()` guard below: the tree crate's
+    // own hidden-entry rule (`is_dotfile`) reasons on raw bytes too, so a
+    // non-UTF-8 dotfile must be caught here or the walk and the tree disagree
+    // on it (review 133 §1). The name-based rules just below stay string-only
+    // and conservative - a non-UTF-8 name simply can't match an extension or
+    // directory pattern - because they have no byte-level counterpart to stay
+    // faithful to.
+    if rules.hide_dotfiles && is_hidden(&raw_name, entry) {
         return true;
     }
+    let Some(name) = raw_name.to_str() else {
+        return false;
+    };
     match entry.file_type() {
         Ok(ft) if ft.is_dir() => rules.is_dir_ignored(name),
         Ok(ft) if ft.is_file() => rules.is_file_ignored(name),
@@ -275,9 +282,12 @@ fn is_ignored(rules: &IgnoreRules, entry: &fs::DirEntry) -> bool {
 /// starts with `.`; Windows, that or the filesystem's hidden attribute bit.
 /// Duplicated rather than depended on — that crate does not expose its rule as
 /// a reusable function, only as part of its own scan — and kept byte-for-byte
-/// equivalent to it on purpose, not reinterpreted.
-fn is_hidden(name: &str, entry: &fs::DirEntry) -> bool {
-    name.starts_with('.') || is_hidden_attribute(entry)
+/// equivalent to it on purpose, not reinterpreted. Takes the raw `OsStr`, not a
+/// `&str`, because the crate's own rule (`is_dotfile`) tests the first raw
+/// byte, not a decoded character — a non-UTF-8 dotfile is still a dotfile to
+/// it, and must be to this function too (review 133 §1).
+fn is_hidden(name: &std::ffi::OsStr, entry: &fs::DirEntry) -> bool {
+    name.as_encoded_bytes().first() == Some(&b'.') || is_hidden_attribute(entry)
 }
 
 #[cfg(windows)]
