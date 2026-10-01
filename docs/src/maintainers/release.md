@@ -151,7 +151,9 @@ annotated tag object (`git tag -l <tag>`) and re-push.
    Before that command runs, the version is only tagged. After it runs, the
    version is published and immutable per the policy above.
 5. **Publishing the release triggers `.github/workflows/aur-publish.yml`
-   automatically** (RFC-081) — nothing further to do by hand. It checks out
+   automatically** (RFC-081). **Its `validate` job works; its `publish` job has
+   never completed, so the AUR push is done by hand today — see *Pushing to the
+   AUR by hand* below (F147).** The validate job checks out
    `packaging/linux/PKGBUILD` as it existed at the tag (not whatever `main` has
    moved to since — the post-release bump usually lands within minutes of the
    tag being pushed, long before the owner publishes the draft), computes the
@@ -161,12 +163,60 @@ annotated tag object (`git tag -l <tag>`) and re-push.
    run `namcap` on both the recipe and the built package — the same check that
    would have caught F81's missing `xdotool` `depends` entry, which three
    hand-published releases did not. A failure at any of these steps leaves the
-   AUR untouched. Only `PKGBUILD` and a freshly generated `.SRCINFO` are ever
-   pushed; watch it run under the "AUR Publish" workflow in the Actions tab, or
-   check the [`forskscope` AUR page](https://aur.archlinux.org/packages/forskscope)
-   directly once it finishes.
+   AUR untouched. Watch it run under the "AUR Publish" workflow in the Actions
+   tab, or check the [`forskscope` AUR page](https://aur.archlinux.org/packages/forskscope)
+   directly.
+
+   ### Pushing to the AUR by hand
+
+   **Why this is here.** `publish` reads `secrets.AUR_SSH_KEY`, a name defined in
+   no scope — the repository holds `AUR_SSH_PRIVATE_KEY` instead — and the
+   artifact it downloads has never contained `.SRCINFO`, because
+   `actions/upload-artifact` defaults to `include-hidden-files: false` and the
+   file begins with a dot. Both are F147 and both are fixable; until they are,
+   the automation stops before the push and these steps finish the job.
+   **The validation is not wasted** — `validate` still builds, installs and
+   `namcap`s the package in an Arch container, which is the part that protects
+   the AUR, and the recipe pushed below is the one it validated.
+
+   1. Open the **AUR Publish** run the publication triggered. `validate` will be
+      green and `publish` red; that is the expected shape today.
+   2. Download the `aur-recipe` artifact from that run and unpack it. It
+      contains `PKGBUILD` only.
+   3. Regenerate the missing file beside it, with the command CI itself ran:
+      ```sh
+      makepkg --printsrcinfo > .SRCINFO
+      ```
+   4. Check `pkgver` matches the release, `pkgrel` is `1`, and the `sha256sums`
+      entry matches the tag's own archive:
+      ```sh
+      curl -sL -o /tmp/tag.tar.gz \
+        "https://github.com/forskscope/forskscope/archive/refs/tags/${VER}.tar.gz"
+      sha256sum /tmp/tag.tar.gz
+      ```
+   5. Push **only those two files**:
+      ```sh
+      git clone ssh://aur@aur.archlinux.org/forskscope.git
+      cp PKGBUILD .SRCINFO forskscope/
+      cd forskscope && git add PKGBUILD .SRCINFO
+      git commit -m "${VER}-1" && git push
+      ```
+   6. Confirm it landed. The RPC listing lags by design, so read the package's
+      git state instead:
+      ```sh
+      curl -s 'https://aur.archlinux.org/cgit/aur.git/plain/.SRCINFO?h=forskscope' | head -4
+      ```
+
+   **If this is skipped, nothing fails loudly.** The AUR simply stays on the
+   previous version — it sat three releases behind between `0.170.1` and
+   `0.173.0` for exactly that reason, and nothing reported it.
 6. **Publishing the release also triggers `.github/workflows/store-submit.yml`
-   automatically** (RFC-079) — nothing further to do by hand. It checks out
+   automatically** (RFC-079). **It has never completed either: the submission API
+   returns `Unauthorized` until the Partner Center tenant association exists
+   (F106), so Store submissions are made by hand in Partner Center today (F108),
+   using the listing copy kept with the owner's working files.** What follows
+   describes the automated path as designed, and applies once that account work
+   is done. It checks out
    the released tag, builds the MSIX, validates it (manifest version against
    the tag, `Identity`/`Publisher`/`PublisherDisplayName` against the tracked
    Store identity, every manifest-referenced asset present, and — the
