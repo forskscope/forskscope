@@ -191,42 +191,89 @@ annotated tag object (`git tag -l <tag>`) and re-push.
    `namcap`s the package in an Arch container, which is the part that protects
    the AUR, and the recipe pushed below is the one it validated.
 
-   1. Find the **AUR Publish** run the publication triggered. `validate` will be
-      green and `publish` red; that is the expected shape today.
-      ```sh
-      gh run list --workflow=aur-publish.yml --limit 1
-      ```
-   2. Download the `aur-recipe` artifact from that run.
-      **It is a workflow artifact, not a release asset — it is not attached to the
-      GitHub Release and will not appear there.** In the browser it is at the
-      bottom of the run's summary page, under *Artifacts*. From the terminal:
-      ```sh
-      gh run download <run-id> -n aur-recipe -D aur-work
-      cd aur-work        # contains PKGBUILD only - see step 3
-      ```
-   3. Regenerate the missing file beside it, with the command CI itself ran:
-      ```sh
-      makepkg --printsrcinfo > .SRCINFO
-      ```
-   4. Check `pkgver` matches the release, `pkgrel` is `1`, and the `sha256sums`
-      entry matches the tag's own archive:
-      ```sh
-      curl -sL -o /tmp/tag.tar.gz \
-        "https://github.com/forskscope/forskscope/archive/refs/tags/${VER}.tar.gz"
-      sha256sum /tmp/tag.tar.gz
-      ```
-   5. Push **only those two files**:
-      ```sh
-      git clone ssh://aur@aur.archlinux.org/forskscope.git
-      cp PKGBUILD .SRCINFO forskscope/
-      cd forskscope && git add PKGBUILD .SRCINFO
-      git commit -m "${VER}-1" && git push
-      ```
-   6. Confirm it landed. The RPC listing lags by design, so read the package's
-      git state instead:
-      ```sh
-      curl -s 'https://aur.archlinux.org/cgit/aur.git/plain/.SRCINFO?h=forskscope' | head -4
-      ```
+   > **These blocks are POSIX shell.** If your login shell is `fish`, as this
+   > project's maintainer's is, start one first — `bash` — and run them there.
+   > `VAR=value`, `${VAR}`, `if … then … fi` and `unset` all differ in fish, and
+   > the variables set in step 1 are used by every later step, so they have to
+   > share one shell session.
+
+   Everything below happens inside one throwaway directory, so the last step
+   removes every trace in one command. Run the stages in order and look at the
+   output between them — the push reaches a public registry and is not worth
+   pasting blind.
+
+   **1 — collect the validated recipe.**
+
+   ```sh
+   VER=0.174.0                                   # the version you just published
+   WORK=$(mktemp -d)                             # never empty, so step 6 is safe
+   RUN=$(gh run list --workflow=aur-publish.yml --limit 1 --json databaseId \
+         --jq '.[0].databaseId')
+
+   gh run download "$RUN" -n aur-recipe -D "$WORK"
+   ```
+
+   `validate` will be green on that run and `publish` red: that is the expected
+   shape today. **`aur-recipe` is a workflow artifact, not a release asset** — it
+   is not attached to the GitHub Release and will not appear there. In a browser
+   it is at the bottom of the run's summary page, under *Artifacts*.
+
+   **2 — regenerate the file the artifact cannot carry, and check it.**
+
+   ```sh
+   cd "$WORK"
+   makepkg --printsrcinfo > .SRCINFO
+
+   curl -sL -o "$WORK/tag.tar.gz" \
+     "https://github.com/forskscope/forskscope/archive/refs/tags/${VER}.tar.gz"
+
+   grep -E '^(pkgver|pkgrel)=' PKGBUILD
+   if [ "$(sha256sum "$WORK/tag.tar.gz" | cut -d' ' -f1)" \
+        = "$(grep -oP "(?<=sha256sums=\(')[0-9a-f]{64}" PKGBUILD)" ]; then
+       echo "source hash matches the published tag"
+   else
+       echo "HASH MISMATCH - do not push"
+   fi
+   ```
+
+   `pkgver` must equal the release and `pkgrel` must be `1`. The hash is compared
+   rather than printed for you to match by eye, because two 64-character strings
+   are exactly what an eye skips.
+
+   **3 — look at what you are about to publish.**
+
+   ```sh
+   cat "$WORK/PKGBUILD" "$WORK/.SRCINFO"
+   ```
+
+   **4 — push, and only these two files.**
+
+   ```sh
+   git clone ssh://aur@aur.archlinux.org/forskscope.git "$WORK/aur"
+   cp "$WORK/PKGBUILD" "$WORK/.SRCINFO" "$WORK/aur/"
+   git -C "$WORK/aur" add PKGBUILD .SRCINFO
+   git -C "$WORK/aur" commit -m "${VER}-1"
+   git -C "$WORK/aur" push
+   ```
+
+   **5 — confirm it landed.** The RPC listing rebuilds on a delay and will still
+   show the previous version for a while, so read the package's git state:
+
+   ```sh
+   curl -s 'https://aur.archlinux.org/cgit/aur.git/plain/.SRCINFO?h=forskscope' \
+     | head -4
+   ```
+
+   **6 — clean up.** The clone, the downloaded archive and the recipe all live
+   under `$WORK`, so one command removes them:
+
+   ```sh
+   rm -rf "$WORK" && unset WORK RUN VER
+   ```
+
+   Run it from outside that directory — `cd ~` first if step 2's `cd` left you
+   inside it. If the shell has been closed since, `mktemp -d` paths live under
+   `/tmp` and go on the next reboot regardless.
 
    **If this is skipped, nothing fails loudly.** The AUR simply stays on the
    previous version — it sat three releases behind between `0.170.1` and
