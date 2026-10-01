@@ -333,3 +333,68 @@ fn restore_skips_entries_without_backup() {
     assert!(dst.join("new.txt").exists());
     let _ = fs::remove_dir_all(&base);
 }
+
+// ── F110: a batch copy into an unreadable destination root ──────────────────
+//
+// This is the determination handoff 059 asked for: does a copy into a root
+// that `RecursiveScan` found unreadable *actually* write anything, or does it
+// fail? Run directly against a real `chmod 000` destination rather than read
+// from the call graph - a batch copy already fails per-item on a permission
+// error (every other test above proves `copy_file` surfaces I/O errors as
+// `Failed`), and a directory with no execute bit cannot be written into any
+// more than it can be listed, so nothing here should ever report `Copied`.
+// This is what makes F110 a display defect (a wrong but harmless `LeftOnly`)
+// rather than a data-safety one (a batch copy believing an unreadable root is
+// empty and silently overwriting or filling it) - see `deep_filter.rs`'s
+// `demote_entries_under_an_unreadable_root` for the display-side fix.
+#[cfg(unix)]
+#[test]
+fn a_batch_copy_into_an_unreadable_root_fails_every_item_not_silently() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let base = tmp("unreadable-dest-root");
+    let src = base.join("src");
+    fs::create_dir_all(&src).unwrap();
+    fs::write(src.join("a.txt"), "left a").unwrap();
+    fs::write(src.join("b.txt"), "left b").unwrap();
+    let dst = base.join("dst");
+    fs::create_dir_all(&dst).unwrap();
+    fs::set_permissions(&dst, fs::Permissions::from_mode(0o000)).unwrap();
+    if fs::read_dir(&dst).is_ok() {
+        eprintln!(
+            "skipping a_batch_copy_into_an_unreadable_root_fails_every_item_not_silently: \
+             chmod had no effect (running as root?)"
+        );
+        fs::set_permissions(&dst, fs::Permissions::from_mode(0o755)).unwrap();
+        let _ = fs::remove_dir_all(&base);
+        return;
+    }
+
+    let items = items(&[("a.txt", "a.txt"), ("b.txt", "b.txt")], &src, &dst);
+    let m = batch_copy(
+        &items,
+        BackupPolicy::SiblingBak,
+        BatchFailurePolicy::ContinueOnFailure,
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(
+        m.succeeded(),
+        0,
+        "nothing can be written into an unreadable root: {:?}",
+        m.entries
+    );
+    assert_eq!(m.failed(), 2);
+    assert!(
+        m.entries.iter().all(|e| matches!(
+            &e.outcome,
+            EntryOutcome::Failed { error } if !error.is_empty()
+        )),
+        "every entry must fail with a real error, not be silently dropped: {:?}",
+        m.entries
+    );
+
+    fs::set_permissions(&dst, fs::Permissions::from_mode(0o755)).unwrap();
+    let _ = fs::remove_dir_all(&base);
+}

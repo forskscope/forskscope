@@ -92,20 +92,24 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
             // F79: `list_recursive_for_display_with_cancel` now returns a
             // `RecursiveScan` - `entries` plus `left_root_unreadable`/
             // `right_root_unreadable`, so a root that cannot even be opened
-            // is distinguishable from an empty tree at the type level. The
-            // flags are not yet surfaced in this view - there is no
-            // existing error-banner affordance here to route them through,
-            // and inventing one is beyond this handoff's scope (state this
-            // plainly rather than silently dropping the signal - review
-            // request §7c). Per-entry `RecStatus::Unreadable` results,
-            // which is what this handoff requires this view to display,
-            // are unaffected and flow through `initial` normally.
+            // is distinguishable from an empty tree at the type level.
+            // F110: a root that cannot be opened makes every entry the walk
+            // *did* collect (all from the other side) an artefact of the
+            // failed read, not a fact about the trees - confirmed by running
+            // it against a real unreadable root, which left every left-side
+            // file at `LeftOnly` and `BatchCopyButtons` offering to copy all
+            // of them. `demote_entries_under_an_unreadable_root` is the same
+            // ruling RFC-080 tier 1 already applies (`dir_verdict`'s module
+            // doc), using the vocabulary this view already has rather than a
+            // second "Unknown": every entry becomes `RecStatus::Unreadable`,
+            // which `can_cmp`/`can_copy_left_to_right`/`can_copy_right_to_left`
+            // already exclude from comparison and copy.
             let initial = tokio::task::spawn_blocking(move || {
                 list_recursive_for_display_with_rules(&lr1, &rr1, &list_token, &rules)
             })
             .await
-            .unwrap_or_default()
-            .entries;
+            .map(forskscope_ui_logic::demote_entries_under_an_unreadable_root)
+            .unwrap_or_default();
 
             if token.is_cancelled() {
                 // Superseded before phase 1 finished - the run that

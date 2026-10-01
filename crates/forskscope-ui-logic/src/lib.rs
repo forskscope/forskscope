@@ -6,7 +6,9 @@
 //!
 //! - [`explore`] — explorer-pane logic:
 //!   - `align`: aligned-row merging for the two-pane explorer.
-//!   - `deep_filter`: `DeepFilter` + `DeepCompareSummary` for recursive compare.
+//!   - `deep_filter`: `DeepFilter` + `DeepCompareSummary` for recursive compare,
+//!     and `demote_entries_under_an_unreadable_root` (F110) — an unreadable
+//!     root downgrades every entry to `Unreadable`, never a one-sided verdict.
 //!   - `dir_verdict`: RFC-080 tier 1 — what a fast recursive listing can
 //!     conclude about a directory pair (`Different` / `MetadataMatch` /
 //!     `Unknown`), and no more.
@@ -59,7 +61,9 @@ pub use compare::startup::{CompareRequest, SaveDestination, StartupRequest, pars
 
 // explore
 pub use explore::align::{AlignedRow, FlatRow, RowData, compute_aligned_rows};
-pub use explore::deep_filter::{DeepCompareSummary, DeepFilter, apply_filter};
+pub use explore::deep_filter::{
+    DeepCompareSummary, DeepFilter, apply_filter, demote_entries_under_an_unreadable_root,
+};
 pub use explore::dir_verdict::{DirVerdict, dir_verdict};
 pub use explore::status::{RowStatusKind, StatusGlyph};
 pub use explore::tier1_trigger::{TIER1_DEBOUNCE, Tier1Action, Tier1Trigger};
