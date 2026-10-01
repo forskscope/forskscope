@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.175.1] — Unreleased
+
 ## [0.175.0] — 2026-10-01
 
 **Folders can now be checked for certain, when you ask.**
