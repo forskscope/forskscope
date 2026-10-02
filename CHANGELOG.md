@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.176.1] — Unreleased
+
 ## [0.176.0] — 2026-10-02
 
 **Maintenance only — no user-visible change.** Publishing to the Arch User
