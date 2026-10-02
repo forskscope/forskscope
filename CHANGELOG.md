@@ -5,7 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.175.1] — Unreleased
+## [0.176.0] — 2026-10-02
+
+**Maintenance only — no user-visible change.** Publishing to the Arch User
+Repository and to the Microsoft Store is now an explicit, separate step rather
+than something a GitHub release sets off, and the packaging checks that had
+silently stopped running are running again.
+
 
 ## [0.175.0] — 2026-10-01
 
