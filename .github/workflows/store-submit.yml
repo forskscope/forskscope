@@ -2,20 +2,26 @@ name: Store Submit
 
 # RFC-079: build a Store-ready MSIX and submit it to Partner Center.
 #
-# Triggers on `release: published` - never on tag push, for the same reason
-# aur-publish.yml (RFC-081) does not: the owner's publish click is the
-# approval gate this submission inherits, and packaging from a tag that has
-# only been pushed, not published, would submit a build the owner has not
-# yet approved (RFC-079 "The approval gate must survive").
+# F147/F156/F158 (handoff 061): owner-dispatched only - there is no
+# `release:` trigger. A GitHub release publishing itself (`release.yml`'s
+# `draft: false`, F156) is no longer this workflow's approval gate;
+# dispatching it, naming the tag, is. F158 found that an event fired by
+# `GITHUB_TOKEN` (what `release.yml`'s own publish step produces) does not
+# start new workflow runs at all, so `release:` here was never actually
+# reachable - the gate it was meant to provide was already gone, just not
+# visibly. A dispatch is a person's own event and always starts a run.
 #
-# `workflow_dispatch` exists for two things, sharing every step with the
-# release path except which tag is targeted:
+# One path now, not two: every dispatch names the tag to build and submit
+# (`tag`, required) and whether to actually submit (`dry_run`, default
+# true) - a brand-new release and a re-submission or packaging-only fix are
+# the same action here, since nothing about building and submitting an
+# already-published tag's MSIX differs between them:
 #   - rehearsal (`dry_run: true`, the default) - authenticate and read the
 #     application resource only, never create/upload/commit anything;
-#   - a manual re-submission of an already-published release
-#     (`dry_run: false`) - RFC-079 §5's documented recovery path for a
-#     post-submission failure ("correct the package and submit again,
-#     manually or by re-running the workflow").
+#   - a real submission, first or repeated (`dry_run: false`) - RFC-079
+#     §5's documented recovery path for a post-submission failure also
+#     covers a fresh one ("correct the package and submit again, manually
+#     or by re-running the workflow").
 #
 # Unlike aur-publish.yml's dry run, which needs no credential at all, a
 # Store dry run still authenticates and reads Partner Center - the AUR is
@@ -26,15 +32,6 @@ name: Store Submit
 # path equally, not only the real one.
 
 on:
-  # ⚠ F156: the GitHub release now publishes IMMEDIATELY on a tag push — there
-  # is no draft and no human step between tagging and this trigger firing.
-  # This path is harmless today only because it cannot complete. **Do not fix
-  # the credential or the artifact without restoring the approval gate in the
-  # same change** (give this workflow's `workflow_dispatch` a release mode and
-  # drop the `release:` trigger), or a tag push alone will publish to the
-  # outside world unattended, which RFC-079's "The approval gate must survive" exists to prevent.
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -63,13 +60,8 @@ jobs:
         id: plan
         shell: pwsh
         run: |
-          if ("${{ github.event_name }}" -eq "release") {
-            $tag = "${{ github.event.release.tag_name }}"
-            $dryRun = "false"
-          } else {
-            $tag = "${{ github.event.inputs.tag }}"
-            $dryRun = "${{ github.event.inputs.dry_run }}"
-          }
+          $tag = "${{ github.event.inputs.tag }}"
+          $dryRun = "${{ github.event.inputs.dry_run }}"
           if (-not $tag) {
             Write-Host "::error::no tag resolved - workflow_dispatch requires the tag input"
             exit 1

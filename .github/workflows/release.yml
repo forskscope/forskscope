@@ -261,12 +261,15 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@v3
         with:
-          # F156, TEMPORARY: the GitHub release publishes immediately instead of
-          # waiting as a draft. The owner authorised this on 2026-10-01 because a
-          # draft is invisible on the front page and kept being missed. It removes
-          # the approval gate RFC-079 and RFC-081 both rest on, and is safe ONLY
-          # while the AUR and Store workflows cannot complete (F147, F106).
-          # **Restore the gate in the same change that fixes either of those.**
+          # F156: the GitHub release publishes immediately instead of waiting as
+          # a draft. The owner authorised this on 2026-10-01 because a draft is
+          # invisible on the front page and kept being missed. This used to
+          # remove the approval gate RFC-079 and RFC-081 both rest on; handoff
+          # 061 restored that gate on distribution instead of on visibility -
+          # aur-publish.yml and store-submit.yml no longer trigger on this
+          # release existing at all, only on the owner explicitly dispatching
+          # them (F158's finding that a `GITHUB_TOKEN`-authored publish event
+          # never started them anyway is also why that move cost nothing).
           draft: false
           body_path: release-notes.md
           files: |
@@ -275,8 +278,8 @@ jobs:
             forskscope-v*-windows-x64.zip
 
       # The run page is where someone looks after tagging, so it carries what is
-      # left to do. While F156 stands there is no approval gate between this step
-      # and distribution, which makes saying so here more important, not less.
+      # left to do - now an explicit dispatch of each distribution workflow,
+      # not a broken automatic one (F147/F156/F158, handoff 061).
       - name: Say what is left to do
         env:
           VER: ${{ github.ref_name }}
@@ -287,16 +290,20 @@ jobs:
             echo
             echo "- Release: ${URL}"
             echo
-            echo "### Still to do by hand"
+            echo "### Distribution is a separate, explicit step"
             echo
-            echo "Publishing started the AUR and Microsoft Store workflows."
-            echo "**Neither can finish today**, so both need manual steps:"
+            echo "Publishing this release did not start the AUR or Microsoft"
+            echo "Store workflows - both are dispatched by hand, every time,"
+            echo "so a person always decides when either reaches the outside"
+            echo "world:"
             echo
-            echo "- **AUR** — the \`publish\` job fails on a secret name (F147)."
-            echo "  Take \`aur-recipe\` from the AUR Publish run, regenerate"
-            echo "  \`.SRCINFO\`, push both files. See *Pushing to the AUR by hand*"
-            echo "  in the maintainer release guide."
-            echo "- **Microsoft Store** — submission returns \`Unauthorized\` until"
-            echo "  the Partner Center tenant association exists (F106). Submit in"
-            echo "  Partner Center."
+            echo "\`\`\`sh"
+            echo "gh workflow run aur-publish.yml -f mode=release -f tag=${VER} -f dry_run=false"
+            echo "gh workflow run store-submit.yml -f tag=${VER} -f dry_run=false"
+            echo "\`\`\`"
+            echo
+            echo "See the maintainer release guide for the dry-run rehearsal of"
+            echo "each. The Store submission still returns \`Unauthorized\` until"
+            echo "the Partner Center tenant association exists (F106, separate"
+            echo "from this release and still open)."
           } >> "$GITHUB_STEP_SUMMARY"

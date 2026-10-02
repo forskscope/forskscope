@@ -2,37 +2,45 @@ name: AUR Publish
 
 # RFC-081: automate publishing packaging/linux/PKGBUILD to the AUR.
 #
-# Two ways in, matching RFC-081 Q3's chosen design (automation never
-# writes pkgver/pkgrel - it only refuses to publish a wrong one):
+# F147/F156/F158 (handoff 061): this workflow is owner-dispatched only -
+# there is no `release:` trigger. A GitHub release publishing itself
+# (`release.yml`'s `draft: false`, F156) is no longer this workflow's
+# approval gate; dispatching it is. That is a deliberate trade, not a
+# narrowing: F158 found that an event fired by `GITHUB_TOKEN` (what
+# `release.yml`'s own publish step produces) does not start new workflow
+# runs at all, so `release:` here was never actually reachable - the gate
+# it was meant to provide was already gone, just not visibly. A dispatch
+# is a person's own event and always starts a run, so this restores
+# validation together with approval, on the same action.
 #
-#   release (release: published)  - a new upstream version. Requires the
-#     checked-out (tagged) PKGBUILD's pkgver to equal the released tag
-#     and pkgrel to be 1.
-#   workflow_dispatch, owner-triggered - a packaging-only fix with no new
+# Two ways in, both now reached through `workflow_dispatch`'s `mode` input
+# (RFC-081 Q3's chosen design: automation never writes pkgver/pkgrel - it
+# only refuses to publish a wrong one):
+#
+#   mode: release      - a new upstream version. `tag` must name the
+#     published release. Requires that tag's checked-out PKGBUILD's
+#     pkgver to equal it and pkgrel to be 1.
+#   mode: recipe-fix (default) - a packaging-only fix with no new
 #     upstream release (e.g. F81's missing `depends`). Requires pkgver to
 #     still equal what the AUR currently carries and pkgrel to be
-#     strictly greater than the AUR's. `dry_run` (default true) runs
-#     every validation step and stops before the push - it is the only
-#     way to rehearse this workflow without touching the real AUR, and
-#     shares every step with the real path; only the final push is
-#     skipped.
+#     strictly greater than the AUR's. `tag` is not used.
 #
-# Never triggers on tag push - the release stays the approval gate the
-# owner controls (RFC-081 §4, the same reasoning RFC-079 §"The approval
-# gate must survive" sets out).
+# `dry_run` (default true) runs every validation step and stops before the
+# push, in either mode - it is the only way to rehearse this workflow
+# without touching the real AUR, and shares every step with the real path;
+# only the final push is skipped.
 
 on:
-  # ⚠ F156: the GitHub release now publishes IMMEDIATELY on a tag push — there
-  # is no draft and no human step between tagging and this trigger firing.
-  # This path is harmless today only because it cannot complete. **Do not fix
-  # the credential or the artifact without restoring the approval gate in the
-  # same change** (give this workflow's `workflow_dispatch` a release mode and
-  # drop the `release:` trigger), or a tag push alone will publish to the
-  # outside world unattended, which RFC-081 §4 exists to prevent.
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
+      mode:
+        description: "release (a published tag) or recipe-fix (packaging-only, no new upstream version)"
+        type: choice
+        options: [recipe-fix, release]
+        default: recipe-fix
+      tag:
+        description: "Released tag to publish, e.g. 0.175.0 (release mode only)"
+        required: false
       dry_run:
         description: "Validate and build only - never push to the AUR"
         type: boolean
@@ -57,21 +65,22 @@ jobs:
       - name: Determine mode
         id: plan
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            echo "mode=release" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=recipe-fix" >> "$GITHUB_OUTPUT"
+          MODE="${{ github.event.inputs.mode }}"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          if [ "$MODE" = "release" ] && [ -z "${{ github.event.inputs.tag }}" ]; then
+            echo "::error::mode=release requires the tag input (the published release to publish)"
+            exit 1
           fi
 
       # The release path must read the PKGBUILD as it existed at the
       # tagged commit, not main's current HEAD - main normally moves to
       # the next (unreleased) version within minutes of the tag being
-      # pushed (the post-release bump), long before the owner publishes
-      # the draft release this workflow actually triggers on.
+      # pushed (the post-release bump), long before the owner dispatches
+      # this workflow for it.
       - uses: actions/checkout@v7
         if: steps.plan.outputs.mode == 'release'
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.inputs.tag }}
 
       - uses: actions/checkout@v7
         if: steps.plan.outputs.mode == 'recipe-fix'
@@ -99,7 +108,7 @@ jobs:
       - name: Prepare the real PKGBUILD (RFC-081 - hash computed here, never committed)
         id: prepare
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.inputs.tag }}
         run: |
           bash packaging/linux/aur-publish.sh "${{ steps.plan.outputs.mode }}" "$GITHUB_WORKSPACE/aur-work"
           PREPARED="$GITHUB_WORKSPACE/aur-work/PKGBUILD"
@@ -148,9 +157,14 @@ jobs:
             echo "push_needed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # F147: `include-hidden-files: true` - the default
+      # (`false`) drops `.SRCINFO` from the artifact silently, because its
+      # name begins with a dot. The run log's own "there will be N file(s)
+      # uploaded" line is what first showed this: it said 1, never 2.
       - uses: actions/upload-artifact@v7
         with:
           name: aur-recipe
+          include-hidden-files: true
           path: |
             aur-work/PKGBUILD
             aur-work/.SRCINFO
@@ -165,7 +179,7 @@ jobs:
   publish:
     name: Publish to the AUR
     needs: validate
-    if: needs.validate.outputs.push_needed == 'true' && (github.event_name == 'release' || github.event.inputs.dry_run == 'false')
+    if: needs.validate.outputs.push_needed == 'true' && github.event.inputs.dry_run == 'false'
     runs-on: ubuntu-latest
     environment: aur-publish
     steps:
@@ -174,10 +188,17 @@ jobs:
           name: aur-recipe
           path: aur-work
 
+      # F147: this secret is named `AUR_SSH_PRIVATE_KEY` at the repository
+      # level, not `AUR_SSH_KEY` - the name this step read until now, which
+      # is defined in no scope and always resolved empty. The `aur-publish`
+      # Environment referenced above (RFC-081 Q4) currently holds no
+      # secrets of its own; GitHub Actions falls through to the
+      # repository-level secret of the same name, so this works unchanged
+      # if the credential is ever moved into the environment instead.
       - name: Configure the AUR SSH credential
         run: |
           install -dm700 "$HOME/.ssh"
-          printf '%s\n' "${{ secrets.AUR_SSH_KEY }}" > "$HOME/.ssh/aur_ed25519"
+          printf '%s\n' "${{ secrets.AUR_SSH_PRIVATE_KEY }}" > "$HOME/.ssh/aur_ed25519"
           chmod 600 "$HOME/.ssh/aur_ed25519"
           # Pinned, not fetched at runtime: aur.archlinux.org's published
           # host key, confirmed live against the real host before this

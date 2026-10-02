@@ -86,8 +86,8 @@ scope before that scope existed.
 ## Publication and immutability
 
 > A version is **published** once its GitHub Release exists and is not a
-> draft. While F156 stands, `release.yml` creates it already published, so that
-> is the moment the release workflow finishes.
+> draft. `release.yml` creates it already published (F156), so that is the
+> moment the release workflow finishes.
 > Before that point the tag may be re-cut: delete the remote tag, re-tag the
 > corrected commit, and record the re-cut in that version's CHANGELOG entry.
 > After that point the version is immutable — supersede it with a new patch
@@ -144,52 +144,65 @@ annotated tag object (`git tag -l <tag>`) and re-push.
    than a regression, and `render_check.py` now retries a start-up crash
    itself (a small, bounded number of attempts, logging each one) — so a
    plain re-run is the first thing to try, not a last resort.
-4. **The release publishes itself — there is no approval gate today (F156).**
-   `release.yml` creates the release already published, so the version becomes
-   immutable the moment the workflow's last job succeeds. Inspect the artifacts
-   and composed notes **after** the fact; if something is wrong, supersede it
-   with a new patch version, because the published release cannot be re-cut.
+4. **The release publishes itself — there is no approval gate on *visibility*
+   (F156).** `release.yml` creates the release already published, so the
+   version becomes immutable the moment the workflow's last job succeeds.
+   Inspect the artifacts and composed notes **after** the fact; if something is
+   wrong, supersede it with a new patch version, because the published release
+   cannot be re-cut.
 
-   > **This is temporary and the owner authorised it as such (2026-10-01.)**
-   > The draft previously held each release until the owner published it, which
-   > is the approval gate RFC-079 and RFC-081 both rest on. It was removed
-   > because a draft is invisible on the repository front page and
-   > `releases/latest` does not resolve to one, so releases were being missed.
+   > **The owner authorised this on 2026-10-01.** The draft previously held
+   > each release until the owner published it, which is the approval gate
+   > RFC-079 and RFC-081 both rest on. It was removed because a draft is
+   > invisible on the repository front page and `releases/latest` does not
+   > resolve to one, so releases were being missed.
    >
-   > **It is safe only while the AUR and Store workflows cannot complete.** Both
-   > fire on publication, so with no gate a tag push alone will reach the outside
-   > world the moment either is repaired. **Restore the gate in the same change
-   > that fixes F147 or F106** — give those workflows a `workflow_dispatch`
-   > release mode and drop their `release:` trigger, so the gate sits on
-   > distribution rather than on visibility.
-5. **Publishing the release triggers `.github/workflows/aur-publish.yml`
-   automatically** (RFC-081). **Its `validate` job works; its `publish` job has
-   never completed, so the AUR push is done by hand today — see *Pushing to the
-   AUR by hand* below (F147).** The validate job checks out
-   `packaging/linux/PKGBUILD` as it existed at the tag (not whatever `main` has
-   moved to since — the post-release bump usually lands within minutes of the
-   tag being pushed, long before the owner publishes the draft), computes the
-   real source hash from the tag's own GitHub archive, and refuses to proceed
-   if `pkgver` does not match the release or `pkgrel` is not `1`. Only then does
-   it build the package (`makepkg --syncdeps`), install it (`pacman -U`), and
-   run `namcap` on both the recipe and the built package — the same check that
-   would have caught F81's missing `xdotool` `depends` entry, which three
-   hand-published releases did not. A failure at any of these steps leaves the
-   AUR untouched. Watch it run under the "AUR Publish" workflow in the Actions
-   tab, or check the [`forskscope` AUR page](https://aur.archlinux.org/packages/forskscope)
-   directly.
+   > **The gate moved rather than disappeared (F147/F158, handoff 061).**
+   > `aur-publish.yml` and `store-submit.yml` no longer trigger on this release
+   > existing — neither has a `release:` trigger at all, and F158 found that a
+   > `GITHUB_TOKEN`-authored publish event never started them in the first
+   > place, so there was nothing actually guarding this. Each now runs only on
+   > an explicit `workflow_dispatch`: see steps 5 and 6 below. The gate is on
+   > distribution, not visibility — exactly the trade this paragraph used to
+   > say still needed making.
+5. **Publish to the AUR by dispatching `.github/workflows/aur-publish.yml`
+   yourself** (RFC-081) — publishing the release above does not start it
+   (F147/F158, handoff 061):
+
+   ```sh
+   gh workflow run aur-publish.yml -f mode=release -f tag=${VER} -f dry_run=false
+   ```
+
+   **Rehearse first if in doubt**: the same command with `dry_run=true` (the
+   default) runs every check below and stops before the push. The `validate`
+   job checks out `packaging/linux/PKGBUILD` as it existed at the tag (not
+   whatever `main` has moved to since — the post-release bump usually lands
+   within minutes of the tag being pushed), computes the real source hash from
+   the tag's own GitHub archive, and refuses to proceed if `pkgver` does not
+   match the release or `pkgrel` is not `1`. Only then does it build the
+   package (`makepkg --syncdeps`), install it (`pacman -U`), and run `namcap`
+   on both the recipe and the built package — the same check that would have
+   caught F81's missing `xdotool` `depends` entry, which three hand-published
+   releases did not. A failure at any of these steps leaves the AUR untouched.
+   Watch it run under the "AUR Publish" workflow in the Actions tab, or check
+   the [`forskscope` AUR page](https://aur.archlinux.org/packages/forskscope)
+   directly. A scheduled check (`audit.yml`) reports if the AUR ever falls
+   behind the latest release — it would have caught the three-release drift
+   between `0.170.1` and `0.173.0` on its first run.
 
    ### Pushing to the AUR by hand
 
-   **Why this is here.** `publish` reads `secrets.AUR_SSH_KEY`, a name defined in
-   no scope — the repository holds `AUR_SSH_PRIVATE_KEY` instead — and the
-   artifact it downloads has never contained `.SRCINFO`, because
-   `actions/upload-artifact` defaults to `include-hidden-files: false` and the
-   file begins with a dot. Both are F147 and both are fixable; until they are,
-   the automation stops before the push and these steps finish the job.
-   **The validation is not wasted** — `validate` still builds, installs and
-   `namcap`s the package in an Arch container, which is the part that protects
-   the AUR, and the recipe pushed below is the one it validated.
+   **Why this is here.** This is the fallback for when the workflow above
+   fails for some other reason — a GitHub outage, a changed AUR host key, a
+   new validation failure worth looking at by hand before retrying — not the
+   expected path. (It was the *only* path through F147: `publish` read
+   `secrets.AUR_SSH_KEY`, a name defined in no scope, and the artifact it
+   downloaded never contained `.SRCINFO`, because `actions/upload-artifact`
+   defaults to `include-hidden-files: false` and the file begins with a dot.
+   Both are fixed.) **The validation is not wasted** — `validate` still
+   builds, installs and `namcap`s the package in an Arch container, which is
+   the part that protects the AUR, and the recipe pushed below is the one it
+   validated.
 
    > **These blocks are POSIX shell.** If your login shell is `fish`, as this
    > project's maintainer's is, start one first — `bash` — and run them there.
@@ -275,16 +288,25 @@ annotated tag object (`git tag -l <tag>`) and re-push.
    inside it. If the shell has been closed since, `mktemp -d` paths live under
    `/tmp` and go on the next reboot regardless.
 
-   **If this is skipped, nothing fails loudly.** The AUR simply stays on the
-   previous version — it sat three releases behind between `0.170.1` and
-   `0.173.0` for exactly that reason, and nothing reported it.
-6. **Publishing the release also triggers `.github/workflows/store-submit.yml`
-   automatically** (RFC-079). **It has never completed either: the submission API
-   returns `Unauthorized` until the Partner Center tenant association exists
-   (F106), so Store submissions are made by hand in Partner Center today (F108),
-   using the listing copy kept with the owner's working files.** What follows
-   describes the automated path as designed, and applies once that account work
-   is done. It checks out
+   **If every dispatch above is skipped, nothing fails loudly until the next
+   day.** The AUR simply stays on the previous version — it sat three
+   releases behind between `0.170.1` and `0.173.0` for exactly that reason,
+   with nothing reporting it at the time. `audit.yml`'s scheduled check now
+   catches this within a day either way (F147).
+6. **Submit to the Microsoft Store by dispatching
+   `.github/workflows/store-submit.yml` yourself** (RFC-079) — publishing the
+   release above does not start it either (F147/F158, handoff 061):
+
+   ```sh
+   gh workflow run store-submit.yml -f tag=${VER} -f dry_run=false
+   ```
+
+   **This still returns `Unauthorized`** until the Partner Center tenant
+   association exists (F106, open and unrelated to this dispatch mechanism),
+   so Store submissions are made by hand in Partner Center today (F108), using
+   the listing copy kept with the owner's working files. What follows
+   describes the dispatched path as designed, and applies once that account
+   work is done. It checks out
    the released tag, builds the MSIX, validates it (manifest version against
    the tag, `Identity`/`Publisher`/`PublisherDisplayName` against the tracked
    Store identity, every manifest-referenced asset present, and — the
@@ -329,15 +351,16 @@ annotated tag object (`git tag -l <tag>`) and re-push.
 ## A packaging-only fix, with no new release
 
 Bumping `pkgrel` — for a `PKGBUILD` change that does not need a new upstream
-version, exactly F81's `xdotool` fix — has no route through the steps above,
-because nothing in them fires without a release. Run the same workflow by hand
-instead, once the `pkgrel` bump is committed to `main`:
+version, exactly F81's `xdotool` fix — uses the same `aur-publish.yml`
+dispatch as step 5 above, with a different `mode`: `recipe-fix`, which is also
+the input's default, so it needs no flag of its own. Run it once the
+`pkgrel` bump is committed to `main`:
 
 ```sh
 gh workflow run aur-publish.yml -f dry_run=false
 ```
 
-It runs every check the release path does, against `main`'s current
+It runs every check `mode=release` does, against `main`'s current
 `PKGBUILD` — except `pkgver` must equal what the AUR **already** carries (a
 recipe fix never changes the upstream version; cut a release instead if it
 does), and `pkgrel` must be strictly greater than the AUR's. Automation never
@@ -352,10 +375,9 @@ while the real path fails.
 
 ## Resubmitting to the Store, with no new release
 
-Recovering from a rejected Store submission, or a packaging-only fix, has no
-route through the automatic trigger either — nothing in
-`store-submit.yml` fires without a **new** release being published. Run it by
-hand against the already-published tag instead:
+Recovering from a rejected Store submission, or a packaging-only fix, uses the
+same `store-submit.yml` dispatch as step 6 above, against the already-published
+tag that needs resubmitting:
 
 ```sh
 gh workflow run store-submit.yml -f tag=0.170.1 -f dry_run=false
