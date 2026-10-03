@@ -293,18 +293,22 @@ annotated tag object (`git tag -l <tag>`) and re-push.
    - the **RPC listing** (`rpc/v5/info`) rebuilds on a delay — do not use it here;
    - and **cgit itself serves a cached page** for a short while after a push.
 
-   So read the package's git state *with a cache-busting parameter*. Without the
-   `&_=1`, a confirmation run within a minute of a successful push reports the old
-   version and reads exactly like a failed push:
+   So read the package's git state with a cache-busting parameter that is
+   **different on every invocation** — `$(date +%s%N)`, not a literal:
 
    ```sh
-   curl -s 'https://aur.archlinux.org/cgit/aur.git/plain/.SRCINFO?h=forskscope&_=1' \
+   curl -s "https://aur.archlinux.org/cgit/aur.git/plain/.SRCINFO?h=forskscope&_=$(date +%s%N)" \
      | head -4
    ```
 
-   Observed on the `0.177.0` and `0.178.0` publishes: the plain URL returned the
-   previous `pkgver` immediately after a push whose workflow had reported success
-   on both jobs; the same URL with a parameter returned the new one first try.
+   **A fixed buster gets cached like any other URL.** This step first shipped with
+   `&_=1`, and the very next release's confirmation returned the previous `pkgver`
+   anyway — because `&_=1` had already been fetched during the *previous* release's
+   confirmation, so it had a cache entry of its own. A unique value per call is the
+   whole point; a constant one just moves the cache key.
+
+   Observed across the `0.177.0`, `0.178.0` and `0.179.0` publishes, each with the
+   workflow reporting success on both jobs.
 
    **6 — clean up.** The clone, the downloaded archive and the recipe all live
    under `$WORK`, so one command removes them:
