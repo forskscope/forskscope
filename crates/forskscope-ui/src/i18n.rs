@@ -41,6 +41,9 @@ fn ja(key: &str) -> Option<&'static str> {
             "確実に判定するため、すべてのバイトを読み込みます。"
         }
         "Filter items" => "アイテムをフィルター",
+        "Sync panes — both panes show the same location" => {
+            "ペインを同期 — 両方のペインが同じ場所を表示します"
+        }
         "Filter by name…" => "名前でフィルター…",
         "Hide binary" => "バイナリを非表示",
         "Hide identical" => "同一ファイルを非表示",
@@ -295,6 +298,8 @@ fn ja(key: &str) -> Option<&'static str> {
         "Close comparison?" => "比較を閉じますか？",
         "Discard and close" => "破棄して閉じる",
         "Copy diagnostics" => "診断情報をコピー",
+        "About ForskScope" => "ForskScope について",
+        "About" => "バージョン情報",
         "Copied." => "コピーしました。",
         "Copy all" => "すべてコピー",
         "Overwrite" => "上書き",

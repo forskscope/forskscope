@@ -21,6 +21,11 @@ pub fn FilterBar(
     filter_query: Signal<String>,
     filter_hide_bin: Signal<bool>,
     filter_hide_eq: Signal<bool>,
+    /// F151 (issue #148): while on, the two panes show the same location.
+    /// The row's second button, always shown - matching `⊞`'s own keyboard
+    /// treatment (none beyond the click itself) rather than giving sync a
+    /// binding `⊞` does not have (handoff 062 §2).
+    sync_locations: Signal<bool>,
 ) -> Element {
     rsx! {
         div { class: "filter-bar-row",
@@ -30,6 +35,13 @@ pub fn FilterBar(
                 aria_label: t(lang, "Filter items"),
                 onclick: move |_| { let v = *filter_open.read(); filter_open.set(!v); },
                 "⊞"
+            }
+            button {
+                class: if *sync_locations.read() { "filter-toggle active" } else { "filter-toggle" },
+                title: t(lang, "Sync panes — both panes show the same location"),
+                aria_label: t(lang, "Sync panes — both panes show the same location"),
+                onclick: move |_| { let v = *sync_locations.read(); sync_locations.set(!v); },
+                "⇄"
             }
             if *filter_open.read() {
                 input {

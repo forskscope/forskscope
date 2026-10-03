@@ -20,6 +20,20 @@
   background: var(--surface);
   color: var(--text);
   font-size: 14px;
+  /* F148 (issue #147): the embedded webview's default Ctrl+A selects the
+     whole page - the app never binds the key itself, so this is the only
+     way to stop it. The regions where selecting text is genuinely useful
+     (diff pane content, the notice-message opt-ins below) opt back in
+     explicitly; everything else in the shell was already opted out per
+     component (the tree row, tab title, status-bar and filter-checkbox
+     rules, unchanged) - this is the one place that was missing, which is
+     why Ctrl+A still highlighted the chrome around them. Per the CSS
+     Selections spec, this property is not meant to affect the text a
+     browser lets you select inside the value of a form control - typing
+     and selecting within the filter/path inputs is unaffected by this rule.
+     Request 135 records what this session could and could not confirm of
+     that live, in a sandboxed test environment with no real pointer. */
+  user-select: none;
 }
 
 /* ---- header ---- */

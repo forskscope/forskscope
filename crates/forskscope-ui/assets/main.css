@@ -89,6 +89,20 @@ body,
   background: var(--surface);
   color: var(--text);
   font-size: 14px;
+  /* F148 (issue #147): the embedded webview's default Ctrl+A selects the
+     whole page - the app never binds the key itself, so this is the only
+     way to stop it. The regions where selecting text is genuinely useful
+     (diff pane content, the notice-message opt-ins below) opt back in
+     explicitly; everything else in the shell was already opted out per
+     component (the tree row, tab title, status-bar and filter-checkbox
+     rules, unchanged) - this is the one place that was missing, which is
+     why Ctrl+A still highlighted the chrome around them. Per the CSS
+     Selections spec, this property is not meant to affect the text a
+     browser lets you select inside the value of a form control - typing
+     and selecting within the filter/path inputs is unaffected by this rule.
+     Request 135 records what this session could and could not confirm of
+     that live, in a sandboxed test environment with no real pointer. */
+  user-select: none;
 }
 
 /* ---- header ---- */
@@ -208,10 +222,14 @@ select option { background: var(--surface); color: var(--text); }
 
 .modal-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
 .modal-header-row h2 { margin: 0; }
+/* F150: a visible text label, not only a hover `title` - the bare "ℹ" was
+   in the reporter's own screenshot and still not found (issue #146). */
 .about-btn {
-  background: none; border: none; font-size: 18px; cursor: pointer;
-  color: var(--muted); padding: .1rem .35rem; border-radius: 4px;
+  background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; gap: .3rem;
+  color: var(--muted); font-size: 13px; padding: .1rem .5rem; border-radius: 4px;
 }
+.about-btn-icon { font-size: 15px; }
 .about-btn:hover { color: var(--text); background: var(--surface-3); }
 .new-profile-btn { margin-top: .5rem; font-size: 12px; }
 
@@ -238,7 +256,10 @@ code.path-display {
 }
 
 /* ---- notice ---- */
-.notice { padding: .5rem .6rem; color: var(--warn); font-size: 12px; }
+/* F148: opts back in to selection against the shell's `.app { user-select:
+   none; }` - error and message text is worth copying (a failure detail, a
+   path, an explanation), unlike the chrome around it. */
+.notice { padding: .5rem .6rem; color: var(--warn); font-size: 12px; user-select: text; }
 .notice.notice-ok { color: var(--ok); }
 .identical { padding: 2rem; text-align: center; color: var(--ok); }
 
@@ -693,6 +714,11 @@ code.path-display {
   line-height: var(--line-h);
   white-space: pre;
   vertical-align: top;
+  /* F148: opts back in to selection against the shell's own opt-out
+     (.app, 02-layout-shell.css) - selecting and copying diff text is a
+     real use of a diff tool, and the gutter/mark columns either side stay
+     unselectable (their own user-select: none, unchanged). */
+  user-select: text;
 }
 
 /* ---- hunk backgrounds ----

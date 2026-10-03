@@ -144,6 +144,71 @@ fn all_css_vars_used_are_defined_in_main_css() {
     }
 }
 
+// F148 (issue #147): the shell opts out of text selection
+// (`.app { user-select: none; }`) so Ctrl+A in the embedded webview no
+// longer highlights the whole page; the regions where selecting text is
+// genuinely useful opt back in explicitly. A simple substring search, like
+// `css_contains_class` above - sufficient for a flat, generated stylesheet,
+// and precise enough that reverting either rule fails this test immediately
+// rather than only being caught by eye in a screenshot. Comments are
+// stripped first: this codebase's own CSS comments routinely name the
+// property or selector being discussed in prose (as the rules just below
+// this test do), and a naive search over the raw source finds its own
+// explanation before the real declaration - found exactly that way, twice,
+// writing this test.
+#[test]
+fn shell_opts_out_of_text_selection_and_named_regions_opt_back_in() {
+    fn strip_css_comments(css: &str) -> String {
+        let mut out = String::with_capacity(css.len());
+        let mut rest = css;
+        while let Some(start) = rest.find("/*") {
+            out.push_str(&rest[..start]);
+            rest = match rest[start..].find("*/") {
+                Some(end) => &rest[start + end + 2..],
+                None => "",
+            };
+        }
+        out.push_str(rest);
+        out
+    }
+
+    fn rule_body<'a>(css: &'a str, selector: &str) -> &'a str {
+        let opener = format!("{selector} {{");
+        let start = css.find(&opener).unwrap_or_else(|| {
+            panic!("main.css must define a `{selector} {{` rule for this test to check")
+        });
+        let end = css[start..]
+            .find('}')
+            .map(|i| start + i)
+            .unwrap_or(css.len());
+        &css[start..end]
+    }
+
+    let stripped = strip_css_comments(MAIN_CSS);
+
+    assert!(
+        rule_body(&stripped, ".app").contains("user-select: none"),
+        "main.css's .app rule must set user-select: none (F148) - this is the \
+         shell-wide opt-out everything else in this test opts back into"
+    );
+    for (selector, why) in [
+        (
+            ".diff-row .cell",
+            "diff pane content - selecting and copying diff text is a real use of a diff tool",
+        ),
+        (
+            ".notice",
+            "error and message text - worth copying (a failure detail, a path, an explanation)",
+        ),
+    ] {
+        assert!(
+            rule_body(&stripped, selector).contains("user-select: text"),
+            "main.css's `{selector}` rule must opt back in with user-select: \
+             text (F148) - {why}"
+        );
+    }
+}
+
 #[test]
 fn generated_main_css_matches_split_sources() {
     // Verify that assets/main.css is current with respect to the split files.

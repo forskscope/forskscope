@@ -22,6 +22,9 @@
 //!   - `status`: `RowStatusKind` from `EqualityEvidence`, and
 //!     `StatusGlyph` — the shared glyph/CSS-class/label vocabulary both
 //!     the Explorer and Deep Compare render through (F82).
+//!   - `sync_panes`: `mirror_target` (F151) — location-mirroring for the
+//!     Explorer's "sync panes" toggle: what the other pane should navigate
+//!     to, given one pane's navigation, with no filesystem access.
 //! - [`compare`] — diff/compare logic:
 //!   - `load_guard`: pre-diff `LoadGuard` from `FileSizeClass`.
 //!   - `load_identity`: runtime tab/load tokens and completion validation.
@@ -31,6 +34,9 @@
 //!     conversion (RFC-077).
 //! - [`settings`] — settings form logic:
 //!   - `settings_view`: theme picker choices and the shared font-size clamp.
+//!   - `field_debounce`: `FieldDebounce` (F136) — debounces a text field that
+//!     is cheap to display but expensive to commit (the ignore-pattern
+//!     fields, whose commit triggers an Explorer rescan).
 //!   - `persistence_recovery`: `SettingsRecoveryView` — RFC-076 migration/
 //!     incompatibility/corruption dialog content.
 //! - [`session`] — session persistence logic:
@@ -72,6 +78,7 @@ pub use explore::deep_filter::{
 };
 pub use explore::dir_verdict::{DirVerdict, dir_verdict};
 pub use explore::status::{RowStatusKind, StatusGlyph};
+pub use explore::sync_panes::mirror_target;
 pub use explore::tier1_trigger::{TIER1_DEBOUNCE, Tier1Action, Tier1Trigger};
 pub use explore::tier2_verdict::{Tier2Verdict, tier2_verdict};
 
@@ -82,6 +89,7 @@ pub use session::persistence_recovery::{
 };
 
 // settings
+pub use settings::field_debounce::FieldDebounce;
 pub use settings::persistence_recovery::{
     RecoveryDialogAction as SettingsRecoveryDialogAction, SettingsRecoveryView,
     action_label as settings_recovery_action_label,

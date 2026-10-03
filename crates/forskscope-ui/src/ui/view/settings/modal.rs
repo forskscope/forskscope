@@ -2,12 +2,42 @@
 //! (RFC-009, RFC-057, RFC-063 C6).
 
 use dioxus::prelude::*;
-use forskscope_ui_logic::{clamp_font_size, theme_choices};
+use forskscope_ui_logic::{FieldDebounce, clamp_font_size, theme_choices};
 
 use super::profile::AddProfileInline;
 use super::{lf, lv, tf, tv};
 use crate::i18n::t;
 use crate::state::{Modal, Store};
+
+/// F136: starts (or restarts) the rest for one ignore-pattern field. `draft`
+/// is set immediately, so the input stays responsive to every keystroke;
+/// `debounce` and the spawned check decide when (if ever, before the next
+/// keystroke) `commit` actually runs — the `store.settings` write that
+/// `AppSettings::ignore_rules()` and the Explorer's tree-rebuild effects
+/// react to, which is the expensive step this exists to debounce, not the
+/// field's own display.
+fn debounce_ignore_field_input(
+    value: String,
+    mut draft: Signal<String>,
+    mut debounce: Signal<FieldDebounce<String>>,
+    clock: std::time::Instant,
+    mut commit: impl FnMut(String) + 'static,
+) {
+    draft.set(value.clone());
+    let now = clock.elapsed();
+    debounce.write().changed(now, value);
+    spawn(async move {
+        let delay = debounce
+            .peek()
+            .due_at()
+            .map(|due| due.saturating_sub(now))
+            .unwrap_or_default();
+        tokio::time::sleep(delay + std::time::Duration::from_millis(5)).await;
+        if let Some(committed) = debounce.write().tick(clock.elapsed()) {
+            commit(committed);
+        }
+    });
+}
 
 #[component]
 pub fn SettingsModal() -> Element {
@@ -18,6 +48,17 @@ pub fn SettingsModal() -> Element {
     let mut show_new_profile = use_signal(|| false);
     // Progressive disclosure: Advanced hidden by default (RFC-063 C6).
     let mut show_advanced = use_signal(|| false);
+
+    // F136: a fresh `SettingsModal` mounts each time the dialog opens
+    // (`Modal::Settings => rsx! { SettingsModal {} }`), so initializing from
+    // `cur` here is always the current committed value - there is no reset
+    // action reachable from inside this open dialog that this would need to
+    // react to mid-edit.
+    let ext_draft: Signal<String> = use_signal(|| cur.ignore_extensions.clone());
+    let ext_debounce: Signal<FieldDebounce<String>> = use_signal(FieldDebounce::default);
+    let dirs_draft: Signal<String> = use_signal(|| cur.ignore_dirs.clone());
+    let dirs_debounce: Signal<FieldDebounce<String>> = use_signal(FieldDebounce::default);
+    let clock = use_hook(std::time::Instant::now);
 
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Settings"),
@@ -42,11 +83,19 @@ pub fn SettingsModal() -> Element {
                 // Header row: title + About button (RFC-057).
                 div { class: "modal-header-row",
                     h2 { id: "settings-title", {t(lang, "Settings")} }
+                    // F150 (issue #146): a bare "ℹ" with only a (previously
+                    // hard-coded English) `title` tooltip was visible in the
+                    // reporter's own screenshot and still not found - a
+                    // translated tooltip alone does not answer what that
+                    // screenshot showed, so this now carries a visible text
+                    // label too, not only a hover-only one.
                     button {
                         class: "about-btn",
-                        title: "About ForskScope",
+                        title: t(lang, "About ForskScope"),
+                        aria_label: t(lang, "About ForskScope"),
                         onclick: move |_| store.modal.set(Modal::About),
-                        "ℹ"
+                        span { class: "about-btn-icon", aria_hidden: "true", "ℹ" }
+                        span { {t(lang, "About")} }
                     }
                 }
 
@@ -192,15 +241,24 @@ pub fn SettingsModal() -> Element {
                     }
 
                     // ── Ignore patterns (RFC-056) ─────────────────────────────
+                    // F136: the displayed value is the draft, updated on
+                    // every keystroke; the `store.settings` write (and the
+                    // Explorer rescan it triggers) is debounced - see
+                    // `debounce_ignore_field_input`'s own doc comment.
                     div { class: "field",
                         span { {t(lang, "Ignore file extensions")} }
                         input {
                             r#type: "text",
                             placeholder: t(lang, "o, class, tmp  (comma separated, no dot needed)"),
-                            value: "{cur.ignore_extensions}",
+                            value: "{ext_draft}",
                             oninput: move |e| {
-                                store.settings.write().ignore_extensions = e.value();
-                                super::persist(store);
+                                debounce_ignore_field_input(
+                                    e.value(), ext_draft, ext_debounce, clock,
+                                    move |value| {
+                                        store.settings.write().ignore_extensions = value;
+                                        super::persist(store);
+                                    },
+                                );
                             }
                         }
                     }
@@ -209,10 +267,15 @@ pub fn SettingsModal() -> Element {
                         input {
                             r#type: "text",
                             placeholder: t(lang, "target, node_modules, *.cache  (* wildcard allowed)"),
-                            value: "{cur.ignore_dirs}",
+                            value: "{dirs_draft}",
                             oninput: move |e| {
-                                store.settings.write().ignore_dirs = e.value();
-                                super::persist(store);
+                                debounce_ignore_field_input(
+                                    e.value(), dirs_draft, dirs_debounce, clock,
+                                    move |value| {
+                                        store.settings.write().ignore_dirs = value;
+                                        super::persist(store);
+                                    },
+                                );
                             }
                         }
                     }

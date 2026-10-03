@@ -239,6 +239,11 @@
   line-height: var(--line-h);
   white-space: pre;
   vertical-align: top;
+  /* F148: opts back in to selection against the shell's own opt-out
+     (.app, 02-layout-shell.css) - selecting and copying diff text is a
+     real use of a diff tool, and the gutter/mark columns either side stay
+     unselectable (their own user-select: none, unchanged). */
+  user-select: text;
 }
 
 /* ---- hunk backgrounds ----

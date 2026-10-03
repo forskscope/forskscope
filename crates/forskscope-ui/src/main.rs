@@ -8,10 +8,19 @@
 //! forskscope <local> <remote> <merged>  # git mergetool: diff local vs remote,
 //!                                       # save result to <merged>
 //! forskscope --diagnostics         # Print platform diagnostics and exit
+//! forskscope --version | -V        # Print the version and exit
+//! forskscope --help | -h           # Print this usage and exit
 //! ```
 //!
 //! Any other argument count is a startup error (non-zero exit), not a
-//! silent fallback to the Explorer workspace (RFC-077).
+//! silent fallback to the Explorer workspace (RFC-077). F150 (issue #146): a
+//! user looking for the version via the only door CLI convention trains
+//! people to try found this error instead - `--version`/`-V` and
+//! `--help`/`-h` are handled the same way `--diagnostics` already was,
+//! before `parse_startup_args` ever sees them, and the error for every
+//! *other* unsupported arity now names `--diagnostics` explicitly, since
+//! the old wording led away from the one flag that actually answers "what
+//! version is this".
 //!
 //! Exit codes: 1 is a startup-argument error; 3 (Windows only, F109) is a
 //! missing Microsoft Edge WebView2 Runtime, raised whichever button the
@@ -99,6 +108,26 @@ fn check_webview2_or_exit() {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+
+    // F150: `--version`/`-V` and `--help`/`-h`, handled the same way
+    // `--diagnostics` already is - before `parse_startup_args` ever sees
+    // them, so neither competes with the 0/2/3-argument modes it parses.
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!("forskscope {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        print!(
+            "Usage:\n  \
+             forskscope                              Open the Explorer workspace\n  \
+             forskscope <left> <right>                Compare two files (git difftool compatible)\n  \
+             forskscope <local> <remote> <merged>     git mergetool: diff local vs remote, save to merged\n  \
+             forskscope --diagnostics                 Print platform diagnostics and exit\n  \
+             forskscope --version, -V                 Print the version and exit\n  \
+             forskscope --help, -h                    Print this message and exit\n"
+        );
+        return;
+    }
 
     // --diagnostics: print platform info and exit without launching the UI.
     // Useful for debugging startup failures and filing bug reports.

@@ -96,7 +96,7 @@ merge-tool = ["forskscope", "$left", "$right", "$output"]
 | Code | Meaning |
 |------|---------|
 | `0`  | Normal exit |
-| `1`  | Unsupported argument count — anything other than 0, 2, or 3 positional arguments (`--diagnostics` is handled separately, before this check). An error naming the argument count is printed to stderr. |
+| `1`  | Unsupported argument count — anything other than 0, 2, or 3 positional arguments (`--diagnostics`, `--version`/`-V` and `--help`/`-h` are all handled separately, before this check). An error naming the argument count is printed to stderr, along with a pointer to `--version`/`--diagnostics` for the question that error most often turns out to be. |
 | `3`  | **Windows only.** The Microsoft Edge WebView2 Runtime is not installed. ForskScope shows a message box offering the download page and exits with `3` whichever button is pressed. |
 
 Code `2` is not used by ForskScope itself.
@@ -107,6 +107,26 @@ opens normally with the missing side shown as empty — and saving can create
 it, restoring a deleted file. The exit code does not indicate whether changes
 were saved, either — git determines that by inspecting whether `$MERGED` was
 written.
+
+### Print the version
+
+```sh
+forskscope --version
+forskscope -V
+```
+
+Prints `forskscope <version>` and exits without launching the UI — the quick
+answer when `--diagnostics`' full report is more than you need (issue #146:
+the version is also shown in the app itself, under **Settings → ℹ About**).
+
+### Print usage
+
+```sh
+forskscope --help
+forskscope -h
+```
+
+Prints the startup modes above and exits without launching the UI.
 
 ### Print platform diagnostics
 

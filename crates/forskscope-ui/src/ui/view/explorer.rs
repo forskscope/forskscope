@@ -31,11 +31,11 @@ use crate::i18n::t;
 use crate::state::Store;
 use crate::ui::view::digest_epoch::{DigestEpoch, EpochStamp};
 use crate::ui::view::dir_pane::{
-    FilteringExecutor, NavHistory, PathBar, SharedIgnoreRules, home_dir, short_name,
+    FilteringExecutor, NavHistory, PathBar, SharedIgnoreRules, home_dir, navigate_to, short_name,
 };
 use forskscope_ui_logic::{
     DirVerdict, EntryClassification, Tier1Action, Tier1Trigger, Tier2Verdict, classify_two_files,
-    compute_aligned_rows, dir_verdict, tier2_verdict,
+    compute_aligned_rows, dir_verdict, mirror_target, tier2_verdict,
 };
 
 use compact::CompactTree;
@@ -727,6 +727,70 @@ pub fn Explorer() -> Element {
         }
     });
 
+    // ── Sync panes (F151, issue #148) ──────────────────────────────────────────
+    // Not persisted, matching the filter's own open-state precedent (handoff
+    // 062 §2: "the filter's open state is the local precedent - follow it
+    // unless you can say why syncing differs"; it doesn't here).
+    let sync_locations: Signal<bool> = use_signal(|| false);
+    // The last (left, right) this effect observed - comparing against it is
+    // how it tells which pane just navigated, which `mirror_target` needs
+    // (the move *from* that pane's old directory, not merely its new one).
+    // Resynced on every run regardless of whether sync is on, so turning sync
+    // on never replays a jump the panes made while it was off.
+    let mut sync_prev: Signal<(PathBuf, PathBuf)> = use_signal(|| (init_l.clone(), init_r.clone()));
+    use_effect(move || {
+        let l = left_dir.read().cloned();
+        let r = right_dir.read().cloned();
+        let (prev_l, prev_r) = sync_prev.read().clone();
+        // Every write below is guarded by "would this actually change the
+        // value" - never an unconditional `set`, even to the same pair this
+        // effect already observed. This effect depends on `sync_prev`
+        // itself; an unconditional re-write every run, including the
+        // steady-state no-op case, would re-trigger it forever whether or
+        // not `Signal::set` happens to skip equal values, which is not a
+        // guarantee this relies on.
+        if !*sync_locations.read() {
+            if (l.clone(), r.clone()) != (prev_l, prev_r) {
+                sync_prev.set((l, r));
+            }
+            return;
+        }
+        let l_changed = l != prev_l;
+        let r_changed = r != prev_r;
+        // Exactly one side changing is what "one pane navigated" means; both
+        // changing at once (e.g. the initial mount) has no single triggering
+        // move to mirror, so it is left alone rather than guessed at.
+        if l_changed && !r_changed {
+            if let Some(target) = mirror_target(&prev_l, &l, &r)
+                && target.is_dir()
+            {
+                // The plain primitive, never the sync-aware wrapper some
+                // future refactor might add here - mirroring a mirror would
+                // recurse. There is no such wrapper today; this is why there
+                // must never be one without re-deriving this guard.
+                navigate_to(target.clone(), false, store, right_hist, right_dir);
+                sync_prev.set((l, target));
+                return;
+            }
+            // No counterpart (handoff 062 §2): the other pane stays where it
+            // is and the mode stays on - the pair still changed (left did),
+            // so this still needs recording below.
+        } else if r_changed && !l_changed {
+            if let Some(target) = mirror_target(&prev_r, &r, &l)
+                && target.is_dir()
+            {
+                navigate_to(target.clone(), true, store, left_hist, left_dir);
+                sync_prev.set((target, r));
+                return;
+            }
+        } else if !l_changed && !r_changed {
+            // Steady state: recording the identical pair again would be the
+            // unconditional write this effect must never make.
+            return;
+        }
+        sync_prev.set((l, r));
+    });
+
     // ── Digest map ────────────────────────────────────────────────────────────
     let mut digest_map: Signal<HashMap<DigestKey, EqualityEvidence>> = use_signal(HashMap::new);
     let mut digest_roots: Signal<(PathBuf, PathBuf)> =
@@ -1029,7 +1093,7 @@ pub fn Explorer() -> Element {
                 }
 
                 // ── Filter bar ────────────────────────────────────────────
-                FilterBar { lang, filter_open, filter_query, filter_hide_bin, filter_hide_eq }
+                FilterBar { lang, filter_open, filter_query, filter_hide_bin, filter_hide_eq, sync_locations }
 
                 // ── Pane-root labels ──────────────────────────────────────
                 div { class: "pane-root-bar",

@@ -160,6 +160,25 @@ Filter state is not persisted — it resets when you restart the app.
 
 ---
 
+## Sync panes
+
+Click the **⇄** toggle (next to **⊞**, always visible) to make both panes
+follow each other. While it is on, navigating one pane — double-clicking a
+folder, the path bar's **↑**/breadcrumbs, typing a path, **⌂** — moves the
+other pane to the same relative location: entering a folder named `utils` on
+one side opens `utils` on the other, and going up a level goes up a level on
+both.
+
+If the other side has no folder of that name (or no further ancestor to go
+up to), it stays exactly where it is and sync stays on — this is expected
+when the two trees genuinely differ at that point, not a malfunction. The
+next navigation that exists on both sides re-joins them.
+
+Sync is not persisted — it resets to off when you restart the app, the same
+as the filter bar's open state.
+
+---
+
 ## Compact layout
 
 By default, same-name entries are aligned across panes with spacer rows for

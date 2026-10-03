@@ -113,10 +113,25 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
+      # F160: reads the AUR package's git state (the `.SRCINFO` cgit serves
+      # for the `forskscope` branch), not the RPC - `release.md` already
+      # tells a human "the RPC listing rebuilds on a delay ... so read the
+      # package's git state", and this check was not following its own
+      # project's advice. The RPC lags a successful publish by some
+      # observed window (minutes, not instant): after `0.176.0` published to
+      # the AUR, the package's git carried `pkgver = 0.176.0` while the RPC
+      # still answered `0.174.0-1` for a time - this check would have
+      # reported a gap that did not exist, on every successful publish,
+      # until the RPC caught up. Anonymous and public either way; no
+      # credential, same as before.
       - name: Compare the AUR's published version against the latest release
         run: |
-          AUR_JSON="$(curl -fsSL 'https://aur.archlinux.org/rpc/v5/info?arg[]=forskscope')"
-          AUR_VERSION="$(printf '%s' "$AUR_JSON" | python3 -c 'import json, sys; d = json.load(sys.stdin); print(d["results"][0]["Version"].split("-")[0])')"
+          AUR_VERSION="$(curl -fsSL 'https://aur.archlinux.org/cgit/aur.git/plain/.SRCINFO?h=forskscope' \
+            | awk -F' = ' '/^\tpkgver = /{print $2; exit}')"
+          if [ -z "$AUR_VERSION" ]; then
+            echo "::error::could not read pkgver from the AUR's .SRCINFO"
+            exit 1
+          fi
           LATEST_TAG="$(curl -fsSL -H 'Accept: application/vnd.github+json' \
             'https://api.github.com/repos/${{ github.repository }}/releases/latest' \
             | python3 -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])')"

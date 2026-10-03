@@ -181,7 +181,7 @@ The profile is saved immediately and appears in the list.
 
 ## About and Diagnostics
 
-The **ℹ** button in the Settings header opens the About dialog. It shows:
+The **ℹ About** button in the Settings header opens the About dialog. It shows:
 
 - ForskScope version
 - Build profile (debug / release)

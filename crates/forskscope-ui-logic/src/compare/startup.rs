@@ -43,7 +43,9 @@ impl fmt::Display for StartupArgError {
         write!(
             f,
             "expected 0 arguments (Explorer), 2 (two-file compare: <left> <right>), \
-             or 3 (git mergetool: <local> <remote> <merged>) — got {}",
+             or 3 (git mergetool: <local> <remote> <merged>) — got {}. \
+             Looking for the version? Run with --version, or --diagnostics for \
+             full platform details.",
             self.arg_count
         )
     }
@@ -178,6 +180,24 @@ mod tests {
         let message = err.to_string();
         assert!(!message.is_empty());
         assert!(message.contains('5'));
+    }
+
+    /// F150 (issue #146): the reporter's actual question was "what version is
+    /// this", and the old message led away from the one flag that answers
+    /// it. Naming `--diagnostics` (full platform detail) and `--version`
+    /// (just the number) here means a user who reaches for the wrong flag
+    /// first still lands on the right one next, from the error itself.
+    #[test]
+    fn startup_arg_error_names_diagnostics_and_version() {
+        let message = StartupArgError { arg_count: 1 }.to_string();
+        assert!(
+            message.contains("--diagnostics"),
+            "message must name --diagnostics: {message:?}"
+        );
+        assert!(
+            message.contains("--version"),
+            "message must name --version: {message:?}"
+        );
     }
 
     // ── into_compare_request ─────────────────────────────────────────────

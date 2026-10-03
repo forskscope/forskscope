@@ -14,7 +14,7 @@ pub fn AboutModal() -> Element {
     let diag = info.to_report();
     let d2 = diag.clone();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "About ForskScope",
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "About ForskScope"),
             div { class: "modal",
                 h2 { "ForskScope v{info.app_version}" }
                 div { class: "about-grid",

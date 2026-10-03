@@ -48,7 +48,7 @@ could be added as a fourth crate without touching core.
 | `watcher` | `FileChangeMonitor` trait, `WatchToken`, `FileChangeEvent`, `WatchError`, `MockFileChangeMonitor` — file-watcher boundary (RFC-036). |
 | `xlsx` | Fail-closed spreadsheet comparison boundary; `.xlsx` parsing is temporarily disabled while the parser dependency path is remediated (RFC-058). |
 
-## `ui-logic` modules (15)
+## `ui-logic` modules (17)
 
 Framework-independent view-model logic. All modules are testable with
 `cargo test -p forskscope-ui-logic` — no GTK or display server required.
@@ -73,6 +73,7 @@ read what a row says a module does; that stays a judgment.
 | `explore::tier2_verdict` | `Tier2Verdict`, `tier2_verdict` — what a full, content-reading recursive comparison can conclude about a directory pair: `Identical`, `Different` or `Unknown` — the only tier entitled to claim identity (RFC-080 tier 2). |
 | `explore::deep_filter` | `DeepFilter`, `DeepCompareSummary`, `apply_filter` — filter state and counts for recursive directory compare (RFC-037, RFC-038). |
 | `explore::status` | `RowStatusKind`, `StatusGlyph` — maps `EqualityEvidence` to CSS class, glyph, and aria label for tree row badges (RFC-054). |
+| `explore::sync_panes` | `mirror_target` — location-mirroring for the Explorer's sync-panes toggle: re-applies the name or level-count a navigation moved by onto the other pane's own current directory, rather than replaying the gesture (handoff 062, F151 / issue #148). |
 | `compare::load_guard` | `guard_for_sizes(left, right)` → `LoadGuard` — pre-diff decision: Proceed / WarnBanner / ConfirmPrompt derived from `FileSizeClass` thresholds (RFC-013, Slice 1). |
 | `compare::load_identity` | Process-local `CompareTabId` allocation, monotonic `LoadGeneration`, and pure async completion validation; runtime tokens are never persisted (RFC-075). |
 | `compare::save_error` | `SaveErrorView::from_error(err, path)` — maps `AppError` to dialog title, body, and ordered `Vec<RecoveryButton>` (RFC-007, RFC-017, Slice 3). |
@@ -81,6 +82,7 @@ read what a row says a module does; that stays a judgment.
 | `session::persistence_recovery` | `SessionRecoveryView::from_resolution` — maps a session `SessionRuntimeResolution` to a recovery dialog's one-time notice and ordered actions (RFC-076). |
 | `settings::persistence_recovery` | `SettingsRecoveryView::from_resolution` — maps a settings `SettingsRuntimeResolution` to a recovery dialog's one-time notice and ordered actions (RFC-076). |
 | `settings::settings_view` | `theme_choices` — theme picker options; `clamp_font_size` — the diff-pane font-size bound the settings modal enforces (F53) (RFC-009, Slice 5). |
+| `settings::field_debounce` | `FieldDebounce`, `FIELD_DEBOUNCE` — the pure debounce state machine behind the ignore-pattern settings fields: a keystroke always overwrites the pending value, and it commits once 400 ms have passed since the last one (handoff 062, F136). |
 
 ## UI modules
 
