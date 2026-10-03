@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.177.1] — Unreleased
+
 ## [0.177.0] — 2026-10-03
 
 **The small things people asked for.**
