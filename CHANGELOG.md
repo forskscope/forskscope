@@ -5,7 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.178.1] — Unreleased
+## [0.179.0] — 2026-10-03
+
+**Documentation only — no change to the application.** The contributor guide's
+instructions for adding a module named files that do not exist and would have
+produced a failing build; they now match the project and name two real modules
+to check them against. Two internal identifiers cited across the documentation
+are now defined where the thing they describe lives.
+
 
 ## [0.178.0] — 2026-10-03
 
