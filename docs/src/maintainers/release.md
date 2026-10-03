@@ -287,13 +287,24 @@ annotated tag object (`git tag -l <tag>`) and re-push.
    git -C "$WORK/aur" push
    ```
 
-   **5 — confirm it landed.** The RPC listing rebuilds on a delay and will still
-   show the previous version for a while, so read the package's git state:
+   **5 — confirm it landed.** Two caches sit between a successful push and what
+   you see, and **both will show you the previous version**:
+
+   - the **RPC listing** (`rpc/v5/info`) rebuilds on a delay — do not use it here;
+   - and **cgit itself serves a cached page** for a short while after a push.
+
+   So read the package's git state *with a cache-busting parameter*. Without the
+   `&_=1`, a confirmation run within a minute of a successful push reports the old
+   version and reads exactly like a failed push:
 
    ```sh
-   curl -s 'https://aur.archlinux.org/cgit/aur.git/plain/.SRCINFO?h=forskscope' \
+   curl -s 'https://aur.archlinux.org/cgit/aur.git/plain/.SRCINFO?h=forskscope&_=1' \
      | head -4
    ```
+
+   Observed on the `0.177.0` and `0.178.0` publishes: the plain URL returned the
+   previous `pkgver` immediately after a push whose workflow had reported success
+   on both jobs; the same URL with a parameter returned the new one first try.
 
    **6 — clean up.** The clone, the downloaded archive and the recipe all live
    under `$WORK`, so one command removes them:
