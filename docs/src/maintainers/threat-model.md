@@ -507,6 +507,16 @@ Key crates touching file I/O or process execution:
 
 ### Accepted local WebView transport
 
+**S-001** names this acceptance (2026-07-09; F119): Dioxus desktop's residual
+network-capable dependency chain - `native-tls`/`rustls` -> `tungstenite` ->
+`dioxus-desktop` - is constrained local WebView IPC transport, not an
+app-authored network feature. It narrowed this document's guarantee from an
+overstated "no network-capable dependency tree" to "no app-authored external
+network service," with `cargo xtask audit-deps` as the enforcement point.
+Any future network-capable dependency needs the same kind of explicit,
+reasoned acceptance - recorded here, under this heading, not merely cited by
+number elsewhere.
+
 Dioxus desktop depends on `tungstenite` and `native-tls` because its WebView
 runtime uses a loopback WebSocket channel for edit and event transport between
 the embedded WebView and the native host process. This is not an application

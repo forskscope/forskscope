@@ -101,14 +101,31 @@ edge case.
 
 ## Adding a view-model module
 
-If you need to expose new presentation logic:
+If you need to expose new presentation logic, follow the shape of two real
+modules added this way — `crates/forskscope-ui-logic/src/explore/sync_panes.rs`
+and `crates/forskscope-ui-logic/src/explore/classify_pair.rs` — rather than
+this list alone; if the two disagree with the steps below, trust the code
+and open an issue about this file.
 
 1. Create `crates/forskscope-ui-logic/src/<area>/<module>.rs`.
-2. Register it in the `mod.rs` for that area and re-export from `lib.rs`.
-3. Add a shim file in `crates/forskscope-ui/src/ui/<module>.rs` with
-   `pub use forskscope_ui_logic::...`.
-4. Register the shim in `crates/forskscope-ui/src/ui/mod.rs`.
-5. Write at least one test per public function.
+2. Add `pub mod <module>;` to `<area>.rs` (e.g. `explore.rs`) — **there is no
+   `mod.rs` anywhere in this codebase**; the area's own `<area>.rs` file is
+   where its submodules are declared.
+3. Re-export from `crates/forskscope-ui-logic/src/lib.rs`'s crate root:
+   `pub use <area>::<module>::{...};`.
+4. Add a row for the module to **both**
+   `docs/src/maintainers/architecture.md`'s `` `ui-logic` modules (N) `` table
+   (and bump `N`) **and** `docs/src/maintainers/testing.md`'s
+   `` `forskscope-ui-logic` test modules `` table. `cargo xtask ui-logic-docs`
+   checks these two documents against the module files on disk — not
+   `lib.rs`'s own doc comment, which is unchecked prose.
+5. **Consume it directly** from `forskscope-ui` — no shim file exists
+   anywhere in this codebase, and none should. `cargo xtask
+   ui-logic-connectivity` requires every crate-root export to have a real
+   consumer somewhere in `forskscope-ui/src`, so export a name only once
+   something actually uses it, not speculatively ahead of a consumer.
+6. Write at least one test per public function, inline in the module file
+   (`#[cfg(test)] mod tests`), matching every other module in this crate.
 
 ---
 

@@ -8,6 +8,14 @@ publish = false
 name = "xtask"
 path = "src/main.rs"
 
+# DEC-005 (F119): xtask stays outside the main Cargo workspace, with its own
+# `[workspace]` table and lockfile, so it keeps building and running on its
+# own even if the main workspace's root Cargo.toml is broken - the gates
+# that check the main workspace (fmt, clippy, tests) need a working `cargo
+# xtask` to run them, so xtask being coupled to the thing it verifies would
+# make a broken main workspace unable to report that it's broken. Cited
+# elsewhere (`.github/workflows/ci.yml`, `ROADMAP.md`) by this name; this is
+# the one place the decision itself, not just a reason to remember it, lives.
 [workspace]
 
 [dependencies]
