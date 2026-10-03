@@ -5,7 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.177.1] — Unreleased
+## [0.178.0] — 2026-10-03
+
+**Maintenance only — no user-visible change.** Internal checks that could pass
+without actually checking anything have been corrected, and the spreadsheet
+reader is updated.
+
+### Changed
+
+**Spreadsheet comparison moved to a newer reader** (`sheets-diff` 3.3.0).
+Results are unchanged, verified across eighty comparisons against the previous
+version.
+
 
 ## [0.177.0] — 2026-10-03
 
