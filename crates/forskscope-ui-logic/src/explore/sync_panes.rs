@@ -14,12 +14,33 @@
 //! "re-join" control.
 //!
 //! **Location**-mirroring instead ties the mirrored move to the *name* the
-//! triggering pane actually navigated to (or the number of levels it ascended),
-//! re-applied onto the other pane's own current directory. This is what lets
-//! a single subsequent navigation re-join two diverged panes with no second
-//! control: the moment both sides have a child of the same name, mirroring a
-//! descend into it succeeds on both, regardless of how different the rest of
-//! each tree looks.
+//! triggering pane actually navigated to or ascended to, re-applied onto the
+//! other pane's own current directory. This is what lets a single subsequent
+//! navigation move two diverged panes together with no second control: the
+//! moment both sides have a child (or an ancestor) of the same name,
+//! mirroring a descend or ascend into it succeeds on both, regardless of how
+//! different the rest of each tree looks - though an existing divergence is
+//! carried forward, not cancelled, by either direction (review 138 §3): the
+//! mirrored move always shares the triggering pane's name, not the triggering
+//! pane's absolute position, so any prior offset between the two panes
+//! persists across it.
+//!
+//! Ascend used to go up the same *number of levels* the triggering pane went
+//! up, which is only correct while both panes sit at the same depth. Once
+//! they have diverged - which the "stays where it is" policy above
+//! deliberately allows - the two depths can differ, and counting levels on
+//! the other pane can overshoot past its own starting point entirely: review
+//! 138 §2 found `left /v1/src -> /v1` (one level up) while the right pane
+//! already sat at `/v2` flinging the right pane to `/`, out of the
+//! comparison altogether, from one ordinary "go up". Ascend now mirrors by
+//! *name*, the same way descend already did: go to the nearest ancestor of
+//! the other pane's current directory that shares the name of the directory
+//! the triggering pane arrived at. This is symmetric with descend, and it
+//! self-corrects after a divergence instead of compounding it - if the other
+//! pane has no such ancestor (most visibly, at its own starting directory,
+//! since the two starting directories are expected to differ in name - that
+//! is the whole point of comparing two different trees), it is left exactly
+//! where it is, never moved somewhere the user has not navigated near.
 //!
 //! [`mirror_target`] is the pure computation at the centre of this: given the
 //! triggering pane's directory before and after one navigation, and the other
@@ -43,7 +64,9 @@ use std::path::{Path, PathBuf};
 ///   same relative tail onto `other_current`. Covers double-clicking a row
 ///   (one component) and any deeper jump that happens to land inside `old`.
 /// - **Ascend** (`old` is `new` plus one or more components — `new` is an
-///   ancestor of `old`): go up the same number of levels on `other_current`.
+///   ancestor of `old`): go to the nearest ancestor of `other_current` that
+///   shares `new`'s name — not up the same *number* of levels, which
+///   overshoots once the two panes are at different depths (review 138 §2).
 ///   Covers `↑`, breadcrumb clicks (always to an ancestor), and `Alt+↑`.
 /// - **Neither**: no relative structure to mirror.
 ///
@@ -57,9 +80,12 @@ pub fn mirror_target(old: &Path, new: &Path, other_current: &Path) -> Option<Pat
     if let Ok(rel) = new.strip_prefix(old) {
         return Some(other_current.join(rel));
     }
-    if let Ok(rel_back) = old.strip_prefix(new) {
-        let levels = rel_back.components().count();
-        return other_current.ancestors().nth(levels).map(Path::to_path_buf);
+    if old.strip_prefix(new).is_ok() {
+        let arrived_at_name = new.file_name()?;
+        return other_current
+            .ancestors()
+            .find(|ancestor| ancestor.file_name() == Some(arrived_at_name))
+            .map(Path::to_path_buf);
     }
     None
 }
@@ -93,11 +119,11 @@ mod tests {
         assert_eq!(target, Some(PathBuf::from("/right/src/a/b/c")));
     }
 
-    /// Ascend: structural, not name-based — going up one level always means
-    /// "the parent", so the other pane goes up one level too, whatever either
-    /// pane's name at that level is.
+    /// Ascend: name-based, like descend — going up one level lands on the
+    /// nearest ancestor of the other pane sharing the arrived-at name, not
+    /// "whatever is one level up" (that was the defect: review 138 §2).
     #[test]
-    fn ascending_one_level_goes_up_one_level_on_the_other_pane() {
+    fn ascending_one_level_goes_up_to_the_ancestor_with_the_same_name() {
         let target = mirror_target(
             Path::new("/left/src/utils"),
             Path::new("/left/src"),
@@ -106,16 +132,33 @@ mod tests {
         assert_eq!(target, Some(PathBuf::from("/right/src")));
     }
 
-    /// A multi-level ascend (breadcrumb click several segments up) goes up
-    /// the same number of levels on the other pane.
+    /// A multi-level ascend (breadcrumb click several segments up) still
+    /// matches by the arrived-at name, not by counting levels — so it finds
+    /// the right ancestor even when the other pane sits at a different depth
+    /// below it (here, one level, not three), which is exactly the shape a
+    /// divergence creates.
     #[test]
-    fn ascending_several_levels_goes_up_the_same_count() {
+    fn ascending_several_levels_finds_the_name_regardless_of_the_other_panes_depth() {
         let target = mirror_target(
-            Path::new("/left/a/b/c"),
-            Path::new("/left"),
-            Path::new("/right/a/b/c"),
+            Path::new("/left/proj/a/b/c"),
+            Path::new("/left/proj"),
+            Path::new("/right/proj/x"),
         );
-        assert_eq!(target, Some(PathBuf::from("/right")));
+        assert_eq!(target, Some(PathBuf::from("/right/proj")));
+    }
+
+    /// The defect itself (review 138 §2), falsified directly: after a
+    /// divergence has left the two panes at different depths, an ascent on
+    /// one side used to go up the same *number* of levels on the other,
+    /// overshooting straight past the other pane's own starting point and
+    /// out into unrelated territory. `/v1` and `/v2` are named differently by
+    /// design — comparing two differently-named trees is the point of this
+    /// product — so there is no ancestor of `/v2` named `v1`, and the right
+    /// pane must stay exactly where it is rather than being flung to `/`.
+    #[test]
+    fn ascending_after_a_divergence_does_not_fling_the_other_pane_past_its_own_start() {
+        let target = mirror_target(Path::new("/v1/src"), Path::new("/v1"), Path::new("/v2"));
+        assert_eq!(target, None);
     }
 
     /// Divergence, decided (handoff 062 §2): an unrelated jump - Home, a typed
@@ -133,11 +176,12 @@ mod tests {
         assert_eq!(target, None);
     }
 
-    /// Ascending past the other pane's own filesystem root has no mirror -
-    /// there is no "further up" to go, so this is the ascend case's own
-    /// divergence, not a panic or a clamp to some arbitrary path.
+    /// When the other pane has no ancestor by the arrived-at name at all -
+    /// here, nothing on `/x`'s side is named `a` - there is nothing to
+    /// mirror, so it stays exactly where it is rather than landing on some
+    /// unrelated ancestor just because one happened to exist.
     #[test]
-    fn ascending_past_the_other_panes_root_has_no_mirror() {
+    fn ascending_to_a_name_the_other_pane_has_nowhere_has_no_mirror() {
         let target = mirror_target(Path::new("/a/b/c"), Path::new("/a"), Path::new("/x"));
         assert_eq!(target, None);
     }

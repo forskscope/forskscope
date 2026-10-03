@@ -165,14 +165,19 @@ Filter state is not persisted — it resets when you restart the app.
 Click the **⇄** toggle (next to **⊞**, always visible) to make both panes
 follow each other. While it is on, navigating one pane — double-clicking a
 folder, the path bar's **↑**/breadcrumbs, typing a path, **⌂** — moves the
-other pane to the same relative location: entering a folder named `utils` on
-one side opens `utils` on the other, and going up a level goes up a level on
-both.
+other pane too: entering a folder named `utils` on one side opens `utils` on
+the other, and going up moves the other pane up to the nearest folder that
+shares the name of the one you just arrived at (not simply one level up,
+which could send it somewhere unrelated once the two sides are no longer at
+the same depth).
 
-If the other side has no folder of that name (or no further ancestor to go
-up to), it stays exactly where it is and sync stays on — this is expected
-when the two trees genuinely differ at that point, not a malfunction. The
-next navigation that exists on both sides re-joins them.
+If the other side has no folder of that name to enter, or no ancestor by
+that name to go up to, it stays exactly where it is and sync stays on — this
+is expected when the two trees genuinely differ at that point, not a
+malfunction. A later navigation that exists on both sides moves them
+together again, but a gap from an earlier divergence carries forward rather
+than closing: diverge by one level, then open a folder named `lib` on both,
+and you land on `.../src/lib` and `.../lib` — still one level apart.
 
 Sync is not persisted — it resets to off when you restart the app, the same
 as the filter bar's open state.
