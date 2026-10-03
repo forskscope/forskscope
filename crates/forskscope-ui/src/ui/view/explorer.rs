@@ -732,9 +732,25 @@ pub fn Explorer() -> Element {
     // 062 §2: "the filter's open state is the local precedent - follow it
     // unless you can say why syncing differs"; it doesn't here).
     let sync_locations: Signal<bool> = use_signal(|| false);
+    // Anchored model (review 139 §3): each pane's directory at the moment
+    // sync was switched on. `mirror_target` always mirrors relative to these,
+    // never to the other pane's live position - this is what makes it
+    // unaffected by any existing divergence. `.peek()` on both reads below:
+    // this effect's only tracked dependency is `sync_locations` itself, so
+    // it never re-runs on an ordinary pane navigation, only on the toggle.
+    let mut sync_anchors: Signal<Option<(PathBuf, PathBuf)>> = use_signal(|| None);
+    use_effect(move || {
+        if *sync_locations.read() {
+            if sync_anchors.peek().is_none() {
+                sync_anchors.set(Some((left_dir.peek().clone(), right_dir.peek().clone())));
+            }
+        } else {
+            sync_anchors.set(None);
+        }
+    });
     // The last (left, right) this effect observed - comparing against it is
-    // how it tells which pane just navigated, which `mirror_target` needs
-    // (the move *from* that pane's old directory, not merely its new one).
+    // how it tells which pane just navigated. Unlike the anchors above, this
+    // is only ever used to find the trigger, never to compute the mirror.
     // Resynced on every run regardless of whether sync is on, so turning sync
     // on never replays a jump the panes made while it was off.
     let mut sync_prev: Signal<(PathBuf, PathBuf)> = use_signal(|| (init_l.clone(), init_r.clone()));
@@ -755,13 +771,16 @@ pub fn Explorer() -> Element {
             }
             return;
         }
+        let Some((anchor_l, anchor_r)) = sync_anchors.read().clone() else {
+            return;
+        };
         let l_changed = l != prev_l;
         let r_changed = r != prev_r;
         // Exactly one side changing is what "one pane navigated" means; both
         // changing at once (e.g. the initial mount) has no single triggering
         // move to mirror, so it is left alone rather than guessed at.
         if l_changed && !r_changed {
-            if let Some(target) = mirror_target(&prev_l, &l, &r)
+            if let Some(target) = mirror_target(&l, &anchor_l, &anchor_r)
                 && target.is_dir()
             {
                 // The plain primitive, never the sync-aware wrapper some
@@ -776,7 +795,7 @@ pub fn Explorer() -> Element {
             // is and the mode stays on - the pair still changed (left did),
             // so this still needs recording below.
         } else if r_changed && !l_changed {
-            if let Some(target) = mirror_target(&prev_r, &r, &l)
+            if let Some(target) = mirror_target(&r, &anchor_r, &anchor_l)
                 && target.is_dir()
             {
                 navigate_to(target.clone(), true, store, left_hist, left_dir);

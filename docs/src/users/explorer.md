@@ -163,21 +163,24 @@ Filter state is not persisted — it resets when you restart the app.
 ## Sync panes
 
 Click the **⇄** toggle (next to **⊞**, always visible) to make both panes
-follow each other. While it is on, navigating one pane — double-clicking a
-folder, the path bar's **↑**/breadcrumbs, typing a path, **⌂** — moves the
-other pane too: entering a folder named `utils` on one side opens `utils` on
-the other, and going up moves the other pane up to the nearest folder that
-shares the name of the one you just arrived at (not simply one level up,
-which could send it somewhere unrelated once the two sides are no longer at
-the same depth).
+follow each other. Turning it on anchors each pane to its directory at that
+moment. While sync is on, navigating one pane — double-clicking a folder,
+the path bar's **↑**/breadcrumbs, typing a path, **⌂** — moves the other
+pane to the same path relative to *its own* anchor: entering `a/b` below
+where the first pane started opens `a/b` below where the second pane
+started, and going up moves the other pane to the matching point on its
+own side, however far either pane has wandered since.
 
-If the other side has no folder of that name to enter, or no ancestor by
-that name to go up to, it stays exactly where it is and sync stays on — this
-is expected when the two trees genuinely differ at that point, not a
-malfunction. A later navigation that exists on both sides moves them
-together again, but a gap from an earlier divergence carries forward rather
-than closing: diverge by one level, then open a folder named `lib` on both,
-and you land on `.../src/lib` and `.../lib` — still one level apart.
+If the other pane has no folder at that relative path, it stays exactly
+where it is and sync stays on — this is expected when the two trees
+genuinely differ at that point, not a malfunction. Because each move is
+measured from the anchors, not from wherever the panes currently sit, a
+later navigation to a path that exists relative to both anchors brings them
+back in step — there is no lingering gap to carry forward.
+
+Navigating a pane above its own anchor is treated the same way: the other
+pane is left alone. Turn sync off and back on to re-anchor both panes to
+wherever they are then.
 
 Sync is not persisted — it resets to off when you restart the app, the same
 as the filter bar's open state.
