@@ -5,7 +5,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.176.1] — Unreleased
+## [0.177.0] — 2026-10-03
+
+**The small things people asked for.**
+
+### Added
+
+**The two Explorer panes can follow each other.** The new **⇄** toggle, next to
+the filter button, keeps both panes at the same place *relative to where each one
+started*: open `src` on one side and `src` opens on the other, go up on one and
+the other goes up too. That works when the two sides are different folders
+entirely, which is the usual case when comparing two versions of a project.
+
+If one side has no folder of that name, it stays where it is and syncing stays
+on — two trees genuinely differing at that point is something worth seeing, not a
+malfunction. The next place that exists on both sides brings them back together.
+(Requested as issue #148.)
+
+**`--version` and `--help`.** Both now work, along with `-V` and `-h`. If you
+pass something unexpected, the error points you at them, and at `--diagnostics`
+for full platform details.
+
+### Changed
+
+**The About button has a visible label.** It was an icon alone, and a user
+reported being unable to find it. It now reads *About*, translated.
+
+### Fixed
+
+**Ctrl+A no longer highlights the whole window.** It selected all the interface
+text — menus, labels, status — while leaving the file rows alone, which was the
+opposite of useful. Text inside the diff, and inside error messages, is still
+selectable and copyable as before. (Reported as issue #147.)
+
+**Typing in the ignore-pattern settings no longer re-scans on every keystroke**,
+which collapsed an expanded folder tree once per character typed.
+
 
 ## [0.176.0] — 2026-10-02
 
