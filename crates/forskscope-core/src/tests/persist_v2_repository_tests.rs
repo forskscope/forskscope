@@ -256,10 +256,7 @@ fn settings_commit_migration_survives_failure_between_backup_and_replace() {
 
     if !make_dir_readonly(dir) {
         restore_dir_writable(dir);
-        eprintln!(
-            "skipping settings_commit_migration_survives_failure_between_backup_and_replace: \
-             the directory permission change had no effect (running as root?)"
-        );
+        super::support::permission_guard_failed();
         return;
     }
 
@@ -482,10 +479,7 @@ fn session_commit_migration_survives_failure_between_backup_and_replace() {
 
     if !make_dir_readonly(dir) {
         restore_dir_writable(dir);
-        eprintln!(
-            "skipping session_commit_migration_survives_failure_between_backup_and_replace: \
-             the directory permission change had no effect (running as root?)"
-        );
+        super::support::permission_guard_failed();
         return;
     }
 

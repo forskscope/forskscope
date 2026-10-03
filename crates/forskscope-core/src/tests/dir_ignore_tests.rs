@@ -142,7 +142,7 @@ fn an_ignored_directory_is_not_walked_not_merely_hidden() {
     let blocked = l.join(".git");
     let _ = fs::set_permissions(&blocked, fs::Permissions::from_mode(0o000));
     if fs::read_dir(&blocked).is_ok() {
-        eprintln!("skipping an_ignored_directory_is_not_walked: chmod had no effect (root?)");
+        super::support::permission_guard_failed();
         let _ = fs::set_permissions(&blocked, fs::Permissions::from_mode(0o755));
         let _ = fs::remove_dir_all(&base);
         return;
@@ -383,7 +383,7 @@ fn a_hidden_directory_is_not_walked_not_merely_hidden() {
     let blocked = l.join(".git");
     let _ = fs::set_permissions(&blocked, fs::Permissions::from_mode(0o000));
     if fs::read_dir(&blocked).is_ok() {
-        eprintln!("skipping a_hidden_directory_is_not_walked: chmod had no effect (root?)");
+        super::support::permission_guard_failed();
         let _ = fs::set_permissions(&blocked, fs::Permissions::from_mode(0o755));
         let _ = fs::remove_dir_all(&base);
         return;

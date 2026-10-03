@@ -241,10 +241,7 @@ fn directory_patch_fails_rather_than_silently_omit_an_unreadable_entry() {
     // `dir_unreadable_tests.rs::make_child_metadata_unreadable`.
     let _ = fs::set_permissions(left.join("blocked"), fs::Permissions::from_mode(0o400));
     if fs::metadata(left.join("blocked/file.txt")).is_ok() {
-        eprintln!(
-            "skipping directory_patch_fails_rather_than_silently_omit_an_unreadable_entry: \
-             chmod had no effect (running as root?)"
-        );
+        super::support::permission_guard_failed();
         let _ = fs::set_permissions(left.join("blocked"), fs::Permissions::from_mode(0o755));
         let _ = fs::remove_dir_all(&base);
         return;
@@ -283,10 +280,7 @@ fn directory_patch_fails_rather_than_silently_treat_an_unreadable_root_as_empty(
 
     let _ = fs::set_permissions(&right, fs::Permissions::from_mode(0o000));
     if fs::read_dir(&right).is_ok() {
-        eprintln!(
-            "skipping directory_patch_fails_rather_than_silently_treat_an_unreadable_root_as_empty: \
-             chmod had no effect (running as root?)"
-        );
+        super::support::permission_guard_failed();
         let _ = fs::set_permissions(&right, fs::Permissions::from_mode(0o755));
         let _ = fs::remove_dir_all(&base);
         return;

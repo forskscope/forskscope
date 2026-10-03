@@ -361,10 +361,7 @@ fn a_batch_copy_into_an_unreadable_root_fails_every_item_not_silently() {
     fs::create_dir_all(&dst).unwrap();
     fs::set_permissions(&dst, fs::Permissions::from_mode(0o000)).unwrap();
     if fs::read_dir(&dst).is_ok() {
-        eprintln!(
-            "skipping a_batch_copy_into_an_unreadable_root_fails_every_item_not_silently: \
-             chmod had no effect (running as root?)"
-        );
+        super::support::permission_guard_failed();
         fs::set_permissions(&dst, fs::Permissions::from_mode(0o755)).unwrap();
         let _ = fs::remove_dir_all(&base);
         return;

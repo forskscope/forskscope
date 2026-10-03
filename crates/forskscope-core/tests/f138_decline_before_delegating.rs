@@ -23,10 +23,12 @@
 //! either way; with the address space capped to 2 GB (`ulimit -v 2000000`),
 //! 3.0.0 aborts with `memory allocation of 9261023232 bytes failed`, SIGABRT.
 //! So the cap below is not a nicety — it is the entire discriminating power
-//! of this test. If `RLIMIT_AS` cannot be set (running as root ignores
-//! limits it can also raise back; some sandboxes refuse `setrlimit`
-//! outright), the test skips loudly rather than passing for the wrong
-//! reason.
+//! of this test. Unlike a `chmod`-based guard, there is no known, legitimate
+//! reason `setrlimit` should fail here to *lower* this process's own limit —
+//! POSIX permits that unconditionally, root included, unlike raising one
+//! past its hard limit — so F143 (handoff 063 §1) makes this fail loudly
+//! rather than skip: a refusal here is itself the finding, not a precondition
+//! to shrug off.
 
 use std::path::PathBuf;
 
@@ -60,14 +62,15 @@ fn expected_bytes() -> [u8; 512] {
 
 #[test]
 fn the_committed_fixture_matches_its_documented_byte_layout() {
-    let on_disk = std::fs::read(fixture("tests/fixtures/f138/oom-artifact-515b.bin")).unwrap();
+    let on_disk = std::fs::read(fixture("tests/fixtures/f138/oom-artifact-512b.bin")).unwrap();
     assert_eq!(on_disk, expected_bytes());
 }
 
-/// Sets this process's own `RLIMIT_AS` (unix only). Returns `false` — do not
-/// assert, skip loudly — if the kernel refused it, so the test cannot pass
-/// silently for the wrong reason (running privileged, or under a sandbox that
-/// disallows `setrlimit`).
+/// Sets this process's own `RLIMIT_AS` (unix only). Returns `false` if the
+/// kernel refused it — the caller panics on that (F143): *lowering* a
+/// process's own `RLIMIT_AS` never requires privilege and is never refused
+/// on a conforming Unix kernel, so there is no known legitimate reason for
+/// this to fail, unlike a `chmod`-based guard that root can validly bypass.
 #[cfg(unix)]
 fn cap_address_space(bytes: u64) -> bool {
     let limit = libc::rlimit {
@@ -85,15 +88,15 @@ fn cap_address_space(bytes: u64) -> bool {
 #[cfg(unix)]
 #[test]
 fn a_crafted_cfb_header_is_declined_not_allocated() {
-    if !cap_address_space(CAP_BYTES) {
-        eprintln!(
-            "skipping a_crafted_cfb_header_is_declined_not_allocated: \
-             setrlimit(RLIMIT_AS) refused (privileged or sandboxed?)"
-        );
-        return;
-    }
+    assert!(
+        cap_address_space(CAP_BYTES),
+        "setrlimit(RLIMIT_AS) was refused - lowering a process's own address \
+         space limit should never require privilege or be refused on a \
+         conforming Unix kernel, so this is the finding, not a precondition \
+         to skip past silently (F143)"
+    );
 
-    let bad = fixture("tests/fixtures/f138/oom-artifact-515b.bin");
+    let bad = fixture("tests/fixtures/f138/oom-artifact-512b.bin");
     // Any small, real workbook; only `bad`'s side matters here. Read through
     // forskscope-core's own xlsx tests fixtures, not a scratch file, so
     // nothing else in this test allocates unexpectedly under the cap.

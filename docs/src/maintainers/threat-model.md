@@ -64,7 +64,7 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
 - Text vs. binary cross-comparison (one side text, other binary) is blocked with
   a clear error message.
 - `.xlsx` files are **parsed** since v0.169.0 (`d492557`, RFC-085): a pair of
-  workbooks goes through `sheets-diff` 3.2.0 (`calamine 0.36.1`,
+  workbooks goes through `sheets-diff` 3.3.0 (`calamine 0.36.1`,
   `quick-xml 0.41.0`, `zip 8.6.0`) under the bounds set in
   `crates/forskscope-core/src/xlsx.rs`. A comparison that cannot finish — a
   corrupt workbook, or one that reaches a size bound — is shown as an error,
@@ -498,7 +498,7 @@ Key crates touching file I/O or process execution:
 | `dioxus-desktop` | 0.7.9 | Desktop WebView host | Uses authenticated loopback WebSocket IPC between WebView and host |
 | `tungstenite` / `native-tls` | 0.28 / 0.2 | Dioxus desktop transport dependency | Accepted only via `dioxus-desktop`; no app-authored remote connections |
 | `quick-xml` | 0.39.4 | Wayland protocol code generation through GTK/Dioxus stack | Build-time/proc-macro path; not reachable from user-supplied files. Carries the two advisories ignored in `.cargo/audit.toml` |
-| `sheets-diff` | 3.2.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0; 3.0.0 since F130, 3.2.0 since F138) | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-core` only (`audit-deps` asserts it) |
+| `sheets-diff` | 3.3.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0; 3.0.0 since F130, 3.2.0 since F138, 3.3.0 since F154) | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-core` only (`audit-deps` asserts it) |
 | `calamine` | 0.36.1 | Workbook reader under `sheets-diff` | **Parses user-supplied XML and archives.** Read as a stream by `sheets-diff` 2.5.1 and later, so memory follows the populated cells (it did not through 2.5.0). Immediate dependent: `sheets-diff` only |
 | `quick-xml` | 0.41.0 | XML parsing under `calamine` | **Reachable from user-supplied files.** Not covered by the `.cargo/audit.toml` ignore list (which names 0.39 only) |
 | `zip` | 8.6.0 | Archive reading under `calamine` | **Reachable from user-supplied files.** Compressed size is bounded (50 MiB); expansion is not |
@@ -660,3 +660,4 @@ its own merits.
 | v0.172.0 | F120: character-level refinement bounded (`MAX_INLINE_CHARS_PER_SIDE` = 2,000), skipped pairs shown, Inline toggle disabled for files over 512 KiB | Closes a file-content-triggered process abort reachable from a user toggle; the aggregate cost of many near-limit pairs is not bounded |
 | v0.173.0 | F121: backup no longer written through a symlink; a save keeps an existing file's mode; precondition re-checked before the rename; `audit-deps` asserts the `rustls` path and queries all targets | Closes the F89 class on the `.bak` path and a private-file exposure; narrows (does not close) the `MustMatch`/`Force` race; extends a dependency gate from the host graph to the shipped platforms' |
 | v0.173.0 | F138: `sheets-diff` 3.0.0 → 3.2.0 — a 512-byte file could make the workbook reader request 9.26 GB in one allocation and abort the process (`GHSA-w5x2-6474-pqp4`, `calamine` `cfb.rs`) | **Closes a file-triggered process abort that both `max_input_bytes` and `Limits::hardened()` failed to bound**, reproduced through `compare_pair` here; 3.2.0 declines non-ZIP input before the parser. Reached us by an upstream letter, not by a scanner: `cargo audit` reads RustSec and the advisory was GitHub-only, and Dependabot alerts were disabled (F140). Also F139: a plain-number sheet no longer builds 400,000 diagnostics |
+| v0.178.0 | F154: `sheets-diff` 3.2.0 → 3.3.0 — upstream fixed the per-sheet formula-diagnostic gate at its cause (a sheet's own `sheet_has_formulas`, captured directly, not the formula-reading pass's unrelated success flag) | F139's workaround (`include_formula_cached_values(false)`) is retired; `build_options` no longer touches the flag. Dependency chain unchanged: `calamine 0.36.1`, `quick-xml 0.41.0`, `zip 8.6.0`, no new transitive crate. `cargo audit` and `audit-deps` clean; `RowSignature`/`Positional`/`RowKey` alignment results confirmed unchanged against 3.2.0 on a 20-case scenario matrix (F132's 0.180.0 decision still rests on these) |

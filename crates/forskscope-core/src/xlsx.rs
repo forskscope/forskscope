@@ -340,48 +340,32 @@ fn build_options(
         let tok = token.clone();
         builder = builder.cancellation(move || tok.is_cancelled());
     }
-    // F138 Part B: off, not the default `true`.
+    // F154: back to the default (`true`) — F138 Part B's `false` is retired.
     //
-    // On any *readable* sheet, `sheets-diff` (3.0.0 through 3.2.0, checked)
-    // emits an `Info` diagnostic per numeric cell with no formula text, because
-    // the flag it checks (`has_formulas`) records that the formula-reading pass
-    // *finished without error* — true of a plain-data sheet with no formulas at
-    // all — not that the sheet *has* formulas. A 51,000-cell numeric sheet
-    // floods `info_notes` to 102,001 (`Debug`-formatted, that alone is ~5.4 MB
-    // for a comparison whose own cell diffs are a handful); with this off, 1.
-    // Measured here (F131's `large` fixture, `compare_pair`, release build):
+    // Through 3.0.0-3.2.0, `sheets-diff`'s per-sheet formula-diagnostic loop
+    // was gated on `has_formulas`, which actually meant "the formula-reading
+    // pass finished without error" - true of a plain-data sheet with no
+    // formulas at all, not "this sheet has formulas". A 51,000-cell numeric
+    // sheet (no formulas anywhere) flooded `info_notes` to 102,001. Turning
+    // the flag off was a workaround: it also skipped the loop, for any sheet,
+    // formulas or not, which is why F138 Part B's own test (now
+    // `a_formula_cells_changed_cached_value_is_always_reported`) had to
+    // confirm cached-value comparison did not quietly go with it.
     //
-    // | | `info_notes` | peak RSS |
-    // |---|---|---|
-    // | before (default `true`) | 102,001 | 53.5 MB |
-    // | after (`false`) | 1 (the unrelated "non-cell objects" blanket note) | 19.8 MB |
+    // 3.3.0 fixed the actual bug: the gate is now whether the sheet genuinely
+    // has at least one formula, captured before the formula list is drained,
+    // not the pass's own success flag. A sheet with no formulas - the `large`
+    // fixture included - never enters the loop at all, flag notwithstanding;
+    // a sheet that does gets at most one `Info` diagnostic per side, carrying
+    // a count in its message text, not one per cell. The workaround has
+    // nothing left to work around.
     //
-    // Turning the flag off means `sheets-diff` skips the loop that builds the
-    // flood in the first place, not merely a later count of it — that is why
-    // memory drops too, not only `info_notes`. `collect_notes` (F131) still
-    // walks and clones whatever *does* arrive; making that cheap for a flood
-    // that gets through some other diagnostic is F139's second half, 0.173.0,
-    // out of scope here.
-    //
-    // **`sheets-diff`'s own doc comment says this loses cached-value comparison
-    // ("whether the formula's cached value is compared as a value change").
-    // Checked, not taken on trust: the flag is read in exactly one place in the
-    // whole crate — `diff.rs`'s diagnostic loop, gated `has_formulas &&
-    // include_formula_cached_values` — in both 3.0.0 and 3.2.0. It gates no
-    // comparison; a formula cell's cached value is read in the same pass as any
-    // other cell's value (`worksheet_cells_reader`'s first pass) and compared
-    // exactly as any other value change would be, regardless of this flag.**
-    //
-    // That is true of the two versions checked and is not a documented
-    // guarantee — the doc comment describes intended, not implemented,
-    // behaviour, and upstream has said this area is next for them. If a later
-    // release wires the flag to what its own doc comment already promises, this
-    // line would silently stop comparing cached values with no compile error
-    // and no test failure elsewhere — so this line does not stand alone: see
-    // `a_formula_cells_changed_cached_value_is_still_reported_with_the_flag_off`
-    // below, which fails the moment that promise starts being kept. Re-check
-    // both when `sheets-diff` is next bumped past 3.2.0.
-    builder = builder.include_formula_cached_values(false);
+    // That test is kept rather than deleted (F154, handoff 063 §6): the
+    // promise `sheets-diff`'s own doc comment makes - this flag never gates
+    // cached-value comparison - is now one upstream has committed to
+    // keeping, not merely true of the versions checked. A promise is not a
+    // compile error, so the test stays as the thing that would notice if
+    // that ever changed.
     // `validate()` only rejects a `formula_compare`/`format_compare`
     // combination neither of which this builder touches, so this should not
     // fail. If it ever does, refuse the comparison: falling back to
@@ -601,6 +585,19 @@ fn collect_notes(wb: &sheets_diff::WorkbookDiff) -> Vec<Note> {
 
 /// Group warnings by kind (one message naming every sheet), order them by
 /// urgency, and count the rest.
+///
+/// F154: confirmed, not assumed, that this is still the right treatment for
+/// `FormulaUnavailable` now that `sheets-diff` 3.3.0 emits it once per sheet
+/// per side (carrying a count in `message`) rather than once per cell. It is
+/// still just counted here, its `message` discarded along with every other
+/// `Info` - unlike before 3.3.0, that discarded text is now itself a short,
+/// bounded summary rather than 102,001 near-identical repeats, so there was
+/// a real question of whether discarding it is still right. Nothing reads
+/// `info_notes` outside this crate today (`SpreadsheetPair` never exposes it
+/// to the UI) and no open finding asks for it to, so there is nowhere for a
+/// per-sheet count to go yet - this is the conservative choice, not a
+/// considered "Info should never be seen" position. Revisit if a future
+/// finding wants these surfaced.
 fn summarize_notes(notes: Vec<Note>) -> (Vec<SpreadsheetWarning>, usize) {
     let mut info = 0;
     let mut warnings: Vec<SpreadsheetWarning> = Vec::new();
@@ -905,29 +902,22 @@ mod tests {
         assert_eq!(cell.new_formula.as_deref(), Some("2+2"));
     }
 
-    /// F138 Part B: the test that makes `include_formula_cached_values(false)`
-    /// safe to take on a promise nobody made. `sheets-diff`'s own doc comment
-    /// says the flag governs "whether the formula's cached value is compared
-    /// as a value change" — checked (not trusted) to be untrue of 3.0.0 and
-    /// 3.2.0, where the flag gates one diagnostic loop and nothing else. If a
-    /// later release starts keeping that promise, `build_options`'s `false`
-    /// would silently stop reporting a formula whose cached result changed —
-    /// and this is the test that catches it first. A3's formula **text** is
-    /// `A1+A2` on both sides of the fixture; only the cached result (2 → 3)
-    /// differs. Falsify by adding `.include_formula_cached_values(true)` back
-    /// after the `false` in `build_options`: this keeps passing, because the
-    /// flag does nothing on the versions in the lock today — which is exactly
-    /// why the doc comment on `build_options` says to re-check both at the
-    /// next bump, not why this test alone would catch a regression today.
+    /// F154 (was F138 Part B): a pin on a promise, not a guard against a
+    /// hazard — `build_options` no longer touches `include_formula_cached_values`
+    /// at all (3.3.0 fixed the actual bug the `false` worked around), and
+    /// upstream has committed that this flag will never gate cached-value
+    /// comparison, correcting the doc comment that once said it did. A3's
+    /// formula **text** is `A1+A2` on both sides of the fixture; only the
+    /// cached result (2 → 3) differs. This test is what would notice if that
+    /// promise were ever broken — a promise is not a compile error.
     #[test]
-    fn a_formula_cells_changed_cached_value_is_still_reported_with_the_flag_off() {
+    fn a_formula_cells_changed_cached_value_is_always_reported() {
         let diff = diff("formula_cached_value_changed");
         assert_eq!(diff.cells.len(), 1);
         let cell = &diff.cells[0].cells[0];
         assert!(
             cell.value_changed,
-            "the cached value differs (2 vs 3) and must be reported, \
-             include_formula_cached_values(false) notwithstanding"
+            "the cached value differs (2 vs 3) and must be reported"
         );
         assert!(
             !cell.formula_changed,
@@ -1403,22 +1393,25 @@ mod tests {
         );
     }
 
-    /// Before F138 Part B: `FormulaUnavailable` is `Info` and was emitted per
-    /// numeric cell on any readable sheet (`sheets-diff`'s `has_formulas` means
-    /// "the formula pass finished", not "this sheet has formulas" — see
-    /// `build_options`'s doc comment). On the `large` fixture (51,000 numeric
-    /// cells, no formulas) that meant 102,001 `info_notes`, counted rather than
-    /// rendered per item — proving `summarize_notes`' architecture held even at
-    /// that scale, which `warnings_are_grouped_by_kind_ordered_by_urgency_and_info_is_counted`
+    /// Through 3.0.0-3.2.0: `FormulaUnavailable` is `Info` and was emitted per
+    /// numeric cell on any readable sheet (`sheets-diff`'s `has_formulas` meant
+    /// "the formula pass finished", not "this sheet has formulas"). On the
+    /// `large` fixture (51,000 numeric cells, no formulas) that meant 102,001
+    /// `info_notes`, counted rather than rendered per item — proving
+    /// `summarize_notes`' architecture held even at that scale, which
+    /// `warnings_are_grouped_by_kind_ordered_by_urgency_and_info_is_counted`
     /// above proves in general on synthetic `Note`s, independent of any real
-    /// flood.
+    /// flood. F138 Part B's `include_formula_cached_values(false)` was a
+    /// workaround for this, from our side.
     ///
-    /// **After Part B, this flood cannot happen at all**
-    /// (`include_formula_cached_values(false)` stops `sheets-diff` from ever
-    /// entering that loop), so this fixture no longer exercises "counted at
-    /// scale" — it exercises that the flood stays gone. Falsify by removing
-    /// the `false` in `build_options`: `info_notes` jumps to 102,001 and the
-    /// bound below fails.
+    /// **F154: 3.3.0 fixed it upstream instead**, and the workaround is
+    /// retired (`build_options` no longer touches the flag) — the diagnostic
+    /// loop is now gated on whether the sheet genuinely has a formula
+    /// (captured directly, not inferred from the read pass succeeding), so a
+    /// plain-numeric sheet like this one never enters it at all, flag or no
+    /// flag. This fixture no longer exercises "counted at scale"; it pins
+    /// that the flood itself stays gone now that the cause is fixed rather
+    /// than merely routed around.
     #[test]
     fn the_large_fixture_no_longer_floods_info_notes() {
         let (old, new) = large();
@@ -1426,7 +1419,8 @@ mod tests {
         assert!(diff.warnings.is_empty(), "{:?}", diff.warnings);
         assert!(
             diff.info_notes < 10,
-            "F138 Part B must keep this fixture's flood off, got {} info_notes",
+            "a sheet with no formulas must never enter the per-sheet formula \
+             diagnostic loop, got {} info_notes",
             diff.info_notes
         );
         let (left, right) = derive_pair_text_from_diff(&diff);

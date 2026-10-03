@@ -229,6 +229,7 @@ by handoff 033's connectivity cleanup; `compare/load_identity`,
 | `settings/persistence_recovery` | Same shape as `session/persistence_recovery`, for `SettingsRuntimeResolution`/`SettingsRecoveryView`. | RFC-076 |
 | `settings/settings_view` | `theme_choices`: covers all three themes, round-trips via `ThemeId::from_id`, non-empty labels, no duplicate values; `clamp_font_size` stays within the shipped 8-32 bound at both extremes (F53). | RFC-009 |
 | `settings/field_debounce` | `FieldDebounce` as a pure state machine on a fake clock: six keystrokes 30 ms apart commit once, not six times; the committed value is the last one typed; typing again before the interval elapses restarts the rest; `due_at` names when the rest will have lasted long enough; a consumed commit does not fire again. | F136 |
+| `test_support` | No tests of its own - a shared helper exercised indirectly by every permission-dependent test in this crate that calls `permission_guard_failed`. | F143 |
 
 Doctest in `watcher.rs` (`MockFileChangeMonitor` usage example): 1 test.
 

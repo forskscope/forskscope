@@ -42,6 +42,7 @@ mod platform_tests;
 mod report_tests;
 mod save_target_tests;
 mod save_tests;
+mod support;
 mod three_way_tests;
 mod transaction_log_tests;
 mod vcs_tests;

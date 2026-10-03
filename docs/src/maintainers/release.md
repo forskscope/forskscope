@@ -1,5 +1,23 @@
 # Release Process
 
+## Planning a cut
+
+Before choosing a version number or a theme, run:
+
+```
+git log <last tag>..HEAD
+```
+
+**This is the first step of planning, not a retrospective check.** `0.172.1`
+was planned as a security patch with scope frozen to three findings, while
+the branch already carried two releases' worth of finished work by the time
+it was cut (F146, from review 131) — a tag on `main` ships the tree, not the
+plan, so that patch was never what the cut would actually have produced.
+Name the release's theme from what this command shows is actually there,
+rather than from whatever was most recently worked on.
+
+---
+
 ## Pre-release checklist
 
 1. All tests pass: `cargo test -p forskscope-core -p forskscope-ui-logic`

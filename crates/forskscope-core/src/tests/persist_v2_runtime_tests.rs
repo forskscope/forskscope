@@ -200,10 +200,7 @@ fn settings_resolve_surfaces_a_failed_commit_and_disables_writes() {
 
     if !make_dir_readonly(dir) {
         restore_dir_writable(dir);
-        eprintln!(
-            "skipping settings_resolve_surfaces_a_failed_commit_and_disables_writes: \
-             the directory permission change had no effect (running as root?)"
-        );
+        super::support::permission_guard_failed();
         return;
     }
 
@@ -279,10 +276,7 @@ fn session_resolve_surfaces_a_failed_commit_and_disables_writes() {
 
     if !make_dir_readonly(dir) {
         restore_dir_writable(dir);
-        eprintln!(
-            "skipping session_resolve_surfaces_a_failed_commit_and_disables_writes: \
-             the directory permission change had no effect (running as root?)"
-        );
+        super::support::permission_guard_failed();
         return;
     }
 

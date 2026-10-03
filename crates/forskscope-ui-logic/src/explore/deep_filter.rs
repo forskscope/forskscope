@@ -432,10 +432,7 @@ mod tests {
         std::fs::create_dir_all(&right).unwrap();
         std::fs::set_permissions(&right, std::fs::Permissions::from_mode(0o000)).unwrap();
         if std::fs::read_dir(&right).is_ok() {
-            eprintln!(
-                "skipping a_real_unreadable_right_root_demotes_the_real_walks_left_only_entries: \
-                 chmod had no effect (running as root?)"
-            );
+            crate::test_support::permission_guard_failed();
             std::fs::set_permissions(&right, std::fs::Permissions::from_mode(0o755)).unwrap();
             let _ = std::fs::remove_dir_all(&base);
             return;

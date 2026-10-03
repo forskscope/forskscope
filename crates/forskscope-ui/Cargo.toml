@@ -35,3 +35,10 @@ rfd                         = { workspace = true }
 serde                       = { workspace = true }
 serde_json                  = { workspace = true }
 tokio                       = { workspace = true }
+
+[target.'cfg(unix)'.dev-dependencies]
+# F143: lets permission-guard tests (explorer.rs, state/compare/tests.rs)
+# tell "running as root" (a known, deliberate reason a chmod-based guard has
+# no effect) from anything else, which must fail loudly instead of skip -
+# same reviewed use as forskscope-core's own cfg(unix) dev-dependency.
+libc                         = { workspace = true }

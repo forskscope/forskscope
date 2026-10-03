@@ -9,6 +9,8 @@
 //!   cargo xtask rfc-sync      — verify ROADMAP.md's RFC table agrees with rfcs/proposed/ (F83)
 //!   cargo xtask ui-logic-connectivity — verify every forskscope-ui-logic crate-root export has a consumer in forskscope-ui (F54)
 //!   cargo xtask ui-logic-docs — verify architecture.md/testing.md's ui-logic module tables match disk (F93)
+//!   cargo xtask xlsx-fixtures           — regenerate the .xlsx test fixtures under forskscope-core (F134)
+//!   cargo xtask xlsx-fixtures --check   — verify the committed fixtures match what the generator produces
 //!
 //! CSS source files under assets/css/ are assembled in alphabetical order.
 //! The numeric prefix on each filename (00-, 01-, …) encodes the cascade order.
@@ -17,6 +19,7 @@
 mod rfc_sync;
 mod ui_logic_connectivity;
 mod ui_logic_docs;
+mod xlsx_fixtures;
 
 use std::{
     collections::BTreeSet,
@@ -42,6 +45,10 @@ fn main() {
             ui_logic_connectivity::run(&workspace_root())
         }
         Some("ui-logic-docs") if args.len() == 1 => ui_logic_docs::run(&workspace_root()),
+        Some("xlsx-fixtures") if args.len() <= 2 => {
+            let check = args.iter().any(|a| a == "--check");
+            xlsx_fixtures::run(&workspace_root(), check);
+        }
         Some(cmd) => {
             eprintln!("unknown command: {cmd}");
             print_usage();
@@ -62,6 +69,7 @@ fn print_usage() {
     eprintln!("       cargo xtask rfc-sync");
     eprintln!("       cargo xtask ui-logic-connectivity");
     eprintln!("       cargo xtask ui-logic-docs");
+    eprintln!("       cargo xtask xlsx-fixtures [--check]");
 }
 
 pub(crate) fn workspace_root() -> PathBuf {
@@ -163,6 +171,225 @@ fn run_audit_deps() {
          through their reviewed paths. This checks dependency shape, not advisories — it does \
          not query a vulnerability database; that is cargo audit's job, run separately."
     );
+    assert_threat_model_versions();
+}
+
+/// F142: the versions `docs/src/maintainers/threat-model.md` quotes for the
+/// `.xlsx` parser chain (`sheets-diff -> calamine -> quick-xml, zip`) must
+/// match what `cargo` actually resolves. This check already resolves these
+/// exact packages to assert their dependency *shape* (F140, above); the
+/// version is one more resolution away, which is where a hand-quoted number
+/// belongs once it has already drifted once (F153: `sheets-diff` 3.0.0 was
+/// still quoted in this document days after the version it names had
+/// already been superseded).
+///
+/// This document also narrates its own history - "closed in `sheets-diff`
+/// 3.0.0 (F123, F130)", a changelog table of past bumps, and so on - quoting
+/// older versions **correctly**, on purpose. A scan for every backtick
+/// -quoted mention of a package name would flag every one of those as
+/// drift; checked against that directly (an earlier draft of this check
+/// did exactly that, and failed on `calamine`'s own reference-table row,
+/// whose *description* cell happens to name `sheets-diff` 2.5.1 in passing).
+/// So this checks exactly two places, each anchored on text specific to it,
+/// not "every mention of the name": the one prose sentence describing the
+/// current `.xlsx` parser chain, and each package's row in the current
+/// -state dependency table (identified by starting with that package's own
+/// name, which no history-table row does).
+fn assert_threat_model_versions() {
+    let path = workspace_root().join("docs/src/maintainers/threat-model.md");
+    let doc = read_file(&path);
+
+    let specs: [(&str, &str, Option<&str>); 4] = [
+        ("sheets-diff", "forskscope-core", None),
+        ("calamine", "sheets-diff", None),
+        // quick-xml also appears, correctly at a different version, as the
+        // unrelated Wayland/GTK build-time dependency - its table row names
+        // `calamine`, that one does not, so that is what distinguishes the
+        // row this check owns from the one it must leave alone.
+        ("quick-xml", "calamine", Some("calamine")),
+        ("zip", "calamine", None),
+    ];
+
+    let prose = ProseWindow::find(&path, &doc);
+    for (package, via, table_disambiguator) in specs {
+        let resolved = resolve_version_via(package, via);
+        prose.assert_quotes_version(&path, package, &resolved);
+        assert_table_row_quotes_version(&path, &doc, package, &resolved, table_disambiguator);
+    }
+
+    println!(
+        "threat model dependency versions check passed: sheets-diff, calamine, quick-xml and \
+         zip all match what cargo actually resolves."
+    );
+}
+
+/// The one prose sentence describing the `.xlsx` parser chain's current
+/// state (" ... workbooks goes through `sheets-diff` 3.2.0 (`calamine
+/// 0.36.1`, `quick-xml 0.41.0`, `zip 8.6.0`) under the bounds ... "),
+/// isolated by its own anchor text so a version check inside it can never
+/// stray into one of this document's many unrelated historical mentions of
+/// the same package names.
+struct ProseWindow {
+    text: String,
+    line_no: usize,
+}
+
+impl ProseWindow {
+    const ANCHOR: &'static str = "workbooks goes through";
+
+    fn find(path: &Path, doc: &str) -> Self {
+        let start = doc.find(Self::ANCHOR).unwrap_or_else(|| {
+            fail(&format!(
+                "{}: could not find the \"{}\" sentence describing the .xlsx parser chain - \
+                 update this check or restore the sentence",
+                path.display(),
+                Self::ANCHOR
+            ))
+        });
+        let end = doc[start..]
+            .find(')')
+            .map(|i| start + i + 1)
+            .unwrap_or_else(|| {
+                fail(&format!(
+                    "{}: the \"{}\" sentence has no closing ')' to bound this check's search",
+                    path.display(),
+                    Self::ANCHOR
+                ))
+            });
+        Self {
+            text: doc[start..end].to_string(),
+            line_no: doc[..start].matches('\n').count() + 1,
+        }
+    }
+
+    /// Checks `package`'s version within this window - either closed-form
+    /// (`` `package` `` followed by a bare version, `sheets-diff`'s own
+    /// style here) or open-form (the version inside the same backtick span,
+    /// e.g. `` `calamine 0.36.1` ``, everything else's style here).
+    fn assert_quotes_version(&self, path: &Path, package: &str, resolved: &str) {
+        for marker in [format!("`{package}` "), format!("`{package} ")] {
+            let Some(pos) = self.text.find(&marker) else {
+                continue;
+            };
+            let after = self.text[pos + marker.len()..].trim_start();
+            let quoted: String = after
+                .chars()
+                .take_while(|c| c.is_ascii_digit() || *c == '.')
+                .collect();
+            if !quoted.starts_with(|c: char| c.is_ascii_digit()) {
+                continue;
+            }
+            if quoted != resolved {
+                fail(&format!(
+                    "{}:{} quotes {package} {quoted} in its .xlsx parser sentence, but the \
+                     dependency graph resolves it to {resolved}",
+                    path.display(),
+                    self.line_no
+                ));
+            }
+            return;
+        }
+        fail(&format!(
+            "{}:{} no longer quotes a version for {package} in its .xlsx parser sentence - \
+             update this check or restore the mention",
+            path.display(),
+            self.line_no
+        ));
+    }
+}
+
+/// Checks `package`'s row in the current-state dependency table - a line
+/// starting with `` | `package` | `` (no history-table row does this; those
+/// lead with a version tag or date, naming the package only in a later
+/// cell), optionally requiring the row to also contain `same_line_requires`
+/// (disambiguating `quick-xml`'s two rows). Fails with the exact line number
+/// and text on a mismatch, and fails if no such row was found at all -
+/// either this check or the table has gone stale.
+fn assert_table_row_quotes_version(
+    path: &Path,
+    doc: &str,
+    package: &str,
+    resolved: &str,
+    same_line_requires: Option<&str>,
+) {
+    let marker = format!("| `{package}` | ");
+    let mut checked = 0usize;
+    for (idx, line) in doc.lines().enumerate() {
+        let trimmed = line.trim_start();
+        if !trimmed.starts_with(&marker) {
+            continue;
+        }
+        if let Some(req) = same_line_requires
+            && !line.contains(req)
+        {
+            continue;
+        }
+        let after = trimmed[marker.len()..].trim_start();
+        let quoted: String = after
+            .chars()
+            .take_while(|c| c.is_ascii_digit() || *c == '.')
+            .collect();
+        if !quoted.starts_with(|c: char| c.is_ascii_digit()) {
+            continue;
+        }
+        checked += 1;
+        if quoted != resolved {
+            fail(&format!(
+                "{}:{} quotes {package} {quoted} in its dependency table, but the dependency \
+                 graph resolves it to {resolved}:\n  {line}",
+                path.display(),
+                idx + 1
+            ));
+        }
+    }
+    if checked == 0 {
+        fail(&format!(
+            "{} no longer has a `{package}` row in its dependency table - update this check or \
+             restore the row",
+            path.display()
+        ));
+    }
+}
+
+/// The version `cargo` resolves for `package`, confirmed to be reached
+/// through `via` (an immediate-dependent name prefix) rather than some other
+/// version of the same package resolved elsewhere in the graph - `quick-xml`
+/// exists at two versions at once (RFC-085: one via `wayland-scanner`, one
+/// via `calamine`), so asking for "the" version of `quick-xml` without
+/// saying through what is already the wrong question.
+fn resolve_version_via(package: &str, via: &str) -> String {
+    let specs = resolve_specs(package);
+    if specs.is_empty() {
+        fail(&format!(
+            "{package} is absent from the dependency graph - the threat model's version claim \
+             for it can no longer be checked"
+        ));
+    }
+    for spec in &specs {
+        let output = cargo_tree(&["tree", "--prefix", "depth", "-i", spec]);
+        if !output.status.success() {
+            eprintln!("could not inspect {spec} dependency path");
+            eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+            process::exit(1);
+        }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut entries = stdout.lines().filter_map(depth_prefixed_package);
+        let Some((0, root)) = entries.next() else {
+            fail(&format!(
+                "unexpected `cargo tree -i {spec}` output:\n{stdout}"
+            ));
+        };
+        let reached_via_expected = entries.any(|(depth, pkg)| depth == 1 && pkg.starts_with(via));
+        if reached_via_expected {
+            return root
+                .rsplit_once(" v")
+                .map(|(_, version)| version.to_string())
+                .unwrap_or_else(|| fail(&format!("could not parse a version from `{root}`")));
+        }
+    }
+    fail(&format!(
+        "{package} has no path through {via} in the dependency graph"
+    ));
 }
 
 /// Checks that every `t(lang, "key")` call site in `forskscope-ui` has a

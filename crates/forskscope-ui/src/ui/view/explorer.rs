@@ -1180,6 +1180,8 @@ pub fn Explorer() -> Element {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    use crate::test_support;
 
     fn temp_dir(tag: &str) -> std::path::PathBuf {
         let dir =
@@ -1560,7 +1562,7 @@ mod tests {
         let f = b.join("l/secret.bin");
         let _ = std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o000));
         if std::fs::read(&f).is_ok() {
-            eprintln!("skipping an_unreadable_file_is_never_opened: chmod had no effect (root?)");
+            test_support::permission_guard_failed();
             return;
         }
         let v = verdict(&b.join("l"), &b.join("r"));
@@ -1583,7 +1585,7 @@ mod tests {
         let locked = b.join("l/locked");
         let _ = std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000));
         if std::fs::read_dir(&locked).is_ok() {
-            eprintln!("skipping the unreadable test: chmod had no effect (root?)");
+            test_support::permission_guard_failed();
             return;
         }
         let sub = verdict(&b.join("l"), &b.join("r"));
@@ -1591,20 +1593,22 @@ mod tests {
 
         let root = b.join("r");
         let _ = std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o000));
-        let root_verdict = if std::fs::read_dir(&root).is_err() {
-            Some(verdict(&b.join("l"), &root))
-        } else {
-            None
-        };
+        // F143 (handoff 063 §1): this used to fold "chmod had no effect" into
+        // `None` and let the final `assert_eq!` fail on that by coincidence -
+        // explicit now, same as the subdirectory guard just above, so a root
+        // run reports why rather than leaving a mismatched `Option` to explain
+        // itself.
+        if std::fs::read_dir(&root).is_ok() {
+            test_support::permission_guard_failed();
+            let _ = std::fs::remove_dir_all(&b);
+            return;
+        }
+        let root_verdict = verdict(&b.join("l"), &root);
         let _ = std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o755));
         let _ = std::fs::remove_dir_all(&b);
 
         assert_eq!(sub, DirVerdict::Unknown, "an unreadable subdirectory");
-        assert_eq!(
-            root_verdict,
-            Some(DirVerdict::Unknown),
-            "an unreadable root"
-        );
+        assert_eq!(root_verdict, DirVerdict::Unknown, "an unreadable root");
     }
 
     /// Criterion 8: a symlink on either side is `Unknown`, not a verdict.

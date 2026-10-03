@@ -92,9 +92,7 @@ mod tests {
         std::fs::write(&b, [7u8; 10]).unwrap();
         let _ = std::fs::set_permissions(&a, std::fs::Permissions::from_mode(0o000));
         if std::fs::read(&a).is_ok() {
-            eprintln!(
-                "skipping a_same_size_pair_at_the_cap_is_never_read: chmod had no effect (root?)"
-            );
+            crate::test_support::permission_guard_failed();
             let _ = std::fs::set_permissions(&a, std::fs::Permissions::from_mode(0o644));
             let _ = std::fs::remove_dir_all(&d);
             return;

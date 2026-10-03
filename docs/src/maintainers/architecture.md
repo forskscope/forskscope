@@ -48,7 +48,7 @@ could be added as a fourth crate without touching core.
 | `watcher` | `FileChangeMonitor` trait, `WatchToken`, `FileChangeEvent`, `WatchError`, `MockFileChangeMonitor` — file-watcher boundary (RFC-036). |
 | `xlsx` | Fail-closed spreadsheet comparison boundary; `.xlsx` parsing is temporarily disabled while the parser dependency path is remediated (RFC-058). |
 
-## `ui-logic` modules (17)
+## `ui-logic` modules (18)
 
 Framework-independent view-model logic. All modules are testable with
 `cargo test -p forskscope-ui-logic` — no GTK or display server required.
@@ -83,6 +83,7 @@ read what a row says a module does; that stays a judgment.
 | `settings::persistence_recovery` | `SettingsRecoveryView::from_resolution` — maps a settings `SettingsRuntimeResolution` to a recovery dialog's one-time notice and ordered actions (RFC-076). |
 | `settings::settings_view` | `theme_choices` — theme picker options; `clamp_font_size` — the diff-pane font-size bound the settings modal enforces (F53) (RFC-009, Slice 5). |
 | `settings::field_debounce` | `FieldDebounce`, `FIELD_DEBOUNCE` — the pure debounce state machine behind the ignore-pattern settings fields: a keystroke always overwrites the pending value, and it commits once 400 ms have passed since the last one (handoff 062, F136). |
+| `test_support` | `permission_guard_failed` — shared by permission-dependent tests across this crate (`explore/deep_filter.rs`, `explore/classify_pair.rs`): panics unless this process is root, so a `chmod`-based test guard that has no effect fails loudly instead of skipping silently (F143, handoff 063 §1). Test-only (`#[cfg(test)]`), duplicated once per crate alongside `forskscope-core`'s and `forskscope-ui`'s own copies - there is no shared test-support crate today. |
 
 ## UI modules
 

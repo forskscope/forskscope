@@ -1,4 +1,4 @@
-# F138 fixture — `oom-artifact-515b.bin`
+# F138 fixture — `oom-artifact-512b.bin`
 
 512 bytes, all zero except the CFB (OLE2) header fields a compound-file parser
 reads before anything else:

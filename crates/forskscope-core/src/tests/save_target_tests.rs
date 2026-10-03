@@ -158,9 +158,7 @@ fn must_be_absent_propagates_a_genuine_read_failure_as_io_not_ok() {
     fs::set_permissions(&blocked, fs::Permissions::from_mode(0o755)).unwrap();
 
     if !restriction_is_effective {
-        eprintln!(
-            "skipping assertion: 0o000 did not block metadata reads (likely running as root)"
-        );
+        super::support::permission_guard_failed();
         return;
     }
     assert!(

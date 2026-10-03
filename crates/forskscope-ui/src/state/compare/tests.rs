@@ -1218,7 +1218,10 @@ fn a_binary_versus_text_error_and_an_uncomparable_workbook_carry_no_advice() {
 }
 
 /// The advice is still given where it fits: a file that exists but cannot be
-/// read. Skipped when `chmod` has no effect (running as root).
+/// read. F143 (handoff 063 §1): this guard used to skip with no message at
+/// all if `chmod` had no effect - the one fully silent site found in the
+/// whole project's inventory of these. Now it panics unless this process is
+/// root, same as every other permission-based guard.
 #[cfg(unix)]
 #[test]
 fn an_unreadable_file_still_gets_the_permission_advice() {
@@ -1231,6 +1234,7 @@ fn an_unreadable_file_still_gets_the_permission_advice() {
     fs::write(&other, "other\n").unwrap();
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
     if fs::File::open(&locked).is_ok() {
+        crate::test_support::permission_guard_failed();
         return;
     }
 

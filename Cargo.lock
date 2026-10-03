@@ -1530,6 +1530,7 @@ dependencies = [
  "dirs-next",
  "forskscope-core",
  "forskscope-ui-logic",
+ "libc",
  "rfd",
  "serde",
  "serde_json",
@@ -1542,6 +1543,7 @@ name = "forskscope-ui-logic"
 version = "0.177.1"
 dependencies = [
  "forskscope-core",
+ "libc",
 ]
 
 [[package]]
@@ -4028,9 +4030,9 @@ dependencies = [
 
 [[package]]
 name = "sheets-diff"
-version = "3.2.0"
+version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2be73fdfeb3c1ead1abacadf4e055e27fa5d20808b2495d638403adda65b0e65"
+checksum = "86a384e8313ab95583a76b05f1df24bfff32e93839a563d1186cd7e58767bc28"
 dependencies = [
  "calamine",
 ]

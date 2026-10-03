@@ -9,3 +9,13 @@ name = "xtask"
 path = "src/main.rs"
 
 [workspace]
+
+[dependencies]
+# F134: generates the `.xlsx` test fixtures under
+# crates/forskscope-core/src/tests/fixtures/xlsx/ (`cargo xtask xlsx-fixtures`).
+# Pinned exactly, not a caret range - this is the one tool whose own version
+# the fixtures' README names, so a silent patch bump must not change what it
+# writes without that claim being updated too. xtask has its own workspace
+# and lockfile (see `[workspace]` below): nothing here reaches the shipped
+# product's dependency graph.
+rust_xlsxwriter = { version = "=0.99.0", default-features = false }

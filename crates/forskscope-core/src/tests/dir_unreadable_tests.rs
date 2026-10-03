@@ -9,7 +9,10 @@
 //! change actually took effect before asserting anything: `chmod` does not
 //! stop root, and a suite running as root (containers often do) would
 //! otherwise pass every one of these for the wrong reason. When the check
-//! fails, the test skips with an explicit message rather than asserting.
+//! fails, `support::permission_guard_failed` decides what that means
+//! (F143, handoff 063 §1): skip, with an explicit message, only if this
+//! process is actually root - otherwise panic, since nothing else is a
+//! known reason for the change to have had no effect.
 
 use std::fs;
 use std::path::PathBuf;
@@ -79,10 +82,7 @@ fn an_unreadable_file_appears_as_unreadable_not_absent() {
     // result (nothing on either side ever produces it).
 
     if !make_child_metadata_unreadable(&left.join("blocked"), &left.join("blocked/file.txt")) {
-        eprintln!(
-            "skipping an_unreadable_file_appears_as_unreadable_not_absent: \
-             chmod had no effect (running as root?)"
-        );
+        super::support::permission_guard_failed();
         restore_perms(&left.join("blocked"), 0o755);
         let _ = fs::remove_dir_all(&base);
         return;
@@ -127,10 +127,7 @@ fn an_unreadable_left_file_is_not_reclassified_by_a_readable_right_counterpart()
     write(&right, "blocked/file.txt", "right content");
 
     if !make_child_metadata_unreadable(&left.join("blocked"), &left.join("blocked/file.txt")) {
-        eprintln!(
-            "skipping an_unreadable_left_file_is_not_reclassified_by_a_readable_right_counterpart: \
-             chmod had no effect (running as root?)"
-        );
+        super::support::permission_guard_failed();
         restore_perms(&left.join("blocked"), 0o755);
         let _ = fs::remove_dir_all(&base);
         return;
@@ -178,10 +175,7 @@ fn an_unreadable_left_file_is_not_reclassified_in_the_fast_listing_either() {
     write(&right, "blocked/file.txt", "right content");
 
     if !make_child_metadata_unreadable(&left.join("blocked"), &left.join("blocked/file.txt")) {
-        eprintln!(
-            "skipping an_unreadable_left_file_is_not_reclassified_in_the_fast_listing_either: \
-             chmod had no effect (running as root?)"
-        );
+        super::support::permission_guard_failed();
         restore_perms(&left.join("blocked"), 0o755);
         let _ = fs::remove_dir_all(&base);
         return;
@@ -222,10 +216,7 @@ fn an_unreadable_directory_appears_as_unreadable_and_its_parent_still_lists() {
 
     let blocked_dir = left.join("parent/blocked_dir");
     if !make_dir_unopenable(&blocked_dir) {
-        eprintln!(
-            "skipping an_unreadable_directory_appears_as_unreadable_and_its_parent_still_lists: \
-             chmod had no effect (running as root?)"
-        );
+        super::support::permission_guard_failed();
         restore_perms(&blocked_dir, 0o755);
         let _ = fs::remove_dir_all(&base);
         return;
@@ -284,10 +275,7 @@ fn an_unopenable_root_is_distinguishable_from_an_empty_tree() {
     write(&left, "b.txt", "content-b");
 
     if !make_dir_unopenable(&right) {
-        eprintln!(
-            "skipping an_unopenable_root_is_distinguishable_from_an_empty_tree: \
-             chmod had no effect (running as root?)"
-        );
+        super::support::permission_guard_failed();
         restore_perms(&right, 0o755);
         let _ = fs::remove_dir_all(&base);
         return;

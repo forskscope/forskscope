@@ -59,6 +59,8 @@ pub mod compare;
 pub mod explore;
 pub mod session;
 pub mod settings;
+#[cfg(test)]
+mod test_support;
 
 // compare
 pub use compare::load_guard::{LoadGuard, guard_for_sizes};

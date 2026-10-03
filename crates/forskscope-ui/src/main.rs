@@ -31,6 +31,8 @@ mod app;
 mod i18n;
 mod keyboard;
 mod state;
+#[cfg(test)]
+mod test_support;
 mod ui;
 mod webview2;
 
