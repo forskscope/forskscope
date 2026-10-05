@@ -247,3 +247,74 @@ Current GTK-free-in-theory, GTK-required-in-practice tests in `state.rs`:
 
 These serve as the template for future state-layer tests once the project
 has a GTK CI environment (RFC-010).
+
+## Checking keyboard bindings in the running app
+
+Unit tests call the handler functions directly, so they cannot show that a key
+reaches the handler from the webview, or what the running app does with it. For
+that, drive the built app with its accessibility tree and the keyboard. This is
+the procedure used to verify the Explorer's path-bar keys (0.181.0). It was run
+on a Linux Wayland session under niri, with `wtype`, `niri`, and the Python
+`gi` AT-SPI bindings installed.
+
+1. **Launch with accessibility on.** Start the app with `GTK_A11Y=atspi` in the
+   environment. Without it the app never joins the accessibility bus, and it
+   looks unreachable. Copy the binary to a distinct name first (for example
+   `bin-<label>`): the AT-SPI application name and the process name are both
+   the binary's name, and that makes it findable and killable on its own.
+
+2. **Prepare the configuration.** Back up `~/.config/forskscope/settings.json`
+   and `session.json` before any run. Set `payload.last_left_dir` and
+   `payload.last_right_dir` to fixture folders, and set
+   `payload.remember_explorer_dirs` to `true`. **The `payload` envelope is
+   required.** A hand-written file without it makes the app show *Settings file
+   could not be read*, and that dialog swallows every later keypress. The
+   symptom looks like a focus failure, and it cost three negative results in one
+   session. If in doubt, launch once against an empty config directory and edit
+   what the app writes.
+
+3. **Focus the window, then the tree.** Get the window id from
+   `niri msg -j windows` (match on the app id, which is the binary name), and run
+   `niri msg action focus-window --id <id>` **before** the AT-SPI grab. Then,
+   among the `section` nodes that AT-SPI reports as `FOCUSABLE`, pick the one
+   whose text **starts with `▸`**. That is the aligned tree's rows. Do not choose
+   by child count, which varies with the folder listed. Do not choose by
+   "contains `▸`": the app shell's text also contains `▸`, and a first attempt
+   grabbed the shell and saw no navigation. Call
+   `Atspi.Component.grab_focus` on it. It returns `True` when it succeeds.
+
+4. **Send keys.** `wtype -M alt -k Left -m alt` sends Alt+←, and `wtype -k F6`
+   sends F6. F6 switches which pane has focus, so use it before Alt+↑ or Alt+←
+   on the right pane. Keep the window focused between keys.
+
+5. **Build history without the keyboard.** `Atspi.Action.do_action(0)` on a
+   button works. The path bar's `Go up one directory`, `Back` and `Forward`
+   buttons appear twice, once per pane, and the first instance is the left pane.
+
+6. **Observe through `settings.json`.** Read `payload.last_left_dir` (or
+   `last_right_dir`) about two seconds after each key. Navigation writes the
+   directory to the settings file before it changes the pane's signal. So a
+   navigation that then panics can still show its new value in the file. Check
+   the process as well, every time (step 7).
+
+7. **Check the process.** Use `pgrep -x <binary-name>` after two or three
+   seconds. An app that is aborting can still show as alive for a second or so,
+   so one early check is not enough. Use `pkill -x`, not `pkill -f`: `-f`
+   matches the shell command line that contains the pattern, which kills the
+   session's own shell.
+
+8. **Close, confirm, restore.** Close the window with
+   `niri msg action close-window --id <id>`. Wait for `pgrep -x` to return
+   nothing before you touch the configuration again, because the app writes
+   `settings.json` on exit when a setting has changed. Then restore the backups.
+
+**What does not work in this environment, so nobody re-derives it:** pointer
+injection. The app is a native Wayland window, `xdotool` cannot see it, and no
+uinput tool is installed. Screenshots too: `niri msg action screenshot-window`
+writes no file and puts nothing on the clipboard here. Neither is needed for
+keyboard work, which the steps above cover.
+
+**What a unit test can and cannot show, from one case.** The Alt+↑ handler
+(`dispatch_go_up`) does reproduce its borrow panic in a unit test, because the
+test calls the same function the key handler calls. The webview dispatch itself
+is not covered by any unit test, so the running app is the only check for it.

@@ -231,6 +231,9 @@ fn ja(key: &str) -> Option<&'static str> {
         "Ignore WS" => "空白無視",
         "Ignore case" => "大小文字無視",
         "Ignore newlines" => "改行無視",
+        "These keys apply to the aligned Explorer layout; compact layout does not respond to them." => {
+            "これらのキーは整列レイアウトのエクスプローラーに対応します。コンパクトレイアウトでは反応しません。"
+        }
         "Context lines" => "コンテキスト行数",
         "Explorer layout" => "エクスプローラーレイアウト",
         "Aligned (default)" => "整列（デフォルト）",
@@ -304,7 +307,6 @@ fn ja(key: &str) -> Option<&'static str> {
         "Discard and close" => "破棄して閉じる",
         "Copy diagnostics" => "診断情報をコピー",
         "About ForskScope" => "ForskScope について",
-        "About" => "バージョン情報",
         "Copied." => "コピーしました。",
         "Copy all" => "すべてコピー",
         "Overwrite" => "上書き",

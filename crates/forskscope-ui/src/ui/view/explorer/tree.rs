@@ -66,15 +66,9 @@ pub fn AlignedTree(
                     focused_pane.set(next);
                     return;
                 }
-                if e.modifiers().contains(Modifiers::ALT) && e.key() == Key::ArrowUp {
-                    e.prevent_default();
-                    if focused_pane.read().is_left() {
-                        if let Some(p) = left_dir.read().parent().map(|p| p.to_path_buf()) {
-                            navigate_to(p, true, store, left_hist, left_dir);
-                        }
-                    } else if let Some(p) = right_dir.read().parent().map(|p| p.to_path_buf()) {
-                        navigate_to(p, false, store, right_hist, right_dir);
-                    }
+                if dispatch_go_up(
+                    &e, focused_pane, store, left_hist, left_dir, right_hist, right_dir,
+                ) {
                     return;
                 }
                 if dispatch_pathbar_shortcut(
@@ -312,6 +306,42 @@ pub fn AlignedTree(
             }
         }
     }
+}
+
+/// Alt+↑: go up one directory in the focused pane. Returns `true` when `e` was
+/// this binding.
+///
+/// The parent is read in a `let` of its own, so the signal's read guard is
+/// dropped before `navigate_to` writes that signal. Reading it in an `if let`
+/// scrutinee holds the guard for the whole body, and the write then panics
+/// with `AlreadyBorrowed`. The app aborts on that panic, because it is raised
+/// inside a webview callback (F169). The unit test below calls this function
+/// directly and does reproduce the panic on the old shape, so it guards the
+/// borrow as well as the navigation.
+fn dispatch_go_up(
+    e: &Event<KeyboardData>,
+    focused_pane: Signal<FocusedPane>,
+    store: Store,
+    left_hist: Signal<NavHistory>,
+    left_dir: Signal<PathBuf>,
+    right_hist: Signal<NavHistory>,
+    right_dir: Signal<PathBuf>,
+) -> bool {
+    if !(e.modifiers().contains(Modifiers::ALT) && e.key() == Key::ArrowUp) {
+        return false;
+    }
+    e.prevent_default();
+    let is_left = focused_pane.read().is_left();
+    let (hist, dir) = if is_left {
+        (left_hist, left_dir)
+    } else {
+        (right_hist, right_dir)
+    };
+    let parent = dir.read().parent().map(|p| p.to_path_buf());
+    if let Some(p) = parent {
+        navigate_to(p, is_left, store, hist, dir);
+    }
+    true
 }
 
 /// F100: Home directory / Open folder, on `AlignedTree`'s focused pane —
@@ -573,6 +603,67 @@ mod tests {
                 *left_dir.read(),
                 PathBuf::from("/left/unmoved"),
                 "the unfocused left pane must not move"
+            );
+        });
+    }
+
+    /// F169: Alt+↑ reaches the navigation for the focused pane. It also guards
+    /// the `AlreadyBorrowed` abort, because it calls `dispatch_go_up` directly:
+    /// on the old `if let` shape this test panics with that error (reproduced).
+    /// It does not cover the real webview dispatch, which is checked in the app.
+    #[test]
+    fn alt_up_goes_to_the_parent_of_the_focused_pane() {
+        with_test_store(|store| {
+            let focused_pane = Signal::new_in_scope(FocusedPane::Left, ScopeId::ROOT);
+            let left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let left_dir = Signal::new_in_scope(PathBuf::from("/a/b"), ScopeId::ROOT);
+            let right_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let right_dir = Signal::new_in_scope(PathBuf::from("/r/s"), ScopeId::ROOT);
+
+            let e = key_event(Key::ArrowUp, Modifiers::ALT);
+            let handled = dispatch_go_up(
+                &e,
+                focused_pane,
+                *store,
+                left_hist,
+                left_dir,
+                right_hist,
+                right_dir,
+            );
+
+            assert!(handled, "Alt+↑ must be recognized as this view's binding");
+            assert_eq!(*left_dir.read(), PathBuf::from("/a"));
+        });
+    }
+
+    /// F169: the right-pane branch has the same shape and the same abort, so it
+    /// is tested on its own. Falsify by calling `navigate_to` on the left pane
+    /// in that branch: the right pane stays put and this fails.
+    #[test]
+    fn alt_up_goes_to_the_parent_of_the_right_pane_when_it_is_focused() {
+        with_test_store(|store| {
+            let focused_pane = Signal::new_in_scope(FocusedPane::Right, ScopeId::ROOT);
+            let left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let left_dir = Signal::new_in_scope(PathBuf::from("/l/m"), ScopeId::ROOT);
+            let right_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let right_dir = Signal::new_in_scope(PathBuf::from("/r/s"), ScopeId::ROOT);
+
+            let e = key_event(Key::ArrowUp, Modifiers::ALT);
+            dispatch_go_up(
+                &e,
+                focused_pane,
+                *store,
+                left_hist,
+                left_dir,
+                right_hist,
+                right_dir,
+            );
+
+            assert_eq!(*right_dir.read(), PathBuf::from("/r"));
+            assert_eq!(
+                *left_dir.read(),
+                PathBuf::from("/l/m"),
+                "the unfocused pane must not move"
             );
         });
     }

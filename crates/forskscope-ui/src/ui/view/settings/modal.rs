@@ -83,19 +83,13 @@ pub fn SettingsModal() -> Element {
                 // Header row: title + About button (RFC-057).
                 div { class: "modal-header-row",
                     h2 { id: "settings-title", {t(lang, "Settings")} }
-                    // F150 (issue #146): a bare "ℹ" with only a (previously
-                    // hard-coded English) `title` tooltip was visible in the
-                    // reporter's own screenshot and still not found - a
-                    // translated tooltip alone does not answer what that
-                    // screenshot showed, so this now carries a visible text
-                    // label too, not only a hover-only one.
+                    // The control inherits the shared button style on purpose: F150
+                    // had cancelled it, so the control was invisible as a button.
                     button {
-                        class: "about-btn",
                         title: t(lang, "About ForskScope"),
                         aria_label: t(lang, "About ForskScope"),
                         onclick: move |_| store.modal.set(Modal::About),
-                        span { class: "about-btn-icon", aria_hidden: "true", "ℹ" }
-                        span { {t(lang, "About")} }
+                        "ℹ"
                     }
                 }
 
@@ -345,5 +339,49 @@ pub fn SettingsModal() -> Element {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::AppSettings;
+
+    /// F150, reversed: the About control keeps its accessible name and title,
+    /// which are dynamic attributes this harness can see. Falsify by removing
+    /// `aria_label`: the assertion fails. It does NOT cover the absence of a
+    /// class, glyph or static style: those are template content, which the
+    /// mutations here do not carry (checked by reading the source and in the app).
+    #[test]
+    fn the_about_control_keeps_its_accessible_name() {
+        fn root() -> Element {
+            use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+            rsx! {
+                SettingsModal {}
+            }
+        }
+
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+
+        // `title` carries the same text, so only the `aria-label` attribute
+        // itself is checked, by name.
+        let labels: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute { name, value, .. }
+                    if name.contains("label") =>
+                {
+                    Some(format!("{value:?}"))
+                }
+                _ => None,
+            })
+            .collect();
+
+        assert!(
+            labels.iter().any(|a| a.contains("About ForskScope")),
+            "the About control must keep its accessible name, got {labels:?}"
+        );
     }
 }

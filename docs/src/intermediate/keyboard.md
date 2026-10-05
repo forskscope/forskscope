@@ -47,6 +47,8 @@ The **?** button in the header opens the same reference from any screen.
 
 ## Explorer
 
+These keys apply to the aligned Explorer layout (Settings → Explorer layout). The compact layout does not respond to them.
+
 | Shortcut | Action |
 |----------|--------|
 | **↑ / ↓**     | Move focus between rows |

@@ -222,15 +222,6 @@ select option { background: var(--surface); color: var(--text); }
 
 .modal-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
 .modal-header-row h2 { margin: 0; }
-/* F150: a visible text label, not only a hover `title` - the bare "ℹ" was
-   in the reporter's own screenshot and still not found (issue #146). */
-.about-btn {
-  background: none; border: none; cursor: pointer;
-  display: flex; align-items: center; gap: .3rem;
-  color: var(--muted); font-size: 13px; padding: .1rem .5rem; border-radius: 4px;
-}
-.about-btn-icon { font-size: 15px; }
-.about-btn:hover { color: var(--text); background: var(--surface-3); }
 .new-profile-btn { margin-top: .5rem; font-size: 12px; }
 
 .about-grid {
