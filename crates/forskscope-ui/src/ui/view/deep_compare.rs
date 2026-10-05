@@ -267,6 +267,12 @@ fn status_label(status: RecStatus, lang: Lang) -> String {
         RecStatus::Changed => t(lang, "Different"),
         RecStatus::LeftOnly => t(lang, "Only on the left"),
         RecStatus::RightOnly => t(lang, "Only on the right"),
+        // F135: distinct wording from the plain one-sided labels above -
+        // this row is an empty directory, not a file, and the label says
+        // so rather than letting the glyph (deliberately the same one,
+        // `status_glyph` below) carry that distinction alone.
+        RecStatus::LeftOnlyDir => t(lang, "Only on the left (empty folder)"),
+        RecStatus::RightOnlyDir => t(lang, "Only on the right (empty folder)"),
         RecStatus::Equal => t(lang, "Identical"),
         RecStatus::Computing => t(lang, "Comparing…"),
         RecStatus::Unreadable => t(lang, "Unreadable"),
@@ -294,13 +300,7 @@ fn DeepRow(entry: RecEntry, lang: Lang, left_root: PathBuf, right_root: PathBuf)
     let mut store = use_context::<Store>();
     let (icon, cls) = status_glyph(entry.status);
     let path_str = entry.rel_path.display().to_string();
-    // F79: nothing was measured for an unreadable entry, so it can be
-    // neither compared nor (per `can_copy_left_to_right`/
-    // `can_copy_right_to_left` below) copied in either direction.
-    let can_cmp = !matches!(
-        entry.status,
-        RecStatus::Equal | RecStatus::Computing | RecStatus::Symlink | RecStatus::Unreadable
-    );
+    let can_cmp = can_compare(entry.status);
     // Copy direction: LeftOnly/Changed → copy left→right; RightOnly → copy right→left.
     // Changed entries show both directions (RFC-062 B3). F68: this is now
     // the *entire* visibility condition for the per-row copy buttons - no
@@ -433,12 +433,45 @@ fn right_then_left(entry: &RecEntry, left_root: &Path, right_root: &Path) -> (Pa
 /// other setting) to gate. The old code additionally required
 /// `store.settings.read().last_left_dir`/`last_right_dir` to be `Some`,
 /// which is exactly what `remember_explorer_dirs` off left `None`.
+// F135: `LeftOnlyDir`/`RightOnlyDir` are deliberately absent from both lists
+// below, and safely so - a positive `matches!` allow-list fails *closed*
+// for a variant it does not name, so these two buttons simply do not
+// appear for an empty one-sided directory rather than offering a copy
+// that would fail (`batch_copy`, what these buttons feed, copies files
+// and has no `RecStatus` awareness of its own). Creating the directory on
+// the other side is `merge_plan.rs`'s `DirectoryMergeAction::CreateDirectory`
+// - a different, currently UI-disconnected code path - not this one;
+// adding that capability here is a feature decision this handoff does not
+// make, not an oversight.
 fn can_copy_left_to_right(status: RecStatus) -> bool {
     matches!(status, RecStatus::Changed | RecStatus::LeftOnly)
 }
 
 fn can_copy_right_to_left(status: RecStatus) -> bool {
     matches!(status, RecStatus::Changed | RecStatus::RightOnly)
+}
+
+/// F79: nothing was measured for an unreadable entry, so it can be neither
+/// compared nor copied in either direction (see `can_copy_left_to_right`/
+/// `can_copy_right_to_left` above).
+///
+/// F135: `LeftOnlyDir`/`RightOnlyDir` excluded explicitly, not left to fall
+/// through - this is a `matches!`, so a new variant left off this list
+/// would default to `true` (fails open) rather than being caught by the
+/// compiler. There is nothing to open a text diff of: the row names an
+/// empty directory, not a file. A free function, like `can_copy_left_to_right`
+/// above, for the same reason: directly testable rather than only
+/// inspectable inside `DeepRow`'s body.
+fn can_compare(status: RecStatus) -> bool {
+    !matches!(
+        status,
+        RecStatus::Equal
+            | RecStatus::Computing
+            | RecStatus::Symlink
+            | RecStatus::Unreadable
+            | RecStatus::LeftOnlyDir
+            | RecStatus::RightOnlyDir
+    )
 }
 
 fn size_label(e: &RecEntry) -> String {
@@ -629,6 +662,11 @@ mod tests {
         // F79 §8.4: nothing was measured for an unreadable entry - it must
         // never be copyable.
         assert!(!can_copy_left_to_right(RecStatus::Unreadable));
+        // F135: fails closed by default, confirmed rather than assumed -
+        // `batch_copy` copies files and has no directory-creation path, so
+        // neither empty-one-sided-directory status offers this button.
+        assert!(!can_copy_left_to_right(RecStatus::LeftOnlyDir));
+        assert!(!can_copy_left_to_right(RecStatus::RightOnlyDir));
     }
 
     #[test]
@@ -640,6 +678,26 @@ mod tests {
         assert!(!can_copy_right_to_left(RecStatus::Computing));
         assert!(!can_copy_right_to_left(RecStatus::Symlink));
         assert!(!can_copy_right_to_left(RecStatus::Unreadable));
+        assert!(!can_copy_right_to_left(RecStatus::LeftOnlyDir));
+        assert!(!can_copy_right_to_left(RecStatus::RightOnlyDir));
+    }
+
+    /// F135 decision #6: `can_cmp` must not be true merely because nobody
+    /// added a variant to its exclusion list - falsified directly by
+    /// checking what the `matches!` macro would otherwise default to.
+    /// Comparing an empty directory as text makes no sense; the row must
+    /// never offer it.
+    #[test]
+    fn an_empty_one_sided_directory_cannot_be_compared() {
+        assert!(!can_compare(RecStatus::LeftOnlyDir));
+        assert!(!can_compare(RecStatus::RightOnlyDir));
+    }
+
+    #[test]
+    fn ordinary_one_sided_and_changed_entries_can_be_compared() {
+        assert!(can_compare(RecStatus::LeftOnly));
+        assert!(can_compare(RecStatus::RightOnly));
+        assert!(can_compare(RecStatus::Changed));
     }
 
     // F79 §8.4: `BatchCopyButtons` builds its manifest by filtering on
@@ -711,6 +769,8 @@ mod tests {
             RecStatus::Changed,
             RecStatus::LeftOnly,
             RecStatus::RightOnly,
+            RecStatus::LeftOnlyDir,
+            RecStatus::RightOnlyDir,
             RecStatus::Equal,
             RecStatus::Computing,
             RecStatus::Unreadable,
@@ -727,16 +787,18 @@ mod tests {
         }
     }
 
-    // F80 §7.2: no two statuses share a label - each of the seven must be
-    // announceable as a distinct thing. (Explorer's `LeftOnly`/`RightOnly`
-    // needed the same fix in review 077 §4b - checked here from the start
-    // rather than discovered later.)
+    // F80 §7.2: no two statuses share a label - each must be announceable
+    // as a distinct thing. (Explorer's `LeftOnly`/`RightOnly` needed the
+    // same fix in review 077 §4b - checked here from the start rather than
+    // discovered later.)
     #[test]
     fn no_two_statuses_share_a_label() {
         let statuses = [
             RecStatus::Changed,
             RecStatus::LeftOnly,
             RecStatus::RightOnly,
+            RecStatus::LeftOnlyDir,
+            RecStatus::RightOnlyDir,
             RecStatus::Equal,
             RecStatus::Computing,
             RecStatus::Unreadable,
@@ -780,6 +842,8 @@ mod tests {
             RecStatus::Changed,
             RecStatus::LeftOnly,
             RecStatus::RightOnly,
+            RecStatus::LeftOnlyDir,
+            RecStatus::RightOnlyDir,
             RecStatus::Equal,
             RecStatus::Computing,
             RecStatus::Unreadable,

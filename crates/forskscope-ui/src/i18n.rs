@@ -28,6 +28,8 @@ fn ja(key: &str) -> Option<&'static str> {
         "Identical — contents compared" => "同一 — 中身を比較済み",
         "Only on the left" => "左側にのみ存在",
         "Only on the right" => "右側にのみ存在",
+        "Only on the left (empty folder)" => "左側にのみ存在（空のフォルダー）",
+        "Only on the right (empty folder)" => "右側にのみ存在（空のフォルダー）",
         "Directory contents not compared — use Deep Compare" => {
             "ディレクトリの中身は比較されていません — ディープ比較を使用してください"
         }

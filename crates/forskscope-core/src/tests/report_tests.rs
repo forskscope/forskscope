@@ -242,6 +242,46 @@ fn dir_markdown_summary_counts_are_correct() {
     assert!(md.contains("| Modified      | 1 |"), "modified count wrong");
 }
 
+/// F135: an empty one-sided directory counts into the ordinary
+/// `left_only`/`right_only` totals (it genuinely is one-sided) but keeps
+/// its own distinguishing status text, so the row never claims a file was
+/// found where there was only an empty directory.
+#[test]
+fn dir_report_counts_an_empty_one_sided_directory_as_one_sided_with_its_own_text() {
+    let mut entries = dir_entries();
+    entries.push(RecEntry {
+        rel_path: PathBuf::from("empty_l"),
+        status: RecStatus::LeftOnlyDir,
+        left_size: None,
+        right_size: None,
+    });
+    entries.push(RecEntry {
+        rel_path: PathBuf::from("empty_r"),
+        status: RecStatus::RightOnlyDir,
+        left_size: None,
+        right_size: None,
+    });
+    let report = DirComparisonReport::from_entries(&entries, None, None, None, opts_default());
+    assert_eq!(report.left_only, 2, "c.rs and empty_l");
+    assert_eq!(report.right_only, 2, "d.rs and empty_r");
+    let row = |path: &str| {
+        report
+            .file_rows
+            .iter()
+            .find(|r| r.path == path)
+            .unwrap()
+            .status
+            .clone()
+    };
+    assert_eq!(row("empty_l"), "left only (empty directory)");
+    assert_eq!(row("empty_r"), "right only (empty directory)");
+    assert_ne!(
+        row("empty_l"),
+        row("c.rs"),
+        "the empty-directory row must not read the same as an ordinary file row"
+    );
+}
+
 #[test]
 fn dir_markdown_omits_equal_from_changed_table() {
     let entries = dir_entries();

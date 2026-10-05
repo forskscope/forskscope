@@ -152,9 +152,22 @@ fn is_different(status: &RecStatus) -> bool {
     // F79: `RecStatus::Unreadable` is deliberately absent from this list -
     // nothing was measured for it, so it is not a verdict and must not be
     // counted as "different" alongside entries that were actually compared.
+    //
+    // F135: this is a `matches!`, not an exhaustive `match` - the compiler
+    // does not stop here for a new `RecStatus` variant, so `LeftOnlyDir`/
+    // `RightOnlyDir` need adding by hand. Left out, an empty one-sided
+    // directory would still show in the Deep Compare list by default
+    // (`DeepFilter::Different` uses the `!= Equal` test below, which does
+    // catch it), but the footer's "N different" count would silently
+    // undercount it - the exact shape of bug this handoff exists to close,
+    // reappearing one layer up if this arm is forgotten.
     matches!(
         status,
-        RecStatus::Changed | RecStatus::LeftOnly | RecStatus::RightOnly
+        RecStatus::Changed
+            | RecStatus::LeftOnly
+            | RecStatus::RightOnly
+            | RecStatus::LeftOnlyDir
+            | RecStatus::RightOnlyDir
     )
 }
 
@@ -333,6 +346,31 @@ mod tests {
         assert_eq!(s.different, 1, "only the Changed entry is different");
         assert_eq!(s.equal, 0);
         assert_eq!(s.unreadable, 1);
+    }
+
+    // ── F135: RecStatus::LeftOnlyDir / RightOnlyDir ──────────────────────────
+
+    #[test]
+    fn is_different_counts_an_empty_one_sided_directory() {
+        assert!(is_different(&RecStatus::LeftOnlyDir));
+        assert!(is_different(&RecStatus::RightOnlyDir));
+    }
+
+    #[test]
+    fn different_filter_includes_an_empty_one_sided_directory() {
+        assert!(DeepFilter::Different.matches(&entry(RecStatus::LeftOnlyDir)));
+        assert!(DeepFilter::Different.matches(&entry(RecStatus::RightOnlyDir)));
+    }
+
+    /// The gap this module's own `is_different` comment warns about,
+    /// falsified directly: the footer's "different" count must include an
+    /// empty one-sided directory, not merely let it show in the list.
+    #[test]
+    fn summary_counts_an_empty_one_sided_directory_as_different() {
+        let ents = vec![entry(RecStatus::Equal), entry(RecStatus::LeftOnlyDir)];
+        let s = DeepCompareSummary::from_entries(&ents, DeepFilter::All);
+        assert_eq!(s.total, 2);
+        assert_eq!(s.different, 1, "the empty one-sided directory counts");
     }
 
     // ── F110: demote_entries_under_an_unreadable_root ────────────────────────

@@ -140,6 +140,131 @@ fn recursive_diff_descends_into_subdirectories() {
     );
 }
 
+// ── F135: an empty one-sided directory ────────────────────────────────────────
+
+/// The defect itself, falsified directly: before this fix, a directory that
+/// exists on one side only and is empty produced no entry at all - the pair
+/// looked exactly like two trees with nothing one-sided in them.
+#[test]
+fn an_empty_left_only_directory_is_reported() {
+    let root = temp_dir("rec-empty-left");
+    let left = root.join("l");
+    let right = root.join("r");
+    fs::create_dir_all(left.join("empty")).unwrap();
+    fs::create_dir_all(&right).unwrap();
+
+    let entries = crate::dir::recursive_diff(&left, &right).entries;
+    assert_eq!(entries.len(), 1, "{entries:?}");
+    assert_eq!(entries[0].rel_path, std::path::Path::new("empty"));
+    assert_eq!(entries[0].status, crate::dir::RecStatus::LeftOnlyDir);
+}
+
+#[test]
+fn an_empty_right_only_directory_is_reported() {
+    let root = temp_dir("rec-empty-right");
+    let left = root.join("l");
+    let right = root.join("r");
+    fs::create_dir_all(&left).unwrap();
+    fs::create_dir_all(right.join("empty")).unwrap();
+
+    let entries = crate::dir::recursive_diff(&left, &right).entries;
+    assert_eq!(entries.len(), 1, "{entries:?}");
+    assert_eq!(entries[0].rel_path, std::path::Path::new("empty"));
+    assert_eq!(entries[0].status, crate::dir::RecStatus::RightOnlyDir);
+}
+
+/// The fast listing (tier 1's own walk, `walk_and_merge_fast`) is a
+/// separate code path from `recursive_diff`'s - checked here directly
+/// rather than assumed from the full walk alone.
+#[test]
+fn the_fast_listing_also_reports_an_empty_one_sided_directory() {
+    let root = temp_dir("rec-empty-fast");
+    let left = root.join("l");
+    let right = root.join("r");
+    fs::create_dir_all(left.join("empty")).unwrap();
+    fs::create_dir_all(&right).unwrap();
+
+    let entries = crate::dir::list_recursive_for_display(&left, &right).entries;
+    assert_eq!(entries.len(), 1, "{entries:?}");
+    assert_eq!(entries[0].status, crate::dir::RecStatus::LeftOnlyDir);
+}
+
+/// A directory empty on *both* sides must stay invisible - unchanged from
+/// before this fix, and the one case the register was explicit must not
+/// regress: this is not a new kind of noise, only the one-sided case closes.
+#[test]
+fn a_directory_empty_on_both_sides_stays_invisible() {
+    let root = temp_dir("rec-empty-both");
+    let left = root.join("l");
+    let right = root.join("r");
+    fs::create_dir_all(left.join("empty")).unwrap();
+    fs::create_dir_all(right.join("empty")).unwrap();
+
+    let entries = crate::dir::recursive_diff(&left, &right).entries;
+    assert!(entries.is_empty(), "{entries:?}");
+}
+
+/// A one-sided directory that is *not* empty is unaffected: its files are
+/// already individually one-sided, exactly as before this fix, and the
+/// directory itself earns no separate marker - reported once, through its
+/// contents, not twice.
+#[test]
+fn a_non_empty_one_sided_directory_is_unaffected() {
+    let root = temp_dir("rec-nonempty-left");
+    let left = root.join("l");
+    let right = root.join("r");
+    fs::create_dir_all(&right).unwrap();
+    fs::create_dir_all(left.join("only")).unwrap();
+    fs::write(left.join("only/a.txt"), "x").unwrap();
+
+    let entries = crate::dir::recursive_diff(&left, &right).entries;
+    assert_eq!(entries.len(), 1, "{entries:?}");
+    assert_eq!(entries[0].rel_path, std::path::Path::new("only/a.txt"));
+    assert_eq!(entries[0].status, crate::dir::RecStatus::LeftOnly);
+}
+
+/// A chain of empty one-sided directories reports once, at the leaf -
+/// mirroring how a one-sided *file* reports once at its own path, with
+/// every ancestor directory staying implicit.
+#[test]
+fn a_nested_empty_one_sided_directory_reports_once_at_the_leaf() {
+    let root = temp_dir("rec-nested-empty");
+    let left = root.join("l");
+    let right = root.join("r");
+    fs::create_dir_all(left.join("a/b/c")).unwrap();
+    fs::create_dir_all(&right).unwrap();
+
+    let entries = crate::dir::recursive_diff(&left, &right).entries;
+    assert_eq!(entries.len(), 1, "{entries:?}");
+    assert_eq!(entries[0].rel_path, std::path::Path::new("a/b/c"));
+    assert_eq!(entries[0].status, crate::dir::RecStatus::LeftOnlyDir);
+}
+
+/// A directory that looks empty only because its one file was excluded by
+/// ignore rules must not be reported as a one-sided difference - the
+/// module doc's own rule ("an ignored entry present on one side only never
+/// becomes a one-sided difference") applies to a directory's *emptiness*
+/// too, not only to the ignored file itself. Falsify by dropping the
+/// `ignored_anything` propagation in `walk`/`walk_and_merge*`: `sub` then
+/// reports as `LeftOnlyDir`, which this fails on.
+#[test]
+fn a_directory_emptied_only_by_an_ignore_rule_is_not_reported() {
+    let root = temp_dir("rec-ignored-empty");
+    let left = root.join("l");
+    let right = root.join("r");
+    fs::create_dir_all(&right).unwrap();
+    fs::create_dir_all(left.join("sub")).unwrap();
+    fs::write(left.join("sub/ignored.log"), "x").unwrap();
+
+    let rules = crate::IgnoreRules::from_settings("log", "");
+    let token = crate::CancellationToken::new();
+    let entries = crate::dir::recursive_diff_with_rules(&left, &right, &token, &rules).entries;
+    assert!(
+        entries.is_empty(),
+        "an ignored-into-emptiness directory must not be reported: {entries:?}"
+    );
+}
+
 // ── v0.34.0 additions ─────────────────────────────────────────────────────────
 
 #[test]

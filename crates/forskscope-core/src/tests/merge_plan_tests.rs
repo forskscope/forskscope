@@ -324,6 +324,87 @@ fn execute_plan_copies_all_planned_files_successfully() {
     let _ = fs::remove_dir_all(&base);
 }
 
+// ── F135: RecStatus::LeftOnlyDir / RightOnlyDir ──────────────────────────────
+
+#[test]
+fn left_to_right_plans_an_empty_left_only_directory_as_create_directory() {
+    let entries = vec![entry("empty", RecStatus::LeftOnlyDir, None, None)];
+    let plan = plan_operations(
+        &entries,
+        "/l".as_ref(),
+        "/r".as_ref(),
+        CopyDirection::LeftToRight,
+        EntrySelection::AllNonEqual,
+    );
+    let op = &plan.operations[0];
+    assert_eq!(op.action, DirectoryMergeAction::CreateDirectory);
+    assert_eq!(op.source, None, "nothing to copy");
+    assert_eq!(op.target, Some(PathBuf::from("/r/empty")));
+}
+
+#[test]
+fn right_to_left_plans_an_empty_right_only_directory_as_create_directory() {
+    let entries = vec![entry("empty", RecStatus::RightOnlyDir, None, None)];
+    let plan = plan_operations(
+        &entries,
+        "/l".as_ref(),
+        "/r".as_ref(),
+        CopyDirection::RightToLeft,
+        EntrySelection::AllNonEqual,
+    );
+    let op = &plan.operations[0];
+    assert_eq!(op.action, DirectoryMergeAction::CreateDirectory);
+    assert_eq!(op.source, None);
+    assert_eq!(op.target, Some(PathBuf::from("/l/empty")));
+}
+
+/// The non-source side is skipped, exactly as an ordinary one-sided file
+/// going the wrong direction is - an empty directory earns no special
+/// exemption from that rule.
+#[test]
+fn an_empty_one_sided_directory_is_skipped_in_the_wrong_direction() {
+    let entries = vec![entry("empty", RecStatus::LeftOnlyDir, None, None)];
+    let plan = plan_operations(
+        &entries,
+        "/l".as_ref(),
+        "/r".as_ref(),
+        CopyDirection::RightToLeft,
+        EntrySelection::AllNonEqual,
+    );
+    assert_eq!(plan.operations[0].action, DirectoryMergeAction::Skip);
+}
+
+#[test]
+fn execute_plan_actually_creates_the_directory() {
+    let base = tmp("execute-mkdir");
+    let left = base.join("l");
+    fs::create_dir_all(left.join("empty")).unwrap();
+    let right = base.join("r");
+    fs::create_dir_all(&right).unwrap();
+
+    let entries = vec![entry("empty", RecStatus::LeftOnlyDir, None, None)];
+    let plan = plan_operations(
+        &entries,
+        &left,
+        &right,
+        CopyDirection::LeftToRight,
+        EntrySelection::AllNonEqual,
+    );
+    let report = execute_plan(
+        &plan,
+        BackupPolicy::None,
+        BatchFailurePolicy::ContinueOnFailure,
+    );
+
+    assert_eq!(report.succeeded, 1);
+    assert_eq!(report.failed, 0);
+    assert!(
+        right.join("empty").is_dir(),
+        "the directory must actually be created on the target side"
+    );
+    let _ = fs::remove_dir_all(&base);
+}
+
 #[test]
 fn execute_plan_creates_backup_when_overwriting() {
     let base = tmp("execute-backup");

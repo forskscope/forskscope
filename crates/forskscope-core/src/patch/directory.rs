@@ -101,6 +101,20 @@ pub fn patch_from_directories(
                     }
                 }
             }
+            // F135: an empty directory on one side only has no content to
+            // add or delete - there is no text patch that could represent
+            // it. Visible as a `BinaryNotice` whenever creation/deletion
+            // entries are wanted at all, never silently dropped: a patch
+            // that omits a difference it was handed without saying so is
+            // the F79 family this function's own doc comment already
+            // refuses for every other entry kind.
+            RecStatus::LeftOnlyDir | RecStatus::RightOnlyDir => {
+                if patch_options.include_creation_deletion {
+                    files.push(PatchFileChange::BinaryNotice {
+                        path: rel.to_path_buf(),
+                    });
+                }
+            }
         }
     }
 

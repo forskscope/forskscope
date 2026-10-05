@@ -54,15 +54,23 @@ pub fn tier2_verdict(scan: &RecursiveScan) -> Tier2Verdict {
     for entry in &scan.entries {
         match entry.status {
             // One-sided beneath a directory that could not be read: an artefact.
-            RecStatus::LeftOnly | RecStatus::RightOnly
+            RecStatus::LeftOnly
+            | RecStatus::RightOnly
+            | RecStatus::LeftOnlyDir
+            | RecStatus::RightOnlyDir
                 if unreadable
                     .iter()
                     .any(|u| entry.rel_path.starts_with(u) && entry.rel_path != *u) =>
             {
                 incomplete = true;
             }
-            // Facts the walk established.
-            RecStatus::LeftOnly | RecStatus::RightOnly | RecStatus::Changed => {
+            // Facts the walk established. F135: an empty one-sided
+            // directory is the same kind of fact a one-sided file is.
+            RecStatus::LeftOnly
+            | RecStatus::RightOnly
+            | RecStatus::LeftOnlyDir
+            | RecStatus::RightOnlyDir
+            | RecStatus::Changed => {
                 return Tier2Verdict::Different;
             }
             // Tier 2 reads every common file's contents, so `Computing`
@@ -140,6 +148,20 @@ mod tests {
         }
     }
 
+    /// F135: tier 2 reuses the same walk tier 1 does, so it is just as
+    /// blind to an empty one-sided directory without the fix - confirmed
+    /// here at this tier too, not assumed from tier 1 alone.
+    #[test]
+    fn an_empty_one_sided_directory_is_different() {
+        for status in [RecStatus::LeftOnlyDir, RecStatus::RightOnlyDir] {
+            let s = scan(vec![
+                entry("a", RecStatus::Equal),
+                entry("empty_dir", status),
+            ]);
+            assert_eq!(tier2_verdict(&s), Tier2Verdict::Different, "{status:?}");
+        }
+    }
+
     /// Cancellation mid-walk leaves at least one file at `Computing` — not
     /// examined to a conclusion, so `Unknown`, never `Identical`. This is
     /// the clause RFC-080 §3 says to keep a permanent test on: tier 2 must
@@ -205,6 +227,16 @@ mod tests {
         let s = scan(vec![
             entry("locked", RecStatus::Unreadable),
             entry("locked/x.txt", RecStatus::RightOnly),
+        ]);
+        assert_eq!(tier2_verdict(&s), Tier2Verdict::Unknown);
+    }
+
+    /// The same refinement applies to an empty one-sided directory.
+    #[test]
+    fn an_empty_one_sided_directory_beneath_an_unreadable_directory_is_unknown() {
+        let s = scan(vec![
+            entry("locked", RecStatus::Unreadable),
+            entry("locked/empty", RecStatus::RightOnlyDir),
         ]);
         assert_eq!(tier2_verdict(&s), Tier2Verdict::Unknown);
     }

@@ -138,6 +138,10 @@ pub enum DirectoryMergeAction {
     CopyLeftToRight,
     /// Copy a file from the right root to the left root.
     CopyRightToLeft,
+    /// Create an empty directory on the target side (F135):
+    /// `RecStatus::LeftOnlyDir`/`RightOnlyDir` carry no file to copy, only
+    /// a path that should exist on the other side too.
+    CreateDirectory,
     /// Skip this entry — no operation.
     Skip,
 }
@@ -164,9 +168,16 @@ pub fn plan_operations(
         let include = match (selection, entry.status) {
             (_, RecStatus::Equal | RecStatus::Computing) => false,
             (EntrySelection::ChangedOnly, s) => s == RecStatus::Changed,
+            // F135: an empty one-sided directory is "present solely on the
+            // source side" exactly as a one-sided file is - included here
+            // for the same reason.
             (EntrySelection::SourceOnlyEntries, s) => match direction {
-                CopyDirection::LeftToRight => s == RecStatus::LeftOnly,
-                CopyDirection::RightToLeft => s == RecStatus::RightOnly,
+                CopyDirection::LeftToRight => {
+                    matches!(s, RecStatus::LeftOnly | RecStatus::LeftOnlyDir)
+                }
+                CopyDirection::RightToLeft => {
+                    matches!(s, RecStatus::RightOnly | RecStatus::RightOnlyDir)
+                }
             },
             (EntrySelection::AllNonEqual, _) => true,
         };
@@ -185,6 +196,19 @@ pub fn plan_operations(
                 let src = right_root.join(&entry.rel_path);
                 let tgt = left_root.join(&entry.rel_path);
                 (Some(src), Some(tgt), DirectoryMergeAction::CopyRightToLeft)
+            }
+            // F135: an empty directory on the source side only - nothing to
+            // copy, but the target side should have it too. Decided
+            // explicitly rather than falling into the generic "skip" arm
+            // below, which would be indistinguishable from "exists only on
+            // the non-source side".
+            (CopyDirection::LeftToRight, RecStatus::LeftOnlyDir) => {
+                let tgt = right_root.join(&entry.rel_path);
+                (None, Some(tgt), DirectoryMergeAction::CreateDirectory)
+            }
+            (CopyDirection::RightToLeft, RecStatus::RightOnlyDir) => {
+                let tgt = left_root.join(&entry.rel_path);
+                (None, Some(tgt), DirectoryMergeAction::CreateDirectory)
             }
             // Entry exists only on the non-source side: skip in this direction.
             _ => {
@@ -314,7 +338,7 @@ pub fn execute_plan(
         panic!("batch_copy returned Err with no manifest_dir: {e}")
     });
 
-    let outcomes: Vec<(PathBuf, FileOutcome)> = copy_ops
+    let mut outcomes: Vec<(PathBuf, FileOutcome)> = copy_ops
         .iter()
         .zip(manifest.entries.iter())
         .map(|(op, entry)| {
@@ -336,10 +360,40 @@ pub fn execute_plan(
         })
         .collect();
 
+    // F135: `CreateDirectory` ops have no `source`, so `batch_copy` (a
+    // file-to-file copier) never sees them - they are executed directly,
+    // here, and folded into the same report `batch_copy`'s file operations
+    // produce.
+    let mut mkdir_succeeded = 0usize;
+    let mut mkdir_failed = 0usize;
+    for op in plan
+        .operations
+        .iter()
+        .filter(|op| op.action == DirectoryMergeAction::CreateDirectory)
+    {
+        let Some(target) = &op.target else { continue };
+        let outcome = match fs::create_dir_all(target) {
+            Ok(()) => {
+                mkdir_succeeded += 1;
+                FileOutcome::Copied {
+                    bytes: 0,
+                    backup_created: false,
+                }
+            }
+            Err(e) => {
+                mkdir_failed += 1;
+                FileOutcome::Failed {
+                    error: e.to_string(),
+                }
+            }
+        };
+        outcomes.push((op.rel_path.clone(), outcome));
+    }
+
     PlanExecutionReport {
         plan_id: plan.id.clone(),
-        succeeded: manifest.succeeded(),
-        failed: manifest.failed(),
+        succeeded: manifest.succeeded() + mkdir_succeeded,
+        failed: manifest.failed() + mkdir_failed,
         skipped: skipped_count,
         outcomes,
     }

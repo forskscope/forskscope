@@ -85,6 +85,18 @@ impl DirComparisonReport {
                         right_only += 1;
                         "right only".into()
                     }
+                    // F135: an empty directory present on one side only -
+                    // counted alongside the ordinary one-sided files
+                    // (it genuinely is one-sided), with its own status
+                    // text so the row does not claim a file was found.
+                    RecStatus::LeftOnlyDir => {
+                        left_only += 1;
+                        "left only (empty directory)".into()
+                    }
+                    RecStatus::RightOnlyDir => {
+                        right_only += 1;
+                        "right only (empty directory)".into()
+                    }
                     RecStatus::Symlink => {
                         symlinks += 1;
                         "symlink".into()

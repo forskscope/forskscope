@@ -24,7 +24,7 @@ When you launch ForskScope without arguments, the Explorer workspace opens with 
 | Icon | Meaning |
 |------|---------|
 | `=` | **Equal** — same name on both sides, with identical content |
-| `≠` | **Different** — the content differs (in the Explorer, also when one side is a file and the other a folder) |
+| `≠` | **Different** — the content differs (in the Explorer, also when one side is a file and the other a folder, or a same-named folder pair has a subdirectory only one side has) |
 | `…` | **Computing** — the comparison is still running |
 | `⊘` | **Unreadable** — something could not be read, so nothing was compared. This is not a verdict: the two sides may or may not match |
 | `←` | **Left only** — present only on the left |
@@ -45,11 +45,15 @@ The Directory Report below uses the same icons.
 
 ## Copying files between sides
 
-Every row in Directory Report that is not equal shows explicit direction buttons:
+Every file row in Directory Report that is not equal shows explicit direction buttons:
 
 - **Copy to right** — copies the left-side file to the right directory.
 - **Copy to left** — copies the right-side file to the left directory.
 - **Changed** entries show both buttons; one-sided entries show only the valid direction.
+
+An **empty one-sided directory** (see below) shows neither button and cannot
+be opened for comparison — there is no file to copy or compare, only a path
+that exists on one side and not the other.
 
 Clicking a button opens a confirmation dialog showing the full source and destination paths. If the destination already exists, a green notice confirms that a `.bak` backup will be created first. **Cancel** is the default-focused button.
 
@@ -63,6 +67,8 @@ ForskScope walks both directory trees in the background and builds a flat report
 
 1. **Fast listing** — identifies all files and their one-sided/common status immediately.
 2. **Digest comparison** — computes file equality for same-name pairs one by one. The `checking N/total…` counter in the status line tracks progress.
+
+An **empty directory present on only one side** is listed too, under the same `←`/`→` icon a one-sided file gets — a folder your tree has that the other side's does not is still a real difference, even with nothing inside it to list.
 
 **Result table columns:**
 

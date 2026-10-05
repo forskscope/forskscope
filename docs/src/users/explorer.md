@@ -116,7 +116,7 @@ pending, cancels whatever is in flight, including a running Verify.
 | Icon | Meaning |
 |------|---------|
 | `=` | **Equal** — same name on both sides, with identical content |
-| `≠` | **Different** — the content differs (in the Explorer, also when one side is a file and the other a folder) |
+| `≠` | **Different** — the content differs (in the Explorer, also when one side is a file and the other a folder, or a same-named folder pair has a subdirectory only one side has) |
 | `…` | **Computing** — the comparison is still running |
 | `⊘` | **Unreadable** — something could not be read, so nothing was compared. This is not a verdict: the two sides may or may not match |
 | `←` | **Left only** — present only on the left |

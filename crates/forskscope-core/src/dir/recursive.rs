@@ -45,6 +45,20 @@ pub enum RecStatus {
     Changed,
     LeftOnly,
     RightOnly,
+    /// A directory that exists on the left side only, and is empty - the
+    /// only shape `LeftOnly`/`RightOnly` cannot report, since they are
+    /// emitted per *file*, never for a directory itself (F135). A
+    /// populated one-sided directory needs no variant of its own: every
+    /// file beneath it is already reported one-sided at its own path, and
+    /// that is what makes the directory's existence visible. Emitted only
+    /// where it carries information that would otherwise be lost - a
+    /// directory present on *both* sides, however different their
+    /// contents, is never this, even when one side's copy happens to be
+    /// empty. No payload, for the same reason `Unreadable` has none: see
+    /// its own doc comment below.
+    LeftOnlyDir,
+    /// The same, for the right side.
+    RightOnlyDir,
     /// Exists on both sides; digest comparison not yet complete.
     /// Used by the incremental UI path, and never returned by
     /// `recursive_diff` (a fresh, uncancellable token). `recursive_diff_with_cancel`
@@ -144,14 +158,20 @@ pub fn recursive_diff_with_rules(
     rules: &IgnoreRules,
 ) -> RecursiveScan {
     let mut map: BTreeMap<PathBuf, RecEntry> = BTreeMap::new();
-    let left_root_unreadable = walk(left_root, left_root, &mut map, token, rules, |rel, meta| {
-        RecEntry {
+    let left_root_unreadable = walk(
+        left_root,
+        left_root,
+        &mut map,
+        right_root,
+        token,
+        rules,
+        |rel, meta| RecEntry {
             rel_path: rel.clone(),
             status: RecStatus::LeftOnly,
             left_size: Some(meta.len()),
             right_size: None,
-        }
-    })
+        },
+    )
     .is_err();
     let right_root_unreadable = if token.is_cancelled() {
         false
@@ -184,19 +204,25 @@ pub fn list_recursive_for_display_with_rules(
     rules: &IgnoreRules,
 ) -> RecursiveScan {
     let mut map: BTreeMap<PathBuf, RecEntry> = BTreeMap::new();
-    let left_root_unreadable = walk(left_root, left_root, &mut map, token, rules, |rel, meta| {
-        RecEntry {
+    let left_root_unreadable = walk(
+        left_root,
+        left_root,
+        &mut map,
+        right_root,
+        token,
+        rules,
+        |rel, meta| RecEntry {
             rel_path: rel.clone(),
             status: RecStatus::LeftOnly,
             left_size: Some(meta.len()),
             right_size: None,
-        }
-    })
+        },
+    )
     .is_err();
     let right_root_unreadable = if token.is_cancelled() {
         false
     } else {
-        walk_and_merge_fast(right_root, right_root, &mut map, token, rules).is_err()
+        walk_and_merge_fast(right_root, right_root, &mut map, left_root, token, rules).is_err()
     };
     RecursiveScan {
         entries: map.into_values().collect(),
@@ -308,24 +334,43 @@ fn is_hidden_attribute(_entry: &fs::DirEntry) -> bool {
 /// inserted with `RecStatus::Symlink`. Returns `Err` only on unrecoverable
 /// directory-open failures (the caller reports the directory itself as
 /// `Unreadable`, F79); a per-entry `metadata()` failure produces an
-/// `Unreadable` entry at that path rather than being skipped.
+/// `Unreadable` entry at that path rather than being skipped. On success,
+/// returns whether `rules` excluded anything anywhere in this subtree
+/// (F135; see the call site's use of it).
+///
+/// `other_root` is the *other* side's root (F135): a subdirectory found
+/// empty here is reported `LeftOnlyDir` only when `other_root` has no
+/// directory at the same relative path *and* nothing inside this one was
+/// excluded by `rules` - a directory that looks empty only because its one
+/// file was ignored is not a one-sided difference (module doc: "an ignored
+/// entry present on one side only never becomes a one-sided difference");
+/// it must read exactly as it would if that file did not exist to the walk
+/// at all, which for a *file* is already true by construction (ignored,
+/// never inserted) and for a *directory* needs this check to also be true.
+/// A directory present on both sides is never this, however different
+/// their contents, and the right-hand walk (`walk_and_merge`/
+/// `walk_and_merge_fast`) makes the symmetric check against this side so a
+/// directory empty on *both* sides stays invisible, exactly as today.
 fn walk(
     root: &Path,
     dir: &Path,
     map: &mut BTreeMap<PathBuf, RecEntry>,
+    other_root: &Path,
     token: &CancellationToken,
     rules: &IgnoreRules,
     make: impl Fn(&PathBuf, &fs::Metadata) -> RecEntry + Copy,
-) -> Result<()> {
+) -> Result<bool> {
     if token.is_cancelled() {
-        return Ok(());
+        return Ok(false);
     }
     let rd = fs::read_dir(dir).map_err(|e| CoreError::io(dir, IoOperation::ListDir, &e))?;
+    let mut ignored_anything = false;
     for entry in rd.flatten() {
         if token.is_cancelled() {
             break;
         }
         if is_ignored(rules, &entry) {
+            ignored_anything = true;
             continue;
         }
         let path = entry.path();
@@ -354,15 +399,39 @@ fn walk(
             // A subdirectory that cannot be opened takes its subtree out of
             // the result - unavoidable, nothing read it - but must itself
             // be visible rather than silently absent (F79).
-            if walk(root, &path, map, token, rules, make).is_err() {
-                mark_unreadable(map, rel);
+            let before = map.len();
+            match walk(root, &path, map, other_root, token, rules, make) {
+                Err(_) => mark_unreadable(map, rel),
+                Ok(child_ignored_anything) => {
+                    ignored_anything |= child_ignored_anything;
+                    if map.len() == before
+                        && !child_ignored_anything
+                        && !other_root.join(&rel).is_dir()
+                    {
+                        // F135: nothing was added for this subtree, nothing
+                        // in it was excluded by `rules` either, and the
+                        // other side has no directory here at all - a
+                        // genuinely one-sided empty directory, the one
+                        // shape `LeftOnly`/`RightOnly` (per-file) cannot
+                        // report.
+                        map.insert(
+                            rel.clone(),
+                            RecEntry {
+                                rel_path: rel,
+                                status: RecStatus::LeftOnlyDir,
+                                left_size: None,
+                                right_size: None,
+                            },
+                        );
+                    }
+                }
             }
         } else if meta.is_file() {
             map.insert(rel.clone(), make(&rel, &meta));
         }
         // Other entry kinds (devices, etc.) silently skipped.
     }
-    Ok(())
+    Ok(ignored_anything)
 }
 
 fn walk_and_merge(
@@ -372,16 +441,18 @@ fn walk_and_merge(
     left_root: &Path,
     token: &CancellationToken,
     rules: &IgnoreRules,
-) -> Result<()> {
+) -> Result<bool> {
     if token.is_cancelled() {
-        return Ok(());
+        return Ok(false);
     }
     let rd = fs::read_dir(dir).map_err(|e| CoreError::io(dir, IoOperation::ListDir, &e))?;
+    let mut ignored_anything = false;
     for entry in rd.flatten() {
         if token.is_cancelled() {
             break;
         }
         if is_ignored(rules, &entry) {
+            ignored_anything = true;
             continue;
         }
         let path = entry.path();
@@ -397,8 +468,29 @@ fn walk_and_merge(
         if meta.is_symlink() {
             mark_symlink(map, rel);
         } else if meta.is_dir() {
-            if walk_and_merge(right_root, &path, map, left_root, token, rules).is_err() {
-                mark_unreadable(map, rel);
+            let before = map.len();
+            match walk_and_merge(right_root, &path, map, left_root, token, rules) {
+                Err(_) => mark_unreadable(map, rel),
+                Ok(child_ignored_anything) => {
+                    ignored_anything |= child_ignored_anything;
+                    if map.len() == before
+                        && !child_ignored_anything
+                        && !left_root.join(&rel).is_dir()
+                    {
+                        // F135: symmetric to `walk`'s own check - empty
+                        // here, nothing in it was excluded by `rules`, and
+                        // the left side has no directory at this path.
+                        map.insert(
+                            rel.clone(),
+                            RecEntry {
+                                rel_path: rel,
+                                status: RecStatus::RightOnlyDir,
+                                left_size: None,
+                                right_size: None,
+                            },
+                        );
+                    }
+                }
             }
         } else if meta.is_file() {
             let right_size = meta.len();
@@ -447,25 +539,28 @@ fn walk_and_merge(
             }
         }
     }
-    Ok(())
+    Ok(ignored_anything)
 }
 
 fn walk_and_merge_fast(
     right_root: &Path,
     dir: &Path,
     map: &mut BTreeMap<PathBuf, RecEntry>,
+    left_root: &Path,
     token: &CancellationToken,
     rules: &IgnoreRules,
-) -> Result<()> {
+) -> Result<bool> {
     if token.is_cancelled() {
-        return Ok(());
+        return Ok(false);
     }
     let rd = fs::read_dir(dir).map_err(|e| CoreError::io(dir, IoOperation::ListDir, &e))?;
+    let mut ignored_anything = false;
     for entry in rd.flatten() {
         if token.is_cancelled() {
             break;
         }
         if is_ignored(rules, &entry) {
+            ignored_anything = true;
             continue;
         }
         let path = entry.path();
@@ -481,8 +576,27 @@ fn walk_and_merge_fast(
         if meta.is_symlink() {
             mark_symlink(map, rel);
         } else if meta.is_dir() {
-            if walk_and_merge_fast(right_root, &path, map, token, rules).is_err() {
-                mark_unreadable(map, rel);
+            let before = map.len();
+            match walk_and_merge_fast(right_root, &path, map, left_root, token, rules) {
+                Err(_) => mark_unreadable(map, rel),
+                Ok(child_ignored_anything) => {
+                    ignored_anything |= child_ignored_anything;
+                    if map.len() == before
+                        && !child_ignored_anything
+                        && !left_root.join(&rel).is_dir()
+                    {
+                        // F135: symmetric to `walk`'s own check.
+                        map.insert(
+                            rel.clone(),
+                            RecEntry {
+                                rel_path: rel,
+                                status: RecStatus::RightOnlyDir,
+                                left_size: None,
+                                right_size: None,
+                            },
+                        );
+                    }
+                }
             }
         } else if meta.is_file() {
             let rs = meta.len();
@@ -512,5 +626,5 @@ fn walk_and_merge_fast(
             }
         }
     }
-    Ok(())
+    Ok(ignored_anything)
 }

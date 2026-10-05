@@ -219,6 +219,52 @@ fn directory_patch_covers_modify_add_and_delete() {
     let _ = fs::remove_dir_all(&base);
 }
 
+/// F135: an empty one-sided directory has no content to add or delete, so
+/// it surfaces as a `BinaryNotice` - visible, never silently dropped -
+/// exactly when creation/deletion entries are wanted at all, and not
+/// otherwise. Falsify by removing the `LeftOnlyDir`/`RightOnlyDir` arm in
+/// `patch_from_directories`: this fails to compile (an exhaustive match),
+/// which is the whole point of the new variant.
+#[test]
+fn directory_patch_notes_an_empty_one_sided_directory_visibly() {
+    let base = temp_dir("dir-empty-one-sided");
+    let left = base.join("left");
+    let right = base.join("right");
+    let _ = fs::remove_dir_all(&left);
+    let _ = fs::remove_dir_all(&right);
+    fs::create_dir_all(left.join("empty")).unwrap();
+    fs::create_dir_all(&right).unwrap();
+
+    let patch = patch_from_directories(
+        &left,
+        &right,
+        DiffOptions::default(),
+        PatchOptions::default(),
+    )
+    .unwrap();
+
+    assert_eq!(patch.files.len(), 1, "{:?}", patch.files);
+    match &patch.files[0] {
+        PatchFileChange::BinaryNotice { path } => {
+            assert_eq!(path, &PathBuf::from("empty"));
+        }
+        other => panic!("expected a BinaryNotice for the empty directory, got {other:?}"),
+    }
+
+    // Turning creation/deletion entries off must drop this too, exactly as
+    // it already does for an ordinary one-sided file - the empty directory
+    // is not a special exemption from that flag, just a different shape of
+    // the same one-sided fact.
+    let options = PatchOptions {
+        include_creation_deletion: false,
+        ..PatchOptions::default()
+    };
+    let patch = patch_from_directories(&left, &right, DiffOptions::default(), options).unwrap();
+    assert!(patch.files.is_empty(), "{:?}", patch.files);
+
+    let _ = fs::remove_dir_all(&base);
+}
+
 // F79 §7c: an unreadable entry must fail patch generation rather than be
 // silently omitted from a document that claims to be a complete record of
 // the difference between two trees.

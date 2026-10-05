@@ -38,13 +38,16 @@
 //! not evidence: they make the verdict `Unknown`, never `Different`. (RFC-080 §1
 //! names the root case: "a definite verdict produced by a failed read".)
 //!
-//! ## What it cannot see
+//! ## What it used to not see (F135, closed)
 //!
-//! The listing records files, not directories. A directory that exists on one
-//! side only **and is empty** produces no entry, so this cannot call it
-//! `Different`; the pair reads `MetadataMatch`, whose wording ("names and sizes
-//! match") is then slightly too strong for that one case. Core would have to
-//! report directories to close it.
+//! The listing used to record files, not directories: a directory that
+//! existed on one side only **and was empty** produced no entry, so this
+//! could not call it `Different` - the pair read `MetadataMatch`, too
+//! strong a claim for that one case. The walk now reports such a
+//! directory as `RecStatus::LeftOnlyDir`/`RightOnlyDir`, which this folds
+//! into `Different` exactly as a one-sided file is - see `RecStatus`'s own
+//! doc comment for what makes this shape different from an ordinary
+//! one-sided entry.
 
 use forskscope_core::dir::{RecStatus, RecursiveScan};
 
@@ -78,15 +81,25 @@ pub fn dir_verdict(scan: &RecursiveScan) -> DirVerdict {
     for entry in &scan.entries {
         match entry.status {
             // One-sided beneath a directory that could not be read: an artefact.
-            RecStatus::LeftOnly | RecStatus::RightOnly
+            RecStatus::LeftOnly
+            | RecStatus::RightOnly
+            | RecStatus::LeftOnlyDir
+            | RecStatus::RightOnlyDir
                 if unreadable
                     .iter()
                     .any(|u| entry.rel_path.starts_with(u) && entry.rel_path != *u) =>
             {
                 incomplete = true;
             }
-            // Facts the walk established.
-            RecStatus::LeftOnly | RecStatus::RightOnly | RecStatus::Changed => {
+            // Facts the walk established. F135: an empty one-sided
+            // directory is the same kind of fact a one-sided file is -
+            // the listing cannot be "names and sizes match" when one side
+            // has a directory the other does not.
+            RecStatus::LeftOnly
+            | RecStatus::RightOnly
+            | RecStatus::LeftOnlyDir
+            | RecStatus::RightOnlyDir
+            | RecStatus::Changed => {
                 return DirVerdict::Different;
             }
             RecStatus::Computing => match (entry.left_size, entry.right_size) {
@@ -153,6 +166,31 @@ mod tests {
             let s = scan(vec![common("a", 1, 1), entry("x", status, Some(1), None)]);
             assert_eq!(dir_verdict(&s), DirVerdict::Different, "{status:?}");
         }
+    }
+
+    /// F135: the defect itself, falsified directly - an empty one-sided
+    /// directory must not fold into `MetadataMatch`, the exact wrong
+    /// result the module doc records as the pre-fix behaviour.
+    #[test]
+    fn an_empty_one_sided_directory_is_different() {
+        for status in [RecStatus::LeftOnlyDir, RecStatus::RightOnlyDir] {
+            let s = scan(vec![
+                common("a", 1, 1),
+                entry("empty_dir", status, None, None),
+            ]);
+            assert_eq!(dir_verdict(&s), DirVerdict::Different, "{status:?}");
+        }
+    }
+
+    /// The refinement applies to the directory shape too: an empty
+    /// one-sided directory beneath an unreadable directory is an artefact
+    /// of the failed read, not a fact about the trees.
+    #[test]
+    fn an_empty_one_sided_directory_under_an_unreadable_directory_is_not_evidence() {
+        let locked = entry("locked", RecStatus::Unreadable, None, None);
+        let under = entry("locked/empty", RecStatus::RightOnlyDir, None, None);
+        let s = scan(vec![locked, under]);
+        assert_eq!(dir_verdict(&s), DirVerdict::Unknown);
     }
 
     #[test]

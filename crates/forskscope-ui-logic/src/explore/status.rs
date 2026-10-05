@@ -112,14 +112,23 @@ impl StatusGlyph {
     }
 
     /// The shared concept for one `RecStatus` (Deep Compare, RFC-037).
+    ///
+    /// F135: `LeftOnlyDir`/`RightOnlyDir` reuse `LeftOnly`/`RightOnly`'s own
+    /// glyph, CSS class and aria label rather than earning a variant of
+    /// their own - decided explicitly, not by default: it is still a
+    /// one-sided entry, the same fact a one-sided file states, so the same
+    /// presentation applies. The distinguishing wording ("empty directory")
+    /// lives in each view's own label text (`status_label` in
+    /// `deep_compare.rs`, the Directory Report's row text), not in the
+    /// glyph table both views share.
     pub fn for_rec_status(status: RecStatus) -> Self {
         match status {
             RecStatus::Equal => Self::Equal,
             RecStatus::Changed => Self::Different,
             RecStatus::Computing => Self::Computing,
             RecStatus::Unreadable => Self::Unreadable,
-            RecStatus::LeftOnly => Self::LeftOnly,
-            RecStatus::RightOnly => Self::RightOnly,
+            RecStatus::LeftOnly | RecStatus::LeftOnlyDir => Self::LeftOnly,
+            RecStatus::RightOnly | RecStatus::RightOnlyDir => Self::RightOnly,
             RecStatus::Symlink => Self::Symlink,
         }
     }
@@ -515,6 +524,20 @@ mod tests {
                  Compare) must render the same concept"
             );
         }
+    }
+
+    // F135: an empty one-sided directory reuses the plain one-sided glyph -
+    // decided, not defaulted; falsify by routing either arm elsewhere.
+    #[test]
+    fn empty_one_sided_directories_share_the_plain_one_sided_glyph() {
+        assert_eq!(
+            StatusGlyph::for_rec_status(RecStatus::LeftOnlyDir),
+            StatusGlyph::LeftOnly
+        );
+        assert_eq!(
+            StatusGlyph::for_rec_status(RecStatus::RightOnlyDir),
+            StatusGlyph::RightOnly
+        );
     }
 
     // ── Tier-1 match (RFC-080 §4) ────────────────────────────────────────────
