@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.180.1] — Unreleased
+
 ## [0.180.0] — 2026-10-05
 
 **A folder that exists on only one side is no longer invisible when it is empty.**
