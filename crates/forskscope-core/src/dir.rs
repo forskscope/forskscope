@@ -3,7 +3,7 @@
 mod batch;
 mod copy;
 mod digest;
-mod index;
+mod evidence;
 mod listing;
 mod merge_plan;
 mod recursive;
@@ -16,10 +16,7 @@ pub use copy::{CopyOutcome, copy_file};
 pub use digest::{
     DigestOutcome, dir_digest_equal, file_digest_equal, file_digest_equal_with_cancel,
 };
-pub use index::{
-    ContentDigest, DirectoryEntryRecord, DirectoryIndex, EntryType, EqualityEvidence,
-    IndexRevision, PairedEntry, PairedEntrySet, pair_entries,
-};
+pub use evidence::{EntryType, EqualityEvidence};
 pub use listing::{DirectoryListing, FileEntry, list_dir};
 pub use merge_plan::{
     CopyDirection, DirectoryMergeAction, EntrySelection, FileOutcome, OperationPlan,

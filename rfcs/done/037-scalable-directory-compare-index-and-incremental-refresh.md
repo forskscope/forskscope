@@ -1,6 +1,6 @@
 # RFC 037: Scalable Directory Compare Index and Incremental Refresh
 
-**Status.** Implemented (v0.42.0 + v0.58.0) — core data model complete; persistent on-disk index cache and incremental refresh deferred (future release)
+**Status.** Partially implemented (v0.42.0 + v0.58.0). The cancellable walks and symlink reporting shipped. The directory index data model below shipped as dead code and was removed in 0.181.0 (F157), because nothing in the product built or consumed it. The persistent index cache and incremental refresh were never built and are not planned in this form.
 
 ## Status
 Partially implemented in v0.42.0:
@@ -18,10 +18,16 @@ Partially implemented in v0.42.0:
   than silently skipped. Patch export treats them as BinaryNotice (optional);
   the deep-compare UI shows them as their own category.
 
-Remaining open (requires UI work or a separate release): a persistent
-directory-compare index for repeated scans without re-walking, true
-incremental refresh on file-watcher events (RFC-036 dependency), and a
-batch-operation preview with per-item confirmation (RFC-022 dependency).
+A `DirectoryIndex` data model (the one in *Internal Design* below) was also
+added in v0.58.0. It had no producer and no consumer outside its own tests,
+so it was removed in 0.181.0 (F157); the equality vocabulary it fed,
+`EqualityEvidence`, remains and is what the Explorer uses.
+
+Remaining open, none of it started: a persistent directory-compare index for
+repeated scans without re-walking, true incremental refresh on file-watcher
+events (RFC-036 dependency), and a batch-operation preview with per-item
+confirmation (RFC-022 dependency). The persistent index is not planned in the
+`DirectoryIndex` form shown below.
 
 ## Summary
 
@@ -69,6 +75,10 @@ Directory comparison can become expensive quickly. Users may compare source tree
 ## Internal Design
 
 ### Directory Index
+
+> **Removed in 0.181.0 (F157).** The code below shipped in v0.58.0 and was
+> never constructed by the product. It is kept as the design record, not as a
+> description of the current code.
 
 ```rust
 pub struct DirectoryIndex {

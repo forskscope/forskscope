@@ -51,6 +51,9 @@ pub struct DiffProfile {
     pub ignore_whitespace: bool,
     pub ignore_case: bool,
     pub algorithm: DiffAlgorithmSetting,
+    /// Newline-style handling. The Settings dialog can set `IgnoreDifference`
+    /// (F159(a)); built-in profiles stay `Significant`.
+    pub newlines: NewlineCompareMode,
     /// Built-in profiles ship with the app and cannot be deleted.
     pub built_in: bool,
 }
@@ -104,17 +107,26 @@ impl DiffProfile {
             ignore_whitespace: self.ignore_whitespace,
             ignore_case: self.ignore_case,
             algorithm: algo,
+            ignore_newlines: self.newlines == NewlineCompareMode::IgnoreDifference,
             ..DiffOptions::default()
         }
     }
 
-    /// Projects a canonical v2 profile into the UI's two-bool view. Lossy
-    /// only for `whitespace`/`newlines`/`inline_mode` values the shipping
-    /// Settings dialog has never been able to produce (`IgnoreTrailing`,
-    /// `IgnoreBlankLines`, non-`Significant` newlines, non-`Lazy` inline
-    /// mode) — every profile the UI itself has ever written round-trips
-    /// exactly, since it only ever writes the values [`Self::to_v2`]
-    /// produces.
+    /// Projects a canonical v2 profile into the UI's view. `newlines` is
+    /// carried through unchanged. Three fields are narrowed, and the
+    /// narrowing is lossy:
+    ///
+    /// - `whitespace`: the dialog's one checkbox covers both `IgnoreAll` and
+    ///   `IgnoreTrailing`, and `to_v2` writes back `IgnoreAll`. `IgnoreBlankLines`
+    ///   also reads as "ignore whitespace" and comes back as `IgnoreAll`.
+    /// - `inline_mode`: the dialog has no control for it, so `to_v2` always
+    ///   writes `Lazy`.
+    /// - `algorithm`: `DiffAlgorithm::Lcs` folds to `Myers`, the dialog never
+    ///   offered it.
+    ///
+    /// Those losses are F168 and go away as each control reaches the dialog.
+    /// Every profile the UI has written round-trips exactly, since it only
+    /// writes the values [`Self::to_v2`] produces.
     pub fn from_v2(p: &PersistedDiffProfile) -> Self {
         Self {
             name: p.name.clone(),
@@ -128,6 +140,7 @@ impl DiffProfile {
                 // rather than losing the profile entirely.
                 DiffAlgorithm::Lcs => DiffAlgorithmSetting::Myers,
             },
+            newlines: p.newlines,
             built_in: p.built_in,
         }
     }
@@ -144,7 +157,7 @@ impl DiffProfile {
             } else {
                 WhitespaceMode::Significant
             },
-            newlines: NewlineCompareMode::Significant,
+            newlines: self.newlines,
             case: if self.ignore_case {
                 CaseSensitivity::Insensitive
             } else {
@@ -293,4 +306,25 @@ impl AppSettings {
 pub struct BatchCopySpec {
     pub items: Vec<(PathBuf, PathBuf)>, // (src, dst)
     pub label: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// F159(a): the mode a profile carries must reach the diff, or the
+    /// Settings checkbox would save a setting that changes nothing. Falsify by
+    /// hardcoding `ignore_newlines: false` in `to_diff_options`.
+    #[test]
+    fn a_profiles_newline_mode_reaches_the_diff_options() {
+        let profile = DiffProfile {
+            name: "Ignore newlines".into(),
+            ignore_whitespace: false,
+            ignore_case: false,
+            algorithm: DiffAlgorithmSetting::Myers,
+            newlines: NewlineCompareMode::IgnoreDifference,
+            built_in: false,
+        };
+        assert!(profile.to_diff_options().ignore_newlines);
+    }
 }

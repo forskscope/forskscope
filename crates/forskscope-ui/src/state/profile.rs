@@ -2,6 +2,8 @@
 
 use dioxus::prelude::*;
 
+use forskscope_core::NewlineCompareMode;
+
 use crate::state::{DiffAlgorithmSetting, Store};
 
 pub fn add_profile(
@@ -10,6 +12,7 @@ pub fn add_profile(
     ignore_whitespace: bool,
     ignore_case: bool,
     algorithm: DiffAlgorithmSetting,
+    newlines: NewlineCompareMode,
 ) {
     store
         .settings
@@ -20,6 +23,7 @@ pub fn add_profile(
             ignore_whitespace,
             ignore_case,
             algorithm,
+            newlines,
             built_in: false,
         });
     crate::ui::view::settings::persist(*store);

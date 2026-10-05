@@ -169,7 +169,9 @@ Built-in profiles cannot be deleted (no **×** button).
 
 1. Click **+ New profile** at the bottom of the profile list.
 2. Enter a name.
-3. Check **Ignore WS** and/or **Ignore case** if desired.
+3. Check **Ignore WS**, **Ignore case**, and/or **Ignore newlines** if desired.
+   **Ignore newlines** treats CRLF and LF line endings as equal; it does not
+   hide any other difference.
 4. Pick an algorithm.
 5. Click **Add**.
 

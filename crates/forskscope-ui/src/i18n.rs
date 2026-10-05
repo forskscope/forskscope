@@ -166,7 +166,9 @@ fn ja(key: &str) -> Option<&'static str> {
         "Go up one directory" => "1階層上に移動",
         "Go to home directory (focused pane)" => "ホームディレクトリに移動（フォーカス中のペイン）",
         "Open a folder (focused pane)" => "フォルダーを開く（フォーカス中のペイン）",
-        "Back / forward directory history" => "ディレクトリ履歴の前 / 次",
+        "Back / forward directory history (focused pane)" => {
+            "ディレクトリ履歴の前 / 次（フォーカス中のペイン）"
+        }
         "Close the active comparison tab" => "アクティブな比較タブを閉じる",
         "This keyboard reference" => "キーボードショートカット一覧",
         "Close modal / search bar" => "モーダル / 検索バーを閉じる",
@@ -228,6 +230,7 @@ fn ja(key: &str) -> Option<&'static str> {
         "off" => "オフ",
         "Ignore WS" => "空白無視",
         "Ignore case" => "大小文字無視",
+        "Ignore newlines" => "改行無視",
         "Context lines" => "コンテキスト行数",
         "Explorer layout" => "エクスプローラーレイアウト",
         "Aligned (default)" => "整列（デフォルト）",

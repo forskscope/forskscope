@@ -224,9 +224,7 @@ impl RowStatusKind {
             // `Different` are the same claim" (RFC-080 §4) extends to
             // `Identical`: both row kinds reach it only by having their
             // contents actually read, so both earn the same display kind.
-            EqualityEvidence::DigestEqual
-            | EqualityEvidence::MetadataEqual
-            | EqualityEvidence::TreeIdentical => Self::Equal,
+            EqualityEvidence::DigestEqual | EqualityEvidence::TreeIdentical => Self::Equal,
             EqualityEvidence::MetadataOnly => Self::Computing,
             EqualityEvidence::DigestDifferent
             | EqualityEvidence::SizeDifferent { .. }
@@ -252,14 +250,6 @@ mod tests {
     fn digest_equal_maps_to_equal() {
         assert_eq!(
             RowStatusKind::from_evidence(&EqualityEvidence::DigestEqual),
-            RowStatusKind::Equal
-        );
-    }
-
-    #[test]
-    fn metadata_equal_maps_to_equal() {
-        assert_eq!(
-            RowStatusKind::from_evidence(&EqualityEvidence::MetadataEqual),
             RowStatusKind::Equal
         );
     }

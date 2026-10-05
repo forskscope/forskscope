@@ -42,7 +42,7 @@ pub fn KeyboardRefModal() -> Element {
                         KbRow { keys: "Alt + ↑",        desc: t(lang, "Go up one directory (focused pane)") }
                         KbRow { keys: "Alt + Home",     desc: t(lang, "Go to home directory (focused pane)") }
                         KbRow { keys: "Ctrl + O",       desc: t(lang, "Open a folder (focused pane)") }
-                        KbRow { keys: "◀ / ▶ buttons",  desc: t(lang, "Back / forward directory history") }
+                        KbRow { keys: "Alt + ← / Alt + →", desc: t(lang, "Back / forward directory history (focused pane)") }
                     }
                 }
                 div { class: "kb-section",
@@ -109,6 +109,8 @@ mod tests {
             "Go to home directory (focused pane)",
             "Ctrl + O",
             "Open a folder (focused pane)",
+            "Alt + ← / Alt + →",
+            "Back / forward directory history (focused pane)",
         ] {
             assert!(
                 texts.iter().any(|t| t == expected),

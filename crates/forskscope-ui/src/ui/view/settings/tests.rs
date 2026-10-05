@@ -45,6 +45,32 @@ fn build_save_payload_overlays_ui_fields_but_preserves_the_rest() {
     );
 }
 
+/// F159(a): a newline mode written by hand into `settings.json` used to be
+/// silently reset to `Significant` on the next save, because the UI's profile
+/// type had no field to carry it. Falsify by hardcoding `Significant` back into
+/// `DiffProfile::to_v2`: the assertion fails.
+#[test]
+fn a_newline_mode_set_by_hand_survives_a_settings_save() {
+    use forskscope_core::NewlineCompareMode;
+
+    let mut base = PersistedSettings::default();
+    let mut hand = base.profiles[0].clone();
+    hand.name = "Hand-written".into();
+    hand.built_in = false;
+    hand.newlines = NewlineCompareMode::IgnoreDifference;
+    base.profiles.push(hand);
+
+    let edited = AppSettings::from_v2(&base);
+    let merged = build_save_payload(&edited, &base);
+
+    let kept = merged
+        .profiles
+        .iter()
+        .find(|p| p.name == "Hand-written")
+        .expect("the hand-written profile must survive the save");
+    assert_eq!(kept.newlines, NewlineCompareMode::IgnoreDifference);
+}
+
 #[test]
 fn persist_settings_writes_through_the_real_repository() {
     let path = temp_path("persist");

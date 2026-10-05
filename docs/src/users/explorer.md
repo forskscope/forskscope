@@ -25,7 +25,8 @@ Click a folder row to expand it and show its contents. Click again to collapse.
 Press **Alt + ↑** or click the **↑** button in the path bar to go up one level in the **focused pane**.
 
 The **◀** and **▶** history buttons step through your recent directory
-navigation within each pane.
+navigation within each pane. **Alt + ←** and **Alt + →** do the same for the
+**focused pane**.
 
 ---
 
@@ -66,6 +67,7 @@ the right candidate. Click **Compare** to open a diff tab.
 | **Space** | Select the focused file as a comparison candidate |
 | **Enter** | Open a folder, or compare a same-name file if a matching file exists in the opposite pane |
 | **Alt + ↑** | Go up one directory level (focused pane only) |
+| **Alt + ←** / **Alt + →** | Back / forward in the focused pane's directory history |
 
 ---
 

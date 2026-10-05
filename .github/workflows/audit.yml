@@ -122,19 +122,32 @@ jobs:
       # the AUR, the package's git carried `pkgver = 0.176.0` while the RPC
       # still answered `0.174.0-1` for a time - this check would have
       # reported a gap that did not exist, on every successful publish,
-      # until the RPC caught up. Anonymous and public either way; no
-      # credential, same as before.
+      # until the RPC caught up.
+      #
+      # F166: the AUR read carries a cache-buster unique to each run. cgit
+      # caches the plain view for about fifteen minutes with no
+      # Last-Modified-driven revalidation of its own, so an un-busted URL
+      # can return a copy older than the AUR's git state at the time of
+      # asking - observed as `x-cgit-cache: STALE` with an older
+      # `last-modified` on the same URL. The release read is our own
+      # repository's data and is read with the job's token via `gh`, since
+      # anonymous API requests share a per-IP rate limit with every other
+      # runner.
       - name: Compare the AUR's published version against the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          AUR_VERSION="$(curl -fsSL 'https://aur.archlinux.org/cgit/aur.git/plain/.SRCINFO?h=forskscope' \
-            | awk -F' = ' '/^\tpkgver = /{print $2; exit}')"
+          AUR_SRCINFO="$(curl -fsSL "https://aur.archlinux.org/cgit/aur.git/plain/.SRCINFO?h=forskscope&_=$(date +%s%N)")" \
+            || { echo "::error::could not download the AUR's .SRCINFO (the cgit request failed)"; exit 1; }
+          AUR_VERSION="$(printf '%s\n' "$AUR_SRCINFO" | awk -F' = ' '/^\tpkgver = /{print $2; exit}')"
           if [ -z "$AUR_VERSION" ]; then
-            echo "::error::could not read pkgver from the AUR's .SRCINFO"
+            echo "::error::downloaded the AUR's .SRCINFO but found no pkgver line in it"
             exit 1
           fi
-          LATEST_TAG="$(curl -fsSL -H 'Accept: application/vnd.github+json' \
-            'https://api.github.com/repos/${{ github.repository }}/releases/latest' \
-            | python3 -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])')"
+          RELEASE_JSON="$(gh api "repos/${{ github.repository }}/releases/latest")" \
+            || { echo "::error::could not read the latest release from the GitHub API (repos/${{ github.repository }}/releases/latest)"; exit 1; }
+          LATEST_TAG="$(printf '%s' "$RELEASE_JSON" | python3 -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])')" \
+            || { echo "::error::the latest-release response from the GitHub API had no tag_name"; exit 1; }
           echo "AUR currently carries: $AUR_VERSION"
           echo "Latest published release: $LATEST_TAG"
           if [ "$AUR_VERSION" != "$LATEST_TAG" ]; then

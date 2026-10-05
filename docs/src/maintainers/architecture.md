@@ -25,7 +25,7 @@ could be added as a fourth crate without touching core.
 | `conflict_nav` | `ConflictNavigator`, `ConflictStatusDisplay`, `NavigatorSummary` — conflict rail view-model over `ThreeWayMergeSession` (RFC-034). |
 | `diff` | `similar` v3 diff engine; normalized `DiffDocument` + hunk model, stable IDs, inline spans. `CompareProfile`, `WhitespaceMode`, `NewlineCompareMode`, `DiffOptions` (RFC-002, RFC-028). |
 | `diff_decoration` | `DiffDecorationSet` derived from `DiffDocument` — CSS class tokens, gutter symbols, aria labels, inline spans, `HunkDecoration` (RFC-024). |
-| `dir` | Directory listing, recursive digest equality, `DirectoryIndex`, `EqualityEvidence`, `pair_entries`. `batch_copy` + `BatchManifest` (RFC-023). `recursive_diff_with_cancel` (RFC-037). `plan_operations` + `execute_plan` (RFC-022). |
+| `dir` | Directory listing, recursive digest equality, `EqualityEvidence` (the comparison vocabulary). `batch_copy` + `BatchManifest` (RFC-023). `recursive_diff_with_cancel` (RFC-037). `plan_operations` + `execute_plan` (RFC-022). |
 | `document` | Load a path into `LoadedDocument` with `FileFingerprint`. `ExternalFileState` / `check_external_state` (RFC-036). |
 | `edit_op` | `TextEditOperation`, `RevisionId`, `TextRange`, `OperationAck/Reject`, `EditTransaction` — editor adapter boundary types (RFC-032). |
 | `encoding` | `decode_bytes` with chardetng + encoding_rs; `decode_body` selects a BOM-implied encoding directly, `decode_with_label` re-decodes an explicit user choice (RFC-083). `NewlinePolicy`, `NewlineStyle`, `detect_newline_style`. `BomPresence`, `BomPolicy`, `detect_bom` (RFC-012). |

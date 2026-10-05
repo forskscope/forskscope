@@ -17,7 +17,9 @@ use super::{DigestKey, FocusedPane, PickKind, Tier1Map, row_evidence, start_tier
 use crate::i18n::t;
 use crate::state::{Lang, Store, open_compare};
 use crate::ui::view::digest_epoch::DigestEpoch;
-use crate::ui::view::dir_pane::{NavHistory, TreeRow, home_dir, navigate_to};
+use crate::ui::view::dir_pane::{
+    NavHistory, TreeRow, home_dir, navigate_to, navigate_to_from_history,
+};
 
 #[allow(clippy::too_many_arguments)]
 #[component]
@@ -347,6 +349,29 @@ fn dispatch_pathbar_shortcut(
         );
         return true;
     }
+    // F161: Back and Forward. `navigate_to_from_history`, not `navigate_to`:
+    // `navigate_to` pushes onto the history, which after `back()` would
+    // truncate the forward entry (F72). `prevent_default` keeps the webview's
+    // own Alt+← (Back) from also firing.
+    if e.modifiers().contains(Modifiers::ALT) && matches!(e.key(), Key::ArrowLeft | Key::ArrowRight)
+    {
+        e.prevent_default();
+        let is_left = focused_pane.read().is_left();
+        let (mut hist, dir) = if is_left {
+            (left_hist, left_dir)
+        } else {
+            (right_hist, right_dir)
+        };
+        let step = if e.key() == Key::ArrowLeft {
+            hist.write().back()
+        } else {
+            hist.write().forward()
+        };
+        if let Some(p) = step {
+            navigate_to_from_history(p, is_left, store, dir);
+        }
+        return true;
+    }
     if e.modifiers().contains(Modifiers::CONTROL)
         && matches!(&e.key(), Key::Character(s) if s.eq_ignore_ascii_case("o"))
     {
@@ -459,6 +484,91 @@ mod tests {
             );
 
             assert_eq!(*right_dir.read(), home_dir());
+            assert_eq!(
+                *left_dir.read(),
+                PathBuf::from("/left/unmoved"),
+                "the unfocused left pane must not move"
+            );
+        });
+    }
+
+    /// F161: Alt+← goes Back and Alt+→ goes Forward in the focused pane, through
+    /// the same history the ◀ ▶ buttons use, and the second step returns to the
+    /// page the first one left. Falsify by calling `navigate_to` in the new
+    /// branch: `navigate_to` pushes, which truncates the forward entry, so the
+    /// Forward step below finds nothing and the assertion fails (F72's bug).
+    #[test]
+    fn alt_arrows_go_back_then_forward_in_the_focused_pane() {
+        with_test_store(|store| {
+            let focused_pane = Signal::new_in_scope(FocusedPane::Left, ScopeId::ROOT);
+            let mut left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let left_dir = Signal::new_in_scope(PathBuf::from("/b"), ScopeId::ROOT);
+            let right_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let right_dir = Signal::new_in_scope(PathBuf::from("/right/unmoved"), ScopeId::ROOT);
+            left_hist.write().push(PathBuf::from("/a"));
+            left_hist.write().push(PathBuf::from("/b"));
+
+            let back = key_event(Key::ArrowLeft, Modifiers::ALT);
+            let handled = dispatch_pathbar_shortcut(
+                &back,
+                focused_pane,
+                *store,
+                left_hist,
+                left_dir,
+                right_hist,
+                right_dir,
+            );
+            assert!(handled, "Alt+← must be recognized as this view's binding");
+            assert_eq!(*left_dir.read(), PathBuf::from("/a"), "Alt+← is Back");
+
+            let forward = key_event(Key::ArrowRight, Modifiers::ALT);
+            dispatch_pathbar_shortcut(
+                &forward,
+                focused_pane,
+                *store,
+                left_hist,
+                left_dir,
+                right_hist,
+                right_dir,
+            );
+            assert_eq!(
+                *left_dir.read(),
+                PathBuf::from("/b"),
+                "Alt+→ after Back must return to the page Back left"
+            );
+            assert_eq!(
+                *right_dir.read(),
+                PathBuf::from("/right/unmoved"),
+                "the unfocused pane must not move"
+            );
+        });
+    }
+
+    /// F161: with the right pane focused, Alt+← moves the right pane's history,
+    /// not the left one. Falsify by hardcoding `is_left = true` in the new branch.
+    #[test]
+    fn alt_left_targets_the_right_pane_when_the_right_pane_is_focused() {
+        with_test_store(|store| {
+            let focused_pane = Signal::new_in_scope(FocusedPane::Right, ScopeId::ROOT);
+            let left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let left_dir = Signal::new_in_scope(PathBuf::from("/left/unmoved"), ScopeId::ROOT);
+            let mut right_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
+            let right_dir = Signal::new_in_scope(PathBuf::from("/y"), ScopeId::ROOT);
+            right_hist.write().push(PathBuf::from("/x"));
+            right_hist.write().push(PathBuf::from("/y"));
+
+            let back = key_event(Key::ArrowLeft, Modifiers::ALT);
+            dispatch_pathbar_shortcut(
+                &back,
+                focused_pane,
+                *store,
+                left_hist,
+                left_dir,
+                right_hist,
+                right_dir,
+            );
+
+            assert_eq!(*right_dir.read(), PathBuf::from("/x"));
             assert_eq!(
                 *left_dir.read(),
                 PathBuf::from("/left/unmoved"),

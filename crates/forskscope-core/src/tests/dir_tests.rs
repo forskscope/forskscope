@@ -320,35 +320,23 @@ fn recursive_diff_returns_empty_for_two_empty_directories() {
     );
 }
 
-/// RFC-080 tier 1: a names-and-sizes match is a completed measurement with an
-/// incomplete conclusion — none of equal, different or pending. Falsify by adding
-/// `MetadataMatch` to `is_equal`: the first assertion fails (it would let *hide
-/// identical* hide it and would assert what tier 1 cannot).
+/// `is_equal` is the one predicate the product calls (`explore/filter.rs`), so
+/// it is pinned variant by variant. Only the two states that read contents
+/// qualify: `DigestEqual` (one file) and `TreeIdentical` (a tree, by
+/// `recursive_diff`). RFC-080 tier 1's `MetadataMatch` must stay false: a
+/// names-and-sizes match cannot mean "identical". Falsify by adding
+/// `MetadataMatch` to `is_equal`: the `MetadataMatch` assertion fails.
 #[test]
-fn a_tier_1_match_is_neither_equal_nor_different_nor_pending() {
+fn is_equal_is_true_only_for_the_two_states_that_read_contents() {
     use crate::dir::EqualityEvidence as E;
-    let m = E::MetadataMatch;
-    assert!(!m.is_equal());
-    assert!(!m.is_different());
-    assert!(!m.is_pending());
-    assert!(m.present_on_both_sides());
+    assert!(E::DigestEqual.is_equal());
+    assert!(E::TreeIdentical.is_equal());
 
-    let d = E::TreeDifferent;
-    assert!(d.is_different());
-    assert!(!d.is_equal());
-    assert!(!d.is_pending());
-}
-
-/// RFC-080 tier 2: `TreeIdentical` is the only evidence a *directory*
-/// comparison is entitled to call equal — reached by `recursive_diff`
-/// actually reading contents, unlike `MetadataMatch` above. Falsify by
-/// removing it from `is_equal`'s match: the first assertion fails.
-#[test]
-fn tree_identical_is_equal_and_present_on_both_sides() {
-    use crate::dir::EqualityEvidence as E;
-    let i = E::TreeIdentical;
-    assert!(i.is_equal());
-    assert!(!i.is_different());
-    assert!(!i.is_pending());
-    assert!(i.present_on_both_sides());
+    assert!(!E::MetadataMatch.is_equal());
+    assert!(!E::MetadataOnly.is_equal());
+    assert!(!E::TreeDifferent.is_equal());
+    assert!(!E::DigestDifferent.is_equal());
+    assert!(!E::LeftOnly.is_equal());
+    assert!(!E::RightOnly.is_equal());
+    assert!(!E::Unknown.is_equal());
 }

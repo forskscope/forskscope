@@ -54,6 +54,8 @@ The **?** button in the header opens the same reference from any screen.
 | **Space**     | Select focused file as left or right comparison candidate |
 | **F6**        | Switch focused pane (left ↔ right) |
 | **Alt+↑**     | Go up one directory level (focused pane only) |
+| **Alt+←**     | Back in the focused pane's directory history (same as ◀) |
+| **Alt+→**     | Forward in the focused pane's directory history (same as ▶) |
 | **Alt+Home**  | Go to your home directory (focused pane only) |
 | **Ctrl+O**    | Choose a folder to open (focused pane only) |
 

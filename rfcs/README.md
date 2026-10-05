@@ -63,7 +63,7 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 034 | [Conflict Resolution Workspace](./done/034-conflict-resolution-workspace.md) | v0.64.0 (workspace UI deferred) |
 | 035 | [Scroll Sync, Line Mapping, and Diff Decoration Engine](./done/035-scroll-sync-line-mapping-and-diff-decoration-engine.md) | v0.61.0 (scroll-sync wiring deferred) |
 | 036 | [Live Reload, File Watcher, and External Modification Handling](./done/036-live-reload-file-watcher-and-external-modification-handling.md) | v0.53.0 + v0.71.0 (platform watcher deferred) |
-| 037 | [Scalable Directory Compare Index and Incremental Refresh](./done/037-scalable-directory-compare-index-and-incremental-refresh.md) | v0.42.0 + v0.58.0 (persistent cache deferred) |
+| 037 | [Scalable Directory Compare Index and Incremental Refresh](./done/037-scalable-directory-compare-index-and-incremental-refresh.md) | Partially implemented (v0.42.0 + v0.58.0); index model removed 0.181.0 (F157); persistent index not planned in this form |
 | 038 | [VCS Context Integration Boundary](./done/038-vcs-context-integration-boundary.md) | v0.54.0 (UI panel and JJ provider deferred) |
 | 039 | [Patch Export, Apply, and Review Workflow](./done/039-patch-export-apply-and-review-workflow.md) | v0.39.0 (export only; apply deferred) |
 | 054 | [Explorer Tree-View and Interaction Model](./done/054-explorer-tree-view-and-interaction-model.md) | v0.36.0 |

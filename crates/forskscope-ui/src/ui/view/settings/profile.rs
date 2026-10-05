@@ -2,6 +2,8 @@
 
 use dioxus::prelude::*;
 
+use forskscope_core::NewlineCompareMode;
+
 use crate::i18n::t;
 use crate::state::Store;
 
@@ -17,6 +19,7 @@ pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
     let mut ignore_case = use_signal(|| false);
     #[allow(unused_mut)]
     let mut algorithm: Signal<crate::state::DiffAlgorithmSetting> = use_signal(Default::default);
+    let mut ignore_newlines = use_signal(|| false);
 
     rsx! {
         div { class: "add-profile-form",
@@ -35,6 +38,11 @@ pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
                 input { r#type: "checkbox", checked: *ignore_case.read(),
                     onchange: move |e| ignore_case.set(e.checked()) }
                 span { {t(lang, "Ignore case")} }
+            }
+            label { class: "profile-check",
+                input { r#type: "checkbox", checked: *ignore_newlines.read(),
+                    onchange: move |e| ignore_newlines.set(e.checked()) }
+                span { {t(lang, "Ignore newlines")} }
             }
             select {
                 onchange: move |e| {
@@ -57,6 +65,11 @@ pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
                             &mut store, n,
                             *ignore_ws.read(), *ignore_case.read(),
                             *algorithm.read(),
+                            if *ignore_newlines.read() {
+                                NewlineCompareMode::IgnoreDifference
+                            } else {
+                                NewlineCompareMode::Significant
+                            },
                         );
                         on_done.call(());
                     }

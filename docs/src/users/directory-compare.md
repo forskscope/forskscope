@@ -15,7 +15,7 @@ When you launch ForskScope without arguments, the Explorer workspace opens with 
 
 - Click a folder to open it.
 - Click `↑` or press `Alt+↑` to go up one level.
-- Use the `◀` / `▶` history buttons to go back and forward.
+- Use the `◀` / `▶` history buttons, or `Alt+←` / `Alt+→`, to go back and forward.
 - Type a path in the path bar and press Enter.
 
 **Status icons per file:**
