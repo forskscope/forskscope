@@ -314,6 +314,15 @@ uinput tool is installed. Screenshots too: `niri msg action screenshot-window`
 writes no file and puts nothing on the clipboard here. Neither is needed for
 keyboard work, which the steps above cover.
 
+Screen capture was then checked by three further routes, all of which also
+fail here: the `org.freedesktop.portal.Screenshot` D-Bus call returns response
+code 2 with no result, because the only portal backend installed is
+`xdg-desktop-portal-gtk`, whose screenshot path expects GNOME Shell's
+interface; `grim` and the other Wayland capture tools are not installed, and
+`import` is X11-only against a native Wayland window. So **appearance is the
+one class of check this procedure cannot make** — ask someone who can look at
+the window rather than deferring it.
+
 **What a unit test can and cannot show, from one case.** The Alt+↑ handler
 (`dispatch_go_up`) does reproduce its borrow panic in a unit test, because the
 test calls the same function the key handler calls. The webview dispatch itself

@@ -5,7 +5,57 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.180.1] — Unreleased
+## [0.181.0] — 2026-10-06
+
+**Things that were there and could not be reached.** Three capabilities the
+product had but nobody could get to, one keyboard shortcut that crashed the
+application, and a check of our own that reported the wrong thing.
+
+### Fixed
+
+**Going up a directory with `Alt + ↑` crashed the application.** In either pane,
+every time. The directory was saved before the crash, so reopening the app showed
+the folder you were heading to — which is why this looked like a random crash
+rather than a broken key. It now simply goes up.
+
+**Ignoring line-ending differences is selectable at last.** Comparing a file with
+Windows line endings against the same file with Unix ones reported every line as
+changed, and the setting that would have prevented it existed with no way to
+choose it. Compare profiles now carry an **Ignore newlines** option, and a profile
+created with it reports only the real differences. If you had set this by hand in
+`settings.json`, it was being silently reset every time the app saved its
+settings; it is now kept.
+
+**Back and Forward have keyboard shortcuts.** `Alt + ←` and `Alt + →` move the
+focused pane through its directory history, which previously needed the mouse.
+They are the only path-bar controls that had no key.
+
+### Changed
+
+**The About control looks like a button.** It is the **ℹ** in the Settings
+dialog's header, and it opens the version and diagnostics information. It was
+styled without a background or a border, so it did not read as something you
+could press, and 0.177.0 added the word *About* beside it to compensate. The
+styling is the fix, so the word is gone and the control now matches every other
+button in the application.
+
+**The keyboard reference says which Explorer layout it describes.** The Explorer's
+keys work in the aligned layout; the compact layout does not respond to them. The
+in-app reference and the guide now say so instead of presenting them as applying
+everywhere.
+
+### Internal
+
+- A directory index and pairing model from an early design was carried, tested and
+  reachable from nothing in the product. It is removed, along with the one
+  equality state it could produce — *the names and sizes match, so treat them as
+  equal* — which contradicted this release series' rule that a verdict may not
+  claim more than was measured.
+- The check that watches whether the Arch User Repository has fallen behind a
+  release could report *behind* when it had simply failed to find out. It now says
+  which of the two happened, and reads the AUR's state without a stale cache.
+- The maintainer documentation gained a procedure for checking keyboard shortcuts
+  in the running application, which is how the `Alt + ↑` crash was found.
 
 ## [0.180.0] — 2026-10-05
 
