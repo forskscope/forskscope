@@ -5,7 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.179.1] — Unreleased
+## [0.180.0] — 2026-10-05
+
+**A folder that exists on only one side is no longer invisible when it is empty.**
+
+### Fixed
+
+**An empty folder present on one side only was not reported at all.** Two
+directories differing only by an empty subfolder were described as *names and
+sizes match* — and a full comparison did not find it either. They are now
+reported as different, the folder is listed on the side it exists, and it is
+offered neither for comparison nor for copying, since there is nothing in it to
+compare. Folders that contain something were always reported through their
+contents and are unaffected.
+
+Ignored names are unaffected too: a folder holding nothing but ignored files is
+still not a difference.
 
 ## [0.179.0] — 2026-10-03
 
