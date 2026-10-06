@@ -50,6 +50,10 @@ case is the change named here; its test states the outcome it expects.
 | `relative_formulas_edits_only` | every `D` is `=C{row}*2`; `B` changed in rows 40, 90, 140 | three cells |
 | `relative_formulas_real_formula_edit` | every `D` is `=C{row}*2`; a row inserted at row 3; row 120's `D` becomes `=C120*3` | one inserted, one real formula edit |
 | `two_sheets_mixed` | `Sheet1` as `row_inserted_near_top`; `Sheet2` as `cells_edited_in_place` | each sheet chooses its own leg |
+| `string_literal_formulas_row_inserted` (F5, 0.184.0) | every `D` is `=IF(C{row}>1000,"big","small")`; a row inserted at row 3 | one inserted; every shifted formula is declined by upstream, so positional |
+| `range_total_row_inserted` (F6, 0.184.0) | every `D` is `=C{row}*2`; a row inserted at row 3; a total row `=SUM(C2:C{last})` below | one inserted; the total's value changed, so it is unpaired and its formula is shown |
+| `range_total_row_inserted_zero` (F6b, 0.184.0) | as F6, but the inserted row's `C` is zero, so the total's value is unchanged | one inserted; the total pairs, and its rewritten range is explained and not reported |
+| `value_and_explained_formula_in_one_cell` (F7, 0.184.0) | every `D` is `=C{row}*2`; a row inserted at row 3; row 120's `C` increased by 1,000 | two inserted, one removed: row 120 is unpaired, so it is removed and re-inserted with its formula shown |
 
 **Not committed** (handoff 069 §9 D): the size cases, one row inserted against
 2,000 rows, one row against 40,000, and 5,000 rows, are written by

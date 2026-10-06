@@ -200,11 +200,14 @@ gate below do not apply. A tie keeps positional.
 - **The formula gate.** `sheets-diff` compares formula text, not its meaning, and
   Excel rewrites a formula's references when the rows they refer to move —
   absolute references included, since `$` governs copy and fill, not insertion.
-  An aligned result that
-  reports more formula changes than positional is rejected, and the header says
-  why. This applies only when the aligned result would have won on count. The
-  gate can reject an alignment, but it can never accept one that positional
-  refused.
+  An aligned result that reports more formula changes than positional is rejected,
+  and the header says why. This applies only when the aligned result would have won
+  on count. The gate can reject an alignment, but it can never accept one that
+  positional refused. **Since v0.184.0 (F177) it counts only the formulas upstream
+  could not map.** `sheets-diff` 3.6.0 explains each formula whose references moved
+  with their rows, and a formula so explained is not a change at all: it is not
+  counted by the gate, and its text is not reported. A formula that upstream
+  declines to map still counts, because "could not tell" is not "unchanged".
 
 **What was measured**, on `sheets-diff` 3.5.0, release build, the whole core path
 (both legs and the conversion):

@@ -115,9 +115,10 @@ pub enum SheetAlignment {
     PositionalIdenticalRows,
     /// Compared by position because the sheet is too large to align.
     PositionalTooLarge,
-    /// Compared by position because aligning rows would report shifted formulas
-    /// as changed (handoff 069 §3.1).
-    PositionalShiftedFormulas,
+    /// Compared by position because some formula could not be checked across the
+    /// rows that moved: upstream declined to map it, so aligning would have reported
+    /// a formula as changed without being able to say whether it was (handoff 070 §3).
+    PositionalUncheckedFormulas,
 }
 
 impl SheetAlignment {
@@ -139,8 +140,8 @@ impl SheetAlignment {
             SheetAlignment::PositionalTooLarge => {
                 " (compared by position: too large to align)".into()
             }
-            SheetAlignment::PositionalShiftedFormulas => {
-                " (compared by position: aligning rows would report shifted formulas as changed)"
+            SheetAlignment::PositionalUncheckedFormulas => {
+                " (compared by position: formulas could not be checked across the moved rows)"
                     .into()
             }
         }
@@ -152,9 +153,6 @@ impl SheetAlignment {
 pub struct SheetCellChanges {
     pub sheet: String,
     pub cells: Vec<CellChange>,
-    /// `placements[i]` is where `cells[i]` sits. Parallel to `cells`, not a field on
-    /// `CellChange`, so that struct's shape does not change.
-    pub placements: Vec<RowPlacement>,
     /// How this sheet's rows were lined up.
     pub alignment: SheetAlignment,
 }
@@ -162,8 +160,8 @@ pub struct SheetCellChanges {
 /// One changed cell. A cell is one entry, however many facets changed: if its
 /// value and its formula both changed, they are combined here (Q1 answer).
 ///
-/// **A change is identified by its address together with its row placement**
-/// (see [`SheetCellChanges::placements`]). Under an aligned sheet two entries
+/// **A change is identified by its address together with its
+/// [`placement`](Self::placement)**. Under an aligned sheet two entries
 /// can share an address and still be different changes: one row removed from
 /// the old sheet and another inserted into the new can both sit at `B6`. The
 /// entries are kept in the order the comparison reports them, and never keyed
@@ -172,10 +170,17 @@ pub struct SheetCellChanges {
 pub struct CellChange {
     /// Spreadsheet address, e.g. `"B3"`.
     pub addr: String,
-    /// 1-based row coordinate.
+    /// 1-based row coordinate of [`addr`](Self::addr). It is the row the address
+    /// names: the old sheet's row when the row exists there (so a paired row's
+    /// `addr` is its old-side address), and the new sheet's row only for a row
+    /// that exists on the new side alone. Under a positional sheet it is the same
+    /// row on both sides. The other side's row is in [`placement`](Self::placement).
     pub row: u32,
     /// 1-based column coordinate.
     pub col: u32,
+    /// Where this cell's row sits in each sheet (handoff 069 §4). Under a positional
+    /// sheet, [`RowPlacement::ByPosition`].
+    pub placement: RowPlacement,
     /// Whether the cell value changed on this entry.
     pub value_changed: bool,
     /// Whether the formula changed on this entry.
@@ -444,7 +449,25 @@ fn has_cell_changes(wb: &sheets_diff::WorkbookDiff) -> bool {
 /// A cell diff that changes a value or a formula. Format-only entries are not
 /// counted, as `convert` has always skipped them.
 fn is_changed_cell(cd: &sheets_diff::CellDiff) -> bool {
-    cd.value.is_some() || cd.formula.is_some()
+    cd.value.is_some() || is_changed_formula(cd)
+}
+
+/// Whether this cell's formula changed, by the one definition the whole module uses
+/// (handoff 070 §2): the formula is present, and upstream did not explain its
+/// difference by a row mapping. An explained formula moved with its row and was not
+/// edited.
+///
+/// It is a positive test for the one variant that does not count, so a variant
+/// upstream adds later counts as a change until its meaning has been read. That is
+/// the safe default. `NotDetermined` counts too: "could not tell" is not
+/// "unchanged".
+fn is_changed_formula(cd: &sheets_diff::CellDiff) -> bool {
+    cd.formula.as_ref().is_some_and(|fc| {
+        !matches!(
+            fc.difference,
+            sheets_diff::FormulaDifference::ExplainedByRowMapping
+        )
+    })
 }
 
 fn display_name(path: &Path) -> String {
@@ -576,13 +599,12 @@ fn convert_legs(
             .unwrap_or_default();
 
         let mut sheet_cells = Vec::new();
-        let mut placements = Vec::new();
         for cd in &chosen.cell_diffs {
             // Q1: `is_some()` *is* the changed flag for each facet, and the
             // two move independently — a cell can have a value change with
             // no formula change, or vice versa, or both at once.
             let value_changed = cd.value.is_some();
-            let formula_changed = cd.formula.is_some();
+            let formula_changed = is_changed_formula(cd);
             if !value_changed && !formula_changed {
                 // Never observed under this crate's options (format-only
                 // changes are excluded — `FormatCompareMode` other than
@@ -599,17 +621,19 @@ fn convert_legs(
                 ),
                 None => (None, None),
             };
+            // An explained formula is not a change, so its text is not shown either.
             let (old_formula, new_formula) = match &cd.formula {
-                Some(fc) => (
+                Some(fc) if formula_changed => (
                     fc.old.as_ref().map(|t| t.raw.clone()),
                     fc.new.as_ref().map(|t| t.raw.clone()),
                 ),
-                None => (None, None),
+                _ => (None, None),
             };
             sheet_cells.push(CellChange {
                 addr: cd.address.a1.clone(),
                 row: cd.address.row,
                 col: cd.address.col,
+                placement: map_placement(&cd.row_placement),
                 value_changed,
                 formula_changed,
                 old_value,
@@ -617,13 +641,11 @@ fn convert_legs(
                 old_formula,
                 new_formula,
             });
-            placements.push(map_placement(&cd.row_placement));
         }
         if !sheet_cells.is_empty() {
             cells.push(SheetCellChanges {
                 sheet: sheet_name,
                 cells: sheet_cells,
-                placements,
                 alignment,
             });
         }
@@ -690,7 +712,10 @@ fn changed_cells(sd: &sheets_diff::SheetDiff) -> usize {
 
 /// Changed formulas in one sheet.
 fn changed_formulas(sd: &sheets_diff::SheetDiff) -> usize {
-    sd.cell_diffs.iter().filter(|c| c.formula.is_some()).count()
+    sd.cell_diffs
+        .iter()
+        .filter(|c| is_changed_formula(c))
+        .count()
 }
 
 /// Whether the aligned leg could not align this sheet and fell back.
@@ -716,9 +741,11 @@ fn fell_back(sd: &sheets_diff::SheetDiff) -> bool {
 /// `ConfidenceReason` is `#[non_exhaustive]`, and `confidence` is not part of
 /// the rule. Under `RowSignature { sample_columns: None }` a pairing only ever
 /// joins display-identical rows, so ambiguity is the only way it can be wrong.
-/// The formula gate (rule 3) guards right pairings that would be reported
-/// wrongly, since formula text moves with its row. Cell count decides only which
-/// result is more useful, never which is more correct.
+/// The formula gate guards right pairings that would be reported wrongly, since
+/// formula text moves with its row. Since 0.184.0 it counts only the formulas
+/// upstream could not map (`is_changed_formula`): an explained shift is not a
+/// change, so the gate does not refuse it (handoff 070 §3). Cell count decides only
+/// which result is more useful, never which is more correct.
 fn pick<'a>(
     pos: &'a sheets_diff::SheetDiff,
     aligned: Option<&'a sheets_diff::SheetDiff>,
@@ -744,7 +771,7 @@ fn pick<'a>(
         return (pos, SheetAlignment::PositionalIdenticalRows);
     }
     if changed_formulas(al) > changed_formulas(pos) {
-        return (pos, SheetAlignment::PositionalShiftedFormulas);
+        return (pos, SheetAlignment::PositionalUncheckedFormulas);
     }
     (
         al,
@@ -1019,10 +1046,10 @@ fn build_side_text(diff: &SpreadsheetDiff, side: Side) -> String {
         // on the right.
         let by_content = matches!(scd.alignment, SheetAlignment::ByContent { .. });
         let mut shown: Vec<(u32, usize)> = scd
-            .placements
+            .cells
             .iter()
             .enumerate()
-            .filter_map(|(i, place)| side_row(*place, side).map(|row| (row, i)))
+            .filter_map(|(i, cell)| side_row(cell.placement, side).map(|row| (row, i)))
             .collect();
         if by_content {
             shown.sort_by_key(|(row, _)| *row); // stable: ties keep the diff's order
@@ -1153,6 +1180,7 @@ mod tests {
             vec![CellChange {
                 addr: "A1".into(),
                 row: 1,
+                placement: RowPlacement::ByPosition { row: 1 },
                 col: 1,
                 value_changed: true,
                 formula_changed: false,
@@ -1795,8 +1823,12 @@ mod tests {
         }
     }
 
+    fn placements(sheet: &SheetCellChanges) -> Vec<RowPlacement> {
+        sheet.cells.iter().map(|c| c.placement).collect()
+    }
+
     fn count(sheet: &SheetCellChanges, pred: impl Fn(&RowPlacement) -> bool) -> usize {
-        sheet.placements.iter().filter(|p| pred(p)).count()
+        placements(sheet).iter().filter(|p| pred(p)).count()
     }
 
     /// A — rows inserted or deleted, no identical rows. The problem this release exists for.
@@ -1815,12 +1847,11 @@ mod tests {
         );
         assert_eq!(sheet.cells.len(), 4, "only the inserted row's cells");
         assert!(
-            sheet
-                .placements
+            placements(sheet)
                 .iter()
                 .all(|p| *p == RowPlacement::NewSideOnly { new_row: 3 }),
             "the inserted row is on the new side only, at its own row 3: {:?}",
-            sheet.placements
+            placements(sheet)
         );
         assert!(
             !side_text("row_inserted_near_top", Side::Old).contains("[value]"),
@@ -1847,8 +1878,7 @@ mod tests {
             }
         ));
         assert!(
-            sheet
-                .placements
+            placements(sheet)
                 .iter()
                 .all(|p| *p == RowPlacement::OldSideOnly { old_row: 3 })
         );
@@ -1898,8 +1928,7 @@ mod tests {
         assert_eq!(sheet.alignment, SheetAlignment::Positional);
         assert_eq!(sheet.cells.len(), 3);
         assert!(
-            sheet
-                .placements
+            placements(sheet)
                 .iter()
                 .all(|p| matches!(p, RowPlacement::ByPosition { .. }))
         );
@@ -1994,15 +2023,24 @@ mod tests {
     /// F — formulas: the gate in handoff 069 §3.1. Truth: a row inserted above row-relative
     /// formulas, which Excel rewrites. Positional wins on formula text, so positional stays.
     #[test]
-    fn f1_row_relative_formulas_keep_positional_and_say_why() {
+    fn f1_row_relative_formulas_align_because_their_shift_is_explained() {
         let d = diff("relative_formulas_row_inserted");
         let sheet = sheet_of(&d, "Sheet1");
-        assert_eq!(sheet.alignment, SheetAlignment::PositionalShiftedFormulas);
-        assert!(
-            side_text("relative_formulas_row_inserted", Side::New).contains(
-                "(compared by position: aligning rows would report shifted formulas as changed)"
-            )
+        assert!(matches!(
+            sheet.alignment,
+            SheetAlignment::ByContent {
+                inserted: 1,
+                removed: 0,
+                ..
+            }
+        ));
+        assert_eq!(
+            sheet.cells.len(),
+            4,
+            "the inserted row only: the shifted formulas are explained"
         );
+        assert!(sheet.cells.iter().all(|c| !c.formula_changed));
+        assert!(!side_text("relative_formulas_row_inserted", Side::New).contains("[formula]"));
     }
 
     /// F2 — the gate does not fire when the referenced row did not move: `$C$2` is above
@@ -2028,13 +2066,21 @@ mod tests {
 
     /// F4 — the gate must not hide a real formula edit: row 120's formula changed to `*3`.
     #[test]
-    fn f4_a_real_formula_edit_is_visible_when_the_gate_keeps_positional() {
+    fn f4_a_real_formula_edit_is_visible_under_the_aligned_leg() {
         let d = diff("relative_formulas_real_formula_edit");
-        assert_eq!(
+        assert!(matches!(
             sheet_of(&d, "Sheet1").alignment,
-            SheetAlignment::PositionalShiftedFormulas
+            SheetAlignment::ByContent {
+                inserted: 2,
+                removed: 1,
+                ..
+            }
+        ));
+        let new = side_text("relative_formulas_real_formula_edit", Side::New);
+        assert!(
+            new.contains("C120*3"),
+            "the real formula edit must be visible: {new}"
         );
-        assert!(side_text("relative_formulas_real_formula_edit", Side::New).contains("C120*3"));
     }
 
     /// E1 — per-sheet choice: the insertion sheet aligns, the in-place edits sheet does not.
@@ -2163,5 +2209,101 @@ mod tests {
             let b: Vec<_> = al.diagnostics.iter().map(key).collect();
             assert_eq!(a, b, "{case}: workbook-level warnings differ between legs");
         }
+    }
+
+    // ── F177: formulas that only moved (handoff 070 §5) ──────────────────────
+
+    /// F5: a string literal in the formula. Every shifted row's formula is declined by
+    /// upstream, and a declined formula counts as changed (§2), so the gate keeps
+    /// positional with the reworded header.
+    #[test]
+    fn f5_formulas_upstream_declines_keep_positional_with_the_reworded_header() {
+        let d = diff("string_literal_formulas_row_inserted");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert_eq!(sheet.alignment, SheetAlignment::PositionalUncheckedFormulas);
+        assert!(
+            side_text("string_literal_formulas_row_inserted", Side::New).contains(
+                "(compared by position: formulas could not be checked across the moved rows)"
+            )
+        );
+    }
+
+    /// F6: a total row below row-relative formulas, whose value changes because the
+    /// inserted row adds to the sum. Upstream cannot explain a formula on an unpaired
+    /// row, and this total row is unpaired, so its formula text is shown as changed.
+    /// The handoff expected it explained and not shown; it is not, and the review says so.
+    #[test]
+    fn f6_a_total_whose_value_changed_is_unpaired_so_its_formula_is_shown() {
+        let d = diff("range_total_row_inserted");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert!(matches!(
+            sheet.alignment,
+            SheetAlignment::ByContent {
+                inserted: 2,
+                removed: 1,
+                ..
+            }
+        ));
+        let total = sheet
+            .cells
+            .iter()
+            .find(|c| c.addr == "D202")
+            .expect("the old total row's formula");
+        assert!(total.formula_changed);
+        assert_eq!(total.old_formula.as_deref(), Some("SUM(C2:C201)"));
+    }
+
+    /// F6b: as F6, but the inserted row adds nothing to the sum, so the total's displayed
+    /// value is unchanged and it pairs by content. Its rewritten range is explained, so
+    /// no cell of the total row is reported at all.
+    #[test]
+    fn f6b_a_total_whose_value_is_unchanged_has_its_rewritten_range_explained_and_hidden() {
+        let d = diff("range_total_row_inserted_zero");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert!(matches!(
+            sheet.alignment,
+            SheetAlignment::ByContent {
+                inserted: 1,
+                removed: 0,
+                ..
+            }
+        ));
+        assert!(
+            sheet.cells.iter().all(|c| c.row != 202 && c.row != 203),
+            "the total row's explained formula must not be reported: {:?}",
+            sheet
+                .cells
+                .iter()
+                .map(|c| c.addr.clone())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    /// F7 (handoff 070 §5): row 120's `C` changed, so the row is unpaired. The handoff
+    /// expected its `D` value shown in place with no formula line. That cannot happen
+    /// under `RowSignature { sample_columns: None }`: a paired row is display-identical,
+    /// so no cell in one has a value change, and §2's second bullet (a value change with
+    /// an explained formula in one cell) has no case to run. What happens instead: the
+    /// row is removed and re-inserted (the documented coarseness), and its new formula
+    /// is shown, because nothing explains a formula on an unpaired row.
+    #[test]
+    fn f7_a_row_whose_value_changed_is_removed_and_reinserted_with_its_formula_shown() {
+        let d = diff("value_and_explained_formula_in_one_cell");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert!(matches!(
+            sheet.alignment,
+            SheetAlignment::ByContent {
+                inserted: 2,
+                removed: 1,
+                ..
+            }
+        ));
+        let d120 = sheet
+            .cells
+            .iter()
+            .find(|c| c.addr == "D120")
+            .expect("row 120's D, new side");
+        assert_eq!(d120.placement, RowPlacement::NewSideOnly { new_row: 120 });
+        assert_eq!(d120.new_formula.as_deref(), Some("C120*2"));
     }
 }

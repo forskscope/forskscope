@@ -84,6 +84,19 @@ pub fn run(root: &Path, check: bool) {
             relative_formulas_real_formula_edit,
         ),
         ("two_sheets_mixed", two_sheets_mixed),
+        (
+            "string_literal_formulas_row_inserted",
+            string_literal_formulas_row_inserted,
+        ),
+        ("range_total_row_inserted", range_total_row_inserted),
+        (
+            "range_total_row_inserted_zero",
+            range_total_row_inserted_zero,
+        ),
+        (
+            "value_and_explained_formula_in_one_cell",
+            value_and_explained_formula_in_one_cell,
+        ),
     ];
 
     if check {
@@ -421,6 +434,12 @@ enum DCell {
     Times(u32),
     /// `=$C$2*2`: refers to row 2, which the cases never move.
     AbsTwo,
+    /// `=IF(C{row}>1000,"big","small")`: a formula with a string literal, which upstream
+    /// declines to map (handoff 070 §1).
+    IfBigSmall,
+    /// `=SUM(C2:C{last})` over every data record above it: the total row of a sheet
+    /// whose range is rewritten when a row is inserted (handoff 070 F6).
+    SumDataAbove,
     /// A formula written verbatim, without the leading `=`, whatever row it lands on.
     Verbatim { text: &'static str, cached: f64 },
 }
@@ -478,7 +497,28 @@ fn copy_row(v: &mut [Rec], from: u32, to: u32) {
     v[at(to)] = source;
 }
 
+/// The record that marks the total row. Its `D` is `SumDataAbove`.
+fn total_row() -> Rec {
+    Rec {
+        id: "TOTAL".into(),
+        text: "total".into(),
+        c: 0.0,
+        d: DCell::SumDataAbove,
+    }
+}
+
 fn write_records(sheet: &mut Worksheet, recs: &[Rec]) -> Result<(), rust_xlsxwriter::XlsxError> {
+    // The last data row is the last record that is not the total row.
+    let data_rows = recs
+        .iter()
+        .filter(|r| !matches!(r.d, DCell::SumDataAbove))
+        .count() as u32;
+    let last_data_excel = data_rows + 1;
+    let data_sum: f64 = recs
+        .iter()
+        .filter(|r| !matches!(r.d, DCell::SumDataAbove))
+        .map(|r| r.c)
+        .sum();
     sheet.write(0, 0, "ID")?;
     sheet.write(0, 1, "Text")?;
     sheet.write(0, 2, "Number")?;
@@ -507,6 +547,22 @@ fn write_records(sheet: &mut Worksheet, recs: &[Rec]) -> Result<(), rust_xlsxwri
                     row,
                     3,
                     Formula::new("$C$2*2").set_result(format!("{}", first_c * 2.0)),
+                )?;
+            }
+            DCell::IfBigSmall => {
+                let cached = if rec.c > 1000.0 { "big" } else { "small" };
+                sheet.write_formula(
+                    row,
+                    3,
+                    Formula::new(format!("IF(C{excel}>1000,\"big\",\"small\")")).set_result(cached),
+                )?;
+            }
+            DCell::SumDataAbove => {
+                sheet.write_formula(
+                    row,
+                    3,
+                    Formula::new(format!("SUM(C2:C{last_data_excel})"))
+                        .set_result(format!("{data_sum}")),
                 )?;
             }
             DCell::Verbatim { text, cached } => {
@@ -735,4 +791,52 @@ pub fn run_scale(dir: &Path) {
         save_records(&case_dir, old, new).unwrap_or_else(|e| panic!("writing {case} failed: {e}"));
     }
     println!("wrote the size cases to {}", dir.display());
+}
+
+/// F5 (handoff 070 §5): a string literal in the formula. Every shifted row is declined,
+/// so the gate keeps positional.
+fn string_literal_formulas_row_inserted(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old = with_formulas(DCell::IfBigSmall);
+    let mut new = with_formulas(DCell::IfBigSmall);
+    insert_at(&mut new, 3, inserted("top"));
+    save_records(dir, &old, &new)
+}
+
+/// F6: the rows of A1 with a relative formula, and a total row summing the data
+/// above it. The total's range is rewritten when a row is inserted.
+fn range_total_row_inserted(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let mut old = with_formulas(DCell::Times(2));
+    old.push(total_row());
+    let mut new = with_formulas(DCell::Times(2));
+    insert_at(&mut new, 3, inserted("top"));
+    new.push(total_row());
+    save_records(dir, &old, &new)
+}
+
+/// F7 (handoff 070 §5, the case most likely to be wrong on a first attempt): the F1
+/// shape, plus row 120's `C` changed, so that row's `D` shows a new value and its
+/// formula also shifted.
+fn value_and_explained_formula_in_one_cell(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old = with_formulas(DCell::Times(2));
+    let mut new = with_formulas(DCell::Times(2));
+    insert_at(&mut new, 3, inserted("top"));
+    let i = at(120);
+    new[i].c += 1000.0;
+    save_records(dir, &old, &new)
+}
+
+/// F6b (added beyond the plan): as F6, but the inserted row's `C` is zero, so the
+/// total's displayed value does not change. The total row then pairs by content, and
+/// its rewritten range is explained, which F6 cannot show: its value changed, so it
+/// was unpaired and nothing could explain its formula.
+fn range_total_row_inserted_zero(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let mut old = with_formulas(DCell::Times(2));
+    old.push(total_row());
+    let mut new = with_formulas(DCell::Times(2));
+    let mut zero = inserted("top");
+    zero.c = 0.0;
+    zero.d = DCell::Plain(0.0);
+    insert_at(&mut new, 3, zero);
+    new.push(total_row());
+    save_records(dir, &old, &new)
 }

@@ -117,11 +117,13 @@ shows fewer changed cells. Its header line says which it used:
   otherwise have shown less change.
 - `Sheet1 (compared by position: too large to align)`: the sheet is past the size
   bound for matching, and the warning above the panes says so.
-- `Sheet1 (compared by position: aligning rows would report shifted formulas as
-  changed)`: the sheet has formulas that refer to rows the edit moved. Excel
-  rewrites those references when a row is inserted or deleted, whether or not they
-  use `$`, so a matched comparison would report each of them as changed. Positional
-  comparison was kept, and any real formula edit is still shown.
+- `Sheet1 (compared by position: formulas could not be checked across the moved
+  rows)`: some formula refers to rows that moved, and the comparison could not work
+  out whether it changed. Positional comparison was kept, and any real formula edit
+  is still shown. The forms that cannot be checked are: text in quotes, references
+  to another sheet, named ranges, whole rows or whole columns, and a few other
+  forms. A formula whose rows moved, and that is one of the forms that can be
+  checked, is not reported as changed.
 
 A sheet with no header note was compared by position, as before.
 
