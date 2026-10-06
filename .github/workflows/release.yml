@@ -11,6 +11,14 @@ env:
 permissions:
   contents: write
 
+# F175: one tag push started this workflow twice while cutting 0.181.0, and
+# the two runs raced in the release step. Queue a second run behind the first
+# instead. `cancel-in-progress: false` is deliberate: cancelling a run mid-upload
+# is the outcome this exists to prevent.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # ── Release gates ───────────────────────────────────────────────────────────
   preflight:
@@ -221,6 +229,38 @@ jobs:
       # stays as a second, independent check on the same condition — cheap,
       # and it would still catch a preflight regression — but preflight is
       # the one that actually saves the re-cut.
+      # F175: a duplicate run of this workflow for the same tag reaches here
+      # after the first run has published, and the release step would then
+      # re-upload over finished assets while the release still looked complete.
+      # `run_attempt` tells that duplicate apart from a deliberate re-run: a new
+      # event starts at attempt 1, and "re-run failed jobs" or "re-run all jobs"
+      # on the same run increments it to 2 and up. A re-run after a partial
+      # failure is meant to update the release, so it passes.
+      - name: Refuse a first attempt over a finished release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          if [ "$RUN_ATTEMPT" != "1" ]; then
+            echo "run attempt ${RUN_ATTEMPT}: a re-run, so the release step may update ${TAG}"
+            exit 0
+          fi
+          if ! ASSETS="$(gh release view "$TAG" --json assets --jq '.assets[].name' 2>&1)"; then
+            case "$ASSETS" in
+              *"not found"*) echo "no release for ${TAG} yet: this is its first publish"; exit 0 ;;
+              *) echo "::error::could not read release ${TAG} to check for a finished publish: ${ASSETS}"; exit 1 ;;
+            esac
+          fi
+          for want in "forskscope-v${TAG}-linux-x86_64.tar.gz" "forskscope-v${TAG}-macos-aarch64.dmg" "forskscope-v${TAG}-windows-x64.zip"; do
+            if ! printf '%s\n' "$ASSETS" | grep -qxF "$want"; then
+              echo "release ${TAG} has no ${want} yet: this is its first publish"
+              exit 0
+            fi
+          done
+          echo "::error::release ${TAG} already has all three assets and this is run attempt 1, so this is a duplicate of a finished publish. Refusing to upload over it. A deliberate re-run of the same run is attempt 2 and is allowed."
+          exit 1
+
       - name: Compose release notes from CHANGELOG
         run: |
           awk -v ver="${GITHUB_REF_NAME}" '

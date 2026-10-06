@@ -49,6 +49,14 @@ on:
 permissions:
   contents: read
 
+# F175: one tag push started this workflow twice while cutting 0.181.0, and
+# the two runs raced in the release step. Queue a second run behind the first
+# instead. `cancel-in-progress: false` is deliberate: cancelling a run mid-upload
+# is the outcome this exists to prevent.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.inputs.tag }}
+  cancel-in-progress: false
+
 jobs:
   # ── Build, install, and lint the real package. Runs unconditionally -
   # no environment, no credential - so every trigger (including a plain
