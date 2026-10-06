@@ -5,7 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.181.1] — Unreleased
+## [0.182.0] — 2026-10-06
+
+**Maintenance. No change to how the application behaves.** A dependency moves
+forward, the release machinery stops being able to publish over itself, and a
+documentation check gains the half of its job it was missing.
+
+### Internal
+
+- **`sheets-diff` 3.3.0 → 3.4.0.** Upstream fixed a case where a spreadsheet row
+  could drop out of a comparison entirely and the result still claim an exact
+  match. **ForskScope was never affected** — it only arose under a row-alignment
+  setting this project does not use — and the comparison results were re-measured
+  across every scenario in the corpus to establish that rather than assume it.
+- **Releasing the same version twice is now refused rather than silently
+  overwritten.** Publishing `0.181.0` started the release workflow twice from one
+  tag; two runs uploading the same files over each other could have left a
+  truncated download, and the result would have looked finished either way. The
+  release and distribution workflows now run one at a time, and a second run over a
+  release that already has all three files stops before building anything.
+- **A new check keeps the contributor guide and the code together.** The guide
+  walks a contributor through two real modules; the check requires both that those
+  modules exist and that the guide still names them, so a rename breaks the build
+  instead of quietly leaving a guide that no longer matches the code.
+- A written rule: when a change alters what a module does, its rows in the
+  architecture and testing documents are part of that change. The documentation
+  gates check which modules are listed, never what a row says about them, and that
+  limit is now recorded where the gate is described instead of being discovered.
 
 ## [0.181.0] — 2026-10-06
 

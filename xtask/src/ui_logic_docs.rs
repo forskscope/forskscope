@@ -71,7 +71,17 @@
 //! Stale prose is not mechanisable. The control for it is the review rule
 //! in `docs/src/maintainers/what-gets-recorded.md` (*a change to a module's
 //! behaviour updates its rows*), enforced in review and not by this gate.
-
+//!
+//! **A row the check cannot read a module name from is reported, never
+//! skipped (F107).** Every table body row must start with a backticked
+//! module name. A stale row written in a slightly different style —
+//! `| compare/ghost_module | ... |`, no backticks — used to be dropped
+//! silently and the check passed on it; now it is a problem, naming the
+//! document and the row's text. There is no allowlist. Restored by the
+//! architect in review 147: the paragraph was dropped while this doc was
+//! being reorganised, which left the overview describing two of the three
+//! things the gate does.
+//!
 //! ## Which table rows are body rows
 //!
 //! A table line is a line starting with `|`. Of those, exactly two kinds are
