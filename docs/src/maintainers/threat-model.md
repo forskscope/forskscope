@@ -64,7 +64,7 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
 - Text vs. binary cross-comparison (one side text, other binary) is blocked with
   a clear error message.
 - `.xlsx` files are **parsed** since v0.169.0 (`d492557`, RFC-085): a pair of
-  workbooks goes through `sheets-diff` 3.5.0 (`calamine 0.36.1`,
+  workbooks goes through `sheets-diff` 3.6.0 (`calamine 0.36.1`,
   `quick-xml 0.41.0`, `zip 8.6.0`) under the bounds set in
   `crates/forskscope-core/src/xlsx.rs`. A comparison that cannot finish — a
   corrupt workbook, or one that reaches a size bound — is shown as an error,
@@ -498,7 +498,7 @@ Key crates touching file I/O or process execution:
 | `dioxus-desktop` | 0.7.9 | Desktop WebView host | Uses authenticated loopback WebSocket IPC between WebView and host |
 | `tungstenite` / `native-tls` | 0.28 / 0.2 | Dioxus desktop transport dependency | Accepted only via `dioxus-desktop`; no app-authored remote connections |
 | `quick-xml` | 0.39.4 | Wayland protocol code generation through GTK/Dioxus stack | Build-time/proc-macro path; not reachable from user-supplied files. Carries the two advisories ignored in `.cargo/audit.toml` |
-| `sheets-diff` | 3.5.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0; 3.0.0 since F130, 3.2.0 since F138, 3.3.0 since F154, 3.4.0 since F173, 3.5.0 since F132) | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-core` only (`audit-deps` asserts it) |
+| `sheets-diff` | 3.6.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0; 3.0.0 since F130, 3.2.0 since F138, 3.3.0 since F154, 3.4.0 since F173, 3.5.0 since F132, 3.6.0 since F177) | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-core` only (`audit-deps` asserts it) |
 | `calamine` | 0.36.1 | Workbook reader under `sheets-diff` | **Parses user-supplied XML and archives.** Read as a stream by `sheets-diff` 2.5.1 and later, so memory follows the populated cells (it did not through 2.5.0). Immediate dependent: `sheets-diff` only |
 | `quick-xml` | 0.41.0 | XML parsing under `calamine` | **Reachable from user-supplied files.** Not covered by the `.cargo/audit.toml` ignore list (which names 0.39 only) |
 | `zip` | 8.6.0 | Archive reading under `calamine` | **Reachable from user-supplied files.** Compressed size is bounded (50 MiB); expansion is not |
@@ -585,6 +585,13 @@ never evaluated. `.xlsx` is read-only in every path.
   displayed as "identical".
 - **Cancellation**, polled every 50,000 cells in `sheets-diff`'s read and compare
   loops, is tested mid-comparison and falsified.
+- **Formula text is now parsed to map its references** (F177, v0.184.0, `sheets-diff`
+  3.6.0). A formula whose rows moved is mapped through the row alignment, so that
+  its shift can be explained. This is new work over untrusted input, inside the
+  parser. It runs per formula change only, and only under the aligned leg, after
+  that comparison has already produced the change. A form it cannot map is
+  declined, not guessed: the cell then counts as changed, and the sheet keeps
+  positional comparison when the declined forms would have hidden a result.
 - **Row alignment is new input-dependent work** (F132, v0.183.0). Positional
   was the only mode through 0.182.0. Now each sheet's rows are also compared by
   content (`RowSignature` with `sample_columns: None`), in a second full
@@ -596,7 +603,7 @@ never evaluated. `.xlsx` is read-only in every path.
     above it and says so with `AlignmentFellBack`;
   - **is cancellable**: both legs take the same token, and a test stops the
     second leg;
-  - **at most doubles** a comparison's parse work, since `sheets-diff` 3.5.0 has
+  - **at most doubles** a comparison's parse work, since `sheets-diff` 3.6.0 has
     no load-once-compare-twice API.
   Measured on 3.5.0, release build, the whole core path (both legs and the
   conversion): 76 ms for 2,000 rows with one row inserted; 234 ms at 4,990 rows,
@@ -690,3 +697,4 @@ its own merits.
 | v0.178.0 | F154: `sheets-diff` 3.2.0 → 3.3.0 — upstream fixed the per-sheet formula-diagnostic gate at its cause (a sheet's own `sheet_has_formulas`, captured directly, not the formula-reading pass's unrelated success flag) | F139's workaround (`include_formula_cached_values(false)`) is retired; `build_options` no longer touches the flag. Dependency chain unchanged: `calamine 0.36.1`, `quick-xml 0.41.0`, `zip 8.6.0`, no new transitive crate. `cargo audit` and `audit-deps` clean; `RowSignature`/`Positional`/`RowKey` alignment results confirmed unchanged against 3.2.0 on a 20-case scenario matrix (F132's 0.180.0 decision still rests on these) |
 | v0.182.0 | F173: `sheets-diff` 3.3.0 → 3.4.0 — upstream rescues a row whose cells all sat outside `sample_columns` (it had dropped out of the comparison as `Exact`); the rescue adds a `missing_row_signature` warning and clamps confidence to `Medium`. We run `Positional`, and F132 pins `sample_columns: None`, which the defect never touched. Dependency chain unchanged: `calamine 0.36.1`, `quick-xml 0.41.0`, `zip 8.6.0`, no new transitive crate. `RUSTSEC-2026-0317` (512-byte allocation, covering `<= 3.1.0`) is not reported on 3.4.0; `cargo audit` exits 0, with its five allowed warnings all on unrelated crates. Re-measured on 20 scenario pairs through four configurations, 80 comparisons, 0 mismatches; `sample_columns: Some([1, 2])` on a row with no populated id or name cell now reports the row (22 cells, not 12) |
 | v0.183.0 | F132: `sheets-diff` 3.4.0 → 3.5.0, and `AlignmentMode` reversed from `Positional` alone to a per-sheet choice between positional and `RowSignature { sample_columns: None }`. A second full comparison of both workbooks is new work, bounded by `CellBounds` and `max_alignment_product` and cancellable (see the bullet above). The veto is `is_ambiguous()`: a sheet whose rows repeat is kept positional, and its header says why. Dependency chain unchanged: `calamine 0.36.1`, `quick-xml 0.41.0`, `zip 8.6.0`, no new transitive crate. `cargo audit` exits 0 on 3.5.0 |
+| v0.184.0 | F177: `sheets-diff` 3.5.0 → 3.6.0 — each formula change says why its texts differ. A formula whose references moved with its row is explained and no longer counted as a change; a declined formula still counts. Formula text is now parsed to map references, per formula change under the aligned leg (see the bullet above). Dependency chain unchanged: `calamine 0.36.1`, `quick-xml 0.41.0`, `zip 8.6.0`, no new transitive crate |
