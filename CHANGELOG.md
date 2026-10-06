@@ -48,9 +48,11 @@ everywhere.
 
 - A directory index and pairing model from an early design was carried, tested and
   reachable from nothing in the product. It is removed, along with the one
-  equality state it could produce — *the names and sizes match, so treat them as
-  equal* — which contradicted this release series' rule that a verdict may not
-  claim more than was measured.
+  equality state only it could produce — *two files have the same size and the
+  same modification time, so treat them as equal* — which contradicted this
+  release series' rule that a verdict may not claim more than was measured. The
+  directory states you actually see, including *names and sizes match*, are
+  unaffected.
 - The check that watches whether the Arch User Repository has fallen behind a
   release could report *behind* when it had simply failed to find out. It now says
   which of the two happened, and reads the AUR's state without a stale cache.
