@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.183.1] — Unreleased
+
 ## [0.183.0] — 2026-10-06
 
 **Spreadsheet rows line up.** Insert one row near the top of a sheet, and the

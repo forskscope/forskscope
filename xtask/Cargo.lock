@@ -89,7 +89,7 @@ checksum = "8e28f89b80c87b8fb0cf04ab448d5dd0dd0ade2f8891bae878de66a75a28600e"
 
 [[package]]
 name = "xtask"
-version = "0.183.0"
+version = "0.183.1"
 dependencies = [
  "rust_xlsxwriter",
 ]
