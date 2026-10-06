@@ -5,7 +5,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.183.1] — Unreleased
+## [0.184.0] — 2026-10-07
+
+**Formulas that only moved no longer read as changed.** In 0.183.0, a spreadsheet
+with a formula column kept the old position-by-position comparison after a row was
+inserted, because matching rows by content reported every formula below the new
+row as changed. Excel rewrites a formula's references when its rows move —
+`=C5*2` becomes `=C6*2` — so the text differed even though the formula had not been
+edited.
+
+### Changed
+
+**A formula whose references changed only because its row moved is no longer
+reported.** So a sheet with ordinary formula columns now matches its rows by
+content when a row is inserted or deleted, and shows the inserted row rather than
+every row beneath it. A real formula edit is still shown.
+
+**Some formulas cannot be checked across moved rows, and those sheets keep the
+position-by-position comparison.** The forms that cannot be checked are text in
+quotes, references to another sheet, named ranges, and whole rows or columns, with a
+few rarer forms. The sheet's header says so: `(compared by position: formulas could
+not be checked across the moved rows)`.
+
+**A total or summary row whose value changed because of the edit reads as removed
+and re-inserted** in a matched sheet, with its formula shown. Its value did change,
+and like any edited row it is not matched to its old self.
+
+### Internal
+
+- `sheets-diff` 3.5.0 → 3.6.0, which reports why each formula's text differs. The
+  threat model now covers the formula parsing this adds: it runs only on a formula
+  already known to differ, on a row the alignment paired, and declines what it
+  cannot map rather than guessing.
 
 ## [0.183.0] — 2026-10-06
 

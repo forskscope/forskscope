@@ -591,7 +591,10 @@ never evaluated. `.xlsx` is read-only in every path.
   parser. It runs per formula change only, and only under the aligned leg, after
   that comparison has already produced the change. A form it cannot map is
   declined, not guessed: the cell then counts as changed, and the sheet keeps
-  positional comparison when the declined forms would have hidden a result.
+  positional comparison when declined formulas would otherwise be reported as
+  changed. Verified in `sheets-diff` 3.6.0's `compare.rs`: the mapping runs only
+  after the two formula texts are already known to differ, and only for a cell
+  whose row was paired by alignment.
 - **Row alignment is new input-dependent work** (F132, v0.183.0). Positional
   was the only mode through 0.182.0. Now each sheet's rows are also compared by
   content (`RowSignature` with `sample_columns: None`), in a second full
