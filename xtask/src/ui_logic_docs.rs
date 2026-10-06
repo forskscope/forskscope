@@ -32,25 +32,46 @@
 //!
 //! ## What is and isn't checked
 //!
-//! Only *which* modules are listed, and (`architecture.md` only) whether the heading's `(N)` matches how many there are. Every mismatch is reported in one run, in both directions (missing from a doc, and present in a doc but absent on disk), not just the first found.
+//! Only *which* modules are listed, and (`architecture.md` only) whether
+//! the heading's `(N)` matches how many there are. Every mismatch is
+//! reported in one run, in both directions (missing from a doc, and
+//! present in a doc but absent on disk), not just the first found.
 //!
-//! The modules `CONTRIBUTING.md` uses as worked examples must also still exist on disk (F165, [`WORKED_EXAMPLE_MODULES`]). That catches a rename at the rename, rather than when a contributor follows a guide that no longer matches the code.
+//! The modules `CONTRIBUTING.md` uses as worked examples must also still
+//! exist on disk, and `CONTRIBUTING.md` must still name each of them
+//! (F165, [`WORKED_EXAMPLE_MODULES`]). That catches a rename at the
+//! rename, rather than when a contributor follows a guide that no longer
+//! matches the code.
 //!
 //! ## What a row's wording is, and why it is not checked
 //!
-//! Row *content*, what a row says a module covers, is **not** parsed or checked. That is a decision, and its cost was accepted rather than overlooked.
+//! A row's content, what it says a module covers, is **not** parsed or
+//! checked. That is a decision, and its cost was accepted rather than
+//! overlooked.
 //!
-//! Review 106 §4 made wording a human judgment. F165 is the instance where that cost us something: `testing.md`'s row for `explore/sync_panes` still described the pre-anchor `mirror_target` (the overshoot behaviour review 139 replaced), and it stayed that way through two releases with this check green throughout. The gate could not see it, because the row named a module that still existed.
+//! Review 106 §4 made wording a human judgment. F165 is the instance where
+//! that cost us something: `testing.md`'s row for `explore/sync_panes`
+//! still described the pre-anchor `mirror_target` (the overshoot behaviour
+//! review 139 replaced), and it stayed that way through two releases with
+//! this check green throughout. The gate could not see it, because the row
+//! named a module that still existed.
 //!
-//! A gate on wording was measured and not built. Of `testing.md`'s 66 table body rows, 14 have a description that does not begin with a backticked symbol, and those are legitimate: a row may describe coverage without naming a symbol (*"round-trip with tabs, empty session"*). A rule requiring a leading symbol would need an exception list, and an exception list is what rots. Stale prose is not mechanisable. The control for it is the review rule in `docs/src/maintainers/what-gets-recorded.md` (*a change to a module's behaviour updates its rows*), enforced in review and not by this gate.
+//! A gate on wording was measured and not built. In the two tables this
+//! gate reads, `testing.md`'s `forskscope-ui-logic` test modules and
+//! `architecture.md`'s `ui-logic` modules, 36 rows have a description, and
+//! 6 do not begin with a backticked symbol. Five are in `testing.md`
+//! (`explore/dir_verdict`, `explore/tier1_trigger`, `explore/tier2_verdict`,
+//! `settings/persistence_recovery`, `test_support`), and one is in
+//! `architecture.md` (`compare/load_identity`). Each is legitimate: they
+//! describe a verdict, a state machine, a cross-reference or a mechanism
+//! rather than leading with a symbol, and `test_support` has no tests of
+//! its own. A rule requiring a leading symbol would need an exception list
+//! for six rows, and an exception list is what rots.
 //!
-//! **A row the check cannot read a module name from is reported, never
-//! skipped (F107).** Every table body row must start with a backticked
-//! module name. A stale row written in a slightly different style —
-//! `| compare/ghost_module | ... |`, no backticks — used to be dropped
-//! silently and the check passed on it; now it is a problem, naming the
-//! document and the row's text. There is no allowlist.
-//!
+//! Stale prose is not mechanisable. The control for it is the review rule
+//! in `docs/src/maintainers/what-gets-recorded.md` (*a change to a module's
+//! behaviour updates its rows*), enforced in review and not by this gate.
+
 //! ## Which table rows are body rows
 //!
 //! A table line is a line starting with `|`. Of those, exactly two kinds are
@@ -148,12 +169,22 @@ const WORKED_EXAMPLE_MODULES: &[&str] = &["explore/sync_panes", "explore/classif
 
 fn check_worked_examples(root: &Path, problems: &mut Vec<String>) {
     let src = root.join("crates/forskscope-ui-logic/src");
+    let guide_path = root.join("CONTRIBUTING.md");
+    let guide = fs::read_to_string(&guide_path)
+        .unwrap_or_else(|e| panic!("cannot read {}: {e}", guide_path.display()));
     for module in WORKED_EXAMPLE_MODULES {
-        let path = src.join(format!("{module}.rs"));
-        if !path.is_file() {
+        let rel = format!("crates/forskscope-ui-logic/src/{module}.rs");
+        if !src.join(format!("{module}.rs")).is_file() {
             problems.push(format!(
-                "CONTRIBUTING.md's worked example `{module}` has no file at {}",
-                path.strip_prefix(root).unwrap_or(&path).display()
+                "CONTRIBUTING.md's worked example `{module}` has no file at {rel}"
+            ));
+        }
+        // The other half: the constant must not outlive the guide's own
+        // example. A guide that stops naming the module leaves the check
+        // guarding two files nothing else refers to.
+        if !guide.contains(&rel) {
+            problems.push(format!(
+                "CONTRIBUTING.md no longer names `{rel}`, which this check treats as a worked example"
             ));
         }
     }
