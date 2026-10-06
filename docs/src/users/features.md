@@ -101,7 +101,7 @@ Store a named combination of diff options as a profile. Built-in profiles:
 | Type | Diff | Merge / Save |
 |------|------|--------------|
 | Text (any encoding) | Line + inline | ✓ |
-| Excel `.xlsx` | Structural (sheet and cell) comparison, read-only. A pair too large to compare, or that cannot be read, is reported as an error | — |
+| Excel `.xlsx` | Structural (sheet and cell) comparison, read-only. Rows are matched by content where that shows less change; an edited row reads as removed and re-inserted. A pair too large to compare, or that cannot be read, is reported as an error | — |
 | Binary | Hex preview | — |
 | Missing (one side) | One-sided diff | Saving creates the file |
 

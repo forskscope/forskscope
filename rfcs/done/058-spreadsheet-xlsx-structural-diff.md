@@ -1,6 +1,6 @@
 # RFC 058: Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract
 
-**Status.** Implemented (v0.57.0) — migrated to sheets-diff v2.2.1; structured result, no catch_unwind, cancellation wired
+**Status.** Implemented (v0.57.0) — migrated to sheets-diff v2.2.1; structured result, no catch_unwind, cancellation wired. `AlignmentMode` reversed in v0.183.0 (F132): see the amendment below.
 
 **Security suspension (F11, audit N4, current as of 2026-08-13):** the
 runtime path this status line describes is not what ships today.
@@ -116,11 +116,10 @@ another thread while a 51,000-cell comparison runs
 (`cancellation_still_interrupts_mid_comparison_under_the_bound`), and before it
 starts, and both were falsified by removing the wiring.
 
-**`AlignmentMode`: `Positional`, kept.** It is `sheets-diff`'s default, the
-cheapest mode and the one measured above. Row-key and row-signature alignment
-add an `m × n` table (bounded by `max_alignment_product`, 25,000,000) that
-nothing in the UI selects. A future aligned-view RFC should revisit this with
-its own measurement.
+**`AlignmentMode`: `Positional`, kept (v0.57.0). Reversed in v0.183.0 (F132).**
+The decision was right for what it measured, the cost of positional alone, and
+it named the condition under which it should be revisited: a future aligned-view
+RFC with its own measurement. That measurement is the amendment below.
 
 **What it did not defend against, and what changed (F123, F130).**
 
@@ -176,6 +175,75 @@ its own measurement.
   landed there upstream.
 - Advisories published after 2026-09-24 against `quick-xml`, `zip` or
   `calamine`. `audit.yml` reports them daily; nothing here prevents them.
+
+## Amendment (v0.183.0, F132): rows aligned by content, per sheet
+
+Positional comparison answers "what changed in each cell". It does not answer
+"what changed in the rows", and an inserted row near the top of a sheet reports
+every cell below it as changed. A 2,000-row sheet with one row inserted at row 3
+reported 8,000 changed cells positionally and 4 aligned, on the recipe in
+`xtask/src/xlsx_fixtures.rs`.
+
+**The rule** (`xlsx.rs`, `pick`). Each sheet is compared twice, positionally and
+with `RowSignature { sample_columns: None }`. It keeps the aligned result only
+when that reports fewer changed cells, and only when the veto and the formula
+gate below do not apply. A tie keeps positional.
+
+- **The veto.** `alignment_summary.is_ambiguous()`: the sheet has rows that
+  repeat, so a pairing among them is a guess. The sheet keeps positional, and its
+  header says so. The veto is applied only where the aligned result would have won
+  on count. Where it would not have, the header would describe a choice that
+  changed nothing, so it stays silent.
+- **The fallback.** `AlignmentBoundExceeded` (`max_alignment_product`, 25,000,000
+  row pairs): positional, with the header and the existing `AlignmentFellBack`
+  warning.
+- **The formula gate.** `sheets-diff` compares formula text, not its meaning, and
+  Excel rewrites row-relative formulas when a row moves. An aligned result that
+  reports more formula changes than positional is rejected, and the header says
+  why. This applies only when the aligned result would have won on count. The
+  gate can reject an alignment, but it can never accept one that positional
+  refused.
+
+**What was measured**, on `sheets-diff` 3.5.0, release build, the whole core path
+(both legs and the conversion):
+
+| shape | positional alone | total | alignment kept |
+|---|---|---|---|
+| 2,000 rows, one row inserted at row 3 | 8,000 cells | 76 ms | aligned, 4 cells |
+| 4,990 rows, one inserted (the largest in-bound size) | 118 ms alone | 234 ms | aligned, 12 cells |
+| 5,000 rows, one inserted (over the bound) | 101 ms alone | 133 ms | positional, `AlignmentFellBack` |
+| 1 row against 40,000 | 385 ms alone | 770 ms | positional (aligned is larger) |
+
+The second comparison adds between about 0.1 and 0.4 seconds at the sizes
+measured. The directory walk, the third pairwise path, was measured for the same
+question: about 0.19 s for a one-entry tree against 40,000 entries, and about 0.52 s
+for two trees of 40,000. Its cost follows the larger tree and has no alignment step.
+
+**Cases, and what each one decided.** The corpus has fifteen committed cases
+(`xtask/src/xlsx_fixtures.rs`) and one added beyond the plan. Each has a test that
+states its truth and its expected outcome. Two decisions in the plan are worth
+recording here:
+
+- *The veto costs something, and it prevents something.* With the veto removed,
+  the identical-rows cases C2 and C3 keep the aligned result, and it is wrong:
+  C2 reports two rows inserted and one removed where the truth is one insertion.
+  The veto is therefore necessary. Its cost is C1: one row inserted and two
+  identical rows elsewhere, where the aligned result is exactly right (four cells)
+  and the veto keeps the cascade (796 cells). The plan's stop condition was that a
+  veto that never prevents a visible error must be narrowed. It does prevent one,
+  so it stays, and C1 is the cost, stated here.
+- *The header is not always shown.* Handoff 069 §3 says an ambiguous sheet is
+  always reported as compared by position. §4 says positional output must stay
+  byte-identical to 0.182.0. Both cannot hold for a sheet the veto does not change:
+  `formula_cached_value_changed` has two identical rows and an unchanged result.
+  The header is therefore shown only when the aligned result would have won.
+
+**Tie case.** The plan's tie candidates, A3 and C4, do not tie. A tie case
+(`row_appended_at_bottom`) was added so the tie rule could be falsified.
+
+**Not committed.** The size cases D1 to D3 were generated by the measurement
+harness and by `cargo xtask xlsx-fixtures --scale <dir>`, and are not in the
+repository. Two measurement tests read them when pointed at a directory.
 
 ## Status
 Implemented (v0.45.0). The core-layer deliverables from RFC-058 are shipped:

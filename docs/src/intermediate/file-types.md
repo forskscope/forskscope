@@ -102,6 +102,32 @@ Each side lists the sheets in its own tab order, and a moved sheet is shown with
 position on that side (`moved: tab 1 of 2` against `moved: tab 2 of 2`), so a
 workbook whose only change is the order of its tabs still shows a difference.
 
+**Rows are matched by content when that shows less change.** A row inserted or
+deleted near the top of a sheet shifts every row below it, and positional
+comparison would report each shifted cell as changed. So each sheet is also
+compared with its rows matched by content, and the sheet keeps whichever result
+shows fewer changed cells. Its header line says which it used:
+
+- `Sheet1 (aligned by content: 1 inserted, 0 removed, 201 matched)`: rows were
+  matched by content. The inserted row is shown on the right, at its own row
+  number; a removed row is shown on the left.
+- `Sheet1 (compared by position: some rows are identical)`: the sheet has rows
+  whose content repeats, so a match between them would be a guess, and positional
+  comparison was kept.
+- `Sheet1 (compared by position: too large to align)`: the sheet is past the size
+  bound for matching, and the warning above the panes says so.
+- `Sheet1 (compared by position: aligning rows would report shifted formulas as
+  changed)`: the sheet has row-relative formulas. Excel rewrites them when a row
+  moves, so a matched comparison would report them as changed. Positional
+  comparison was kept, and any real formula edit is still shown.
+
+A sheet with no header note was compared by position, as before.
+
+Matching is exact, so **an edited row reads as removed and re-inserted.** A row
+whose content changed is not matched to its old self. A sheet where edits
+dominate shows the same cells changed in place, because the matched result would
+have been larger.
+
 **A warning above the panes means the result may be incomplete or wrong in a way the
 diff itself does not show** — a sheet that is not a worksheet (a chart sheet) and so
 was not compared, or several sheets that could have been renamed and so were not

@@ -148,9 +148,10 @@ and other platform-specific startup problems, see the full
 ## Can I compare PDF or Word documents?
 
 Not in the current release. ForskScope compares text files and shows a hex
-preview for binary files. Excel `.xlsx` files are recognized but comparison is
-temporarily disabled for security. PDF, Word (`.docx`), PowerPoint, and similar
-document formats are not supported.
+preview for binary files. Excel `.xlsx` files are compared by sheet and by cell,
+read-only; a row inserted or deleted is shown as a row when that reads better (see
+*File type support*). PDF, Word (`.docx`), PowerPoint, and similar document formats
+are not supported.
 
 For Word documents, consider exporting to plain text first, then comparing
 the text files. For PDF, the same approach (extract text with a CLI tool)

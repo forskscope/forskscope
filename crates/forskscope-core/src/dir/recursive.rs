@@ -628,3 +628,29 @@ fn walk_and_merge_fast(
     }
     Ok(ignored_anything)
 }
+
+#[cfg(test)]
+mod measurement_tests {
+    use super::*;
+
+    /// Measurement, not a committed case (F137, handoff 069 §6): the directory walk on
+    /// a one-entry tree against a large one, in both directions. Run with
+    /// `FSK_DIR_LEFT=<a> FSK_DIR_RIGHT=<b> cargo test --release -p forskscope-core -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "measurement over generated trees; set FSK_DIR_LEFT and FSK_DIR_RIGHT"]
+    fn walk_measured_on_the_given_trees() {
+        let left =
+            std::path::PathBuf::from(std::env::var("FSK_DIR_LEFT").expect("set FSK_DIR_LEFT"));
+        let right =
+            std::path::PathBuf::from(std::env::var("FSK_DIR_RIGHT").expect("set FSK_DIR_RIGHT"));
+        let started = std::time::Instant::now();
+        let scan = recursive_diff(&left, &right);
+        let ms = started.elapsed().as_secs_f64() * 1000.0;
+        println!(
+            "recursive_diff {} vs {}: {ms:.1} ms, entries={}",
+            left.display(),
+            right.display(),
+            scan.entries.len()
+        );
+    }
+}

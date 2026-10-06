@@ -53,6 +53,37 @@ pub fn run(root: &Path, check: bool) {
         ("chart_sheet_not_compared", chart_sheet_not_compared),
         ("ambiguous_rename", ambiguous_rename),
         ("duplicate_row_keys", duplicate_row_keys),
+        ("row_inserted_near_top", row_inserted_near_top),
+        ("row_appended_at_bottom", row_appended_at_bottom),
+        ("row_deleted_near_top", row_deleted_near_top),
+        ("row_inserted_near_bottom", row_inserted_near_bottom),
+        ("insert_and_delete_balanced", insert_and_delete_balanced),
+        ("cells_edited_in_place", cells_edited_in_place),
+        ("insert_plus_edit_below", insert_plus_edit_below),
+        (
+            "identical_rows_away_from_edit",
+            identical_rows_away_from_edit,
+        ),
+        (
+            "display_identical_formulas_differ",
+            display_identical_formulas_differ,
+        ),
+        ("identical_rows_one_deleted", identical_rows_one_deleted),
+        (
+            "identical_rows_no_structure_change",
+            identical_rows_no_structure_change,
+        ),
+        (
+            "relative_formulas_row_inserted",
+            relative_formulas_row_inserted,
+        ),
+        ("formulas_above_the_edit", formulas_above_the_edit),
+        ("relative_formulas_edits_only", relative_formulas_edits_only),
+        (
+            "relative_formulas_real_formula_edit",
+            relative_formulas_real_formula_edit,
+        ),
+        ("two_sheets_mixed", two_sheets_mixed),
     ];
 
     if check {
@@ -367,4 +398,341 @@ fn duplicate_row_keys(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
         }
     }
     save_pair(dir, old, new)
+}
+
+// ── Alignment corpus (F132; handoff 069 §9) ──────────────────────────────────
+//
+// Each case is a recipe, not a hand-made pair. The base sheet has a header row
+// and four columns: `A` a unique id, `B` text derived from the id, `C` a number
+// derived from the id, `D` a plain number derived from `C`. Formulas appear only
+// where a case is about them. Every case's truth is the exact change made to the
+// base, and `xlsx.rs`'s tests state that truth beside the outcome it expects.
+// Rows are numbered as Excel numbers them: the header is row 1, the first record
+// row 2.
+
+use rust_xlsxwriter::Worksheet;
+
+/// How one record's `D` cell is written.
+#[derive(Clone)]
+enum DCell {
+    /// A plain number.
+    Plain(f64),
+    /// `=C{row}*k`: the row-relative form, which Excel rewrites on every row move.
+    Times(u32),
+    /// `=$C$2*2`: refers to row 2, which the cases never move.
+    AbsTwo,
+    /// A formula written verbatim, without the leading `=`, whatever row it lands on.
+    Verbatim { text: &'static str, cached: f64 },
+}
+
+#[derive(Clone)]
+struct Rec {
+    id: String,
+    text: String,
+    c: f64,
+    d: DCell,
+}
+
+/// The `i`-th base record (1-based): derived entirely from `i`.
+fn base_rec(i: u32) -> Rec {
+    let id = format!("ID-{i:04}");
+    Rec {
+        text: format!("text-{id}"),
+        id,
+        c: f64::from(i) * 10.0,
+        d: DCell::Plain(f64::from(i) * 2.5),
+    }
+}
+
+/// `n` base records, numbered 1 to `n`.
+fn base(n: u32) -> Vec<Rec> {
+    (1..=n).map(base_rec).collect()
+}
+
+/// A record that appears only in the new sheet.
+fn inserted(tag: &str) -> Rec {
+    Rec {
+        id: format!("NEW-{tag}"),
+        text: format!("inserted {tag}"),
+        c: 5555.0,
+        d: DCell::Plain(1388.75),
+    }
+}
+
+/// The index of the record that sits at Excel row `row`.
+fn at(row: u32) -> usize {
+    (row - 2) as usize
+}
+
+fn insert_at(v: &mut Vec<Rec>, row: u32, rec: Rec) {
+    v.insert(at(row), rec);
+}
+
+fn delete_at(v: &mut Vec<Rec>, row: u32) {
+    v.remove(at(row));
+}
+
+/// Makes the record at Excel row `to` identical to the one at `from`, in every column.
+fn copy_row(v: &mut [Rec], from: u32, to: u32) {
+    let source = v[at(from)].clone();
+    v[at(to)] = source;
+}
+
+fn write_records(sheet: &mut Worksheet, recs: &[Rec]) -> Result<(), rust_xlsxwriter::XlsxError> {
+    sheet.write(0, 0, "ID")?;
+    sheet.write(0, 1, "Text")?;
+    sheet.write(0, 2, "Number")?;
+    sheet.write(0, 3, "Value")?;
+    let first_c = recs.first().map(|r| r.c).unwrap_or(0.0);
+    for (k, rec) in recs.iter().enumerate() {
+        let row = k as u32 + 1; // zero-based sheet row; Excel row is `row + 1`
+        let excel = row + 1;
+        sheet.write(row, 0, rec.id.as_str())?;
+        sheet.write(row, 1, rec.text.as_str())?;
+        sheet.write(row, 2, rec.c)?;
+        match &rec.d {
+            DCell::Plain(v) => {
+                sheet.write(row, 3, *v)?;
+            }
+            DCell::Times(k) => {
+                sheet.write_formula(
+                    row,
+                    3,
+                    Formula::new(format!("C{excel}*{k}"))
+                        .set_result(format!("{}", rec.c * f64::from(*k))),
+                )?;
+            }
+            DCell::AbsTwo => {
+                sheet.write_formula(
+                    row,
+                    3,
+                    Formula::new("$C$2*2").set_result(format!("{}", first_c * 2.0)),
+                )?;
+            }
+            DCell::Verbatim { text, cached } => {
+                sheet.write_formula(row, 3, Formula::new(*text).set_result(format!("{cached}")))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A workbook with one sheet per `(name, records)` entry, in order.
+fn book(sheets: &[(&str, &[Rec])]) -> Result<Workbook, rust_xlsxwriter::XlsxError> {
+    let mut workbook = new_workbook()?;
+    for (name, recs) in sheets {
+        let sheet = workbook.add_worksheet().set_name(*name)?;
+        write_records(sheet, recs)?;
+    }
+    Ok(workbook)
+}
+
+/// Saves a pair built from single-sheet record lists.
+fn save_records(dir: &Path, old: &[Rec], new: &[Rec]) -> Result<(), rust_xlsxwriter::XlsxError> {
+    save_pair(dir, book(&[("Sheet1", old)])?, book(&[("Sheet1", new)])?)
+}
+
+fn row_inserted_near_top(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old = base(200);
+    let mut new = base(200);
+    insert_at(&mut new, 3, inserted("top"));
+    save_records(dir, &old, &new)
+}
+
+/// Added beyond handoff 069 §9, because none of its named cases ties: A3 and C4 were
+/// both decided on count alone. Appending a row moves nothing, so the positional
+/// and aligned results both count the new row's four cells, a tie, and the tie
+/// rule is the only thing that chooses between them.
+fn row_appended_at_bottom(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old = base(200);
+    let mut new = base(200);
+    insert_at(&mut new, 202, inserted("bottom"));
+    save_records(dir, &old, &new)
+}
+
+fn row_deleted_near_top(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old = base(200);
+    let mut new = base(200);
+    delete_at(&mut new, 3);
+    save_records(dir, &old, &new)
+}
+
+fn row_inserted_near_bottom(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old = base(200);
+    let mut new = base(200);
+    insert_at(&mut new, 199, inserted("bottom"));
+    save_records(dir, &old, &new)
+}
+
+fn insert_and_delete_balanced(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old = base(200);
+    let mut new = base(200);
+    insert_at(&mut new, 10, inserted("ten"));
+    delete_at(&mut new, 150);
+    save_records(dir, &old, &new)
+}
+
+fn cells_edited_in_place(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old = base(200);
+    let mut new = base(200);
+    for row in [40, 90, 140] {
+        let i = at(row);
+        new[i].text = format!("edited {row}");
+    }
+    save_records(dir, &old, &new)
+}
+
+fn insert_plus_edit_below(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old = base(200);
+    let mut new = base(200);
+    insert_at(&mut new, 3, inserted("top"));
+    let i = at(120);
+    new[i].text = "edited 120".into();
+    save_records(dir, &old, &new)
+}
+
+/// Rows 150 and 151 are identical in every column, in both sheets. The insertion
+/// is the only difference between old and new.
+fn identical_rows_away_from_edit(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let mut old = base(200);
+    copy_row(&mut old, 150, 151);
+    let mut new = old.clone();
+    insert_at(&mut new, 3, inserted("top"));
+    save_records(dir, &old, &new)
+}
+
+/// Rows 150 and 151 share `A`, `B` and `C`, and their `D` formulas differ in text but
+/// give the same result. In the new sheet those two rows are swapped, with their
+/// formula text carried over verbatim. Every `D` is a formula in this case only.
+fn display_identical_formulas_differ(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let mut old: Vec<Rec> = base(200)
+        .into_iter()
+        .map(|mut r| {
+            r.d = DCell::Times(2);
+            r
+        })
+        .collect();
+    copy_row(&mut old, 150, 151);
+    let i150 = at(150);
+    let i151 = at(151);
+    old[i150].d = DCell::Verbatim {
+        text: "2*C150",
+        cached: old[i150].c * 2.0,
+    };
+    old[i151].d = DCell::Verbatim {
+        text: "C151+C151",
+        cached: old[i151].c * 2.0,
+    };
+    let mut new = old.clone();
+    insert_at(&mut new, 3, inserted("top"));
+    let (a, b) = (at(150), at(151));
+    new.swap(a, b);
+    save_records(dir, &old, &new)
+}
+
+/// Rows 100 and 101 are identical; the new sheet deletes one of them. Which one was
+/// deleted is not determinable from the content.
+fn identical_rows_one_deleted(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let mut old = base(200);
+    copy_row(&mut old, 100, 101);
+    let mut new = old.clone();
+    delete_at(&mut new, 101);
+    save_records(dir, &old, &new)
+}
+
+/// Rows 100 and 101 are identical, and the new sheet carries B1's three edits.
+fn identical_rows_no_structure_change(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let mut old = base(200);
+    copy_row(&mut old, 100, 101);
+    let mut new = old.clone();
+    for row in [40, 90, 140] {
+        let i = at(row);
+        new[i].text = format!("edited {row}");
+    }
+    save_records(dir, &old, &new)
+}
+
+fn with_formulas(d: DCell) -> Vec<Rec> {
+    base(200)
+        .into_iter()
+        .map(|mut r| {
+            r.d = d.clone();
+            r
+        })
+        .collect()
+}
+
+fn relative_formulas_row_inserted(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old = with_formulas(DCell::Times(2));
+    let mut new = with_formulas(DCell::Times(2));
+    insert_at(&mut new, 3, inserted("top"));
+    save_records(dir, &old, &new)
+}
+
+fn formulas_above_the_edit(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old = with_formulas(DCell::AbsTwo);
+    let mut new = with_formulas(DCell::AbsTwo);
+    insert_at(&mut new, 3, inserted("top"));
+    save_records(dir, &old, &new)
+}
+
+fn relative_formulas_edits_only(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old = with_formulas(DCell::Times(2));
+    let mut new = with_formulas(DCell::Times(2));
+    for row in [40, 90, 140] {
+        let i = at(row);
+        new[i].text = format!("edited {row}");
+    }
+    save_records(dir, &old, &new)
+}
+
+fn relative_formulas_real_formula_edit(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old = with_formulas(DCell::Times(2));
+    let mut new = with_formulas(DCell::Times(2));
+    insert_at(&mut new, 3, inserted("top"));
+    let i = at(120);
+    new[i].d = DCell::Times(3);
+    save_records(dir, &old, &new)
+}
+
+/// Two sheets: `Sheet1` is the insertion case, `Sheet2` the in-place edits case.
+fn two_sheets_mixed(dir: &Path) -> Result<(), rust_xlsxwriter::XlsxError> {
+    let old1 = base(200);
+    let mut new1 = base(200);
+    insert_at(&mut new1, 3, inserted("top"));
+    let old2 = base(200);
+    let mut new2 = base(200);
+    for row in [40, 90, 140] {
+        let i = at(row);
+        new2[i].text = format!("edited {row}");
+    }
+    save_pair(
+        dir,
+        book(&[("Sheet1", &old1), ("Sheet2", &old2)])?,
+        book(&[("Sheet1", &new1), ("Sheet2", &new2)])?,
+    )
+}
+
+/// F137 (handoff 069 §6, §9 D): the size cases, written to `dir` and never into the
+/// repository, because a committed 40,000-row workbook is weight for no gain over
+/// its recipe. Old and new each keep the recipe's own shape; sheet names are the
+/// generator's defaults.
+pub fn run_scale(dir: &Path) {
+    let mut headline_new = base(2_000);
+    insert_at(&mut headline_new, 3, inserted("top"));
+    let pairs: [(&str, Vec<Rec>, Vec<Rec>); 2] = [
+        (
+            "asymmetric_five_against_forty_thousand",
+            base(5),
+            base(40_000),
+        ),
+        ("headline_2000", base(2_000), headline_new),
+    ];
+    for (case, old, new) in &pairs {
+        let case_dir = dir.join(case);
+        std::fs::create_dir_all(&case_dir)
+            .unwrap_or_else(|e| panic!("cannot create {}: {e}", case_dir.display()));
+        save_records(&case_dir, old, new).unwrap_or_else(|e| panic!("writing {case} failed: {e}"));
+    }
+    println!("wrote the size cases to {}", dir.display());
 }

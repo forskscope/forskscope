@@ -477,3 +477,18 @@ fn very_long_single_line_produces_one_replace_hunk() {
         "a change hunk must exist for different long lines"
     );
 }
+
+// ── Text: asymmetric sizes (F137, handoff 069 §6) ────────────────────────────
+//
+// A handful of lines against tens of thousands, generated in memory rather than
+// committed. The five old lines are the first five of the new file, so the whole
+// difference is 39,995 inserted lines and nothing removed.
+
+#[test]
+fn a_handful_of_lines_against_forty_thousand_is_an_insertion_of_the_rest() {
+    let left: String = (0..5).map(|i| format!("row {i}\n")).collect();
+    let right: String = (0..40_000).map(|i| format!("row {i}\n")).collect();
+    let doc = compute_diff(&left, &right, opts_default());
+    assert_eq!(doc.stats.lines_deleted, 0);
+    assert_eq!(doc.stats.lines_inserted, 39_995);
+}

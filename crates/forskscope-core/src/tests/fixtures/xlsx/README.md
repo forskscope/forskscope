@@ -26,6 +26,37 @@ shape — the generator was written to match *that*, not to guess at lost
 bytes. The crate's full test suite, and specifically every `xlsx::tests::*`
 test, passes unchanged against the replacement files.
 
+Row alignment (F132, handoff 069 §9). Each base sheet has a header and four
+columns: `A` a unique id (`ID-0001`…), `B` text derived from it, `C` a number
+derived from it, `D` a plain number derived from `C`. No formulas, unless the
+case is about them. Rows are numbered as Excel numbers them. The truth of each
+case is the change named here; its test states the outcome it expects.
+
+| case | recipe (new sheet, against the 200-row base) | truth |
+|---|---|---|
+| `row_inserted_near_top` | a row inserted at row 3 | one row inserted |
+| `row_deleted_near_top` | row 3 deleted | one row removed |
+| `row_inserted_near_bottom` | a row inserted at row 199 | one row inserted |
+| `row_appended_at_bottom` (added beyond the plan: a tie case) | a row inserted at row 202 | one row appended; both legs count four cells |
+| `insert_and_delete_balanced` | a row inserted at row 10, row 150 deleted | one inserted, one removed |
+| `cells_edited_in_place` | `B` changed in rows 40, 90, 140 | three cells |
+| `insert_plus_edit_below` | a row inserted at row 3, `B` changed in row 120 | one inserted, one cell |
+| `identical_rows_away_from_edit` | rows 150 and 151 identical in every column, in both sheets; a row inserted at row 3 | one inserted |
+| `display_identical_formulas_differ` | rows 150 and 151 share `A`, `B`, `C`, with formulas `2*C150` and `C151+C151`; every `D` is a formula; a row inserted at row 3; rows 150 and 151 then swapped | one inserted, two rows swapped |
+| `identical_rows_one_deleted` | rows 100 and 101 identical; row 101 deleted | one of two identical rows removed |
+| `identical_rows_no_structure_change` | rows 100 and 101 identical; `B` changed in rows 40, 90, 140 | three cells |
+| `relative_formulas_row_inserted` | every `D` is `=C{row}*2`; a row inserted at row 3 | one inserted; formulas below rewritten |
+| `formulas_above_the_edit` | every `D` is `=$C$2*2`; a row inserted at row 3 | one inserted; no formula text changes |
+| `relative_formulas_edits_only` | every `D` is `=C{row}*2`; `B` changed in rows 40, 90, 140 | three cells |
+| `relative_formulas_real_formula_edit` | every `D` is `=C{row}*2`; a row inserted at row 3; row 120's `D` becomes `=C120*3` | one inserted, one real formula edit |
+| `two_sheets_mixed` | `Sheet1` as `row_inserted_near_top`; `Sheet2` as `cells_edited_in_place` | each sheet chooses its own leg |
+
+**Not committed** (handoff 069 §9 D): the size cases, one row inserted against
+2,000 rows, one row against 40,000, and 5,000 rows, are written by
+`cargo xtask xlsx-fixtures --scale <dir>` to a directory outside the repository.
+The text corpus's asymmetric case is generated in memory by
+`tests/diff_corpus.rs`, for the same reason.
+
 Sheets and cells:
 
 | case | old | new |

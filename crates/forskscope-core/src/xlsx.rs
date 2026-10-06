@@ -80,17 +80,94 @@ pub enum SheetChange {
     Moved(String),
 }
 
+/// Where one changed cell's row sits in each sheet. Our mirror of `sheets-diff`'s
+/// `RowPlacement` (RFC-085 keeps upstream's naming on its own side of `convert`).
+/// Exhaustive on purpose: a `_ =>` must not be able to put a change in the wrong
+/// row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RowPlacement {
+    /// Paired by content: the row is `old_row` in the old sheet and `new_row` in the new.
+    PairedByContent { old_row: u32, new_row: u32 },
+    /// The row exists only in the old sheet (removed).
+    OldSideOnly { old_row: u32 },
+    /// The row exists only in the new sheet (inserted).
+    NewSideOnly { new_row: u32 },
+    /// Compared by position: row N of the old sheet against row N of the new.
+    ByPosition { row: u32 },
+}
+
+/// How one sheet's rows were lined up, which is what its header line says (F132;
+/// handoff 069 §3 and §5). Every variant but `Positional` is a claim the user is
+/// owed the reason for, so each one carries its own sentence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SheetAlignment {
+    /// Compared by position, and nothing needs saying.
+    Positional,
+    /// Rows paired by content. `matched` counts paired rows; `inserted` and
+    /// `removed` count rows with no counterpart.
+    ByContent {
+        inserted: usize,
+        removed: usize,
+        matched: usize,
+    },
+    /// Compared by position because some rows are identical, so a pairing among
+    /// them would have been a guess.
+    PositionalIdenticalRows,
+    /// Compared by position because the sheet is too large to align.
+    PositionalTooLarge,
+    /// Compared by position because aligning rows would report shifted formulas
+    /// as changed (handoff 069 §3.1).
+    PositionalShiftedFormulas,
+}
+
+impl SheetAlignment {
+    /// The text that follows `Sheet: <name>` on the sheet's header line, both
+    /// panes alike. English throughout: the side texts carry no locale.
+    fn header_note(&self) -> String {
+        match self {
+            SheetAlignment::Positional => String::new(),
+            SheetAlignment::ByContent {
+                inserted,
+                removed,
+                matched,
+            } => format!(
+                " (aligned by content: {inserted} inserted, {removed} removed, {matched} matched)"
+            ),
+            SheetAlignment::PositionalIdenticalRows => {
+                " (compared by position: some rows are identical)".into()
+            }
+            SheetAlignment::PositionalTooLarge => {
+                " (compared by position: too large to align)".into()
+            }
+            SheetAlignment::PositionalShiftedFormulas => {
+                " (compared by position: aligning rows would report shifted formulas as changed)"
+                    .into()
+            }
+        }
+    }
+}
+
 /// Changed cells within one sheet.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SheetCellChanges {
     pub sheet: String,
     pub cells: Vec<CellChange>,
+    /// `placements[i]` is where `cells[i]` sits. Parallel to `cells`, not a field on
+    /// `CellChange`, so that struct's shape does not change.
+    pub placements: Vec<RowPlacement>,
+    /// How this sheet's rows were lined up.
+    pub alignment: SheetAlignment,
 }
 
-/// One changed cell — one entry per address regardless of how many facets changed.
+/// One changed cell. A cell is one entry, however many facets changed: if its
+/// value and its formula both changed, they are combined here (Q1 answer).
 ///
-/// If both the value and formula changed at the same address, they are
-/// combined into a single `CellChange` (Q1 answer: one row per address).
+/// **A change is identified by its address together with its row placement**
+/// (see [`SheetCellChanges::placements`]). Under an aligned sheet two entries
+/// can share an address and still be different changes: one row removed from
+/// the old sheet and another inserted into the new can both sit at `B6`. The
+/// entries are kept in the order the comparison reports them, and never keyed
+/// by address alone.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CellChange {
     /// Spreadsheet address, e.g. `"B3"`.
@@ -246,11 +323,13 @@ impl SpreadsheetDiff {
 /// above). The tables for the 2.5.0 defect are in RFC-058's amendment.
 /// `max_input_bytes` (50 MiB, from `hardened()`) limits compressed size only.
 ///
-/// **`AlignmentMode` (RFC-058 condition 4): `Positional`, kept.** It is
-/// `sheets-diff`'s default, the cheapest mode, and the one measured above.
-/// The row-key and row-signature modes add an `m × n` alignment table
-/// (bounded separately by `max_alignment_product`) that this product does
-/// not need: nothing in the UI selects an alignment.
+/// **`AlignmentMode` (RFC-058 condition 4): reversed in 0.183.0 (F132).** Each
+/// sheet keeps its positional result or a content-aligned one, by the rule in
+/// `pick`. The content-aligned leg is a second, full comparison, so it is
+/// bounded by the same `CellBounds`, and by `max_alignment_product` (25,000,000
+/// row pairs) inside `sheets-diff`, which falls back to positional above it.
+/// The one-row insertion cases in `xlsx_fixtures.rs` are the reason the reversal
+/// was made.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CellBounds {
     pub max_cells_read: u64,
@@ -300,26 +379,72 @@ pub fn diff_xlsx_with_bounds(
     cancel: Option<&CancellationToken>,
     bounds: CellBounds,
 ) -> Result<SpreadsheetDiff> {
-    let opts = build_options(cancel, bounds)?;
-
-    let workbook_diff =
-        sheets_diff::compare_paths_with_options(old_path, new_path, opts).map_err(|e| match e {
-            sheets_diff::SheetsDiffError::LimitExceeded { limit, observed } => {
-                CoreError::Unsupported {
-                    message: format!(
-                        "{} is too large to compare: it exceeded the size bound ({limit}, \
-                         reached {observed}). The comparison was stopped, not completed, so no \
-                         result is shown",
-                        display_name(old_path)
-                    ),
-                }
-            }
-            e => CoreError::Unsupported {
-                message: format!("could not diff workbook '{}': {}", old_path.display(), e),
+    // Two comparisons, not one: positional, which is today's result, and rows
+    // paired by content (`RowSignature` over every column). Each sheet keeps one
+    // of them, by the rule in `choose_leg`. The second is skipped when the
+    // positional result has no cell changes, because nothing could be chosen
+    // over it. Both go through `build_options`, so both honour the same bounds
+    // and the same cancellation token.
+    let positional = compare_leg(
+        old_path,
+        new_path,
+        cancel,
+        bounds,
+        sheets_diff::AlignmentMode::Positional,
+    )?;
+    let aligned = if has_cell_changes(&positional) {
+        Some(compare_leg(
+            old_path,
+            new_path,
+            cancel,
+            bounds,
+            sheets_diff::AlignmentMode::RowSignature {
+                sample_columns: None,
             },
-        })?;
+        )?)
+    } else {
+        None
+    };
 
-    Ok(convert(workbook_diff))
+    Ok(convert_legs(&positional, aligned.as_ref()))
+}
+
+/// One comparison of the two workbooks under one alignment mode. Its errors are
+/// mapped the same way whichever mode ran.
+fn compare_leg(
+    old_path: &Path,
+    new_path: &Path,
+    cancel: Option<&CancellationToken>,
+    bounds: CellBounds,
+    alignment: sheets_diff::AlignmentMode,
+) -> Result<sheets_diff::WorkbookDiff> {
+    let opts = build_options(cancel, bounds, alignment)?;
+    sheets_diff::compare_paths_with_options(old_path, new_path, opts).map_err(|e| match e {
+        sheets_diff::SheetsDiffError::LimitExceeded { limit, observed } => CoreError::Unsupported {
+            message: format!(
+                "{} is too large to compare: it exceeded the size bound ({limit}, \
+                     reached {observed}). The comparison was stopped, not completed, so no \
+                     result is shown",
+                display_name(old_path)
+            ),
+        },
+        e => CoreError::Unsupported {
+            message: format!("could not diff workbook '{}': {}", old_path.display(), e),
+        },
+    })
+}
+
+/// Whether any sheet of this comparison has a cell that changed in value or formula.
+fn has_cell_changes(wb: &sheets_diff::WorkbookDiff) -> bool {
+    wb.sheets
+        .iter()
+        .any(|sd| sd.cell_diffs.iter().any(is_changed_cell))
+}
+
+/// A cell diff that changes a value or a formula. Format-only entries are not
+/// counted, as `convert` has always skipped them.
+fn is_changed_cell(cd: &sheets_diff::CellDiff) -> bool {
+    cd.value.is_some() || cd.formula.is_some()
 }
 
 fn display_name(path: &Path) -> String {
@@ -331,11 +456,14 @@ fn display_name(path: &Path) -> String {
 fn build_options(
     cancel: Option<&CancellationToken>,
     bounds: CellBounds,
+    alignment: sheets_diff::AlignmentMode,
 ) -> Result<sheets_diff::DiffOptions> {
     let mut limits = sheets_diff::Limits::hardened();
     limits.max_cells_read = Some(bounds.max_cells_read);
     limits.max_cells_compared = Some(bounds.max_cells_compared);
-    let mut builder = sheets_diff::DiffOptions::builder().limits(limits);
+    let mut builder = sheets_diff::DiffOptions::builder()
+        .limits(limits)
+        .alignment(alignment);
     if let Some(token) = cancel {
         let tok = token.clone();
         builder = builder.cancellation(move || tok.is_cancelled());
@@ -378,7 +506,13 @@ fn build_options(
 /// Maps `sheets-diff`'s v2 model onto our own (RFC-085 Q1: upstream declined
 /// to reshape their model to ours, so this boundary is where their naming
 /// stops and ours begins).
-fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
+///
+/// `wb` is the positional comparison; `aligned` is the `RowSignature` one when
+/// it ran. Each sheet keeps one of them, by [`pick`].
+fn convert_legs(
+    wb: &sheets_diff::WorkbookDiff,
+    aligned: Option<&sheets_diff::WorkbookDiff>,
+) -> SpreadsheetDiff {
     use sheets_diff::SheetChange as UpSheetChange;
 
     let mut sheets = Vec::new();
@@ -429,7 +563,9 @@ fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
             new: sd.new_sheet.as_ref().map(|s| s.index),
         });
 
-        if sd.cell_diffs.is_empty() {
+        let al = aligned.and_then(|a| a.sheets.iter().find(|x| same_sheet(x, sd)));
+        let (chosen, alignment) = pick(sd, al);
+        if chosen.cell_diffs.is_empty() {
             continue;
         }
         let sheet_name = sd
@@ -440,7 +576,8 @@ fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
             .unwrap_or_default();
 
         let mut sheet_cells = Vec::new();
-        for cd in &sd.cell_diffs {
+        let mut placements = Vec::new();
+        for cd in &chosen.cell_diffs {
             // Q1: `is_some()` *is* the changed flag for each facet, and the
             // two move independently — a cell can have a value change with
             // no formula change, or vice versa, or both at once.
@@ -480,22 +617,36 @@ fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
                 old_formula,
                 new_formula,
             });
+            placements.push(map_placement(&cd.row_placement));
         }
         if !sheet_cells.is_empty() {
             cells.push(SheetCellChanges {
                 sheet: sheet_name,
                 cells: sheet_cells,
+                placements,
+                alignment,
             });
         }
     }
 
-    // Stats — driven directly from wb.summary (no manual counting). Their
-    // own `derive_summary` counts a `RenamedAndMoved` sheet in *both*
-    // `sheets_renamed` and `sheets_moved` — a sheet-count mismatch against
-    // our single collapsed `sheets` entry for it that already existed in
-    // their own aggregate semantics, not one this adapter introduces.
-    let (warnings, info_notes) = summarize_notes(collect_notes(&wb));
+    // Stats. `sheets_*` come from the positional summary, which describes the
+    // sheet list both legs share. The cell counts come from the cells we kept.
+    // With no aligned sheet, the positional summary is exactly what it was
+    // before this change, so it is kept as it was.
+    let (warnings, info_notes) = summarize_notes(collect_notes(wb, aligned));
     let s = &wb.summary;
+    let any_aligned = cells
+        .iter()
+        .any(|sc| matches!(sc.alignment, SheetAlignment::ByContent { .. }));
+    let (values_changed, formulas_changed) = if any_aligned {
+        let all = cells.iter().flat_map(|sc| sc.cells.iter());
+        (
+            all.clone().filter(|c| c.value_changed).count(),
+            all.filter(|c| c.formula_changed).count(),
+        )
+    } else {
+        (s.values_changed, s.formulas_changed)
+    };
     let stats = SpreadsheetDiffStats {
         sheets_added: s.sheets_added,
         sheets_removed: s.sheets_removed,
@@ -503,8 +654,8 @@ fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
         sheets_renamed: s.sheets_renamed,
         sheets_moved: s.sheets_moved,
         cells_changed: cells.iter().map(|sc| sc.cells.len()).sum(),
-        values_changed: s.values_changed,
-        formulas_changed: s.formulas_changed,
+        values_changed,
+        formulas_changed,
     };
 
     SpreadsheetDiff {
@@ -515,6 +666,104 @@ fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
         tab_counts: (wb.old.sheet_count, wb.new.sheet_count),
         cells,
         stats,
+    }
+}
+
+/// A positional-only conversion. Tests use it on a single comparison, which is
+/// the case `convert_legs` reduces to with no aligned leg.
+#[cfg(test)]
+fn convert(wb: sheets_diff::WorkbookDiff) -> SpreadsheetDiff {
+    convert_legs(&wb, None)
+}
+
+/// The same sheet in the other comparison: sheets are identified by their tab
+/// positions on each side, which both comparisons share.
+fn same_sheet(a: &sheets_diff::SheetDiff, b: &sheets_diff::SheetDiff) -> bool {
+    a.old_sheet.as_ref().map(|s| s.index) == b.old_sheet.as_ref().map(|s| s.index)
+        && a.new_sheet.as_ref().map(|s| s.index) == b.new_sheet.as_ref().map(|s| s.index)
+}
+
+/// Changed cells in one sheet, as `convert` counts them.
+fn changed_cells(sd: &sheets_diff::SheetDiff) -> usize {
+    sd.cell_diffs.iter().filter(|c| is_changed_cell(c)).count()
+}
+
+/// Changed formulas in one sheet.
+fn changed_formulas(sd: &sheets_diff::SheetDiff) -> usize {
+    sd.cell_diffs.iter().filter(|c| c.formula.is_some()).count()
+}
+
+/// Whether the aligned leg could not align this sheet and fell back.
+fn fell_back(sd: &sheets_diff::SheetDiff) -> bool {
+    sd.diagnostics.iter().any(|d| {
+        matches!(
+            d.kind,
+            sheets_diff::DiagnosticKind::AlignmentBoundExceeded { .. }
+        )
+    })
+}
+
+/// The per-sheet rule of handoff 069 §3, in the order the handoff states it.
+///
+/// Returns the leg this sheet keeps and the reason its header states. `pos` is
+/// the positional sheet; `aligned` is the same sheet from the `RowSignature` leg,
+/// when that leg ran.
+///
+/// The veto (rule 1) is `is_ambiguous()` and nothing else from the summary:
+/// `ConfidenceReason` is `#[non_exhaustive]`, and `confidence` is not part of
+/// the rule. Under `RowSignature { sample_columns: None }` a pairing only ever
+/// joins display-identical rows, so ambiguity is the only way it can be wrong.
+/// The formula gate (rule 3) guards right pairings that would be reported
+/// wrongly, since formula text moves with its row. Cell count decides only which
+/// result is more useful, never which is more correct.
+fn pick<'a>(
+    pos: &'a sheets_diff::SheetDiff,
+    aligned: Option<&'a sheets_diff::SheetDiff>,
+) -> (&'a sheets_diff::SheetDiff, SheetAlignment) {
+    let Some(al) = aligned else {
+        return (pos, SheetAlignment::Positional);
+    };
+    if fell_back(al) {
+        return (pos, SheetAlignment::PositionalTooLarge);
+    }
+    let Some(summary) = al.alignment_summary.as_ref() else {
+        return (pos, SheetAlignment::Positional);
+    };
+    // A tie keeps positional, which is the status quo and needs no explanation.
+    if changed_cells(al) >= changed_cells(pos) {
+        // Whether or not the sheet is ambiguous, the aligned result does not win,
+        // so there is nothing for the veto to explain. Saying "some rows are
+        // identical" here would change the output of a sheet that was never
+        // going to be aligned (handoff 069 §4's byte-identity guard).
+        return (pos, SheetAlignment::Positional);
+    }
+    if summary.is_ambiguous() {
+        return (pos, SheetAlignment::PositionalIdenticalRows);
+    }
+    if changed_formulas(al) > changed_formulas(pos) {
+        return (pos, SheetAlignment::PositionalShiftedFormulas);
+    }
+    (
+        al,
+        SheetAlignment::ByContent {
+            inserted: summary.inserted_rows,
+            removed: summary.removed_rows,
+            matched: summary.matched_rows,
+        },
+    )
+}
+
+/// Our placement from upstream's. Exhaustive, so a new upstream case is a compile
+/// error here rather than a change placed in the wrong row.
+fn map_placement(p: &sheets_diff::RowPlacement) -> RowPlacement {
+    use sheets_diff::RowPlacement as Up;
+    match *p {
+        Up::PairedByAlignment { old_row, new_row } => {
+            RowPlacement::PairedByContent { old_row, new_row }
+        }
+        Up::UnpairedInOldSheet { old_row } => RowPlacement::OldSideOnly { old_row },
+        Up::UnpairedInNewSheet { new_row } => RowPlacement::NewSideOnly { new_row },
+        Up::ComparedPositionally { row } => RowPlacement::ByPosition { row },
     }
 }
 
@@ -574,11 +823,38 @@ fn note_from(d: &sheets_diff::Diagnostic) -> Note {
     }
 }
 
-/// Every diagnostic of the comparison, workbook-level **and** sheet-level.
-fn collect_notes(wb: &sheets_diff::WorkbookDiff) -> Vec<Note> {
+/// Every diagnostic the result stands on: workbook-level and sheet-level, from the
+/// positional leg, plus one the aligned leg raises that the user is owed.
+///
+/// That one is `AlignmentBoundExceeded` on a sheet whose changes are reported:
+/// the sheet was too large to align and was compared by position, which is what
+/// `AlignmentFellBack` says (F131; handoff 069 §5). The aligned leg's other
+/// diagnostics are not surfaced. Its duplicate-signature diagnostic is the veto,
+/// and the sheet's header says why. `missing_row_signature` cannot fire under
+/// `sample_columns: None`.
+fn collect_notes(
+    wb: &sheets_diff::WorkbookDiff,
+    aligned: Option<&sheets_diff::WorkbookDiff>,
+) -> Vec<Note> {
     let mut notes: Vec<Note> = wb.diagnostics.iter().map(note_from).collect();
     for sd in &wb.sheets {
         notes.extend(sd.diagnostics.iter().map(note_from));
+        if !sd.cell_diffs.iter().any(is_changed_cell) {
+            continue;
+        }
+        if let Some(al) = aligned.and_then(|a| a.sheets.iter().find(|x| same_sheet(x, sd))) {
+            notes.extend(
+                al.diagnostics
+                    .iter()
+                    .filter(|d| {
+                        matches!(
+                            d.kind,
+                            sheets_diff::DiagnosticKind::AlignmentBoundExceeded { .. }
+                        )
+                    })
+                    .map(note_from),
+            );
+        }
     }
     notes
 }
@@ -728,15 +1004,40 @@ fn build_side_text(diff: &SpreadsheetDiff, side: Side) -> String {
     }
 
     for scd in &diff.cells {
-        out.push_str(&format!("Sheet: {}\n", scd.sheet));
-        for cell in &scd.cells {
+        out.push_str(&format!(
+            "Sheet: {}{}\n",
+            scd.sheet,
+            scd.alignment.header_note()
+        ));
+        // The cells this side shows, each at its row on this side. A sheet
+        // compared by position keeps its order and its addresses unchanged. A
+        // sheet paired by content lists each side in that side's own row order,
+        // so a row that moved shows at its old row on the left and its new row
+        // on the right.
+        let by_content = matches!(scd.alignment, SheetAlignment::ByContent { .. });
+        let mut shown: Vec<(u32, usize)> = scd
+            .placements
+            .iter()
+            .enumerate()
+            .filter_map(|(i, place)| side_row(*place, side).map(|row| (row, i)))
+            .collect();
+        if by_content {
+            shown.sort_by_key(|(row, _)| *row); // stable: ties keep the diff's order
+        }
+        for (row, i) in shown {
+            let cell = &scd.cells[i];
+            let addr = if by_content {
+                a1(cell.col, row)
+            } else {
+                cell.addr.clone()
+            };
             // Value line
             if cell.value_changed {
                 let v = match side {
                     Side::Old => cell.old_value.as_deref().unwrap_or("(empty)"),
                     Side::New => cell.new_value.as_deref().unwrap_or("(empty)"),
                 };
-                out.push_str(&format!("  {} [value]: {}\n", cell.addr, v));
+                out.push_str(&format!("  {} [value]: {}\n", addr, v));
             }
             // Formula line
             if cell.formula_changed {
@@ -744,12 +1045,38 @@ fn build_side_text(diff: &SpreadsheetDiff, side: Side) -> String {
                     Side::Old => cell.old_formula.as_deref().unwrap_or("(none)"),
                     Side::New => cell.new_formula.as_deref().unwrap_or("(none)"),
                 };
-                out.push_str(&format!("  {} [formula]: {}\n", cell.addr, f));
+                out.push_str(&format!("  {} [formula]: {}\n", addr, f));
             }
         }
     }
 
     out
+}
+
+/// The row a placed cell shows at on this side, or `None` when the row does not
+/// exist on this side (a row removed from the old sheet shows nothing on the new).
+fn side_row(place: RowPlacement, side: Side) -> Option<u32> {
+    match (place, side) {
+        (RowPlacement::PairedByContent { old_row, .. }, Side::Old) => Some(old_row),
+        (RowPlacement::PairedByContent { new_row, .. }, Side::New) => Some(new_row),
+        (RowPlacement::OldSideOnly { old_row }, Side::Old) => Some(old_row),
+        (RowPlacement::NewSideOnly { new_row }, Side::New) => Some(new_row),
+        (RowPlacement::ByPosition { row }, _) => Some(row),
+        (RowPlacement::OldSideOnly { .. }, Side::New)
+        | (RowPlacement::NewSideOnly { .. }, Side::Old) => None,
+    }
+}
+
+/// A spreadsheet address (`B6`) from a 1-based column and a row.
+fn a1(col: u32, row: u32) -> String {
+    let mut letters = String::new();
+    let mut c = col;
+    while c > 0 {
+        let rem = (c - 1) % 26;
+        letters.insert(0, char::from(b'A' + rem as u8));
+        c = (c - 1) / 26;
+    }
+    format!("{letters}{row}")
 }
 
 fn excel_doc(content: String) -> TextDocument {
@@ -1441,5 +1768,397 @@ mod tests {
         .unwrap();
         assert_eq!(pair.warnings.len(), 1);
         assert!(pair.left.content.contains("A1 [value]: before"));
+    }
+
+    // ── F132: rows aligned by content (handoff 069 §9) ───────────────────────
+    //
+    // Each case below states its truth, the change its recipe made, and the
+    // outcome §3's rule must produce. A case is named for its recipe in
+    // `xtask/src/xlsx_fixtures.rs`. Falsifications are listed on each branch.
+
+    fn sheet_of<'a>(d: &'a SpreadsheetDiff, name: &str) -> &'a SheetCellChanges {
+        d.cells
+            .iter()
+            .find(|s| s.sheet == name)
+            .unwrap_or_else(|| panic!("no changed cells for sheet {name}"))
+    }
+
+    fn side_text(case: &str, side: Side) -> String {
+        let d = diff(case);
+        let (old, new) = derive_pair_text_from_diff(&d);
+        match side {
+            Side::Old => old.content,
+            Side::New => new.content,
+        }
+    }
+
+    fn count(sheet: &SheetCellChanges, pred: impl Fn(&RowPlacement) -> bool) -> usize {
+        sheet.placements.iter().filter(|p| pred(p)).count()
+    }
+
+    /// A — rows inserted or deleted, no identical rows. The problem this release exists for.
+    /// Truth: one row inserted at row 3. Outcome: aligned, four cells, all on the new side.
+    #[test]
+    fn a1_an_inserted_row_is_reported_as_one_row_not_a_cascade() {
+        let d = diff("row_inserted_near_top");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert_eq!(
+            sheet.alignment,
+            SheetAlignment::ByContent {
+                inserted: 1,
+                removed: 0,
+                matched: 201
+            }
+        );
+        assert_eq!(sheet.cells.len(), 4, "only the inserted row's cells");
+        assert!(
+            sheet
+                .placements
+                .iter()
+                .all(|p| *p == RowPlacement::NewSideOnly { new_row: 3 }),
+            "the inserted row is on the new side only, at its own row 3: {:?}",
+            sheet.placements
+        );
+        assert!(
+            !side_text("row_inserted_near_top", Side::Old).contains("[value]"),
+            "the old pane shows nothing for a row that is not in it"
+        );
+        let new = side_text("row_inserted_near_top", Side::New);
+        assert!(
+            new.contains("(aligned by content: 1 inserted, 0 removed, 201 matched)"),
+            "the header must say the sheet was aligned, and how: {new}"
+        );
+    }
+
+    /// Mirror of A1: row 3 removed. Outcome: aligned, shown on the old side only.
+    #[test]
+    fn a2_a_removed_row_is_shown_on_the_old_side_only() {
+        let d = diff("row_deleted_near_top");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert!(matches!(
+            sheet.alignment,
+            SheetAlignment::ByContent {
+                removed: 1,
+                inserted: 0,
+                ..
+            }
+        ));
+        assert!(
+            sheet
+                .placements
+                .iter()
+                .all(|p| *p == RowPlacement::OldSideOnly { old_row: 3 })
+        );
+        assert!(!side_text("row_deleted_near_top", Side::New).contains("[value]"));
+    }
+
+    /// Truth: one row inserted at 199. Positional 16 cells, aligned 4. Outcome: aligned.
+    #[test]
+    fn a3_an_insertion_near_the_bottom_is_aligned_when_that_reports_fewer_cells() {
+        let d = diff("row_inserted_near_bottom");
+        assert!(matches!(
+            sheet_of(&d, "Sheet1").alignment,
+            SheetAlignment::ByContent { inserted: 1, .. }
+        ));
+        assert_eq!(sheet_of(&d, "Sheet1").cells.len(), 4);
+    }
+
+    /// Truth: one row inserted at 10 and one removed at 150. Outcome: aligned, both shown.
+    #[test]
+    fn a4_a_balanced_insert_and_delete_is_aligned_and_both_are_shown() {
+        let d = diff("insert_and_delete_balanced");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert!(matches!(
+            sheet.alignment,
+            SheetAlignment::ByContent {
+                inserted: 1,
+                removed: 1,
+                ..
+            }
+        ));
+        assert_eq!(
+            count(sheet, |p| matches!(p, RowPlacement::NewSideOnly { .. })),
+            4
+        );
+        assert_eq!(
+            count(sheet, |p| matches!(p, RowPlacement::OldSideOnly { .. })),
+            4
+        );
+    }
+
+    /// B — where aligned must lose. Truth: three cells edited in place. Outcome: positional,
+    /// no header, because aligning would report three removed rows and three inserted.
+    #[test]
+    fn b1_cells_edited_in_place_stay_positional_with_no_header() {
+        let d = diff("cells_edited_in_place");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert_eq!(sheet.alignment, SheetAlignment::Positional);
+        assert_eq!(sheet.cells.len(), 3);
+        assert!(
+            sheet
+                .placements
+                .iter()
+                .all(|p| matches!(p, RowPlacement::ByPosition { .. }))
+        );
+        assert!(!side_text("cells_edited_in_place", Side::New).contains("aligned by content"));
+    }
+
+    /// Truth: one row inserted at 3, and row 120's `B` edited. Outcome: aligned, and row 120
+    /// reads as removed and re-inserted, which §2 documents as expected.
+    #[test]
+    fn b2_an_edit_below_an_insertion_reads_as_removed_and_reinserted() {
+        let d = diff("insert_plus_edit_below");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert!(matches!(
+            sheet.alignment,
+            SheetAlignment::ByContent {
+                inserted: 2,
+                removed: 1,
+                ..
+            }
+        ));
+        assert_eq!(
+            sheet.cells.len(),
+            12,
+            "the inserted row, plus the edited row twice"
+        );
+        assert_eq!(
+            count(sheet, |p| matches!(p, RowPlacement::OldSideOnly { .. })),
+            4
+        );
+    }
+
+    /// C — identical rows. Truth: one row inserted, and rows 150 and 151 identical in every
+    /// column. Outcome: positional, with the identical-rows header. The aligned leg was
+    /// correct here, so this case records what the veto costs.
+    #[test]
+    fn c1_identical_rows_veto_the_aligned_result_and_say_so() {
+        let d = diff("identical_rows_away_from_edit");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert_eq!(sheet.alignment, SheetAlignment::PositionalIdenticalRows);
+        assert!(
+            side_text("identical_rows_away_from_edit", Side::New)
+                .contains("(compared by position: some rows are identical)")
+        );
+    }
+
+    /// C2 — the veto's necessity. Truth: one insertion, and rows 150 and 151 swapped with
+    /// display-identical content. The aligned leg reports two inserted and one removed,
+    /// which is wrong, so the veto must hold here.
+    #[test]
+    fn c2_display_identical_rows_with_formulas_that_differ_are_not_paired_by_content() {
+        let d = diff("display_identical_formulas_differ");
+        assert_eq!(
+            sheet_of(&d, "Sheet1").alignment,
+            SheetAlignment::PositionalIdenticalRows
+        );
+    }
+
+    /// C3 — truth: one of two identical rows deleted, and which one is undeterminable.
+    /// Outcome: positional, with the identical-rows header.
+    #[test]
+    fn c3_a_deleted_row_among_identical_rows_is_not_claimed_as_a_specific_row() {
+        let d = diff("identical_rows_one_deleted");
+        assert_eq!(
+            sheet_of(&d, "Sheet1").alignment,
+            SheetAlignment::PositionalIdenticalRows
+        );
+    }
+
+    /// C4 — the veto costs nothing where alignment would not have helped: the aligned
+    /// result is larger, so positional stands by count, and the header stays silent,
+    /// because the veto changes nothing a user would see. (Handoff 069 §9 expected the
+    /// identical-rows header here; §4's byte-identity guard decided against it. See the
+    /// review request.)
+    #[test]
+    fn c4_identical_rows_with_edits_only_stay_positional() {
+        let d = diff("identical_rows_no_structure_change");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert_eq!(sheet.alignment, SheetAlignment::Positional);
+        assert_eq!(sheet.cells.len(), 3);
+    }
+
+    /// The tie rule (added case, see `xlsx_fixtures.rs`): one row appended at the bottom
+    /// moves nothing, so both legs report four cells. A tie keeps positional, with no header.
+    #[test]
+    fn a_tie_keeps_positional_with_no_header() {
+        let d = diff("row_appended_at_bottom");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert_eq!(sheet.cells.len(), 4);
+        assert_eq!(sheet.alignment, SheetAlignment::Positional);
+    }
+
+    /// F — formulas: the gate in handoff 069 §3.1. Truth: a row inserted above row-relative
+    /// formulas, which Excel rewrites. Positional wins on formula text, so positional stays.
+    #[test]
+    fn f1_row_relative_formulas_keep_positional_and_say_why() {
+        let d = diff("relative_formulas_row_inserted");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert_eq!(sheet.alignment, SheetAlignment::PositionalShiftedFormulas);
+        assert!(
+            side_text("relative_formulas_row_inserted", Side::New).contains(
+                "(compared by position: aligning rows would report shifted formulas as changed)"
+            )
+        );
+    }
+
+    /// F2 — the gate does not fire when the referenced row did not move: `$C$2` is above
+    /// the insertion. The aligned leg wins, with no formula changes.
+    #[test]
+    fn f2_a_reference_above_the_edit_does_not_trigger_the_formula_gate() {
+        let d = diff("formulas_above_the_edit");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert!(matches!(
+            sheet.alignment,
+            SheetAlignment::ByContent { inserted: 1, .. }
+        ));
+        assert!(sheet.cells.iter().all(|c| !c.formula_changed));
+    }
+
+    /// F3 — the aligned leg would not have won on count, so there is no formula header.
+    #[test]
+    fn f3_row_relative_formulas_with_edits_only_stay_positional_with_no_header() {
+        let d = diff("relative_formulas_edits_only");
+        let sheet = sheet_of(&d, "Sheet1");
+        assert_eq!(sheet.alignment, SheetAlignment::Positional);
+    }
+
+    /// F4 — the gate must not hide a real formula edit: row 120's formula changed to `*3`.
+    #[test]
+    fn f4_a_real_formula_edit_is_visible_when_the_gate_keeps_positional() {
+        let d = diff("relative_formulas_real_formula_edit");
+        assert_eq!(
+            sheet_of(&d, "Sheet1").alignment,
+            SheetAlignment::PositionalShiftedFormulas
+        );
+        assert!(side_text("relative_formulas_real_formula_edit", Side::New).contains("C120*3"));
+    }
+
+    /// E1 — per-sheet choice: the insertion sheet aligns, the in-place edits sheet does not.
+    #[test]
+    fn e1_each_sheet_chooses_its_own_leg() {
+        let d = diff("two_sheets_mixed");
+        assert!(matches!(
+            sheet_of(&d, "Sheet1").alignment,
+            SheetAlignment::ByContent { .. }
+        ));
+        assert_eq!(sheet_of(&d, "Sheet2").alignment, SheetAlignment::Positional);
+    }
+
+    /// Cancellation reaches the second leg: a token cancelled before the aligned leg runs
+    /// stops that leg with an error, and nothing is returned for the comparison.
+    #[test]
+    fn cancellation_reaches_the_aligned_leg() {
+        let token = CancellationToken::new();
+        token.cancel();
+        let r = compare_leg(
+            &fixture("row_inserted_near_top", "old.xlsx"),
+            &fixture("row_inserted_near_top", "new.xlsx"),
+            Some(&token),
+            CellBounds::PRODUCT,
+            sheets_diff::AlignmentMode::RowSignature {
+                sample_columns: None,
+            },
+        );
+        assert!(
+            r.is_err(),
+            "a cancelled aligned leg must not return a result"
+        );
+    }
+
+    /// Measurement, not a committed case: handoff 069 §9's size cases (D), which are
+    /// generated by the measurement harness and never committed. Run with
+    /// `FSK_D_DIR=<dir> cargo test -p forskscope-core -- --ignored --nocapture`,
+    /// where `<dir>` holds one sub-directory per pair, each with `old.xlsx` and `new.xlsx`.
+    #[test]
+    #[ignore = "measurement over generated workbooks; set FSK_D_DIR"]
+    fn d_cases_measured_outside_the_repository() {
+        let root = std::env::var("FSK_D_DIR").expect("set FSK_D_DIR");
+        let mut dirs: Vec<PathBuf> = std::fs::read_dir(root)
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .filter(|p| p.join("old.xlsx").exists())
+            .collect();
+        dirs.sort();
+        for dir in dirs {
+            let started = std::time::Instant::now();
+            let d = diff_xlsx(&dir.join("old.xlsx"), &dir.join("new.xlsx"), None).unwrap();
+            let ms = started.elapsed().as_secs_f64() * 1000.0;
+            let alignments: Vec<(String, SheetAlignment)> = d
+                .cells
+                .iter()
+                .map(|s| (s.sheet.clone(), s.alignment.clone()))
+                .collect();
+            let warnings: Vec<SpreadsheetWarningKind> = d.warnings.iter().map(|w| w.kind).collect();
+            println!(
+                "{} ms={ms:.1} cells={} alignment={alignments:?} warnings={warnings:?}",
+                dir.display(),
+                d.stats.cells_changed
+            );
+        }
+    }
+
+    /// Handoff 069 §3.2: the workbook-level warnings must be identical between the two
+    /// legs, because `convert_legs` reads them from the positional leg only. Checked on
+    /// every committed case, both legs, by kind and message.
+    #[test]
+    fn workbook_level_warnings_are_identical_between_the_two_legs() {
+        let cases = [
+            "basic",
+            "unchanged_sheet",
+            "renamed",
+            "renamed_and_moved",
+            "formula",
+            "formula_cached_value_changed",
+            "large",
+            "reorder_only",
+            "sheet_added",
+            "sheet_removed",
+            "stray_far_cell",
+            "chart_sheet_not_compared",
+            "ambiguous_rename",
+            "duplicate_row_keys",
+            "row_inserted_near_top",
+            "row_appended_at_bottom",
+            "insert_and_delete_balanced",
+            "cells_edited_in_place",
+            "insert_plus_edit_below",
+            "identical_rows_away_from_edit",
+            "display_identical_formulas_differ",
+            "identical_rows_one_deleted",
+            "identical_rows_no_structure_change",
+            "relative_formulas_row_inserted",
+            "formulas_above_the_edit",
+            "relative_formulas_edits_only",
+            "relative_formulas_real_formula_edit",
+            "two_sheets_mixed",
+        ];
+        for case in cases {
+            let (old, new) = (fixture(case, "old.xlsx"), fixture(case, "new.xlsx"));
+            let pos = compare_leg(
+                &old,
+                &new,
+                None,
+                CellBounds::PRODUCT,
+                sheets_diff::AlignmentMode::Positional,
+            )
+            .unwrap();
+            let al = compare_leg(
+                &old,
+                &new,
+                None,
+                CellBounds::PRODUCT,
+                sheets_diff::AlignmentMode::RowSignature {
+                    sample_columns: None,
+                },
+            )
+            .unwrap();
+            let key = |d: &sheets_diff::Diagnostic| {
+                (d.severity, d.kind.code().to_string(), d.message.clone())
+            };
+            let a: Vec<_> = pos.diagnostics.iter().map(key).collect();
+            let b: Vec<_> = al.diagnostics.iter().map(key).collect();
+            assert_eq!(a, b, "{case}: workbook-level warnings differ between legs");
+        }
     }
 }

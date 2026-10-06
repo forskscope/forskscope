@@ -11,6 +11,7 @@
 //!   cargo xtask ui-logic-docs — verify architecture.md/testing.md's ui-logic module tables match disk (F93)
 //!   cargo xtask xlsx-fixtures           — regenerate the .xlsx test fixtures under forskscope-core (F134)
 //!   cargo xtask xlsx-fixtures --check   — verify the committed fixtures match what the generator produces
+//!   cargo xtask xlsx-fixtures --scale <dir> — write the size cases (a handful of rows against 40,000; 2,000 rows) to <dir>, never into the repository
 //!
 //! CSS source files under assets/css/ are assembled in alphabetical order.
 //! The numeric prefix on each filename (00-, 01-, …) encodes the cascade order.
@@ -49,6 +50,10 @@ fn main() {
             let check = args.iter().any(|a| a == "--check");
             xlsx_fixtures::run(&workspace_root(), check);
         }
+        // F137 / handoff 069 §9: the size cases, written outside the repository.
+        Some("xlsx-fixtures") if args.len() == 3 && args[1] == "--scale" => {
+            xlsx_fixtures::run_scale(std::path::Path::new(&args[2]));
+        }
         Some(cmd) => {
             eprintln!("unknown command: {cmd}");
             print_usage();
@@ -69,7 +74,7 @@ fn print_usage() {
     eprintln!("       cargo xtask rfc-sync");
     eprintln!("       cargo xtask ui-logic-connectivity");
     eprintln!("       cargo xtask ui-logic-docs");
-    eprintln!("       cargo xtask xlsx-fixtures [--check]");
+    eprintln!("       cargo xtask xlsx-fixtures [--check | --scale <dir>]");
 }
 
 pub(crate) fn workspace_root() -> PathBuf {

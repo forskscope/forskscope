@@ -184,7 +184,7 @@ Tests live in `crates/forskscope-core/src/tests/` and are declared in `tests.rs`
 | `transaction_log_tests` | `TransactionLog` push/undo/redo/mark_saved, `is_dirty`. | RFC-015 |
 | `vcs_tests` | `GitProvider::detect`, `VcsProvider` trait contract. | RFC-038 |
 | `watcher_tests` | `MockFileChangeMonitor` watch/inject/poll/drain, `WatchError`, `FileChangeKind`. | RFC-036 |
-| `xlsx_tests` | Fail-closed spreadsheet comparison behavior while XLSX parsing is security-disabled. | RFC-058 |
+| `xlsx_tests` | Fail-closed spreadsheet comparison behavior: an unreadable pair errors instead of comparing as empty. | RFC-058 |
 
 Integration tests in `tests/`:
 
@@ -327,3 +327,33 @@ the window rather than deferring it.
 (`dispatch_go_up`) does reproduce its borrow panic in a unit test, because the
 test calls the same function the key handler calls. The webview dispatch itself
 is not covered by any unit test, so the running app is the only check for it.
+
+## The `.xlsx` corpus, and the sizes it covers
+
+The spreadsheet tests in `forskscope-core/src/xlsx.rs` read real workbooks from
+`src/tests/fixtures/xlsx/`, which `cargo xtask xlsx-fixtures` generates and
+`--check` verifies. The corpus is described case by case in that directory's
+`README.md`, with each case's recipe.
+
+Two dimensions are named here, so a reader knows what the corpus must cover:
+
+- **Row identity.** Rows inserted, deleted, edited in place, identical to another
+  row, and repeated formulas. Each has a case in the corpus.
+- **Size asymmetry (F137).** A one-row sheet against a 40,000-row sheet is the
+  largest cascade positional comparison can produce, and the shape where the
+  content-aligned comparison costs the most. It is not committed, because a
+  40,000-row workbook is repository weight for no gain over its recipe. It is
+  written on demand, and so is the 2,000-row headline case:
+
+  ```sh
+  cargo xtask xlsx-fixtures --scale /some/scratch/dir
+  ```
+
+  The text corpus has the same dimension in memory, in `tests/diff_corpus.rs`:
+  five lines against forty thousand.
+
+The measured cost of each size is in RFC-058's amendment and the threat model's
+parser section, not repeated here. Measurements that read generated workbooks
+are `#[ignore]`d tests that take a directory from an environment variable
+(`FSK_D_DIR`, `FSK_DIR_LEFT`/`FSK_DIR_RIGHT`).
+

@@ -70,7 +70,7 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 055 | [Breadcrumb Path Navigation](./done/055-breadcrumb-path-navigation.md) | v0.36.0 |
 | 056 | [Ignore Patterns for Files and Directories](./done/056-ignore-patterns-for-files-and-directories.md) | v0.36.0 |
 | 057 | [Settings Dialog Layout Refinements](./done/057-settings-dialog-layout-refinements.md) | v0.36.0 |
-| 058 | [Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract](./done/058-spreadsheet-xlsx-structural-diff.md) | v0.57.0 (aligned view deferred) |
+| 058 | [Spreadsheet (`.xlsx`) Structural Diff and Adapter Contract](./done/058-spreadsheet-xlsx-structural-diff.md) | v0.57.0; rows aligned by content v0.183.0 (F132, amended) |
 | 059 | [Explorer and Compare UI/UX Audit Remediation](./done/059-explorer-and-compare-uiux-audit-remediation.md) | v0.41.0 (UI keyboard items deferred) |
 | 062 | [Safe Batch Copy UX and Restore Manifest Integration](./done/062-safe-batch-copy-ux-and-restore-manifest.md) | v0.145.3 |
 | 064 | [Compare View — Per-Pane Scroll and All-Different Coloring](./done/064-compare-view-scroll-and-coloring-fixes.md) | v0.147.0 |
