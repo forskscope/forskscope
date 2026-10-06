@@ -32,12 +32,17 @@
 //!
 //! ## What is and isn't checked
 //!
-//! Only *which* modules are listed, and (`architecture.md` only) whether
-//! the heading's `(N)` matches how many there are. Row *content* — what a
-//! row says a module covers — is not parsed or checked; review 106 §4
-//! was explicit that wording stays a human judgment. Every mismatch is
-//! reported in one run, in both directions (missing from a doc, and
-//! present in a doc but absent on disk) — not just the first found.
+//! Only *which* modules are listed, and (`architecture.md` only) whether the heading's `(N)` matches how many there are. Every mismatch is reported in one run, in both directions (missing from a doc, and present in a doc but absent on disk), not just the first found.
+//!
+//! The modules `CONTRIBUTING.md` uses as worked examples must also still exist on disk (F165, [`WORKED_EXAMPLE_MODULES`]). That catches a rename at the rename, rather than when a contributor follows a guide that no longer matches the code.
+//!
+//! ## What a row's wording is, and why it is not checked
+//!
+//! Row *content*, what a row says a module covers, is **not** parsed or checked. That is a decision, and its cost was accepted rather than overlooked.
+//!
+//! Review 106 §4 made wording a human judgment. F165 is the instance where that cost us something: `testing.md`'s row for `explore/sync_panes` still described the pre-anchor `mirror_target` (the overshoot behaviour review 139 replaced), and it stayed that way through two releases with this check green throughout. The gate could not see it, because the row named a module that still existed.
+//!
+//! A gate on wording was measured and not built. Of `testing.md`'s 66 table body rows, 14 have a description that does not begin with a backticked symbol, and those are legitimate: a row may describe coverage without naming a symbol (*"round-trip with tabs, empty session"*). A rule requiring a leading symbol would need an exception list, and an exception list is what rots. Stale prose is not mechanisable. The control for it is the review rule in `docs/src/maintainers/what-gets-recorded.md` (*a change to a module's behaviour updates its rows*), enforced in review and not by this gate.
 //!
 //! **A row the check cannot read a module name from is reported, never
 //! skipped (F107).** Every table body row must start with a backticked
@@ -121,6 +126,7 @@ pub fn run(root: &Path) {
     report_diff(&mut problems, "testing.md", &testing_rows, &disk_set);
     report_unreadable(&mut problems, "architecture.md", &arch_table);
     report_unreadable(&mut problems, "testing.md", &testing_table);
+    check_worked_examples(root, &mut problems);
 
     if !problems.is_empty() {
         eprintln!("ui-logic-docs check failed:");
@@ -134,6 +140,23 @@ pub fn run(root: &Path) {
         "ui-logic-docs check passed: architecture.md and testing.md both list exactly the {} ui-logic modules on disk.",
         disk_set.len()
     );
+}
+
+/// F165: the modules `CONTRIBUTING.md` walks through as worked examples. A
+/// rename of one of them fails here, at the rename.
+const WORKED_EXAMPLE_MODULES: &[&str] = &["explore/sync_panes", "explore/classify_pair"];
+
+fn check_worked_examples(root: &Path, problems: &mut Vec<String>) {
+    let src = root.join("crates/forskscope-ui-logic/src");
+    for module in WORKED_EXAMPLE_MODULES {
+        let path = src.join(format!("{module}.rs"));
+        if !path.is_file() {
+            problems.push(format!(
+                "CONTRIBUTING.md's worked example `{module}` has no file at {}",
+                path.strip_prefix(root).unwrap_or(&path).display()
+            ));
+        }
+    }
 }
 
 /// F107: a row the check cannot read a module name from is a problem, named,

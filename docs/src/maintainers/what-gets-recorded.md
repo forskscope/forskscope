@@ -49,6 +49,29 @@ demonstration matters enough to mention, it matters enough to state here; if it
 does not, drop the sentence. The register entries in `ROADMAP.md` follow this
 rule: they name the review that found a thing, and then say what was found.
 
+## A change to a module's behaviour updates its rows
+
+When a change alters what a module does, that module's row in
+`architecture.md` and `testing.md` is in scope for the same change. The review
+request says whether the row changed, or why it is still accurate.
+
+The documentation gates check which modules are listed, not what a row says
+(`cargo xtask ui-logic-docs` states this in its own module doc). So a row's
+wording is a review step, and a reviewer applies it like this:
+
+1. Find each module the change touches, and its row in the two tables. The
+   module path is the row's name: `explore/sync_panes` is the row for
+   `crates/forskscope-ui-logic/src/explore/sync_panes.rs`.
+2. Read the row against the new behaviour. A row that describes behaviour the
+   change removed or replaced is stale, and the change is not complete until
+   the row is corrected.
+3. The review request states either *row changed: what changed* or *row
+   unchanged: why it is still accurate*.
+
+Why this rule exists: F165. `testing.md`'s row for `explore/sync_panes` still
+described the pre-anchor `mirror_target` after the behaviour had changed, and
+the gate stayed green throughout.
+
 ## What is tracked, and what is not
 
 Tracked: RFCs, the register, the changelog, this documentation, release
