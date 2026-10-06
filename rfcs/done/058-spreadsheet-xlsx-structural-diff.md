@@ -198,7 +198,9 @@ gate below do not apply. A tie keeps positional.
   row pairs): positional, with the header and the existing `AlignmentFellBack`
   warning.
 - **The formula gate.** `sheets-diff` compares formula text, not its meaning, and
-  Excel rewrites row-relative formulas when a row moves. An aligned result that
+  Excel rewrites a formula's references when the rows they refer to move —
+  absolute references included, since `$` governs copy and fill, not insertion.
+  An aligned result that
   reports more formula changes than positional is rejected, and the header says
   why. This applies only when the aligned result would have won on count. The
   gate can reject an alignment, but it can never accept one that positional

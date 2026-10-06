@@ -5,7 +5,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.182.1] — Unreleased
+## [0.183.0] — 2026-10-06
+
+**Spreadsheet rows line up.** Insert one row near the top of a sheet, and the
+comparison now shows that row — not every row below it as changed.
+
+### Changed
+
+**A row inserted or deleted in a spreadsheet is shown as a row.** Previously the
+cells of a sheet were compared position by position, so one row inserted near the
+top shifted everything beneath it and every shifted cell was reported as changed.
+On a 2,000-row sheet of four columns, that was 8,000 changed cells for one new
+row. Each sheet is now also compared with its rows matched by content, and keeps
+whichever result shows less change — here, 4 cells: the inserted row, on the right
+at its own row number.
+
+Each sheet's header line says which comparison it used, for example
+`Sheet1 (aligned by content: 1 inserted, 0 removed, 2001 matched)`. A sheet with no
+note was compared by position, as before.
+
+**When rows are not matched, and why.** Matching is only used where it is safe and
+shows less change:
+
+- **Rows that display identical values** could be matched either way, so the match
+  would be a guess. The sheet is compared by position and its header says so.
+- **Formulas that refer to rows the edit moved.** Excel rewrites those references
+  when a row is inserted or deleted, so a matched comparison would report each such
+  formula as changed when none was edited. The sheet is compared by position, and
+  any real formula edit is still shown. This is expected to improve in a future
+  release.
+- **Very large sheets** past the matching bound are compared by position, with the
+  existing warning.
+
+**An edited row in a matched sheet reads as removed and re-inserted**, because
+matching is exact: a row whose content changed is not matched to its old self.
+Where edits dominate, the sheet keeps the position-by-position result instead.
+
+### Internal
+
+- `sheets-diff` 3.4.0 → 3.5.0, which reports where each changed cell sits in each
+  workbook. The threat model now describes the second comparison: its bounds, its
+  cancellation, and that it at most doubles a comparison's parse work.
+- Size asymmetry — a handful of rows or lines against tens of thousands — is now a
+  named dimension of the test corpus for text and spreadsheets. Folder comparison
+  was measured on the same shape: its cost follows the larger folder.
 
 ## [0.182.0] — 2026-10-06
 

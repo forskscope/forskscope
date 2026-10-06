@@ -703,7 +703,10 @@ fn fell_back(sd: &sheets_diff::SheetDiff) -> bool {
     })
 }
 
-/// The per-sheet rule of handoff 069 §3, in the order the handoff states it.
+/// The per-sheet rule of handoff 069 §3. The outcome is the handoff's; the order
+/// is not: the cell count is checked before the veto and the formula gate, so that
+/// a header naming a refusal appears only where the refusal changed what the user
+/// sees (review 148; the byte-identity guard of §4 requires it).
 ///
 /// Returns the leg this sheet keeps and the reason its header states. `pos` is
 /// the positional sheet; `aligned` is the same sheet from the `RowSignature` leg,

@@ -112,13 +112,15 @@ shows fewer changed cells. Its header line says which it used:
   matched by content. The inserted row is shown on the right, at its own row
   number; a removed row is shown on the left.
 - `Sheet1 (compared by position: some rows are identical)`: the sheet has rows
-  whose content repeats, so a match between them would be a guess, and positional
-  comparison was kept.
+  that display identical values, so a match between them would be a guess, and
+  positional comparison was kept. This note appears only where matching would
+  otherwise have shown less change.
 - `Sheet1 (compared by position: too large to align)`: the sheet is past the size
   bound for matching, and the warning above the panes says so.
 - `Sheet1 (compared by position: aligning rows would report shifted formulas as
-  changed)`: the sheet has row-relative formulas. Excel rewrites them when a row
-  moves, so a matched comparison would report them as changed. Positional
+  changed)`: the sheet has formulas that refer to rows the edit moved. Excel
+  rewrites those references when a row is inserted or deleted, whether or not they
+  use `$`, so a matched comparison would report each of them as changed. Positional
   comparison was kept, and any real formula edit is still shown.
 
 A sheet with no header note was compared by position, as before.
