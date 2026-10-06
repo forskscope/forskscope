@@ -129,6 +129,31 @@ If cleaning up a mistakenly created release, delete the release only
 tag, and if the tag disappears unexpectedly, recover it from the local
 annotated tag object (`git tag -l <tag>`) and re-push.
 
+### A second run for a tag is refused once its release is complete (F175)
+
+Since 0.182.0, a **new** run of `release.yml` for a tag whose release already
+carries all three assets stops in its first job, `Release gates`, with
+`release <tag> already has all three assets and this is run attempt 1`. It
+does not rebuild the platforms. This is what stops a duplicate push from
+overwriting a finished publish.
+
+What that means for a maintainer:
+
+- **Re-cutting a published version is still not an option**, and the guard now
+  enforces it for new runs. Supersede the version with a new patch version, as
+  above. Deleting the release to get past the guard is not a recovery the
+  publication rule allows.
+- **A tag whose release is not complete** (no release yet, or one with fewer than
+  three assets) is not refused. The re-cut described above still works there:
+  delete the remote tag, re-tag, re-push.
+- **A re-run of a run that already ran** is attempt 2 or later, and the guard lets
+  it through. The guard does not stop this, so the runbook does. Do not re-run a
+  run whose release step has finished, because the release step updates the
+  published release and re-uploads its assets. Use `gh run rerun <run-id> --failed`
+  only for a run whose release step did not complete, as step 3 says.
+- **A run in the list marked `cancelled`** is a duplicate that was replaced while
+  queued behind another run for the same tag. It is not someone intervening.
+
 ---
 
 ## After local artifact checks

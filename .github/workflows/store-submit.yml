@@ -49,6 +49,12 @@ permissions:
 # the two runs raced in the release step. Queue a second run behind the first
 # instead. `cancel-in-progress: false` is deliberate: cancelling a run mid-upload
 # is the outcome this exists to prevent.
+# Measured (architect, 2026-10-06): at most one run waits per group. Three
+# dispatches six seconds apart gave 37455568001 (ran), 37455579254 (cancelled
+# before any job started, replaced by the third) and 37455590498 (ran). A
+# cancelled run in the list is a queued duplicate, not someone intervening.
+# The group key includes the tag, so runs for different tags never replace
+# each other.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.inputs.tag }}
   cancel-in-progress: false
