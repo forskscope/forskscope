@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.184.1] — Unreleased
+
 ## [0.184.0] — 2026-10-07
 
 **Formulas that only moved no longer read as changed.** In 0.183.0, a spreadsheet
