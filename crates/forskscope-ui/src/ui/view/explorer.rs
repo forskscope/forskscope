@@ -35,11 +35,10 @@ use crate::ui::view::dir_pane::{
 };
 use forskscope_ui_logic::{
     DirVerdict, EntryClassification, FlatRow, Tier1Action, Tier1Trigger, Tier2Verdict,
-    classify_two_files, compute_aligned_rows, dir_verdict, mirror_target, pair_by_index,
-    tier2_verdict,
+    classify_two_files, dir_verdict, mirror_target, tier2_verdict,
 };
 
-use filter::{FilterBar, apply_filter, filter_flat};
+use filter::{FilterBar, rows_for_layout};
 use footer::ExplorerFooter;
 use tree::ExplorerTree;
 
@@ -1074,47 +1073,21 @@ pub fn Explorer() -> Element {
         .map(|(n, d)| (n.path.clone(), n.is_dir, n.is_expanded, n.is_selected, d))
         .collect();
 
-    // One row model for both layouts (handoff 071 §2): the layout decides only how the
-    // two lists are paired. The filter runs in the order that layout's rows need
-    // (review 150 §3). Aligned pairs same-named entries, so it filters pairs. Compact
-    // pairs by position, so it filters each side's entries first, and a filtered-out
-    // entry leaves no gap.
+    // One row model for both layouts (handoff 071 §2): `rows_for_layout` is the only
+    // place rows are built, so the order of pairing and filtering is tested through the
+    // same function the app calls (review 151 §2).
     let query = filter_query.read().to_lowercase();
-    let (hide_bin, hide_eq) = (*filter_hide_bin.read(), *filter_hide_eq.read());
-    let rows = if compact_mode {
-        let left = filter_flat(
-            &left_flat,
-            &l_root_snap,
-            &query,
-            hide_bin,
-            hide_eq,
-            binary_enabled,
-            &digest_map.read(),
-            &mut binary_cache,
-        );
-        let right = filter_flat(
-            &right_flat,
-            &r_root_snap,
-            &query,
-            hide_bin,
-            hide_eq,
-            binary_enabled,
-            &digest_map.read(),
-            &mut binary_cache,
-        );
-        pair_by_index(&left, &right, &l_root_snap, &r_root_snap)
-    } else {
-        let rows = compute_aligned_rows(&left_flat, &right_flat, &l_root_snap, &r_root_snap);
-        apply_filter(
-            rows,
-            &query,
-            hide_bin,
-            hide_eq,
-            binary_enabled,
-            &digest_map.read(),
-            &mut binary_cache,
-        )
-    };
+    let rows = rows_for_layout(
+        compact_mode,
+        &left_flat,
+        &right_flat,
+        (&l_root_snap, &r_root_snap),
+        &query,
+        (*filter_hide_bin.read(), *filter_hide_eq.read()),
+        binary_enabled,
+        &digest_map.read(),
+        &mut binary_cache,
+    );
 
     rsx! {
         div { class: "explorer",
