@@ -155,6 +155,13 @@ fn run_css(check: bool) {
 /// ("carries none") rather than the shape assertion actually made; corrected.
 fn run_audit_deps() {
     assert_package_inactive("dioxus-devtools");
+    // F179: muda is vendored at vendor/muda (patched to drop its libxdo
+    // dependency — see vendor/README.md) specifically to take libxdo out of
+    // the graph, not merely out of use. This is the gate that guards that:
+    // falsify by removing the `[patch.crates-io]` entry from the workspace
+    // Cargo.toml and this must fail.
+    assert_package_absent("libxdo");
+    assert_dioxus_desktop_libxdo_not_yet_optional();
     assert_external_network_crates_absent();
     assert_quick_xml_path_is_reviewed();
     assert_network_paths_are_reviewed();
@@ -748,6 +755,44 @@ fn assert_package_inactive(package: &str) {
     eprintln!("{package} is active in the dependency graph:");
     eprintln!("{stdout}");
     process::exit(1);
+}
+
+/// F179's removal condition, read from the dependency rather than
+/// remembered: `vendor/muda`'s patch exists only because `dioxus-desktop`
+/// 0.7.9 enables `muda`'s and `tray-icon`'s default features with no way for
+/// us to opt out. Dioxus PR #5749 (merged to `main`, not yet on the `v0.7`
+/// branch we depend on) fixes this upstream by declaring both with
+/// `default-features = false` and adding a new `linux-libxdo` feature that
+/// makes `libxdo` opt-in. Once that reaches a `dioxus-desktop` release we
+/// depend on, this feature name appears in the resolved metadata and this
+/// check fails, naming the fix: delete `vendor/muda/` and the
+/// `[patch.crates-io]` entry.
+fn assert_dioxus_desktop_libxdo_not_yet_optional() {
+    let output = Command::new("cargo")
+        .args(["metadata", "--format-version", "1"])
+        .current_dir(workspace_root())
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run cargo metadata: {e}"));
+
+    if !output.status.success() {
+        eprintln!("could not resolve dependency metadata");
+        eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+        process::exit(1);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if stdout.contains("linux-libxdo") {
+        fail(
+            "dioxus-desktop's resolved dependencies now define a `linux-libxdo` feature \
+             (DioxusLabs/dioxus#5749): libxdo is opt-in upstream now, so vendor/muda/ and the \
+             `[patch.crates-io]` entry in the workspace Cargo.toml are no longer needed - \
+             delete them (F179).",
+        );
+    }
+
+    println!(
+        "dioxus-desktop does not yet make libxdo opt-in (F179's vendor patch is still needed)."
+    );
 }
 
 /// RFC-085: `wayland-scanner` (pre-existing, reviewed) and `calamine <-

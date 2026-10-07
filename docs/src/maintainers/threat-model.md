@@ -504,6 +504,7 @@ Key crates touching file I/O or process execution:
 | `zip` | 8.6.0 | Archive reading under `calamine` | **Reachable from user-supplied files.** Compressed size is bounded (50 MiB); expansion is not |
 | `rustls` | 0.23.45 | TLS library compiled into `tungstenite` (v0.171.0: RUSTSEC-2026-0285) | Framework transport only, see "Accepted local WebView transport"; not reachable from file content |
 | `tempfile` | 3.27.0 | RFC-077: promoted from a `forskscope-core` dev-dependency to a normal one for the Git mergetool save target's no-clobber commit (`save::persist_noclobber`, using `NamedTempFile::persist_noclobber`) | Local filesystem only — creates a same-directory temp file and commits or discards it; no network data flow; re-audited with `cargo xtask audit-deps` and `cargo audit` after promotion, no new advisories |
+| `muda` | 0.17.2 (vendored, F179) | `dioxus-desktop`'s native-menu crate | **Patched, path dependency** — see "Vendored crate" below |
 
 ### Accepted local WebView transport
 
@@ -667,6 +668,44 @@ never evaluated. `.xlsx` is read-only in every path.
 The reviewed `quick-xml 0.39` advisory exceptions are recorded in
 `.cargo/audit.toml`; they do not cover `0.41.0`, which `cargo audit` reports on
 its own merits.
+
+### Vendored crate: `muda` (F179)
+
+`vendor/muda/` is a copy of `muda` **0.17.2 exactly as published on
+crates.io** (the version already in `Cargo.lock`, checksum verified) with one
+change: its `libxdo` dependency is dropped, backporting what `muda` 0.21.0 and
+Dioxus PR [#5749](https://github.com/DioxusLabs/dioxus/pull/5749) already did
+upstream. Brought in through `[patch.crates-io]` so our Linux binary stops
+linking `libxdo.so.3`, which is absent on Arch (F179) and which ForskScope
+never calls — see `vendor/README.md` for the exact diff and provenance.
+
+**This is new supply-chain surface, not a routine dependency bump.** A path
+dependency is new source we carry and are responsible for, under our own
+review rather than a registry maintainer's.
+
+**`cargo audit` does not check it.** Measured: running `cargo audit` with the
+patch active reports no entry for `muda` at all, neither as a finding nor as
+an acknowledged-and-skipped package — RustSec advisories are matched by
+registry source and version, and a `path` dependency carries neither. An
+advisory against `muda` 0.17.x would not be reported for our copy even if one
+is published while the patch exists. `cargo deny` is not used in this
+project and would have the same blind spot: its advisory check is also
+RustSec-against-registry-source, with no notion of "this path dependency is
+really version X of a published crate."
+
+**What covers the gap, since no tool does:**
+- The copy is tiny and reviewed in full (above, and in `vendor/README.md`):
+  there is no code here beyond what the diff shows.
+- Any `muda` 0.17.x RustSec advisory must be checked by hand against this
+  copy while it exists — it is not caught automatically.
+- The removal gate (`cargo xtask audit-deps`, `assert_dioxus_desktop_libxdo_not_yet_optional`)
+  keeps the window during which this blind spot exists as short as the
+  upstream fix landing on our `dioxus-desktop` line, not indefinite: it reads
+  the resolved dependency's own feature set on every run and fails, naming
+  the fix, the moment `libxdo` becomes opt-in upstream.
+- `cargo xtask audit-deps` also asserts `libxdo` is absent from the
+  dependency graph at all (`assert_package_absent("libxdo")`), so the one
+  thing this patch exists to fix cannot silently regress either.
 
 ---
 

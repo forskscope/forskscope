@@ -25,34 +25,14 @@ tar -xzf forskscope-v*-linux-x86_64.tar.gz
 You need WebKitGTK 4.1 and GTK 3 at runtime:
 
 ```sh
-sudo apt-get install libwebkit2gtk-4.1-0 libgtk-3-0 libxdo3   # Debian / Ubuntu
-sudo dnf install webkit2gtk4.1 gtk3                            # Fedora
-sudo pacman -S webkit2gtk-4.1 gtk3                             # Arch
+sudo apt-get install libwebkit2gtk-4.1-0 libgtk-3-0    # Debian / Ubuntu
+sudo dnf install webkit2gtk4.1 gtk3                     # Fedora
+sudo pacman -S webkit2gtk-4.1 gtk3                      # Arch
 ```
 
-`libxdo3` (F59) is required but is not pulled in by either
-`libwebkit2gtk-4.1-0` or `libgtk-3-0` — a Debian/Ubuntu host without it
-fails to launch at all (`error while loading shared libraries:
-libxdo.so.3`), confirmed on a fresh `ubuntu-latest` host that had only
-the other two packages installed.
-
-> **Known limitation — the prebuilt binary is Debian/Ubuntu-family only.**
->
-> It is built on Ubuntu and records `libxdo.so.3`, while Arch and other rolling
-> distributions ship `libxdo.so.4`. The dynamic loader will not substitute one
-> for the other, so on those systems it fails with:
->
-> ```text
-> error while loading shared libraries: libxdo.so.3: cannot open shared object file
-> ```
->
-> Installing `xdotool` does **not** fix this — you already have soname 4, and
-> soname 3 is not available there. **Build from source instead** (below), which
-> links against whatever your distribution provides.
->
-> The underlying cause is fixed upstream
-> ([DioxusLabs/dioxus#5749](https://github.com/DioxusLabs/dioxus/pull/5749),
-> merged) and this limitation goes away once that release is picked up.
+> **Built on Ubuntu.** The prebuilt tarball is built on Ubuntu, so it needs a
+> glibc at least as new as that build runner's. Measured on an Arch-based
+> machine: it starts there too. It has not been run on other distributions.
 
 ### Arch Linux
 
@@ -63,8 +43,7 @@ paru -S forskscope      # or: yay -S forskscope
 ```
 
 It is a **source** package — it compiles on your machine and links your own
-system libraries, so unlike the prebuilt tarball above it works on Arch and
-other `libxdo.so.4` distributions.
+system libraries, rather than Ubuntu's.
 
 > **You may be asked to choose a `cargo` provider, even with Rust already
 > installed.**
@@ -106,12 +85,12 @@ this exact copy by hand with `makepkg -si` skips that verification entirely.
 
 ### Build from source
 
-Recommended on any distribution that is not Debian/Ubuntu-family, and the only
-option on non-x86_64 hardware.
+The only option on non-x86_64 hardware, or on a distribution whose glibc is
+older than the prebuilt binary's Ubuntu build runner.
 
 ```sh
 # Prerequisites: Rust 1.91 or newer
-sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev pkg-config libssl-dev
+sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev pkg-config libssl-dev
 
 git clone https://github.com/forskscope/forskscope
 cd forskscope

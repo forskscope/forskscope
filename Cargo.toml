@@ -54,3 +54,7 @@ libc                        = "0.2"
 [profile.release]
 lto = true
 strip = true
+
+# F179: muda 0.17.2 with its libxdo dependency removed. See vendor/README.md.
+[patch.crates-io]
+muda = { path = "vendor/muda" }

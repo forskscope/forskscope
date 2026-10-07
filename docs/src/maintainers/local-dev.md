@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Rust ≥ 1.91 via [rustup](https://rustup.rs/).
-- On Linux: `libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev pkg-config libssl-dev`
+- On Linux: `libwebkit2gtk-4.1-dev libgtk-3-dev pkg-config libssl-dev`
 - On macOS: Xcode CLT.
 - On Windows: MSVC toolchain.
 

@@ -74,7 +74,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             pkg-config libssl-dev \
-            libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev
+            libwebkit2gtk-4.1-dev libgtk-3-dev
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -130,7 +130,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             pkg-config libssl-dev \
-            libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev \
             xvfb dbus-x11 at-spi2-core python3-gi gir1.2-atspi-2.0
 
       - uses: dtolnay/rust-toolchain@stable
@@ -145,6 +145,16 @@ jobs:
 
       - name: Build release binary
         run: cargo build --release --locked -p forskscope-ui
+
+      # F179: the graph check in `cargo xtask audit-deps` reports what Cargo
+      # intends; this reports what the linker actually produced (review
+      # 151's lesson - a check on a copy is not a check on the thing).
+      - name: Linux binary links no libxdo (F179)
+        run: |
+          if readelf -d target/release/forskscope | grep -i libxdo; then
+            echo "::error::target/release/forskscope links libxdo - this is F179's regression, the Arch Linux start-up failure"
+            exit 1
+          fi
 
       # F34: nothing had ever looked at the rendered application before this
       # - F32 shipped misaligned in two releases with every gate green, and
@@ -281,16 +291,19 @@ jobs:
           ' CHANGELOG.md > release-notes.md
           grep -q '[^[:space:]]' release-notes.md || { echo "::error::CHANGELOG section for ${GITHUB_REF_NAME} is missing or empty"; exit 1; }
 
-          # The prebuilt Linux tarball is built on Ubuntu and records
-          # libxdo.so.3, so it is a Debian/Ubuntu-family artifact (matrix-plan
-          # §1a, amended 2026-09-02). The Releases page is where people
-          # download, so the qualification belongs here and not only in the
-          # docs -- that gap is what let F44 read as an unqualified claim.
+          # F179: the prebuilt Linux tarball no longer links libxdo (the
+          # Linux job's readelf check enforces this), so it is no longer
+          # Debian/Ubuntu-family only - it starts on Arch too, measured on
+          # an Arch-based machine. It is still built on Ubuntu, so it still
+          # needs a glibc at least as new as that runner's. The Releases
+          # page is where people download, so the qualification belongs
+          # here and not only in the docs -- that gap is what let F44 read
+          # as an unqualified claim.
           {
             echo ""
             echo "### Platform notes"
             echo ""
-            echo "- **Linux (\`*-linux-x86_64.tar.gz\`)** is built on Ubuntu and is a **Debian/Ubuntu-family** binary. On Arch and other distributions shipping \`libxdo.so.4\` it will not start; install from the [AUR package](https://aur.archlinux.org/packages/forskscope) or build from source, both of which link your own \`libxdo\`."
+            echo "- **Linux (\`*-linux-x86_64.tar.gz\`)** is built on Ubuntu; it needs a glibc at least as new as that build runner's. It starts on Arch as well as on Ubuntu. It has not been run on other distributions."
             echo "- **Windows** is tested on Windows 11. It installs on Windows 10 1809+ but is untested there; Windows 10 reached end of support on 2025-10-14."
             echo "- **macOS (\`*.dmg\`)** is **not signed with an Apple Developer ID and not notarized**, so Gatekeeper will refuse it on first launch. Right-click the app and choose **Open**, or run \`xattr -d com.apple.quarantine /Applications/ForskScope.app\`. Requires macOS 13.0 or later."
           } >> release-notes.md

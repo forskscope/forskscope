@@ -8,7 +8,7 @@ environment.
 
 ```sh
 # Linux: WebKitGTK 4.1 required
-sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev pkg-config
+sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev pkg-config
 
 # Build
 cargo build --release -p forskscope-ui
