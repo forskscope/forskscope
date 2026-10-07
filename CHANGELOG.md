@@ -5,7 +5,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.184.1] — Unreleased
+## [0.185.0] — 2026-10-07
+
+**One Explorer, two layouts.** The Explorer's *Aligned* and *Compact* layouts now
+differ only in whether spacer rows keep same-named entries on the same line.
+Everything else behaves the same in both, and **Compact is the default for new
+installs.**
+
+### Changed
+
+- **Compact is the default for new installs.** Settings → Explorer layout now offers
+  `Aligned` and `Compact (no spacer rows, default)`. **Existing installs keep the
+  layout they already have.** Nothing is changed for you unless you choose it.
+- **Both layouts scroll together with one scrollbar.** In Compact, the two panes used
+  to scroll separately. A row now shows each side's entries at the same position;
+  when one side is longer, the other side's column ends early.
+
+### Fixed
+
+The two layouts had been built as two separate pieces that drifted apart. Compact
+was missing several things Aligned had:
+
+- **Keyboard navigation in Compact.** None of the Explorer's keys worked in Compact
+  layout: the arrows, Enter, Space, F6 to switch panes, Alt + ↑, Alt + Home,
+  Ctrl + O, and Alt + ← / →. They all work now, and the keyboard reference no longer
+  says Compact ignores them.
+- **Double-clicking a file in Compact** with nothing picked on the other side did
+  nothing. It now compares the file with the same-named file on the other side, as
+  Aligned does.
+- **The filter's *hide binary* and *hide identical* options** had no effect in
+  Compact. They now apply. Each side is filtered on its own entries, so a file is
+  never hidden or shown because of an unrelated file beside it.
+- **The empty Explorer** now shows its *Compare files or folders* hint in Compact
+  too.
+
+### Internal
+
+- The two Explorer layouts are one component. The layout setting chooses only how
+  rows are paired: by name with spacer rows, or by position.
+- RFC-068 records the two of its decisions this release reverses: that Compact is
+  not the default, and that Compact panes scroll independently.
 
 ## [0.184.0] — 2026-10-07
 
