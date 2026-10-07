@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.186.1] — Unreleased
+
 ## [0.186.0] — 2026-10-07
 
 **The Linux download starts on Arch Linux.**
