@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.185.1] — Unreleased
+
 ## [0.185.0] — 2026-10-07
 
 **One Explorer, two layouts.** The Explorer's *Aligned* and *Compact* layouts now
