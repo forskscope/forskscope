@@ -5,7 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.185.1] — Unreleased
+## [0.186.0] — 2026-10-07
+
+**The Linux download starts on Arch Linux.**
+
+### Fixed
+
+**The prebuilt Linux binary failed to start on Arch Linux and other rolling
+distributions** with `libxdo.so.3: cannot open shared object file`. It is built on
+Ubuntu, which ships that library under a different version number than Arch does.
+ForskScope never actually used the library: it came in through a menu component, for
+native menu items ForskScope does not have. The binary no longer depends on it, so
+the same download now starts on Arch as well as on Ubuntu. It is still built on
+Ubuntu and needs a C library at least that recent; other distributions have not
+been tested.
+
+### Changed
+
+- **The AUR package no longer requires `xdotool`.**
+
+### Internal
+
+- A patched copy of the `muda` crate lives in `vendor/muda/`. It makes the same
+  change `muda` itself made in version 0.21, which the version of Dioxus we use
+  cannot adopt yet. Dioxus has already made the library optional for its next
+  release; a build check reports when our copy can be deleted, and another fails if
+  the library ever returns. The release build also checks the binary itself.
 
 ## [0.185.0] — 2026-10-07
 

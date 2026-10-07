@@ -20,6 +20,12 @@ native menu and that code path never runs — `libxdo` is dead weight we can't
 drop from our own manifest, because Cargo features only add and
 `dioxus-desktop` 0.7.9 enables `muda`'s (and `tray-icon`'s) default features.
 
+**If a native menu is ever added, this patch must go first.** Under it, the
+predefined *Copy*, *Cut*, *Paste* and *Select All* menu items still appear and
+show their shortcuts, but clicking them does nothing: the handler that faked the
+keystroke is the code removed here. That is invisible today only because
+ForskScope has no native menu. (Added in review 153.)
+
 **Provenance.** Copied from `muda` **0.17.2** exactly as published on
 crates.io — the version already pinned in our `Cargo.lock` — verified
 against that lockfile's checksum:

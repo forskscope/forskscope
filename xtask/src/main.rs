@@ -783,10 +783,12 @@ fn assert_dioxus_desktop_libxdo_not_yet_optional() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     if stdout.contains("linux-libxdo") {
         fail(
-            "dioxus-desktop's resolved dependencies now define a `linux-libxdo` feature \
-             (DioxusLabs/dioxus#5749): libxdo is opt-in upstream now, so vendor/muda/ and the \
-             `[patch.crates-io]` entry in the workspace Cargo.toml are no longer needed - \
-             delete them (F179).",
+            "a package in the resolved dependency graph now defines a `linux-libxdo` feature, \
+             most likely dioxus-desktop adopting DioxusLabs/dioxus#5749. Confirm that \
+             dioxus-desktop is the package that defines it; if so, libxdo is opt-in upstream, \
+             so delete vendor/muda/ and the `[patch.crates-io]` entry in the workspace \
+             Cargo.toml (F179). If it was deleted too early, the `libxdo is absent` check \
+             fails as soon as libxdo returns.",
         );
     }
 
