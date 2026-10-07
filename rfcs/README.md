@@ -77,7 +77,7 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 065 | [Asynchronous Comparison and Loading-State Tabs](./done/065-async-comparison-and-loading-state-tabs.md) | v0.148.0 |
 | 066 | [Binary Comparison Policy — Off by Default](./done/066-binary-comparison-policy.md) | v0.149.0 |
 | 067 | [Explorer Name-Pattern Filter and Filter Checkboxes](./done/067-explorer-name-filter-and-checkboxes.md) | v0.150.0 |
-| 068 | [Explorer Unaligned (Compact) View Mode](./done/068-explorer-unaligned-compact-view-mode.md) | v0.151.0 |
+| 068 | [Explorer Unaligned (Compact) View Mode](./done/068-explorer-unaligned-compact-view-mode.md) | v0.151.0; default and scroll reversed v0.185.0 (F178, amended) |
 | 069 | [Explorer Layout — Compare Action and Header/Footer](./done/069-explorer-layout-compare-action-and-header-footer.md) | v0.152.0 |
 | 070 | [Font Family Selector in Settings](./done/070-font-family-selector.md) | v0.152.0 |
 | 071 | [UI Module Structural Redesign (Rust 2024 Hierarchy)](./done/071-ui-module-structural-redesign.md) | v0.152.0–v0.158.0 |

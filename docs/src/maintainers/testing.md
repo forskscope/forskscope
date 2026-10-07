@@ -211,7 +211,7 @@ by handoff 033's connectivity cleanup; `compare/load_identity`,
 
 | File | Covers | RFC |
 |---|---|---|
-| `explore/align` | `compute_aligned_rows`: pairing, ordering, one-sided entries, recursion depth, selection state; field propagation (`is_selected` left/right, `depth`, `abs_path`/`rel_path`, `is_expanded`); both-sides-selected merges into one row. | RFC-059 |
+| `explore/align` | `compute_aligned_rows`: pairing, ordering, one-sided entries, recursion depth, selection state; field propagation (`is_selected` left/right, `depth`, `abs_path`/`rel_path`, `is_expanded`); both-sides-selected merges into one row. `pair_by_index` (compact): by position, not name; the shorter side padded at the end; rows outside the root dropped. | RFC-059, RFC-068 |
 | `explore/classify_pair` | `classify_two_files` against the automatic-digest cap: a same-size pair at the cap is never read (proven with a `chmod 000` side); a size mismatch at the cap is still `Different`; under the cap nothing changes; a pair at the cap never reaches `NeedsDigest` either way it resolves. | RFC-080 §5, F77, F145 |
 | `explore/dir_verdict` | Each verdict (`Different`, `MetadataMatch`, `Unknown`); a one-sided entry, a size mismatch and a `Changed` file are `Different`; unreadable entry, symlink, unreadable root and a common file missing a size are `Unknown`; a definite `Different` stands over an unreadable entry in **both** orders of input, and `Unknown` outranks only a match. | RFC-080 |
 | `explore/tier1_trigger` | The debounce as a pure state machine on a fake clock: twenty rows passed through start no walk; a rest past 250 ms starts exactly one; the selection moving cancels the walk and never leaves two in flight; navigation cancels; re-selecting the same row keeps its timer. | RFC-080 |
@@ -277,7 +277,7 @@ on a Linux Wayland session under niri, with `wtype`, `niri`, and the Python
    `niri msg -j windows` (match on the app id, which is the binary name), and run
    `niri msg action focus-window --id <id>` **before** the AT-SPI grab. Then,
    among the `section` nodes that AT-SPI reports as `FOCUSABLE`, pick the one
-   whose text **starts with `▸`**. That is the aligned tree's rows. Do not choose
+   whose text **starts with `▸`**. That is the tree's rows, in either layout. Do not choose
    by child count, which varies with the folder listed. Do not choose by
    "contains `▸`": the app shell's text also contains `▸`, and a first attempt
    grabbed the shell and saw no navigation. Call

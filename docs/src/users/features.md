@@ -37,8 +37,9 @@
   non-actionable by default; enable in **Settings → Advanced**.
 - **Filter bar** — ⊞ toggle reveals a name-pattern input plus
   "Hide binary" / "Hide identical" checkboxes (session-only, not persisted).
-- **Compact layout** option (Settings → Advanced) removes spacer rows so each
-  pane packs independently; cross-pane alignment is intentionally absent.
+- **Two layouts** (Settings → Advanced): Compact, the default for new installs,
+  packs each pane and pairs entries by position; Aligned pairs same-name entries
+  with spacer rows. Both scroll together and take the same keys.
 - **Targets label** in the footer always shows the pending comparison pair
   with progressive guidance when only one pick is set.
 - **Async tab opening** — tabs open immediately with a ⟳ spinner; loading and

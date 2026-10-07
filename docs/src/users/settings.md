@@ -75,8 +75,8 @@ Controls how entries are displayed in the two-pane Explorer.
 
 | Value | Behaviour |
 |---|---|
-| **Aligned (default)** | Same-name entries share a row across panes; spacer rows fill gaps where one side is missing. Vertical scrolling implicitly keeps panes in sync. |
-| **Compact (independent panes)** | No spacer rows. Each pane packs its own entries and scrolls independently. Cross-pane row alignment is intentionally absent. Best for directories where many files exist only on one side. |
+| **Aligned** | Same-name entries share a row across panes; spacer rows fill gaps where one side is missing. The panes scroll together. |
+| **Compact (no spacer rows, default)** | Each pane packs its own entries, and row *n* shows each pane's *n*-th entry; the two are not the same entry. The panes scroll together. This is the default for new installs. Existing installs keep the layout they have. |
 
 ### Remember Explorer directories
 

@@ -1,6 +1,6 @@
 # RFC 068: Explorer Unaligned (Compact) View Mode
 
-**Status.** Implemented (v0.151.0)
+**Status.** Implemented (v0.151.0). Two decisions here were reversed in v0.185.0 (F178): compact is the default for new installs, and vertical scroll is shared between the layouts, so it is no longer independent per pane. The amendment at the end of this RFC records both.
 **Tracks.** An optional view mode that removes the empty spacer rows from the
 two-pane Explorer so each pane packs its entries independently, for users who
 prefer density over cross-pane row alignment. Bound to a user setting.
@@ -116,3 +116,26 @@ non-matching rows per pane). The filter code must branch on the active mode.
   same way so same-name entries often line up by coincidence), or make no
   alignment promise at all? Recommend: no promise, just sort each pane
   consistently (name order) so it is predictable.
+
+## Amendment (v0.185.0, F178): one Explorer, two alignments
+
+The owner's model is that the two layouts are one Explorer, and differ only in how
+rows are aligned. The copies had drifted (keyboard, double-click, filter, empty
+state), so the code now has one tree component, and the layouts differ only in the
+row pairs they build. Three decisions were made on 2026-10-07.
+
+- **Compact is the default for new installs.** The reasoning in *The trade-off*
+  above was right for compact as an optional mode for loosely related folders. The
+  default changes who meets it first. Settings that record the layout keep it: only
+  new installs, and files without the field, start in compact.
+- **One scroller in both layouts.** The original *Scroll behaviour* section made
+  compact independent per pane. That is reversed. Packing still means row *i* of one
+  pane is not the same entry as row *i* of the other, and the owner accepted that
+  cost knowingly.
+- **Keyboard in both layouts.** *Keyboard / focus* said compact needed no new
+  design. It now shares the aligned keyboard handler, on the focused pane, so F6 and
+  the arrows mean the same in both.
+
+Narrow windows: below 720 px each row's two halves stack and the spacer rows are
+hidden, in both layouts.
+

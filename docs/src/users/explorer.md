@@ -189,15 +189,29 @@ as the filter bar's open state.
 
 ---
 
-## Compact layout
+## Layouts
 
-By default, same-name entries are aligned across panes with spacer rows for
-entries that exist on only one side. Switch to **Compact** layout in
-**Settings → Advanced → Explorer layout** to remove the spacer rows and let each
-pane pack its entries independently.
+The Explorer has two layouts. They differ in one thing only: which entries share
+a row.
 
-In compact mode, vertical scrolling is independent per pane. Same-name equality
-badges still appear but cross-pane row alignment is not guaranteed.
+- **Compact** is the default for new installs. Each pane packs its own entries,
+  and row *n* shows each pane's *n*-th entry. The two entries in a row are not the
+  same entry, and nothing claims they are. When one pane has more entries, the
+  other's column ends early.
+- **Aligned** puts same-name entries on the same row, with spacer rows where one
+  side is missing.
+
+Both layouts scroll together, in one list, and both take the same keys: arrows and
+Enter act on the focused pane, and F6 moves focus between panes. Double-clicking a
+file compares it with the file picked on the other side, or, if nothing is picked
+there, with the same-named file on the other side.
+
+Existing installs keep the layout they have. Only new installs, and settings files
+that do not record a layout, start in Compact. To change it, use
+**Settings → Advanced → Explorer layout**.
+
+On a narrow window (under 720 px), each row's two halves stack and the spacer rows
+are hidden, so the list reads as one column of entries.
 
 ---
 

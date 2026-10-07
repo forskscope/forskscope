@@ -66,7 +66,7 @@ read what a row says a module does; that stays a judgment.
 
 | Module | Purpose |
 |---|---|
-| `explore::align` | `compute_aligned_rows` — merges two flat tree row lists into an aligned two-pane sequence (RFC-059). |
+| `explore::align` | `compute_aligned_rows` — merges two flat tree row lists into an aligned two-pane sequence (RFC-059); `pair_by_index` — the compact pairing, by position (RFC-068, handoff 071). |
 | `explore::classify_pair` | `EntryClassification`, `classify_two_files` — a file pair's equality classification under the automatic-digest cap (RFC-080 §5 / F77, moved from `forskscope-ui` by F145). |
 | `explore::dir_verdict` | `DirVerdict`, `dir_verdict` — what a fast recursive listing can conclude about a directory pair: `Different`, `MetadataMatch` (names and sizes match, contents unread) or `Unknown`, with the precedence written down (RFC-080 tier 1). |
 | `explore::tier1_trigger` | `Tier1Trigger`, `TIER1_DEBOUNCE` — the pure debounce state machine deciding when a tier-1 walk starts: a row must be rested on for 250 ms, and moving through rows starts none (RFC-080 §5). |
@@ -93,7 +93,7 @@ read what a row says a module does; that stays a judgment.
 | `app` | Root component; provides store context; CSS injection; startup pair; git mergetool mode. |
 | `ui/header` | Brand, Settings button, keyboard reference shortcut. |
 | `ui/tabs` | Tab bar with dirty-dot markers and close. |
-| `ui/explorer` | Two `DirectoryTreeView` panes; aligned row display; digest status; pick and compare. |
+| `ui/explorer` | Two `DirectoryTreeView` panes; one tree component for both layouts (row pairs from `compute_aligned_rows` or `pair_by_index`); digest status; pick and compare. |
 | `ui/diff` | Diff workspace; hunk rendering from `MergeSession`; toolbar with progressive disclosure. |
 | `ui/dir_pane` | Tree row building blocks (`PathBar`, `TreeRow`), `NavHistory`, `FilteringExecutor`. |
 | `ui/deep_compare` | Recursive directory compare with incremental digest progress. |
