@@ -2,11 +2,11 @@
 //! checkboxes. Also exposes `apply_filter` which narrows the aligned row list.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use dioxus::prelude::*;
 use forskscope_core::dir::EqualityEvidence;
-use forskscope_ui_logic::AlignedRow;
+use forskscope_ui_logic::{AlignedRow, FlatRow};
 
 use super::DigestKey;
 use crate::i18n::t;
@@ -90,7 +90,77 @@ fn filter_input_keydown(e: &Event<KeyboardData>) {
 
 // ── Filter predicate ──────────────────────────────────────────────────────────
 
-/// Apply the active filter to the aligned row list.
+// ── Entry predicates and pair predicates (review 150 §3) ─────────────────────
+//
+// A filter predicate must say whether it is about an **entry** (one path on one
+// side) or a **pair** (a row, two entries). The two layouts mean different things by a
+// row: aligned pairs entries of the same name, so a pair is one entry seen twice;
+// compact pairs by position, so a pair is two unrelated entries. Entry predicates are
+// therefore applied to each side before pairing (`filter_flat`), and only aligned,
+// whose pairs are same-named, applies the pair predicates in `apply_filter`.
+
+/// Entry: the lowercase `query` is a substring of the entry's file name. An empty
+/// query matches everything.
+fn entry_name_matches(rel: &Path, query: &str) -> bool {
+    query.is_empty()
+        || rel
+            .file_name()
+            .map(|n| n.to_string_lossy().to_lowercase().contains(query))
+            .unwrap_or(false)
+}
+
+/// Entry: whether the file at `path` is binary, cached per path.
+fn is_binary_cached(path: &PathBuf, binary_cache: &mut Signal<HashMap<PathBuf, bool>>) -> bool {
+    let cached = binary_cache.read().get(path).copied();
+    cached.unwrap_or_else(|| {
+        let b = matches!(
+            forskscope_core::file_kind::classify(path),
+            Ok(forskscope_core::file_kind::FileKind::Binary)
+        );
+        binary_cache.write().insert(path.clone(), b);
+        b
+    })
+}
+
+/// Entry predicates, applied to one side's visible entries before compact packs them by
+/// position. Each entry is judged alone: a name it does not match is hidden, whatever
+/// its neighbour in the other pane is. A filtered-out entry leaves no gap.
+///
+/// - Name: the entry's name contains `query`.
+/// - Hide binary (only when binary comparison is off): a binary file is hidden.
+/// - Hide identical: an entry whose `Common` evidence `is_equal()` is hidden. Directories
+///   are exempt (F74): the Explorer never proves a directory identical.
+#[allow(clippy::too_many_arguments)]
+pub fn filter_flat(
+    rows: &[FlatRow],
+    root: &Path,
+    query: &str,
+    hide_bin: bool,
+    hide_eq: bool,
+    binary_enabled: bool,
+    digest_map: &HashMap<DigestKey, EqualityEvidence>,
+    binary_cache: &mut Signal<HashMap<PathBuf, bool>>,
+) -> Vec<FlatRow> {
+    rows.iter()
+        .filter(|(abs, is_dir, ..)| {
+            let Ok(rel) = abs.strip_prefix(root) else {
+                return false;
+            };
+            entry_name_matches(rel, query)
+                && !(hide_bin && !binary_enabled && !is_dir && is_binary_cached(abs, binary_cache))
+                && !(hide_eq
+                    && !is_dir
+                    && digest_map
+                        .get(&DigestKey::Common(rel.to_path_buf()))
+                        .is_some_and(EqualityEvidence::is_equal))
+        })
+        .cloned()
+        .collect()
+}
+
+/// Apply the active filter to the aligned row list. **A pair predicate**: each row is
+/// judged as a pair of same-named entries, which is true of aligned rows and of no
+/// compact row (compact filters entries first, through [`filter_flat`]).
 ///
 /// - `query`: lowercase name substring (empty = no filter).
 /// - `hide_bin`: hide pairs where all present file sides are binary.
@@ -108,43 +178,24 @@ pub fn apply_filter(
 ) -> Vec<AlignedRow> {
     rows.into_iter()
         .filter(|(lr, rr)| {
-            // Name filter.
-            let name_ok = if query.is_empty() {
-                true
-            } else {
-                let l_match = lr
+            // Name filter: the same name on either side keeps the row.
+            let name_ok = query.is_empty()
+                || lr
                     .as_ref()
-                    .and_then(|r| r.rel_path.file_name())
-                    .map(|n| n.to_string_lossy().to_lowercase().contains(query))
-                    .unwrap_or(false);
-                let r_match = rr
+                    .is_some_and(|r| entry_name_matches(&r.rel_path, query))
+                || rr
                     .as_ref()
-                    .and_then(|r| r.rel_path.file_name())
-                    .map(|n| n.to_string_lossy().to_lowercase().contains(query))
-                    .unwrap_or(false);
-                l_match || r_match
-            };
+                    .is_some_and(|r| entry_name_matches(&r.rel_path, query));
 
             // Hide-binary filter (only meaningful when binary comparison is off).
             let bin_ok = if hide_bin && !binary_enabled {
-                let mut is_bin = |path: &PathBuf| -> bool {
-                    let cached = binary_cache.read().get(path).copied();
-                    cached.unwrap_or_else(|| {
-                        let b = matches!(
-                            forskscope_core::file_kind::classify(path),
-                            Ok(forskscope_core::file_kind::FileKind::Binary)
-                        );
-                        binary_cache.write().insert(path.clone(), b);
-                        b
-                    })
-                };
                 let l_bin = lr
                     .as_ref()
-                    .map(|r| !r.is_dir && is_bin(&r.abs_path))
+                    .map(|r| !r.is_dir && is_binary_cached(&r.abs_path, binary_cache))
                     .unwrap_or(false);
                 let r_bin = rr
                     .as_ref()
-                    .map(|r| !r.is_dir && is_bin(&r.abs_path))
+                    .map(|r| !r.is_dir && is_binary_cached(&r.abs_path, binary_cache))
                     .unwrap_or(false);
                 match (lr.is_some(), rr.is_some()) {
                     (true, true) => !l_bin || !r_bin,
@@ -289,6 +340,196 @@ mod tests {
             ];
             let visible = apply_filter(rows, "", false, true, true, &digest_map, &mut binary_cache);
             assert_eq!(visible.len(), 2, "a tier-1 match must stay visible");
+        });
+    }
+
+    // ── Compact: entries are filtered before they are paired (review 150 §1, §3) ──
+
+    fn plain(root: &str, names: &[&str]) -> Vec<FlatRow> {
+        names
+            .iter()
+            .map(|n| (PathBuf::from(root).join(n), false, false, false, 0))
+            .collect()
+    }
+
+    fn compact_rows(
+        left: &[FlatRow],
+        right: &[FlatRow],
+        query: &str,
+        hide_bin: bool,
+        hide_eq: bool,
+        binary_enabled: bool,
+        digest_map: &HashMap<DigestKey, EqualityEvidence>,
+    ) -> Vec<AlignedRow> {
+        let mut cache: Signal<HashMap<PathBuf, bool>> =
+            Signal::new_in_scope(HashMap::new(), ScopeId::ROOT);
+        let (l_root, r_root) = (Path::new("/l"), Path::new("/r"));
+        let lf = filter_flat(
+            left,
+            l_root,
+            query,
+            hide_bin,
+            hide_eq,
+            binary_enabled,
+            digest_map,
+            &mut cache,
+        );
+        let rf = filter_flat(
+            right,
+            r_root,
+            query,
+            hide_bin,
+            hide_eq,
+            binary_enabled,
+            digest_map,
+            &mut cache,
+        );
+        forskscope_ui_logic::pair_by_index(&lf, &rf, l_root, r_root)
+    }
+
+    fn right_names(rows: &[AlignedRow]) -> Vec<String> {
+        rows.iter()
+            .filter_map(|(_, r)| {
+                r.as_ref()
+                    .map(|d| d.rel_path.to_string_lossy().into_owned())
+            })
+            .collect()
+    }
+
+    /// Review 150 §1, the name probe: the left entry matches the query and the right
+    /// entry, which is its positional neighbour, does not. The right entry must not be
+    /// shown. Falsify by filtering the pairs after packing, as aligned does: zulu.txt is
+    /// then shown beside alpha.txt.
+    #[test]
+    fn compact_name_filter_does_not_show_an_entry_because_its_neighbour_matched() {
+        with_test_store(|_store| {
+            let rows = compact_rows(
+                &plain("/l", &["alpha.txt"]),
+                &plain("/r", &["zulu.txt"]),
+                "alpha",
+                false,
+                false,
+                true,
+                &HashMap::new(),
+            );
+            assert!(
+                right_names(&rows).is_empty(),
+                "zulu.txt must stay hidden: {rows:?}"
+            );
+            assert_eq!(rows.len(), 1, "alpha.txt is still shown");
+        });
+    }
+
+    /// Review 150 §1, the hide-identical probe: the left entry is identical and hidden, and
+    /// the right entry, a positional neighbour, is changed. The changed file must stay
+    /// visible. Falsify by pairing first and judging the pair by its left evidence: the
+    /// changed file is hidden with its identical neighbour.
+    #[test]
+    fn compact_hide_identical_keeps_a_changed_entry_whatever_its_neighbour() {
+        with_test_store(|_store| {
+            let mut digest = HashMap::new();
+            digest.insert(
+                DigestKey::Common(PathBuf::from("same.txt")),
+                EqualityEvidence::DigestEqual,
+            );
+            digest.insert(
+                DigestKey::Common(PathBuf::from("changed.txt")),
+                EqualityEvidence::DigestDifferent,
+            );
+            let rows = compact_rows(
+                &plain("/l", &["same.txt"]),
+                &plain("/r", &["changed.txt"]),
+                "",
+                false,
+                true,
+                true,
+                &digest,
+            );
+            assert_eq!(
+                right_names(&rows),
+                vec!["changed.txt".to_string()],
+                "changed.txt must stay visible: {rows:?}"
+            );
+        });
+    }
+
+    /// Hide binary in compact: a binary file is hidden, and its text neighbour stays.
+    #[test]
+    fn compact_hide_binary_hides_a_binary_entry_beside_a_text_one() {
+        with_test_store(|_store| {
+            let dir = std::env::temp_dir().join(format!("fsk-compact-bin-{}", std::process::id()));
+            let (l, r) = (dir.join("l"), dir.join("r"));
+            std::fs::create_dir_all(&l).unwrap();
+            std::fs::create_dir_all(&r).unwrap();
+            std::fs::write(l.join("data.bin"), [0u8, 159, 146, 150, 0, 1]).unwrap();
+            std::fs::write(r.join("notes.txt"), "plain text\n").unwrap();
+            let left = vec![(l.join("data.bin"), false, false, false, 0)];
+            let right = vec![(r.join("notes.txt"), false, false, false, 0)];
+            let mut cache: Signal<HashMap<PathBuf, bool>> =
+                Signal::new_in_scope(HashMap::new(), ScopeId::ROOT);
+            let lf = filter_flat(
+                &left,
+                &l,
+                "",
+                true,
+                false,
+                false,
+                &HashMap::new(),
+                &mut cache,
+            );
+            let rf = filter_flat(
+                &right,
+                &r,
+                "",
+                true,
+                false,
+                false,
+                &HashMap::new(),
+                &mut cache,
+            );
+            let rows = forskscope_ui_logic::pair_by_index(&lf, &rf, &l, &r);
+            assert!(lf.is_empty(), "the binary file must be hidden");
+            assert_eq!(right_names(&rows), vec!["notes.txt".to_string()]);
+            let _ = std::fs::remove_dir_all(&dir);
+        });
+    }
+
+    /// Packing: a filtered-out entry leaves no gap. Filtering out the second of three
+    /// left entries leaves the left column as entries 1 and 3, adjacent.
+    #[test]
+    fn compact_filtered_entries_pack_without_a_gap() {
+        with_test_store(|_store| {
+            let mut digest = HashMap::new();
+            digest.insert(
+                DigestKey::Common(PathBuf::from("b")),
+                EqualityEvidence::DigestEqual,
+            );
+            let rows = compact_rows(
+                &plain("/l", &["a", "b", "c"]),
+                &plain("/r", &["x", "y", "z"]),
+                "",
+                false,
+                true,
+                true,
+                &digest,
+            );
+            let lefts: Vec<String> = rows
+                .iter()
+                .filter_map(|(l, _)| {
+                    l.as_ref()
+                        .map(|d| d.rel_path.to_string_lossy().into_owned())
+                })
+                .collect();
+            assert_eq!(
+                lefts,
+                vec!["a".to_string(), "c".to_string()],
+                "no gap where b was: {rows:?}"
+            );
+            assert_eq!(
+                rows.len(),
+                3,
+                "the right column still has all three, paired by position"
+            );
         });
     }
 }
