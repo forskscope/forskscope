@@ -73,7 +73,7 @@ pub use compare::search_index::MatchIndex;
 pub use compare::startup::{CompareRequest, SaveDestination, StartupRequest, parse_startup_args};
 
 // explore
-pub use explore::align::{AlignedRow, FlatRow, RowData, compute_aligned_rows};
+pub use explore::align::{AlignedRow, FlatRow, RowData, compute_aligned_rows, pair_by_index};
 pub use explore::classify_pair::{EntryClassification, classify_two_files};
 pub use explore::deep_filter::{
     DeepCompareSummary, DeepFilter, apply_filter, demote_entries_under_an_unreadable_root,

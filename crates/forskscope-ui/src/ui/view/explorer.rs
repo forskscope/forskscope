@@ -3,12 +3,12 @@
 //! This file owns signal setup, digest computation, and top-level layout.
 //! Sub-components live in the `explorer/` subdirectory:
 //!
-//! - `tree.rs`    — aligned two-pane tree with keyboard navigation
-//! - `compact.rs` — compact (unaligned) tree view (RFC-068)
+//! - `tree.rs`    — the two-pane tree, one component for both layouts (RFC-054,
+//!   RFC-068, handoff 071): it renders row pairs, and the layout only decides how
+//!   they are paired
 //! - `filter.rs`  — filter bar UI and filter predicate (RFC-067)
 //! - `footer.rs`  — targets label and Compare button (RFC-069)
 
-pub mod compact;
 pub mod filter;
 pub mod footer;
 pub mod tree;
@@ -34,14 +34,14 @@ use crate::ui::view::dir_pane::{
     FilteringExecutor, NavHistory, PathBar, SharedIgnoreRules, home_dir, navigate_to, short_name,
 };
 use forskscope_ui_logic::{
-    DirVerdict, EntryClassification, Tier1Action, Tier1Trigger, Tier2Verdict, classify_two_files,
-    compute_aligned_rows, dir_verdict, mirror_target, tier2_verdict,
+    DirVerdict, EntryClassification, FlatRow, Tier1Action, Tier1Trigger, Tier2Verdict,
+    classify_two_files, compute_aligned_rows, dir_verdict, mirror_target, pair_by_index,
+    tier2_verdict,
 };
 
-use compact::CompactTree;
 use filter::{FilterBar, apply_filter};
 use footer::ExplorerFooter;
-use tree::AlignedTree;
+use tree::ExplorerTree;
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -1059,14 +1059,14 @@ pub fn Explorer() -> Element {
     let l_root_snap = left_dir.read().cloned();
     let r_root_snap = right_dir.read().cloned();
 
-    let left_flat: Vec<(PathBuf, bool, bool, bool, u32)> = tree_l
+    let left_flat: Vec<FlatRow> = tree_l
         .read()
         .visible_rows()
         .into_iter()
         .filter(|(n, _)| n.path != l_root_snap)
         .map(|(n, d)| (n.path.clone(), n.is_dir, n.is_expanded, n.is_selected, d))
         .collect();
-    let right_flat: Vec<(PathBuf, bool, bool, bool, u32)> = tree_r
+    let right_flat: Vec<FlatRow> = tree_r
         .read()
         .visible_rows()
         .into_iter()
@@ -1074,9 +1074,15 @@ pub fn Explorer() -> Element {
         .map(|(n, d)| (n.path.clone(), n.is_dir, n.is_expanded, n.is_selected, d))
         .collect();
 
-    let aligned = compute_aligned_rows(&left_flat, &right_flat, &l_root_snap, &r_root_snap);
-    let aligned = apply_filter(
-        aligned,
+    // One row model for both layouts (handoff 071 §2): the layout decides only how
+    // the two lists are paired. The same filter then applies to the pairs in both.
+    let rows = if compact_mode {
+        pair_by_index(&left_flat, &right_flat, &l_root_snap, &r_root_snap)
+    } else {
+        compute_aligned_rows(&left_flat, &right_flat, &l_root_snap, &r_root_snap)
+    };
+    let rows = apply_filter(
+        rows,
         &filter_query.read().to_lowercase(),
         *filter_hide_bin.read(),
         *filter_hide_eq.read(),
@@ -1135,27 +1141,13 @@ pub fn Explorer() -> Element {
                 }
 
                 // ── Tree ──────────────────────────────────────────────────
-                if !compact_mode {
-                    AlignedTree {
-                        lang, aligned,
-                        tree_l, tree_r, scans_l, scans_r,
-                        left_dir, right_dir, left_hist, right_hist,
-                        left_pick, right_pick, focused_pane,
-                        digest_map, tier1_map, binary_cache, binary_enabled,
-                        tier1_epoch, tier1_announcement, rules: shared_rules.get(),
-                    }
-                } else {
-                    CompactTree {
-                        lang,
-                        left_flat, right_flat,
-                        l_root: l_root_snap.clone(), r_root: r_root_snap.clone(),
-                        tree_l, tree_r, scans_l, scans_r,
-                        left_dir, right_dir, left_hist, right_hist,
-                        left_pick, right_pick,
-                        digest_map, tier1_map, binary_cache, binary_enabled,
-                        filter_query,
-                        tier1_epoch, tier1_announcement, rules: shared_rules.get(),
-                    }
+                ExplorerTree {
+                    lang, rows,
+                    tree_l, tree_r, scans_l, scans_r,
+                    left_dir, right_dir, left_hist, right_hist,
+                    left_pick, right_pick, focused_pane,
+                    digest_map, tier1_map, binary_cache, binary_enabled,
+                    tier1_epoch, tier1_announcement, rules: shared_rules.get(),
                 }
 
                 // ── Footer ────────────────────────────────────────────────

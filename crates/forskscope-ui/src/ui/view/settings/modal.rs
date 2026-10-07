@@ -191,8 +191,8 @@ pub fn SettingsModal() -> Element {
                                 store.settings.write().explorer_compact = e.value() == "compact";
                                 super::persist(store);
                             },
-                            option { value: "aligned", {t(lang, "Aligned (default)")} }
-                            option { value: "compact", {t(lang, "Compact (independent panes)")} }
+                            option { value: "aligned", {t(lang, "Aligned")} }
+                            option { value: "compact", {t(lang, "Compact (no spacer rows, default)")} }
                         }
                     }
                     div { class: "field",

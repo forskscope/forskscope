@@ -353,3 +353,33 @@ fn out_of_range_diff_font_size_clamps() {
         other => panic!("expected Current, got {other:?}"),
     }
 }
+
+// ── Handoff 071 §4: the Explorer layout's default ────────────────────────────
+
+/// A fresh install starts in compact. Falsify by restoring `explorer_compact: false`
+/// in `PersistedSettings::default()`: this fails.
+#[test]
+fn a_fresh_install_starts_in_compact() {
+    assert!(PersistedSettings::default().explorer_compact);
+}
+
+/// A settings file that records the layout stays where the user left it.
+#[test]
+fn a_file_that_records_aligned_stays_aligned() {
+    let mut doc = serde_json::to_value(PersistedSettings::default()).unwrap();
+    doc["explorer_compact"] = serde_json::Value::Bool(false);
+    let v: PersistedSettings = serde_json::from_value(doc).unwrap();
+    assert!(!v.explorer_compact);
+}
+
+/// A file without the field decodes to the default, which is compact. Falsify by
+/// removing the `default = "default_explorer_compact"` attribute: the bool defaults to
+/// `false`, and this fails.
+#[test]
+fn a_file_without_the_field_decodes_to_the_default_layout() {
+    // A complete settings document with only the layout field removed, as an older file has.
+    let mut doc = serde_json::to_value(PersistedSettings::default()).unwrap();
+    doc.as_object_mut().unwrap().remove("explorer_compact");
+    let v: PersistedSettings = serde_json::from_value(doc).unwrap();
+    assert!(v.explorer_compact);
+}

@@ -34,7 +34,6 @@ pub fn KeyboardRefModal() -> Element {
                 }
                 div { class: "kb-section",
                     h3 { {t(lang, "Navigation")} }
-                    p { class: "kb-desc", {t(lang, "These keys apply to the aligned Explorer layout; compact layout does not respond to them.")} }
                     div { class: "kb-table",
                         KbRow { keys: "F6",             desc: t(lang, "Switch focused pane (left ↔ right)") }
                         KbRow { keys: "↑ / ↓",         desc: t(lang, "Move focus in explorer list") }
@@ -112,7 +111,6 @@ mod tests {
             "Open a folder (focused pane)",
             "Alt + ← / Alt + →",
             "Back / forward directory history (focused pane)",
-            "These keys apply to the aligned Explorer layout; compact layout does not respond to them.",
         ] {
             assert!(
                 texts.iter().any(|t| t == expected),

@@ -231,13 +231,10 @@ fn ja(key: &str) -> Option<&'static str> {
         "Ignore WS" => "空白無視",
         "Ignore case" => "大小文字無視",
         "Ignore newlines" => "改行無視",
-        "These keys apply to the aligned Explorer layout; compact layout does not respond to them." => {
-            "これらのキーは整列レイアウトのエクスプローラーに対応します。コンパクトレイアウトでは反応しません。"
-        }
         "Context lines" => "コンテキスト行数",
         "Explorer layout" => "エクスプローラーレイアウト",
-        "Aligned (default)" => "整列（デフォルト）",
-        "Compact (independent panes)" => "コンパクト（独立ペイン）",
+        "Aligned" => "整列",
+        "Compact (no spacer rows, default)" => "コンパクト（空白行なし、デフォルト）",
         "Remember Explorer directories" => "エクスプローラーのディレクトリを記憶する",
         "When on, the Explorer reopens the last directory shown in each pane. When off, it always starts at your home directory." => {
             "オンの場合、エクスプローラーは各ペインで最後に表示したディレクトリを再度開きます。オフの場合は常にホームディレクトリから開始します。"

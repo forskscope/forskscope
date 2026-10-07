@@ -360,7 +360,8 @@ code.path-display {
 /* ── Aligned two-pane tree (RFC-054) ── */
 .explorer-browse { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 .explorer-path-bars { display: grid; grid-template-columns: 1fr 1fr; flex-shrink: 0; }
-.aligned-tree { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+/* One scroller for both layouts (handoff 071): compact differs from aligned only in its row pairs. */
+.explorer-tree { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
 .aligned-row { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid transparent; }
 .pane-half { min-width: 0; overflow: hidden; border-right: 1px solid var(--border); }
 .pane-half:last-child { border-right: none; }
@@ -423,10 +424,6 @@ code.path-display {
 .filter-clear { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 11px; color: var(--muted); background: none; border: 1px solid var(--border); }
 .filter-clear:hover { color: var(--text); border-color: var(--accent); }
 
-/* ── Explorer compact view (RFC-068) ── */
-.compact-tree { display: flex; flex: 1; min-height: 0; overflow: hidden; }
-.compact-pane { flex: 1; overflow-y: auto; overflow-x: hidden; padding: .2rem; }
-.compact-pane-right { border-left: 1px solid var(--border); }
 
 /* ── Explorer footer ── */
 .explorer-footer {

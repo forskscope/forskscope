@@ -1,7 +1,10 @@
-//! Aligned two-pane tree rendering with keyboard navigation (RFC-054, RFC-061).
+//! The Explorer's two-pane tree (RFC-054, RFC-061, RFC-068; handoff 071).
 //!
-//! Displays same-name entries on the same row with spacers where one side is
-//! missing. Keyboard events are dispatched to the focused pane.
+//! One component for both layouts. It renders a sequence of row pairs, one
+//! `(left, right)` per visual row, and does not know how they were paired:
+//! aligned pairs same-name entries with spacers (`compute_aligned_rows`), compact
+//! packs each side and pairs by index (`pair_by_index`). Keyboard events go to the
+//! focused pane in both layouts.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -23,9 +26,9 @@ use crate::ui::view::dir_pane::{
 
 #[allow(clippy::too_many_arguments)]
 #[component]
-pub fn AlignedTree(
+pub fn ExplorerTree(
     lang: Lang,
-    aligned: Vec<AlignedRow>,
+    rows: Vec<AlignedRow>,
     mut tree_l: Signal<DirectoryTree>,
     mut tree_r: Signal<DirectoryTree>,
     scans_l: Coroutine<ScanRequest>,
@@ -53,8 +56,8 @@ pub fn AlignedTree(
 
     rsx! {
         div {
-            id: "aligned-tree",
-            class: "aligned-tree",
+            id: "explorer-tree",
+            class: "explorer-tree",
             tabindex: "0",
             onkeydown: move |e: Event<KeyboardData>| {
                 use dioxus_swdir_tree::keyboard::{Modifiers as CM, TreeKey, handle_key};
@@ -128,7 +131,7 @@ pub fn AlignedTree(
                 }
             },
 
-            if aligned.is_empty() {
+            if rows.is_empty() {
                 div { class: "explorer-empty",
                     div { class: "explorer-empty-icon", "📂" }
                     p { class: "explorer-empty-title", {t(lang, "Compare files or folders")} }
@@ -141,7 +144,7 @@ pub fn AlignedTree(
                 }
             }
 
-            for (left_row, right_row) in aligned.iter() {
+            for (left_row, right_row) in rows.iter() {
                 {
                     let lr = left_row.clone();
                     let rr = right_row.clone();
@@ -200,15 +203,12 @@ pub fn AlignedTree(
                                                     if is_dir {
                                                         navigate_to(p_nav.clone(), true, store, left_hist, left_dir);
                                                     } else {
-                                                        let rp = store.right_pick.read().cloned();
-                                                        if let Some(cp) = rp.filter(|p| p.is_file()) {
-                                                            open_compare(&mut store, p_dbl.clone(), cp);
-                                                            return;
-                                                        }
-                                                        let r_root = right_dir.read().cloned();
-                                                        if let Ok(rel) = p_dbl.strip_prefix(&l_root_c) {
-                                                            let cp = r_root.join(rel);
-                                                            if cp.is_file() { open_compare(&mut store, p_dbl.clone(), cp); }
+                                                        let other_root = right_dir.read().cloned();
+                                                        let other_pick = store.right_pick.read().cloned();
+                                                        if let Some((l, r)) = dblclick_counterpart(
+                                                            true, &p_dbl, other_pick.as_ref(), &l_root_c, &other_root,
+                                                        ) {
+                                                            open_compare(&mut store, l, r);
                                                         }
                                                     }
                                                 },
@@ -275,15 +275,12 @@ pub fn AlignedTree(
                                                     if is_dir {
                                                         navigate_to(p_nav.clone(), false, store, right_hist, right_dir);
                                                     } else {
-                                                        let lp = store.left_pick.read().cloned();
-                                                        if let Some(cp) = lp.filter(|p| p.is_file()) {
-                                                            open_compare(&mut store, cp, p_dbl.clone());
-                                                            return;
-                                                        }
-                                                        let l_root = left_dir.read().cloned();
-                                                        if let Ok(rel) = p_dbl.strip_prefix(&r_root_c) {
-                                                            let cp = l_root.join(rel);
-                                                            if cp.is_file() { open_compare(&mut store, cp, p_dbl.clone()); }
+                                                        let other_root = left_dir.read().cloned();
+                                                        let other_pick = store.left_pick.read().cloned();
+                                                        if let Some((l, r)) = dblclick_counterpart(
+                                                            false, &p_dbl, other_pick.as_ref(), &r_root_c, &other_root,
+                                                        ) {
+                                                            open_compare(&mut store, l, r);
                                                         }
                                                     }
                                                 },
@@ -305,6 +302,88 @@ pub fn AlignedTree(
                 }
             }
         }
+    }
+}
+
+/// What a double-click on a file compares it with, in both layouts (handoff 071 §1):
+/// the file picked on the other side, if there is one; otherwise the same-named file
+/// on the other side, if that exists. The result is always `(left, right)`. `None`
+/// means there is nothing to compare, and the double-click does nothing.
+fn dblclick_counterpart(
+    own_is_left: bool,
+    own_path: &std::path::Path,
+    other_pick: Option<&PathBuf>,
+    own_root: &std::path::Path,
+    other_root: &std::path::Path,
+) -> Option<(PathBuf, PathBuf)> {
+    let other = match other_pick.filter(|p| p.is_file()) {
+        Some(picked) => picked.clone(),
+        None => {
+            let rel = own_path.strip_prefix(own_root).ok()?;
+            let same_named = other_root.join(rel);
+            if !same_named.is_file() {
+                return None;
+            }
+            same_named
+        }
+    };
+    Some(if own_is_left {
+        (own_path.to_path_buf(), other)
+    } else {
+        (other, own_path.to_path_buf())
+    })
+}
+
+#[cfg(test)]
+mod dblclick_tests {
+    use super::*;
+
+    /// A fresh pair of roots, each with one file of the same relative name. Per-process
+    /// names, so parallel test runs do not collide.
+    fn roots(tag: &str) -> (PathBuf, PathBuf) {
+        let base = std::env::temp_dir().join(format!("fsk-dblclick-{tag}-{}", std::process::id()));
+        let (l, r) = (base.join("l"), base.join("r"));
+        std::fs::create_dir_all(&l).unwrap();
+        std::fs::create_dir_all(&r).unwrap();
+        std::fs::write(l.join("same.txt"), "a").unwrap();
+        std::fs::write(r.join("same.txt"), "b").unwrap();
+        (l, r)
+    }
+
+    /// Handoff 071 §7(4): the fallback is shared by both layouts, and is tested here
+    /// through the one helper both layouts call. Falsify by deleting the fallback arm:
+    /// the second test fails.
+    #[test]
+    fn with_nothing_picked_the_same_named_file_on_the_other_side_is_compared() {
+        let (l, r) = roots("fallback");
+        let got = dblclick_counterpart(true, &l.join("same.txt"), None, &l, &r);
+        assert_eq!(got, Some((l.join("same.txt"), r.join("same.txt"))));
+    }
+
+    #[test]
+    fn with_nothing_picked_and_no_same_named_file_nothing_happens() {
+        let (l, r) = roots("missing");
+        std::fs::write(l.join("only_left.txt"), "a").unwrap();
+        let got = dblclick_counterpart(true, &l.join("only_left.txt"), None, &l, &r);
+        assert_eq!(got, None);
+    }
+
+    /// The right pane's double-click pairs the same way, with the order kept `(left, right)`.
+    #[test]
+    fn a_double_click_on_the_right_pane_keeps_left_then_right() {
+        let (l, r) = roots("right");
+        let got = dblclick_counterpart(false, &r.join("same.txt"), None, &r, &l);
+        assert_eq!(got, Some((l.join("same.txt"), r.join("same.txt"))));
+    }
+
+    /// A file picked on the other side wins over the same-named file.
+    #[test]
+    fn a_picked_file_on_the_other_side_wins_over_the_same_named_one() {
+        let (l, r) = roots("picked");
+        std::fs::write(r.join("picked.txt"), "c").unwrap();
+        let pick = r.join("picked.txt");
+        let got = dblclick_counterpart(true, &l.join("same.txt"), Some(&pick), &l, &r);
+        assert_eq!(got, Some((l.join("same.txt"), r.join("picked.txt"))));
     }
 }
 

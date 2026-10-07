@@ -498,7 +498,7 @@ fn apply_navigation(
     // safe to outlive whatever triggered it.
     spawn_forever(async move {
         let _ = dioxus::document::eval(
-            "var t = document.getElementById('aligned-tree'); if(t) t.scrollTop = 0;",
+            "var t = document.getElementById('explorer-tree'); if(t) t.scrollTop = 0;",
         )
         .await;
     });

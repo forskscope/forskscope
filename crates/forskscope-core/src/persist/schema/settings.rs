@@ -98,7 +98,9 @@ pub struct PersistedSettings {
     /// being compared.
     #[serde(default)]
     pub hide_dotfiles: bool,
-    #[serde(default)]
+    /// Handoff 071 §4: compact is the default. A file without the field decodes to the
+    /// same default as a new install; a file that records `false` stays aligned.
+    #[serde(default = "default_explorer_compact")]
     pub explorer_compact: bool,
     #[serde(default)]
     pub enable_binary_comparison: bool,
@@ -164,7 +166,7 @@ impl Default for PersistedSettings {
             ignore_extensions: String::new(),
             ignore_dirs: String::new(),
             hide_dotfiles: false,
-            explorer_compact: false,
+            explorer_compact: true,
             enable_binary_comparison: false,
             remember_explorer_dirs: true,
             show_line_numbers: true,
@@ -178,6 +180,10 @@ impl Default for PersistedSettings {
 }
 
 fn default_true() -> bool {
+    true
+}
+/// Handoff 071 §4: the layout a file without the field decodes to. Compact.
+fn default_explorer_compact() -> bool {
     true
 }
 fn default_recent_limit() -> usize {

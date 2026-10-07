@@ -65,6 +65,42 @@ pub fn compute_aligned_rows(
     merge_level(Path::new(""), &l_by_parent, &r_by_parent)
 }
 
+/// The compact pairing (RFC-068; handoff 071 §2). Each side's visible rows are packed
+/// and zipped by index: row *i* shows the left side's *i*-th entry beside the right
+/// side's *i*-th entry. Entries that share a name are **not** paired, and nothing
+/// claims that paired entries are the same. The shorter side is padded with `None`
+/// at the end, so its column ends early.
+///
+/// Rows outside their root are dropped, as [`compute_aligned_rows`] drops them.
+pub fn pair_by_index(
+    left_rows: &[FlatRow],
+    right_rows: &[FlatRow],
+    left_root: &Path,
+    right_root: &Path,
+) -> Vec<AlignedRow> {
+    let left = packed(left_rows, left_root);
+    let right = packed(right_rows, right_root);
+    let n = left.len().max(right.len());
+    (0..n)
+        .map(|i| (left.get(i).cloned(), right.get(i).cloned()))
+        .collect()
+}
+
+fn packed(rows: &[FlatRow], root: &Path) -> Vec<RowData> {
+    rows.iter()
+        .filter_map(|(abs, is_dir, expanded, selected, depth)| {
+            abs.strip_prefix(root).ok().map(|rel| RowData {
+                abs_path: abs.clone(),
+                rel_path: rel.to_path_buf(),
+                is_dir: *is_dir,
+                is_expanded: *expanded,
+                is_selected: *selected,
+                depth: *depth,
+            })
+        })
+        .collect()
+}
+
 // ── Internal ──────────────────────────────────────────────────────────────────
 
 fn merge_level(
@@ -414,5 +450,76 @@ mod tests {
             r.as_ref().map(|d| d.is_selected).unwrap_or(false),
             "right side must be selected"
         );
+    }
+
+    // ── Compact pairing (handoff 071 §2) ──────────────────────────────────────
+
+    fn plain(root: &str, names: &[&str]) -> Vec<FlatRow> {
+        names
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (PathBuf::from(root).join(n), false, false, false, i as u32))
+            .collect()
+    }
+
+    fn pair_names(rows: &[AlignedRow]) -> Vec<(Option<String>, Option<String>)> {
+        rows.iter()
+            .map(|(l, r)| {
+                (
+                    l.as_ref()
+                        .map(|d| d.rel_path.to_string_lossy().into_owned()),
+                    r.as_ref()
+                        .map(|d| d.rel_path.to_string_lossy().into_owned()),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn pair_by_index_zips_the_two_lists_in_order() {
+        let l = plain("/l", &["a", "b"]);
+        let r = plain("/r", &["x", "y"]);
+        let rows = pair_by_index(&l, &r, Path::new("/l"), Path::new("/r"));
+        assert_eq!(
+            pair_names(&rows),
+            vec![
+                (Some("a".into()), Some("x".into())),
+                (Some("b".into()), Some("y".into())),
+            ]
+        );
+    }
+
+    #[test]
+    fn pair_by_index_pads_the_shorter_side_at_the_end() {
+        let l = plain("/l", &["a", "b", "c"]);
+        let r = plain("/r", &["x"]);
+        let rows = pair_by_index(&l, &r, Path::new("/l"), Path::new("/r"));
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[1], (Some(rows[1].0.clone().unwrap()), None));
+        assert_eq!(rows[2].1, None);
+    }
+
+    /// Same-named entries at different positions are not paired: packing is the point.
+    /// Falsify by pairing by name instead, and this fails.
+    #[test]
+    fn pair_by_index_does_not_pair_same_names_at_different_positions() {
+        let l = plain("/l", &["b", "a"]);
+        let r = plain("/r", &["a"]);
+        let rows = pair_by_index(&l, &r, Path::new("/l"), Path::new("/r"));
+        assert_eq!(
+            pair_names(&rows),
+            vec![
+                (Some("b".into()), Some("a".into())),
+                (Some("a".into()), None),
+            ]
+        );
+    }
+
+    #[test]
+    fn pair_by_index_drops_rows_outside_their_root_as_the_aligned_pairing_does() {
+        let mut l = plain("/l", &["a"]);
+        l.push((PathBuf::from("/elsewhere/z"), false, false, false, 0));
+        let rows = pair_by_index(&l, &[], Path::new("/l"), Path::new("/r"));
+        assert_eq!(pair_names(&rows), vec![(Some("a".into()), None)]);
     }
 }
