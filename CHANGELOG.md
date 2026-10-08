@@ -5,7 +5,48 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.186.1] — Unreleased
+## [0.187.0] — 2026-10-08
+
+**Know when there is something new.** The About dialog can now tell you whether a
+newer version has been released, when you ask it to.
+
+### Added
+
+- **Check for updates**, in the About dialog (ℹ, in Settings). One click sends one
+  request to GitHub to read the latest release's version number, then says which is
+  true: you have the latest version, a newer version is available, this build is
+  newer than the latest release, or it could not check (no connection, rate-limited,
+  an unexpected response, or a reply it could not read). **A check that fails never
+  says you are up to date.**
+  - **Nothing happens until you click.** There is no check at startup, in the
+    background or on a schedule, and the result is not saved.
+  - **What is sent:** like any web request, it carries your IP address, and it
+    identifies itself as `ForskScope/<version>`. Nothing about your files is sent.
+  - **When a newer version exists**, the downloaded build offers **Open release
+    page**; the AUR package tells you to update with your AUR helper instead.
+    ForskScope never downloads or installs anything itself.
+- **Every release now includes a `SHA256SUMS` file** with a checksum for each
+  download. The release notes and the installation guide show how to check it. It
+  shows that a download arrived intact, not who built it: builds are not signed yet.
+
+### Changed
+
+- **The documentation no longer says ForskScope makes no network requests.** It now
+  says exactly what the update check sends, to whom and when. Your files never leave
+  your machine; that has not changed.
+
+### Internal
+
+- The update check is a small hand-written HTTPS request over the TLS library
+  ForskScope already used; no HTTP client library was added. It accepts both ways
+  HTTP/1.1 allows a server to frame a reply, gives up after 10 seconds without
+  progress, and reads at most 1 MiB. The version in the reply must be a plain
+  `X.Y.Z` before anything uses it, and the release-page link is built only from
+  those three numbers.
+- A Microsoft Store build, when there is one, will say to update through the Store.
+- The Linux release build now checks the binary's exact list of 16 system
+  libraries, so a new one cannot arrive unnoticed.
+- The threat model has a new section on this one accepted outbound request.
 
 ## [0.186.0] — 2026-10-07
 

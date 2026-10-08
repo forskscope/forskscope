@@ -166,11 +166,11 @@ digest for each of the three platform assets, in the standard `sha256sum`
 format:
 
 ```sh
-# Linux — downloads forskscope-v*-linux-x86_64.tar.gz and SHA256SUMS first
+# Linux — download forskscope-v*-linux-x86_64.tar.gz and SHA256SUMS first
 sha256sum -c SHA256SUMS --ignore-missing
 
-# macOS
-shasum -a 256 -c SHA256SUMS
+# macOS — download the .dmg and SHA256SUMS first
+grep macos-aarch64 SHA256SUMS | shasum -a 256 -c
 ```
 
 ```powershell
@@ -179,11 +179,12 @@ Get-FileHash forskscope-vX.Y.Z-windows-x64.zip -Algorithm SHA256
 # then compare against the matching line in SHA256SUMS by hand
 ```
 
-`--ignore-missing` lets `sha256sum` check only the files you actually
-downloaded, rather than failing on the two platform assets you did not.
+Both commands check only the file you downloaded. Without `--ignore-missing`
+(Linux) or the `grep` (macOS), they would also try the two platform assets you
+did not download and report them as `FAILED`, even though your file is fine.
 
 **This protects against a corrupted or incomplete download, not against
-this host being compromised** — `SHA256SUMS` is computed on the same CI
+the build host being compromised** — `SHA256SUMS` is computed on the same CI
 runner that builds the assets, by the same workflow. It confirms the file
 you have matches what that build produced, not who produced it. Nothing
 in this release signs a build independently of GitHub's own hosting.
