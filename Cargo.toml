@@ -32,6 +32,11 @@ app-json-settings           = "2"
 chardetng                   = "0.1"
 dirs-next                   = "2"
 encoding_rs                 = "0.8"
+# F180: already resolved transitively (tungstenite -> dioxus-desktop); its
+# first direct, declared use is the update-check request's TLS (handoff
+# 073) - no new TLS stack, no new system library. audit-deps' reviewed set
+# names forskscope-ui as a second accepted path.
+native-tls                  = "0.2"
 rfd                         = { version = "0.17", default-features = true }
 # RFC-085: default features off deliberately - chrono/cli/serde are all
 # optional and unused here; audit-deps' reviewed set assumes exactly the

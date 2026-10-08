@@ -32,6 +32,10 @@ sha256sums=('SKIP')
 
 build() {
     cd "$pkgname-$pkgver"
+    # F180: this build is updated by pacman, not by the app's own Check for
+    # updates button - FORSKSCOPE_CHANNEL tells the About dialog to say so
+    # ("Update with your AUR helper") instead of linking a GitHub download.
+    export FORSKSCOPE_CHANNEL=aur
     cargo build --release --locked
 }
 

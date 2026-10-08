@@ -461,9 +461,16 @@ reachable from a file name.
 The following properties are guaranteed by the absence of application code, not
 by defensive programming:
 
-- **No external network requests** — no `reqwest`, `hyper`, `ureq`, or app
-  feature opens remote HTTP endpoints. Dioxus desktop's loopback WebSocket
-  transport is the reviewed exception.
+- **No network request without the user's own click** — this is no longer
+  an absolute "no app feature opens remote HTTP endpoints" (F180, handoff
+  073, owner's decision 2026-10-08: see `design-principles.md`'s "Local
+  -first and private"). One feature does, deliberately: the About dialog's
+  *Check for updates* button, one bounded HTTPS GET to GitHub, only on
+  click — see "Accepted outbound request: update check" below for exactly
+  what it sends, parses, and never does. No `reqwest`, `hyper`, or `ureq`
+  is added for it (`cargo xtask audit-deps` still asserts all three
+  absent); it reuses the TLS stack already linked for Dioxus desktop's
+  loopback WebSocket transport, that section's reviewed exception.
 - **No telemetry or analytics** — no beacon calls, no usage counters written
   to any remote endpoint.
 - **No code execution from diff content** — diffs are rendered as text with
@@ -496,7 +503,8 @@ Key crates touching file I/O or process execution:
 | `rfd` | 0.17 | File picker dialog | OS dialog; no custom code |
 | `dioxus` | 0.7.9 | UI framework | Default features disabled; no devtools |
 | `dioxus-desktop` | 0.7.9 | Desktop WebView host | Uses authenticated loopback WebSocket IPC between WebView and host |
-| `tungstenite` / `native-tls` | 0.28 / 0.2 | Dioxus desktop transport dependency | Accepted only via `dioxus-desktop`; no app-authored remote connections |
+| `tungstenite` | 0.28 | Dioxus desktop transport dependency | Accepted only via `dioxus-desktop`; no app-authored remote connections |
+| `native-tls` | 0.2 | Dioxus desktop's transport TLS, and (F180, handoff 073) the update-check request's TLS | Two reviewed paths: via `dioxus-desktop` (no app-authored connection), and directly from `forskscope-ui` for one bounded, user-clicked HTTPS GET — see "Accepted outbound request: update check" |
 | `quick-xml` | 0.39.4 | Wayland protocol code generation through GTK/Dioxus stack | Build-time/proc-macro path; not reachable from user-supplied files. Carries the two advisories ignored in `.cargo/audit.toml` |
 | `sheets-diff` | 3.6.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0; 3.0.0 since F130, 3.2.0 since F138, 3.3.0 since F154, 3.4.0 since F173, 3.5.0 since F132, 3.6.0 since F177) | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-core` only (`audit-deps` asserts it) |
 | `calamine` | 0.36.1 | Workbook reader under `sheets-diff` | **Parses user-supplied XML and archives.** Read as a stream by `sheets-diff` 2.5.1 and later, so memory follows the populated cells (it did not through 2.5.0). Immediate dependent: `sheets-diff` only |
@@ -544,9 +552,11 @@ encrypted when a peer sent them in plaintext. The handshake stayed
 authenticated. The path is framework transport, not file content.
 
 The release gate `cargo xtask audit-deps` asserts that `dioxus-devtools` is not
-active, that `tungstenite`/`native-tls` remain limited to the reviewed
-`dioxus-desktop` path, and that common external HTTP client/server crates
-(`reqwest`, `hyper`, `ureq`) are absent. Since F121 D (2026-09-24) it also asserts that `rustls`'s only immediate dependent
+active, that `tungstenite` remains limited to the reviewed `dioxus-desktop`
+path, that `native-tls` is limited to exactly its two reviewed paths
+(`tungstenite` and, since F180/handoff 073, `forskscope-ui` directly — see
+below), and that common external HTTP client/server crates (`reqwest`,
+`hyper`, `ureq`) are absent. Since F121 D (2026-09-24) it also asserts that `rustls`'s only immediate dependent
 is `tungstenite` and `rustls-webpki`'s is `rustls`. **It now queries every
 target's graph** (`cargo tree --target all`): before, it saw only the host's,
 and `rustls` — compiled for the Windows and macOS builds that ship — was not
@@ -554,6 +564,60 @@ in the Linux graph at all, so a crate that appeared only in a shipped-platform
 build would have passed every assertion. If a future dependency introduces
 another network-capable path, update this threat model under S-001 before
 release.
+
+### Accepted outbound request: update check (F180/F181, handoff 073)
+
+**S-001's sibling acceptance, 2026-10-08:** the About dialog's *Check for
+updates* button is ForskScope's first app-authored outbound network
+request. The owner's decision (`design-principles.md`, "Local-first and
+private") narrows "no network requests" to "no network request without
+the user's own click" — this is the one feature that makes one, and this
+section is its full, explicit review.
+
+**What it sends.** On click, one HTTPS `GET
+https://api.github.com/repos/forskscope/forskscope/releases/latest`, with
+a `User-Agent: ForskScope/<version>` header GitHub requires. Nothing about
+the user, their files, or their comparisons is ever sent — there is
+nothing in the request to carry it, by construction, not by omission
+someone has to remember.
+
+**What it reads.** Only the `tag_name` field of the JSON reply
+(`forskscope-ui/src/update_check.rs`'s `LatestRelease` struct has exactly
+that one field — any other field in the reply is never deserialized into
+anything). Bounded: a ~10 s timeout on connect and on every subsequent
+read, and a 1 MiB cap on the raw bytes received, checked against what
+actually arrived rather than trusted from a `Content-Length` header.
+
+**The TLS stack.** `native-tls`, already linked for Dioxus desktop's
+loopback WebSocket transport (above) — no new TLS stack, no new system
+library. `readelf -d` on a release build lists the same 16 libraries as
+0.186.0 (`.github/workflows/release.yml`'s Linux job asserts this
+directly on the built artifact, not only on the dependency graph —
+review 151's lesson, F179). `cargo xtask audit-deps` accepts exactly two
+paths to `native-tls`: through `tungstenite`, and now directly through
+`forskscope-ui`; a third path is not accepted silently.
+
+**The tag is validated before it can reach anything launched.** A reply's
+`tag_name` is untrusted text. `forskscope_ui_logic::update_check::Version::parse`
+accepts only a plain `X.Y.Z` shape and rejects everything else — including
+shapes built to look like shell injection (tested directly:
+`"0.187.0; rm -rf /"`, `"$(whoami)"`, `"../../etc/passwd"`, and others).
+The release-page URL the *Open release page* button launches
+(`release_page_url`) is built only from a successfully parsed `Version`'s
+three numeric fields — there is no code path from raw reply text into
+that URL, because there is no code path from raw reply text into a
+`Version` at all. The URL is then opened via
+`forskscope_core::external_tool::open_url`, which passes it to the
+platform's own opener (`xdg-open`/`open`/`cmd /C start`) as a single
+argument, never through a shell string.
+
+**What it never does.** No check at startup, none periodic or
+backgrounded, no automatic retry, no result persisted across launches
+(§"Settings and session persistence" above is unaffected — this feature
+writes nothing to either file). It never downloads or installs anything;
+it reports a version number and, for a direct download, opens a web page.
+That is what keeps it outside the security objection to an embedded
+updater.
 
 ### Enabled third-party parser: `.xlsx`
 

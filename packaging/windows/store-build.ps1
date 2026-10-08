@@ -37,8 +37,13 @@ if ($ActualVersion -ne $ExpectedVersion) {
 Write-Host "AppxManifest.xml Version matches the released tag: $ActualVersion"
 
 # ── Build the same binary the Windows zip release artifact uses. ──────────
+# F180: this build is updated by the Store, not by the app's own Check for
+# updates button - FORSKSCOPE_CHANNEL tells the About dialog to say so
+# ("Update through the Microsoft Store") instead of linking a GitHub
+# download.
 Push-Location $RepoRoot
 try {
+    $env:FORSKSCOPE_CHANNEL = "store"
     cargo build --release --locked -p forskscope-ui
     if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
 } finally {

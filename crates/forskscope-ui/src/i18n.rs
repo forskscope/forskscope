@@ -305,6 +305,28 @@ fn ja(key: &str) -> Option<&'static str> {
         "Copy diagnostics" => "診断情報をコピー",
         "About ForskScope" => "ForskScope について",
         "Copied." => "コピーしました。",
+        "Check for updates" => "更新を確認",
+        "Checking…" => "確認中…",
+        "You have the latest version ({version})." => "最新バージョンです（{version}）。",
+        "{version} is available." => "{version} が利用可能です。",
+        "This build is newer than the latest release ({version})." => {
+            "このビルドは最新リリース（{version}）より新しいバージョンです。"
+        }
+        "Could not check for updates: no network connection." => {
+            "更新を確認できませんでした: ネットワーク接続がありません。"
+        }
+        "Could not check for updates: rate-limited, try again later." => {
+            "更新を確認できませんでした: レート制限されています。後でもう一度お試しください。"
+        }
+        "Could not check for updates: unexpected response (HTTP {code})." => {
+            "更新を確認できませんでした: 予期しない応答です（HTTP {code}）。"
+        }
+        "Could not check for updates: the reply could not be read." => {
+            "更新を確認できませんでした: 応答を読み取れませんでした。"
+        }
+        "Open release page" => "リリースページを開く",
+        "Update with your AUR helper" => "AUR ヘルパーで更新してください",
+        "Update through the Microsoft Store" => "Microsoft Store から更新してください",
         "Copy all" => "すべてコピー",
         "Overwrite" => "上書き",
         "Cancel" => "キャンセル",

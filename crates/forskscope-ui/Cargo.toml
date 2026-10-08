@@ -30,6 +30,7 @@ wry                         = { workspace = true }
 
 app-json-settings           = { workspace = true }
 dirs-next                   = { workspace = true }
+native-tls                  = { workspace = true }
 rfd                         = { workspace = true }
 
 serde                       = { workspace = true }

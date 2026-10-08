@@ -12,7 +12,7 @@ Diff and merge through Exploring 🕵️‍♀️ GUI tool, local-first, with cr
 forskscope old/src/main.rs new/src/main.rs
 ```
 
-ForskScope opens two files side by side, highlights every change at line and character level, and lets you apply hunks from left to right with a single keystroke. It also compares two directories at once through the Explorer view. Everything runs locally — no accounts, no uploads, no telemetry.
+ForskScope opens two files side by side, highlights every change at line and character level, and lets you apply hunks from left to right with a single keystroke. It also compares two directories at once through the Explorer view. Everything runs locally — no accounts, no uploads, no telemetry. The one exception: clicking *Check for updates* in the About dialog sends a single request to GitHub for the latest version number.
 
 ![Side-by-side diff with per-hunk apply buttons](docs/src/assets/screenshot-diff.png)
 

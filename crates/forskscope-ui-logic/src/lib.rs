@@ -42,6 +42,10 @@
 //! - [`session`] — session persistence logic:
 //!   - `persistence_recovery`: `SessionRecoveryView`, the session mirror of
 //!     `settings::persistence_recovery`.
+//! - `update_check` — F180/F181 (handoff 073): `decide`, the pure
+//!   `(current version, network outcome) -> state` mapping behind the About
+//!   dialog's *Check for updates* button; `Version`, `AppChannel`,
+//!   `UpdateAction`, `release_page_url`.
 //!
 //! Crate-root re-exports keep the common types one import away. **F75/F54:**
 //! this list is checked by `cargo xtask ui-logic-connectivity` — every name
@@ -61,6 +65,7 @@ pub mod session;
 pub mod settings;
 #[cfg(test)]
 mod test_support;
+pub mod update_check;
 
 // compare
 pub use compare::load_guard::{LoadGuard, guard_for_sizes};
@@ -97,3 +102,9 @@ pub use settings::persistence_recovery::{
     action_label as settings_recovery_action_label,
 };
 pub use settings::settings_view::{clamp_font_size, theme_choices};
+
+// update_check
+pub use update_check::{
+    AppChannel, CheckFailureReason, CheckOutcome, UpdateAction, UpdateCheckState, Version, decide,
+    release_page_url, update_action,
+};

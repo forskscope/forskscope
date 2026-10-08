@@ -145,5 +145,8 @@ See [Git integration](../intermediate/git-integration.md) for full setup.
 
 ## Privacy
 
-No accounts, no telemetry, no cloud upload, and no external network service.
-Everything stays on your machine.
+No accounts, no telemetry, no cloud upload. Everything stays on your
+machine, with one exception you control: clicking **Check for updates** in
+the About dialog sends a single request to GitHub to read the latest
+version number. Nothing else is sent, nothing runs in the background, and
+nothing is ever sent without that click.

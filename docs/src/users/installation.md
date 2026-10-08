@@ -4,8 +4,12 @@ Every release publishes four artifacts plus a source archive on the
 [Releases page](https://github.com/forskscope/forskscope/releases). Pick the one
 that matches your platform.
 
-ForskScope runs entirely on your machine. It makes no network requests, has no
-accounts, and collects no telemetry.
+ForskScope runs entirely on your machine, has no accounts, and collects no
+telemetry. It makes no network requests unless you click **Check for
+updates** in the About dialog (ℹ, in Settings) — that sends one request to
+GitHub to read the latest version number. Like any web request it carries
+your IP address, and it identifies itself as `ForskScope/<version>`.
+Nothing else is sent, and nothing runs in the background.
 
 ---
 
@@ -155,16 +159,41 @@ ForskScope to Applications. Requires **macOS 13.0 or later** (matches
 
 ---
 
-## Verifying a download
+## Verifying your download
 
-Each file on a release's page shows a SHA-256 digest, which GitHub computes
-when the file is uploaded; the release notes do not list them. Nothing signs a
-build independently of that page, so a digest confirms the file arrived intact,
-not who made it. To check one:
+Every release publishes a fourth file, **`SHA256SUMS`**, listing a SHA-256
+digest for each of the three platform assets, in the standard `sha256sum`
+format:
 
 ```sh
-sha256sum forskscope-v*-linux-x86_64.tar.gz
+# Linux — downloads forskscope-v*-linux-x86_64.tar.gz and SHA256SUMS first
+sha256sum -c SHA256SUMS --ignore-missing
+
+# macOS
+shasum -a 256 -c SHA256SUMS
 ```
+
+```powershell
+# Windows
+Get-FileHash forskscope-vX.Y.Z-windows-x64.zip -Algorithm SHA256
+# then compare against the matching line in SHA256SUMS by hand
+```
+
+`--ignore-missing` lets `sha256sum` check only the files you actually
+downloaded, rather than failing on the two platform assets you did not.
+
+**This protects against a corrupted or incomplete download, not against
+this host being compromised** — `SHA256SUMS` is computed on the same CI
+runner that builds the assets, by the same workflow. It confirms the file
+you have matches what that build produced, not who produced it. Nothing
+in this release signs a build independently of GitHub's own hosting.
+Signing is a separate, open question (F46) and is not part of this
+release.
+
+Each file on a release's page also shows its own SHA-256 digest, which
+GitHub computes independently when the file is uploaded — a second,
+independent source for the same number, if you want to cross-check
+`SHA256SUMS` itself rather than trust the file that names it.
 
 ---
 

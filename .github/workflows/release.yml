@@ -146,13 +146,38 @@ jobs:
       - name: Build release binary
         run: cargo build --release --locked -p forskscope-ui
 
-      # F179: the graph check in `cargo xtask audit-deps` reports what Cargo
-      # intends; this reports what the linker actually produced (review
-      # 151's lesson - a check on a copy is not a check on the thing).
-      - name: Linux binary links no libxdo (F179)
+      # F179/F180: the graph check in `cargo xtask audit-deps` reports what
+      # Cargo intends; this reports what the linker actually produced
+      # (review 151's lesson - a check on a copy is not a check on the
+      # thing). F180 (handoff 073) added `native-tls` as a direct
+      # dependency for the update-check request; this list is the exact
+      # 16 libraries 0.186.0 already linked, so this also proves that
+      # change added nothing new, not only that libxdo stayed gone.
+      - name: Linux binary links the same 16 libraries as 0.186.0 (F179/F180)
         run: |
-          if readelf -d target/release/forskscope | grep -i libxdo; then
-            echo "::error::target/release/forskscope links libxdo - this is F179's regression, the Arch Linux start-up failure"
+          EXPECTED="libwayland-client.so.0
+          libm.so.6
+          libssl.so.3
+          libcrypto.so.3
+          libwebkit2gtk-4.1.so.0
+          libgtk-3.so.0
+          libgdk-3.so.0
+          libgdk_pixbuf-2.0.so.0
+          libcairo.so.2
+          libsoup-3.0.so.0
+          libgio-2.0.so.0
+          libjavascriptcoregtk-4.1.so.0
+          libgobject-2.0.so.0
+          libglib-2.0.so.0
+          libgcc_s.so.1
+          libc.so.6"
+          ACTUAL=$(readelf -d target/release/forskscope \
+            | grep NEEDED \
+            | sed -E 's/.*\[(.*)\]/\1/')
+          DIFF=$(diff <(echo "$EXPECTED" | sed 's/^ *//' | sort) <(echo "$ACTUAL" | sort)) || true
+          if [ -n "$DIFF" ]; then
+            echo "::error::target/release/forskscope's linked libraries differ from 0.186.0's 16:"
+            echo "$DIFF"
             exit 1
           fi
 
@@ -306,6 +331,28 @@ jobs:
             echo "- **Linux (\`*-linux-x86_64.tar.gz\`)** is built on Ubuntu; it needs a glibc at least as new as that build runner's. It starts on Arch as well as on Ubuntu. It has not been run on other distributions."
             echo "- **Windows** is tested on Windows 11. It installs on Windows 10 1809+ but is untested there; Windows 10 reached end of support on 2025-10-14."
             echo "- **macOS (\`*.dmg\`)** is **not signed with an Apple Developer ID and not notarized**, so Gatekeeper will refuse it on first launch. Right-click the app and choose **Open**, or run \`xattr -d com.apple.quarantine /Applications/ForskScope.app\`. Requires macOS 13.0 or later."
+            echo ""
+            echo "### Verifying your download"
+            echo ""
+            echo "\`SHA256SUMS\` (below) lists a SHA-256 digest for each of the three"
+            echo "platform assets. It protects against a corrupted or incomplete"
+            echo "download, not against this host being compromised - it is computed"
+            echo "here, on the same runner that builds the assets. Signing is a"
+            echo "separate, open question (F46) and is not part of this release."
+            echo ""
+            echo "\`\`\`sh"
+            echo "# Linux"
+            echo "sha256sum -c SHA256SUMS --ignore-missing"
+            echo ""
+            echo "# macOS"
+            echo "shasum -a 256 -c SHA256SUMS"
+            echo "\`\`\`"
+            echo ""
+            echo "\`\`\`powershell"
+            echo "# Windows"
+            echo "Get-FileHash forskscope-v${GITHUB_REF_NAME}-windows-x64.zip -Algorithm SHA256"
+            echo "# then compare against the matching line in SHA256SUMS by hand"
+            echo "\`\`\`"
           } >> release-notes.md
 
           PREV_TAG=$(git tag --sort=-creatordate | awk -v cur="${GITHUB_REF_NAME}" 'found{print; exit} $0==cur{found=1}')
@@ -319,6 +366,18 @@ jobs:
       - uses: actions/download-artifact@v7
         with:
           merge-multiple: true
+
+      # F181: a fourth asset, computed from the same three files this job is
+      # about to attach. Standard `sha256sum` output format, so the commands
+      # named in the release notes above work unmodified.
+      - name: Compute checksums
+        run: |
+          sha256sum \
+            forskscope-v*-linux-x86_64.tar.gz \
+            forskscope-v*-macos-aarch64.dmg \
+            forskscope-v*-windows-x64.zip \
+            > SHA256SUMS
+          cat SHA256SUMS
 
       - name: Create release
         id: create_release
@@ -339,6 +398,7 @@ jobs:
             forskscope-v*-linux-x86_64.tar.gz
             forskscope-v*-macos-aarch64.dmg
             forskscope-v*-windows-x64.zip
+            SHA256SUMS
 
       # The run page is where someone looks after tagging, so it carries what is
       # left to do - now an explicit dispatch of each distribution workflow,

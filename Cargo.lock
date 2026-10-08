@@ -1531,6 +1531,7 @@ dependencies = [
  "forskscope-core",
  "forskscope-ui-logic",
  "libc",
+ "native-tls",
  "rfd",
  "serde",
  "serde_json",

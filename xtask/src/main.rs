@@ -814,7 +814,11 @@ fn assert_external_network_crates_absent() {
 
 fn assert_network_paths_are_reviewed() {
     assert_immediate_dependents("tungstenite", &["dioxus-desktop "]);
-    assert_immediate_dependents("native-tls", &["tungstenite "]);
+    // F180 (handoff 073): `forskscope-ui` depends on `native-tls` directly
+    // now too, for the update-check request's TLS — no new TLS stack, the
+    // same already-reviewed crate and version `tungstenite` pulls in. Both
+    // paths are accepted deliberately; a third would not be.
+    assert_immediate_dependents("native-tls", &["tungstenite ", "forskscope-ui "]);
     // F121 D: `tungstenite` compiles in both TLS backends, so the transport
     // has two reviewed paths, not one — and RUSTSEC-2026-0285 (0.171.0) was a
     // `rustls` advisory. Without these, a second crate pulling `rustls` would

@@ -40,3 +40,15 @@ No accounts, no telemetry, no cloud upload.  The local-first stance is not a
 feature to market; it is the default because users compare private source code,
 credentials in config files, internal documents, and production logs.  Trust
 should not require opting out.
+
+**"No network requests" is policy, not this principle itself — and policy
+can change where the user acts with intent (owner's decision, 2026-10-08,
+F180).** The principle above is about what ForskScope does with *your
+file contents* by default, and that is unconditional: nothing here reads,
+uploads, or phones home about the files you compare. The *Check for
+updates* button in the About dialog is the one deliberate exception to the
+narrower "no network requests at all" claim that used to follow from it:
+one HTTPS request, only on click, that reads a version number and nothing
+about your files. Any future feature that wants a second exception needs
+the same kind of explicit, owner-reasoned acceptance this one got — not an
+assumption that the door is now generally open.

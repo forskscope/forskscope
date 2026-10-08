@@ -326,3 +326,77 @@ impl ExternalToolCommand {
         ]
     }
 }
+
+// ── Opening a URL in the default browser (F180, handoff 073) ──────────────────
+
+/// The platform a URL-open command is built for — a parameter rather than
+/// a bare `#[cfg(target_os = ..)]` split, so every branch's command shape
+/// is unit-testable regardless of which OS runs the test suite.
+// Only one variant is ever constructed by `host_target_os()` on a given
+// build target; the others exist for `open_url_command`'s tests, which
+// check every platform's command shape regardless of which OS runs them.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TargetOs {
+    Linux,
+    Macos,
+    Windows,
+    /// Anything else: falls back to the `xdg-open` convention, same as
+    /// [`PlatformInfo`](crate::platform::PlatformInfo)'s own OS detection.
+    Other,
+}
+
+pub(crate) fn host_target_os() -> TargetOs {
+    #[cfg(target_os = "macos")]
+    {
+        TargetOs::Macos
+    }
+    #[cfg(target_os = "windows")]
+    {
+        TargetOs::Windows
+    }
+    #[cfg(target_os = "linux")]
+    {
+        TargetOs::Linux
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    {
+        TargetOs::Other
+    }
+}
+
+/// The [`std::process::Command`] that opens `url` in the default browser on
+/// `os` — `xdg-open` on Linux (and any other Unix-like host, the same
+/// fallback [`ExternalToolCommand::system_open`] uses), `open` on macOS,
+/// and the `cmd /C start "" <url>` form `main.rs`'s WebView2 download-page
+/// opener already uses on Windows. No shell string is built; `url` is
+/// passed as a single argument element, never interpolated into one.
+pub(crate) fn open_url_command(os: TargetOs, url: &str) -> std::process::Command {
+    match os {
+        TargetOs::Macos => {
+            let mut cmd = std::process::Command::new("open");
+            cmd.arg(url);
+            cmd
+        }
+        TargetOs::Windows => {
+            let mut cmd = std::process::Command::new("cmd");
+            // The explicit "" window-title argument is required: without
+            // it, `start` can misread the URL itself as a quoted title —
+            // the same pitfall `main.rs`'s WebView2 opener documents.
+            cmd.args(["/C", "start", "", url]);
+            cmd
+        }
+        TargetOs::Linux | TargetOs::Other => {
+            let mut cmd = std::process::Command::new("xdg-open");
+            cmd.arg(url);
+            cmd
+        }
+    }
+}
+
+/// Opens `url` in the system's default browser and returns the spawned
+/// child process. The caller never waits on it — once started, the browser
+/// is an independent process ForskScope has no further relationship with.
+pub fn open_url(url: &str) -> std::io::Result<std::process::Child> {
+    open_url_command(host_target_os(), url).spawn()
+}

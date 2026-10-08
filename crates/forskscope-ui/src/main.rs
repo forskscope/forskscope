@@ -34,6 +34,7 @@ mod state;
 #[cfg(test)]
 mod test_support;
 mod ui;
+mod update_check;
 mod webview2;
 
 use dioxus_desktop::tao::dpi::LogicalSize;

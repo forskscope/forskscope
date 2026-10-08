@@ -8,8 +8,8 @@
 use std::path::PathBuf;
 
 use crate::external_tool::{
-    ExpandContext, ExternalToolArg, ExternalToolCommand, ExternalToolPlaceholder, ToolId, ToolKind,
-    UnknownTokenError, expand_args, parse_arg,
+    ExpandContext, ExternalToolArg, ExternalToolCommand, ExternalToolPlaceholder, TargetOs, ToolId,
+    ToolKind, UnknownTokenError, expand_args, open_url_command, parse_arg,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -360,4 +360,60 @@ fn tool_kind_variants_are_distinct() {
     ];
     let unique: std::collections::HashSet<_> = kinds.iter().map(|k| format!("{k:?}")).collect();
     assert_eq!(unique.len(), kinds.len());
+}
+
+// ── open_url_command (F180, handoff 073) ───────────────────────────────────────
+//
+// Parameterized by `TargetOs` rather than `#[cfg(target_os = ..)]`, so every
+// platform's command shape is checked here regardless of which OS runs this
+// suite (`cargo test --workspace` only ever runs on one host).
+
+#[test]
+fn linux_opens_with_xdg_open_and_the_url_as_a_single_argument() {
+    let cmd = open_url_command(TargetOs::Linux, "https://example.com/a b");
+    assert_eq!(cmd.get_program(), "xdg-open");
+    let args: Vec<_> = cmd.get_args().collect();
+    assert_eq!(args, vec!["https://example.com/a b"]);
+}
+
+#[test]
+fn other_unix_like_falls_back_to_xdg_open_same_as_linux() {
+    let cmd = open_url_command(TargetOs::Other, "https://example.com");
+    assert_eq!(cmd.get_program(), "xdg-open");
+}
+
+#[test]
+fn macos_opens_with_open_and_the_url_as_a_single_argument() {
+    let cmd = open_url_command(TargetOs::Macos, "https://example.com/a b");
+    assert_eq!(cmd.get_program(), "open");
+    let args: Vec<_> = cmd.get_args().collect();
+    assert_eq!(args, vec!["https://example.com/a b"]);
+}
+
+#[test]
+fn windows_uses_cmd_start_with_an_explicit_empty_title() {
+    let cmd = open_url_command(TargetOs::Windows, "https://example.com/a b");
+    assert_eq!(cmd.get_program(), "cmd");
+    let args: Vec<_> = cmd.get_args().collect();
+    // The empty "" is the explicit window-title argument `start` needs so it
+    // does not misread the URL itself as a quoted title.
+    assert_eq!(args, vec!["/C", "start", "", "https://example.com/a b"]);
+}
+
+#[test]
+fn a_url_with_shell_metacharacters_arrives_as_one_intact_argument_on_every_platform() {
+    let hostile = "https://example.com/?x=1;rm -rf /&&touch pwned`echo x`";
+    for os in [
+        TargetOs::Linux,
+        TargetOs::Macos,
+        TargetOs::Windows,
+        TargetOs::Other,
+    ] {
+        let cmd = open_url_command(os, hostile);
+        let args: Vec<_> = cmd.get_args().collect();
+        assert!(
+            args.contains(&std::ffi::OsStr::new(hostile)),
+            "{os:?}: hostile url must arrive as one intact argument, got {args:?}"
+        );
+    }
 }
