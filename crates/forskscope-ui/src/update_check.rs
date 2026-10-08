@@ -14,9 +14,15 @@
 //! HTTP client crate (`ureq`, `reqwest`, …) is added either, so there is
 //! nothing new in `cargo xtask audit-deps`'s external-network-crate list to
 //! review. GitHub's REST API answers a plain `GET` with no ALPN offered in
-//! HTTP/1.1 framed by `Content-Length`, never chunked or compressed
-//! (measured directly against the real endpoint while writing this) —
-//! simple enough to parse without a general-purpose client.
+//! HTTP/1.1, framed by `Content-Length`, when measured against the real
+//! endpoint while writing this — but that is a measurement of GitHub's
+//! current deployment, not a property of the protocol HTTP/1.1 lets a
+//! server choose freely (RFC 9112 §7.1). **The client accepts both framings
+//! HTTP/1.1 allows**: `Content-Length`/connection-close as measured, and
+//! `Transfer-Encoding: chunked` decoded by [`decode_chunked_body`] — review
+//! 154's correction, after review found this module's first draft claimed
+//! chunked replies could not happen rather than that they had not been
+//! observed.
 
 use std::io::{self, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
@@ -157,24 +163,82 @@ fn is_timeout(e: &io::Error) -> bool {
 }
 
 /// Parses a raw HTTP/1.1 response into a status code and body. Does not
-/// trust or even read `Content-Length` — the body is simply "everything
-/// after the header terminator that arrived before the read loop above
-/// stopped". A short body (truncated mid-response) is not specially
-/// detected here; it fails at the next step instead, when
-/// [`extract_tag_name`]'s JSON parse rejects an incomplete document —
-/// exactly the "reply that does not parse" outcome §2 already has a state
-/// for, not a new failure mode to invent.
+/// trust or even read `Content-Length` — a `Content-Length`-framed or
+/// connection-closed body is simply "everything after the header
+/// terminator that arrived before the read loop above stopped". A short
+/// body (truncated mid-response) is not specially detected here; it fails
+/// at the next step instead, when [`extract_tag_name`]'s JSON parse
+/// rejects an incomplete document — exactly the "reply that does not
+/// parse" outcome §2 already has a state for, not a new failure mode to
+/// invent. `Transfer-Encoding: chunked` is the one framing that needs its
+/// own step first (review 154): [`decode_chunked_body`] turns it back into
+/// a plain body, or fails this whole parse (`None`) on a malformed chunk —
+/// which reaches the caller the same way a truncated non-chunked body
+/// does, through [`extract_tag_name`]'s JSON parse never seeing a tag.
 fn parse_http_response(raw: &[u8]) -> Option<RawResponse> {
     let header_end = find_double_crlf(raw)?;
     let header_text = std::str::from_utf8(&raw[..header_end]).ok()?;
-    let status_line = header_text.lines().next()?;
+    let mut lines = header_text.lines();
+    let status_line = lines.next()?;
     let status = parse_status_code(status_line)?;
-    let body = raw[header_end + 4..].to_vec();
+    let is_chunked = lines.any(|line| {
+        line.split_once(':').is_some_and(|(name, value)| {
+            name.trim().eq_ignore_ascii_case("transfer-encoding")
+                && value.trim().eq_ignore_ascii_case("chunked")
+        })
+    });
+    let raw_body = &raw[header_end + 4..];
+    let body = if is_chunked {
+        decode_chunked_body(raw_body)?
+    } else {
+        raw_body.to_vec()
+    };
     Some(RawResponse { status, body })
 }
 
 fn find_double_crlf(raw: &[u8]) -> Option<usize> {
     raw.windows(4).position(|w| w == b"\r\n\r\n")
+}
+
+/// Decodes a `Transfer-Encoding: chunked` body (RFC 9112 §7.1): a sequence
+/// of `<hex-size>[;extension]\r\n<data>\r\n` chunks, terminated by a
+/// zero-size chunk. Chunk extensions are ignored (nothing here needs one);
+/// trailers after the terminating chunk are ignored too, by returning as
+/// soon as it is seen. Fails (`None`), rather than returning a partial
+/// body, on a bad hex size, a chunk whose declared length reaches past
+/// what arrived, a missing chunk-terminating CRLF, or a decoded body that
+/// would exceed [`MAX_RESPONSE_BYTES`] — checked here explicitly, not left
+/// to follow only as a side effect of the raw-byte cap already applied to
+/// what the read loop in [`fetch`] accepted.
+fn decode_chunked_body(raw: &[u8]) -> Option<Vec<u8>> {
+    let mut out = Vec::new();
+    let mut pos = 0;
+    loop {
+        let line_end = pos + find_crlf(&raw[pos..])?;
+        let size_line = std::str::from_utf8(&raw[pos..line_end]).ok()?;
+        let size_hex = size_line.split(';').next()?.trim();
+        let size = usize::from_str_radix(size_hex, 16).ok()?;
+        pos = line_end + 2;
+        if size == 0 {
+            return Some(out);
+        }
+        let chunk_end = pos.checked_add(size)?;
+        if chunk_end.checked_add(2)? > raw.len() {
+            return None; // declared length reaches past what arrived
+        }
+        if &raw[chunk_end..chunk_end + 2] != b"\r\n" {
+            return None;
+        }
+        out.extend_from_slice(&raw[pos..chunk_end]);
+        if out.len() > MAX_RESPONSE_BYTES {
+            return None;
+        }
+        pos = chunk_end + 2;
+    }
+}
+
+fn find_crlf(buf: &[u8]) -> Option<usize> {
+    buf.windows(2).position(|w| w == b"\r\n")
 }
 
 /// `"HTTP/1.1 200 OK"` -> `200`.
@@ -212,6 +276,89 @@ mod tests {
         let r = parse_http_response(raw).expect("must parse");
         assert_eq!(r.status, 204);
         assert!(r.body.is_empty());
+    }
+
+    // ── chunked transfer encoding (review 154) ──────────────────────────────
+
+    /// A chunked reply whose chunk boundaries split the JSON mid-token
+    /// still yields the tag — through `parse_http_response`, the same
+    /// function `fetch` calls, then `extract_tag_name` on its body, the
+    /// same function `check_for_updates` calls.
+    #[test]
+    fn a_chunked_reply_split_mid_token_still_yields_the_tag() {
+        let full_body = br#"{"tag_name":"0.187.0","other":"x"}"#;
+        // Splits "0.187.0" as "0.1" | "87.0" - genuinely mid-token, not at
+        // a field boundary (checked: byte 16 of this exact literal).
+        let (first, second) = full_body.split_at(16);
+        let mut raw = Vec::new();
+        raw.extend_from_slice(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
+        raw.extend_from_slice(format!("{:x}\r\n", first.len()).as_bytes());
+        raw.extend_from_slice(first);
+        raw.extend_from_slice(b"\r\n");
+        raw.extend_from_slice(format!("{:x}\r\n", second.len()).as_bytes());
+        raw.extend_from_slice(second);
+        raw.extend_from_slice(b"\r\n0\r\n\r\n");
+
+        let r = parse_http_response(&raw).expect("must parse");
+        assert_eq!(r.status, 200);
+        assert_eq!(r.body, full_body);
+        assert_eq!(extract_tag_name(&r.body), Some("0.187.0".to_string()));
+    }
+
+    #[test]
+    fn chunk_extensions_and_trailers_are_ignored() {
+        let body = br#"{"tag_name":"0.187.0"}"#;
+        let mut raw = Vec::new();
+        raw.extend_from_slice(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
+        raw.extend_from_slice(format!("{:x};some-extension=1\r\n", body.len()).as_bytes());
+        raw.extend_from_slice(body);
+        raw.extend_from_slice(b"\r\n0\r\nX-Trailer: ignored\r\n\r\n");
+
+        let r = parse_http_response(&raw).expect("must parse");
+        assert_eq!(r.body, body);
+    }
+
+    #[test]
+    fn a_bad_hex_chunk_size_fails_to_parse_and_never_yields_a_tag() {
+        let mut raw = Vec::new();
+        raw.extend_from_slice(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
+        raw.extend_from_slice(b"not-hex\r\nxxxxxxx\r\n0\r\n\r\n");
+        assert!(parse_http_response(&raw).is_none());
+    }
+
+    #[test]
+    fn a_truncated_chunk_fails_to_parse_and_never_yields_a_tag() {
+        let mut raw = Vec::new();
+        raw.extend_from_slice(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
+        // Declares 100 (0x64) bytes but the connection stopped after 10.
+        raw.extend_from_slice(b"64\r\n");
+        raw.extend_from_slice(br#"{"tag_na"#);
+        assert!(parse_http_response(&raw).is_none());
+    }
+
+    #[test]
+    fn a_chunked_body_over_the_cap_is_refused() {
+        let mut raw = Vec::new();
+        raw.extend_from_slice(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
+        // Two chunks that together exceed MAX_RESPONSE_BYTES, each
+        // individually well under it - the cap must apply to the decoded
+        // total, not be checkable by looking at any one chunk alone.
+        let half = vec![b'a'; (MAX_RESPONSE_BYTES / 2) + 1];
+        for _ in 0..2 {
+            raw.extend_from_slice(format!("{:x}\r\n", half.len()).as_bytes());
+            raw.extend_from_slice(&half);
+            raw.extend_from_slice(b"\r\n");
+        }
+        raw.extend_from_slice(b"0\r\n\r\n");
+        assert!(parse_http_response(&raw).is_none());
+    }
+
+    #[test]
+    fn content_length_framed_and_connection_close_framed_bodies_still_work_unchanged() {
+        // No Transfer-Encoding header at all: the pre-existing path.
+        let raw = b"HTTP/1.1 200 OK\r\nContent-Length: 23\r\n\r\n{\"tag_name\":\"0.187.0\"}";
+        let r = parse_http_response(raw).expect("must parse");
+        assert_eq!(r.body, br#"{"tag_name":"0.187.0"}"#);
     }
 
     #[test]
