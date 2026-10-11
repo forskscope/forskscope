@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.187.1] — Unreleased
+
 ## [0.187.0] — 2026-10-12
 
 **Know when there is something new.** The About dialog can now tell you whether a
