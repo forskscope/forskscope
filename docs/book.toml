@@ -1,0 +1,8 @@
+[book]
+title = "ForskScope Guide"
+language = "en"
+src = "src"
+
+[output.html]
+site-url = "/forskscope/guide/"
+git-repository-url = "https://github.com/forskscope/forskscope"

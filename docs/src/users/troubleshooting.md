@@ -194,4 +194,5 @@ Include:
 - How to reproduce the problem
 - What you expected vs what happened
 
-See [CONTRIBUTING.md](../../../CONTRIBUTING.md) for the issue tracker link.
+See [CONTRIBUTING.md](https://github.com/forskscope/forskscope/blob/main/CONTRIBUTING.md)
+for the issue tracker link.

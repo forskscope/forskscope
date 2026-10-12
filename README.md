@@ -4,6 +4,8 @@
 [![CI](https://github.com/forskscope/forskscope/actions/workflows/ci.yml/badge.svg)](https://github.com/forskscope/forskscope/actions/workflows/ci.yml)
 [![Release](https://github.com/forskscope/forskscope/actions/workflows/release.yml/badge.svg)](https://github.com/forskscope/forskscope/actions/workflows/release.yml)
 
+Website and user guide: https://forskscope.github.io/forskscope/
+
 <img src="docs/src/assets/logo.png" alt="ForskScope logo" width="120">
 
 Diff and merge through Exploring 🕵️‍♀️ GUI tool, local-first, with cross-platform support 💻️ named after "*forske forskjell*" (research difference) 🤍

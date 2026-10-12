@@ -16,7 +16,7 @@ still read both.
 
 | Knowledge | Home |
 |---|---|
-| Why a design is the way it is: alternatives weighed, questions closed | An RFC under `rfcs/`. [RFC-000](../../../rfcs/done/000-rfc-lifecycle-policy.md) governs their lifecycle. |
+| Why a design is the way it is: alternatives weighed, questions closed | An RFC under `rfcs/`. [RFC-000](https://github.com/forskscope/forskscope/blob/main/rfcs/done/000-rfc-lifecycle-policy.md) governs their lifecycle. |
 | A defect or risk: what it is, the evidence, the disposition, how it was resolved | The register in `ROADMAP.md` |
 | What shipped, and what changed for a user | `CHANGELOG.md` |
 | How the system works, and **what a gate actually guarantees** | This maintainers section |

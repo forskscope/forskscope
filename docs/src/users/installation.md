@@ -110,13 +110,10 @@ cargo build --release -p forskscope-ui
 
 [**ForskScope on the Microsoft Store**](https://apps.microsoft.com/detail/9p63f7npc3mh)
 
-Every published release is submitted to the Store automatically. The listing
-can still lag briefly — Microsoft's certification runs asynchronously after
-submission and can take hours to days — so if the Store's version looks
-behind, that is certification catching up, not a missed submission. Check
-its version against the
+The Store listing is **not updated with each release yet**. The zip below is
+always the newest build; check the Store's version against the
 [latest release](https://github.com/forskscope/forskscope/releases/latest)
-and use the zip below if you need the build immediately.
+before relying on it.
 
 ### Zip
 

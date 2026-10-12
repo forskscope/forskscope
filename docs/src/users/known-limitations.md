@@ -170,5 +170,5 @@ The following are not planned features. They are out of scope by design:
 - AI-assisted merge
 - Collaborative editing
 
-See the [non-goals policy](../../rfcs/notes/feature-completion-scope-control.md)
+See the [non-goals policy](https://github.com/forskscope/forskscope/blob/main/rfcs/notes/feature-completion-scope-control.md)
 for the full list.

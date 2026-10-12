@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="ForskScope is a desktop app for Linux, macOS and Windows. Open two files or two folders, see what changed, and apply changes from one side to the other. Everything runs on your computer.">
+<link rel="icon" href="guide/assets/logo.png">
+<title>ForskScope</title>
+<style>
+/* Layout: one centred column; a hero with the product shot, then why, the
+   Explorer, and download cards. Colours are ForskScope's own (01-tokens.css):
+   light theme on bare :root, dark theme when the reader's system asks.
+   No web fonts, no CDNs: this page loads nothing from other sites. */
+:root {
+  --bg: #ffffff; --surface: #f3f4f6; --surface-2: #e8eaed;
+  --text: #1f2328; --muted: #5c636a; --border: #d0d7de;
+  --accent: #0969da; --accent-ink: #ffffff;
+  --ins: #1a7f37; --warn: #9a6700;
+  --font-ui: system-ui, -apple-system, "Segoe UI", "Noto Sans", "Noto Sans JP", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1e1f22; --surface: #2b2d31; --surface-2: #36383d;
+  --text: #e6e6e6; --muted: #9aa0a6; --border: #3a3d42;
+  --accent: #4f8cff; --accent-ink: #0d1117;
+  --ins: #5fd28a; --warn: #e0b341; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #1e1f22; --surface: #2b2d31; --surface-2: #36383d;
+  --text: #e6e6e6; --muted: #9aa0a6; --border: #3a3d42;
+  --accent: #4f8cff; --accent-ink: #0d1117;
+  --ins: #5fd28a; --warn: #e0b341; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 16px; line-height: 1.6; }
+a { color: var(--accent); }
+a:focus-visible, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code { font-family: var(--font-mono); font-size: .9em; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: .05em .35em; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 20px; }
+.col { max-width: 66ch; }
+
+header.top { border-bottom: 1px solid var(--border); }
+header.top .wrap { display: flex; align-items: center; gap: 12px; padding-block: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; color: var(--text); text-decoration: none; }
+.brand img { width: 32px; height: 32px; }
+nav { margin-left: auto; display: flex; gap: 18px; flex-wrap: wrap; }
+nav a { color: var(--muted); text-decoration: none; font-size: 15px; }
+nav a:hover { color: var(--text); }
+
+.hero { padding-block: 56px 28px; }
+.hero h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.12; letter-spacing: -.015em; margin: 0 0 16px; max-width: 18ch; text-wrap: balance; }
+.hero p.lead { font-size: 19px; color: var(--muted); margin: 0 0 26px; max-width: 58ch; }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.btn { display: inline-block; padding: 10px 20px; border-radius: 6px; font-weight: 600; text-decoration: none; border: 1px solid var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); }
+.btn.ghost { color: var(--accent); }
+.fine { font-size: 14px; color: var(--muted); }
+
+figure { margin: 0; }
+.shot { padding-block: 12px 8px; }
+.shot img { display: block; width: 100%; max-width: 100%; height: auto; }
+figcaption { font-size: 14px; color: var(--muted); margin-top: 6px; max-width: 70ch; }
+
+section { padding-block: 44px; }
+section + section { border-top: 1px solid var(--border); }
+h2 { font-size: 26px; margin: 0 0 14px; text-wrap: balance; }
+.why { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px 32px; margin-top: 24px; padding: 0; list-style: none; }
+.why li { min-width: 0; }
+.why b { display: block; margin-bottom: 4px; }
+.why span { color: var(--muted); }
+
+.legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; color: var(--muted); margin-top: 10px; }
+.legend span b { font-family: var(--font-mono); margin-right: 4px; }
+.g-eq { color: var(--ins); } .g-ne { color: var(--warn); }
+
+.platforms { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 18px; margin-top: 22px; }
+.card { border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; background: var(--surface); min-width: 0; }
+.card h3 { margin: 0 0 4px; font-size: 18px; }
+.card .file { font-family: var(--font-mono); font-size: 13px; color: var(--muted); margin: 0 0 10px; overflow-wrap: anywhere; }
+.card p { margin: 0 0 10px; font-size: 15px; }
+.card p:last-child { margin-bottom: 0; }
+.note { font-size: 14px; color: var(--muted); }
+pre { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; overflow-x: auto; font-size: 13px; margin: 6px 0 10px; }
+pre code { background: none; border: 0; padding: 0; }
+
+footer { border-top: 1px solid var(--border); }
+footer .wrap { padding-block: 26px 40px; font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px 24px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="guide/assets/logo.png" alt="" width="32" height="32">ForskScope</a>
+    <nav aria-label="Site">
+      <a href="#download">Download</a>
+      <a href="guide/">Guide</a>
+      <a href="https://github.com/forskscope/forskscope">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <h1>Compare and merge files and folders, side by side.</h1>
+    <p class="lead">ForskScope is a desktop app for Linux, macOS and Windows. Open two files or two folders, see what changed, and apply changes from one side to the other. Everything runs on your computer.</p>
+    <div class="actions">
+      <a class="btn primary" href="#download">Download</a>
+      <a class="btn ghost" href="guide/">Read the guide</a>
+      <span class="fine">Free and open source, Apache-2.0</span>
+    </div>
+  </div>
+
+  <div class="wrap shot">
+    <figure>
+      <img src="guide/assets/screenshot-diff.png" width="1584" height="1008" alt="Two versions of a JavaScript file side by side, with a Use button beside each change and the changed characters highlighted">
+      <figcaption>Move between changes with F7 and F8, and apply one with Enter or its <b>Use</b> button. Here <i>Inline diff</i> is on, so the changed characters within each line are marked.</figcaption>
+    </figure>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <h2>Why ForskScope</h2>
+      <p class="col">ForskScope began as one more option among the GUI tools for comparing and merging files on Linux, where its author found the choices too few.</p>
+      <ul class="why">
+        <li><b>Your files stay on your computer.</b><span>No accounts, no uploads, no telemetry. The only network request is the one you make by clicking <i>Check for updates</i>.</span></li>
+        <li><b>Start from folders, not only files.</b><span>The Explorer shows two directory trees side by side, marks each file as identical, different or on one side only, and opens any pair you pick.</span></li>
+        <li><b>It does not claim more than it checked.</b><span>A file is marked identical only after its contents were compared. When only the sizes match, it says so, and <i>Verify</i> reads every byte to find out.</span></li>
+        <li><b>Spreadsheets too.</b><span><code>.xlsx</code> workbooks are compared sheet by sheet and cell by cell, read-only, with rows lined up by content where that shows fewer changes.</span></li>
+        <li><b>Keyboard first.</b><span>Move between changes, apply them, search, and switch panes without the mouse.</span></li>
+        <li><b>Works with Git.</b><span>Use it as <code>git difftool</code> and <code>git mergetool</code>. The guide shows the settings.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Two folders at a glance</h2>
+      <p class="col">Pick a folder for each side. Files with the same name line up, and each one says how it compares. Choose one on each side and press <b>Compare</b>.</p>
+      <figure class="shot">
+        <img src="guide/assets/screenshot-explorer.png" width="1584" height="1008" alt="The Explorer comparing two versions of a website folder, with style.css selected on both sides">
+        <div class="legend" aria-label="What the marks mean">
+          <span><b class="g-eq">=</b>identical, contents compared</span>
+          <span><b class="g-ne">≠</b>different</span>
+          <span><b>→</b> only on the right</span>
+          <span><b>–</b> folder, contents not compared yet</span>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="wrap">
+      <h2>Download</h2>
+      <p class="col">Every release is on the <a href="https://github.com/forskscope/forskscope/releases/latest">GitHub releases page</a>. Pick the file for your system below.</p>
+      <div class="platforms">
+        <div class="card">
+          <h3>Linux</h3>
+          <p class="file">forskscope-v…-linux-x86_64.tar.gz</p>
+          <p>Extract it and run <code>./forskscope</code>.</p>
+          <p class="note">Built on Ubuntu, so it needs a glibc at least as new as that build's. It also runs on Arch Linux. Other distributions have not been tested.</p>
+          <p><b>Arch Linux:</b> install <a href="https://aur.archlinux.org/packages/forskscope"><code>forskscope</code> from the AUR</a> with your AUR helper.</p>
+        </div>
+        <div class="card">
+          <h3>macOS</h3>
+          <p class="file">forskscope-v…-macos-aarch64.dmg</p>
+          <p>For Apple silicon Macs, macOS 13 or later.</p>
+          <p class="note">The app is not signed with an Apple Developer ID and not notarized, so macOS refuses to open it the first time. Right-click the app and choose <b>Open</b>, or run:</p>
+          <pre><code>xattr -d com.apple.quarantine /Applications/ForskScope.app</code></pre>
+        </div>
+        <div class="card">
+          <h3>Windows</h3>
+          <p class="file">forskscope-v…-windows-x64.zip</p>
+          <p>Extract it and run <code>forskscope.exe</code>.</p>
+          <p class="note">ForskScope is also on the <a href="https://apps.microsoft.com/detail/9p63f7npc3mh">Microsoft Store</a>, but that listing is not yet updated with each release. For the newest version, use the zip.</p>
+          <p class="note">Tested on Windows 11. It needs the WebView2 runtime, which Windows 11 includes.</p>
+        </div>
+      </div>
+      <p class="col note" style="margin-top:18px">Each release includes a <code>SHA256SUMS</code> file to check your download against. See <a href="guide/users/installation.html#verifying-your-download">Verifying your download</a>. To build from source instead, see the <a href="guide/users/installation.html">installation guide</a>.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>ForskScope by nabbisen</span>
+    <a href="https://github.com/forskscope/forskscope">Source on GitHub</a>
+    <a href="https://github.com/forskscope/forskscope/blob/main/LICENSE">Apache-2.0</a>
+    <span>This page loads nothing from other sites and collects nothing.</span>
+  </div>
+</footer>
+</body>
+</html>

@@ -71,7 +71,7 @@ diff.tool = ["forskscope", "$left", "$right"]
 merge-tool = ["forskscope", "$left", "$right", "$output"]
 ```
 
-See [Git Integration](./intermediate/git-integration.md) for full details.
+See [Git Integration](../intermediate/git-integration.md) for full details.
 
 ---
 

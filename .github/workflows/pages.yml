@@ -1,0 +1,98 @@
+name: Pages
+
+# Handoff 075: publishes on every docs change to main, not per release - the
+# guide should always match main's docs. The landing page only ever links to
+# releases/latest, so it never names a version that could go stale.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  MDBOOK_VERSION: 0.5.4
+  MDBOOK_SHA256: 3f28de05dafca9d0f2eab99c662116b0e37b89b1d96a08f8f430b9eeae958cd7
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# F175's lesson for releases, applied here: a second push queues behind the
+# first instead of racing it. Cancelling a deploy mid-upload is the outcome
+# this is meant to prevent, so cancel-in-progress stays false.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Pinned exactly, not "latest" - the guide must build the same way in
+      # every run, not whatever mdbook last happened to publish.
+      - name: Install mdbook ${{ env.MDBOOK_VERSION }}
+        run: |
+          curl -sSLO "https://github.com/rust-lang/mdBook/releases/download/v${MDBOOK_VERSION}/mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          echo "${MDBOOK_SHA256}  mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" | sha256sum -c -
+          tar xzf "mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" mdbook
+          sudo mv mdbook /usr/local/bin/mdbook
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            xtask/target
+          key: pages-${{ runner.os }}-cargo-${{ hashFiles('xtask/Cargo.lock') }}
+
+      - name: Build the guide
+        run: mdbook build docs
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site/guide
+          cp -r docs/site/. _site/
+          cp -r docs/book/. _site/guide/
+          # So a missing path anywhere on the site - not only under /guide/ -
+          # returns the guide's own 404 page, not GitHub's.
+          cp _site/guide/404.html _site/404.html
+
+      # The landing page's footer promises it loads nothing from another
+      # site; this makes that a gate, not a hope (handoff 075 §1).
+      - name: Verify the landing page loads nothing from another origin
+        run: cargo xtask pages-origin-check _site/index.html
+
+      # Handoff 075 §3: every relative link/image across the assembled site
+      - name: Verify every relative link and image resolves
+        run: cargo xtask pages-link-check _site
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

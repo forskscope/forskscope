@@ -39,7 +39,7 @@
 - [Design principles](./maintainers/design-principles.md)
 - [What gets recorded, and where](./maintainers/what-gets-recorded.md)
 - [Threat model and security notes](./maintainers/threat-model.md)
-- [RFC directory](../../rfcs/README.md)
+- [RFC directory](./maintainers/rfcs.md)
 - [Local development](./maintainers/local-dev.md)
 - [Testing strategy](./maintainers/testing.md)
 - [GTK smoke test checklist](./maintainers/gtk-smoke-test.md)
