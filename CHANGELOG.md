@@ -5,7 +5,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.187.1] — Unreleased
+## [0.188.0] — 2026-10-12
+
+**A cleaner Explorer.** Fewer buttons are always on screen, the two that were only
+symbols now say what they do, and a filter can no longer hide files without showing
+it. Every keyboard shortcut is unchanged.
+
+### Fixed
+
+- **A closed filter no longer hides files silently.** If you typed a pattern or
+  ticked *Hide binary* or *Hide identical* and then closed the filter bar, the
+  filter stayed in effect but its button looked off. You could conclude a file
+  existed on only one side when it was only filtered out. The **Filter** button
+  now shows a dot whenever a filter is in effect, open or closed, and screen readers
+  hear *Filter (on)*. Closing the bar still keeps the filter.
+
+### Changed
+
+- **Each path bar keeps ← → ↑ and gains a ⋯ menu** with *Home folder*, *Open
+  folder…* and *Edit path*. Each item shows its shortcut (`Alt+Home`, `Ctrl+O`, or
+  clicking the folder name). The ⌂, 📁 and ✎ buttons are gone from the bar. The
+  menu works from the keyboard: `Enter`, `Space` or `↓` opens it, the arrows move,
+  and `Esc` closes it.
+- **The row of pane names above the tree is gone.** It repeated the folder name the
+  path bar already shows. The focused pane's path bar is now underlined and tinted
+  instead, and clicking anywhere on a path bar focuses that pane. The tree has one
+  more row of space.
+- **⊞ and ⇄ are now the words *Filter* and *Move together*.** *Move together* sits
+  at the end of the toolbar and is highlighted while it is on, since it changes what
+  every navigation does.
+- **Fewer buttons are always on screen around the tree:** 11 instead of 15.
+
+### Internal
+
+- RFC-061 and RFC-069 record the change: the focus indicator moved to the path bar,
+  and the pane-name row was removed.
+- The two path bars are now exactly equal in width. Before, a longer path could
+  make one slightly wider.
+- The update check's chunked-reply decoder has a test for every check it makes.
 
 ## [0.187.0] — 2026-10-12
 

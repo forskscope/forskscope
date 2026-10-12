@@ -33,14 +33,12 @@ pub fn FilterBar(
     filter_hide_bin: Signal<bool>,
     filter_hide_eq: Signal<bool>,
     /// F151 (issue #148): while on, the two panes show the same location.
-    /// Always shown, at the end of the row - the owner found, during
-    /// handoff 074 verification, that it interrupted Filter's own
-    /// disclosure; moving it to the end (it has nothing of its own to
-    /// disclose, so it does not need to sit inside Filter's group) was my
-    /// own fix, found while verifying the same handoff - matching the
-    /// Filter button's own keyboard treatment (none beyond the click
-    /// itself) rather than giving sync a binding Filter does not have
-    /// (handoff 062 §2).
+    /// Always shown, at the end of the row: it has nothing of its own to
+    /// disclose, and placed between Filter and Filter's expanded controls
+    /// it interrupted that disclosure (found by the dev team while verifying
+    /// handoff 074). Keyboard treatment matches the Filter button's (none
+    /// beyond the click itself) rather than giving sync a binding Filter
+    /// does not have (handoff 062 §2).
     sync_locations: Signal<bool>,
 ) -> Element {
     let in_effect = filter_in_effect(
@@ -50,13 +48,10 @@ pub fn FilterBar(
     );
     rsx! {
         div { class: "filter-bar-row",
-            // The owner found, during handoff 074 verification, that Filter
-            // and its own expanded controls (the input, the two checkboxes,
-            // Clear) were not next to each other — *Move together*, an
-            // unrelated toggle, sat between them, interrupting Filter's own
-            // disclosure. Moving Move together to the end of the row, so
-            // Filter's whole group comes first, was my own fix, found while
-            // verifying the same handoff.
+            // Filter and its own expanded controls (the input, the two
+            // checkboxes, Clear) sit next to each other; *Move together*, an
+            // unrelated toggle, comes last so it never interrupts Filter's
+            // disclosure (found by the dev team while verifying handoff 074).
             button {
                 class: "filter-toggle",
                 aria_expanded: if *filter_open.read() { "true" } else { "false" },
