@@ -4,7 +4,7 @@
 [![CI](https://github.com/forskscope/forskscope/actions/workflows/ci.yml/badge.svg)](https://github.com/forskscope/forskscope/actions/workflows/ci.yml)
 [![Release](https://github.com/forskscope/forskscope/actions/workflows/release.yml/badge.svg)](https://github.com/forskscope/forskscope/actions/workflows/release.yml)
 
-![logo](docs/src/assets/logo.png)
+<img src="docs/src/assets/logo.png" alt="ForskScope logo" width="120">
 
 Diff and merge through Exploring 🕵️‍♀️ GUI tool, local-first, with cross-platform support 💻️ named after "*forske forskjell*" (research difference) 🤍
 
@@ -12,23 +12,28 @@ Diff and merge through Exploring 🕵️‍♀️ GUI tool, local-first, with cr
 forskscope old/src/main.rs new/src/main.rs
 ```
 
-ForskScope opens two files side by side, highlights every change at line and character level, and lets you apply hunks from left to right with a single keystroke. It also compares two directories at once through the Explorer view. Everything runs locally — no accounts, no uploads, no telemetry. The one exception: clicking *Check for updates* in the About dialog sends a single request to GitHub for the latest version number.
+ForskScope opens two files side by side, highlights every changed line, and lets you apply changes from left to right one at a time with a single keystroke. It also compares two folders through the Explorer. Everything runs locally: no accounts, no uploads, no telemetry. The one exception is *Check for updates* in the About dialog, which sends a single request to GitHub for the latest version number, and only when you click it.
 
-![Side-by-side diff with per-hunk apply buttons](docs/src/assets/screenshot-diff.png)
+![Two versions of a JavaScript file side by side, with a Use button beside each change](docs/src/assets/screenshot-diff.png)
 
-Every change is navigable with F7/F8 and applied with Enter or the **Use** button. Character-level highlighting shows what actually changed within a line.
+Move between changes with F7 / F8 and apply one with Enter or its **Use** button. Turn on **More ▼ → Inline diff** to see which characters changed within a line, as shown here.
 
-![Two-pane explorer comparing two directories](docs/src/assets/screenshot-explorer.png)
+![The Explorer comparing two versions of a website folder](docs/src/assets/screenshot-explorer.png)
 
-Browse two directories side by side, see at a glance which files match, and open any pair in a diff tab.
+Browse two folders side by side. Each file shows whether it is identical (=), different (≠) or on one side only (→). Pick one on each side and press **Compare**.
 
 ---
 
 ## Why ForskScope
 
-Most Unix/Linux workers reach for `vimdiff`, `git diff`, or a web-based paste tool when they need to compare files. These work but they don't give a persistent, navigable side-by-side view with merge support. WinMerge does — but only on Windows.
+ForskScope began as one more option among the GUI tools for comparing and merging files on Linux, where its author found the choices too few.
 
-ForskScope fills that gap: a desktop app built on [Dioxus](https://dioxuslabs.com/) and a pure-Rust diff engine ([similar v3](https://docs.rs/similar)), with Linux, macOS, and Windows packaging under release-readiness verification.
+- **Your files stay on your computer.** No accounts, no uploads, no telemetry. The only network request is the one you make by clicking *Check for updates*.
+- **Start from folders, not only files.** The Explorer shows two directory trees side by side, marks each file as identical, different or on one side only, and opens any pair you pick.
+- **It does not claim more than it checked.** A file is marked identical only after its contents were compared. When only the sizes match, it says so, and **Verify** reads every byte to find out.
+- **Spreadsheets too.** `.xlsx` workbooks are compared sheet by sheet and cell by cell, read-only, with rows lined up by content where that shows fewer changes.
+- **Keyboard first.** Move between changes, apply them, search, and switch panes without the mouse.
+- **One app on Linux, macOS and Windows**, written in Rust with [Dioxus](https://dioxuslabs.com/) and the [similar](https://docs.rs/similar) diff engine.
 
 ---
 
@@ -88,14 +93,13 @@ git mergetool
 
 ## Features
 
-- **Side-by-side diff** with line-level and character-level highlighting
+- **Side-by-side diff** with line-level highlighting, and character-level highlighting when you turn on *Inline diff*
 - **Merge** — apply changes from left to right one hunk at a time; undo / redo
-- **Three-way merge model** — base-aware diff3 with automatic merge of non-conflicting changes and structured conflict resolution (core model shipped; conflict workspace UI deferred post-v1)
 - **Enter to apply** the focused hunk; F7/F8 to navigate; Ctrl+S to save
 - **Explorer** — browse two directories, see digest equality indicators, compare same-name files with one click
 - **Deep compare** — recursive directory scan with live progress; batch copy changed files between trees
-- **Directory compare filter** — All / Different / Equal in the Directory Report view
-- **Git difftool / mergetool** compatible (`forskscope old new` or `old remote merged`)
+- **Deep compare filter** — Different / All / Equal only in the deep compare report
+- **Git difftool / mergetool** compatible: `forskscope old new`, or `forskscope local remote merged` to save the result to the merged file. Merging with a common ancestor (three-way) is not available in the app
 - **Compare profiles** — named presets for ignore-whitespace, ignore-case, and algorithm (Myers / Patience / Histogram)
 - **Session persistence** — open tabs are restored on next launch
 - **Patch export** — export a unified-diff `.patch` file from a file comparison; compatible with `patch -p1` and `git apply`
@@ -104,7 +108,10 @@ git mergetool
 - **Navigation history** — back/forward per explorer pane
 - **Dark, Light, and Night themes**
 - **English and Japanese UI** (i18n)
-- **GitHub Actions gates** — CI and draft-release workflows check formatting, tests, clippy, audit policy, dependency paths, i18n, and version metadata
+- **Spreadsheets** — `.xlsx` sheet and cell comparison, read-only
+- **Binary files** — off by default; turn on in Settings → Advanced for a hex preview
+- **Check for updates** — in the About dialog, only when you click it
+- **Verifiable downloads** — every release includes `SHA256SUMS`
 
 ---
 
