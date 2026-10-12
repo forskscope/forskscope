@@ -458,6 +458,15 @@ fn menu_item_keydown(
             focus_handle(more_btn_handle.read().clone());
             None
         }
+        // Review 156: Tab (and Shift+Tab, the same key value) must close the
+        // menu and let focus move on natively, as the WAI-ARIA menu pattern
+        // does — never `prevent_default`, or the browser's own Tab-order
+        // traversal never runs and the `.pathbar-menu-catcher` is left
+        // covering the window, silently absorbing the user's next click.
+        Key::Tab => {
+            menu_open.set(false);
+            None
+        }
         _ => None,
     }
 }
@@ -1106,6 +1115,52 @@ mod tests {
             );
             let next = menu_item_keydown(&e, 1, menu_open, item_handles, more_btn_handle);
             assert!(!*menu_open.read());
+            assert_eq!(next, None);
+        });
+    }
+
+    /// Review 156: Tab must close the menu (so its full-viewport
+    /// `.pathbar-menu-catcher` does not linger and absorb the user's next
+    /// click) but must leave the browser's own Tab-order traversal alone —
+    /// the WAI-ARIA menu pattern, not a focus trap. Falsify by calling
+    /// `e.prevent_default()` in the `Key::Tab` arm: this fails on the second
+    /// assertion even though the menu still closes correctly.
+    #[test]
+    fn menu_item_tab_closes_the_menu_without_preventing_the_default_action() {
+        with_test_store(|_store| {
+            let menu_open = Signal::new_in_scope(true, ScopeId::ROOT);
+            let item_handles = Signal::new_in_scope([None, None, None], ScopeId::ROOT);
+            let more_btn_handle = Signal::new_in_scope(None, ScopeId::ROOT);
+            let e = crate::keyboard::test_support::key_event(
+                Key::Tab,
+                dioxus::html::input_data::keyboard_types::Modifiers::empty(),
+            );
+            assert!(e.default_action_enabled(), "test setup");
+            let next = menu_item_keydown(&e, 1, menu_open, item_handles, more_btn_handle);
+            assert!(!*menu_open.read(), "Tab must close the menu");
+            assert!(
+                e.default_action_enabled(),
+                "Tab's own focus-order traversal must not be prevented"
+            );
+            assert_eq!(next, None);
+        });
+    }
+
+    /// Shift+Tab is the same key value with a modifier; the modifier must
+    /// not change which arm handles it.
+    #[test]
+    fn menu_item_shift_tab_also_closes_the_menu_without_preventing_the_default_action() {
+        with_test_store(|_store| {
+            let menu_open = Signal::new_in_scope(true, ScopeId::ROOT);
+            let item_handles = Signal::new_in_scope([None, None, None], ScopeId::ROOT);
+            let more_btn_handle = Signal::new_in_scope(None, ScopeId::ROOT);
+            let e = crate::keyboard::test_support::key_event(
+                Key::Tab,
+                dioxus::html::input_data::keyboard_types::Modifiers::SHIFT,
+            );
+            let next = menu_item_keydown(&e, 1, menu_open, item_handles, more_btn_handle);
+            assert!(!*menu_open.read(), "Shift+Tab must close the menu");
+            assert!(e.default_action_enabled());
             assert_eq!(next, None);
         });
     }

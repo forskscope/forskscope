@@ -462,6 +462,13 @@ code.path-display {
    class only trims the toolbar-sized padding/height, it no longer flattens
    the border to transparent the way the old ⊞/⇄ glyph buttons did. */
 .filter-toggle { flex: 0 0 auto; min-height: 24px; padding: 0 .5rem; font-size: 12px; white-space: nowrap; }
+/* Review 156 §1: *Move together* is a real `aria-pressed` toggle with no
+   visible "on" state - `aria-pressed` was set correctly, but nothing read
+   it, so a sighted user had no way to tell it was active while it silently
+   kept moving the other pane on every navigation. Styled from the
+   attribute itself, not a class kept in sync by hand, so what a screen
+   reader hears and what the eye sees read the same one value. */
+.filter-toggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); }
 /* F187: always rendered (reserves its space so *Move together* never
    shifts when a filter turns on or off); only its colour changes. */
 .filter-dot { display: inline-block; width: 6px; height: 6px; margin-left: .3rem; border-radius: 50%; background: transparent; vertical-align: middle; }

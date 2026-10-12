@@ -33,11 +33,14 @@ pub fn FilterBar(
     filter_hide_bin: Signal<bool>,
     filter_hide_eq: Signal<bool>,
     /// F151 (issue #148): while on, the two panes show the same location.
-    /// Always shown, at the end of the row (owner finding, handoff 074: it
-    /// has nothing of its own to disclose, so it does not sit inside
-    /// Filter's own group) - matching the Filter button's own keyboard
-    /// treatment (none beyond the click itself) rather than giving sync a
-    /// binding Filter does not have (handoff 062 §2).
+    /// Always shown, at the end of the row - the owner found, during
+    /// handoff 074 verification, that it interrupted Filter's own
+    /// disclosure; moving it to the end (it has nothing of its own to
+    /// disclose, so it does not need to sit inside Filter's group) was my
+    /// own fix, found while verifying the same handoff - matching the
+    /// Filter button's own keyboard treatment (none beyond the click
+    /// itself) rather than giving sync a binding Filter does not have
+    /// (handoff 062 §2).
     sync_locations: Signal<bool>,
 ) -> Element {
     let in_effect = filter_in_effect(
@@ -47,12 +50,13 @@ pub fn FilterBar(
     );
     rsx! {
         div { class: "filter-bar-row",
-            // Owner finding, handoff 074 verification: Filter and its own
-            // expanded controls (the input, the two checkboxes, Clear) must
-            // sit next to each other — they used to have *Move together*
-            // between them, an unrelated toggle interrupting one control's
-            // own disclosure. Filter's whole group comes first now; Move
-            // together, with nothing of its own to disclose, comes last.
+            // The owner found, during handoff 074 verification, that Filter
+            // and its own expanded controls (the input, the two checkboxes,
+            // Clear) were not next to each other — *Move together*, an
+            // unrelated toggle, sat between them, interrupting Filter's own
+            // disclosure. Moving Move together to the end of the row, so
+            // Filter's whole group comes first, was my own fix, found while
+            // verifying the same handoff.
             button {
                 class: "filter-toggle",
                 aria_expanded: if *filter_open.read() { "true" } else { "false" },
@@ -446,6 +450,73 @@ mod tests {
         assert!(
             aria_labels.iter().any(|l| l == "Filter"),
             "expected the plain \"Filter\" aria-label, among {aria_labels:?}"
+        );
+    }
+
+    // ── Review 156 §1: Move together's on state is keyed off aria-pressed ──
+
+    fn aria_pressed_values(mutations: &dioxus_core::Mutations) -> Vec<String> {
+        mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "aria-pressed",
+                    value: dioxus_core::AttributeValue::Text(s),
+                    ..
+                } => Some(s.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Review 156 §1: the CSS keys the visible "on" look off `aria-pressed`
+    /// itself (`.filter-toggle[aria-pressed="true"]`), not a class kept in
+    /// sync by hand — so what a screen reader hears and what the eye sees
+    /// cannot disagree. This is the half a unit test can check (styling
+    /// itself is a code-review item: screenshots do not work in this
+    /// environment, and AT-SPI does not expose colour).
+    #[test]
+    fn move_together_aria_pressed_is_true_when_sync_is_on() {
+        fn root() -> Element {
+            rsx! {
+                FilterBar {
+                    lang: Lang::En,
+                    filter_open: Signal::new_in_scope(false, ScopeId::ROOT),
+                    filter_query: Signal::new_in_scope(String::new(), ScopeId::ROOT),
+                    filter_hide_bin: Signal::new_in_scope(false, ScopeId::ROOT),
+                    filter_hide_eq: Signal::new_in_scope(false, ScopeId::ROOT),
+                    sync_locations: Signal::new_in_scope(true, ScopeId::ROOT),
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let values = aria_pressed_values(&vdom.rebuild_to_vec());
+        assert!(
+            values.iter().any(|v| v == "true"),
+            "expected aria-pressed=\"true\", among {values:?}"
+        );
+    }
+
+    #[test]
+    fn move_together_aria_pressed_is_false_when_sync_is_off() {
+        fn root() -> Element {
+            rsx! {
+                FilterBar {
+                    lang: Lang::En,
+                    filter_open: Signal::new_in_scope(false, ScopeId::ROOT),
+                    filter_query: Signal::new_in_scope(String::new(), ScopeId::ROOT),
+                    filter_hide_bin: Signal::new_in_scope(false, ScopeId::ROOT),
+                    filter_hide_eq: Signal::new_in_scope(false, ScopeId::ROOT),
+                    sync_locations: Signal::new_in_scope(false, ScopeId::ROOT),
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let values = aria_pressed_values(&vdom.rebuild_to_vec());
+        assert!(
+            values.iter().any(|v| v == "false"),
+            "expected aria-pressed=\"false\", among {values:?}"
         );
     }
 

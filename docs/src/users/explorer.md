@@ -170,8 +170,10 @@ Filter state is not persisted — it resets when you restart the app.
 
 ## Sync panes
 
-Click the **Move together** button (next to **Filter**, always visible) to
-make both panes follow each other. Turning it on anchors each pane to its
+Click the **Move together** button (at the end of the toolbar, always
+visible) to make both panes follow each other. It carries an accent border
+and tint while on, so sync mode is never silently in effect — every
+navigation in one pane moves the other while it is. Turning it on anchors each pane to its
 directory at that moment. While sync is on, navigating one pane —
 double-clicking a folder, the path bar's **↑**/breadcrumbs, typing a path,
 **⋯ → Home folder** — moves the other pane to the same path relative to
