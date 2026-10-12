@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.188.1] — Unreleased
+
 ## [0.188.0] — 2026-10-12
 
 **A cleaner Explorer.** Fewer buttons are always on screen, the two that were only
