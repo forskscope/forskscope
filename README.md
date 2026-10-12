@@ -139,4 +139,4 @@ Full documentation (built with mdbook): [`docs/src/`](docs/src/SUMMARY.md)
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE). Author: **nabbisen**.
+Apache-2.0 — see [LICENSE](LICENSE). Author: [**nabbisen**](https://github.com/nabbisen).
