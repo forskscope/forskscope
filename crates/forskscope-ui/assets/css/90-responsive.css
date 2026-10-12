@@ -5,9 +5,12 @@
 
 @media (max-width: 719px) {
 
-  /* ── Explorer: stack path bars vertically ── */
+  /* ── Explorer: stack path bars vertically ──
+     F185: `.pathbar-wrapper`, not `.path-bar`, is `.explorer-path-bars`'s
+     direct grid child now — `.path-bar:last-child` would match both
+     wrappers' sole child trivially and put the divider on both. */
   .explorer-path-bars { grid-template-columns: 1fr; }
-  .explorer-path-bars .path-bar:last-child { border-top: 1px solid var(--border); }
+  .explorer-path-bars .pathbar-wrapper:last-child .path-bar { border-top: 1px solid var(--border); }
   .aligned-row { grid-template-columns: 1fr; }
   .aligned-row .pane-half:last-child { border-right: none; border-top: 1px solid var(--border); }
   .row-spacer { display: none; }

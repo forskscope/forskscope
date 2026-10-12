@@ -1,6 +1,7 @@
 # RFC 069: Explorer Layout — Compare Action, Targets Label, and Tab Header/Footer
 
-**Status.** Implemented (v0.152.0)
+**Status.** Implemented (v0.152.0). **Amended v0.188.0 (F185): the region
+stack loses the pane-root focus bar.** See the amendment at the end.
 **Tracks.** Repositioning the Compare button and the label that shows its current
 targets; rethinking the Explorer tab's header and footer regions in light of the
 new filter bar (RFC-067) and view-mode control (RFC-068).
@@ -119,3 +120,29 @@ advanced.
 - Whether the targets label is always visible (showing "no picks yet") or only
   appears once a pick exists. Lean toward always visible with guidance text, for
   discoverability.
+
+## Amendment (v0.188.0, F185): the region stack loses the pane-root focus bar
+
+The header region's stack (§"Header/footer composition") is now:
+
+```
+┌─ Explorer tab ─────────────────────────────────────────────┐
+│ [optional] Filter bar (RFC-067)                            │  header
+│ Path bar (L) │ Path bar (R)        (RFC-061 amendment)     │
+├────────────────────────────────────────────────────────────┤
+│ Tree (L)            │ Tree (R)                             │  body
+├────────────────────────────────────────────────────────────┤
+│ Targets label + Compare action                             │  footer
+│ Copy/sync actions │ view-mode toggle (RFC-068) │ size unit │
+└────────────────────────────────────────────────────────────┘
+```
+
+The pane-root focus bar is gone (RFC-061's own amendment covers what
+replaces its job). The path bar absorbs it, and gains ⋯: under F162's
+progressive-disclosure rule, ⌂ (*Home folder*), the folder-picker (*Open
+folder…*), and ✎ (*Edit path*) move into that menu, each still naming its
+own shortcut — only **← → ↑** stay as the path bar's own always-visible
+buttons, disabled rather than hidden when there is nowhere to go (F162's
+warning about layout shift, restated). The toolbar's **⊞**/**⇄** become the
+words *Filter*/*Move together* (F187 rides along: *Filter* marks whenever a
+filter is in effect, whether its own bar is open or closed).

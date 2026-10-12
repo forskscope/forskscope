@@ -14,6 +14,17 @@ use crate::state::Lang;
 
 // ── Filter bar component ──────────────────────────────────────────────────────
 
+/// F187: whether a filter is narrowing what the tree shows right now — true
+/// whenever a query is typed or either *Hide* option is ticked, regardless
+/// of whether the filter bar itself is open or closed. The one function the
+/// render and the tests both call (F169/review 151): the *Filter* button's
+/// class/dot and accessible name are driven by this, never by `filter_open`
+/// directly — a filtered row that stays hidden behind a closed, unmarked
+/// button is F166's kind of fault, the screen saying something untrue.
+pub(crate) fn filter_in_effect(query: &str, hide_bin: bool, hide_eq: bool) -> bool {
+    !query.is_empty() || hide_bin || hide_eq
+}
+
 #[component]
 pub fn FilterBar(
     lang: Lang,
@@ -22,26 +33,37 @@ pub fn FilterBar(
     filter_hide_bin: Signal<bool>,
     filter_hide_eq: Signal<bool>,
     /// F151 (issue #148): while on, the two panes show the same location.
-    /// The row's second button, always shown - matching `⊞`'s own keyboard
+    /// Always shown, at the end of the row (owner finding, handoff 074: it
+    /// has nothing of its own to disclose, so it does not sit inside
+    /// Filter's own group) - matching the Filter button's own keyboard
     /// treatment (none beyond the click itself) rather than giving sync a
-    /// binding `⊞` does not have (handoff 062 §2).
+    /// binding Filter does not have (handoff 062 §2).
     sync_locations: Signal<bool>,
 ) -> Element {
+    let in_effect = filter_in_effect(
+        &filter_query.read(),
+        *filter_hide_bin.read(),
+        *filter_hide_eq.read(),
+    );
     rsx! {
         div { class: "filter-bar-row",
+            // Owner finding, handoff 074 verification: Filter and its own
+            // expanded controls (the input, the two checkboxes, Clear) must
+            // sit next to each other — they used to have *Move together*
+            // between them, an unrelated toggle interrupting one control's
+            // own disclosure. Filter's whole group comes first now; Move
+            // together, with nothing of its own to disclose, comes last.
             button {
-                class: if *filter_open.read() { "filter-toggle active" } else { "filter-toggle" },
-                title: t(lang, "Filter items"),
-                aria_label: t(lang, "Filter items"),
+                class: "filter-toggle",
+                aria_expanded: if *filter_open.read() { "true" } else { "false" },
+                title: t(lang, if in_effect { "Filter (on)" } else { "Filter" }),
+                aria_label: t(lang, if in_effect { "Filter (on)" } else { "Filter" }),
                 onclick: move |_| { let v = *filter_open.read(); filter_open.set(!v); },
-                "⊞"
-            }
-            button {
-                class: if *sync_locations.read() { "filter-toggle active" } else { "filter-toggle" },
-                title: t(lang, "Sync panes — both panes show the same location"),
-                aria_label: t(lang, "Sync panes — both panes show the same location"),
-                onclick: move |_| { let v = *sync_locations.read(); sync_locations.set(!v); },
-                "⇄"
+                {t(lang, "Filter")}
+                // F187: always rendered, so nothing else on the row shifts
+                // sideways when a filter turns on or off — only its own
+                // colour changes, never its presence.
+                span { class: if in_effect { "filter-dot on" } else { "filter-dot" }, aria_hidden: "true" }
             }
             if *filter_open.read() {
                 input {
@@ -74,6 +96,14 @@ pub fn FilterBar(
                         "✕"
                     }
                 }
+            }
+            button {
+                class: "filter-toggle",
+                aria_pressed: if *sync_locations.read() { "true" } else { "false" },
+                title: t(lang, "When one pane moves to a folder, the other moves to the matching folder, if it has one."),
+                aria_label: t(lang, "Move together"),
+                onclick: move |_| { let v = *sync_locations.read(); sync_locations.set(!v); },
+                {t(lang, "Move together")}
             }
         }
     }
@@ -313,6 +343,109 @@ mod tests {
             !e.propagates(),
             "typing in the filter input must not let Ctrl+S (or any other \
              key) reach the global keyboard handler behind it"
+        );
+    }
+
+    // ── F187: filter_in_effect ───────────────────────────────────────────────
+
+    #[test]
+    fn no_query_and_no_hide_option_is_not_in_effect() {
+        assert!(!filter_in_effect("", false, false));
+    }
+
+    #[test]
+    fn a_query_is_in_effect() {
+        assert!(filter_in_effect("x", false, false));
+    }
+
+    #[test]
+    fn hide_binary_alone_is_in_effect() {
+        assert!(filter_in_effect("", true, false));
+    }
+
+    #[test]
+    fn hide_identical_alone_is_in_effect() {
+        assert!(filter_in_effect("", false, true));
+    }
+
+    /// The render must call this exact function — not re-derive the same
+    /// answer from `filter_open` — so a `FilterBar` with the bar **closed**
+    /// but a filter **in effect** still renders the "on" state. Falsify by
+    /// making the button's class/label depend on `filter_open` again (as it
+    /// did before F187): with the bar closed, this fails.
+    #[test]
+    fn the_filter_button_shows_on_even_while_the_bar_is_closed() {
+        fn root() -> Element {
+            rsx! {
+                FilterBar {
+                    lang: Lang::En,
+                    filter_open: Signal::new_in_scope(false, ScopeId::ROOT),
+                    filter_query: Signal::new_in_scope("pattern".to_string(), ScopeId::ROOT),
+                    filter_hide_bin: Signal::new_in_scope(false, ScopeId::ROOT),
+                    filter_hide_eq: Signal::new_in_scope(false, ScopeId::ROOT),
+                    sync_locations: Signal::new_in_scope(false, ScopeId::ROOT),
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let aria_labels: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "aria-label",
+                    value: dioxus_core::AttributeValue::Text(s),
+                    ..
+                } => Some(s.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            aria_labels.iter().any(|l| l == "Filter (on)"),
+            "expected an aria-label \"Filter (on)\" with the bar closed and a \
+             query typed, among {aria_labels:?}"
+        );
+        assert!(
+            !aria_labels.iter().any(|l| l == "Filter"),
+            "the bar-closed, no-filter label must not appear once a filter \
+             is in effect: {aria_labels:?}"
+        );
+    }
+
+    /// The converse: nothing typed, nothing ticked — the plain label, not
+    /// "(on)" — whether the bar is open or closed.
+    #[test]
+    fn the_filter_button_shows_the_plain_label_when_nothing_is_active() {
+        fn root() -> Element {
+            rsx! {
+                FilterBar {
+                    lang: Lang::En,
+                    filter_open: Signal::new_in_scope(true, ScopeId::ROOT),
+                    filter_query: Signal::new_in_scope(String::new(), ScopeId::ROOT),
+                    filter_hide_bin: Signal::new_in_scope(false, ScopeId::ROOT),
+                    filter_hide_eq: Signal::new_in_scope(false, ScopeId::ROOT),
+                    sync_locations: Signal::new_in_scope(false, ScopeId::ROOT),
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let aria_labels: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "aria-label",
+                    value: dioxus_core::AttributeValue::Text(s),
+                    ..
+                } => Some(s.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            aria_labels.iter().any(|l| l == "Filter"),
+            "expected the plain \"Filter\" aria-label, among {aria_labels:?}"
         );
     }
 

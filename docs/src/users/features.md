@@ -26,7 +26,8 @@
 ## Explorer
 
 - Two directory panes with lazy-loading tree views.
-- Path bar, directory picker dialog, history ◀▶, and Alt+↑ to go up.
+- Path bar with history ← →, Alt+↑ to go up, and a **⋯** menu for Home
+  folder, a directory picker dialog, and Edit path.
 - Status icons on every row: equal, different, computing, unreadable, left only, right only, not compared (see the table below).
 - Full keyboard navigation: arrows to move, Space to select, Enter to
   open/compare, **F6** to switch focused pane.
@@ -35,8 +36,9 @@
 - **Empty state** shown when no entries are visible, with a first-run orientation hint.
 - **Binary file policy** — binary files show a `bin` badge and are
   non-actionable by default; enable in **Settings → Advanced**.
-- **Filter bar** — ⊞ toggle reveals a name-pattern input plus
-  "Hide binary" / "Hide identical" checkboxes (session-only, not persisted).
+- **Filter bar** — the **Filter** button reveals a name-pattern input plus
+  "Hide binary" / "Hide identical" checkboxes (session-only, not persisted);
+  it marks whenever a filter is active, even with the bar closed.
 - **Two layouts** (Settings → Advanced): Compact, the default for new installs,
   packs each pane and pairs entries by position; Aligned pairs same-name entries
   with spacer rows. Both scroll together and take the same keys.

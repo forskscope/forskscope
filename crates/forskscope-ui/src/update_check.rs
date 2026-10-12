@@ -330,7 +330,7 @@ mod tests {
     fn a_truncated_chunk_fails_to_parse_and_never_yields_a_tag() {
         let mut raw = Vec::new();
         raw.extend_from_slice(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n");
-        // Declares 100 (0x64) bytes but the connection stopped after 10.
+        // Declares 100 (0x64) bytes but the connection stopped after 8.
         raw.extend_from_slice(b"64\r\n");
         raw.extend_from_slice(br#"{"tag_na"#);
         assert!(parse_http_response(&raw).is_none());
@@ -353,10 +353,31 @@ mod tests {
         assert!(parse_http_response(&raw).is_none());
     }
 
+    /// F186: falsifies `decode_chunked_body`'s "chunk ends in CRLF" check
+    /// directly. A chunk declares size 1, but the sender actually wrote 2
+    /// bytes of real data ("AB") before the real terminating CRLF - more
+    /// data than the declared size. With the check, the mismatched bytes
+    /// (`B\r`) are rejected outright. Without it (confirmed by hand,
+    /// reverted before committing): the decoder blindly takes only the
+    /// declared-size prefix ("A"), treats the two bytes after it as if they
+    /// were the terminator it never checked, and resumes from there - which
+    /// happens to land exactly on `0\r\n\r\n`, a syntactically valid
+    /// terminating chunk. The result is `Some(b"A")`: a wrong, silently
+    /// truncated body, not a rejection.
+    #[test]
+    fn a_chunk_longer_than_its_declared_size_fails_to_parse() {
+        let raw = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nAB\r\n0\r\n\r\n";
+        assert!(parse_http_response(raw).is_none());
+    }
+
     #[test]
     fn content_length_framed_and_connection_close_framed_bodies_still_work_unchanged() {
-        // No Transfer-Encoding header at all: the pre-existing path.
-        let raw = b"HTTP/1.1 200 OK\r\nContent-Length: 23\r\n\r\n{\"tag_name\":\"0.187.0\"}";
+        // No Transfer-Encoding header at all: the pre-existing path. 22 is
+        // this exact body's real length - the client never reads
+        // Content-Length at all, so a wrong number here would still pass;
+        // get it right anyway, since a test named for this framing should
+        // not depend on that fact to pass.
+        let raw = b"HTTP/1.1 200 OK\r\nContent-Length: 22\r\n\r\n{\"tag_name\":\"0.187.0\"}";
         let r = parse_http_response(raw).expect("must parse");
         assert_eq!(r.body, br#"{"tag_name":"0.187.0"}"#);
     }

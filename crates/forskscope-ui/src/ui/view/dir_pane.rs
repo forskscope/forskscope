@@ -7,6 +7,7 @@
 
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
+use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
 use dioxus::html::input_data::keyboard_types::Key;
@@ -164,7 +165,14 @@ impl ScanExecutor for FilteringExecutor {
 /// Full-featured path navigation bar.
 ///
 /// Layout (single row, never wraps):
-/// `← → ⌂ 📁 │ /path/segments/current ✎`
+/// `← → ↑ │ /path/segments/current │ ⋯`
+///
+/// F185 (handoff 074): ⌂, 📁 and ✎ no longer sit in the bar as their own
+/// buttons — they live in the **⋯** menu (`Home folder`, `Open folder…`,
+/// `Edit path`), a small WAI-ARIA menu button local to this component (not
+/// a reusable framework — #111's context menus are a separate decision).
+/// Clicking the current folder name still opens the path editor directly,
+/// unchanged.
 ///
 /// The breadcrumb uses `direction: rtl` via CSS so that when the path is too
 /// long for the available space, the LEADING segments (ancestors) overflow
@@ -178,6 +186,18 @@ pub fn PathBar(
     on_forward: EventHandler<()>,
     on_navigate: EventHandler<PathBuf>,
     lang: Lang,
+    /// Renders the accent underline/tint (RFC-061 amendment, F185): this
+    /// bar replaces the removed pane-root cell as the focus indicator.
+    is_focused: bool,
+    /// Clicking anywhere on this bar — background, buttons, or a path
+    /// segment — focuses this pane. F6 still switches (unchanged).
+    on_focus: EventHandler<()>,
+    /// This pane's side name ("Left pane" / "Right pane"), already
+    /// translated by the caller. Combined with the current folder's short
+    /// name, this is the bar's own accessible group name — the job the
+    /// removed `role="heading"` cell used to do, kept current as the pane
+    /// navigates because it is computed from `path` on every render.
+    side_label: String,
 ) -> Element {
     // Pre-compute everything before closures consume values.
     let segs = path_segs(&path);
@@ -185,10 +205,31 @@ pub fn PathBar(
     let path_str = path.display().to_string();
     let path_str_reset = path_str.clone();
     let path_str_blur = path_str.clone();
+    let group_label = format!("{side_label} — {}", short_name(&path));
 
     let mut edit_mode: Signal<bool> = use_signal(|| false);
     let mut input_val: Signal<String> = use_signal(|| path_str.clone());
     let mut input_err: Signal<bool> = use_signal(|| false);
+    let mut menu_open: Signal<bool> = use_signal(|| false);
+
+    // F185 §2.1's menu: each focusable target's own `MountedData` handle,
+    // captured via its `onmounted` (the same mechanism
+    // `ui/overlay/modals.rs`'s `focus_autofocus_button` uses, there via a
+    // raw `document::eval` lookup because it only ever needs *today's*
+    // autofocused element; here every target is reused across opens, so
+    // each keeps its own handle). `set_focus` on a handle works
+    // immediately for an already-mounted target — which covers ↑/↓ moving
+    // onto any of the three items, and Esc returning to ⋯ — *except* the
+    // one case where the target is being created in the very same render
+    // pass that is opening the menu (item 0, the moment the menu first
+    // opens): calling `set_focus` on a handle captured before that render
+    // cannot win a race against the mount it is racing, and silently does
+    // nothing when it loses (confirmed live, AT-SPI, while building this).
+    // Item 0's `onmounted` therefore also focuses *itself*, which has no
+    // such race — by the time an element's own `onmounted` fires, it is
+    // already in the DOM.
+    let mut more_btn_handle: Signal<Option<Rc<MountedData>>> = use_signal(|| None);
+    let mut item_handles: Signal<[Option<Rc<MountedData>>; 3]> = use_signal(|| [None, None, None]);
 
     use_effect(move || {
         if !*edit_mode.read() {
@@ -196,69 +237,228 @@ pub fn PathBar(
         }
     });
 
-    rsx! {
-        div { class: "path-bar",
-            button { class: "path-btn", title: t(lang, "Back"), aria_label: t(lang, "Back"), disabled: !can_back,    onclick: move |_| on_back.call(()),    "←" }
-            button { class: "path-btn", title: t(lang, "Forward"), aria_label: t(lang, "Forward"), disabled: !can_forward, onclick: move |_| on_forward.call(()), "→" }
-            button { class: "path-btn", title: t(lang, "Go up one directory"), aria_label: t(lang, "Go up one directory"),
-                onclick: move |_| {
-                    let p = path.parent().map(|p| p.to_path_buf());
-                    if let Some(p) = p { on_navigate.call(p); }
-                }, "↑" }
-            button { class: "path-btn", title: t(lang, "Home directory"), aria_label: t(lang, "Home directory"),
-                onclick: move |_| on_navigate.call(home_dir()), "⌂" }
-            button { class: "path-btn", title: t(lang, "Open folder…"), aria_label: t(lang, "Open folder…"),
-                onclick: move |_| {
-                    let nav = on_navigate;
-                    spawn(async move {
-                        let r = tokio::task::spawn_blocking(|| rfd::FileDialog::new().pick_folder())
-                            .await.ok().flatten();
-                        if let Some(p) = r { nav.call(p); }
-                    });
-                }, "📁" }
+    let home_item = move |_| {
+        on_focus.call(());
+        on_navigate.call(home_dir());
+        menu_open.set(false);
+        focus_handle(more_btn_handle.read().clone());
+    };
+    let open_folder_item = move |_| {
+        on_focus.call(());
+        menu_open.set(false);
+        focus_handle(more_btn_handle.read().clone());
+        let nav = on_navigate;
+        spawn(async move {
+            let r = tokio::task::spawn_blocking(|| rfd::FileDialog::new().pick_folder())
+                .await
+                .ok()
+                .flatten();
+            if let Some(p) = r {
+                nav.call(p);
+            }
+        });
+    };
+    let edit_path_item = move |_| {
+        on_focus.call(());
+        menu_open.set(false);
+        edit_mode.set(true);
+    };
 
-            div { class: "path-segments",
-                if *edit_mode.read() {
-                    input {
-                        class: if *input_err.read() { "path-input error" } else { "path-input" },
-                        r#type: "text", value: "{input_val}", autofocus: true,
-                        oninput:  move |e| { input_val.set(e.value()); input_err.set(false); },
-                        onkeydown: move |e| path_input_keydown(
-                            &e, edit_mode, input_val, input_err, on_navigate, &path_str_reset,
-                        ),
-                        onblur: move |_| {
-                            let v = PathBuf::from(input_val.read().cloned());
-                            if v.is_dir() { edit_mode.set(false); on_navigate.call(v); }
-                            else { input_val.set(path_str_blur.clone()); edit_mode.set(false); input_err.set(false); }
-                        },
-                    }
-                } else {
-                    // Root prefix icon — navigates to filesystem root on click.
-                    if path.has_root() {
-                        { let root = PathBuf::from("/");
-                          rsx! { button { class: "bc-root", title: "/",
-                              onclick: move |_| on_navigate.call(root.clone()),
-                              "/" } } }
-                        if n > 0 { span { class: "bc-sep", " " } }
-                    }
-                    for (idx, (seg_path, label)) in segs.iter().enumerate() {
-                        if idx > 0 { span { class: "bc-sep", " / " } }
-                        if idx == n - 1 {
-                            span { class: "bc-current", title: "{label}",
-                                onclick: move |_| edit_mode.set(true),
-                                {trunc_label(label, 20)} }
-                        } else {
-                            { let t = seg_path.clone(); let full = label.clone();
-                              rsx! { button { class: "bc-seg", title: "{full}",
-                                  onclick: move |_| on_navigate.call(t.clone()),
-                                  {trunc_label(&full, 20)} } } }
+    rsx! {
+        div { class: "pathbar-wrapper",
+            div {
+                class: if is_focused { "path-bar pane-focused" } else { "path-bar" },
+                role: "group",
+                aria_label: "{group_label}",
+                onclick: move |_| on_focus.call(()),
+                button { class: "path-btn", title: t(lang, "Back"), aria_label: t(lang, "Back"), disabled: !can_back,    onclick: move |_| on_back.call(()),    "←" }
+                button { class: "path-btn", title: t(lang, "Forward"), aria_label: t(lang, "Forward"), disabled: !can_forward, onclick: move |_| on_forward.call(()), "→" }
+                button { class: "path-btn", title: t(lang, "Go up one directory"), aria_label: t(lang, "Go up one directory"),
+                    onclick: move |_| {
+                        let p = path.parent().map(|p| p.to_path_buf());
+                        if let Some(p) = p { on_navigate.call(p); }
+                    }, "↑" }
+
+                div { class: "path-segments",
+                    if *edit_mode.read() {
+                        input {
+                            class: if *input_err.read() { "path-input error" } else { "path-input" },
+                            r#type: "text", value: "{input_val}", autofocus: true,
+                            oninput:  move |e| { input_val.set(e.value()); input_err.set(false); },
+                            onkeydown: move |e| path_input_keydown(
+                                &e, edit_mode, input_val, input_err, on_navigate, &path_str_reset,
+                            ),
+                            onblur: move |_| {
+                                let v = PathBuf::from(input_val.read().cloned());
+                                if v.is_dir() { edit_mode.set(false); on_navigate.call(v); }
+                                else { input_val.set(path_str_blur.clone()); edit_mode.set(false); input_err.set(false); }
+                            },
+                        }
+                    } else {
+                        // Root prefix icon — navigates to filesystem root on click.
+                        if path.has_root() {
+                            { let root = PathBuf::from("/");
+                              rsx! { button { class: "bc-root", title: "/",
+                                  onclick: move |_| on_navigate.call(root.clone()),
+                                  "/" } } }
+                            if n > 0 { span { class: "bc-sep", " " } }
+                        }
+                        for (idx, (seg_path, label)) in segs.iter().enumerate() {
+                            if idx > 0 { span { class: "bc-sep", " / " } }
+                            if idx == n - 1 {
+                                span { class: "bc-current", title: "{label}",
+                                    onclick: move |_| edit_mode.set(true),
+                                    {trunc_label(label, 20)} }
+                            } else {
+                                { let t = seg_path.clone(); let full = label.clone();
+                                  rsx! { button { class: "bc-seg", title: "{full}",
+                                      onclick: move |_| on_navigate.call(t.clone()),
+                                      {trunc_label(&full, 20)} } } }
+                            }
                         }
                     }
-                    button { class: "path-btn path-edit-btn", title: t(lang, "Edit path"),
-                        onclick: move |_| edit_mode.set(true), "✎" }
+                }
+
+                button {
+                    class: "path-btn path-more-btn",
+                    title: t(lang, "More"), aria_label: t(lang, "More"),
+                    aria_haspopup: "menu",
+                    aria_expanded: if *menu_open.read() { "true" } else { "false" },
+                    onmounted: move |e| more_btn_handle.set(Some(e.data())),
+                    onclick: move |_| {
+                        if *menu_open.read() {
+                            menu_open.set(false);
+                        } else {
+                            open_pathbar_menu(menu_open);
+                        }
+                    },
+                    onkeydown: move |e| more_btn_keydown(&e, menu_open),
+                    "⋯"
+                }
+            }
+            if *menu_open.read() {
+                div { class: "pathbar-menu-catcher", onclick: move |_| menu_open.set(false) }
+                div { class: "pathbar-menu", role: "menu", aria_label: t(lang, "More"),
+                    button {
+                        role: "menuitem", class: "pathbar-menu-item",
+                        onmounted: move |e| {
+                            let h = e.data();
+                            item_handles.write()[0] = Some(h.clone());
+                            // The only item that must also focus itself the
+                            // instant it exists — see the handle-field doc
+                            // comment above.
+                            focus_handle(Some(h));
+                        },
+                        onkeydown: move |e| { menu_item_keydown(&e, 0, menu_open, item_handles, more_btn_handle); },
+                        onclick: home_item,
+                        span { class: "pathbar-menu-label", {t(lang, "Home folder")} }
+                        span { class: "pathbar-menu-shortcut", "Alt+Home" }
+                    }
+                    button {
+                        role: "menuitem", class: "pathbar-menu-item",
+                        onmounted: move |e| item_handles.write()[1] = Some(e.data()),
+                        onkeydown: move |e| { menu_item_keydown(&e, 1, menu_open, item_handles, more_btn_handle); },
+                        onclick: open_folder_item,
+                        span { class: "pathbar-menu-label", {t(lang, "Open folder…")} }
+                        span { class: "pathbar-menu-shortcut", "Ctrl+O" }
+                    }
+                    button {
+                        role: "menuitem", class: "pathbar-menu-item",
+                        onmounted: move |e| item_handles.write()[2] = Some(e.data()),
+                        onkeydown: move |e| { menu_item_keydown(&e, 2, menu_open, item_handles, more_btn_handle); },
+                        onclick: edit_path_item,
+                        span { class: "pathbar-menu-label", {t(lang, "Edit path")} }
+                        span { class: "pathbar-menu-shortcut", {t(lang, "click the name")} }
+                    }
                 }
             }
         }
+    }
+}
+
+// ── ⋯ menu: keyboard model (F185, handoff 074 §2.1) ────────────────────────────
+//
+// A small WAI-ARIA menu button, local to `PathBar` — not a framework for
+// #111's future context menus. Enter/Space on ⋯ open it via the native
+// button click the browser already fires; only ↓ needs its own keydown
+// case, since arrow keys are not native button-activation keys.
+
+/// `.set_focus(true)` on an already-mounted target's handle. A no-op if the
+/// handle has not been captured yet (should not happen for any of the
+/// three targets this is called with, each captured well before any key
+/// that reaches this function can fire — but a silent no-op is still the
+/// right failure mode over a panic for a focus call, which is advisory).
+fn focus_handle(handle: Option<Rc<MountedData>>) {
+    if let Some(h) = handle {
+        spawn(async move {
+            let _ = h.set_focus(true).await;
+        });
+    }
+}
+
+/// Opens the menu. Item 0 focuses itself on mount (see the handle-field
+/// doc comment on `PathBar`); this function only ever needs to flip the
+/// one signal that makes that mount happen — the ⋯ button's onclick
+/// (mouse, or Enter/Space via native button activation) and its onkeydown
+/// (↓) both call this one function, so "opens with focus on the first
+/// item" is asserted once, against what both input paths actually run.
+fn open_pathbar_menu(mut menu_open: Signal<bool>) {
+    menu_open.set(true);
+}
+
+/// The ⋯ button's own keydown: ↓ opens the menu (Enter/Space already reach
+/// `onclick` natively via the browser's own button-activation behaviour, so
+/// they need no case here — and `ControlZone`'s `controls_keep_enter`
+/// already keeps Enter from reaching the global handler besides). Only ↓ is
+/// stopped: this is a plain button, not a text field, so every other key
+/// (Tab included) keeps its ordinary behaviour.
+fn more_btn_keydown(e: &Event<KeyboardData>, menu_open: Signal<bool>) {
+    if e.key() == Key::ArrowDown {
+        e.stop_propagation();
+        open_pathbar_menu(menu_open);
+    }
+}
+
+/// A menu item's keydown. Swallows every key first (RFC-060/`swallow_when_typing`'s
+/// own rule, restated by the handoff as "keys in the open menu reach
+/// nothing behind it") — arrows must not move the tree's row focus, and
+/// Enter must not open a row underneath. `own_idx` is this item's own
+/// position in `item_handles` (all three items' handles, captured by all
+/// three — every item can be wrapped onto from any other, so each needs
+/// every handle, not just its immediate neighbours'). `Esc` closes the
+/// menu and returns focus to ⋯. Enter/Space activate via the item's own
+/// native `onclick`, which closes the menu itself (see each item's closure
+/// in `PathBar`).
+///
+/// Returns the index arrow navigation moved to, so a test can assert the
+/// wrap-around math directly against this function's own return value —
+/// no signal needs to exist purely to make that observable.
+fn menu_item_keydown(
+    e: &Event<KeyboardData>,
+    own_idx: usize,
+    mut menu_open: Signal<bool>,
+    item_handles: Signal<[Option<Rc<MountedData>>; 3]>,
+    more_btn_handle: Signal<Option<Rc<MountedData>>>,
+) -> Option<usize> {
+    crate::keyboard::swallow_when_typing(e);
+    const LEN: usize = 3;
+    match e.key() {
+        Key::ArrowDown => {
+            let next = (own_idx + 1) % LEN;
+            focus_handle(item_handles.read()[next].clone());
+            Some(next)
+        }
+        Key::ArrowUp => {
+            let next = (own_idx + LEN - 1) % LEN;
+            focus_handle(item_handles.read()[next].clone());
+            Some(next)
+        }
+        Key::Escape => {
+            menu_open.set(false);
+            focus_handle(more_btn_handle.read().clone());
+            None
+        }
+        _ => None,
     }
 }
 
@@ -741,8 +941,7 @@ mod tests {
     // `aria-label` attribute with the expected translated text — falsify
     // by removing any one `aria_label:` from `PathBar` and the
     // corresponding assertion below fails.
-    #[test]
-    fn path_bar_buttons_carry_the_expected_aria_label() {
+    fn path_bar_aria_labels() -> Vec<String> {
         fn root() -> Element {
             rsx! {
                 PathBar {
@@ -753,13 +952,16 @@ mod tests {
                     on_forward: move |_| {},
                     on_navigate: move |_: PathBuf| {},
                     lang: Lang::En,
+                    is_focused: false,
+                    on_focus: move |_| {},
+                    side_label: "Left pane".to_string(),
                 }
             }
         }
         let mut vdom = VirtualDom::new(root);
         let mutations = vdom.rebuild_to_vec();
 
-        let aria_labels: Vec<String> = mutations
+        mutations
             .edits
             .iter()
             .filter_map(|m| match m {
@@ -770,21 +972,165 @@ mod tests {
                 } => Some(s.clone()),
                 _ => None,
             })
-            .collect();
+            .collect()
+    }
 
-        for expected in [
-            "Back",
-            "Forward",
-            "Go up one directory",
-            "Home directory",
-            "Open folder…",
-        ] {
+    /// F185: the path bar's always-visible buttons — ⌂/📁/✎ moved into the
+    /// ⋯ menu, which is not in this list because it only renders while
+    /// `menu_open` is true, and this just mounts the component fresh.
+    #[test]
+    fn path_bar_buttons_carry_the_expected_aria_label() {
+        let aria_labels = path_bar_aria_labels();
+        for expected in ["Back", "Forward", "Go up one directory", "More"] {
             assert!(
                 aria_labels.iter().any(|l| l == expected),
                 "expected an aria-label {expected:?} among the rendered \
                  attributes {aria_labels:?}"
             );
         }
+    }
+
+    /// F185/RFC-061 amendment: the path bar itself is now the labelled
+    /// group the removed `role="heading"` pane-root cell used to be —
+    /// "{side} — {current folder name}", kept current because it is
+    /// computed from `path` on every render, not cached at mount.
+    #[test]
+    fn path_bar_group_label_names_the_side_and_the_current_folder() {
+        let aria_labels = path_bar_aria_labels();
+        assert!(
+            aria_labels.iter().any(|l| l == "Left pane — tmp"),
+            "expected the group aria-label \"Left pane — tmp\" among \
+             {aria_labels:?}"
+        );
+    }
+
+    // ── ⋯ menu keyboard model (F185) ─────────────────────────────────────────
+    //
+    // `item_handles`/`more_btn_handle` are left `None` throughout: these
+    // tests exercise the index math and the key-swallowing contract, not
+    // `set_focus` itself (a real `MountedData` handle needs a live
+    // renderer — `focus_handle`'s own doc comment covers why a `None`
+    // handle is a safe no-op).
+
+    #[test]
+    fn more_btn_arrow_down_opens_the_menu() {
+        with_test_store(|_store| {
+            let menu_open = Signal::new_in_scope(false, ScopeId::ROOT);
+            let e = crate::keyboard::test_support::key_event(
+                Key::ArrowDown,
+                dioxus::html::input_data::keyboard_types::Modifiers::empty(),
+            );
+            assert!(e.propagates(), "test setup");
+            more_btn_keydown(&e, menu_open);
+            assert!(*menu_open.read(), "↓ on ⋯ must open the menu");
+            assert!(!e.propagates(), "↓ must not reach anything behind ⋯ either");
+        });
+    }
+
+    #[test]
+    fn more_btn_other_keys_do_not_open_the_menu_or_get_swallowed() {
+        with_test_store(|_store| {
+            let menu_open = Signal::new_in_scope(false, ScopeId::ROOT);
+            let e = crate::keyboard::test_support::key_event(
+                Key::Tab,
+                dioxus::html::input_data::keyboard_types::Modifiers::empty(),
+            );
+            assert!(e.propagates(), "test setup");
+            more_btn_keydown(&e, menu_open);
+            assert!(!*menu_open.read(), "Tab must not open the menu");
+            assert!(
+                e.propagates(),
+                "a plain button must keep its ordinary Tab behaviour"
+            );
+        });
+    }
+
+    #[test]
+    fn open_pathbar_menu_opens_it() {
+        with_test_store(|_store| {
+            let menu_open = Signal::new_in_scope(false, ScopeId::ROOT);
+            open_pathbar_menu(menu_open);
+            assert!(*menu_open.read());
+        });
+    }
+
+    /// Wrap-around math, asserted against `menu_item_keydown`'s own return
+    /// value — no signal needs to exist purely to make this observable.
+    #[test]
+    fn menu_item_arrow_down_wraps_from_the_last_item_to_the_first() {
+        with_test_store(|_store| {
+            let menu_open = Signal::new_in_scope(true, ScopeId::ROOT);
+            let item_handles = Signal::new_in_scope([None, None, None], ScopeId::ROOT);
+            let more_btn_handle = Signal::new_in_scope(None, ScopeId::ROOT);
+            let e = crate::keyboard::test_support::key_event(
+                Key::ArrowDown,
+                dioxus::html::input_data::keyboard_types::Modifiers::empty(),
+            );
+            let next = menu_item_keydown(&e, 2, menu_open, item_handles, more_btn_handle);
+            assert_eq!(next, Some(0), "must wrap from the last item to the first");
+            assert!(
+                *menu_open.read(),
+                "arrow navigation must not close the menu"
+            );
+        });
+    }
+
+    #[test]
+    fn menu_item_arrow_up_wraps_from_the_first_item_to_the_last() {
+        with_test_store(|_store| {
+            let menu_open = Signal::new_in_scope(true, ScopeId::ROOT);
+            let item_handles = Signal::new_in_scope([None, None, None], ScopeId::ROOT);
+            let more_btn_handle = Signal::new_in_scope(None, ScopeId::ROOT);
+            let e = crate::keyboard::test_support::key_event(
+                Key::ArrowUp,
+                dioxus::html::input_data::keyboard_types::Modifiers::empty(),
+            );
+            let next = menu_item_keydown(&e, 0, menu_open, item_handles, more_btn_handle);
+            assert_eq!(next, Some(2), "must wrap from the first item to the last");
+        });
+    }
+
+    /// Handoff 074 §2.1: "Esc closes the menu and returns focus to ⋯." The
+    /// focus-return itself needs a real `MountedData` handle (a live
+    /// renderer) to observe — this is the half a unit test can: the menu
+    /// closes.
+    #[test]
+    fn menu_item_escape_closes_the_menu() {
+        with_test_store(|_store| {
+            let menu_open = Signal::new_in_scope(true, ScopeId::ROOT);
+            let item_handles = Signal::new_in_scope([None, None, None], ScopeId::ROOT);
+            let more_btn_handle = Signal::new_in_scope(None, ScopeId::ROOT);
+            let e = crate::keyboard::test_support::key_event(
+                Key::Escape,
+                dioxus::html::input_data::keyboard_types::Modifiers::empty(),
+            );
+            let next = menu_item_keydown(&e, 1, menu_open, item_handles, more_btn_handle);
+            assert!(!*menu_open.read());
+            assert_eq!(next, None);
+        });
+    }
+
+    /// "Keys in the open menu reach nothing behind it" (handoff 074 §2.1):
+    /// every key on a menu item is swallowed, not only the ones this
+    /// function gives a specific meaning to — the same
+    /// `swallow_when_typing` discipline `path_input_keydown` and
+    /// `filter_input_keydown` already follow. Falsify by removing the
+    /// `swallow_when_typing` call: this fails on a plain character key that
+    /// none of the `match` arms handle.
+    #[test]
+    fn menu_item_swallows_every_key_not_just_the_ones_it_acts_on() {
+        with_test_store(|_store| {
+            let menu_open = Signal::new_in_scope(true, ScopeId::ROOT);
+            let item_handles = Signal::new_in_scope([None, None, None], ScopeId::ROOT);
+            let more_btn_handle = Signal::new_in_scope(None, ScopeId::ROOT);
+            let e = crate::keyboard::test_support::key_event(
+                Key::Character("x".into()),
+                dioxus::html::input_data::keyboard_types::Modifiers::empty(),
+            );
+            assert!(e.propagates(), "test setup");
+            menu_item_keydown(&e, 0, menu_open, item_handles, more_btn_handle);
+            assert!(!e.propagates());
+        });
     }
 }
 

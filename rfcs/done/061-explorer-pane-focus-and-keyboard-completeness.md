@@ -4,7 +4,9 @@
 All three requirements ship: the `FocusedPane` model with `toggle()`/`is_left()`
 (`view/explorer/tree.rs`), **F6** to switch panes, `handle_key` dispatching to
 `tree_l` **or** `tree_r` by focus, and a visible indicator
-(`.pane-root-cell.pane-focused`, `10-view-explorer.css`).
+(`.pane-root-cell.pane-focused`, `10-view-explorer.css`). **Amended
+v0.188.0 (F185): the indicator and its click target moved to the path bar.**
+See the amendment at the end.
 **Deferred:** nothing found.
 **Tracks.** Explorer keyboard accessibility; left/right pane focus model;
 making the stated keyboard-only path real for the Explorer's core
@@ -148,3 +150,25 @@ which is why it passed through here first.
 - Keep coupled `Alt+↑` (move both panes) at all, or drop it? It has a narrow
   use (sibling directory trees) but adds surface. Lean toward dropping unless a
   user need is demonstrated.
+
+## Amendment (v0.188.0, F185): the indicator moves to the path bar
+
+The pane-root bar (`.pane-root-bar`, its two `.pane-root-cell`s) is removed —
+F185's layout work found it repeated the folder name the path bar already
+shows, and its real job was only the focus indicator. That job moves to the
+path bar itself:
+
+- The focused pane's path bar shows an accent underline and a light accent
+  tint (`.path-bar.pane-focused`, `var(--focus)`/`var(--accent)`), visible in
+  all three themes, replacing the outlined `pane-root-cell.pane-focused`.
+- Clicking anywhere on a pane's path bar — background, buttons, or a path
+  segment — focuses that pane, not only a dedicated cell. **F6 still
+  switches, unchanged.**
+- The removed cell's `role="heading"` accessible name ("Left pane — ‹folder›")
+  becomes the path bar's own `role="group"` name, computed from its current
+  path on every render, so it stays current exactly as before.
+
+Nothing about the focused-pane *model* changed: `FocusedPane`, `toggle()`,
+`is_left()`/`is_right()`, and `tree.rs`'s per-pane keydown dispatch are
+untouched. Only where the indicator lives, and what you click to move it,
+changed.

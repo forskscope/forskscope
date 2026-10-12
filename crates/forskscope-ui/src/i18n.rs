@@ -42,9 +42,11 @@ fn ja(key: &str) -> Option<&'static str> {
         "Read every byte to find out for certain." => {
             "確実に判定するため、すべてのバイトを読み込みます。"
         }
-        "Filter items" => "アイテムをフィルター",
-        "Sync panes — both panes show the same location" => {
-            "ペインを同期 — 両方のペインが同じ場所を表示します"
+        "Filter" => "フィルター",
+        "Filter (on)" => "フィルター（適用中）",
+        "Move together" => "一緒に移動",
+        "When one pane moves to a folder, the other moves to the matching folder, if it has one." => {
+            "片方のペインでフォルダーを移動すると、もう片方も対応するフォルダーに移動します（ある場合）。"
         }
         "Filter by name…" => "名前でフィルター…",
         "Hide binary" => "バイナリを非表示",
@@ -118,9 +120,11 @@ fn ja(key: &str) -> Option<&'static str> {
         "Copy" => "コピー",
         "Back" => "戻る",
         "Forward" => "進む",
-        "Home directory" => "ホームディレクトリ",
-        "Open folder…" => "フォルダを開く…",
+        "Home folder" => "ホームフォルダー",
+        "Open folder…" => "フォルダーを開く…",
         "Edit path" => "パスを編集",
+        "click the name" => "名前をクリック",
+        "More" => "その他",
         "Keyboard shortcuts (Ctrl+/)" => "キーボードショートカット (Ctrl+/)",
         "File comparison" => "ファイル比較",
         "F7 — Previous change" => "F7 — 前の変更",
@@ -211,7 +215,7 @@ fn ja(key: &str) -> Option<&'static str> {
         "Ignore directory names" => "除外ディレクトリ名",
         "Hide hidden files" => "隠しファイルを非表示にする",
         "Also excludes hidden files and folders from comparisons — recursive compare, Deep Compare, and the Explorer's quick folder check. Off by default, so .gitignore, .env, and similar files are included." => {
-            "隠しファイルやフォルダは、比較(再帰比較・ディープ比較・エクスプローラーのクイックフォルダー確認)からも除外されます。デフォルトではオフになっており、.gitignore や .env などのファイルも比較対象に含まれます。"
+            "隠しファイルやフォルダーは、比較(再帰比較・ディープ比較・エクスプローラーのクイックフォルダー確認)からも除外されます。デフォルトではオフになっており、.gitignore や .env などのファイルも比較対象に含まれます。"
         }
         "Delete profile" => "プロファイルを削除",
         "0 (show all)" => "0（全表示）",

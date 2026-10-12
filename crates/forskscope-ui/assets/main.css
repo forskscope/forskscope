@@ -307,6 +307,21 @@ code.path-display {
 .bc-sep { color: var(--muted); padding: 0 .05rem; }
 .bc-current { color: var(--text); font-weight: 600; padding: .1rem .2rem; }
 
+/* F185: `.path-bar` itself keeps `overflow: hidden` (the breadcrumb relies
+   on it to clip overflowing ancestor segments, RFC "single row, never
+   wraps"). `.pathbar-wrapper` is the ⋯ menu's positioning context instead -
+   a plain `position: relative` box with no clipping of its own, so the
+   menu (`position: absolute` within it) is never cut by its sibling's
+   `overflow: hidden`.
+   `min-width: 0` is required, not decorative: a grid item's default
+   `min-width: auto` lets its content's minimum size push it wider than its
+   `1fr` share, so the two `.explorer-path-bars` columns silently stopped
+   matching the moment the two panes' breadcrumbs differed in length
+   (measured: 728px vs 738px at one window size, with two short, differently
+   -named directories). Overriding it to `0` is what actually makes `1fr 1fr`
+   split the row equally, which `.explorer-path-bars` already declares but
+   could not previously keep a promise on. */
+.pathbar-wrapper { position: relative; min-width: 0; }
 .path-bar {
   display: flex; align-items: center; gap: .2rem; padding: .25rem .4rem;
   background: var(--surface-2); border-bottom: 1px solid var(--border);
@@ -315,12 +330,37 @@ code.path-display {
 .path-btn { background: none; border: 1px solid transparent; border-radius: 3px; padding: .1rem .35rem; cursor: pointer; color: var(--text); font-size: 13px; line-height: 1.2; }
 .path-btn:hover:not(:disabled) { background: var(--surface-3); border-color: var(--border); }
 .path-btn:disabled { color: var(--muted); cursor: default; }
-.path-edit-btn { margin-left: .15rem; color: var(--muted); }
+.path-more-btn { margin-left: .15rem; color: var(--muted); }
 .path-segments { display: flex; align-items: center; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
 .path-segments .bc-seg { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .path-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 3px; font-size: 12px; min-width: 6ch; }
 .path-input.error { border-color: var(--del-mark, #e05); }
 .path-input:focus { outline: 2px solid var(--accent); }
+
+/* ── ⋯ path-bar menu (F185, handoff 074 §2.1 — small and local, not #111's
+   future context-menu framework) ──
+   `.pathbar-menu-catcher` is a full-viewport transparent layer, present
+   only while the menu is open, that closes it on any outside click - the
+   same underlying trick the modal `.scrim` uses, without a full-screen
+   dialog. `.pathbar-menu` sits above it, anchored to `.pathbar-wrapper`'s
+   own right edge (not the viewport's), so it opens inward on *both* panes
+   even when they stack on a narrow window (90-responsive.css). */
+.pathbar-menu-catcher { position: fixed; inset: 0; z-index: 20; background: transparent; }
+.pathbar-menu {
+  position: absolute; top: 100%; right: 0; z-index: 21;
+  min-width: 15rem; margin-top: .15rem; padding: .25rem;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, .25);
+  display: flex; flex-direction: column; gap: .05rem;
+}
+.pathbar-menu-item {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  width: 100%; background: none; border: 1px solid transparent; text-align: left;
+  padding: .3rem .5rem; font-size: 12px; color: var(--text); border-radius: 4px;
+}
+.pathbar-menu-item:hover { background: var(--surface-3); }
+.pathbar-menu-label { flex: 1; min-width: 0; }
+.pathbar-menu-shortcut { color: var(--muted); font-size: 11px; flex-shrink: 0; white-space: nowrap; }
 
 /* ---- tree rows ---- */
 .tree-row { display: flex; align-items: center; gap: .3rem; padding: .15rem .4rem; cursor: pointer; user-select: none; white-space: nowrap; min-height: var(--row-h); }
@@ -417,8 +457,15 @@ code.path-display {
   padding: .2rem .4rem; background: var(--surface-2);
   border-bottom: 1px solid var(--border); min-height: 32px; flex-shrink: 0;
 }
-.filter-toggle { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 13px; background: none; border: 1px solid transparent; }
-.filter-toggle.active { border-color: var(--accent); color: var(--accent); }
+/* F185: text buttons with a visible border ("so they read as buttons") -
+   the global `button` rule in 02-layout-shell.css already gives one; this
+   class only trims the toolbar-sized padding/height, it no longer flattens
+   the border to transparent the way the old ⊞/⇄ glyph buttons did. */
+.filter-toggle { flex: 0 0 auto; min-height: 24px; padding: 0 .5rem; font-size: 12px; white-space: nowrap; }
+/* F187: always rendered (reserves its space so *Move together* never
+   shifts when a filter turns on or off); only its colour changes. */
+.filter-dot { display: inline-block; width: 6px; height: 6px; margin-left: .3rem; border-radius: 50%; background: transparent; vertical-align: middle; }
+.filter-dot.on { background: var(--accent); }
 .filter-input { flex: 1; min-width: 0; font-size: 12px; height: 24px; padding: 0 .4rem; }
 .filter-check { display: flex; align-items: center; gap: .25rem; font-size: 12px; color: var(--text); cursor: pointer; white-space: nowrap; user-select: none; }
 .filter-clear { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 11px; color: var(--muted); background: none; border: 1px solid var(--border); }
@@ -447,15 +494,14 @@ code.path-display {
 .explorer-empty-hint  { font-size: 13px; margin: 0; max-width: 36ch; }
 .explorer-empty-local { font-size: 12px; margin: 0; }
 
-/* ── Pane root bar ── */
-.pane-root-bar { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-bottom: 2px solid var(--accent); flex-shrink: 0; }
-.pane-root-cell { display: flex; align-items: center; gap: .2rem; padding: .25rem .5rem; font-size: 12px; font-weight: 700; overflow: hidden; cursor: pointer; }
-.pane-root-cell:first-child { border-right: 1px solid var(--border); }
-.root-label { color: var(--muted); flex-shrink: 0; }
-.root-name  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-
-/* ── Explorer pane focus indicator (RFC-061) ── */
-.pane-root-cell.pane-focused { outline: 2px solid var(--focus); outline-offset: -2px; background: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); }
+/* ── Explorer pane focus indicator (RFC-061 amendment, F185) ──
+   The pane-root bar/cells are gone; the path bar is now the focus
+   indicator (an accent underline and a light accent tint) and the click
+   target that focuses a pane — see `PathBar`'s own `onclick`. */
+.path-bar.pane-focused {
+  border-bottom: 2px solid var(--focus);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+}
 
 /* ── Directory report back bar ── */
 .explorer-deep-back { display: flex; align-items: center; padding: .3rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
@@ -891,9 +937,12 @@ code.path-display {
 
 @media (max-width: 719px) {
 
-  /* ── Explorer: stack path bars vertically ── */
+  /* ── Explorer: stack path bars vertically ──
+     F185: `.pathbar-wrapper`, not `.path-bar`, is `.explorer-path-bars`'s
+     direct grid child now — `.path-bar:last-child` would match both
+     wrappers' sole child trivially and put the divider on both. */
   .explorer-path-bars { grid-template-columns: 1fr; }
-  .explorer-path-bars .path-bar:last-child { border-top: 1px solid var(--border); }
+  .explorer-path-bars .pathbar-wrapper:last-child .path-bar { border-top: 1px solid var(--border); }
   .aligned-row { grid-template-columns: 1fr; }
   .aligned-row .pane-half:last-child { border-right: none; border-top: 1px solid var(--border); }
   .row-spacer { display: none; }

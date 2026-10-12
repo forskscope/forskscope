@@ -84,8 +84,15 @@
   padding: .2rem .4rem; background: var(--surface-2);
   border-bottom: 1px solid var(--border); min-height: 32px; flex-shrink: 0;
 }
-.filter-toggle { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 13px; background: none; border: 1px solid transparent; }
-.filter-toggle.active { border-color: var(--accent); color: var(--accent); }
+/* F185: text buttons with a visible border ("so they read as buttons") -
+   the global `button` rule in 02-layout-shell.css already gives one; this
+   class only trims the toolbar-sized padding/height, it no longer flattens
+   the border to transparent the way the old ⊞/⇄ glyph buttons did. */
+.filter-toggle { flex: 0 0 auto; min-height: 24px; padding: 0 .5rem; font-size: 12px; white-space: nowrap; }
+/* F187: always rendered (reserves its space so *Move together* never
+   shifts when a filter turns on or off); only its colour changes. */
+.filter-dot { display: inline-block; width: 6px; height: 6px; margin-left: .3rem; border-radius: 50%; background: transparent; vertical-align: middle; }
+.filter-dot.on { background: var(--accent); }
 .filter-input { flex: 1; min-width: 0; font-size: 12px; height: 24px; padding: 0 .4rem; }
 .filter-check { display: flex; align-items: center; gap: .25rem; font-size: 12px; color: var(--text); cursor: pointer; white-space: nowrap; user-select: none; }
 .filter-clear { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 11px; color: var(--muted); background: none; border: 1px solid var(--border); }
@@ -114,15 +121,14 @@
 .explorer-empty-hint  { font-size: 13px; margin: 0; max-width: 36ch; }
 .explorer-empty-local { font-size: 12px; margin: 0; }
 
-/* ── Pane root bar ── */
-.pane-root-bar { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-bottom: 2px solid var(--accent); flex-shrink: 0; }
-.pane-root-cell { display: flex; align-items: center; gap: .2rem; padding: .25rem .5rem; font-size: 12px; font-weight: 700; overflow: hidden; cursor: pointer; }
-.pane-root-cell:first-child { border-right: 1px solid var(--border); }
-.root-label { color: var(--muted); flex-shrink: 0; }
-.root-name  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-
-/* ── Explorer pane focus indicator (RFC-061) ── */
-.pane-root-cell.pane-focused { outline: 2px solid var(--focus); outline-offset: -2px; background: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); }
+/* ── Explorer pane focus indicator (RFC-061 amendment, F185) ──
+   The pane-root bar/cells are gone; the path bar is now the focus
+   indicator (an accent underline and a light accent tint) and the click
+   target that focuses a pane — see `PathBar`'s own `onclick`. */
+.path-bar.pane-focused {
+  border-bottom: 2px solid var(--focus);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+}
 
 /* ── Directory report back bar ── */
 .explorer-deep-back { display: flex; align-items: center; padding: .3rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); flex-shrink: 0; }

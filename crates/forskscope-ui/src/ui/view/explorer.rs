@@ -1094,6 +1094,9 @@ pub fn Explorer() -> Element {
             div { class: "explorer-browse",
 
                 // ── Path bars ─────────────────────────────────────────────
+                // F185: the path bar is now also the pane-focus indicator
+                // and its own focus target (RFC-061 amendment) — the
+                // removed pane-root cells used to do both.
                 div { class: "explorer-path-bars",
                     PathBar {
                         path: left_dir.read().cloned(),
@@ -1103,6 +1106,9 @@ pub fn Explorer() -> Element {
                         on_forward: move |_| { let p = left_hist.write().forward(); if let Some(p) = p { crate::ui::view::dir_pane::navigate_to_from_history(p, true,  store, left_dir); } },
                         on_navigate: move |p| crate::ui::view::dir_pane::navigate_to(p, true, store, left_hist, left_dir),
                         lang,
+                        is_focused: focused_pane.read().is_left(),
+                        on_focus: move |_| focused_pane.set(FocusedPane::Left),
+                        side_label: t(lang, "Left pane"),
                     }
                     PathBar {
                         path: right_dir.read().cloned(),
@@ -1112,31 +1118,14 @@ pub fn Explorer() -> Element {
                         on_forward: move |_| { let p = right_hist.write().forward(); if let Some(p) = p { crate::ui::view::dir_pane::navigate_to_from_history(p, false, store, right_dir); } },
                         on_navigate: move |p| crate::ui::view::dir_pane::navigate_to(p, false, store, right_hist, right_dir),
                         lang,
+                        is_focused: focused_pane.read().is_right(),
+                        on_focus: move |_| focused_pane.set(FocusedPane::Right),
+                        side_label: t(lang, "Right pane"),
                     }
                 }
 
                 // ── Filter bar ────────────────────────────────────────────
                 FilterBar { lang, filter_open, filter_query, filter_hide_bin, filter_hide_eq, sync_locations }
-
-                // ── Pane-root labels ──────────────────────────────────────
-                div { class: "pane-root-bar",
-                    div {
-                        class: if focused_pane.read().is_left() { "pane-root-cell pane-focused" } else { "pane-root-cell" },
-                        role: "heading",
-                        aria_label: format!("{} — {}", t(lang, "Left pane"), short_name(&l_root_snap)),
-                        onclick: move |_| focused_pane.set(FocusedPane::Left),
-                        span { class: "root-label", "📁 " }
-                        span { class: "root-name", title: "{l_root_snap.display()}", {short_name(&l_root_snap)} }
-                    }
-                    div {
-                        class: if focused_pane.read().is_right() { "pane-root-cell pane-focused" } else { "pane-root-cell" },
-                        role: "heading",
-                        aria_label: format!("{} — {}", t(lang, "Right pane"), short_name(&r_root_snap)),
-                        onclick: move |_| focused_pane.set(FocusedPane::Right),
-                        span { class: "root-label", "📁 " }
-                        span { class: "root-name", title: "{r_root_snap.display()}", {short_name(&r_root_snap)} }
-                    }
-                }
 
                 // ── Tree ──────────────────────────────────────────────────
                 ExplorerTree {

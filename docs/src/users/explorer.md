@@ -8,8 +8,8 @@ and **Right / New** (target).
 
 ## Opening directories
 
-**From the path bar:** type or paste a path and press **Enter**, or click the
-folder icon to open a directory picker dialog.
+**From the path bar:** type or paste a path and press **Enter**, or open the
+**⋯** menu and choose **Open folder…** to open a directory picker dialog.
 
 **From the command line:** you cannot. Two arguments always mean two *files*:
 `forskscope <dirA> <dirB>` does not open the Explorer, and opens a tab that
@@ -24,7 +24,7 @@ Click a folder row to expand it and show its contents. Click again to collapse.
 
 Press **Alt + ↑** or click the **↑** button in the path bar to go up one level in the **focused pane**.
 
-The **◀** and **▶** history buttons step through your recent directory
+The **←** and **→** history buttons step through your recent directory
 navigation within each pane. **Alt + ←** and **Alt + →** do the same for the
 **focused pane**.
 
@@ -33,11 +33,12 @@ navigation within each pane. **Alt + ←** and **Alt + →** do the same for the
 ## Focused pane
 
 The Explorer has a **focused pane** — the pane that receives keyboard input. The
-focused pane is indicated by a highlighted root header cell (accent outline and
-tinted background).
+focused pane is indicated by its path bar: an accent underline and a light
+tinted background.
 
 - Press **F6** to switch keyboard focus between the left and right panes.
-- Click a pane's root header cell to focus it with the mouse.
+- Click a pane's path bar — its background, its buttons, or a path segment —
+  to focus it with the mouse.
 
 When the Explorer first opens, the left pane is focused. Use F6 after navigating
 the left pane to switch to the right pane and select a file there.
@@ -148,7 +149,7 @@ immediately and shows a spinner while loading.
 
 ## Filter bar
 
-Click the **⊞** toggle (between the path bars and the pane headers) to reveal
+Click the **Filter** button (between the path bars and the tree) to reveal
 the filter bar.
 
 | Control | Effect |
@@ -158,20 +159,26 @@ the filter bar.
 | **Hide identical** checkbox | Hides rows whose status is `=` (equal). |
 | **✕ Clear** | Resets all filters in one click (appears when any filter is active). |
 
+A filter stays in effect when you close the bar to get the space back — closing
+it does not clear it. The **Filter** button shows a small accent dot whenever
+a filter is narrowing the rows, whether the bar is open or closed, so a
+filtered-out file is never hidden behind a button that looks off.
+
 Filter state is not persisted — it resets when you restart the app.
 
 ---
 
 ## Sync panes
 
-Click the **⇄** toggle (next to **⊞**, always visible) to make both panes
-follow each other. Turning it on anchors each pane to its directory at that
-moment. While sync is on, navigating one pane — double-clicking a folder,
-the path bar's **↑**/breadcrumbs, typing a path, **⌂** — moves the other
-pane to the same path relative to *its own* anchor: entering `a/b` below
-where the first pane started opens `a/b` below where the second pane
-started, and going up moves the other pane to the matching point on its
-own side, however far either pane has wandered since.
+Click the **Move together** button (next to **Filter**, always visible) to
+make both panes follow each other. Turning it on anchors each pane to its
+directory at that moment. While sync is on, navigating one pane —
+double-clicking a folder, the path bar's **↑**/breadcrumbs, typing a path,
+**⋯ → Home folder** — moves the other pane to the same path relative to
+*its own* anchor: entering `a/b` below where the first pane started opens
+`a/b` below where the second pane started, and going up moves the other
+pane to the matching point on its own side, however far either pane has
+wandered since.
 
 If the other pane has no folder at that relative path, it stays exactly
 where it is and sync stays on — this is expected when the two trees
