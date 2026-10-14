@@ -85,7 +85,7 @@ Accessed via **More ▼** in the toolbar:
 |--------|-------------|
 | Inline diff | Character-level highlighting in replaced lines |
 | Wrap | Wrap long lines instead of scrolling horizontally |
-| Ignore WS | Treat whitespace-only differences as equal |
+| Ignore whitespace | Treat whitespace-only differences as equal |
 | Ignore case | Treat case differences as equal |
 | Algorithm | Myers, Patience, or Histogram |
 
@@ -95,7 +95,9 @@ Accessed via **More ▼** in the toolbar:
 
 Store a named combination of diff options as a profile. Built-in profiles:
 **Exact (default)** (Myers), **Ignore whitespace**, **Ignore case**,
-**Histogram**. Add custom profiles in Settings.
+**Histogram**. Add custom profiles in Settings; **More options ▸**, hidden
+by default, sets when character-level highlighting turns on for a comparison
+opened under that profile.
 
 ---
 

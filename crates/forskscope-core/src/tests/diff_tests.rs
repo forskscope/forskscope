@@ -355,41 +355,142 @@ fn line_of(n: usize, ch: char) -> String {
     std::iter::repeat_n(ch, n).collect()
 }
 
-/// The case that matters (handoff 043 §Verification 1): without the guard a
-/// pair over the limit is not merely slow, it **produces spans it must not
-/// have produced**. Deliberately only 3x the limit (about 30 ms in a release
-/// build) — the 400,000-character case that aborted the process is not run
-/// here, or anywhere in CI. Falsified for real: making `refine_pair` skip the
-/// `pair_over_inline_limit` check returns `Some` with spans and this fails.
+/// Two lines of length `n` with **no common prefix or suffix at all** — `x`
+/// and `y` differ at every position, so the differing middle is exactly `n`
+/// characters on each side, not shrunk by any shared run. The fixture F127's
+/// "dissimilar middle" tests need: a pair built from a single repeated
+/// character on each side (`line_of(n, 'a')` vs `line_of(n, 'a')` shifted by
+/// one, as this module's tests used before F127) looks long but is actually
+/// almost entirely a common prefix, which is exactly the cheap case F127
+/// exists to stop rejecting — using it to test the "still skipped" path
+/// would test nothing.
+fn dissimilar_pair_of(n: usize) -> (String, String) {
+    (line_of(n, 'x'), line_of(n, 'y'))
+}
+
+/// Like [`dissimilar_pair_of`], but the dissimilar run of length `n` sits
+/// between a short shared prefix and suffix — so trimming has real work to
+/// do on both ends, not just one, and the resulting middle is still exactly
+/// `n` on each side. Used to pin the limit's exact boundary.
+fn bracketed_dissimilar_middle(n: usize) -> (String, String) {
+    (
+        format!("PRE{}POST", line_of(n, 'x')),
+        format!("PRE{}POST", line_of(n, 'y')),
+    )
+}
+
+/// F127 (handoff 076 §3): without the fix, a pair over the limit is not
+/// merely slow, it **produces spans it must not have produced** (handoff 043
+/// §Verification 1) — so this still asserts `refine_pair` on a long,
+/// genuinely dissimilar pair (`x`≠`y` at every position, no common run to
+/// trim away). Deliberately only 3x the limit (well under a millisecond even
+/// un-trimmed) — the 400,000-character case belongs to the release-only
+/// timing test below, not this one.
 #[test]
 fn a_pair_over_the_limit_is_not_refined_and_produces_no_spans() {
-    let left = line_of(3 * MAX_INLINE_CHARS_PER_SIDE, 'a');
-    let right = format!("{}X", &left[1..]);
+    let (left, right) = dissimilar_pair_of(3 * MAX_INLINE_CHARS_PER_SIDE);
     assert!(
         refine_pair(&left, &right).is_none(),
-        "a pair three times the limit must not be refined"
+        "a pair three times the limit, with nothing to trim, must not be refined"
+    );
+}
+
+/// F127: a long line differing in only one character trims down to a tiny
+/// middle and must be refined, not skipped — this is the case the whole-line
+/// check used to reject wrongly. `3 * MAX` is a comfortable margin past the
+/// limit for the *line itself*; only the one-character middle is checked
+/// against it.
+#[test]
+fn a_long_line_differing_in_one_character_is_refined_not_skipped() {
+    let base = line_of(3 * MAX_INLINE_CHARS_PER_SIDE, 'a');
+    let changed = format!("{}X", &base[1..]); // shifted by one, one char different
+    assert!(
+        !pair_over_inline_limit(&base, &changed),
+        "the differing middle is one character, far under the limit"
+    );
+    assert!(
+        refine_pair(&base, &changed).is_some(),
+        "a long line that differs in one place must still be refined"
+    );
+}
+
+/// F127, multi-byte: Japanese text differing in a single character. The
+/// prefix/suffix trim walks `char`s, not bytes, so this must neither panic
+/// nor miscount — each "character" here is 3 UTF-8 bytes.
+#[test]
+fn a_long_japanese_line_differing_in_one_character_is_refined_not_panicking() {
+    let base: String = "あ".repeat(3 * MAX_INLINE_CHARS_PER_SIDE);
+    let mut chars: Vec<char> = base.chars().collect();
+    let mid = chars.len() / 2;
+    chars[mid] = 'い';
+    let changed: String = chars.into_iter().collect();
+
+    assert!(!pair_over_inline_limit(&base, &changed));
+    let diff = refine_pair(&base, &changed).expect("must be refined, not skipped");
+    assert!(
+        diff.right_spans
+            .iter()
+            .any(|s| s.kind == InlineKind::Insert || s.kind == InlineKind::Delete)
+            || diff.left_spans.iter().any(|s| s.kind == InlineKind::Delete),
+        "the one-character change must show up as a span, not be lost"
+    );
+}
+
+/// F127 (handoff 076 §3, test plan item 1): the 400,000-character case —
+/// the exact length that aborted the process before F120's guard existed —
+/// differing in one character in the middle, must be highlighted and must
+/// be fast. `#[ignore]`d: timing assertions do not belong in the default
+/// suite (flaky under CI load, and a debug build's constant-factor noise
+/// could trip a tight bound for reasons unrelated to the fix). Run with
+/// `cargo test --release -p forskscope-core -- --ignored a_400_000`.
+#[test]
+#[ignore = "timing assertion; run explicitly in release mode"]
+fn a_400_000_character_line_differing_in_one_character_is_fast() {
+    let base = line_of(400_000, 'a');
+    let changed = format!("{}X{}", &base[..200_000], &base[200_001..]);
+
+    let start = std::time::Instant::now();
+    let diff = refine_pair(&base, &changed).expect("must be refined, not skipped");
+    let elapsed = start.elapsed();
+
+    assert!(
+        diff.right_spans
+            .iter()
+            .any(|s| s.kind == InlineKind::Insert)
+            || diff.left_spans.iter().any(|s| s.kind == InlineKind::Delete),
+        "the one-character change must show up as a span"
+    );
+    assert!(
+        elapsed < std::time::Duration::from_millis(50),
+        "expected well under 50ms for a one-character middle, took {elapsed:?}"
     );
 }
 
 /// The bound is on the assertion, not on wall-clock, so it cannot be flaky:
-/// the limit is exact and asserted at the boundary, in characters (not bytes).
+/// the limit is exact and asserted at the boundary, in characters (not
+/// bytes) — against the differing middle (F127), using
+/// [`bracketed_dissimilar_middle`] so the boundary is real and not shrunk by
+/// an accidental common run.
 #[test]
-fn the_limit_is_exact_per_side_and_counts_characters_not_bytes() {
-    let at = line_of(MAX_INLINE_CHARS_PER_SIDE, 'a');
-    let over = line_of(MAX_INLINE_CHARS_PER_SIDE + 1, 'a');
+fn the_limit_is_exact_on_the_differing_middle_and_counts_characters_not_bytes() {
+    let (left_at, right_at) = bracketed_dissimilar_middle(MAX_INLINE_CHARS_PER_SIDE);
+    let (left_over, right_over) = bracketed_dissimilar_middle(MAX_INLINE_CHARS_PER_SIDE + 1);
     assert!(
-        refine_pair(&at, &at).is_some(),
-        "exactly at the limit is refined"
+        refine_pair(&left_at, &right_at).is_some(),
+        "a middle exactly at the limit is refined"
     );
-    assert!(refine_pair(&over, &at).is_none(), "left one over");
-    assert!(refine_pair(&at, &over).is_none(), "right one over");
-    assert!(pair_over_inline_limit(&at, &over));
-    assert!(!pair_over_inline_limit(&at, &at));
+    assert!(
+        refine_pair(&left_over, &right_over).is_none(),
+        "a middle one over the limit is not refined"
+    );
+    assert!(pair_over_inline_limit(&left_over, &right_over));
+    assert!(!pair_over_inline_limit(&left_at, &right_at));
 
     // 2,000 three-byte characters are 6,000 bytes but 2,000 characters.
-    let wide = line_of(MAX_INLINE_CHARS_PER_SIDE, 'あ');
-    assert!(wide.len() > MAX_INLINE_CHARS_PER_SIDE);
-    assert!(refine_pair(&wide, &wide).is_some());
+    let wide_left = format!("PRE{}POST", "あ".repeat(MAX_INLINE_CHARS_PER_SIDE));
+    let wide_right = format!("PRE{}POST", "い".repeat(MAX_INLINE_CHARS_PER_SIDE));
+    assert!(wide_left.len() > MAX_INLINE_CHARS_PER_SIDE);
+    assert!(refine_pair(&wide_left, &wide_right).is_some());
 }
 
 #[test]
@@ -405,9 +506,9 @@ fn an_ordinary_source_line_still_gets_character_level_highlighting() {
 
 #[test]
 fn a_hunk_with_one_over_limit_row_is_left_untouched_by_inline_diff_rows() {
-    let long = line_of(MAX_INLINE_CHARS_PER_SIDE + 1, 'a');
-    let left = format!("short one\n{long}\n");
-    let right = format!("short two\n{long}b\n");
+    let (long_left, long_right) = dissimilar_pair_of(MAX_INLINE_CHARS_PER_SIDE + 1);
+    let left = format!("short one\n{long_left}\n");
+    let right = format!("short two\n{long_right}\n");
     let mut doc = compute_diff(&left, &right, DiffOptions::default());
     let hunk = doc
         .hunks
@@ -423,9 +524,9 @@ fn a_hunk_with_one_over_limit_row_is_left_untouched_by_inline_diff_rows() {
 
 #[test]
 fn skipped_inline_pairs_counts_only_over_limit_two_sided_pairs() {
-    let long = line_of(MAX_INLINE_CHARS_PER_SIDE + 1, 'a');
-    let left = format!("short one\n{long}\nkeep\n");
-    let right = format!("short two\n{long}b\nkeep\n");
+    let (long_left, long_right) = dissimilar_pair_of(MAX_INLINE_CHARS_PER_SIDE + 1);
+    let left = format!("short one\n{long_left}\nkeep\n");
+    let right = format!("short two\n{long_right}\nkeep\n");
     let doc = compute_diff(&left, &right, DiffOptions::default());
     let over = skipped_inline_pairs(&doc);
     assert_eq!(over, 1, "the long pair is counted, the short one is not");

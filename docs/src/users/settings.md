@@ -156,7 +156,7 @@ Open tabs are unaffected; change their options directly in the toolbar's
 
 **Built-in profiles (read-only):**
 
-| Profile | Algorithm | Ignore WS | Ignore case |
+| Profile | Algorithm | Ignore whitespace | Ignore case |
 |---------|-----------|-----------|-------------|
 | **Exact (default)** | Myers | — | — |
 | **Ignore whitespace** | Myers | ✓ | — |
@@ -169,11 +169,14 @@ Built-in profiles cannot be deleted (no **×** button).
 
 1. Click **+ New profile** at the bottom of the profile list.
 2. Enter a name.
-3. Check **Ignore WS**, **Ignore case**, and/or **Ignore newlines** if desired.
-   **Ignore newlines** treats CRLF and LF line endings as equal; it does not
-   hide any other difference.
+3. Check **Ignore whitespace**, **Ignore case**, and/or **Ignore line-ending
+   differences (CRLF/LF)** if desired. The line-ending option treats CRLF and
+   LF as equal; it does not hide any other difference.
 4. Pick an algorithm.
-5. Click **Add**.
+5. Optionally, open **More options ▸** to set when character-level
+   highlighting turns on for comparisons opened under this profile — see
+   [Inline (character-level) diff](../intermediate/diff-options.md#inline-character-level-diff).
+6. Click **Add**.
 
 The profile is saved immediately and appears in the list.
 

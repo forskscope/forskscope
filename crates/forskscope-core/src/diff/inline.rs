@@ -45,31 +45,87 @@ use super::model::{DiffDocument, DiffHunk, HunkKind, InlineDiff, InlineKind, Inl
 /// takes its default from it, and the engine's own bound (there was a second,
 /// 16 KiB per hunk, applied only under `InlineMode::EagerForSmallHunks`) was
 /// removed in favour of it.
+///
+/// F127: checked against each side's *differing middle* — the line's length
+/// after trimming the common prefix and suffix — not the line's own length.
+/// Before this fix the guard checked the whole line, which rejected the
+/// cheap case this doc comment measures above (a long line differing in one
+/// place): a 1,900-character pair differing in one character costs the
+/// *single-edit* row in this table, not the *1,900-character* row, but the
+/// whole-line check applied the wrong one. See
+/// [`differing_middle_char_counts`].
 pub const MAX_INLINE_CHARS_PER_SIDE: usize = 2_000;
 
 /// `true` when `s` has more than [`MAX_INLINE_CHARS_PER_SIDE`] characters.
 /// Stops counting at the limit, so checking a 400,000-character line is as
-/// cheap as checking a 2,001-character one.
+/// cheap as checking a 2,001-character one. Used only where there is no
+/// pair to trim a common prefix/suffix against (a one-sided row) — see
+/// [`pair_over_inline_limit`] for the pair case.
 fn over_limit(s: &str) -> bool {
     s.chars().nth(MAX_INLINE_CHARS_PER_SIDE).is_some()
 }
 
+/// F127: the length, in characters, of each side's *differing middle* — what
+/// remains after trimming the common prefix and the common suffix. Neither
+/// trim crosses into the other: the suffix walk stops once, combined with
+/// the prefix already found, it would re-examine characters the shorter
+/// side's prefix already claimed (`max_suffix` below).
+///
+/// `similar`'s `diff_chars` performs this same trim internally before it
+/// runs LCS — it is *why* a pair with one edit costs far less than a
+/// uniformly-dissimilar pair of the same length (see
+/// [`MAX_INLINE_CHARS_PER_SIDE`]'s doc). Measuring the untrimmed line length
+/// checks something that does not drive the cost; this measures what does.
+///
+/// Iterator-only, no `Vec<char>` allocation: `str::chars()` is already a
+/// `DoubleEndedIterator`, and both the prefix and suffix walks stop at the
+/// first mismatch, so a uniformly dissimilar pair (the expensive case this
+/// whole limit exists to catch) is rejected in O(1), not O(n).
+fn differing_middle_char_counts(left: &str, right: &str) -> (usize, usize) {
+    let left_len = left.chars().count();
+    let right_len = right.chars().count();
+    let prefix = left
+        .chars()
+        .zip(right.chars())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let max_suffix = left_len.min(right_len) - prefix;
+    let suffix = left
+        .chars()
+        .rev()
+        .zip(right.chars().rev())
+        .take(max_suffix)
+        .take_while(|(a, b)| a == b)
+        .count();
+    (left_len - prefix - suffix, right_len - prefix - suffix)
+}
+
 /// Whether a changed line pair is too long to refine character by character.
+/// F127: the limit applies to the differing middle (after trimming the
+/// common prefix/suffix), not to either side's whole length — a long,
+/// mostly-identical pair (a minified line changed in one place) is cheap to
+/// refine and must not be skipped just because the *line* is long.
 pub fn pair_over_inline_limit(left: &str, right: &str) -> bool {
-    over_limit(left) || over_limit(right)
+    let (left_middle, right_middle) = differing_middle_char_counts(left, right);
+    left_middle > MAX_INLINE_CHARS_PER_SIDE || right_middle > MAX_INLINE_CHARS_PER_SIDE
 }
 
 /// Compute inline spans for every row of a replace hunk, in place.
 ///
-/// Returns `false` (leaving the hunk untouched) when any row of the hunk has a
-/// side over [`MAX_INLINE_CHARS_PER_SIDE`].
+/// Returns `false` (leaving the hunk untouched) when any row of the hunk has
+/// a two-sided pair whose differing middle is over
+/// [`MAX_INLINE_CHARS_PER_SIDE`] (F127), or a one-sided row whose single
+/// side is — there is no pair to trim a prefix/suffix against there, so the
+/// whole-line check is what it falls back to.
 pub fn inline_diff_rows(hunk: &mut DiffHunk) -> bool {
     if hunk.kind != HunkKind::Replace {
         return true;
     }
-    let too_long = hunk.rows.iter().any(|r| {
-        r.left.as_ref().is_some_and(|l| over_limit(&l.content))
-            || r.right.as_ref().is_some_and(|l| over_limit(&l.content))
+    let too_long = hunk.rows.iter().any(|r| match (&r.left, &r.right) {
+        (Some(l), Some(rt)) => pair_over_inline_limit(&l.content, &rt.content),
+        (Some(l), None) => over_limit(&l.content),
+        (None, Some(rt)) => over_limit(&rt.content),
+        (None, None) => false,
     });
     if too_long {
         return false;

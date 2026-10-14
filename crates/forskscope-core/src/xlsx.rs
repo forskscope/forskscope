@@ -655,7 +655,14 @@ fn convert_legs(
     // sheet list both legs share. The cell counts come from the cells we kept.
     // With no aligned sheet, the positional summary is exactly what it was
     // before this change, so it is kept as it was.
-    let (warnings, info_notes) = summarize_notes(collect_notes(wb, aligned));
+    let (notes, skipped_info) = collect_notes(wb, aligned);
+    let (warnings, info_notes) = summarize_notes(notes);
+    // F139 second half: `collect_notes` already counted every Info-severity
+    // diagnostic without building a `Note` for it, so `info_notes` above is
+    // always 0 (nothing but warnings ever reaches `summarize_notes` now);
+    // summed anyway rather than discarded, so a future change that let an
+    // Info `Note` slip through would still be counted correctly, not lost.
+    let info_notes = skipped_info + info_notes;
     let s = &wb.summary;
     let any_aligned = cells
         .iter()
@@ -819,8 +826,22 @@ struct Note {
     message: String,
 }
 
+#[cfg(test)]
+thread_local! {
+    /// F139 second half: how many times [`note_from`] actually ran — the
+    /// observable `note_from_is_never_called_for_an_info_diagnostic` and
+    /// `note_from_is_called_once_per_warning_not_per_info` assert on,
+    /// proving by construction (not by timing or memory) that an
+    /// `Info`-severity diagnostic never reaches it. Same pattern as
+    /// `forskscope-ui`'s hunk-refinement `REFINEMENTS` counter.
+    static NOTES_BUILT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 fn note_from(d: &sheets_diff::Diagnostic) -> Note {
     use sheets_diff::DiagnosticKind as K;
+
+    #[cfg(test)]
+    NOTES_BUILT.with(|c| c.set(c.get() + 1));
 
     // The severity, not the kind, decides whether this is heard about. `Ord`
     // means a level added above `Warning` is inherited too.
@@ -853,8 +874,25 @@ fn note_from(d: &sheets_diff::Diagnostic) -> Note {
     }
 }
 
-/// Every diagnostic the result stands on: workbook-level and sheet-level, from the
-/// positional leg, plus one the aligned leg raises that the user is owed.
+/// F139 second half: counts `d` without building a [`Note`] when it is
+/// `Info`-severity — `note_from` clones `d.message` and collects a
+/// `Vec<String>` of sheet names, work worth skipping for a diagnostic
+/// nothing ever renders. Checking severity here, before `note_from` runs,
+/// is what makes that true; checking it inside `note_from` (the previous
+/// shape) still built the `Note` for every diagnostic, `Info` included, and
+/// only discarded it afterwards in `summarize_notes`.
+fn tally_diagnostic(d: &sheets_diff::Diagnostic, notes: &mut Vec<Note>, info: &mut usize) {
+    if d.severity >= sheets_diff::Severity::Warning {
+        notes.push(note_from(d));
+    } else {
+        *info += 1;
+    }
+}
+
+/// Every diagnostic the result stands on, split into the warnings to render
+/// and a plain count of the `Info` ones — see [`tally_diagnostic`]. Sources:
+/// workbook-level and sheet-level diagnostics from the positional leg, plus
+/// one the aligned leg raises that the user is owed.
 ///
 /// That one is `AlignmentBoundExceeded` on a sheet whose changes are reported:
 /// the sheet was too large to align and was compared by position, which is what
@@ -865,28 +903,31 @@ fn note_from(d: &sheets_diff::Diagnostic) -> Note {
 fn collect_notes(
     wb: &sheets_diff::WorkbookDiff,
     aligned: Option<&sheets_diff::WorkbookDiff>,
-) -> Vec<Note> {
-    let mut notes: Vec<Note> = wb.diagnostics.iter().map(note_from).collect();
+) -> (Vec<Note>, usize) {
+    let mut notes: Vec<Note> = Vec::new();
+    let mut info = 0usize;
+    for d in &wb.diagnostics {
+        tally_diagnostic(d, &mut notes, &mut info);
+    }
     for sd in &wb.sheets {
-        notes.extend(sd.diagnostics.iter().map(note_from));
+        for d in &sd.diagnostics {
+            tally_diagnostic(d, &mut notes, &mut info);
+        }
         if !sd.cell_diffs.iter().any(is_changed_cell) {
             continue;
         }
         if let Some(al) = aligned.and_then(|a| a.sheets.iter().find(|x| same_sheet(x, sd))) {
-            notes.extend(
-                al.diagnostics
-                    .iter()
-                    .filter(|d| {
-                        matches!(
-                            d.kind,
-                            sheets_diff::DiagnosticKind::AlignmentBoundExceeded { .. }
-                        )
-                    })
-                    .map(note_from),
-            );
+            for d in al.diagnostics.iter().filter(|d| {
+                matches!(
+                    d.kind,
+                    sheets_diff::DiagnosticKind::AlignmentBoundExceeded { .. }
+                )
+            }) {
+                tally_diagnostic(d, &mut notes, &mut info);
+            }
         }
     }
-    notes
+    (notes, info)
 }
 
 /// Group warnings by kind (one message naming every sheet), order them by
@@ -1748,6 +1789,70 @@ mod tests {
                 (DuplicateAlignmentKey, vec!["A", "B"]),
                 (SheetNotCompared, vec!["Chart1"])
             ]
+        );
+    }
+
+    // ── F139 second half: Info is counted, never built as a Note ───────────
+    //
+    // `sheets_diff::Diagnostic` cannot be constructed here (`DiagnosticKind`
+    // is `#[non_exhaustive]` outside its own crate), so these drive real
+    // fixtures through the real entry points rather than a hand-built
+    // diagnostics vector, and prove the claim by construction via
+    // `NOTES_BUILT` — the same "count the operation, not the clock"
+    // technique `forskscope-ui`'s hunk-refinement tests use — rather than by
+    // measuring allocations or peak RSS directly.
+
+    /// `large` has exactly one real `Info` diagnostic and no warnings
+    /// (confirmed by running this test). Falsify by reverting
+    /// `tally_diagnostic` to call `note_from` unconditionally: this then
+    /// fails with `1`, not `0`.
+    #[test]
+    fn note_from_is_never_called_for_an_info_only_comparison() {
+        NOTES_BUILT.with(|c| c.set(0));
+        let (old, new) = large();
+        let diff = diff_xlsx(&old, &new, None).unwrap();
+        assert!(diff.warnings.is_empty(), "{:?}", diff.warnings);
+        assert_eq!(
+            diff.info_notes, 1,
+            "test premise: exactly one Info diagnostic"
+        );
+        assert_eq!(
+            NOTES_BUILT.with(|c| c.get()),
+            0,
+            "an Info-only comparison must build zero Notes"
+        );
+    }
+
+    /// `chart_sheet_not_compared` displays as one `SheetNotCompared` warning
+    /// (`pair.warnings.len() == 1`) and one `Info` diagnostic
+    /// (`pair.info_notes == 1`) — but two *raw* warning-severity diagnostics
+    /// underlie that one displayed warning: the unsupported chart sheet is
+    /// reported once per side, old and new, and `summarize_notes` groups
+    /// same-kind, same-sheet notes into one entry. `note_from` must run
+    /// exactly twice — for both raw warnings — and never for the one `Info`
+    /// diagnostic alongside them.
+    #[test]
+    fn note_from_is_called_once_per_warning_not_per_info() {
+        NOTES_BUILT.with(|c| c.set(0));
+        let pair = compare_pair(
+            &fixture("chart_sheet_not_compared", "old.xlsx"),
+            &fixture("chart_sheet_not_compared", "new.xlsx"),
+        )
+        .unwrap();
+        assert_eq!(
+            pair.warnings.len(),
+            1,
+            "test premise: one displayed warning"
+        );
+        assert_eq!(
+            pair.info_notes, 1,
+            "test premise: exactly one Info diagnostic"
+        );
+        assert_eq!(
+            NOTES_BUILT.with(|c| c.get()),
+            2,
+            "note_from must run once per raw warning diagnostic (two, here) \
+             and never for the Info diagnostic alongside them"
         );
     }
 

@@ -3,10 +3,18 @@
 //!
 //! `cargo xtask pages-origin-check <index.html>` — the landing page's own
 //! footer promises *"This page loads nothing from other sites and collects
-//! nothing."* That is a gate, not a hope: every `src=`, `<link href=`,
-//! `@import` and `url(...)` the page would have the browser fetch must stay
-//! same-origin (a relative path, or a fragment). `<a href>` is deliberately
-//! not scanned — a link a person clicks is not something the page *loads*.
+//! nothing."* That is a gate, not a hope: every `src=`, `srcset=`, `poster=`,
+//! `<link href=`, `<object data=`, `@import` and `url(...)` the page would
+//! have the browser fetch must stay same-origin (a relative path, or a
+//! fragment). `<a href>` is deliberately not scanned — a link a person
+//! clicks is not something the page *loads*.
+//!
+//! F190 (review 158): the attribute/tag scan is case-insensitive and
+//! tolerates whitespace around `=` (`SRC = "…"` is still an `src`
+//! attribute). It does not handle an unquoted attribute value
+//! (`src=foo.png`, no quotes at all) — noted by the review as a gap, but
+//! explicitly left for a later handoff, since nothing this project writes
+//! produces one.
 //!
 //! `cargo xtask pages-link-check <site-dir>` — every relative link or image
 //! in the built `_site/`'s own HTML files resolves to a real file in it. A
@@ -63,9 +71,28 @@ fn foreign_origin_problems(html: &str) -> Vec<String> {
             problems.push(format!("src=\"{value}\" loads from another origin"));
         }
     }
+    for value in find_attr_values(html, "poster") {
+        if is_foreign(&value) {
+            problems.push(format!("poster=\"{value}\" loads from another origin"));
+        }
+    }
+    for value in find_srcset_urls(html) {
+        if is_foreign(&value) {
+            problems.push(format!(
+                "srcset candidate \"{value}\" loads from another origin"
+            ));
+        }
+    }
     for value in find_tag_attr_values(html, "<link", "href") {
         if is_foreign(&value) {
             problems.push(format!("<link href=\"{value}\"> loads from another origin"));
+        }
+    }
+    for value in find_tag_attr_values(html, "<object", "data") {
+        if is_foreign(&value) {
+            problems.push(format!(
+                "<object data=\"{value}\"> loads from another origin"
+            ));
         }
     }
     for value in find_css_urls(html) {
@@ -81,8 +108,23 @@ fn foreign_origin_problems(html: &str) -> Vec<String> {
     problems
 }
 
+/// Every candidate URL in a `srcset` value — a comma-separated list of
+/// `url [descriptor]` pairs (`"small.jpg 480w, large.jpg 800w"`). Only the
+/// URL, the leading token of each candidate, matters here.
+fn find_srcset_urls(html: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for value in find_attr_values(html, "srcset") {
+        for candidate in value.split(',') {
+            if let Some(url) = candidate.split_whitespace().next() {
+                out.push(url.to_string());
+            }
+        }
+    }
+    out
+}
+
 fn is_foreign(value: &str) -> bool {
-    let v = value.trim();
+    let v = value.trim().to_ascii_lowercase();
     v.starts_with("http://") || v.starts_with("https://") || v.starts_with("//")
 }
 
@@ -171,40 +213,60 @@ fn unresolved_link(site_root: &Path, file_dir: &Path, file: &Path, target: &str)
 
 /// Every `attr="value"` or `attr='value'` in `text`, wherever it appears —
 /// good enough for a hand-written page and mdbook's own output, neither of
-/// which nest quotes inside attribute values. Guards against matching
-/// inside a longer name (`data-src=` must not match `src=`): the character
-/// immediately before the match, if any, must not be alphanumeric, `-` or
-/// `_`.
+/// which nest quotes inside attribute values. The attribute name is matched
+/// case-insensitively (`SRC=` is still `src=`), and whitespace around `=`
+/// is tolerated (`src = "…"`). Guards against matching inside a longer name
+/// (`data-src=` must not match `src=`): the character immediately before
+/// the match, if any, must not be alphanumeric, `-` or `_`. An unquoted
+/// value (`src=foo.png`, no quotes at all) is not matched — F190, left for
+/// later, since nothing this project writes produces one.
 fn find_attr_values(text: &str, attr: &str) -> Vec<String> {
-    let needle = format!("{attr}=");
+    let lower = text.to_ascii_lowercase();
+    let attr_lower = attr.to_ascii_lowercase();
     let mut out = Vec::new();
     let mut start = 0usize;
-    while let Some(pos) = text[start..].find(&needle) {
+    while let Some(pos) = lower[start..].find(&attr_lower) {
         let abs = start + pos;
         let boundary_ok = abs == 0
-            || !matches!(text.as_bytes()[abs - 1], b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_');
-        let after = &text[abs + needle.len()..];
-        if boundary_ok && let Some((value, consumed)) = extract_quoted(after) {
-            out.push(value);
-            start = abs + needle.len() + consumed;
-            continue;
+            || !matches!(lower.as_bytes()[abs - 1], b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_');
+        let mut idx = abs + attr_lower.len();
+        idx += whitespace_len(&lower[idx..]);
+        if boundary_ok && lower.as_bytes().get(idx) == Some(&b'=') {
+            idx += 1;
+            idx += whitespace_len(&lower[idx..]);
+            if let Some((value, consumed)) = extract_quoted(&text[idx..]) {
+                out.push(value);
+                start = idx + consumed;
+                continue;
+            }
         }
-        start = abs + needle.len();
+        start = abs + attr_lower.len();
     }
     out
 }
 
+/// How many leading bytes of `s` are ASCII whitespace.
+fn whitespace_len(s: &str) -> usize {
+    s.bytes().take_while(|b| b.is_ascii_whitespace()).count()
+}
+
 /// Like [`find_attr_values`], but only within occurrences of `tag` (e.g.
-/// `"<link"`), bounded by that tag's own closing `>` — so a `href` on an
-/// `<a>` is never mistaken for one on a `<link>`.
+/// `"<link"`, matched case-insensitively), bounded by that tag's own
+/// closing `>` — so a `href` on an `<a>` is never mistaken for one on a
+/// `<link>`.
 fn find_tag_attr_values(html: &str, tag: &str, attr: &str) -> Vec<String> {
+    let lower = html.to_ascii_lowercase();
+    let tag_lower = tag.to_ascii_lowercase();
     let mut out = Vec::new();
-    let mut rest = html;
-    while let Some(pos) = rest.find(tag) {
-        let after = &rest[pos..];
-        let end = after.find('>').map(|i| i + 1).unwrap_or(after.len());
-        out.extend(find_attr_values(&after[..end], attr));
-        rest = &after[end..];
+    let mut rest_start = 0usize;
+    while let Some(pos) = lower[rest_start..].find(&tag_lower) {
+        let abs = rest_start + pos;
+        let end = html[abs..]
+            .find('>')
+            .map(|i| abs + i + 1)
+            .unwrap_or(html.len());
+        out.extend(find_attr_values(&html[abs..end], attr));
+        rest_start = end.max(abs + tag_lower.len());
     }
     out
 }
@@ -326,6 +388,53 @@ mod tests {
     fn a_data_attribute_ending_in_src_is_not_mistaken_for_src() {
         let html = r#"<div data-src="https://example.com/x.png"></div>"#;
         assert!(foreign_origin_problems(html).is_empty());
+    }
+
+    // ── F190 (review 158): case, whitespace, srcset/poster/object ──────────
+
+    #[test]
+    fn an_uppercase_src_attribute_is_caught() {
+        let html = r#"<img SRC="https://example.com/tracker.png">"#;
+        assert_eq!(foreign_origin_problems(html).len(), 1);
+    }
+
+    #[test]
+    fn an_uppercase_link_tag_is_caught() {
+        let html = r#"<LINK rel="stylesheet" href="https://fonts.googleapis.com/css">"#;
+        assert_eq!(foreign_origin_problems(html).len(), 1);
+    }
+
+    #[test]
+    fn an_uppercase_scheme_is_caught() {
+        let html = r#"<img src="HTTPS://example.com/tracker.png">"#;
+        assert_eq!(foreign_origin_problems(html).len(), 1);
+    }
+
+    #[test]
+    fn whitespace_around_the_equals_sign_is_tolerated() {
+        let html = r#"<img src = "https://example.com/tracker.png">"#;
+        assert_eq!(foreign_origin_problems(html).len(), 1);
+    }
+
+    #[test]
+    fn a_foreign_candidate_anywhere_in_srcset_is_caught() {
+        let html =
+            r#"<img src="local.png" srcset="local-2x.png 2x, https://example.com/hero.jpg 3x">"#;
+        let problems = foreign_origin_problems(html);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("example.com/hero.jpg"));
+    }
+
+    #[test]
+    fn a_foreign_poster_is_caught() {
+        let html = r#"<video poster="https://example.com/poster.jpg"></video>"#;
+        assert_eq!(foreign_origin_problems(html).len(), 1);
+    }
+
+    #[test]
+    fn a_foreign_object_data_is_caught() {
+        let html = r#"<object data="https://example.com/thing.svg"></object>"#;
+        assert_eq!(foreign_origin_problems(html).len(), 1);
     }
 
     // ── Link check ───────────────────────────────────────────────────────

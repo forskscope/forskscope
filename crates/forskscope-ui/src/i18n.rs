@@ -232,9 +232,9 @@ fn ja(key: &str) -> Option<&'static str> {
         "Wrap" => "折り返し",
         "on" => "オン",
         "off" => "オフ",
-        "Ignore WS" => "空白無視",
+        "Ignore whitespace" => "空白無視",
         "Ignore case" => "大小文字無視",
-        "Ignore newlines" => "改行無視",
+        "Ignore line-ending differences (CRLF/LF)" => "改行コードの違いを無視 (CRLF/LF)",
         "Context lines" => "コンテキスト行数",
         "Explorer layout" => "エクスプローラーレイアウト",
         "Aligned" => "整列",
@@ -260,6 +260,11 @@ fn ja(key: &str) -> Option<&'static str> {
         "+ New profile" => "+ 新規プロファイル",
         "Profile name" => "プロファイル名",
         "Add" => "追加",
+        "More options" => "詳細オプション",
+        "Character-level highlighting" => "文字単位のハイライト",
+        "When I turn it on" => "オンにしたとき",
+        "Automatically for small changes" => "小さな変更は自動的に",
+        "Never" => "常にオフ",
         "Files are identical" => "ファイルは同一です",
         "Files are identical — nothing to export." => {
             "ファイルは同一です — エクスポートする内容がありません。"
@@ -423,7 +428,9 @@ fn ja(key: &str) -> Option<&'static str> {
             "長すぎるため文字単位のハイライトを行いません"
         }
         "Long line" => "長い行",
-        "Inline diff is off for large files." => "大きなファイルではインライン差分は無効です。",
+        "Character-level highlighting is not available for this comparison." => {
+            "この比較では文字単位のハイライトは利用できません。"
+        }
         // F122: the large-file prompt says what the product does.
         "File is large" => "ファイルが大きいです",
         "Diff anyway" => "それでも比較する",

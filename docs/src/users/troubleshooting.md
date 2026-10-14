@@ -171,8 +171,10 @@ Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
 
 ## Session not restored on restart
 
-ForskScope saves the open tabs when the tab list changes. If the session
-is not restored:
+ForskScope saves open file comparison tabs, and which one was active, when
+the tab list changes. Folder comparisons (Deep compare) are not saved, and
+reopening them is not automatic — pick the folders again in the Explorer. If
+a file comparison tab is not restored:
 
 1. Check that the config directory is writable:
    - Linux: `~/.config/forskscope/`

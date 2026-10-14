@@ -2,17 +2,20 @@
 
 use dioxus::prelude::*;
 
-use forskscope_core::NewlineCompareMode;
+use forskscope_core::diff::InlineMode;
+use forskscope_core::{NewlineCompareMode, WhitespaceMode};
 
 use crate::state::{DiffAlgorithmSetting, Store};
 
+#[allow(clippy::too_many_arguments)]
 pub fn add_profile(
     store: &mut Store,
     name: String,
-    ignore_whitespace: bool,
+    whitespace: WhitespaceMode,
     ignore_case: bool,
     algorithm: DiffAlgorithmSetting,
     newlines: NewlineCompareMode,
+    inline_mode: InlineMode,
 ) {
     store
         .settings
@@ -20,10 +23,11 @@ pub fn add_profile(
         .profiles
         .push(crate::state::settings::DiffProfile {
             name,
-            ignore_whitespace,
+            whitespace,
             ignore_case,
             algorithm,
             newlines,
+            inline_mode,
             built_in: false,
         });
     crate::ui::view::settings::persist(*store);

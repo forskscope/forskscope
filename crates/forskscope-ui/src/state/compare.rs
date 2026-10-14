@@ -366,7 +366,10 @@ pub(crate) fn open_compare_request_with_options(
         can_save: false,
         save_capability: SaveCapability::Blocked(SaveCapabilityBlockReason::NotMergeableText),
         spreadsheet_warnings: Vec::new(),
-        char_mode: false,
+        // F168 §2.2: a profile with character highlighting set to
+        // "Automatically for small changes" starts a new tab with it
+        // already on, rather than requiring the toolbar toggle first.
+        char_mode: opts.inline_mode == InlineMode::EagerForSmallHunks,
         word_wrap: false,
         focused_change: 0,
         save_target: None,

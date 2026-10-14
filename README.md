@@ -95,7 +95,7 @@ git mergetool
 
 ## Features
 
-- **Side-by-side diff** with line-level highlighting, and character-level highlighting when you turn on *Inline diff*
+- **Side-by-side diff** with line-level highlighting, and character-level highlighting when you turn on *Inline diff* (or set a profile to show it automatically)
 - **Merge** — apply changes from left to right one hunk at a time; undo / redo
 - **Enter to apply** the focused hunk; F7/F8 to navigate; Ctrl+S to save
 - **Explorer** — browse two directories, see digest equality indicators, compare same-name files with one click
@@ -103,7 +103,7 @@ git mergetool
 - **Deep compare filter** — Different / All / Equal only in the deep compare report
 - **Git difftool / mergetool** compatible: `forskscope old new`, or `forskscope local remote merged` to save the result to the merged file. Merging with a common ancestor (three-way) is not available in the app
 - **Compare profiles** — named presets for ignore-whitespace, ignore-case, and algorithm (Myers / Patience / Histogram)
-- **Session persistence** — open tabs are restored on next launch
+- **Session persistence** — open file comparison tabs, and which one was active, are restored on next launch; folder comparisons are not
 - **Patch export** — export a unified-diff `.patch` file from a file comparison; compatible with `patch -p1` and `git apply`
 - **Safe saves** — atomic write (never a partial file; not a power-loss guarantee — see [Merging](docs/src/users/merging.md)), `.bak` backup, external-change detection
 - **Search within diff** — Ctrl+F highlights matching rows across both panes

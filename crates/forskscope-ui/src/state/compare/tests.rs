@@ -666,6 +666,65 @@ fn opening_a_tab_persists_the_session_without_any_further_render() {
     }
 }
 
+// ── F168 §2.2: a profile's inline_mode seeds char_mode on open ─────────────
+
+/// Falsify by reverting `char_mode` to the unconditional `false` literal in
+/// `open_compare_request_with_options`: this fails.
+#[test]
+fn a_new_tab_under_an_eager_profile_starts_with_char_mode_on() {
+    let dir = temp_dir("f168-eager-profile");
+    let left = dir.join("left.txt");
+    let right = dir.join("right.txt");
+    fs::write(&left, "alpha\n").unwrap();
+    fs::write(&right, "beta\n").unwrap();
+    let config_home = dir.join("config");
+    fs::create_dir_all(&config_home).unwrap();
+    let _config_root = crate::state::ConfigRootOverrideGuard::set(config_home);
+
+    crate::state::with_test_store(|store| {
+        {
+            let mut settings = store.settings.write();
+            settings.profiles = vec![crate::state::settings::DiffProfile {
+                name: "Eager".into(),
+                whitespace: forskscope_core::WhitespaceMode::Significant,
+                ignore_case: false,
+                algorithm: crate::state::DiffAlgorithmSetting::Myers,
+                newlines: forskscope_core::NewlineCompareMode::Significant,
+                inline_mode: InlineMode::EagerForSmallHunks,
+                built_in: false,
+            }];
+            settings.active_profile = 0;
+        }
+
+        open_compare_request(store, normal_request(left.clone(), right.clone()));
+
+        assert!(
+            store.tabs.read()[0].char_mode,
+            "a profile set to \"Automatically for small changes\" must start \
+             a new tab with character highlighting already on"
+        );
+    });
+}
+
+/// The companion case: the default ("When I turn it on") profile must not
+/// start a tab with character mode already on.
+#[test]
+fn a_new_tab_under_the_default_profile_starts_with_char_mode_off() {
+    let dir = temp_dir("f168-lazy-profile");
+    let left = dir.join("left.txt");
+    let right = dir.join("right.txt");
+    fs::write(&left, "alpha\n").unwrap();
+    fs::write(&right, "beta\n").unwrap();
+    let config_home = dir.join("config");
+    fs::create_dir_all(&config_home).unwrap();
+    let _config_root = crate::state::ConfigRootOverrideGuard::set(config_home);
+
+    crate::state::with_test_store(|store| {
+        open_compare_request(store, normal_request(left.clone(), right.clone()));
+        assert!(!store.tabs.read()[0].char_mode);
+    });
+}
+
 // ── F84: pre-load size guard (RFC-013 §"Large file prompt", handoff 011) ───
 
 /// Comfortably past the default 4 MiB medium threshold and comfortably under

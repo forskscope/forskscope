@@ -311,9 +311,12 @@ pub(crate) fn TabError(msg: String) -> Element {
 // ── Tab snapshot ──────────────────────────────────────────────────────────────
 
 /// Whether the toolbar's Inline diff toggle may be used on a tab with these
-/// options. The load guard sets `inline_mode = None` for a file over the size
-/// it warns about (`decide_load`), and every profile the app builds is `Lazy`,
-/// so `None` here means exactly "the guard turned inline diff off" (F120).
+/// options. `inline_mode == None` has two causes: the load guard forcing it
+/// off for a file over the size `decide_load` warns about (F120), or a
+/// profile whose character-level highlighting is set to "Never" (F168
+/// §2.2). Either way the toggle must stay disabled, so the two are not
+/// distinguished here — `TabSnapshot::inline_available`'s tooltip is worded
+/// to stay true for both rather than naming a specific cause.
 pub(crate) fn inline_available(opts: &forskscope_core::DiffOptions) -> bool {
     opts.inline_mode != forskscope_core::diff::InlineMode::None
 }
@@ -323,9 +326,9 @@ pub struct TabSnapshot {
     pub hunks: Vec<forskscope_core::merge::MergeHunk>,
     pub identical: bool,
     pub char_mode: bool,
-    /// `false` when the load guard turned inline diff off for this tab (a
-    /// file over the size the guard warns about): the toolbar toggle is then
-    /// disabled, so the "inline diff disabled" wording is true (F120).
+    /// `false` when inline diff is unavailable for this tab — see
+    /// [`inline_available`] for the two causes. The toolbar toggle is then
+    /// disabled.
     pub inline_available: bool,
     pub word_wrap: bool,
     pub can_save: bool,
@@ -509,6 +512,46 @@ impl TabSnapshot {
             right_is_text: matches!(tab.right_doc.kind, FileKind::Text),
             right_encoding_label: tab.right_label(),
         }
+    }
+}
+
+#[cfg(test)]
+mod inline_available_tests {
+    use super::*;
+    use forskscope_core::DiffOptions;
+    use forskscope_core::diff::InlineMode;
+
+    fn opts_with(inline_mode: InlineMode) -> DiffOptions {
+        DiffOptions {
+            inline_mode,
+            ..DiffOptions::default()
+        }
+    }
+
+    /// F120: the load guard's reason for `None`.
+    #[test]
+    fn lazy_and_eager_are_available_none_is_not() {
+        assert!(inline_available(&opts_with(InlineMode::Lazy)));
+        assert!(inline_available(&opts_with(InlineMode::EagerForSmallHunks)));
+        assert!(!inline_available(&opts_with(InlineMode::None)));
+    }
+
+    /// F168 §2.2: a profile's own "Never" reaches `DiffOptions` as the same
+    /// `InlineMode::None` the load guard would have forced — `inline_available`
+    /// does not need to (and, per its doc comment, deliberately does not) know
+    /// which of the two caused it; both must disable the toggle.
+    #[test]
+    fn a_profile_set_to_never_also_disables_the_toggle() {
+        let profile = crate::state::settings::DiffProfile {
+            name: "Never".into(),
+            whitespace: forskscope_core::WhitespaceMode::Significant,
+            ignore_case: false,
+            algorithm: crate::state::DiffAlgorithmSetting::Myers,
+            newlines: forskscope_core::NewlineCompareMode::Significant,
+            inline_mode: InlineMode::None,
+            built_in: false,
+        };
+        assert!(!inline_available(&profile.to_diff_options()));
     }
 }
 

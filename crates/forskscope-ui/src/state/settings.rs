@@ -13,6 +13,7 @@ use std::path::PathBuf;
 
 pub use forskscope_core::DiffAlgorithm;
 use forskscope_core::DiffOptions;
+use forskscope_core::diff::InlineMode;
 use forskscope_core::persist::schema::settings::{PersistedDiffProfile, PersistedSettings};
 use forskscope_core::settings::display::DiffFontFamilySetting;
 use forskscope_core::settings::{LocaleId, ThemeId};
@@ -45,15 +46,28 @@ pub enum Lang {
 
 /// A named preset for diff options — stored in settings, applied when
 /// opening new comparisons (RFC-009 compare profiles).
+///
+/// F168: every field here is exactly what [`PersistedDiffProfile`] holds —
+/// `from_v2`/`to_v2` is a lossless round trip for any value either side can
+/// produce, including ones the dialog itself never writes (`whitespace:
+/// IgnoreTrailing`/`IgnoreBlankLines`, `algorithm: Lcs`), so a profile a
+/// future dialog control or a hand-edited `settings.json` sets is carried
+/// through unchanged rather than silently narrowed on the next save.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiffProfile {
     pub name: String,
-    pub ignore_whitespace: bool,
+    pub whitespace: WhitespaceMode,
     pub ignore_case: bool,
     pub algorithm: DiffAlgorithmSetting,
     /// Newline-style handling. The Settings dialog can set `IgnoreDifference`
     /// (F159(a)); built-in profiles stay `Significant`.
     pub newlines: NewlineCompareMode,
+    /// Whether character-level highlighting starts on, automatically turns
+    /// on for small replace hunks, or is unavailable (F168 §2.2). The dialog
+    /// offers all three; `to_diff_options` passes this straight through, and
+    /// a new tab under this profile seeds `char_mode` from it (`EagerForSmallHunks`
+    /// starts with highlighting already on — `state/compare.rs`).
+    pub inline_mode: InlineMode,
     /// Built-in profiles ship with the app and cannot be deleted.
     pub built_in: bool,
 }
@@ -88,12 +102,18 @@ impl DiffFontFamily {
     }
 }
 
+/// F168: carries `Lcs` so a profile already set to it (by a future dialog
+/// control, or a hand-edited `settings.json`) round-trips exactly — the
+/// dialog's own algorithm `<select>` still only ever writes `Myers`,
+/// `Patience` or `Histogram` (handoff 076 §2.2: "do not add LCS to the
+/// algorithm list").
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DiffAlgorithmSetting {
     #[default]
     Myers,
     Patience,
     Histogram,
+    Lcs,
 }
 
 impl DiffProfile {
@@ -102,45 +122,45 @@ impl DiffProfile {
             DiffAlgorithmSetting::Myers => DiffAlgorithm::Myers,
             DiffAlgorithmSetting::Patience => DiffAlgorithm::Patience,
             DiffAlgorithmSetting::Histogram => DiffAlgorithm::Histogram,
+            DiffAlgorithmSetting::Lcs => DiffAlgorithm::Lcs,
         };
         DiffOptions {
-            ignore_whitespace: self.ignore_whitespace,
+            // `DiffOptions.ignore_whitespace` is a single bool the engine
+            // treats as "strip every whitespace character" — see
+            // `engine.rs`'s `line_key`. It cannot tell `IgnoreTrailing` or
+            // `IgnoreBlankLines` apart from `IgnoreAll`; all three collapse
+            // to the same comparison today. `self.whitespace` still carries
+            // the distinct value losslessly (ignore_whitespace below is
+            // derived, not stored), so a later engine change can make the
+            // distinction real without another migration.
+            ignore_whitespace: self.whitespace != WhitespaceMode::Significant,
             ignore_case: self.ignore_case,
             algorithm: algo,
             ignore_newlines: self.newlines == NewlineCompareMode::IgnoreDifference,
+            inline_mode: self.inline_mode,
             ..DiffOptions::default()
         }
     }
 
-    /// Projects a canonical v2 profile into the UI's view. `newlines` is
-    /// carried through unchanged. Three fields are narrowed, and the
-    /// narrowing is lossy:
-    ///
-    /// - `whitespace`: the dialog's one checkbox covers both `IgnoreAll` and
-    ///   `IgnoreTrailing`, and `to_v2` writes back `IgnoreAll`. `IgnoreBlankLines`
-    ///   also reads as "ignore whitespace" and comes back as `IgnoreAll`.
-    /// - `inline_mode`: the dialog has no control for it, so `to_v2` always
-    ///   writes `Lazy`.
-    /// - `algorithm`: `DiffAlgorithm::Lcs` folds to `Myers`, the dialog never
-    ///   offered it.
-    ///
-    /// Those losses are F168 and go away as each control reaches the dialog.
-    /// Every profile the UI has written round-trips exactly, since it only
-    /// writes the values [`Self::to_v2`] produces.
+    /// Projects a canonical v2 profile into the UI's view. F168: every field
+    /// round-trips exactly now — `whitespace`, `inline_mode` and `algorithm`
+    /// used to narrow (see git history for the account of each loss); none
+    /// of them do anymore. The invariant
+    /// `to_v2(from_v2(p)) == p for every p` is asserted over every
+    /// combination of enum values in the test module, not samples.
     pub fn from_v2(p: &PersistedDiffProfile) -> Self {
         Self {
             name: p.name.clone(),
-            ignore_whitespace: p.whitespace != WhitespaceMode::Significant,
+            whitespace: p.whitespace,
             ignore_case: p.case == CaseSensitivity::Insensitive,
             algorithm: match p.algorithm {
                 DiffAlgorithm::Myers => DiffAlgorithmSetting::Myers,
                 DiffAlgorithm::Patience => DiffAlgorithmSetting::Patience,
                 DiffAlgorithm::Histogram => DiffAlgorithmSetting::Histogram,
-                // The UI has never offered Lcs; fold to the closest default
-                // rather than losing the profile entirely.
-                DiffAlgorithm::Lcs => DiffAlgorithmSetting::Myers,
+                DiffAlgorithm::Lcs => DiffAlgorithmSetting::Lcs,
             },
             newlines: p.newlines,
+            inline_mode: p.inline_mode,
             built_in: p.built_in,
         }
     }
@@ -152,22 +172,19 @@ impl DiffProfile {
     pub fn to_v2(&self) -> PersistedDiffProfile {
         PersistedDiffProfile {
             name: self.name.clone(),
-            whitespace: if self.ignore_whitespace {
-                WhitespaceMode::IgnoreAll
-            } else {
-                WhitespaceMode::Significant
-            },
+            whitespace: self.whitespace,
             newlines: self.newlines,
             case: if self.ignore_case {
                 CaseSensitivity::Insensitive
             } else {
                 CaseSensitivity::Sensitive
             },
-            inline_mode: forskscope_core::diff::InlineMode::Lazy,
+            inline_mode: self.inline_mode,
             algorithm: match self.algorithm {
                 DiffAlgorithmSetting::Myers => DiffAlgorithm::Myers,
                 DiffAlgorithmSetting::Patience => DiffAlgorithm::Patience,
                 DiffAlgorithmSetting::Histogram => DiffAlgorithm::Histogram,
+                DiffAlgorithmSetting::Lcs => DiffAlgorithm::Lcs,
             },
             built_in: self.built_in,
         }
@@ -319,12 +336,96 @@ mod tests {
     fn a_profiles_newline_mode_reaches_the_diff_options() {
         let profile = DiffProfile {
             name: "Ignore newlines".into(),
-            ignore_whitespace: false,
+            whitespace: WhitespaceMode::Significant,
             ignore_case: false,
             algorithm: DiffAlgorithmSetting::Myers,
             newlines: NewlineCompareMode::IgnoreDifference,
+            inline_mode: InlineMode::Lazy,
             built_in: false,
         };
         assert!(profile.to_diff_options().ignore_newlines);
+    }
+
+    // ── F168 §2.1: lossless round trip ─────────────────────────────────────
+
+    const ALL_WHITESPACE: [WhitespaceMode; 4] = [
+        WhitespaceMode::Significant,
+        WhitespaceMode::IgnoreTrailing,
+        WhitespaceMode::IgnoreAll,
+        WhitespaceMode::IgnoreBlankLines,
+    ];
+    const ALL_NEWLINES: [NewlineCompareMode; 2] = [
+        NewlineCompareMode::Significant,
+        NewlineCompareMode::IgnoreDifference,
+    ];
+    const ALL_CASE: [CaseSensitivity; 2] =
+        [CaseSensitivity::Sensitive, CaseSensitivity::Insensitive];
+    const ALL_INLINE: [InlineMode; 3] = [
+        InlineMode::None,
+        InlineMode::Lazy,
+        InlineMode::EagerForSmallHunks,
+    ];
+    const ALL_ALGORITHMS: [DiffAlgorithm; 4] = [
+        DiffAlgorithm::Myers,
+        DiffAlgorithm::Patience,
+        DiffAlgorithm::Histogram,
+        DiffAlgorithm::Lcs,
+    ];
+
+    fn every_persisted_profile() -> Vec<PersistedDiffProfile> {
+        let mut out = Vec::new();
+        for &whitespace in &ALL_WHITESPACE {
+            for &newlines in &ALL_NEWLINES {
+                for &case in &ALL_CASE {
+                    for &inline_mode in &ALL_INLINE {
+                        for &algorithm in &ALL_ALGORITHMS {
+                            for &built_in in &[false, true] {
+                                out.push(PersistedDiffProfile {
+                                    name: "p".to_string(),
+                                    whitespace,
+                                    newlines,
+                                    case,
+                                    inline_mode,
+                                    algorithm,
+                                    built_in,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// F168: every value `PersistedDiffProfile` can hold survives a trip
+    /// through the UI's `DiffProfile`, not just the ones the dialog itself
+    /// writes — 4×2×2×3×4×2 = 384 combinations, not samples. Falsify by
+    /// reintroducing any one of the three old collapses (e.g. `from_v2`
+    /// folding `WhitespaceMode::IgnoreTrailing` to `IgnoreAll`, or `to_v2`
+    /// hardcoding `inline_mode: InlineMode::Lazy`, or `DiffAlgorithm::Lcs`
+    /// folding to `Myers`): this fails on the matching combination.
+    #[test]
+    fn every_persisted_profile_round_trips_through_the_ui_type_exactly() {
+        for p in every_persisted_profile() {
+            let round_tripped = DiffProfile::from_v2(&p).to_v2();
+            assert_eq!(round_tripped, p, "did not round-trip: {p:?}");
+        }
+    }
+
+    #[test]
+    fn to_diff_options_carries_inline_mode_through() {
+        for &inline_mode in &ALL_INLINE {
+            let profile = DiffProfile {
+                name: "p".into(),
+                whitespace: WhitespaceMode::Significant,
+                ignore_case: false,
+                algorithm: DiffAlgorithmSetting::Myers,
+                newlines: NewlineCompareMode::Significant,
+                inline_mode,
+                built_in: false,
+            };
+            assert_eq!(profile.to_diff_options().inline_mode, inline_mode);
+        }
     }
 }

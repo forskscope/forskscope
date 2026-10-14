@@ -99,7 +99,7 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     aria_pressed: if snap.char_mode { "true" } else { "false" },
                     aria_label: t(lang, "Toggle character-level inline diff"),
                     disabled: !snap.inline_available,
-                    title: if snap.inline_available { String::new() } else { t(lang, "Inline diff is off for large files.") },
+                    title: if snap.inline_available { String::new() } else { t(lang, "Character-level highlighting is not available for this comparison.") },
                     onclick: move |_| {
                         if let Some(tab) = store.tabs.write().get_mut(index)
                             && crate::ui::view::diff::inline_available(&tab.diff_options)
@@ -148,7 +148,7 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                             change_diff_options(&mut store, index, next);
                         }
                     },
-                    {format!("{}: {}", t(lang, "Ignore WS"), t(lang, if snap.ignore_whitespace { "on" } else { "off" }))}
+                    {format!("{}: {}", t(lang, "Ignore whitespace"), t(lang, if snap.ignore_whitespace { "on" } else { "off" }))}
                 }
                 button {
                     aria_pressed: if snap.ignore_case { "true" } else { "false" },

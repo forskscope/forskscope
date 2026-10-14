@@ -30,25 +30,28 @@ pub const SESSION_SCHEMA_VERSION_V2: u32 = 2;
 // ── Canonical v2 payload ────────────────────────────────────────────────────
 
 /// `#[derive(Default)]` is exactly the "no session yet" state — empty tabs,
-/// no active tab, no explorer roots — which is what a repository returns for
+/// no active tab — which is what a repository returns for
 /// [`PersistenceLoad::Missing`] when no session file exists yet.
+///
+/// F67: there is no `explorer_roots` field. One existed through 0.188.x,
+/// always written `None` and never read — directory comparisons were never
+/// restored, so it recorded nothing a restore could use. Rather than keep
+/// writing a value nobody reads, the field is gone; restoring directory
+/// comparisons is a design question for a later release (handoff 076 §1),
+/// and the field returns, carrying real data, if that release needs it. A
+/// file written by an older build that still has `explorer_roots` loads
+/// unaffected — an unrecognized payload field is ignored, not an error — see
+/// `a_stale_explorer_roots_field_from_an_older_build_is_ignored_not_an_error`
+/// in the session schema tests.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PersistedSession {
     pub tabs: Vec<PersistedComparePair>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_tab: Option<usize>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub explorer_roots: Option<PersistedDirectoryPair>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PersistedComparePair {
-    pub left: PathBuf,
-    pub right: PathBuf,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PersistedDirectoryPair {
     pub left: PathBuf,
     pub right: PathBuf,
 }
@@ -153,12 +156,11 @@ fn migrate_from_v0(v0: LegacySessionStateV0) -> PersistedSession {
             right: PathBuf::from(right),
         })
         .collect();
-    // v0 tracks an ordered list only, no active-tab index and no directory
-    // comparison root; the UI re-derives an active tab after restore.
+    // v0 tracks an ordered list only, no active-tab index; the UI re-derives
+    // an active tab after restore.
     normalize(PersistedSession {
         tabs,
         active_tab: None,
-        explorer_roots: None,
     })
 }
 

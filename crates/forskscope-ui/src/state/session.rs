@@ -34,9 +34,10 @@ pub fn save_session(store: &Store) {
         .iter()
         .map(|tab| (tab.left_path.clone(), tab.right_path.clone()))
         .collect();
+    let active = *store.active.read();
     let result = save_session_if_allowed(
         *store.session_write_disabled.read(),
-        &build_save_payload(&pairs),
+        &build_save_payload(&pairs, active),
         &repository(),
     );
     if let Err(e) = result {
@@ -63,19 +64,32 @@ pub fn save_session_if_allowed(
 /// out so a test can exercise it without needing a running Dioxus runtime or
 /// constructing a full `CompareTab` — only the path pair matters here.
 /// Drops any pair where either side is `None`.
-pub fn build_save_payload(pairs: &[(Option<PathBuf>, Option<PathBuf>)]) -> PersistedSession {
-    let saved: Vec<PersistedComparePair> = pairs
-        .iter()
-        .filter_map(|(l, r)| {
-            let left = l.clone()?;
-            let right = r.clone()?;
-            Some(PersistedComparePair { left, right })
-        })
-        .collect();
+///
+/// F67: `active` is `store.active`'s value, an index into `pairs` — the same
+/// index space `store.tabs` and `pairs` share, since `pairs` is built from
+/// `store.tabs` in order. A dropped (incomplete) pair before the active one
+/// shifts every later index, so `active_tab` in the payload is computed
+/// against `saved`'s own position, not copied from `active` verbatim: the
+/// file's index must mean "this many pairs into what's actually saved",
+/// never "this many pairs into what was open".
+pub fn build_save_payload(
+    pairs: &[(Option<PathBuf>, Option<PathBuf>)],
+    active: Option<usize>,
+) -> PersistedSession {
+    let mut saved: Vec<PersistedComparePair> = Vec::new();
+    let mut active_tab = None;
+    for (i, (l, r)) in pairs.iter().enumerate() {
+        let (Some(left), Some(right)) = (l.clone(), r.clone()) else {
+            continue;
+        };
+        if active == Some(i) {
+            active_tab = Some(saved.len());
+        }
+        saved.push(PersistedComparePair { left, right });
+    }
     PersistedSession {
         tabs: saved,
-        active_tab: None,
-        explorer_roots: None,
+        active_tab,
     }
 }
 
@@ -114,11 +128,29 @@ pub fn resolve_session(store: &mut Store) -> (SessionRuntimeResolution, Option<N
 /// (silently skipping pairs where both sides are gone). Only called when no
 /// CLI startup pair was given — see [`resolve_session`]'s doc for why
 /// resolving and restoring are two separate steps.
+///
+/// F67: also restores which tab was active. `active_tab` is an index into
+/// the *file's* `tabs` list, but a pair whose files are both gone is skipped
+/// above, so the index actually opened can differ from the file's — tracked
+/// here as `opened` increments only for a pair that was actually opened.
+/// Falls back to the first restored tab (`Some(0)`) when `active_tab` is
+/// absent, out of range, or names a pair that was skipped; `open_compare`
+/// already leaves `store.active` on the *last* opened tab by its own side
+/// effect, so this still has to run, even to confirm that fallback is right.
 pub fn restore_tabs(store: &mut Store, resolution: &SessionRuntimeResolution) {
-    for pair in &resolution.value.tabs {
+    let mut opened = 0usize;
+    let mut active_idx = None;
+    for (i, pair) in resolution.value.tabs.iter().enumerate() {
         if pair.left.exists() || pair.right.exists() {
             open_compare(store, pair.left.clone(), pair.right.clone());
+            if resolution.value.active_tab == Some(i) {
+                active_idx = Some(opened);
+            }
+            opened += 1;
         }
+    }
+    if opened > 0 {
+        store.active.set(Some(active_idx.unwrap_or(0)));
     }
 }
 

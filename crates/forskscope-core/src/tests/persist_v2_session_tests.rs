@@ -5,9 +5,7 @@
 //! `schema_version_1_is_corrupt_not_migrated`.
 
 use crate::persist::schema::PersistenceLoad;
-use crate::persist::schema::session::{
-    PersistedComparePair, PersistedDirectoryPair, PersistedSession, load_session,
-};
+use crate::persist::schema::session::{PersistedComparePair, PersistedSession, load_session};
 
 const SESSION_V0_FIXTURE: &str = include_str!("fixtures/persistence/session-v0.json");
 const SESSION_V2_FIXTURE: &str = include_str!("fixtures/persistence/session-v2.json");
@@ -19,10 +17,6 @@ fn sample_v2() -> PersistedSession {
             right: "/tmp/fixtures/right.txt".into(),
         }],
         active_tab: Some(0),
-        explorer_roots: Some(PersistedDirectoryPair {
-            left: "/tmp/fixtures/left-dir".into(),
-            right: "/tmp/fixtures/right-dir".into(),
-        }),
     }
 }
 
@@ -66,6 +60,12 @@ fn current_v2_tolerates_unknown_payload_fields() {
 
 /// Pins the v2 wire *format* (review 035 C2) — see the settings-side
 /// counterpart for why a struct round-trip test cannot substitute for this.
+///
+/// F67: the fixture itself still carries a `payload.explorer_roots` key
+/// (deliberately left in place, not updated) — it is exactly the "a file an
+/// older build wrote" case `a_stale_explorer_roots_field_from_an_older_build_is_ignored_not_an_error`
+/// names below. This test is this fixture's other half: the field is simply
+/// absent from `expected`, since `PersistedSession` no longer has it.
 #[test]
 fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
     let expected = PersistedSession {
@@ -80,14 +80,31 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
             },
         ],
         active_tab: Some(1),
-        explorer_roots: Some(PersistedDirectoryPair {
-            left: "/tmp/fixtures/left-dir".into(),
-            right: "/tmp/fixtures/right-dir".into(),
-        }),
     };
     match load_session(SESSION_V2_FIXTURE) {
         PersistenceLoad::Current { value } => assert_eq!(value, expected),
         other => panic!("expected Current, got {other:?}"),
+    }
+}
+
+/// F67: `PersistedSession` dropped its always-`None`, never-read
+/// `explorer_roots` field. A v2 file an older (0.188.x or earlier) build
+/// wrote can still carry that key in its payload — RFC-076's "unknown
+/// payload fields are tolerated" rule means it must still load as `Current`,
+/// not `Corrupt`, with the stale field simply dropped rather than erroring.
+/// Falsify by adding `#[serde(deny_unknown_fields)]` to `PersistedSession`:
+/// this then fails with `Corrupt`.
+#[test]
+fn a_stale_explorer_roots_field_from_an_older_build_is_ignored_not_an_error() {
+    let mut payload = serde_json::to_value(sample_v2()).unwrap();
+    payload.as_object_mut().unwrap().insert(
+        "explorer_roots".into(),
+        serde_json::json!({"left": "/tmp/fixtures/left-dir", "right": "/tmp/fixtures/right-dir"}),
+    );
+    let raw = envelope_for(2, &payload);
+    match load_session(&raw) {
+        PersistenceLoad::Current { value } => assert_eq!(value, sample_v2()),
+        other => panic!("expected Current despite the stale explorer_roots field, got {other:?}"),
     }
 }
 
@@ -114,9 +131,8 @@ fn legacy_v0_fixture_migrates_every_field_exactly() {
                 value.tabs[1].left,
                 std::path::PathBuf::from("/tmp/fixtures/left-b.txt")
             );
-            // v0 has no active-tab-index or explorer-root concept.
+            // v0 has no active-tab-index concept.
             assert_eq!(value.active_tab, None);
-            assert_eq!(value.explorer_roots, None);
         }
         other => panic!("expected MigratedLegacy, got {other:?}"),
     }

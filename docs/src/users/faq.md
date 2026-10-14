@@ -81,6 +81,10 @@ Session restore only works when you launch ForskScope **without arguments**. If
 you pass file paths on the command line (e.g. from `git difftool`), the session
 is not restored — the explicit arguments take priority.
 
+Only file comparison tabs are restored, along with which one was active.
+Folder comparisons (Deep compare) are not part of session restore — reopen
+them from the Explorer.
+
 Also, session restore silently skips tabs where both paths no longer exist. If
 only one side is gone the tab opens with that side showing an empty document.
 
