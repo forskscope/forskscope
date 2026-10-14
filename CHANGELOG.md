@@ -7,6 +7,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.188.1] — Unreleased
 
+### Added
+
+- **A website: https://forskscope.github.io/forskscope/**, with downloads and the
+  user guide. It loads nothing from other sites and collects nothing. It went live
+  on 2026-10-13 without a new app release.
+
+### Fixed
+
+- **The installation guide no longer says every release reaches the Microsoft
+  Store automatically.** The Store listing is not updated with each release yet;
+  the zip on the releases page is the newest version.
+- A broken link in the FAQ to the Git integration page.
+
 ## [0.188.0] — 2026-10-12
 
 **A cleaner Explorer.** Fewer buttons are always on screen, the two that were only
