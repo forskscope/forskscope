@@ -1,6 +1,7 @@
 # RFC 076: Versioned Runtime Settings and Session Persistence
 
 **Status.** Implemented (Milestone M2-B)
+**Note (0.189.0, F67).** `explorer_roots` below was never written with a value nor read, and was removed from `PersistedSessionV2` in 0.189.0. A file from an older build that still has the key loads unchanged. `active_tab` is now written and restored. See `CHANGELOG.md` 0.189.0.
 **Tracks.** Release-stabilization audit finding B2.
 **Touches.** Core persistence/settings/session models, UI settings/session
 adapters, config-file migration, user-visible recovery, and runtime-path tests.
