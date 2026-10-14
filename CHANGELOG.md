@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.190.1] — Unreleased
+
 ## [0.190.0] — 2026-10-14
 
 **Every tab and every compare profile, by keyboard.** Before this release a

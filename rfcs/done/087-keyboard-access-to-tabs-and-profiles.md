@@ -1,6 +1,6 @@
 # RFC 087: Keyboard Access to Tabs and Compare Profiles
 
-**Status.** Accepted — review complete; implementer may start. Moves to `done/` when the work ships (RFC-000, 5-folder variant).
+**Status.** Implemented (`0.190.0`, `81d4601`, review 161). Both shortcut pairs reach the page in WebKitGTK; Windows (WebView2) is unverified.
 **Accepted.** 2026-10-14 by the project owner.
 **Scheduling.** Planned for `0.190.0`. See `ROADMAP.md` § "Remaining proposed RFCs".
 **Tracks.** F192: keyboard users cannot switch tabs or choose a compare profile.

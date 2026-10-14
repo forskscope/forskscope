@@ -7,7 +7,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Accepted (5)
+## Accepted (4)
 
 Review complete; the implementer may start. Distinct from **Proposed**, which
 is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
@@ -18,12 +18,12 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 078 | [Platform Runtime Acceptance and Release Evidence](./accepted/078-platform-runtime-acceptance.md) | Accepted |
 | 079 | [Microsoft Store Submission Automation](./accepted/079-microsoft-store-submission-automation.md) | Accepted |
 | 081 | [AUR Publication Automation](./accepted/081-aur-publication-automation.md) | Accepted |
-| 087 | [Keyboard Access to Tabs and Compare Profiles](./accepted/087-keyboard-access-to-tabs-and-profiles.md) | Accepted 2026-10-14 |
 
-## Implemented (62)
+## Implemented (63)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
+| 087 | [Keyboard Access to Tabs and Compare Profiles](./done/087-keyboard-access-to-tabs-and-profiles.md) | Implemented — `0.190.0` |
 | 080 | [Tiered Directory Comparison in the Explorer](./done/080-explorer-tiered-directory-comparison.md) | Implemented — `0.175.0` |
 | 082 | [Write-Path Integrity](./done/082-write-path-integrity.md) | Implemented — B5, `ad2f162` |
 | 086 | [Stable Hunk Identity, and an Amendment to RFC-015 Rule 4](./done/086-stable-hunk-identity.md) | Implemented — `77666ec` |
