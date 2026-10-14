@@ -17,13 +17,14 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 074 | [v1 Release Stabilization Program](./accepted/074-v1-release-stabilization-program.md) | Accepted |
 | 078 | [Platform Runtime Acceptance and Release Evidence](./accepted/078-platform-runtime-acceptance.md) | Accepted |
 | 079 | [Microsoft Store Submission Automation](./accepted/079-microsoft-store-submission-automation.md) | Accepted |
-| 080 | [Tiered Directory Comparison in the Explorer](./accepted/080-explorer-tiered-directory-comparison.md) | Accepted |
 | 081 | [AUR Publication Automation](./accepted/081-aur-publication-automation.md) | Accepted |
+| 087 | [Keyboard Access to Tabs and Compare Profiles](./accepted/087-keyboard-access-to-tabs-and-profiles.md) | Accepted 2026-10-14 |
 
-## Implemented (61)
+## Implemented (62)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
+| 080 | [Tiered Directory Comparison in the Explorer](./done/080-explorer-tiered-directory-comparison.md) | Implemented — `0.175.0` |
 | 082 | [Write-Path Integrity](./done/082-write-path-integrity.md) | Implemented — B5, `ad2f162` |
 | 086 | [Stable Hunk Identity, and an Amendment to RFC-015 Rule 4](./done/086-stable-hunk-identity.md) | Implemented — `77666ec` |
 | 084 | [Patch Export Conformance](./done/084-patch-export-conformance.md) | Implemented — `e2dd55d` |
@@ -86,7 +87,7 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 076 | [Versioned Runtime Settings and Session Persistence](./done/076-versioned-runtime-persistence.md) | post-v0.165.1 stabilization |
 | 077 | [Git Mergetool Save-Target Model](./done/077-mergetool-save-target-model.md) | post-v0.165.1 stabilization |
 
-## Proposed (15)
+## Proposed (9)
 
 RFC-004–040 are editor-adapter track, platform/packaging, or governance/documentation.
 RFC-026 and RFC-030 are substantially implemented; their remaining items require GTK or are deferred.
