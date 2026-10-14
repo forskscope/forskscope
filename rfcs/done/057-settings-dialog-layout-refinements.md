@@ -1,6 +1,7 @@
 # RFC 057: Settings Dialog Layout Refinements
 
 **Status.** Implemented (v0.36.0)
+**Amended by RFC-089 (accepted 2026-10-15).** The global header this RFC refers to is removed; Settings and `?` sit at the end of the tab bar. See [RFC-089](../accepted/089-one-bar-at-the-top.md).
 
 **Tracks.** Settings dialog UX. Two focused layout changes: relocating the
 About/info action into the Settings header, and hiding the new-profile

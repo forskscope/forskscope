@@ -1,14 +1,15 @@
 # RFC 089: One Bar at the Top, and a Window Title That Says What Is Open
 
-**Status.** Proposed — awaiting the owner's acceptance. Implementation does not
-start before this moves to `accepted/` (RFC-000, 5-folder variant).
-**Scheduling.** The next app release after acceptance. See `ROADMAP.md` §
+**Status.** Accepted — review complete; implementer may start. Moves to `done/`
+when the work ships (RFC-000, 5-folder variant).
+**Accepted.** 2026-10-15 by the project owner.
+**Scheduling.** `0.191.0`. See `ROADMAP.md` §
 "Remaining proposed RFCs".
 **Tracks.** The owner's question, 2026-10-14: is the app header row optimized
 enough? The owner accepted the direction on 2026-10-15.
-**Amends, on acceptance.** RFC-003 (the shell's `AppHeader` region) and RFC-057
+**Amends.** RFC-003 (the shell's `AppHeader` region) and RFC-057
 (which placed About in the Settings dialog because the global header carried
-Settings and `?`). Each gets a one-line Status note pointing here.
+Settings and `?`). Each carries a one-line Status note pointing here.
 **Touches.**
 - `crates/forskscope-ui/src/app.rs` (shell order)
 - `crates/forskscope-ui/src/ui/layout/header.rs` (removed)

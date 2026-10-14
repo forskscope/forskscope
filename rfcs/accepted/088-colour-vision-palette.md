@@ -1,15 +1,16 @@
 # RFC 088: A Colour-Vision Setting with a Red–Green-Safe Palette
 
-**Status.** Proposed — awaiting the owner's acceptance. Implementation does not
-start before this moves to `accepted/` (RFC-000, 5-folder variant).
-**Scheduling.** The next app release after acceptance. See `ROADMAP.md` §
+**Status.** Accepted — review complete; implementer may start. Moves to `done/`
+when the work ships (RFC-000, 5-folder variant).
+**Accepted.** 2026-10-15 by the project owner.
+**Scheduling.** `0.191.0`. See `ROADMAP.md` §
 "Remaining proposed RFCs".
 **Tracks.** The owner's question, 2026-10-14: is there a plan for users with
 colour vision deficiency (CVD)? There was none. The owner accepted the direction
 on 2026-10-15.
-**Amends, on acceptance.** RFC-009 (§6, theme semantics: a second, independent
+**Amends.** RFC-009 (§6, theme semantics: a second, independent
 axis beside the theme) and RFC-024 (the colour/background affordance per
-semantic state). Each gets a one-line Status note pointing here.
+semantic state). Each carries a one-line Status note pointing here.
 **Touches.**
 - `crates/forskscope-ui/assets/css/01-tokens.css` (palette tokens)
 - `crates/forskscope-core/src/persist/schema/settings.rs` (a new setting)
