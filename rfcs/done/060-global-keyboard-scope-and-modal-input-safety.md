@@ -8,6 +8,7 @@ inputs (`stop_propagation` in `view/search.rs`), across six surfaces:
 **Deferred:** the regression tests this RFC asked for were never written, so
 nothing stops a seventh input surface from omitting the guard — which was this
 RFC's stated purpose. Tracked as open work, not as part of this RFC.
+**Amended by RFC-087 (accepted 2026-10-14).** The global handler acts with no active comparison tab, for tab switching only. The ownership rule is unchanged; see [RFC-087](../accepted/087-keyboard-access-to-tabs-and-profiles.md).
 **Tracks.** Keyboard event ownership; modal and text-input safety; prevention
 of accidental merge/save/close actions.
 **Touches.** `crates/forskscope-ui/src/app.rs` (root `onkeydown`),

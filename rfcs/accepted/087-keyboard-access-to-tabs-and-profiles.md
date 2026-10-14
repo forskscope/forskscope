@@ -1,9 +1,10 @@
 # RFC 087: Keyboard Access to Tabs and Compare Profiles
 
-**Status.** Proposed — awaiting the owner's acceptance. Implementation does not start before this moves to `accepted/` (RFC-000, 5-folder variant).
+**Status.** Accepted — review complete; implementer may start. Moves to `done/` when the work ships (RFC-000, 5-folder variant).
+**Accepted.** 2026-10-14 by the project owner.
 **Scheduling.** Planned for `0.190.0`. See `ROADMAP.md` § "Remaining proposed RFCs".
 **Tracks.** F192: keyboard users cannot switch tabs or choose a compare profile.
-**Amends, on acceptance.** RFC-019 (the shortcut map, §7 and §10) and RFC-060 (the global handler's scope). Each gets a one-line Status note pointing here once this RFC is accepted. The decisions live here.
+**Amends.** RFC-019 (the shortcut map, §7 and §10) and RFC-060 (the global handler's scope). Each carries a one-line Status note pointing here. The decisions live here.
 **Touches.**
 - `crates/forskscope-ui/src/ui/layout/tabs.rs` (tab bar)
 - `crates/forskscope-ui/src/keyboard.rs` (`global_key_action`)
