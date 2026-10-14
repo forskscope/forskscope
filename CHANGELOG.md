@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.189.1] — Unreleased
+
 ## [0.189.0] — 2026-10-14
 
 **Says what is true, offers what it can do.** ForskScope reopens with the tab you
