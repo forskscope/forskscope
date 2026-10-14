@@ -78,11 +78,17 @@ pub enum WhitespaceMode {
     /// Every whitespace character is significant. Default.
     #[default]
     Significant,
-    /// Trailing whitespace on a line is ignored.
+    /// Intended: trailing whitespace on a line is ignored. **Not implemented
+    /// as such (F191):** `to_diff_options` maps every mode except
+    /// `Significant` to `ignore_whitespace`, so this behaves as `IgnoreAll`.
     IgnoreTrailing,
-    /// All whitespace differences (leading, trailing, internal) are ignored.
+    /// All whitespace characters are removed before lines are compared, so
+    /// leading, trailing and internal whitespace differences are ignored. An
+    /// added or removed blank line is still a change.
     IgnoreAll,
-    /// Lines that are entirely blank are ignored.
+    /// Intended: lines that are entirely blank are ignored. **Not implemented
+    /// as such (F191):** behaves as `IgnoreAll`, and an added blank line is
+    /// still reported as an insertion.
     IgnoreBlankLines,
 }
 

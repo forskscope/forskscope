@@ -23,8 +23,9 @@ distance between two files.
 
 ## Ignore whitespace
 
-When enabled, lines that differ only in leading/trailing spaces, indentation, or
-blank lines between them are treated as equal and do not appear as changes.
+When enabled, lines that differ only in whitespace (indentation, trailing spaces,
+or spaces inside the line) are treated as equal and do not appear as changes. An
+added or removed blank line still appears as a change.
 
 Useful for:
 - Comparing files reformatted by an auto-formatter

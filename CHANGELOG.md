@@ -5,20 +5,61 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.188.1] — Unreleased
+## [0.189.0] — 2026-10-14
+
+**Says what is true, offers what it can do.** ForskScope reopens with the tab you
+were on, compare profiles keep every setting you give them, long lines that differ
+by a little are highlighted, and the documentation no longer claims more than the
+app does.
 
 ### Added
 
 - **A website: https://forskscope.github.io/forskscope/**, with downloads and the
   user guide. It loads nothing from other sites and collects nothing. It went live
-  on 2026-10-13 without a new app release.
+  on 2026-10-13, before this release.
+- **Character-level highlighting can be set per compare profile.** Under Settings
+  → Advanced → *+ New profile* → **More options**, choose *When I turn it on* (as
+  before), *Automatically for small changes*, or *Never*. A comparison opened
+  under *Automatically* starts with highlighting on.
+
+### Changed
+
+- **ForskScope reopens with the tab you had selected.** Before, the last restored
+  tab was selected, whichever you had been using.
+- **Long lines that differ by a little are now highlighted.** The size limit for
+  character-level highlighting used to apply to the whole line, so a long minified
+  line with one changed value was skipped. It now applies only to the part that
+  differs.
+- **Clearer labels in the new-profile form:** *Ignore WS* is now *Ignore
+  whitespace*, and *Ignore newlines* is now *Ignore line-ending differences
+  (CRLF/LF)*, which is what it does.
+- When character-level highlighting is unavailable, its button now says so for
+  this comparison, whatever the reason. It used to blame large files every time.
 
 ### Fixed
 
+- **Compare profiles no longer lose settings when settings are saved.** A value
+  the Settings dialog could not show was replaced on every save. That affected
+  only values written outside the dialog, but nothing warned about it.
+- **The documentation says exactly what is restored on restart:** file comparison
+  tabs, and which one was active. Folder comparisons are not restored. The README
+  said "open tabs are restored".
+- **The guide's description of *Ignore whitespace* was wrong about blank lines.**
+  An added or removed blank line still appears as a change, and the guide now
+  says so.
 - **The installation guide no longer says every release reaches the Microsoft
   Store automatically.** The Store listing is not updated with each release yet;
   the zip on the releases page is the newest version.
 - A broken link in the FAQ to the Git integration page.
+
+### Internal
+
+- Spreadsheet comparisons count informational messages without building a note
+  for each one.
+- An unused field, `explorer_roots`, is no longer written to `session.json`. Files
+  from older versions that still contain it load as before.
+- The website's check that it loads nothing from other sites also covers
+  `srcset`, `poster`, `<object data>`, capital letters, and spaces around `=`.
 
 ## [0.188.0] — 2026-10-12
 
