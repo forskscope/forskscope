@@ -20,8 +20,8 @@ use forskscope_core::persist::schema::session::{
 };
 
 use super::{
-    build_save_payload, load_session, persist_session, recovery_modal, reset_session, restore_tabs,
-    save_session_if_allowed,
+    build_save_payload, load_session, persist_session, recovery_modal, request_close_file_tab,
+    reset_session, restore_tabs, save_session_if_allowed, set_active_tab,
 };
 use crate::state::{ConfigRootOverrideGuard, Modal, with_test_store};
 
@@ -385,4 +385,128 @@ fn recovery_modal_is_some_for_outcomes_with_a_dialog() {
         recovery_modal(&res),
         Some(Modal::SessionRecovery(_))
     ));
+}
+
+// ── F194 (RFC-087 §3a, handoff 077): save on every active-tab change ───────
+
+/// "Open two tabs. Select the first. Show that `session.json`'s
+/// `active_tab` is 0 without any open or close." Falsify by reverting
+/// `set_active_tab` to a bare `store.active.set(index)` with no save: this
+/// then fails, since opening the two tabs already wrote `active_tab: 1`
+/// (the second, last-opened one, by `open_compare`'s own side effect) and
+/// nothing updates the file after that.
+#[test]
+fn switching_the_active_tab_saves_the_session_without_any_open_or_close() {
+    let fx = restore_fixture("f194-switch");
+    let left1 = fx.dir.join("a-left.txt");
+    let right1 = fx.dir.join("a-right.txt");
+    let left2 = fx.dir.join("b-left.txt");
+    let right2 = fx.dir.join("b-right.txt");
+    fs::write(&left1, "a left\n").unwrap();
+    fs::write(&right1, "a right\n").unwrap();
+    fs::write(&left2, "b left\n").unwrap();
+    fs::write(&right2, "b right\n").unwrap();
+
+    with_test_store(|store| {
+        crate::state::open_compare(store, left1, right1);
+        crate::state::open_compare(store, left2, right2);
+        assert_eq!(
+            *store.active.read(),
+            Some(1),
+            "test premise: opening leaves the second (last-opened) tab active"
+        );
+
+        // The switch itself — no tab opens or closes here.
+        set_active_tab(store, Some(0));
+
+        let session_path = fx
+            .dir
+            .join("config")
+            .join("forskscope")
+            .join("session.json");
+        let repo = SessionRepository::new(session_path);
+        match repo.load() {
+            PersistenceLoad::Current { value } => {
+                assert_eq!(value.active_tab, Some(0));
+            }
+            other => panic!("expected Current, got {other:?}"),
+        }
+    });
+}
+
+/// `request_close_file_tab`: the one path the × button, `Ctrl+W` and
+/// `Delete` on a focused tab (RFC-087 §1) all go through. Falsify by
+/// removing the `dirty` branch (always closing at once): the dirty case
+/// then fails, since the tab would already be gone instead of waiting on
+/// `Modal::ConfirmClose`.
+#[test]
+fn request_close_file_tab_asks_first_only_when_dirty() {
+    let fx = restore_fixture("f194-request-close");
+    let left = fx.dir.join("left.txt");
+    let right = fx.dir.join("right.txt");
+    fs::write(&left, "a\n").unwrap();
+    fs::write(&right, "b\n").unwrap();
+
+    with_test_store(|store| {
+        crate::state::open_compare(store, left, right);
+        assert_eq!(store.tabs.read().len(), 1, "test premise");
+
+        // Not dirty: closes at once, no modal.
+        request_close_file_tab(store, 0);
+        assert_eq!(store.tabs.read().len(), 0, "a clean tab must close at once");
+        assert!(matches!(*store.modal.read(), Modal::None));
+    });
+}
+
+#[test]
+fn request_close_file_tab_asks_first_when_dirty() {
+    let fx = restore_fixture("f194-request-close-dirty");
+    let left = fx.dir.join("left.txt");
+    let right = fx.dir.join("right.txt");
+    fs::write(&left, "a\n").unwrap();
+    fs::write(&right, "b\n").unwrap();
+
+    with_test_store(|store| {
+        // A real tab (id, generation, paths) from the real open path — but
+        // its diff/merge are built directly here rather than waited on from
+        // `open_compare`'s spawned load task, which `with_test_store`'s bare
+        // synchronous call never drives to completion (confirmed: the
+        // tab's `diff.hunks` is still empty immediately after this call).
+        crate::state::open_compare(store, left, right);
+        let diff_options = forskscope_core::DiffOptions::default();
+        let diff = forskscope_core::compute_diff("a\n", "b\n", diff_options);
+        let hunk_id = diff
+            .hunks
+            .first()
+            .expect("test premise: the differing pair must produce at least one hunk")
+            .hunk_id;
+        let mut merge = forskscope_core::MergeSession::from_diff(&diff);
+        merge
+            .apply_left_to_right(hunk_id)
+            .expect("test premise: applying the hunk must succeed");
+        {
+            let mut tabs = store.tabs.write();
+            let tab = &mut tabs[0];
+            // Still `Loading` otherwise, since the real load never ran —
+            // and `request_close_file_tab`'s own `is_loading` fast path
+            // (RFC-065) would then skip the dirty check entirely.
+            tab.state = crate::state::TabState::Ready;
+            tab.diff_options = diff_options;
+            tab.diff = diff;
+            tab.merge = merge;
+            tab.can_save = true;
+        }
+        assert!(
+            store.tabs.read()[0].can_save && store.tabs.read()[0].merge.is_dirty(),
+            "test premise: the tab must actually be dirty and saveable"
+        );
+
+        request_close_file_tab(store, 0);
+        assert_eq!(
+            store.tabs.read().len(),
+            1,
+            "a dirty tab must not close until confirmed"
+        );
+        assert!(matches!(*store.modal.read(), Modal::ConfirmClose(0)));
+    });
 }

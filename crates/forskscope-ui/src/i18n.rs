@@ -17,6 +17,7 @@ pub fn t(lang: Lang, key: &str) -> String {
 fn ja(key: &str) -> Option<&'static str> {
     let v = match key {
         "Explorer" => "エクスプローラー",
+        "Open tabs" => "開いているタブ",
         "Settings" => "設定",
         "Compare selected files" => "選択したファイルを比較",
         "Compare selected directories" => "選択したディレクトリを比較",
@@ -149,6 +150,7 @@ fn ja(key: &str) -> Option<&'static str> {
             "比較できません: 一方がバイナリ、もう一方がテキストです。テキスト同士またはバイナリ同士で比較してください。"
         }
         "Loading" => "読み込み中",
+        "loading" => "読み込み中",
         "Could not open" => "開けませんでした",
         "Check that the file exists and you have read permission." => {
             "ファイルが存在し、読み取り権限があることを確認してください。"
@@ -203,6 +205,18 @@ fn ja(key: &str) -> Option<&'static str> {
         "Keyboard shortcuts" => "キーボードショートカット",
         "Diff view" => "差分ビュー",
         "Navigation" => "ナビゲーション",
+        "Tabs" => "タブ",
+        "Next tab, from anywhere (wraps, includes Explorer)" => {
+            "次のタブへ（どこからでも、循環、エクスプローラーを含む）"
+        }
+        "Previous tab, from anywhere (wraps, includes Explorer)" => {
+            "前のタブへ（どこからでも、循環、エクスプローラーを含む）"
+        }
+        "Previous / next tab (tab list focused)" => "前 / 次のタブ（タブ一覧にフォーカス時）",
+        "First / last tab (tab list focused)" => "最初 / 最後のタブ（タブ一覧にフォーカス時）",
+        "Close the focused tab (tab list focused)" => {
+            "フォーカス中のタブを閉じる（タブ一覧にフォーカス時）"
+        }
         "App" => "アプリ",
         "Search…" => "検索…",
         "o, class, tmp  (comma separated, no dot needed)" => {
@@ -257,6 +271,7 @@ fn ja(key: &str) -> Option<&'static str> {
         "Advanced" => "詳細設定",
         "Hide advanced" => "詳細設定を隠す",
         "Compare profiles" => "比較プロファイル",
+        "Active compare profile" => "使用する比較プロファイル",
         "+ New profile" => "+ 新規プロファイル",
         "Profile name" => "プロファイル名",
         "Add" => "追加",

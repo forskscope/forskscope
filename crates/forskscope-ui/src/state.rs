@@ -6,20 +6,25 @@
 //! - `tab`       — `CompareTab`, `TabState`, `swap_sides`, `change_diff_options`, `set_diff_options`
 //! - `compare`   — `open_compare`, `reload_tab`, `load_and_diff`, dir tabs
 //! - `session`   — `save_session`, `restore_session`, `close_tab` (RFC-076 repository-backed)
-//! - `profile`   — `add_profile`, `remove_profile`
+//! - `profile`   — `add_profile`, `remove_profile`, `select_profile`
 
 pub mod compare;
 pub mod profile;
 pub mod session;
 pub mod settings;
 pub mod tab;
+pub(crate) mod tab_nav;
 pub mod types;
 
+pub(crate) use compare::{
+    activate_adjacent_tab, activate_tab_at, open_compare_request_with_options,
+    reload_tab_with_options,
+};
 pub use compare::{
     close_dir_tab, open_compare, open_compare_request, open_dir_compare, reload_tab,
 };
-pub(crate) use compare::{open_compare_request_with_options, reload_tab_with_options};
-pub use profile::{add_profile, remove_profile};
+pub use profile::{add_profile, remove_profile, select_profile};
+pub(crate) use session::request_close_file_tab;
 pub use session::{close_tab, resolve_session, restore_tabs, save_session};
 pub use settings::{AppSettings, BatchCopySpec, DiffAlgorithmSetting, DiffFontFamily, Lang, Theme};
 pub use tab::{
@@ -33,7 +38,9 @@ use forskscope_core::persist::schema::session::runtime::SessionRuntimeResolution
 use forskscope_core::persist::schema::settings::PersistedSettings;
 use forskscope_core::persist::schema::settings::runtime::SettingsRuntimeResolution;
 use forskscope_ui_logic::{CompareTabId, CompareTabIdAllocator, LoadIdentityError};
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 thread_local! {
     /// F95: a per-thread override of the config root, consulted by
@@ -246,6 +253,15 @@ pub struct Store {
     /// dropping the second is what keeps both visible in sequence. See
     /// [`advance_recovery_queue`].
     pub pending_recovery: Signal<Vec<Modal>>,
+    /// RFC-087: every tab-list item's own `MountedData` handle, keyed by its
+    /// flat position (`tab_nav::position_of`) — not by tab identity, since a
+    /// position can briefly outlive the tab that held it (a close shifts
+    /// every later position down by one). Lives on `Store`, not as a
+    /// `TabBar`-local signal, because the dirty-tab confirm modal
+    /// (`ui/overlay/modals/tab.rs`) also needs to move focus to the tab that
+    /// becomes selected once the user confirms, and it is not a descendant
+    /// of `TabBar`.
+    pub(crate) tab_handles: Signal<HashMap<usize, Rc<MountedData>>>,
 }
 
 impl Store {
@@ -274,6 +290,7 @@ impl Store {
             modal: Signal::new_in_scope(Modal::None, ScopeId::ROOT),
             toast: Signal::new_in_scope(None, ScopeId::ROOT),
             pending_recovery: Signal::new_in_scope(Vec::new(), ScopeId::ROOT),
+            tab_handles: Signal::new_in_scope(HashMap::new(), ScopeId::ROOT),
         }
     }
     pub fn lang(&self) -> Lang {
@@ -293,6 +310,19 @@ impl Store {
     }
     pub fn notify_warning(&mut self, msg: impl Into<String>) {
         self.toast.set(Some(Notice::warning(msg)));
+    }
+    /// RFC-087: move keyboard focus to whichever tab is now active — "focus
+    /// moves to the tab that became selected" after a close. Safe to call
+    /// from the very event handler that triggered the close (the tab
+    /// list's `on_delete`, `CloseTabModal`'s "Discard and close"), even
+    /// though that component is about to unmount, because `focus_handle`
+    /// (`keyboard.rs`) spawns the actual `set_focus` with `spawn_forever`,
+    /// not `spawn` — see its doc for why a plain `spawn` lost the race.
+    pub(crate) fn focus_active_tab(&self) {
+        let file_count = self.tabs.read().len();
+        let position =
+            tab_nav::position_of(*self.active.read(), *self.active_dir.read(), file_count);
+        crate::keyboard::focus_handle(self.tab_handles.read().get(&position).cloned());
     }
 }
 

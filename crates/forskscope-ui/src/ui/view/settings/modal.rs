@@ -291,19 +291,27 @@ pub fn SettingsModal() -> Element {
                         }
                     }
 
-                    // ── Compare profiles ──────────────────────────────────────
+                    // ── Compare profiles (RFC-087 §3: a radio group) ───────────
                     div { class: "field",
                         span { {t(lang, "Compare profiles")} }
-                        div { class: "profile-list",
+                        div {
+                            class: "profile-list",
+                            role: "radiogroup",
+                            aria_label: t(lang, "Active compare profile"),
                             for (i, p) in cur.profiles.iter().enumerate() {
                                 div {
                                     class: if cur.active_profile == i { "profile-row active" } else { "profile-row" },
-                                    span {
+                                    input {
+                                        r#type: "radio",
+                                        class: "profile-radio",
+                                        id: "profile-radio-{i}",
+                                        name: "active-compare-profile",
+                                        checked: cur.active_profile == i,
+                                        onchange: move |_| crate::state::select_profile(&mut store, i),
+                                    }
+                                    label {
                                         class: "profile-name",
-                                        onclick: move |_| {
-                                            store.settings.write().active_profile = i;
-                                            super::persist(store);
-                                        },
+                                        r#for: "profile-radio-{i}",
                                         if cur.active_profile == i { "▸ " } else { "  " }
                                         "{p.name}"
                                     }

@@ -15,6 +15,7 @@ use dioxus::prelude::*;
 use dioxus_core::spawn_forever;
 
 use crate::i18n::t;
+use crate::keyboard::focus_handle;
 use crate::state::Lang;
 use dioxus_swdir_tree::ThreadExecutor;
 use dioxus_swdir_tree::{LoadPayload, ScanExecutor, ScanFuture, ScanJob};
@@ -382,19 +383,6 @@ pub fn PathBar(
 // #111's future context menus. Enter/Space on ⋯ open it via the native
 // button click the browser already fires; only ↓ needs its own keydown
 // case, since arrow keys are not native button-activation keys.
-
-/// `.set_focus(true)` on an already-mounted target's handle. A no-op if the
-/// handle has not been captured yet (should not happen for any of the
-/// three targets this is called with, each captured well before any key
-/// that reaches this function can fire — but a silent no-op is still the
-/// right failure mode over a panic for a focus call, which is advisory).
-fn focus_handle(handle: Option<Rc<MountedData>>) {
-    if let Some(h) = handle {
-        spawn(async move {
-            let _ = h.set_focus(true).await;
-        });
-    }
-}
 
 /// Opens the menu. Item 0 focuses itself on mount (see the handle-field
 /// doc comment on `PathBar`); this function only ever needs to flip the

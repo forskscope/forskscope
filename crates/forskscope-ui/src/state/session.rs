@@ -150,7 +150,7 @@ pub fn restore_tabs(store: &mut Store, resolution: &SessionRuntimeResolution) {
         }
     }
     if opened > 0 {
-        store.active.set(Some(active_idx.unwrap_or(0)));
+        set_active_tab(store, Some(active_idx.unwrap_or(0)));
     }
 }
 
@@ -202,8 +202,47 @@ pub fn close_tab(store: &mut Store, index: usize) {
     } else {
         Some(index.min(len - 1))
     };
-    store.active.set(new_active);
+    set_active_tab(store, new_active);
+}
+
+/// F194 (RFC-087 §3a): the one place `store.active` — the file-tab index
+/// `session.json`'s `active_tab` is derived from — is set. Every route that
+/// changes it goes through here: a tab-bar click, `Ctrl+Tab` and the tab
+/// list's own arrow keys (this release), and a close that selects a
+/// neighbour (already a caller, above). Before this, the session was saved
+/// only when a tab opened, closed or swapped sides — switching which tab
+/// was active, with none of those, left the restored tab wrong on next
+/// launch. `store.active_dir` is not routed through here: it is never read
+/// by `build_save_payload`, and it is always set in the same breath as
+/// `store.active` by every caller that changes it (never on its own, so
+/// there is nothing it alone could leave unsaved) — see `activate_tab_at`.
+pub(crate) fn set_active_tab(store: &mut Store, index: Option<usize>) {
+    store.active.set(index);
     save_session(store);
+}
+
+/// Request closing a file comparison tab — the one path the × button,
+/// `Ctrl+W` and `Delete` on a focused tab (RFC-087 §1) all go through, so
+/// "the same path" is true by construction rather than by three call sites
+/// agreeing to copy each other. A loading tab closes without asking
+/// (RFC-065: it has no merge state yet to lose); a dirty one asks first via
+/// `Modal::ConfirmClose`; otherwise it closes at once.
+pub(crate) fn request_close_file_tab(store: &mut Store, index: usize) {
+    let Some((is_loading, dirty)) = store.tabs.read().get(index).map(|tab| {
+        (
+            tab.state == crate::state::TabState::Loading,
+            tab.can_save && tab.merge.is_dirty(),
+        )
+    }) else {
+        return;
+    };
+    if is_loading {
+        close_tab(store, index);
+    } else if dirty {
+        store.modal.set(Modal::ConfirmClose(index));
+    } else {
+        close_tab(store, index);
+    }
 }
 
 #[cfg(test)]

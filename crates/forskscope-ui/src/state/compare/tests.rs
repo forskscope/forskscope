@@ -1305,3 +1305,146 @@ fn an_unreadable_file_still_gets_the_permission_advice() {
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o644)).unwrap();
     assert!(message.contains(ACCESS_GUIDANCE), "{message}");
 }
+
+// ── RFC-087 §2: activate_tab_at / activate_adjacent_tab ─────────────────────
+
+#[test]
+fn activate_adjacent_tab_cycles_through_explorer_files_and_dirs_wrapping() {
+    let dir = temp_dir("f087-adjacent-cycle");
+    let left1 = dir.join("a-left.txt");
+    let right1 = dir.join("a-right.txt");
+    let left2 = dir.join("b-left.txt");
+    let right2 = dir.join("b-right.txt");
+    fs::write(&left1, "a left\n").unwrap();
+    fs::write(&right1, "a right\n").unwrap();
+    fs::write(&left2, "b left\n").unwrap();
+    fs::write(&right2, "b right\n").unwrap();
+    let dir_left = dir.join("left-dir");
+    let dir_right = dir.join("right-dir");
+    fs::create_dir_all(&dir_left).unwrap();
+    fs::create_dir_all(&dir_right).unwrap();
+
+    crate::state::with_test_store(|store| {
+        open_compare(store, left1, right1);
+        open_compare(store, left2, right2);
+        open_dir_compare(store, dir_left, dir_right);
+        // Test premise: opening leaves the last-opened tab (the dir tab)
+        // active, at flat position 3 (Explorer, file, file, dir).
+        assert_eq!(*store.active.read(), None, "test premise");
+        assert_eq!(*store.active_dir.read(), Some(0), "test premise");
+
+        activate_adjacent_tab(store, true);
+        assert_eq!(
+            (*store.active.read(), *store.active_dir.read()),
+            (None, None),
+            "forward from the last tab (the dir tab) wraps to the Explorer"
+        );
+
+        activate_adjacent_tab(store, true);
+        assert_eq!(
+            (*store.active.read(), *store.active_dir.read()),
+            (Some(0), None),
+            "forward from the Explorer selects the first file tab"
+        );
+
+        activate_adjacent_tab(store, false);
+        assert_eq!(
+            (*store.active.read(), *store.active_dir.read()),
+            (None, None),
+            "backward from the first file tab wraps to the Explorer"
+        );
+    });
+}
+
+/// Falsify by routing `activate_tab_at`'s `TabKind::File` arm through
+/// `store.active.set(...)` directly instead of `super::session::set_active_tab`:
+/// this fails, since nothing would write `session.json` on the switch.
+#[test]
+fn activate_adjacent_tab_switching_to_a_file_tab_saves_the_session() {
+    let dir = temp_dir("f087-adjacent-saves");
+    let left1 = dir.join("a-left.txt");
+    let right1 = dir.join("a-right.txt");
+    let left2 = dir.join("b-left.txt");
+    let right2 = dir.join("b-right.txt");
+    fs::write(&left1, "a left\n").unwrap();
+    fs::write(&right1, "a right\n").unwrap();
+    fs::write(&left2, "b left\n").unwrap();
+    fs::write(&right2, "b right\n").unwrap();
+    let config_home = dir.join("config");
+    fs::create_dir_all(&config_home).unwrap();
+    let _config_root = crate::state::ConfigRootOverrideGuard::set(config_home.clone());
+
+    crate::state::with_test_store(|store| {
+        open_compare(store, left1, right1);
+        open_compare(store, left2, right2);
+        assert_eq!(
+            *store.active.read(),
+            Some(1),
+            "test premise: opening leaves the second (last-opened) tab active"
+        );
+
+        activate_adjacent_tab(store, false);
+        assert_eq!(*store.active.read(), Some(0));
+    });
+
+    let session_path = config_home.join("forskscope").join("session.json");
+    let repo = SessionRepository::new(session_path);
+    match repo.load() {
+        PersistenceLoad::Current { value } => {
+            assert_eq!(
+                value.active_tab,
+                Some(0),
+                "RFC-087 §2 / F194: a shortcut-driven tab switch must save \
+                 the newly active tab, just like a tab-bar click would"
+            );
+        }
+        other => panic!("expected Current, got {other:?}"),
+    }
+}
+
+#[test]
+fn activate_tab_at_the_explorer_position_clears_both_active_indices() {
+    let dir = temp_dir("f087-activate-explorer");
+    let left = dir.join("left.txt");
+    let right = dir.join("right.txt");
+    fs::write(&left, "a\n").unwrap();
+    fs::write(&right, "b\n").unwrap();
+
+    crate::state::with_test_store(|store| {
+        open_compare(store, left, right);
+        assert_eq!(*store.active.read(), Some(0), "test premise");
+
+        // Position 0 is always the Explorer, regardless of counts.
+        activate_tab_at(store, 0, 1, 0);
+        assert_eq!(*store.active.read(), None);
+        assert_eq!(*store.active_dir.read(), None);
+    });
+}
+
+#[test]
+fn activate_tab_at_a_dir_tab_position_selects_it_and_clears_the_file_index() {
+    let dir = temp_dir("f087-activate-dir");
+    let left = dir.join("left.txt");
+    let right = dir.join("right.txt");
+    fs::write(&left, "a\n").unwrap();
+    fs::write(&right, "b\n").unwrap();
+    let dir_left = dir.join("left-dir");
+    let dir_right = dir.join("right-dir");
+    fs::create_dir_all(&dir_left).unwrap();
+    fs::create_dir_all(&dir_right).unwrap();
+
+    crate::state::with_test_store(|store| {
+        open_compare(store, left, right);
+        assert_eq!(*store.active.read(), Some(0), "test premise");
+        open_dir_compare(store, dir_left, dir_right);
+        // Opening the dir tab already moved selection off the file tab.
+        assert_eq!(*store.active.read(), None, "test premise");
+        assert_eq!(*store.active_dir.read(), Some(0), "test premise");
+
+        // One file tab (positions 0=Explorer, 1=File(0)), so position 2 is
+        // the one dir tab.
+        activate_tab_at(store, 2, 1, 1);
+        assert_eq!(*store.active.read(), None);
+        assert_eq!(*store.active_dir.read(), Some(0));
+    });
+}

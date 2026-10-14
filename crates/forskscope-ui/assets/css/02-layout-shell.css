@@ -67,27 +67,49 @@ select option { background: var(--surface); color: var(--text); }
 
 /* ---- tabs ---- */
 .tabbar {
-  display: flex; align-items: flex-end; gap: .25rem; padding: .3rem .6rem 0;
+  display: flex; padding: .3rem .6rem 0;
   background: var(--surface-2); border-bottom: 1px solid var(--border);
   max-height: 3rem; overflow: hidden;
   flex-shrink: 0;
 }
-.tab {
+/* The `role="tablist"` element itself (RFC-087): the actual flex row the
+   tab slots sit in. A plain div has no layout of its own, so without this
+   the tablist wrapper rendered as a block box and every `.tab-slot` inside
+   it stacked as a separate line, clipped by `.tabbar`'s own overflow -
+   found live, by actually looking at the running app, not by review. */
+.tablist {
+  display: flex; align-items: flex-end; gap: .25rem; min-width: 0; overflow: hidden;
+}
+/* RFC-087: the close button is a DOM *sibling* of the tab, not a
+   descendant — a nested focusable button made WebKitGTK's AT-SPI bridge
+   resolve the tab's own default action to the button's, so `do_action` on
+   the tab closed it instead of selecting it (found by live testing, not
+   by assumption). `.tab-slot` is the flex row and carries the tab's whole
+   box (border/background/sizing) exactly as `.tab` used to; `.tab` itself
+   is now just the clickable/focusable label area within it. */
+.tab-slot {
   display: flex; align-items: center; gap: .4rem;
   padding: .3rem .7rem; border: 1px solid var(--border);
   border-bottom: none; border-radius: 6px 6px 0 0;
-  background: var(--surface); cursor: pointer; max-width: 22ch;
+  background: var(--surface); max-width: 22ch;
   height: 2.2rem; overflow: hidden;
 }
-.tab.active { background: var(--surface-3); border-color: var(--accent); }
+.tab-slot:has(.tab.active) { background: var(--surface-3); border-color: var(--accent); }
+.tab {
+  display: flex; align-items: center; gap: .4rem;
+  cursor: pointer; flex: 1; min-width: 0; overflow: hidden;
+}
+/* RFC-087: a real roving-tabindex focus ring — only the active tab is ever
+   a Tab stop, so this only ever shows on the one tab that can have it. */
+.tab:focus-visible { outline: var(--focus-ring) solid var(--focus); outline-offset: -2px; }
 .tab-title {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
   padding: .35rem .5rem .35rem .6rem; user-select: none;
   display: flex; align-items: center; gap: .25rem;
 }
-.tab-close { padding: .15rem .35rem; font-size: 14px; opacity: 0; border-radius: 4px; transition: opacity .1s; }
-.tab:hover .tab-close, .tab.active .tab-close { opacity: .6; }
-.tab:hover .tab-close:hover { opacity: 1; background: var(--danger-bg); }
+.tab-close { padding: .15rem .35rem; font-size: 14px; opacity: 0; border-radius: 4px; transition: opacity .1s; flex-shrink: 0; }
+.tab-slot:hover .tab-close, .tab-slot:has(.tab.active) .tab-close { opacity: .6; }
+.tab-slot:hover .tab-close:hover { opacity: 1; background: var(--danger-bg); }
 .dirty-dot { color: var(--warn); font-size: 10px; line-height: 1; }
 .tab-loading-spinner { display: inline-block; font-size: 10px; animation: spin 1.2s linear infinite; }
 

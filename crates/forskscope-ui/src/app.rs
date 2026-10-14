@@ -164,19 +164,15 @@ pub fn App() -> Element {
                         }
                     }
                     GlobalKeyAction::RequestCloseTab => {
+                        // Ctrl+W: close the active tab, through the same path
+                        // the tab's × button and Delete on a focused tab use.
                         if let Some(index) = active {
-                            // Ctrl+W: close the active tab, with dirty-state guard.
-                            let dirty = store.tabs.read().get(index)
-                                .map(|t| t.can_save && t.merge.is_dirty())
-                                .unwrap_or(false);
-                            if dirty {
-                                store.modal.set(crate::state::Modal::ConfirmClose(index));
-                            } else {
-                                crate::state::close_tab(&mut store, index);
-                            }
+                            crate::state::request_close_file_tab(&mut store, index);
                         }
                     }
                     GlobalKeyAction::OpenKeyboardRef => store.modal.set(crate::state::Modal::KeyboardRef),
+                    GlobalKeyAction::NextTab => crate::state::activate_adjacent_tab(&mut store, true),
+                    GlobalKeyAction::PrevTab => crate::state::activate_adjacent_tab(&mut store, false),
                     GlobalKeyAction::OpenSearch => {
                         // Ctrl+F: the search bar inside DiffWorkspace handles its own
                         // context; we use document::eval to click the search button.
@@ -190,7 +186,21 @@ pub fn App() -> Element {
             },
             Header {}
             TabBar {}
-            crate::keyboard::ControlZone { class: "body",
+            crate::keyboard::ControlZone {
+                class: "body",
+                role: "tabpanel",
+                // RFC-087 §1: the content area is labelled by the tab that
+                // is actually selected, by the same flat position its own
+                // `id="tab-{position}"` (tabs.rs) is rendered with.
+                aria_labelledby: {
+                    let file_count = store.tabs.read().len();
+                    let position = crate::state::tab_nav::position_of(
+                        active,
+                        *store.active_dir.read(),
+                        file_count,
+                    );
+                    format!("tab-{position}")
+                },
                 match (active, *store.active_dir.read()) {
                     (_, Some(dir_idx)) => {
                         let dir_tabs = store.dir_tabs.read();

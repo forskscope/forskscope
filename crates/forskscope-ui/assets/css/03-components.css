@@ -81,10 +81,20 @@ code.path-display {
 .advanced-toggle:hover { color: var(--accent); }
 
 .profile-list { display: flex; flex-direction: column; gap: .2rem; margin: .25rem 0; }
-.profile-row { display: flex; align-items: center; gap: .3rem; padding: .2rem .35rem; border-radius: 5px; cursor: pointer; }
+.profile-row { position: relative; display: flex; align-items: center; gap: .3rem; padding: .2rem .35rem; border-radius: 5px; cursor: pointer; }
 .profile-row:hover { background: var(--surface-3); }
 .profile-row.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.profile-name { flex: 1; font-size: 13px; font-family: ui-monospace, monospace; white-space: pre; }
+/* RFC-087 §3: a native radio, so the browser gives arrow-key selection and
+   change events for free — appearance alone is hidden (not display:none, so
+   it stays focusable and in the Tab order); `▸ `/`  ` in the label is still
+   what shows which one is active, same as before this was a radio group. */
+.profile-radio {
+  appearance: none; position: absolute; width: 1px; height: 1px; opacity: 0;
+}
+.profile-row:has(.profile-radio:focus-visible) {
+  outline: var(--focus-ring) solid var(--focus); outline-offset: 1px;
+}
+.profile-name { flex: 1; font-size: 13px; font-family: ui-monospace, monospace; white-space: pre; cursor: pointer; }
 .profile-delete { opacity: .4; padding: 0 .3rem; font-size: 12px; }
 .profile-delete:hover { opacity: 1; }
 .add-profile-form { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-top: .25rem; }

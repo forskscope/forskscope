@@ -9,6 +9,8 @@
 //! a text input must swallow a keydown before it can reach the global
 //! handler — one shared, testable helper: [`swallow_when_typing`].
 
+use std::rc::Rc;
+
 use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
 
@@ -62,6 +64,12 @@ pub(crate) enum GlobalKeyAction {
     RequestCloseTab,
     OpenKeyboardRef,
     OpenSearch,
+    /// RFC-087 §2: select the next / previous tab in the flat Explorer +
+    /// file + directory list, wrapping. The one pair of actions this
+    /// function returns with no active comparison tab — see
+    /// [`global_key_action`]'s own doc for why the gate moved.
+    NextTab,
+    PrevTab,
 }
 
 /// The decision RFC-060 guards: Escape closes an ordinary modal but never a
@@ -87,6 +95,25 @@ pub(crate) fn global_key_action(
 
     if modal.is_open() {
         return A::Ignore;
+    }
+
+    // RFC-087 §2: tab switching is the one command that needs no active
+    // comparison tab — checked before the gate below, which every other
+    // command still passes through unchanged. `swallow_when_typing` keeps
+    // this from a focused text field the same way it keeps everything else
+    // global out: `app.rs` only ever calls this with events a text input
+    // did not already stop.
+    match key {
+        Key::Tab if mods.contains(Modifiers::CONTROL) => {
+            return if mods.contains(Modifiers::SHIFT) {
+                A::PrevTab
+            } else {
+                A::NextTab
+            };
+        }
+        Key::PageDown if mods.contains(Modifiers::CONTROL) => return A::NextTab,
+        Key::PageUp if mods.contains(Modifiers::CONTROL) => return A::PrevTab,
+        _ => {}
     }
 
     if !has_active_tab {
@@ -161,13 +188,50 @@ pub(crate) fn controls_keep_enter(e: &Event<KeyboardData>) {
 /// deliberately **not** inside one, so Enter pressed with focus on the root
 /// still reaches the global handler.
 #[component]
-pub(crate) fn ControlZone(class: String, children: Element) -> Element {
+pub(crate) fn ControlZone(
+    class: String,
+    #[props(default)] role: Option<String>,
+    #[props(default)] aria_labelledby: Option<String>,
+    children: Element,
+) -> Element {
     rsx! {
         div {
             class: "{class}",
+            role,
+            aria_labelledby,
             onkeydown: move |e| controls_keep_enter(&e),
             {children}
         }
+    }
+}
+
+// ── Part D: focusing an already-mounted target (F185) ───────────────────────
+
+/// `.set_focus(true)` on an already-mounted target's handle, via
+/// `spawn_forever` so the caller's own `onkeydown` returns immediately. A
+/// no-op if the handle has not been captured yet — a silent no-op is the
+/// right failure mode for a focus call, which is advisory, not a panic.
+/// Shared by every keyboard surface that moves focus programmatically
+/// between its own already-mounted elements (the path bar's ⋯ menu, F185;
+/// the tab list's roving tabindex, RFC-087) — never for a target that
+/// might not exist in the DOM yet, which needs to focus itself from its
+/// own `onmounted` instead (see each caller's own account of why).
+///
+/// `spawn_forever`, not `spawn`: live AT-SPI testing of RFC-087's
+/// close-then-refocus requirement found that a plain `spawn` ties the task
+/// to whatever component scope is current when it's called — and every
+/// real caller here (the tab list's own `Delete` handling, the dirty-tab
+/// confirm modal's "Discard and close") calls this from the very
+/// component that is itself about to unmount as a result of the same
+/// click. Dioxus drops a `spawn`-ed task when its owning scope tears down,
+/// so `set_focus` silently never ran; `spawn_forever` runs detached from
+/// any one scope's lifecycle (the same reason `state::compare` already
+/// uses it for a reload that must survive its own view unmounting).
+pub(crate) fn focus_handle(handle: Option<Rc<MountedData>>) {
+    if let Some(h) = handle {
+        dioxus_core::spawn_forever(async move {
+            let _ = h.set_focus(true).await;
+        });
     }
 }
 
@@ -175,8 +239,6 @@ pub(crate) fn ControlZone(class: String, children: Element) -> Element {
 
 #[cfg(test)]
 pub(crate) mod test_support {
-    use std::rc::Rc;
-
     use super::*;
 
     struct FakeKeyboardEvent {
@@ -435,6 +497,72 @@ mod tests {
         );
     }
 
+    // ── RFC-087 §2: tab switching from anywhere ─────────────────────────────
+
+    /// The one pair of actions `global_key_action` returns with no active
+    /// comparison tab — the premise of "works from the Explorer". Falsify
+    /// by leaving the `!has_active_tab` gate where it was, ahead of the tab
+    /// switch match: this then fails with `Ignore`.
+    #[test]
+    fn ctrl_tab_switches_tabs_with_no_active_tab() {
+        assert_eq!(
+            global_key_action(&Key::Tab, Modifiers::CONTROL, ModalState::None, false),
+            GlobalKeyAction::NextTab,
+        );
+        assert_eq!(
+            global_key_action(
+                &Key::Tab,
+                Modifiers::CONTROL | Modifiers::SHIFT,
+                ModalState::None,
+                false,
+            ),
+            GlobalKeyAction::PrevTab,
+        );
+    }
+
+    #[test]
+    fn ctrl_page_down_and_up_also_switch_tabs_with_no_active_tab() {
+        assert_eq!(
+            global_key_action(&Key::PageDown, Modifiers::CONTROL, ModalState::None, false),
+            GlobalKeyAction::NextTab,
+        );
+        assert_eq!(
+            global_key_action(&Key::PageUp, Modifiers::CONTROL, ModalState::None, false),
+            GlobalKeyAction::PrevTab,
+        );
+    }
+
+    #[test]
+    fn tab_switching_also_works_with_an_active_tab() {
+        assert_eq!(
+            global_key_action(&Key::Tab, Modifiers::CONTROL, ModalState::None, true),
+            GlobalKeyAction::NextTab,
+        );
+    }
+
+    /// Acceptance criterion 3: while a modal is open, the tab-switch keys
+    /// do nothing either — the one exception to "needs no active tab" is
+    /// not an exception to "a modal owns every key".
+    #[test]
+    fn tab_switching_is_ignored_while_a_modal_is_open() {
+        assert_eq!(
+            global_key_action(&Key::Tab, Modifiers::CONTROL, ModalState::Other, false),
+            GlobalKeyAction::Ignore,
+        );
+        assert_eq!(
+            global_key_action(&Key::Tab, Modifiers::CONTROL, ModalState::Recovery, false),
+            GlobalKeyAction::Ignore,
+        );
+    }
+
+    #[test]
+    fn plain_tab_with_no_control_is_not_a_tab_switch() {
+        assert_eq!(
+            global_key_action(&Key::Tab, Modifiers::empty(), ModalState::None, true),
+            GlobalKeyAction::Ignore,
+        );
+    }
+
     // ── swallow_when_typing ─────────────────────────────────────────────────
 
     #[test]
@@ -512,11 +640,18 @@ mod tests {
         f()
     }
 
-    /// The wiring, not just the helper: the header, the tab bar and a bare
-    /// `ControlZone` each render a `keydown` listener. Neither the header's
-    /// nor the tab bar's own buttons register one (only `click`), so the
-    /// listener is `ControlZone`'s. Falsify by deleting `onkeydown` from
-    /// `ControlZone`: all three counts drop to zero.
+    /// The wiring, not just the helper: the header and a bare `ControlZone`
+    /// each render exactly one `keydown` listener, `ControlZone`'s own.
+    /// Falsify by deleting `onkeydown` from `ControlZone`: both counts drop
+    /// to zero.
+    ///
+    /// The tab bar renders **two** with nothing but the permanent Explorer
+    /// tab (no file or directory tabs): `ControlZone`'s, and the Explorer
+    /// tab's own (RFC-087 — every `role="tab"` needs its own keydown for
+    /// ←/→/Home/End/Delete, independent of `ControlZone`). Falsifying
+    /// `ControlZone` alone only brings the tab bar's count to one, not
+    /// zero — proven directly below, rather than folded into the same
+    /// zero-or-not assertion the other two use.
     #[test]
     fn the_header_the_tab_bar_and_control_zone_carry_the_enter_guard() {
         fn zone() -> Element {
@@ -530,6 +665,10 @@ mod tests {
         }
         assert_eq!(keydown_listeners(zone), 1, "ControlZone");
         assert_eq!(keydown_listeners(header), 1, "Header");
-        assert_eq!(keydown_listeners(tabbar), 1, "TabBar");
+        assert_eq!(
+            keydown_listeners(tabbar),
+            2,
+            "TabBar: ControlZone + the Explorer tab"
+        );
     }
 }

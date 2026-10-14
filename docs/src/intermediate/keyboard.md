@@ -1,8 +1,10 @@
 # Keyboard Reference
 
-Every shortcut below except **Escape** and the **Explorer** and **Modals** sections needs a
-**file-comparison tab to be active**. In the Explorer (the screen ForskScope starts on) and in
-a Directory Report tab, **Ctrl+/**, **Ctrl+W** and every Diff-view shortcut do nothing.
+Every shortcut below except **Escape**, the **Tabs**, **Explorer** and **Modals** sections
+needs a **file-comparison tab to be active**. In the Explorer (the screen ForskScope starts
+on) and in a Directory Report tab, **Ctrl+/**, **Ctrl+W** and every Diff-view shortcut do
+nothing — but switching tabs (below) works from anywhere, with no active comparison tab
+needed.
 
 ## Needs an active comparison tab
 
@@ -44,6 +46,20 @@ The **?** button in the header opens the same reference from any screen.
 | **Ctrl+F** | Open / close inline search bar |
 | **F3** | Next search match |
 | **Shift+F3** | Previous search match |
+
+## Tabs
+
+The tab bar (the Explorer tab plus every open file and directory comparison) is a standard
+accessible tab list: only the active tab is a Tab stop, and arrow keys move *and* select
+within it.
+
+| Shortcut | Action |
+|----------|--------|
+| **Ctrl+Tab** / **Ctrl+PageDown**         | Next tab, from anywhere — wraps, includes the Explorer |
+| **Ctrl+Shift+Tab** / **Ctrl+PageUp**     | Previous tab, from anywhere — wraps, includes the Explorer |
+| **←** / **→** *(tab list focused)*       | Previous / next tab |
+| **Home** / **End** *(tab list focused)*  | First (Explorer) / last tab |
+| **Delete** *(tab list focused)*          | Close the focused tab — same path as its **×** button and **Ctrl+W**; a tab with unsaved changes asks first. Does nothing on the Explorer tab |
 
 ## Explorer
 

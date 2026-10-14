@@ -21,7 +21,7 @@ use forskscope_ui_logic::{
 use crate::i18n::t;
 use crate::state::tab::{CompareLaunchMode, CompareTab, TabState, tab_title};
 use crate::state::types::{LargeLoadPrompt, LargeLoadTarget};
-use crate::state::{Modal, Store, save_session, settings::Lang};
+use crate::state::{Modal, Store, settings::Lang};
 
 // ── F84: pre-load size guard (RFC-013 §"Large file prompt") ────────────────────
 
@@ -377,7 +377,6 @@ pub(crate) fn open_compare_request_with_options(
     };
     let idx = store.tabs.read().len();
     store.tabs.write().push(tab);
-    store.active.set(Some(idx));
     // F61: session persistence is an explicit call, not the reactive
     // `use_effect` app.rs used to have on `store.tabs` - confirmed on a
     // real desktop process that the effect never runs for a signal write
@@ -386,8 +385,10 @@ pub(crate) fn open_compare_request_with_options(
     // correctly triggers a visual re-render. Only a write made from inside
     // a real Dioxus event handler (e.g. `close_tab`'s `onclick`) reliably
     // flushed the effect queue. See ROADMAP.md's F61 entry for the full
-    // account.
-    save_session(store);
+    // account. `set_active_tab` (F194) is now that explicit call, since it
+    // always saves when it sets `store.active` — kept here rather than
+    // relying on a caller elsewhere to do it.
+    super::session::set_active_tab(store, Some(idx));
 
     let mut tabs_signal = store.tabs;
     let lang = store.lang();
@@ -561,7 +562,7 @@ mod tests;
 pub fn open_dir_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     store.dir_tabs.write().push((left, right));
     let idx = store.dir_tabs.read().len() - 1;
-    store.active.set(None);
+    super::session::set_active_tab(store, None);
     store.active_dir.set(Some(idx));
 }
 
@@ -578,4 +579,52 @@ pub fn close_dir_tab(store: &mut Store, index: usize) {
     } else if cur > Some(index) {
         store.active_dir.set(cur.map(|i| i - 1));
     }
+}
+
+/// Make the tab at flat `position` (RFC-087; see `state::tab_nav`) the
+/// active one — what every navigation route (a tab-bar click, `Ctrl+Tab`,
+/// the tab list's arrow keys) ultimately does. Goes through
+/// [`super::session::set_active_tab`] for the file-tab case so the session
+/// is saved on every one of those routes, not just an open or close
+/// (F194).
+pub(crate) fn activate_tab_at(
+    store: &mut Store,
+    position: usize,
+    file_count: usize,
+    dir_count: usize,
+) {
+    use super::tab_nav::TabKind;
+    match super::tab_nav::kind_at(position, file_count, dir_count) {
+        TabKind::Explorer => {
+            super::session::set_active_tab(store, None);
+            store.active_dir.set(None);
+        }
+        TabKind::File(i) => {
+            super::session::set_active_tab(store, Some(i));
+            store.active_dir.set(None);
+        }
+        TabKind::Dir(j) => {
+            super::session::set_active_tab(store, None);
+            store.active_dir.set(Some(j));
+        }
+    }
+}
+
+/// `Ctrl+Tab` / `Ctrl+PageDown` (`forward`) and `Ctrl+Shift+Tab` /
+/// `Ctrl+PageUp` (`!forward`) (RFC-087 §2): the current flat position,
+/// wrapped one step. Reads `store` for the current tab counts and active
+/// state rather than taking them as parameters — its callers (the global
+/// keydown handler) have nothing else to pass.
+pub(crate) fn activate_adjacent_tab(store: &mut Store, forward: bool) {
+    let file_count = store.tabs.read().len();
+    let dir_count = store.dir_tabs.read().len();
+    let total = super::tab_nav::tab_count(file_count, dir_count);
+    let current =
+        super::tab_nav::position_of(*store.active.read(), *store.active_dir.read(), file_count);
+    let next = if forward {
+        super::tab_nav::next_position(current, total)
+    } else {
+        super::tab_nav::prev_position(current, total)
+    };
+    activate_tab_at(store, next, file_count, dir_count);
 }

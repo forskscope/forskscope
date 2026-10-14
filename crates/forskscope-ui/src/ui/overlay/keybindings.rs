@@ -46,6 +46,16 @@ pub fn KeyboardRefModal() -> Element {
                     }
                 }
                 div { class: "kb-section",
+                    h3 { {t(lang, "Tabs")} }
+                    div { class: "kb-table",
+                        KbRow { keys: "Ctrl + Tab / Ctrl + PageDown",         desc: t(lang, "Next tab, from anywhere (wraps, includes Explorer)") }
+                        KbRow { keys: "Ctrl + Shift + Tab / Ctrl + PageUp",   desc: t(lang, "Previous tab, from anywhere (wraps, includes Explorer)") }
+                        KbRow { keys: "← / →",          desc: t(lang, "Previous / next tab (tab list focused)") }
+                        KbRow { keys: "Home / End",     desc: t(lang, "First / last tab (tab list focused)") }
+                        KbRow { keys: "Delete",         desc: t(lang, "Close the focused tab (tab list focused)") }
+                    }
+                }
+                div { class: "kb-section",
                     h3 { {t(lang, "App")} }
                     div { class: "kb-table",
                         KbRow { keys: "Ctrl + W",       desc: t(lang, "Close the active comparison tab") }
