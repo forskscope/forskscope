@@ -5,7 +5,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.189.1] — Unreleased
+## [0.190.0] — 2026-10-14
+
+**Every tab and every compare profile, by keyboard.** Before this release a
+keyboard-only user could not get back to the Explorer from a comparison, move
+between comparisons, or choose a compare profile.
+
+### Added
+
+- **Switch tabs from anywhere:** `Ctrl+Tab` / `Ctrl+Shift+Tab` for the next and
+  previous tab, and `Ctrl+PageDown` / `Ctrl+PageUp` for the same. They wrap
+  around and include the Explorer. They do nothing while a dialog is open or
+  while you are typing in a text field. Verified on Linux.
+- **The tab bar works from the keyboard.** Tab moves into it once.
+  - ← and → move between tabs.
+  - Home and End go to the Explorer and to the last tab.
+  - Delete closes the focused tab. A tab with unsaved changes asks first, as its
+    × does.
+- **Screen readers hear the tab bar as a list of tabs,** with the selected tab
+  marked and *unsaved* in the name of a tab with unsaved changes.
+- **The active compare profile can be chosen with the arrow keys** (Settings →
+  Advanced). It looks the same as before.
+- The keyboard reference (`?` / `Ctrl+/`) lists the new keys.
+
+### Fixed
+
+- **ForskScope now reopens with the tab you were on.** 0.189.0 saved the selected
+  tab only when a tab was opened or closed, so switching tabs and then quitting
+  restored the wrong one.
+
+### Internal
+
+- RFC-087 records this design. It amends RFC-019's shortcut map and RFC-060's
+  rule for when global shortcuts apply.
+
 
 ## [0.189.0] — 2026-10-14
 
