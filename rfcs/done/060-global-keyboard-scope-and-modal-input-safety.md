@@ -8,6 +8,7 @@ inputs (`stop_propagation` in `view/search.rs`), across six surfaces:
 **Deferred:** the regression tests this RFC asked for were never written, so
 nothing stops a seventh input surface from omitting the guard — which was this
 RFC's stated purpose. Tracked as open work, not as part of this RFC.
+**Amended (v0.190.0, F192).** The global handler may act with no active comparison tab, for tab switching only; see *Amendment (v0.190.0, F192)* at the end.
 **Tracks.** Keyboard event ownership; modal and text-input safety; prevention
 of accidental merge/save/close actions.
 **Touches.** `crates/forskscope-ui/src/app.rs` (root `onkeydown`),
@@ -144,3 +145,22 @@ part of this RFC.
 - Is a tracked "text-entry focused" signal (set on focus/blur of known inputs)
   cleaner than a per-surface `stop_propagation`, given Dioxus 0.7's event API?
   W1 is the safe baseline; W2 is the nicer-if-feasible alternative.
+
+## Amendment (v0.190.0, F192): tab switching needs no active tab
+
+`global_key_action` returns *ignore* for every key while no comparison tab is
+active, which is always the case in the Explorer. That was right for every command
+it handled: save, undo, apply and search all act on a comparison. RFC-019's
+amendment of the same release adds tab switching (`Ctrl+Tab`, `Ctrl+PageDown`),
+which must work from the Explorer, because that is where a keyboard user is
+stranded today.
+
+**Decision.** The *no active tab* check moves from the top of the handler to the
+commands that need a comparison. Tab switching is the only command that runs
+without one.
+
+**This RFC's ownership rule is unchanged.** A modal open, or a text field focused,
+still takes every key first. `Ctrl+Tab` typed in the path editor, the filter, the
+search field or the profile name does nothing, and switches no tab under the
+user's typing. Tests: tab switching is returned with no active tab, and nothing is
+returned while a modal is open or a text field has focus.

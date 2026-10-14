@@ -1,6 +1,7 @@
 # RFC-019 — Command Registry, Keyboard Shortcuts, Command Palette, and Accessibility
 
 **Status.** Implemented (v0.63.0) — core complete; command palette UI component, context-menu generation deferred to UI layer
+**Amended (v0.190.0, F192).** Tab switching shortcuts and the tab list's own keys are added to the shortcut map; see *Amendment (v0.190.0, F192)* at the end.
 **Note (2026-08-27).** The `ToolbarSection`/`ToolbarItem` view-model (`forskscope-ui-logic::compare::command_bar`) was removed as obsolete (F75(b), handoff 010): the toolbar is built directly in `ui/view/diff/toolbar.rs`, nothing adopted the parallel representation. The command palette's own view-model (`palette_view`) is unaffected and remains deferred.
 
 ## 1. Summary
@@ -255,3 +256,43 @@ flowchart TD
 | Buttons bypass command registry | Medium | UI review rule |
 | Disabled commands confuse users | Low | Disabled reason messages |
 | Shortcut customization expands scope | Medium | Defer full customization |
+
+## Amendment (v0.190.0, F192): every tab and profile by keyboard
+
+§10 requires a keyboard path for every command-backed control. Two controls never
+had one: the tab bar (`ui/layout/tabs.rs`) and the Settings profile rows
+(`ui/view/settings/modal.rs`). Both are `div`/`span` with `onclick` and no
+`tabindex`, role or key handler, and nothing switched tabs from the keyboard. A
+keyboard-only user could not return to the Explorer from a comparison or make a
+profile active. Decided by the architect on 2026-10-14; the owner accepted F192 as
+the next theme the same day.
+
+**Shortcut map additions** (resolution level 3, *global app command shortcuts*, in
+§7):
+
+| Shortcut | Command | Available when |
+|---|---|---|
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab, wrapping, the Explorer included | no modal is open and no text field has focus |
+| `Ctrl+PageDown` / `Ctrl+PageUp` | The same | the same |
+
+If the WebView or the window consumes one pair before the page sees it, only the
+pair that arrives is shipped and documented. A shortcut that does not work is not
+listed.
+
+**The tab bar is a tab list** (the WAI-ARIA tabs pattern, automatic activation):
+
+- `role="tablist"`; each tab, the Explorer included, has `role="tab"` and
+  `aria-selected`. A roving tabindex gives the list one Tab stop.
+- ← / → move and select, wrapping. Home / End go to the Explorer / the last tab.
+- Delete closes the focused tab through the same path as its × button and
+  `Ctrl+W`, so unsaved changes still ask first. The Explorer tab cannot be closed.
+- The × buttons leave the Tab order, because closing has keyboard paths.
+- A tab with unsaved changes says so in its accessible name. The dot is not the
+  only cue (§10, *non-color-only state*).
+
+**The active compare profile is a radio group** (native radio inputs with labels),
+so the arrow keys choose it. Its appearance does not change. It stays inside
+Settings → *Advanced*, under the owner's rule that detailed settings stay hidden.
+
+Related: RFC-060's amendment of the same release, which lets the global handler
+act without an active comparison tab, for tab switching only.
