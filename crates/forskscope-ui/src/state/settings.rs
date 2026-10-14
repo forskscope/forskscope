@@ -15,6 +15,7 @@ pub use forskscope_core::DiffAlgorithm;
 use forskscope_core::DiffOptions;
 use forskscope_core::diff::InlineMode;
 use forskscope_core::persist::schema::settings::{PersistedDiffProfile, PersistedSettings};
+pub use forskscope_core::settings::display::ColourVision;
 use forskscope_core::settings::display::DiffFontFamilySetting;
 use forskscope_core::settings::{LocaleId, ThemeId};
 use forskscope_core::{CaseSensitivity, NewlineCompareMode, WhitespaceMode};
@@ -33,6 +34,18 @@ impl Theme {
             Self::Light => "theme-light",
             Self::Night => "theme-night",
         }
+    }
+}
+
+/// RFC-088 §2: the root class the red–green-safe palette combines with the
+/// theme class to override — `""` for `Standard`, so the root carries no
+/// extra class and only the theme's own tokens apply. `ColourVision` is a
+/// core type (re-exported above), so this is a free function rather than an
+/// inherent method (the orphan rule).
+pub fn colour_vision_css_class(cv: ColourVision) -> &'static str {
+    match cv {
+        ColourVision::Standard => "",
+        ColourVision::RedGreenSafe => "cv-rgsafe",
     }
 }
 
@@ -194,6 +207,9 @@ impl DiffProfile {
 #[derive(Debug, Clone)]
 pub struct AppSettings {
     pub theme: Theme,
+    /// RFC-088: a second, independent axis beside `theme` — it combines
+    /// with every theme rather than adding new ones.
+    pub colour_vision: ColourVision,
     pub language: Lang,
     pub diff_font_size: u32,
     /// Font family used in the diff panes (RFC-070). Default: Monospace.
@@ -248,6 +264,7 @@ impl AppSettings {
                 ThemeId::Light => Theme::Light,
                 ThemeId::Night => Theme::Night,
             },
+            colour_vision: v2.colour_vision,
             language: if v2.language == LocaleId::japanese() {
                 Lang::Ja
             } else {
@@ -290,6 +307,7 @@ impl AppSettings {
                 Theme::Light => ThemeId::Light,
                 Theme::Night => ThemeId::Night,
             },
+            colour_vision: self.colour_vision,
             language: match self.language {
                 Lang::En => LocaleId::english(),
                 Lang::Ja => LocaleId::japanese(),

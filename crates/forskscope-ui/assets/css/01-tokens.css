@@ -36,3 +36,23 @@
   --danger-bg: #4a1515;
   --ok: #3fb950; --warn: #d29922; --err: #f85149; --focus: #58a6ff;
 }
+
+/* ── Colour vision (RFC-088) ──
+   A second, independent axis beside the theme class: `.cv-rgsafe` combines
+   with every theme rather than adding new ones. Overrides exactly the four
+   tokens RFC-088 §2's table gives — every other token (including --rep-bg
+   and --warn, already told apart from these by hue and glyph) is
+   unchanged. `cargo xtask colour-vision` measures these pairs against
+   01-tokens.css directly, so a value here is the value the gate checks. */
+.theme-dark.cv-rgsafe {
+  --del-bg: #4d2e14; --ins-bg: #14304d;
+  --del-mark: #ff9b4a; --ins-mark: #5aa9ff;
+}
+.theme-light.cv-rgsafe {
+  --del-bg: #ffe2c7; --ins-bg: #d4e6ff;
+  --del-mark: #944800; --ins-mark: #0a5fd6;
+}
+.theme-night.cv-rgsafe {
+  --del-bg: #3d2410; --ins-bg: #10284a;
+  --del-mark: #f0883e; --ins-mark: #4fa3ff;
+}

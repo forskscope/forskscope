@@ -8,13 +8,19 @@
 //! ←/→/Home/End move *and select* within it (automatic activation: there is
 //! no separate "focused but not yet selected" state). `Delete` closes the
 //! focused tab through the exact path its own × button (and `Ctrl+W`) use.
+//!
+//! RFC-089: this bar also carries the app's *Settings* and *?* controls,
+//! the former global header's only working content — the header row itself
+//! is removed. They sit after the tab list as its siblings, not inside
+//! `role="tablist"`, so the tab list's own arrow-key navigation never
+//! reaches them.
 
 use dioxus::html::input_data::keyboard_types::Key;
 use dioxus::prelude::*;
 
 use crate::i18n::t;
 use crate::keyboard::focus_handle;
-use crate::state::{self, Store, tab_nav};
+use crate::state::{self, Modal, Store, tab_nav};
 
 #[component]
 pub fn TabBar() -> Element {
@@ -52,6 +58,19 @@ pub fn TabBar() -> Element {
                         is_active: active_dir == Some(j),
                     }
                 }
+            }
+            // RFC-089 §1: siblings of the tab list, never inside it, so
+            // RFC-087's arrow-key navigation (scoped to `role="tablist"`'s
+            // own children) cannot reach them — ordinary Tab stops after
+            // the tab list instead. They replace the removed `Header`.
+            span { class: "spacer" }
+            button {
+                onclick: move |_| store.modal.set(Modal::Settings),
+                {t(lang, "Settings")}
+            }
+            button {
+                onclick: move |_| store.modal.set(Modal::KeyboardRef),
+                title: t(lang, "Keyboard shortcuts (Ctrl+/)"), "?"
             }
         }
     }
@@ -91,6 +110,13 @@ fn TabItem(
     rsx! {
         div {
             class: "tab-slot",
+            // Review 161: explicit, not relied-on-by-omission — WebKitGTK
+            // prunes a role-less div from the accessibility tree on its
+            // own (confirmed live, request 152), but Chromium (WebView2)
+            // is untested here, and `role="none"` states the same intent
+            // without depending on each engine's default for an unstyled
+            // div specifically.
+            role: "none",
             div {
                 id: "tab-{position}",
                 role: "tab",
@@ -368,19 +394,7 @@ fn DirTabItem(
         let Some((l, r)) = tabs.get(index) else {
             return rsx! {};
         };
-        let ln = l
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        let rn = r
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        if ln == rn {
-            ln
-        } else {
-            format!("{ln} ↔ {rn}")
-        }
+        state::dir_tab_title(l, r)
     };
 
     rsx! {

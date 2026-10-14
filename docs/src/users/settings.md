@@ -1,7 +1,6 @@
 # Settings Reference
 
-Open Settings via the **Settings** button (⚙) in the header bar, or press
-**Ctrl+/** to open the keyboard reference, which has a link to Settings.
+Open Settings via the **Settings** button at the right end of the tab bar.
 Close Settings with **Esc**, the **Close** button, or by clicking outside
 the dialog.
 
@@ -18,6 +17,18 @@ the dialog.
 | **Night** | Deeper blacks, higher contrast. |
 
 Changes take effect immediately.
+
+### Colour vision
+
+| Value | Description |
+|-------|-------------|
+| **Standard** (default) | Today's diff colours. |
+| **Red–green safe (blue and orange)** | Removed lines and marks use orange, added lines and marks use blue, instead of red and green — distinguishable under deuteranopia and protanopia, the common forms of red–green colour vision deficiency. |
+
+Combines with every theme — it is a second, independent choice beside
+*Theme*, not a fourth theme. Changes take effect immediately. Every change is
+still marked with a `+`/`−`/`=`/`≠` glyph as well as colour, in both
+palettes, so colour is never the only cue.
 
 ### Diff font size
 

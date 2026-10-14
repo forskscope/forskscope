@@ -69,6 +69,7 @@ fn ja(key: &str) -> Option<&'static str> {
         "··· {n} unchanged lines — click to expand ···" => {
             "··· {n} 行変更なし — クリックして展開 ···"
         }
+        "Show {n} unchanged lines" => "{n} 行の変更なしを表示",
         "Deleted" => "削除",
         "Inserted" => "挿入",
         "Changed" => "変更",
@@ -286,6 +287,9 @@ fn ja(key: &str) -> Option<&'static str> {
         }
         "unsaved" => "未保存",
         "Theme" => "テーマ",
+        "Colour vision" => "色覚",
+        "Standard" => "標準",
+        "Red–green safe (blue and orange)" => "赤緑の区別に配慮（青とオレンジ）",
         "Language" => "言語",
         "Diff font family" => "差分フォントファミリー",
         "Monospace (default)" => "等幅（デフォルト）",

@@ -91,6 +91,13 @@ jobs:
       - name: CSS generated artifact check
         run: cargo xtask css --check
 
+      # RFC-088 §3: measures every removed/added colour pair in
+      # 01-tokens.css for visibility under simulated colour vision
+      # deficiency (Machado et al. 2009), so a later colour change cannot
+      # quietly undo the red-green-safe palette's whole reason to exist.
+      - name: Colour vision check
+        run: cargo xtask colour-vision
+
       - name: Version metadata sync check
         run: cargo xtask version-sync
 

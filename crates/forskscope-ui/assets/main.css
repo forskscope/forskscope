@@ -66,6 +66,26 @@ body,
   --ok: #3fb950; --warn: #d29922; --err: #f85149; --focus: #58a6ff;
 }
 
+/* ── Colour vision (RFC-088) ──
+   A second, independent axis beside the theme class: `.cv-rgsafe` combines
+   with every theme rather than adding new ones. Overrides exactly the four
+   tokens RFC-088 §2's table gives — every other token (including --rep-bg
+   and --warn, already told apart from these by hue and glyph) is
+   unchanged. `cargo xtask colour-vision` measures these pairs against
+   01-tokens.css directly, so a value here is the value the gate checks. */
+.theme-dark.cv-rgsafe {
+  --del-bg: #4d2e14; --ins-bg: #14304d;
+  --del-mark: #ff9b4a; --ins-mark: #5aa9ff;
+}
+.theme-light.cv-rgsafe {
+  --del-bg: #ffe2c7; --ins-bg: #d4e6ff;
+  --del-mark: #944800; --ins-mark: #0a5fd6;
+}
+.theme-night.cv-rgsafe {
+  --del-bg: #3d2410; --ins-bg: #10284a;
+  --del-mark: #f0883e; --ins-mark: #4fa3ff;
+}
+
 /* @source css/02-layout-shell.css */
 /* ── 02-layout-shell ────────────────────────────────────────────────────────
    App chrome: the persistent frame that wraps every workspace.
@@ -105,14 +125,6 @@ body,
   user-select: none;
 }
 
-/* ---- header ---- */
-.header {
-  display: flex; align-items: center; gap: .5rem;
-  padding: .35rem .6rem; background: var(--surface-2);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.brand { font-weight: 700; letter-spacing: .02em; }
 .spacer { flex: 1; }
 button {
   background: var(--surface-3); color: var(--text);
@@ -136,11 +148,16 @@ select option { background: var(--surface); color: var(--text); }
 
 /* ---- tabs ---- */
 .tabbar {
-  display: flex; padding: .3rem .6rem 0;
+  display: flex; align-items: flex-end; padding: .3rem .6rem 0;
   background: var(--surface-2); border-bottom: 1px solid var(--border);
   max-height: 3rem; overflow: hidden;
   flex-shrink: 0;
 }
+/* RFC-089: Settings/? sit at the bar's own bottom edge, level with the
+   tabs, not stretched to the bar's full height (flex's default
+   align-items: stretch). A little breathing room under them keeps them
+   off the border the tabs themselves touch. */
+.tabbar > button { margin-bottom: .3rem; }
 /* The `role="tablist"` element itself (RFC-087): the actual flex row the
    tab slots sit in. A plain div has no layout of its own, so without this
    the tablist wrapper rendered as a block box and every `.tab-slot` inside
@@ -854,10 +871,19 @@ code.path-display {
 .collapse-divider {
   display: block;
   box-sizing: border-box;
+  /* F196: now a real <button> (for a native Enter/Space activation path),
+     so the generic `button { min-height: var(--control-h); }` rule
+     (02-layout-shell.css) would otherwise win over this element's own
+     fixed `height` below — `min-height` and `height` are different
+     properties, so setting one does not override the other. Without this,
+     the divider grows taller than `.collapse-divider-spacer`'s matching
+     height and the three columns drift out of row alignment. */
+  min-height: 0;
   height: calc(var(--line-h) + .4rem + 2px);  /* line + .2rem*2 padding + 1px*2 border */
   line-height: var(--line-h);
+  width: 100%;
   padding: .2rem .6rem; margin: 0;
-  text-align: center; font-size: 11px;
+  text-align: center; font-size: 11px; font-family: inherit;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--muted); background: var(--surface-2);
   border: 1px dashed var(--border); border-radius: 4px;

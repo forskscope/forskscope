@@ -1,24 +1,26 @@
-//! RFC-076 F26: per-variant serialization assertions for the ten schema
+//! RFC-076 F26: per-variant serialization assertions for the eleven schema
 //! enums [`crate::persist::schema::settings::PersistedSettings`] reuses
 //! directly as canonical v2 wire types.
 //!
 //! Five of these enums (`WhitespaceMode`, `NewlineCompareMode`,
 //! `CaseSensitivity`, `InlineMode`, `DiffAlgorithm`) only ever appear on
 //! `profiles`, a list field — the golden fixture's multiple profile entries
-//! already exercise every variant. The other five (`ThemeId`, `Density`,
-//! `FontFamilySetting`, `DiffFontFamilySetting`, `NewlinePolicy`) appear
-//! only on scalar fields, where a payload holds exactly one value: the
-//! fixture can pin only whichever variant happens to be on disk, so twelve
-//! variants were provably unpinned (review 036's mutation-testing finding,
-//! registered as F26) — renaming `ThemeId::Dark` passed all 969 tests before
-//! this file existed. These tests assert every variant's exact wire string
-//! directly, independent of any fixture, so a rename of any variant —
-//! scalar-field or list-field — fails here regardless of which value a
-//! fixture happens to hold.
+//! already exercise every variant. The other six (`ThemeId`, `ColourVision`
+//! (RFC-088), `Density`, `FontFamilySetting`, `DiffFontFamilySetting`,
+//! `NewlinePolicy`) appear only on scalar fields, where a payload holds
+//! exactly one value: the fixture can pin only whichever variant happens to
+//! be on disk, so twelve variants were provably unpinned (review 036's
+//! mutation-testing finding, registered as F26) — renaming `ThemeId::Dark`
+//! passed all 969 tests before this file existed. These tests assert every
+//! variant's exact wire string directly, independent of any fixture, so a
+//! rename of any variant — scalar-field or list-field — fails here
+//! regardless of which value a fixture happens to hold.
 
 use crate::diff::{CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode};
 use crate::encoding::NewlinePolicy;
-use crate::settings::display::{Density, DiffFontFamilySetting, FontFamilySetting, ThemeId};
+use crate::settings::display::{
+    ColourVision, Density, DiffFontFamilySetting, FontFamilySetting, ThemeId,
+};
 
 fn assert_wire_string<T>(value: T, expected: &str)
 where
@@ -41,6 +43,12 @@ fn theme_id_variants_have_exact_wire_strings() {
     assert_wire_string(ThemeId::Dark, "dark");
     assert_wire_string(ThemeId::Light, "light");
     assert_wire_string(ThemeId::Night, "night");
+}
+
+#[test]
+fn colour_vision_variants_have_exact_wire_strings() {
+    assert_wire_string(ColourVision::Standard, "standard");
+    assert_wire_string(ColourVision::RedGreenSafe, "red-green-safe");
 }
 
 #[test]

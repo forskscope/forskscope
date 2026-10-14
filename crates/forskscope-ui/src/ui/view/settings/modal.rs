@@ -108,6 +108,19 @@ pub fn SettingsModal() -> Element {
                     }
                 }
                 div { class: "field",
+                    span { {t(lang, "Colour vision")} }
+                    select {
+                        value: cur.colour_vision.as_str(),
+                        onchange: move |e| {
+                            store.settings.write().colour_vision =
+                                crate::state::ColourVision::from_id(&e.value()).unwrap_or_default();
+                            super::persist(store);
+                        },
+                        option { value: "standard", {t(lang, "Standard")} }
+                        option { value: "red-green-safe", {t(lang, "Red–green safe (blue and orange)")} }
+                    }
+                }
+                div { class: "field",
                     span { {t(lang, "Language")} }
                     select {
                         value: lv(cur.language),

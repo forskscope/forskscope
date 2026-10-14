@@ -91,6 +91,43 @@ impl ThemeTokens {
     }
 }
 
+// ── Colour vision ────────────────────────────────────────────────────────────
+
+/// Colour-vision palette choice (RFC-088): a second, independent axis beside
+/// [`ThemeId`] — it combines with every theme rather than adding new ones.
+///
+/// Part of the settings v2 on-disk schema (RFC-076): renaming a variant or
+/// changing its serde representation is a schema change and requires a
+/// version bump, not just a Rust-level rename.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ColourVision {
+    #[default]
+    Standard,
+    RedGreenSafe,
+}
+
+impl ColourVision {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Standard => "standard",
+            Self::RedGreenSafe => "red-green-safe",
+        }
+    }
+
+    pub fn from_id(s: &str) -> Option<Self> {
+        match s {
+            "standard" => Some(Self::Standard),
+            "red-green-safe" => Some(Self::RedGreenSafe),
+            _ => None,
+        }
+    }
+
+    pub fn all() -> &'static [Self] {
+        &[Self::Standard, Self::RedGreenSafe]
+    }
+}
+
 // ── Density / display ─────────────────────────────────────────────────────────
 
 /// UI layout density (RFC-009 §4 `AppearanceSettings`).

@@ -14,11 +14,13 @@
 //!   cargo xtask xlsx-fixtures --scale <dir> — write the size cases (a handful of rows against 40,000; 2,000 rows) to <dir>, never into the repository
 //!   cargo xtask pages-origin-check <index.html> — verify a page loads nothing from another origin (handoff 075 §1)
 //!   cargo xtask pages-link-check <site-dir>     — verify every relative link/image in a built site resolves (handoff 075 §3)
+//!   cargo xtask colour-vision — verify every removed/added colour pair stays distinguishable under simulated colour vision deficiency (RFC-088 §3)
 //!
 //! CSS source files under assets/css/ are assembled in alphabetical order.
 //! The numeric prefix on each filename (00-, 01-, …) encodes the cascade order.
 //! To add a file: create it with the appropriate prefix; run `cargo xtask css`.
 
+mod colour_vision;
 mod pages_check;
 mod rfc_sync;
 mod ui_logic_connectivity;
@@ -63,6 +65,7 @@ fn main() {
         Some("pages-link-check") if args.len() == 2 => {
             pages_check::run_link_check(Path::new(&args[1]));
         }
+        Some("colour-vision") if args.len() == 1 => colour_vision::run(&workspace_root()),
         Some(cmd) => {
             eprintln!("unknown command: {cmd}");
             print_usage();
@@ -86,6 +89,7 @@ fn print_usage() {
     eprintln!("       cargo xtask xlsx-fixtures [--check | --scale <dir>]");
     eprintln!("       cargo xtask pages-origin-check <index.html>");
     eprintln!("       cargo xtask pages-link-check <site-dir>");
+    eprintln!("       cargo xtask colour-vision");
 }
 
 pub(crate) fn workspace_root() -> PathBuf {

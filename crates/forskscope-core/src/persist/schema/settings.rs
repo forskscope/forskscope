@@ -27,7 +27,7 @@ use crate::diff::{CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode
 use crate::encoding::NewlinePolicy;
 use crate::job::PerformanceLimits;
 use crate::settings::display::{
-    Density, DiffFontFamilySetting, FontFamilySetting, LocaleId, ThemeId,
+    ColourVision, Density, DiffFontFamilySetting, FontFamilySetting, LocaleId, ThemeId,
 };
 use legacy::{
     LegacyAppSettingsV0, LegacyDiffAlgorithmV0, LegacyDiffFontFamilyV0, LegacyLangV0, LegacyThemeV0,
@@ -59,6 +59,10 @@ const CONTEXT_LINES_MAX: usize = 20;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PersistedSettings {
     pub theme: ThemeId,
+    /// RFC-088: a second, independent axis beside `theme` — it combines with
+    /// every theme rather than adding new ones.
+    #[serde(default)]
+    pub colour_vision: ColourVision,
     pub language: LocaleId,
 
     /// Diff-pane font size (UI-owned).
@@ -152,6 +156,7 @@ impl Default for PersistedSettings {
     fn default() -> Self {
         Self {
             theme: ThemeId::default(),
+            colour_vision: ColourVision::default(),
             language: LocaleId::english(),
             diff_font_size: default_diff_font_size(),
             diff_font_family: DiffFontFamilySetting::default(),
@@ -316,6 +321,8 @@ fn migrate_from_v0(v0: LegacyAppSettingsV0) -> PersistedSettings {
             LegacyThemeV0::Light => ThemeId::Light,
             LegacyThemeV0::Night => ThemeId::Night,
         },
+        // v0 has no colour-vision concept; the product-wide default applies.
+        colour_vision: ColourVision::default(),
         language: match v0.language {
             LegacyLangV0::En => LocaleId::english(),
             LegacyLangV0::Ja => LocaleId::japanese(),

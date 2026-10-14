@@ -17,7 +17,7 @@ pub(crate) mod tab_nav;
 pub mod types;
 
 pub(crate) use compare::{
-    activate_adjacent_tab, activate_tab_at, open_compare_request_with_options,
+    activate_adjacent_tab, activate_tab_at, dir_tab_title, open_compare_request_with_options,
     reload_tab_with_options,
 };
 pub use compare::{
@@ -26,7 +26,9 @@ pub use compare::{
 pub use profile::{add_profile, remove_profile, select_profile};
 pub(crate) use session::request_close_file_tab;
 pub use session::{close_tab, resolve_session, restore_tabs, save_session};
-pub use settings::{AppSettings, BatchCopySpec, DiffAlgorithmSetting, DiffFontFamily, Lang, Theme};
+pub use settings::{
+    AppSettings, BatchCopySpec, ColourVision, DiffAlgorithmSetting, DiffFontFamily, Lang, Theme,
+};
 pub use tab::{
     CompareTab, TabState, change_diff_options, change_encoding, set_diff_options, set_encoding,
     swap_sides,

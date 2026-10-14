@@ -6,7 +6,6 @@ use forskscope_ui_logic::StartupRequest;
 use crate::state::{
     Store, advance_recovery_queue, open_compare_request, resolve_session, restore_tabs,
 };
-use crate::ui::layout::header::Header;
 use crate::ui::layout::statusbar::StatusBar;
 use crate::ui::layout::tabs::TabBar;
 use crate::ui::view::diff::{DiffWorkspace, apply_focused_hunk, move_focus, save_tab};
@@ -80,30 +79,75 @@ pub fn App() -> Element {
         }
     });
 
-    // Update the OS window title to reflect the active comparison.
-    use_effect(move || {
-        let title = match *store.active.read() {
-            Some(i) => store
-                .tabs
-                .read()
-                .get(i)
-                .map(|t| format!("ForskScope — {}", t.title))
-                .unwrap_or_else(|| "ForskScope".into()),
-            None => "ForskScope".into(),
-        };
-        spawn(async move {
-            let _ = dioxus::document::eval(&format!("document.title = {:?}", title)).await;
-        });
-    });
+    // RFC-089 §2: the desktop window's title follows the selected tab, its
+    // title text, and its unsaved state.
+    //
+    // Set directly in the render body, not from a `use_effect` — live
+    // testing found that this dioxus-desktop integration's effect queue
+    // lags renders by several ticks in this environment (confirmed by
+    // instrumenting both: a render's own `eprintln!` fires on every real
+    // state change, but a `use_effect` queued by that same change sat
+    // unflushed through multiple further actions and 8+ idle seconds,
+    // only running once *another* unrelated action arrived). A stale
+    // window title for an unpredictable number of actions is a real,
+    // visible defect, not a cosmetic one, so this follows render's own
+    // prompt timing instead of depending on effect flushing — the same
+    // reasoning this codebase already applies to session saves (F194:
+    // `set_active_tab` calls `save_session` directly, not via an effect).
+    // `use_window()` is a real hook (`use_hook` underneath) and must be
+    // called unconditionally at the top level, every render, in the same
+    // order — never from inside a conditional or a closure.
+    let desktop = dioxus_desktop::use_window();
+    // `Rc<RefCell<_>>`, not a bare `RefCell<_>`: `use_hook` clones its
+    // stored value on every call (its `State: Clone` bound), and cloning a
+    // bare `RefCell` would hand back an independent copy each render —
+    // mutations through it would never reach the next render's clone. `Rc`
+    // clones cheaply (a refcount bump) while every clone still shares the
+    // one underlying cell.
+    let last_window_title = use_hook(|| std::rc::Rc::new(std::cell::RefCell::new(String::new())));
+    {
+        let (selected_title, dirty): (Option<String>, bool) =
+            match (*store.active.read(), *store.active_dir.read()) {
+                (Some(i), _) => {
+                    let tabs = store.tabs.read();
+                    match tabs.get(i) {
+                        Some(t) => (Some(t.title.clone()), t.can_save && t.merge.is_dirty()),
+                        None => (None, false),
+                    }
+                }
+                (None, Some(j)) => {
+                    let dir_tabs = store.dir_tabs.read();
+                    let title = dir_tabs
+                        .get(j)
+                        .map(|(l, r)| crate::state::dir_tab_title(l, r));
+                    (title, false)
+                }
+                (None, None) => (None, false),
+            };
+        let title = window_title(selected_title.as_deref(), dirty);
+        // A plain `RefCell`, not a `Signal` — this is a side-effect guard
+        // read and written in the same render pass, never read by `rsx!`,
+        // so it must never participate in Dioxus's own reactivity (writing
+        // a `Signal` during render, rather than in an event handler or
+        // effect, schedules a further render on every call).
+        if *last_window_title.borrow() != title {
+            desktop.window.set_title(&title);
+            *last_window_title.borrow_mut() = title;
+        }
+    }
 
     let theme_class = store.settings.read().theme.css_class();
+    // RFC-088: a second, independent root class — "" for Standard, so the
+    // root carries no extra class and only the theme's own tokens apply.
+    let cv_class =
+        crate::state::settings::colour_vision_css_class(store.settings.read().colour_vision);
     let active = *store.active.read();
     let toast = store.toast.read().cloned();
 
     rsx! {
         style { {MAIN_CSS} }
         div {
-            class: "app {theme_class}",
+            class: "app {theme_class} {cv_class}",
             id: "app-root",
             tabindex: "-1",
             onmounted: move |_| {
@@ -184,7 +228,6 @@ pub fn App() -> Element {
                     }
                 }
             },
-            Header {}
             TabBar {}
             crate::keyboard::ControlZone {
                 class: "body",
@@ -246,5 +289,46 @@ pub fn App() -> Element {
                 }
             }
         }
+    }
+}
+
+/// RFC-089 §2: the desktop window's title for the given selection state —
+/// pure, so the mapping itself is unit-testable independent of the
+/// `set_title` call; the effect above is `window_title`'s only caller.
+/// `selected` is `None` for the Explorer, `Some(title)` for a file or
+/// folder comparison; `dirty` is only ever true for a file comparison.
+fn window_title(selected: Option<&str>, dirty: bool) -> String {
+    match selected {
+        None => "ForskScope".to_string(),
+        Some(title) if dirty => format!("● {title} — ForskScope"),
+        Some(title) => format!("{title} — ForskScope"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::window_title;
+
+    /// RFC-089 §2's table, one row per case. Falsify by deleting any one
+    /// arm's distinguishing behaviour (the dirty-bullet prefix, or the
+    /// em-dash suffix): the matching assertion fails.
+    #[test]
+    fn window_title_follows_rfc_089_table() {
+        assert_eq!(window_title(None, false), "ForskScope", "Explorer");
+        assert_eq!(
+            window_title(Some("app.js ↔ app.js"), false),
+            "app.js ↔ app.js — ForskScope",
+            "a file comparison"
+        );
+        assert_eq!(
+            window_title(Some("app.js ↔ app.js"), true),
+            "● app.js ↔ app.js — ForskScope",
+            "a file comparison with unsaved changes"
+        );
+        assert_eq!(
+            window_title(Some("src ↔ src"), false),
+            "src ↔ src — ForskScope",
+            "a folder comparison"
+        );
     }
 }

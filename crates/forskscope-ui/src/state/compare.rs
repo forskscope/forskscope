@@ -559,6 +559,26 @@ pub(super) fn load_and_diff(
 #[cfg(test)]
 mod tests;
 
+/// Derive a human-readable title for a directory comparison from its two
+/// roots. The one function the tab bar's `DirTabItem` and the window-title
+/// effect (RFC-089 §2) both call, so the two cannot disagree — mirrors
+/// `state::tab::tab_title`'s file-tab equivalent.
+pub(crate) fn dir_tab_title(l: &std::path::Path, r: &std::path::Path) -> String {
+    let ln = l
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let rn = r
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if ln == rn {
+        ln
+    } else {
+        format!("{ln} ↔ {rn}")
+    }
+}
+
 pub fn open_dir_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     store.dir_tabs.write().push((left, right));
     let idx = store.dir_tabs.read().len() - 1;

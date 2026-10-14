@@ -14,7 +14,7 @@ use crate::job::PerformanceLimits;
 use crate::persist::schema::PersistenceLoad;
 use crate::persist::schema::settings::{PersistedDiffProfile, PersistedSettings, load_settings};
 use crate::settings::display::{
-    Density, DiffFontFamilySetting, FontFamilySetting, LocaleId, ThemeId,
+    ColourVision, Density, DiffFontFamilySetting, FontFamilySetting, LocaleId, ThemeId,
 };
 
 const SETTINGS_V0_FIXTURE: &str = include_str!("fixtures/persistence/settings-v0.json");
@@ -23,6 +23,7 @@ const SETTINGS_V2_FIXTURE: &str = include_str!("fixtures/persistence/settings-v2
 fn sample_v2() -> PersistedSettings {
     PersistedSettings {
         theme: ThemeId::Night,
+        colour_vision: ColourVision::RedGreenSafe,
         language: LocaleId::english(),
         diff_font_size: 15,
         diff_font_family: DiffFontFamilySetting::Consolas,
@@ -106,6 +107,7 @@ fn current_v2_tolerates_unknown_payload_fields() {
 fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
     let expected = PersistedSettings {
         theme: ThemeId::Night,
+        colour_vision: ColourVision::RedGreenSafe,
         language: LocaleId::japanese(),
         diff_font_size: 15,
         diff_font_family: DiffFontFamilySetting::Consolas,
@@ -173,6 +175,26 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
     }
 }
 
+/// RFC-088: a v2 settings file written before `colour_vision` existed (every
+/// 0.190.x release) has no such key in its payload at all — distinct from
+/// `current_v2_tolerates_unknown_payload_fields`, which proves the *reverse*
+/// direction (an unrecognized field is ignored). `#[serde(default)]` is what
+/// makes a *missing* field fall back to `ColourVision::default()` rather than
+/// fail to parse. Falsify by removing `#[serde(default)]` from the field:
+/// this fails to parse and the match hits the `other` arm.
+#[test]
+fn a_pre_colour_vision_v2_file_loads_with_the_standard_palette() {
+    let mut payload = serde_json::to_value(sample_v2()).unwrap();
+    payload.as_object_mut().unwrap().remove("colour_vision");
+    let raw = envelope_for(2, &payload);
+    match load_settings(&raw) {
+        PersistenceLoad::Current { value } => {
+            assert_eq!(value.colour_vision, ColourVision::Standard);
+        }
+        other => panic!("expected Current, got {other:?}"),
+    }
+}
+
 // ── Legacy v0 ────────────────────────────────────────────────────────────
 
 #[test]
@@ -208,6 +230,7 @@ fn legacy_v0_fixture_migrates_every_field_exactly() {
             // Core-only fields not present in v0 fall back to core defaults.
             assert_eq!(value.density, Density::default());
             assert_eq!(value.performance, PerformanceLimits::default());
+            assert_eq!(value.colour_vision, ColourVision::default());
         }
         other => panic!("expected MigratedLegacy, got {other:?}"),
     }

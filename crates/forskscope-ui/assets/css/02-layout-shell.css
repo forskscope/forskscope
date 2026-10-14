@@ -36,14 +36,6 @@
   user-select: none;
 }
 
-/* ---- header ---- */
-.header {
-  display: flex; align-items: center; gap: .5rem;
-  padding: .35rem .6rem; background: var(--surface-2);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.brand { font-weight: 700; letter-spacing: .02em; }
 .spacer { flex: 1; }
 button {
   background: var(--surface-3); color: var(--text);
@@ -67,11 +59,16 @@ select option { background: var(--surface); color: var(--text); }
 
 /* ---- tabs ---- */
 .tabbar {
-  display: flex; padding: .3rem .6rem 0;
+  display: flex; align-items: flex-end; padding: .3rem .6rem 0;
   background: var(--surface-2); border-bottom: 1px solid var(--border);
   max-height: 3rem; overflow: hidden;
   flex-shrink: 0;
 }
+/* RFC-089: Settings/? sit at the bar's own bottom edge, level with the
+   tabs, not stretched to the bar's full height (flex's default
+   align-items: stretch). A little breathing room under them keeps them
+   off the border the tabs themselves touch. */
+.tabbar > button { margin-bottom: .3rem; }
 /* The `role="tablist"` element itself (RFC-087): the actual flex row the
    tab slots sit in. A plain div has no layout of its own, so without this
    the tablist wrapper rendered as a block box and every `.tab-slot` inside

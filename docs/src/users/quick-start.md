@@ -49,5 +49,6 @@ The tab shows a dot (●) when the result has unsaved changes.
 
 ## Settings
 
-Click **Settings** in the header to change the theme, language, or diff font
-size.  Settings are saved automatically.
+Click **Settings** at the right end of the tab bar to change the theme,
+colour vision palette, language, or diff font size.  Settings are saved
+automatically.

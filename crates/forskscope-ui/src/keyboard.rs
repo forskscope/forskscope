@@ -640,10 +640,9 @@ mod tests {
         f()
     }
 
-    /// The wiring, not just the helper: the header and a bare `ControlZone`
-    /// each render exactly one `keydown` listener, `ControlZone`'s own.
-    /// Falsify by deleting `onkeydown` from `ControlZone`: both counts drop
-    /// to zero.
+    /// The wiring, not just the helper: a bare `ControlZone` renders
+    /// exactly one `keydown` listener, its own. Falsify by deleting
+    /// `onkeydown` from `ControlZone`: both counts drop to zero.
     ///
     /// The tab bar renders **two** with nothing but the permanent Explorer
     /// tab (no file or directory tabs): `ControlZone`'s, and the Explorer
@@ -651,20 +650,19 @@ mod tests {
     /// ←/→/Home/End/Delete, independent of `ControlZone`). Falsifying
     /// `ControlZone` alone only brings the tab bar's count to one, not
     /// zero — proven directly below, rather than folded into the same
-    /// zero-or-not assertion the other two use.
+    /// zero-or-not assertion the other uses. RFC-089: the tab bar now also
+    /// carries the *Settings* and *?* buttons the removed `Header` used to
+    /// — plain buttons, no `onkeydown` of their own, so this count is
+    /// unaffected by their addition.
     #[test]
-    fn the_header_the_tab_bar_and_control_zone_carry_the_enter_guard() {
+    fn the_tab_bar_and_a_bare_control_zone_carry_the_enter_guard() {
         fn zone() -> Element {
             rsx! { ControlZone { class: "z", button { "x" } } }
-        }
-        fn header() -> Element {
-            with_store(|| rsx! { crate::ui::layout::header::Header {} })
         }
         fn tabbar() -> Element {
             with_store(|| rsx! { crate::ui::layout::tabs::TabBar {} })
         }
         assert_eq!(keydown_listeners(zone), 1, "ControlZone");
-        assert_eq!(keydown_listeners(header), 1, "Header");
         assert_eq!(
             keydown_listeners(tabbar),
             2,

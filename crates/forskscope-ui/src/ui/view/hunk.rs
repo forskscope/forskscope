@@ -97,7 +97,13 @@ pub fn HunkBlock(
                         left_no: row.left.as_ref().and_then(|l| l.original_line_number),
                         kind: hunk.kind, char_mode, lang,
                     } }
-                    div { class: "collapse-divider", onclick: move |_| on_expand.call(hunk_id),
+                    button {
+                        class: "collapse-divider",
+                        // F196: a real button, not a div — Enter and Space
+                        // now expand it natively; before this, no keyboard
+                        // route existed to reach it at all.
+                        aria_label: t(lang, "Show {n} unchanged lines").replace("{n}", &hidden.to_string()),
+                        onclick: move |_| on_expand.call(hunk_id),
                         {t(lang, "··· {n} unchanged lines — click to expand ···").replace("{n}", &hidden.to_string())}
                     }
                     for (_, row) in tail_rows { RowLeft {
@@ -543,5 +549,71 @@ mod tests {
             assert!(!wants_replace_label(kind, true));
             assert!(!wants_replace_label(kind, false));
         }
+    }
+
+    /// F196: the collapsed-lines divider's accessible name says how many
+    /// lines it would show — before this it was a `div` with `onclick`
+    /// only, with no keyboard route at all and no name distinct from its
+    /// decorative "··· click to expand ···" text. Falsify by removing the
+    /// `aria_label` from the `button` in `HunkBlock`'s collapse branch:
+    /// this fails to find any matching label.
+    ///
+    /// Does NOT prove the element is a `<button>` rather than a `div` with
+    /// `role="button"` — the tag itself is static template content this
+    /// harness's mutation-inspection cannot see (same limitation
+    /// `settings::modal::tests::the_about_control_keeps_its_accessible_name`
+    /// documents). Confirmed by reading the source, and live — Tab reaches
+    /// it, Enter expands it — in the review response.
+    #[test]
+    fn the_collapsed_lines_divider_names_how_many_lines_it_hides() {
+        fn root() -> Element {
+            use_context_provider(|| {
+                Store::new(
+                    crate::state::AppSettings::default(),
+                    Default::default(),
+                    false,
+                )
+            });
+            // Eleven shared lines after one that differs: one Replace hunk,
+            // then one Equal hunk long enough (> 2*3+1) to collapse at
+            // context_lines: 3.
+            let left = "X\na\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\n";
+            let right = "Y\na\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\n";
+            let diff =
+                forskscope_core::compute_diff(left, right, forskscope_core::DiffOptions::default());
+            let merge = forskscope_core::MergeSession::from_diff(&diff);
+            let hunk = merge
+                .hunks()
+                .iter()
+                .find(|h| h.kind == HunkKind::Equal && h.rows.len() > 7)
+                .expect("test premise: an Equal hunk long enough to collapse")
+                .clone();
+            rsx! {
+                HunkBlock {
+                    index: 0, hunk, col: HunkCol::Left,
+                    char_mode: false, context_lines: 3, focused: false,
+                    can_save: true, is_expanded: false,
+                    on_expand: move |_: u64| {},
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let labels: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute { name, value, .. }
+                    if name.contains("label") =>
+                {
+                    Some(format!("{value:?}"))
+                }
+                _ => None,
+            })
+            .collect();
+        assert!(
+            labels.iter().any(|l| l.contains("unchanged lines")),
+            "expected the collapse button's accessible name among {labels:?}"
+        );
     }
 }

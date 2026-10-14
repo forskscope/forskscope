@@ -6,6 +6,7 @@
   "updated_unix": 1700000100,
   "payload": {
     "theme": "night",
+    "colour_vision": "red-green-safe",
     "language": "ja",
     "diff_font_size": 15,
     "diff_font_family": "consolas",
