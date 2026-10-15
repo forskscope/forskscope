@@ -1,7 +1,6 @@
 # RFC 089: One Bar at the Top, and a Window Title That Says What Is Open
 
-**Status.** Accepted — review complete; implementer may start. Moves to `done/`
-when the work ships (RFC-000, 5-folder variant).
+**Status.** Implemented (`0.191.0`, `e3a5a26`/`3f3b409`; reviews 162–163).
 **Accepted.** 2026-10-15 by the project owner.
 **Scheduling.** `0.191.0`. See `ROADMAP.md` §
 "Remaining proposed RFCs".

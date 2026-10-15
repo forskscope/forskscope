@@ -1,6 +1,6 @@
 # RFC 024 — Diff Visual Semantics and Decoration Contract
 
-**Amended by RFC-088 (accepted 2026-10-15).** The removed/added colours have a red–green-safe alternative; see [RFC-088](../accepted/088-colour-vision-palette.md).
+**Amended by RFC-088 (implemented in 0.191.0).** The removed/added colours have a red–green-safe alternative; see [RFC-088](./088-colour-vision-palette.md).
 ## Status
 
 **Core complete, renderer wiring not implemented (F48, 2026-08-13).**

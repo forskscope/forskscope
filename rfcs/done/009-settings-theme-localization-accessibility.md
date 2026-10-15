@@ -1,7 +1,7 @@
 # RFC-009 — Settings, Theme, Localization, and Accessibility
 
 **Status.** Implemented (v0.60.0) — core complete; settings dialog UI, LocaleBundle, i18n message IDs deferred to UI layer
-**Amended by RFC-088 (accepted 2026-10-15).** A colour-vision setting beside the theme, with a red–green-safe palette; see [RFC-088](../accepted/088-colour-vision-palette.md).
+**Amended by RFC-088 (implemented in 0.191.0).** A colour-vision setting beside the theme, with a red–green-safe palette; see [RFC-088](./088-colour-vision-palette.md).
 
 ---toml
 project = "ForskScope"

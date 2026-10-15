@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.191.1] — Unreleased
+
 ## [0.191.0] — 2026-10-15
 
 **Colours for red–green colour blindness, and one bar at the top.**
