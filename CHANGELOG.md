@@ -5,7 +5,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.190.1] — Unreleased
+## [0.191.0] — 2026-10-15
+
+**Colours for red–green colour blindness, and one bar at the top.**
+
+### Added
+
+- **A *Colour vision* setting**, directly under *Theme* in Settings.
+  - *Red–green safe (blue and orange)* shows removed lines in orange and added
+    lines in blue instead of red and green. It works with every theme.
+  - With the standard colours, removed and added lines look almost the same to
+    people with the most common red–green colour blindness. The new colours
+    stay clearly distinct.
+  - *Standard* stays the default.
+- **The window title names what is open**, for example *app.js ↔ app.js —
+  ForskScope*, with ● when there are unsaved changes, so the taskbar and the
+  window switcher tell comparisons apart.
+
+### Changed
+
+- **The row with the app's name is gone.** *Settings* and *?* are at the right
+  end of the tab bar, so every view has one more line of space. The app's name
+  is in the window title.
+- The "··· N unchanged lines ···" divider is now a button, so the keyboard can
+  expand it too (Tab to it, then Enter).
+
+### Fixed
+
+- **Tab titles are readable again in a narrow window.** Since 0.190.0, under
+  720 px wide, tabs shrank to empty boxes. They wrap onto extra rows again, as
+  before.
+
+### Known limitations
+
+- With *Red–green safe* in the **Light** theme, removed lines and replaced lines
+  have similar backgrounds for people with red–green colour blindness. Removed
+  lines still have an empty line opposite them, and replaced lines have text on
+  both sides. This will be improved.
+
+### Internal
+
+- RFC-088 and RFC-089 record these designs.
+- A new build check, `cargo xtask colour-vision`, simulates colour blindness on
+  every palette and fails if removed and added lines become hard to tell apart.
+
 
 ## [0.190.0] — 2026-10-14
 
