@@ -9,6 +9,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 **Colours for red–green colour blindness, and one bar at the top.**
 
+*Re-cut before publication:* the first `0.191.0` tag (`8c8888e`) stopped at
+the release workflow's security audit, which flagged the four `rustls`
+advisories above. No release was created. The tag was moved to the corrected
+commit, as the release policy allows before publication.
+
 ### Added
 
 - **A *Colour vision* setting**, directly under *Theme* in Settings.
@@ -35,6 +40,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Tab titles are readable again in a narrow window.** Since 0.190.0, under
   720 px wide, tabs shrank to empty boxes. They wrap onto extra rows again, as
   before.
+
+### Security
+
+- **`rustls` updated from 0.23.45 to 0.23.46**, fixing RUSTSEC-2026-0346,
+  -0347, -0348 and -0349, published 2026-10-14. ForskScope does not use
+  `rustls` itself; it comes with the UI framework's internal connection
+  (`dioxus-desktop` → `tungstenite`). *Check for updates* uses the system's TLS
+  instead.
 
 ### Known limitations
 
