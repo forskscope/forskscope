@@ -130,6 +130,7 @@ footer .wrap { padding-block: 26px 40px; font-size: 14px; color: var(--muted); d
         <li><b>Spreadsheets too.</b><span><code>.xlsx</code> workbooks are compared sheet by sheet and cell by cell, read-only, with rows lined up by content where that shows fewer changes.</span></li>
         <li><b>Keyboard first.</b><span>Move between changes, apply them, search, and switch panes without the mouse.</span></li>
         <li><b>Works with Git.</b><span>Use it as <code>git difftool</code> and <code>git mergetool</code>. The guide shows the settings.</span></li>
+        <li><b>One file, no installer.</b><span>On Windows and Linux, ForskScope is a single program file. Download it and run it.</span></li>
       </ul>
     </div>
   </section>
@@ -174,7 +175,7 @@ footer .wrap { padding-block: 26px 40px; font-size: 14px; color: var(--muted); d
           <p class="file">forskscope-v…-windows-x64.zip</p>
           <p>Extract it and run <code>forskscope.exe</code>.</p>
           <p class="note">ForskScope is also on the <a href="https://apps.microsoft.com/detail/9p63f7npc3mh">Microsoft Store</a>, but that listing is not yet updated with each release. For the newest version, use the zip.</p>
-          <p class="note">Tested on Windows 11. It needs the WebView2 runtime, which Windows 11 includes.</p>
+          <p class="note">Tested on Windows 11. It needs the WebView2 runtime, which Windows 11 includes, and the <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe">Visual C++ runtime</a>, which many systems already have.</p>
         </div>
       </div>
       <p class="col note" style="margin-top:18px">Each release includes a <code>SHA256SUMS</code> file to check your download against. See <a href="guide/users/installation.html#verifying-your-download">Verifying your download</a>. To build from source instead, see the <a href="guide/users/installation.html">installation guide</a>.</p>

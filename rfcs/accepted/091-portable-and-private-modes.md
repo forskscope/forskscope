@@ -1,15 +1,16 @@
 # RFC 091: Portable and Private Modes, and a Windows Program That Runs by Copying
 
-**Status.** Proposed — awaiting the owner's acceptance. Implementation does not
-start before this moves to `accepted/` (RFC-000, 5-folder variant).
-**Scheduling.** The next app release after acceptance. See `ROADMAP.md` §
+**Status.** Accepted — review complete; implementer may start. Moves to `done/`
+when the work ships (RFC-000, 5-folder variant).
+**Accepted.** 2026-10-15 by the project owner.
+**Scheduling.** `0.193.0`. See `ROADMAP.md` §
 "Remaining proposed RFCs".
 **Tracks.** The owner's idea, 2026-10-15: improve portability, store settings
 beside the program or not at all, and say so on the website. It also resolves
 F45 (a): the Windows program depends on the Visual C++ runtime. The owner
 accepted the direction on 2026-10-15.
-**Amends, on acceptance.** RFC-076 (where settings and session are stored) and
-RFC-011 (session persistence). Each gets a one-line Status note pointing here.
+**Amends.** RFC-076 (where settings and session are stored) and
+RFC-011 (session persistence). Each carries a one-line Status note pointing here.
 **Touches.**
 - `crates/forskscope-ui-logic/src/compare/startup.rs` (argument parsing)
 - `crates/forskscope-ui/src/main.rs`

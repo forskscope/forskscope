@@ -1,6 +1,7 @@
 # RFC-011 — Workspace Session Persistence
 
 **Status.** Implemented (v0.56.0) — core fully complete; tab list JSON persistence deferred to schema v2
+**Amended by RFC-091 (accepted 2026-10-15).** In private mode no session is read or written; in portable mode it lives in the data location. See [RFC-091](../accepted/091-portable-and-private-modes.md).
 
 ## Amendment — 2026-08-04: `WorkspaceSession` model removed by RFC-076
 
