@@ -1364,6 +1364,7 @@ were in `proposed/`. Nothing checks this — see **F83**.
 | 042 | Ongoing | Roadmap (this document) |
 | 074 | Pre-v1 stabilization | Umbrella schedule, milestones, gates, and final go/no-go package |
 | 078 | Milestone M5 | Platform runtime acceptance and retained release evidence |
+| 091 | Next app release, on acceptance | Portable and private modes, and a Windows program that runs by copying — **proposed, awaiting the owner** |
 | 090 | `0.192.0` | Replaced lines in the red–green-safe palette (F199) — **accepted 2026-10-15** |
 | 079 | **Implemented `b488d24`** (review 103); stays **accepted** — no Partner Center contact has ever occurred | Microsoft Store submission automation — **accepted**; dispatch-only since 0.176.0, and its last runs failed on the Partner Center step that waits on the owner (F106 (b)) |
 | 081 | **Implemented `8e54e44`** (review 102); stays **accepted** until the owner moves it to `done/`. Real pushes have run since 0.176.0, each verified against the tag tarball | AUR publication automation — **accepted**; publishing is a `workflow_dispatch` of `aur-publish.yml` per release (`release.md` step 5) |
