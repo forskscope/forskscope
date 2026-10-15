@@ -5,7 +5,51 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.191.1] — Unreleased
+## [0.192.0] — 2026-10-15
+
+**The documentation says what the app does, and replaced lines stay distinct.**
+
+### Fixed
+
+- **With *Red–green safe*, replaced lines now have their own colour,** a muted
+  teal. Before, people with red–green colour blindness saw them in nearly the same
+  colour as removed lines, especially in the Light theme. This resolves the
+  0.191.0 known limitation.
+- **The path you type into starts from the folder you are in.** After Back or
+  Forward, clicking the folder name to edit the path showed the *previous*
+  folder's path most of the time.
+- **The app's keyboard reference no longer says Enter opens a folder or compares
+  files** in the Explorer. Enter expands or collapses the selected folder, and
+  does nothing on a file.
+- **The user guide is corrected throughout.** Among the things it got wrong:
+  - **Clicking a folder** selects it. The ▸ arrow expands it, and a
+    double-click opens it.
+  - **The two sides scroll sideways together.**
+  - **Changed lines are marked `−` and `+`.** There is no `~` mark.
+  - **The large-file limits:**
+    - character-level highlighting is unavailable above 512 KiB;
+    - a confirmation is asked above 4 MiB;
+    - above 64 MiB only the file's details are shown.
+  - **Settings → Advanced → Context lines;** sizes in px; the real button labels.
+  - **`Ctrl+/` needs a comparison tab,** but the **?** button works anywhere.
+
+### Internal
+
+- **New build checks:**
+  - `cargo xtask keyboard-docs` keeps the in-app keyboard reference and the
+    keyboard guide listing the same keys. It cannot check what a key does, and
+    says so.
+  - `cargo xtask xlsx-fixtures --check` now runs in CI.
+  - `cargo xtask colour-vision` measures replaced lines against removed and added
+    lines too.
+- **The maintainer documents are brought up to date:**
+  - the release process, the security notes, the packaging and contributor
+    guides, and the RFC index;
+  - a new page on how the website is published.
+- **Every background effect was measured in the running app.** One, the path
+  field, ran late and is fixed above. The rest respond promptly, including *Move
+  together* and the folder report.
+
 
 ## [0.191.0] — 2026-10-15
 
