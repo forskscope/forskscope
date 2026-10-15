@@ -23,7 +23,7 @@ Changes take effect immediately.
 | Value | Description |
 |-------|-------------|
 | **Standard** (default) | Today's diff colours. |
-| **Red–green safe (blue and orange)** | Removed lines and marks use orange, added lines and marks use blue, instead of red and green — distinguishable under deuteranopia and protanopia, the common forms of red–green colour vision deficiency. |
+| **Red–green safe (blue and orange)** | Removed lines and marks use orange, added lines and marks use blue, and replaced lines use a muted teal, instead of red, green and amber — distinguishable under deuteranopia and protanopia, the common forms of red–green colour vision deficiency. |
 
 Combines with every theme — it is a second, independent choice beside
 *Theme*, not a fourth theme. Changes take effect immediately. Every change is

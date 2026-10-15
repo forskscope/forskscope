@@ -233,14 +233,21 @@ fn find_decl<'a>(rules: &'a [Rule], selector: &str, var: &str) -> Option<&'a str
         .map(|(_, value)| value.as_str())
 }
 
-const TOKENS: [&str; 5] = ["--text", "--del-bg", "--ins-bg", "--del-mark", "--ins-mark"];
+const TOKENS: [&str; 6] = [
+    "--text",
+    "--del-bg",
+    "--ins-bg",
+    "--del-mark",
+    "--ins-mark",
+    "--rep-bg",
+];
 
-/// The five tokens this gate needs, resolved for one theme × palette
+/// The six tokens this gate needs, resolved for one theme × palette
 /// combination: the palette's own override where `01-tokens.css` declares
 /// one (`.theme-X.cv-rgsafe`), else the base theme's value — exactly CSS's
 /// own cascade, since `.theme-X.cv-rgsafe` has higher specificity and the
 /// browser resolves it the same way.
-fn resolve(rules: &[Rule], theme: &str, rgsafe: bool) -> [String; 5] {
+fn resolve(rules: &[Rule], theme: &str, rgsafe: bool) -> [String; 6] {
     let base_sel = format!(".theme-{theme}");
     let rgsafe_sel = format!(".theme-{theme}.cv-rgsafe");
     TOKENS.map(|var| {
@@ -259,8 +266,53 @@ fn resolve(rules: &[Rule], theme: &str, rgsafe: bool) -> [String; 5] {
 
 const THEMES: [&str; 3] = ["dark", "light", "night"];
 const DELTA_E_MIN: f64 = 20.0;
+/// RFC-090 §3: the Standard palette's two replaced-line pairs are not this
+/// RFC's subject (its amber is unchanged), but having fallen to 4.6 once
+/// already in the red-green-safe palette (review 163) is reason enough to
+/// guard the Standard pairs against a future regression too, at a floor
+/// loose enough not to force a redesign: they measure 16.2 to 21.7 today.
+const REP_DELTA_E_MIN_STANDARD: f64 = 15.0;
 const TEXT_CONTRAST_MIN: f64 = 4.5;
 const MARK_CONTRAST_MIN: f64 = 3.0;
+
+fn check_delta_e(
+    problems: &mut Vec<String>,
+    theme: &str,
+    palette: &str,
+    label: &str,
+    hex1: &str,
+    hex2: &str,
+    sim: Simulation,
+    min: f64,
+) {
+    let de = simulated_delta_e(hex1, hex2, sim);
+    if de < min {
+        problems.push(format!(
+            "{theme}/{palette}: {label} pair ({hex1} vs {hex2}) under {} has ΔE {de:.1}, \
+             below the required {min:.1}",
+            sim.label(),
+        ));
+    }
+}
+
+fn check_contrast(
+    problems: &mut Vec<String>,
+    theme: &str,
+    palette: &str,
+    fg_label: &str,
+    fg: &str,
+    bg_label: &str,
+    bg: &str,
+    min: f64,
+) {
+    let ratio = contrast_ratio(fg, bg);
+    if ratio < min {
+        problems.push(format!(
+            "{theme}/{palette}: {fg_label} {fg} on {bg_label} {bg} has contrast {ratio:.1}, \
+             below the required {min:.1}"
+        ));
+    }
+}
 
 pub fn run(root: &Path) {
     let css_path = root.join("crates/forskscope-ui/assets/css/01-tokens.css");
@@ -272,7 +324,7 @@ pub fn run(root: &Path) {
 
     for &theme in &THEMES {
         for &rgsafe in &[false, true] {
-            let [text, del_bg, ins_bg, del_mark, ins_mark] = resolve(&rules, theme, rgsafe);
+            let [text, del_bg, ins_bg, del_mark, ins_mark, rep_bg] = resolve(&rules, theme, rgsafe);
             let palette = if rgsafe { "red-green-safe" } else { "standard" };
 
             let sims: &[Simulation] = if rgsafe {
@@ -287,54 +339,107 @@ pub fn run(root: &Path) {
                 // against — only its normal-vision ΔE is gated.
                 &[Simulation::Normal]
             };
+            // RFC-090 §3: the two replaced-line pairs, at the Standard
+            // palette's looser floor when not red-green-safe.
+            let rep_min = if rgsafe {
+                DELTA_E_MIN
+            } else {
+                REP_DELTA_E_MIN_STANDARD
+            };
 
             for &sim in sims {
-                let bg_de = simulated_delta_e(&del_bg, &ins_bg, sim);
-                if bg_de < DELTA_E_MIN {
-                    problems.push(format!(
-                        "{theme}/{palette}: background pair ({del_bg} vs {ins_bg}) under {} \
-                         has ΔE {bg_de:.1}, below the required {DELTA_E_MIN:.1}",
-                        sim.label(),
-                    ));
-                }
-                let mark_de = simulated_delta_e(&del_mark, &ins_mark, sim);
-                if mark_de < DELTA_E_MIN {
-                    problems.push(format!(
-                        "{theme}/{palette}: mark pair ({del_mark} vs {ins_mark}) under {} \
-                         has ΔE {mark_de:.1}, below the required {DELTA_E_MIN:.1}",
-                        sim.label(),
-                    ));
-                }
+                check_delta_e(
+                    &mut problems,
+                    theme,
+                    palette,
+                    "background",
+                    &del_bg,
+                    &ins_bg,
+                    sim,
+                    DELTA_E_MIN,
+                );
+                check_delta_e(
+                    &mut problems,
+                    theme,
+                    palette,
+                    "mark",
+                    &del_mark,
+                    &ins_mark,
+                    sim,
+                    DELTA_E_MIN,
+                );
+                check_delta_e(
+                    &mut problems,
+                    theme,
+                    palette,
+                    "replaced-removed",
+                    &rep_bg,
+                    &del_bg,
+                    sim,
+                    rep_min,
+                );
+                check_delta_e(
+                    &mut problems,
+                    theme,
+                    palette,
+                    "replaced-added",
+                    &rep_bg,
+                    &ins_bg,
+                    sim,
+                    rep_min,
+                );
             }
 
-            let text_on_del = contrast_ratio(&text, &del_bg);
-            if text_on_del < TEXT_CONTRAST_MIN {
-                problems.push(format!(
-                    "{theme}/{palette}: text {text} on del-bg {del_bg} has contrast \
-                     {text_on_del:.1}, below the required {TEXT_CONTRAST_MIN:.1}"
-                ));
-            }
-            let text_on_ins = contrast_ratio(&text, &ins_bg);
-            if text_on_ins < TEXT_CONTRAST_MIN {
-                problems.push(format!(
-                    "{theme}/{palette}: text {text} on ins-bg {ins_bg} has contrast \
-                     {text_on_ins:.1}, below the required {TEXT_CONTRAST_MIN:.1}"
-                ));
-            }
-            let del_mark_contrast = contrast_ratio(&del_mark, &del_bg);
-            if del_mark_contrast < MARK_CONTRAST_MIN {
-                problems.push(format!(
-                    "{theme}/{palette}: del-mark {del_mark} on del-bg {del_bg} has contrast \
-                     {del_mark_contrast:.1}, below the required {MARK_CONTRAST_MIN:.1}"
-                ));
-            }
-            let ins_mark_contrast = contrast_ratio(&ins_mark, &ins_bg);
-            if ins_mark_contrast < MARK_CONTRAST_MIN {
-                problems.push(format!(
-                    "{theme}/{palette}: ins-mark {ins_mark} on ins-bg {ins_bg} has contrast \
-                     {ins_mark_contrast:.1}, below the required {MARK_CONTRAST_MIN:.1}"
-                ));
-            }
+            check_contrast(
+                &mut problems,
+                theme,
+                palette,
+                "text",
+                &text,
+                "del-bg",
+                &del_bg,
+                TEXT_CONTRAST_MIN,
+            );
+            check_contrast(
+                &mut problems,
+                theme,
+                palette,
+                "text",
+                &text,
+                "ins-bg",
+                &ins_bg,
+                TEXT_CONTRAST_MIN,
+            );
+            check_contrast(
+                &mut problems,
+                theme,
+                palette,
+                "text",
+                &text,
+                "rep-bg",
+                &rep_bg,
+                TEXT_CONTRAST_MIN,
+            );
+            check_contrast(
+                &mut problems,
+                theme,
+                palette,
+                "del-mark",
+                &del_mark,
+                "del-bg",
+                &del_bg,
+                MARK_CONTRAST_MIN,
+            );
+            check_contrast(
+                &mut problems,
+                theme,
+                palette,
+                "ins-mark",
+                &ins_mark,
+                "ins-bg",
+                &ins_bg,
+                MARK_CONTRAST_MIN,
+            );
         }
     }
 
@@ -346,9 +451,10 @@ pub fn run(root: &Path) {
         process::exit(1);
     }
     println!(
-        "colour-vision check passed: every removed/added pair in every theme and palette stays \
-         distinguishable (ΔE ≥ {DELTA_E_MIN:.0}) under normal vision, and red-green-safe stays \
-         distinguishable under deuteranopia and protanopia too; text and mark contrast meet WCAG."
+        "colour-vision check passed: every removed/added, replaced/removed and replaced/added \
+         pair in every theme and palette stays distinguishable under normal vision, and \
+         red-green-safe stays distinguishable under deuteranopia and protanopia too; text and \
+         mark contrast meet WCAG."
     );
 }
 
@@ -392,7 +498,7 @@ mod tests {
     #[test]
     fn resolve_falls_back_to_the_base_theme_when_the_palette_has_no_override() {
         let css = ".theme-dark { --text: #e6e6e6; --del-bg: #111111; --ins-bg: #222222; \
-                    --del-mark: #333333; --ins-mark: #444444; }\n\
+                    --del-mark: #333333; --ins-mark: #444444; --rep-bg: #555555; }\n\
                     .theme-dark.cv-rgsafe { --del-bg: #999999; }";
         let rules = parse_rules(css);
         let standard = resolve(&rules, "dark", false);
