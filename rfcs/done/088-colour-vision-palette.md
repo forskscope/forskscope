@@ -1,6 +1,6 @@
 # RFC 088: A Colour-Vision Setting with a Red–Green-Safe Palette
 
-**Status.** Implemented (`0.191.0`, `e3a5a26`/`3f3b409`/`8f449f2`; reviews 162–163). **Open:** F199. Removed vs replaced lines were not measured, and in Light the red–green-safe palette brings them closer. To be addressed by a proposal amending this RFC.
+**Status.** Implemented (`0.191.0`, `e3a5a26`/`3f3b409`/`8f449f2`; reviews 162–163). **Open:** F199. Removed vs replaced lines were not measured, and in Light the red–green-safe palette brings them closer. Addressed by [RFC-090](../accepted/090-replaced-lines-in-the-red-green-safe-palette.md) (accepted 2026-10-15), which amends §2 and §3.
 **Accepted.** 2026-10-15 by the project owner.
 **Scheduling.** `0.191.0`. See `ROADMAP.md` §
 "Remaining proposed RFCs".

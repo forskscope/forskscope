@@ -1,12 +1,13 @@
 # RFC 090: Replaced Lines in the Red–Green-Safe Palette
 
-**Status.** Proposed — awaiting the owner's acceptance. Implementation does not
-start before this moves to `accepted/` (RFC-000, 5-folder variant).
+**Status.** Accepted — review complete; implementer may start. Moves to `done/`
+when the work ships (RFC-000, 5-folder variant).
+**Accepted.** 2026-10-15 by the project owner.
 **Scheduling.** Planned for `0.192.0`. See `ROADMAP.md` § "Remaining proposed
 RFCs".
 **Tracks.** F199.
-**Amends, on acceptance.** RFC-088 (§2, the palette's token list; §3, the gate's
-pairs). RFC-088 gets a one-line Status note pointing here.
+**Amends.** RFC-088 (§2, the palette's token list; §3, the gate's
+pairs). RFC-088 carries a one-line Status note pointing here.
 **Touches.** `crates/forskscope-ui/assets/css/01-tokens.css` (one token),
 `xtask`'s `colour-vision` gate, and `docs/src/users/settings.md`.
 
