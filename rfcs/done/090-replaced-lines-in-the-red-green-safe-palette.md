@@ -1,7 +1,6 @@
 # RFC 090: Replaced Lines in the Red–Green-Safe Palette
 
-**Status.** Accepted — review complete; implementer may start. Moves to `done/`
-when the work ships (RFC-000, 5-folder variant).
+**Status.** Implemented (`0.192.0`, `326a38b`; review 166).
 **Accepted.** 2026-10-15 by the project owner.
 **Scheduling.** Planned for `0.192.0`. See `ROADMAP.md` § "Remaining proposed
 RFCs".

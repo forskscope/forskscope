@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.192.1] — Unreleased
+
 ## [0.192.0] — 2026-10-15
 
 **The documentation says what the app does, and replaced lines stay distinct.**
