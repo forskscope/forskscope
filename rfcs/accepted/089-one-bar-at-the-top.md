@@ -82,8 +82,12 @@ not adopted.
 
 - The `{tab title}` is the same text the tab shows, so the two never disagree.
 - It updates whenever the selected tab, a tab's title, or its unsaved state
-  changes. Use one effect on those signals, calling the desktop window's
-  `set_title`.
+  changes, by calling the desktop window's `set_title` when the computed title
+  differs from the last one set.
+  - *Corrected 2026-10-15 (review 162):* this first said to use one effect on
+    those signals. In dioxus-desktop such an effect did not run reliably after
+    a render (request 153), so the title is computed in render and set only
+    when it changes. The behaviour this section requires is unchanged.
 - **Privacy:** file names already appear in the tab bar. The window title shows
   them to the system too: the taskbar, the window switcher and screen sharing.
   That is the same convention as every editor. It sends nothing anywhere.

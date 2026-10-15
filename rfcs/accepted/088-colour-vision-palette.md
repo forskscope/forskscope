@@ -101,9 +101,15 @@ Every other token is unchanged. `--warn` (Explorer `≠`) and `--rep-bg`
 | Background, Dark | 44.7 | 45.9 | 40.6 | 39.3 |
 | Background, Light | 31.7 | 32.7 | 28.6 | 24.6 |
 | Background, Night | 42.1 | 44.3 | 39.3 | 34.0 |
-| Mark, Dark | 110.5 | 112.5 | 98.5 | 88.9 |
-| Mark, Night | 112.5 | 114.4 | 99.6 | 97.1 |
-| Mark, Light (`#944800` / `#0a5fd6`) | 116.6 | 119.4 | 107.6 | 78.4 |
+| Mark, Dark | 110.5 | 112.5 | 98.4 | 88.9 |
+| Mark, Night | 112.5 | 114.4 | 99.5 | 97.1 |
+| Mark, Light (`#944800` / `#0a5fd6`) | 116.6 | 119.4 | 107.5 | 78.4 |
+
+*Corrected 2026-10-15 (review 162):* the three protanopia mark figures were
+98.5, 99.6 and 107.6. The values sit on a rounding boundary. The architect's
+first measurement used the approximate CIE constants (`0.008856`, `7.787`);
+the gate uses the exact ones (`216/24389`, `24389/27`) and gives the figures
+above. No threshold or decision is affected.
 
 **Readability (WCAG contrast ratio):**
 
