@@ -18,9 +18,16 @@ cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
 # Full workspace gates used by CI when GTK/WebKitGTK dependencies are present
 cargo test --workspace
 cargo clippy --workspace -- -D warnings
+cargo clippy --workspace --all-targets -- -D warnings
+
+# cfg(windows) code (main.rs, webview2.rs), type-checked on a Linux runner —
+# no linker involved, so it needs no MinGW toolchain (F109)
+rustup target add x86_64-pc-windows-gnu
+cargo clippy --workspace --all-targets --target x86_64-pc-windows-gnu -- -D warnings
 
 # Format and generated CSS gates
 cargo fmt --check
+cargo fmt --manifest-path xtask/Cargo.toml --check
 cargo xtask css --check
 
 # Security audit (uses .cargo/audit.toml for reviewed advisories)
@@ -29,10 +36,27 @@ cargo audit
 # Enforce the reviewed dependency paths behind audit exceptions
 cargo xtask audit-deps
 
+# Every removed/added/replaced colour pair stays distinguishable under
+# simulated colour vision deficiency (RFC-088, RFC-090)
+cargo xtask colour-vision
+
+# The in-app keyboard reference and keyboard.md name the same keys (F165)
+cargo xtask keyboard-docs
+
 # Release metadata and localization gates
 cargo xtask version-sync
 cargo xtask i18n
+
+# RFC schedule, and the ui-logic module tables' connectivity and docs (F54, F93)
+cargo xtask rfc-sync
+cargo xtask ui-logic-connectivity
+cargo xtask ui-logic-docs
 ```
+
+A non-default umask (077) is also exercised in CI, in its own step, for the
+one test that can only fail under one (F41) — not reproduced above since it
+needs a dedicated shell, not a bare `cargo test` invocation; see
+`ci.yml`'s own "File permission tests under a non-default umask" step.
 
 The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
 be tested in environments without a display server. Core and ui-logic tests
@@ -152,12 +176,15 @@ Tests live in `crates/forskscope-core/src/tests/` and are declared in `tests.rs`
 | `batch_tests` | `batch_copy`, `restore_from_manifest`, `BatchManifest`. | RFC-023 |
 | `cancel_tests` | `CancellationToken::new`/`cancel`/idempotent; clone propagation (original→clone, clone→original, clone-of-clone); `Default`; `Debug`. | RFC-037, RFC-008 |
 | `command_tests` | `AvailabilityRule` evaluation, `CommandRegistry` uniqueness/search/shortcut lookup, `CommandDangerLevel`. | RFC-019 |
+| `compare_prep_tests` | `save_target_from_loaded`/`inspect_save_target` — the prepared-comparison save-target derivation for normal compare and Git mergetool mode. | RFC-077 |
 | `compare_profile_tests` | `CompareProfile` presets, `to_diff_options`, `NewlineCompareMode` engine wiring. | RFC-028 |
 | `conflict_nav_tests` | `ConflictNavigator` build/focus/prev/next/filter, `ConflictStatusDisplay` glyphs, summary counts, progress fraction. | RFC-034 |
 | `diff_decoration_tests` | `DiffDecorationSet` from diff, CSS class uniqueness/prefix, gutter symbols, aria labels, focused hunk marking. | RFC-024 |
 | `diff_tests` | `compute_diff`, hunk kinds, inline spans, equal/insert/delete/replace, whitespace/case modes. | RFC-002 |
 | `dir_cancel_tests` | `recursive_diff_with_cancel`, cancellation mid-scan. | RFC-037 |
+| `dir_ignore_tests` | Ignore rules reach the recursive directory walk: an ignored subtree is never walked or reported, shown by making it unreadable so a walk that descended would fail. | RFC-056 |
 | `dir_tests` | Directory listing, recursive digest equality, `file_digest_equal`. | RFC-022 |
+| `dir_unreadable_tests` | An unreadable entry is always visible — never silently dropped, never asserted as a verdict — and an unopenable root is distinguishable from an empty tree. | F79 |
 | `document_tests` | `LoadedDocument`, `FileFingerprint`, `check_external_state`, `ExternalFileState`. | RFC-036 |
 | `edit_op_tests` | `TextEditOperation` variants, `RevisionId`, `TextRange`, revision compatibility, `EditTransaction`. | RFC-032 |
 | `editability_tests` | `EditabilityClass::from_kind`, `requires_save_guard`, `NewlinePolicy::resolve`. | RFC-012 |
@@ -174,12 +201,16 @@ Tests live in `crates/forskscope-core/src/tests/` and are declared in `tests.rs`
 | `merge_tests` | `MergeSession` apply/undo/redo, dirty state, `result_text`, transaction log. | RFC-006 |
 | `patch_tests` | `patch_from_file_diff`, `to_unified`; GNU `patch` round-trip integration. | RFC-039 |
 | `path_tests` | `split_parent_name`, `has_extension` (case-insensitive, dotfile edge cases), `display`, `canonicalize_lenient` (nonexistent/absolute/edge inputs). | RFC-001 |
-| `persist_tests` | `VersionedEnvelope` round-trip, `MigrationPolicy`, newer-schema rejection. | RFC-031 |
+| `persist_v2_repository_tests` | Explicit-path repository safe-write tests: `Missing` on an absent file, save/load round-trip, migration-commit backup semantics (created once, never overwritten by a retry), no stray temp file after an ordinary save. | RFC-076 |
+| `persist_v2_runtime_tests` | The settings/session runtime adapter (`resolve_and_commit`) end to end against real temp-path repositories: fresh/current pass through unchanged, legacy files migrate, future/corrupt sources disable writes. | RFC-076 |
+| `persist_v2_schema_enum_wire_format_tests` | Per-variant exact wire-string assertions for every schema enum `PersistedSettings` reuses directly — independent of any fixture, so a variant rename fails here even where a fixture's own value happens not to exercise it (F26). | RFC-076 |
+| `persist_v2_session_tests` | Session schema v2 routing, migration and validation; the legacy v1 envelope (never shipped) is preserved as `Corrupt`, never silently reinterpreted. | RFC-076 |
+| `persist_v2_settings_tests` | Settings schema v2 routing, migration and validation: current-envelope round-trip, exact field-for-field legacy v0 migration, future/corrupt/unrecognized-legacy handling, unknown payload fields tolerated, range/index normalization. | RFC-076 |
 | `platform_tests` | `PlatformInfo::collect` non-panic; `os`/`arch`/`app_version` non-empty; `to_report` format; home redaction (`***`); determinism; `logical_cpus` positive. | RFC-026 |
 | `report_tests` | `FileComparisonReport`, `DirComparisonReport`, Markdown/JSON output. | RFC-027 |
+| `save_target_tests` | `TargetPrecondition`/`check_precondition` and the no-clobber commit (`persist_noclobber`) directly, as primitives — `save_tests` covers their integration through `save_text`. | RFC-077 |
 | `save_tests` | `save_text` with fingerprint match, `TargetPrecondition`, `BackupPolicy`. | RFC-007 |
-| `session_tests` | `WorkspaceSession` tab lifecycle, dirty state, `CloseResult`, JSON round-trip, schema-version guard. | RFC-011 |
-| `settings_tests` | `UserSettings` defaults, round-trip JSON, theme/density/font round-trips, CSS var count, fallback. | RFC-009 |
+| `support` | No tests of its own — shared `chmod`-based "make this unreadable" helpers for every permission-dependent test in this crate. | F143 |
 | `three_way_tests` | `ThreeWayMergeSession` conflicts, resolution, undo/redo, `can_save`, `result_text`. | RFC-033 |
 | `transaction_log_tests` | `TransactionLog` push/undo/redo/mark_saved, `is_dirty`. | RFC-015 |
 | `vcs_tests` | `GitProvider::detect`, `VcsProvider` trait contract. | RFC-038 |
@@ -311,18 +342,20 @@ on a Linux Wayland session under niri, with `wtype`, `niri`, and the Python
 
 **What does not work in this environment, so nobody re-derives it:** pointer
 injection. The app is a native Wayland window, `xdotool` cannot see it, and no
-uinput tool is installed. Screenshots too: `niri msg action screenshot-window`
-writes no file and puts nothing on the clipboard here. Neither is needed for
-keyboard work, which the steps above cover.
+uinput tool is installed. Not needed for keyboard work, which the steps above
+cover.
 
-Screen capture was then checked by three further routes, all of which also
-fail here: the `org.freedesktop.portal.Screenshot` D-Bus call returns response
-code 2 with no result, because the only portal backend installed is
-`xdg-desktop-portal-gtk`, whose screenshot path expects GNOME Shell's
-interface; `grim` and the other Wayland capture tools are not installed, and
-`import` is X11-only against a native Wayland window. So **appearance is the
-one class of check this procedure cannot make** — ask someone who can look at
-the window rather than deferring it.
+**Screenshots do work**, once an early round of attempts without a usable
+destination wrongly concluded otherwise: `niri msg action screenshot-window
+--id <id> --path <absolute path>` writes a PNG to that path. The path **must
+be absolute** — the failures that led to the earlier, wrong conclusion were
+runs with no usable `--path` at all. To get a fixed size for a reproducible
+screenshot, `niri msg action toggle-window-floating --id <id>` first, then
+`set-window-width`/`set-window-height`. So appearance is checkable by this
+same procedure, not a case for deferring to someone else to look at the
+window — though a released build run with real, non-invented data is still
+the right source for anything public, never a screenshot from this
+sandboxed procedure's own invented fixtures.
 
 **What a unit test can and cannot show, from one case.** The Alt+↑ handler
 (`dispatch_go_up`) does reproduce its borrow panic in a unit test, because the
@@ -335,6 +368,11 @@ The spreadsheet tests in `forskscope-core/src/xlsx.rs` read real workbooks from
 `src/tests/fixtures/xlsx/`, which `cargo xtask xlsx-fixtures` generates and
 `--check` verifies. The corpus is described case by case in that directory's
 `README.md`, with each case's recipe.
+
+`cargo xtask xlsx-fixtures --check` does not run in any CI workflow today —
+it is not in the gate list above. The committed fixtures are trusted as
+checked-in test data, the same as every other corpus file in this repository;
+nothing currently re-derives them from their recipes on every run.
 
 Two dimensions are named here, so a reader knows what the corpus must cover:
 

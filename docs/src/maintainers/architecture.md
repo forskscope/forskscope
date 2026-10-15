@@ -16,12 +16,13 @@ commands to it. `forskscope-ui-logic` holds pure presentation logic that is
 testable without a display server. A future alternative frontend (e.g. Iced)
 could be added as a fourth crate without touching core.
 
-## Core modules (26)
+## Core modules (27)
 
 | Module | Responsibility |
 |---|---|
 | `cancel` | `CancellationToken` — lightweight `Arc<AtomicBool>` for cancellable background jobs. |
 | `command` | `CommandDefinition`, `CommandRegistry`, `AvailabilityRule`, `CommandContext` — all user-visible commands, IDs, shortcuts (RFC-019). |
+| `compare_prep` | `PreparedCompare`, `SaveTargetSnapshot`, `save_target_from_loaded`, `inspect_save_target` — separates what's compared from what's saved to, since normal two-file mode and Git mergetool mode disagree (RFC-077). |
 | `conflict_nav` | `ConflictNavigator`, `ConflictStatusDisplay`, `NavigatorSummary` — conflict rail view-model over `ThreeWayMergeSession` (RFC-034). |
 | `diff` | `similar` v3 diff engine; normalized `DiffDocument` + hunk model, stable IDs, inline spans. `CompareProfile`, `WhitespaceMode`, `NewlineCompareMode`, `DiffOptions` (RFC-002, RFC-028). |
 | `diff_decoration` | `DiffDecorationSet` derived from `DiffDocument` — CSS class tokens, gutter symbols, aria labels, inline spans, `HunkDecoration` (RFC-024). |
@@ -38,15 +39,14 @@ could be added as a fourth crate without touching core.
 | `merge` | `MergeSession` (two-way) with transaction log, undo/redo, dirty state, `result_text()`; `ThreeWayMergeSession` (base-aware diff3, structured conflicts, resolution + undo/redo). `TransactionLog`, `TransactionKind` (RFC-015, RFC-033). |
 | `patch` | `PatchDocument`, unified-diff export from file and directory diffs (RFC-039). |
 | `path` | Lenient canonicalization; platform-safe display helpers. |
-| `persist` | `VersionedEnvelope` + `MigrationPolicy` — schema-versioned JSON wrapper for all persisted data (RFC-031). |
+| `persist` | `schema` — the canonical settings/session v2 schema, migration from the shipping UI's plain-JSON v0 files, and load outcomes via `PersistenceLoad` (RFC-076). RFC-031's original `VersionedEnvelope`/`MigrationPolicy` wrapper and v1 records were removed (RFC-076 patch 5, 2026-08-03): no released version ever wrote a v1 file. |
 | `platform` | `PlatformInfo::collect()` — runtime diagnostic snapshot (OS, arch, CPUs, app version, redacted home, config dir). `to_report()` for clipboard copy in the About panel (RFC-026). |
 | `report` | `FileComparisonReport` + `DirComparisonReport` — Markdown and JSON report export (RFC-027). |
 | `save` | `save_text`, `TargetPrecondition`, `BackupPolicy`, `SaveRequest`, `SaveOutcome` — conflict detection, backup, temp-file-then-rename write (visibility-atomic, not a power-loss guarantee — F9/N2) via `atomic_replace`/`persist_noclobber` (RFC-007, RFC-077). |
-| `session` | `WorkspaceSession`, `WorkspaceTab`, `CloseResult`, `RecentSessionEntry` — session model and JSON persistence (RFC-011). |
-| `settings` | `UserSettings`, `AppearanceSettings`, `DiffSettings`, `ThemeId`, `FontFamilySetting` — persisted user preferences (RFC-009). |
+| `settings` | `ThemeId`, `LocaleId`, `Density`, `FontFamilySetting`, `ThemeTokens` — display types `forskscope-ui`/`forskscope-ui-logic` and `persist::schema::settings::PersistedSettings` depend on (RFC-009). `UserSettings` (RFC-031's schema v1 record) was removed, never having shipped (RFC-076 patch 5). |
 | `vcs` | `VcsProvider` trait + `GitProvider` — read-only VCS context (status, file at revision, merge base). `detect(path)` (RFC-038). |
 | `watcher` | `FileChangeMonitor` trait, `WatchToken`, `FileChangeEvent`, `WatchError`, `MockFileChangeMonitor` — file-watcher boundary (RFC-036). |
-| `xlsx` | Fail-closed spreadsheet comparison boundary; `.xlsx` parsing is temporarily disabled while the parser dependency path is remediated (RFC-058). |
+| `xlsx` | Fail-closed spreadsheet comparison boundary between `sheets-diff` and ForskScope's app model, no `sheets-diff` types in the public API (RFC-058). Suspended for one release over an XML denial-of-service advisory chain, restored at `sheets-diff` 2.5.0 with cancellation polling inside a sheet (RFC-085); now at 3.0.0, which streams its read (F130). |
 
 ## `ui-logic` modules (19)
 
@@ -73,7 +73,7 @@ read what a row says a module does; that stays a judgment.
 | `explore::tier2_verdict` | `Tier2Verdict`, `tier2_verdict` — what a full, content-reading recursive comparison can conclude about a directory pair: `Identical`, `Different` or `Unknown` — the only tier entitled to claim identity (RFC-080 tier 2). |
 | `explore::deep_filter` | `DeepFilter`, `DeepCompareSummary`, `apply_filter` — filter state and counts for recursive directory compare (RFC-037, RFC-038). |
 | `explore::status` | `RowStatusKind`, `StatusGlyph` — maps `EqualityEvidence` to CSS class, glyph, and aria label for tree row badges (RFC-054). |
-| `explore::sync_panes` | `mirror_target` — location-mirroring for the Explorer's sync-panes toggle: re-applies the name or level-count a navigation moved by onto the other pane's own current directory, rather than replaying the gesture (handoff 062, F151 / issue #148). |
+| `explore::sync_panes` | `mirror_target` — the anchored model (review 139 §3): an in-step descent or ascent mirrors the triggering pane's path *relative to its own anchor* onto the other pane's anchor; navigating above your own anchor, or an unrelated jump, mirrors nothing, even if the anchors happen to share a leaf name (F151, issue #148). |
 | `compare::load_guard` | `guard_for_sizes(left, right)` → `LoadGuard` — pre-diff decision: Proceed / WarnBanner / ConfirmPrompt derived from `FileSizeClass` thresholds (RFC-013, Slice 1). |
 | `compare::load_identity` | Process-local `CompareTabId` allocation, monotonic `LoadGeneration`, and pure async completion validation; runtime tokens are never persisted (RFC-075). |
 | `compare::save_error` | `SaveErrorView::from_error(err, path)` — maps `AppError` to dialog title, body, and ordered `Vec<RecoveryButton>` (RFC-007, RFC-017, Slice 3). |
@@ -91,17 +91,21 @@ read what a row says a module does; that stays a judgment.
 | Module | Responsibility |
 |---|---|
 | `state` | `Store` (shared Dioxus signals and root-owned compare-tab ID allocator), `CompareTab`, token-guarded async open/reload completion, `AppSettings`, and session persistence. |
-| `app` | Root component; provides store context; CSS injection; startup pair; git mergetool mode. |
-| `ui/header` | Brand, Settings button, keyboard reference shortcut. |
-| `ui/tabs` | Tab bar with dirty-dot markers and close. |
-| `ui/explorer` | Two `DirectoryTreeView` panes; one tree component for both layouts (row pairs from `compute_aligned_rows` or `pair_by_index`); digest status; pick and compare. |
-| `ui/diff` | Diff workspace; hunk rendering from `MergeSession`; toolbar with progressive disclosure. |
-| `ui/dir_pane` | Tree row building blocks (`PathBar`, `TreeRow`), `NavHistory`, `FilteringExecutor`. |
-| `ui/deep_compare` | Recursive directory compare with incremental digest progress. |
-| `ui/settings` | Settings modal + persistence; `ModalLayer` dispatcher. |
-| `ui/statusbar` | Passive context: file names, encoding, diff stats, local-only marker. |
-| `ui/search` | Inline search bar, `SearchCtx`, scroll-to-focused. |
-| `ui/keybindings` | Keyboard reference modal. |
+| `app` | Root component; provides store context; CSS injection; startup pair; git mergetool mode; the desktop window title (RFC-089). |
+| `keyboard` | Global keyboard ownership, testable: `global_key_action` (pure state-in/action-out), `ControlZone`, `swallow_when_typing` (RFC-060). |
+| `update_check` | Update-check network adapter: one bounded HTTPS GET, off the UI thread; the decision logic lives in `forskscope-ui-logic` (F180). |
+| `webview2` | Windows-only WebView2 Runtime presence check, since `wry` panics with no console to explain why if it's missing (F109). |
+| `ui/layout/tabs` | Tab bar: Explorer tab + file/directory comparison tabs (a WAI-ARIA tabs pattern, RFC-087), plus the *Settings* and *?* buttons moved here when the header was removed (RFC-089). |
+| `ui/layout/statusbar` | Passive context: file names, encoding, diff stats, local-only marker. |
+| `ui/view/explorer` | Two `DirectoryTreeView` panes; one tree component for both layouts (row pairs from `compute_aligned_rows` or `pair_by_index`); digest status; pick and compare. |
+| `ui/view/diff` | Diff workspace; hunk rendering from `MergeSession`; toolbar with progressive disclosure. |
+| `ui/view/dir_pane` | Tree row building blocks (`PathBar`, `TreeRow`), `NavHistory`, `FilteringExecutor`. |
+| `ui/view/deep_compare` | Recursive directory compare with incremental digest progress. |
+| `ui/view/settings` | Settings modal + persistence; `ModalLayer` dispatcher. |
+| `ui/view/search` | Inline search bar, `SearchCtx`, scroll-to-focused. |
+| `ui/overlay/keybindings` | Keyboard reference modal (`KbRow` rows; `cargo xtask keyboard-docs` ties these to `keyboard.md`). |
+| `ui/overlay/modals` | Every safety/action dialog dispatched from `ModalLayer`: `file` (overwrite, save-as, reload, swap, option/encoding-change confirms, large-load, save-error), `tab` (`CloseTabModal`), plus `about`, `copy`, `recovery`. |
+| `ui/component/notice` | `Notice` — a styled inline message strip (default/success/warning) reused across views and overlays. |
 | `i18n` | English passthrough + Japanese key map. |
 
 ## Core ownership rule

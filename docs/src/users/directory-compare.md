@@ -13,10 +13,13 @@ When you launch ForskScope without arguments, the Explorer workspace opens with 
 
 **Navigating:**
 
-- Click a folder to open it.
+- Click a folder to select it, click its **▸** caret to expand or collapse it,
+  or double-click it to enter it.
 - Click `↑` or press `Alt+↑` to go up one level.
-- Use the `◀` / `▶` history buttons, or `Alt+←` / `Alt+→`, to go back and forward.
-- Type a path in the path bar and press Enter.
+- Use the `←` / `→` history buttons, or `Alt+←` / `Alt+→`, to go back and forward.
+- Click the breadcrumb's current folder name (or the **⋯** menu's **Edit
+  path** item) to turn the path bar into a text field, type a path, and press
+  Enter.
 
 **Status icons per file:**
 
@@ -79,11 +82,11 @@ An **empty directory present on only one side** is listed too, under the same `�
 | Size | File size (or `old → new` if sizes differ) |
 | Compare button | Opens a file comparison for differing files |
 
-**Filtering results:** use the **Different / All / Equal** buttons (same as browse mode).
+**Filtering results:** use the **Different / All / Equal only** buttons (same as browse mode).
 
 **Batch copy:** when differing files exist, **Copy to right N** and **Copy to left N** buttons appear in the toolbar. Clicking shows a confirmation with the file count and a note that a restore manifest will be saved.
 
-After a batch copy completes, a **result summary** shows the number of files succeeded and failed, and the path to the manifest JSON file written to `$XDG_DATA_DIR/forskscope/manifests/`. The manifest records every file copied, its backup path, and any errors — it can be used to audit or reverse the operation.
+After a batch copy completes, a **result summary** shows the number of files succeeded and failed, and the path to the manifest JSON file written to `$XDG_DATA_HOME/forskscope/manifests/`. The manifest records every file copied, its backup path, and any errors — it can be used to audit or reverse the operation.
 
 ---
 
@@ -91,4 +94,5 @@ After a batch copy completes, a **result summary** shows the number of files suc
 
 - **Compare profiles** affect the file comparison that opens when you click Compare in the explorer. Set "Ignore whitespace" as the active profile if you're comparing generated files with inconsistent formatting.
 - The last-used left and right directories are remembered across launches **when Settings → Advanced → Remember Explorer directories is on** (the default). When it is off, the Explorer always starts at your home directory, and turning it off forgets the stored locations.
-- The deep compare report resets when you click ⟳ Deep compare again with different directory paths.
+- There is no re-run button for an open deep-compare tab — to compare a
+  different pair of directories, open a new deep compare from the Explorer.

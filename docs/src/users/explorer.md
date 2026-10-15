@@ -8,19 +8,34 @@ and **Right / New** (target).
 
 ## Opening directories
 
-**From the path bar:** type or paste a path and press **Enter**, or open the
-**⋯** menu and choose **Open folder…** to open a directory picker dialog.
+**From the path bar:** click the breadcrumb's current folder name (or the
+**⋯** menu's **Edit path** item) to turn the path bar into a text field, type
+or paste a path, and press **Enter**. Or open the **⋯** menu and choose
+**Open folder…** to open a directory picker dialog instead.
 
 **From the command line:** you cannot. Two arguments always mean two *files*:
 `forskscope <dirA> <dirB>` does not open the Explorer, and opens a tab that
 fails with "Could not open … not a regular file". Start ForskScope with no
 arguments and choose the folders here.
 
+**The ⋯ menu** is fully keyboard-operable: Enter, Space or ↓ opens it from the
+**⋯** button, ↑/↓ move between its items, Enter activates one, and Escape
+closes it. Its three items, each with the same effect as its own dedicated
+shortcut:
+
+| Item | Shortcut |
+|------|----------|
+| Home folder | **Alt+Home** |
+| Open folder… | **Ctrl+O** |
+| Edit path | Click the breadcrumb path's name |
+
 ---
 
 ## Navigating
 
-Click a folder row to expand it and show its contents. Click again to collapse.
+Click a folder row to select it. Click its **▸** caret to expand or collapse
+it. Double-click a folder to enter it (open its contents as the pane's new
+directory).
 
 Press **Alt + ↑** or click the **↑** button in the path bar to go up one level in the **focused pane**.
 
@@ -47,9 +62,12 @@ the left pane to switch to the right pane and select a file there.
 
 ## Empty state
 
-When both panes are at the same directory and no entries are visible, the
-Explorer shows a **Compare files or folders** card with a brief orientation
-hint and a `🔒 Nothing leaves this computer.` trust notice.
+When neither pane has any row to show — both directories are empty, or an
+active filter hides every entry on both sides — the Explorer shows a
+**Compare files or folders** card with a brief orientation hint and a
+`🔒 Nothing leaves this computer.` trust notice. The two directories do not
+need to be the same one; each side being empty (by content or by filtering)
+is enough on its own.
 
 ---
 
@@ -66,7 +84,7 @@ the right candidate. Click **Compare** to open a diff tab.
 | **F6** | Switch keyboard focus between left and right pane |
 | ↑ / ↓ | Move focus within the active pane |
 | **Space** | Select the focused file as a comparison candidate |
-| **Enter** | Open a folder, or compare a same-name file if a matching file exists in the opposite pane |
+| **Enter** | Expand or collapse the focused folder; does nothing on a file |
 | **Alt + ↑** | Go up one directory level (focused pane only) |
 | **Alt + ←** / **Alt + →** | Back / forward in the focused pane's directory history |
 
@@ -74,9 +92,9 @@ the right candidate. Click **Compare** to open a diff tab.
 
 ## Same-name file shortcut
 
-If a file with the same name exists in both panes, double-click it (or press
-**Enter** with it focused) to compare it immediately without needing to select
-it on both sides.
+If a file with the same name exists in both panes, double-click it to compare
+it immediately without needing to select it on both sides. (**Enter** does
+nothing on a file — it only expands or collapses a focused folder.)
 
 ---
 
@@ -154,15 +172,19 @@ the filter bar.
 
 | Control | Effect |
 |---|---|
-| **Name input** | Narrows visible rows live — case-insensitive substring match. A pair is shown if either side's filename matches. |
+| **Name input** | Narrows visible rows live — case-insensitive substring match. In **Aligned**, a same-name pair is shown if either side's filename matches. In **Compact**, each side is filtered independently before the two columns are packed by position again, so a surviving left entry and the right entry it now shares a row with need not be the same name. |
 | **Hide binary** checkbox | Hides rows where all present file sides are binary (only effective when binary comparison is off). |
 | **Hide identical** checkbox | Hides rows whose status is `=` (equal). |
-| **✕ Clear** | Resets all filters in one click (appears when any filter is active). |
+| **✕** (tooltip "Clear filter") | Resets all filters in one click (appears when any filter is active). |
 
 A filter stays in effect when you close the bar to get the space back — closing
 it does not clear it. The **Filter** button shows a small accent dot whenever
 a filter is narrowing the rows, whether the bar is open or closed, so a
 filtered-out file is never hidden behind a button that looks off.
+
+If a filter hides every row, the pane shows the same **Compare files or
+folders** card as a genuinely empty pair of directories — there is no
+separate "no matches" message.
 
 Filter state is not persisted — it resets when you restart the app.
 

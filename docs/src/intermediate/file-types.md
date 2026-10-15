@@ -156,9 +156,9 @@ thresholds (and what changes at each level) are:
 | Class | Default threshold | Behaviour change |
 |-------|------------------|-------------------|
 | Small | ≤ 512 KiB | Full diff + inline diff computed eagerly |
-| Medium | 512 KiB – 4 MiB | Full diff; inline diff on demand only |
-| Large | 4 MiB – 64 MiB | User prompted before diff; inline diff disabled |
-| Very large | > 64 MiB | User prompted; diff may be approximate |
+| Medium | 512 KiB – 4 MiB | Full diff proceeds with a warning banner; inline diff disabled |
+| Large | 4 MiB – 64 MiB | User confirmation required before diffing; inline diff disabled; the line diff stops after 5 seconds and says so if its result is approximate |
+| Very large | > 64 MiB | User confirmation required; no text diff — metadata and a binary summary only |
 
 These thresholds are controlled by `PerformanceLimits` in the `job` module
 (see [Architecture](../maintainers/architecture.md)).

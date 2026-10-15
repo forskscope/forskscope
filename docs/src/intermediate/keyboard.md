@@ -69,7 +69,7 @@ These keys work in both Explorer layouts (Aligned and Compact).
 | Shortcut | Action |
 |----------|--------|
 | **↑ / ↓**     | Move focus between rows |
-| **Enter**     | Open directory / compare same-name file |
+| **Enter**     | Expand or collapse the focused folder; does nothing on a file |
 | **Space**     | Select focused file as left or right comparison candidate |
 | **F6**        | Switch focused pane (left ↔ right) |
 | **Alt+↑**     | Go up one directory level (focused pane only) |
@@ -94,3 +94,6 @@ These keys work in both Explorer layouts (Aligned and Compact).
   but can be reached by Tab-navigating the toolbar.
 - The diff search bar (**Ctrl+F**) supports **Esc** to dismiss. While the bar is open, the
   search runs live on every keystroke; no explicit submit is needed.
+- **F3** / **Shift+F3** step through matches while focus is elsewhere in the tab. While
+  focus is in the search box itself, the box takes every key typed into it — use
+  **Enter** / **Shift+Enter** there instead.

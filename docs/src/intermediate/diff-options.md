@@ -68,7 +68,7 @@ collapses. A collapsible divider (···) marks the hidden region; click it to e
 | `5`   | More context, useful for reviewing function-level changes |
 | `10`  | Maximum context, useful for auditing intent in long stable sections |
 
-Set in Settings → "Context lines".
+Set in Settings → Advanced → "Context lines".
 
 ---
 
@@ -84,8 +84,11 @@ turns on for a new comparison opened under that profile:
 
 - **When I turn it on** (default) — off until you click the toggle, as above.
 - **Automatically for small changes** — on from the moment a new tab opens.
-- **Never** — the toggle itself is disabled, with a tooltip explaining why;
-  this comparison never shows character-level highlighting.
+- **Never** — the toggle itself is disabled, with the tooltip "Character-level
+  highlighting is not available for this comparison." (the same generic
+  tooltip shown whenever the toggle is unavailable, for any reason — it does
+  not name the profile as the specific cause); this comparison never shows
+  character-level highlighting.
 
 Opening a tab is the only thing a profile's setting affects — an already-open
 tab keeps whatever the toggle is set to until you change it yourself.

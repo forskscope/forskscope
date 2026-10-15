@@ -2,7 +2,9 @@
 
 Merging means taking changes from the **left (source)** side and applying them to the **right (result)** side. This is useful when you want to accept specific changes from an older version into your current file, or when resolving a two-way difference.
 
-> For three-way conflict resolution (base/ours/theirs), see [Git Integration](../intermediate/git-integration.md).
+> For using ForskScope as a `git mergetool` (two-way: your version vs theirs,
+> saved to the file git expects — no base/ours/theirs three-way view), see
+> [Git Integration](../intermediate/git-integration.md).
 
 ---
 

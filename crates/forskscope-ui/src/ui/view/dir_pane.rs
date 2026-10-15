@@ -232,11 +232,17 @@ pub fn PathBar(
     let mut more_btn_handle: Signal<Option<Rc<MountedData>>> = use_signal(|| None);
     let mut item_handles: Signal<[Option<Rc<MountedData>>; 3]> = use_signal(|| [None, None, None]);
 
-    use_effect(move || {
-        if !*edit_mode.read() {
-            input_val.set(path_str.clone());
-        }
-    });
+    // F197: this used to be a `use_effect` syncing `input_val` from
+    // `path_str` whenever not editing. Driven live (AT-SPI), it lagged:
+    // navigating via Back/Forward and immediately clicking the breadcrumb's
+    // current segment to edit it showed the *previous* directory, not the
+    // one just navigated to, in 9 of 10 repeats. `path_str` is recomputed
+    // fresh every render from the `path` prop, so the sync belongs in the
+    // render itself, guarded against re-writing an unchanged value.
+    let sync = path_input_sync(*edit_mode.read(), &input_val.read(), &path_str);
+    if let Some(v) = sync {
+        input_val.set(v);
+    }
 
     let home_item = move |_| {
         on_focus.call(());
@@ -456,6 +462,21 @@ fn menu_item_keydown(
             None
         }
         _ => None,
+    }
+}
+
+/// F197: whether this render should overwrite `PathBar`'s `input_val` from
+/// `path_str` — never while editing (the user's in-progress text wins), and
+/// never with a value already in sync (an unconditional `Signal::set` here
+/// would re-trigger subscribers, including this same check, every render).
+/// Called directly in the render body rather than from a `use_effect`: see
+/// that call site's comment for why — a `use_effect`-driven version of this
+/// exact guard lagged a navigation by one step when driven live.
+fn path_input_sync(editing: bool, current: &str, path_str: &str) -> Option<String> {
+    if !editing && current != path_str {
+        Some(path_str.to_string())
+    } else {
+        None
     }
 }
 
@@ -923,6 +944,37 @@ mod tests {
             assert!(!*edit_mode.read());
             assert!(!*input_err.read());
         });
+    }
+
+    // ── F197: `input_val` tracks `path_str` without an effect's lag ─────────
+    //
+    // Driven live (AT-SPI): clicking Back/Forward then immediately clicking
+    // the breadcrumb's current segment to edit it showed the *previous*
+    // directory in the input, not the one just navigated to, in 9 of 10
+    // repeats — the `use_effect` syncing `input_val` from `path_str` had not
+    // run yet by the time the click handler read `input_val`. Falsify by
+    // reverting `path_input_sync`'s call site to a `use_effect`: these tests
+    // of the pure guard keep passing (it is called the same way either way),
+    // but restoring the effect reintroduces the lag these tests cannot see —
+    // which is exactly why the fix is "call this synchronously in render",
+    // not "keep calling it from somewhere".
+
+    #[test]
+    fn path_input_sync_updates_when_not_editing_and_the_path_changed() {
+        assert_eq!(
+            path_input_sync(false, "/old", "/new"),
+            Some("/new".to_string())
+        );
+    }
+
+    #[test]
+    fn path_input_sync_does_nothing_while_editing_even_if_the_path_changed() {
+        assert_eq!(path_input_sync(true, "/old", "/new"), None);
+    }
+
+    #[test]
+    fn path_input_sync_does_nothing_once_already_in_sync() {
+        assert_eq!(path_input_sync(false, "/same", "/same"), None);
     }
 
     // F99/C3: PathBar's Back/Forward/Up/Home/Open-folder buttons carried a

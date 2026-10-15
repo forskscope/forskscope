@@ -98,11 +98,13 @@ git mergetool
 - **Side-by-side diff** with line-level highlighting, and character-level highlighting when you turn on *Inline diff* (or set a profile to show it automatically)
 - **Merge** — apply changes from left to right one hunk at a time; undo / redo
 - **Enter to apply** the focused hunk; F7/F8 to navigate; Ctrl+S to save
-- **Explorer** — browse two directories, see digest equality indicators, compare same-name files with one click
+- **Explorer** — browse two directories, see digest equality indicators, double-click a same-name file to compare it instantly
 - **Deep compare** — recursive directory scan with live progress; batch copy changed files between trees
 - **Deep compare filter** — Different / All / Equal only in the deep compare report
 - **Git difftool / mergetool** compatible: `forskscope old new`, or `forskscope local remote merged` to save the result to the merged file. Merging with a common ancestor (three-way) is not available in the app
-- **Compare profiles** — named presets for ignore-whitespace, ignore-case, and algorithm (Myers / Patience / Histogram)
+- **Compare profiles** — named presets for ignore-whitespace, ignore-case,
+  ignore-line-ending (CRLF/LF), algorithm (Myers / Patience / Histogram), and
+  inline-diff highlighting mode (lazy / eager / never)
 - **Session persistence** — open file comparison tabs, and which one was active, are restored on next launch; folder comparisons are not
 - **Patch export** — export a unified-diff `.patch` file from a file comparison; compatible with `patch -p1` and `git apply`
 - **Safe saves** — atomic write (never a partial file; not a power-loss guarantee — see [Merging](docs/src/users/merging.md)), `.bak` backup, external-change detection
@@ -129,7 +131,9 @@ git mergetool
 | F3 / Shift+F3 | Next / previous search match |
 | Ctrl+/ | Keyboard shortcut reference |
 
-Press **?** in the header or **Ctrl+/** for the full reference.
+Press the **?** button in the tab bar for the full reference — it always
+works. **Ctrl+/** does the same thing, but only while a file or directory
+comparison tab is open; it's ignored on the Explorer tab.
 
 ---
 

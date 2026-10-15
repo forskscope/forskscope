@@ -50,14 +50,14 @@ For files over 512 KiB the **Inline diff** button is disabled and the load shows
 
 ---
 
-### Very large files may produce approximate diffs
+### Very large files may produce approximate diffs, or none at all
 
-Files over 4 MiB show a warning banner, and files over 64 MiB ask for
-confirmation before loading. The diff itself is time-bounded at 5 seconds
-regardless of file size — there is no shortened deadline for large files.
-The result is correct for the differences found but may miss some changes
-deep in a very large file. A warning is shown in the diff view when this
-occurs.
+Files over 512 KiB show a warning banner but still load. Files over 4 MiB ask
+for confirmation before loading; once confirmed, the diff itself is
+time-bounded at 5 seconds — the result is correct for the differences found
+but may miss some changes deep in a large file, and a warning is shown in the
+diff view when this occurs. Files over 64 MiB ask for confirmation too, but
+show metadata and a binary summary only — there is no text diff at that size.
 
 ---
 
@@ -101,7 +101,7 @@ The Explorer's **Directory Report** mode supports per-file copy (both directions
 and batch copy via the **Copy to right N** / **Copy to left N** toolbar buttons.
 Each copy shows a confirmation with the full source and destination path; existing
 files receive a `.bak` backup. A restore manifest is written to
-`$XDG_DATA_DIR/forskscope/manifests/` after every batch operation.
+`$XDG_DATA_HOME/forskscope/manifests/` after every batch operation.
 
 Delete and full directory-sync operations are not supported and are not planned
 for v1 (non-goal NG-004 in the product policy).
@@ -152,7 +152,7 @@ sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev
 The release binary is not notarized. macOS Gatekeeper will show a warning on
 first launch. Right-click → Open to bypass it, or run:
 ```sh
-xattr -d com.apple.quarantine ./forskscope
+xattr -d com.apple.quarantine /Applications/ForskScope.app
 ```
 
 ---

@@ -11,16 +11,18 @@ bug report.
 forskscope --diagnostics
 ```
 
-Example output:
+Example output (field order and spacing exactly as printed; "OS" includes
+the OS family in parentheses, and "Home" is redacted after the last path
+separator):
 
 ```
 ForskScope 0.112.0
-OS:       linux
-Arch:     x86_64
-CPUs:     8
-Rust:     1.91.0
-Home:     ***
-Config:   /home/user/.config/forskscope
+Rust: 1.91.0
+OS: linux (unix)
+Arch: x86_64
+CPUs: 8
+Home: ***
+Config: ~/.config (default)
 ```
 
 ---
@@ -93,8 +95,11 @@ appears.
 
 ## Linux: file picker dialog does not open
 
-**Symptom:** Clicking "Open files" or using drag-and-drop does nothing, or
-the app hangs briefly and nothing appears.
+**Symptom:** Clicking **Open folder…** (in the Explorer's **⋯** menu), or any
+action that opens a save/export file dialog, does nothing — or the app hangs
+briefly and nothing appears. (ForskScope has no "Open files" button and does
+not support drag-and-drop; every file and folder is chosen through the
+Explorer or one of these dialogs.)
 
 **Cause:** The file picker (`rfd`) uses the OS portal on Wayland and the
 GTK file chooser on X11. Missing portal or XDG desktop portal services can
@@ -118,7 +123,7 @@ Then restart your desktop session.
 **Fix:** Right-click the app icon → **Open**, then click **Open** in the
 dialog. Alternatively, from a terminal:
 ```sh
-xattr -d com.apple.quarantine ./forskscope
+xattr -d com.apple.quarantine /Applications/ForskScope.app
 ```
 
 This only needs to be done once.

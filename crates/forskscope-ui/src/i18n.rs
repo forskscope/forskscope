@@ -166,7 +166,9 @@ fn ja(key: &str) -> Option<&'static str> {
         "Open / close inline search" => "差分内検索を開く / 閉じる",
         "Next / previous search match" => "次 / 前の一致",
         "Move focus in explorer list" => "エクスプローラー内のフォーカス移動",
-        "Open directory / compare same-name file" => "ディレクトリを開く / 同名ファイルを比較",
+        "Expand or collapse the focused folder; does nothing on a file" => {
+            "フォーカスしたフォルダーを展開/折りたたみ。ファイルでは何も起きません"
+        }
         "Select file as comparison candidate" => "ファイルを比較候補として選択",
         "Switch focused pane (left ↔ right)" => "フォーカスペインを切り替え（左↔右）",
         "Go up one directory (focused pane)" => "1階層上に移動（フォーカス中のペイン）",

@@ -30,9 +30,10 @@ to keep the focused change visible.
 
 ## Scrolling
 
-Each pane has its own horizontal scroll bar, so a long line in the left file
-does not force the right pane to scroll unnecessarily. Vertical scrolling keeps
-both panes row-aligned — use the window scroll or your mouse wheel.
+Each pane has its own horizontal scroll bar, but scrolling either one mirrors
+the same position onto the other, so matched content stays aligned side by
+side. Vertical scrolling keeps both panes row-aligned — use the window scroll
+or your mouse wheel.
 
 ---
 
@@ -47,9 +48,13 @@ Changed characters inside replaced lines become highlighted at the character
 level. Toggle **Inline diff: off** to return to the plain line view.
 
 Inline diff is only available for **Replace** hunks (lines that exist on both
-sides but differ). Pure insertions and deletions are shown as whole lines. A
-line over 2,000 characters is not highlighted; it carries a **Long line** badge
-instead. Files over 512 KiB have the button disabled. See
+sides but differ). Pure insertions and deletions are shown as whole lines. The
+limit is on the *differing* portion of a line, not the whole line — a long
+line with only a short change at one end still gets character-level
+highlighting; it's a long **shared** middle that's skipped. When the differing
+middle is over 2,000 characters on either side, the pair is not highlighted
+and carries a **Long line** badge instead. Files over 512 KiB have the button
+disabled. See
 [Inline diff options](../intermediate/diff-options.md#inline-character-level-diff).
 
 ---
@@ -65,7 +70,7 @@ Long stretches of identical lines collapse automatically. A divider like:
 marks a collapsed region. Click the divider to expand it.
 
 The number of context lines shown above and below each change is set in
-[Settings → Context lines](settings.md#context-lines).
+[Settings → Advanced → Context lines](settings.md#context-lines).
 
 ---
 
@@ -88,7 +93,7 @@ The **More ▼** section of the toolbar exposes per-tab diff options:
 |--------|-------------|
 | **Inline diff** | Toggle character-level highlighting within replaced lines |
 | **Wrap** | Wrap long lines in each pane instead of scrolling horizontally |
-| **Ignore WS** | Treat whitespace-only differences as equal |
+| **Ignore whitespace** | Treat whitespace-only differences as equal |
 | **Ignore case** | Treat uppercase/lowercase differences as equal |
 | **Algorithm** | Myers (default), Patience, or Histogram — affects how changes are grouped |
 

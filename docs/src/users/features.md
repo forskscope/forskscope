@@ -3,10 +3,12 @@
 ## Core workflow
 
 - **Side-by-side two-pane comparison** — Left / Old and Right / New panes with
-  a fixed divider. Each pane has its own horizontal scroll bar so long lines
-  on one side do not force the other pane to scroll.
+  a fixed divider. Each pane has its own horizontal scroll bar, mirrored
+  between panes so matched content stays aligned as you scroll either side.
 - **Line-level diff** — insertions (green), deletions (red), and replacements
-  (amber) with colour-independent `+`/`−`/`~` gutter marks.
+  (amber) with colour-independent gutter marks: `−` on the left/old side of a
+  removed or replaced line, `+` on the right/new side of an added or replaced
+  line.
 - **Hunk navigation** — ◀ ▶ buttons (F7/F8) jump between changes; a position
   indicator shows `current / total`.
 - **Inline character diff** — for replaced lines, toggle character-level
@@ -30,7 +32,7 @@
   folder, a directory picker dialog, and Edit path.
 - Status icons on every row: equal, different, computing, unreadable, left only, right only, not compared (see the table below).
 - Full keyboard navigation: arrows to move, Space to select, Enter to
-  open/compare, **F6** to switch focused pane.
+  expand/collapse a folder, **F6** to switch focused pane.
 - **Alt+↑** navigates the focused pane up one level.
 - Same-name file shortcut: double-click to compare immediately.
 - **Empty state** shown when no entries are visible, with a first-run orientation hint.
@@ -71,9 +73,9 @@
 - **Directory Report** mode recursively scans both directory trees.
 - Two-phase scan: fast listing first, then background digest comparison.
 - Status per file: the same icons as the Explorer, plus a symlink that is not followed.
-- Filter results: **Different** / **All** / **Equal**.
+- Filter results: **Different** / **All** / **Equal only**.
 - **Per-file copy** — explicit `Copy to right` / `Copy to left` buttons; confirmation shows full source and destination paths; `.bak` backup created when destination exists.
-- **Batch copy** — explicit direction buttons (`Copy to right N` / `Copy to left N`); confirmation and result summary; restore manifest written to `$XDG_DATA_DIR/forskscope/manifests/`.
+- **Batch copy** — explicit direction buttons (`Copy to right N` / `Copy to left N`); confirmation and result summary; restore manifest written to `$XDG_DATA_HOME/forskscope/manifests/`.
 
 ---
 
@@ -117,15 +119,17 @@ the original encoding. UTF-8 BOM is round-tripped.
 
 ## Patch export
 
-Export a unified-diff patch from a file or directory comparison. The patch is
-compatible with `patch -p1` and `git apply`.
+Export a unified-diff patch from a file comparison (directory comparisons
+don't offer this). The patch is compatible with `patch -p1` and `git apply`.
 See [Patch export](../intermediate/patch-export.md).
 
 ---
 
-## Three-way merge (git mergetool)
+## Git mergetool (two-way)
 
-Use ForskScope as a `git mergetool` to resolve conflicts:
+Use ForskScope as a `git mergetool` to resolve conflicts. It compares your
+version against theirs and saves the result to the file git expects —
+there's no base/ours/theirs three-way view:
 
 ```sh
 git config merge.tool forskscope

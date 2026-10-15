@@ -32,9 +32,10 @@ palettes, so colour is never the only cue.
 
 ### Diff font size
 
-Point size for text in the diff panes. Range: 8–32 pt. Default: 14.
+Pixel size for text in the diff panes. Range: 8–32 px. Default: 14.
 
-The UI chrome (toolbar, tabs, status bar) scales proportionally.
+Only the diff panes are affected — the UI chrome (toolbar, tabs, status bar)
+is not.
 
 ### Diff font family
 
@@ -197,15 +198,19 @@ The profile is saved immediately and appears in the list.
 
 ## About and Diagnostics
 
-The **ℹ About** button in the Settings header opens the About dialog. It shows:
+The **ℹ About** button in the Settings dialog's own header opens the About
+dialog. It shows:
 
-- ForskScope version
-- Build profile (debug / release)
-- Platform (OS and architecture)
-- UI framework and diff engine versions
+- Version
+- Rust (the `rustc` version it was built with)
+- OS
+- Arch
+- CPUs (logical processor count)
 
-Click **Copy diagnostics** to copy this information to the clipboard for
-use in bug reports.
+A **Check for updates** button checks the latest release and offers to open
+its release page (or points you to your AUR helper / the Microsoft Store,
+depending how you installed it). Click **Copy diagnostics** to copy this
+information to the clipboard for use in bug reports.
 
 ---
 

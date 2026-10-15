@@ -13,10 +13,12 @@
 cargo build                            # debug build (requires GTK on Linux)
 cargo build --release                  # release (LTO, stripped)
 
-# Tests that run WITHOUT GTK / display server:
-cargo test -p forskscope-core          # 695 tests: 643 unit + 27 diff corpus + 16 merge corpus + 2 patch apply + 7 doctests
-cargo test -p forskscope-ui-logic      # 235 tests: 228 unit + 6 CSS coverage + 1 doctest
-cargo test -p forskscope-core -p forskscope-ui-logic  # headless gate (930 total)
+# Tests that run WITHOUT GTK / display server (see testing.md's "Test
+# counts" for why no number is given here — a hand-maintained count drifts
+# in both directions and nothing checks it):
+cargo test -p forskscope-core
+cargo test -p forskscope-ui-logic
+cargo test -p forskscope-core -p forskscope-ui-logic  # headless gate
 
 # Full workspace (requires GTK):
 cargo test --workspace

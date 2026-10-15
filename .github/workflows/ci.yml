@@ -98,6 +98,14 @@ jobs:
       - name: Colour vision check
         run: cargo xtask colour-vision
 
+      # F165: the in-app keyboard reference and docs/src/intermediate/
+      # keyboard.md drifted furthest of anything review 160 found (Enter's
+      # real behaviour, the Ctrl+/ gating note). This checks the two lists
+      # of keys agree, not that either is correct — see the gate's own
+      # module doc.
+      - name: Keyboard docs check
+        run: cargo xtask keyboard-docs
+
       - name: Version metadata sync check
         run: cargo xtask version-sync
 

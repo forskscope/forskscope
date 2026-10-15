@@ -3,8 +3,10 @@
 ## Why can't I save after merging?
 
 The **Save** button is only available when both files are plain text. If one
-side is a binary file, a spreadsheet, or a missing path, the comparison is
-read-only. A notice below the toolbar explains which case applies.
+side is a binary file or a spreadsheet, the comparison is read-only. A
+notice below the toolbar explains which case applies. A **missing** side is
+different: it's treated as empty text, not an unsupported kind, so saving
+still works — it creates the file.
 
 For binary files you can still compare the hex preview — you just can't merge
 and save the result.
@@ -31,12 +33,13 @@ Histogram is usually the most human-readable choice for structured code.
 ## My files are identical but ForskScope shows differences
 
 Check whether whitespace differences are the culprit:
-- Enable **Ignore WS** in the advanced toolbar and see if the diff disappears.
+- Enable **Ignore whitespace** in the advanced toolbar and see if the diff disappears.
 - Check the encoding shown in the status bar — `UTF-8` vs `UTF-8 BOM` or
   `Windows-1252` means the files have different encodings.
 - On Windows vs Linux, files may have `\r\n` vs `\n` line endings. The diff
-  will show each line as replaced. Enable Ignore WS, which strips all
-  whitespace including `\r`, or use a compare profile that normalises endings.
+  will show each line as replaced. Enable Ignore whitespace, which strips all
+  whitespace including `\r`, or create a compare profile with **Ignore
+  line-ending differences (CRLF/LF)** checked.
 
 ---
 
@@ -103,7 +106,7 @@ option does and how to recover after downgrading ForskScope.
 
 ## How do I report a bug?
 
-1. Open the **About** panel (ℹ button in the header).
+1. Open the **About** panel (ℹ button in the Settings dialog's header).
 2. Click **Copy diagnostics** to copy version and platform info.
 3. Open an issue on the project repository and paste the diagnostics.
 
@@ -117,8 +120,9 @@ a location and filename (it defaults to `<filename>.patch`). The output is a
 standard unified-diff patch that can be applied with `patch -p1` or
 `git apply`.
 
-If the two files are identical, the Export patch button does nothing; there
-are no changes to export.
+If the two files are identical, clicking Export patch shows a notice —
+"Files are identical — nothing to export." — instead of opening the save
+dialog.
 
 ---
 

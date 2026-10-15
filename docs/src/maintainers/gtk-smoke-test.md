@@ -166,7 +166,7 @@ highlighted with gutter markers.
   if destination exists, a green backup notice appears; **Cancel** is focused by default
 - Confirm the copy
 - Expected: file copied; for single-file success a toast confirms;
-  a manifest JSON is written to `$XDG_DATA_DIR/forskscope/manifests/`
+  a manifest JSON is written to `$XDG_DATA_HOME/forskscope/manifests/`
 
 ---
 
