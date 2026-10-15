@@ -49,8 +49,28 @@
   .deep-roots { flex-wrap: wrap; white-space: normal; }
   .deep-root-path { text-overflow: clip; white-space: normal; word-break: break-all; }
 
-  /* ── Tabs ── */
-  .tabbar { flex-wrap: wrap; max-height: none; }
+  /* ── Tabs ──
+     Review 162: restores pre-0.190.0 behaviour — every tab title stays
+     readable under 720px, by wrapping the *tab list* onto extra rows
+     (what happened before RFC-087/089 put `.tablist` and the two buttons
+     between `.tab` and `.tabbar`). `.tabbar` itself must NOT wrap: it has
+     exactly two line-worthy children now (`.tablist`, and the
+     Settings/?-holding remainder), and letting `.tabbar` wrap pushed the
+     buttons onto their own second line below every tab row — found from
+     actually looking at the screenshot. `.tab-slot` must not shrink here
+     either: `.tab-slot`'s own `overflow: hidden` drops its default
+     flexbox minimum width to 0 (the automatic-minimum-size rule), which
+     is exactly why it shrank to an empty box with no title visible,
+     instead of wrapping, when `.tablist` tried to fit every tab on one
+     line. */
+  .tabbar { max-height: none; }
+  .tablist { flex-wrap: wrap; overflow: visible; }
+  .tab-slot { flex-shrink: 0; }
+  /* The tab list can now grow taller than the buttons (several wrapped
+     rows of tabs); `flex-start` keeps the buttons on the tab list's own
+     first row instead of following `.tabbar`'s default `align-items:
+     flex-end` down to its bottom edge. */
+  .tabbar > button { align-self: flex-start; }
 
   /* ── Modals ── */
   .modal, .modal-wide { min-width: min(98vw, 20rem); max-width: 98vw; margin: .5rem; }
