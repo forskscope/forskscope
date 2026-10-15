@@ -93,15 +93,16 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 
 ## Proposed (9)
 
-RFC-004–040 are editor-adapter track, platform/packaging, or governance/documentation.
-RFC-026 and RFC-030 are substantially implemented; their remaining items require GTK or are deferred.
-RFC-060, 061, and 063 are the remaining UI/UX architect review remediation track (shipped across v0.145.0–v0.145.3); RFC-062, the fourth, is fully shipped and filed under Implemented.
-RFC-072 is the remaining phase of the UI structural redesign (RFC-071).
-RFC-074 and RFC-078 are the remaining release-stabilization program created
-from the 2026-07-15 architecture audit; they are release-blocking in
-dependency order. RFC-075, RFC-076, and RFC-077 are implemented and close
-audit findings B1, B2, and B3 respectively, but the overall v1 release
-remains No-Go.
+These are the RFCs not yet accepted, all from the early design phase:
+
+- **Editor-adapter track:** RFC-004, 016, 025 and 040.
+- **Platform and packaging:** RFC-010 and 026. RFC-026 is substantially
+  implemented, and its remaining items require GTK or are deferred.
+- **Documentation:** RFC-030, substantially implemented.
+- **Governance and roadmap:** RFC-041 and 042.
+
+RFCs from the 2026 stabilization program and later are under **Accepted** or
+**Implemented**, not here.
 
 | ID | Title | Category | Progress |
 |----|-------|----------|----------|
@@ -141,7 +142,6 @@ remains No-Go.
 - [roadmap-v0.2-refinement](./notes/roadmap-v0.2-refinement.md)
 - [roadmap-v0.3-feature-completion](./notes/roadmap-v0.3-feature-completion.md)
 - [roadmap-v0.4-winmerge-class-hardening](./notes/roadmap-v0.4-winmerge-class-hardening.md)
-- [sheets-diff-upstream-request-2026-08](./notes/sheets-diff-upstream-request-2026-08.md)
 - [sheets-diff-v2-migration](./notes/sheets-diff-v2-migration.md)
 - [sheets-diff-v2-questions](./notes/sheets-diff-v2-questions.md)
 - [v0.4-implementation-gate-checklist](./notes/v0.4-implementation-gate-checklist.md)
@@ -177,6 +177,8 @@ RFC design decisions. This list is every file under `handoffs/`.
 - [RFC-078 M5-C visual navigation and assembly handoff](./handoffs/078-platform-runtime-acceptance/m5c-visual-navigation-and-assembly-handoff.md)
 - [RFC-079 store submission automation (handoff 030)](./handoffs/079-microsoft-store-submission-automation/030-rfc079-store-submission-automation.md)
 - [RFC-080 tier 1 (handoff 039)](./handoffs/080-explorer-tiered-directory-comparison/039-rfc080-tier1.md)
+- [RFC-080 file row size cap (handoff 056)](./handoffs/080-explorer-tiered-directory-comparison/056-file-row-size-cap.md)
+- [RFC-080 tier 2 (handoff 060)](./handoffs/080-explorer-tiered-directory-comparison/060-rfc080-tier2.md)
 - [RFC-081 AUR publication automation (handoff 029)](./handoffs/081-aur-publication-automation/029-rfc081-aur-publication-automation.md)
 - [RFC-083 encoding breadth (handoff 023)](./handoffs/083-text-encoding-breadth/023-rfc083-encoding-breadth.md)
 - [RFC-084 patch conformance (handoff 024)](./handoffs/084-patch-export-conformance/024-rfc084-patch-conformance.md)

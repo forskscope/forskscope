@@ -1,10 +1,18 @@
 # Threat Model and Security Notes
 
-This document records the security posture of ForskScope at **v0.171.1**, the
+This document records the security posture of ForskScope at **v0.192.0**, the
 data flows that carry risk, the controls in place, and the known residual
 concerns. It is a living document; update it when a new data flow is added.
 
-**Review stamp.** Last full revision 2026-09-24, against commit `2bb7ca8`
+**Review stamp.** Partial revision 2026-10-15, by the architect, after the
+documentation audit (review 160).
+
+- **Updated:** the fundamental position, the threat surface list, §8
+  (Distribution, including the website) and the audit history, covering
+  0.186.0 to 0.192.0.
+- **Not re-audited:** every other section.
+
+Previous full revision: 2026-09-24, against commit `2bb7ca8`
 (the previous stamp was v0.165.0, 2026-08-01). That revision corrected the
 `.xlsx` sections, the script-evaluation claim, the transport dependency chain,
 and added the write path (§7), script evaluation (§9) and distribution (§8).
@@ -14,10 +22,13 @@ as they stood at v0.165.x–v0.170.2. Where this document says a property was
 
 ---
 
-## Fundamental position: local-only, no external network service
+## Fundamental position: local-first, one outbound request on click
 
-ForskScope has no application-authored external network workflow. It does not
-phone home, load remote resources, upload files, or provide a remote API.
+ForskScope has **one** application-authored outbound request: *Check for
+updates*, sent only when the user clicks it (since 0.187.0; *Accepted outbound
+request: update check*, below). Apart from that it does not phone home, load
+remote resources, upload files, or provide a remote API. The user's files never
+leave the device.
 Dioxus desktop uses a loopback WebSocket transport between the embedded WebView
 and the native host process; that framework transport is accepted and constrained
 below. The threat surface is therefore limited to:
@@ -32,7 +43,9 @@ below. The threat surface is therefore limited to:
    reads file content (below, under "Enabled third-party parser").
 8. **Saving files** — the only operation that can destroy user data (§7).
 9. **Script evaluation in the WebView** — `document::eval` (§9).
-10. **Distribution** — how a build reaches a user (§8).
+10. **Distribution** — how a build reaches a user, including the website (§8).
+11. **The update check** — one HTTPS GET to `api.github.com` on the user's click
+    (*Accepted outbound request*, below).
 
 There is no product/user authentication surface, no session tokens, no cookies,
 no persisted user secrets, and no user-account data.
@@ -381,24 +394,31 @@ substitute a build. Checked 2026-09-24.
 | AUR | A `PKGBUILD` (and `.SRCINFO`) pushed by `aur-publish.yml`. `sha256sums=('SKIP')` in the repository; the real source hash is computed at publish time from GitHub's own archive of the tag. | The workflow, then the AUR account holding the SSH key. |
 
 **Controls:**
-- A release is created as a **draft** by the tag-triggered `release.yml`; it does
-  nothing user-visible until the owner publishes it, and both the Store and AUR
-  workflows trigger on *publication*, never on the tag push. A published version
-  is immutable by policy (`release.md`).
+- **`release.yml` publishes the release directly** (`draft: false`, F156), after
+  its gates pass:
+  - `cargo audit` on the day of the tag, which stopped the first `0.191.0` tag;
+  - the Linux binary's exact 16-library list (F179/F180);
+  - the duplicate-run guard (F175).
+- **The AUR and the Store receive a release only by an explicit
+  `workflow_dispatch`,** never on a tag or a release event (F147/F158). The owner
+  authorizes each dispatch.
+- **A published version is immutable by policy** (`release.md`).
 - The AUR key lives in the `aur-publish` GitHub Environment; only `PKGBUILD` and
   a regenerated `.SRCINFO` are pushed, after the package has been built,
   installed and run through `namcap`; the AUR host key is pinned in the
   workflow, not fetched.
-- Each release asset carries a SHA-256 digest that GitHub computes on upload
-  (`gh release view <tag> --json assets`).
+- **Each release includes `SHA256SUMS`** for its three files (F181, since
+  0.187.0), and the release notes say how to check a download against it.
+- **GitHub also computes each asset's digest on upload** (`gh release view <tag>
+  --json assets`), a second source for the same number.
 
 **Residual concerns:**
 - **Integrity and origin are the same anchor.** The only digest a Windows-zip,
   DMG or tarball user can compare against is published by the same GitHub
   account that publishes the file; nothing independent signs a build. Anyone who
-  can replace a release asset can replace its digest. The digest is on the
-  release's asset list, **not in the release notes**, which `installation.md`
-  ("listed with their digests in each release's notes") had said.
+  can replace a release asset can replace its digest. `SHA256SUMS` and the release notes come from the same workflow and account as
+  the files. So they detect a corrupted or incomplete download, not a
+  compromised account. Signing is F46.
 - **Unsigned binaries teach users to click through warnings.** macOS users are
   told to clear the quarantine attribute (`installation.md`), which removes the
   operating system's check for that build entirely.
@@ -409,6 +429,40 @@ substitute a build. Checked 2026-09-24.
   repository each reaches users as an official update.** §6 records the Store
   case; this document does not record whether the `aur-publish` environment
   requires a reviewer, and this revision did not check.
+
+### 8a. The website (GitHub Pages)
+
+**What it is.** `https://forskscope.github.io/forskscope/` serves the download
+page and the user guide. `.github/workflows/pages.yml` builds and deploys it
+from `docs/site/` and `docs/` on every push to `main` that touches `docs/**`.
+
+**Controls:**
+
+- **Permissions:** `contents: read`, `pages: write`, `id-token: write` (the
+  Pages deploy token), and nothing else. Concurrency group `pages`, never
+  cancelled midway.
+- **`mdbook` is pinned** to an exact version and verified by SHA-256 before it
+  runs.
+- **`cargo xtask pages-origin-check`** fails the deploy if the page loads
+  anything from another origin. It checks `src`, `srcset`, `poster`,
+  `<object data>`, `<link href>`, `@import` and `url()`, case-insensitively
+  (F190).
+  - The page's promise, *"loads nothing from other sites and collects
+    nothing"*, is held by this gate.
+  - The guide built by `mdbook` was checked once (review 158) and loads nothing
+    foreign either. The gate checks only the landing page.
+- **`cargo xtask pages-link-check`** fails it if a link or image inside the site
+  does not resolve.
+- **The download page links to `releases/latest`,** never to a named version, so
+  it cannot point to a stale or substituted file name.
+
+**Residual concerns:**
+
+- **Anyone who can push to `main` can change the public download page.** That is
+  the same trust as the repository itself: the page adds no new holder of power,
+  but it is one more thing that holder can change.
+- **GitHub, as the host, sees visitors' requests** under its own privacy
+  statement. `PRIVACY.md` says so.
 
 ### 9. Script evaluation in the WebView (`document::eval`)
 
@@ -805,3 +859,9 @@ really version X of a published crate."
 | v0.183.0 | F132: `sheets-diff` 3.4.0 → 3.5.0, and `AlignmentMode` reversed from `Positional` alone to a per-sheet choice between positional and `RowSignature { sample_columns: None }`. A second full comparison of both workbooks is new work, bounded by `CellBounds` and `max_alignment_product` and cancellable (see the bullet above). The veto is `is_ambiguous()`: a sheet whose rows repeat is kept positional, and its header says why. Dependency chain unchanged: `calamine 0.36.1`, `quick-xml 0.41.0`, `zip 8.6.0`, no new transitive crate. `cargo audit` exits 0 on 3.5.0 |
 | v0.184.0 | F177: `sheets-diff` 3.5.0 → 3.6.0 — each formula change says why its texts differ. A formula whose references moved with its row is explained and no longer counted as a change; a declined formula still counts. Formula text is now parsed to map references, per formula change under the aligned leg (see the bullet above). Dependency chain unchanged: `calamine 0.36.1`, `quick-xml 0.41.0`, `zip 8.6.0`, no new transitive crate |
 | v0.185.0 | F178: one Explorer tree component for both layouts, compact the default for new installs | Tree rendering and row pairing only; no new data flow. The double-click compare now uses the same file-selection path in both layouts |
+| v0.186.0 | F179: `libxdo` removed from the Linux binary by a vendored, patched `muda` (`vendor/muda/`) | One fewer system library. `audit-deps` fails if `libxdo` returns, and reports when the vendored copy can be deleted. The release checks the binary itself (*Vendored crate: `muda`*) |
+| v0.187.0 | F180: *Check for updates*; F181: `SHA256SUMS` | **The first app-authored outbound request**: one HTTPS GET on click, response capped, tag validated before use, nothing persisted (*Accepted outbound request*). Releases gain a checksum file; integrity against corruption only (§8) |
+| site (2026-10-13) | F182: the website on GitHub Pages | A new deploy surface with `pages: write` / `id-token: write`; origin and link gates (§8a) |
+| v0.188.0–v0.190.0 | F185/F187 Explorer layout; F67/F168/F127/F139 restore, profiles and inline limits; RFC-087 keyboard access | UI and persistence shape only; `explorer_roots` removed from `session.json` (RFC-076's note). No new data flow |
+| v0.191.0 | RFC-088 colour vision, RFC-089 window title; `rustls` 0.23.45 → 0.23.46 | The window title now shows the open comparison's file names to the system (taskbar, window switcher, screen sharing). That is local, and the same convention as every editor. `rustls` fixes RUSTSEC-2026-0346 to -0349. It reaches us only through `dioxus-desktop` → `tungstenite`, not the update check (`native-tls`). The release audit stopped the first tag on these advisories |
+| v0.192.0 | RFC-090 palette, F195 documentation, F197 effects | No data-flow change |

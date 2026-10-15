@@ -1,8 +1,16 @@
 # Windows Packaging — MSIX for the Microsoft Store
 
-**Status: automated.** `.github/workflows/store-submit.yml` (RFC-079) builds,
-validates, and submits the MSIX on every published release. What follows is
-the manual equivalent — useful for understanding what the workflow does, for
+**Status: automated, by explicit dispatch, and not currently submitting.**
+`.github/workflows/store-submit.yml` (RFC-079) builds, validates, and submits
+the MSIX when dispatched (`gh workflow run store-submit.yml -f tag=X.Y.Z -f
+dry_run=false`).
+
+- It has no `release:` trigger (F147/F158).
+- **No submission has succeeded since 0.174.0:** it fails at the Partner Center
+  step, which waits on the owner's account work (F106 (b)).
+- So the Store listing is not updated with each release (F189).
+
+What follows is the manual equivalent — useful for understanding what the workflow does, for
 rehearsing with `workflow_dispatch` + `dry_run: true`, or as a fallback if
 the workflow is broken. **Three of the steps below exist to avoid mistakes
 this file previously invited**, and the workflow avoids the same three by
@@ -16,8 +24,8 @@ step 2 names — it never packs the whole `packaging/windows/` directory).
 
 **`AppxManifest.xml` in the working tree names the *next* version, not the
 released one.** The post-release bump moves it immediately after each cut, so
-between releases it is always one ahead. At the time of writing, `main` declares
-`0.170.1` while the newest release is `0.170.0`.
+between releases it is always one ahead: after `X.Y.0` is released, `main`
+declares `X.Y.1`.
 
 Packaging from `main` therefore submits a version to the Store that **does not
 exist and was never released**. This is the same structural trap F81 records for
@@ -102,7 +110,8 @@ submission, and no code-signing certificate of this project's own is involved
 
 ## What the automated workflow does instead
 
-`.github/workflows/store-submit.yml`, triggered by `release: published`:
+`.github/workflows/store-submit.yml`, run by `workflow_dispatch` with the
+released tag:
 
 1. Checks out the released tag (not `main` — see "Before you start" above)
    and runs `store-build.ps1`, which does exactly steps 1–3 above.

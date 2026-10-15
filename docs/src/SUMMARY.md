@@ -44,3 +44,4 @@
 - [Testing strategy](./maintainers/testing.md)
 - [GTK smoke test checklist](./maintainers/gtk-smoke-test.md)
 - [Release process](./maintainers/release.md)
+- [The website](./maintainers/website.md)

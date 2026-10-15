@@ -71,8 +71,10 @@ request for anything beyond a one-line fix.
    cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
    ```
    Both must pass with zero failures and zero warnings before opening a PR.
-4. **Check file size.** Files over 300 ELOC should be split; over 500 ELOC
-   splitting is required.
+4. **Check file size.** Split files over 300 ELOC where it helps. Over 500
+   ELOC it is strongly recommended (`local-dev.md`). It is a soft threshold:
+   several existing files are above it, and they are split when they are
+   touched (F13).
 5. **Update docs** if the change affects user-visible behaviour or the
    public API.
 6. **Record what must survive.** A reason, a limit you discovered, or
@@ -132,7 +134,7 @@ and open an issue about this file.
 ## RFC governance
 
 RFC numbers are never reused. Lifecycle changes (moving an RFC between
-`proposed/`, `done/`, `archive/`) are maintainer decisions, not contributor
+`proposed/`, `accepted/`, `done/` and `archive/`) are maintainer decisions, not contributor
 decisions — flag in the PR or issue that an RFC should be closed/archived and
 the maintainer will do it.
 
@@ -158,8 +160,9 @@ Refs: RFC-024, RFC-035
 
 - One logical change per PR; split unrelated fixes.
 - Link to the relevant issue or RFC.
-- The CI-equivalent command (`cargo test -p … && cargo clippy -p … -- -D warnings`)
-  must be green before requesting review.
+- The tests and `clippy` must be green before requesting review. CI runs many
+  more gates: the full list, step for step, is in
+  `docs/src/maintainers/testing.md`. A PR is mergeable when CI is green.
 - Reviewers may ask for tests, documentation, or scope reduction — this is
   normal and not a rejection.
 

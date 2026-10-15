@@ -2,12 +2,23 @@
 
 ## Prerequisites
 
-Build a release binary first:
+Build a release binary first.
+
+- **Linux:** a host build is enough.
+- **macOS and Windows:** the packaging scripts read a **target-specific** build
+  directory, so build for that target.
 
 ```sh
+# Linux
 cargo build --release --locked
 # or use the convenience script:
 bash packaging/build-release.sh
+
+# macOS (packaging/macos/build-dmg.sh reads target/aarch64-apple-darwin/release)
+cargo build --release --locked --target aarch64-apple-darwin
+
+# Windows (packaging/windows/build-zip.sh reads target/x86_64-pc-windows-msvc/release)
+cargo build --release --locked --target x86_64-pc-windows-msvc
 ```
 
 ## Linux
@@ -18,11 +29,17 @@ bash packaging/build-release.sh
 bash packaging/linux/install.sh
 ```
 
-**Arch Linux (AUR-style):**
+**Arch Linux:** install `forskscope` from the AUR.
 
-Copy `packaging/linux/PKGBUILD` into a directory and run `makepkg -si`.
-`makepkg` downloads the matching source directly from GitHub's own
-per-tag archive.
+**Do not build `packaging/linux/PKGBUILD` from this repository.**
+
+- Its `pkgver` names the *next*, unreleased version between releases, so the
+  source it downloads has no tag behind it.
+- Its `sha256sums=('SKIP')` checks nothing.
+
+The AUR copy is the verified one. `aur-publish.yml` writes the real hash and
+builds, installs and `namcap`s the package before pushing it. The PKGBUILD's own
+comment says the same.
 
 **System requirements at runtime:**
 

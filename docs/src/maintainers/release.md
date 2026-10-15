@@ -16,32 +16,56 @@ plan, so that patch was never what the cut would actually have produced.
 Name the release's theme from what this command shows is actually there,
 rather than from whatever was most recently worked on.
 
+**Only a change to the application gets a tag.** Work that changes no
+application code, such as the website or a distribution channel, is delivered
+without one, and its plan row is labelled by kind (`site`, `channel`) instead of
+a version (owner, 2026-10-14). A tag publishes new binaries, and every AUR user
+rebuilds for it. That is worth doing only when the app changed.
+
 ---
 
 ## Pre-release checklist
 
-1. All tests pass: `cargo test -p forskscope-core -p forskscope-ui-logic`
-2. Clippy clean: `cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings`
-3. Format clean: `cargo fmt --check`
-4. Security audit passes under the checked-in policy: `cargo audit`
-5. Reviewed security dependency paths are enforced: `cargo xtask audit-deps`
-6. CSS generated artifact is current: `cargo xtask css --check`
-7. Version metadata is synchronized: `cargo xtask version-sync`
-8. Release tag matches the workspace version: `cargo xtask version-sync "${GITHUB_REF_NAME}"`
-9. Japanese localization covers `t(...)` UI keys: `cargo xtask i18n`
-10. `CHANGELOG.md` updated with the new version and date.
-11. `version` bumped in the workspace `Cargo.toml` (`[workspace.package]`),
-    and **`xtask/Cargo.lock` staged with it** (F64). `xtask` has no
-    dependencies, so that lock pins nothing and its only content is the
-    version — but it is tracked, and any `cargo xtask` invocation after a
-    bump rewrites it. Leave it out of the bump commit and the working tree
-    goes dirty immediately, which is how a generated file gets swept into an
-    unrelated commit. **This cannot be gated:** a `version-sync` check was
-    written and removed, because running `cargo xtask` rebuilds xtask and
-    repairs the lock *before* the check reads it — the gate could never fail.
-12. Completed RFCs moved from `rfcs/proposed/` to `rfcs/done/`; `rfcs/README.md` updated.
-13. `ROADMAP.md` current state paragraph updated if the milestone is significant.
-14. F109: dispatch `windows-check.yml` (`gh workflow run windows-check.yml`)
+1. **Every CI gate passes locally.**
+   - `testing.md`'s gate list mirrors `ci.yml` step for step; run it as
+     written.
+   - It covers the tests, the three `clippy` forms, both `fmt --check`s, and
+     every `cargo xtask` gate (`css --check`, `i18n`, `colour-vision`,
+     `keyboard-docs`, `xlsx-fixtures --check`, `audit-deps`, `version-sync`,
+     `rfc-sync`, `ui-logic-connectivity`, `ui-logic-docs`).
+2. **The security audit passes** under the checked-in policy: `cargo audit`.
+   - The release workflow runs it again and stops on any advisory published
+     since. That is how the first `0.191.0` tag stopped: four `rustls`
+     advisories appeared the day before.
+   - Run it on the day of the cut, not only when `main` last changed.
+3. **The release tag matches the workspace version:**
+   `cargo xtask version-sync "${GITHUB_REF_NAME}"`.
+4. **`CHANGELOG.md`:** the version's section is written and dated.
+5. **The version is set in all five places** that `cargo xtask version-sync`
+   checks:
+   - the workspace `Cargo.toml` (`[workspace.package]`);
+   - `xtask/Cargo.toml`;
+   - `packaging/linux/PKGBUILD` (`pkgver`);
+   - `packaging/windows/AppxManifest.xml` (`Version="X.Y.Z.0"`);
+   - the `CHANGELOG.md` heading.
+
+   Commit `Cargo.lock` and **`xtask/Cargo.lock`** with them (F64). Any `cargo`
+   or `cargo xtask` invocation rewrites both; `cargo metadata` is enough.
+   `xtask` has dependencies of its own (`rust_xlsxwriter`), so its lock pins
+   real packages, and a bump changes only xtask's own version line in it.
+   Leave the lock out of the bump commit and the working tree goes dirty at the
+   next `cargo xtask`, which is how a generated file gets swept into an
+   unrelated commit.
+
+   **The lock cannot be gated.** A `version-sync` check was written and removed,
+   because running `cargo xtask` rebuilds xtask and repairs the lock *before*
+   the check reads it, so the gate could never fail.
+6. **Completed RFCs move** from `rfcs/accepted/` to `rfcs/done/` once the
+   release is published (RFC-000, 5-folder variant). Update the RFC's
+   **Status**, `rfcs/README.md`, the *Amended by* pointers in the RFCs it
+   amends, and ROADMAP's *Remaining proposed RFCs* (`cargo xtask rfc-sync`).
+7. **`ROADMAP.md`**: the header line names the published version.
+8. F109: dispatch `windows-check.yml` (`gh workflow run windows-check.yml`)
     for the release commit and confirm the run is green — proves the
     WebView2 detection check on a real `windows-latest` runner before the
     release build ships it.
@@ -72,6 +96,28 @@ verify a source archive at all.
 | `forskscope-vX.Y.Z-linux-x86_64.tar.gz` | Linux x86_64 release binary |
 | `forskscope-vX.Y.Z-macos-aarch64.dmg` | macOS aarch64 DMG |
 | `forskscope-vX.Y.Z-windows-x64.zip` | Windows x64 release zip with README, license, notice, changelog, and executable |
+| `SHA256SUMS` | SHA-256 of the three files above, in `sha256sum` format (F181). The release notes say how to check a download against it. |
+
+**Gates on the artifacts themselves**, in `release.yml`:
+
+- **The Linux binary must link exactly the 16 shared libraries listed in the
+  workflow** (F179/F180), checked with `readelf -d` on the built file.
+  - A new native dependency fails the release until the list is updated, with
+    the reason in the commit.
+  - The list is the whole contract with a user's system. That is why `libxdo`,
+    which Arch names differently, had to go.
+
+**The build-channel label.** `FORSKSCOPE_CHANNEL` is read at compile time, and
+it decides only what *Check for updates* tells the user to do about a newer
+version:
+
+| Value | Set by | The app says |
+|---|---|---|
+| unset | `release.yml` | *Open release page* |
+| `aur` | `PKGBUILD` | update with the AUR helper |
+| `store` | `store-build.ps1` | update through the Store |
+
+**A new channel must set it,** or its users are told to download from GitHub.
 
 A source archive is still attached to every GitHub Release automatically —
 GitHub generates one for every tag regardless of what this project does.
@@ -122,6 +168,12 @@ the point of no return for the release itself. Do not read the two as
 contradictory or try to make `version-sync` key on draft state instead — the
 tag check needs to run before any release exists to check.
 
+**In a re-cut, delete the stopped tag first.** While it exists, `version-sync`
+fails on every push to `main` (*"version X.Y.Z is already tagged; bump it"*),
+including the fix itself. Before deleting it, confirm it has no release
+(`gh release view <tag>` → *release not found*). Then push the fix, let CI pass,
+and re-tag. That is the order `0.191.0` took.
+
 **Caution:** `gh release delete --cleanup-tag` deletes the **remote tag** as
 well as the release. The flag name reads as scoped to the release; it is not.
 If cleaning up a mistakenly created release, delete the release only
@@ -162,26 +214,32 @@ What that means for a maintainer:
    A comment in the file notes this requirement; failing to do so causes stale
    Arch packages, and `cargo xtask version-sync` requires this to already match
    before the release gates pass. Leave `pkgrel=1` and `sha256sums=('SKIP')`
-   exactly as they are — both are filled in automatically at publish time (see
-   step 5 below) and neither should ever be edited by hand in this file.
+   exactly as they are.
+   - The AUR publish (step 5) computes the real source hash and writes it into
+     the copy it pushes.
+   - It **checks** `pkgrel` (it must be `1` for a release) but never writes it.
+   - Neither is edited by hand in this file.
 2. Tag the commit: `git tag -a ${VER} -m "Release ${VER}"`. Tags are unprefixed
    (`X.Y.Z`, no `v`) — the release workflow trigger only matches that form.
 3. Push the tag. The release workflow builds the source and platform artifacts,
-   composes release notes from the tag's `CHANGELOG.md` section, and creates a
-   **draft** GitHub release. It does not publish anything by itself.
+   composes release notes from the tag's `CHANGELOG.md` section, computes
+   `SHA256SUMS`, and creates the GitHub release **already published** (step 4).
 
-   **If the tag is pushed and no draft appears, do not re-cut the tag.** A
-   pushed tag with no draft means one of `release.yml`'s jobs failed —
-   `release.md`'s other recovery advice assumes a draft already exists,
-   which is not this state. Check which job failed:
+   **If the tag is pushed and no release appears, do not re-cut the tag yet.** A
+   pushed tag with no release means one of `release.yml`'s jobs failed. Check
+   which job failed:
    ```sh
    gh run rerun <run-id> --failed
    ```
    re-runs only the failed jobs, keeping the platform builds that already
    succeeded — a full re-cut would rebuild everything and burn a second
    tag for a problem that was never in the code. **Re-cut the tag only if
-   the fix requires a code change** — `F102` (0.170.0's cut: `render.yml`'s
-   F34 step launched the app while `xvfb`'s X server was still starting,
+   the fix requires a change to the tree.**
+   - **A change is needed:** a new security advisory stopping `cargo audit`
+     needs a lock-file update, so the tag is re-cut on the fixed commit, as
+     *Publication and immutability* allows before publication. `0.191.0` was
+     re-cut this way, and the re-cut is recorded in its CHANGELOG entry.
+   - **No change is needed:** `F102` (0.170.0's cut: `release.yml`'s F34 step launched the app while `xvfb`'s X server was still starting,
    and the check reported "never registered" for a process that had
    already exited) established this exact shape as environmental rather
    than a regression, and `render_check.py` now retries a start-up crash
@@ -269,8 +327,8 @@ What that means for a maintainer:
    gh run download "$RUN" -n aur-recipe -D "$WORK"
    ```
 
-   `validate` will be green on that run and `publish` red: that is the expected
-   shape today. **`aur-recipe` is a workflow artifact, not a release asset** — it
+   Use the run whose `publish` job failed: its `validate` job passed, so its
+   recipe is the validated one. **`aur-recipe` is a workflow artifact, not a release asset** — it
    is not attached to the GitHub Release and will not appear there. In a browser
    it is at the bottom of the run's summary page, under *Artifacts*.
 
@@ -359,12 +417,14 @@ What that means for a maintainer:
    gh workflow run store-submit.yml -f tag=${VER} -f dry_run=false
    ```
 
-   **This still returns `Unauthorized`** until the Partner Center tenant
-   association exists (F106, open and unrelated to this dispatch mechanism),
-   so Store submissions are made by hand in Partner Center today (F108), using
-   the listing copy kept with the owner's working files. What follows
-   describes the dispatched path as designed, and applies once that account
-   work is done. It checks out
+   **No submission has succeeded since 0.174.0.** The dispatch fails at the
+   Partner Center step, which waits on the owner's account work (F106 (b)).
+   - So **the Store listing is not updated with each release** (F189), and the
+     user guide says so.
+   - The listing copy is tracked in `packaging/windows/store-listing/`.
+
+   What follows describes the dispatched path as designed, and applies once
+   that account work is done. It checks out
    the released tag, builds the MSIX, validates it (manifest version against
    the tag, `Identity`/`Publisher`/`PublisherDisplayName` against the tracked
    Store identity, every manifest-referenced asset present, and — the
@@ -441,7 +501,7 @@ tag that needs resubmitting:
 gh workflow run store-submit.yml -f tag=0.170.1 -f dry_run=false
 ```
 
-It builds and validates exactly as the release trigger does, then deletes
+It builds and validates exactly as a release dispatch does, then deletes
 any existing pending submission for the app before creating a new one — a
 second run never leaves two submissions in flight, it replaces the first.
 
