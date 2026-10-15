@@ -43,6 +43,9 @@ cargo xtask colour-vision
 # The in-app keyboard reference and keyboard.md name the same keys (F165)
 cargo xtask keyboard-docs
 
+# The committed .xlsx fixtures match what the generator produces
+cargo xtask xlsx-fixtures --check
+
 # Release metadata and localization gates
 cargo xtask version-sync
 cargo xtask i18n
@@ -369,10 +372,9 @@ The spreadsheet tests in `forskscope-core/src/xlsx.rs` read real workbooks from
 `--check` verifies. The corpus is described case by case in that directory's
 `README.md`, with each case's recipe.
 
-`cargo xtask xlsx-fixtures --check` does not run in any CI workflow today —
-it is not in the gate list above. The committed fixtures are trusted as
-checked-in test data, the same as every other corpus file in this repository;
-nothing currently re-derives them from their recipes on every run.
+`cargo xtask xlsx-fixtures --check` runs in CI (the gate list above), so a
+committed fixture that drifts from its own recipe fails the build, the same
+as every other "two things must agree" gate in this list.
 
 Two dimensions are named here, so a reader knows what the corpus must cover:
 

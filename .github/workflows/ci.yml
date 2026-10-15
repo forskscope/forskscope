@@ -106,6 +106,13 @@ jobs:
       - name: Keyboard docs check
         run: cargo xtask keyboard-docs
 
+      # Review 164 §3: without this, a committed .xlsx fixture can drift
+      # from the recipe that generates it, unseen — the same class of
+      # silent gap F165 records for every other "two things must agree"
+      # gate in this list.
+      - name: xlsx fixtures check
+        run: cargo xtask xlsx-fixtures --check
+
       - name: Version metadata sync check
         run: cargo xtask version-sync
 
