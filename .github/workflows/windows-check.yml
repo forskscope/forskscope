@@ -113,6 +113,13 @@ jobs:
       - name: Build release binary
         run: cargo build --release --locked -p forskscope-ui
 
+      # RFC-091 §4: "about 100 to 200 KB" larger, measure and report.
+      - name: Report forskscope.exe's size
+        shell: pwsh
+        run: |
+          $bytes = (Get-Item ./target/release/forskscope.exe).Length
+          Write-Host "forskscope.exe: $bytes bytes ($([math]::Round($bytes / 1MB, 2)) MiB)"
+
       - name: List imported DLLs and enforce the allow-list
         shell: pwsh
         run: |
