@@ -18,7 +18,6 @@ xtask = "run --manifest-path xtask/Cargo.toml --"
 # anything else off its explicit allow-list.
 [target.x86_64-pc-windows-msvc]
 rustflags = [
-    "-C", "target-feature=+crt-static",
     "-C", "link-arg=/NODEFAULTLIB:libucrt.lib",
     "-C", "link-arg=/DEFAULTLIB:ucrt.lib",
 ]
