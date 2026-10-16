@@ -21,6 +21,7 @@ pub mod dir;
 pub mod document;
 pub mod edit_op;
 pub mod encoding;
+pub mod env_passthrough;
 pub mod error;
 pub mod external_tool;
 pub mod file_kind;

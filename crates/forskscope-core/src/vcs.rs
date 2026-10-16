@@ -141,9 +141,12 @@ impl GitProvider {
     /// Run a git command with the given args, working in the repo root.
     /// Returns stdout as UTF-8, or an error.
     fn git(&self, args: &[&str]) -> Result<String, VcsError> {
-        let out = Command::new("git")
-            .current_dir(&self.root)
-            .args(args)
+        let mut cmd = Command::new("git");
+        cmd.current_dir(&self.root).args(args);
+        // RFC-091 §2: undo any portable/private-mode XDG_* override before
+        // git sees it — a no-op in Installed mode.
+        crate::env_passthrough::restore_onto(&mut cmd);
+        let out = cmd
             .output()
             .map_err(|e| VcsError::new(format!("git command failed to start: {e}")))?;
         if out.status.success() {
@@ -186,9 +189,10 @@ impl VcsProvider for GitProvider {
 
     fn read_revision_file(&self, rev: &VcsRevision, path: &Path) -> Result<Vec<u8>, VcsError> {
         let spec = format!("{}:{}", rev.0, path.display());
-        let out = Command::new("git")
-            .current_dir(&self.root)
-            .args(["show", &spec])
+        let mut cmd = Command::new("git");
+        cmd.current_dir(&self.root).args(["show", &spec]);
+        crate::env_passthrough::restore_onto(&mut cmd);
+        let out = cmd
             .output()
             .map_err(|e| VcsError::new(format!("git show failed: {e}")))?;
         if out.status.success() {

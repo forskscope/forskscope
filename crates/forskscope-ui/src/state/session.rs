@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use dioxus::prelude::*;
 use forskscope_core::persist::schema::session::runtime::{
-    SessionRuntimeResolution, resolve_and_commit,
+    SessionRuntimeOutcome, SessionRuntimeResolution, resolve_and_commit,
 };
 use forskscope_core::persist::schema::session::{
     PersistedComparePair, PersistedSession, SessionRepository,
@@ -117,7 +117,23 @@ pub fn persist_session(
 /// (`forskscope left right`) never restores tabs, but still needs
 /// `session_write_disabled` set before its own `open_compare` triggers a
 /// `save_session`, or a future/corrupt session file is silently overwritten.
+///
+/// RFC-091 §3: private mode reads nothing, so this never constructs a
+/// repository when [`crate::startup_mode::is_private`] — a CLI-mode
+/// launch under `--private` still opens its explicit pair (that is the
+/// user's files, not ForskScope's own records), but nothing is restored
+/// from a session file and nothing is read from one either.
 pub fn resolve_session(store: &mut Store) -> (SessionRuntimeResolution, Option<Notice>) {
+    if crate::startup_mode::is_private() {
+        let resolution = SessionRuntimeResolution {
+            value: PersistedSession::default(),
+            write_disabled: true,
+            outcome: SessionRuntimeOutcome::Fresh,
+            raw_bytes: None,
+        };
+        store.session_write_disabled.set(true);
+        return (resolution, None);
+    }
     let resolution = load_session(&repository());
     store.session_write_disabled.set(resolution.write_disabled);
     let notice = recovery_notice(&resolution);

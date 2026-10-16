@@ -1,2 +1,24 @@
 [alias]
 xtask = "run --manifest-path xtask/Cargo.toml --"
+
+# RFC-091 §4 (F45): the hybrid CRT. +crt-static links the Visual C++
+# runtime (VCRUNTIME140*.dll, MSVCP140*.dll) statically into forskscope.exe,
+# so it no longer depends on the Visual C++ Redistributable being installed
+# — "VCRUNTIME140.dll was not found" at launch, on a clean Windows with no
+# other VC++-linked program ever installed. The two linker arguments then
+# swap the *static* Universal C Runtime back out for the *dynamic* one
+# (ucrtbase.dll): the UCRT ships with Windows 10 and later and is serviced
+# by Windows Update, so linking it statically would freeze its security
+# fixes into each release — the one part of a fully static build this
+# project deliberately does not want. `/NODEFAULTLIB:libucrt.lib` drops the
+# static UCRT import library that `+crt-static` would otherwise pull in;
+# `/DEFAULTLIB:ucrt.lib` adds the dynamic one back. Enforced in CI by the
+# Windows import-list check (`.github/workflows/windows-check.yml`), which
+# fails if `forskscope.exe` imports `VCRUNTIME*.dll`/`MSVCP*.dll` or
+# anything else off its explicit allow-list.
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+    "-C", "target-feature=+crt-static",
+    "-C", "link-arg=/NODEFAULTLIB:libucrt.lib",
+    "-C", "link-arg=/DEFAULTLIB:ucrt.lib",
+]

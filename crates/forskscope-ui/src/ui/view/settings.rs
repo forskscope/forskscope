@@ -8,7 +8,7 @@ pub mod profile;
 
 use dioxus::prelude::*;
 use forskscope_core::persist::schema::settings::runtime::{
-    SettingsRuntimeResolution, resolve_and_commit,
+    SettingsRuntimeOutcome, SettingsRuntimeResolution, resolve_and_commit,
 };
 use forskscope_core::persist::schema::settings::{PersistedSettings, SettingsRepository};
 use forskscope_core::persist::schema::{PersistenceCommitError, PersistenceIoError};
@@ -71,7 +71,26 @@ pub fn persist_settings(
 /// migration. Returns the UI-facing view alongside the full resolution, so
 /// callers can decide what (if anything) to tell the user and whether
 /// writes should start out disabled.
+///
+/// RFC-091 §3: private mode reads nothing — not even a real settings file
+/// sitting at the installed location — so this never constructs a
+/// repository, let alone reads through it, when
+/// [`crate::startup_mode::is_private`]. The synthesized resolution is
+/// `Fresh` (silent: no recovery toast or modal, exactly as a real first
+/// launch would be) with `write_disabled: true`, which already makes
+/// [`persist`] a no-op for the rest of this run — no second gate needed
+/// there.
 pub fn load() -> (AppSettings, SettingsRuntimeResolution) {
+    if crate::startup_mode::is_private() {
+        let resolution = SettingsRuntimeResolution {
+            value: PersistedSettings::default(),
+            write_disabled: true,
+            outcome: SettingsRuntimeOutcome::Fresh,
+            raw_bytes: None,
+        };
+        let settings = AppSettings::from_v2(&resolution.value);
+        return (settings, resolution);
+    }
     load_settings(&repository())
 }
 

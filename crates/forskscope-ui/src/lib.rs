@@ -8,6 +8,7 @@
 pub mod app;
 pub mod i18n;
 pub mod keyboard;
+pub mod startup_mode;
 pub mod state;
 #[cfg(test)]
 mod test_support;

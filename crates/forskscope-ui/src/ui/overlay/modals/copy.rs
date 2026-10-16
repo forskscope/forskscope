@@ -29,8 +29,7 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
                         onclick: move |_| {
                             use forskscope_core::dir::{BatchItem, BatchFailurePolicy, batch_copy};
                             let items = vec![BatchItem { src: op.src.clone(), dst: op.dst.clone() }];
-                            let manifest_dir = dirs_next::data_dir()
-                                .map(|d| d.join("forskscope").join("manifests"));
+                            let manifest_dir = crate::startup_mode::manifest_dir();
                             let result_spec = match batch_copy(
                                 &items,
                                 forskscope_core::BackupPolicy::SiblingBak,
@@ -95,8 +94,7 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
                             let items: Vec<BatchItem> = spec.items.iter()
                                 .map(|(s, d)| BatchItem { src: s.clone(), dst: d.clone() })
                                 .collect();
-                            let manifest_dir = dirs_next::data_dir()
-                                .map(|d| d.join("forskscope").join("manifests"));
+                            let manifest_dir = crate::startup_mode::manifest_dir();
                             let result_spec = match batch_copy(
                                 &items,
                                 forskscope_core::BackupPolicy::SiblingBak,

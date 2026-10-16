@@ -26,6 +26,11 @@
 //!     Explorer's "sync panes" toggle: what the other pane should navigate
 //!     to, given one pane's navigation, with no filesystem access.
 //! - [`compare`] — diff/compare logic:
+//!   - `data_location`: `resolve_data_location` and
+//!     `extract_data_location_flags` (RFC-091) — where ForskScope keeps its
+//!     data, decided once at startup from `--private`/`--data-dir` and the
+//!     program's own folder, before any settings/session/web-view path is
+//!     resolved.
 //!   - `load_guard`: pre-diff `LoadGuard` from `FileSizeClass`.
 //!   - `load_identity`: runtime tab/load tokens and completion validation.
 //!   - `save_error`: `SaveErrorView` — `AppError` → dialog content.
@@ -68,6 +73,9 @@ mod test_support;
 pub mod update_check;
 
 // compare
+pub use compare::data_location::{
+    DataLocation, extract_data_location_flags, resolve_data_location,
+};
 pub use compare::load_guard::{LoadGuard, guard_for_sizes};
 pub use compare::load_identity::{
     CompareTabId, CompareTabIdAllocator, CompletionDecision, LoadGeneration, LoadIdentityError,

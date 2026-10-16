@@ -20,6 +20,7 @@ mod document_tests;
 mod edit_op_tests;
 mod editability_tests;
 mod encoding_tests;
+mod env_passthrough_tests;
 mod error_tests;
 mod external_state_tests;
 mod external_tool_tests;

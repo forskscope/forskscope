@@ -65,12 +65,23 @@ thread_local! {
 /// `app-json-settings`'s previous behavior. Production resolution is
 /// unchanged by F95: [`CONFIG_ROOT_OVERRIDE`] is only ever set by
 /// [`ConfigRootOverrideGuard`], a `#[cfg(test)]`-only type.
+///
+/// RFC-091: in Portable mode the file sits directly in the chosen data
+/// folder, with no `forskscope` subfolder — that subfolder exists only to
+/// keep this app's files apart from every other app's inside a *shared*
+/// platform config folder, which a folder the user picked on purpose
+/// already is not. Never called while
+/// [`crate::startup_mode::is_private`] — every settings/session read or
+/// write site checks that first — so [`crate::startup_mode::config_dir`]
+/// returning `None` there and falling through to the Installed-mode
+/// default is an inert fallback for a path this crate's own code never
+/// actually constructs for I/O in that mode, not a correctness dependency.
 pub(crate) fn config_file_path(file_name: &str) -> PathBuf {
     CONFIG_ROOT_OVERRIDE
         .with(|o| o.borrow().clone())
-        .or_else(dirs_next::config_dir)
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("forskscope")
+        .map(|root| root.join("forskscope"))
+        .or_else(crate::startup_mode::config_dir)
+        .unwrap_or_else(|| PathBuf::from(".").join("forskscope"))
         .join(file_name)
 }
 

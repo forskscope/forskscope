@@ -397,6 +397,14 @@ pub(crate) fn open_url_command(os: TargetOs, url: &str) -> std::process::Command
 /// Opens `url` in the system's default browser and returns the spawned
 /// child process. The caller never waits on it — once started, the browser
 /// is an independent process ForskScope has no further relationship with.
+///
+/// RFC-091 §2: the browser must see the user's own environment, not any
+/// `XDG_*` override portable/private mode made for ForskScope's own web
+/// view — [`crate::env_passthrough::restore_onto`] undoes it on this one
+/// `Command` before it spawns. A no-op in Installed mode, where nothing
+/// was ever overridden.
 pub fn open_url(url: &str) -> std::io::Result<std::process::Child> {
-    open_url_command(host_target_os(), url).spawn()
+    let mut cmd = open_url_command(host_target_os(), url);
+    crate::env_passthrough::restore_onto(&mut cmd);
+    cmd.spawn()
 }

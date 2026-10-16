@@ -85,3 +85,103 @@ jobs:
             exit 1
           }
           Write-Host "Both assertions passed."
+
+  # RFC-091 §4 (F45): the hybrid-CRT release gate, Windows' equivalent of
+  # the Linux 16-library check (F179/F180, release.yml). Dispatchable on
+  # demand for the same reason as the job above: proven against a real
+  # windows-latest runner before it ships, no rehearsal tag needed.
+  crt-import-check:
+    name: Hybrid CRT import check (RFC-091 §4, F45)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: windows-crt-check-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cargo-binutils (llvm-objdump wrapper)
+        run: cargo install cargo-binutils --locked
+
+      - name: Build release binary
+        run: cargo build --release --locked -p forskscope-ui
+
+      - name: List imported DLLs and enforce the allow-list
+        shell: pwsh
+        run: |
+          $dump = cargo objdump --release --bin forskscope -- -p 2>&1 | Out-String
+          Write-Host "--- llvm-objdump -p (private headers) ---"
+          Write-Host $dump
+
+          $imports = [regex]::Matches($dump, '(?m)^\s*DLL Name:\s*(\S+)\s*$') |
+            ForEach-Object { $_.Groups[1].Value } |
+            Sort-Object -Unique
+
+          Write-Host "--- Imported DLLs (unique) ---"
+          $imports | ForEach-Object { Write-Host $_ }
+
+          if ($imports.Count -eq 0) {
+            Write-Error "no 'DLL Name:' lines were found in llvm-objdump's output — the parse itself may be wrong, not the binary. Full output is above."
+            exit 1
+          }
+
+          # Explicit allow-list (RFC-091 §4: "a new import must be
+          # justified, as on Linux"). Each entry is a Windows system DLL
+          # present on every supported Windows 10+ install, never the
+          # Visual C++ Redistributable this change exists to stop
+          # depending on.
+          $allowExact = @(
+            "KERNEL32.dll",        # core Win32 API
+            "USER32.dll",          # windowing, messages
+            "GDI32.dll",           # graphics primitives
+            "ADVAPI32.dll",        # registry, security, service APIs
+            "SHELL32.dll",         # shell integration (rfd's native dialogs)
+            "SHLWAPI.dll",         # shell path/string helpers
+            "COMCTL32.dll",        # common controls (native dialogs/menus)
+            "COMDLG32.dll",        # common dialogs
+            "OLE32.dll",           # COM — how WebView2 is reached
+            "OLEAUT32.dll",        # COM automation (BSTR etc.)
+            "WS2_32.dll",          # networking (update check, HTTPS)
+            "CRYPT32.dll",         # TLS certificate handling
+            "BCRYPT.dll",          # Windows CNG crypto primitives
+            "WINMM.dll",           # multimedia timers
+            "IMM32.dll",           # input method editor support
+            "UxTheme.dll",         # themed window chrome
+            "DWMAPI.dll",          # desktop window manager (drop shadows etc.)
+            "SETUPAPI.dll",        # device/driver enumeration (WebView2 loader)
+            "VERSION.dll",         # file version info (WebView2 loader)
+            "USERENV.dll",         # user profile APIs
+            "NTDLL.dll",           # always present, loaded by the OS loader itself
+            "ucrtbase.dll"         # the *dynamic* UCRT — the whole point of "hybrid"
+          )
+          # The Universal CRT's own API-set forwarders (api-ms-win-crt-*)
+          # and core OS API-set forwarders (api-ms-win-core-*): Windows
+          # 10+ system components, not anything this project links against
+          # directly or redistributes — matched by prefix because there
+          # are dozens of them and every one names the same kind of thing.
+          $allowPrefixes = @("api-ms-win-crt-", "api-ms-win-core-")
+
+          $bad = $imports | Where-Object {
+            $name = $_
+            $isVcrt = $name -match '^(?i)VCRUNTIME'
+            $isMsvcp = $name -match '^(?i)MSVCP'
+            $isAllowedExact = $allowExact -contains $name
+            $isAllowedPrefix = $false
+            foreach ($p in $allowPrefixes) {
+              if ($name.ToLower().StartsWith($p)) { $isAllowedPrefix = $true }
+            }
+            $isVcrt -or $isMsvcp -or -not ($isAllowedExact -or $isAllowedPrefix)
+          }
+
+          if ($bad) {
+            Write-Error "forskscope.exe imports a DLL not on the allow-list (or a VCRUNTIME*/MSVCP* dependency the hybrid CRT exists to remove): $($bad -join ', ')"
+            exit 1
+          }
+          Write-Host "All imports are on the allow-list; no VCRUNTIME*/MSVCP* present."

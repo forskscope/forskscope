@@ -16,7 +16,7 @@ commands to it. `forskscope-ui-logic` holds pure presentation logic that is
 testable without a display server. A future alternative frontend (e.g. Iced)
 could be added as a fourth crate without touching core.
 
-## Core modules (27)
+## Core modules (28)
 
 | Module | Responsibility |
 |---|---|
@@ -30,6 +30,7 @@ could be added as a fourth crate without touching core.
 | `document` | Load a path into `LoadedDocument` with `FileFingerprint`. `ExternalFileState` / `check_external_state` (RFC-036). |
 | `edit_op` | `TextEditOperation`, `RevisionId`, `TextRange`, `OperationAck/Reject`, `EditTransaction` — editor adapter boundary types (RFC-032). |
 | `encoding` | `decode_bytes` with chardetng + encoding_rs; `decode_body` selects a BOM-implied encoding directly, `decode_with_label` re-decodes an explicit user choice (RFC-083). `NewlinePolicy`, `NewlineStyle`, `detect_newline_style`. `BomPresence`, `BomPolicy`, `detect_bom` (RFC-012). |
+| `env_passthrough` | `record_before_override`/`restore_onto` — remembers an environment variable's value before this process overrides it (RFC-091 §2's portable/private `XDG_*` redirection) and reapplies the original onto a child `Command`, so a process ForskScope launches never inherits the override. |
 | `error` | `CoreError` (internal), `AppError` (UI envelope), `AppErrorKind` (25 variants), `ErrorId`, `TechnicalDetail`, `RecoveryAction`, `UserMessage` (RFC-017). |
 | `external_tool` | `ExternalToolCommand`, `expand_args`, `ToolKind`, built-in presets (file manager reveal, VS Code, system open). No shell execution (RFC-029). |
 | `file_kind` | `FileKind` (Text, Binary, ExcelXlsx, Missing). `EditabilityClass`, `requires_save_guard()` (RFC-012). |
@@ -48,7 +49,7 @@ could be added as a fourth crate without touching core.
 | `watcher` | `FileChangeMonitor` trait, `WatchToken`, `FileChangeEvent`, `WatchError`, `MockFileChangeMonitor` — file-watcher boundary (RFC-036). |
 | `xlsx` | Fail-closed spreadsheet comparison boundary between `sheets-diff` and ForskScope's app model, no `sheets-diff` types in the public API (RFC-058). Suspended for one release over an XML denial-of-service advisory chain, restored at `sheets-diff` 2.5.0 with cancellation polling inside a sheet (RFC-085); now at 3.0.0, which streams its read (F130). |
 
-## `ui-logic` modules (19)
+## `ui-logic` modules (20)
 
 Framework-independent view-model logic. All modules are testable with
 `cargo test -p forskscope-ui-logic` — no GTK or display server required.
@@ -74,6 +75,7 @@ read what a row says a module does; that stays a judgment.
 | `explore::deep_filter` | `DeepFilter`, `DeepCompareSummary`, `apply_filter` — filter state and counts for recursive directory compare (RFC-037, RFC-038). |
 | `explore::status` | `RowStatusKind`, `StatusGlyph` — maps `EqualityEvidence` to CSS class, glyph, and aria label for tree row badges (RFC-054). |
 | `explore::sync_panes` | `mirror_target` — the anchored model (review 139 §3): an in-step descent or ascent mirrors the triggering pane's path *relative to its own anchor* onto the other pane's anchor; navigating above your own anchor, or an unrelated jump, mirrors nothing, even if the anchors happen to share a leaf name (F151, issue #148). |
+| `compare::data_location` | `resolve_data_location`, `extract_data_location_flags` — where ForskScope keeps its data, decided once at startup from `--private`/`--data-dir` and the program's own folder, before any settings/session/web-view path is resolved (RFC-091). |
 | `compare::load_guard` | `guard_for_sizes(left, right)` → `LoadGuard` — pre-diff decision: Proceed / WarnBanner / ConfirmPrompt derived from `FileSizeClass` thresholds (RFC-013, Slice 1). |
 | `compare::load_identity` | Process-local `CompareTabId` allocation, monotonic `LoadGeneration`, and pure async completion validation; runtime tokens are never persisted (RFC-075). |
 | `compare::save_error` | `SaveErrorView::from_error(err, path)` — maps `AppError` to dialog title, body, and ordered `Vec<RecoveryButton>` (RFC-007, RFC-017, Slice 3). |
