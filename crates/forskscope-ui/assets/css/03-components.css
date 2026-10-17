@@ -12,7 +12,16 @@
   min-width: 22rem; max-width: 30rem; padding: 1rem;
 }
 .modal h2 { margin: 0 0 .75rem; font-size: 1rem; }
-.modal .field { display: flex; justify-content: space-between; align-items: center; margin: .5rem 0; }
+.modal .field {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: .5rem 0; gap: .75rem;
+}
+/* F205: a long label (English or Japanese) and the control it names must
+   never touch — the label is the one that wraps, since the control stays
+   legible only at or near its natural width. */
+.modal .field > span:first-child { flex: 1 1 auto; min-width: 0; }
+.modal .field > select,
+.modal .field > input { flex-shrink: 0; }
 .modal .actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
 .modal-wide { min-width: min(540px, 90vw); }
 
