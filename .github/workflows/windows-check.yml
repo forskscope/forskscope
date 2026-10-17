@@ -252,6 +252,7 @@ jobs:
             exit 1
           }
           Write-Host "OK: refused, naming both the real tag and the wrong one."
+          exit 0
 
       - name: "Guards: build succeeds with no GITHUB_OUTPUT, prints the path last, restores FORSKSCOPE_CHANNEL"
         shell: pwsh
@@ -293,6 +294,7 @@ jobs:
           Write-Host "OK: FORSKSCOPE_CHANNEL is unset after the build."
 
           "GOOD_MSIX=$expectedPath" >> $env:GITHUB_ENV
+          exit 0
 
       - name: "Guard: store-validate.ps1 -SkipInstall passes on a good package and changes no registry value"
         shell: pwsh
@@ -315,6 +317,7 @@ jobs:
             exit 1
           }
           Write-Host "OK: -SkipInstall passed on a good package and touched no registry value (before/after: '$before')."
+          exit 0
 
       - name: "Guard: store-validate.ps1 -SkipInstall fails on a package missing an asset"
         shell: pwsh
@@ -346,6 +349,7 @@ jobs:
             exit 1
           }
           Write-Host "OK: failed with the expected missing-asset message."
+          exit 0
 
       - name: "Guard: store-validate.ps1 refuses outside CI without either switch, before any change"
         shell: pwsh
@@ -374,6 +378,7 @@ jobs:
             exit 1
           }
           Write-Host "OK: refused with the expected message, and changed nothing."
+          exit 0
 
       - name: "Guard: AllowAllTrustedApps reads the same before and after a full CI validation"
         shell: pwsh
@@ -398,3 +403,4 @@ jobs:
             exit 1
           }
           Write-Host "OK: full install+launch validation passed, and AllowAllTrustedApps reads the same before ('$before') and after ('$after')."
+          exit 0
