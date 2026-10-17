@@ -3,6 +3,7 @@
 **Status.** Accepted — review complete; implementer may start. Moves to `done/`
 when the work ships (RFC-000, 5-folder variant).
 **Accepted.** 2026-10-15 by the project owner.
+**Amended.** 2026-10-17, by the owner's decision: on macOS the two modes refuse to start (§2a). The system web view's own storage on Linux is redirected through the XDG directories (§2). F200.
 **Scheduling.** `0.193.0`. See `ROADMAP.md` §
 "Remaining proposed RFCs".
 **Tracks.** The owner's idea, 2026-10-15: improve portability, store settings
@@ -120,16 +121,54 @@ Everything the app writes goes inside the data location:
   someone's settings onto a USB drive is worse than one manual step.
 - **Where it applies:** the downloaded program on Windows and Linux. An AUR or
   Store installation has a program folder that is not writable, so the marker
-  folder cannot exist there. `--data-dir` and `--private` still work on every
-  platform.
-- **macOS:** `--data-dir` and `--private` work. The marker folder is **not**
-  supported. macOS runs an unsigned app from a hidden, read-only copy (App
-  Translocation), so *beside the program* is not a stable place. Revisit with
-  signing (F46).
+  folder cannot exist there. `--data-dir` and `--private` work on Windows and
+  Linux, and refuse to start on macOS (§2a).
+- **macOS:** see §2a. The marker folder is ignored there. macOS runs an unsigned
+  app from a hidden, read-only copy (App Translocation), so *beside the
+  program* is not a stable place.
 - **Trust:** whoever can write the program's folder can choose its settings.
   Settings hold no commands or anything that runs today (verified 2026-10-15),
   so that grants nothing. **Any future setting that runs or names a program must
   be reviewed against portable mode before it is added.**
+
+**The system web view's own storage, on Linux (F200).** `dioxus-desktop`
+0.7.9's pinned `wry` sets only WebKitGTK's base data directory, so its cache and
+HSTS file would stay in home. Before GTK initialises and before any thread
+exists, ForskScope therefore sets `XDG_CACHE_HOME`, `XDG_DATA_HOME` and
+`XDG_STATE_HOME` to folders inside the data location. That also captures the
+toolkit's own writes, such as file-chooser metadata. Every child process
+ForskScope starts gets the user's original values back. `XDG_CONFIG_HOME` is not
+changed, so the user's GTK settings are still read.
+
+**On Windows,** WebView2 keeps its cache inside the user data folder that
+`with_data_directory` sets. This is measured, not assumed. If it is shown to
+escape, Windows gets §2a's refusal until it is fixed.
+
+### 2a. A mode that cannot keep its promise does not start
+
+**The owner's principle, 2026-10-17:** a mode either keeps its promise fully or
+is not offered. Users must never be left to rely on a guarantee that silently
+does not hold.
+
+**On macOS,** `dioxus-desktop` neither applies the data directory to WKWebView nor
+exposes a non-persistent store. So the system web view would keep its cache in
+`~/Library` whatever the mode, and neither mode's promise can be kept there.
+Therefore, **on macOS:**
+
+- **`--private` and `--data-dir` refuse to start.** ForskScope prints one plain
+  message and exits with status 2, before any window opens. For example:
+  - *"--private is not available on macOS: the system web view keeps its own
+    data in your home folder, so ForskScope cannot promise to save nothing."*
+  - The `--data-dir` message says that ForskScope cannot keep everything in the
+    chosen folder.
+- **`--help` does not list the two options on macOS,** rather than listing them
+  with a caveat.
+- **The installed mode is unchanged.**
+- **Revisit** when the framework can relocate or disable WKWebView's storage.
+
+**The same rule binds every platform.** No status bar, About text or document
+carries a platform exception for these modes. Where a mode runs, its promise is
+whole.
 
 ### 3. Private mode (`--private`)
 
@@ -190,7 +229,8 @@ Everything the app writes goes inside the data location:
   - the marker folder, `--data-dir`, `--private`;
   - what each writes, and what it does not;
   - how to move existing settings;
-  - macOS's limit.
+  - one line saying the modes are for Windows and Linux, with the reason macOS
+    is excluded for now.
 
 ## Non-goals
 
@@ -235,6 +275,9 @@ Everything the app writes goes inside the data location:
    and Private.
 8. **`--help`, `cli.md` and *Running portably*** describe exactly the behaviour
    above.
+9. **On macOS,** `--private` and `--data-dir` each exit with status 2 and their
+   message, before any window, in a unit test of the resolver with the platform
+   as a parameter. `--help` there omits them.
 
 ## Open questions
 
