@@ -1,6 +1,7 @@
 # RFC 027 — Report Export and Session Evidence
 
 **Status.** Implemented (v0.49.0) — Markdown and JSON report core; HTML and export dialog open
+**Amended by RFC-092 (accepted 2026-10-17).** The export dialog and the HTML report, for files and folders; PDF through printing. See [RFC-092](../accepted/092-comparison-reports.md).
 
 ## Status
 Implemented (v0.49.0). The `forskscope-core::report` module ships:

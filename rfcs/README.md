@@ -7,7 +7,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Accepted (5)
+## Accepted (7)
 
 Review complete; the implementer may start. Distinct from **Proposed**, which
 is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
@@ -19,6 +19,7 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 079 | [Microsoft Store Submission Automation](./accepted/079-microsoft-store-submission-automation.md) | Accepted |
 | 081 | [AUR Publication Automation](./accepted/081-aur-publication-automation.md) | Accepted |
 | 091 | [Portable and Private Modes, and a Windows Program That Runs by Copying](./accepted/091-portable-and-private-modes.md) | Accepted 2026-10-15 |
+| 092 | [Comparison Reports — HTML and Unified Diff, for Files and Folders](./accepted/092-comparison-reports.md) | Accepted 2026-10-17 |
 
 ## Implemented (66)
 
@@ -91,7 +92,7 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 076 | [Versioned Runtime Settings and Session Persistence](./done/076-versioned-runtime-persistence.md) | post-v0.165.1 stabilization |
 | 077 | [Git Mergetool Save-Target Model](./done/077-mergetool-save-target-model.md) | post-v0.165.1 stabilization |
 
-## Proposed (10)
+## Proposed (9)
 
 These are the RFCs not yet accepted, all from the early design phase:
 
@@ -106,7 +107,6 @@ RFCs from the 2026 stabilization program and later are under **Accepted** or
 
 | ID | Title | Category | Progress |
 |----|-------|----------|----------|
-| 092 | [Comparison Reports — HTML and Unified Diff, for Files and Folders](./proposed/092-comparison-reports.md) | Reports | Proposed 2026-10-17 — awaiting the owner |
 | 004 | [Editor Adapter and CodeMirror Bridge](./proposed/004-editor-adapter-and-codemirror-bridge.md) | Editor adapter | Not started — requires GTK/WebView |
 | 010 | [Packaging, Diagnostics, QA, and Release Gates](./proposed/010-packaging-diagnostics-qa.md) | Platform/packaging | Not started — requires cross-platform CI |
 | 016 | [Editor Bridge Security and Contract](./proposed/016-editor-bridge-security-and-contract.md) | Editor adapter | Blocked on RFC-004 |

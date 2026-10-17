@@ -1,15 +1,19 @@
 # RFC 092: Comparison Reports — HTML and Unified Diff, for Files and Folders
 
-**Status.** Proposed — awaiting the owner's acceptance. Implementation does not
-start before this moves to `accepted/` (RFC-000, 5-folder variant).
+**Status.** Accepted — review complete; implementer may start. Moves to `done/`
+when the work ships (RFC-000, 5-folder variant).
+**Accepted.** 2026-10-17 by the project owner, with one rule: *“Be careful not to
+print noise to users, which results into only confusion.”* That rule governs §3:
+every line in a report must help its reader, and a section or note appears only
+when it applies.
 **Scheduling.** After `0.193.0` (RFC-091). See `ROADMAP.md` § "Remaining proposed
 RFCs".
 **Tracks.** The owner's question, 2026-10-17: is a report of a diff supported, in
 a format that is easy to read and hard to change? The owner accepted the
 direction the same day.
-**Amends, on acceptance.** RFC-027 (Report Export and Session Evidence). This RFC
+**Amends.** RFC-027 (Report Export and Session Evidence). This RFC
 takes over its deferred items: the export dialog and the HTML report. It leaves
-PDF to the system's printing. RFC-027 gets a one-line Status note pointing here.
+PDF to the system's printing. RFC-027 carries a one-line Status note pointing here.
 **Touches.**
 - `crates/forskscope-core/src/report/` (a new HTML renderer)
 - `crates/forskscope-core/src/patch/` (unchanged, newly reached from the UI)
@@ -107,10 +111,9 @@ What a report *can* carry cheaply is **the SHA-256 of each compared file**:
 2. **What was compared.** Each side's name, per the path choice, then:
    - **a file:** its size and **SHA-256**;
    - **a folder:** its root, and the counts in §3a.
-3. **How:**
-   - the compare profile's name and options (whitespace, case, line endings,
-     algorithm);
-   - the context lines used.
+3. **How:** the compare profile's name. Its options and the context lines are
+   listed **only where they differ from the defaults**, because a default changes
+   nothing the reader needs to know.
 4. **Summary in one sentence first,** for example *"3 changes: 2 lines removed,
    5 added, 1 replaced."* Then the counts.
 5. **The changes,** in unified layout:
@@ -118,11 +121,15 @@ What a report *can* carry cheaply is **the SHA-256 of each compared file**:
    - **`−` and `+` marks on every changed line;**
    - the context lines around each change;
    - character-level highlights where the comparison computed them.
-6. **Notes**, never omitted:
-   - limits that applied, such as character highlighting being off for size;
-   - encoding notes;
-   - anything the comparison could not do;
-   - **What the checksums prove,** in one sentence.
+6. **Notes, only when something applies:**
+   - a limit that changed what is shown, such as character highlighting being
+     off for size;
+   - an encoding that is not UTF-8;
+   - anything the comparison could not do.
+   
+   **A report with nothing to note has no Notes section.** The one sentence on
+   what the checksums prove sits beside the checksums, not in a general notes
+   block.
 
 **Readable without colour.** Every change carries its `−`/`+` mark and a visible
 label. The colours follow the user's *Colour vision* setting (RFC-088 / RFC-090),
