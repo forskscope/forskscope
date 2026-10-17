@@ -189,3 +189,205 @@ jobs:
             exit 1
           }
           Write-Host "All imports are on the allow-list; no VCRUNTIME*/MSVCP* present."
+
+  # TEMPORARY (handoff 082): falsifies the new store-build.ps1/
+  # store-validate.ps1 guards on a real windows-latest runner, then is
+  # reverted in the next commit - this is a one-off verification run, not
+  # a release gate. The scripts under test are copied out before any
+  # `git switch`, since store-submit.yml's own real checkout of a tag
+  # would otherwise replace them with whatever that tag's commit held.
+  store-packaging-guards:
+    name: TEMP - store packaging script guards (handoff 082)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: store-guards-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Copy the scripts under test out of the way of the tag checkout below
+        shell: pwsh
+        run: |
+          $dest = Join-Path $env:RUNNER_TEMP "scripts-under-test"
+          New-Item -ItemType Directory -Path $dest -Force | Out-Null
+          Copy-Item packaging/windows/store-build.ps1 $dest
+          Copy-Item packaging/windows/store-validate.ps1 $dest
+          Write-Host "Copied to $dest"
+
+      - name: Check out the latest released tag for the guards below
+        shell: pwsh
+        run: |
+          git fetch --tags
+          $tag = git describe --tags --abbrev=0
+          "TAG=$tag" >> $env:GITHUB_ENV
+          git switch --detach $tag
+          Write-Host "Checked out tag $tag"
+
+      - name: "Guard: store-build.ps1 refuses when HEAD is a real tag but not the one named"
+        shell: pwsh
+        run: |
+          $script = Join-Path $env:RUNNER_TEMP "scripts-under-test/store-build.ps1"
+          $out = Join-Path $env:RUNNER_TEMP "guard-wrong-commit"
+          $wrongTag = "0.0.0-not-$env:TAG"
+          $output = & $script -Tag $wrongTag -OutDir $out 2>&1 | Out-String
+          $exit = $LASTEXITCODE
+          Write-Host $output
+          if ($exit -eq 0) {
+            Write-Error "expected store-build.ps1 to refuse when HEAD (tag $env:TAG) is not the named tag ($wrongTag), but it exited 0"
+            exit 1
+          }
+          if ($output -notmatch "HEAD is not exactly tag $wrongTag" -or $output -notmatch [regex]::Escape($env:TAG)) {
+            Write-Error "refused, but not with the expected message naming both tags - got:`n$output"
+            exit 1
+          }
+          Write-Host "OK: refused, naming both the real tag and the wrong one."
+
+      - name: "Guards: build succeeds with no GITHUB_OUTPUT, prints the path last, restores FORSKSCOPE_CHANNEL"
+        shell: pwsh
+        run: |
+          $script = Join-Path $env:RUNNER_TEMP "scripts-under-test/store-build.ps1"
+          $out = Join-Path $env:RUNNER_TEMP "guard-build"
+
+          Remove-Item Env:GITHUB_OUTPUT -ErrorAction SilentlyContinue
+          Remove-Item Env:FORSKSCOPE_CHANNEL -ErrorAction SilentlyContinue
+
+          $output = & $script -Tag "$env:TAG" -OutDir $out 2>&1 | Out-String
+          $exit = $LASTEXITCODE
+          Write-Host $output
+
+          if ($exit -ne 0) {
+            Write-Error "store-build.ps1 failed with no GITHUB_OUTPUT set"
+            exit 1
+          }
+
+          $lines = $output -split "`r?`n" | Where-Object { $_.Trim() -ne "" }
+          $lastLine = $lines[-1].Trim()
+          $expectedPath = Join-Path $out "forskscope-$env:TAG.msix"
+          if ($lastLine -ne $expectedPath) {
+            Write-Error "expected the last line of output to be the MSIX path '$expectedPath', got '$lastLine'"
+            exit 1
+          }
+          if (-not (Test-Path $expectedPath)) {
+            Write-Error "the printed path does not exist: $expectedPath"
+            exit 1
+          }
+          Write-Host "OK: succeeded with no GITHUB_OUTPUT, printed the real path as the last line."
+
+          if ($env:FORSKSCOPE_CHANNEL) {
+            Write-Error "FORSKSCOPE_CHANNEL is still '$env:FORSKSCOPE_CHANNEL' after store-build.ps1 returned"
+            exit 1
+          }
+          Write-Host "OK: FORSKSCOPE_CHANNEL is unset after the build."
+
+          "GOOD_MSIX=$expectedPath" >> $env:GITHUB_ENV
+
+      - name: "Guard: store-validate.ps1 -SkipInstall passes on a good package and changes no registry value"
+        shell: pwsh
+        run: |
+          $script = Join-Path $env:RUNNER_TEMP "scripts-under-test/store-validate.ps1"
+          $unlockKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+          $before = (Get-ItemProperty -Path $unlockKey -Name AllowAllTrustedApps -ErrorAction SilentlyContinue).AllowAllTrustedApps
+
+          $output = & $script -MsixPath "$env:GOOD_MSIX" -Tag "$env:TAG" -SkipInstall 2>&1 | Out-String
+          $exit = $LASTEXITCODE
+          Write-Host $output
+          if ($exit -ne 0) {
+            Write-Error "-SkipInstall did not pass on a good package"
+            exit 1
+          }
+
+          $after = (Get-ItemProperty -Path $unlockKey -Name AllowAllTrustedApps -ErrorAction SilentlyContinue).AllowAllTrustedApps
+          if ($before -ne $after) {
+            Write-Error "AllowAllTrustedApps changed from '$before' to '$after' even though -SkipInstall was passed"
+            exit 1
+          }
+          Write-Host "OK: -SkipInstall passed on a good package and touched no registry value (before/after: '$before')."
+
+      - name: "Guard: store-validate.ps1 -SkipInstall fails on a package missing an asset"
+        shell: pwsh
+        run: |
+          $MakeAppx = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe" -ErrorAction Stop |
+              Sort-Object FullName -Descending | Select-Object -First 1
+
+          $unpack = Join-Path $env:RUNNER_TEMP "guard-broken-unpack"
+          if (Test-Path $unpack) { Remove-Item -Recurse -Force $unpack }
+          & $MakeAppx.FullName unpack /p "$env:GOOD_MSIX" /d $unpack /overwrite
+          if ($LASTEXITCODE -ne 0) { throw "makeappx unpack failed" }
+
+          Remove-Item (Join-Path $unpack "Assets\Square44x44Logo.png") -ErrorAction Stop
+
+          $brokenMsix = Join-Path $env:RUNNER_TEMP "forskscope-broken-$env:TAG.msix"
+          & $MakeAppx.FullName pack /d $unpack /p $brokenMsix /overwrite
+          if ($LASTEXITCODE -ne 0) { throw "makeappx pack failed" }
+
+          $script = Join-Path $env:RUNNER_TEMP "scripts-under-test/store-validate.ps1"
+          $output = & $script -MsixPath $brokenMsix -Tag "$env:TAG" -SkipInstall 2>&1 | Out-String
+          $exit = $LASTEXITCODE
+          Write-Host $output
+          if ($exit -eq 0) {
+            Write-Error "expected store-validate.ps1 to fail on a package missing an asset, but it exited 0"
+            exit 1
+          }
+          if ($output -notmatch "is missing Assets\\Square44x44Logo.png") {
+            Write-Error "failed, but not with the expected message - got:`n$output"
+            exit 1
+          }
+          Write-Host "OK: failed with the expected missing-asset message."
+
+      - name: "Guard: store-validate.ps1 refuses outside CI without either switch, before any change"
+        shell: pwsh
+        run: |
+          $script = Join-Path $env:RUNNER_TEMP "scripts-under-test/store-validate.ps1"
+          $unlockKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+          $before = (Get-ItemProperty -Path $unlockKey -Name AllowAllTrustedApps -ErrorAction SilentlyContinue).AllowAllTrustedApps
+
+          Remove-Item Env:GITHUB_ACTIONS -ErrorAction SilentlyContinue
+          $output = & $script -MsixPath "$env:GOOD_MSIX" -Tag "$env:TAG" 2>&1 | Out-String
+          $exit = $LASTEXITCODE
+          Write-Host $output
+
+          if ($exit -eq 0) {
+            Write-Error "expected store-validate.ps1 to refuse outside CI without -SkipInstall/-AllowMachineChanges, but it exited 0"
+            exit 1
+          }
+          if ($output -notmatch "changes this machine") {
+            Write-Error "refused, but not with the expected message - got:`n$output"
+            exit 1
+          }
+
+          $after = (Get-ItemProperty -Path $unlockKey -Name AllowAllTrustedApps -ErrorAction SilentlyContinue).AllowAllTrustedApps
+          if ($before -ne $after) {
+            Write-Error "AllowAllTrustedApps changed from '$before' to '$after' even though the script was supposed to refuse before any change"
+            exit 1
+          }
+          Write-Host "OK: refused with the expected message, and changed nothing."
+
+      - name: "Guard: AllowAllTrustedApps reads the same before and after a full CI validation"
+        shell: pwsh
+        run: |
+          $script = Join-Path $env:RUNNER_TEMP "scripts-under-test/store-validate.ps1"
+          $unlockKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+          $before = (Get-ItemProperty -Path $unlockKey -Name AllowAllTrustedApps -ErrorAction SilentlyContinue).AllowAllTrustedApps
+
+          # $env:GITHUB_ACTIONS is set by the runner for every step by
+          # default; the previous guard step only cleared it for itself.
+          $output = & $script -MsixPath "$env:GOOD_MSIX" -Tag "$env:TAG" 2>&1 | Out-String
+          $exit = $LASTEXITCODE
+          Write-Host $output
+          if ($exit -ne 0) {
+            Write-Error "the full install+launch validation failed on a good package in CI"
+            exit 1
+          }
+
+          $after = (Get-ItemProperty -Path $unlockKey -Name AllowAllTrustedApps -ErrorAction SilentlyContinue).AllowAllTrustedApps
+          if ($before -ne $after) {
+            Write-Error "AllowAllTrustedApps was left at '$after' after a full validation, instead of its original '$before'"
+            exit 1
+          }
+          Write-Host "OK: full install+launch validation passed, and AllowAllTrustedApps reads the same before ('$before') and after ('$after')."
