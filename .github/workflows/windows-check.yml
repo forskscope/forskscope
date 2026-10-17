@@ -322,19 +322,26 @@ jobs:
       - name: "Guard: store-validate.ps1 -SkipInstall fails on a package missing an asset"
         shell: pwsh
         run: |
-          $MakeAppx = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe" -ErrorAction Stop |
-              Sort-Object FullName -Descending | Select-Object -First 1
-
-          $unpack = Join-Path $env:RUNNER_TEMP "guard-broken-unpack"
-          if (Test-Path $unpack) { Remove-Item -Recurse -Force $unpack }
-          & $MakeAppx.FullName unpack /p "$env:GOOD_MSIX" /d $unpack /overwrite
-          if ($LASTEXITCODE -ne 0) { throw "makeappx unpack failed" }
-
-          Remove-Item (Join-Path $unpack "Assets\Square44x44Logo.png") -ErrorAction Stop
-
+          # makeappx pack itself refuses to build a package whose manifest
+          # references a file that is not in the staged content (tried
+          # first, and confirmed: "Manifest validation error ... doesn't
+          # exist in the package"). A package actually missing a declared
+          # asset only exists if something edits the .msix after packing,
+          # so this guard does exactly that - deletes one entry straight
+          # out of the built .msix (an ordinary zip container), bypassing
+          # makeappx's own validation entirely, the same way a corrupted
+          # upload or a bad manual edit would.
           $brokenMsix = Join-Path $env:RUNNER_TEMP "forskscope-broken-$env:TAG.msix"
-          & $MakeAppx.FullName pack /d $unpack /p $brokenMsix /overwrite
-          if ($LASTEXITCODE -ne 0) { throw "makeappx pack failed" }
+          Copy-Item "$env:GOOD_MSIX" $brokenMsix -Force
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::Open($brokenMsix, [System.IO.Compression.ZipArchiveMode]::Update)
+          try {
+            $entry = $zip.GetEntry("Assets/Square44x44Logo.png")
+            if (-not $entry) { throw "Assets/Square44x44Logo.png not found in the built MSIX - cannot stage this guard" }
+            $entry.Delete()
+          } finally {
+            $zip.Dispose()
+          }
 
           $script = Join-Path $env:RUNNER_TEMP "scripts-under-test/store-validate.ps1"
           $output = & pwsh -NoProfile -File $script -MsixPath $brokenMsix -Tag "$env:TAG" -SkipInstall 2>&1 | Out-String
