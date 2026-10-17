@@ -156,6 +156,63 @@ ForskScope to Applications. Requires **macOS 13.0 or later** (matches
 
 ---
 
+## Running portably
+
+Two ways to keep ForskScope from writing anything to your home folder — a
+shared machine, a locked-down one where home is not writable, or a copy you
+carry on a USB drive.
+
+**A `forskscope-data` folder beside the program.** Create an empty folder
+named `forskscope-data` next to `forskscope`/`forskscope.exe` — the
+downloaded Linux and Windows binaries only; the program folder is not
+writable (and so this marker folder cannot exist there) on an AUR or
+Microsoft Store install. The next launch finds it and keeps everything
+inside it.
+
+**`--data-dir <path>`**, on any platform:
+
+```sh
+forskscope --data-dir /path/to/folder
+```
+
+Keeps everything inside `<path>` instead, created if it does not already
+exist. Combines with a normal comparison: `forskscope --data-dir
+/path/to/folder left.txt right.txt`.
+
+**What either one keeps inside the folder:** `settings.json`, `session.json`,
+batch-copy restore manifests, and the web view's own storage — nothing of
+ForskScope's own goes to the usual platform locations. If the folder (or the
+drive it is on) is not writable, ForskScope still starts with whatever
+settings it can read, and does not fall back to writing your home folder
+instead.
+
+**Moving existing settings in:** copy your current `settings.json` into the
+new folder — see [Where your settings and session are
+stored](settings.md#where-your-settings-and-session-are-stored) for its
+current location. This is the only step; ForskScope does not import or sync
+it for you, on purpose, so a portable copy never silently carries a surprise
+copy of someone else's settings.
+
+**`--private`**, on any platform, starts from default settings and keeps
+nothing:
+
+```sh
+forskscope --private
+```
+
+No settings file and no session file are read or written — a run under
+`--private` starts the same way whether or not a settings file already
+exists anywhere. Changes made in Settings apply for that run only. The web
+view still needs somewhere to write while it runs; that is a temporary
+folder removed when ForskScope exits. The files you compare and save are
+still your own files, read and written exactly as normal — `--private` is
+about ForskScope's own records, not about your documents.
+
+`--private` and `--data-dir` cannot be combined — see [CLI
+reference](../intermediate/cli.md) for the exact error and exit code.
+
+---
+
 ## Verifying your download
 
 Every release publishes a fourth file, **`SHA256SUMS`**, listing a SHA-256

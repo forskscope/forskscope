@@ -33,6 +33,40 @@ suffix, and a quiet `Result: <merged>` line under the file header names the
 save destination throughout — it is not a button; the normal save/overwrite
 guards are the only path to writing there.
 
+### `--data-dir <path>` — portable mode
+
+```sh
+forskscope --data-dir /path/to/folder
+forskscope --data-dir /path/to/folder <left> <right>
+```
+
+Keeps settings, session and everything else ForskScope writes inside
+`<path>` instead of the platform's usual locations — nothing is written to
+your home folder. The folder is created if it does not exist. Combines
+with the normal startup forms: `--data-dir` is parsed out of the argument
+list before the file arguments are, the same way `--version` is, so
+`forskscope --data-dir /path/to/folder a.txt b.txt` still opens a
+comparison. See [Running portably](../users/installation.md#running-portably)
+for what is and is not moved, and for the alternative — a `forskscope-data`
+folder kept beside the program — that needs no flag at all.
+
+### `--private` — private mode
+
+```sh
+forskscope --private
+forskscope --private <left> <right>
+```
+
+Starts with default settings, and saves nothing: no settings file is read
+or written, no session is read or written, and nothing survives after
+ForskScope exits. The files you compare and save are still your files,
+written when you save — private mode is about ForskScope's own records,
+not about the documents you open. See
+[Running portably](../users/installation.md#running-portably) for the full
+list of what each mode writes and does not.
+
+`--private` and `--data-dir` cannot be combined (exit code `2`, above).
+
 ---
 
 ## Git integration
@@ -96,10 +130,9 @@ merge-tool = ["forskscope", "$left", "$right", "$output"]
 | Code | Meaning |
 |------|---------|
 | `0`  | Normal exit |
-| `1`  | Unsupported argument count — anything other than 0, 2, or 3 positional arguments (`--diagnostics`, `--version`/`-V` and `--help`/`-h` are all handled separately, before this check). An error naming the argument count is printed to stderr, along with a pointer to `--version`/`--diagnostics` for the question that error most often turns out to be. |
+| `1`  | Unsupported argument count — anything other than 0, 2, or 3 positional arguments (`--diagnostics`, `--version`/`-V` and `--help`/`-h` are all handled separately, before this check). An error naming the argument count is printed to stderr, along with a pointer to `--version`/`--diagnostics` for the question that error most often turns out to be. The same code is used for an unrecognized `--` flag and for `--data-dir` with no path after it — both are startup-argument errors, not a file name ForskScope tried and failed to open. |
+| `2`  | `--private` combined with `--data-dir` — a contradiction, not a priority to resolve by picking one: `--private` starts from nothing and keeps nothing, `--data-dir` names a folder to keep everything in. The error names both flags. |
 | `3`  | **Windows only.** The Microsoft Edge WebView2 Runtime is not installed. ForskScope shows a message box offering the download page and exits with `3` whichever button is pressed. |
-
-Code `2` is not used by ForskScope itself.
 
 A missing file path is **not** a startup error: one side of a comparison may
 be absent (e.g. a newly-added or deleted file), so `forskscope <left> <right>`

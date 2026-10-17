@@ -222,6 +222,10 @@ Windows): `settings.json` for everything on this page, and `session.json` for
 your open tabs (see [My session was not restored](faq.md#my-session-was-not-restored-after-restarting)).
 Both files stay on this computer — nothing here is uploaded.
 
+Running with `--data-dir` or `--private` changes where these files live, or
+whether they are read and written at all — see [Running
+portably](installation.md#running-portably).
+
 If one of these files can't be used as-is — it was written by a newer version
 of ForskScope, or it's unreadable/corrupted — a dialog appears at startup
 instead of silently falling back to defaults. What it offers depends on why:
