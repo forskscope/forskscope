@@ -9,7 +9,26 @@
 # only immediate dependent stays wayland-scanner (and that 0.41's stays
 # calamine), so this exception cannot silently widen to cover a path it
 # was never meant to.
+#
+# RUSTSEC-2026-0367/-0368/-0369 (zip 8.6.0, fixed in >= 9.0.0, reviewed
+# 2026-10-17 against zip 8.6.0 and calamine 0.36.1, the versions resolved at
+# review time): all three concern `ZipArchive::extract`/
+# `ZipStreamReader::extract` writing an archive's entries to disk - symlink
+# targets and Unix permissions/SUID bits an attacker's archive controls,
+# landing outside the destination directory. zip reaches this workspace only
+# through calamine (`cargo tree -i zip`: calamine is its sole immediate
+# dependent), which reads a workbook's parts in memory via `ZipArchive` and
+# never calls `extract` or `ZipStreamReader` anywhere in its source (checked
+# directly, calamine 0.36.1). calamine 0.36.1 is its latest release and
+# requires zip 8.x, so there is no upgrade path today. `cargo xtask
+# audit-deps` enforces the shape this exception depends on: zip's only
+# immediate dependent stays calamine, no workspace crate or xtask names zip
+# as a direct dependency, and it reports (without failing) once zip resolves
+# to >= 9 via calamine, which is this exception's removal trigger.
 ignore = [
     "RUSTSEC-2026-0194",
     "RUSTSEC-2026-0195",
+    "RUSTSEC-2026-0367",
+    "RUSTSEC-2026-0368",
+    "RUSTSEC-2026-0369",
 ]

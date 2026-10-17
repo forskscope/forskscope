@@ -197,12 +197,86 @@ fn run_audit_deps() {
     assert_immediate_dependents("sheets-diff", &["forskscope-core "]);
     assert_immediate_dependents("calamine", &["sheets-diff "]);
     assert_immediate_dependents("zip", &["calamine "]);
+    // RUSTSEC-2026-0367/-0368/-0369 (zip 8.6.0, ignored in .cargo/audit.toml,
+    // reviewed 2026-10-17): the `assert_immediate_dependents` call above
+    // already guards the resolved-graph half of that exception (zip reached
+    // only through calamine). This guards the half it cannot see — a
+    // manifest naming zip directly, which would not need to be *built* by a
+    // default run to widen the exception's real scope — and reports,
+    // without failing, once the resolved graph no longer needs the
+    // exception at all.
+    assert_no_direct_zip_dependency();
+    report_if_zip_resolves_fixed();
     println!(
         "security dependency path check passed: sensitive dependencies are reached only \
          through their reviewed paths. This checks dependency shape, not advisories — it does \
          not query a vulnerability database; that is cargo audit's job, run separately."
     );
     assert_threat_model_versions();
+}
+
+/// RUSTSEC-2026-0367/-0368/-0369's `.cargo/audit.toml` ignore is reviewed
+/// against zip reached *only* through calamine's safe, in-memory
+/// `ZipArchive` reads — never through this project's own code naming zip
+/// directly, which would need its own review before the ignore could cover
+/// it. Checked against every workspace crate's manifest and xtask's own
+/// (a separate workspace, with its own `Cargo.lock` — `cargo tree`'s
+/// resolved-graph check above never sees it, and it has its own zip
+/// exposure today, via `rust_xlsxwriter`, reviewed the same way: no
+/// `extract`/`ZipStreamReader` call in its source either).
+/// Falsify by adding `zip = "..."` to any of these `[dependencies]`.
+fn assert_no_direct_zip_dependency() {
+    let manifests = [
+        "Cargo.toml",
+        "crates/forskscope-core/Cargo.toml",
+        "crates/forskscope-ui/Cargo.toml",
+        "crates/forskscope-ui-logic/Cargo.toml",
+        "xtask/Cargo.toml",
+    ];
+    for manifest in manifests {
+        let path = workspace_root().join(manifest);
+        let text = read_file(&path);
+        for (idx, line) in text.lines().enumerate() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("zip ")
+                || trimmed.starts_with("zip=")
+                || trimmed.starts_with("zip.")
+            {
+                fail(&format!(
+                    "{}:{} names `zip` as a direct dependency - RUSTSEC-2026-0367/-0368/-0369 \
+                     are ignored in .cargo/audit.toml only because zip is reached exclusively \
+                     through calamine's (or rust_xlsxwriter's) reviewed, extract-free usage; a \
+                     direct dependency on zip needs its own review before the ignore can cover \
+                     it:\n  {line}",
+                    path.display(),
+                    idx + 1
+                ));
+            }
+        }
+    }
+    println!("no workspace crate or xtask names zip as a direct dependency.");
+}
+
+/// This exception's removal trigger: once zip resolves to >= 9 (the version
+/// RUSTSEC-2026-0367/-0368/-0369 are fixed in) through calamine, a fixed
+/// version is already in the graph and the ignore entries in
+/// `.cargo/audit.toml` likely no longer apply. Reports, never fails — a
+/// resolved fix is good news, not a gate to block on, and whether to drop
+/// the ignore is a one-line review, not an emergency.
+fn report_if_zip_resolves_fixed() {
+    let resolved = resolve_version_via("zip", "calamine");
+    let major: u32 = resolved
+        .split('.')
+        .next()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    if major >= 9 {
+        println!(
+            "NOTICE: zip now resolves to {resolved} (>= 9) via calamine — RUSTSEC-2026-0367/\
+             -0368/-0369 are fixed there; .cargo/audit.toml's ignore entries for them were \
+             written against zip 8.6.0 and should be reconsidered now."
+        );
+    }
 }
 
 /// F142: the versions `docs/src/maintainers/threat-model.md` quotes for the
