@@ -3,7 +3,22 @@
 use dioxus::prelude::*;
 
 use crate::i18n::t;
+use crate::startup_mode::{self, ModeDisplay};
 use crate::state::Store;
+
+/// RFC-091 §2/§3, acceptance criterion 7: the exact text for each
+/// non-installed mode. `None` for `Installed` — today's behaviour is to
+/// show nothing here, the RFC's texts cover every *other* case.
+fn mode_text(lang: crate::state::Lang, mode: &ModeDisplay) -> Option<String> {
+    match mode {
+        ModeDisplay::Installed => None,
+        ModeDisplay::Portable(_) => Some(t(lang, "Portable")),
+        ModeDisplay::PortableReadOnly(_) => {
+            Some(t(lang, "Portable (read-only): changes are not saved"))
+        }
+        ModeDisplay::Private => Some(t(lang, "Private: nothing is saved")),
+    }
+}
 
 #[component]
 pub fn StatusBar() -> Element {
@@ -60,6 +75,21 @@ pub fn StatusBar() -> Element {
                 }
             }
             span { class: "spacer" }
+            {
+                let mode = startup_mode::mode_display();
+                let text = mode_text(lang, &mode);
+                let tooltip = match &mode {
+                    ModeDisplay::Portable(dir) | ModeDisplay::PortableReadOnly(dir) => {
+                        Some(dir.display().to_string())
+                    }
+                    ModeDisplay::Installed | ModeDisplay::Private => None,
+                };
+                rsx! {
+                    if let Some(text) = text {
+                        span { class: "mode-indicator", title: tooltip.unwrap_or_default(), "{text}" }
+                    }
+                }
+            }
             span { class: "local-only", title: t(lang, "Files stay on this computer. ForskScope does not upload them."),
                 "🔒 " {t(lang, "Local only")} }
         }

@@ -67,6 +67,14 @@ list of what each mode writes and does not.
 
 `--private` and `--data-dir` cannot be combined (exit code `2`, above).
 
+**Windows and Linux only.** On macOS, the system web view keeps its own
+cache in your home folder regardless of either mode, so neither can keep
+its promise there. Both refuse to start on macOS: one plain message to
+stderr, then exit code `2` (above) — the same code the two flags'
+contradiction uses, since both are "this cannot be satisfied," not two
+different kinds of failure. `--help` does not list `--data-dir`/`--private`
+on macOS, rather than listing them with a caveat.
+
 ---
 
 ## Git integration
@@ -131,7 +139,7 @@ merge-tool = ["forskscope", "$left", "$right", "$output"]
 |------|---------|
 | `0`  | Normal exit |
 | `1`  | Unsupported argument count — anything other than 0, 2, or 3 positional arguments (`--diagnostics`, `--version`/`-V` and `--help`/`-h` are all handled separately, before this check). An error naming the argument count is printed to stderr, along with a pointer to `--version`/`--diagnostics` for the question that error most often turns out to be. The same code is used for an unrecognized `--` flag and for `--data-dir` with no path after it — both are startup-argument errors, not a file name ForskScope tried and failed to open. |
-| `2`  | `--private` combined with `--data-dir` — a contradiction, not a priority to resolve by picking one: `--private` starts from nothing and keeps nothing, `--data-dir` names a folder to keep everything in. The error names both flags. |
+| `2`  | Either of two things `--private`/`--data-dir` cannot resolve: the two combined — a contradiction, not a priority to resolve by picking one, since `--private` starts from nothing and keeps nothing while `--data-dir` names a folder to keep everything in (the error names both flags) — or, **on macOS,** either flag used at all, because the system web view there keeps its own cache in your home folder regardless of the mode (the error names the one flag used). |
 | `3`  | **Windows only.** The Microsoft Edge WebView2 Runtime is not installed. ForskScope shows a message box offering the download page and exits with `3` whichever button is pressed. |
 
 A missing file path is **not** a startup error: one side of a comparison may

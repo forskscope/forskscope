@@ -92,6 +92,13 @@ pub fn SettingsModal() -> Element {
                         "ℹ"
                     }
                 }
+                // RFC-091 §3: "A Settings change says the same next to it" -
+                // the status bar's own "Private: nothing is saved" repeated
+                // here, so a change made from inside this dialog is not
+                // mistaken for one that will survive the run.
+                if crate::startup_mode::is_private() {
+                    p { class: "notice", {t(lang, "Private: nothing is saved")} }
+                }
 
                 // ── Appearance ────────────────────────────────────────────────
                 div { class: "field",

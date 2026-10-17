@@ -4,12 +4,13 @@
 //! Two pure functions carry the whole decision: [`extract_data_location_flags`]
 //! pulls `--private` and `--data-dir <path>` out of argv (ahead of the
 //! positional file arguments, the same way `--version` already is), and
-//! [`resolve_data_location`] turns those flags plus two facts about the
-//! running program — its real folder, and whether a `forskscope-data` folder
-//! sits beside it — into one [`DataLocation`]. Neither touches the
-//! filesystem or the environment; the caller (`forskscope-ui::startup_mode`)
-//! supplies both facts, which is where `std::env::current_exe` and
-//! `std::fs` actually run.
+//! [`resolve_data_location`] turns those flags, [`Platform`], and two facts
+//! about the running program — its real folder, and whether a
+//! `forskscope-data` folder sits beside it — into one [`DataLocation`].
+//! Neither touches the filesystem or the environment; the caller
+//! (`forskscope-ui::startup_mode`/`startup_resolve`) supplies all of it,
+//! which is where `std::env::current_exe`, `std::fs` and `cfg!(target_os)`
+//! actually run.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -28,55 +29,122 @@ pub enum DataLocation {
     Installed,
 }
 
-/// `--private` and `--data-dir` name opposite destinations for the same
-/// decision — RFC-091 §1 calls this a contradiction, not a priority to
-/// break by picking one. The caller exits 2 on this, before opening a
-/// window.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PrivateAndDataDirConflict;
+/// The platform fact [`resolve_data_location`] needs for RFC-091 §2a, passed
+/// in rather than read internally (`cfg!(target_os = ...)`) so the decision
+/// stays a pure function of its arguments and acceptance criterion 9's
+/// resolver test can exercise macOS from any machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Platform {
+    /// `dioxus-desktop` neither applies the data directory to WKWebView nor
+    /// exposes a non-persistent store there, so neither mode's promise can
+    /// be kept (RFC-091 §2a).
+    MacOs,
+    /// Every other platform this project ships on. Windows gets this same
+    /// refusal too, the RFC says, if its own WebView2 cache is ever shown
+    /// to escape `with_data_directory` — not true today (measured).
+    Other,
+}
 
-impl fmt::Display for PrivateAndDataDirConflict {
+/// Which flag [`DataLocationError::NotAvailableOnPlatform`] refused, so its
+/// `Display` can name the one the caller actually typed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StartupFlag {
+    Private,
+    DataDir,
+}
+
+/// Why [`resolve_data_location`] refused to decide, before any window
+/// opens (RFC-091 §1's contradiction, and §2a's platform refusal) — the
+/// caller exits 2 on either, printing the message below.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DataLocationError {
+    /// `--private` and `--data-dir` name opposite destinations for the same
+    /// decision — RFC-091 §1 calls this a contradiction, not a priority to
+    /// break by picking one.
+    PrivateAndDataDir,
+    /// RFC-091 §2a: this platform's system web view cannot keep this mode's
+    /// promise, so the mode does not start rather than run with a promise
+    /// that silently does not hold.
+    NotAvailableOnPlatform(StartupFlag),
+}
+
+impl fmt::Display for DataLocationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "--private and --data-dir cannot be combined: --private starts \
-             from nothing and keeps nothing, --data-dir names a folder to \
-             keep everything in. Choose one."
-        )
+        match self {
+            DataLocationError::PrivateAndDataDir => write!(
+                f,
+                "--private and --data-dir cannot be combined: --private starts \
+                 from nothing and keeps nothing, --data-dir names a folder to \
+                 keep everything in. Choose one."
+            ),
+            DataLocationError::NotAvailableOnPlatform(StartupFlag::Private) => write!(
+                f,
+                "--private is not available on macOS: the system web view keeps \
+                 its own data in your home folder, so ForskScope cannot promise \
+                 to save nothing."
+            ),
+            DataLocationError::NotAvailableOnPlatform(StartupFlag::DataDir) => write!(
+                f,
+                "--data-dir is not available on macOS: the system web view keeps \
+                 its own data in your home folder, so ForskScope cannot keep \
+                 everything in the chosen folder."
+            ),
+        }
     }
 }
 
-impl std::error::Error for PrivateAndDataDirConflict {}
+impl std::error::Error for DataLocationError {}
 
-/// RFC-091 §1's resolution table, row by row, the first match winning:
+/// RFC-091 §1's resolution table, row by row, the first match winning,
+/// with §2a's platform refusal checked for either flag before its row would
+/// otherwise succeed:
 ///
 /// | # | Condition | Mode |
 /// |---|---|---|
-/// | 1 | `private` | Private |
-/// | 2 | `data_dir` given | Portable(that path) |
-/// | 3 | `marker_exists` | Portable(`program_dir`/`forskscope-data`) |
+/// | 1 | `private` | Private (refused on macOS) |
+/// | 2 | `data_dir` given | Portable(that path) (refused on macOS) |
+/// | 3 | `marker_exists`, not macOS | Portable(`program_dir`/`forskscope-data`) |
 /// | 4 | otherwise | Installed |
+///
+/// Row 3 is simply **ignored** on macOS, not refused — no flag was typed,
+/// so there is nothing to print an error about; it falls through to
+/// Installed the same as a marker that is absent (RFC-091 §2: "The marker
+/// folder is ignored there").
 ///
 /// `program_dir` and `marker_exists` are facts the caller establishes
 /// (`std::env::current_exe`, symlinks resolved, and an existence check) —
 /// this function only arranges them into a decision, so the arrangement
 /// itself is testable without touching a real filesystem.
 pub fn resolve_data_location(
+    platform: Platform,
     private: bool,
     data_dir: Option<PathBuf>,
     program_dir: Option<&Path>,
     marker_exists: bool,
-) -> Result<DataLocation, PrivateAndDataDirConflict> {
+) -> Result<DataLocation, DataLocationError> {
     if private && data_dir.is_some() {
-        return Err(PrivateAndDataDirConflict);
+        return Err(DataLocationError::PrivateAndDataDir);
     }
     if private {
+        if platform == Platform::MacOs {
+            return Err(DataLocationError::NotAvailableOnPlatform(
+                StartupFlag::Private,
+            ));
+        }
         return Ok(DataLocation::Private);
     }
     if let Some(dir) = data_dir {
+        if platform == Platform::MacOs {
+            return Err(DataLocationError::NotAvailableOnPlatform(
+                StartupFlag::DataDir,
+            ));
+        }
         return Ok(DataLocation::Portable(dir));
     }
-    if marker_exists && let Some(dir) = program_dir {
+    if platform != Platform::MacOs
+        && marker_exists
+        && let Some(dir) = program_dir
+    {
         return Ok(DataLocation::Portable(dir.join("forskscope-data")));
     }
     Ok(DataLocation::Installed)
@@ -161,6 +229,7 @@ mod tests {
     #[test]
     fn row_1_private_wins_regardless_of_the_other_rows() {
         let result = resolve_data_location(
+            Platform::Other,
             true,
             None,
             Some(Path::new("/opt/forskscope")),
@@ -172,6 +241,7 @@ mod tests {
     #[test]
     fn row_2_data_dir_wins_over_a_marker() {
         let result = resolve_data_location(
+            Platform::Other,
             false,
             Some(PathBuf::from("/mnt/usb/data")),
             Some(Path::new("/opt/forskscope")),
@@ -185,7 +255,13 @@ mod tests {
 
     #[test]
     fn row_3_the_marker_names_a_forskscope_data_folder_beside_the_program() {
-        let result = resolve_data_location(false, None, Some(Path::new("/opt/forskscope")), true);
+        let result = resolve_data_location(
+            Platform::Other,
+            false,
+            None,
+            Some(Path::new("/opt/forskscope")),
+            true,
+        );
         assert_eq!(
             result,
             Ok(DataLocation::Portable(PathBuf::from(
@@ -200,37 +276,111 @@ mod tests {
         // folder) must not be treated as "found" — it must fall to row 4,
         // the same as a marker that was checked and is absent.
         assert_eq!(
-            resolve_data_location(false, None, None, false),
+            resolve_data_location(Platform::Other, false, None, None, false),
             Ok(DataLocation::Installed)
         );
         assert_eq!(
-            resolve_data_location(false, None, None, true),
+            resolve_data_location(Platform::Other, false, None, None, true),
             Ok(DataLocation::Installed)
         );
     }
 
     #[test]
     fn row_4_otherwise_installed() {
-        let result = resolve_data_location(false, None, Some(Path::new("/opt/forskscope")), false);
+        let result = resolve_data_location(
+            Platform::Other,
+            false,
+            None,
+            Some(Path::new("/opt/forskscope")),
+            false,
+        );
         assert_eq!(result, Ok(DataLocation::Installed));
     }
 
     #[test]
     fn private_with_data_dir_is_a_conflict_not_a_priority_order() {
         let result = resolve_data_location(
+            Platform::Other,
             true,
             Some(PathBuf::from("/mnt/usb/data")),
             Some(Path::new("/opt/forskscope")),
             false,
         );
-        assert_eq!(result, Err(PrivateAndDataDirConflict));
+        assert_eq!(result, Err(DataLocationError::PrivateAndDataDir));
     }
 
     #[test]
     fn the_conflict_message_names_both_flags() {
-        let message = PrivateAndDataDirConflict.to_string();
+        let message = DataLocationError::PrivateAndDataDir.to_string();
         assert!(message.contains("--private"));
         assert!(message.contains("--data-dir"));
+    }
+
+    // ── §2a: macOS refuses either flag, falsified with the platform as a
+    //    parameter (acceptance criterion 9) ────────────────────────────────
+
+    #[test]
+    fn macos_refuses_private_naming_the_flag_and_the_platform() {
+        let result = resolve_data_location(Platform::MacOs, true, None, None, false);
+        assert_eq!(
+            result,
+            Err(DataLocationError::NotAvailableOnPlatform(
+                StartupFlag::Private
+            ))
+        );
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("--private"));
+        assert!(message.contains("macOS"));
+    }
+
+    #[test]
+    fn macos_refuses_data_dir_naming_the_flag_and_the_platform() {
+        let result = resolve_data_location(
+            Platform::MacOs,
+            false,
+            Some(PathBuf::from("/Volumes/usb/data")),
+            None,
+            false,
+        );
+        assert_eq!(
+            result,
+            Err(DataLocationError::NotAvailableOnPlatform(
+                StartupFlag::DataDir
+            ))
+        );
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("--data-dir"));
+        assert!(message.contains("macOS"));
+    }
+
+    #[test]
+    fn macos_ignores_the_marker_folder_rather_than_refusing_it() {
+        // No flag was typed here, so there is nothing to refuse — row 3 is
+        // simply skipped on macOS and this falls through to Installed, the
+        // same outcome as a marker that was checked and found absent.
+        let result = resolve_data_location(
+            Platform::MacOs,
+            false,
+            None,
+            Some(Path::new("/Applications/ForskScope.app/Contents/MacOS")),
+            true,
+        );
+        assert_eq!(result, Ok(DataLocation::Installed));
+    }
+
+    #[test]
+    fn macos_private_and_data_dir_together_is_still_the_conflict_not_the_platform_refusal() {
+        // The contradiction is checked first, and does not depend on the
+        // platform — refusing it must not be read as a macOS-specific
+        // message when the real problem is the two flags together.
+        let result = resolve_data_location(
+            Platform::MacOs,
+            true,
+            Some(PathBuf::from("/Volumes/usb/data")),
+            None,
+            false,
+        );
+        assert_eq!(result, Err(DataLocationError::PrivateAndDataDir));
     }
 
     // ── extract_data_location_flags ─────────────────────────────────────

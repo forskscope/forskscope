@@ -160,7 +160,10 @@ ForskScope to Applications. Requires **macOS 13.0 or later** (matches
 
 Two ways to keep ForskScope from writing anything to your home folder — a
 shared machine, a locked-down one where home is not writable, or a copy you
-carry on a USB drive.
+carry on a USB drive. **Windows and Linux only:** on macOS, the system web
+view keeps its own cache in your home folder regardless of either mode, so
+neither can actually keep its promise there, and both refuse to start rather
+than run with one that silently does not hold.
 
 **A `forskscope-data` folder beside the program.** Create an empty folder
 named `forskscope-data` next to `forskscope`/`forskscope.exe` — the
@@ -169,7 +172,7 @@ writable (and so this marker folder cannot exist there) on an AUR or
 Microsoft Store install. The next launch finds it and keeps everything
 inside it.
 
-**`--data-dir <path>`**, on any platform:
+**`--data-dir <path>`**, on Windows and Linux:
 
 ```sh
 forskscope --data-dir /path/to/folder
@@ -193,8 +196,8 @@ current location. This is the only step; ForskScope does not import or sync
 it for you, on purpose, so a portable copy never silently carries a surprise
 copy of someone else's settings.
 
-**`--private`**, on any platform, starts from default settings and keeps
-nothing:
+**`--private`**, on Windows and Linux, starts from default settings and
+keeps nothing:
 
 ```sh
 forskscope --private

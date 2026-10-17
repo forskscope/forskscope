@@ -35,11 +35,13 @@
 //! of the three.
 //!
 //! Exit codes: 1 is a startup-argument error (including an unrecognized
-//! `--` flag, and `--data-dir` with no path after it); 2 is `--private`
-//! combined with `--data-dir` (RFC-091 §1: a contradiction, not a priority
-//! to resolve by picking one); 3 (Windows only, F109) is a missing
-//! Microsoft Edge WebView2 Runtime, raised whichever button the user
-//! presses on the message box offering the download page.
+//! `--` flag, and `--data-dir` with no path after it); 2 is either
+//! `--private` combined with `--data-dir` (RFC-091 §1: a contradiction, not
+//! a priority to resolve by picking one) or, on macOS, `--private` or
+//! `--data-dir` used at all (RFC-091 §2a: the system web view there cannot
+//! keep either mode's promise, so neither mode starts); 3 (Windows only,
+//! F109) is a missing Microsoft Edge WebView2 Runtime, raised whichever
+//! button the user presses on the message box offering the download page.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
@@ -161,7 +163,15 @@ fn main() {
              forskscope <local> <remote> <merged>     git mergetool: diff local vs remote, save to merged\n  \
              forskscope --diagnostics                 Print platform diagnostics and exit\n  \
              forskscope --version, -V                 Print the version and exit\n  \
-             forskscope --help, -h                    Print this message and exit\n  \
+             forskscope --help, -h                    Print this message and exit\n"
+        );
+        // RFC-091 §2a: neither mode can keep its promise on macOS (the
+        // system web view there keeps its own cache regardless), so both
+        // refuse to start — listing them here, even with a caveat, would
+        // describe something that only exits 2. Omitted, not qualified.
+        #[cfg(not(target_os = "macos"))]
+        print!(
+            "  \
              forskscope --data-dir <path> ...         Portable: keep settings, session and\n  \
              \x20                                        everything else this writes inside <path>\n  \
              \x20                                        instead of the usual system locations\n  \
@@ -205,6 +215,7 @@ fn main() {
         .as_deref()
         .is_some_and(startup_resolve::marker_exists);
     let data_location = match resolve_data_location(
+        startup_resolve::current_platform(),
         flags.private,
         flags.data_dir,
         program_dir.as_deref(),
@@ -220,13 +231,15 @@ fn main() {
         // RFC-091 §1: "--data-dir's folder is created if it does not
         // exist." The marker-folder case already exists by definition
         // (that is how it was found); create_dir_all is a no-op on it.
-        if let Err(error) = std::fs::create_dir_all(dir) {
-            eprintln!(
-                "forskscope: could not create the portable data folder {}: {error}",
-                dir.display()
-            );
-            std::process::exit(1);
-        }
+        //
+        // RFC-091 §2's "Read-only data location" criterion: a folder that
+        // cannot be created, or exists but fails the write probe, is not a
+        // reason to exit — ForskScope still starts, reads what it can from
+        // it, and saves nothing (startup_mode::is_portable_read_only, which
+        // every settings/session/manifest write site checks). Detected by
+        // an actual write attempt, not permission bits, which can lie.
+        let writable = std::fs::create_dir_all(dir).is_ok() && startup_resolve::probe_writable(dir);
+        let _ = startup_mode::PORTABLE_WRITABLE.set(writable);
     }
     // Set before anything else touches a settings/session/web-view path —
     // config_file_path, the manifest folder and the web-view Config below

@@ -23,8 +23,25 @@ use forskscope_ui_logic::{
 };
 
 use crate::i18n::t;
+use crate::startup_mode::{self, ModeDisplay};
 use crate::state::{Lang, Modal, Store};
 use crate::update_check::check_for_updates;
+
+/// RFC-091 §2/§3, acceptance criterion 7: the same mode text the status bar
+/// shows, paired here with the data location itself (the status bar only
+/// puts that in a tooltip) — `None` for `Installed`, where there is
+/// neither a mode nor a location to report.
+fn mode_and_location(lang: Lang) -> Option<(String, Option<String>)> {
+    match startup_mode::mode_display() {
+        ModeDisplay::Installed => None,
+        ModeDisplay::Portable(dir) => Some((t(lang, "Portable"), Some(dir.display().to_string()))),
+        ModeDisplay::PortableReadOnly(dir) => Some((
+            t(lang, "Portable (read-only): changes are not saved"),
+            Some(dir.display().to_string()),
+        )),
+        ModeDisplay::Private => Some((t(lang, "Private: nothing is saved"), None)),
+    }
+}
 
 /// How this build was obtained, read once at compile time — never from
 /// anything the network returned (§4).
@@ -97,13 +114,36 @@ fn newer_available_action(lang: Lang, channel: AppChannel, latest: Version) -> E
     }
 }
 
+/// The plain-English line(s) appended to the copied diagnostics text —
+/// matching `PlatformInfo::to_report`'s own un-localized style, so the
+/// clipboard content a bug report gets stays in one language regardless of
+/// the UI's. `None` for `Installed`, which has nothing extra to report.
+fn diagnostics_mode_lines() -> Option<String> {
+    match startup_mode::mode_display() {
+        ModeDisplay::Installed => None,
+        ModeDisplay::Portable(dir) => {
+            Some(format!("Mode: Portable\nData location: {}", dir.display()))
+        }
+        ModeDisplay::PortableReadOnly(dir) => Some(format!(
+            "Mode: Portable (read-only)\nData location: {}",
+            dir.display()
+        )),
+        ModeDisplay::Private => Some("Mode: Private".to_string()),
+    }
+}
+
 #[component]
 pub fn AboutModal() -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     let info = PlatformInfo::collect();
-    let diag = info.to_report();
+    let mut diag = info.to_report();
+    if let Some(mode_lines) = diagnostics_mode_lines() {
+        diag.push('\n');
+        diag.push_str(&mode_lines);
+    }
     let d2 = diag.clone();
+    let mode_and_location = mode_and_location(lang);
 
     let mut update_state = use_signal(|| None::<UpdateCheckState>);
     let checking = matches!(&*update_state.read(), Some(UpdateCheckState::Checking));
@@ -124,6 +164,12 @@ pub fn AboutModal() -> Element {
                     span { class: "about-key", {t(lang, "OS")}      } span { "{info.os}" }
                     span { class: "about-key", {t(lang, "Arch")}    } span { "{info.arch}" }
                     span { class: "about-key", {t(lang, "CPUs")}    } span { "{info.logical_cpus}" }
+                    if let Some((mode, location)) = &mode_and_location {
+                        span { class: "about-key", {t(lang, "Mode")} } span { "{mode}" }
+                        if let Some(location) = location {
+                            span { class: "about-key", {t(lang, "Data location")} } span { "{location}" }
+                        }
+                    }
                 }
                 div { class: "update-check",
                     button {

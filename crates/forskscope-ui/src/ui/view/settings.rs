@@ -80,6 +80,14 @@ pub fn persist_settings(
 /// launch would be) with `write_disabled: true`, which already makes
 /// [`persist`] a no-op for the rest of this run — no second gate needed
 /// there.
+///
+/// RFC-091 §2's "Read-only data location" is different: it still reads
+/// normally (a settings file there was written while the folder *was*
+/// writable, or came pre-populated), so the load below is unchanged; only
+/// `write_disabled` is forced `true` afterward when
+/// [`crate::startup_mode::is_portable_read_only`], overriding whatever the
+/// resolution would otherwise have decided — "reads what it can... saves
+/// nothing", not "starts from defaults" the way Private does.
 pub fn load() -> (AppSettings, SettingsRuntimeResolution) {
     if crate::startup_mode::is_private() {
         let resolution = SettingsRuntimeResolution {
@@ -91,7 +99,11 @@ pub fn load() -> (AppSettings, SettingsRuntimeResolution) {
         let settings = AppSettings::from_v2(&resolution.value);
         return (settings, resolution);
     }
-    load_settings(&repository())
+    let (settings, mut resolution) = load_settings(&repository());
+    if crate::startup_mode::is_portable_read_only() {
+        resolution.write_disabled = true;
+    }
+    (settings, resolution)
 }
 
 /// The repository-explicit half of [`load`], exposed for direct testing.

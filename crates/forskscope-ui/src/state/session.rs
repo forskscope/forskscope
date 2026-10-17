@@ -123,6 +123,11 @@ pub fn persist_session(
 /// launch under `--private` still opens its explicit pair (that is the
 /// user's files, not ForskScope's own records), but nothing is restored
 /// from a session file and nothing is read from one either.
+///
+/// RFC-091 §2's "Read-only data location" still loads normally — the
+/// session restores as usual — but [`crate::startup_mode::is_portable_read_only`]
+/// forces `write_disabled` afterward regardless of what the load decided,
+/// so nothing this run does writes it back out.
 pub fn resolve_session(store: &mut Store) -> (SessionRuntimeResolution, Option<Notice>) {
     if crate::startup_mode::is_private() {
         let resolution = SessionRuntimeResolution {
@@ -134,7 +139,10 @@ pub fn resolve_session(store: &mut Store) -> (SessionRuntimeResolution, Option<N
         store.session_write_disabled.set(true);
         return (resolution, None);
     }
-    let resolution = load_session(&repository());
+    let mut resolution = load_session(&repository());
+    if crate::startup_mode::is_portable_read_only() {
+        resolution.write_disabled = true;
+    }
     store.session_write_disabled.set(resolution.write_disabled);
     let notice = recovery_notice(&resolution);
     (resolution, notice)

@@ -200,6 +200,13 @@ fn ja(key: &str) -> Option<&'static str> {
             "ファイルはこのコンピューターに留まります。ForskScopeはアップロードしません。"
         }
         "Local only" => "ローカルのみ",
+        "Portable" => "ポータブル",
+        "Portable (read-only): changes are not saved" => {
+            "ポータブル（読み取り専用）：変更は保存されません"
+        }
+        "Private: nothing is saved" => "プライベート：何も保存されません",
+        "Mode" => "モード",
+        "Data location" => "データの保存先",
         "No matches" => "一致なし",
         "Deep compare" => "深度比較",
         "Different" => "差分あり",

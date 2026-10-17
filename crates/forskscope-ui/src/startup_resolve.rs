@@ -7,8 +7,36 @@
 use std::path::{Path, PathBuf};
 
 use dioxus_desktop::Config;
+use forskscope_ui_logic::Platform;
 
 use crate::startup_mode::DataLocation;
+
+/// The platform fact `resolve_data_location` needs for RFC-091 §2a, read
+/// once here (the one impure/environment-reading side) rather than inside
+/// the pure resolver itself, so criterion 9's resolver test can exercise
+/// macOS from any machine by passing `Platform::MacOs` directly.
+pub(crate) fn current_platform() -> Platform {
+    if cfg!(target_os = "macos") {
+        Platform::MacOs
+    } else {
+        Platform::Other
+    }
+}
+
+/// RFC-091 §2: "detected at startup by an actual write probe, not by
+/// permission bits" — permission bits can lie (root, ACLs, a read-only
+/// mount reported as writable, an overlay filesystem), so this writes a
+/// real file into `dir` and removes it again, the same thing any later
+/// settings/session/manifest write into this folder will actually attempt.
+pub(crate) fn probe_writable(dir: &Path) -> bool {
+    let probe = dir.join(".forskscope-write-probe");
+    if std::fs::write(&probe, b"").is_ok() {
+        let _ = std::fs::remove_file(&probe);
+        true
+    } else {
+        false
+    }
+}
 
 /// The program's real folder — `std::env::current_exe()`, symbolic links
 /// resolved. `None` if either call fails, which `resolve_data_location`
@@ -171,6 +199,57 @@ pub(crate) fn redirect_xdg_dirs(location: &DataLocation) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn current_platform_is_macos_only_under_cfg_target_os_macos() {
+        let platform = current_platform();
+        if cfg!(target_os = "macos") {
+            assert_eq!(platform, Platform::MacOs);
+        } else {
+            assert_eq!(platform, Platform::Other);
+        }
+    }
+
+    #[test]
+    fn probe_writable_is_true_for_a_real_writable_directory() {
+        let base = std::env::temp_dir().join(format!(
+            "forskscope-startup-resolve-test-probe-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        std::fs::create_dir_all(&base).unwrap();
+
+        assert!(probe_writable(&base));
+        // The probe file must not be left behind.
+        assert_eq!(std::fs::read_dir(&base).unwrap().count(), 0);
+
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn probe_writable_is_false_for_a_read_only_directory() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let base = std::env::temp_dir().join(format!(
+            "forskscope-startup-resolve-test-probe-ro-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::set_permissions(&base, std::fs::Permissions::from_mode(0o500)).unwrap();
+
+        let writable = probe_writable(&base);
+
+        // Restore write permission before cleanup, regardless of outcome.
+        std::fs::set_permissions(&base, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::remove_dir_all(&base).ok();
+
+        assert!(
+            !writable,
+            "a directory with no write permission for its owner must fail the probe - this test does not apply running as root, which bypasses the permission check entirely"
+        );
+    }
 
     /// RFC-091 §1: "a link in `~/bin` to a program elsewhere uses the real
     /// program's folder." Falsify by having `resolve_real_exe` return its

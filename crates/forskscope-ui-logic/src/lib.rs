@@ -74,7 +74,7 @@ pub mod update_check;
 
 // compare
 pub use compare::data_location::{
-    DataLocation, extract_data_location_flags, resolve_data_location,
+    DataLocation, Platform, extract_data_location_flags, resolve_data_location,
 };
 pub use compare::load_guard::{LoadGuard, guard_for_sizes};
 pub use compare::load_identity::{
