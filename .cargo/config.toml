@@ -16,9 +16,9 @@ xtask = "run --manifest-path xtask/Cargo.toml --"
 # Windows import-list check (`.github/workflows/windows-check.yml`), which
 # fails if `forskscope.exe` imports `VCRUNTIME*.dll`/`MSVCP*.dll` or
 # anything else off its explicit allow-list.
-[target.x86_64-pc-windows-msvc]
-rustflags = [
-    "-C", "target-feature=+crt-static",
-    "-C", "link-arg=/NODEFAULTLIB:libucrt.lib",
-    "-C", "link-arg=/DEFAULTLIB:ucrt.lib",
-]
+#[target.x86_64-pc-windows-msvc]
+#rustflags = [
+#    "-C", "target-feature=+crt-static",
+#    "-C", "link-arg=/NODEFAULTLIB:libucrt.lib",
+#    "-C", "link-arg=/DEFAULTLIB:ucrt.lib",
+#]
