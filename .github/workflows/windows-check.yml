@@ -322,26 +322,37 @@ jobs:
       - name: "Guard: store-validate.ps1 -SkipInstall fails on a package missing an asset"
         shell: pwsh
         run: |
-          # makeappx pack itself refuses to build a package whose manifest
-          # references a file that is not in the staged content (tried
-          # first, and confirmed: "Manifest validation error ... doesn't
-          # exist in the package"). A package actually missing a declared
-          # asset only exists if something edits the .msix after packing,
-          # so this guard does exactly that - deletes one entry straight
-          # out of the built .msix (an ordinary zip container), bypassing
-          # makeappx's own validation entirely, the same way a corrupted
-          # upload or a bad manual edit would.
+          # Two things already tried and ruled out:
+          # - makeappx pack refuses to build a package whose manifest
+          #   references a file that is not in the staged content
+          #   ("Manifest validation error ... doesn't exist in the
+          #   package") - confirmed live on this guard's first run.
+          # - Deleting one zip entry straight out of an already-built
+          #   .msix breaks its signed block map, so makeappx itself then
+          #   refuses to unpack it at all ("package block map is not
+          #   valid") - confirmed live on this guard's second run, and
+          #   store-validate.ps1 unpacks every package before it can
+          #   check anything, so that check never even runs.
+          # What's left: pack from a stage directory that is missing the
+          # asset, with /nv (skip semantic validation - makeappx's own
+          # documented "testing only" escape hatch) so pack does not
+          # refuse. The resulting block map only covers what is actually
+          # there, so it stays internally consistent and unpacks fine,
+          # leaving a structurally valid package that is genuinely
+          # missing a file its manifest still references - which is what
+          # store-validate.ps1's check 3 exists to catch.
+          $MakeAppx = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe" -ErrorAction Stop |
+              Sort-Object FullName -Descending | Select-Object -First 1
+
+          $goodStage = Join-Path $env:RUNNER_TEMP "guard-build/stage"
+          $brokenStage = Join-Path $env:RUNNER_TEMP "guard-broken-stage"
+          if (Test-Path $brokenStage) { Remove-Item -Recurse -Force $brokenStage }
+          Copy-Item $goodStage $brokenStage -Recurse
+          Remove-Item (Join-Path $brokenStage "Assets\Square44x44Logo.png") -ErrorAction Stop
+
           $brokenMsix = Join-Path $env:RUNNER_TEMP "forskscope-broken-$env:TAG.msix"
-          Copy-Item "$env:GOOD_MSIX" $brokenMsix -Force
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $zip = [System.IO.Compression.ZipFile]::Open($brokenMsix, [System.IO.Compression.ZipArchiveMode]::Update)
-          try {
-            $entry = $zip.GetEntry("Assets/Square44x44Logo.png")
-            if (-not $entry) { throw "Assets/Square44x44Logo.png not found in the built MSIX - cannot stage this guard" }
-            $entry.Delete()
-          } finally {
-            $zip.Dispose()
-          }
+          & $MakeAppx.FullName pack /d $brokenStage /p $brokenMsix /nv /overwrite
+          if ($LASTEXITCODE -ne 0) { throw "makeappx pack (/nv) failed" }
 
           $script = Join-Path $env:RUNNER_TEMP "scripts-under-test/store-validate.ps1"
           $output = & pwsh -NoProfile -File $script -MsixPath $brokenMsix -Tag "$env:TAG" -SkipInstall 2>&1 | Out-String
