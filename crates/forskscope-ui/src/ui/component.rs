@@ -4,3 +4,4 @@
 //! plus one overlay. Components here must not import from `crate::state`.
 
 pub mod notice;
+pub mod select_field;

@@ -8,6 +8,7 @@ use crate::i18n::t;
 use crate::state::{
     Lang, Modal, Store, change_diff_options, change_encoding, reload_tab, swap_sides,
 };
+use crate::ui::component::select_field::{SelectField, SelectOption};
 use crate::ui::view::diff_actions::{algo_val, export_patch, save_tab};
 use crate::ui::view::search::SearchCtx;
 
@@ -165,12 +166,17 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     },
                     {format!("{}: {}", t(lang, "Ignore case"), t(lang, if snap.ignore_case { "on" } else { "off" }))}
                 }
-                select {
+                SelectField {
                     title: t(lang, "Diff algorithm"),
-                    value: algo_val(snap.algorithm),
-                    onchange: move |e| {
+                    value: algo_val(snap.algorithm).to_string(),
+                    options: vec![
+                        SelectOption::new("myers", "Myers"),
+                        SelectOption::new("patience", "Patience"),
+                        SelectOption::new("histogram", "Histogram"),
+                    ],
+                    onchange: move |v: String| {
                         use forskscope_core::DiffAlgorithm;
-                        let algorithm = match e.value().as_str() {
+                        let algorithm = match v.as_str() {
                             "patience"  => DiffAlgorithm::Patience,
                             "histogram" => DiffAlgorithm::Histogram,
                             _           => DiffAlgorithm::Myers,
@@ -184,9 +190,6 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                             change_diff_options(&mut store, index, next);
                         }
                     },
-                    option { value: "myers",     "Myers"     }
-                    option { value: "patience",  "Patience"  }
-                    option { value: "histogram", "Histogram" }
                 }
                 button {
                     title: t(lang, "Export unified-diff patch file"),
@@ -195,21 +198,33 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     {t(lang, "Export patch")}
                 }
                 if snap.right_is_text {
-                    select {
-                        title: t(lang, "Encoding — re-decode if this looks wrong"),
-                        aria_label: t(lang, "Right-side text encoding"),
-                        value: "{snap.right_encoding_label}",
-                        onchange: move |e| change_encoding(&mut store, index, e.value()),
+                    {
                         // The current label may not be one of the curated
                         // options (e.g. an unusual chardetng guess) — an
-                        // extra selected option keeps the control showing
-                        // the true current state rather than silently
-                        // snapping to the list's first entry.
+                        // extra option, passed through SelectField like any
+                        // other, keeps the control showing the true current
+                        // state rather than silently snapping to the list's
+                        // first entry.
+                        let mut options: Vec<SelectOption> = Vec::new();
                         if !forskscope_core::COMMON_ENCODING_LABELS.contains(&snap.right_encoding_label.as_str()) {
-                            option { value: "{snap.right_encoding_label}", selected: true, "{snap.right_encoding_label}" }
+                            options.push(SelectOption::new(
+                                snap.right_encoding_label.clone(),
+                                snap.right_encoding_label.clone(),
+                            ));
                         }
-                        for label in forskscope_core::COMMON_ENCODING_LABELS {
-                            option { value: "{label}", "{label}" }
+                        options.extend(
+                            forskscope_core::COMMON_ENCODING_LABELS
+                                .iter()
+                                .map(|label| SelectOption::new(*label, *label)),
+                        );
+                        rsx! {
+                            SelectField {
+                                title: t(lang, "Encoding — re-decode if this looks wrong"),
+                                aria_label: t(lang, "Right-side text encoding"),
+                                value: snap.right_encoding_label.clone(),
+                                options,
+                                onchange: move |v: String| change_encoding(&mut store, index, v),
+                            }
                         }
                     }
                 }

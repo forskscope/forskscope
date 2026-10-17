@@ -8,6 +8,7 @@ use forskscope_core::diff::InlineMode;
 
 use crate::i18n::t;
 use crate::state::Store;
+use crate::ui::component::select_field::{SelectField, SelectOption};
 
 /// Inline form for adding a new compare profile (revealed on demand, RFC-057).
 ///
@@ -60,17 +61,29 @@ pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
                     onchange: move |e| ignore_newlines.set(e.checked()) }
                 span { {t(lang, "Ignore line-ending differences (CRLF/LF)")} }
             }
-            select {
-                onchange: move |e| {
-                    algorithm.set(match e.value().as_str() {
-                        "patience"  => crate::state::DiffAlgorithmSetting::Patience,
-                        "histogram" => crate::state::DiffAlgorithmSetting::Histogram,
-                        _           => crate::state::DiffAlgorithmSetting::Myers,
-                    });
-                },
-                option { value: "myers",     "Myers"     }
-                option { value: "patience",  "Patience"  }
-                option { value: "histogram", "Histogram" }
+            {
+                let algo_value = match *algorithm.read() {
+                    crate::state::DiffAlgorithmSetting::Patience  => "patience",
+                    crate::state::DiffAlgorithmSetting::Histogram => "histogram",
+                    _                                              => "myers",
+                };
+                rsx! {
+                    SelectField {
+                        value: algo_value.to_string(),
+                        options: vec![
+                            SelectOption::new("myers", "Myers"),
+                            SelectOption::new("patience", "Patience"),
+                            SelectOption::new("histogram", "Histogram"),
+                        ],
+                        onchange: move |v: String| {
+                            algorithm.set(match v.as_str() {
+                                "patience"  => crate::state::DiffAlgorithmSetting::Patience,
+                                "histogram" => crate::state::DiffAlgorithmSetting::Histogram,
+                                _           => crate::state::DiffAlgorithmSetting::Myers,
+                            });
+                        },
+                    }
+                }
             }
             button {
                 class: "more-options-toggle",
@@ -81,21 +94,30 @@ pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
             if *more_options.read() {
                 div { class: "add-profile-more-options",
                     label { r#for: "profile-inline-mode", {t(lang, "Character-level highlighting")} }
-                    select {
-                        id: "profile-inline-mode",
-                        onchange: move |e| {
-                            inline_mode.set(match e.value().as_str() {
-                                "eager" => InlineMode::EagerForSmallHunks,
-                                "never" => InlineMode::None,
-                                _       => InlineMode::Lazy,
-                            });
-                        },
-                        option { value: "lazy",  selected: *inline_mode.read() == InlineMode::Lazy,
-                            {t(lang, "When I turn it on")} }
-                        option { value: "eager", selected: *inline_mode.read() == InlineMode::EagerForSmallHunks,
-                            {t(lang, "Automatically for small changes")} }
-                        option { value: "never", selected: *inline_mode.read() == InlineMode::None,
-                            {t(lang, "Never")} }
+                    {
+                        let inline_value = match *inline_mode.read() {
+                            InlineMode::EagerForSmallHunks => "eager",
+                            InlineMode::None               => "never",
+                            InlineMode::Lazy               => "lazy",
+                        };
+                        rsx! {
+                            SelectField {
+                                id: "profile-inline-mode".to_string(),
+                                value: inline_value.to_string(),
+                                options: vec![
+                                    SelectOption::new("lazy", t(lang, "When I turn it on")),
+                                    SelectOption::new("eager", t(lang, "Automatically for small changes")),
+                                    SelectOption::new("never", t(lang, "Never")),
+                                ],
+                                onchange: move |v: String| {
+                                    inline_mode.set(match v.as_str() {
+                                        "eager" => InlineMode::EagerForSmallHunks,
+                                        "never" => InlineMode::None,
+                                        _       => InlineMode::Lazy,
+                                    });
+                                },
+                            }
+                        }
                     }
                 }
             }

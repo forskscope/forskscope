@@ -8,6 +8,7 @@ use super::profile::AddProfileInline;
 use super::{lf, lv, tf, tv};
 use crate::i18n::t;
 use crate::state::{Modal, Store};
+use crate::ui::component::select_field::{SelectField, SelectOption};
 
 /// F136: starts (or restarts) the rest for one ignore-pattern field. `draft`
 /// is set immediately, so the input stays responsive to every keystroke;
@@ -103,54 +104,44 @@ pub fn SettingsModal() -> Element {
                 // ── Appearance ────────────────────────────────────────────────
                 div { class: "field",
                     span { {t(lang, "Theme")} }
-                    select {
-                        value: tv(cur.theme),
-                        onchange: move |e| {
-                            store.settings.write().theme = tf(&e.value());
+                    SelectField {
+                        value: tv(cur.theme).to_string(),
+                        options: theme_choices().into_iter()
+                            .map(|c| SelectOption::new(c.value, c.label))
+                            .collect::<Vec<_>>(),
+                        onchange: move |v: String| {
+                            store.settings.write().theme = tf(&v);
                             super::persist(store);
                         },
-                        for choice in theme_choices() {
-                            option {
-                                value: choice.value,
-                                selected: choice.value == tv(cur.theme),
-                                {choice.label}
-                            }
-                        }
                     }
                 }
                 div { class: "field",
                     span { {t(lang, "Colour vision")} }
-                    {
-                        let cv = cur.colour_vision.as_str();
-                        rsx! {
-                            select {
-                                value: cv,
-                                onchange: move |e| {
-                                    store.settings.write().colour_vision =
-                                        crate::state::ColourVision::from_id(&e.value()).unwrap_or_default();
-                                    super::persist(store);
-                                },
-                                option { value: "standard", selected: cv == "standard", {t(lang, "Standard")} }
-                                option { value: "red-green-safe", selected: cv == "red-green-safe", {t(lang, "Red–green safe (blue and orange)")} }
-                            }
-                        }
+                    SelectField {
+                        value: cur.colour_vision.as_str().to_string(),
+                        options: vec![
+                            SelectOption::new("standard", t(lang, "Standard")),
+                            SelectOption::new("red-green-safe", t(lang, "Red–green safe (blue and orange)")),
+                        ],
+                        onchange: move |v: String| {
+                            store.settings.write().colour_vision =
+                                crate::state::ColourVision::from_id(&v).unwrap_or_default();
+                            super::persist(store);
+                        },
                     }
                 }
                 div { class: "field",
                     span { {t(lang, "Language")} }
-                    {
-                        let lang_value = lv(cur.language);
-                        rsx! {
-                            select {
-                                value: lang_value,
-                                onchange: move |e| {
-                                    store.settings.write().language = lf(&e.value());
-                                    super::persist(store);
-                                },
-                                option { value: "en", selected: lang_value == "en", "English" }
-                                option { value: "ja", selected: lang_value == "ja", "日本語" }
-                            }
-                        }
+                    SelectField {
+                        value: lv(cur.language).to_string(),
+                        options: vec![
+                            SelectOption::new("en", "English"),
+                            SelectOption::new("ja", "日本語"),
+                        ],
+                        onchange: move |v: String| {
+                            store.settings.write().language = lf(&v);
+                            super::persist(store);
+                        },
                     }
                 }
                 div { class: "field",
@@ -177,11 +168,18 @@ pub fn SettingsModal() -> Element {
                             crate::state::DiffFontFamily::Consolas   => "consolas",
                         };
                         rsx! {
-                            select {
-                                value: ff_value,
-                                onchange: move |e| {
+                            SelectField {
+                                value: ff_value.to_string(),
+                                options: vec![
+                                    SelectOption::new("monospace", t(lang, "Monospace (default)")),
+                                    SelectOption::new("sans-serif", t(lang, "Sans-serif")),
+                                    SelectOption::new("serif", t(lang, "Serif")),
+                                    SelectOption::new("courier-new", "Courier New"),
+                                    SelectOption::new("consolas", "Consolas / Menlo"),
+                                ],
+                                onchange: move |v: String| {
                                     use crate::state::DiffFontFamily;
-                                    let ff = match e.value().as_str() {
+                                    let ff = match v.as_str() {
                                         "sans-serif"  => DiffFontFamily::SansSerif,
                                         "serif"       => DiffFontFamily::Serif,
                                         "courier-new" => DiffFontFamily::CourierNew,
@@ -191,11 +189,6 @@ pub fn SettingsModal() -> Element {
                                     store.settings.write().diff_font_family = ff;
                                     super::persist(store);
                                 },
-                                option { value: "monospace",   selected: ff_value == "monospace",   {t(lang, "Monospace (default)")} }
-                                option { value: "sans-serif",  selected: ff_value == "sans-serif",  {t(lang, "Sans-serif")} }
-                                option { value: "serif",       selected: ff_value == "serif",       {t(lang, "Serif")} }
-                                option { value: "courier-new", selected: ff_value == "courier-new", "Courier New" }
-                                option { value: "consolas",    selected: ff_value == "consolas",    "Consolas / Menlo" }
                             }
                         }
                     }
@@ -227,14 +220,16 @@ pub fn SettingsModal() -> Element {
                         {
                             let layout_value = if cur.explorer_compact { "compact" } else { "aligned" };
                             rsx! {
-                                select {
-                                    value: layout_value,
-                                    onchange: move |e| {
-                                        store.settings.write().explorer_compact = e.value() == "compact";
+                                SelectField {
+                                    value: layout_value.to_string(),
+                                    options: vec![
+                                        SelectOption::new("aligned", t(lang, "Aligned")),
+                                        SelectOption::new("compact", t(lang, "Compact (no spacer rows, default)")),
+                                    ],
+                                    onchange: move |v: String| {
+                                        store.settings.write().explorer_compact = v == "compact";
                                         super::persist(store);
                                     },
-                                    option { value: "aligned", selected: layout_value == "aligned", {t(lang, "Aligned")} }
-                                    option { value: "compact", selected: layout_value == "compact", {t(lang, "Compact (no spacer rows, default)")} }
                                 }
                             }
                         }
@@ -266,18 +261,20 @@ pub fn SettingsModal() -> Element {
                         {
                             let context_lines = cur.context_lines;
                             rsx! {
-                                select {
-                                    value: "{context_lines}",
-                                    onchange: move |e| {
-                                        if let Ok(n) = e.value().parse::<usize>() {
+                                SelectField {
+                                    value: context_lines.to_string(),
+                                    options: vec![
+                                        SelectOption::new("0", t(lang, "0 (show all)")),
+                                        SelectOption::new("3", t(lang, "3 (default)")),
+                                        SelectOption::new("5", "5"),
+                                        SelectOption::new("10", "10"),
+                                    ],
+                                    onchange: move |v: String| {
+                                        if let Ok(n) = v.parse::<usize>() {
                                             store.settings.write().context_lines = n;
                                             super::persist(store);
                                         }
                                     },
-                                    option { value: "0",  selected: context_lines == 0,  {t(lang, "0 (show all)")} }
-                                    option { value: "3",  selected: context_lines == 3,  {t(lang, "3 (default)")} }
-                                    option { value: "5",  selected: context_lines == 5,  "5"  }
-                                    option { value: "10", selected: context_lines == 10, "10" }
                                 }
                             }
                         }
