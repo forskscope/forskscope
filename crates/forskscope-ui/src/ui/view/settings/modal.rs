@@ -110,33 +110,47 @@ pub fn SettingsModal() -> Element {
                             super::persist(store);
                         },
                         for choice in theme_choices() {
-                            option { value: choice.value, {choice.label} }
+                            option {
+                                value: choice.value,
+                                selected: choice.value == tv(cur.theme),
+                                {choice.label}
+                            }
                         }
                     }
                 }
                 div { class: "field",
                     span { {t(lang, "Colour vision")} }
-                    select {
-                        value: cur.colour_vision.as_str(),
-                        onchange: move |e| {
-                            store.settings.write().colour_vision =
-                                crate::state::ColourVision::from_id(&e.value()).unwrap_or_default();
-                            super::persist(store);
-                        },
-                        option { value: "standard", {t(lang, "Standard")} }
-                        option { value: "red-green-safe", {t(lang, "Red–green safe (blue and orange)")} }
+                    {
+                        let cv = cur.colour_vision.as_str();
+                        rsx! {
+                            select {
+                                value: cv,
+                                onchange: move |e| {
+                                    store.settings.write().colour_vision =
+                                        crate::state::ColourVision::from_id(&e.value()).unwrap_or_default();
+                                    super::persist(store);
+                                },
+                                option { value: "standard", selected: cv == "standard", {t(lang, "Standard")} }
+                                option { value: "red-green-safe", selected: cv == "red-green-safe", {t(lang, "Red–green safe (blue and orange)")} }
+                            }
+                        }
                     }
                 }
                 div { class: "field",
                     span { {t(lang, "Language")} }
-                    select {
-                        value: lv(cur.language),
-                        onchange: move |e| {
-                            store.settings.write().language = lf(&e.value());
-                            super::persist(store);
-                        },
-                        option { value: "en", "English" }
-                        option { value: "ja", "日本語"   }
+                    {
+                        let lang_value = lv(cur.language);
+                        rsx! {
+                            select {
+                                value: lang_value,
+                                onchange: move |e| {
+                                    store.settings.write().language = lf(&e.value());
+                                    super::persist(store);
+                                },
+                                option { value: "en", selected: lang_value == "en", "English" }
+                                option { value: "ja", selected: lang_value == "ja", "日本語" }
+                            }
+                        }
                     }
                 }
                 div { class: "field",
@@ -154,31 +168,36 @@ pub fn SettingsModal() -> Element {
                 }
                 div { class: "field",
                     span { {t(lang, "Diff font family")} }
-                    select {
-                        value: match cur.diff_font_family {
+                    {
+                        let ff_value = match cur.diff_font_family {
                             crate::state::DiffFontFamily::Monospace  => "monospace",
                             crate::state::DiffFontFamily::SansSerif  => "sans-serif",
                             crate::state::DiffFontFamily::Serif      => "serif",
                             crate::state::DiffFontFamily::CourierNew => "courier-new",
                             crate::state::DiffFontFamily::Consolas   => "consolas",
-                        },
-                        onchange: move |e| {
-                            use crate::state::DiffFontFamily;
-                            let ff = match e.value().as_str() {
-                                "sans-serif"  => DiffFontFamily::SansSerif,
-                                "serif"       => DiffFontFamily::Serif,
-                                "courier-new" => DiffFontFamily::CourierNew,
-                                "consolas"    => DiffFontFamily::Consolas,
-                                _             => DiffFontFamily::Monospace,
-                            };
-                            store.settings.write().diff_font_family = ff;
-                            super::persist(store);
-                        },
-                        option { value: "monospace",  {t(lang, "Monospace (default)")} }
-                        option { value: "sans-serif",  {t(lang, "Sans-serif")} }
-                        option { value: "serif",       {t(lang, "Serif")} }
-                        option { value: "courier-new", "Courier New" }
-                        option { value: "consolas",    "Consolas / Menlo" }
+                        };
+                        rsx! {
+                            select {
+                                value: ff_value,
+                                onchange: move |e| {
+                                    use crate::state::DiffFontFamily;
+                                    let ff = match e.value().as_str() {
+                                        "sans-serif"  => DiffFontFamily::SansSerif,
+                                        "serif"       => DiffFontFamily::Serif,
+                                        "courier-new" => DiffFontFamily::CourierNew,
+                                        "consolas"    => DiffFontFamily::Consolas,
+                                        _             => DiffFontFamily::Monospace,
+                                    };
+                                    store.settings.write().diff_font_family = ff;
+                                    super::persist(store);
+                                },
+                                option { value: "monospace",   selected: ff_value == "monospace",   {t(lang, "Monospace (default)")} }
+                                option { value: "sans-serif",  selected: ff_value == "sans-serif",  {t(lang, "Sans-serif")} }
+                                option { value: "serif",       selected: ff_value == "serif",       {t(lang, "Serif")} }
+                                option { value: "courier-new", selected: ff_value == "courier-new", "Courier New" }
+                                option { value: "consolas",    selected: ff_value == "consolas",    "Consolas / Menlo" }
+                            }
+                        }
                     }
                 }
 
@@ -205,14 +224,19 @@ pub fn SettingsModal() -> Element {
                     }
                     div { class: "field",
                         span { {t(lang, "Explorer layout")} }
-                        select {
-                            value: if cur.explorer_compact { "compact" } else { "aligned" },
-                            onchange: move |e| {
-                                store.settings.write().explorer_compact = e.value() == "compact";
-                                super::persist(store);
-                            },
-                            option { value: "aligned", {t(lang, "Aligned")} }
-                            option { value: "compact", {t(lang, "Compact (no spacer rows, default)")} }
+                        {
+                            let layout_value = if cur.explorer_compact { "compact" } else { "aligned" };
+                            rsx! {
+                                select {
+                                    value: layout_value,
+                                    onchange: move |e| {
+                                        store.settings.write().explorer_compact = e.value() == "compact";
+                                        super::persist(store);
+                                    },
+                                    option { value: "aligned", selected: layout_value == "aligned", {t(lang, "Aligned")} }
+                                    option { value: "compact", selected: layout_value == "compact", {t(lang, "Compact (no spacer rows, default)")} }
+                                }
+                            }
                         }
                     }
                     div { class: "field",
@@ -239,18 +263,23 @@ pub fn SettingsModal() -> Element {
                     }
                     div { class: "field",
                         span { {t(lang, "Context lines")} }
-                        select {
-                            value: "{cur.context_lines}",
-                            onchange: move |e| {
-                                if let Ok(n) = e.value().parse::<usize>() {
-                                    store.settings.write().context_lines = n;
-                                    super::persist(store);
+                        {
+                            let context_lines = cur.context_lines;
+                            rsx! {
+                                select {
+                                    value: "{context_lines}",
+                                    onchange: move |e| {
+                                        if let Ok(n) = e.value().parse::<usize>() {
+                                            store.settings.write().context_lines = n;
+                                            super::persist(store);
+                                        }
+                                    },
+                                    option { value: "0",  selected: context_lines == 0,  {t(lang, "0 (show all)")} }
+                                    option { value: "3",  selected: context_lines == 3,  {t(lang, "3 (default)")} }
+                                    option { value: "5",  selected: context_lines == 5,  "5"  }
+                                    option { value: "10", selected: context_lines == 10, "10" }
                                 }
-                            },
-                            option { value: "0",  {t(lang, "0 (show all)")} }
-                            option { value: "3",  {t(lang, "3 (default)")} }
-                            option { value: "5",  "5"  }
-                            option { value: "10", "10" }
+                            }
                         }
                     }
 
