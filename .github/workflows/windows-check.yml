@@ -189,3 +189,58 @@ jobs:
             exit 1
           }
           Write-Host "All imports are on the allow-list; no VCRUNTIME*/MSVCP* present."
+
+  # TEMPORARY (review 169 §1 item 6): measures where WebView2 actually
+  # writes its cache on a real Windows runner, which review 167's own
+  # verification claimed but never showed. Reverted once this is captured.
+  webview2-cache-location:
+    name: TEMP - WebView2 cache location (review 169)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: windows-check-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release binary
+        run: cargo build --release --locked -p forskscope-ui
+
+      - name: Run the real app under --data-dir, then list where WebView2 wrote
+        shell: pwsh
+        run: |
+          $dataDir = Join-Path $env:RUNNER_TEMP "forskscope-webview2-cache-test"
+          New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
+
+          $proc = Start-Process -FilePath "./target/release/forskscope.exe" -ArgumentList "--data-dir", "`"$dataDir`"" -PassThru
+          Start-Sleep -Seconds 10
+          if (-not $proc.HasExited) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          } else {
+            Write-Host "process exited on its own (exit code $($proc.ExitCode)) before the timeout"
+          }
+          Start-Sleep -Seconds 2
+
+          Write-Host "--- $dataDir (the --data-dir folder) ---"
+          Get-ChildItem -Recurse $dataDir | ForEach-Object { Write-Host $_.FullName }
+
+          Write-Host "--- %LOCALAPPDATA%\forskscope ---"
+          $localAppData = Join-Path $env:LOCALAPPDATA "forskscope"
+          if (Test-Path $localAppData) {
+            Get-ChildItem -Recurse $localAppData | ForEach-Object { Write-Host $_.FullName }
+          } else {
+            Write-Host "does not exist"
+          }
+
+          Write-Host "--- %APPDATA%\forskscope ---"
+          $roamingAppData = Join-Path $env:APPDATA "forskscope"
+          if (Test-Path $roamingAppData) {
+            Get-ChildItem -Recurse $roamingAppData | ForEach-Object { Write-Host $_.FullName }
+          } else {
+            Write-Host "does not exist"
+          }
