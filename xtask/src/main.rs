@@ -207,6 +207,7 @@ fn run_audit_deps() {
     // exception at all.
     assert_no_direct_zip_dependency();
     report_if_zip_resolves_fixed();
+    assert_xtask_zip_dependent_is_rust_xlsxwriter();
     println!(
         "security dependency path check passed: sensitive dependencies are reached only \
          through their reviewed paths. This checks dependency shape, not advisories — it does \
@@ -277,6 +278,53 @@ fn report_if_zip_resolves_fixed() {
              written against zip 8.6.0 and should be reconsidered now."
         );
     }
+}
+
+/// F204 (review 170 §4): `.cargo/audit.toml`'s zip ignore was reviewed for
+/// two reached-only-through-safe-usage paths, not one — xtask's own
+/// `rust_xlsxwriter` dependency (the `.xlsx` fixture generator) pulls in
+/// the same vulnerable zip 8.6.0, through a lockfile the main workspace's
+/// `assert_immediate_dependents("zip", ...)` above never sees (xtask is a
+/// separate workspace, run from the repo root this check is already in).
+/// `rust_xlsxwriter` only writes archives and never calls
+/// `extract`/`ZipStreamReader` (checked directly, 0.99.0, the same way
+/// calamine's usage was). Falsify by adding a second crate to
+/// `xtask/Cargo.toml` that also depends on zip.
+fn assert_xtask_zip_dependent_is_rust_xlsxwriter() {
+    let output = Command::new("cargo")
+        .args(["tree", "--prefix", "depth", "-i", "zip", "--target", "all"])
+        .current_dir(workspace_root().join("xtask"))
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run cargo tree in xtask: {e}"));
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("did not match any packages") {
+            println!("zip is absent from xtask's dependency graph.");
+            return;
+        }
+        eprintln!("could not inspect zip's dependency path in xtask");
+        eprintln!("{stderr}");
+        process::exit(1);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let immediate_dependents: Vec<&str> = stdout
+        .lines()
+        .filter_map(depth_prefixed_package)
+        .filter_map(|(depth, package)| (depth == 1).then_some(package))
+        .collect();
+
+    if immediate_dependents.is_empty()
+        || immediate_dependents
+            .iter()
+            .any(|package| !package.starts_with("rust_xlsxwriter "))
+    {
+        eprintln!("xtask's zip has an unreviewed immediate dependency path:");
+        eprintln!("{stdout}");
+        process::exit(1);
+    }
+    println!("xtask's zip path is limited to rust_xlsxwriter.");
 }
 
 /// F142: the versions `docs/src/maintainers/threat-model.md` quotes for the

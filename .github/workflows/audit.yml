@@ -66,10 +66,12 @@ on:
     branches: [main, master]
     paths:
       - 'Cargo.lock'
+      - 'xtask/Cargo.lock'
       - '**/Cargo.toml'
   pull_request:
     paths:
       - 'Cargo.lock'
+      - 'xtask/Cargo.lock'
       - '**/Cargo.toml'
 
 env:
@@ -97,6 +99,16 @@ jobs:
 
       - name: cargo audit
         run: cargo audit
+
+      # F204: xtask is a separate workspace with its own Cargo.lock,
+      # invisible to the `cargo audit` run above (which reads Cargo.lock in
+      # the directory it runs in). `cargo audit` still reads
+      # .cargo/audit.toml from the directory it runs in regardless of
+      # which lockfile it's pointed at, so this reuses the same ignore
+      # list — found live (review 170 §4): `cargo audit --file
+      # xtask/Cargo.lock`, run at the repo root, already passes today.
+      - name: cargo audit (xtask's own lockfile)
+        run: cargo audit --file xtask/Cargo.lock
 
   # F147 (handoff 061): a drift between the AUR's published version and the
   # latest GitHub release is not tied to any one push or PR - it is what

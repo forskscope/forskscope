@@ -108,6 +108,12 @@ jobs:
       - name: Security advisory audit
         run: cargo audit
 
+      # F204: xtask is a separate workspace with its own lockfile, not
+      # covered by the run above - see audit.yml's matching step for why
+      # the same .cargo/audit.toml ignore list still applies.
+      - name: Security advisory audit (xtask's own lockfile)
+        run: cargo audit --file xtask/Cargo.lock
+
       - name: Security dependency path check
         run: cargo xtask audit-deps
 

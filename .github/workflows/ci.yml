@@ -88,6 +88,13 @@ jobs:
       - name: cargo fmt (xtask)
         run: cargo fmt --manifest-path xtask/Cargo.toml --check
 
+      # F204: xtask is not a workspace member (see the comment above), so
+      # none of the `cargo clippy --workspace` runs below ever see it
+      # either — it was red at 129dc67 (too_many_arguments in
+      # colour_vision.rs) with nothing here to catch it.
+      - name: cargo clippy (xtask)
+        run: cargo clippy --manifest-path xtask/Cargo.toml -- -D warnings
+
       - name: CSS generated artifact check
         run: cargo xtask css --check
 

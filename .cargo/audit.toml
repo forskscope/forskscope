@@ -11,20 +11,30 @@
 # was never meant to.
 #
 # RUSTSEC-2026-0367/-0368/-0369 (zip 8.6.0, fixed in >= 9.0.0, reviewed
-# 2026-10-17 against zip 8.6.0 and calamine 0.36.1, the versions resolved at
-# review time): all three concern `ZipArchive::extract`/
-# `ZipStreamReader::extract` writing an archive's entries to disk - symlink
-# targets and Unix permissions/SUID bits an attacker's archive controls,
-# landing outside the destination directory. zip reaches this workspace only
+# 2026-10-17 against zip 8.6.0, calamine 0.36.1 and rust_xlsxwriter 0.99.0,
+# the versions resolved at review time): all three concern
+# `ZipArchive::extract`/`ZipStreamReader::extract` writing an archive's
+# entries to disk - symlink targets and Unix permissions/SUID bits an
+# attacker's archive controls, landing outside the destination directory.
+# This ignore list applies to two separate lockfiles, each read against it
+# on its own `cargo audit` run (`cargo audit --file xtask/Cargo.lock` reads
+# this same file from the directory it runs in, regardless of which
+# lockfile it's pointed at): the main workspace's, where zip reaches it only
 # through calamine (`cargo tree -i zip`: calamine is its sole immediate
 # dependent), which reads a workbook's parts in memory via `ZipArchive` and
 # never calls `extract` or `ZipStreamReader` anywhere in its source (checked
-# directly, calamine 0.36.1). calamine 0.36.1 is its latest release and
-# requires zip 8.x, so there is no upgrade path today. `cargo xtask
-# audit-deps` enforces the shape this exception depends on: zip's only
-# immediate dependent stays calamine, no workspace crate or xtask names zip
-# as a direct dependency, and it reports (without failing) once zip resolves
-# to >= 9 via calamine, which is this exception's removal trigger.
+# directly, calamine 0.36.1); and xtask's own, a separate workspace, where
+# zip reaches it only through `rust_xlsxwriter` (the `.xlsx` fixture
+# generator), which only writes archives and never calls
+# `extract`/`ZipStreamReader` either (checked directly, rust_xlsxwriter
+# 0.99.0). Neither calamine 0.36.1 nor rust_xlsxwriter 0.99.0 has a newer
+# release that moves off zip 8.x, so there is no upgrade path today on
+# either side. `cargo xtask audit-deps` enforces the shape this exception
+# depends on, for both lockfiles: zip's only immediate dependent in each
+# stays calamine (main workspace) or rust_xlsxwriter (xtask), no workspace
+# crate or xtask names zip as a direct dependency, and it reports (without
+# failing) once zip resolves to >= 9 via calamine, which is this
+# exception's removal trigger for the main workspace side.
 ignore = [
     "RUSTSEC-2026-0194",
     "RUSTSEC-2026-0195",

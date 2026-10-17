@@ -275,10 +275,20 @@ const REP_DELTA_E_MIN_STANDARD: f64 = 15.0;
 const TEXT_CONTRAST_MIN: f64 = 4.5;
 const MARK_CONTRAST_MIN: f64 = 3.0;
 
+/// Which theme/palette combination a [`check_delta_e`]/[`check_contrast`]
+/// call belongs to — bundled so neither function's own argument count grows
+/// with how many ways a problem can be labelled (clippy's `too_many_arguments`,
+/// F204): both already needed `theme` and `palette` on every call, so this
+/// is the pair that was always travelling together, not a grouping invented
+/// to dodge the lint.
+struct PaletteContext<'a> {
+    theme: &'a str,
+    palette: &'a str,
+}
+
 fn check_delta_e(
     problems: &mut Vec<String>,
-    theme: &str,
-    palette: &str,
+    ctx: &PaletteContext,
     label: &str,
     hex1: &str,
     hex2: &str,
@@ -288,8 +298,10 @@ fn check_delta_e(
     let de = simulated_delta_e(hex1, hex2, sim);
     if de < min {
         problems.push(format!(
-            "{theme}/{palette}: {label} pair ({hex1} vs {hex2}) under {} has ΔE {de:.1}, \
+            "{}/{}: {label} pair ({hex1} vs {hex2}) under {} has ΔE {de:.1}, \
              below the required {min:.1}",
+            ctx.theme,
+            ctx.palette,
             sim.label(),
         ));
     }
@@ -297,8 +309,7 @@ fn check_delta_e(
 
 fn check_contrast(
     problems: &mut Vec<String>,
-    theme: &str,
-    palette: &str,
+    ctx: &PaletteContext,
     fg_label: &str,
     fg: &str,
     bg_label: &str,
@@ -308,8 +319,9 @@ fn check_contrast(
     let ratio = contrast_ratio(fg, bg);
     if ratio < min {
         problems.push(format!(
-            "{theme}/{palette}: {fg_label} {fg} on {bg_label} {bg} has contrast {ratio:.1}, \
-             below the required {min:.1}"
+            "{}/{}: {fg_label} {fg} on {bg_label} {bg} has contrast {ratio:.1}, \
+             below the required {min:.1}",
+            ctx.theme, ctx.palette
         ));
     }
 }
@@ -346,12 +358,12 @@ pub fn run(root: &Path) {
             } else {
                 REP_DELTA_E_MIN_STANDARD
             };
+            let ctx = PaletteContext { theme, palette };
 
             for &sim in sims {
                 check_delta_e(
                     &mut problems,
-                    theme,
-                    palette,
+                    &ctx,
                     "background",
                     &del_bg,
                     &ins_bg,
@@ -360,8 +372,7 @@ pub fn run(root: &Path) {
                 );
                 check_delta_e(
                     &mut problems,
-                    theme,
-                    palette,
+                    &ctx,
                     "mark",
                     &del_mark,
                     &ins_mark,
@@ -370,8 +381,7 @@ pub fn run(root: &Path) {
                 );
                 check_delta_e(
                     &mut problems,
-                    theme,
-                    palette,
+                    &ctx,
                     "replaced-removed",
                     &rep_bg,
                     &del_bg,
@@ -380,8 +390,7 @@ pub fn run(root: &Path) {
                 );
                 check_delta_e(
                     &mut problems,
-                    theme,
-                    palette,
+                    &ctx,
                     "replaced-added",
                     &rep_bg,
                     &ins_bg,
@@ -392,8 +401,7 @@ pub fn run(root: &Path) {
 
             check_contrast(
                 &mut problems,
-                theme,
-                palette,
+                &ctx,
                 "text",
                 &text,
                 "del-bg",
@@ -402,8 +410,7 @@ pub fn run(root: &Path) {
             );
             check_contrast(
                 &mut problems,
-                theme,
-                palette,
+                &ctx,
                 "text",
                 &text,
                 "ins-bg",
@@ -412,8 +419,7 @@ pub fn run(root: &Path) {
             );
             check_contrast(
                 &mut problems,
-                theme,
-                palette,
+                &ctx,
                 "text",
                 &text,
                 "rep-bg",
@@ -422,8 +428,7 @@ pub fn run(root: &Path) {
             );
             check_contrast(
                 &mut problems,
-                theme,
-                palette,
+                &ctx,
                 "del-mark",
                 &del_mark,
                 "del-bg",
@@ -432,8 +437,7 @@ pub fn run(root: &Path) {
             );
             check_contrast(
                 &mut problems,
-                theme,
-                palette,
+                &ctx,
                 "ins-mark",
                 &ins_mark,
                 "ins-bg",
