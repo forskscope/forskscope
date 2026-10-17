@@ -11,10 +11,13 @@
 # the release gates would have failed before the tag was ever pushed. This
 # script's job is to catch the one case that check cannot: packaging from
 # the wrong commit (F103 - main's post-release bump names the *next*
-# version within minutes of the tag, well before the owner publishes the
-# draft release this workflow triggers on).
+# version within minutes of the tag, well before anyone dispatches
+# store-submit.yml for it).
 #
 # Usage: store-build.ps1 -Tag <released-tag> -OutDir <output-directory>
+# Runs outside CI too: $env:GITHUB_OUTPUT is only written when it is set,
+# and FORSKSCOPE_CHANNEL is restored to whatever it was before this script
+# ran (or removed, if it was unset) once the build finishes.
 
 param(
     [Parameter(Mandatory = $true)][string]$Tag,
@@ -24,6 +27,17 @@ param(
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = git rev-parse --show-toplevel
+
+# ── Refuse unless HEAD is exactly the tag. Stronger than the manifest
+#    check below alone, which a commit between the tag and the post-release
+#    bump would also pass (its manifest still reads the old version). ────
+$CheckedOutTag = git describe --tags --exact-match 2>$null
+if ($LASTEXITCODE -ne 0 -or $CheckedOutTag -ne $Tag) {
+    Write-Host "::error::HEAD is not exactly tag $Tag (git describe --tags --exact-match returned '$CheckedOutTag') - checked out the wrong commit"
+    exit 1
+}
+Write-Host "HEAD is exactly tag $Tag"
+
 $ManifestPath = Join-Path $RepoRoot "packaging/windows/AppxManifest.xml"
 $ExpectedVersion = "$Tag.0"
 
@@ -41,12 +55,21 @@ Write-Host "AppxManifest.xml Version matches the released tag: $ActualVersion"
 # updates button - FORSKSCOPE_CHANNEL tells the About dialog to say so
 # ("Update through the Microsoft Store") instead of linking a GitHub
 # download.
+$PreviousChannel = $env:FORSKSCOPE_CHANNEL
 Push-Location $RepoRoot
 try {
     $env:FORSKSCOPE_CHANNEL = "store"
     cargo build --release --locked -p forskscope-ui
     if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
 } finally {
+    # Restore the caller's shell exactly as found - without this, a later
+    # `cargo build` in the same session (CI or a PC) would keep picking up
+    # FORSKSCOPE_CHANNEL=store.
+    if ($null -eq $PreviousChannel) {
+        Remove-Item Env:FORSKSCOPE_CHANNEL -ErrorAction SilentlyContinue
+    } else {
+        $env:FORSKSCOPE_CHANNEL = $PreviousChannel
+    }
     Pop-Location
 }
 
@@ -76,5 +99,11 @@ $MsixPath = Join-Path $OutDir "forskscope-$Tag.msix"
 & $MakeAppx.FullName pack /d $Stage /p $MsixPath /overwrite
 if ($LASTEXITCODE -ne 0) { throw "makeappx pack failed" }
 
-Write-Host "Built $MsixPath"
-Add-Content -Path $env:GITHUB_OUTPUT -Value "msix_path=$MsixPath"
+# GITHUB_OUTPUT is unset outside CI - writing to it there would error after
+# the MSIX is already built, so only write it when it exists. Either way,
+# the path is always the last line of output, for a human or a workflow
+# step to read.
+if ($env:GITHUB_OUTPUT) {
+    Add-Content -Path $env:GITHUB_OUTPUT -Value "msix_path=$MsixPath"
+}
+Write-Host $MsixPath

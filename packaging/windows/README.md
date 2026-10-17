@@ -1,8 +1,8 @@
 # Windows Packaging — MSIX for the Microsoft Store
 
 **Status: automated, by explicit dispatch, and not currently submitting.**
-`.github/workflows/store-submit.yml` (RFC-079) builds, validates, and submits
-the MSIX when dispatched (`gh workflow run store-submit.yml -f tag=X.Y.Z -f
+`.github/workflows/store-submit.yml` (RFC-079) builds, validates and submits the
+MSIX when dispatched (`gh workflow run store-submit.yml -f tag=X.Y.Z -f
 dry_run=false`).
 
 - It has no `release:` trigger (F147/F158).
@@ -10,153 +10,134 @@ dry_run=false`).
   step, which waits on the owner's account work (F106 (b)).
 - So the Store listing is not updated with each release (F189).
 
-What follows is the manual equivalent — useful for understanding what the workflow does, for
-rehearsing with `workflow_dispatch` + `dry_run: true`, or as a fallback if
-the workflow is broken. **Three of the steps below exist to avoid mistakes
-this file previously invited**, and the workflow avoids the same three by
-construction (`packaging/windows/store-build.ps1` checks out the tag the
-same way "Before you start" says to below, and stages only the four files
-step 2 names — it never packs the whole `packaging/windows/` directory).
+Until then, a Store release is built here and uploaded by hand. The steps below
+use the same scripts the workflow uses.
 
 ---
 
-## Before you start: build from the tag, not from `main`
+## Building and submitting by hand
 
-**`AppxManifest.xml` in the working tree names the *next* version, not the
-released one.** The post-release bump moves it immediately after each cut, so
-between releases it is always one ahead: after `X.Y.0` is released, `main`
-declares `X.Y.1`.
+**You need:**
 
-Packaging from `main` therefore submits a version to the Store that **does not
-exist and was never released**. This is the same structural trap F81 records for
-`PKGBUILD`'s `pkgver`, in the Windows path.
+- Windows 10 or 11, with the Windows SDK (for `makeappx.exe`);
+- Rust (MSVC toolchain), Git, and PowerShell 7;
+- a clean checkout of this repository.
+
+Run everything in **one PowerShell session**, from the repository root.
+
+### 1. Check out the released tag, and name it once
 
 ```powershell
 git fetch --tags
-git checkout 0.170.0          # the tag you are publishing, not main
+$tag = '0.192.0'          # the release you are submitting: the only value you type
+git switch --detach $tag
+$out = Join-Path $env:TEMP "forskscope-store-$tag"
 ```
 
-**Verify before building** — this is the whole point of the step:
+**Why the tag and not `main`.** `AppxManifest.xml` on `main` already names the
+*next* version, because the post-release bump moves it minutes after each cut.
+Packaging from `main` would submit a version that was never released. The build
+script refuses unless the checkout is exactly the tag.
+
+### 2. Build the package
 
 ```powershell
-Select-String -Path packaging\windows\AppxManifest.xml -Pattern 'Version="'
-# must read Version="<tag>.0" — e.g. 0.170.0.0 for tag 0.170.0
+./packaging/windows/store-build.ps1 -Tag $tag -OutDir $out
 ```
 
-If it does not match the tag, stop. Nothing below fixes it.
+It checks that the checkout and `AppxManifest.xml` both match `$tag`, builds the
+same binary the release zip uses, labelled as the Store build so *Check for
+updates* sends users to the Store, and packs exactly four things:
 
-## 1. Build
+- the program;
+- the manifest;
+- the `Assets\` images;
+- nothing else.
+
+It prints the package's path last: `$out\forskscope-$tag.msix`.
+
+### 3. Check the package
 
 ```powershell
-cargo build --release --locked -p forskscope-ui
+./packaging/windows/store-validate.ps1 -MsixPath "$out\forskscope-$tag.msix" -Tag $tag -SkipInstall
 ```
 
-`--locked` so the build cannot silently resolve different dependencies than the
-release did.
+It checks that the package:
 
-## 2. Stage the package contents
+- has the right version;
+- has ForskScope's registered Store identity;
+- contains every file the manifest names.
 
-**Do not copy the executable into `packaging\windows\`.** `makeappx pack /d`
-packs *everything* in the directory it is given, so doing that ships this README
-and `build-zip.sh` inside the product — and leaves an untracked binary in a
-tracked directory (`packaging/windows/forskscope.exe` is not in `.gitignore`).
+It needs no administrator rights and changes nothing on your PC. It clears its
+own working folder **before** it unpacks, so a file left from an earlier run
+cannot hide a missing one.
 
-Stage instead:
+**The install-and-launch check runs only in CI.** It would enable sideloading
+for the whole machine, add a certificate to the machine store, and uninstall any
+installed ForskScope, so the script refuses to run it on a PC unless you pass
+`-AllowMachineChanges` deliberately.
+
+### 4. Upload in Partner Center
+
+Upload `$out\forskscope-$tag.msix` to the app's submission page, and submit.
+
+- **Signing is not part of this.** The package's `Publisher` is a
+  Store-assigned identity, and Microsoft signs the package itself (RFC-079 §2a).
+- **If the workflow created a pending submission, do not edit it here.**
+  Delete it first. A submission the API created can no longer be changed
+  through the API once Partner Center edits it (`release.md`, *Do not open an
+  automated submission in Partner Center*).
+
+### 5. Clean up, and return to `main`
+
+Once the upload is accepted:
 
 ```powershell
-$stage = "$env:TEMP\forskscope-msix"
-Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Path $stage | Out-Null
-
-Copy-Item target\release\forskscope.exe        $stage\
-Copy-Item packaging\windows\AppxManifest.xml   $stage\
-Copy-Item packaging\windows\Assets             $stage\ -Recurse
+git switch main
+Remove-Item -Recurse -Force $out
 ```
 
-Exactly four things belong in the package: the executable, the manifest, and the
-`Assets\` tile images. Nothing else.
+**Keep the package until the upload is accepted.** It is the file you would
+upload again. Returning to `main` matters: a commit made on the detached tag
+belongs to no branch and is easily lost.
 
-## 3. Pack
+---
 
-`makeappx.exe` lives under the Windows SDK, whose version is part of the path.
-Do not hard-code it — find it, so this does not break when the SDK updates:
+## What the automated workflow does
 
-```powershell
-$makeappx = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe" |
-            Sort-Object FullName -Descending | Select-Object -First 1
-& $makeappx.FullName pack /d $stage /p "$env:TEMP\forskscope-$(git describe --tags --abbrev=0).msix"
-```
+`.github/workflows/store-submit.yml`, dispatched with the released tag:
 
-## 4. Verify the package before submitting
+1. **Checks out the tag** and runs `store-build.ps1`, as in step 2.
+2. **Runs `store-validate.ps1`** with the full install-and-launch check. It signs
+   a throwaway, validation-only copy, installs it, launches it, and tears it all
+   down. The uploaded package stays unsigned.
+3. **Submits through the Microsoft Store submission API:**
+   - deletes any pending submission first, so a re-run replaces it rather than
+     duplicating it;
+   - replaces only the package, never the listing, pricing or images (those are
+     published by hand, RFC-079 §9 Q5);
+   - uploads, commits, and reports the status without waiting for
+     certification.
 
-```powershell
-& $makeappx.FullName unpack /p "$env:TEMP\forskscope-<version>.msix" /d "$env:TEMP\forskscope-msix-check"
-Get-ChildItem -Recurse "$env:TEMP\forskscope-msix-check" | Select-Object FullName
-```
+**Rehearse** with `gh workflow run store-submit.yml -f tag=<released tag> -f
+dry_run=true`, the default. It authenticates and reads the app's state, then
+stops before creating anything.
 
-Confirm: the executable is present, the manifest's `Version` matches the tag,
-`Assets\` is present, and **`README.md` and `build-zip.sh` are not** — if they
-are, step 2 was skipped and `/d` was pointed at `packaging\windows\`.
+**Re-submit a published release** (a packaging-only fix, or after a rejection)
+with `-f dry_run=false`.
 
-## 5. Submit to Partner Center
+### Owner setup, once
 
-Manual, in the browser. Upload the `.msix` to the app's submission page and
-publish.
+- **A GitHub Environment named `store-publish`** (Settings → Environments). Add
+  required reviewers there for a human check before every real submission.
+- **Three secrets** in it: `STORE_TENANT_ID`, `STORE_CLIENT_ID` and
+  `STORE_CLIENT_SECRET`, from the existing ForskScope Entra ID app registration
+  (RFC-079 §9 Q4).
+- **Record `STORE_CLIENT_SECRET`'s expiry** in
+  `docs/src/maintainers/threat-model.md` when you create it. These secrets last
+  24 months at most, and a lapsed one fails silently.
 
-**Signing is not part of this.** `Publisher="CN=C4BA37E8-8670-4C82-8365-5ECB57373921"`
-is a Store-assigned publisher identity — Microsoft signs the package on
-submission, and no code-signing certificate of this project's own is involved
-(RFC-079 §2a).
-
-## What the automated workflow does instead
-
-`.github/workflows/store-submit.yml`, run by `workflow_dispatch` with the
-released tag:
-
-1. Checks out the released tag (not `main` — see "Before you start" above)
-   and runs `store-build.ps1`, which does exactly steps 1–3 above.
-2. Runs `store-validate.ps1`: manifest version against the tag,
-   `Identity`/`Publisher`/`PublisherDisplayName` against
-   `store-listing/en-us/identity.toml`, every asset the manifest
-   references is present, **and the package actually installs and
-   launches** — signed with a throwaway validation-only certificate
-   generated on the runner, never the real (unsigned) upload.
-3. Submits through the Microsoft Store submission API: deletes any existing
-   pending submission for this app first (so a re-run replaces rather than
-   duplicates), creates a new submission, replaces only its
-   `applicationPackages` (never listings, pricing, or images —
-   `store-listing/` content is published by hand, RFC-079 §9 Q5), uploads
-   the package, commits, and polls status without waiting for
-   certification to finish.
-
-**Rehearse it** with `gh workflow run store-submit.yml -f tag=<a released tag>
--f dry_run=true` (the default). This authenticates against Partner Center and
-reads the application resource — proving the credential and connectivity —
-and stops there. It shares every line of code with the real path up to that
-point; only the create/upload/commit sequence after it is skipped.
-
-**Re-submit an already-published release** (a packaging-only fix, or
-recovering from a rejected submission) with `-f dry_run=false`. Automation
-never re-triggers on its own; this is the same recovery path RFC-079 §5
-documents, run by hand.
-
-Owner setup, once: a GitHub **Environment** named `store-publish`
-(Settings → Environments — add required reviewers there if you want a human
-check before every real submission), holding three secrets:
-`STORE_TENANT_ID`, `STORE_CLIENT_ID`, `STORE_CLIENT_SECRET` (the Entra ID app
-registration's tenant, client, and client secret — RFC-079 §9 Q4: the
-existing ForskScope registration, not a new one). **Record
-`STORE_CLIENT_SECRET`'s expiry** in `docs/src/maintainers/threat-model.md`
-when you create it — Entra ID secrets last 24 months at most, often less,
-and a lapsed one breaks silently otherwise.
-
-The application ID (the Store submission API's `applicationId` — the same
-public Store ID, `9P63F7NPC3MH`, that `installation.md` links to) is **not**
-a secret to set up: it is tracked identity in
-`store-listing/en-us/identity.toml`'s `store_id` field, alongside the app's
-other fixed Partner Center identity, and `store-submit.ps1` reads it from
-there. *(F105, 2026-09-08: this had briefly been a fourth environment
-secret, `STORE_APP_ID`. A public identifier bought nothing from being
-stored as one, and produced the same "not set" refusal as a missing
-credential when left unconfigured. If you set `STORE_APP_ID` while this was
-still true, it is now inert and can be deleted — nothing reads it.)*
+**The application ID is not a secret.** The Store ID `9P63F7NPC3MH` is public, so
+it is tracked in `store-listing/en-us/identity.toml` (`store_id`), not set up.
+*(A `STORE_APP_ID` secret, if one exists from before F105, is inert and can be
+deleted.)*

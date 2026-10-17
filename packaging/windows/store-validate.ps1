@@ -20,11 +20,22 @@
 #      runner only, installs the signed copy, launches it, and confirms
 #      the process is actually running before tearing everything down.
 #
-# Usage: store-validate.ps1 -MsixPath <path> -Tag <released-tag>
+# Check 4 changes the machine it runs on: it enables sideloading machine-
+# wide, imports a certificate into the machine certificate store, and
+# uninstalls any ForskScope package already installed under this app's
+# identity. That is fine on an ephemeral CI runner and wrong on anyone's
+# own PC, so it runs unconditionally only when $env:GITHUB_ACTIONS is
+# "true"; elsewhere it refuses unless -AllowMachineChanges is given.
+# -SkipInstall runs checks 1-3 only and never reaches it - no
+# administrator rights, no certificate, no registry change, no install.
+#
+# Usage: store-validate.ps1 -MsixPath <path> -Tag <released-tag> [-SkipInstall] [-AllowMachineChanges]
 
 param(
     [Parameter(Mandatory = $true)][string]$MsixPath,
-    [Parameter(Mandatory = $true)][string]$Tag
+    [Parameter(Mandatory = $true)][string]$Tag,
+    [switch]$SkipInstall,
+    [switch]$AllowMachineChanges
 )
 
 $ErrorActionPreference = "Stop"
@@ -103,6 +114,21 @@ if ($Fail) {
     exit 1
 }
 
+if ($SkipInstall) {
+    Write-Host "Skipping the install+launch check (-SkipInstall): no administrator rights, no certificate, no registry change, no install."
+    Write-Host "All validation checks passed for $MsixPath (checks 1-3 only)"
+    exit 0
+}
+
+# ── Check 4 changes this machine - see the header comment for exactly how.
+#    Safe on an ephemeral CI runner; refuse elsewhere unless asked for
+#    deliberately with -AllowMachineChanges. ───────────────────────────────
+$InCI = $env:GITHUB_ACTIONS -eq 'true'
+if (-not $InCI -and -not $AllowMachineChanges) {
+    Write-Host "::error::the install+launch check changes this machine - it enables sideloading machine-wide (AllowAllTrustedApps), imports a certificate into the machine certificate store, and uninstalls any ForskScope package already installed under this app's identity. Pass -SkipInstall to run only checks 1-3, or -AllowMachineChanges to run this deliberately."
+    exit 1
+}
+
 # ── 4. Install and launch, for real. Self-signs a SEPARATE copy for this
 #    check only; $MsixPath itself (the one that gets uploaded) is never
 #    modified. ───────────────────────────────────────────────────────────
@@ -131,6 +157,15 @@ $DerPath = Join-Path ([System.IO.Path]::GetTempPath()) "forskscope-validation.ce
 Import-Certificate -FilePath $DerPath -CertStoreLocation "Cert:\LocalMachine\TrustedPeople" | Out-Null
 
 $UnlockKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+$HadAllowAllTrustedApps = $false
+$PreviousAllowAllTrustedApps = $null
+if (Test-Path $UnlockKey) {
+    $ExistingProp = Get-ItemProperty -Path $UnlockKey -Name "AllowAllTrustedApps" -ErrorAction SilentlyContinue
+    if ($null -ne $ExistingProp) {
+        $HadAllowAllTrustedApps = $true
+        $PreviousAllowAllTrustedApps = $ExistingProp.AllowAllTrustedApps
+    }
+}
 if (-not (Test-Path $UnlockKey)) { New-Item -Path $UnlockKey -Force | Out-Null }
 Set-ItemProperty -Path $UnlockKey -Name "AllowAllTrustedApps" -Value 1 -Type DWord
 
@@ -165,6 +200,13 @@ try {
     Remove-Item "Cert:\LocalMachine\TrustedPeople\$($Cert.Thumbprint)" -ErrorAction SilentlyContinue
     Remove-Item "Cert:\CurrentUser\My\$($Cert.Thumbprint)" -ErrorAction SilentlyContinue
     Remove-Item $PfxPath, $DerPath, $SignedCopy -ErrorAction SilentlyContinue
+    # AllowAllTrustedApps is machine-wide - restore it even in CI, so a
+    # runner reused across jobs is left exactly as this script found it.
+    if ($HadAllowAllTrustedApps) {
+        Set-ItemProperty -Path $UnlockKey -Name "AllowAllTrustedApps" -Value $PreviousAllowAllTrustedApps -Type DWord -ErrorAction SilentlyContinue
+    } else {
+        Remove-ItemProperty -Path $UnlockKey -Name "AllowAllTrustedApps" -ErrorAction SilentlyContinue
+    }
 }
 
 if ($Fail) {
