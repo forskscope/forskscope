@@ -234,10 +234,13 @@ jobs:
       - name: "Guard: store-build.ps1 refuses when HEAD is a real tag but not the one named"
         shell: pwsh
         run: |
+          # Spawned as a real child process (pwsh -File), not `& $script` in
+          # this process: store-build.ps1's own `exit` would otherwise end
+          # this whole step before any assertion below ever ran.
           $script = Join-Path $env:RUNNER_TEMP "scripts-under-test/store-build.ps1"
           $out = Join-Path $env:RUNNER_TEMP "guard-wrong-commit"
           $wrongTag = "0.0.0-not-$env:TAG"
-          $output = & $script -Tag $wrongTag -OutDir $out 2>&1 | Out-String
+          $output = & pwsh -NoProfile -File $script -Tag $wrongTag -OutDir $out 2>&1 | Out-String
           $exit = $LASTEXITCODE
           Write-Host $output
           if ($exit -eq 0) {
@@ -259,7 +262,9 @@ jobs:
           Remove-Item Env:GITHUB_OUTPUT -ErrorAction SilentlyContinue
           Remove-Item Env:FORSKSCOPE_CHANNEL -ErrorAction SilentlyContinue
 
-          $output = & $script -Tag "$env:TAG" -OutDir $out 2>&1 | Out-String
+          # Spawned as a real child process - see the comment on the guard
+          # above for why.
+          $output = & pwsh -NoProfile -File $script -Tag "$env:TAG" -OutDir $out 2>&1 | Out-String
           $exit = $LASTEXITCODE
           Write-Host $output
 
@@ -296,7 +301,7 @@ jobs:
           $unlockKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
           $before = (Get-ItemProperty -Path $unlockKey -Name AllowAllTrustedApps -ErrorAction SilentlyContinue).AllowAllTrustedApps
 
-          $output = & $script -MsixPath "$env:GOOD_MSIX" -Tag "$env:TAG" -SkipInstall 2>&1 | Out-String
+          $output = & pwsh -NoProfile -File $script -MsixPath "$env:GOOD_MSIX" -Tag "$env:TAG" -SkipInstall 2>&1 | Out-String
           $exit = $LASTEXITCODE
           Write-Host $output
           if ($exit -ne 0) {
@@ -329,7 +334,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "makeappx pack failed" }
 
           $script = Join-Path $env:RUNNER_TEMP "scripts-under-test/store-validate.ps1"
-          $output = & $script -MsixPath $brokenMsix -Tag "$env:TAG" -SkipInstall 2>&1 | Out-String
+          $output = & pwsh -NoProfile -File $script -MsixPath $brokenMsix -Tag "$env:TAG" -SkipInstall 2>&1 | Out-String
           $exit = $LASTEXITCODE
           Write-Host $output
           if ($exit -eq 0) {
@@ -350,7 +355,7 @@ jobs:
           $before = (Get-ItemProperty -Path $unlockKey -Name AllowAllTrustedApps -ErrorAction SilentlyContinue).AllowAllTrustedApps
 
           Remove-Item Env:GITHUB_ACTIONS -ErrorAction SilentlyContinue
-          $output = & $script -MsixPath "$env:GOOD_MSIX" -Tag "$env:TAG" 2>&1 | Out-String
+          $output = & pwsh -NoProfile -File $script -MsixPath "$env:GOOD_MSIX" -Tag "$env:TAG" 2>&1 | Out-String
           $exit = $LASTEXITCODE
           Write-Host $output
 
@@ -379,7 +384,7 @@ jobs:
 
           # $env:GITHUB_ACTIONS is set by the runner for every step by
           # default; the previous guard step only cleared it for itself.
-          $output = & $script -MsixPath "$env:GOOD_MSIX" -Tag "$env:TAG" 2>&1 | Out-String
+          $output = & pwsh -NoProfile -File $script -MsixPath "$env:GOOD_MSIX" -Tag "$env:TAG" 2>&1 | Out-String
           $exit = $LASTEXITCODE
           Write-Host $output
           if ($exit -ne 0) {
