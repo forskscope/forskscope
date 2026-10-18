@@ -5,7 +5,63 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.192.1] — Unreleased
+## [0.193.0] — 2026-10-18
+
+**Carry it with you.**
+
+### Added
+
+- **Portable mode, on Windows and Linux.** ForskScope keeps everything it writes
+  in one folder, and nothing in your home folder. There are two ways to start
+  it:
+  - put a folder named `forskscope-data` beside the program;
+  - or start it with `--data-dir <path>`.
+
+  Settings, session, restore manifests and the web view's own storage all stay
+  in that folder. The status bar says **Portable**. If the folder cannot be
+  written to, ForskScope still starts with the settings it can read, saves
+  nothing, and says **Portable (read-only): changes are not saved**.
+- **Private mode, on Windows and Linux:** `--private`.
+  - ForskScope starts from default settings, reads no saved settings or session,
+    and keeps nothing after it closes.
+  - The status bar says **Private: nothing is saved**.
+  - The files you compare and save are still saved when you save them.
+- **On macOS, `--data-dir` and `--private` refuse to start,** with one plain
+  message. There, the system web view keeps its cache in your home folder, so
+  neither mode could keep its promise.
+- **About and *Copy diagnostics*** show the mode, and the data folder in
+  portable mode.
+- **The user guide gains *Running portably*.**
+
+### Changed
+
+- **The Windows program no longer needs the Visual C++ runtime.**
+  `forskscope.exe` carries it, and runs by copying it, wherever the WebView2
+  runtime is installed. The program is 33 KB larger.
+
+### Fixed
+
+- **Dropdowns show the current value.** On launch, every dropdown showed its
+  first choice instead:
+  - in Settings, the saved theme, colour vision, language and the rest;
+  - in the comparison toolbar, the encoding (for example **UTF-8** for a
+    Shift_JIS file, while the status bar said Shift_JIS) and the diff algorithm.
+
+  The app always used the right value; only the dropdowns were wrong.
+- **Settings labels no longer run into their controls,** in English or Japanese.
+
+### Security
+
+- **Three advisories for `zip` 8.6.0** (RUSTSEC-2026-0367, -0368, -0369) concern
+  extracting an archive to disk. ForskScope reads workbooks in memory and never
+  extracts, and no fixed version is reachable yet. The audit records this as an
+  exception, and a build check keeps that path the only one.
+
+### Internal
+
+- **A release check fails if `forskscope.exe` needs a DLL outside its list of
+  Windows system libraries.**
+- **CI now covers `xtask`:** a security audit of its lockfile, and clippy.
 
 ## [0.192.0] — 2026-10-15
 
