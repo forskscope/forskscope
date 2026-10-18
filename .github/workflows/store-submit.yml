@@ -93,6 +93,13 @@ jobs:
         with:
           ref: ${{ steps.plan.outputs.tag }}
 
+      # RFC-091 §4 / F206: store-build.ps1 now runs the hybrid-CRT import
+      # gate on the binary it packs (packaging/windows/check-imports.ps1),
+      # which needs the llvm-tools component's llvm-objdump - not
+      # preinstalled on this runner's own Rust toolchain.
+      - name: Install the llvm-tools component (for the import gate)
+        run: rustup component add llvm-tools
+
       - name: Build the MSIX
         id: build
         shell: pwsh

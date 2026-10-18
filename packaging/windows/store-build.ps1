@@ -73,6 +73,18 @@ try {
     Pop-Location
 }
 
+# ── RFC-091 §4 / F206: the Store package must keep the same hybrid-CRT
+#    promise the zip does - checked here, on this exact binary, before it
+#    is staged and packed, not left to a separate, easily-forgotten step.
+#    Run as a real child process (`pwsh -File`, not `&` in this process):
+#    check-imports.ps1's own `exit` on failure would otherwise end this
+#    whole non-interactive pwsh process immediately, skipping the `throw`
+#    below (and any future cleanup added after it) rather than letting
+#    this script observe and report the failure on its own terms. ────────
+$BuiltExe = Join-Path $RepoRoot "target/release/forskscope.exe"
+& pwsh -NoProfile -File (Join-Path $RepoRoot "packaging/windows/check-imports.ps1") -ExePath $BuiltExe
+if ($LASTEXITCODE -ne 0) { throw "import gate failed - see above" }
+
 # ── Stage exactly four things: executable, manifest, tile assets. Nothing
 #    else - packaging/windows/README.md and store-*.ps1 must never end up
 #    inside the package (the same trap this script's own manual-path

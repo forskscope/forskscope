@@ -262,6 +262,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools
 
       - uses: actions/cache@v5
         with:
@@ -273,6 +275,14 @@ jobs:
 
       - name: Build release binary
         run: cargo build --release --locked -p forskscope-ui
+
+      # RFC-091 §4 / F206: the hybrid-CRT import gate, run on the exact
+      # binary this release packages - before Package, so a failing binary
+      # is never zipped. Previously only windows-check.yml's dispatchable
+      # crt-import-check ran this; the release itself never did.
+      - name: Check imports against the allow-list
+        shell: pwsh
+        run: ./packaging/windows/check-imports.ps1 -ExePath ./target/release/forskscope.exe
 
       - name: Package
         shell: bash

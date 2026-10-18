@@ -69,6 +69,20 @@ rebuilds for it. That is worth doing only when the app changed.
     for the release commit and confirm the run is green — proves the
     WebView2 detection check on a real `windows-latest` runner before the
     release build ships it.
+9. **The hybrid-CRT import gate (RFC-091 §4, F45, F206) runs automatically —
+   nothing to dispatch by hand.** `packaging/windows/check-imports.ps1` is the
+   one script behind all three places it runs:
+   - **`release.yml`'s Windows job**, on `target/release/forskscope.exe`,
+     between *Build release binary* and *Package* — the release itself fails
+     if the binary imports `VCRUNTIME*.dll`/`MSVCP*.dll` or anything off the
+     allow-list, before it is ever zipped. (F206: this did not exist through
+     0.193.0 — only `windows-check.yml`'s dispatchable copy did, and the
+     release's own Windows job never called it.)
+   - **`windows-check.yml`'s `crt-import-check` job**, dispatched on demand
+     (step 8's same mechanism), for proving the gate ahead of a cut without
+     needing a tag.
+   - **`store-build.ps1`**, on the binary it packs — the Store package keeps
+     the same promise.
 
 ---
 
