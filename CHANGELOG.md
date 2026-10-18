@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.193.1] — Unreleased
+
 ## [0.193.0] — 2026-10-18
 
 **Carry it with you.**
@@ -59,8 +61,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Internal
 
-- **A release check fails if `forskscope.exe` needs a DLL outside its list of
-  Windows system libraries.**
+- **A check lists `forskscope.exe`'s imports** and fails on any DLL outside its
+  list of Windows system libraries. *Corrected after publication:* in this
+  release it ran only in the hand-dispatched *Windows Check* workflow, not in
+  the release itself (F206). The published `forskscope.exe` was checked
+  afterwards and imports no Visual C++ runtime.
 - **CI now covers `xtask`:** a security audit of its lockfile, and clippy.
 
 ## [0.192.0] — 2026-10-15

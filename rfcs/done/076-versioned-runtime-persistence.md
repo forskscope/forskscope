@@ -1,7 +1,7 @@
 # RFC 076: Versioned Runtime Settings and Session Persistence
 
 **Status.** Implemented (Milestone M2-B)
-**Amended by RFC-091 (accepted 2026-10-15).** Where settings and session live is now resolved once at startup: installed (here), portable (`forskscope-data` beside the program, or `--data-dir`), or private (`--private`, nothing kept). See [RFC-091](../accepted/091-portable-and-private-modes.md).
+**Amended by RFC-091 (shipped in `0.193.0`).** Where settings and session live is now resolved once at startup: installed (here), portable (`forskscope-data` beside the program, or `--data-dir`), or private (`--private`, nothing kept). See [RFC-091](../accepted/091-portable-and-private-modes.md).
 **Note (0.189.0, F67).** `explorer_roots` below was never written with a value nor read, and was removed from `PersistedSessionV2` in 0.189.0. A file from an older build that still has the key loads unchanged. `active_tab` is now written and restored. See `CHANGELOG.md` 0.189.0.
 **Tracks.** Release-stabilization audit finding B2.
 **Touches.** Core persistence/settings/session models, UI settings/session

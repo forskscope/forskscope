@@ -7,7 +7,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Accepted (7)
+## Accepted (6)
 
 Review complete; the implementer may start. Distinct from **Proposed**, which
 is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
@@ -18,13 +18,13 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 078 | [Platform Runtime Acceptance and Release Evidence](./accepted/078-platform-runtime-acceptance.md) | Accepted |
 | 079 | [Microsoft Store Submission Automation](./accepted/079-microsoft-store-submission-automation.md) | Accepted |
 | 081 | [AUR Publication Automation](./accepted/081-aur-publication-automation.md) | Accepted |
-| 091 | [Portable and Private Modes, and a Windows Program That Runs by Copying](./accepted/091-portable-and-private-modes.md) | Accepted 2026-10-15 |
 | 092 | [Comparison Reports — HTML and Unified Diff, for Files and Folders](./accepted/092-comparison-reports.md) | Accepted 2026-10-17 |
 
-## Implemented (66)
+## Implemented (67)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
+| 091 | [Portable and Private Modes, and a Windows Program That Runs by Copying](./done/091-portable-and-private-modes.md) | Implemented — `0.193.0` |
 | 090 | [Replaced Lines in the Red–Green-Safe Palette](./done/090-replaced-lines-in-the-red-green-safe-palette.md) | Implemented — `0.192.0` |
 | 088 | [A Colour-Vision Setting with a Red–Green-Safe Palette](./done/088-colour-vision-palette.md) | Implemented — `0.191.0` |
 | 089 | [One Bar at the Top, and a Window Title That Says What Is Open](./done/089-one-bar-at-the-top.md) | Implemented — `0.191.0` |

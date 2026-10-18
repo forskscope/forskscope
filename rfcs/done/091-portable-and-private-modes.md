@@ -1,7 +1,6 @@
 # RFC 091: Portable and Private Modes, and a Windows Program That Runs by Copying
 
-**Status.** Accepted — review complete; implementer may start. Moves to `done/`
-when the work ships (RFC-000, 5-folder variant).
+**Status.** Implemented (`0.193.0`, `a4fb730`; reviews 170, 171).
 **Accepted.** 2026-10-15 by the project owner.
 **Amended.** 2026-10-17, by the owner's decision: on macOS the two modes refuse to start (§2a). The system web view's own storage on Linux is redirected through the XDG directories (§2). F200.
 **Scheduling.** `0.193.0`. See `ROADMAP.md` §
