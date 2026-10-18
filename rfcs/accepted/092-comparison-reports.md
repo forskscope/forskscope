@@ -193,6 +193,10 @@ says so.
   stops the export without writing anything.
 - **Hashes are computed only for the export,** never kept or written anywhere
   else.
+- *Clarified 2026-10-19 (architect, handoff 084 §0):* the report's changes are
+  computed from the same bytes that are hashed. A file comparison with unsaved
+  edits cannot export a report, and a file that changed since it was compared
+  refuses the export, so a report always describes exactly the files it hashes.
 
 ### 6. What stays out of the UI
 
