@@ -408,3 +408,51 @@ pub fn open_url(url: &str) -> std::io::Result<std::process::Child> {
     crate::env_passthrough::restore_onto(&mut cmd);
     cmd.spawn()
 }
+
+// ── Opening a file in its default program (RFC-092 §2, handoff 084) ───────────
+
+/// The [`std::process::Command`] that opens `path` — a file the user just
+/// saved, e.g. a comparison report — in its default program on `os`. Same
+/// `xdg-open`/`open` shape as [`open_url_command`] on Linux/Other/macOS.
+///
+/// **Windows deliberately does not reuse `open_url_command`'s `cmd /C
+/// start` form here.** `cmd` interprets `&`, `^` and `%` in an argument —
+/// safe for a URL ForskScope itself constructs (never containing those as
+/// literal path characters), but not for a saved file's name, which is
+/// whatever the user typed in the save dialog. `explorer.exe <path>` opens
+/// the path via its normal shell association without going through `cmd`'s
+/// parser at all, so those characters arrive as one intact argument instead
+/// of being interpreted. (`explorer.exe` is also well known to return a
+/// non-zero exit code even on an ordinary success — not a signal to treat
+/// as failure.)
+pub(crate) fn open_path_command(os: TargetOs, path: &str) -> std::process::Command {
+    match os {
+        TargetOs::Macos => {
+            let mut cmd = std::process::Command::new("open");
+            cmd.arg(path);
+            cmd
+        }
+        TargetOs::Windows => {
+            let mut cmd = std::process::Command::new("explorer.exe");
+            cmd.arg(path);
+            cmd
+        }
+        TargetOs::Linux | TargetOs::Other => {
+            let mut cmd = std::process::Command::new("xdg-open");
+            cmd.arg(path);
+            cmd
+        }
+    }
+}
+
+/// Opens `path` in its default program and returns the spawned child
+/// process. The caller never waits on it — same fire-and-forget contract as
+/// [`open_url`], and the same RFC-091 §2 environment restoration
+/// (`env_passthrough::restore_onto`), since a saved file opened through a
+/// portable/private-mode override would otherwise hand its default program
+/// ForskScope's own `XDG_*` overrides instead of the user's real ones.
+pub fn open_path(path: &str) -> std::io::Result<std::process::Child> {
+    let mut cmd = open_path_command(host_target_os(), path);
+    crate::env_passthrough::restore_onto(&mut cmd);
+    cmd.spawn()
+}

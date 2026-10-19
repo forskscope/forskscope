@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use crate::external_tool::{
     ExpandContext, ExternalToolArg, ExternalToolCommand, ExternalToolPlaceholder, TargetOs, ToolId,
-    ToolKind, UnknownTokenError, expand_args, open_url_command, parse_arg,
+    ToolKind, UnknownTokenError, expand_args, open_path_command, open_url_command, parse_arg,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -414,6 +414,87 @@ fn a_url_with_shell_metacharacters_arrives_as_one_intact_argument_on_every_platf
         assert!(
             args.contains(&std::ffi::OsStr::new(hostile)),
             "{os:?}: hostile url must arrive as one intact argument, got {args:?}"
+        );
+    }
+}
+
+// ── open_path_command (RFC-092 §2, handoff 084) ────────────────────────────────
+//
+// Same parameterized-by-TargetOs shape as open_url_command's tests above.
+// Windows is the point of this function: it must NOT go through `cmd /C
+// start`, which `open_url_command` uses and which misparses `&`/`^`/`%` in
+// an argument - a saved file's name is user-chosen, unlike a URL
+// ForskScope itself constructs.
+
+#[test]
+fn linux_opens_a_path_with_xdg_open_and_the_path_as_a_single_argument() {
+    let cmd = open_path_command(TargetOs::Linux, "/home/user/My Report.html");
+    assert_eq!(cmd.get_program(), "xdg-open");
+    let args: Vec<_> = cmd.get_args().collect();
+    assert_eq!(args, vec!["/home/user/My Report.html"]);
+}
+
+#[test]
+fn other_unix_like_falls_back_to_xdg_open_for_a_path_too() {
+    let cmd = open_path_command(TargetOs::Other, "/home/user/report.html");
+    assert_eq!(cmd.get_program(), "xdg-open");
+}
+
+#[test]
+fn macos_opens_a_path_with_open_and_the_path_as_a_single_argument() {
+    let cmd = open_path_command(TargetOs::Macos, "/Users/user/My Report.html");
+    assert_eq!(cmd.get_program(), "open");
+    let args: Vec<_> = cmd.get_args().collect();
+    assert_eq!(args, vec!["/Users/user/My Report.html"]);
+}
+
+#[test]
+fn windows_uses_explorer_exe_never_cmd_start() {
+    let cmd = open_path_command(TargetOs::Windows, r"C:\Users\user\report.html");
+    assert_eq!(cmd.get_program(), "explorer.exe");
+    assert_ne!(
+        cmd.get_program(),
+        "cmd",
+        "cmd /C start would misparse &, ^ and % in a user-chosen file name"
+    );
+    let args: Vec<_> = cmd.get_args().collect();
+    assert_eq!(args, vec![r"C:\Users\user\report.html"]);
+}
+
+#[test]
+fn a_filename_containing_an_ampersand_arrives_as_one_intact_argument_on_every_platform() {
+    // The exact character class `cmd /C start` would misparse - this is
+    // the case open_path_command exists to not have.
+    let hostile = "reports/left & right-report.html";
+    for os in [
+        TargetOs::Linux,
+        TargetOs::Macos,
+        TargetOs::Windows,
+        TargetOs::Other,
+    ] {
+        let cmd = open_path_command(os, hostile);
+        let args: Vec<_> = cmd.get_args().collect();
+        assert!(
+            args.contains(&std::ffi::OsStr::new(hostile)),
+            "{os:?}: a file name with '&' must arrive as one intact argument, got {args:?}"
+        );
+    }
+}
+
+#[test]
+fn a_path_with_shell_metacharacters_arrives_as_one_intact_argument_on_every_platform() {
+    let hostile = "reports/?x=1;rm -rf /&&touch pwned`echo x`.html";
+    for os in [
+        TargetOs::Linux,
+        TargetOs::Macos,
+        TargetOs::Windows,
+        TargetOs::Other,
+    ] {
+        let cmd = open_path_command(os, hostile);
+        let args: Vec<_> = cmd.get_args().collect();
+        assert!(
+            args.contains(&std::ffi::OsStr::new(hostile)),
+            "{os:?}: hostile path must arrive as one intact argument, got {args:?}"
         );
     }
 }
