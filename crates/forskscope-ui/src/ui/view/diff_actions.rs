@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
+use dioxus_core::spawn_forever;
 
 use forskscope_core::CoreError;
 use forskscope_core::compare_prep::{
@@ -530,8 +531,15 @@ pub fn export_patch(store: &mut Store, index: usize) {
 
     drop(tabs);
 
-    // Spawn an async task to open the save dialog and write the file.
-    spawn(async move {
+    let lang = store.lang();
+    let mut store = *store;
+
+    // `spawn_forever`, not `spawn`: the caller is a modal's own "Export"
+    // button, which closes the modal (unmounting its scope) right after
+    // this call returns (F208) — a plain `spawn` would be dropped before
+    // `save_file()` ever resolves. See `keyboard.rs::focus_handle`'s doc
+    // for the same trap on a different caller.
+    spawn_forever(async move {
         let handle = rfd::AsyncFileDialog::new()
             .set_title("Export patch")
             .set_file_name(&default_name)
@@ -543,7 +551,11 @@ pub fn export_patch(store: &mut Store, index: usize) {
         if let Some(file) = handle {
             let path = file.path();
             if let Err(e) = std::fs::write(path, &patch_text) {
-                eprintln!("export_patch: write error: {e}");
+                store.notify(format!(
+                    "{} \"{}\" — {e}.",
+                    t(lang, "Could not save the patch"),
+                    path.display()
+                ));
             }
         }
     });
@@ -690,7 +702,12 @@ pub fn export_file_report(
             drop(tabs);
             let mut store = *store;
 
-            spawn(async move {
+            // `spawn_forever`, not `spawn`: `ExportReportModal`'s "Export"
+            // button calls this and then closes the modal in the same
+            // click handler, unmounting the scope this would otherwise be
+            // tied to, before `save_file()` ever resolves (F208 — the save
+            // dialog silently never opened).
+            spawn_forever(async move {
                 let handle = rfd::AsyncFileDialog::new()
                     .set_title("Export report")
                     .set_file_name(&default_name)
@@ -732,9 +749,15 @@ pub fn export_file_report(
                                 path.display().to_string(),
                             );
                         }
-                        Err(e) => eprintln!("export_file_report: write error: {e}"),
+                        Err(e) => store.notify(format!(
+                            "{} \"{}\" — {e}.",
+                            t(lang, "Could not save the report"),
+                            path.display()
+                        )),
                     },
-                    Err(e) => eprintln!("export_file_report: join error: {e}"),
+                    Err(e) => {
+                        store.notify(format!("{}: {e}.", t(lang, "Could not save the report")))
+                    }
                 }
             });
         }

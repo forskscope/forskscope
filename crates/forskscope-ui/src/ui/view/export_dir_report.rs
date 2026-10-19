@@ -6,6 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use dioxus::prelude::*;
+use dioxus_core::spawn_forever;
 
 use forskscope_core::CancellationToken;
 use forskscope_core::dir::{RecEntry, RecStatus};
@@ -125,7 +126,16 @@ pub fn ExportDirReportModal(
                                         format: fmt,
                                         path_mode: mode,
                                     };
-                                    spawn(start_dir_export(store, request, phase, cancel_token));
+                                    // `spawn_forever`, not `spawn` (F208): for
+                                    // consistency with the file-report path,
+                                    // where closing the modal right after this
+                                    // call drops a plain `spawn`-ed task before
+                                    // its first `.await` — see
+                                    // `diff_actions::export_file_report`'s own
+                                    // note. Cancel keeps working regardless,
+                                    // through `cancel_token`, not scope
+                                    // teardown.
+                                    spawn_forever(start_dir_export(store, request, phase, cancel_token));
                                 },
                                 {t(lang, "Export")}
                             }
@@ -237,7 +247,11 @@ async fn start_dir_export(
                             t(lang, "Open"),
                             path.display().to_string(),
                         ),
-                        Err(e) => eprintln!("export_dir_report (patch): write error: {e}"),
+                        Err(e) => store.notify(format!(
+                            "{} \"{}\" — {e}.",
+                            t(lang, "Could not save the patch"),
+                            path.display()
+                        )),
                     }
                 }
                 // F79: an unreadable entry fails the whole patch, naming it -
@@ -246,7 +260,7 @@ async fn start_dir_export(
                 Ok(Err(e)) => {
                     store.notify(format!("{}: {e}", t(lang, "Could not build the patch")))
                 }
-                Err(e) => eprintln!("export_dir_report (patch): join error: {e}"),
+                Err(e) => store.notify(format!("{}: {e}.", t(lang, "Could not save the patch"))),
             }
         }
         ReportExportFormat::Html => {
@@ -308,7 +322,11 @@ async fn start_dir_export(
                             t(lang, "Open"),
                             path.display().to_string(),
                         ),
-                        Err(e) => eprintln!("export_dir_report (html): write error: {e}"),
+                        Err(e) => store.notify(format!(
+                            "{} \"{}\" — {e}.",
+                            t(lang, "Could not save the report"),
+                            path.display()
+                        )),
                     }
                 }
                 // Cancelled: nothing written, nothing to notify beyond
@@ -322,7 +340,7 @@ async fn start_dir_export(
                         "A file changed since it was compared. Compare again, then export."
                     )
                 )),
-                Err(e) => eprintln!("export_dir_report (html): join error: {e}"),
+                Err(e) => store.notify(format!("{}: {e}.", t(lang, "Could not save the report"))),
             }
         }
     }

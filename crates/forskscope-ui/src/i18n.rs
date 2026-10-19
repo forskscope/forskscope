@@ -505,6 +505,8 @@ fn ja(key: &str) -> Option<&'static str> {
         "Reading and hashing files" => "ファイルの読み込みとハッシュ計算",
         "Working…" => "処理中…",
         "Could not build the patch" => "パッチを作成できませんでした",
+        "Could not save the report" => "レポートを保存できませんでした",
+        "Could not save the patch" => "パッチを保存できませんでした",
 
         // RFC-092: the HTML report itself (forskscope-core/src/report/html.rs).
         // Reached through a translator closure, not a literal t(lang, ...)
