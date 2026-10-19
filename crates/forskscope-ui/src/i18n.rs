@@ -525,10 +525,47 @@ fn ja(key: &str) -> Option<&'static str> {
         "Left size" => "左のサイズ",
         "Right size" => "右のサイズ",
         "No differences — the two files are identical." => "差分なし — 2つのファイルは同一です。",
-        "changes" => "件の変更",
-        "lines removed" => "行削除",
-        "lines added" => "行追加",
-        "hunks replaced" => "個のハンク置換",
+        // Review 174 §4: whole-sentence summary templates
+        // (report::html::summary_template_key) - each of the 18 shapes
+        // that function can produce, keyed by its exact English text
+        // (with English's own singular/plural already baked in - Japanese
+        // needs no such distinction, so both the n=1 and n>1 English keys
+        // for a given (d>0, a>0) shape map to the same Japanese template).
+        // {n}/{d}/{a} are substituted after translation, not before.
+        "{n} change: {d} line removed, {a} line added." => {
+            "{n} か所の変更（削除 {d} 行、追加 {a} 行）。"
+        }
+        "{n} change: {d} line removed, {a} lines added." => {
+            "{n} か所の変更（削除 {d} 行、追加 {a} 行）。"
+        }
+        "{n} change: {d} lines removed, {a} line added." => {
+            "{n} か所の変更（削除 {d} 行、追加 {a} 行）。"
+        }
+        "{n} change: {d} lines removed, {a} lines added." => {
+            "{n} か所の変更（削除 {d} 行、追加 {a} 行）。"
+        }
+        "{n} changes: {d} line removed, {a} line added." => {
+            "{n} か所の変更（削除 {d} 行、追加 {a} 行）。"
+        }
+        "{n} changes: {d} line removed, {a} lines added." => {
+            "{n} か所の変更（削除 {d} 行、追加 {a} 行）。"
+        }
+        "{n} changes: {d} lines removed, {a} line added." => {
+            "{n} か所の変更（削除 {d} 行、追加 {a} 行）。"
+        }
+        "{n} changes: {d} lines removed, {a} lines added." => {
+            "{n} か所の変更（削除 {d} 行、追加 {a} 行）。"
+        }
+        "{n} change: {d} line removed." => "{n} か所の変更（削除 {d} 行）。",
+        "{n} change: {d} lines removed." => "{n} か所の変更（削除 {d} 行）。",
+        "{n} changes: {d} line removed." => "{n} か所の変更（削除 {d} 行）。",
+        "{n} changes: {d} lines removed." => "{n} か所の変更（削除 {d} 行）。",
+        "{n} change: {a} line added." => "{n} か所の変更（追加 {a} 行）。",
+        "{n} change: {a} lines added." => "{n} か所の変更（追加 {a} 行）。",
+        "{n} changes: {a} line added." => "{n} か所の変更（追加 {a} 行）。",
+        "{n} changes: {a} lines added." => "{n} か所の変更（追加 {a} 行）。",
+        "{n} change." => "{n} か所の変更。",
+        "{n} changes." => "{n} か所の変更。",
         "Whitespace" => "空白",
         "Case" => "大文字・小文字",
         "Newlines" => "改行",

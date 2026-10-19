@@ -284,11 +284,10 @@ impl FileComparisonReport {
         if self.is_identical {
             return "No differences — the two files are identical.".into();
         }
-        let replaced = self
-            .hunk_rows
-            .iter()
-            .filter(|h| h.kind == "replace")
-            .count();
+        // Review 174 §4: lines only, never hunks — a count of *hunks*
+        // alongside counts of *lines* reads as more change stacked on top
+        // of the lines already counted, and the change list below already
+        // shows which hunks are replacements.
         let mut clauses = Vec::new();
         if self.lines_deleted > 0 {
             clauses.push(format!(
@@ -303,9 +302,6 @@ impl FileComparisonReport {
                 self.lines_added,
                 plural(self.lines_added)
             ));
-        }
-        if replaced > 0 {
-            clauses.push(format!("{} hunk{} replaced", replaced, plural(replaced)));
         }
         let lead = format!(
             "{} change{}",

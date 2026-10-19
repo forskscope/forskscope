@@ -367,7 +367,7 @@ fn identical_files_have_no_differences_summary_sentence() {
 }
 
 #[test]
-fn a_replace_hunk_summary_sentence_names_lines_and_hunks() {
+fn a_replace_hunk_summary_sentence_names_lines_not_hunks() {
     let diff = compute_diff(
         "one\ntwo\nthree\n",
         "one\nTWO\nthree\n",
@@ -375,10 +375,10 @@ fn a_replace_hunk_summary_sentence_names_lines_and_hunks() {
     );
     let report = FileComparisonReport::from_diff(&diff, None, None, None, opts_default());
     let sentence = report.one_sentence_summary();
-    assert!(sentence.starts_with("1 change:"), "{sentence}");
-    assert!(sentence.contains("1 line removed"), "{sentence}");
-    assert!(sentence.contains("1 line added"), "{sentence}");
-    assert!(sentence.contains("1 hunk replaced"), "{sentence}");
+    // Review 174 §4: no "hunk"/"replaced" jargon - lines only.
+    assert_eq!(sentence, "1 change: 1 line removed, 1 line added.");
+    assert!(!sentence.contains("hunk"));
+    assert!(!sentence.contains("replace"));
 }
 
 #[test]

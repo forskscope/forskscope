@@ -232,6 +232,50 @@ fn render_checksum_row(out: &mut String, label: &str, checksum: &FileChecksum) {
 /// facts from the report's raw fields instead, one translated word next to
 /// each raw number, the same concatenation convention the rest of the UI
 /// uses for a count in a label (e.g. `deep_compare.rs`'s `{} {count} {}`).
+/// The English template *key* for `(n, d, a)` — hunks changed, lines
+/// removed, lines added — with the correct singular/plural word already
+/// baked into the literal text (review 174 §4: "whole-sentence templates
+/// per language... with singular forms in English"). `{n}`/`{d}`/`{a}`
+/// stay as literal placeholder text; `tr()` translates this whole string
+/// as one unit (English gets it back verbatim; Japanese's `ja()` match
+/// has its own entry for each of the 18 shapes this can produce — see
+/// `i18n.rs`), then the placeholders are substituted. Deliberately not a
+/// composed-from-words sentence: Japanese's own template has different
+/// punctuation and word order throughout, not just translated words in
+/// the same slots English uses — concatenating translated fragments can't
+/// produce that.
+///
+/// No "hunks replaced": a count of *hunks* next to counts of *lines* reads
+/// as more change stacked on top of the lines already counted, and the
+/// change list below already shows which hunks are replacements.
+fn summary_template_key(n: usize, d: usize, a: usize) -> String {
+    let n_word = if n == 1 { "change" } else { "changes" };
+    match (d > 0, a > 0) {
+        (true, true) => {
+            let d_word = if d == 1 {
+                "line removed"
+            } else {
+                "lines removed"
+            };
+            let a_word = if a == 1 { "line added" } else { "lines added" };
+            format!("{{n}} {n_word}: {{d}} {d_word}, {{a}} {a_word}.")
+        }
+        (true, false) => {
+            let d_word = if d == 1 {
+                "line removed"
+            } else {
+                "lines removed"
+            };
+            format!("{{n}} {n_word}: {{d}} {d_word}.")
+        }
+        (false, true) => {
+            let a_word = if a == 1 { "line added" } else { "lines added" };
+            format!("{{n}} {n_word}: {{a}} {a_word}.")
+        }
+        (false, false) => format!("{{n}} {n_word}."),
+    }
+}
+
 fn localized_summary_sentence(
     report: &FileComparisonReport,
     tr: &dyn Fn(&str) -> String,
@@ -239,27 +283,14 @@ fn localized_summary_sentence(
     if report.is_identical {
         return tr("No differences — the two files are identical.");
     }
-    let replaced = report
-        .hunk_rows
-        .iter()
-        .filter(|h| h.kind == "replace")
-        .count();
-    let mut parts = Vec::new();
-    if report.lines_deleted > 0 {
-        parts.push(format!("{} {}", report.lines_deleted, tr("lines removed")));
-    }
-    if report.lines_added > 0 {
-        parts.push(format!("{} {}", report.lines_added, tr("lines added")));
-    }
-    if replaced > 0 {
-        parts.push(format!("{} {}", replaced, tr("hunks replaced")));
-    }
-    let lead = format!("{} {}", report.hunks_changed, tr("changes"));
-    if parts.is_empty() {
-        format!("{lead}.")
-    } else {
-        format!("{lead}: {}.", parts.join(", "))
-    }
+    let n = report.hunks_changed;
+    let d = report.lines_deleted;
+    let a = report.lines_added;
+    let key = summary_template_key(n, d, a);
+    tr(&key)
+        .replace("{n}", &n.to_string())
+        .replace("{d}", &d.to_string())
+        .replace("{a}", &a.to_string())
 }
 
 // ── File report ────────────────────────────────────────────────────────────────
@@ -714,8 +745,60 @@ mod tests {
         assert!(html.contains("TWO"));
     }
 
+    // ── Review 174 §4: whole-sentence summary templates ────────────────────
+
     #[test]
-    fn the_summary_sentence_is_built_from_translated_words_not_a_whole_english_sentence() {
+    fn summary_template_key_matches_the_reviews_own_examples() {
+        // "3 changes: 2 lines removed, 3 lines added." (review 174 §4)
+        assert_eq!(
+            summary_template_key(3, 2, 3),
+            "{n} changes: {d} lines removed, {a} lines added."
+        );
+        // "1 change: 1 line added." (review 174 §4)
+        assert_eq!(summary_template_key(1, 0, 1), "{n} change: {a} line added.");
+    }
+
+    #[test]
+    fn singular_and_plural_are_resolved_independently_per_number() {
+        // n, d and a each get their own singular/plural word, not just n's.
+        assert_eq!(
+            summary_template_key(5, 1, 3),
+            "{n} changes: {d} line removed, {a} lines added."
+        );
+        assert_eq!(
+            summary_template_key(1, 4, 1),
+            "{n} change: {d} lines removed, {a} line added."
+        );
+    }
+
+    #[test]
+    fn a_zero_count_is_omitted_never_shown_as_zero() {
+        assert_eq!(
+            summary_template_key(2, 2, 0),
+            "{n} changes: {d} lines removed."
+        );
+        assert_eq!(
+            summary_template_key(2, 0, 2),
+            "{n} changes: {a} lines added."
+        );
+        assert_eq!(summary_template_key(2, 0, 0), "{n} changes.");
+    }
+
+    #[test]
+    fn no_hunks_or_replaced_jargon_appears_in_any_template() {
+        for n in 1..=3 {
+            for d in 0..=2 {
+                for a in 0..=2 {
+                    let key = summary_template_key(n, d, a);
+                    assert!(!key.contains("hunk"), "{key:?} must not mention hunks");
+                    assert!(!key.contains("replace"), "{key:?} must not mention replace");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_rendered_sentence_substitutes_real_numbers_into_the_chosen_template() {
         let diff = crate::diff::compute_diff(
             "one\ntwo\n",
             "one\nTWO\n",
@@ -728,21 +811,46 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        // A translator that only knows individual words, never a whole
-        // composed sentence - this is exactly what a real `ja()` match
-        // provides, and it must still produce a sentence with the real
-        // numbers in it, not fall through to the raw English sentence.
-        let html = render_file_report(&report, "0.0.0", "now", false, &|s| match s {
-            "changes" => "件の変更".to_string(),
-            "lines removed" => "行削除".to_string(),
-            "lines added" => "行追加".to_string(),
-            "hunks replaced" => "個のハンク置換".to_string(),
-            other => other.to_string(),
-        });
-        assert!(html.contains("1 件の変更"));
-        assert!(html.contains("1 行削除"));
-        assert!(html.contains("1 行追加"));
-        assert!(html.contains("1 個のハンク置換"));
+        let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        assert!(html.contains("1 change: 1 line removed, 1 line added."));
+    }
+
+    #[test]
+    fn a_translator_that_only_knows_whole_templates_still_produces_a_real_japanese_sentence() {
+        // Mirrors i18n.rs's real ja() shape: whole templates, not
+        // individual words - this translator cannot answer "lines
+        // removed" on its own, only the full key.
+        // Two widely-separated changes, so they land in separate hunks and
+        // hunks_changed is unambiguously > 1 (picking the plural template
+        // key deterministically, regardless of windowing details).
+        let left = "a\nb\n".to_string() + &"x\n".repeat(10) + "c\n";
+        let right = "a\nB\n".to_string() + &"x\n".repeat(10) + "C\nd\n";
+        let html = render_file_report(
+            &crate::report::FileComparisonReport::from_diff(
+                &crate::diff::compute_diff(&left, &right, crate::diff::DiffOptions::default()),
+                None,
+                None,
+                None,
+                crate::report::ReportOptions::default(),
+            ),
+            "0.0.0",
+            "now",
+            false,
+            &|s| match s {
+                "{n} changes: {d} lines removed, {a} lines added." => {
+                    "{n} か所の変更（削除 {d} 行、追加 {a} 行）。".to_string()
+                }
+                other => other.to_string(),
+            },
+        );
+        assert!(
+            html.contains("か所の変更"),
+            "expected the Japanese whole-sentence template to be used, got: {html}"
+        );
+        assert!(
+            !html.contains("changes:"),
+            "the raw English template must not leak through"
+        );
     }
 
     #[test]
