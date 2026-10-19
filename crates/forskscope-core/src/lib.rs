@@ -12,6 +12,7 @@
 //! "Core First").
 
 pub mod cancel;
+pub mod checksum;
 pub mod command;
 pub mod compare_prep;
 pub mod conflict_nav;

@@ -12,14 +12,36 @@
 //! another tool — not something this app reloads across versions, so there
 //! is no read path a schema version would protect.
 
+pub mod changes;
 pub mod dir;
 pub mod file;
+pub mod html;
 
+pub use changes::{ChangeHunk, ChangeLine, ChangeLineKind, change_hunks_from_diff};
 pub use dir::{BatchSummary, DirComparisonReport, DirFileRow};
 pub use file::{FileComparisonReport, HistoryEntry, HunkSummaryRow, ReportOptions, ReportPathMode};
+pub use html::{render_dir_report, render_file_report};
 
 use crate::diff::HunkKind;
 use std::path::Path;
+
+/// Size and SHA-256 of one compared file's bytes, as read at export time
+/// (RFC-092 §5). Computed only for a report export, never kept or written
+/// anywhere else.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileChecksum {
+    pub size: u64,
+    pub sha256_hex: String,
+}
+
+impl FileChecksum {
+    pub fn of_bytes(bytes: &[u8]) -> Self {
+        Self {
+            size: bytes.len() as u64,
+            sha256_hex: crate::checksum::sha256_hex(bytes),
+        }
+    }
+}
 
 /// Format a path according to `mode`, optionally stripping a `root` prefix.
 /// Shared by both file and directory reports.

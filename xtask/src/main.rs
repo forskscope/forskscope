@@ -184,6 +184,7 @@ fn run_audit_deps() {
     assert_external_network_crates_absent();
     assert_quick_xml_path_is_reviewed();
     assert_network_paths_are_reviewed();
+    assert_sha2_path_is_reviewed();
     // RFC-085: sheets-diff -> calamine -> quick-xml/zip is a deliberately
     // re-added, reviewed path — RFC-058 suspended it (quick-xml 0.39 XML
     // DoS advisories). What is asserted here is that each of the three
@@ -945,6 +946,15 @@ fn assert_dioxus_desktop_libxdo_not_yet_optional() {
 /// this just supplies both accepted paths.
 fn assert_quick_xml_path_is_reviewed() {
     assert_immediate_dependents("quick-xml", &["wayland-scanner ", "calamine "]);
+}
+
+/// RFC-092/handoff 084: `sha2` was already resolved transitively (`wry` ->
+/// `forskscope-ui`); `forskscope-core` now depends on it directly too, for
+/// comparison-report checksums (SHA-256 of each compared file's bytes).
+/// Same crate, same version, no new crypto stack — both paths are accepted
+/// deliberately, a third would not be.
+fn assert_sha2_path_is_reviewed() {
+    assert_immediate_dependents("sha2", &["wry ", "forskscope-core "]);
 }
 
 fn assert_external_network_crates_absent() {

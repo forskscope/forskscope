@@ -1,6 +1,9 @@
-//! Directory-level comparison report: `DirComparisonReport`, `BatchSummary` (RFC-008).
+//! Directory-level comparison report: `DirComparisonReport`, `BatchSummary` (RFC-008, RFC-092).
 
-use super::file::{ReportOptions, ReportPathMode};
+use super::FileChecksum;
+use super::changes::ChangeHunk;
+use super::file::{ReportOptions, ReportPathMode, non_default_options_summary};
+use crate::diff::DiffOptions;
 use crate::dir::{BatchManifest, RecEntry, RecStatus};
 use std::fmt::Write as _;
 use std::path::Path;
@@ -24,6 +27,23 @@ pub struct DirComparisonReport {
     pub file_rows: Vec<DirFileRow>,
     pub batch_summary: Option<BatchSummary>,
     pub options: ReportOptions,
+    /// Compare options that differ from `DiffOptions::default()` (RFC-092
+    /// §3 item 3), from the `diff_options` passed to `from_entries` — empty
+    /// when the caller passed `None` (no single comparison settings apply,
+    /// e.g. a listing with no digest pass yet).
+    pub non_default_options: Vec<(String, String)>,
+    /// The compare profile's name — see `ReportOptions::profile_name`'s doc
+    /// comment for the "Default"/"Custom" fallback. `None` when
+    /// `diff_options` was `None`.
+    pub profile_name: Option<String>,
+    /// Changed text files whose change hunks were left out by the HTML
+    /// report's cap (RFC-092 §3a: "50 files or 5 MiB of change text,
+    /// whichever comes first"), by path, in the order they were left out.
+    /// Populated by the caller (the export job, which decides how many
+    /// files it has budget for) — empty means the cap did not apply.
+    /// Never omits silently: a non-empty list is itself the report's only
+    /// record of what got left out.
+    pub change_hunks_omitted: Vec<String>,
 }
 
 /// One file row in the directory report.
@@ -33,6 +53,17 @@ pub struct DirFileRow {
     pub status: String,
     pub left_size: Option<u64>,
     pub right_size: Option<u64>,
+    /// SHA-256 of each side's bytes as read at export time (RFC-092 §5) —
+    /// `None` until the caller attaches them (checksumming is file I/O,
+    /// which `from_entries` itself never performs). `None` also for a side
+    /// where the file does not exist (one-sided entries).
+    pub left_checksum: Option<FileChecksum>,
+    pub right_checksum: Option<FileChecksum>,
+    /// Content-carrying change hunks for a changed text file, attached by
+    /// the caller once it has read and diffed this file — `None` for every
+    /// status other than "modified", and for a modified file the cap left
+    /// out (see `DirComparisonReport::change_hunks_omitted`).
+    pub change_hunks: Option<Vec<ChangeHunk>>,
 }
 
 /// Summary of a batch copy operation (from `BatchManifest`).
@@ -53,6 +84,7 @@ impl DirComparisonReport {
         left_root: Option<&Path>,
         right_root: Option<&Path>,
         manifest: Option<&BatchManifest>,
+        diff_options: Option<&DiffOptions>,
         opts: ReportOptions,
     ) -> Self {
         let left_display = super::display_path(left_root, &opts.path_mode, None);
@@ -105,7 +137,14 @@ impl DirComparisonReport {
                         unreadable += 1;
                         "unreadable".into()
                     }
-                    RecStatus::Computing => "computing".into(),
+                    // F77/RFC-092 §0: this status survives only from a scan
+                    // that was cancelled mid-flight — a *finished* report
+                    // can never legitimately show "computing" (something
+                    // still in progress), so this is the report-only label
+                    // for "its comparison never completed", distinct from
+                    // deep_compare.rs's own live "Comparing…" label for the
+                    // same `RecStatus::Computing` while a scan is running.
+                    RecStatus::Computing => "not compared".into(),
                 };
                 let path = match opts.path_mode {
                     ReportPathMode::NameOnly => e
@@ -120,6 +159,9 @@ impl DirComparisonReport {
                     status,
                     left_size: e.left_size,
                     right_size: e.right_size,
+                    left_checksum: None,
+                    right_checksum: None,
+                    change_hunks: None,
                 }
             })
             .collect();
@@ -128,6 +170,19 @@ impl DirComparisonReport {
             operation_id: m.operation_id.to_string(),
             succeeded: m.succeeded(),
             failed: m.failed(),
+        });
+
+        let non_default_options = diff_options
+            .map(non_default_options_summary)
+            .unwrap_or_default();
+        let profile_name = diff_options.map(|_| {
+            opts.profile_name.clone().unwrap_or_else(|| {
+                if non_default_options.is_empty() {
+                    "Default".into()
+                } else {
+                    "Custom".into()
+                }
+            })
         });
 
         let total = entries.len();
@@ -143,6 +198,9 @@ impl DirComparisonReport {
             unreadable,
             file_rows,
             batch_summary,
+            non_default_options,
+            profile_name,
+            change_hunks_omitted: Vec::new(),
             options: opts,
         }
     }

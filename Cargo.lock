@@ -1513,6 +1513,7 @@ dependencies = [
  "libc",
  "serde",
  "serde_json",
+ "sha2",
  "sheets-diff",
  "similar",
  "tempfile",

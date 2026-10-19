@@ -1,6 +1,8 @@
-//! File-level comparison report: `FileComparisonReport`, `HunkSummaryRow` (RFC-006).
+//! File-level comparison report: `FileComparisonReport`, `HunkSummaryRow` (RFC-006, RFC-092).
 
-use crate::diff::{DiffDocument, DiffWarning, HunkKind};
+use super::FileChecksum;
+use super::changes::{ChangeHunk, change_hunks_from_diff};
+use crate::diff::{DiffDocument, DiffOptions, DiffWarning, HunkKind};
 use crate::merge::{TransactionEntry, TransactionLog};
 use std::fmt::Write as _;
 use std::path::Path;
@@ -33,6 +35,17 @@ pub struct ReportOptions {
     pub include_warnings: bool,
     /// Include per-file size columns in directory reports.
     pub include_sizes: bool,
+    /// Unified-layout context lines kept around each change, for the
+    /// HTML report's change hunks (RFC-092 §3 item 5). Matches
+    /// `PatchOptions`' own default so the HTML report and the unified-diff
+    /// export agree on what "the changes" means.
+    pub context_lines: usize,
+    /// The named compare profile the diff was run under, if the caller
+    /// knows one (RFC-092 §3 item 3: "How: the compare profile's name").
+    /// `None` falls back to "Default" when every option is at its default,
+    /// or "Custom" otherwise — `from_diff` decides which once it has
+    /// compared the actual options.
+    pub profile_name: Option<String>,
 }
 
 impl Default for ReportOptions {
@@ -44,6 +57,8 @@ impl Default for ReportOptions {
             include_options: true,
             include_warnings: true,
             include_sizes: true,
+            context_lines: 3,
+            profile_name: None,
         }
     }
 }
@@ -67,6 +82,20 @@ pub struct FileComparisonReport {
     pub history: Vec<HistoryEntry>,
     pub options_summary: Vec<(String, String)>,
     pub options: ReportOptions,
+    /// Content-carrying, windowed change hunks for the HTML report (RFC-092
+    /// §3 item 5) — `hunk_rows` stays range-only for `to_markdown`/`to_json`,
+    /// which are unaffected by RFC-092 (§6: "stay as they are").
+    pub change_hunks: Vec<ChangeHunk>,
+    /// Compare options that differ from `DiffOptions::default()` — RFC-092
+    /// §3 item 3: listed "only where they differ from the defaults",
+    /// separate from `options_summary` (which `to_markdown`/`to_json` keep
+    /// showing unconditionally, unchanged).
+    pub non_default_options: Vec<(String, String)>,
+    /// The compare profile's name, resolved from `ReportOptions::profile_name`
+    /// (see its doc comment for the "Default"/"Custom" fallback).
+    pub profile_name: String,
+    pub left_checksum: Option<FileChecksum>,
+    pub right_checksum: Option<FileChecksum>,
 }
 
 /// One row in the hunk summary table.
@@ -85,6 +114,31 @@ pub struct HunkSummaryRow {
 pub struct HistoryEntry {
     pub timestamp_sec: u64,
     pub label: String,
+}
+
+/// Compare options that differ from `DiffOptions::default()`, in display
+/// order (RFC-092 §3 item 3). Shared with `DirComparisonReport`, since a
+/// folder comparison's "How" section describes the same `DiffOptions`.
+pub(crate) fn non_default_options_summary(o: &DiffOptions) -> Vec<(String, String)> {
+    let d = DiffOptions::default();
+    let mut v = Vec::new();
+    if o.ignore_whitespace != d.ignore_whitespace {
+        v.push(("Whitespace".into(), "ignored".into()));
+    }
+    if o.ignore_case != d.ignore_case {
+        v.push(("Case".into(), "ignored".into()));
+    }
+    if o.ignore_newlines != d.ignore_newlines {
+        v.push(("Newlines".into(), "ignored".into()));
+    }
+    if o.algorithm != d.algorithm {
+        v.push(("Algorithm".into(), format!("{:?}", o.algorithm)));
+    }
+    v
+}
+
+fn plural(n: usize) -> &'static str {
+    if n == 1 { "" } else { "s" }
 }
 
 impl FileComparisonReport {
@@ -172,6 +226,16 @@ impl FileComparisonReport {
             vec![]
         };
 
+        let non_default_options = non_default_options_summary(&diff.options);
+        let profile_name = opts.profile_name.clone().unwrap_or_else(|| {
+            if non_default_options.is_empty() {
+                "Default".into()
+            } else {
+                "Custom".into()
+            }
+        });
+        let change_hunks = change_hunks_from_diff(diff, opts.context_lines);
+
         Self {
             left_display,
             right_display,
@@ -184,7 +248,74 @@ impl FileComparisonReport {
             hunk_rows,
             history,
             options_summary,
+            change_hunks,
+            non_default_options,
+            profile_name,
+            left_checksum: None,
+            right_checksum: None,
             options: opts,
+        }
+    }
+
+    /// Attach checksums computed from the exact bytes read at export time
+    /// (RFC-092 §5). Not part of `from_diff` itself, since checksumming
+    /// requires file I/O the diff computation never performs.
+    pub fn with_checksums(
+        mut self,
+        left: Option<FileChecksum>,
+        right: Option<FileChecksum>,
+    ) -> Self {
+        self.left_checksum = left;
+        self.right_checksum = right;
+        self
+    }
+
+    /// Record a note the caller knows but the diff itself does not carry
+    /// (RFC-092 §3: "an encoding that is not UTF-8", or anything else the
+    /// comparison could not do) — rendered alongside `warnings` in the
+    /// HTML report's Notes section.
+    pub fn push_note(&mut self, note: impl Into<String>) {
+        self.warnings.push(note.into());
+    }
+
+    /// One sentence summarizing the change, for example "3 changes: 2 lines
+    /// removed, 5 lines added, 1 hunk replaced." (RFC-092 §3 item 4).
+    pub fn one_sentence_summary(&self) -> String {
+        if self.is_identical {
+            return "No differences — the two files are identical.".into();
+        }
+        let replaced = self
+            .hunk_rows
+            .iter()
+            .filter(|h| h.kind == "replace")
+            .count();
+        let mut clauses = Vec::new();
+        if self.lines_deleted > 0 {
+            clauses.push(format!(
+                "{} line{} removed",
+                self.lines_deleted,
+                plural(self.lines_deleted)
+            ));
+        }
+        if self.lines_added > 0 {
+            clauses.push(format!(
+                "{} line{} added",
+                self.lines_added,
+                plural(self.lines_added)
+            ));
+        }
+        if replaced > 0 {
+            clauses.push(format!("{} hunk{} replaced", replaced, plural(replaced)));
+        }
+        let lead = format!(
+            "{} change{}",
+            self.hunks_changed,
+            plural(self.hunks_changed)
+        );
+        if clauses.is_empty() {
+            format!("{lead}.")
+        } else {
+            format!("{lead}: {}.", clauses.join(", "))
         }
     }
 
