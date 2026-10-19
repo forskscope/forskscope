@@ -447,6 +447,8 @@ pub fn run(root: &Path) {
         }
     }
 
+    assert_html_report_colours_match_tokens(root, &rules, &mut problems);
+
     if !problems.is_empty() {
         eprintln!("colour-vision check failed:");
         for p in &problems {
@@ -458,8 +460,113 @@ pub fn run(root: &Path) {
         "colour-vision check passed: every removed/added, replaced/removed and replaced/added \
          pair in every theme and palette stays distinguishable under normal vision, and \
          red-green-safe stays distinguishable under deuteranopia and protanopia too; text and \
-         mark contrast meet WCAG."
+         mark contrast meet WCAG; the HTML comparison report's own copied colours match \
+         01-tokens.css exactly."
     );
+}
+
+// ── Review 174 §5: the HTML report's copied colours, guarded against drift ──
+//
+// `report::html.rs` (forskscope-core) cannot read `01-tokens.css` itself -
+// it has no asset pipeline and must stay buildable with no GUI dependency -
+// so RFC-092's light-theme diff colours are copied in as literal hex in two
+// `Palette` consts, `STANDARD`/`RED_GREEN_SAFE`. That copy has no mechanism
+// keeping it in sync with the source tokens; this is it. xtask deliberately
+// has no dependency on the main workspace (DEC-005/F119) - it cannot import
+// `Palette` as a Rust type, so this reads html.rs's own source text and
+// pulls the six `field: "#hex"` lines out of each const block, the same
+// text-scan style `parse_rules` already uses for the CSS side.
+
+const REPORT_PALETTE_FIELDS: [(&str, &str); 6] = [
+    ("del_bg", "--del-bg"),
+    ("ins_bg", "--ins-bg"),
+    ("del_mark", "--del-mark"),
+    ("ins_mark", "--ins-mark"),
+    ("rep_bg", "--rep-bg"),
+    ("warn", "--warn"),
+];
+
+/// Pulls `field: "#hex",` lines for one `const NAME: Palette = Palette { ...
+/// };` block out of `source`. Not a Rust parser - good enough for a
+/// hand-written, one-field-per-line struct literal, same spirit as
+/// `parse_rules` above.
+fn parse_report_palette_const(
+    source: &str,
+    const_name: &str,
+) -> std::collections::HashMap<String, String> {
+    let marker = format!("const {const_name}: Palette = Palette {{");
+    let start = source
+        .find(&marker)
+        .unwrap_or_else(|| panic!("no `{marker}` found in report/html.rs"));
+    let after = &source[start + marker.len()..];
+    let end = after
+        .find("};")
+        .unwrap_or_else(|| panic!("unterminated `{const_name}` Palette literal in report/html.rs"));
+    let body = &after[..end];
+
+    let mut found = std::collections::HashMap::new();
+    for (field, _) in REPORT_PALETTE_FIELDS {
+        let field_marker = format!("{field}:");
+        if let Some(pos) = body.find(&field_marker) {
+            let rest = &body[pos + field_marker.len()..];
+            let quote1 = rest.find('"').unwrap_or_else(|| {
+                panic!("`{field}` in `{const_name}` has no quoted hex value in report/html.rs")
+            });
+            let after_quote = &rest[quote1 + 1..];
+            let quote2 = after_quote.find('"').unwrap_or_else(|| {
+                panic!("`{field}` in `{const_name}` has an unterminated string")
+            });
+            found.insert(field.to_string(), after_quote[..quote2].to_string());
+        }
+    }
+    found
+}
+
+fn assert_html_report_colours_match_tokens(
+    root: &Path,
+    rules: &[Rule],
+    problems: &mut Vec<String>,
+) {
+    let html_path = root.join("crates/forskscope-core/src/report/html.rs");
+    let source = fs::read_to_string(&html_path)
+        .unwrap_or_else(|e| panic!("cannot read {}: {e}", html_path.display()));
+
+    for (const_name, rgsafe) in [("STANDARD", false), ("RED_GREEN_SAFE", true)] {
+        let parsed = parse_report_palette_const(&source, const_name);
+        let rgsafe_sel = ".theme-light.cv-rgsafe";
+        let base_sel = ".theme-light";
+        for (field, css_var) in REPORT_PALETTE_FIELDS {
+            let Some(rust_value) = parsed.get(field) else {
+                problems.push(format!(
+                    "report/html.rs's {const_name} is missing a `{field}` field \
+                     ({html_path:?})"
+                ));
+                continue;
+            };
+            // Same cascade `resolve()` uses: the palette's own override
+            // where `01-tokens.css` declares one, else the base theme's
+            // value (`--warn` never has a `.cv-rgsafe` override - "already
+            // told apart from these by hue and glyph").
+            let token_value = if rgsafe {
+                find_decl(rules, rgsafe_sel, css_var)
+                    .or_else(|| find_decl(rules, base_sel, css_var))
+            } else {
+                find_decl(rules, base_sel, css_var)
+            }
+            .unwrap_or_else(|| {
+                panic!("01-tokens.css has no {css_var} declaration for {base_sel}/{rgsafe_sel}")
+            });
+            if rust_value != token_value {
+                problems.push(format!(
+                    "report/html.rs's {const_name}.{field} is {rust_value:?} but \
+                     01-tokens.css's {base_sel}{} {css_var} is {token_value:?} - the HTML \
+                     comparison report's copied colour has drifted from the token it was \
+                     copied from",
+                    if rgsafe { ".cv-rgsafe" } else { "" }
+                ));
+            }
+        }
+    }
 }
 
 #[cfg(test)]
