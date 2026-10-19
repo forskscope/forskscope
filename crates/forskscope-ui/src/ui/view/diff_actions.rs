@@ -566,6 +566,25 @@ pub(crate) fn local_timestamp_display() -> String {
         .to_string()
 }
 
+/// Review 174 §6: a checksum appears only where a reader can reproduce it
+/// by running `sha256sum` on a real file — `has_fingerprint` is `false`
+/// for exactly one case in this codebase today, `LoadedDocument::empty()`
+/// ("one side is intentionally absent"), whose `raw_bytes` would otherwise
+/// still produce a real-looking checksum (of zero bytes) that proves
+/// nothing about any actual file. See `export_file_report`'s own doc
+/// comment for why there is no git-revision-side case to handle here (none
+/// is wired into `CompareTab` today).
+fn checksum_if_fingerprinted(
+    bytes: Option<&[u8]>,
+    has_fingerprint: bool,
+) -> Option<forskscope_core::report::FileChecksum> {
+    if has_fingerprint {
+        bytes.map(forskscope_core::report::FileChecksum::of_bytes)
+    } else {
+        None
+    }
+}
+
 /// Export the current file comparison as an HTML report or a unified-diff
 /// patch, per the dialog's chosen format and path mode.
 ///
@@ -640,6 +659,21 @@ pub fn export_file_report(
             let right_path = tab.right_path.clone();
             let left_bytes = tab.left_doc.text.as_ref().map(|t| t.raw_bytes.clone());
             let right_bytes = tab.right_doc.text.as_ref().map(|t| t.raw_bytes.clone());
+            // Review 174 §6: a checksum appears only where a reader can
+            // reproduce it by running `sha256sum` on a real file.
+            // `fingerprint_at_load` is `None` for exactly one case in this
+            // codebase today - `LoadedDocument::empty()`, "one side is
+            // intentionally absent" (a new or deleted file in a
+            // comparison). There is no git-revision-as-a-side feature
+            // wired into CompareTab to check for (`vcs::read_revision_file`
+            // exists but nothing in forskscope-ui ever calls it) - if one
+            // is ever added, it will need this same decision made again
+            // for whatever it sets `fingerprint_at_load` to. Showing a
+            // checksum for an absent side would be the SHA-256 of zero
+            // bytes (`raw_bytes: Vec::new()` in `empty()`), which proves
+            // nothing about any real file.
+            let left_has_fingerprint = tab.left_doc.fingerprint_at_load.is_some();
+            let right_has_fingerprint = tab.right_doc.fingerprint_at_load.is_some();
 
             let default_name = tab
                 .right_path
@@ -676,12 +710,8 @@ pub fn export_file_report(
                         report_options,
                     )
                     .with_checksums(
-                        left_bytes
-                            .as_deref()
-                            .map(forskscope_core::report::FileChecksum::of_bytes),
-                        right_bytes
-                            .as_deref()
-                            .map(forskscope_core::report::FileChecksum::of_bytes),
+                        checksum_if_fingerprinted(left_bytes.as_deref(), left_has_fingerprint),
+                        checksum_if_fingerprinted(right_bytes.as_deref(), right_has_fingerprint),
                     );
                     forskscope_core::report::render_file_report(
                         &report,
@@ -722,6 +752,29 @@ mod tests {
     // code). `to_precondition` is the one piece of this migration's logic
     // that's genuinely pure; the rest is covered by runtime evidence
     // (see the RFC-077 patch 4b review request).
+
+    // ── Review 174 §6: a checksum appears only where it's reproducible ────
+
+    #[test]
+    fn no_fingerprint_means_no_checksum_even_with_real_bytes_present() {
+        // Exactly LoadedDocument::empty()'s shape: real (empty) bytes, no
+        // fingerprint - the case this exists to not show a misleading
+        // checksum-of-nothing for.
+        assert!(checksum_if_fingerprinted(Some(&[]), false).is_none());
+        // Also true for a non-empty byte slice - `has_fingerprint` is the
+        // only thing that matters, not whether bytes happen to be present.
+        assert!(checksum_if_fingerprinted(Some(b"anything"), false).is_none());
+    }
+
+    #[test]
+    fn a_real_fingerprint_produces_the_real_checksum() {
+        let checksum = checksum_if_fingerprinted(Some(b"hello"), true).unwrap();
+        assert_eq!(checksum.size, 5);
+        assert_eq!(
+            checksum.sha256_hex,
+            forskscope_core::checksum::sha256_hex(b"hello")
+        );
+    }
 
     #[test]
     fn to_precondition_maps_must_match_one_to_one() {
