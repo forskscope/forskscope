@@ -632,23 +632,14 @@ pub fn export_file_report(
                 context_lines: store.settings.read().context_lines,
                 ..Default::default()
             };
+            // Cloned, not yet hashed or rendered - RFC-092 §5: that work
+            // (SHA-256 over however large the file is, plus building the
+            // HTML string) runs off the UI thread below, not here.
+            let diff = tab.diff.clone();
+            let left_path = tab.left_path.clone();
+            let right_path = tab.right_path.clone();
             let left_bytes = tab.left_doc.text.as_ref().map(|t| t.raw_bytes.clone());
             let right_bytes = tab.right_doc.text.as_ref().map(|t| t.raw_bytes.clone());
-            let report = forskscope_core::report::FileComparisonReport::from_diff(
-                &tab.diff,
-                tab.left_path.as_deref(),
-                tab.right_path.as_deref(),
-                None,
-                report_options,
-            )
-            .with_checksums(
-                left_bytes
-                    .as_deref()
-                    .map(forskscope_core::report::FileChecksum::of_bytes),
-                right_bytes
-                    .as_deref()
-                    .map(forskscope_core::report::FileChecksum::of_bytes),
-            );
 
             let default_name = tab
                 .right_path
@@ -673,16 +664,37 @@ pub fn export_file_report(
                     .add_filter("All files", &["*"])
                     .save_file()
                     .await;
-                if let Some(file) = handle {
-                    let path = file.path().to_path_buf();
-                    let html = forskscope_core::report::render_file_report(
+                let Some(file) = handle else { return };
+                let path = file.path().to_path_buf();
+
+                let html = tokio::task::spawn_blocking(move || {
+                    let report = forskscope_core::report::FileComparisonReport::from_diff(
+                        &diff,
+                        left_path.as_deref(),
+                        right_path.as_deref(),
+                        None,
+                        report_options,
+                    )
+                    .with_checksums(
+                        left_bytes
+                            .as_deref()
+                            .map(forskscope_core::report::FileChecksum::of_bytes),
+                        right_bytes
+                            .as_deref()
+                            .map(forskscope_core::report::FileChecksum::of_bytes),
+                    );
+                    forskscope_core::report::render_file_report(
                         &report,
                         env!("CARGO_PKG_VERSION"),
                         &generated_at,
                         color_vision_safe,
                         &|s| t(lang, s),
-                    );
-                    match std::fs::write(&path, &html) {
+                    )
+                })
+                .await;
+
+                match html {
+                    Ok(html) => match std::fs::write(&path, &html) {
                         Ok(()) => {
                             store.notify_success_with_open(
                                 t(lang, "Report saved."),
@@ -691,7 +703,8 @@ pub fn export_file_report(
                             );
                         }
                         Err(e) => eprintln!("export_file_report: write error: {e}"),
-                    }
+                    },
+                    Err(e) => eprintln!("export_file_report: join error: {e}"),
                 }
             });
         }
