@@ -560,7 +560,7 @@ pub enum ReportExportFormat {
 
 /// "Generated" timestamp for a report's header: local time with its UTC
 /// offset (RFC-092 §3 item 1), e.g. `2026-10-19 12:00 +09:00`.
-fn local_timestamp_display() -> String {
+pub(crate) fn local_timestamp_display() -> String {
     chrono::Local::now()
         .format("%Y-%m-%d %H:%M %:z")
         .to_string()

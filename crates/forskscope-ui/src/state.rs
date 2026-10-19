@@ -181,6 +181,17 @@ pub enum Modal {
     /// RFC-092 (handoff 084): the comparison-report/unified-diff export
     /// dialog for a file comparison, by tab index.
     ExportReport(usize),
+    /// RFC-092 (handoff 084): the same, for a folder comparison. `entries`
+    /// is a snapshot of Deep Compare's table taken when the dialog opened,
+    /// not re-read live. `initial_format` lets the toolbar's two separate
+    /// buttons ("Export report…" / "Export patch…") open the one dialog
+    /// pre-selected, since the RFC asks for both to be offered.
+    ExportDirReport(
+        std::path::PathBuf,
+        std::path::PathBuf,
+        Vec<forskscope_core::dir::RecEntry>,
+        crate::ui::view::diff_actions::ReportExportFormat,
+    ),
 }
 
 // ── Toast / notice ────────────────────────────────────────────────────────────

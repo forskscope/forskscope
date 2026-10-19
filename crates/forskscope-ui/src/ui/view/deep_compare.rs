@@ -42,7 +42,13 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
     // F111: the ignore rules are part of what a scan was run for, so a settings
     // change re-scans too (a scan under old rules is a different answer).
     let mut scan_roots: Signal<Option<(PathBuf, PathBuf, IgnoreRules)>> = use_signal(|| None);
-    let store = use_context::<Store>();
+    // RFC-092 §0 (handoff 084): "a comparison that was cancelled can be
+    // exported" has no existing trigger otherwise - a root change already
+    // supersedes in-flight work (F78), but discards it for the new roots
+    // rather than leaving it in place to export. Reset whenever a new scan
+    // actually starts (`roots_changed` below); set by the Cancel button.
+    let mut cancelled: Signal<bool> = use_signal(|| false);
+    let mut store = use_context::<Store>();
     // F78: owns the generation guard, the cancellation token shared by
     // both phases, and the concurrency bound this view already had -
     // replacing the ad hoc per-effect-run `Semaphore` below with one that
@@ -69,6 +75,7 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
             return;
         }
         scan_roots.set(Some(key));
+        cancelled.set(false);
         // Cancel outstanding work under the old roots (both phases share
         // this token) before anything else observes the new ones.
         digest_epoch.write().restart();
@@ -193,7 +200,14 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
     let tc = *total_common.read();
     let is_scan = *scanning.read();
     let in_flight = !is_scan && tc > 0 && done < tc;
+    // RFC-092 §0: disabled while a scan is genuinely still running; a
+    // cancelled one (the user hit Cancel below) is exportable again even
+    // though `in_flight` would otherwise still read true (nothing ever
+    // made `done` reach `tc` for the entries that were in flight when
+    // cancelled - see the Cancel button's own comment).
+    let still_comparing = is_scan || (in_flight && !*cancelled.read());
     let visible: Vec<RecEntry> = apply_filter(&snap, f).into_iter().cloned().collect();
+    let all_entries: Vec<RecEntry> = snap.iter().cloned().collect();
     drop(snap);
 
     rsx! {
@@ -215,6 +229,72 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                     onclick: move |_| filter.set(DeepFilter::Equal), {t(lang, "Equal only")} }
                 span { class: "spacer" }
                 BatchCopyButtons { entries, left_root: left_root.clone(), right_root: right_root.clone() }
+                // RFC-092 §1: two separate buttons here (unlike a file
+                // comparison's single "Export report…" beside "Export
+                // patch" under "More ▼") - the RFC asks for both, offered
+                // directly, in a folder comparison's own toolbar.
+                button {
+                    disabled: still_comparing,
+                    title: if still_comparing {
+                        t(lang, "Finish comparing, or Cancel, before exporting.")
+                    } else {
+                        t(lang, "Export a comparison report")
+                    },
+                    onclick: {
+                        let lr = left_root.clone();
+                        let rr = right_root.clone();
+                        let all = all_entries.clone();
+                        move |_| {
+                            store.modal.set(Modal::ExportDirReport(
+                                lr.clone(), rr.clone(), all.clone(),
+                                crate::ui::view::diff_actions::ReportExportFormat::Html,
+                            ));
+                        }
+                    },
+                    {t(lang, "Export report…")}
+                }
+                button {
+                    disabled: still_comparing,
+                    title: if still_comparing {
+                        t(lang, "Finish comparing, or Cancel, before exporting.")
+                    } else {
+                        t(lang, "Export a unified-diff patch file")
+                    },
+                    onclick: {
+                        let lr = left_root.clone();
+                        let rr = right_root.clone();
+                        let all = all_entries.clone();
+                        move |_| {
+                            store.modal.set(Modal::ExportDirReport(
+                                lr.clone(), rr.clone(), all.clone(),
+                                crate::ui::view::diff_actions::ReportExportFormat::Patch,
+                            ));
+                        }
+                    },
+                    {t(lang, "Export patch…")}
+                }
+                if is_scan || in_flight {
+                    button {
+                        disabled: *cancelled.read(),
+                        title: t(lang, "Stop comparing — entries not yet compared stay as they are, and can still be exported."),
+                        onclick: move |_| {
+                            // Cancels the shared token without changing
+                            // `scan_roots` - the effect above only restarts
+                            // a scan when the roots/rules key actually
+                            // changes, so this just stops outstanding work
+                            // in place. Phase-2 tasks already in flight see
+                            // their token cancelled and return without
+                            // applying a result (existing `DigestOutcome::
+                            // Cancelled` handling), leaving those entries at
+                            // `RecStatus::Computing` - which the report
+                            // renders as "not compared" (report::dir).
+                            digest_epoch.write().restart();
+                            scanning.set(false);
+                            cancelled.set(true);
+                        },
+                        {t(lang, "Cancel")}
+                    }
+                }
             }
             if is_scan {
                 div { class: "deep-scanning", {t(lang, "Scanning…")} }

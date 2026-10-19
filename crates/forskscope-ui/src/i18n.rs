@@ -494,6 +494,17 @@ fn ja(key: &str) -> Option<&'static str> {
         "A file changed since it was compared. Compare again, then export." => {
             "比較した後にファイルが変更されました。再度比較してからエクスポートしてください。"
         }
+        "Export patch…" => "パッチをエクスポート…",
+        "Export a unified-diff patch file" => "統合diff形式のパッチファイルをエクスポートします",
+        "Finish comparing, or Cancel, before exporting." => {
+            "エクスポートする前に、比較を完了するかキャンセルしてください。"
+        }
+        "Stop comparing — entries not yet compared stay as they are, and can still be exported." => {
+            "比較を停止します。まだ比較されていない項目はそのまま残り、エクスポートすることもできます。"
+        }
+        "Reading and hashing files" => "ファイルの読み込みとハッシュ計算",
+        "Working…" => "処理中…",
+        "Could not build the patch" => "パッチを作成できませんでした",
 
         // RFC-092: the HTML report itself (forskscope-core/src/report/html.rs).
         // Reached through a translator closure, not a literal t(lang, ...)

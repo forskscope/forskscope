@@ -191,6 +191,11 @@ pub fn ModalLayer() -> Element {
             SaveErrorModal { index: i, target, view }
         },
         Modal::ExportReport(i) => rsx! { ExportReportModal { index: i } },
+        Modal::ExportDirReport(l, r, entries, initial_format) => rsx! {
+            crate::ui::view::export_dir_report::ExportDirReportModal {
+                left_root: l, right_root: r, entries, initial_format,
+            }
+        },
     }
 }
 
