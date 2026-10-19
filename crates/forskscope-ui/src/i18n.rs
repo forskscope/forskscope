@@ -537,15 +537,19 @@ fn ja(key: &str) -> Option<&'static str> {
         "Run `sha256sum` on a file to confirm it is the file this report describes. This does not prove the report itself is unaltered." => {
             "ファイルに対して `sha256sum` を実行すると、このレポートが説明しているファイルであることを確認できます。ただし、レポート自体が改ざんされていないことは証明しません。"
         }
-        // report::dir::DirComparisonReport's DirFileRow.status - "equal",
-        // "left only", "right only" and "unreadable" already have entries
-        // above (shared with deep_compare.rs's own words); these are the
-        // ones only the report model uses.
-        "modified" => "変更あり",
-        "left only (empty directory)" => "左のみ（空のディレクトリ）",
-        "right only (empty directory)" => "右のみ（空のディレクトリ）",
-        "symlink" => "シンボリックリンク",
-        "not compared" => "未比較",
+        // review 174 §3: report::html's per-row status words now come from
+        // forskscope_core::dir::status_key, the same keys status_label
+        // (deep_compare.rs) reads - "Different"/"Identical"/"Only on the
+        // left"/"Only on the right"/"Only on the left (empty folder)"/
+        // "Only on the right (empty folder)"/"Symlink not followed"/
+        // "Unreadable" all already have entries (pre-existing, shared with
+        // the live view). "Not compared" (RecStatus::Computing once
+        // nothing is comparing it any more - review 174 §2a) is new here.
+        "Not compared" => "未比較",
+        "Cancelled — compare again to see the folders." => {
+            "キャンセルしました — フォルダーを表示するには再度比較してください。"
+        }
+        "Compare again, then export." => "再度比較してからエクスポートしてください。",
         "changed files' content is not shown in this report (the cap of 50 files or 5 MiB of change text was reached)" => {
             "変更されたファイルの内容はこのレポートには表示されません（50ファイルまたは5 MiBの変更テキストという上限に達しました）"
         }

@@ -50,7 +50,14 @@ pub struct DirComparisonReport {
 #[derive(Debug, Clone)]
 pub struct DirFileRow {
     pub path: String,
+    /// The machine word `to_markdown`/`to_json` render unchanged (RFC-092
+    /// §6: out of UI scope, kept as-is — review 174 §3). The HTML renderer
+    /// reads `rec_status` instead, through the same `status_key` Deep
+    /// Compare's own live view reads, so the two can't drift apart.
     pub status: String,
+    /// The raw status this row's `status`/HTML-report word were both
+    /// derived from (review 174 §3).
+    pub rec_status: RecStatus,
     pub left_size: Option<u64>,
     pub right_size: Option<u64>,
     /// SHA-256 of each side's bytes as read at export time (RFC-092 §5) —
@@ -157,6 +164,7 @@ impl DirComparisonReport {
                 DirFileRow {
                     path,
                     status,
+                    rec_status: e.status,
                     left_size: e.left_size,
                     right_size: e.right_size,
                     left_checksum: None,

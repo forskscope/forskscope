@@ -91,6 +91,50 @@ pub struct RecEntry {
     pub right_size: Option<u64>,
 }
 
+/// The single source of a `RecStatus`'s status word — review 174 §3: the
+/// app's own words, one function, so Deep Compare's live view
+/// (`deep_compare.rs`'s `status_label`) and a comparison report
+/// (`report::html`) can never drift apart. Returns an **i18n key** (English
+/// text), not a translation — the caller passes it through `t(lang, ...)`
+/// (UI) or a translator closure (core's report renderer); this function
+/// itself has no i18n dependency, matching core's GUI-independence.
+///
+/// `in_progress` distinguishes `RecStatus::Computing`'s two honest
+/// readings (review 174 §2a): `true` while a scan is actually still
+/// running ("Comparing…"); `false` once the scan is done or cancelled and
+/// an entry never reached a verdict ("Not compared" - never "Comparing…"
+/// for something nothing is currently comparing). A report never passes
+/// `true`: by the time an export runs, the scan it describes has already
+/// finished or been cancelled, never both-at-once with the export itself.
+pub fn status_key(status: RecStatus, in_progress: bool) -> &'static str {
+    match status {
+        RecStatus::Changed => "Different",
+        RecStatus::LeftOnly => "Only on the left",
+        RecStatus::RightOnly => "Only on the right",
+        // F135: distinct wording from the plain one-sided labels above -
+        // this row is an empty directory, not a file, and the label says
+        // so rather than letting the glyph (deliberately the same one)
+        // carry that distinction alone.
+        RecStatus::LeftOnlyDir => "Only on the left (empty folder)",
+        RecStatus::RightOnlyDir => "Only on the right (empty folder)",
+        RecStatus::Equal => "Identical",
+        RecStatus::Computing => {
+            if in_progress {
+                "Comparing…"
+            } else {
+                "Not compared"
+            }
+        }
+        RecStatus::Unreadable => "Unreadable",
+        // F80: core does not follow cross-root symlinks (the entry is
+        // reported, not compared, per RecStatus::Symlink's own doc comment)
+        // - the honest label says the link was not followed, not merely
+        // that one exists, so it does not read as a verdict about the
+        // target.
+        RecStatus::Symlink => "Symlink not followed",
+    }
+}
+
 /// Result of a recursive comparison scan (F79).
 ///
 /// `left_root_unreadable`/`right_root_unreadable` distinguish "the root

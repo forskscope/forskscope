@@ -398,22 +398,40 @@ pub fn render_dir_report(
     let _ = writeln!(
         out,
         "<p>{}: {} · {}: {} · {}: {} · {}: {}</p>",
-        escape_html(&tr("equal")),
+        escape_html(&tr(crate::dir::status_key(
+            crate::dir::RecStatus::Equal,
+            false
+        ))),
         report.equal,
-        escape_html(&tr("modified")),
+        escape_html(&tr(crate::dir::status_key(
+            crate::dir::RecStatus::Changed,
+            false
+        ))),
         report.changed,
-        escape_html(&tr("left only")),
+        escape_html(&tr(crate::dir::status_key(
+            crate::dir::RecStatus::LeftOnly,
+            false
+        ))),
         report.left_only,
-        escape_html(&tr("right only")),
+        escape_html(&tr(crate::dir::status_key(
+            crate::dir::RecStatus::RightOnly,
+            false
+        ))),
         report.right_only
     );
     if report.symlinks > 0 || report.unreadable > 0 {
         let _ = writeln!(
             out,
             "<p>{}: {} · {}: {}</p>",
-            escape_html(&tr("symlink")),
+            escape_html(&tr(crate::dir::status_key(
+                crate::dir::RecStatus::Symlink,
+                false
+            ))),
             report.symlinks,
-            escape_html(&tr("unreadable")),
+            escape_html(&tr(crate::dir::status_key(
+                crate::dir::RecStatus::Unreadable,
+                false
+            ))),
             report.unreadable
         );
     }
@@ -554,7 +572,14 @@ fn render_dir_file_row(
         out,
         "<tr><td>{}</td><td>{}</td>{sizes}<td>{checksums}</td></tr>",
         escape_html(&row.path),
-        escape_html(&tr(&row.status))
+        // review 174 §3: the same `status_key` Deep Compare's live view
+        // reads, not `row.status` (the machine word `to_markdown`/
+        // `to_json` keep - RFC-092 §6, those two stay as they are). A
+        // report never renders while its scan is still live (export is
+        // disabled until it finishes or is cancelled), so `in_progress` is
+        // always `false` here - a `Computing` row always reads "Not
+        // compared", never "Comparing…", in a report.
+        escape_html(&tr(crate::dir::status_key(row.rec_status, false)))
     );
 }
 
@@ -801,8 +826,13 @@ mod tests {
         let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
         assert!(html.contains("a.txt"));
         assert!(html.contains("b.txt"));
-        assert!(html.contains("equal"));
-        assert!(html.contains("modified"));
+        // Review 174 §3: the app's own words - the same ones
+        // deep_compare.rs's status_label reads, via the shared
+        // forskscope_core::dir::status_key - not the report model's own
+        // invented "equal"/"modified" (those stay in to_markdown/to_json
+        // only, RFC-092 §6).
+        assert!(html.contains("Identical"));
+        assert!(html.contains("Different"));
     }
 
     #[test]
@@ -850,7 +880,10 @@ mod tests {
             crate::report::ReportOptions::default(),
         );
         let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
-        assert!(html.contains("not compared"));
-        assert!(!html.contains(">computing<"));
+        // Review 174 §2a/§3: the app's own word, via status_key - a report
+        // never renders mid-scan, so a Computing entry always reads "Not
+        // compared", never "Comparing…".
+        assert!(html.contains("Not compared"));
+        assert!(!html.contains("Comparing"));
     }
 }

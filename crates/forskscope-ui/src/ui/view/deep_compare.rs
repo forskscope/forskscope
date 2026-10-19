@@ -21,6 +21,65 @@ use crate::i18n::t;
 use crate::state::{DirOp, Lang, Modal, Store, open_compare};
 use crate::ui::view::digest_epoch::{DigestEpoch, EpochStamp};
 
+/// The export buttons' tooltip, distinguishing the two disabled reasons
+/// review 174 §2b asks for: a cancelled *listing* ("nothing to export at
+/// all, compare again") reads differently from an ordinary in-progress
+/// comparison ("wait, or stop the comparison"). `enabled_text` is the key
+/// to show once the button is not disabled at all.
+fn export_disabled_tooltip(
+    disabled: bool,
+    listing_cancelled: bool,
+    lang: Lang,
+    enabled_text: &'static str,
+) -> String {
+    if !disabled {
+        t(lang, enabled_text)
+    } else if listing_cancelled {
+        t(lang, "Compare again, then export.")
+    } else {
+        t(lang, "Finish comparing, or Cancel, before exporting.")
+    }
+}
+
+/// Review 174 §2b: which phase, if any, a user-initiated Cancel stopped —
+/// not merely whether one happened. See `DeepCompareView`'s `cancel_state`
+/// field doc for why phase matters.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum CancelState {
+    None,
+    /// Cancel landed during phase 1 (the listing walk) - `entries` is
+    /// empty or partial, never exportable.
+    DuringListing,
+    /// Cancel landed during phase 2 (digest) - the listing finished;
+    /// unfinished rows are "Not compared", but the rest is real and
+    /// exportable.
+    DuringDigest,
+}
+
+/// Review 174 §2b, the state-level rule: a phase-1 (listing) cancel is
+/// never exportable — `entries` is empty or partial, and `is_scan`/
+/// `in_flight` both read `false` once it returns (phase 1 never reaches
+/// the line that sets `total_common`), so without this special case the
+/// export buttons would read "nothing in progress" and happily write a
+/// report of an incomplete tree. A phase-2 (digest) cancel is always
+/// exportable, overriding `in_flight`'s own stale-`true` reading (nothing
+/// ever makes `done` reach `tc` for rows a cancel left unfinished).
+fn export_disabled(state: CancelState, is_scan: bool, in_flight: bool) -> bool {
+    match state {
+        CancelState::DuringListing => true,
+        CancelState::DuringDigest => false,
+        CancelState::None => is_scan || in_flight,
+    }
+}
+
+/// Review 174 §2a, the state-level rule: a `Computing` row reads "still
+/// comparing" only while something genuinely still is — never once any
+/// cancel has landed, even a phase-2 one that leaves the rest of the
+/// result real and exportable.
+fn row_in_progress(state: CancelState, in_flight: bool) -> bool {
+    in_flight && state == CancelState::None
+}
+
 #[component]
 pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> Element {
     // Clone once outside all closures so the props aren't moved piecemeal.
@@ -47,7 +106,16 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
     // supersedes in-flight work (F78), but discards it for the new roots
     // rather than leaving it in place to export. Reset whenever a new scan
     // actually starts (`roots_changed` below); set by the Cancel button.
-    let mut cancelled: Signal<bool> = use_signal(|| false);
+    //
+    // Review 174 §2b: *which phase* was cancelled matters. A phase-1
+    // (listing) cancel leaves `entries` empty or partial - nothing
+    // meaningful to export, and `is_scan`/`in_flight` both read `false`
+    // afterwards (phase 1 never reached the line that sets `total_common`),
+    // so without this the export buttons would read "not in progress" and
+    // happily write a report of an incomplete, misleading "0 files" tree.
+    // Only a phase-2 (digest) cancel leaves a real, exportable partial
+    // result, with its unfinished rows reading "Not compared" (§2a).
+    let mut cancel_state: Signal<CancelState> = use_signal(|| CancelState::None);
     let mut store = use_context::<Store>();
     // F78: owns the generation guard, the cancellation token shared by
     // both phases, and the concurrency bound this view already had -
@@ -75,7 +143,7 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
             return;
         }
         scan_roots.set(Some(key));
-        cancelled.set(false);
+        cancel_state.set(CancelState::None);
         // Cancel outstanding work under the old roots (both phases share
         // this token) before anything else observes the new ones.
         digest_epoch.write().restart();
@@ -200,12 +268,9 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
     let tc = *total_common.read();
     let is_scan = *scanning.read();
     let in_flight = !is_scan && tc > 0 && done < tc;
-    // RFC-092 §0: disabled while a scan is genuinely still running; a
-    // cancelled one (the user hit Cancel below) is exportable again even
-    // though `in_flight` would otherwise still read true (nothing ever
-    // made `done` reach `tc` for the entries that were in flight when
-    // cancelled - see the Cancel button's own comment).
-    let still_comparing = is_scan || (in_flight && !*cancelled.read());
+    let state = *cancel_state.read();
+    let still_comparing = export_disabled(state, is_scan, in_flight);
+    let listing_cancelled = state == CancelState::DuringListing;
     let visible: Vec<RecEntry> = apply_filter(&snap, f).into_iter().cloned().collect();
     let all_entries: Vec<RecEntry> = snap.iter().cloned().collect();
     drop(snap);
@@ -235,11 +300,7 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                 // directly, in a folder comparison's own toolbar.
                 button {
                     disabled: still_comparing,
-                    title: if still_comparing {
-                        t(lang, "Finish comparing, or Cancel, before exporting.")
-                    } else {
-                        t(lang, "Export a comparison report")
-                    },
+                    title: export_disabled_tooltip(still_comparing, listing_cancelled, lang, "Export a comparison report"),
                     onclick: {
                         let lr = left_root.clone();
                         let rr = right_root.clone();
@@ -255,11 +316,7 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                 }
                 button {
                     disabled: still_comparing,
-                    title: if still_comparing {
-                        t(lang, "Finish comparing, or Cancel, before exporting.")
-                    } else {
-                        t(lang, "Export a unified-diff patch file")
-                    },
+                    title: export_disabled_tooltip(still_comparing, listing_cancelled, lang, "Export a unified-diff patch file"),
                     onclick: {
                         let lr = left_root.clone();
                         let rr = right_root.clone();
@@ -273,9 +330,14 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                     },
                     {t(lang, "Export patch…")}
                 }
-                if is_scan || in_flight {
+                // Visible only while something is genuinely still running
+                // and nothing has been cancelled yet - once `state` leaves
+                // `None`, `in_flight`'s own stale-true reading (nothing
+                // ever makes `done` reach `tc` for rows a cancel left
+                // unfinished) would otherwise keep this button shown
+                // forever.
+                if state == CancelState::None && (is_scan || in_flight) {
                     button {
-                        disabled: *cancelled.read(),
                         title: t(lang, "Stop comparing — entries not yet compared stay as they are, and can still be exported."),
                         onclick: move |_| {
                             // Cancels the shared token without changing
@@ -286,11 +348,17 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                             // their token cancelled and return without
                             // applying a result (existing `DigestOutcome::
                             // Cancelled` handling), leaving those entries at
-                            // `RecStatus::Computing` - which the report
-                            // renders as "not compared" (report::dir).
+                            // `RecStatus::Computing` - which both the view
+                            // and a report now read as "Not compared"
+                            // (review 174 §2a/§3).
+                            let during_listing = *scanning.read();
                             digest_epoch.write().restart();
                             scanning.set(false);
-                            cancelled.set(true);
+                            cancel_state.set(if during_listing {
+                                CancelState::DuringListing
+                            } else {
+                                CancelState::DuringDigest
+                            });
                         },
                         {t(lang, "Cancel")}
                     }
@@ -298,6 +366,13 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
             }
             if is_scan {
                 div { class: "deep-scanning", {t(lang, "Scanning…")} }
+            } else if listing_cancelled {
+                // Review 174 §2b: phase 1 never finished - `entries` is
+                // empty or partial, so the table below would otherwise
+                // show a misleadingly small or empty listing as if it were
+                // complete. Neither export button is reachable in this
+                // state either (`still_comparing` above).
+                div { class: "deep-cancelled", {t(lang, "Cancelled — compare again to see the folders.")} }
             } else {
                 div { class: "deep-stats",
                     {format!("{} {} · {} {} · {} {} · {} {}",
@@ -318,7 +393,20 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                 }
                 div { class: "deep-table",
                     for entry in visible {
-                        DeepRow { entry, lang, left_root: left_root.clone(), right_root: right_root.clone() }
+                        DeepRow {
+                            entry, lang,
+                            left_root: left_root.clone(), right_root: right_root.clone(),
+                            // review 174 §2a: `is_scan` is always false in
+                            // this branch (`listing_cancelled` and
+                            // "Scanning…" are the other two) - a Computing
+                            // row here is still being digested only while
+                            // `in_flight` AND nothing was cancelled; after
+                            // Cancel (either phase - this branch is only
+                            // reached post-`listing_cancelled` check), the
+                            // same row must read "Not compared", not
+                            // "Comparing…".
+                            in_progress: row_in_progress(state, in_flight),
+                        }
                     }
                 }
             }
@@ -342,27 +430,13 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
 /// `title` gives a screen reader nothing to announce. Reuses the six keys
 /// the Explorer work already added (handoff 007) rather than inventing
 /// near-duplicates - only `Symlink` is new here.
-fn status_label(status: RecStatus, lang: Lang) -> String {
-    match status {
-        RecStatus::Changed => t(lang, "Different"),
-        RecStatus::LeftOnly => t(lang, "Only on the left"),
-        RecStatus::RightOnly => t(lang, "Only on the right"),
-        // F135: distinct wording from the plain one-sided labels above -
-        // this row is an empty directory, not a file, and the label says
-        // so rather than letting the glyph (deliberately the same one,
-        // `status_glyph` below) carry that distinction alone.
-        RecStatus::LeftOnlyDir => t(lang, "Only on the left (empty folder)"),
-        RecStatus::RightOnlyDir => t(lang, "Only on the right (empty folder)"),
-        RecStatus::Equal => t(lang, "Identical"),
-        RecStatus::Computing => t(lang, "Comparing…"),
-        RecStatus::Unreadable => t(lang, "Unreadable"),
-        // F80: core does not follow cross-root symlinks (the entry is
-        // reported, not compared, per `RecStatus::Symlink`'s own doc
-        // comment) - the honest label says the link was not followed, not
-        // merely that one exists, so it does not read as a verdict about
-        // the target.
-        RecStatus::Symlink => t(lang, "Symlink not followed"),
-    }
+/// Review 174 §3: this is now a thin wrapper over
+/// `forskscope_core::dir::status_key`, the one function a comparison
+/// report's renderer also reads (`report::html`) - same i18n keys, so the
+/// two can never say different things about the same `RecStatus`. See
+/// `status_key`'s own doc for `in_progress`.
+fn status_label(status: RecStatus, in_progress: bool, lang: Lang) -> String {
+    t(lang, forskscope_core::dir::status_key(status, in_progress))
 }
 
 /// F82: `(glyph, CSS class)` for `status`, from the shared vocabulary both
@@ -376,7 +450,13 @@ fn status_glyph(status: RecStatus) -> (char, &'static str) {
 }
 
 #[component]
-fn DeepRow(entry: RecEntry, lang: Lang, left_root: PathBuf, right_root: PathBuf) -> Element {
+fn DeepRow(
+    entry: RecEntry,
+    lang: Lang,
+    left_root: PathBuf,
+    right_root: PathBuf,
+    in_progress: bool,
+) -> Element {
     let mut store = use_context::<Store>();
     let (icon, cls) = status_glyph(entry.status);
     let path_str = entry.rel_path.display().to_string();
@@ -396,7 +476,7 @@ fn DeepRow(entry: RecEntry, lang: Lang, left_root: PathBuf, right_root: PathBuf)
     // than the uniform absence F79 started from). `role: "img"` +
     // `aria_label` is the pattern F74 established in `dir_pane.rs`;
     // `title` kept for the mouse tooltip.
-    let label = status_label(entry.status, lang);
+    let label = status_label(entry.status, in_progress, lang);
     rsx! {
         div { class: "deep-row",
             span {
@@ -651,6 +731,50 @@ fn BatchCopyButtons(
 mod tests {
     use super::*;
 
+    // ── Review 174 §2b: Cancel's two untrue states, at the state level ─────
+
+    #[test]
+    fn a_cancel_during_listing_leaves_exports_disabled_even_once_is_scan_and_in_flight_both_read_false()
+     {
+        // Exactly the state phase 1 leaves behind right after a cancel:
+        // `scanning.set(false)` already ran, and `total_common` was never
+        // set (phase 1 returns before reaching that line), so `in_flight`
+        // (`!is_scan && tc > 0 && ...`) reads `false` too.
+        assert!(export_disabled(CancelState::DuringListing, false, false));
+    }
+
+    #[test]
+    fn a_cancel_during_digest_leaves_exports_enabled_despite_in_flight_still_reading_true() {
+        // `in_flight` never naturally clears after a digest-phase cancel -
+        // nothing left in flight ever makes `done` reach `tc`. The naive
+        // formula `is_scan || (in_flight && state != DuringDigest)` gets
+        // this one case right by accident but still gets the listing-phase
+        // case above wrong (`DuringListing` with both already `false`) -
+        // `export_disabled`'s explicit match on `state` is what covers
+        // both.
+        assert!(!export_disabled(CancelState::DuringDigest, false, true));
+    }
+
+    #[test]
+    fn with_nothing_cancelled_the_ordinary_is_scan_or_in_flight_rule_still_applies() {
+        assert!(export_disabled(CancelState::None, true, false));
+        assert!(export_disabled(CancelState::None, false, true));
+        assert!(!export_disabled(CancelState::None, false, false));
+    }
+
+    #[test]
+    fn a_row_stops_reading_in_progress_the_moment_any_cancel_lands() {
+        // Falsifies the bug review 174 §2a found: before this, a Computing
+        // row's `in_progress` was computed as `in_flight && !cancelled`
+        // where `cancelled` was a plain bool with no phase - which this
+        // function's signature makes impossible to regress to, since
+        // there is no bare bool to pass instead of `CancelState`.
+        assert!(row_in_progress(CancelState::None, true));
+        assert!(!row_in_progress(CancelState::DuringDigest, true));
+        assert!(!row_in_progress(CancelState::DuringListing, true));
+        assert!(!row_in_progress(CancelState::None, false));
+    }
+
     fn entry(rel: &str) -> RecEntry {
         RecEntry {
             rel_path: PathBuf::from(rel),
@@ -858,7 +982,7 @@ mod tests {
         ];
         for status in statuses {
             for lang in [Lang::En, Lang::Ja] {
-                let label = status_label(status, lang);
+                let label = status_label(status, true, lang);
                 assert!(
                     !label.is_empty(),
                     "{status:?} has an empty accessible label for {lang:?}"
@@ -886,7 +1010,7 @@ mod tests {
         ];
         let labels: std::collections::HashSet<String> = statuses
             .iter()
-            .map(|s| status_label(*s, Lang::En))
+            .map(|s| status_label(*s, true, Lang::En))
             .collect();
         assert_eq!(
             labels.len(),
@@ -901,11 +1025,58 @@ mod tests {
     // the (unexamined) target.
     #[test]
     fn symlink_label_says_not_followed_not_a_verdict() {
-        let label = status_label(RecStatus::Symlink, Lang::En);
+        let label = status_label(RecStatus::Symlink, true, Lang::En);
         assert!(
             label.to_lowercase().contains("not followed"),
             "the symlink label must say the link was not followed: {label:?}"
         );
+    }
+
+    // Review 174 §3: the live view and a comparison report must say the
+    // *same* thing for the same `RecStatus` - both now read
+    // `forskscope_core::dir::status_key`, but that is a structural
+    // guarantee, not a test; this makes it an explicit, regression-proof
+    // one, in both languages. A report never renders mid-scan, so its
+    // reading is always `in_progress: false` - asserted against
+    // `status_label(status, false, lang)`, not the live (`true`) call the
+    // other tests in this module use.
+    #[test]
+    fn the_live_view_and_a_report_say_the_same_thing_for_every_status_in_both_languages() {
+        let statuses = [
+            RecStatus::Changed,
+            RecStatus::LeftOnly,
+            RecStatus::RightOnly,
+            RecStatus::LeftOnlyDir,
+            RecStatus::RightOnlyDir,
+            RecStatus::Equal,
+            RecStatus::Computing,
+            RecStatus::Unreadable,
+            RecStatus::Symlink,
+        ];
+        for status in statuses {
+            for lang in [Lang::En, Lang::Ja] {
+                let view_label = status_label(status, false, lang);
+                let report_label = t(lang, forskscope_core::dir::status_key(status, false));
+                assert_eq!(
+                    view_label, report_label,
+                    "{status:?}/{lang:?}: the view said {view_label:?}, a report would say {report_label:?}"
+                );
+            }
+        }
+    }
+
+    // Review 174 §2a: a Computing row reads differently depending on
+    // whether something is actually still comparing it right now.
+    #[test]
+    fn computing_reads_comparing_while_live_and_not_compared_once_it_is_not() {
+        for lang in [Lang::En, Lang::Ja] {
+            let live = status_label(RecStatus::Computing, true, lang);
+            let done = status_label(RecStatus::Computing, false, lang);
+            assert_ne!(
+                live, done,
+                "{lang:?}: 'still comparing' and 'stopped without a verdict' must read differently"
+            );
+        }
     }
 
     // ── F82: shared status vocabulary ────────────────────────────────────────
