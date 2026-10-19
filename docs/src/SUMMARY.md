@@ -28,7 +28,7 @@
 - [Keyboard reference](./intermediate/keyboard.md)
 - [CLI usage](./intermediate/cli.md)
 - [Git integration](./intermediate/git-integration.md)
-- [Patch export](./intermediate/patch-export.md)
+- [Exporting a comparison](./intermediate/patch-export.md)
 
 ---
 

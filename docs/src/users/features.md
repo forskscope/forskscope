@@ -117,11 +117,12 @@ the original encoding. UTF-8 BOM is round-tripped.
 
 ---
 
-## Patch export
+## Exporting a comparison
 
-Export a unified-diff patch from a file comparison (directory comparisons
-don't offer this). The patch is compatible with `patch -p1` and `git apply`.
-See [Patch export](../intermediate/patch-export.md).
+Save what a comparison found, as a self-contained **HTML report** (with the
+SHA-256 of every file it describes) or a **unified-diff patch** — from a
+file comparison or a folder comparison. See
+[Exporting a comparison](../intermediate/patch-export.md).
 
 ---
 
