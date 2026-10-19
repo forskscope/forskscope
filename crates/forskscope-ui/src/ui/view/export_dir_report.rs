@@ -690,9 +690,12 @@ mod tests {
 
     #[test]
     fn the_cap_names_every_file_it_leaves_out_never_silently() {
+        // Handoff 084 §7 criterion 2's own fixture size: 60 changed text
+        // files against the 50-file cap, so exactly 10 are left out.
+        assert_eq!(MAX_CHANGED_FILES_WITH_CONTENT, 50);
         let s = Scratch::new("cap");
         let mut entries = Vec::new();
-        for i in 0..(MAX_CHANGED_FILES_WITH_CONTENT + 5) {
+        for i in 0..60 {
             let name = format!("f{i:03}.txt");
             s.write("left", &name, b"old\n");
             s.write("right", &name, format!("new {i}\n").as_bytes());
@@ -714,8 +717,8 @@ mod tests {
             .iter()
             .filter(|r| r.change_hunks.is_some())
             .count();
-        assert_eq!(with_content, MAX_CHANGED_FILES_WITH_CONTENT);
-        assert_eq!(report.change_hunks_omitted.len(), 5);
+        assert_eq!(with_content, 50);
+        assert_eq!(report.change_hunks_omitted.len(), 10);
         // Every omitted file still has its checksum - the cap limits
         // *content shown*, never what gets hashed.
         for name in &report.change_hunks_omitted {

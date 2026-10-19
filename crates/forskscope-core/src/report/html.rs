@@ -597,7 +597,13 @@ mod tests {
             crate::report::ReportOptions::default(),
         );
         let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
-        assert!(html.contains(CSP_META));
+        // A fixed literal, not `CSP_META` itself - comparing against the
+        // same constant the page is built from would pass even if that
+        // constant were emptied out (caught live: it did, until this was
+        // fixed to check the exact required directive text instead).
+        assert!(html.contains(
+            r#"<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">"#
+        ));
     }
 
     #[test]
