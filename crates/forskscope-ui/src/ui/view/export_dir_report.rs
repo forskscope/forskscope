@@ -381,41 +381,47 @@ fn build_dir_report(
         }
 
         if entry.status == RecStatus::Changed
-            && files_with_content < MAX_CHANGED_FILES_WITH_CONTENT
-            && change_text_bytes < MAX_CHANGE_TEXT_BYTES
+            && let (Some(left_bytes), Some(right_bytes)) = (&left_bytes, &right_bytes)
         {
-            if let (Some(left_bytes), Some(right_bytes)) = (&left_bytes, &right_bytes) {
-                // Binary/spreadsheet entries show status only (RFC-092
-                // §3a) - only a file `classify` calls Text gets diffed.
-                let is_text = matches!(
-                    forskscope_core::file_kind::classify(&left_path),
-                    Ok(forskscope_core::FileKind::Text)
-                ) && matches!(
-                    forskscope_core::file_kind::classify(&right_path),
-                    Ok(forskscope_core::FileKind::Text)
-                );
-                if is_text
-                    && let (Ok(left_text), Ok(right_text)) = (
+            // Binary/spreadsheet entries show status only (RFC-092 §3a) -
+            // never added to `change_hunks_omitted`, which names only what
+            // the *cap* left out; a binary file was never going to be
+            // diffed regardless of the cap, so listing it there would
+            // misattribute why its content is absent.
+            let is_text = matches!(
+                forskscope_core::file_kind::classify(&left_path),
+                Ok(forskscope_core::FileKind::Text)
+            ) && matches!(
+                forskscope_core::file_kind::classify(&right_path),
+                Ok(forskscope_core::FileKind::Text)
+            );
+            if is_text {
+                if files_with_content < MAX_CHANGED_FILES_WITH_CONTENT
+                    && change_text_bytes < MAX_CHANGE_TEXT_BYTES
+                {
+                    if let (Ok(left_text), Ok(right_text)) = (
                         String::from_utf8(left_bytes.clone()),
                         String::from_utf8(right_bytes.clone()),
-                    )
-                {
-                    let diff = forskscope_core::compute_diff(&left_text, &right_text, diff_options);
-                    let hunks = change_hunks_from_diff(&diff, context_lines);
-                    let hunk_text_len: usize = hunks
-                        .iter()
-                        .flat_map(|h: &ChangeHunk| h.lines.iter())
-                        .map(|l| l.content.len())
-                        .sum();
-                    change_text_bytes += hunk_text_len;
-                    files_with_content += 1;
-                    row.change_hunks = Some(hunks);
+                    ) {
+                        let diff =
+                            forskscope_core::compute_diff(&left_text, &right_text, diff_options);
+                        let hunks = change_hunks_from_diff(&diff, context_lines);
+                        let hunk_text_len: usize = hunks
+                            .iter()
+                            .flat_map(|h: &ChangeHunk| h.lines.iter())
+                            .map(|l| l.content.len())
+                            .sum();
+                        change_text_bytes += hunk_text_len;
+                        files_with_content += 1;
+                        row.change_hunks = Some(hunks);
+                    }
+                    // `classify` sampled a prefix; a full-file UTF-8 decode
+                    // failure here is rare and not a cap omission either -
+                    // left with no change_hunks, same as a binary file.
                 } else {
                     report.change_hunks_omitted.push(row.path.clone());
                 }
             }
-        } else if entry.status == RecStatus::Changed {
-            report.change_hunks_omitted.push(row.path.clone());
         }
     }
     on_progress(total, total);
@@ -424,4 +430,201 @@ fn build_dir_report(
 
 fn report_options_context_lines(report: &DirComparisonReport) -> usize {
     report.options.context_lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct Scratch {
+        root: PathBuf,
+    }
+
+    impl Scratch {
+        fn new(label: &str) -> Self {
+            let root = std::env::temp_dir().join(format!(
+                "fsk-ui-export-dir-report-{label}-{}-{}",
+                std::process::id(),
+                line!()
+            ));
+            std::fs::create_dir_all(root.join("left")).unwrap();
+            std::fs::create_dir_all(root.join("right")).unwrap();
+            Self { root }
+        }
+        fn left(&self) -> PathBuf {
+            self.root.join("left")
+        }
+        fn right(&self) -> PathBuf {
+            self.root.join("right")
+        }
+        fn write(&self, side: &str, name: &str, content: &[u8]) {
+            std::fs::write(self.root.join(side).join(name), content).unwrap();
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            std::fs::remove_dir_all(&self.root).ok();
+        }
+    }
+
+    fn entry(rel: &str, status: RecStatus) -> RecEntry {
+        RecEntry {
+            rel_path: PathBuf::from(rel),
+            status,
+            left_size: Some(1),
+            right_size: Some(1),
+        }
+    }
+
+    #[test]
+    fn hashes_every_readable_file_and_diffs_a_changed_text_file() {
+        let s = Scratch::new("basic");
+        s.write("left", "equal.txt", b"same\n");
+        s.write("right", "equal.txt", b"same\n");
+        s.write("left", "changed.txt", b"old\n");
+        s.write("right", "changed.txt", b"new\n");
+        s.write("left", "left_only.txt", b"only here\n");
+
+        let entries = vec![
+            entry("equal.txt", RecStatus::Equal),
+            entry("changed.txt", RecStatus::Changed),
+            entry("left_only.txt", RecStatus::LeftOnly),
+        ];
+
+        let report = build_dir_report(
+            &s.left(),
+            &s.right(),
+            entries,
+            forskscope_core::DiffOptions::default(),
+            ReportOptions::default(),
+            &CancellationToken::new(),
+            &mut |_, _| {},
+        )
+        .expect("not cancelled");
+
+        let equal_row = report
+            .file_rows
+            .iter()
+            .find(|r| r.path == "equal.txt")
+            .unwrap();
+        assert!(equal_row.left_checksum.is_some());
+        assert!(equal_row.right_checksum.is_some());
+        assert!(
+            equal_row.change_hunks.is_none(),
+            "equal files are not diffed"
+        );
+
+        let changed_row = report
+            .file_rows
+            .iter()
+            .find(|r| r.path == "changed.txt")
+            .unwrap();
+        assert!(changed_row.left_checksum.is_some());
+        assert!(changed_row.right_checksum.is_some());
+        assert!(
+            changed_row
+                .change_hunks
+                .as_ref()
+                .is_some_and(|h| !h.is_empty())
+        );
+
+        let left_only_row = report
+            .file_rows
+            .iter()
+            .find(|r| r.path == "left_only.txt")
+            .unwrap();
+        assert!(left_only_row.left_checksum.is_some());
+        assert!(left_only_row.right_checksum.is_none());
+
+        assert!(report.change_hunks_omitted.is_empty());
+    }
+
+    #[test]
+    fn a_binary_changed_file_is_hashed_but_never_listed_as_cap_omitted() {
+        let s = Scratch::new("binary");
+        s.write("left", "data.bin", &[0u8, 1, 2, 3]);
+        s.write("right", "data.bin", &[0u8, 1, 2, 4]);
+        let entries = vec![entry("data.bin", RecStatus::Changed)];
+
+        let report = build_dir_report(
+            &s.left(),
+            &s.right(),
+            entries,
+            forskscope_core::DiffOptions::default(),
+            ReportOptions::default(),
+            &CancellationToken::new(),
+            &mut |_, _| {},
+        )
+        .expect("not cancelled");
+
+        let row = &report.file_rows[0];
+        assert!(row.left_checksum.is_some());
+        assert!(row.right_checksum.is_some());
+        assert!(row.change_hunks.is_none());
+        assert!(
+            report.change_hunks_omitted.is_empty(),
+            "a binary file's missing diff is not a cap omission"
+        );
+    }
+
+    #[test]
+    fn a_cancelled_token_returns_none_and_writes_nothing() {
+        let s = Scratch::new("cancel");
+        s.write("left", "a.txt", b"a\n");
+        s.write("right", "a.txt", b"b\n");
+        let entries = vec![entry("a.txt", RecStatus::Changed)];
+
+        let token = CancellationToken::new();
+        token.cancel();
+
+        let report = build_dir_report(
+            &s.left(),
+            &s.right(),
+            entries,
+            forskscope_core::DiffOptions::default(),
+            ReportOptions::default(),
+            &token,
+            &mut |_, _| {},
+        );
+        assert!(report.is_none());
+    }
+
+    #[test]
+    fn the_cap_names_every_file_it_leaves_out_never_silently() {
+        let s = Scratch::new("cap");
+        let mut entries = Vec::new();
+        for i in 0..(MAX_CHANGED_FILES_WITH_CONTENT + 5) {
+            let name = format!("f{i:03}.txt");
+            s.write("left", &name, b"old\n");
+            s.write("right", &name, format!("new {i}\n").as_bytes());
+            entries.push(entry(&name, RecStatus::Changed));
+        }
+
+        let report = build_dir_report(
+            &s.left(),
+            &s.right(),
+            entries,
+            forskscope_core::DiffOptions::default(),
+            ReportOptions::default(),
+            &CancellationToken::new(),
+            &mut |_, _| {},
+        )
+        .expect("not cancelled");
+
+        let with_content = report
+            .file_rows
+            .iter()
+            .filter(|r| r.change_hunks.is_some())
+            .count();
+        assert_eq!(with_content, MAX_CHANGED_FILES_WITH_CONTENT);
+        assert_eq!(report.change_hunks_omitted.len(), 5);
+        // Every omitted file still has its checksum - the cap limits
+        // *content shown*, never what gets hashed.
+        for name in &report.change_hunks_omitted {
+            let row = report.file_rows.iter().find(|r| &r.path == name).unwrap();
+            assert!(row.left_checksum.is_some());
+            assert!(row.right_checksum.is_some());
+        }
+    }
 }
