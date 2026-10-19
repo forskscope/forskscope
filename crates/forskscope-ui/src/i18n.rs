@@ -576,9 +576,17 @@ fn ja(key: &str) -> Option<&'static str> {
         "Newlines" => "改行",
         "Algorithm" => "アルゴリズム",
         "ignored" => "無視",
-        "Run `sha256sum` on a file to confirm it is the file this report describes. This does not prove the report itself is unaltered." => {
-            "ファイルに対して `sha256sum` を実行すると、このレポートが説明しているファイルであることを確認できます。ただし、レポート自体が改ざんされていないことは証明しません。"
+        // review 175 §2: the placeholder keeps `<code>sha256sum</code>` out
+        // of the translated text - it is substituted in by
+        // `report::html::checksum_caveat` after escaping, so the Japanese
+        // text itself must carry no backticks of its own.
+        "Run {cmd} on a file to confirm it is the file this report describes. This does not prove the report itself is unaltered." => {
+            "ファイルに対して{cmd}を実行すると、このレポートが説明しているファイルであることを確認できます。ただし、レポート自体が改ざんされていないことは証明しません。"
         }
+        // review 175 §3: the folder report's main counts line falls back
+        // to this when every count is zero, rather than printing "X: 0"
+        // for each.
+        "No files." => "ファイルはありません。",
         // review 174 §3: report::html's per-row status words now come from
         // forskscope_core::dir::status_key, the same keys status_label
         // (deep_compare.rs) reads - "Different"/"Identical"/"Only on the
@@ -796,5 +804,26 @@ mod tests {
     #[test]
     fn a_genuinely_untranslated_key_is_detected_as_missing() {
         assert!(ja("a string that is definitely not in the ja table").is_none());
+    }
+
+    /// Review 175 §2: the checksum caveat sentence, rendered through the
+    /// real `t(Lang::Ja, …)`, must carry `<code>sha256sum</code>` and no
+    /// literal backtick in either language - not just in a mock-translator
+    /// unit test of `checksum_caveat` itself, but in what the real app
+    /// would actually produce.
+    #[test]
+    fn the_checksum_caveat_uses_code_markup_and_no_backtick_in_both_languages() {
+        let report = comprehensive_file_report();
+        for lang in [Lang::En, Lang::Ja] {
+            let html = render_file_report(&report, "0.194.0", "now", false, &|s| t(lang, s));
+            assert!(
+                html.contains("<code>sha256sum</code>"),
+                "{lang:?}: missing <code>sha256sum</code> markup"
+            );
+            assert!(
+                !html.contains('`'),
+                "{lang:?}: a literal backtick leaked into the rendered page"
+            );
+        }
     }
 }

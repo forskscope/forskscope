@@ -334,7 +334,9 @@ impl DirComparisonReport {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn fmt_size(bytes: u64) -> String {
+/// Shared with `report::html` (review 175 §3) so the folder report's
+/// per-row sizes carry the same unit the file report's checksum row does.
+pub(super) fn fmt_size(bytes: u64) -> String {
     if bytes < 1024 {
         format!("{bytes} B")
     } else if bytes < 1_048_576 {

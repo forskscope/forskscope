@@ -184,22 +184,50 @@ fn render_content(line: &super::changes::ChangeLine) -> String {
     }
 }
 
+/// Whether each line in `lines` belongs to a replacement, by run rather than
+/// by whole display block (review 175 §1): a display block can merge an
+/// actual replacement with a separate pure addition or removal that happens
+/// to sit within context distance of it, and painting the whole block as
+/// replaced would then colour that separate change wrongly. A "run" is a
+/// maximal span of consecutive non-`Context` lines; a run counts as a
+/// replacement only if it contains both a `Delete` and an `Insert`.
+fn is_replace_runs(lines: &[super::changes::ChangeLine]) -> Vec<bool> {
+    let mut flags = vec![false; lines.len()];
+    let mut run_start = None;
+    for i in 0..=lines.len() {
+        let at_boundary = i == lines.len() || lines[i].kind == ChangeLineKind::Context;
+        if at_boundary {
+            if let Some(start) = run_start {
+                let run = &lines[start..i];
+                let has_delete = run.iter().any(|l| l.kind == ChangeLineKind::Delete);
+                let has_insert = run.iter().any(|l| l.kind == ChangeLineKind::Insert);
+                if has_delete && has_insert {
+                    flags[start..i].fill(true);
+                }
+                run_start = None;
+            }
+        } else if run_start.is_none() {
+            run_start = Some(i);
+        }
+    }
+    flags
+}
+
 fn render_hunk(out: &mut String, hunk: &ChangeHunk) {
-    let is_replace = hunk.lines.iter().any(|l| l.kind == ChangeLineKind::Delete)
-        && hunk.lines.iter().any(|l| l.kind == ChangeLineKind::Insert);
+    let is_replace = is_replace_runs(&hunk.lines);
     let _ = writeln!(out, "<div class=\"hunk\">");
     let _ = writeln!(
         out,
         "<div class=\"hunk-header\">@@ -{},{} +{},{} @@</div>",
         hunk.old_start, hunk.old_len, hunk.new_start, hunk.new_len
     );
-    for line in &hunk.lines {
+    for (line, is_replace) in hunk.lines.iter().zip(is_replace.iter()) {
         let left = line.left_line.map(|n| n.to_string()).unwrap_or_default();
         let right = line.right_line.map(|n| n.to_string()).unwrap_or_default();
         let _ = writeln!(
             out,
             "<div class=\"{}\"><span class=\"diff-lineno\">{left}</span><span class=\"diff-lineno\">{right}</span><span class=\"diff-mark\">{}</span><span class=\"diff-content\">{}</span></div>",
-            row_class(line.kind, is_replace),
+            row_class(line.kind, *is_replace),
             mark_for(line.kind),
             render_content(line)
         );
@@ -207,10 +235,18 @@ fn render_hunk(out: &mut String, hunk: &ChangeHunk) {
     let _ = writeln!(out, "</div>");
 }
 
+/// Builds the checksum caveat sentence as ready-to-embed HTML: the
+/// translated template is escaped first, and `<code>sha256sum</code>` is
+/// substituted into its `{cmd}` placeholder afterward (review 175 §2) — a
+/// literal backtick-quoted `` `sha256sum` `` prints as literal backticks,
+/// since nothing in this renderer converts Markdown to HTML. Callers must
+/// not run this result through `escape_html` again, or the inserted
+/// `<code>` markup would itself get escaped.
 fn checksum_caveat(tr: &dyn Fn(&str) -> String) -> String {
-    tr(
-        "Run `sha256sum` on a file to confirm it is the file this report describes. This does not prove the report itself is unaltered.",
-    )
+    let template = tr(
+        "Run {cmd} on a file to confirm it is the file this report describes. This does not prove the report itself is unaltered.",
+    );
+    escape_html(&template).replace("{cmd}", "<code>sha256sum</code>")
 }
 
 fn render_checksum_row(out: &mut String, label: &str, checksum: &FileChecksum) {
@@ -336,11 +372,7 @@ pub fn render_file_report(
     }
     let _ = writeln!(out, "</table>");
     if report.left_checksum.is_some() || report.right_checksum.is_some() {
-        let _ = writeln!(
-            out,
-            "<p class=\"note\">{}</p>",
-            escape_html(&checksum_caveat(tr))
-        );
+        let _ = writeln!(out, "<p class=\"note\">{}</p>", checksum_caveat(tr));
     }
 
     let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("How")));
@@ -392,6 +424,25 @@ pub fn render_file_report(
 
 // ── Directory report ──────────────────────────────────────────────────────────
 
+/// Joins `label: count` for every non-zero count (review 175 §3) —
+/// `"Only on the left: 0"` is noise this report must not print, the same
+/// rule already applied to the summary sentence's own numbers. `None` when
+/// every count given is zero, so a caller can decide what that means (a
+/// "No files." substitute for the main counts, or simply nothing for the
+/// already-optional Symlink/Unreadable line).
+fn counts_line(tr: &dyn Fn(&str) -> String, counts: &[(&str, usize)]) -> Option<String> {
+    let parts: Vec<String> = counts
+        .iter()
+        .filter(|(_, n)| *n > 0)
+        .map(|(key, n)| format!("{}: {n}", escape_html(&tr(key))))
+        .collect();
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join(" · "))
+    }
+}
+
 pub fn render_dir_report(
     report: &DirComparisonReport,
     app_version: &str,
@@ -426,45 +477,39 @@ pub fn render_dir_report(
         escape_html(&report.right_display)
     );
     let _ = writeln!(out, "</table>");
-    let _ = writeln!(
-        out,
-        "<p>{}: {} · {}: {} · {}: {} · {}: {}</p>",
-        escape_html(&tr(crate::dir::status_key(
-            crate::dir::RecStatus::Equal,
-            false
-        ))),
-        report.equal,
-        escape_html(&tr(crate::dir::status_key(
-            crate::dir::RecStatus::Changed,
-            false
-        ))),
-        report.changed,
-        escape_html(&tr(crate::dir::status_key(
-            crate::dir::RecStatus::LeftOnly,
-            false
-        ))),
-        report.left_only,
-        escape_html(&tr(crate::dir::status_key(
-            crate::dir::RecStatus::RightOnly,
-            false
-        ))),
-        report.right_only
-    );
-    if report.symlinks > 0 || report.unreadable > 0 {
-        let _ = writeln!(
-            out,
-            "<p>{}: {} · {}: {}</p>",
-            escape_html(&tr(crate::dir::status_key(
-                crate::dir::RecStatus::Symlink,
-                false
-            ))),
+    let main_counts = [
+        (
+            crate::dir::status_key(crate::dir::RecStatus::Equal, false),
+            report.equal,
+        ),
+        (
+            crate::dir::status_key(crate::dir::RecStatus::Changed, false),
+            report.changed,
+        ),
+        (
+            crate::dir::status_key(crate::dir::RecStatus::LeftOnly, false),
+            report.left_only,
+        ),
+        (
+            crate::dir::status_key(crate::dir::RecStatus::RightOnly, false),
+            report.right_only,
+        ),
+    ];
+    let line = counts_line(tr, &main_counts).unwrap_or_else(|| escape_html(&tr("No files.")));
+    let _ = writeln!(out, "<p>{line}</p>");
+
+    let extra_counts = [
+        (
+            crate::dir::status_key(crate::dir::RecStatus::Symlink, false),
             report.symlinks,
-            escape_html(&tr(crate::dir::status_key(
-                crate::dir::RecStatus::Unreadable,
-                false
-            ))),
-            report.unreadable
-        );
+        ),
+        (
+            crate::dir::status_key(crate::dir::RecStatus::Unreadable, false),
+            report.unreadable,
+        ),
+    ];
+    if let Some(line) = counts_line(tr, &extra_counts) {
+        let _ = writeln!(out, "<p>{line}</p>");
     }
 
     if let Some(name) = &report.profile_name {
@@ -517,11 +562,7 @@ pub fn render_dir_report(
         .iter()
         .any(|r| r.left_checksum.is_some() || r.right_checksum.is_some())
     {
-        let _ = writeln!(
-            out,
-            "<p class=\"note\">{}</p>",
-            escape_html(&checksum_caveat(tr))
-        );
+        let _ = writeln!(out, "<p class=\"note\">{}</p>", checksum_caveat(tr));
     }
 
     let changed_with_hunks: Vec<&DirFileRow> = report
@@ -569,8 +610,8 @@ fn render_dir_file_row(
     let sizes = if show_sizes {
         format!(
             "<td>{}</td><td>{}</td>",
-            row.left_size.map(|n| n.to_string()).unwrap_or_default(),
-            row.right_size.map(|n| n.to_string()).unwrap_or_default()
+            row.left_size.map(super::dir::fmt_size).unwrap_or_default(),
+            row.right_size.map(super::dir::fmt_size).unwrap_or_default()
         )
     } else {
         String::new()
@@ -719,6 +760,44 @@ mod tests {
         let with = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
         assert!(with.contains(&crate::checksum::sha256_hex(b"a\n")));
         assert!(with.contains(&crate::checksum::sha256_hex(b"b\n")));
+    }
+
+    #[test]
+    fn a_pure_addition_sharing_a_block_with_a_replacement_keeps_its_own_colour() {
+        // review 175 §1: a display block merges nearby changes within
+        // context distance. Here it holds a genuine replacement (one
+        // deleted line immediately followed by one inserted line) and,
+        // separated by an unchanged context line, a pure addition with no
+        // paired delete - exactly the `file-default-rgsafe.pdf`/
+        // `file-ja.pdf` shape the review cites ("line six" wrongly
+        // inheriting the replacement colour).
+        fn line(kind: ChangeLineKind, content: &str) -> super::super::changes::ChangeLine {
+            super::super::changes::ChangeLine {
+                kind,
+                left_line: None,
+                right_line: None,
+                content: content.to_string(),
+                spans: None,
+            }
+        }
+        let lines = vec![
+            line(ChangeLineKind::Context, "line one"),
+            line(ChangeLineKind::Delete, "line two old"), // } replacement
+            line(ChangeLineKind::Insert, "line two new"), // }
+            line(ChangeLineKind::Context, "line five"),
+            line(ChangeLineKind::Insert, "line six"), // pure addition, no delete
+        ];
+        let flags = is_replace_runs(&lines);
+        assert_eq!(
+            flags,
+            vec![false, true, true, false, false],
+            "only the delete/insert pair is a replacement; the later pure \
+             addition must not inherit it"
+        );
+
+        // Confirmed this test catches the regression: temporarily restoring
+        // the old per-block rule (`has_delete && has_insert` over the whole
+        // slice) made every changed line read `true`, including "line six".
     }
 
     #[test]
@@ -941,6 +1020,33 @@ mod tests {
         // only, RFC-092 §6).
         assert!(html.contains("Identical"));
         assert!(html.contains("Different"));
+
+        // review 175 §3: no "Only on the left: 0" / "Only on the right: 0"
+        // noise - both are genuinely zero in this fixture.
+        assert!(!html.contains("Only on the left: 0"));
+        assert!(!html.contains("Only on the right: 0"));
+        // And the sizes carry the same unit the file report's checksum
+        // row does ("71 B"), not a bare number.
+        assert!(html.contains("2 B"));
+        assert!(html.contains("3 B"));
+    }
+
+    #[test]
+    fn a_folder_report_with_every_count_at_zero_says_no_files() {
+        let report = crate::report::DirComparisonReport::from_entries(
+            &[],
+            None,
+            None,
+            None,
+            None,
+            crate::report::ReportOptions::default(),
+        );
+        let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        assert!(html.contains("No files."));
+        assert!(!html.contains("Identical: 0"));
+        assert!(!html.contains("Different: 0"));
+        assert!(!html.contains("Only on the left: 0"));
+        assert!(!html.contains("Only on the right: 0"));
     }
 
     #[test]
