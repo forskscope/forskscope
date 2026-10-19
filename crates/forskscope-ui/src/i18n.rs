@@ -513,6 +513,11 @@ fn ja(key: &str) -> Option<&'static str> {
         "Comparison report" => "比較レポート",
         "Generated" => "生成日時",
         "What was compared" => "比較対象",
+        // Deliberately unchanged - a universal technical term, not an
+        // untranslated gap. Review 174 §5's "assert nothing comes back
+        // untranslated" test checks this key explicitly for that reason,
+        // not just its presence here.
+        "SHA-256" => "SHA-256",
         "How" => "方法",
         "Compare profile" => "比較プロファイル",
         "Default" => "デフォルト",
@@ -603,4 +608,193 @@ fn ja(key: &str) -> Option<&'static str> {
         _ => return None,
     };
     Some(v)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use std::path::PathBuf;
+
+    use forskscope_core::diff::{DiffOptions, compute_diff};
+    use forskscope_core::dir::{RecEntry, RecStatus};
+    use forskscope_core::report::{
+        ChangeHunk, DirComparisonReport, FileChecksum, FileComparisonReport, ReportOptions,
+        change_hunks_from_diff, render_dir_report, render_file_report,
+    };
+
+    /// Review 174 §5: "Japanese through a stand-in translator is not
+    /// evidence of criterion 7. Render in a UI-crate test with the real
+    /// t(Lang::Ja, …). Assert that no string the renderer requests comes
+    /// back untranslated." Records every key `render_file_report`/
+    /// `render_dir_report` actually requests through `tr`, then — since
+    /// `ja()` is this module's own private function, reachable here but
+    /// not from forskscope-core — asserts each one has a real entry in it.
+    /// Checking `ja(key).is_some()` rather than comparing translated text
+    /// to the key is deliberate: a deliberately-identical entry (`"SHA-256"
+    /// => "SHA-256"`, a universal technical term) must count as translated,
+    /// not as a gap that merely produces the same text as a coincidence.
+    /// A renderer call, boxed so its concrete closure type (and the
+    /// translator type it takes) doesn't need spelling out at every call
+    /// site.
+    type RenderCall<'a> = Box<dyn FnOnce(&dyn Fn(&str) -> String) -> String + 'a>;
+
+    fn requested_ja_keys(render: RenderCall<'_>) -> Vec<String> {
+        let requested: RefCell<Vec<String>> = RefCell::new(Vec::new());
+        let tr = |s: &str| -> String {
+            requested.borrow_mut().push(s.to_string());
+            t(Lang::Ja, s)
+        };
+        let _ = render(&tr);
+        requested.into_inner()
+    }
+
+    fn assert_every_requested_key_has_a_real_ja_entry(keys: &[String]) {
+        let mut missing: Vec<&str> = keys
+            .iter()
+            .map(String::as_str)
+            .filter(|k| ja(k).is_none())
+            .collect();
+        missing.sort_unstable();
+        missing.dedup();
+        assert!(
+            missing.is_empty(),
+            "these keys the renderer requested have no ja() entry at all - they fall through \
+             to the raw English key, not a real translation: {missing:?}"
+        );
+    }
+
+    fn comprehensive_file_report() -> FileComparisonReport {
+        let diff = compute_diff(
+            "one\ntwo\nthree\n",
+            "one\nTWO\nthree\nfour\n",
+            DiffOptions {
+                ignore_case: true,
+                ..DiffOptions::default()
+            },
+        );
+        let mut report = FileComparisonReport::from_diff(
+            &diff,
+            Some(&PathBuf::from("/left/report.txt")),
+            Some(&PathBuf::from("/right/report.txt")),
+            None,
+            ReportOptions::default(),
+        )
+        .with_checksums(
+            Some(FileChecksum::of_bytes(b"left")),
+            Some(FileChecksum::of_bytes(b"right")),
+        );
+        // A real, pre-existing warning string (not caller-pushed free
+        // text like an encoding label, which is inherently untranslatable
+        // dynamic content, not something this test is about).
+        report.push_note("Large file — inline diff disabled.");
+        report
+    }
+
+    fn comprehensive_dir_report() -> DirComparisonReport {
+        let entries = vec![
+            RecEntry {
+                rel_path: PathBuf::from("equal.txt"),
+                status: RecStatus::Equal,
+                left_size: Some(1),
+                right_size: Some(1),
+            },
+            RecEntry {
+                rel_path: PathBuf::from("changed.txt"),
+                status: RecStatus::Changed,
+                left_size: Some(2),
+                right_size: Some(3),
+            },
+            RecEntry {
+                rel_path: PathBuf::from("left_only.txt"),
+                status: RecStatus::LeftOnly,
+                left_size: Some(1),
+                right_size: None,
+            },
+            RecEntry {
+                rel_path: PathBuf::from("right_only.txt"),
+                status: RecStatus::RightOnly,
+                left_size: None,
+                right_size: Some(1),
+            },
+            RecEntry {
+                rel_path: PathBuf::from("a_link"),
+                status: RecStatus::Symlink,
+                left_size: None,
+                right_size: None,
+            },
+            RecEntry {
+                rel_path: PathBuf::from("unreadable.txt"),
+                status: RecStatus::Unreadable,
+                left_size: None,
+                right_size: None,
+            },
+            RecEntry {
+                rel_path: PathBuf::from("cancelled.txt"),
+                status: RecStatus::Computing,
+                left_size: Some(1),
+                right_size: Some(1),
+            },
+        ];
+        let diff_options = DiffOptions {
+            ignore_case: true,
+            ..DiffOptions::default()
+        };
+        let mut report = DirComparisonReport::from_entries(
+            &entries,
+            Some(&PathBuf::from("/left")),
+            Some(&PathBuf::from("/right")),
+            None,
+            Some(&diff_options),
+            ReportOptions::default(),
+        );
+        let changed_row = report
+            .file_rows
+            .iter_mut()
+            .find(|r| r.path == "changed.txt")
+            .unwrap();
+        changed_row.left_checksum = Some(FileChecksum::of_bytes(b"old"));
+        changed_row.right_checksum = Some(FileChecksum::of_bytes(b"new"));
+        let d = compute_diff("old\n", "new\n", DiffOptions::default());
+        let hunks: Vec<ChangeHunk> = change_hunks_from_diff(&d, 3);
+        changed_row.change_hunks = Some(hunks);
+        // Exercise the cap-omission message too, for real.
+        report.change_hunks_omitted.push("huge.txt".into());
+        report
+    }
+
+    #[test]
+    fn every_key_a_file_report_requests_in_japanese_has_a_real_translation() {
+        let report = comprehensive_file_report();
+        let keys = requested_ja_keys(Box::new(|tr| {
+            render_file_report(&report, "0.194.0", "now", false, tr)
+        }));
+        assert!(
+            !keys.is_empty(),
+            "the renderer requested nothing - fixture is too thin"
+        );
+        assert_every_requested_key_has_a_real_ja_entry(&keys);
+    }
+
+    #[test]
+    fn every_key_a_dir_report_requests_in_japanese_has_a_real_translation() {
+        let report = comprehensive_dir_report();
+        let keys = requested_ja_keys(Box::new(|tr| {
+            render_dir_report(&report, "0.194.0", "now", false, tr)
+        }));
+        assert!(
+            !keys.is_empty(),
+            "the renderer requested nothing - fixture is too thin"
+        );
+        assert_every_requested_key_has_a_real_ja_entry(&keys);
+    }
+
+    /// Falsification: a key this test does *not* cover (because nothing
+    /// requests it) must not silently pass - confirms `ja(k).is_none()`
+    /// really does detect a gap, not just that the fixture is comprehensive
+    /// by accident.
+    #[test]
+    fn a_genuinely_untranslated_key_is_detected_as_missing() {
+        assert!(ja("a string that is definitely not in the ja table").is_none());
+    }
 }
