@@ -468,6 +468,86 @@ fn ja(key: &str) -> Option<&'static str> {
         "One or both workbooks exceed the recommended comparison size ({n} MiB). Comparing them may be slow. The comparison is exact, or it is refused if a workbook is too large to compare; it is never approximate." => {
             "一方または両方のブックが推奨される比較サイズ（{n} MiB）を超えています。比較に時間がかかることがあります。比較は正確に行われるか、大きすぎる場合は拒否されます。近似の結果が表示されることはありません。"
         }
+
+        // RFC-092 (handoff 084): the export dialog, the toolbar button, the
+        // "Open" toast action, and §0's two refusal messages.
+        "Export report" => "レポートをエクスポート",
+        "Export report…" => "レポートをエクスポート…",
+        "Export a comparison report" => "比較レポートをエクスポートします",
+        "Export" => "エクスポート",
+        "Format" => "形式",
+        "HTML report" => "HTML レポート",
+        "Unified diff (.patch)" => "統合diff（.patch）",
+        "More options ▸" => "詳細オプション ▸",
+        "Paths" => "パス",
+        "File names only" => "ファイル名のみ",
+        "Paths relative to the compared folders" => "比較したフォルダーからの相対パス",
+        "Full paths" => "完全なパス",
+        "Report saved." => "レポートを保存しました。",
+        "Open" => "開く",
+        "Reports cover text comparisons for now." => {
+            "レポートは現在、テキスト比較のみに対応しています。"
+        }
+        "Save or undo your changes first: a report describes the saved files." => {
+            "先に変更を保存するか取り消してください。レポートは保存済みのファイルの内容を記述します。"
+        }
+        "A file changed since it was compared. Compare again, then export." => {
+            "比較した後にファイルが変更されました。再度比較してからエクスポートしてください。"
+        }
+
+        // RFC-092: the HTML report itself (forskscope-core/src/report/html.rs).
+        // Reached through a translator closure, not a literal t(lang, ...)
+        // call site here, so cargo xtask i18n cannot see these keys - kept
+        // in sync by hand against html.rs's own tr() calls.
+        "Comparison report" => "比較レポート",
+        "Generated" => "生成日時",
+        "What was compared" => "比較対象",
+        "How" => "方法",
+        "Compare profile" => "比較プロファイル",
+        "Default" => "デフォルト",
+        "Custom" => "カスタム",
+        "Summary" => "概要",
+        "The changes" => "変更内容",
+        "Notes" => "注記",
+        "Files" => "ファイル",
+        "Status" => "ステータス",
+        "Left size" => "左のサイズ",
+        "Right size" => "右のサイズ",
+        "No differences — the two files are identical." => "差分なし — 2つのファイルは同一です。",
+        "changes" => "件の変更",
+        "lines removed" => "行削除",
+        "lines added" => "行追加",
+        "hunks replaced" => "個のハンク置換",
+        "Whitespace" => "空白",
+        "Case" => "大文字・小文字",
+        "Newlines" => "改行",
+        "Algorithm" => "アルゴリズム",
+        "ignored" => "無視",
+        "Run `sha256sum` on a file to confirm it is the file this report describes. This does not prove the report itself is unaltered." => {
+            "ファイルに対して `sha256sum` を実行すると、このレポートが説明しているファイルであることを確認できます。ただし、レポート自体が改ざんされていないことは証明しません。"
+        }
+        // report::dir::DirComparisonReport's DirFileRow.status - "equal",
+        // "left only", "right only" and "unreadable" already have entries
+        // above (shared with deep_compare.rs's own words); these are the
+        // ones only the report model uses.
+        "modified" => "変更あり",
+        "left only (empty directory)" => "左のみ（空のディレクトリ）",
+        "right only (empty directory)" => "右のみ（空のディレクトリ）",
+        "symlink" => "シンボリックリンク",
+        "not compared" => "未比較",
+        "changed files' content is not shown in this report (the cap of 50 files or 5 MiB of change text was reached)" => {
+            "変更されたファイルの内容はこのレポートには表示されません（50ファイルまたは5 MiBの変更テキストという上限に達しました）"
+        }
+        // report::file's own warning strings (distinct wording from
+        // diff.rs's live-UI versions of the same facts - report/file.rs
+        // predates this handoff and is out of its scope to reword).
+        "Large file — inline diff disabled." => {
+            "大きなファイルのため、文字単位の差分表示を無効にしました。"
+        }
+        "Some hunks were too large for inline diff." => {
+            "一部のハンクは大きすぎたため、文字単位の差分表示を省略しました。"
+        }
+
         _ => return None,
     };
     Some(v)

@@ -6,15 +6,18 @@
 //! - `copy`     — `ConfirmDirOpModal`, `BatchCopyModal`, `BatchResultModal`
 //! - `about`    — `AboutModal`
 //! - `recovery` — `SettingsRecoveryModal`, `SessionRecoveryModal` (RFC-076)
+//! - `export_report` — `ExportReportModal` (RFC-092)
 
 pub mod about;
 pub mod copy;
+pub mod export_report;
 pub mod file;
 pub mod recovery;
 pub mod tab;
 
 pub use about::AboutModal;
 pub use copy::{BatchCopyModal, BatchResultModal, ConfirmDirOpModal};
+pub use export_report::ExportReportModal;
 pub use file::{
     ConfirmDiffOptionChangeModal, ConfirmEncodingChangeModal, ConfirmSaveAsOverwriteModal,
     LargeLoadModal, OverwriteModal, ReloadModal, SaveAsModal, SaveErrorModal, SwapModal,

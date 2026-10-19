@@ -178,6 +178,9 @@ pub enum Modal {
         std::path::PathBuf,
         forskscope_ui_logic::SaveErrorView,
     ),
+    /// RFC-092 (handoff 084): the comparison-report/unified-diff export
+    /// dialog for a file comparison, by tab index.
+    ExportReport(usize),
 }
 
 // ── Toast / notice ────────────────────────────────────────────────────────────
@@ -192,11 +195,25 @@ pub enum NoticeSeverity {
     Error,
 }
 
+/// A single action button a toast can offer, beside its own dismiss-on-click
+/// (RFC-092 §2: "After saving, a notice offers Open"). Kept to exactly one
+/// action, and — per handoff 084 — not reused anywhere else in that
+/// handoff: a second use would need its own decision about what "the
+/// action" means for a toast in general, which this one does not make.
+#[derive(Clone, PartialEq, Debug)]
+pub struct NoticeAction {
+    pub label: String,
+    /// The file path the action opens, via
+    /// `forskscope_core::external_tool::open_path`.
+    pub path: String,
+}
+
 /// A user-facing notice shown as a toast.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Notice {
     pub message: String,
     pub severity: NoticeSeverity,
+    pub action: Option<NoticeAction>,
 }
 
 impl Notice {
@@ -204,12 +221,14 @@ impl Notice {
         Self {
             message: msg.into(),
             severity: NoticeSeverity::Success,
+            action: None,
         }
     }
     pub fn info(msg: impl Into<String>) -> Self {
         Self {
             message: msg.into(),
             severity: NoticeSeverity::Info,
+            action: None,
         }
     }
     #[allow(dead_code)]
@@ -217,13 +236,23 @@ impl Notice {
         Self {
             message: msg.into(),
             severity: NoticeSeverity::Warning,
+            action: None,
         }
     }
     pub fn error(msg: impl Into<String>) -> Self {
         Self {
             message: msg.into(),
             severity: NoticeSeverity::Error,
+            action: None,
         }
+    }
+    /// Attach the toast's one allowed action (RFC-092 §2's "Open").
+    pub fn with_open_action(mut self, label: impl Into<String>, path: impl Into<String>) -> Self {
+        self.action = Some(NoticeAction {
+            label: label.into(),
+            path: path.into(),
+        });
+        self
     }
     pub fn auto_dismiss_ms(&self) -> Option<u64> {
         match self.severity {
@@ -317,6 +346,18 @@ impl Store {
     }
     pub fn notify_success(&mut self, msg: impl Into<String>) {
         self.toast.set(Some(Notice::success(msg)));
+    }
+    /// RFC-092 §2: after a successful export, a success toast that also
+    /// offers an "Open" button for the file just saved.
+    pub fn notify_success_with_open(
+        &mut self,
+        msg: impl Into<String>,
+        open_label: impl Into<String>,
+        path: impl Into<String>,
+    ) {
+        self.toast.set(Some(
+            Notice::success(msg).with_open_action(open_label, path),
+        ));
     }
     pub fn notify_info(&mut self, msg: impl Into<String>) {
         self.toast.set(Some(Notice::info(msg)));

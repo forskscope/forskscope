@@ -29,6 +29,10 @@ dioxus-swdir-tree           = { workspace = true }
 wry                         = { workspace = true }
 
 app-json-settings           = { workspace = true }
+# RFC-092 (handoff 084): already resolved transitively (forskscope-core);
+# first direct, declared use is the comparison-report export dialog's
+# "generated at" timestamp (local time with its UTC offset).
+chrono                       = { workspace = true }
 dirs-next                   = { workspace = true }
 # RFC-091 §3: `atexit`, to remove Private mode's temporary web-view folder
 # even though `dioxus_desktop::launch::launch` never returns to `main` — see

@@ -549,6 +549,155 @@ pub fn export_patch(store: &mut Store, index: usize) {
     });
 }
 
+// ── Comparison report export (RFC-092, handoff 084) ────────────────────────────
+
+/// The export dialog's format choice (RFC-092 §2).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ReportExportFormat {
+    Html,
+    Patch,
+}
+
+/// "Generated" timestamp for a report's header: local time with its UTC
+/// offset (RFC-092 §3 item 1), e.g. `2026-10-19 12:00 +09:00`.
+fn local_timestamp_display() -> String {
+    chrono::Local::now()
+        .format("%Y-%m-%d %H:%M %:z")
+        .to_string()
+}
+
+/// Export the current file comparison as an HTML report or a unified-diff
+/// patch, per the dialog's chosen format and path mode.
+///
+/// §0's two refusal rules are enforced here, not left to the caller:
+/// - **a dirty tab never writes a report** — the dialog's own "Export
+///   report…" control is disabled for one, with its own tooltip
+///   (`Toolbar`'s wiring); this is a second check, not the only one.
+/// - **either compared file changed on disk since it was loaded** refuses
+///   before anything is written, reusing the exact fingerprint/staleness
+///   check the save-conflict path already trusts
+///   (`fingerprint_at_load`/`check_external_state`) rather than a second,
+///   parallel mechanism — this *is* "the save path's fingerprint where it
+///   exists" the handoff names.
+pub fn export_file_report(
+    store: &mut Store,
+    index: usize,
+    format: ReportExportFormat,
+    path_mode: forskscope_core::report::ReportPathMode,
+) {
+    let lang = store.lang();
+    let tabs = store.tabs.read();
+    let Some(tab) = tabs.get(index) else { return };
+
+    if tab.merge.is_dirty() {
+        drop(tabs);
+        store.notify(t(
+            lang,
+            "Save or undo your changes first: a report describes the saved files.",
+        ));
+        return;
+    }
+
+    let staleness_checks: Vec<(std::path::PathBuf, forskscope_core::FileFingerprint)> = [
+        (tab.left_path.clone(), tab.left_doc.fingerprint_at_load),
+        (tab.right_path.clone(), tab.right_doc.fingerprint_at_load),
+    ]
+    .into_iter()
+    .filter_map(|(path, fp)| Some((path?, fp?)))
+    .collect();
+    drop(tabs);
+
+    for (path, fp) in &staleness_checks {
+        let state = forskscope_core::check_external_state(path, fp, false);
+        if state != forskscope_core::ExternalFileState::Clean {
+            store.notify(t(
+                lang,
+                "A file changed since it was compared. Compare again, then export.",
+            ));
+            return;
+        }
+    }
+
+    let tabs = store.tabs.read();
+    let Some(tab) = tabs.get(index) else { return };
+
+    match format {
+        ReportExportFormat::Patch => {
+            drop(tabs);
+            export_patch(store, index);
+        }
+        ReportExportFormat::Html => {
+            let report_options = forskscope_core::report::ReportOptions {
+                path_mode,
+                context_lines: store.settings.read().context_lines,
+                ..Default::default()
+            };
+            let left_bytes = tab.left_doc.text.as_ref().map(|t| t.raw_bytes.clone());
+            let right_bytes = tab.right_doc.text.as_ref().map(|t| t.raw_bytes.clone());
+            let report = forskscope_core::report::FileComparisonReport::from_diff(
+                &tab.diff,
+                tab.left_path.as_deref(),
+                tab.right_path.as_deref(),
+                None,
+                report_options,
+            )
+            .with_checksums(
+                left_bytes
+                    .as_deref()
+                    .map(forskscope_core::report::FileChecksum::of_bytes),
+                right_bytes
+                    .as_deref()
+                    .map(forskscope_core::report::FileChecksum::of_bytes),
+            );
+
+            let default_name = tab
+                .right_path
+                .as_ref()
+                .and_then(|p| p.file_name())
+                .map(|n| format!("{}-report.html", n.to_string_lossy()))
+                .unwrap_or_else(|| "report.html".into());
+            let color_vision_safe = matches!(
+                store.settings.read().colour_vision,
+                crate::state::settings::ColourVision::RedGreenSafe
+            );
+            let generated_at = local_timestamp_display();
+
+            drop(tabs);
+            let mut store = *store;
+
+            spawn(async move {
+                let handle = rfd::AsyncFileDialog::new()
+                    .set_title("Export report")
+                    .set_file_name(&default_name)
+                    .add_filter("HTML", &["html"])
+                    .add_filter("All files", &["*"])
+                    .save_file()
+                    .await;
+                if let Some(file) = handle {
+                    let path = file.path().to_path_buf();
+                    let html = forskscope_core::report::render_file_report(
+                        &report,
+                        env!("CARGO_PKG_VERSION"),
+                        &generated_at,
+                        color_vision_safe,
+                        &|s| t(lang, s),
+                    );
+                    match std::fs::write(&path, &html) {
+                        Ok(()) => {
+                            store.notify_success_with_open(
+                                t(lang, "Report saved."),
+                                t(lang, "Open"),
+                                path.display().to_string(),
+                            );
+                        }
+                        Err(e) => eprintln!("export_file_report: write error: {e}"),
+                    }
+                }
+            });
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -18,8 +18,8 @@ use crate::state::{AppSettings, Lang, Modal, Notice, Store, Theme, config_file_p
 use crate::ui::overlay::keybindings::KeyboardRefModal;
 use crate::ui::overlay::modals::{
     AboutModal, BatchCopyModal, BatchResultModal, CloseTabModal, ConfirmDiffOptionChangeModal,
-    ConfirmDirOpModal, ConfirmEncodingChangeModal, ConfirmSaveAsOverwriteModal, LargeLoadModal,
-    OverwriteModal, ReloadModal, SaveAsModal, SaveErrorModal, SessionRecoveryModal,
+    ConfirmDirOpModal, ConfirmEncodingChangeModal, ConfirmSaveAsOverwriteModal, ExportReportModal,
+    LargeLoadModal, OverwriteModal, ReloadModal, SaveAsModal, SaveErrorModal, SessionRecoveryModal,
     SettingsRecoveryModal, SwapModal,
 };
 use modal::SettingsModal;
@@ -190,6 +190,7 @@ pub fn ModalLayer() -> Element {
         Modal::SaveError(i, target, view) => rsx! {
             SaveErrorModal { index: i, target, view }
         },
+        Modal::ExportReport(i) => rsx! { ExportReportModal { index: i } },
     }
 }
 

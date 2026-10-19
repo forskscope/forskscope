@@ -1524,6 +1524,7 @@ name = "forskscope-ui"
 version = "0.193.1"
 dependencies = [
  "app-json-settings",
+ "chrono",
  "dioxus",
  "dioxus-core",
  "dioxus-desktop",

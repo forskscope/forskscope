@@ -91,6 +91,31 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     if *advanced.read() { {t(lang, "Less ▲")} } else { {t(lang, "More ▼")} }
                 }
             }
+            {
+                // RFC-092 §1: unlike "Export patch" (in the `can_save`-gated
+                // advanced row below), this control must stay reachable even
+                // for a read-only spreadsheet/binary comparison — the RFC
+                // asks for it *visible but disabled*, with a tooltip saying
+                // why, not hidden the way the whole advanced row already is
+                // for a non-saveable tab. Lives in the primary row for
+                // that reason, not literally beside "Export patch".
+                let (disabled, tooltip) = if !snap.right_is_text {
+                    (true, t(lang, "Reports cover text comparisons for now."))
+                } else if snap.is_dirty {
+                    (true, t(lang, "Save or undo your changes first: a report describes the saved files."))
+                } else {
+                    (false, t(lang, "Export a comparison report"))
+                };
+                rsx! {
+                    button {
+                        disabled,
+                        title: "{tooltip}",
+                        aria_label: t(lang, "Export report"),
+                        onclick: move |_| store.modal.set(Modal::ExportReport(index)),
+                        {t(lang, "Export report…")}
+                    }
+                }
+            }
         }
 
         // ── Advanced disclosure panel ─────────────────────────────────────────

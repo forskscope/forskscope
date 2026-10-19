@@ -270,6 +270,7 @@ pub fn App() -> Element {
                         crate::state::NoticeSeverity::Error   => "toast toast-error",
                     };
                     let message = notice.message.clone();
+                    let action = notice.action.clone();
                     // Auto-dismiss for Success and Info notices.
                     if let Some(ms) = notice.auto_dismiss_ms() {
                         spawn(async move {
@@ -284,6 +285,24 @@ pub fn App() -> Element {
                             aria_live: "polite",
                             onclick: move |_| store.toast.set(None),
                             "{message}"
+                            if let Some(action) = action {
+                                button {
+                                    class: "toast-action",
+                                    onclick: move |e| {
+                                        // RFC-092 §2: stays on the toast's own
+                                        // click-anywhere-to-dismiss, but this
+                                        // click must act (open the file), not
+                                        // merely dismiss - stop it reaching the
+                                        // outer div's onclick.
+                                        e.stop_propagation();
+                                        if let Err(err) = forskscope_core::external_tool::open_path(&action.path) {
+                                            eprintln!("open_path: {err} (path: {})", action.path);
+                                        }
+                                        store.toast.set(None);
+                                    },
+                                    "{action.label}"
+                                }
+                            }
                         }
                     }
                 }
