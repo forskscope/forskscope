@@ -289,7 +289,7 @@ async fn start_dir_export(
             cancel_token.set(None);
 
             match outcome {
-                Ok(Some(report)) => {
+                Ok(BuildOutcome::Report(report)) => {
                     let color_vision_safe = matches!(
                         store.settings.read().colour_vision,
                         ColourVision::RedGreenSafe
@@ -313,17 +313,36 @@ async fn start_dir_export(
                 }
                 // Cancelled: nothing written, nothing to notify beyond
                 // silence - the user asked for this.
-                Ok(None) => {}
+                Ok(BuildOutcome::Cancelled) => {}
+                // RFC-092 §0: refuse before writing anything.
+                Ok(BuildOutcome::Stale(path)) => store.notify(format!(
+                    "{} ({path})",
+                    t(
+                        lang,
+                        "A file changed since it was compared. Compare again, then export."
+                    )
+                )),
                 Err(e) => eprintln!("export_dir_report (html): join error: {e}"),
             }
         }
     }
 }
 
+/// What building the report produced.
+enum BuildOutcome {
+    Report(Box<DirComparisonReport>),
+    /// `token` was cancelled before finishing — nothing partial is ever
+    /// handed back to be written.
+    Cancelled,
+    /// RFC-092 §0: a file read at export time no longer agrees with what
+    /// the scan found — an entry listed `Equal` whose two hashes now
+    /// differ, or listed `Changed` whose two hashes now match. The whole
+    /// export refuses, naming the one path that triggered it.
+    Stale(String),
+}
+
 /// Reads, hashes and (for changed text files, under the cap) diffs every
-/// entry — off the UI thread via `spawn_blocking`'s caller. Returns `None`
-/// if `token` was cancelled before finishing (nothing partial is ever
-/// handed back to be written).
+/// entry — off the UI thread via `spawn_blocking`'s caller.
 fn build_dir_report(
     left_root: &Path,
     right_root: &Path,
@@ -332,7 +351,7 @@ fn build_dir_report(
     report_options: ReportOptions,
     token: &CancellationToken,
     on_progress: &mut dyn FnMut(usize, usize),
-) -> Option<DirComparisonReport> {
+) -> BuildOutcome {
     let total = entries.len();
     let mut report = DirComparisonReport::from_entries(
         &entries,
@@ -349,7 +368,7 @@ fn build_dir_report(
 
     for (i, entry) in entries.iter().enumerate() {
         if token.is_cancelled() {
-            return None;
+            return BuildOutcome::Cancelled;
         }
         on_progress(i, total);
 
@@ -372,6 +391,14 @@ fn build_dir_report(
         )
         .then(|| std::fs::read(&right_path).ok())
         .flatten();
+
+        if let (Some(l), Some(r)) = (&left_bytes, &right_bytes) {
+            let now_equal = l == r;
+            let was_equal = entry.status == RecStatus::Equal;
+            if now_equal != was_equal {
+                return BuildOutcome::Stale(row.path.clone());
+            }
+        }
 
         if let Some(bytes) = &left_bytes {
             row.left_checksum = Some(FileChecksum::of_bytes(bytes));
@@ -425,7 +452,7 @@ fn build_dir_report(
         }
     }
     on_progress(total, total);
-    Some(report)
+    BuildOutcome::Report(Box::new(report))
 }
 
 fn report_options_context_lines(report: &DirComparisonReport) -> usize {
@@ -468,6 +495,14 @@ mod tests {
         }
     }
 
+    fn expect_report(outcome: BuildOutcome) -> DirComparisonReport {
+        match outcome {
+            BuildOutcome::Report(r) => *r,
+            BuildOutcome::Cancelled => panic!("expected a report, got Cancelled"),
+            BuildOutcome::Stale(path) => panic!("expected a report, got Stale({path})"),
+        }
+    }
+
     fn entry(rel: &str, status: RecStatus) -> RecEntry {
         RecEntry {
             rel_path: PathBuf::from(rel),
@@ -492,7 +527,7 @@ mod tests {
             entry("left_only.txt", RecStatus::LeftOnly),
         ];
 
-        let report = build_dir_report(
+        let report = expect_report(build_dir_report(
             &s.left(),
             &s.right(),
             entries,
@@ -500,8 +535,7 @@ mod tests {
             ReportOptions::default(),
             &CancellationToken::new(),
             &mut |_, _| {},
-        )
-        .expect("not cancelled");
+        ));
 
         let equal_row = report
             .file_rows
@@ -547,7 +581,7 @@ mod tests {
         s.write("right", "data.bin", &[0u8, 1, 2, 4]);
         let entries = vec![entry("data.bin", RecStatus::Changed)];
 
-        let report = build_dir_report(
+        let report = expect_report(build_dir_report(
             &s.left(),
             &s.right(),
             entries,
@@ -555,8 +589,7 @@ mod tests {
             ReportOptions::default(),
             &CancellationToken::new(),
             &mut |_, _| {},
-        )
-        .expect("not cancelled");
+        ));
 
         let row = &report.file_rows[0];
         assert!(row.left_checksum.is_some());
@@ -569,7 +602,7 @@ mod tests {
     }
 
     #[test]
-    fn a_cancelled_token_returns_none_and_writes_nothing() {
+    fn a_cancelled_token_returns_cancelled_and_writes_nothing() {
         let s = Scratch::new("cancel");
         s.write("left", "a.txt", b"a\n");
         s.write("right", "a.txt", b"b\n");
@@ -578,7 +611,7 @@ mod tests {
         let token = CancellationToken::new();
         token.cancel();
 
-        let report = build_dir_report(
+        let outcome = build_dir_report(
             &s.left(),
             &s.right(),
             entries,
@@ -587,7 +620,72 @@ mod tests {
             &token,
             &mut |_, _| {},
         );
-        assert!(report.is_none());
+        assert!(matches!(outcome, BuildOutcome::Cancelled));
+    }
+
+    #[test]
+    fn an_entry_listed_equal_whose_hashes_now_differ_refuses_the_whole_export() {
+        let s = Scratch::new("stale-equal-now-differs");
+        // The scan found these equal; the right file changed since then.
+        s.write("left", "a.txt", b"same\n");
+        s.write("right", "a.txt", b"not the same anymore\n");
+        let entries = vec![entry("a.txt", RecStatus::Equal)];
+
+        let outcome = build_dir_report(
+            &s.left(),
+            &s.right(),
+            entries,
+            forskscope_core::DiffOptions::default(),
+            ReportOptions::default(),
+            &CancellationToken::new(),
+            &mut |_, _| {},
+        );
+        match outcome {
+            BuildOutcome::Stale(path) => assert_eq!(path, "a.txt"),
+            _ => panic!("expected Stale(\"a.txt\"), got a different outcome"),
+        }
+    }
+
+    #[test]
+    fn an_entry_listed_changed_whose_hashes_now_match_refuses_the_whole_export() {
+        let s = Scratch::new("stale-changed-now-matches");
+        // The scan found these different; one side was edited back since.
+        s.write("left", "a.txt", b"now the same\n");
+        s.write("right", "a.txt", b"now the same\n");
+        let entries = vec![entry("a.txt", RecStatus::Changed)];
+
+        let outcome = build_dir_report(
+            &s.left(),
+            &s.right(),
+            entries,
+            forskscope_core::DiffOptions::default(),
+            ReportOptions::default(),
+            &CancellationToken::new(),
+            &mut |_, _| {},
+        );
+        match outcome {
+            BuildOutcome::Stale(path) => assert_eq!(path, "a.txt"),
+            _ => panic!("expected Stale(\"a.txt\"), got a different outcome"),
+        }
+    }
+
+    #[test]
+    fn an_unaffected_equal_entry_does_not_refuse_the_export() {
+        let s = Scratch::new("stale-unaffected");
+        s.write("left", "still-equal.txt", b"same\n");
+        s.write("right", "still-equal.txt", b"same\n");
+        let entries = vec![entry("still-equal.txt", RecStatus::Equal)];
+
+        let outcome = build_dir_report(
+            &s.left(),
+            &s.right(),
+            entries,
+            forskscope_core::DiffOptions::default(),
+            ReportOptions::default(),
+            &CancellationToken::new(),
+            &mut |_, _| {},
+        );
+        assert!(matches!(outcome, BuildOutcome::Report(_)));
     }
 
     #[test]
@@ -601,7 +699,7 @@ mod tests {
             entries.push(entry(&name, RecStatus::Changed));
         }
 
-        let report = build_dir_report(
+        let report = expect_report(build_dir_report(
             &s.left(),
             &s.right(),
             entries,
@@ -609,8 +707,7 @@ mod tests {
             ReportOptions::default(),
             &CancellationToken::new(),
             &mut |_, _| {},
-        )
-        .expect("not cancelled");
+        ));
 
         let with_content = report
             .file_rows
