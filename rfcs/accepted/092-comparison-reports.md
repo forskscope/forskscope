@@ -77,6 +77,10 @@ What a report *can* carry cheaply is **the SHA-256 of each compared file**:
   tooltip saying reports cover text comparisons for now.
 - **Nothing is exported automatically.** Every export is the user's click and a
   save dialog.
+- *Clarified 2026-10-19 (architect, review 174 §1):* in a file comparison,
+  *Export report…* sits in the toolbar's main row, not the *More* row. The *More*
+  row exists only for a comparison that can be saved, so placing it there would
+  hide reports for read-only text files as well as spreadsheets.
 
 ### 2. The export dialog: small on purpose
 
