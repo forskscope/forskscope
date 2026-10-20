@@ -27,6 +27,7 @@
 - [Diff options](./intermediate/diff-options.md)
 - [Keyboard reference](./intermediate/keyboard.md)
 - [CLI usage](./intermediate/cli.md)
+- [Using ForskScope from scripts and AI agents](./intermediate/scripts-and-agents.md)
 - [Git integration](./intermediate/git-integration.md)
 - [Exporting a comparison](./intermediate/patch-export.md)
 

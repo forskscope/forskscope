@@ -1,5 +1,10 @@
 # CLI Reference
 
+This page covers the GUI program's own command line (`forskscope`). For a
+separate, headless program built for scripts and AI agents — no GTK, no
+window, prints to standard output only — see
+[Using ForskScope from scripts and AI agents](./scripts-and-agents.md).
+
 ## Startup modes
 
 ### Open the explorer workspace
