@@ -189,6 +189,11 @@ outside user.
   history section. `forskscope-report` defines its own small input type for
   that section, and the GUI fills it from `forskscope-edit`. That keeps `report`
   free of `edit`.
+  - *Clarified 2026-10-20 (architect, review 180):* the implementation map
+    found the same shape for a folder report's batch summary
+    (`BatchManifest`). **No caller ever passed either, and no shipped output
+    showed either,** so both sections are **removed** rather than decoupled.
+    A report-owned type returns only with a decision to show them.
 - **`dir` mixes reading and writing.** Listing, recursive comparison and
   digests go to `compare`. Batch copy, plan and execute, and manifests go to
   `edit`.
