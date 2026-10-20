@@ -400,3 +400,43 @@ impl FileComparisonReport {
         s
     }
 }
+
+// ── Building a report from disk (RFC-092 §5, moved from forskscope-ui by
+// RFC-093 §1 step 6) ────────────────────────────────────────────────────────
+
+/// Review 174 §6: a checksum appears only where a reader can reproduce it
+/// by running `sha256sum` on a real file — `has_fingerprint` is `false`
+/// for exactly one case in this codebase today, `LoadedDocument::empty()`
+/// ("one side is intentionally absent"), whose `raw_bytes` would otherwise
+/// still produce a real-looking checksum (of zero bytes) that proves
+/// nothing about any actual file.
+pub fn checksum_if_fingerprinted(
+    bytes: Option<&[u8]>,
+    has_fingerprint: bool,
+) -> Option<FileChecksum> {
+    if has_fingerprint {
+        bytes.map(FileChecksum::of_bytes)
+    } else {
+        None
+    }
+}
+
+/// Assembles a file comparison report with its checksums attached - the
+/// caller's own fingerprint/staleness check, the actual file I/O that
+/// produced the bytes behind `left_checksum`/`right_checksum`
+/// (`checksum_if_fingerprinted`, above), and that decision itself, all
+/// happen before this is called; this function itself does no file I/O and
+/// writes nothing. A thin `from_diff` + `with_checksums` combination, kept
+/// as its own function so the GUI's export job has one call to make
+/// instead of two.
+pub fn build_file_report(
+    diff: &DiffDocument,
+    left_path: Option<&Path>,
+    right_path: Option<&Path>,
+    report_options: ReportOptions,
+    left_checksum: Option<FileChecksum>,
+    right_checksum: Option<FileChecksum>,
+) -> FileComparisonReport {
+    FileComparisonReport::from_diff(diff, left_path, right_path, report_options)
+        .with_checksums(left_checksum, right_checksum)
+}

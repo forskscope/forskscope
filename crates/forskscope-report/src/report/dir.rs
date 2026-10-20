@@ -1,8 +1,10 @@
 //! Directory-level comparison report: `DirComparisonReport` (RFC-008, RFC-092).
 
 use super::FileChecksum;
+use super::change_hunks_from_diff;
 use super::changes::ChangeHunk;
 use super::file::{ReportOptions, ReportPathMode, non_default_options_summary};
+use forskscope_compare::CancellationToken;
 use forskscope_compare::diff::DiffOptions;
 use forskscope_compare::dir::{RecEntry, RecStatus};
 use std::fmt::Write as _;
@@ -311,4 +313,140 @@ pub(super) fn fmt_size(bytes: u64) -> String {
     } else {
         format!("{:.1} MiB", bytes as f64 / 1_048_576.0)
     }
+}
+
+// ── Building a report from disk (RFC-092 §5, moved from forskscope-ui by
+// RFC-093 §1 step 6) ────────────────────────────────────────────────────────
+
+/// RFC-092 §3a: "50 files or 5 MiB of change text, whichever comes first."
+const MAX_CHANGED_FILES_WITH_CONTENT: usize = 50;
+const MAX_CHANGE_TEXT_BYTES: usize = 5 * 1024 * 1024;
+
+/// What building the report produced.
+pub enum BuildOutcome {
+    Report(Box<DirComparisonReport>),
+    /// `token` was cancelled before finishing — nothing partial is ever
+    /// handed back to be written.
+    Cancelled,
+    /// RFC-092 §0: a file read at export time no longer agrees with what
+    /// the scan found — an entry listed `Equal` whose two hashes now
+    /// differ, or listed `Changed` whose two hashes now match. The whole
+    /// export refuses, naming the one path that triggered it.
+    Stale(String),
+}
+
+/// Reads, hashes and (for changed text files, under the cap) diffs every
+/// entry. The caller (the GUI) runs this off its own UI thread; this
+/// function itself does no threading and writes no file — it only reads
+/// the compared files and returns the assembled report for the caller to
+/// render and write.
+pub fn build_dir_report(
+    left_root: &Path,
+    right_root: &Path,
+    entries: Vec<RecEntry>,
+    diff_options: DiffOptions,
+    report_options: ReportOptions,
+    token: &CancellationToken,
+    on_progress: &mut dyn FnMut(usize, usize),
+) -> BuildOutcome {
+    let total = entries.len();
+    let mut report = DirComparisonReport::from_entries(
+        &entries,
+        Some(left_root),
+        Some(right_root),
+        Some(&diff_options),
+        report_options,
+    );
+
+    let context_lines = report.options.context_lines;
+    let mut change_text_bytes = 0usize;
+    let mut files_with_content = 0usize;
+
+    for (i, entry) in entries.iter().enumerate() {
+        if token.is_cancelled() {
+            return BuildOutcome::Cancelled;
+        }
+        on_progress(i, total);
+
+        let Some(row) = report.file_rows.get_mut(i) else {
+            continue;
+        };
+
+        let left_path = left_root.join(&entry.rel_path);
+        let right_path = right_root.join(&entry.rel_path);
+
+        let left_bytes = matches!(
+            entry.status,
+            RecStatus::Equal | RecStatus::Changed | RecStatus::LeftOnly
+        )
+        .then(|| std::fs::read(&left_path).ok())
+        .flatten();
+        let right_bytes = matches!(
+            entry.status,
+            RecStatus::Equal | RecStatus::Changed | RecStatus::RightOnly
+        )
+        .then(|| std::fs::read(&right_path).ok())
+        .flatten();
+
+        if let (Some(l), Some(r)) = (&left_bytes, &right_bytes) {
+            let now_equal = l == r;
+            let was_equal = entry.status == RecStatus::Equal;
+            if now_equal != was_equal {
+                return BuildOutcome::Stale(row.path.clone());
+            }
+        }
+
+        if let Some(bytes) = &left_bytes {
+            row.left_checksum = Some(FileChecksum::of_bytes(bytes));
+        }
+        if let Some(bytes) = &right_bytes {
+            row.right_checksum = Some(FileChecksum::of_bytes(bytes));
+        }
+
+        if entry.status == RecStatus::Changed
+            && let (Some(left_bytes), Some(right_bytes)) = (&left_bytes, &right_bytes)
+        {
+            // Binary/spreadsheet entries show status only (RFC-092 §3a) -
+            // never added to `change_hunks_omitted`, which names only what
+            // the *cap* left out; a binary file was never going to be
+            // diffed regardless of the cap, so listing it there would
+            // misattribute why its content is absent.
+            let is_text = matches!(
+                forskscope_compare::file_kind::classify(&left_path),
+                Ok(forskscope_compare::FileKind::Text)
+            ) && matches!(
+                forskscope_compare::file_kind::classify(&right_path),
+                Ok(forskscope_compare::FileKind::Text)
+            );
+            if is_text {
+                if files_with_content < MAX_CHANGED_FILES_WITH_CONTENT
+                    && change_text_bytes < MAX_CHANGE_TEXT_BYTES
+                {
+                    if let (Ok(left_text), Ok(right_text)) = (
+                        String::from_utf8(left_bytes.clone()),
+                        String::from_utf8(right_bytes.clone()),
+                    ) {
+                        let diff =
+                            forskscope_compare::compute_diff(&left_text, &right_text, diff_options);
+                        let hunks = change_hunks_from_diff(&diff, context_lines);
+                        let hunk_text_len: usize = hunks
+                            .iter()
+                            .flat_map(|h: &ChangeHunk| h.lines.iter())
+                            .map(|l| l.content.len())
+                            .sum();
+                        change_text_bytes += hunk_text_len;
+                        files_with_content += 1;
+                        row.change_hunks = Some(hunks);
+                    }
+                    // `classify` sampled a prefix; a full-file UTF-8 decode
+                    // failure here is rare and not a cap omission either -
+                    // left with no change_hunks, same as a binary file.
+                } else {
+                    report.change_hunks_omitted.push(row.path.clone());
+                }
+            }
+        }
+    }
+    on_progress(total, total);
+    BuildOutcome::Report(Box::new(report))
 }

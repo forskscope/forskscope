@@ -18,8 +18,11 @@ pub mod file;
 pub mod html;
 
 pub use changes::{ChangeHunk, ChangeLine, ChangeLineKind, change_hunks_from_diff};
-pub use dir::{DirComparisonReport, DirFileRow};
-pub use file::{FileComparisonReport, HunkSummaryRow, ReportOptions, ReportPathMode};
+pub use dir::{BuildOutcome, DirComparisonReport, DirFileRow, build_dir_report};
+pub use file::{
+    FileComparisonReport, HunkSummaryRow, ReportOptions, ReportPathMode, build_file_report,
+    checksum_if_fingerprinted,
+};
 pub use html::{render_dir_report, render_file_report};
 
 use forskscope_compare::diff::HunkKind;
