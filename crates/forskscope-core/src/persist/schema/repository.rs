@@ -22,7 +22,7 @@ pub struct PersistenceSaveOutcome {
     pub backup_path: Option<PathBuf>,
 }
 
-/// A file-write failure. Deliberately not [`crate::error::CoreError`]: that
+/// A file-write failure. Deliberately not [`forskscope_compare::error::CoreError`]: that
 /// type's variants (`Conflict`, document-oriented `IoOperation`s) are shaped
 /// for document saves under RFC-007, not preference files with no fingerprint
 /// or dirty-content concept.

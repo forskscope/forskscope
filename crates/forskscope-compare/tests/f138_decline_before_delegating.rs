@@ -102,7 +102,7 @@ fn a_crafted_cfb_header_is_declined_not_allocated() {
     // nothing else in this test allocates unexpectedly under the cap.
     let good = fixture("src/tests/fixtures/xlsx/basic/old.xlsx");
 
-    let result = forskscope_core::xlsx::compare_pair(&bad, &good);
+    let result = forskscope_compare::xlsx::compare_pair(&bad, &good);
 
     // If the regression reappeared, the attempted 9.26 GB allocation would
     // fail against the 2 GB cap and abort *this test binary* — no assertion

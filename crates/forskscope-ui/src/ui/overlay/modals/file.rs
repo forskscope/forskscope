@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
-use forskscope_core::DiffOptions;
+use forskscope_compare::DiffOptions;
 use forskscope_ui_logic::SaveErrorView;
 
 use crate::i18n::t;
@@ -232,7 +232,7 @@ pub(crate) fn large_load_text(lang: Lang, prompt: &LargeLoadPrompt) -> (String, 
             prompt.confirm_label.clone(),
         );
     }
-    let mib = (forskscope_core::job::PerformanceLimits::default().medium_text_threshold_bytes
+    let mib = (forskscope_compare::job::PerformanceLimits::default().medium_text_threshold_bytes
         / (1024 * 1024))
         .to_string();
     let body = if prompt.spreadsheet {
@@ -370,7 +370,8 @@ mod large_load_text_tests {
 
     #[test]
     fn the_size_in_the_prompt_is_the_guard_threshold_and_both_languages_differ() {
-        let mib = (forskscope_core::job::PerformanceLimits::default().medium_text_threshold_bytes
+        let mib = (forskscope_compare::job::PerformanceLimits::default()
+            .medium_text_threshold_bytes
             / (1024 * 1024))
             .to_string();
         for spreadsheet in [false, true] {

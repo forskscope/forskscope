@@ -16,11 +16,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::document::{ExternalFileState, FileFingerprint, check_external_state};
-use crate::encoding::{
+use forskscope_compare::document::{ExternalFileState, FileFingerprint, check_external_state};
+use forskscope_compare::encoding::{
     BomPolicy, BomPresence, MAX_REPORTED_UNMAPPABLE_CHARS, encode_text, unmappable_characters,
 };
-use crate::error::{CoreError, IoOperation, Result};
+use forskscope_compare::error::{CoreError, IoOperation, Result};
 
 /// Backup behavior for a save.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

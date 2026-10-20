@@ -3,8 +3,8 @@
 use super::FileChecksum;
 use super::changes::ChangeHunk;
 use super::file::{ReportOptions, ReportPathMode, non_default_options_summary};
-use crate::diff::DiffOptions;
-use crate::dir::{RecEntry, RecStatus};
+use forskscope_compare::diff::DiffOptions;
+use forskscope_compare::dir::{RecEntry, RecStatus};
 use std::fmt::Write as _;
 use std::path::Path;
 

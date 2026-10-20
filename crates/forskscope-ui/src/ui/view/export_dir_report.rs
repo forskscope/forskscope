@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use dioxus::prelude::*;
 use dioxus_core::spawn_forever;
 
-use forskscope_core::CancellationToken;
-use forskscope_core::dir::{RecEntry, RecStatus};
+use forskscope_compare::CancellationToken;
+use forskscope_compare::dir::{RecEntry, RecStatus};
 use forskscope_core::report::{
     ChangeHunk, DirComparisonReport, FileChecksum, ReportOptions, ReportPathMode,
     change_hunks_from_diff, render_dir_report,
@@ -221,7 +221,7 @@ async fn start_dir_export(
 
     match format {
         ReportExportFormat::Patch => {
-            let diff_options = forskscope_core::DiffOptions::default();
+            let diff_options = forskscope_compare::DiffOptions::default();
             let patch_options = forskscope_core::patch::PatchOptions {
                 context_lines: store.settings.read().context_lines,
                 ..Default::default()
@@ -271,7 +271,7 @@ async fn start_dir_export(
                 total: entries.len(),
             });
 
-            let diff_options = forskscope_core::DiffOptions::default();
+            let diff_options = forskscope_compare::DiffOptions::default();
             let report_options = ReportOptions {
                 path_mode,
                 context_lines: store.settings.read().context_lines,
@@ -365,7 +365,7 @@ fn build_dir_report(
     left_root: &Path,
     right_root: &Path,
     entries: Vec<RecEntry>,
-    diff_options: forskscope_core::DiffOptions,
+    diff_options: forskscope_compare::DiffOptions,
     report_options: ReportOptions,
     token: &CancellationToken,
     on_progress: &mut dyn FnMut(usize, usize),
@@ -433,11 +433,11 @@ fn build_dir_report(
             // diffed regardless of the cap, so listing it there would
             // misattribute why its content is absent.
             let is_text = matches!(
-                forskscope_core::file_kind::classify(&left_path),
-                Ok(forskscope_core::FileKind::Text)
+                forskscope_compare::file_kind::classify(&left_path),
+                Ok(forskscope_compare::FileKind::Text)
             ) && matches!(
-                forskscope_core::file_kind::classify(&right_path),
-                Ok(forskscope_core::FileKind::Text)
+                forskscope_compare::file_kind::classify(&right_path),
+                Ok(forskscope_compare::FileKind::Text)
             );
             if is_text {
                 if files_with_content < MAX_CHANGED_FILES_WITH_CONTENT
@@ -448,7 +448,7 @@ fn build_dir_report(
                         String::from_utf8(right_bytes.clone()),
                     ) {
                         let diff =
-                            forskscope_core::compute_diff(&left_text, &right_text, diff_options);
+                            forskscope_compare::compute_diff(&left_text, &right_text, diff_options);
                         let hunks = change_hunks_from_diff(&diff, context_lines);
                         let hunk_text_len: usize = hunks
                             .iter()
@@ -548,7 +548,7 @@ mod tests {
             &s.left(),
             &s.right(),
             entries,
-            forskscope_core::DiffOptions::default(),
+            forskscope_compare::DiffOptions::default(),
             ReportOptions::default(),
             &CancellationToken::new(),
             &mut |_, _| {},
@@ -602,7 +602,7 @@ mod tests {
             &s.left(),
             &s.right(),
             entries,
-            forskscope_core::DiffOptions::default(),
+            forskscope_compare::DiffOptions::default(),
             ReportOptions::default(),
             &CancellationToken::new(),
             &mut |_, _| {},
@@ -632,7 +632,7 @@ mod tests {
             &s.left(),
             &s.right(),
             entries,
-            forskscope_core::DiffOptions::default(),
+            forskscope_compare::DiffOptions::default(),
             ReportOptions::default(),
             &token,
             &mut |_, _| {},
@@ -652,7 +652,7 @@ mod tests {
             &s.left(),
             &s.right(),
             entries,
-            forskscope_core::DiffOptions::default(),
+            forskscope_compare::DiffOptions::default(),
             ReportOptions::default(),
             &CancellationToken::new(),
             &mut |_, _| {},
@@ -675,7 +675,7 @@ mod tests {
             &s.left(),
             &s.right(),
             entries,
-            forskscope_core::DiffOptions::default(),
+            forskscope_compare::DiffOptions::default(),
             ReportOptions::default(),
             &CancellationToken::new(),
             &mut |_, _| {},
@@ -697,7 +697,7 @@ mod tests {
             &s.left(),
             &s.right(),
             entries,
-            forskscope_core::DiffOptions::default(),
+            forskscope_compare::DiffOptions::default(),
             ReportOptions::default(),
             &CancellationToken::new(),
             &mut |_, _| {},
@@ -723,7 +723,7 @@ mod tests {
             &s.left(),
             &s.right(),
             entries,
-            forskscope_core::DiffOptions::default(),
+            forskscope_compare::DiffOptions::default(),
             ReportOptions::default(),
             &CancellationToken::new(),
             &mut |_, _| {},

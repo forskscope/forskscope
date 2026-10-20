@@ -51,7 +51,7 @@ fn build_save_payload_overlays_ui_fields_but_preserves_the_rest() {
 /// `DiffProfile::to_v2`: the assertion fails.
 #[test]
 fn a_newline_mode_set_by_hand_survives_a_settings_save() {
-    use forskscope_core::NewlineCompareMode;
+    use forskscope_compare::NewlineCompareMode;
 
     let mut base = PersistedSettings::default();
     let mut hand = base.profiles[0].clone();

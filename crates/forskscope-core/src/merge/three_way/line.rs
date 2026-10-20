@@ -4,7 +4,7 @@
 //! the source line endings, consistent with the two-way diff engine
 //! (RFC-002, RFC-010 newline semantics).
 
-use crate::diff::NewlineMarker;
+use forskscope_compare::diff::NewlineMarker;
 
 /// One source line: content without terminator, plus its terminator marker.
 #[derive(Debug, Clone, PartialEq, Eq)]

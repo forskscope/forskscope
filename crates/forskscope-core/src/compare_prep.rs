@@ -19,11 +19,11 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::diff::DiffDocument;
-use crate::document::{FileFingerprint, LoadOptions, LoadedDocument, load_path};
-use crate::encoding::BomPresence;
-use crate::file_kind::{EditabilityClass, FileKind, classify};
 use crate::merge::MergeSession;
+use forskscope_compare::diff::DiffDocument;
+use forskscope_compare::document::{FileFingerprint, LoadOptions, LoadedDocument, load_path};
+use forskscope_compare::encoding::BomPresence;
+use forskscope_compare::file_kind::{EditabilityClass, FileKind, classify};
 
 /// The result of blocking comparison preparation: loaded documents, the
 /// computed diff, a fresh merge session, and the save target — committed
@@ -40,7 +40,7 @@ pub struct PreparedCompare {
     pub save_capability: SaveCapability,
     /// The spreadsheet parser's warnings (F131); empty unless both sides are
     /// `.xlsx`. Committed with the documents they qualify.
-    pub spreadsheet_warnings: Vec<crate::xlsx::SpreadsheetWarning>,
+    pub spreadsheet_warnings: Vec<forskscope_compare::xlsx::SpreadsheetWarning>,
 }
 
 /// Where a save will go, and whether it's currently possible.

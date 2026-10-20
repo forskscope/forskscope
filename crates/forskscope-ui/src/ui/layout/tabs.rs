@@ -227,11 +227,12 @@ fn FileTabItem(
 #[cfg(test)]
 mod tests {
     use dioxus::prelude::*;
-    use forskscope_core::compare_prep::SaveCapability;
-    use forskscope_core::{
-        BomPresence, DiffOptions, FileKind, LoadedDocument, MergeSession, NewlineStyle,
-        TextDocument, TextEncoding, compute_diff,
+    use forskscope_compare::{
+        BomPresence, DiffOptions, FileKind, LoadedDocument, NewlineStyle, TextDocument,
+        TextEncoding, compute_diff,
     };
+    use forskscope_core::MergeSession;
+    use forskscope_core::compare_prep::SaveCapability;
     use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
     use super::TabBar;

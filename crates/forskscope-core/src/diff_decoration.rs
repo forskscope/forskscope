@@ -14,7 +14,7 @@
 //! - `InlineDecoration` column ranges are byte-offset based, consistent
 //!   with `InlineSpan`.
 
-use crate::diff::{DiffDocument, DiffWarning, HunkId, HunkKind, InlineKind};
+use forskscope_compare::diff::{DiffDocument, DiffWarning, HunkId, HunkKind, InlineKind};
 
 // ── Side ──────────────────────────────────────────────────────────────────────
 

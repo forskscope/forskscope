@@ -2,9 +2,9 @@
 
 use dioxus::prelude::*;
 
-use forskscope_core::NewlineCompareMode;
-use forskscope_core::WhitespaceMode;
-use forskscope_core::diff::InlineMode;
+use forskscope_compare::NewlineCompareMode;
+use forskscope_compare::WhitespaceMode;
+use forskscope_compare::diff::InlineMode;
 
 use crate::i18n::t;
 use crate::state::Store;

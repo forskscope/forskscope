@@ -19,6 +19,7 @@ name = "forskscope_ui"
 path = "src/lib.rs"
 
 [dependencies]
+forskscope-compare           = { workspace = true }
 forskscope-core             = { workspace = true }
 forskscope-ui-logic         = { workspace = true }
 

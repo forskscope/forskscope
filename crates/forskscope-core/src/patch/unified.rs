@@ -12,7 +12,7 @@
 
 use std::fmt::Write as _;
 
-use crate::diff::NewlineMarker;
+use forskscope_compare::diff::NewlineMarker;
 
 use super::model::{PatchDocument, PatchFileChange, PatchHunk};
 

@@ -79,7 +79,7 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
 - `.xlsx` files are **parsed** since v0.169.0 (`d492557`, RFC-085): a pair of
   workbooks goes through `sheets-diff` 3.6.0 (`calamine 0.36.1`,
   `quick-xml 0.41.0`, `zip 8.6.0`) under the bounds set in
-  `crates/forskscope-core/src/xlsx.rs`. A comparison that cannot finish — a
+  `crates/forskscope-compare/src/xlsx.rs`. A comparison that cannot finish — a
   corrupt workbook, or one that reaches a size bound — is shown as an error,
   never as an identical result. What the parser defends against and what it
   does not is under "Enabled third-party parser" below.
@@ -560,7 +560,7 @@ Key crates touching file I/O or process execution:
 | `tungstenite` | 0.28 | Dioxus desktop transport dependency | Accepted only via `dioxus-desktop`; no app-authored remote connections |
 | `native-tls` | 0.2 | Dioxus desktop's transport TLS, and (F180, handoff 073) the update-check request's TLS | Two reviewed paths: via `dioxus-desktop` (no app-authored connection), and directly from `forskscope-ui` for one bounded, user-clicked HTTPS GET — see "Accepted outbound request: update check" |
 | `quick-xml` | 0.39.4 | Wayland protocol code generation through GTK/Dioxus stack | Build-time/proc-macro path; not reachable from user-supplied files. Carries the two advisories ignored in `.cargo/audit.toml` |
-| `sheets-diff` | 3.6.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0; 3.0.0 since F130, 3.2.0 since F138, 3.3.0 since F154, 3.4.0 since F173, 3.5.0 since F132, 3.6.0 since F177) | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-core` only (`audit-deps` asserts it) |
+| `sheets-diff` | 3.6.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0; 3.0.0 since F130, 3.2.0 since F138, 3.3.0 since F154, 3.4.0 since F173, 3.5.0 since F132, 3.6.0 since F177) | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-compare` only (`audit-deps` asserts it) |
 | `calamine` | 0.36.1 | Workbook reader under `sheets-diff` | **Parses user-supplied XML and archives.** Read as a stream by `sheets-diff` 2.5.1 and later, so memory follows the populated cells (it did not through 2.5.0). Immediate dependent: `sheets-diff` only |
 | `quick-xml` | 0.41.0 | XML parsing under `calamine` | **Reachable from user-supplied files.** Not covered by the `.cargo/audit.toml` ignore list (which names 0.39 only) |
 | `zip` | 8.6.0 | Archive reading under `calamine` | **Reachable from user-supplied files.** Compressed size is bounded (50 MiB); expansion is not |

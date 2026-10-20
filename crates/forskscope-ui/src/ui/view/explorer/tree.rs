@@ -12,8 +12,8 @@ use std::path::PathBuf;
 use dioxus::html::input_data::keyboard_types::{Key, Modifiers};
 use dioxus::prelude::*;
 use dioxus_swdir_tree::{DirectoryTree, DirectoryTreeEvent, ScanRequest, SelectionMode};
-use forskscope_core::IgnoreRules;
-use forskscope_core::dir::EqualityEvidence;
+use forskscope_compare::IgnoreRules;
+use forskscope_compare::dir::EqualityEvidence;
 use forskscope_ui_logic::AlignedRow;
 
 use super::{DigestKey, FocusedPane, PickKind, Tier1Map, row_evidence, start_tier2_verify};
@@ -173,8 +173,8 @@ pub fn ExplorerTree(
                                             let cached = binary_cache.read().get(&row.abs_path).copied();
                                             cached.unwrap_or_else(|| {
                                                 let b = matches!(
-                                                    forskscope_core::file_kind::classify(&p_bin),
-                                                    Ok(forskscope_core::file_kind::FileKind::Binary)
+                                                    forskscope_compare::file_kind::classify(&p_bin),
+                                                    Ok(forskscope_compare::file_kind::FileKind::Binary)
                                                 );
                                                 binary_cache.write().insert(p_bin, b);
                                                 b
@@ -245,8 +245,8 @@ pub fn ExplorerTree(
                                             let cached = binary_cache.read().get(&row.abs_path).copied();
                                             cached.unwrap_or_else(|| {
                                                 let b = matches!(
-                                                    forskscope_core::file_kind::classify(&p_bin),
-                                                    Ok(forskscope_core::file_kind::FileKind::Binary)
+                                                    forskscope_compare::file_kind::classify(&p_bin),
+                                                    Ok(forskscope_compare::file_kind::FileKind::Binary)
                                                 );
                                                 binary_cache.write().insert(p_bin, b);
                                                 b

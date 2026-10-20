@@ -1,30 +1,18 @@
-//! Directory listing, digest comparison, file copy, and recursive diff (RFC-005, RFC-008, RFC-037).
+//! Folder operations that write — batch copy, plan and execute (RFC-008,
+//! RFC-037). The read half (listing, recursive diff, digests) is
+//! `forskscope_compare::dir` (RFC-093 §1).
 
 mod batch;
 mod copy;
-mod digest;
-mod evidence;
-mod listing;
 mod merge_plan;
-mod recursive;
 
 pub use batch::{
     BatchFailurePolicy, BatchItem, BatchManifest, EntryOutcome, ManifestEntry, OperationId,
     batch_copy, restore_from_manifest,
 };
 pub use copy::{CopyOutcome, copy_file};
-pub use digest::{
-    DigestOutcome, dir_digest_equal, file_digest_equal, file_digest_equal_with_cancel,
-};
-pub use evidence::{EntryType, EqualityEvidence};
-pub use listing::{DirectoryListing, FileEntry, list_dir};
 pub use merge_plan::{
     CopyDirection, DirectoryMergeAction, EntrySelection, FileOutcome, OperationPlan,
     OperationPlanId, OperationPreflight, PlanExecutionReport, PlannedFileOperation, RiskSummary,
     execute_plan, plan_operations,
-};
-pub use recursive::{
-    RecEntry, RecStatus, RecursiveScan, list_recursive_for_display,
-    list_recursive_for_display_with_cancel, list_recursive_for_display_with_rules, recursive_diff,
-    recursive_diff_with_cancel, recursive_diff_with_rules, status_key,
 };

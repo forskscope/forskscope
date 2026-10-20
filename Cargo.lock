@@ -1504,7 +1504,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "forskscope-core"
+name = "forskscope-compare"
 version = "0.194.1"
 dependencies = [
  "chardetng",
@@ -1512,9 +1512,21 @@ dependencies = [
  "encoding_rs",
  "libc",
  "serde",
+ "sheets-diff",
+ "similar",
+ "tempfile",
+]
+
+[[package]]
+name = "forskscope-core"
+version = "0.194.1"
+dependencies = [
+ "chrono",
+ "forskscope-compare",
+ "libc",
+ "serde",
  "serde_json",
  "sha2",
- "sheets-diff",
  "similar",
  "tempfile",
 ]
@@ -1530,6 +1542,7 @@ dependencies = [
  "dioxus-desktop",
  "dioxus-swdir-tree",
  "dirs-next",
+ "forskscope-compare",
  "forskscope-core",
  "forskscope-ui-logic",
  "libc",
@@ -1545,6 +1558,7 @@ dependencies = [
 name = "forskscope-ui-logic"
 version = "0.194.1"
 dependencies = [
+ "forskscope-compare",
  "forskscope-core",
  "libc",
 ]

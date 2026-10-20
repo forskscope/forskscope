@@ -1,9 +1,9 @@
 //! DiffDecorationSet tests (RFC-024 §"Visual contract", §"CSS class contract").
 
-use crate::diff::{DiffOptions, compute_diff};
 use crate::diff_decoration::{
     DiffDecorationSet, DiffSide, InlineDecorationKind, LineDecorationKind,
 };
+use forskscope_compare::diff::{DiffOptions, compute_diff};
 
 fn decoration(old: &str, new: &str) -> DiffDecorationSet {
     let doc = compute_diff(old, new, DiffOptions::default());

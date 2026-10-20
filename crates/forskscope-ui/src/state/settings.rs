@@ -11,14 +11,14 @@
 
 use std::path::PathBuf;
 
-pub use forskscope_core::DiffAlgorithm;
-use forskscope_core::DiffOptions;
-use forskscope_core::diff::InlineMode;
+pub use forskscope_compare::DiffAlgorithm;
+use forskscope_compare::DiffOptions;
+use forskscope_compare::diff::InlineMode;
+use forskscope_compare::{CaseSensitivity, NewlineCompareMode, WhitespaceMode};
 use forskscope_core::persist::schema::settings::{PersistedDiffProfile, PersistedSettings};
 pub use forskscope_core::settings::display::ColourVision;
 use forskscope_core::settings::display::DiffFontFamilySetting;
 use forskscope_core::settings::{LocaleId, ThemeId};
-use forskscope_core::{CaseSensitivity, NewlineCompareMode, WhitespaceMode};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Theme {
@@ -248,9 +248,11 @@ impl Default for AppSettings {
 
 impl AppSettings {
     /// Build an [`IgnoreRules`] snapshot from the current settings.
-    pub fn ignore_rules(&self) -> forskscope_core::IgnoreRules {
-        let mut rules =
-            forskscope_core::IgnoreRules::from_settings(&self.ignore_extensions, &self.ignore_dirs);
+    pub fn ignore_rules(&self) -> forskscope_compare::IgnoreRules {
+        let mut rules = forskscope_compare::IgnoreRules::from_settings(
+            &self.ignore_extensions,
+            &self.ignore_dirs,
+        );
         rules.hide_dotfiles = self.hide_dotfiles;
         rules
     }

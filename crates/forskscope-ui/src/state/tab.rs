@@ -3,12 +3,13 @@
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
+use forskscope_compare::diff::DiffDocument;
+use forskscope_compare::document::LoadedDocument;
+use forskscope_compare::{DiffOptions, compute_diff};
+use forskscope_core::MergeSession;
 use forskscope_core::compare_prep::{
     SaveCapability, SaveTargetSnapshot, save_capability, save_target_from_loaded,
 };
-use forskscope_core::diff::DiffDocument;
-use forskscope_core::document::LoadedDocument;
-use forskscope_core::{DiffOptions, MergeSession, compute_diff};
 use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
 use crate::state::save_session;
@@ -68,7 +69,7 @@ pub struct CompareTab {
     /// `Warning`-level diagnostic, grouped. Empty for anything but `.xlsx`. Kept
     /// on the tab, not in the diff, because the diff is recomputed when options
     /// change and these belong to the load.
-    pub spreadsheet_warnings: Vec<forskscope_core::xlsx::SpreadsheetWarning>,
+    pub spreadsheet_warnings: Vec<forskscope_compare::xlsx::SpreadsheetWarning>,
     pub char_mode: bool,
     pub word_wrap: bool,
     pub focused_change: usize,
@@ -284,19 +285,19 @@ pub fn set_encoding(store: &mut crate::state::Store, index: usize, label: String
     let Some(tab) = tabs.get_mut(index) else {
         return;
     };
-    if !matches!(tab.right_doc.kind, forskscope_core::FileKind::Text) {
+    if !matches!(tab.right_doc.kind, forskscope_compare::FileKind::Text) {
         return;
     }
     let Some(text) = tab.right_doc.text.as_mut() else {
         return;
     };
     let (content, encoding, had_errors) =
-        forskscope_core::encoding::decode_with_label(&text.raw_bytes, &label);
+        forskscope_compare::encoding::decode_with_label(&text.raw_bytes, &label);
     text.content = content;
-    text.newline_style = forskscope_core::encoding::detect_newline_style(&text.content);
+    text.newline_style = forskscope_compare::encoding::detect_newline_style(&text.content);
     text.encoding = encoding;
     text.had_decode_errors = had_errors;
-    text.bom = forskscope_core::BomPresence::Absent;
+    text.bom = forskscope_compare::BomPresence::Absent;
     recompute_diff(tab);
     refresh_save_target(tab);
     refresh_save_capability(tab);

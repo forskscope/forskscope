@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use dioxus::prelude::*;
-use forskscope_core::dir::EqualityEvidence;
+use forskscope_compare::dir::EqualityEvidence;
 use forskscope_ui_logic::{AlignedRow, FlatRow};
 
 use super::DigestKey;
@@ -143,8 +143,8 @@ fn is_binary_cached(path: &PathBuf, binary_cache: &mut Signal<HashMap<PathBuf, b
     let cached = binary_cache.read().get(path).copied();
     cached.unwrap_or_else(|| {
         let b = matches!(
-            forskscope_core::file_kind::classify(path),
-            Ok(forskscope_core::file_kind::FileKind::Binary)
+            forskscope_compare::file_kind::classify(path),
+            Ok(forskscope_compare::file_kind::FileKind::Binary)
         );
         binary_cache.write().insert(path.clone(), b);
         b

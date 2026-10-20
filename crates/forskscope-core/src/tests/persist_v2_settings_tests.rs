@@ -8,14 +8,16 @@
 //! RFC-076's 2026-08-03 amendment (patch 5) — see
 //! `schema_version_1_is_corrupt_not_migrated`.
 
-use crate::diff::{CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode};
-use crate::encoding::NewlinePolicy;
-use crate::job::PerformanceLimits;
 use crate::persist::schema::PersistenceLoad;
 use crate::persist::schema::settings::{PersistedDiffProfile, PersistedSettings, load_settings};
 use crate::settings::display::{
     ColourVision, Density, DiffFontFamilySetting, FontFamilySetting, LocaleId, ThemeId,
 };
+use forskscope_compare::diff::{
+    CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode,
+};
+use forskscope_compare::encoding::NewlinePolicy;
+use forskscope_compare::job::PerformanceLimits;
 
 const SETTINGS_V0_FIXTURE: &str = include_str!("fixtures/persistence/settings-v0.json");
 const SETTINGS_V2_FIXTURE: &str = include_str!("fixtures/persistence/settings-v2.json");

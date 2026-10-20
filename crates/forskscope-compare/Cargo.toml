@@ -1,0 +1,43 @@
+[package]
+name        = "forskscope-compare"
+description = "ForskScope's read-only comparison engine: file loading, encoding, diff, and directory comparison. Never writes a file."
+readme      = "../../README.md"
+
+version.workspace       = true
+edition.workspace       = true
+rust-version.workspace  = true
+license.workspace       = true
+authors.workspace       = true
+repository.workspace    = true
+
+[features]
+default = ["spreadsheet"]
+# RFC-093 §1: the workbook stack (sheets-diff -> calamine -> zip, quick-xml)
+# behind a feature, on by default, so a consumer that never compares
+# workbooks can leave it out, and the engine can be built and tested
+# without it (RFC-093 acceptance criterion 4).
+spreadsheet = ["dep:sheets-diff"]
+
+[dependencies]
+encoding_rs                 = { workspace = true }
+chardetng                   = { workspace = true }
+chrono                      = { workspace = true }
+# DiffOptions and the encoding types derive Serialize/Deserialize so
+# forskscope-desktop's persisted settings can store them directly - this
+# crate itself performs no I/O.
+serde                       = { workspace = true }
+# RFC-085: default features off deliberately - chrono/cli/serde are all
+# optional and unused here; audit-deps' reviewed set assumes exactly the
+# calamine -> quick-xml -> zip chain this default-features build pulls.
+sheets-diff                 = { workspace = true, optional = true }
+similar                     = { workspace = true }
+
+[dev-dependencies]
+tempfile                    = { workspace = true }
+
+[target.'cfg(unix)'.dev-dependencies]
+# F138: caps this process's own address space before opening a crafted CFB
+# header, so the regression this guards against (a huge allocation instead of
+# a declined file) fails loudly rather than passing unnoticed on a machine
+# with room to spare — see tests/f138_decline_before_delegating.rs.
+libc                         = { workspace = true }

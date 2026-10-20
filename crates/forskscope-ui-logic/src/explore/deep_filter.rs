@@ -8,7 +8,7 @@
 //! states for tier 1: a root that could not be opened makes every entry on
 //! the other side an artefact of the failed read, not a fact about the trees.
 
-use forskscope_core::dir::{RecEntry, RecStatus, RecursiveScan};
+use forskscope_compare::dir::{RecEntry, RecStatus, RecursiveScan};
 
 // ── Filter ────────────────────────────────────────────────────────────────────
 
@@ -476,12 +476,12 @@ mod tests {
             return;
         }
 
-        let token = forskscope_core::CancellationToken::new();
-        let scan = forskscope_core::dir::list_recursive_for_display_with_rules(
+        let token = forskscope_compare::CancellationToken::new();
+        let scan = forskscope_compare::dir::list_recursive_for_display_with_rules(
             &left,
             &right,
             &token,
-            &forskscope_core::IgnoreRules::default(),
+            &forskscope_compare::IgnoreRules::default(),
         );
         // The premise, from the real walk: exactly what F110 reported before
         // this fix - a confident `LeftOnly` for every left-side file.

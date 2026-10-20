@@ -8,7 +8,7 @@
 
 use std::path::PathBuf;
 
-use crate::diff::NewlineMarker;
+use forskscope_compare::diff::NewlineMarker;
 
 /// Patch serialization format. Only unified diff is supported in the
 /// v0.39.0 export slice; the enum exists so the apply half (RFC-039) can

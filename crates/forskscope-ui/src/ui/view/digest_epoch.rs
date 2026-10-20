@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use tokio::sync::Semaphore;
 
-use forskscope_core::CancellationToken;
+use forskscope_compare::CancellationToken;
 
 /// An opaque marker for "the epoch as it was when this comparison was
 /// spawned". Only [`DigestEpoch::begin_task`] can produce one — there is no

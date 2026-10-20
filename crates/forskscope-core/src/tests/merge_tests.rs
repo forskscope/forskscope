@@ -1,5 +1,5 @@
-use crate::diff::{DiffOptions, HunkKind, compute_diff};
 use crate::merge::{HunkState, MergeSession};
+use forskscope_compare::diff::{DiffOptions, HunkKind, compute_diff};
 
 fn replace_session() -> MergeSession {
     let diff = compute_diff(
@@ -129,9 +129,9 @@ fn result_text_before_any_apply_equals_right_side() {
 fn partial_apply_preserves_unapplied_hunks() {
     let left = "line1\nold\nline3\n";
     let right = "line1\nnew\nline3\n";
-    use crate::diff::DiffOptions;
     use crate::merge::MergeSession;
-    let diff = crate::compute_diff(left, right, DiffOptions::default());
+    use forskscope_compare::diff::DiffOptions;
+    let diff = forskscope_compare::compute_diff(left, right, DiffOptions::default());
     let mut s = MergeSession::from_diff(&diff);
     assert_eq!(s.result_text(), right, "starts as right side");
     let hunk_id = s
@@ -216,7 +216,8 @@ fn can_undo_is_false_on_fresh_session() {
 fn multiple_independent_hunks_can_each_be_undone() {
     let left = "a\nX\nb\nY\nc\n";
     let right = "a\nX2\nb\nY2\nc\n";
-    use crate::{DiffOptions, MergeSession, compute_diff};
+    use crate::MergeSession;
+    use forskscope_compare::{DiffOptions, compute_diff};
     let diff = compute_diff(left, right, DiffOptions::default());
     let mut s = MergeSession::from_diff(&diff);
     let ids: Vec<u64> = s
@@ -280,7 +281,8 @@ fn pending_changes_restored_after_undo() {
 
 #[test]
 fn session_from_identical_diff_has_zero_pending_changes() {
-    use crate::{DiffOptions, MergeSession, compute_diff};
+    use crate::MergeSession;
+    use forskscope_compare::{DiffOptions, compute_diff};
     let diff = compute_diff("same\n", "same\n", DiffOptions::default());
     let s = MergeSession::from_diff(&diff);
     assert_eq!(s.pending_changes(), 0);
@@ -291,10 +293,10 @@ fn session_from_identical_diff_has_zero_pending_changes() {
 // depth ────────────────────────────────────────────────────────────────────
 
 fn two_hunk_session() -> MergeSession {
-    let diff = crate::compute_diff(
+    let diff = forskscope_compare::compute_diff(
         "a\nX\nb\nY\nc\n",
         "a\nX2\nb\nY2\nc\n",
-        crate::DiffOptions::default(),
+        forskscope_compare::DiffOptions::default(),
     );
     MergeSession::from_diff(&diff)
 }

@@ -37,8 +37,8 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::dir::copy::copy_file;
-use crate::error::{CoreError, IoOperation, Result};
 use crate::save::BackupPolicy;
+use forskscope_compare::{CoreError, IoOperation, Result};
 
 // ── Public types ──────────────────────────────────────────────────────────────
 

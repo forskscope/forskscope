@@ -10,7 +10,7 @@
 
 use dioxus::prelude::*;
 
-use forskscope_core::diff::{
+use forskscope_compare::diff::{
     HunkKind, InlineDiff, InlineKind, pair_over_inline_limit, refine_pair,
 };
 use forskscope_core::merge::{HunkState, MergeHunk};
@@ -469,7 +469,7 @@ mod tests {
     /// pair then comes back `Spans` and this fails.
     #[test]
     fn a_pair_too_long_to_refine_is_skipped_not_silently_plain() {
-        let long = "a".repeat(forskscope_core::diff::MAX_INLINE_CHARS_PER_SIDE + 1);
+        let long = "a".repeat(forskscope_compare::diff::MAX_INLINE_CHARS_PER_SIDE + 1);
         assert_eq!(
             pair_inline(true, HunkKind::Replace, &some(&long), &some("b")),
             PairInline::Skipped
@@ -491,7 +491,7 @@ mod tests {
 
     #[test]
     fn nothing_is_refined_when_character_mode_is_off_or_the_pair_is_one_sided() {
-        let long = "a".repeat(forskscope_core::diff::MAX_INLINE_CHARS_PER_SIDE + 1);
+        let long = "a".repeat(forskscope_compare::diff::MAX_INLINE_CHARS_PER_SIDE + 1);
         assert_eq!(
             pair_inline(false, HunkKind::Replace, &some(&long), &some("b")),
             PairInline::NotApplicable
@@ -533,7 +533,7 @@ mod tests {
     #[test]
     fn a_skipped_pair_is_never_refined_or_cached() {
         REFINEMENTS.with(|n| n.set(0));
-        let long = "a".repeat(forskscope_core::diff::MAX_INLINE_CHARS_PER_SIDE + 1);
+        let long = "a".repeat(forskscope_compare::diff::MAX_INLINE_CHARS_PER_SIDE + 1);
         for _ in 0..3 {
             assert_eq!(
                 pair_inline(true, HunkKind::Replace, &some(&long), &some("b")),
@@ -579,8 +579,11 @@ mod tests {
             // context_lines: 3.
             let left = "X\na\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\n";
             let right = "Y\na\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\n";
-            let diff =
-                forskscope_core::compute_diff(left, right, forskscope_core::DiffOptions::default());
+            let diff = forskscope_compare::compute_diff(
+                left,
+                right,
+                forskscope_compare::DiffOptions::default(),
+            );
             let merge = forskscope_core::MergeSession::from_diff(&diff);
             let hunk = merge
                 .hunks()

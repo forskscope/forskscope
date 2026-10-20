@@ -23,12 +23,14 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::{PersistenceError, PersistenceLoad};
-use crate::diff::{CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode};
-use crate::encoding::NewlinePolicy;
-use crate::job::PerformanceLimits;
 use crate::settings::display::{
     ColourVision, Density, DiffFontFamilySetting, FontFamilySetting, LocaleId, ThemeId,
 };
+use forskscope_compare::diff::{
+    CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode,
+};
+use forskscope_compare::encoding::NewlinePolicy;
+use forskscope_compare::job::PerformanceLimits;
 use legacy::{
     LegacyAppSettingsV0, LegacyDiffAlgorithmV0, LegacyDiffFontFamilyV0, LegacyLangV0, LegacyThemeV0,
 };
@@ -127,7 +129,7 @@ pub struct PersistedSettings {
 }
 
 /// One named compare preset in v2 shape. Modeled on the core's richer
-/// [`crate::diff::CompareProfile`] rather than the UI's two-boolean v0 shape,
+/// [`forskscope_compare::diff::CompareProfile`] rather than the UI's two-boolean v0 shape,
 /// since v2 is the converged canonical form; v0 profiles migrate up into it
 /// (see [`migrate_from_v0`]), never the reverse.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -363,7 +365,7 @@ fn migrate_from_v0(v0: LegacyAppSettingsV0) -> PersistedSettings {
 
 /// The UI's four shipping built-in profiles, expressed in v2 shape. Canonical
 /// for v2 because these are the profiles users have actually seen; core's
-/// richer [`crate::diff::CompareProfile::all_presets`] is RFC-028's legacy
+/// richer [`forskscope_compare::diff::CompareProfile::all_presets`] is RFC-028's legacy
 /// toolbar-picker preset set, deliberately not kept in sync with this one —
 /// see its doc comment for the full reasoning (F25/F25b).
 fn ui_builtin_profiles() -> Vec<PersistedDiffProfile> {

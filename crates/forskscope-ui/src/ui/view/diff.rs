@@ -317,8 +317,8 @@ pub(crate) fn TabError(msg: String) -> Element {
 /// §2.2). Either way the toggle must stay disabled, so the two are not
 /// distinguished here — `TabSnapshot::inline_available`'s tooltip is worded
 /// to stay true for both rather than naming a specific cause.
-pub(crate) fn inline_available(opts: &forskscope_core::DiffOptions) -> bool {
-    opts.inline_mode != forskscope_core::diff::InlineMode::None
+pub(crate) fn inline_available(opts: &forskscope_compare::DiffOptions) -> bool {
+    opts.inline_mode != forskscope_compare::diff::InlineMode::None
 }
 
 #[derive(Clone, PartialEq)]
@@ -343,7 +343,7 @@ pub struct TabSnapshot {
     pub ignore_whitespace: bool,
     pub ignore_case: bool,
     pub context_lines: usize,
-    pub algorithm: forskscope_core::DiffAlgorithm,
+    pub algorithm: forskscope_compare::DiffAlgorithm,
     pub warnings: Vec<String>,
     pub readonly_notice: String,
     /// RFC-083 §3: whether the right side is `FileKind::Text` — the
@@ -362,10 +362,10 @@ const MAX_SHEETS_NAMED: usize = 5;
 /// sheets it concerns (F131).
 fn spreadsheet_warning_text(
     lang: crate::state::Lang,
-    warning: &forskscope_core::xlsx::SpreadsheetWarning,
+    warning: &forskscope_compare::xlsx::SpreadsheetWarning,
 ) -> String {
     use crate::i18n::t;
-    use forskscope_core::xlsx::SpreadsheetWarningKind as K;
+    use forskscope_compare::xlsx::SpreadsheetWarningKind as K;
 
     let sentence = match warning.kind {
         K::DuplicateAlignmentKey => t(
@@ -417,8 +417,8 @@ impl TabSnapshot {
         lang: crate::state::Lang,
     ) -> Self {
         use crate::i18n::t;
-        use forskscope_core::diff::DiffWarning;
-        use forskscope_core::file_kind::FileKind;
+        use forskscope_compare::diff::DiffWarning;
+        use forskscope_compare::file_kind::FileKind;
 
         let hunks = tab.merge.hunks().to_vec();
         let ids: Vec<u64> = hunks
@@ -446,7 +446,7 @@ impl TabSnapshot {
         // F120: character mode skips a pair over the length limit. Say so
         // here as well as on the row, or a skipped pair reads as "no
         // character-level differences".
-        if tab.char_mode && forskscope_core::diff::skipped_inline_pairs(&tab.diff) > 0 {
+        if tab.char_mode && forskscope_compare::diff::skipped_inline_pairs(&tab.diff) > 0 {
             warnings.push(t(
                 lang,
                 "Some hunks were too large for character-level diff.",
@@ -518,8 +518,8 @@ impl TabSnapshot {
 #[cfg(test)]
 mod inline_available_tests {
     use super::*;
-    use forskscope_core::DiffOptions;
-    use forskscope_core::diff::InlineMode;
+    use forskscope_compare::DiffOptions;
+    use forskscope_compare::diff::InlineMode;
 
     fn opts_with(inline_mode: InlineMode) -> DiffOptions {
         DiffOptions {
@@ -544,10 +544,10 @@ mod inline_available_tests {
     fn a_profile_set_to_never_also_disables_the_toggle() {
         let profile = crate::state::settings::DiffProfile {
             name: "Never".into(),
-            whitespace: forskscope_core::WhitespaceMode::Significant,
+            whitespace: forskscope_compare::WhitespaceMode::Significant,
             ignore_case: false,
             algorithm: crate::state::DiffAlgorithmSetting::Myers,
-            newlines: forskscope_core::NewlineCompareMode::Significant,
+            newlines: forskscope_compare::NewlineCompareMode::Significant,
             inline_mode: InlineMode::None,
             built_in: false,
         };
@@ -596,7 +596,7 @@ mod tab_error_tests {
 mod spreadsheet_warning_tests {
     use super::*;
     use crate::state::Lang;
-    use forskscope_core::xlsx::{SpreadsheetWarning, SpreadsheetWarningKind as K};
+    use forskscope_compare::xlsx::{SpreadsheetWarning, SpreadsheetWarningKind as K};
 
     fn warning(kind: K, sheets: &[&str]) -> SpreadsheetWarning {
         SpreadsheetWarning {
@@ -607,16 +607,17 @@ mod spreadsheet_warning_tests {
     }
 
     /// A present (not `Missing`) side, so "identical" is decided by the diff.
-    fn text_doc() -> forskscope_core::document::LoadedDocument {
-        let mut d = forskscope_core::document::LoadedDocument::empty();
-        d.kind = forskscope_core::file_kind::FileKind::Text;
+    fn text_doc() -> forskscope_compare::document::LoadedDocument {
+        let mut d = forskscope_compare::document::LoadedDocument::empty();
+        d.kind = forskscope_compare::file_kind::FileKind::Text;
         d
     }
 
     fn snapshot_with(warnings: Vec<SpreadsheetWarning>, lang: Lang) -> TabSnapshot {
         use crate::state::tab::{CompareLaunchMode, TabState};
+        use forskscope_compare::{DiffDocument, DiffOptions};
+        use forskscope_core::MergeSession;
         use forskscope_core::compare_prep::{SaveCapability, SaveCapabilityBlockReason};
-        use forskscope_core::{DiffDocument, DiffOptions, MergeSession};
         use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
         let tab = crate::state::CompareTab {

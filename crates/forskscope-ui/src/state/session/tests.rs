@@ -473,8 +473,8 @@ fn request_close_file_tab_asks_first_when_dirty() {
         // synchronous call never drives to completion (confirmed: the
         // tab's `diff.hunks` is still empty immediately after this call).
         crate::state::open_compare(store, left, right);
-        let diff_options = forskscope_core::DiffOptions::default();
-        let diff = forskscope_core::compute_diff("a\n", "b\n", diff_options);
+        let diff_options = forskscope_compare::DiffOptions::default();
+        let diff = forskscope_compare::compute_diff("a\n", "b\n", diff_options);
         let hunk_id = diff
             .hunks
             .first()

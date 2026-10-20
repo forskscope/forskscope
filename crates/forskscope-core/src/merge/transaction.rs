@@ -1,6 +1,6 @@
 //! Merge transaction record (RFC-015).
 
-use crate::diff::{DiffRow, HunkId, HunkKind};
+use forskscope_compare::diff::{DiffRow, HunkId, HunkKind};
 
 use super::session::HunkState;
 

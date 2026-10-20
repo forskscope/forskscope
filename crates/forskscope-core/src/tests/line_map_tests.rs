@@ -1,7 +1,7 @@
 //! LineMap, AlignedRow, ScrollAnchor, and mini-map tests (RFC-035).
 
-use crate::diff::{DiffOptions, compute_diff};
 use crate::line_map::{LineMap, RowState, ScrollAnchor, build_mini_map};
+use forskscope_compare::diff::{DiffOptions, compute_diff};
 
 fn map(old: &str, new: &str) -> LineMap {
     let doc = compute_diff(old, new, DiffOptions::default());

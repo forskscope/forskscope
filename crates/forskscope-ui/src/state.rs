@@ -145,7 +145,7 @@ pub enum Modal {
     /// fires when the recompute is *not* hunk-stable — see
     /// `change_diff_options`'s doc comment for the compatibility check
     /// that skips it otherwise.
-    ConfirmDiffOptionChange(usize, forskscope_core::DiffOptions),
+    ConfirmDiffOptionChange(usize, forskscope_compare::DiffOptions),
     /// RFC-083 §3: choosing a new encoding re-decodes the right side and
     /// discards applied merge work and the undo/redo stack, the same
     /// `recompute_diff` hazard `ConfirmDiffOptionChange` guards — see
@@ -189,7 +189,7 @@ pub enum Modal {
     ExportDirReport(
         std::path::PathBuf,
         std::path::PathBuf,
-        Vec<forskscope_core::dir::RecEntry>,
+        Vec<forskscope_compare::dir::RecEntry>,
         crate::ui::view::diff_actions::ReportExportFormat,
     ),
 }

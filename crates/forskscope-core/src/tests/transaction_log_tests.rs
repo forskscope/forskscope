@@ -5,11 +5,11 @@
 //! redo branch discard on new push, and integration with the existing
 //! `MergeSession` and `ThreeWayMergeSession` APIs.
 
-use crate::diff::{DiffOptions, compute_diff};
 use crate::merge::{
     ConflictStatus, MergeSession, SessionRevision, ThreeWayMergeSession, TransactionKind,
     TransactionLog,
 };
+use forskscope_compare::diff::{DiffOptions, compute_diff};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

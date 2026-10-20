@@ -15,8 +15,8 @@
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::diff::HunkId;
 use crate::merge::three_way::ConflictId;
+use forskscope_compare::diff::HunkId;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

@@ -195,7 +195,7 @@ fn run_audit_deps() {
     // `assert_package_absent` — a gate that passed because the dependency
     // was absent, not because the path was reviewed, is exactly the failure
     // mode F65 records.
-    assert_immediate_dependents("sheets-diff", &["forskscope-core "]);
+    assert_immediate_dependents("sheets-diff", &["forskscope-compare "]);
     assert_immediate_dependents("calamine", &["sheets-diff "]);
     assert_immediate_dependents("zip", &["calamine "]);
     // RUSTSEC-2026-0367/-0368/-0369 (zip 8.6.0, ignored in .cargo/audit.toml,
@@ -230,6 +230,7 @@ fn run_audit_deps() {
 fn assert_no_direct_zip_dependency() {
     let manifests = [
         "Cargo.toml",
+        "crates/forskscope-compare/Cargo.toml",
         "crates/forskscope-core/Cargo.toml",
         "crates/forskscope-ui/Cargo.toml",
         "crates/forskscope-ui-logic/Cargo.toml",
@@ -354,7 +355,7 @@ fn assert_threat_model_versions() {
     let doc = read_file(&path);
 
     let specs: [(&str, &str, Option<&str>); 4] = [
-        ("sheets-diff", "forskscope-core", None),
+        ("sheets-diff", "forskscope-compare", None),
         ("calamine", "sheets-diff", None),
         // quick-xml also appears, correctly at a different version, as the
         // unrelated Wayland/GTK build-time dependency - its table row names

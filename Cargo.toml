@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/forskscope-compare",
     "crates/forskscope-core",
     "crates/forskscope-ui",
     "crates/forskscope-ui-logic",
@@ -16,6 +17,7 @@ authors         = ["nabbisen"]
 repository      = "https://github.com/forskscope/forskscope"
 
 [workspace.dependencies]
+forskscope-compare           = { version = "0", path = "crates/forskscope-compare" }
 forskscope-core             = { version = "0", path = "crates/forskscope-core" }
 forskscope-ui-logic         = { version = "0", path = "crates/forskscope-ui-logic" }
 

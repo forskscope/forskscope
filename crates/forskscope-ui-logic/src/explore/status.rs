@@ -26,7 +26,7 @@
 //! exactly one definition of every glyph, never a second copy for the view
 //! that doesn't currently need it.
 
-use forskscope_core::dir::{EqualityEvidence, RecStatus};
+use forskscope_compare::dir::{EqualityEvidence, RecStatus};
 
 // ── Shared status vocabulary (F82) ──────────────────────────────────────────
 
@@ -242,7 +242,7 @@ impl RowStatusKind {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use forskscope_core::dir::{EntryType, EqualityEvidence};
+    use forskscope_compare::dir::{EntryType, EqualityEvidence};
 
     // ── RowStatusKind from EqualityEvidence ───────────────────────────────────
 
@@ -495,7 +495,7 @@ mod tests {
     // `RowStatusKind::status_glyph` or `StatusGlyph::for_rec_status`.
     #[test]
     fn explorer_and_deep_compare_render_overlapping_concepts_identically() {
-        use forskscope_core::dir::RecStatus;
+        use forskscope_compare::dir::RecStatus;
 
         let pairs = [
             (RowStatusKind::Equal, RecStatus::Equal),

@@ -22,7 +22,7 @@ pub use dir::{DirComparisonReport, DirFileRow};
 pub use file::{FileComparisonReport, HunkSummaryRow, ReportOptions, ReportPathMode};
 pub use html::{render_dir_report, render_file_report};
 
-use crate::diff::HunkKind;
+use forskscope_compare::diff::HunkKind;
 use std::path::Path;
 
 /// Size and SHA-256 of one compared file's bytes, as read at export time

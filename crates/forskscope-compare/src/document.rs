@@ -13,8 +13,10 @@ use crate::encoding::{
 };
 use crate::error::{CoreError, IoOperation, Result};
 use crate::file_kind::{EditabilityClass, FileKind, classify};
+use crate::fnv1a64;
 use crate::path::{canonicalize_lenient, display};
-use crate::{fnv1a64, xlsx};
+#[cfg(feature = "spreadsheet")]
+use crate::xlsx;
 
 /// Stable identity of a file participating in a session.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -234,7 +236,26 @@ pub fn load_path(path: &Path, options: LoadOptions) -> Result<LoadedDocument> {
                 warnings: vec![LoadWarning::BinaryRenderedAsHexPreview],
             })
         }
+        #[cfg(feature = "spreadsheet")]
         FileKind::ExcelXlsx => xlsx::load_placeholder(path),
+        // Without the `spreadsheet` feature, the workbook stack (and its
+        // `sheets-diff`/`calamine`/`zip` dependency tree) is not compiled
+        // in at all — this crate still classifies and fingerprints a
+        // `.xlsx` file, the same placeholder `load_placeholder` builds when
+        // the feature is on, just without the module that would otherwise
+        // own this.
+        #[cfg(not(feature = "spreadsheet"))]
+        FileKind::ExcelXlsx => {
+            let fingerprint = FileFingerprint::capture(path, None)?;
+            Ok(LoadedDocument {
+                file_id: Some(FileId::new(path)),
+                fingerprint_at_load: Some(fingerprint),
+                kind: FileKind::ExcelXlsx,
+                bytes_len: fingerprint.len,
+                text: None,
+                warnings: vec![LoadWarning::ExcelRenderedAsDerivedText],
+            })
+        }
     }
 }
 

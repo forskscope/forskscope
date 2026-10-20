@@ -11,27 +11,18 @@
 //! they must never become an independent source of truth (see RFC-042,
 //! "Core First").
 
-pub mod cancel;
 pub mod checksum;
 pub mod command;
 pub mod compare_prep;
 pub mod conflict_nav;
-pub mod diff;
 pub mod diff_decoration;
 pub mod dir;
-pub mod document;
 pub mod edit_op;
-pub mod encoding;
 pub mod env_passthrough;
-pub mod error;
 pub mod external_tool;
-pub mod file_kind;
-pub mod ignore;
-pub mod job;
 pub mod line_map;
 pub mod merge;
 pub mod patch;
-pub mod path;
 pub mod persist;
 pub mod platform;
 pub mod report;
@@ -39,7 +30,6 @@ pub mod save;
 pub mod settings;
 pub mod vcs;
 pub mod watcher;
-pub mod xlsx;
 
 pub use compare_prep::{
     // RFC-077
@@ -51,61 +41,6 @@ pub use compare_prep::{
     inspect_save_target,
     save_target_from_loaded,
 };
-pub use diff::{
-    // RFC-028
-    CaseSensitivity,
-    CompareProfile,
-    DiffAlgorithm,
-    DiffDocument,
-    DiffHunk,
-    DiffOptions,
-    DiffRow,
-    DiffWarning,
-    HunkKind,
-    InlineKind,
-    InlineSpan,
-    NewlineCompareMode,
-    WhitespaceMode,
-    compute_diff,
-};
-pub use document::{
-    // RFC-036
-    ExternalFileState,
-    FileFingerprint,
-    FileId,
-    LoadOptions,
-    LoadedDocument,
-    TextDocument,
-    check_external_state,
-    load_path,
-};
-pub use encoding::{
-    // RFC-083
-    BomPolicy,
-    BomPresence,
-    COMMON_ENCODING_LABELS,
-    // RFC-012
-    NewlinePolicy,
-    NewlineStyle,
-    TextEncoding,
-};
-pub use error::{
-    // RFC-017
-    AppErrorKind,
-    CoreError,
-    ErrorSeverity,
-    IoOperation,
-    RecoveryAction,
-    RecoveryHint,
-    Result,
-    UserMessage,
-};
-pub use file_kind::{
-    // RFC-012
-    EditabilityClass,
-    FileKind,
-};
-pub use ignore::IgnoreRules;
 pub use merge::{
     ConflictId, ConflictStatus, HunkState, MergeConflict, MergeHunk, MergeSession, SessionRevision,
     ThreeWayMergeSession, ThreeWayStats, TransactionEntry, TransactionKind, TransactionLog,
@@ -129,30 +64,5 @@ pub use save::{
 #[cfg(test)]
 mod tests;
 
-/// FNV-1a 64-bit hash used for cheap, deterministic identifiers and
-/// non-cryptographic content digests. Not suitable for security purposes.
-pub(crate) fn fnv1a64(bytes: &[u8]) -> u64 {
-    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-    for b in bytes {
-        hash ^= u64::from(*b);
-        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    hash
-}
-pub use cancel::CancellationToken;
 pub use dir::batch_copy;
 pub use dir::copy_file;
-pub use job::{
-    DIGEST_CONCURRENCY_LIMIT,
-    // RFC-013
-    FileSizeClass,
-    JobHandle,
-    JobId,
-    JobKind,
-    JobProgress,
-    LARGE_DIRECTORY_VIRTUAL_THRESHOLD,
-    LARGE_FILE_INLINE_DIFF_BYTES,
-    LARGE_HUNK_AUTO_EXPAND_LINES,
-    PerformanceLimits,
-    VERY_LARGE_FILE_BYTES,
-};

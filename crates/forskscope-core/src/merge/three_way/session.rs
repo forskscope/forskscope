@@ -6,7 +6,7 @@
 //! ForskScope never writes conflict markers into the result unless the user
 //! explicitly exports a marker file.
 
-use crate::fnv1a64;
+use forskscope_compare::fnv1a64;
 
 use super::engine::{MergeRegion, RegionKind, diff3};
 use super::line::{MergeLine, render_lines, split_lines};
@@ -223,33 +223,33 @@ impl ThreeWayMergeSession {
     }
 
     /// Resolve a conflict by choosing the left side.
-    pub fn resolve_left(&mut self, id: ConflictId) -> crate::Result<()> {
+    pub fn resolve_left(&mut self, id: ConflictId) -> forskscope_compare::Result<()> {
         self.set_status(id, ConflictStatus::ResolvedLeft, None)
     }
 
     /// Resolve a conflict by choosing the right side.
-    pub fn resolve_right(&mut self, id: ConflictId) -> crate::Result<()> {
+    pub fn resolve_right(&mut self, id: ConflictId) -> forskscope_compare::Result<()> {
         self.set_status(id, ConflictStatus::ResolvedRight, None)
     }
 
     /// Resolve a conflict by taking left then right.
-    pub fn resolve_both(&mut self, id: ConflictId) -> crate::Result<()> {
+    pub fn resolve_both(&mut self, id: ConflictId) -> forskscope_compare::Result<()> {
         self.set_status(id, ConflictStatus::ResolvedBoth, None)
     }
 
     /// Ignore a conflict, taking the base content.
-    pub fn ignore(&mut self, id: ConflictId) -> crate::Result<()> {
+    pub fn ignore(&mut self, id: ConflictId) -> forskscope_compare::Result<()> {
         self.set_status(id, ConflictStatus::Ignored, None)
     }
 
     /// Resolve a conflict with user-supplied text.
-    pub fn resolve_manual(&mut self, id: ConflictId, text: &str) -> crate::Result<()> {
+    pub fn resolve_manual(&mut self, id: ConflictId, text: &str) -> forskscope_compare::Result<()> {
         let lines = split_lines(text);
         self.set_status(id, ConflictStatus::ResolvedManual, Some(lines))
     }
 
     /// Revert a conflict to unresolved.
-    pub fn reset(&mut self, id: ConflictId) -> crate::Result<()> {
+    pub fn reset(&mut self, id: ConflictId) -> forskscope_compare::Result<()> {
         self.set_status(id, ConflictStatus::Unresolved, None)
     }
 
@@ -258,14 +258,12 @@ impl ThreeWayMergeSession {
         id: ConflictId,
         status: ConflictStatus,
         manual: Option<Vec<MergeLine>>,
-    ) -> crate::Result<()> {
-        let conflict =
-            self.conflicts
-                .iter_mut()
-                .find(|c| c.id == id)
-                .ok_or(crate::CoreError::Conflict {
-                    message: "unknown conflict id".into(),
-                })?;
+    ) -> forskscope_compare::Result<()> {
+        let conflict = self.conflicts.iter_mut().find(|c| c.id == id).ok_or(
+            forskscope_compare::CoreError::Conflict {
+                message: "unknown conflict id".into(),
+            },
+        )?;
         let txn = ResolutionTransaction {
             conflict_id: id,
             previous_status: conflict.status.clone(),
@@ -280,10 +278,13 @@ impl ThreeWayMergeSession {
     }
 
     /// Undo the most recent resolution change.
-    pub fn undo(&mut self) -> crate::Result<ConflictId> {
-        let txn = self.undo_stack.pop().ok_or(crate::CoreError::Conflict {
-            message: "nothing to undo".into(),
-        })?;
+    pub fn undo(&mut self) -> forskscope_compare::Result<ConflictId> {
+        let txn = self
+            .undo_stack
+            .pop()
+            .ok_or(forskscope_compare::CoreError::Conflict {
+                message: "nothing to undo".into(),
+            })?;
         let id = txn.conflict_id;
         let redo = self.swap_in(txn)?;
         self.redo_stack.push(redo);
@@ -291,10 +292,13 @@ impl ThreeWayMergeSession {
     }
 
     /// Redo the most recently undone resolution change.
-    pub fn redo(&mut self) -> crate::Result<ConflictId> {
-        let txn = self.redo_stack.pop().ok_or(crate::CoreError::Conflict {
-            message: "nothing to redo".into(),
-        })?;
+    pub fn redo(&mut self) -> forskscope_compare::Result<ConflictId> {
+        let txn = self
+            .redo_stack
+            .pop()
+            .ok_or(forskscope_compare::CoreError::Conflict {
+                message: "nothing to redo".into(),
+            })?;
         let id = txn.conflict_id;
         let undo = self.swap_in(txn)?;
         self.undo_stack.push(undo);
@@ -304,12 +308,15 @@ impl ThreeWayMergeSession {
     /// Shared by [`undo`](Self::undo) and [`redo`](Self::redo) — both
     /// mutate `conflicts` only through here, so refreshing `current_hash`
     /// in this one place keeps it in sync for both callers.
-    fn swap_in(&mut self, txn: ResolutionTransaction) -> crate::Result<ResolutionTransaction> {
+    fn swap_in(
+        &mut self,
+        txn: ResolutionTransaction,
+    ) -> forskscope_compare::Result<ResolutionTransaction> {
         let conflict = self
             .conflicts
             .iter_mut()
             .find(|c| c.id == txn.conflict_id)
-            .ok_or(crate::CoreError::InternalInvariant {
+            .ok_or(forskscope_compare::CoreError::InternalInvariant {
                 message: "transaction references missing conflict".into(),
             })?;
         let inverse = ResolutionTransaction {

@@ -200,7 +200,7 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                         SelectOption::new("histogram", "Histogram"),
                     ],
                     onchange: move |v: String| {
-                        use forskscope_core::DiffAlgorithm;
+                        use forskscope_compare::DiffAlgorithm;
                         let algorithm = match v.as_str() {
                             "patience"  => DiffAlgorithm::Patience,
                             "histogram" => DiffAlgorithm::Histogram,
@@ -231,14 +231,14 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                         // state rather than silently snapping to the list's
                         // first entry.
                         let mut options: Vec<SelectOption> = Vec::new();
-                        if !forskscope_core::COMMON_ENCODING_LABELS.contains(&snap.right_encoding_label.as_str()) {
+                        if !forskscope_compare::COMMON_ENCODING_LABELS.contains(&snap.right_encoding_label.as_str()) {
                             options.push(SelectOption::new(
                                 snap.right_encoding_label.clone(),
                                 snap.right_encoding_label.clone(),
                             ));
                         }
                         options.extend(
-                            forskscope_core::COMMON_ENCODING_LABELS
+                            forskscope_compare::COMMON_ENCODING_LABELS
                                 .iter()
                                 .map(|label| SelectOption::new(*label, *label)),
                         );

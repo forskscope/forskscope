@@ -14,7 +14,7 @@
 //! correctly. This module's job is to assign a button label to each and
 //! expose it as a plain struct the component can iterate.
 
-use forskscope_core::error::{AppError, RecoveryAction};
+use forskscope_compare::error::{AppError, RecoveryAction};
 
 // ── RecoveryButton ────────────────────────────────────────────────────────────
 
@@ -118,7 +118,7 @@ impl SaveErrorView {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use forskscope_core::error::{AppError, AppErrorKind, RecoveryAction};
+    use forskscope_compare::error::{AppError, AppErrorKind, RecoveryAction};
 
     fn err(kind: AppErrorKind) -> AppError {
         AppError::new(kind, "test detail")

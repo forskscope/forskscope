@@ -6,9 +6,9 @@
 
 use std::path::PathBuf;
 
-use crate::diff::{DiffOptions, compute_diff};
-use crate::dir::{RecEntry, RecStatus};
 use crate::report::{DirComparisonReport, FileComparisonReport, ReportOptions, ReportPathMode};
+use forskscope_compare::diff::{DiffOptions, compute_diff};
+use forskscope_compare::dir::{RecEntry, RecStatus};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -9,9 +9,9 @@ use crate::compare_prep::{
     SaveTargetBlockReason, SaveTargetState, TargetExpectation, inspect_save_target,
     save_target_from_loaded,
 };
-use crate::document::{FileFingerprint, LoadOptions, LoadedDocument, load_path};
-use crate::encoding::BomPresence;
-use crate::file_kind::FileKind;
+use forskscope_compare::document::{FileFingerprint, LoadOptions, LoadedDocument, load_path};
+use forskscope_compare::encoding::BomPresence;
+use forskscope_compare::file_kind::FileKind;
 
 fn temp_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("fsk-compare-prep-{tag}-{}", std::process::id()));

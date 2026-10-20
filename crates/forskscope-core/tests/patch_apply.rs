@@ -12,7 +12,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-use forskscope_core::{DiffOptions, PatchOptions, compute_diff, patch_from_file_diff, to_unified};
+use forskscope_compare::{DiffOptions, compute_diff};
+use forskscope_core::{PatchOptions, patch_from_file_diff, to_unified};
 
 fn have_patch() -> bool {
     Command::new("patch")

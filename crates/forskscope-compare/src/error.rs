@@ -132,11 +132,12 @@ pub enum CoreError {
 }
 
 impl CoreError {
-    pub(crate) fn io(
-        path: impl Into<PathBuf>,
-        operation: IoOperation,
-        err: &std::io::Error,
-    ) -> Self {
+    // `pub`, not `pub(crate)`: constructed outside this crate too, wherever
+    // a write (`forskscope-edit`) or system I/O (`forskscope-desktop`)
+    // fails and needs the same `CoreError::Io` shape this crate's own read
+    // failures use (RFC-093 §1 — `error` is the one error type every crate
+    // shares, by depending on `compare`).
+    pub fn io(path: impl Into<PathBuf>, operation: IoOperation, err: &std::io::Error) -> Self {
         Self::Io {
             path: Some(path.into()),
             operation,

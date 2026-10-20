@@ -16,7 +16,7 @@
 
 use dioxus::prelude::*;
 
-use forskscope_core::error::{AppError, AppErrorKind};
+use forskscope_compare::error::{AppError, AppErrorKind};
 use forskscope_core::persist::schema::PersistenceCommitError;
 use forskscope_core::persist::schema::session::runtime::{
     MigrationCommitOutcome as SessionMigrationCommitOutcome, SessionRuntimeOutcome,

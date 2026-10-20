@@ -17,10 +17,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::dir::RecStatus;
 use crate::dir::batch::{BatchFailurePolicy, BatchItem, batch_copy};
-use crate::dir::recursive::RecEntry;
 use crate::save::BackupPolicy;
+use forskscope_compare::dir::RecEntry;
+use forskscope_compare::dir::RecStatus;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 

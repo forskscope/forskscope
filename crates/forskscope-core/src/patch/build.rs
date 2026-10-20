@@ -8,7 +8,7 @@
 
 use std::path::PathBuf;
 
-use crate::diff::{DiffDocument, DiffRow, HunkKind, NewlineMarker};
+use forskscope_compare::diff::{DiffDocument, DiffRow, HunkKind, NewlineMarker};
 
 use super::model::{
     LineOrigin, PatchDocument, PatchFileChange, PatchFormat, PatchHunk, PatchLine, PatchSummary,

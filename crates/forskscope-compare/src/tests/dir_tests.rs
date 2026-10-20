@@ -62,31 +62,6 @@ fn dir_digest_equal_is_recursive() {
 }
 
 #[test]
-fn copy_file_creates_backup_and_overwrites() {
-    let dir = temp_dir("copy");
-    let src = dir.join("src.txt");
-    let dst = dir.join("dst.txt");
-    fs::write(&src, "new content").unwrap();
-    fs::write(&dst, "old content").unwrap();
-
-    let outcome = crate::dir::copy_file(&src, &dst, crate::save::BackupPolicy::SiblingBak).unwrap();
-    assert_eq!(fs::read_to_string(&dst).unwrap(), "new content");
-    let bak = outcome.backup_path.expect("backup created");
-    assert_eq!(fs::read_to_string(&bak).unwrap(), "old content");
-}
-
-#[test]
-fn copy_file_creates_destination_parent_dirs() {
-    let dir = temp_dir("copy-nested");
-    let src = dir.join("src.txt");
-    let dst = dir.join("deep").join("nested").join("dst.txt");
-    fs::write(&src, "hello").unwrap();
-
-    crate::dir::copy_file(&src, &dst, crate::save::BackupPolicy::None).unwrap();
-    assert_eq!(fs::read_to_string(&dst).unwrap(), "hello");
-}
-
-#[test]
 fn recursive_diff_classifies_equal_changed_left_only_right_only() {
     let root = temp_dir("rec");
     let left = root.join("left");

@@ -2,8 +2,8 @@
 
 use dioxus::prelude::*;
 
-use forskscope_core::diff::InlineMode;
-use forskscope_core::{NewlineCompareMode, WhitespaceMode};
+use forskscope_compare::diff::InlineMode;
+use forskscope_compare::{NewlineCompareMode, WhitespaceMode};
 
 use crate::state::{DiffAlgorithmSetting, Store};
 

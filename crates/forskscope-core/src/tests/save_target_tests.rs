@@ -6,11 +6,11 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::document::FileFingerprint;
-use crate::error::CoreError;
 use crate::save::{
     TargetPrecondition, check_precondition, persist_noclobber, persist_noclobber_with_hook,
 };
+use forskscope_compare::document::FileFingerprint;
+use forskscope_compare::error::CoreError;
 
 fn temp_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("fsk-save-target-{tag}-{}", std::process::id()));

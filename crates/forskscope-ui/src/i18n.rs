@@ -590,7 +590,7 @@ fn ja(key: &str) -> Option<&'static str> {
         // for each.
         "No files." => "ファイルはありません。",
         // review 174 §3: report::html's per-row status words now come from
-        // forskscope_core::dir::status_key, the same keys status_label
+        // forskscope_compare::dir::status_key, the same keys status_label
         // (deep_compare.rs) reads - "Different"/"Identical"/"Only on the
         // left"/"Only on the right"/"Only on the left (empty folder)"/
         // "Only on the right (empty folder)"/"Symlink not followed"/
@@ -626,8 +626,8 @@ mod tests {
     use std::cell::RefCell;
     use std::path::PathBuf;
 
-    use forskscope_core::diff::{DiffOptions, compute_diff};
-    use forskscope_core::dir::{RecEntry, RecStatus};
+    use forskscope_compare::diff::{DiffOptions, compute_diff};
+    use forskscope_compare::dir::{RecEntry, RecStatus};
     use forskscope_core::report::{
         ChangeHunk, DirComparisonReport, FileChecksum, FileComparisonReport, ReportOptions,
         change_hunks_from_diff, render_dir_report, render_file_report,

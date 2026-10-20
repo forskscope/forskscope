@@ -14,7 +14,7 @@
 //! reads line text from `DiffDocument::hunks` by `HunkId`. Row IDs are stable
 //! within a single `DiffDocument` computation; they are re-derived on reload.
 
-use crate::diff::{DiffDocument, HunkId, HunkKind};
+use forskscope_compare::diff::{DiffDocument, HunkId, HunkKind};
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 

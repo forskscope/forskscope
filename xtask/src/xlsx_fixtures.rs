@@ -1,12 +1,12 @@
 //! F134: generates the `.xlsx` test fixtures under
-//! `crates/forskscope-core/src/tests/fixtures/xlsx/<case>/{old,new}.xlsx`,
+//! `crates/forskscope-compare/src/tests/fixtures/xlsx/<case>/{old,new}.xlsx`,
 //! making checkable the claim their own README used to make uncheckable -
 //! that they "were written with `rust_xlsxwriter` 0.99.0 from a throwaway
 //! program, with a fixed creation timestamp so regenerating gives identical
 //! files", with no such program tracked anywhere.
 //!
 //! Every case's exact shape (sheet names, cell addresses and values,
-//! formulas) is derived directly from `forskscope-core/src/xlsx.rs`'s own
+//! formulas) is derived directly from `forskscope-compare/src/xlsx.rs`'s own
 //! test assertions against these fixtures - the ground truth for what each
 //! one must contain already existed there; this just makes it reproducible
 //! rather than committed-and-unexplained.
@@ -37,7 +37,7 @@ fn new_workbook() -> Result<Workbook, rust_xlsxwriter::XlsxError> {
 }
 
 pub fn run(root: &Path, check: bool) {
-    let fixtures_dir = root.join("crates/forskscope-core/src/tests/fixtures/xlsx");
+    let fixtures_dir = root.join("crates/forskscope-compare/src/tests/fixtures/xlsx");
     let cases: Vec<(&str, CaseGenerator)> = vec![
         ("basic", basic),
         ("unchanged_sheet", unchanged_sheet),

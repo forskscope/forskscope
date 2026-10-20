@@ -11,6 +11,7 @@ authors.workspace       = true
 repository.workspace    = true
 
 [dependencies]
+forskscope-compare           = { workspace = true }
 forskscope-core             = { path = "../forskscope-core" }
 
 [target.'cfg(unix)'.dev-dependencies]

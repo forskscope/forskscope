@@ -20,8 +20,8 @@ use crate::state::Lang;
 use dioxus_swdir_tree::ThreadExecutor;
 use dioxus_swdir_tree::{LoadPayload, ScanExecutor, ScanFuture, ScanJob};
 
-use forskscope_core::IgnoreRules;
-use forskscope_core::dir::EqualityEvidence;
+use forskscope_compare::IgnoreRules;
+use forskscope_compare::dir::EqualityEvidence;
 use forskscope_ui_logic::RowStatusKind;
 
 // ── Public types ──────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use forskscope_core::DiffOptions;
+use forskscope_compare::DiffOptions;
 use forskscope_ui_logic::CompareRequest;
 
 /// F84: which real action a confirmed [`LargeLoadPrompt`] resumes — the two

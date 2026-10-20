@@ -1,8 +1,8 @@
 //! Merge session (RFC-006, RFC-007, RFC-015).
 
-use crate::diff::{DiffDocument, DiffRow, HunkId, HunkKind, SideLine};
-use crate::error::{CoreError, Result};
-use crate::fnv1a64;
+use forskscope_compare::diff::{DiffDocument, DiffRow, HunkId, HunkKind, SideLine};
+use forskscope_compare::error::{CoreError, Result};
+use forskscope_compare::fnv1a64;
 
 use super::transaction::MergeTransaction;
 
@@ -305,7 +305,7 @@ fn has_unique_hunk_ids(hunks: &[MergeHunk]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diff::{DiffHunk, DiffOptions, DiffStats, LineRange};
+    use forskscope_compare::diff::{DiffHunk, DiffOptions, DiffStats, LineRange};
 
     fn hunk_doc(ids: &[HunkId]) -> DiffDocument {
         DiffDocument {

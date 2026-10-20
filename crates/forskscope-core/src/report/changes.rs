@@ -13,7 +13,7 @@
 //! reimplements it independently, against the same `DiffDocument`, so a
 //! change to one never silently changes the other.
 
-use crate::diff::{DiffDocument, DiffRow, HunkKind, InlineSpan};
+use forskscope_compare::diff::{DiffDocument, DiffRow, HunkKind, InlineSpan};
 
 /// The role of one line within a [`ChangeHunk`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -225,7 +225,7 @@ fn normalize_range(start: u32, len: u32) -> (u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diff::{DiffOptions, InlineMode, compute_diff};
+    use forskscope_compare::diff::{DiffOptions, InlineMode, compute_diff};
 
     fn diff_of(left: &str, right: &str) -> DiffDocument {
         compute_diff(left, right, DiffOptions::default())

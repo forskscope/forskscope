@@ -20,12 +20,12 @@ use std::sync::Arc;
 use dioxus::prelude::*;
 use dioxus_swdir_tree::{DirectoryTree, DisplayFilter, use_scan_driver};
 
-use forskscope_core::IgnoreRules;
-use forskscope_core::dir::{
+use forskscope_compare::IgnoreRules;
+use forskscope_compare::dir::{
     DigestOutcome, EntryType, EqualityEvidence, file_digest_equal_with_cancel,
     list_recursive_for_display_with_rules, recursive_diff_with_rules,
 };
-use forskscope_core::error::Result as CoreResult;
+use forskscope_compare::error::Result as CoreResult;
 
 use crate::i18n::t;
 use crate::state::Store;
@@ -98,7 +98,7 @@ pub enum DigestKey {
 /// same caveat every other measured bound in this codebase carries.
 ///
 /// **64 MiB**, chosen to equal
-/// [`forskscope_core::job::PerformanceLimits`]'s existing
+/// [`forskscope_compare::job::PerformanceLimits`]'s existing
 /// `large_text_threshold_bytes` default — the size at which this product
 /// already treats a file as no longer casually cheap, for the diff view's
 /// own prompt-before-diffing threshold. Reusing that number keeps one
@@ -315,7 +315,7 @@ fn verdict_evidence(verdict: DirVerdict) -> EqualityEvidence {
 /// exactly the false result cancellation exists to prevent. Checked, not assumed
 /// (the F61 pattern).
 fn tier1_outcome(
-    scan: &forskscope_core::dir::RecursiveScan,
+    scan: &forskscope_compare::dir::RecursiveScan,
     cancelled: bool,
     epoch_current: bool,
 ) -> Option<EqualityEvidence> {
@@ -402,7 +402,7 @@ fn tier2_dir_evidence(verdict: Tier2Verdict) -> EqualityEvidence {
 /// a cancelled walk returns a partial scan, and applying it would repaint a
 /// row with a verdict tier 2 never actually finished establishing.
 fn tier2_dir_outcome(
-    scan: &forskscope_core::dir::RecursiveScan,
+    scan: &forskscope_compare::dir::RecursiveScan,
     cancelled: bool,
     epoch_current: bool,
 ) -> Option<EqualityEvidence> {
@@ -820,7 +820,7 @@ pub fn Explorer() -> Element {
     // `restart()` is called at the same place `digest_map` is cleared -
     // see the `changed` block below.
     let mut digest_epoch: Signal<DigestEpoch> =
-        use_signal(|| DigestEpoch::new(forskscope_core::DIGEST_CONCURRENCY_LIMIT));
+        use_signal(|| DigestEpoch::new(forskscope_compare::DIGEST_CONCURRENCY_LIMIT));
 
     // RFC-080 tier 1. Its own results map (see `Tier1Map`), and its own
     // `DigestEpoch` — concurrency 1, so at most one walk in flight — restarted
@@ -1325,10 +1325,10 @@ mod tests {
     fn a_failed_comparison_is_reported_as_error_not_different() {
         let missing_a = std::path::Path::new("/nonexistent/fsk-explorer-f76/a");
         let missing_b = std::path::Path::new("/nonexistent/fsk-explorer-f76/b");
-        let outcome = forskscope_core::dir::file_digest_equal_with_cancel(
+        let outcome = forskscope_compare::dir::file_digest_equal_with_cancel(
             missing_a,
             missing_b,
-            &forskscope_core::CancellationToken::new(),
+            &forskscope_compare::CancellationToken::new(),
         );
         assert!(outcome.is_err(), "a nonexistent path must fail to compare");
 
@@ -1410,8 +1410,8 @@ mod tests {
     // introduces standing in for the thing it tests. Permission-dependent tests
     // are unix-only and skip, loudly, when `chmod` has no effect (running as root).
 
-    use forskscope_core::CancellationToken;
-    use forskscope_core::dir::RecursiveScan;
+    use forskscope_compare::CancellationToken;
+    use forskscope_compare::dir::RecursiveScan;
 
     fn tier1_dir(tag: &str) -> std::path::PathBuf {
         let d = std::env::temp_dir().join(format!("fsk-tier1-{tag}-{}", std::process::id()));

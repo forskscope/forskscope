@@ -8,10 +8,11 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::dir::{
-    BatchFailurePolicy, CopyDirection, DirectoryMergeAction, EntrySelection, FileOutcome, RecEntry,
-    RecStatus, execute_plan, plan_operations,
+    BatchFailurePolicy, CopyDirection, DirectoryMergeAction, EntrySelection, FileOutcome,
+    execute_plan, plan_operations,
 };
 use crate::save::BackupPolicy;
+use forskscope_compare::dir::{RecEntry, RecStatus};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

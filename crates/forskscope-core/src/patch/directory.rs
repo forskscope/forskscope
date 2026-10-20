@@ -9,11 +9,11 @@
 
 use std::path::Path;
 
-use crate::diff::{DiffOptions, compute_diff};
-use crate::dir::{RecStatus, recursive_diff};
-use crate::document::{LoadOptions, load_path};
-use crate::error::{CoreError, IoOperation, Result};
-use crate::file_kind::FileKind;
+use forskscope_compare::diff::{DiffOptions, compute_diff};
+use forskscope_compare::dir::{RecStatus, recursive_diff};
+use forskscope_compare::document::{LoadOptions, load_path};
+use forskscope_compare::error::{CoreError, IoOperation, Result};
+use forskscope_compare::file_kind::FileKind;
 
 use super::build::{PatchOptions, Side, hunks_from_diff, whole_side_lines};
 use super::model::{PatchDocument, PatchFileChange, PatchFormat, PatchSummary};

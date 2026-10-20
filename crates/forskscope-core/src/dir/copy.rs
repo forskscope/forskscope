@@ -7,8 +7,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::error::{CoreError, IoOperation, Result};
 use crate::save::BackupPolicy;
+use forskscope_compare::{CoreError, IoOperation, Result};
 
 /// Result of a successful copy.
 #[derive(Debug, Clone)]

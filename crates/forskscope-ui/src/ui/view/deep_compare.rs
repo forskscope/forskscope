@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 
 use dioxus::prelude::*;
 
-use forskscope_core::IgnoreRules;
-use forskscope_core::dir::{
+use forskscope_compare::IgnoreRules;
+use forskscope_compare::dir::{
     DigestOutcome, RecEntry, RecStatus, file_digest_equal_with_cancel,
     list_recursive_for_display_with_rules,
 };
@@ -122,7 +122,7 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
     // replacing the ad hoc per-effect-run `Semaphore` below with one that
     // survives `restart()`, matching `explorer.rs`.
     let mut digest_epoch: Signal<DigestEpoch> =
-        use_signal(|| DigestEpoch::new(forskscope_core::DIGEST_CONCURRENCY_LIMIT));
+        use_signal(|| DigestEpoch::new(forskscope_compare::DIGEST_CONCURRENCY_LIMIT));
 
     use_effect(move || {
         let lr1 = lr.clone();
@@ -431,12 +431,15 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
 /// the Explorer work already added (handoff 007) rather than inventing
 /// near-duplicates - only `Symlink` is new here.
 /// Review 174 §3: this is now a thin wrapper over
-/// `forskscope_core::dir::status_key`, the one function a comparison
+/// `forskscope_compare::dir::status_key`, the one function a comparison
 /// report's renderer also reads (`report::html`) - same i18n keys, so the
 /// two can never say different things about the same `RecStatus`. See
 /// `status_key`'s own doc for `in_progress`.
 fn status_label(status: RecStatus, in_progress: bool, lang: Lang) -> String {
-    t(lang, forskscope_core::dir::status_key(status, in_progress))
+    t(
+        lang,
+        forskscope_compare::dir::status_key(status, in_progress),
+    )
 }
 
 /// F82: `(glyph, CSS class)` for `status`, from the shared vocabulary both
@@ -1034,7 +1037,7 @@ mod tests {
 
     // Review 174 §3: the live view and a comparison report must say the
     // *same* thing for the same `RecStatus` - both now read
-    // `forskscope_core::dir::status_key`, but that is a structural
+    // `forskscope_compare::dir::status_key`, but that is a structural
     // guarantee, not a test; this makes it an explicit, regression-proof
     // one, in both languages. A report never renders mid-scan, so its
     // reading is always `in_progress: false` - asserted against
@@ -1056,7 +1059,7 @@ mod tests {
         for status in statuses {
             for lang in [Lang::En, Lang::Ja] {
                 let view_label = status_label(status, false, lang);
-                let report_label = t(lang, forskscope_core::dir::status_key(status, false));
+                let report_label = t(lang, forskscope_compare::dir::status_key(status, false));
                 assert_eq!(
                     view_label, report_label,
                     "{status:?}/{lang:?}: the view said {view_label:?}, a report would say {report_label:?}"

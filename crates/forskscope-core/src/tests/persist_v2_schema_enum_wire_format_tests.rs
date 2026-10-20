@@ -16,11 +16,13 @@
 //! rename of any variant — scalar-field or list-field — fails here
 //! regardless of which value a fixture happens to hold.
 
-use crate::diff::{CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode};
-use crate::encoding::NewlinePolicy;
 use crate::settings::display::{
     ColourVision, Density, DiffFontFamilySetting, FontFamilySetting, ThemeId,
 };
+use forskscope_compare::diff::{
+    CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode,
+};
+use forskscope_compare::encoding::NewlinePolicy;
 
 fn assert_wire_string<T>(value: T, expected: &str)
 where

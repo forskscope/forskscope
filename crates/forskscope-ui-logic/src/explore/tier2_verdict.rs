@@ -17,7 +17,7 @@
 
 use std::path::Path;
 
-use forskscope_core::dir::{RecStatus, RecursiveScan};
+use forskscope_compare::dir::{RecStatus, RecursiveScan};
 
 /// What tier 2 concluded about one directory pair.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,7 +93,7 @@ pub fn tier2_verdict(scan: &RecursiveScan) -> Tier2Verdict {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use forskscope_core::dir::RecEntry;
+    use forskscope_compare::dir::RecEntry;
     use std::path::PathBuf;
 
     fn entry(name: &str, status: RecStatus) -> RecEntry {

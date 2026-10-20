@@ -8,11 +8,11 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::diff::{DiffOptions, compute_diff};
 use crate::patch::{
     LineOrigin, PatchFileChange, PatchOptions, patch_from_directories, patch_from_file_diff,
     to_unified,
 };
+use forskscope_compare::diff::{DiffOptions, compute_diff};
 
 fn temp_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("fsk-patch-{tag}-{}", std::process::id()));
@@ -20,7 +20,7 @@ fn temp_dir(tag: &str) -> PathBuf {
     dir
 }
 
-fn diff(left: &str, right: &str) -> crate::diff::DiffDocument {
+fn diff(left: &str, right: &str) -> forskscope_compare::diff::DiffDocument {
     compute_diff(left, right, DiffOptions::default())
 }
 

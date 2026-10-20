@@ -1,12 +1,12 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::document::FileFingerprint;
-use crate::encoding::BomPresence;
-use crate::error::CoreError;
 #[cfg(unix)]
 use crate::save::atomic_replace;
 use crate::save::{BackupPolicy, SaveRequest, TargetPrecondition, save_text};
+use forskscope_compare::document::FileFingerprint;
+use forskscope_compare::encoding::BomPresence;
+use forskscope_compare::error::CoreError;
 
 fn temp_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("fsk-save-{tag}-{}", std::process::id()));
@@ -163,7 +163,7 @@ fn conflict_error_contains_path_info() {
     std::fs::write(&target, "v1").unwrap();
 
     // Capture a fingerprint before writing.
-    let fp = crate::document::FileFingerprint::capture(&target, None).unwrap();
+    let fp = forskscope_compare::document::FileFingerprint::capture(&target, None).unwrap();
 
     // Modify the file to simulate external change.
     std::fs::write(&target, "v2-external").unwrap();
@@ -179,7 +179,7 @@ fn conflict_error_contains_path_info() {
     let err = crate::save::save_text(&req).unwrap_err();
     // The error should be a Conflict variant.
     assert!(
-        matches!(err, crate::CoreError::Conflict { .. }),
+        matches!(err, forskscope_compare::CoreError::Conflict { .. }),
         "should report Conflict when file was externally changed"
     );
 }

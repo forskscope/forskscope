@@ -10,7 +10,7 @@
 
 use std::path::PathBuf;
 
-use forskscope_core::dir::EqualityEvidence;
+use forskscope_compare::dir::EqualityEvidence;
 
 /// What a left-side entry's classification will be, before any async work
 /// starts. `Final` is inserted immediately; `NeedsDigest` means the caller

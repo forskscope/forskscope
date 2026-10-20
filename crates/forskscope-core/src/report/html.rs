@@ -170,11 +170,11 @@ fn render_content(line: &super::changes::ChangeLine) -> String {
             for span in spans {
                 let escaped = escape_html(&span.text);
                 match span.kind {
-                    crate::diff::InlineKind::Equal => out.push_str(&escaped),
-                    crate::diff::InlineKind::Insert => {
+                    forskscope_compare::diff::InlineKind::Equal => out.push_str(&escaped),
+                    forskscope_compare::diff::InlineKind::Insert => {
                         let _ = write!(out, "<mark class=\"ins\">{escaped}</mark>");
                     }
-                    crate::diff::InlineKind::Delete => {
+                    forskscope_compare::diff::InlineKind::Delete => {
                         let _ = write!(out, "<mark class=\"del\">{escaped}</mark>");
                     }
                 }
@@ -479,19 +479,25 @@ pub fn render_dir_report(
     let _ = writeln!(out, "</table>");
     let main_counts = [
         (
-            crate::dir::status_key(crate::dir::RecStatus::Equal, false),
+            forskscope_compare::dir::status_key(forskscope_compare::dir::RecStatus::Equal, false),
             report.equal,
         ),
         (
-            crate::dir::status_key(crate::dir::RecStatus::Changed, false),
+            forskscope_compare::dir::status_key(forskscope_compare::dir::RecStatus::Changed, false),
             report.changed,
         ),
         (
-            crate::dir::status_key(crate::dir::RecStatus::LeftOnly, false),
+            forskscope_compare::dir::status_key(
+                forskscope_compare::dir::RecStatus::LeftOnly,
+                false,
+            ),
             report.left_only,
         ),
         (
-            crate::dir::status_key(crate::dir::RecStatus::RightOnly, false),
+            forskscope_compare::dir::status_key(
+                forskscope_compare::dir::RecStatus::RightOnly,
+                false,
+            ),
             report.right_only,
         ),
     ];
@@ -500,11 +506,14 @@ pub fn render_dir_report(
 
     let extra_counts = [
         (
-            crate::dir::status_key(crate::dir::RecStatus::Symlink, false),
+            forskscope_compare::dir::status_key(forskscope_compare::dir::RecStatus::Symlink, false),
             report.symlinks,
         ),
         (
-            crate::dir::status_key(crate::dir::RecStatus::Unreadable, false),
+            forskscope_compare::dir::status_key(
+                forskscope_compare::dir::RecStatus::Unreadable,
+                false,
+            ),
             report.unreadable,
         ),
     ];
@@ -651,7 +660,10 @@ fn render_dir_file_row(
         // disabled until it finishes or is cancelled), so `in_progress` is
         // always `false` here - a `Computing` row always reads "Not
         // compared", never "Comparing…", in a report.
-        escape_html(&tr(crate::dir::status_key(row.rec_status, false)))
+        escape_html(&tr(forskscope_compare::dir::status_key(
+            row.rec_status,
+            false
+        )))
     );
 }
 
@@ -687,7 +699,11 @@ mod tests {
     #[test]
     fn a_report_without_the_csp_meta_would_fail_this_check_removed_it_is_present() {
         let report = crate::report::FileComparisonReport::from_diff(
-            &crate::diff::compute_diff("a\n", "b\n", crate::diff::DiffOptions::default()),
+            &forskscope_compare::diff::compute_diff(
+                "a\n",
+                "b\n",
+                forskscope_compare::diff::DiffOptions::default(),
+            ),
             None,
             None,
             crate::report::ReportOptions::default(),
@@ -704,10 +720,10 @@ mod tests {
 
     #[test]
     fn a_fixture_containing_markup_appears_as_text_not_as_markup_in_the_rendered_report() {
-        let diff = crate::diff::compute_diff(
+        let diff = forskscope_compare::diff::compute_diff(
             "safe\n",
             "</pre><script>alert(1)</script>\n<img src=x onerror=alert(1)>\n",
-            crate::diff::DiffOptions::default(),
+            forskscope_compare::diff::DiffOptions::default(),
         );
         let report = crate::report::FileComparisonReport::from_diff(
             &diff,
@@ -724,7 +740,11 @@ mod tests {
     #[test]
     fn the_report_carries_no_script_tag_and_loads_nothing_external() {
         let report = crate::report::FileComparisonReport::from_diff(
-            &crate::diff::compute_diff("a\n", "b\n", crate::diff::DiffOptions::default()),
+            &forskscope_compare::diff::compute_diff(
+                "a\n",
+                "b\n",
+                forskscope_compare::diff::DiffOptions::default(),
+            ),
             None,
             None,
             crate::report::ReportOptions::default(),
@@ -738,7 +758,11 @@ mod tests {
     #[test]
     fn checksums_render_only_when_attached() {
         let report = crate::report::FileComparisonReport::from_diff(
-            &crate::diff::compute_diff("a\n", "b\n", crate::diff::DiffOptions::default()),
+            &forskscope_compare::diff::compute_diff(
+                "a\n",
+                "b\n",
+                forskscope_compare::diff::DiffOptions::default(),
+            ),
             None,
             None,
             crate::report::ReportOptions::default(),
@@ -798,10 +822,10 @@ mod tests {
 
     #[test]
     fn a_change_hunk_shows_both_marks_and_the_changed_line_numbers() {
-        let diff = crate::diff::compute_diff(
+        let diff = forskscope_compare::diff::compute_diff(
             "one\ntwo\n",
             "one\nTWO\n",
-            crate::diff::DiffOptions::default(),
+            forskscope_compare::diff::DiffOptions::default(),
         );
         let report = crate::report::FileComparisonReport::from_diff(
             &diff,
@@ -873,10 +897,10 @@ mod tests {
 
     #[test]
     fn the_rendered_sentence_substitutes_real_numbers_into_the_chosen_template() {
-        let diff = crate::diff::compute_diff(
+        let diff = forskscope_compare::diff::compute_diff(
             "one\ntwo\n",
             "one\nTWO\n",
-            crate::diff::DiffOptions::default(),
+            forskscope_compare::diff::DiffOptions::default(),
         );
         let report = crate::report::FileComparisonReport::from_diff(
             &diff,
@@ -900,7 +924,11 @@ mod tests {
         let right = "a\nB\n".to_string() + &"x\n".repeat(10) + "C\nd\n";
         let html = render_file_report(
             &crate::report::FileComparisonReport::from_diff(
-                &crate::diff::compute_diff(&left, &right, crate::diff::DiffOptions::default()),
+                &forskscope_compare::diff::compute_diff(
+                    &left,
+                    &right,
+                    forskscope_compare::diff::DiffOptions::default(),
+                ),
                 None,
                 None,
                 crate::report::ReportOptions::default(),
@@ -928,7 +956,11 @@ mod tests {
     #[test]
     fn a_translator_closure_is_honoured() {
         let report = crate::report::FileComparisonReport::from_diff(
-            &crate::diff::compute_diff("a\n", "b\n", crate::diff::DiffOptions::default()),
+            &forskscope_compare::diff::compute_diff(
+                "a\n",
+                "b\n",
+                forskscope_compare::diff::DiffOptions::default(),
+            ),
             None,
             None,
             crate::report::ReportOptions::default(),
@@ -947,7 +979,11 @@ mod tests {
     #[test]
     fn red_green_safe_uses_a_different_palette_than_standard() {
         let report = crate::report::FileComparisonReport::from_diff(
-            &crate::diff::compute_diff("a\n", "b\n", crate::diff::DiffOptions::default()),
+            &forskscope_compare::diff::compute_diff(
+                "a\n",
+                "b\n",
+                forskscope_compare::diff::DiffOptions::default(),
+            ),
             None,
             None,
             crate::report::ReportOptions::default(),
@@ -962,7 +998,11 @@ mod tests {
     #[test]
     fn an_identical_file_comparison_still_renders_a_complete_page() {
         let report = crate::report::FileComparisonReport::from_diff(
-            &crate::diff::compute_diff("same\n", "same\n", crate::diff::DiffOptions::default()),
+            &forskscope_compare::diff::compute_diff(
+                "same\n",
+                "same\n",
+                forskscope_compare::diff::DiffOptions::default(),
+            ),
             None,
             None,
             crate::report::ReportOptions::default(),
@@ -975,7 +1015,7 @@ mod tests {
 
     #[test]
     fn a_dir_report_lists_files_with_the_apps_own_status_words() {
-        use crate::dir::{RecEntry, RecStatus};
+        use forskscope_compare::dir::{RecEntry, RecStatus};
         use std::path::PathBuf;
 
         let entries = vec![
@@ -1039,7 +1079,7 @@ mod tests {
 
     #[test]
     fn a_dir_reports_cap_notice_names_every_omitted_file() {
-        use crate::dir::{RecEntry, RecStatus};
+        use forskscope_compare::dir::{RecEntry, RecStatus};
         use std::path::PathBuf;
 
         let entries = vec![RecEntry {
@@ -1063,7 +1103,7 @@ mod tests {
 
     #[test]
     fn a_cancelled_scans_unfinished_entry_renders_not_compared() {
-        use crate::dir::{RecEntry, RecStatus};
+        use forskscope_compare::dir::{RecEntry, RecStatus};
         use std::path::PathBuf;
 
         let entries = vec![RecEntry {

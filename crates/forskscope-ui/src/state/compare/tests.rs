@@ -210,7 +210,7 @@ fn normal_compare_save_target_is_the_right_input_must_match_its_own_fingerprint(
     .unwrap();
 
     assert_eq!(prepared.save_target.path, right);
-    let expected_fp = forskscope_core::document::FileFingerprint::capture(&right, None).unwrap();
+    let expected_fp = forskscope_compare::document::FileFingerprint::capture(&right, None).unwrap();
     match prepared.save_target.state {
         SaveTargetState::Writable { expectation, .. } => match expectation {
             TargetExpectation::MustMatch(fp) => assert_eq!(fp.len, expected_fp.len),
@@ -351,7 +351,7 @@ fn both_sides_xlsx_produces_a_real_structural_diff_not_an_empty_one() {
     // built once with rust_xlsxwriter, committed as binary fixtures, not a
     // project dependency).
     let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../forskscope-core/src/tests/fixtures/xlsx/basic");
+        .join("../forskscope-compare/src/tests/fixtures/xlsx/basic");
     let left = fixtures.join("old.xlsx");
     let right = fixtures.join("new.xlsx");
 
@@ -386,7 +386,7 @@ fn both_sides_xlsx_produces_a_real_structural_diff_not_an_empty_one() {
 #[test]
 fn a_spreadsheet_warning_reaches_the_prepared_comparison() {
     let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../forskscope-core/src/tests/fixtures/xlsx");
+        .join("../forskscope-compare/src/tests/fixtures/xlsx");
     let load = |case: &str| {
         load_and_diff(
             normal_request(
@@ -474,7 +474,8 @@ fn mergetool_save_target_is_the_merged_path_not_the_compared_remote() {
         "save target must be the merged output, not the compared remote"
     );
     assert_ne!(prepared.save_target.path, remote);
-    let expected_fp = forskscope_core::document::FileFingerprint::capture(&merged, None).unwrap();
+    let expected_fp =
+        forskscope_compare::document::FileFingerprint::capture(&merged, None).unwrap();
     match prepared.save_target.state {
         SaveTargetState::Writable { expectation, .. } => match expectation {
             TargetExpectation::MustMatch(fp) => assert_eq!(fp.len, expected_fp.len),
@@ -686,10 +687,10 @@ fn a_new_tab_under_an_eager_profile_starts_with_char_mode_on() {
             let mut settings = store.settings.write();
             settings.profiles = vec![crate::state::settings::DiffProfile {
                 name: "Eager".into(),
-                whitespace: forskscope_core::WhitespaceMode::Significant,
+                whitespace: forskscope_compare::WhitespaceMode::Significant,
                 ignore_case: false,
                 algorithm: crate::state::DiffAlgorithmSetting::Myers,
-                newlines: forskscope_core::NewlineCompareMode::Significant,
+                newlines: forskscope_compare::NewlineCompareMode::Significant,
                 inline_mode: InlineMode::EagerForSmallHunks,
                 built_in: false,
             }];
@@ -1178,8 +1179,8 @@ fn load_error(request: CompareRequest, enable_binary: bool, why: &str) -> String
     }
 }
 
-fn io_error(operation: forskscope_core::IoOperation) -> forskscope_core::CoreError {
-    forskscope_core::CoreError::Io {
+fn io_error(operation: forskscope_compare::IoOperation) -> forskscope_compare::CoreError {
+    forskscope_compare::CoreError::Io {
         path: None,
         operation,
         message: "boom".into(),
@@ -1191,7 +1192,7 @@ fn io_error(operation: forskscope_core::IoOperation) -> forskscope_core::CoreErr
 /// and `Decode` cases then carry it and this fails.
 #[test]
 fn access_guidance_is_appended_only_to_errors_about_existence_or_permission() {
-    use forskscope_core::{CoreError, IoOperation};
+    use forskscope_compare::{CoreError, IoOperation};
     let path = Path::new("/some/dir/report.txt");
 
     for op in [

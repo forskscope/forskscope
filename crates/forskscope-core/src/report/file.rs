@@ -2,7 +2,7 @@
 
 use super::FileChecksum;
 use super::changes::{ChangeHunk, change_hunks_from_diff};
-use crate::diff::{DiffDocument, DiffOptions, DiffWarning, HunkKind};
+use forskscope_compare::diff::{DiffDocument, DiffOptions, DiffWarning, HunkKind};
 use std::fmt::Write as _;
 use std::path::Path;
 

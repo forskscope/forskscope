@@ -8,8 +8,8 @@
 use std::fs;
 use std::path::Path;
 
-use forskscope_core::diff::HunkKind;
-use forskscope_core::{DiffOptions, compute_diff};
+use forskscope_compare::diff::HunkKind;
+use forskscope_compare::{DiffOptions, compute_diff};
 
 fn load(path: &str) -> String {
     let manifest =
@@ -405,7 +405,7 @@ fn large_file_with_one_change_produces_one_hunk() {
 
 #[test]
 fn binary_fixture_classifies_as_binary() {
-    use forskscope_core::file_kind::{FileKind, classify};
+    use forskscope_compare::file_kind::{FileKind, classify};
     use std::path::Path;
     let manifest =
         std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set by cargo test");
@@ -420,7 +420,7 @@ fn binary_fixture_classifies_as_binary() {
 
 #[test]
 fn text_fixtures_classify_as_text() {
-    use forskscope_core::file_kind::{FileKind, classify};
+    use forskscope_compare::file_kind::{FileKind, classify};
     use std::path::Path;
     let manifest =
         std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set by cargo test");
@@ -452,7 +452,7 @@ fn mixed_crlf_lf_file_has_changes_detected() {
         "mixed-ending files with one changed line must not be identical"
     );
     // Must produce at least one changed hunk.
-    use forskscope_core::diff::HunkKind;
+    use forskscope_compare::diff::HunkKind;
     let has_change = diff.hunks.iter().any(|h| h.kind != HunkKind::Equal);
     assert!(has_change, "at least one non-equal hunk must be present");
 }
@@ -470,7 +470,7 @@ fn very_long_single_line_produces_one_replace_hunk() {
         "long single-line diff must not be empty"
     );
     // The hunk must not be Equal — the 2000-char content is different.
-    use forskscope_core::diff::HunkKind;
+    use forskscope_compare::diff::HunkKind;
     let has_change = diff.hunks.iter().any(|h| h.kind != HunkKind::Equal);
     assert!(
         has_change,

@@ -4,13 +4,14 @@ use super::{
 };
 use crate::state::settings::Lang;
 use dioxus::prelude::{ReadableExt, WritableExt};
+use forskscope_compare::document::FileFingerprint;
+use forskscope_compare::{
+    BomPresence, DiffOptions, FileKind, LoadedDocument, NewlineStyle, TextDocument, TextEncoding,
+    compute_diff,
+};
+use forskscope_core::MergeSession;
 use forskscope_core::compare_prep::{
     SaveCapability, SaveTargetSnapshot, SaveTargetState, TargetExpectation,
-};
-use forskscope_core::document::FileFingerprint;
-use forskscope_core::{
-    BomPresence, DiffOptions, FileKind, LoadedDocument, MergeSession, NewlineStyle, TextDocument,
-    TextEncoding, compute_diff,
 };
 use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 use std::path::{Path, PathBuf};
@@ -274,7 +275,7 @@ fn change_diff_options_applies_without_prompting_when_dirty_but_hunks_are_unchan
     use crate::state::Modal;
     use crate::state::tab::change_diff_options;
     use crate::state::with_test_store;
-    use forskscope_core::diff::InlineMode;
+    use forskscope_compare::diff::InlineMode;
 
     with_test_store(|store| {
         let tab = dirty_tab();
@@ -414,7 +415,7 @@ fn misdetected_tab() -> CompareTab {
     // already uses for a legitimate Shift_JIS decode).
     let sjis_bytes: Vec<u8> = vec![0x82, 0xA0, 0x82, 0xA2, 0x82, 0xA4];
     let (misdetected_content, _, _) =
-        forskscope_core::encoding::decode_with_label(&sjis_bytes, "windows-1252");
+        forskscope_compare::encoding::decode_with_label(&sjis_bytes, "windows-1252");
 
     let right_path = PathBuf::from("/tmp/f90-right.txt");
     let mut right_doc = text_doc(&misdetected_content);

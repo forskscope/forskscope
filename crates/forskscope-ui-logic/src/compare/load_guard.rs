@@ -19,7 +19,7 @@
 //! - All text in the guard is owned `String` so the component holds a
 //!   snapshot without lifetime coupling.
 
-use forskscope_core::job::{FileSizeClass, PerformanceLimits};
+use forskscope_compare::job::{FileSizeClass, PerformanceLimits};
 
 // ── LoadGuard ─────────────────────────────────────────────────────────────────
 

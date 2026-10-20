@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///
 /// # Example
 /// ```
-/// use forskscope_core::CancellationToken;
+/// use forskscope_compare::CancellationToken;
 ///
 /// let token = CancellationToken::new();
 /// let worker_token = token.clone();

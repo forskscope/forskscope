@@ -5,14 +5,15 @@ use std::path::{Path, PathBuf};
 
 use dioxus::prelude::*;
 use dioxus_core::spawn_forever;
+use forskscope_compare::diff::{DiffDocument, InlineMode};
+use forskscope_compare::document::{LoadOptions, LoadedDocument, load_path};
+use forskscope_compare::file_kind::FileKind;
+use forskscope_compare::{DiffOptions, compute_diff};
+use forskscope_core::MergeSession;
 use forskscope_core::compare_prep::{
     PreparedCompare, SaveCapability, SaveCapabilityBlockReason, inspect_save_target,
     save_capability, save_target_from_loaded,
 };
-use forskscope_core::diff::{DiffDocument, InlineMode};
-use forskscope_core::document::{LoadOptions, LoadedDocument, load_path};
-use forskscope_core::file_kind::FileKind;
-use forskscope_core::{DiffOptions, MergeSession, compute_diff};
 use forskscope_ui_logic::{
     CompareRequest, CompletionDecision, LoadGeneration, LoadGuard, LoadIdentitySnapshot, LoadToken,
     SaveDestination, completion_decision, guard_for_sizes,
@@ -38,8 +39,8 @@ fn size_or_zero(path: &Path) -> u64 {
 /// Whether both sides are `.xlsx` workbooks, so the large-file prompt can say
 /// what a spreadsheet comparison does instead of what a text one does.
 fn is_spreadsheet_pair(left: &Path, right: &Path) -> bool {
-    forskscope_core::path::has_extension(left, "xlsx")
-        && forskscope_core::path::has_extension(right, "xlsx")
+    forskscope_compare::path::has_extension(left, "xlsx")
+        && forskscope_compare::path::has_extension(right, "xlsx")
 }
 
 /// What a call site should do about one file pair, given their sizes and
@@ -418,8 +419,8 @@ pub(crate) fn open_compare_request_with_options(
 /// (F122): only a failed read or stat does. A directory given as a file, an
 /// unsupported kind or a decode failure is not cured by checking that the file
 /// exists, so it gets none — the default is no guidance, not wrong guidance.
-fn wants_access_guidance(error: &forskscope_core::CoreError) -> bool {
-    use forskscope_core::{CoreError, IoOperation};
+fn wants_access_guidance(error: &forskscope_compare::CoreError) -> bool {
+    use forskscope_compare::{CoreError, IoOperation};
     matches!(
         error,
         CoreError::Io {
@@ -432,7 +433,7 @@ fn wants_access_guidance(error: &forskscope_core::CoreError) -> bool {
 /// The text for a side that could not be opened. Guidance is appended here,
 /// by the error's class, and nowhere else: the error tab shows this message
 /// as it is.
-fn open_error(lang: Lang, path: &Path, error: &forskscope_core::CoreError) -> String {
+fn open_error(lang: Lang, path: &Path, error: &forskscope_compare::CoreError) -> String {
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -504,9 +505,9 @@ pub(super) fn load_and_diff(
         // reach the user as an error. Falling through with two empty sides
         // would diff as identical and report "these workbooks match" for a
         // pair that was never fully compared.
-        let pair = forskscope_core::xlsx::compare_pair(&left, &right).map_err(|e| {
+        let pair = forskscope_compare::xlsx::compare_pair(&left, &right).map_err(|e| {
             let detail = match e {
-                forskscope_core::CoreError::Unsupported { message } => message,
+                forskscope_compare::CoreError::Unsupported { message } => message,
                 other => other.to_string(),
             };
             format!(

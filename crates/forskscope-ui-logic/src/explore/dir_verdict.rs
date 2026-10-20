@@ -49,7 +49,7 @@
 //! doc comment for what makes this shape different from an ordinary
 //! one-sided entry.
 
-use forskscope_core::dir::{RecStatus, RecursiveScan};
+use forskscope_compare::dir::{RecStatus, RecursiveScan};
 
 /// What tier 1 concluded about one directory pair.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -125,7 +125,7 @@ pub fn dir_verdict(scan: &RecursiveScan) -> DirVerdict {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use forskscope_core::dir::RecEntry;
+    use forskscope_compare::dir::RecEntry;
     use std::path::PathBuf;
 
     fn entry(name: &str, status: RecStatus, l: Option<u64>, r: Option<u64>) -> RecEntry {

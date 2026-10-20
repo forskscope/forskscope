@@ -6,13 +6,13 @@ use std::path::PathBuf;
 use dioxus::prelude::*;
 use dioxus_core::spawn_forever;
 
-use forskscope_core::CoreError;
+use forskscope_compare::CoreError;
+use forskscope_compare::encoding::BomPresence;
+use forskscope_compare::error::{AppError, AppErrorKind, RecoveryAction};
 use forskscope_core::compare_prep::{
     SaveTargetBlockReason, SaveTargetSnapshot, SaveTargetState, TargetExpectation,
     inspect_save_target,
 };
-use forskscope_core::encoding::BomPresence;
-use forskscope_core::error::{AppError, AppErrorKind, RecoveryAction};
 use forskscope_core::save::{
     BackupPolicy, SaveOutcome, SaveRequest, TargetPrecondition, save_text,
 };
@@ -469,8 +469,8 @@ pub(crate) fn trunc(s: &str) -> String {
     s.to_string()
 }
 
-pub(crate) fn algo_val(a: forskscope_core::DiffAlgorithm) -> &'static str {
-    use forskscope_core::DiffAlgorithm;
+pub(crate) fn algo_val(a: forskscope_compare::DiffAlgorithm) -> &'static str {
+    use forskscope_compare::DiffAlgorithm;
     match a {
         DiffAlgorithm::Patience => "patience",
         DiffAlgorithm::Histogram => "histogram",
@@ -654,7 +654,7 @@ pub fn export_file_report(
         return;
     }
 
-    let staleness_checks: Vec<(std::path::PathBuf, forskscope_core::FileFingerprint)> = [
+    let staleness_checks: Vec<(std::path::PathBuf, forskscope_compare::FileFingerprint)> = [
         (tab.left_path.clone(), tab.left_doc.fingerprint_at_load),
         (tab.right_path.clone(), tab.right_doc.fingerprint_at_load),
     ]
@@ -664,8 +664,8 @@ pub fn export_file_report(
     drop(tabs);
 
     for (path, fp) in &staleness_checks {
-        let state = forskscope_core::check_external_state(path, fp, false);
-        if state != forskscope_core::ExternalFileState::Clean {
+        let state = forskscope_compare::check_external_state(path, fp, false);
+        if state != forskscope_compare::ExternalFileState::Clean {
             store.notify(t(
                 lang,
                 "A file changed since it was compared. Compare again, then export.",
@@ -791,7 +791,7 @@ pub fn export_file_report(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use forskscope_core::document::FileFingerprint;
+    use forskscope_compare::document::FileFingerprint;
 
     // `build_request`/`save_tab`/`save_as`/`handle_result` all need a live
     // `Store` (Signal::new_in_scope panics outside a Dioxus runtime — F36,
@@ -1078,7 +1078,7 @@ mod tests {
     /// violates this now fails here instead of panicking in the GUI.
     #[test]
     fn every_save_reachable_kind_only_emits_handled_recovery_actions() {
-        use forskscope_core::error::AppErrorKind;
+        use forskscope_compare::error::AppErrorKind;
 
         const HANDLED: [RecoveryAction; 4] = [
             RecoveryAction::ChooseAnotherFile,
@@ -1113,11 +1113,12 @@ mod tests {
         encoding_label: &str,
     ) -> CompareTab {
         use crate::state::tab::{CompareLaunchMode, TabState};
+        use forskscope_compare::document::{FileFingerprint, LoadedDocument, TextDocument};
+        use forskscope_compare::encoding::{NewlineStyle, TextEncoding};
+        use forskscope_compare::file_kind::FileKind;
+        use forskscope_compare::{DiffOptions, compute_diff};
+        use forskscope_core::MergeSession;
         use forskscope_core::compare_prep::SaveCapability;
-        use forskscope_core::document::{FileFingerprint, LoadedDocument, TextDocument};
-        use forskscope_core::encoding::{NewlineStyle, TextEncoding};
-        use forskscope_core::file_kind::FileKind;
-        use forskscope_core::{DiffOptions, MergeSession, compute_diff};
         use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
         let fp = FileFingerprint::capture(&target, None).unwrap();
@@ -1231,11 +1232,12 @@ mod tests {
         right: &str,
     ) -> CompareTab {
         use crate::state::tab::{CompareLaunchMode, TabState};
+        use forskscope_compare::document::{LoadedDocument, TextDocument};
+        use forskscope_compare::encoding::{NewlineStyle, TextEncoding};
+        use forskscope_compare::file_kind::FileKind;
+        use forskscope_compare::{DiffOptions, compute_diff};
+        use forskscope_core::MergeSession;
         use forskscope_core::compare_prep::SaveCapability;
-        use forskscope_core::document::{LoadedDocument, TextDocument};
-        use forskscope_core::encoding::{NewlineStyle, TextEncoding};
-        use forskscope_core::file_kind::FileKind;
-        use forskscope_core::{DiffOptions, MergeSession, compute_diff};
         use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
         fn doc(content: &str) -> LoadedDocument {
