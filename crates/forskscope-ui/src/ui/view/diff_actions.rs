@@ -550,12 +550,12 @@ pub fn export_patch(store: &mut Store, index: usize) {
 
         if let Some(file) = handle {
             let path = file.path();
-            if let Err(e) = std::fs::write(path, &patch_text) {
-                store.notify(format!(
-                    "{} \"{}\" — {e}.",
-                    t(lang, "Could not save the patch"),
-                    path.display()
-                ));
+            if let Err(msg) = write_export_file(
+                path,
+                patch_text.as_bytes(),
+                &t(lang, "Could not save the patch"),
+            ) {
+                store.notify(msg);
             }
         }
     });
@@ -576,6 +576,31 @@ pub(crate) fn local_timestamp_display() -> String {
     chrono::Local::now()
         .format("%Y-%m-%d %H:%M %:z")
         .to_string()
+}
+
+/// Writes `contents` to `path`, the one place every export write site
+/// (`export_patch`, the file report, and both branches of `start_dir_export`)
+/// calls through, after review 176 found two of them doing this with a bare
+/// `eprintln!` on failure instead of telling the user (F208).
+///
+/// `label` is the already-translated prefix (`t(lang, "Could not save the
+/// report")` / `t(lang, "Could not save the patch")`) — picking it is the
+/// caller's job, since it is the only part of the message that differs
+/// between call sites. On failure the returned `String` names the path and
+/// the OS reason, ready to hand straight to `Store::notify`.
+///
+/// Deliberately returns a `String`, not calling `Store::notify` itself:
+/// `Store` needs a live Dioxus scope to construct (`Signal::new_in_scope`
+/// panics outside one — F36), so a real write failure (review 176 §3: GTK's
+/// save dialog refuses a path outside the Home folder before our code ever
+/// runs, so this cannot be driven end to end through the UI) can only be
+/// asserted here, against the pure path-in / message-out contract.
+pub(crate) fn write_export_file(
+    path: &std::path::Path,
+    contents: &[u8],
+    label: &str,
+) -> Result<(), String> {
+    std::fs::write(path, contents).map_err(|e| format!("{label} \"{}\" — {e}.", path.display()))
 }
 
 /// Review 174 §6: a checksum appears only where a reader can reproduce it
@@ -741,7 +766,11 @@ pub fn export_file_report(
                 .await;
 
                 match html {
-                    Ok(html) => match std::fs::write(&path, &html) {
+                    Ok(html) => match write_export_file(
+                        &path,
+                        html.as_bytes(),
+                        &t(lang, "Could not save the report"),
+                    ) {
                         Ok(()) => {
                             store.notify_success_with_open(
                                 t(lang, "Report saved."),
@@ -749,11 +778,7 @@ pub fn export_file_report(
                                 path.display().to_string(),
                             );
                         }
-                        Err(e) => store.notify(format!(
-                            "{} \"{}\" — {e}.",
-                            t(lang, "Could not save the report"),
-                            path.display()
-                        )),
+                        Err(msg) => store.notify(msg),
                     },
                     Err(e) => {
                         store.notify(format!("{}: {e}.", t(lang, "Could not save the report")))
@@ -796,6 +821,64 @@ mod tests {
         assert_eq!(
             checksum.sha256_hex,
             forskscope_core::checksum::sha256_hex(b"hello")
+        );
+    }
+
+    // ── Review 177 §3: the write-error message, by a test since GTK's own
+    //    save dialog refuses to hand a live write path a folder it cannot
+    //    write to ────────────────────────────────────────────────────────
+
+    #[test]
+    fn write_export_file_writes_the_bytes_on_a_writable_folder() {
+        let dir = std::env::temp_dir().join(format!(
+            "fsk-diff-actions-write-export-ok-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("report.html");
+
+        assert!(write_export_file(&path, b"<html></html>", "Could not save the report").is_ok());
+        assert_eq!(std::fs::read(&path).unwrap(), b"<html></html>");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn write_export_file_names_the_path_and_the_os_reason_on_a_read_only_folder() {
+        let dir = std::env::temp_dir().join(format!(
+            "fsk-diff-actions-write-export-readonly-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut perms = std::fs::metadata(&dir).unwrap().permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(&dir, perms).unwrap();
+
+        let path = dir.join("report.html");
+        let result = write_export_file(&path, b"<html></html>", "Could not save the report");
+
+        // Restore before any assertion can panic and skip cleanup.
+        let mut perms = std::fs::metadata(&dir).unwrap().permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        perms.set_readonly(false);
+        std::fs::set_permissions(&dir, perms).unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+
+        let msg = result.expect_err("a read-only folder must refuse the write");
+        assert!(
+            msg.contains(&path.display().to_string()),
+            "message must name the path: {msg}"
+        );
+        assert!(
+            msg.starts_with("Could not save the report"),
+            "message must carry the caller's label: {msg}"
+        );
+        // The OS reason, not just the label and the path: on every platform
+        // this crate ships for, a permission failure's `Display` names
+        // "denied"/"permission" in some form.
+        assert!(
+            msg.to_lowercase().contains("denied") || msg.to_lowercase().contains("permission"),
+            "message must carry the OS reason: {msg}"
         );
     }
 

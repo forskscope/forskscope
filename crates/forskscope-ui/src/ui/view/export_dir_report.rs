@@ -241,17 +241,17 @@ async fn start_dir_export(
             match result {
                 Ok(Ok(patch)) => {
                     let text = forskscope_core::patch::to_unified(&patch);
-                    match std::fs::write(&path, &text) {
+                    match crate::ui::view::diff_actions::write_export_file(
+                        &path,
+                        text.as_bytes(),
+                        &t(lang, "Could not save the patch"),
+                    ) {
                         Ok(()) => store.notify_success_with_open(
                             t(lang, "Report saved."),
                             t(lang, "Open"),
                             path.display().to_string(),
                         ),
-                        Err(e) => store.notify(format!(
-                            "{} \"{}\" — {e}.",
-                            t(lang, "Could not save the patch"),
-                            path.display()
-                        )),
+                        Err(msg) => store.notify(msg),
                     }
                 }
                 // F79: an unreadable entry fails the whole patch, naming it -
@@ -316,17 +316,17 @@ async fn start_dir_export(
                         color_vision_safe,
                         &|s| t(lang, s),
                     );
-                    match std::fs::write(&path, &html) {
+                    match crate::ui::view::diff_actions::write_export_file(
+                        &path,
+                        html.as_bytes(),
+                        &t(lang, "Could not save the report"),
+                    ) {
                         Ok(()) => store.notify_success_with_open(
                             t(lang, "Report saved."),
                             t(lang, "Open"),
                             path.display().to_string(),
                         ),
-                        Err(e) => store.notify(format!(
-                            "{} \"{}\" — {e}.",
-                            t(lang, "Could not save the report"),
-                            path.display()
-                        )),
+                        Err(msg) => store.notify(msg),
                     }
                 }
                 // Cancelled: nothing written, nothing to notify beyond
