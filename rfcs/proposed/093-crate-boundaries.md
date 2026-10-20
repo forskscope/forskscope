@@ -12,6 +12,7 @@ RFCs".
 **Amends.** None. It changes no behaviour.
 **Touches.**
 - every module of `crates/forskscope-core/` (moved, none rewritten);
+- the report-building logic in `forskscope-ui`'s export code (moved down, §1);
 - `crates/forskscope-ui-logic/` (receives four view-model modules);
 - the workspace `Cargo.toml`;
 - `xtask` (a new `crate-boundaries` gate; `audit-deps`, `ui-logic-connectivity`
@@ -122,6 +123,30 @@ absence is a guarantee or a real dependency cut.
   
   Then move RFC-094's contract types into it, not the engine's internal types.
 
+### No API or interface crate
+
+A `forskscope-api` or `forskscope-interface` crate would be one of two things:
+- **a facade** that re-exports or wraps the engine and the outputs for
+  frontends;
+- **a crate of traits** that the engine implements.
+
+**Neither passes the rule:**
+- **A facade adds nothing a program could do without.** The GUI and RFC-094's
+  program would each still link the engine beneath it. Its public functions
+  would only forward to `forskscope-compare` and `forskscope-report`, whose
+  public functions **are** the API.
+- **Traits pay when there is a second implementation to swap in.** There is one
+  engine. The one trait boundary that exists, the file watcher (RFC-036), stays
+  where its single implementation lives.
+
+**The real API concern is placement.** An operation that two programs need must
+live below both of them, not inside one. §1 *Shared operations move down*
+applies this.
+
+**When to revisit:** the same trigger as a model crate. That is a consumer
+outside this workspace, such as a published library, which needs a stable Rust
+API across several crates.
+
 ### `forskscope-ui-logic`: not split
 
 - It has **one consumer, the GUI**.
@@ -161,6 +186,39 @@ outside user.
   `edit`.
 - **`compare_prep`** splits along the same line: what is compared goes to
   `compare`, and what is saved to goes to `edit`.
+
+#### Shared operations move down
+
+Some comparison logic that more than one program needs sits in the GUI crate
+today, although nothing in it depends on the GUI. **It moves into
+`forskscope-report`,** so that the GUI and RFC-094's program build a report
+through one function:
+
+- **`build_dir_report` and `BuildOutcome`**, from
+  `forskscope-ui/src/ui/view/export_dir_report.rs`. They:
+  - read every file once;
+  - hash it;
+  - refuse when a verdict no longer matches the files (RFC-092 §0);
+  - apply the cap, naming what is left out;
+  - assemble the folder report.
+- **The file report's assembly**, from `diff_actions.rs`:
+  - the rule that a side without a load fingerprint gets no checksum
+    (`checksum_if_fingerprinted`);
+  - building the report from a comparison and its options.
+
+**What stays in the GUI:**
+- the dialogs;
+- the save picker;
+- the notice;
+- **writing the file** (`write_export_file`). Writing is the caller's job,
+  which is how `forskscope-report` stays read-only.
+
+The progress callback and the `CancellationToken` keep their present shape, so
+both programs drive the same function.
+
+**No gate can detect a duplicated copy of such logic,** so this is a review rule:
+an operation that a second program needs moves below both programs before the
+second program uses it. It is never copied.
 
 ### 2. A gate that keeps it so: `cargo xtask crate-boundaries`
 
@@ -217,6 +275,8 @@ It fails, naming the file and line, when:
 ## Acceptance criteria
 
 1. **The crates and modules** are as §1, and `forskscope-core` is gone.
+   `build_dir_report` and the file report's assembly live in
+   `forskscope-report`, and the GUI calls them.
 2. **`cargo xtask crate-boundaries`** passes in CI. Each of its three rules is
    shown failing on a temporary commit.
 3. **The test count** is unchanged apart from the gate's own tests, and every
