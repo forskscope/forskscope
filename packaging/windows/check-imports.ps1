@@ -1,4 +1,5 @@
 #!/usr/bin/env pwsh
+#Requires -Version 7.0
 # RFC-091 §4 (F45, F206): lists an .exe's imported DLLs and fails if any is
 # VCRUNTIME*.dll, MSVCP*.dll, or not on an explicit allow-list of Windows
 # system DLLs. One script, three callers - release.yml's Windows job (the

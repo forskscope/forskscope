@@ -1,4 +1,5 @@
 #!/usr/bin/env pwsh
+#Requires -Version 7.0
 # RFC-079: build a Store-ready MSIX from the same commit and the same built
 # binary the Windows zip already uses.
 #
@@ -18,6 +19,11 @@
 # Runs outside CI too: $env:GITHUB_OUTPUT is only written when it is set,
 # and FORSKSCOPE_CHANNEL is restored to whatever it was before this script
 # ran (or removed, if it was unset) once the build finishes.
+#
+# Handoff 085 (F207): finds the built binary through $env:CARGO_TARGET_DIR
+# when it is set (store-package.ps1 points it at a shared build cache for
+# its worktree build), falling back to this repo's own "target" the way
+# this script and CI always have when it is not.
 
 param(
     [Parameter(Mandatory = $true)][string]$Tag,
@@ -41,7 +47,15 @@ Write-Host "HEAD is exactly tag $Tag"
 $ManifestPath = Join-Path $RepoRoot "packaging/windows/AppxManifest.xml"
 $ExpectedVersion = "$Tag.0"
 
-[xml]$Manifest = Get-Content -Raw $ManifestPath
+# XmlDocument.Load, not Get-Content -Raw cast to [xml]: it reads the file's
+# own bytes and honours the XML declaration's encoding itself, rather than
+# PowerShell's own text-encoding guess for Get-Content - Windows PowerShell
+# 5.1's guess is the host's ANSI code page (CP932 on Japanese Windows) for a
+# UTF-8 file with no BOM, which this manifest is (its Description has
+# emoji). That guess turned one emoji's bytes into a stray quote and broke
+# the parse (F207) - this reads correctly regardless of the host's locale.
+$Manifest = New-Object System.Xml.XmlDocument
+$Manifest.Load($ManifestPath)
 $ActualVersion = $Manifest.Package.Identity.Version
 
 if ($ActualVersion -ne $ExpectedVersion) {
@@ -81,7 +95,12 @@ try {
 #    whole non-interactive pwsh process immediately, skipping the `throw`
 #    below (and any future cleanup added after it) rather than letting
 #    this script observe and report the failure on its own terms. ────────
-$BuiltExe = Join-Path $RepoRoot "target/release/forskscope.exe"
+# Handoff 085: `cargo build` above already honours $env:CARGO_TARGET_DIR
+# when it is set (store-package.ps1's worktree build points it at a shared
+# cache) - find the binary the same way, rather than assuming $RepoRoot's
+# own "target", which would be empty for that build.
+$TargetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $RepoRoot "target" }
+$BuiltExe = Join-Path $TargetDir "release/forskscope.exe"
 & pwsh -NoProfile -File (Join-Path $RepoRoot "packaging/windows/check-imports.ps1") -ExePath $BuiltExe
 if ($LASTEXITCODE -ne 0) { throw "import gate failed - see above" }
 
@@ -93,7 +112,7 @@ $Stage = Join-Path $OutDir "stage"
 if (Test-Path $Stage) { Remove-Item -Recurse -Force $Stage }
 New-Item -ItemType Directory -Path $Stage | Out-Null
 
-Copy-Item (Join-Path $RepoRoot "target/release/forskscope.exe") (Join-Path $Stage "forskscope.exe")
+Copy-Item $BuiltExe (Join-Path $Stage "forskscope.exe")
 Copy-Item $ManifestPath (Join-Path $Stage "AppxManifest.xml")
 Copy-Item (Join-Path $RepoRoot "packaging/windows/Assets") (Join-Path $Stage "Assets") -Recurse
 

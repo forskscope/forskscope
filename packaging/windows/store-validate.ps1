@@ -1,4 +1,5 @@
 #!/usr/bin/env pwsh
+#Requires -Version 7.0
 # RFC-079 §3/§4: validate a built MSIX before it ever reaches Partner
 # Center. A failure here fails the workflow before anything is uploaded.
 #
@@ -57,7 +58,11 @@ $MakeAppx = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\make
 & $MakeAppx.FullName unpack /p $MsixPath /d $UnpackDir /overwrite
 if ($LASTEXITCODE -ne 0) { throw "makeappx unpack failed" }
 
-[xml]$Manifest = Get-Content -Raw (Join-Path $UnpackDir "AppxManifest.xml")
+# XmlDocument.Load, not Get-Content -Raw cast to [xml]: see store-build.ps1's
+# own comment at its matching read - F207, the same manifest, same emoji,
+# same Windows PowerShell 5.1 ANSI-code-page guess on a BOM-less UTF-8 file.
+$Manifest = New-Object System.Xml.XmlDocument
+$Manifest.Load((Join-Path $UnpackDir "AppxManifest.xml"))
 
 # ── 1. Manifest version equals the released tag. ───────────────────────────
 $ExpectedVersion = "$Tag.0"
@@ -71,7 +76,10 @@ if ($ActualVersion -ne $ExpectedVersion) {
 # ── 2. Identity/Publisher/PublisherDisplayName match the tracked record. ───
 $IdentityTomlPath = Join-Path $RepoRoot "packaging/windows/store-listing/en-us/identity.toml"
 $Identity = @{}
-foreach ($line in Get-Content $IdentityTomlPath) {
+# -Encoding utf8, explicitly: same F207 class of risk as the manifest read
+# above - this file is BOM-less UTF-8 (ASCII-only today, but nothing pins
+# that), so an un-pinned Get-Content would still guess the host's code page.
+foreach ($line in Get-Content -Encoding utf8 $IdentityTomlPath) {
     if ($line -match '^\s*#') { continue }
     if ($line -match '^\s*(\w+)\s*=\s*"([^"]*)"\s*$') {
         $Identity[$Matches[1]] = $Matches[2]

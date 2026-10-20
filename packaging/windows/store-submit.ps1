@@ -1,4 +1,5 @@
 #!/usr/bin/env pwsh
+#Requires -Version 7.0
 # RFC-079 §2, §4, §5: submit a validated MSIX to Partner Center through the
 # Microsoft Store submission API. This is the only script in this
 # directory that ever reads the Entra ID client secret, and the only one
@@ -38,7 +39,8 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = git rev-parse --show-toplevel
 $IdentityTomlPath = Join-Path $RepoRoot "packaging/windows/store-listing/en-us/identity.toml"
 $Identity = @{}
-foreach ($line in Get-Content $IdentityTomlPath) {
+# -Encoding utf8, explicitly: F207 - see store-validate.ps1's matching read.
+foreach ($line in Get-Content -Encoding utf8 $IdentityTomlPath) {
     if ($line -match '^\s*#') { continue }
     if ($line -match '^\s*(\w+)\s*=\s*"([^"]*)"\s*$') {
         $Identity[$Matches[1]] = $Matches[2]

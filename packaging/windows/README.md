@@ -20,66 +20,53 @@ use the same scripts the workflow uses.
 **You need:**
 
 - Windows 10 or 11, with the Windows SDK (for `makeappx.exe`);
-- Rust (MSVC toolchain), Git, and PowerShell 7;
-- a clean checkout of this repository.
+- **PowerShell 7** (`pwsh`) — not *Windows PowerShell*, the older `powershell.exe`
+  that ships with Windows itself. Every script here starts with `#Requires
+  -Version 7.0` and refuses to run under it, with that message, before doing
+  anything;
+- Rust (MSVC toolchain) and Git;
+- **a Git clone of this repository** — not a ZIP download. A ZIP marks the
+  scripts it contains as downloaded from the internet, and PowerShell 7's
+  default execution policy (`RemoteSigned`) then blocks them from running at
+  all. A `git clone` carries no such mark. Do not change your execution policy
+  to work around this — clone instead.
 
-Run everything in **one PowerShell session**, from the repository root.
-
-### 1. Check out the released tag, and name it once
+### 1. Fetch the released tag
 
 ```powershell
 git fetch --tags
-$tag = '0.192.0'          # the release you are submitting: the only value you type
-git switch --detach $tag
-$out = Join-Path $env:TEMP "forskscope-store-$tag"
 ```
 
-**Why the tag and not `main`.** `AppxManifest.xml` on `main` already names the
-*next* version, because the post-release bump moves it minutes after each cut.
-Packaging from `main` would submit a version that was never released. The build
-script refuses unless the checkout is exactly the tag.
-
-### 2. Build the package
+### 2. Build and check the package, in one command
 
 ```powershell
-./packaging/windows/store-build.ps1 -Tag $tag -OutDir $out
+pwsh -File ./packaging/windows/store-package.ps1 -Tag 0.193.0
 ```
 
-It checks that the checkout and `AppxManifest.xml` both match `$tag`, builds the
-same binary the release zip uses, labelled as the Store build so *Check for
-updates* sends users to the Store, and packs exactly four things:
+This never touches your checkout — it builds in a temporary `git worktree`,
+detached at the tag, so your own branch, any uncommitted changes, and your
+current folder are all untouched throughout. There is nothing to switch back to
+afterwards.
 
-- the program;
-- the manifest;
-- the `Assets\` images;
-- nothing else.
+- **If the tag is not fetched yet,** it stops and tells you to run `git fetch
+  --tags` first — it never fetches on its own.
+- It builds the same binary the release zip uses, labelled as the Store build
+  so *Check for updates* sends users to the Store, and packs exactly four
+  things: the program, the manifest, the `Assets\` images, and nothing else.
+- It then validates the package — the right version, ForskScope's registered
+  Store identity, every file the manifest names — with no administrator rights
+  and no change to your PC (`-SkipInstall`; the install-and-launch check that
+  needs those runs only in CI).
+- It writes only to this repository's own `target/store/0.193.0/`, already
+  ignored by Git, clearing that one folder first so a file left from an earlier
+  run cannot hide a missing one. `cargo clean` removes it along with everything
+  else under `target/`; there is nothing else to clean up by hand.
+- It prints the package's path last:
+  `<repo>\target\store\0.193.0\forskscope-0.193.0.msix`.
 
-It prints the package's path last: `$out\forskscope-$tag.msix`.
+### 3. Upload in Partner Center
 
-### 3. Check the package
-
-```powershell
-./packaging/windows/store-validate.ps1 -MsixPath "$out\forskscope-$tag.msix" -Tag $tag -SkipInstall
-```
-
-It checks that the package:
-
-- has the right version;
-- has ForskScope's registered Store identity;
-- contains every file the manifest names.
-
-It needs no administrator rights and changes nothing on your PC. It clears its
-own working folder **before** it unpacks, so a file left from an earlier run
-cannot hide a missing one.
-
-**The install-and-launch check runs only in CI.** It would enable sideloading
-for the whole machine, add a certificate to the machine store, and uninstall any
-installed ForskScope, so the script refuses to run it on a PC unless you pass
-`-AllowMachineChanges` deliberately.
-
-### 4. Upload in Partner Center
-
-Upload `$out\forskscope-$tag.msix` to the app's submission page, and submit.
+Upload the printed `.msix` to the app's submission page, and submit.
 
 - **Signing is not part of this.** The package's `Publisher` is a
   Store-assigned identity, and Microsoft signs the package itself (RFC-079 §2a).
@@ -87,19 +74,8 @@ Upload `$out\forskscope-$tag.msix` to the app's submission page, and submit.
   Delete it first. A submission the API created can no longer be changed
   through the API once Partner Center edits it (`release.md`, *Do not open an
   automated submission in Partner Center*).
-
-### 5. Clean up, and return to `main`
-
-Once the upload is accepted:
-
-```powershell
-git switch main
-Remove-Item -Recurse -Force $out
-```
-
-**Keep the package until the upload is accepted.** It is the file you would
-upload again. Returning to `main` matters: a commit made on the detached tag
-belongs to no branch and is easily lost.
+- **Keep the package until the upload is accepted** — it is the file you would
+  upload again.
 
 ---
 
@@ -107,7 +83,8 @@ belongs to no branch and is easily lost.
 
 `.github/workflows/store-submit.yml`, dispatched with the released tag:
 
-1. **Checks out the tag** and runs `store-build.ps1`, as in step 2.
+1. **Checks out the tag** and runs `store-build.ps1` directly — the same
+   script `store-package.ps1` runs inside its own temporary worktree above.
 2. **Runs `store-validate.ps1`** with the full install-and-launch check. It signs
    a throwaway, validation-only copy, installs it, launches it, and tears it all
    down. The uploaded package stays unsigned.
