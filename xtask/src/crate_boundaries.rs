@@ -51,6 +51,18 @@
 //! and `tempfile::`/`NamedTempFile`/`TempDir` (any use of the crate at all,
 //! since every one of its real entry points ends up creating a file).
 //!
+//! A qualified call (`fs::write(`) is not the only way to reach these
+//! functions: `use std::fs::write;` followed by a bare `write(p, b)` call
+//! site carries none of the text patterns above (review 181 §3's own
+//! falsification). [`find_fs_write_fn_imports`] catches the import itself
+//! — `use std::fs::<name>` or `use std::fs::{.., <name>, ..}` for any of
+//! rule 1's nine write functions — rather than trying to track every later
+//! bare-name call site, which risks missing one disguised behind a local
+//! alias or a re-export. `File`/`OpenOptions` reached the same way still
+//! trips rule 1 through the `.write(true)`/`.create(true)`/`.append(true)`
+//! builder-method patterns above, which do not care how `File`/
+//! `OpenOptions` itself was imported.
+//!
 //! ## Rule 2's call
 //!
 //! `process::Command` (covers both `std::process::Command` and an
@@ -131,6 +143,21 @@ const WRITE_CALL_PATTERNS: &[&str] = &[
 
 const PROCESS_SPAWN_PATTERN: &str = "process::Command";
 
+/// Rule 1's nine write functions, by bare name - the identifiers
+/// [`find_fs_write_fn_imports`] looks for inside a `use std::fs::...`
+/// import.
+const WRITE_FN_NAMES: &[&str] = &[
+    "write",
+    "create_dir_all",
+    "create_dir",
+    "remove_file",
+    "remove_dir_all",
+    "remove_dir",
+    "rename",
+    "copy",
+    "set_permissions",
+];
+
 pub fn run(root: &Path) {
     let mut problems = Vec::new();
 
@@ -180,6 +207,13 @@ fn check_no_writes_or_spawns(src_root: &Path, crate_name: &str, problems: &mut V
                 ));
             }
         }
+        for name in find_fs_write_fn_imports(&stripped) {
+            problems.push(format!(
+                "{crate_name}/src/{rel}: found `use std::fs::{name}` (or braced) outside \
+                 #[cfg(test)]/tests/ - a bare `{name}(...)` call site would evade rule 1's \
+                 qualified-call patterns (rule 1: {crate_name} never writes a file)"
+            ));
+        }
         if stripped.contains(PROCESS_SPAWN_PATTERN) {
             problems.push(format!(
                 "{crate_name}/src/{rel}: found `{PROCESS_SPAWN_PATTERN}` (rule 2: {crate_name} \
@@ -187,6 +221,80 @@ fn check_no_writes_or_spawns(src_root: &Path, crate_name: &str, problems: &mut V
             ));
         }
     }
+}
+
+/// Finds `use std::fs::<name>` or `use std::fs::{.., <name>, ..}` imports
+/// of any of [`WRITE_FN_NAMES`] in already comment/string/cfg-test-stripped
+/// source — the bare-name import that would let a later unqualified
+/// `<name>(...)` call evade `WRITE_CALL_PATTERNS`'s `fs::<name>(`-qualified
+/// matches (review 181 §3). Returns each matched name once, even if
+/// imported more than once.
+fn find_fs_write_fn_imports(stripped: &str) -> Vec<&'static str> {
+    let mut found = Vec::new();
+    let mut search_from = 0usize;
+    while let Some(rel) = stripped[search_from..].find("fs::") {
+        let after_prefix = search_from + rel + "fs::".len();
+        // Only a `use` statement's path counts - look backward, within the
+        // current statement (bounded by the previous `;` or `\n`), for a
+        // line that starts with `use `.
+        let scan_start = search_from.max(after_prefix.saturating_sub(200));
+        let prefix = &stripped[scan_start..after_prefix - "fs::".len()];
+        let is_use = prefix
+            .rsplit(['\n', ';'])
+            .next()
+            .is_some_and(|segment| segment.trim_start().starts_with("use "));
+        if is_use {
+            let rest = &stripped[after_prefix..];
+            if let Some(brace_rest) = rest.strip_prefix('{') {
+                if let Some(close) = brace_rest.find('}') {
+                    let list = &brace_rest[..close];
+                    for &name in WRITE_FN_NAMES {
+                        if contains_word(list, name) {
+                            found.push(name);
+                        }
+                    }
+                }
+            } else {
+                for &name in WRITE_FN_NAMES {
+                    if let Some(tail) = rest.strip_prefix(name) {
+                        let next_is_ident =
+                            tail.as_bytes().first().is_some_and(|&b| is_ident_byte(b));
+                        if !next_is_ident {
+                            found.push(name);
+                        }
+                    }
+                }
+            }
+        }
+        search_from = after_prefix;
+    }
+    found.sort_unstable();
+    found.dedup();
+    found
+}
+
+fn is_ident_byte(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+/// `true` if `word` appears in `haystack` with no identifier character
+/// immediately before or after it - a whole-word match, not a substring
+/// that merely contains `word` (so `write` does not match inside
+/// `rewrite_count`).
+fn contains_word(haystack: &str, word: &str) -> bool {
+    let bytes = haystack.as_bytes();
+    let mut i = 0usize;
+    while let Some(pos) = haystack[i..].find(word) {
+        let start = i + pos;
+        let end = start + word.len();
+        let before_ok = start == 0 || !is_ident_byte(bytes[start - 1]);
+        let after_ok = end >= bytes.len() || !is_ident_byte(bytes[end]);
+        if before_ok && after_ok {
+            return true;
+        }
+        i = start + 1;
+    }
+    false
 }
 
 /// Every `.rs` file under `src_root`, excluding a `tests` directory
@@ -397,6 +505,58 @@ mod tests {
         let blanked = blank_inline_cfg_test_blocks(src);
         assert!(!blanked.contains("do_write"));
         assert!(blanked.contains("fn after()"));
+    }
+
+    #[test]
+    fn find_fs_write_fn_imports_catches_the_bare_name_evasion() {
+        // review 181 §3's own falsification: a qualified-call pattern like
+        // `fs::write(` never appears here at all.
+        let src =
+            "use std::fs::write;\nfn f(p: &std::path::Path, b: &[u8]) { write(p, b).unwrap(); }";
+        let stripped = strip_comments_and_strings(src);
+        let found = find_fs_write_fn_imports(&stripped);
+        assert_eq!(found, vec!["write"]);
+    }
+
+    #[test]
+    fn find_fs_write_fn_imports_catches_a_braced_multi_import() {
+        let src = "use std::fs::{create_dir_all, read_to_string, write};";
+        let stripped = strip_comments_and_strings(src);
+        let mut found = find_fs_write_fn_imports(&stripped);
+        found.sort_unstable();
+        assert_eq!(found, vec!["create_dir_all", "write"]);
+    }
+
+    #[test]
+    fn find_fs_write_fn_imports_ignores_a_qualified_call_site() {
+        // `fs::write(` with no preceding `use` - already caught by
+        // WRITE_CALL_PATTERNS, and must not also double-report here.
+        let src = "fn f() { std::fs::write(\"x\", []).unwrap(); }";
+        let stripped = strip_comments_and_strings(src);
+        assert!(find_fs_write_fn_imports(&stripped).is_empty());
+    }
+
+    #[test]
+    fn find_fs_write_fn_imports_ignores_an_unrelated_read_import() {
+        let src = "use std::fs::read_to_string;";
+        let stripped = strip_comments_and_strings(src);
+        assert!(find_fs_write_fn_imports(&stripped).is_empty());
+    }
+
+    #[test]
+    fn find_fs_write_fn_imports_does_not_match_a_longer_identifier_sharing_the_prefix() {
+        // `write_metrics` starts with "write" but is a different, unrelated
+        // identifier - not a boundary match for the single-import form.
+        let src = "use std::fs::write_metrics;";
+        let stripped = strip_comments_and_strings(src);
+        assert!(find_fs_write_fn_imports(&stripped).is_empty());
+    }
+
+    #[test]
+    fn find_fs_write_fn_imports_braced_form_does_not_match_a_longer_identifier() {
+        let src = "use std::fs::{read_to_string, write_metrics};";
+        let stripped = strip_comments_and_strings(src);
+        assert!(find_fs_write_fn_imports(&stripped).is_empty());
     }
 
     #[test]
