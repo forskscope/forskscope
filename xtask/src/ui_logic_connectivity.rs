@@ -146,7 +146,11 @@ pub fn run(root: &Path) {
 /// Leaves lifetimes (`'a`) untouched — see this module's doc comment for
 /// how a char literal is told apart from one. Written by hand, on
 /// purpose: review 106 §3 asked for no new parser dependency.
-fn strip_comments_and_strings(src: &str) -> String {
+///
+/// `pub(crate)`: reused by `crate_boundaries`, which needs the same
+/// comment/string stripping before it can reliably find (or rule out) a
+/// forbidden call by name.
+pub(crate) fn strip_comments_and_strings(src: &str) -> String {
     let chars: Vec<char> = src.chars().collect();
     let n = chars.len();
     let mut out = String::with_capacity(src.len());

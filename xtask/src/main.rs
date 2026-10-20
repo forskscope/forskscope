@@ -16,12 +16,14 @@
 //!   cargo xtask pages-link-check <site-dir>     — verify every relative link/image in a built site resolves (handoff 075 §3)
 //!   cargo xtask colour-vision — verify every removed/added colour pair stays distinguishable under simulated colour vision deficiency (RFC-088 §3)
 //!   cargo xtask keyboard-docs — verify the in-app keyboard reference and keyboard.md name the same set of keys (handoff 079 §3, F165)
+//!   cargo xtask crate-boundaries — verify forskscope-compare/-report never write a file or spawn a process, and every crate's dependency graph matches RFC-093 §1's table
 //!
 //! CSS source files under assets/css/ are assembled in alphabetical order.
 //! The numeric prefix on each filename (00-, 01-, …) encodes the cascade order.
 //! To add a file: create it with the appropriate prefix; run `cargo xtask css`.
 
 mod colour_vision;
+mod crate_boundaries;
 mod keyboard_docs;
 mod pages_check;
 mod rfc_sync;
@@ -69,6 +71,7 @@ fn main() {
         }
         Some("colour-vision") if args.len() == 1 => colour_vision::run(&workspace_root()),
         Some("keyboard-docs") if args.len() == 1 => keyboard_docs::run(&workspace_root()),
+        Some("crate-boundaries") if args.len() == 1 => crate_boundaries::run(&workspace_root()),
         Some(cmd) => {
             eprintln!("unknown command: {cmd}");
             print_usage();
@@ -94,6 +97,7 @@ fn print_usage() {
     eprintln!("       cargo xtask pages-link-check <site-dir>");
     eprintln!("       cargo xtask colour-vision");
     eprintln!("       cargo xtask keyboard-docs");
+    eprintln!("       cargo xtask crate-boundaries");
 }
 
 pub(crate) fn workspace_root() -> PathBuf {
