@@ -583,11 +583,11 @@ pub(crate) fn local_timestamp_display() -> String {
 /// calls through, after review 176 found two of them doing this with a bare
 /// `eprintln!` on failure instead of telling the user (F208).
 ///
-/// `label` is the already-translated prefix (`t(lang, "Could not save the
-/// report")` / `t(lang, "Could not save the patch")`) — picking it is the
-/// caller's job, since it is the only part of the message that differs
-/// between call sites. On failure the returned `String` names the path and
-/// the OS reason, ready to hand straight to `Store::notify`.
+/// `label` is the already-translated prefix — either of the two
+/// "Could not save the..." i18n keys below, picked by the caller since
+/// that is the only part of the message that differs between call sites.
+/// On failure the returned `String` names the path and the OS reason,
+/// ready to hand straight to `Store::notify`.
 ///
 /// Deliberately returns a `String`, not calling `Store::notify` itself:
 /// `Store` needs a live Dioxus scope to construct (`Signal::new_in_scope`
