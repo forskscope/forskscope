@@ -16,6 +16,12 @@ forskscope-compare           = { workspace = true }
 # compared file's bytes as read at export time, so anyone can confirm a
 # report describes exactly those files.
 sha2                         = { workspace = true }
+# RFC-094 §3: the versioned `forskscope.comparison/1` JSON contract
+# `forskscope-cli compare --format json` emits - its own types here, never
+# `Serialize` on the engine's own types (same reasoning the persisted
+# settings' `Persisted*` types already follow).
+serde                        = { workspace = true }
+serde_json                   = { workspace = true }
 
 [dev-dependencies]
 tempfile                    = { workspace = true }

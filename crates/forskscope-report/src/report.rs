@@ -16,14 +16,20 @@ pub mod changes;
 pub mod dir;
 pub mod file;
 pub mod html;
+pub mod json;
 
 pub use changes::{ChangeHunk, ChangeLine, ChangeLineKind, change_hunks_from_diff};
 pub use dir::{BuildOutcome, DirComparisonReport, DirFileRow, build_dir_report};
 pub use file::{
-    FileComparisonReport, HunkSummaryRow, ReportOptions, ReportPathMode, build_file_report,
-    checksum_if_fingerprinted,
+    DEFAULT_MAX_CHANGE_TEXT_BYTES, DEFAULT_MAX_CHANGED_FILES_WITH_CONTENT, FileComparisonReport,
+    HunkSummaryRow, ReportOptions, ReportPathMode, build_file_report, checksum_if_fingerprinted,
 };
 pub use html::{render_dir_report, render_file_report};
+pub use json::{
+    COMPARISON_SCHEMA, DirComparisonDocument, DirEntryJson, FileComparisonDocument, FileCounts,
+    JsonChangeHunk, JsonChangeLine, JsonChangeLineKind, OmittedEntry, SideInfo,
+    dir_comparison_document, file_comparison_document, status_identifier,
+};
 
 use forskscope_compare::diff::HunkKind;
 use std::path::Path;

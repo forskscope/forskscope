@@ -318,9 +318,9 @@ pub(super) fn fmt_size(bytes: u64) -> String {
 // ── Building a report from disk (RFC-092 §5, moved from forskscope-ui by
 // RFC-093 §1 step 6) ────────────────────────────────────────────────────────
 
-/// RFC-092 §3a: "50 files or 5 MiB of change text, whichever comes first."
-const MAX_CHANGED_FILES_WITH_CONTENT: usize = 50;
-const MAX_CHANGE_TEXT_BYTES: usize = 5 * 1024 * 1024;
+// RFC-092 §3a's two caps now live as fields on `ReportOptions`
+// (`DEFAULT_MAX_CHANGED_FILES_WITH_CONTENT`/`DEFAULT_MAX_CHANGE_TEXT_BYTES`
+// in `file.rs`) rather than as parameters here - see their doc comments.
 
 /// What building the report produced.
 pub enum BuildOutcome {
@@ -350,6 +350,8 @@ pub fn build_dir_report(
     on_progress: &mut dyn FnMut(usize, usize),
 ) -> BuildOutcome {
     let total = entries.len();
+    let max_files_with_content = report_options.max_files_with_content;
+    let max_change_bytes = report_options.max_change_bytes;
     let mut report = DirComparisonReport::from_entries(
         &entries,
         Some(left_root),
@@ -419,8 +421,8 @@ pub fn build_dir_report(
                 Ok(forskscope_compare::FileKind::Text)
             );
             if is_text {
-                if files_with_content < MAX_CHANGED_FILES_WITH_CONTENT
-                    && change_text_bytes < MAX_CHANGE_TEXT_BYTES
+                if files_with_content < max_files_with_content
+                    && change_text_bytes < max_change_bytes
                 {
                     if let (Ok(left_text), Ok(right_text)) = (
                         String::from_utf8(left_bytes.clone()),

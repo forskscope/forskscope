@@ -9,8 +9,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::patch::{
-    LineOrigin, PatchFileChange, PatchOptions, patch_from_directories, patch_from_file_diff,
-    to_unified,
+    LineOrigin, PatchFileChange, PatchOptions, patch_from_binary_notice, patch_from_directories,
+    patch_from_file_diff, to_unified,
 };
 use forskscope_compare::diff::{DiffOptions, compute_diff};
 
@@ -28,6 +28,23 @@ fn diff(left: &str, right: &str) -> forskscope_compare::diff::DiffDocument {
 fn identical_inputs_produce_no_patch() {
     let d = diff("a\nb\nc\n", "a\nb\nc\n");
     assert!(patch_from_file_diff("f.txt", &d, PatchOptions::default()).is_none());
+}
+
+#[test]
+fn a_single_file_binary_notice_renders_the_same_line_git_uses_for_a_directory_entry() {
+    // RFC-094 §2/§3: a top-level `compare --format patch` on two binary (or
+    // workbook) files reports status only, through this same
+    // `PatchFileChange::BinaryNotice` variant `patch_from_directories`
+    // already emits per-entry - never a second, differently-worded notice.
+    let doc = patch_from_binary_notice("image.png");
+    assert_eq!(doc.files.len(), 1);
+    assert!(
+        matches!(&doc.files[0], PatchFileChange::BinaryNotice { path } if path == std::path::Path::new("image.png"))
+    );
+    assert_eq!(doc.summary.binary_files, 1);
+    assert_eq!(doc.summary.files_changed, 0);
+    let text = to_unified(&doc);
+    assert!(text.contains("Binary files a/image.png and b/image.png differ"));
 }
 
 #[test]

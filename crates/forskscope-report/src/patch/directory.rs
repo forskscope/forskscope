@@ -10,10 +10,11 @@
 use std::path::Path;
 
 use forskscope_compare::diff::{DiffOptions, compute_diff};
-use forskscope_compare::dir::{RecStatus, recursive_diff};
+use forskscope_compare::dir::{RecStatus, recursive_diff, recursive_diff_with_rules};
 use forskscope_compare::document::{LoadOptions, load_path};
 use forskscope_compare::error::{CoreError, IoOperation, Result};
 use forskscope_compare::file_kind::FileKind;
+use forskscope_compare::{CancellationToken, IgnoreRules};
 
 use super::build::{PatchOptions, Side, hunks_from_diff, whole_side_lines};
 use super::model::{PatchDocument, PatchFileChange, PatchFormat, PatchSummary};
@@ -38,6 +39,33 @@ pub fn patch_from_directories(
     patch_options: PatchOptions,
 ) -> Result<PatchDocument> {
     let scan = recursive_diff(left_root, right_root);
+    patch_from_scan(left_root, right_root, scan, diff_options, patch_options)
+}
+
+/// Like [`patch_from_directories`] but skips what `rules` ignore, the same
+/// relationship `recursive_diff_with_rules` has to `recursive_diff`
+/// (RFC-094 §2: `forskscope-cli compare`'s `--ignore-ext`/`--ignore-dir`/
+/// `--hide-dotfiles` must shape every output format alike, `patch`
+/// included - the file set a patch covers must be the same one a text,
+/// JSON or HTML report of the same comparison would show).
+pub fn patch_from_directories_with_rules(
+    left_root: &Path,
+    right_root: &Path,
+    diff_options: DiffOptions,
+    patch_options: PatchOptions,
+    rules: &IgnoreRules,
+) -> Result<PatchDocument> {
+    let scan = recursive_diff_with_rules(left_root, right_root, &CancellationToken::new(), rules);
+    patch_from_scan(left_root, right_root, scan, diff_options, patch_options)
+}
+
+fn patch_from_scan(
+    left_root: &Path,
+    right_root: &Path,
+    scan: forskscope_compare::dir::RecursiveScan,
+    diff_options: DiffOptions,
+    patch_options: PatchOptions,
+) -> Result<PatchDocument> {
     if scan.left_root_unreadable {
         return Err(CoreError::Io {
             path: Some(left_root.to_path_buf()),

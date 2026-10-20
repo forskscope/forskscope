@@ -27,8 +27,8 @@ mod directory;
 mod model;
 mod unified;
 
-pub use build::{PatchOptions, hunks_from_diff, patch_from_file_diff};
-pub use directory::patch_from_directories;
+pub use build::{PatchOptions, hunks_from_diff, patch_from_binary_notice, patch_from_file_diff};
+pub use directory::{patch_from_directories, patch_from_directories_with_rules};
 pub use model::{
     LineOrigin, PatchDocument, PatchFileChange, PatchFormat, PatchHunk, PatchLine, PatchSummary,
 };

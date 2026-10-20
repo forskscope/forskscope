@@ -20,6 +20,19 @@ pub enum ReportPathMode {
     Absolute,
 }
 
+/// RFC-092 §3a: "50 files or 5 MiB of change text, whichever comes first" —
+/// a directory report's own default caps, carried as two fields on
+/// [`ReportOptions`] (below) rather than as two extra parameters on
+/// `build_dir_report` (which would push that function over clippy's
+/// `too_many_arguments` limit — the same reasoning
+/// `build_file_report`/`checksum_if_fingerprinted`'s split already follows
+/// for checksums). RFC-094 §3's `forskscope-cli compare --max-files`/
+/// `--max-change-bytes` set these two fields directly; the GUI
+/// (`export_dir_report.rs`) never sets them, so it keeps these defaults
+/// unchanged.
+pub const DEFAULT_MAX_CHANGED_FILES_WITH_CONTENT: usize = 50;
+pub const DEFAULT_MAX_CHANGE_TEXT_BYTES: usize = 5 * 1024 * 1024;
+
 /// What optional sections to include in a report.
 #[derive(Debug, Clone)]
 pub struct ReportOptions {
@@ -43,6 +56,13 @@ pub struct ReportOptions {
     /// or "Custom" otherwise — `from_diff` decides which once it has
     /// compared the actual options.
     pub profile_name: Option<String>,
+    /// Directory reports only: the most changed text files that get full
+    /// change-hunk content before `build_dir_report` starts listing the
+    /// rest in `change_hunks_omitted` (RFC-092 §3a / RFC-094 §3).
+    pub max_files_with_content: usize,
+    /// Directory reports only: the most cumulative change-text bytes
+    /// across those files before the same cap applies.
+    pub max_change_bytes: usize,
 }
 
 impl Default for ReportOptions {
@@ -55,6 +75,8 @@ impl Default for ReportOptions {
             include_sizes: true,
             context_lines: 3,
             profile_name: None,
+            max_files_with_content: DEFAULT_MAX_CHANGED_FILES_WITH_CONTENT,
+            max_change_bytes: DEFAULT_MAX_CHANGE_TEXT_BYTES,
         }
     }
 }

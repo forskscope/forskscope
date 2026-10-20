@@ -76,6 +76,25 @@ pub fn patch_from_file_diff(
     Some(doc)
 }
 
+/// Convenience: a single-file `BinaryNotice` patch — the `--format patch`
+/// output for a top-level comparison where either side is not text
+/// (RFC-094 §2/§3: binary and workbook files report status only, never a
+/// detailed diff). There is no "identical" case to return `None` for the
+/// way [`patch_from_file_diff`] does — the caller decides whether the two
+/// sides actually differ (a byte digest, for binary content) before
+/// calling this at all.
+pub fn patch_from_binary_notice(rel_path: impl Into<PathBuf>) -> PatchDocument {
+    let mut doc = PatchDocument {
+        format: PatchFormat::Unified,
+        files: vec![PatchFileChange::BinaryNotice {
+            path: rel_path.into(),
+        }],
+        summary: PatchSummary::default(),
+    };
+    doc.recompute_summary();
+    doc
+}
+
 /// Whole-file lines (terminators stripped) for an `Add` or `Delete` entry,
 /// reading the right or left content of a diff respectively. Used when a
 /// file exists on only one side.

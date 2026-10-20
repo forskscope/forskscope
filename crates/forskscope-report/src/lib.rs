@@ -14,7 +14,8 @@ pub mod report;
 
 pub use patch::{
     LineOrigin, PatchDocument, PatchFileChange, PatchFormat, PatchHunk, PatchLine, PatchOptions,
-    PatchSummary, patch_from_directories, patch_from_file_diff, to_unified,
+    PatchSummary, patch_from_binary_notice, patch_from_directories,
+    patch_from_directories_with_rules, patch_from_file_diff, to_unified,
 };
 
 #[cfg(test)]
