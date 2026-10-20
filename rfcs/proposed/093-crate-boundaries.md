@@ -91,6 +91,37 @@ The owner's concern is bloat, and that applies to crates too.
   from `forskscope-folder` is an example.
 - So the engine stays one crate, and so do the outputs.
 
+### No separate data crate (IR, object model or store), for now
+
+**Each candidate is weighed against the rule above:** a boundary pays only if
+some program or crate can then **depend on one side without the other**, and that
+absence is a guarantee or a real dependency cut.
+
+- **A shared model or intermediate representation** (`forskscope-ir`,
+  `forskscope-model`) would hold `DiffDocument`, `RecEntry`, `RecStatus`,
+  `LoadedDocument` and the options. **Today every crate that reads these types
+  also needs the engine that produces them:** report, edit, the GUI and RFC-094's
+  program. No consumer would link the types without the engine, so the boundary
+  would guarantee nothing.
+  - **The data-boundary concern that is real is different.** An *external*
+    contract must not be the engine's internal types. If it were, an internal
+    refactor would silently break every script and agent.
+  - **This project already keeps the two apart.** The stored settings and session
+    use their own `Persisted*` types, never the domain types, and no engine
+    result type derives `Serialize`. RFC-094's JSON follows the same rule, with
+    its own contract types in `forskscope-report` (RFC-094 §3).
+- **A store crate** (`forskscope-store`) would hold settings and session
+  persistence apart from Git, external tools and file watching. **Only the GUI
+  links either half,** so splitting them guarantees nothing for any program.
+  Persistence stays in `forskscope-desktop`.
+- **When to revisit, and the trigger is concrete:** create a model crate when a
+  consumer must read comparison data **without** linking the engine. Two
+  examples:
+  - a published client library for agents;
+  - a frontend that talks to the engine across a process boundary.
+  
+  Then move RFC-094's contract types into it, not the engine's internal types.
+
 ### `forskscope-ui-logic`: not split
 
 - It has **one consumer, the GUI**.

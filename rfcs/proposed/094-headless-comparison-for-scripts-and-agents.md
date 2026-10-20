@@ -126,6 +126,11 @@ forskscope-cli --version | --help
 
 ### 3. The JSON format: versioned, and the app's own vocabulary
 
+- **The contract has its own types,** in `forskscope-report`, built from the
+  engine's results. The engine's types are never serialized directly, so the
+  engine can change shape without the contract changing. This is the rule the
+  stored settings already follow with their `Persisted*` types (RFC-093,
+  *No separate data crate*).
 - **Every document starts with its schema:**
   `{"schema": "forskscope.comparison/1", …}`.
   - Adding a field keeps `/1`.
