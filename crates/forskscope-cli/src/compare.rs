@@ -275,7 +275,7 @@ fn compare_files(opts: &Options) -> i32 {
             };
             let rel = display_name(&opts.right, opts.path_mode);
             if let Some(patch) = patch_from_file_diff(rel, &diff, patch_opts) {
-                println!("{}", to_unified(&patch));
+                print!("{}", to_unified(&patch));
             }
             // Identical: nothing to export, matching the GUI's own
             // "Files are identical — nothing to export." (no file is
@@ -358,7 +358,7 @@ fn compare_files_status_only(opts: &Options, left_kind: &FileKind, right_kind: &
         Format::Patch => {
             if !identical {
                 let doc = patch_from_binary_notice(right_name);
-                println!("{}", to_unified(&doc));
+                print!("{}", to_unified(&doc));
             }
         }
         Format::Text => {
@@ -488,7 +488,7 @@ fn compare_dirs(opts: &Options) -> i32 {
             ) {
                 Ok(doc) => {
                     if !doc.is_empty() {
-                        println!("{}", to_unified(&doc));
+                        print!("{}", to_unified(&doc));
                     }
                 }
                 Err(e) => {
