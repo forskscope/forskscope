@@ -35,6 +35,7 @@ package list.
 crates/
   forskscope-compare/     # Read-only comparison engine (load, diff, folder scan); no Dioxus dependency
   forskscope-report/      # Report/patch/checksum building, returns text and bytes, never writes a file
+  forskscope-cli/         # The headless program forskscope-cli (RFC-094): depends only on compare + report
   forskscope-edit/        # The write path: merge sessions, edit ops, atomic save, batch copy
   forskscope-desktop/     # Settings/session persistence, external tools, Git, file watching
   forskscope-ui-logic/    # Pure view-model layer, built on the four crates above; no GTK dependency
@@ -70,7 +71,7 @@ request for anything beyond a one-line fix.
 1. **Branch** from `main`.
 2. **Write the test first** (or alongside the code). Tests live in
    `crates/<crate>/src/tests/` (unit) or `crates/<crate>/tests/`
-   (integration), in whichever of the six crates owns the module you're
+   (integration), in whichever of the seven crates owns the module you're
    changing — `docs/src/maintainers/architecture.md` says which.
 3. **Run the test suite:**
    ```sh

@@ -1,12 +1,13 @@
 # Architecture
 
-ForskScope is a Cargo workspace with six crates (RFC-093).
+ForskScope is a Cargo workspace with seven crates (RFC-093, RFC-094).
 
 ```text
 forskscope/
   crates/
     forskscope-compare/    read-only comparison engine: load, diff, folder scan - never writes a file, never spawns a process
     forskscope-report/     report/patch/checksum building - returns text and bytes, the caller writes them
+    forskscope-cli/        the headless program forskscope-cli: compare from a script or an MCP agent (RFC-094)
     forskscope-edit/       the write path: merge sessions, edit ops, atomic save, folder batch copy/plan/execute
     forskscope-desktop/    settings/session persistence, external tools, Git, file watching, platform detection
     forskscope-ui-logic/   view-model layer, no Dioxus/GTK dependency
@@ -28,7 +29,8 @@ without a display server.
 | Crate | Owns | May write files | May spawn processes | Depends on |
 |---|---|---|---|---|
 | `forskscope-compare` | document loading/decoding/classifying with fingerprints; line diff + comparison profile; folder listing, recursive comparison, digests; workbook comparison (feature `spreadsheet`, on by default); ignore rules; jobs/cancellation; errors | No | No | — |
-| `forskscope-report` | unified diff (`patch`); Markdown/JSON/HTML reports; SHA-256; building a report from disk (`build_dir_report`, `build_file_report`) | No (returns text/bytes, caller writes) | No | compare |
+| `forskscope-report` | unified diff (`patch`); Markdown/JSON/HTML reports; SHA-256; building a report from disk (`build_dir_report`, `build_file_report`); the versioned `forskscope.comparison/1` JSON contract (`report::json`, RFC-094 §3) | No (returns text/bytes, caller writes) | No | compare |
+| `forskscope-cli` | the headless program `forskscope-cli`: `compare` (RFC-094 §2) prints text/JSON/patch/HTML to standard output only | No | No | compare, report |
 | `forskscope-edit` | merge sessions incl. three-way; edit operations; atomic save with fingerprint preconditions; folder batch-copy/plan/execute; `compare_prep`'s save-target half | Yes, only crate that writes user files | No | compare |
 | `forskscope-desktop` | settings/session persistence; settings display types; external tools; Git; file watching; platform detection; env pass-through | Only its own settings/session | Yes: external tools, Git, system opener | compare, edit |
 | `forskscope-ui-logic` | GUI view-models incl. `command`, `diff_decoration`, `line_map`, `conflict_nav` | No | No | compare, report, edit, desktop |
@@ -57,6 +59,13 @@ without a display server.
 | `checksum` | `sha256_hex` — SHA-256 of a byte slice, hex-encoded. |
 | `patch` | `PatchDocument`, unified-diff export from file and directory diffs (RFC-039). |
 | `report` | `FileComparisonReport` + `DirComparisonReport` — Markdown/JSON/HTML report export (RFC-027, RFC-092). `build_dir_report`/`BuildOutcome` and `build_file_report`/`checksum_if_fingerprinted` read, hash and diff the compared files to assemble a report, written by the caller (RFC-092 §5, moved from `forskscope-ui` in RFC-093 §1 step 6). |
+
+## `forskscope-cli` modules
+
+| Module | Responsibility |
+|---|---|
+| `main` | `--version`/`--help`, command dispatch. Hand-written argument parsing, no parser framework. |
+| `compare` | `compare <left> <right> [options]` (RFC-094 §2): file-vs-folder decided from the paths; `--format text\|json\|patch\|html`; exit codes follow `diff`. Binary/workbook files report status only. |
 
 ## `forskscope-edit` modules
 

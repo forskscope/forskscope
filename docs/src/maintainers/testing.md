@@ -9,6 +9,9 @@ cargo test -p forskscope-report
 cargo test -p forskscope-edit
 cargo test -p forskscope-desktop
 
+# The headless program (RFC-094) - runs the compiled binary
+cargo test -p forskscope-cli
+
 # View-model layer (no GTK required)
 cargo test -p forskscope-ui-logic
 
@@ -22,6 +25,10 @@ cargo clippy -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p fo
 # outside #[cfg(test)], and every crate's dependencies stay within RFC-093
 # §1's table
 cargo xtask crate-boundaries
+
+# forskscope-cli compare --format json validates against
+# docs/schemas/forskscope.comparison.v1.json (RFC-094 §3)
+cargo xtask json-schema
 
 # Full workspace gates used by CI when GTK/WebKitGTK dependencies are present
 cargo test --workspace
@@ -172,6 +179,7 @@ The suites, for orientation:
 |-------|-------|
 | `forskscope-compare`/`-report`/`-edit`/`-desktop` unit | `crates/<crate>/src/tests/` (RFC-093) |
 | `forskscope-compare`/`-report`/`-edit`/`-desktop` integration | `crates/<crate>/tests/` — `diff_corpus`, `f138_decline_before_delegating` (compare); `patch_apply` (report, shells out to real `git apply` and `patch -p1`); `merge_corpus` (edit) |
+| `forskscope-cli` integration | `crates/forskscope-cli/tests/` — `compare_exit_codes.rs` (every exit-code path, via the compiled binary); `patch_matches_gui_export.rs` (stdout byte-compared against `patch_from_file_diff` + `to_unified` directly, RFC-094 §2) |
 | `forskscope-ui-logic` unit | inline `#[cfg(test)]` modules, plus `command`/`conflict_nav`/`diff_decoration`/`line_map`'s external `tests/*_tests.rs` files (moved in from the old `forskscope-core`, RFC-093 §1 step 5) |
 | `forskscope-ui-logic` integration | `crates/forskscope-ui-logic/tests/css_coverage.rs` |
 | `forskscope-ui` lib and bin | inline `#[cfg(test)]` modules, compiled twice (library and binary targets) |

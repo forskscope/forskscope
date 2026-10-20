@@ -52,6 +52,7 @@ cargo run -p forskscope
 crates/
   forskscope-compare/src/   # load, diff, folder scan - no writes, no process spawn
   forskscope-report/src/    # report/patch/checksum building - returns text/bytes
+  forskscope-cli/src/       # the headless program forskscope-cli (RFC-094): depends only on compare + report
   forskscope-edit/src/      # merge sessions, edit ops, atomic save, batch copy
   forskscope-desktop/src/   # settings/session persistence, external tools, Git, watcher
   forskscope-ui-logic/src/
