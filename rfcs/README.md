@@ -92,9 +92,14 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 076 | [Versioned Runtime Settings and Session Persistence](./done/076-versioned-runtime-persistence.md) | post-v0.165.1 stabilization |
 | 077 | [Git Mergetool Save-Target Model](./done/077-mergetool-save-target-model.md) | post-v0.165.1 stabilization |
 
-## Proposed (9)
+## Proposed (11)
 
-These are the RFCs not yet accepted, all from the early design phase:
+These are the RFCs not yet accepted. Two are new proposals awaiting the owner:
+
+- **Agents and architecture (2026-10-20):** RFC-093 (crate boundaries) and
+  RFC-094 (headless comparison for scripts and AI agents).
+
+The rest are from the early design phase:
 
 - **Editor-adapter track:** RFC-004, 016, 025 and 040.
 - **Platform and packaging:** RFC-010 and 026. RFC-026 is substantially
@@ -102,11 +107,13 @@ These are the RFCs not yet accepted, all from the early design phase:
 - **Documentation:** RFC-030, substantially implemented.
 - **Governance and roadmap:** RFC-041 and 042.
 
-RFCs from the 2026 stabilization program and later are under **Accepted** or
-**Implemented**, not here.
+Other RFCs from the 2026 stabilization program and later are under **Accepted**
+or **Implemented**.
 
 | ID | Title | Category | Progress |
 |----|-------|----------|----------|
+| 093 | [Crate Boundaries — a Read-Only Engine, Its Outputs, and Everything That Writes](./proposed/093-crate-boundaries.md) | Architecture | **Proposed 2026-10-20**; before RFC-094 |
+| 094 | [Headless Comparison for Scripts and AI Agents](./proposed/094-headless-comparison-for-scripts-and-agents.md) | Agents/CLI | **Proposed 2026-10-20**; after RFC-093 |
 | 004 | [Editor Adapter and CodeMirror Bridge](./proposed/004-editor-adapter-and-codemirror-bridge.md) | Editor adapter | Not started — requires GTK/WebView |
 | 010 | [Packaging, Diagnostics, QA, and Release Gates](./proposed/010-packaging-diagnostics-qa.md) | Platform/packaging | Not started — requires cross-platform CI |
 | 016 | [Editor Bridge Security and Contract](./proposed/016-editor-bridge-security-and-contract.md) | Editor adapter | Blocked on RFC-004 |

@@ -1367,6 +1367,8 @@ were in `proposed/`. Nothing checks this — see **F83**.
 | 004 | Slice 8 | Editor adapter and CodeMirror bridge |
 | 010 | Post-slice-5 | Packaging, diagnostics, QA |
 | 016 | Slice 8 | Editor bridge security and contract |
+| 093 | Before RFC-094, on `main` (no release of its own) | Crate boundaries: a read-only engine (`forskscope-compare`), its outputs (`forskscope-report`), the only writer (`forskscope-edit`), the app's own state (`forskscope-desktop`) — **proposed 2026-10-20** |
+| 094 | After RFC-093 | Headless comparison for scripts and AI agents: `forskscope-cli compare` (text, versioned JSON, patch, HTML) and `forskscope-cli mcp` (stdio, read-only, roots) — **proposed 2026-10-20** |
 | 025 | Slice 8 | Editor adapter prototype and kill-switch |
 | 026 | Post-slice-3 | Cross-platform WebView compatibility |
 | 030 | Post-slice-5 | User documentation and onboarding |
