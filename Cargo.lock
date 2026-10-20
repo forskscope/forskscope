@@ -1504,6 +1504,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "forskscope"
+version = "0.194.1"
+dependencies = [
+ "app-json-settings",
+ "chrono",
+ "dioxus",
+ "dioxus-core",
+ "dioxus-desktop",
+ "dioxus-swdir-tree",
+ "dirs-next",
+ "forskscope-compare",
+ "forskscope-desktop",
+ "forskscope-edit",
+ "forskscope-report",
+ "forskscope-ui-logic",
+ "libc",
+ "native-tls",
+ "rfd",
+ "serde",
+ "serde_json",
+ "tokio",
+ "wry",
+]
+
+[[package]]
 name = "forskscope-compare"
 version = "0.194.1"
 dependencies = [
@@ -1546,31 +1571,6 @@ dependencies = [
  "libc",
  "sha2",
  "tempfile",
-]
-
-[[package]]
-name = "forskscope-ui"
-version = "0.194.1"
-dependencies = [
- "app-json-settings",
- "chrono",
- "dioxus",
- "dioxus-core",
- "dioxus-desktop",
- "dioxus-swdir-tree",
- "dirs-next",
- "forskscope-compare",
- "forskscope-desktop",
- "forskscope-edit",
- "forskscope-report",
- "forskscope-ui-logic",
- "libc",
- "native-tls",
- "rfd",
- "serde",
- "serde_json",
- "tokio",
- "wry",
 ]
 
 [[package]]

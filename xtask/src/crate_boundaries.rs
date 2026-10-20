@@ -96,7 +96,9 @@ fn expected_dependency_table() -> BTreeMap<&'static str, &'static [&'static str]
             ] as &[&str],
         ),
         (
-            "forskscope-ui",
+            // RFC-093 amendment (36eb2a4): the forskscope-ui package is
+            // named forskscope, matching the program it builds.
+            "forskscope",
             &[
                 "forskscope-compare",
                 "forskscope-report",

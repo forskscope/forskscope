@@ -40,7 +40,7 @@ jobs:
           key: windows-check-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build release binary
-        run: cargo build --release --locked -p forskscope-ui
+        run: cargo build --release --locked -p forskscope
 
       # The binary is windows_subsystem = "windows" in a release build, so
       # the first thing this step must confirm is that its stdout actually
@@ -114,7 +114,7 @@ jobs:
           key: windows-crt-check-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build release binary
-        run: cargo build --release --locked -p forskscope-ui
+        run: cargo build --release --locked -p forskscope
 
       - name: Check imports against the allow-list
         shell: pwsh

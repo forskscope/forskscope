@@ -150,7 +150,7 @@ jobs:
           key: linux-release-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build release binary
-        run: cargo build --release --locked -p forskscope-ui
+        run: cargo build --release --locked -p forskscope
 
       # F179/F180: the graph check in `cargo xtask audit-deps` reports what
       # Cargo intends; this reports what the linker actually produced
@@ -244,7 +244,7 @@ jobs:
       - name: Build release binary
         env:
           MACOSX_DEPLOYMENT_TARGET: "13.0"
-        run: cargo build --release --locked --target aarch64-apple-darwin -p forskscope-ui
+        run: cargo build --release --locked --target aarch64-apple-darwin -p forskscope
 
       - name: Package
         run: bash packaging/macos/build-dmg.sh
@@ -274,7 +274,7 @@ jobs:
           key: windows-release-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build release binary
-        run: cargo build --release --locked -p forskscope-ui
+        run: cargo build --release --locked -p forskscope
 
       # RFC-091 §4 / F206: the hybrid-CRT import gate, run on the exact
       # binary this release packages - before Package, so a failing binary

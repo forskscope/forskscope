@@ -57,7 +57,7 @@ tar -xzf forskscope-v*-linux-x86_64.tar.gz
 
 # Any distribution — build from source (Rust 1.91+)
 sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev pkg-config libssl-dev
-cargo build --release -p forskscope-ui && ./target/release/forskscope
+cargo build --release -p forskscope && ./target/release/forskscope
 ```
 
 > The prebuilt Linux binary is built on Ubuntu, so it needs a glibc at least

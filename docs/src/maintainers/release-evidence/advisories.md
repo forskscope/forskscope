@@ -41,9 +41,10 @@ string — producing crashes from NULL-pointer dereferences. Fixed in `glib`
 desktop backend, reached via `dioxus-desktop` → (`tao`, `wry`, `muda`,
 `tray-icon`) → `gtk`/`gdk`/`webkit2gtk` → `glib`. None of ForskScope's own
 crates (`forskscope-compare`, `forskscope-report`, `forskscope-edit`,
-`forskscope-desktop`, `forskscope-ui-logic`, `forskscope-ui`) ever depends
-on `glib` directly — confirmed by `grep -rn "glib::\|use glib" crates/`
-finding no matches.
+`forskscope-desktop`, `forskscope-ui-logic`, `forskscope` - the package
+RFC-093's amendment renamed from `forskscope-ui`) ever depends on `glib`
+directly — confirmed by `grep -rn "glib::\|use glib" crates/` finding no
+matches.
 
 **Reachability — not reachable, established two ways.** `VariantStrIter::new`
 (`glib-0.18.5/src/variant_iter.rs:108-109`) is `pub(crate)` — **the type has
@@ -111,7 +112,7 @@ of generated data), and trace-level logging is active (or warn-level with
 logger into `rand`'s internals.
 
 **Dependency path — established via `cargo tree -i rand@0.7.3 --target all`.**
-`--target all` is required: `cargo tree -i rand@0.7.3 -p forskscope-ui`
+`--target all` is required: `cargo tree -i rand@0.7.3 -p forskscope`
 (the obvious command a future reviewer would reach for first) prints
 *"nothing to print"* and suggests `--target all` itself, because the whole
 path is `[build-dependencies]`-only and `cargo tree` filters those out of
@@ -139,7 +140,8 @@ rand v0.7.3
    through a `[build-dependencies]` edge (`phf_codegen`, used by `selectors`'
    own build script to generate a perfect-hash-function lookup table at
    compile time). `rand` 0.7.3 is never a runtime dependency of the shipped
-   `forskscope`/`forskscope-ui` binary — it does not link into the artifact
+   `forskscope` binary (built from the package of the same name,
+   `forskscope-ui` until RFC-093's amendment) — it does not link into the artifact
    users run, only into the build process that produces it. This also
    answers the handoff's specific question of *why* a `rand` 0.7 is still in
    the graph at all: it's an old, stable, unmaintained-but-inert build tool

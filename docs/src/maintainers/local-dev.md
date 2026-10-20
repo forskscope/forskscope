@@ -41,7 +41,7 @@ cargo clippy -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p f
 ## Run
 
 ```sh
-cargo run -p forskscope-ui
+cargo run -p forskscope
 # or, after a release build:
 ./target/release/forskscope old.txt new.txt
 ```

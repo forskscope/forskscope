@@ -754,7 +754,9 @@ fn run_version_sync(expected_version: Option<&str>) {
         "forskscope-desktop",
         "forskscope-edit",
         "forskscope-report",
-        "forskscope-ui",
+        // RFC-093 amendment (36eb2a4): the forskscope-ui package is named
+        // forskscope, matching the program it builds.
+        "forskscope",
         "forskscope-ui-logic",
     ] {
         let expected = format!("name = \"{package}\"\nversion = \"{version}\"");
@@ -980,11 +982,12 @@ fn assert_external_network_crates_absent() {
 
 fn assert_network_paths_are_reviewed() {
     assert_immediate_dependents("tungstenite", &["dioxus-desktop "]);
-    // F180 (handoff 073): `forskscope-ui` depends on `native-tls` directly
-    // now too, for the update-check request's TLS — no new TLS stack, the
-    // same already-reviewed crate and version `tungstenite` pulls in. Both
-    // paths are accepted deliberately; a third would not be.
-    assert_immediate_dependents("native-tls", &["tungstenite ", "forskscope-ui "]);
+    // F180 (handoff 073): `forskscope-ui` (the package, now named
+    // `forskscope` per RFC-093's amendment) depends on `native-tls`
+    // directly now too, for the update-check request's TLS — no new TLS
+    // stack, the same already-reviewed crate and version `tungstenite`
+    // pulls in. Both paths are accepted deliberately; a third would not be.
+    assert_immediate_dependents("native-tls", &["tungstenite ", "forskscope "]);
     // F121 D: `tungstenite` compiles in both TLS backends, so the transport
     // has two reviewed paths, not one — and RUSTSEC-2026-0285 (0.171.0) was a
     // `rustls` advisory. Without these, a second crate pulling `rustls` would

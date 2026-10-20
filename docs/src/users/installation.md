@@ -98,7 +98,7 @@ sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev pkg-config libssl-dev
 
 git clone https://github.com/forskscope/forskscope
 cd forskscope
-cargo build --release -p forskscope-ui
+cargo build --release -p forskscope
 ./target/release/forskscope
 ```
 

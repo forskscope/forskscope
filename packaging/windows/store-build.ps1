@@ -85,7 +85,7 @@ $PreviousChannel = $env:FORSKSCOPE_CHANNEL
 Push-Location $RepoRoot
 try {
     $env:FORSKSCOPE_CHANNEL = "store"
-    cargo build --release --locked -p forskscope-ui
+    cargo build --release --locked -p forskscope
     if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
 } finally {
     # Restore the caller's shell exactly as found - without this, a later

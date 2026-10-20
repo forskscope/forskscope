@@ -559,7 +559,7 @@ Key crates touching file I/O or process execution:
 | `dioxus` | 0.7.9 | UI framework | Default features disabled; no devtools |
 | `dioxus-desktop` | 0.7.9 | Desktop WebView host | Uses authenticated loopback WebSocket IPC between WebView and host |
 | `tungstenite` | 0.28 | Dioxus desktop transport dependency | Accepted only via `dioxus-desktop`; no app-authored remote connections |
-| `native-tls` | 0.2 | Dioxus desktop's transport TLS, and (F180, handoff 073) the update-check request's TLS | Two reviewed paths: via `dioxus-desktop` (no app-authored connection), and directly from `forskscope-ui` for one bounded, user-clicked HTTPS GET — see "Accepted outbound request: update check" |
+| `native-tls` | 0.2 | Dioxus desktop's transport TLS, and (F180, handoff 073) the update-check request's TLS | Two reviewed paths: via `dioxus-desktop` (no app-authored connection), and directly from `forskscope` (the GUI package, `forskscope-ui` until RFC-093's amendment) for one bounded, user-clicked HTTPS GET — see "Accepted outbound request: update check" |
 | `quick-xml` | 0.39.4 | Wayland protocol code generation through GTK/Dioxus stack | Build-time/proc-macro path; not reachable from user-supplied files. Carries the two advisories ignored in `.cargo/audit.toml` |
 | `sheets-diff` | 3.6.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0; 3.0.0 since F130, 3.2.0 since F138, 3.3.0 since F154, 3.4.0 since F173, 3.5.0 since F132, 3.6.0 since F177) | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-compare` only (`audit-deps` asserts it) |
 | `calamine` | 0.36.1 | Workbook reader under `sheets-diff` | **Parses user-supplied XML and archives.** Read as a stream by `sheets-diff` 2.5.1 and later, so memory follows the populated cells (it did not through 2.5.0). Immediate dependent: `sheets-diff` only |
@@ -609,7 +609,8 @@ authenticated. The path is framework transport, not file content.
 The release gate `cargo xtask audit-deps` asserts that `dioxus-devtools` is not
 active, that `tungstenite` remains limited to the reviewed `dioxus-desktop`
 path, that `native-tls` is limited to exactly its two reviewed paths
-(`tungstenite` and, since F180/handoff 073, `forskscope-ui` directly — see
+(`tungstenite` and, since F180/handoff 073, `forskscope` - the GUI
+package, `forskscope-ui` until RFC-093's amendment - directly — see
 below), and that common external HTTP client/server crates (`reqwest`,
 `hyper`, `ureq`) are absent. Since F121 D (2026-09-24) it also asserts that `rustls`'s only immediate dependent
 is `tungstenite` and `rustls-webpki`'s is `rustls`. **It now queries every
@@ -650,7 +651,8 @@ library. `readelf -d` on a release build lists the same 16 libraries as
 directly on the built artifact, not only on the dependency graph —
 review 151's lesson, F179). `cargo xtask audit-deps` accepts exactly two
 paths to `native-tls`: through `tungstenite`, and now directly through
-`forskscope-ui`; a third path is not accepted silently.
+`forskscope` (the GUI package, `forskscope-ui` until RFC-093's amendment);
+a third path is not accepted silently.
 
 **The tag is validated before it can reach anything launched.** A reply's
 `tag_name` is untrusted text. `forskscope_ui_logic::update_check::Version::parse`

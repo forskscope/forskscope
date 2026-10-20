@@ -1,5 +1,9 @@
 [package]
-name        = "forskscope-ui"
+# RFC-093 amendment (36eb2a4): the package is named `forskscope`, matching
+# the program it builds; the directory stays `crates/forskscope-ui` and the
+# library target keeps the name `forskscope_ui` (a library named like the
+# `forskscope` program would collide with it in `cargo doc`).
+name        = "forskscope"
 description = "ForskScope desktop UI: app shell, explorer, compare/diff-merge workspace, settings, dialogs."
 readme      = "../../README.md"
 

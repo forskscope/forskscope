@@ -78,7 +78,7 @@ jobs:
         run: python3 packaging/inject_geometry_defect.py
 
       - name: Build release binary
-        run: cargo build --release --locked -p forskscope-ui
+        run: cargo build --release --locked -p forskscope
 
       - name: Compare view renders without column misalignment (F34)
         run: |
