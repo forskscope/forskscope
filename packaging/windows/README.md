@@ -46,7 +46,10 @@ pwsh -File ./packaging/windows/store-package.ps1 -Tag 0.193.0
 This never touches your checkout — it builds in a temporary `git worktree`,
 detached at the tag, so your own branch, any uncommitted changes, and your
 current folder are all untouched throughout. There is nothing to switch back to
-afterwards.
+afterwards. **The packaging scripts come from your checkout; what is packaged
+comes from the tag** — so a packaging fix on `main` applies to every past
+release you package with it, and the release itself is never rebuilt from
+anything but its own source.
 
 - **If the tag is not fetched yet,** it stops and tells you to run `git fetch
   --tags` first — it never fetches on its own.

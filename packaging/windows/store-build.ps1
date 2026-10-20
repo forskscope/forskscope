@@ -24,6 +24,18 @@
 # when it is set (store-package.ps1 points it at a shared build cache for
 # its worktree build), falling back to this repo's own "target" the way
 # this script and CI always have when it is not.
+#
+# Review 178 §1: the packaging scripts come from your checkout; what is
+# packaged comes from the tag. $RepoRoot below (git rev-parse
+# --show-toplevel from wherever this script is run) names the tag's own
+# worktree when store-package.ps1 runs this - the source that gets built,
+# AppxManifest.xml, Assets\. Tooling that is not part of a release's own
+# content - check-imports.ps1 - is instead found through $PSScriptRoot, the
+# directory this exact script file lives in, so a release tag older than
+# that gate still gets it run against it. A direct CI run checks out the
+# tag and runs that tag's own copy of this script, so $PSScriptRoot and
+# $RepoRoot agree there - this split only matters through
+# store-package.ps1.
 
 param(
     [Parameter(Mandatory = $true)][string]$Tag,
@@ -101,7 +113,13 @@ try {
 # own "target", which would be empty for that build.
 $TargetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $RepoRoot "target" }
 $BuiltExe = Join-Path $TargetDir "release/forskscope.exe"
-& pwsh -NoProfile -File (Join-Path $RepoRoot "packaging/windows/check-imports.ps1") -ExePath $BuiltExe
+# $PSScriptRoot, not $RepoRoot (review 178 §1): this is tooling, which must
+# come from the checkout running store-build.ps1, not from $RepoRoot - for
+# a release tag older than this gate, $RepoRoot (store-package.ps1's
+# worktree, detached at that tag) has no check-imports.ps1 at all. A
+# straight CI run of this script still finds the same file either way, since
+# $PSScriptRoot and $RepoRoot are the same checkout there.
+& pwsh -NoProfile -File (Join-Path $PSScriptRoot "check-imports.ps1") -ExePath $BuiltExe
 if ($LASTEXITCODE -ne 0) { throw "import gate failed - see above" }
 
 # ── Stage exactly four things: executable, manifest, tile assets. Nothing

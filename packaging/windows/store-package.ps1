@@ -21,20 +21,29 @@
 #   to clean up here afterwards.
 # - Reuses `target/store-build` as a shared Cargo build cache across runs,
 #   via `$env:CARGO_TARGET_DIR` - `store-build.ps1` finds the binary
-#   through it when it is set (handoff 085). This is effective starting
-#   with the tag that first carries that change (0.194.0): an older tag's
-#   own `store-build.ps1` still hard-codes `target/release` relative to
-#   the worktree, and would fail cleanly there (a "file not found" at its
-#   own `Copy-Item`, not a silently wrong package) if pointed at a shared
-#   cache it does not know to look in.
+#   through it when it is set (handoff 085).
 # - Ends by running `store-validate.ps1 -SkipInstall` on the package it
 #   just built - the checks that need no administrator rights and change
 #   nothing on this machine (see that script's own header for why the
 #   install+launch check is CI-only).
 #
+# Review 178 §1: the packaging scripts come from your checkout; what is
+# packaged comes from the tag. `store-build.ps1` and `store-validate.ps1`
+# are run from THIS checkout (via `$PSScriptRoot`, not the worktree) with
+# the worktree only as their working directory (`Push-Location`) - so every
+# `git rev-parse --show-toplevel` inside them names the tag's own worktree
+# for what gets built and packaged (the source, `AppxManifest.xml`,
+# `Assets\`, `identity.toml`), while the scripts doing that work, and
+# `store-build.ps1`'s own call to `check-imports.ps1`, are always this
+# checkout's current ones. A tag older than a packaging fix - including one
+# that predates `check-imports.ps1` existing at all - still gets built with
+# that fix and that gate; a release is never rebuilt from anything but its
+# own source, only packaged with current tooling.
+#
 # CI keeps calling store-build.ps1 and store-validate.ps1 directly
 # (`.github/workflows/store-submit.yml`) - this script is for the manual
-# path only.
+# path only. There, $PSScriptRoot and $RepoRoot are the same checkout (the
+# tag CI checked out), so this split does not change anything for CI.
 
 param(
     [Parameter(Mandatory = $true)][string]$Tag
@@ -79,14 +88,17 @@ try {
 
     $env:CARGO_TARGET_DIR = $CacheDir
 
+    # $PSScriptRoot, not $WorktreeDir: the tooling comes from this checkout
+    # (see the header) - only the working directory is the worktree, so
+    # `git rev-parse --show-toplevel` inside each script names the tag.
     Push-Location $WorktreeDir
     try {
-        & pwsh -NoProfile -File (Join-Path $WorktreeDir "packaging/windows/store-build.ps1") -Tag $Tag -OutDir $OutDir
+        & pwsh -NoProfile -File (Join-Path $PSScriptRoot "store-build.ps1") -Tag $Tag -OutDir $OutDir
         if ($LASTEXITCODE -ne 0) { throw "store-build.ps1 failed - see above" }
 
         Write-Host ""
         Write-Host "Validating..."
-        & pwsh -NoProfile -File (Join-Path $WorktreeDir "packaging/windows/store-validate.ps1") -MsixPath $MsixPath -Tag $Tag -SkipInstall
+        & pwsh -NoProfile -File (Join-Path $PSScriptRoot "store-validate.ps1") -MsixPath $MsixPath -Tag $Tag -SkipInstall
         if ($LASTEXITCODE -ne 0) { throw "store-validate.ps1 failed - see above" }
     } finally {
         Pop-Location
