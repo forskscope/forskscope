@@ -1,0 +1,28 @@
+[package]
+name        = "forskscope-cli"
+description = "Headless ForskScope: compare two files or two folders from a script, or serve an MCP tool over stdio (RFC-094). Depends only on forskscope-compare and forskscope-report."
+readme      = "../../README.md"
+
+version.workspace       = true
+edition.workspace       = true
+rust-version.workspace  = true
+license.workspace       = true
+authors.workspace       = true
+repository.workspace    = true
+
+[[bin]]
+name = "forskscope-cli"
+path = "src/main.rs"
+
+[dependencies]
+forskscope-compare            = { workspace = true }
+forskscope-report             = { workspace = true }
+# HTML report's `generated_at` timestamp only (RFC-092's own format) -
+# already resolved transitively; this is this crate's own direct use.
+chrono                        = { workspace = true }
+
+[dev-dependencies]
+tempfile                    = { workspace = true }
+# Test-only: parsing `--format json` output to check its shape, not a
+# runtime dependency of the program itself.
+serde_json                   = { workspace = true }

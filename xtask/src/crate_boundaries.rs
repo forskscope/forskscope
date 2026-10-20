@@ -93,6 +93,13 @@ fn expected_dependency_table() -> BTreeMap<&'static str, &'static [&'static str]
     BTreeMap::from([
         ("forskscope-compare", &[] as &[&str]),
         ("forskscope-report", &["forskscope-compare"] as &[&str]),
+        (
+            // RFC-094 §1: the headless program - depends only on the
+            // read-only engine and report crates, nothing from edit,
+            // desktop, ui-logic or ui.
+            "forskscope-cli",
+            &["forskscope-compare", "forskscope-report"] as &[&str],
+        ),
         ("forskscope-edit", &["forskscope-compare"] as &[&str]),
         (
             "forskscope-desktop",
