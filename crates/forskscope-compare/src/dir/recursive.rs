@@ -679,7 +679,7 @@ mod measurement_tests {
 
     /// Measurement, not a committed case (F137, handoff 069 §6): the directory walk on
     /// a one-entry tree against a large one, in both directions. Run with
-    /// `FSK_DIR_LEFT=<a> FSK_DIR_RIGHT=<b> cargo test --release -p forskscope-core -- --ignored --nocapture`.
+    /// `FSK_DIR_LEFT=<a> FSK_DIR_RIGHT=<b> cargo test --release -p forskscope-compare -- --ignored --nocapture`.
     #[test]
     #[ignore = "measurement over generated trees; set FSK_DIR_LEFT and FSK_DIR_RIGHT"]
     fn walk_measured_on_the_given_trees() {

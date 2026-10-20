@@ -1,4 +1,4 @@
-//! Integration test: patches produced by `forskscope-core` must apply
+//! Integration test: patches produced by `forskscope-report` must apply
 //! cleanly with the system `patch` tool and with `git apply` (RFC-039
 //! acceptance criterion — "users can export a unified diff for selected
 //! changes"; RFC-084 — CRLF, mixed-newline, and space-in-path

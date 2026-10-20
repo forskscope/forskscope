@@ -1,53 +1,84 @@
 # Architecture
 
-ForskScope is a Cargo workspace with three crates.
+ForskScope is a Cargo workspace with six crates (RFC-093).
 
 ```text
 forskscope/
   crates/
-    forskscope-core/      domain logic, no UI dependency
-    forskscope-ui-logic/  view-model layer, no Dioxus/GTK dependency
-    forskscope-ui/        Dioxus 0.7 desktop frontend (shell, workspaces, dialogs)
+    forskscope-compare/    read-only comparison engine: load, diff, folder scan - never writes a file, never spawns a process
+    forskscope-report/     report/patch/checksum building - returns text and bytes, the caller writes them
+    forskscope-edit/       the write path: merge sessions, edit ops, atomic save, folder batch copy/plan/execute
+    forskscope-desktop/    settings/session persistence, external tools, Git, file watching, platform detection
+    forskscope-ui-logic/   view-model layer, no Dioxus/GTK dependency
+    forskscope-ui/         Dioxus 0.7 desktop frontend (shell, workspaces, dialogs)
 ```
 
-The core crate has no dependency on Dioxus, Tauri, or any UI framework. It is
-the canonical owner of product truth; the UI reads from it and dispatches
-commands to it. `forskscope-ui-logic` holds pure presentation logic that is
-testable without a display server. A future alternative frontend (e.g. Iced)
-could be added as a fourth crate without touching core.
+A boundary pays only where some program or crate can depend on one side
+without the other, and that absence is a real guarantee: `forskscope-compare`
+and `forskscope-report` are the only crates that can be depended on with a
+compiler-enforced promise of never writing a file or spawning a process
+(`cargo xtask crate-boundaries` checks this on every push, by rule and by
+`cargo metadata`'s dependency graph against the table below); `forskscope-edit`
+is the only crate besides the GUI itself that writes a user's file;
+`forskscope-desktop` is the only one that spawns a process. None of the four
+engine crates depends on Dioxus, Tauri, or any UI framework. `forskscope-ui-logic`
+holds pure presentation logic, built on the four engine crates, testable
+without a display server.
 
-## Core modules (28)
+| Crate | Owns | May write files | May spawn processes | Depends on |
+|---|---|---|---|---|
+| `forskscope-compare` | document loading/decoding/classifying with fingerprints; line diff + comparison profile; folder listing, recursive comparison, digests; workbook comparison (feature `spreadsheet`, on by default); ignore rules; jobs/cancellation; errors | No | No | — |
+| `forskscope-report` | unified diff (`patch`); Markdown/JSON/HTML reports; SHA-256; building a report from disk (`build_dir_report`, `build_file_report`) | No (returns text/bytes, caller writes) | No | compare |
+| `forskscope-edit` | merge sessions incl. three-way; edit operations; atomic save with fingerprint preconditions; folder batch-copy/plan/execute; `compare_prep`'s save-target half | Yes, only crate that writes user files | No | compare |
+| `forskscope-desktop` | settings/session persistence; settings display types; external tools; Git; file watching; platform detection; env pass-through | Only its own settings/session | Yes: external tools, Git, system opener | compare, edit |
+| `forskscope-ui-logic` | GUI view-models incl. `command`, `diff_decoration`, `line_map`, `conflict_nav` | No | No | compare, report, edit, desktop |
+| `forskscope-ui` | the GUI program `forskscope` | — | — | all of the above |
+
+## `forskscope-compare` modules
 
 | Module | Responsibility |
 |---|---|
 | `cancel` | `CancellationToken` — lightweight `Arc<AtomicBool>` for cancellable background jobs. |
-| `command` | `CommandDefinition`, `CommandRegistry`, `AvailabilityRule`, `CommandContext` — all user-visible commands, IDs, shortcuts (RFC-019). |
-| `compare_prep` | `PreparedCompare`, `SaveTargetSnapshot`, `save_target_from_loaded`, `inspect_save_target` — separates what's compared from what's saved to, since normal two-file mode and Git mergetool mode disagree (RFC-077). |
-| `conflict_nav` | `ConflictNavigator`, `ConflictStatusDisplay`, `NavigatorSummary` — conflict rail view-model over `ThreeWayMergeSession` (RFC-034). |
 | `diff` | `similar` v3 diff engine; normalized `DiffDocument` + hunk model, stable IDs, inline spans. `CompareProfile`, `WhitespaceMode`, `NewlineCompareMode`, `DiffOptions` (RFC-002, RFC-028). |
-| `diff_decoration` | `DiffDecorationSet` derived from `DiffDocument` — CSS class tokens, gutter symbols, aria labels, inline spans, `HunkDecoration` (RFC-024). |
-| `dir` | Directory listing, recursive digest equality, `EqualityEvidence` (the comparison vocabulary). `batch_copy` + `BatchManifest` (RFC-023). `recursive_diff_with_cancel` (RFC-037). `plan_operations` + `execute_plan` (RFC-022). |
+| `dir` | Directory listing, recursive digest equality, `EqualityEvidence` (the comparison vocabulary). `recursive_diff_with_cancel` (RFC-037). The write half (batch copy, plan/execute) is `forskscope_edit::dir`. |
 | `document` | Load a path into `LoadedDocument` with `FileFingerprint`. `ExternalFileState` / `check_external_state` (RFC-036). |
-| `edit_op` | `TextEditOperation`, `RevisionId`, `TextRange`, `OperationAck/Reject`, `EditTransaction` — editor adapter boundary types (RFC-032). |
 | `encoding` | `decode_bytes` with chardetng + encoding_rs; `decode_body` selects a BOM-implied encoding directly, `decode_with_label` re-decodes an explicit user choice (RFC-083). `NewlinePolicy`, `NewlineStyle`, `detect_newline_style`. `BomPresence`, `BomPolicy`, `detect_bom` (RFC-012). |
-| `env_passthrough` | `record_before_override`/`restore_onto` — remembers an environment variable's value before this process overrides it (RFC-091 §2's portable/private `XDG_*` redirection) and reapplies the original onto a child `Command`, so a process ForskScope launches never inherits the override. |
 | `error` | `CoreError` (internal), `AppError` (UI envelope), `AppErrorKind` (25 variants), `ErrorId`, `TechnicalDetail`, `RecoveryAction`, `UserMessage` (RFC-017). |
-| `external_tool` | `ExternalToolCommand`, `expand_args`, `ToolKind`, built-in presets (file manager reveal, VS Code, system open). No shell execution (RFC-029). |
 | `file_kind` | `FileKind` (Text, Binary, ExcelXlsx, Missing). `EditabilityClass`, `requires_save_guard()` (RFC-012). |
 | `ignore` | `IgnoreRules` — extension and directory-pattern filtering (RFC-056). |
 | `job` | `JobProgress`, `JobHandle`, `JobStatus`, `JobStatusRecord`, `JobRegistry` — background job lifecycle. `FileSizeClass`, `PerformanceLimits` (RFC-013). |
-| `line_map` | `LineMap`, `AlignedRow`, `RowId`, `ScrollAnchor`, `build_mini_map` — aligned row sequence for synchronized scroll (RFC-035). |
-| `merge` | `MergeSession` (two-way) with transaction log, undo/redo, dirty state, `result_text()`; `ThreeWayMergeSession` (base-aware diff3, structured conflicts, resolution + undo/redo). `TransactionLog`, `TransactionKind` (RFC-015, RFC-033). |
-| `patch` | `PatchDocument`, unified-diff export from file and directory diffs (RFC-039). |
 | `path` | Lenient canonicalization; platform-safe display helpers. |
+| `xlsx` | Fail-closed spreadsheet comparison boundary between `sheets-diff` and ForskScope's app model, no `sheets-diff` types in the public API (RFC-058). Suspended for one release over an XML denial-of-service advisory chain, restored at `sheets-diff` 2.5.0 with cancellation polling inside a sheet (RFC-085); now at 3.0.0, which streams its read (F130). Gated behind the `spreadsheet` feature, on by default. |
+
+## `forskscope-report` modules
+
+| Module | Responsibility |
+|---|---|
+| `checksum` | `sha256_hex` — SHA-256 of a byte slice, hex-encoded. |
+| `patch` | `PatchDocument`, unified-diff export from file and directory diffs (RFC-039). |
+| `report` | `FileComparisonReport` + `DirComparisonReport` — Markdown/JSON/HTML report export (RFC-027, RFC-092). `build_dir_report`/`BuildOutcome` and `build_file_report`/`checksum_if_fingerprinted` read, hash and diff the compared files to assemble a report, written by the caller (RFC-092 §5, moved from `forskscope-ui` in RFC-093 §1 step 6). |
+
+## `forskscope-edit` modules
+
+| Module | Responsibility |
+|---|---|
+| `compare_prep` | `PreparedCompare`, `SaveTargetSnapshot`, `save_target_from_loaded`, `inspect_save_target` — separates what's compared from what's saved to, since normal two-file mode and Git mergetool mode disagree (RFC-077). |
+| `dir` | The write half of folder operations: `batch_copy` + `BatchManifest` (RFC-023), `plan_operations` + `execute_plan` (RFC-022), `copy_file`. The read half (listing, recursive diff, digests) is `forskscope_compare::dir`. |
+| `edit_op` | `TextEditOperation`, `RevisionId`, `TextRange`, `OperationAck/Reject`, `EditTransaction` — editor adapter boundary types (RFC-032). |
+| `merge` | `MergeSession` (two-way) with transaction log, undo/redo, dirty state, `result_text()`; `ThreeWayMergeSession` (base-aware diff3, structured conflicts, resolution + undo/redo). `TransactionLog`, `TransactionKind` (RFC-015, RFC-033). |
+| `save` | `save_text`, `TargetPrecondition`, `BackupPolicy`, `SaveRequest`, `SaveOutcome` — conflict detection, backup, temp-file-then-rename write (visibility-atomic, not a power-loss guarantee — F9/N2) via `atomic_replace`/`persist_noclobber` (RFC-007, RFC-077). `atomic_replace` is `pub`, reused directly by `forskscope-desktop`'s settings/session persistence. |
+
+## `forskscope-desktop` modules
+
+| Module | Responsibility |
+|---|---|
+| `env_passthrough` | `record_before_override`/`restore_onto` — remembers an environment variable's value before this process overrides it (RFC-091 §2's portable/private `XDG_*` redirection) and reapplies the original onto a child `Command`, so a process ForskScope launches never inherits the override. |
+| `external_tool` | `ExternalToolCommand`, `expand_args`, `ToolKind`, built-in presets (file manager reveal, VS Code, system open). No shell execution (RFC-029). |
 | `persist` | `schema` — the canonical settings/session v2 schema, migration from the shipping UI's plain-JSON v0 files, and load outcomes via `PersistenceLoad` (RFC-076). RFC-031's original `VersionedEnvelope`/`MigrationPolicy` wrapper and v1 records were removed (RFC-076 patch 5, 2026-08-03): no released version ever wrote a v1 file. |
 | `platform` | `PlatformInfo::collect()` — runtime diagnostic snapshot (OS, arch, CPUs, app version, redacted home, config dir). `to_report()` for clipboard copy in the About panel (RFC-026). |
-| `report` | `FileComparisonReport` + `DirComparisonReport` — Markdown and JSON report export (RFC-027). |
-| `save` | `save_text`, `TargetPrecondition`, `BackupPolicy`, `SaveRequest`, `SaveOutcome` — conflict detection, backup, temp-file-then-rename write (visibility-atomic, not a power-loss guarantee — F9/N2) via `atomic_replace`/`persist_noclobber` (RFC-007, RFC-077). |
 | `settings` | `ThemeId`, `LocaleId`, `Density`, `FontFamilySetting`, `ThemeTokens` — display types `forskscope-ui`/`forskscope-ui-logic` and `persist::schema::settings::PersistedSettings` depend on (RFC-009). `UserSettings` (RFC-031's schema v1 record) was removed, never having shipped (RFC-076 patch 5). |
 | `vcs` | `VcsProvider` trait + `GitProvider` — read-only VCS context (status, file at revision, merge base). `detect(path)` (RFC-038). |
 | `watcher` | `FileChangeMonitor` trait, `WatchToken`, `FileChangeEvent`, `WatchError`, `MockFileChangeMonitor` — file-watcher boundary (RFC-036). |
-| `xlsx` | Fail-closed spreadsheet comparison boundary between `sheets-diff` and ForskScope's app model, no `sheets-diff` types in the public API (RFC-058). Suspended for one release over an XML denial-of-service advisory chain, restored at `sheets-diff` 2.5.0 with cancellation polling inside a sheet (RFC-085); now at 3.0.0, which streams its read (F130). |
 
 ## `ui-logic` modules (28)
 
@@ -120,8 +151,9 @@ read what a row says a module does; that stays a judgment.
 
 ## Core ownership rule
 
-The Rust core owns product truth: documents, diff, merge state, dirty state,
-and save policy. `ui-logic` holds tested view-model derivations. Dioxus owns
-rendering and interaction dispatch. The UI must never reconstruct merge results
-from rendered content or `contenteditable` state; it must read from
-`result_text()` and write through `apply_left_to_right()` / `undo()`.
+The four engine crates own product truth: documents and diff
+(`forskscope-compare`), merge state and dirty state (`forskscope-edit`), save
+policy (`forskscope-edit`). `ui-logic` holds tested view-model derivations.
+Dioxus owns rendering and interaction dispatch. The UI must never reconstruct
+merge results from rendered content or `contenteditable` state; it must read
+from `result_text()` and write through `apply_left_to_right()` / `undo()`.

@@ -16,22 +16,27 @@ cargo build --release                  # release (LTO, stripped)
 # Tests that run WITHOUT GTK / display server (see testing.md's "Test
 # counts" for why no number is given here — a hand-maintained count drifts
 # in both directions and nothing checks it):
-cargo test -p forskscope-core
+cargo test -p forskscope-compare
+cargo test -p forskscope-desktop
+cargo test -p forskscope-edit
+cargo test -p forskscope-report
 cargo test -p forskscope-ui-logic
-cargo test -p forskscope-core -p forskscope-ui-logic  # headless gate
+cargo test -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic  # headless gate
 
 # Full workspace (requires GTK):
 cargo test --workspace
 
 # Lint (run before every commit):
-cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
+cargo clippy -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
 ```
 
 > **Note:** `forskscope-ui` depends on `dioxus-desktop` which requires GTK3
-> at compile time (even for `cargo check` and `cargo test --lib`).  All
-> product-logic tests live in `forskscope-core` and `forskscope-ui-logic`
-> which have no GUI dependency.  UI-side `#[cfg(test)]` blocks in `state.rs`
-> are syntactically complete but require a GTK build environment to run.
+> at compile time (even for `cargo check` and `cargo test --lib`). All
+> product-logic tests live in `forskscope-compare`, `forskscope-report`,
+> `forskscope-edit`, `forskscope-desktop`, and `forskscope-ui-logic` (RFC-093),
+> none of which has a GUI dependency. UI-side `#[cfg(test)]` blocks in
+> `state.rs` are syntactically complete but require a GTK build environment
+> to run.
 
 ## Run
 
@@ -45,17 +50,24 @@ cargo run -p forskscope-ui
 
 ```
 crates/
-  forskscope-core/src/
-    tests.rs          # module root declaring test submodules
-    tests/            # one file per domain: diff_tests, merge_tests, …
+  forskscope-compare/src/   # load, diff, folder scan - no writes, no process spawn
+  forskscope-report/src/    # report/patch/checksum building - returns text/bytes
+  forskscope-edit/src/      # merge sessions, edit ops, atomic save, batch copy
+  forskscope-desktop/src/   # settings/session persistence, external tools, Git, watcher
   forskscope-ui-logic/src/
     compare/          # diff/compare view-model modules
     explore/          # explorer view-model modules
     settings/         # settings form view-model modules
+    command/, conflict_nav.rs, diff_decoration.rs, line_map.rs  # not yet wired into forskscope-ui
 tests/
   fixtures/           # diff acceptance corpus (text/, newlines/, whitespace/)
     README.md         # documents each fixture pair and how to add new ones
 ```
+
+Each of the four engine crates (`compare`, `report`, `edit`, `desktop`)
+follows the same `src/tests.rs` + `src/tests/*_tests.rs` layout: one file
+per domain, registered in `tests.rs`. Add a new `foo_tests.rs` and `mod
+foo_tests;` in `tests.rs`.
 
 Files are split at 300 ELOC; splitting is strongly recommended above 500 ELOC.
 
@@ -63,10 +75,12 @@ Files are split at 300 ELOC; splitting is strongly recommended above 500 ELOC.
 
 ## Adding tests
 
-**Unit tests** live in `crates/forskscope-core/src/tests/` — one file per domain,
-registered in `tests.rs`. Add a new `foo_tests.rs` and `mod foo_tests;` in `tests.rs`.
+**Unit tests** live under `crates/<crate>/src/tests/`, in whichever of the
+engine crates owns the module — see the directory layout above, or
+`docs/src/maintainers/architecture.md`'s per-crate module tables. Add a new
+`foo_tests.rs` and `mod foo_tests;` in that crate's `src/tests.rs`.
 
-**Corpus tests** (`crates/forskscope-core/tests/diff_corpus.rs`) load fixture files
+**Corpus tests** (`crates/forskscope-compare/tests/diff_corpus.rs`) load fixture files
 from `tests/fixtures/` via `load("subdir/name.txt")` and call `compute_diff`.
 To add a new case:
 
@@ -112,5 +126,5 @@ Verify on MSRV before releasing:
 
 ```sh
 rustup install 1.91
-cargo +1.91 test -p forskscope-core -p forskscope-ui-logic
+cargo +1.91 test -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
 ```

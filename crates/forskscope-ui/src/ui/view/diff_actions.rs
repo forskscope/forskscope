@@ -1029,7 +1029,7 @@ mod tests {
 
     /// Review 083 §4: naming all twelve `RecoveryAction` variants in
     /// `handle_save_recovery_action` means a *thirteenth* variant is a
-    /// compile error — but it does not catch `forskscope-core` changing
+    /// compile error — but it does not catch `forskscope-compare` changing
     /// which actions an *existing* `AppErrorKind` emits. If
     /// `default_recovery_actions()` ever grows to include, say, `Retry` for
     /// `FileWriteFailed`, the button would render and panic on click, with

@@ -3,7 +3,7 @@
 //! The running application used to serialize its own plain-JSON structs
 //! directly — a corrupt or future-schema file was then indistinguishable
 //! from a missing one, and both silently collapsed to defaults. This module
-//! makes `forskscope-core` the canonical owner of the settings and session
+//! makes `forskscope-desktop` the canonical owner of the settings and session
 //! disk schema: it defines the canonical payload shapes, migrates the
 //! shipping UI's plain-JSON v0 files, and reports what happened via
 //! [`PersistenceLoad`] instead of collapsing every failure mode into the

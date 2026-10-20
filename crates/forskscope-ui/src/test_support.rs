@@ -1,6 +1,6 @@
 //! Shared test infrastructure for permission-dependent tests (F143, handoff
-//! 063 §1) - see `forskscope-core`'s own `src/tests/support.rs` for the full
-//! rationale; this is the same fix, duplicated once per crate because
+//! 063 §1) - see `forskscope-compare`'s own `src/tests/support.rs` for the
+//! full rationale; this is the same fix, duplicated once per crate because
 //! `ui/view/explorer.rs` and `state/compare/tests.rs` share no other common
 //! test module today.
 

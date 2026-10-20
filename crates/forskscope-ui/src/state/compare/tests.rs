@@ -346,7 +346,7 @@ fn a_mixed_text_and_xlsx_pair_compares_the_xlsx_side_as_empty() {
 /// diff engine, not that its formatting is a specific string).
 #[test]
 fn both_sides_xlsx_produces_a_real_structural_diff_not_an_empty_one() {
-    // Shared with forskscope-core's own xlsx tests (handoff 022's review
+    // Shared with forskscope-compare's own xlsx tests (handoff 022's review
     // request explains why these are real workbooks, not hand-built bytes:
     // built once with rust_xlsxwriter, committed as binary fixtures, not a
     // project dependency).
@@ -731,7 +731,7 @@ fn a_new_tab_under_the_default_profile_starts_with_char_mode_off() {
 /// Comfortably past the default 4 MiB medium threshold and comfortably under
 /// the 64 MiB large threshold — classifies as `Large`, producing
 /// `LoadGuard::ConfirmPrompt { too_large: false, .. }` under
-/// `PerformanceLimits::default()` (`forskscope-core/src/job/limits.rs`).
+/// `PerformanceLimits::default()` (`forskscope-compare/src/job/limits.rs`).
 const LARGE_FILE_BYTES: usize = 5 * 1024 * 1024;
 
 #[test]

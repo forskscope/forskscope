@@ -19,11 +19,11 @@ are welcome; personal attacks are not.
 ```sh
 git clone https://github.com/forskscope/forskscope
 cd forskscope
-cargo test -p forskscope-core -p forskscope-ui-logic
+cargo test -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
 ```
 
-Tests in `forskscope-core` and `forskscope-ui-logic` run without GTK. The UI
-crate (`forskscope-ui`) requires GTK3/WebKitGTK on Linux — see
+Those five crates run without GTK. The UI crate (`forskscope-ui`) requires
+GTK3/WebKitGTK on Linux — see
 [Local development](docs/src/maintainers/local-dev.md) for the system
 package list.
 
@@ -33,18 +33,24 @@ package list.
 
 ```
 crates/
-  forskscope-core/        # GUI-independent domain logic; no Dioxus dependency
-  forskscope-ui-logic/    # Pure view-model layer; no GTK dependency
+  forskscope-compare/     # Read-only comparison engine (load, diff, folder scan); no Dioxus dependency
+  forskscope-report/      # Report/patch/checksum building, returns text and bytes, never writes a file
+  forskscope-edit/        # The write path: merge sessions, edit ops, atomic save, batch copy
+  forskscope-desktop/     # Settings/session persistence, external tools, Git, file watching
+  forskscope-ui-logic/    # Pure view-model layer, built on the four crates above; no GTK dependency
   forskscope-ui/          # Dioxus desktop shell (requires GTK to build)
 docs/src/                 # mdBook documentation
 rfcs/                     # Design documents (RFC lifecycle: rfcs/done/000-…)
 tests/fixtures/           # Diff acceptance test corpus
 ```
 
-The critical constraint: **`forskscope-core` and `forskscope-ui-logic` must
-never gain a Dioxus or GTK dependency.** All product logic — file loading,
-diff computation, merge decisions, save safety — lives in core, tested without
-a display server.
+The critical constraint (RFC-093): **only `forskscope-ui` may depend on
+Dioxus or GTK.** Every other crate stays testable without a display server.
+Within that, each engine crate has its own narrower rule, enforced by
+`cargo xtask crate-boundaries`: `forskscope-compare` and `forskscope-report`
+never write a file or spawn a process; `forskscope-edit` is the only crate
+besides the GUI itself that writes a user's file; `forskscope-desktop` is
+the only one that spawns a process.
 
 ---
 
@@ -63,12 +69,13 @@ request for anything beyond a one-line fix.
 
 1. **Branch** from `main`.
 2. **Write the test first** (or alongside the code). Tests live in
-   `crates/forskscope-core/src/tests/` (unit) or
-   `crates/forskscope-core/tests/` (integration).
+   `crates/<crate>/src/tests/` (unit) or `crates/<crate>/tests/`
+   (integration), in whichever of the six crates owns the module you're
+   changing — `docs/src/maintainers/architecture.md` says which.
 3. **Run the test suite:**
    ```sh
-   cargo test -p forskscope-core -p forskscope-ui-logic
-   cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
+   cargo test -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
+   cargo clippy -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
    ```
    Both must pass with zero failures and zero warnings before opening a PR.
 4. **Check file size.** Split files over 300 ELOC where it helps. Over 500
@@ -92,7 +99,7 @@ case or add a feature, add a fixture pair that exercises it:
 
 1. Create matching `left_*.txt` and `right_*.txt` files in the appropriate
    subdirectory (`text/`, `newlines/`, `whitespace/`).
-2. Add a test in `crates/forskscope-core/tests/diff_corpus.rs` that loads
+2. Add a test in `crates/forskscope-compare/tests/diff_corpus.rs` that loads
    the pair and asserts the expected diff behaviour.
 3. Update `tests/fixtures/README.md` with a description of the pair.
 

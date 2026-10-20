@@ -2,7 +2,6 @@
 resolver = "3"
 members = [
     "crates/forskscope-compare",
-    "crates/forskscope-core",
     "crates/forskscope-desktop",
     "crates/forskscope-edit",
     "crates/forskscope-report",
@@ -21,7 +20,6 @@ repository      = "https://github.com/forskscope/forskscope"
 
 [workspace.dependencies]
 forskscope-compare           = { version = "0", path = "crates/forskscope-compare" }
-forskscope-core             = { version = "0", path = "crates/forskscope-core" }
 forskscope-desktop           = { version = "0", path = "crates/forskscope-desktop" }
 forskscope-edit             = { version = "0", path = "crates/forskscope-edit" }
 forskscope-report           = { version = "0", path = "crates/forskscope-report" }
@@ -47,9 +45,10 @@ encoding_rs                 = "0.8"
 native-tls                  = "0.2"
 rfd                         = { version = "0.17", default-features = true }
 # RFC-092/F206-adjacent (handoff 084): already resolved transitively
-# (wry -> forskscope-ui) at 0.10.9; its first direct, declared use is
-# forskscope-core's comparison-report checksums - no new crypto stack.
-# audit-deps' reviewed set names forskscope-core as a second accepted path.
+# (wry -> forskscope-ui) at 0.10.9; its first direct, declared use was
+# forskscope-core's comparison-report checksums, moved to
+# forskscope-report by RFC-093 §1 step 2 - no new crypto stack either way.
+# audit-deps' reviewed set names forskscope-report as a second accepted path.
 sha2                        = "0.10"
 # RFC-085: default features off deliberately - chrono/cli/serde are all
 # optional and unused here; audit-deps' reviewed set assumes exactly the

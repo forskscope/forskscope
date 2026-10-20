@@ -1011,9 +1011,10 @@ code.path-display {
    forskscope-ui-logic::compare::hunk_decorations view-model that fed it, and
    the two css_coverage tests asserting the classes existed were removed
    rather than wired through — see RFC-024's status note for the reasoning.
-   forskscope-core's DiffDecorationSet/LineDecorationKind/InlineDecorationKind
-   model itself was kept: it is self-contained, tested independently of any
-   renderer, and remains RFC-024's actual "core complete" deliverable.
+   forskscope-ui-logic::diff_decoration's DiffDecorationSet/LineDecorationKind/
+   InlineDecorationKind model itself was kept: it is self-contained, tested
+   independently of any renderer, and remains RFC-024's actual "core
+   complete" deliverable.
    ─────────────────────────────────────────────────────────────────────────── */
 .fsk-conflict-unresolved { color: var(--warn); font-weight: bold; }
 .fsk-conflict-left       { color: var(--ins-mark); }

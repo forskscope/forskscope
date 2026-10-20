@@ -508,7 +508,7 @@ fn ja(key: &str) -> Option<&'static str> {
         "Could not save the report" => "レポートを保存できませんでした",
         "Could not save the patch" => "パッチを保存できませんでした",
 
-        // RFC-092: the HTML report itself (forskscope-core/src/report/html.rs).
+        // RFC-092: the HTML report itself (forskscope-report/src/report/html.rs).
         // Reached through a translator closure, not a literal t(lang, ...)
         // call site here, so cargo xtask i18n cannot see these keys - kept
         // in sync by hand against html.rs's own tr() calls.
@@ -639,7 +639,7 @@ mod tests {
     /// back untranslated." Records every key `render_file_report`/
     /// `render_dir_report` actually requests through `tr`, then — since
     /// `ja()` is this module's own private function, reachable here but
-    /// not from forskscope-core — asserts each one has a real entry in it.
+    /// not from forskscope-report — asserts each one has a real entry in it.
     /// Checking `ja(key).is_some()` rather than comparing translated text
     /// to the key is deliberate: a deliberately-identical entry (`"SHA-256"
     /// => "SHA-256"`, a universal technical term) must count as translated,

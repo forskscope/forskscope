@@ -1,7 +1,8 @@
 //! Framework-independent presentation logic for ForskScope (RFC-020 §5a).
 //!
-//! This crate is the *view-model* layer: pure logic derived from
-//! `forskscope-core` truth, with no Dioxus or GTK dependency, so it can be
+//! This crate is the *view-model* layer: pure logic derived from the engine
+//! crates' truth (`forskscope-compare`, `forskscope-edit`,
+//! `forskscope-desktop`), with no Dioxus or GTK dependency, so it can be
 //! unit-tested without a display server. Feature areas are modules:
 //!
 //! - [`explore`] — explorer-pane logic:

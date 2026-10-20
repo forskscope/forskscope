@@ -96,7 +96,7 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
   panic path exists from oversized input is unverified in general — no fuzzing
   or property-based testing exists in this repository. **One was found and fixed
   (F120, 2026-09-24):** the Inline diff toggle called
-  `forskscope_core::diff::refine_pair` on every changed line pair with no length
+  `forskscope_compare::diff::refine_pair` on every changed line pair with no length
   bound, and a 400,000-character pair aborted the process ("memory allocation of
   518405760016 bytes failed" — measured by calling the function directly on
   `similar` 3.2.0, whose LCS table is a flat `n × m × 4` bytes; the workspace
@@ -165,7 +165,7 @@ handled as `Ok(None)` in the result path.
 
 ### 4. Settings and session persistence
 
-**Flow:** `forskscope-core::persist::schema` is the sole owner of the on-disk
+**Flow:** `forskscope-desktop::persist::schema` is the sole owner of the on-disk
 settings/session schema. `SettingsRepository`/`SessionRepository`
 (`persist::schema::settings`/`session`) read and write an explicit path —
 `forskscope-ui` resolves that path to the platform config directory
@@ -175,7 +175,8 @@ file, classifies it (`PersistenceLoad`: `Missing`/`Current`/`MigratedLegacy`/
 `FutureVersion`/`Corrupt`), and commits a legacy migration immediately if one
 applies, through the same temp-file-then-rename primitive `save.rs` uses —
 visibility-atomic (a reader never sees a partial file), not a power-loss
-guarantee (F9/N2; no `fsync`/`sync_all` anywhere in `forskscope-core`).
+guarantee (F9/N2; no `fsync`/`sync_all` anywhere in `forskscope-edit` or
+`forskscope-desktop`).
 
 **Controls:**
 - Reads and writes use standard serde-json through a versioned envelope
@@ -287,7 +288,7 @@ creates, uploads to, and commits a Store submission.
 ### 7. Saving: the write path
 
 This is the one place the tool can destroy user data, and it carries the
-strongest controls in the codebase. Everything below is `crates/forskscope-core/
+strongest controls in the codebase. Everything below is `crates/forskscope-edit/
 src/save.rs` unless stated, checked against the code and against a probe run
 on 2026-09-24 (Linux, `umask 022`; **Windows and macOS behaviour was not
 probed**).
@@ -550,7 +551,7 @@ Key crates touching file I/O or process execution:
 | `similar` | 3.2.0 | Diff computation | Pure computation; no I/O. The default line algorithm is `RawMyers`, upstream's legacy-labelled path, so a bump does not change the hunks (F128 is the open question of adopting the new `Myers`) |
 | `encoding_rs` | * | Text decoding | No I/O; operates on in-memory bytes |
 | `chardetng` | * | Encoding detection | No I/O |
-| `serde` / `serde_json` | 1.0.228 / 1.0.150 | RFC-076 settings/session schema v2: envelope parsing and payload (de)serialization in `forskscope-core` | Local serialization only; parses/writes local settings and session JSON, never network input; introduces no data flow |
+| `serde` / `serde_json` | 1.0.228 / 1.0.150 | RFC-076 settings/session schema v2: envelope parsing and payload (de)serialization in `forskscope-desktop` | Local serialization only; parses/writes local settings and session JSON, never network input; introduces no data flow |
 | `tokio` | 1 | Async runtime + `spawn_blocking` | Standard; no network features enabled |
 | `app_json_settings` | 2.4.1 | Settings persistence (production call sites being converged onto RFC-076 core repositories; see `persist::v2`) | Local JSON file only |
 | `dirs_next` | * | Platform dirs | Read-only path resolution |
@@ -565,7 +566,7 @@ Key crates touching file I/O or process execution:
 | `quick-xml` | 0.41.0 | XML parsing under `calamine` | **Reachable from user-supplied files.** Not covered by the `.cargo/audit.toml` ignore list (which names 0.39 only) |
 | `zip` | 8.6.0 | Archive reading under `calamine` | **Reachable from user-supplied files.** Compressed size is bounded (50 MiB); expansion is not |
 | `rustls` | 0.23.45 | TLS library compiled into `tungstenite` (v0.171.0: RUSTSEC-2026-0285) | Framework transport only, see "Accepted local WebView transport"; not reachable from file content |
-| `tempfile` | 3.27.0 | RFC-077: promoted from a `forskscope-core` dev-dependency to a normal one for the Git mergetool save target's no-clobber commit (`save::persist_noclobber`, using `NamedTempFile::persist_noclobber`) | Local filesystem only — creates a same-directory temp file and commits or discards it; no network data flow; re-audited with `cargo xtask audit-deps` and `cargo audit` after promotion, no new advisories |
+| `tempfile` | 3.27.0 | RFC-077: promoted from a `forskscope-core` dev-dependency to a normal one (now `forskscope-edit`'s, since RFC-093 §1 step 3) for the Git mergetool save target's no-clobber commit (`save::persist_noclobber`, using `NamedTempFile::persist_noclobber`) | Local filesystem only — creates a same-directory temp file and commits or discards it; no network data flow; re-audited with `cargo xtask audit-deps` and `cargo audit` after promotion, no new advisories |
 | `muda` | 0.17.2 (vendored, F179) | `dioxus-desktop`'s native-menu crate | **Patched, path dependency** — see "Vendored crate" below |
 
 ### Accepted local WebView transport
@@ -661,7 +662,7 @@ The release-page URL the *Open release page* button launches
 three numeric fields — there is no code path from raw reply text into
 that URL, because there is no code path from raw reply text into a
 `Version` at all. The URL is then opened via
-`forskscope_core::external_tool::open_url`, which passes it to the
+`forskscope_desktop::external_tool::open_url`, which passes it to the
 platform's own opener (`xdg-open`/`open`/`cmd /C start`) as a single
 argument, never through a shell string.
 
@@ -744,7 +745,7 @@ never evaluated. `.xlsx` is read-only in every path.
   from `Limits::hardened()`) measures the file, while the allocation size comes
   from a field inside it, and `Limits::hardened()` was confirmed not to cover it;
   an allocation failure is an abort, not an `Err` any caller can catch.
-  **Reproduced here through `forskscope_core::xlsx::compare_pair`**, not accepted
+  **Reproduced here through `forskscope_compare::xlsx::compare_pair`**, not accepted
   on report, and pinned by a regression test that caps its own address space.
   **Whether it aborts depends on the host:** where the allocator can satisfy 9.26
   GB by overcommitting, the same input returns an ordinary *not an xlsx file* —

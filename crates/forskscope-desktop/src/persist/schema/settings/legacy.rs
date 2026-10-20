@@ -1,9 +1,10 @@
 //! Legacy v0 DTO: an exact, frozen mirror of the shipping UI's plain-JSON
 //! settings shape (`forskscope_ui::state::settings::AppSettings`).
 //!
-//! `forskscope-core` cannot depend on `forskscope-ui`, so this is a private
-//! copy, field-for-field including serde attributes. It must change only if
-//! the shipping v0 format itself changes, never to track v2 evolution.
+//! `forskscope-desktop` cannot depend on `forskscope-ui`, so this is a
+//! private copy, field-for-field including serde attributes. It must
+//! change only if the shipping v0 format itself changes, never to track v2
+//! evolution.
 
 use std::path::PathBuf;
 

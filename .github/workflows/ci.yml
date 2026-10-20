@@ -163,10 +163,10 @@ jobs:
         run: cargo xtask audit-deps
 
       - name: cargo test (headless release gate)
-        run: cargo test -p forskscope-compare -p forskscope-core -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
+        run: cargo test -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
 
       - name: cargo clippy (headless release gate)
-        run: cargo clippy -p forskscope-compare -p forskscope-core -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
+        run: cargo clippy -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
 
       - name: cargo test (workspace)
         run: cargo test --workspace

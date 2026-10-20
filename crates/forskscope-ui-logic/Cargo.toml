@@ -21,6 +21,6 @@ forskscope-edit               = { workspace = true }
 # F143: lets permission-guard tests (explore/deep_filter.rs,
 # explore/classify_pair.rs) tell "running as root" (a known, deliberate
 # reason a chmod-based guard has no effect) from anything else, which must
-# fail loudly instead of skip - same reviewed use as forskscope-core's own
-# cfg(unix) dev-dependency.
+# fail loudly instead of skip - same reviewed use as the other RFC-093
+# crates' own cfg(unix) dev-dependency.
 libc                         = { workspace = true }

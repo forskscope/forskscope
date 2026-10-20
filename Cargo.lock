@@ -1518,10 +1518,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "forskscope-core"
-version = "0.194.1"
-
-[[package]]
 name = "forskscope-desktop"
 version = "0.194.1"
 dependencies = [

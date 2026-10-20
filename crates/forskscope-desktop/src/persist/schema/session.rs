@@ -59,8 +59,8 @@ pub struct PersistedComparePair {
 // ── Legacy v0 DTO (exact mirror of the shipping UI's plain-JSON shape) ─────
 
 /// Mirrors `forskscope_ui::state::session::SessionState` field-for-field.
-/// `forskscope-core` cannot depend on `forskscope-ui`, so this is a private,
-/// intentionally frozen copy.
+/// `forskscope-desktop` cannot depend on `forskscope-ui`, so this is a
+/// private, intentionally frozen copy.
 #[derive(Debug, Deserialize)]
 struct LegacySessionStateV0 {
     tabs: Vec<(String, String)>,

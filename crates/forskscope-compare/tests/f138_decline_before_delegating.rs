@@ -98,8 +98,8 @@ fn a_crafted_cfb_header_is_declined_not_allocated() {
 
     let bad = fixture("tests/fixtures/f138/oom-artifact-512b.bin");
     // Any small, real workbook; only `bad`'s side matters here. Read through
-    // forskscope-core's own xlsx tests fixtures, not a scratch file, so
-    // nothing else in this test allocates unexpectedly under the cap.
+    // this crate's own xlsx tests fixtures, not a scratch file, so nothing
+    // else in this test allocates unexpectedly under the cap.
     let good = fixture("src/tests/fixtures/xlsx/basic/old.xlsx");
 
     let result = forskscope_compare::xlsx::compare_pair(&bad, &good);

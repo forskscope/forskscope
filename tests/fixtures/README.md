@@ -60,7 +60,7 @@ When adding a new fixture pair:
 ## `merge/` — Three-way merge corpus
 
 Each scenario is a base/left/right triple (`base_*.txt`, `left_*.txt`, `right_*.txt`).
-Loaded by `crates/forskscope-core/tests/merge_corpus.rs`.
+Loaded by `crates/forskscope-edit/tests/merge_corpus.rs`.
 
 | Scenario | Description |
 |----------|-------------|
@@ -75,6 +75,6 @@ Loaded by `crates/forskscope-core/tests/merge_corpus.rs`.
 
 1. Create `base_<scenario>.txt`, `left_<scenario>.txt`, `right_<scenario>.txt`
    in `tests/fixtures/merge/`.
-2. Add a `#[test]` in `crates/forskscope-core/tests/merge_corpus.rs` using
+2. Add a `#[test]` in `crates/forskscope-edit/tests/merge_corpus.rs` using
    `session("<scenario>")` to load the triple.
 3. Add a row to the table above.

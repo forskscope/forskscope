@@ -1,7 +1,8 @@
 //! Shared test infrastructure for permission-dependent tests (F143, handoff
-//! 063 §1) - see `forskscope-core`'s own `src/tests/support.rs` for the full
-//! rationale; this is the same fix, duplicated once per crate because this
-//! crate shares no test module with `forskscope-core` or `forskscope-ui`.
+//! 063 §1) - see `forskscope-compare`'s own `src/tests/support.rs` for the
+//! full rationale; this is the same fix, duplicated once per crate because
+//! this crate shares no test module with any of the RFC-093 crates or
+//! `forskscope-ui`.
 
 /// Whether this process can rely on Unix file-permission checks actually
 /// doing something. `false` only when running as root (euid 0) - the one

@@ -231,7 +231,9 @@ fn assert_no_direct_zip_dependency() {
     let manifests = [
         "Cargo.toml",
         "crates/forskscope-compare/Cargo.toml",
-        "crates/forskscope-core/Cargo.toml",
+        "crates/forskscope-desktop/Cargo.toml",
+        "crates/forskscope-edit/Cargo.toml",
+        "crates/forskscope-report/Cargo.toml",
         "crates/forskscope-ui/Cargo.toml",
         "crates/forskscope-ui-logic/Cargo.toml",
         "xtask/Cargo.toml",
@@ -743,7 +745,14 @@ fn run_version_sync(expected_version: Option<&str>) {
     }
 
     let cargo_lock = read_file(&root.join("Cargo.lock"));
-    for package in ["forskscope-core", "forskscope-ui", "forskscope-ui-logic"] {
+    for package in [
+        "forskscope-compare",
+        "forskscope-desktop",
+        "forskscope-edit",
+        "forskscope-report",
+        "forskscope-ui",
+        "forskscope-ui-logic",
+    ] {
         let expected = format!("name = \"{package}\"\nversion = \"{version}\"");
         if !cargo_lock.contains(&expected) {
             fail(&format!(

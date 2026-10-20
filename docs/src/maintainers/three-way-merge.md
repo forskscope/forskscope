@@ -1,8 +1,8 @@
 # Three-way merge model
 
-`forskscope-core::merge::ThreeWayMergeSession` implements the base-aware
+`forskscope-edit::merge::ThreeWayMergeSession` implements the base-aware
 merge model defined in [RFC-033](https://github.com/forskscope/forskscope/blob/main/rfcs/done/033-three-way-merge-model.md).
-It lives entirely in the core crate and is independent of any UI.
+It lives entirely in the edit crate and is independent of any UI.
 
 ## Algorithm
 

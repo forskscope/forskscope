@@ -442,7 +442,7 @@ fn a_long_japanese_line_differing_in_one_character_is_refined_not_panicking() {
 /// be fast. `#[ignore]`d: timing assertions do not belong in the default
 /// suite (flaky under CI load, and a debug build's constant-factor noise
 /// could trip a tight bound for reasons unrelated to the fix). Run with
-/// `cargo test --release -p forskscope-core -- --ignored a_400_000`.
+/// `cargo test --release -p forskscope-compare -- --ignored a_400_000`.
 #[test]
 #[ignore = "timing assertion; run explicitly in release mode"]
 fn a_400_000_character_line_differing_in_one_character_is_fast() {

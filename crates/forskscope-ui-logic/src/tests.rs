@@ -1,4 +1,4 @@
-//! Tests for the view-model modules moved in from `forskscope-core`
+//! Tests for the view-model modules moved in from the old `forskscope-core`
 //! (RFC-093 §1 step 5): `command`, `conflict_nav`, `diff_decoration`,
 //! `line_map`. Every other module in this crate keeps its tests inline
 //! (`#[cfg(test)] mod tests` at the bottom of the file) - these four keep

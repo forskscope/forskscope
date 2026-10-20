@@ -39,10 +39,11 @@ string — producing crashes from NULL-pointer dereferences. Fixed in `glib`
 
 **Dependency path.** `glib` is transitive through the Linux GTK/WebKitGTK
 desktop backend, reached via `dioxus-desktop` → (`tao`, `wry`, `muda`,
-`tray-icon`) → `gtk`/`gdk`/`webkit2gtk` → `glib`. ForskScope's own crates
-(`forskscope-core`, `forskscope-ui-logic`, `forskscope-ui`) never depend on
-`glib` directly — confirmed by `grep -rn "glib::\|use glib" crates/` finding
-no matches.
+`tray-icon`) → `gtk`/`gdk`/`webkit2gtk` → `glib`. None of ForskScope's own
+crates (`forskscope-compare`, `forskscope-report`, `forskscope-edit`,
+`forskscope-desktop`, `forskscope-ui-logic`, `forskscope-ui`) ever depends
+on `glib` directly — confirmed by `grep -rn "glib::\|use glib" crates/`
+finding no matches.
 
 **Reachability — not reachable, established two ways.** `VariantStrIter::new`
 (`glib-0.18.5/src/variant_iter.rs:108-109`) is `pub(crate)` — **the type has

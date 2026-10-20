@@ -13,7 +13,7 @@
 //! ## Schema versioning (F31, decided 2026-08-13)
 //!
 //! [`BatchManifest::to_json`] hand-rolls JSON with no schema envelope
-//! (`forskscope-core::persist` does not cover it) and stays that way
+//! (`forskscope-desktop::persist` does not cover it) and stays that way
 //! deliberately, not by oversight: [`restore_from_manifest`] operates
 //! directly on the in-memory `BatchManifest` produced by the batch that just
 //! ran — nothing in ForskScope ever reads a manifest `.json` file back off

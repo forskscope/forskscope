@@ -3,17 +3,24 @@
 ## Running tests
 
 ```sh
-# Core domain logic (no GTK required)
-cargo test -p forskscope-core
+# Each engine crate, individually (none requires GTK) - RFC-093
+cargo test -p forskscope-compare
+cargo test -p forskscope-report
+cargo test -p forskscope-edit
+cargo test -p forskscope-desktop
 
 # View-model layer (no GTK required)
 cargo test -p forskscope-ui-logic
 
 # Headless test gate
-cargo test -p forskscope-core -p forskscope-ui-logic
+cargo test -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
 
 # Clippy (must pass without warnings)
-cargo clippy -p forskscope-core -p forskscope-ui-logic -- -D warnings
+cargo clippy -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
+
+# Crate-boundary rules: no file writes or process spawns in compare/report
+# outside #[cfg(test)], and the dependency graph matches RFC-093 §1's table
+cargo xtask crate-boundaries
 
 # Full workspace gates used by CI when GTK/WebKitGTK dependencies are present
 cargo test --workspace
@@ -62,8 +69,8 @@ needs a dedicated shell, not a bare `cargo test` invocation; see
 `ci.yml`'s own "File permission tests under a non-default umask" step.
 
 The UI crate (`forskscope-ui`) requires WebKitGTK/GTK3 to build and cannot
-be tested in environments without a display server. Core and ui-logic tests
-run anywhere Rust is installed.
+be tested in environments without a display server. The four engine crates
+and ui-logic run anywhere Rust is installed.
 
 ## `cargo audit`'s cadence (F55, refined per review 059 N1)
 
@@ -162,72 +169,105 @@ The suites, for orientation:
 
 | Suite | Where |
 |-------|-------|
-| `forskscope-core` unit | `crates/forskscope-core/src/tests/` |
-| `forskscope-core` integration | `crates/forskscope-core/tests/` — `diff_corpus`, `merge_corpus`, `patch_apply` (shells out to real `git apply` and `patch -p1`) |
-| `forskscope-ui-logic` unit | inline `#[cfg(test)]` modules |
+| `forskscope-compare`/`-report`/`-edit`/`-desktop` unit | `crates/<crate>/src/tests/` (RFC-093) |
+| `forskscope-compare`/`-report`/`-edit`/`-desktop` integration | `crates/<crate>/tests/` — `diff_corpus`, `f138_decline_before_delegating` (compare); `patch_apply` (report, shells out to real `git apply` and `patch -p1`); `merge_corpus` (edit) |
+| `forskscope-ui-logic` unit | inline `#[cfg(test)]` modules, plus `command`/`conflict_nav`/`diff_decoration`/`line_map`'s external `tests/*_tests.rs` files (moved in from the old `forskscope-core`, RFC-093 §1 step 5) |
 | `forskscope-ui-logic` integration | `crates/forskscope-ui-logic/tests/css_coverage.rs` |
 | `forskscope-ui` lib and bin | inline `#[cfg(test)]` modules, compiled twice (library and binary targets) |
-| doctests | `forskscope-core` |
+| doctests | `forskscope-compare`, `forskscope-edit`, `forskscope-desktop` |
 
-## `forskscope-core` test modules
+## `forskscope-compare` test modules
 
-Tests live in `crates/forskscope-core/src/tests/` and are declared in `tests.rs`.
+Tests live in `crates/forskscope-compare/src/tests/` and are declared in `tests.rs`.
 
 | File | Covers | RFC |
 |---|---|---|
 | `app_error_tests` | `AppError::from_core`, `is_blocking`, `is_recoverable`, `ErrorId`, `TechnicalDetail`. | RFC-017 |
-| `batch_tests` | `batch_copy`, `restore_from_manifest`, `BatchManifest`. | RFC-023 |
 | `cancel_tests` | `CancellationToken::new`/`cancel`/idempotent; clone propagation (original→clone, clone→original, clone-of-clone); `Default`; `Debug`. | RFC-037, RFC-008 |
-| `command_tests` | `AvailabilityRule` evaluation, `CommandRegistry` uniqueness/search/shortcut lookup, `CommandDangerLevel`. | RFC-019 |
-| `compare_prep_tests` | `save_target_from_loaded`/`inspect_save_target` — the prepared-comparison save-target derivation for normal compare and Git mergetool mode. | RFC-077 |
 | `compare_profile_tests` | `CompareProfile` presets, `to_diff_options`, `NewlineCompareMode` engine wiring. | RFC-028 |
-| `conflict_nav_tests` | `ConflictNavigator` build/focus/prev/next/filter, `ConflictStatusDisplay` glyphs, summary counts, progress fraction. | RFC-034 |
-| `diff_decoration_tests` | `DiffDecorationSet` from diff, CSS class uniqueness/prefix, gutter symbols, aria labels, focused hunk marking. | RFC-024 |
 | `diff_tests` | `compute_diff`, hunk kinds, inline spans, equal/insert/delete/replace, whitespace/case modes. | RFC-002 |
 | `dir_cancel_tests` | `recursive_diff_with_cancel`, cancellation mid-scan. | RFC-037 |
 | `dir_ignore_tests` | Ignore rules reach the recursive directory walk: an ignored subtree is never walked or reported, shown by making it unreadable so a walk that descended would fail. | RFC-056 |
 | `dir_tests` | Directory listing, recursive digest equality, `file_digest_equal`. | RFC-022 |
 | `dir_unreadable_tests` | An unreadable entry is always visible — never silently dropped, never asserted as a verdict — and an unopenable root is distinguishable from an empty tree. | F79 |
 | `document_tests` | `LoadedDocument`, `FileFingerprint`, `check_external_state`, `ExternalFileState`. | RFC-036 |
-| `edit_op_tests` | `TextEditOperation` variants, `RevisionId`, `TextRange`, revision compatibility, `EditTransaction`. | RFC-032 |
 | `editability_tests` | `EditabilityClass::from_kind`, `requires_save_guard`, `NewlinePolicy::resolve`. | RFC-012 |
 | `encoding_tests` | `decode_bytes`, `detect_newline_style`, `BomPresence`, `BomPolicy`, `detect_bom`. | RFC-012 |
-| `env_passthrough_tests` | `record_before_override`/`restore_onto` — a recorded variable is restored onto a `Command`, an unset one is removed rather than left at its overridden value, and an unrecorded variable is left untouched. | RFC-091 |
 | `error_tests` | `CoreError` variants, `AppErrorKind::from_core`, `RecoveryAction` defaults. | RFC-017 |
 | `external_state_tests` | `check_external_state` with mocked fingerprints. | RFC-036 |
-| `external_tool_tests` | `expand_args` placeholder expansion; shell safety (spaces, semicolons, $HOME, backticks); built-in presets. | RFC-029 |
 | `file_kind_tests` | `FileKind::is_mergeable_text` all variants; `classify` via tempfiles (text/binary/xlsx/uppercase-xlsx/empty/directory). | RFC-001 |
 | `file_size_tests` | `FileSizeClass::classify` against `PerformanceLimits` thresholds. | RFC-013 |
 | `ignore_tests` | `IgnoreRules::from_settings`, extension and directory pattern matching. | RFC-056 |
 | `job_tests` | `JobStatus` lifecycle transitions, `JobStatusRecord`, `JobRegistry` register/get/active/prune. | RFC-008 |
-| `line_map_tests` | `LineMap` row states, navigation, `ScrollAnchor` clamping, `build_mini_map` weight sum. | RFC-035 |
-| `merge_plan_tests` | `plan_operations`, `execute_plan`, `OperationPlan` safety. | RFC-022 |
-| `merge_tests` | `MergeSession` apply/undo/redo, dirty state, `result_text`, transaction log. | RFC-006 |
-| `patch_tests` | `patch_from_file_diff`, `to_unified`; GNU `patch` round-trip integration. | RFC-039 |
 | `path_tests` | `split_parent_name`, `has_extension` (case-insensitive, dotfile edge cases), `display`, `canonicalize_lenient` (nonexistent/absolute/edge inputs). | RFC-001 |
-| `persist_v2_repository_tests` | Explicit-path repository safe-write tests: `Missing` on an absent file, save/load round-trip, migration-commit backup semantics (created once, never overwritten by a retry), no stray temp file after an ordinary save. | RFC-076 |
-| `persist_v2_runtime_tests` | The settings/session runtime adapter (`resolve_and_commit`) end to end against real temp-path repositories: fresh/current pass through unchanged, legacy files migrate, future/corrupt sources disable writes. | RFC-076 |
-| `persist_v2_schema_enum_wire_format_tests` | Per-variant exact wire-string assertions for every schema enum `PersistedSettings` reuses directly — independent of any fixture, so a variant rename fails here even where a fixture's own value happens not to exercise it (F26). | RFC-076 |
-| `persist_v2_session_tests` | Session schema v2 routing, migration and validation; the legacy v1 envelope (never shipped) is preserved as `Corrupt`, never silently reinterpreted. | RFC-076 |
-| `persist_v2_settings_tests` | Settings schema v2 routing, migration and validation: current-envelope round-trip, exact field-for-field legacy v0 migration, future/corrupt/unrecognized-legacy handling, unknown payload fields tolerated, range/index normalization. | RFC-076 |
-| `platform_tests` | `PlatformInfo::collect` non-panic; `os`/`arch`/`app_version` non-empty; `to_report` format; home redaction (`***`); determinism; `logical_cpus` positive. | RFC-026 |
-| `report_tests` | `FileComparisonReport`, `DirComparisonReport`, Markdown/JSON output. | RFC-027 |
-| `save_target_tests` | `TargetPrecondition`/`check_precondition` and the no-clobber commit (`persist_noclobber`) directly, as primitives — `save_tests` covers their integration through `save_text`. | RFC-077 |
-| `save_tests` | `save_text` with fingerprint match, `TargetPrecondition`, `BackupPolicy`. | RFC-007 |
 | `support` | No tests of its own — shared `chmod`-based "make this unreadable" helpers for every permission-dependent test in this crate. | F143 |
-| `three_way_tests` | `ThreeWayMergeSession` conflicts, resolution, undo/redo, `can_save`, `result_text`. | RFC-033 |
-| `transaction_log_tests` | `TransactionLog` push/undo/redo/mark_saved, `is_dirty`. | RFC-015 |
-| `vcs_tests` | `GitProvider::detect`, `VcsProvider` trait contract. | RFC-038 |
-| `watcher_tests` | `MockFileChangeMonitor` watch/inject/poll/drain, `WatchError`, `FileChangeKind`. | RFC-036 |
-| `xlsx_tests` | Fail-closed spreadsheet comparison behavior: an unreadable pair errors instead of comparing as empty. | RFC-058 |
+| `xlsx_tests` | Fail-closed spreadsheet comparison behavior: an unreadable pair errors instead of comparing as empty. Built only with the `spreadsheet` feature (on by default). | RFC-058 |
 
 Integration tests in `tests/`:
 
 | File | Count | Covers |
 |---|---|---|
 | `diff_corpus` | 27 | Corpus-driven `compute_diff` correctness: identical, insertions, deletions, reordered, empty, LF vs CRLF, no-final-newline, whitespace/trailing/tabs, case, function edit, Unicode, UTF-8 BOM, large files (200 lines), binary classification. Fixtures in `tests/fixtures/`. |
+| `f138_decline_before_delegating` | 2 | A crafted CFB header declines before the full-file allocation it would otherwise trigger, capping this process's own address space first so the regression fails loudly (F138). Unix only. |
+
+## `forskscope-report` test modules
+
+Tests live in `crates/forskscope-report/src/tests/` and are declared in `tests.rs`.
+
+| File | Covers | RFC |
+|---|---|---|
+| `build_tests` | `build_dir_report`/`BuildOutcome` (read-hash-diff every entry, stale-on-re-read refusal, the content cap); `checksum_if_fingerprinted`; `build_file_report`'s own `from_diff` + `with_checksums` wiring. Moved in from `forskscope-ui` (RFC-093 §1 step 6). | RFC-092 §5 |
+| `patch_tests` | `patch_from_file_diff`, `to_unified`; GNU `patch` round-trip integration. | RFC-039 |
+| `report_tests` | `FileComparisonReport`, `DirComparisonReport`, Markdown/JSON output. | RFC-027 |
+| `support` | No tests of its own — shared `chmod`-based "make this unreadable" helpers for every permission-dependent test in this crate. | F143 |
+
+Integration tests in `tests/`:
+
+| File | Count | Covers |
+|---|---|---|
+| `patch_apply` | 5 | Generates a unified-diff patch and verifies it applies with GNU `patch` and `git apply` (CRLF, mixed-newline, space-in-path conformance; RFC-039, RFC-084). |
+
+## `forskscope-edit` test modules
+
+Tests live in `crates/forskscope-edit/src/tests/` and are declared in `tests.rs`.
+
+| File | Covers | RFC |
+|---|---|---|
+| `batch_tests` | `batch_copy`, `restore_from_manifest`, `BatchManifest`. | RFC-023 |
+| `compare_prep_tests` | `save_target_from_loaded`/`inspect_save_target` — the prepared-comparison save-target derivation for normal compare and Git mergetool mode. | RFC-077 |
+| `dir_tests` | `copy_file`'s backup-and-overwrite and destination-parent-dir creation — the write half of `dir`; the read half's own `dir_tests` lives in `forskscope-compare`. | RFC-093 §1 |
+| `edit_op_tests` | `TextEditOperation` variants, `RevisionId`, `TextRange`, revision compatibility, `EditTransaction`. | RFC-032 |
+| `merge_plan_tests` | `plan_operations`, `execute_plan`, `OperationPlan` safety. | RFC-022 |
+| `merge_tests` | `MergeSession` apply/undo/redo, dirty state, `result_text`, transaction log. | RFC-006 |
+| `save_target_tests` | `TargetPrecondition`/`check_precondition` and the no-clobber commit (`persist_noclobber`) directly, as primitives — `save_tests` covers their integration through `save_text`. | RFC-077 |
+| `save_tests` | `save_text` with fingerprint match, `TargetPrecondition`, `BackupPolicy`. | RFC-007 |
+| `support` | No tests of its own — shared `chmod`-based "make this unreadable" helpers for every permission-dependent test in this crate. | F143 |
+| `three_way_tests` | `ThreeWayMergeSession` conflicts, resolution, undo/redo, `can_save`, `result_text`. | RFC-033 |
+| `transaction_log_tests` | `TransactionLog` push/undo/redo/mark_saved, `is_dirty`. | RFC-015 |
+
+Integration tests in `tests/`:
+
+| File | Count | Covers |
+|---|---|---|
 | `merge_corpus` | 16 | Corpus-driven `ThreeWayMergeSession` correctness across 6 fixture triples: no-conflict auto-merge, conflict detection and resolution (left/right), identical-both-sides dedup, one-sided insert, CRLF preservation, multiple conflicts. Fixtures in `tests/fixtures/merge/`. |
-| `patch_apply` | 2 | Generates a unified-diff patch and verifies it applies with GNU `patch`. |
+
+## `forskscope-desktop` test modules
+
+Tests live in `crates/forskscope-desktop/src/tests/` and are declared in `tests.rs`.
+
+| File | Covers | RFC |
+|---|---|---|
+| `env_passthrough_tests` | `record_before_override`/`restore_onto` — a recorded variable is restored onto a `Command`, an unset one is removed rather than left at its overridden value, and an unrecorded variable is left untouched. | RFC-091 |
+| `external_tool_tests` | `expand_args` placeholder expansion; shell safety (spaces, semicolons, $HOME, backticks); built-in presets. | RFC-029 |
+| `persist_v2_repository_tests` | Explicit-path repository safe-write tests: `Missing` on an absent file, save/load round-trip, migration-commit backup semantics (created once, never overwritten by a retry), no stray temp file after an ordinary save. | RFC-076 |
+| `persist_v2_runtime_tests` | The settings/session runtime adapter (`resolve_and_commit`) end to end against real temp-path repositories: fresh/current pass through unchanged, legacy files migrate, future/corrupt sources disable writes. | RFC-076 |
+| `persist_v2_schema_enum_wire_format_tests` | Per-variant exact wire-string assertions for every schema enum `PersistedSettings` reuses directly — independent of any fixture, so a variant rename fails here even where a fixture's own value happens not to exercise it (F26). | RFC-076 |
+| `persist_v2_session_tests` | Session schema v2 routing, migration and validation; the legacy v1 envelope (never shipped) is preserved as `Corrupt`, never silently reinterpreted. | RFC-076 |
+| `persist_v2_settings_tests` | Settings schema v2 routing, migration and validation: current-envelope round-trip, exact field-for-field legacy v0 migration, future/corrupt/unrecognized-legacy handling, unknown payload fields tolerated, range/index normalization. | RFC-076 |
+| `platform_tests` | `PlatformInfo::collect` non-panic; `os`/`arch`/`app_version` non-empty; `to_report` format; home redaction (`***`); determinism; `logical_cpus` positive. | RFC-026 |
+| `support` | No tests of its own — shared `chmod`-based "make this unreadable" helpers for every permission-dependent test in this crate. | F143 |
+| `vcs_tests` | `GitProvider::detect`, `VcsProvider` trait contract. | RFC-038 |
+| `watcher_tests` | `MockFileChangeMonitor` watch/inject/poll/drain, `WatchError`, `FileChangeKind`. | RFC-036 |
 
 ## `forskscope-ui-logic` test modules
 
@@ -381,7 +421,7 @@ is not covered by any unit test, so the running app is the only check for it.
 
 ## The `.xlsx` corpus, and the sizes it covers
 
-The spreadsheet tests in `forskscope-core/src/xlsx.rs` read real workbooks from
+The spreadsheet tests in `forskscope-compare/src/xlsx.rs` read real workbooks from
 `src/tests/fixtures/xlsx/`, which `cargo xtask xlsx-fixtures` generates and
 `--check` verifies. The corpus is described case by case in that directory's
 `README.md`, with each case's recipe.

@@ -467,7 +467,7 @@ pub fn run(root: &Path) {
 
 // ── Review 174 §5: the HTML report's copied colours, guarded against drift ──
 //
-// `report::html.rs` (forskscope-core) cannot read `01-tokens.css` itself -
+// `report::html.rs` (forskscope-report) cannot read `01-tokens.css` itself -
 // it has no asset pipeline and must stay buildable with no GUI dependency -
 // so RFC-092's light-theme diff colours are copied in as literal hex in two
 // `Palette` consts, `STANDARD`/`RED_GREEN_SAFE`. That copy has no mechanism
