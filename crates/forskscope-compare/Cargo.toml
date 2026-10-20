@@ -35,6 +35,13 @@ similar                     = { workspace = true }
 [dev-dependencies]
 tempfile                    = { workspace = true }
 
+# F138's CFB-decline regression only exercises xlsx loading, so it needs the
+# spreadsheet feature — without this, cargo would try to compile it unguarded
+# under --no-default-features and fail (RFC-093 acceptance criterion 4).
+[[test]]
+name = "f138_decline_before_delegating"
+required-features = ["spreadsheet"]
+
 [target.'cfg(unix)'.dev-dependencies]
 # F138: caps this process's own address space before opening a crafted CFB
 # header, so the regression this guards against (a huge allocation instead of
