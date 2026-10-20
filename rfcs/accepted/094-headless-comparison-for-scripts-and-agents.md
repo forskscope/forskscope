@@ -278,6 +278,10 @@ would be its own small decision, later.
      the pair with it.
 5. **No network:** under `strace -f -e trace=network` on Linux, neither mode
    opens a socket.
+   *Clarified 2026-10-21 (architect):* `strace` is not installed on the
+   project's Linux machine. An equivalent observer is accepted if it can fail:
+   for example, an `LD_PRELOAD` library logging every `socket` and `connect`
+   call, shown catching a deliberate socket in a test build.
 6. **No writes:** a run of each mode, against a home folder overlaid as
    writable, leaves the overlay empty. This is the RFC-091 method.
 7. **The guide page and the threat model** describe exactly the behaviour
