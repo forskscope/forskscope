@@ -13,7 +13,7 @@ use dioxus::prelude::*;
 use forskscope_compare::diff::{
     HunkKind, InlineDiff, InlineKind, pair_over_inline_limit, refine_pair,
 };
-use forskscope_core::merge::{HunkState, MergeHunk};
+use forskscope_edit::merge::{HunkState, MergeHunk};
 
 use crate::i18n::t;
 use crate::state::{Lang, Store};
@@ -584,7 +584,7 @@ mod tests {
                 right,
                 forskscope_compare::DiffOptions::default(),
             );
-            let merge = forskscope_core::MergeSession::from_diff(&diff);
+            let merge = forskscope_edit::MergeSession::from_diff(&diff);
             let hunk = merge
                 .hunks()
                 .iter()

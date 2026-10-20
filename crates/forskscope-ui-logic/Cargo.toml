@@ -14,6 +14,11 @@ repository.workspace    = true
 forskscope-compare           = { workspace = true }
 forskscope-core             = { path = "../forskscope-core" }
 
+[dev-dependencies]
+# tests/css_coverage.rs exercises a ThreeWayMergeSession to cover its CSS
+# classes - the only use of forskscope-edit in this crate.
+forskscope-edit               = { workspace = true }
+
 [target.'cfg(unix)'.dev-dependencies]
 # F143: lets permission-guard tests (explore/deep_filter.rs,
 # explore/classify_pair.rs) tell "running as root" (a known, deliberate

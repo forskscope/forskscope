@@ -10,8 +10,8 @@
 use std::fs;
 use std::path::Path;
 
-use forskscope_core::ConflictId;
-use forskscope_core::merge::ThreeWayMergeSession;
+use forskscope_edit::ConflictId;
+use forskscope_edit::merge::ThreeWayMergeSession;
 
 fn load(path: &str) -> String {
     let manifest =

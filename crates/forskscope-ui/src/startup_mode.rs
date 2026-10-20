@@ -110,7 +110,7 @@ pub(crate) fn config_dir() -> Option<PathBuf> {
 /// The folder batch-copy manifests are written to. `None` in Private mode,
 /// in a read-only Portable location (RFC-091 §2: "writes nothing
 /// anywhere"), and whenever the Installed platform folder cannot be found —
-/// `forskscope_core::dir::batch_copy` already treats `None` as "write no
+/// `forskscope_edit::dir::batch_copy` already treats `None` as "write no
 /// manifest", so neither case needs a separate gate here: both reach the
 /// same "nothing kept" outcome through the existing optional-manifest path
 /// rather than a new one.

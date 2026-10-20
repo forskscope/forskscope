@@ -16,7 +16,7 @@
 //! ## Shared vocabulary (F82)
 //!
 //! [`RowStatusKind`] (this module, Explorer) and `RecStatus`
-//! (`forskscope_core::dir`, Deep Compare) describe different things — an
+//! (`forskscope_compare::dir`, Deep Compare) describe different things — an
 //! explorer-tree row versus a recursive scan result — and stay separate
 //! types; they are not merged here. What both views need to be the same
 //! is the *presentation* for the concepts they share, so [`StatusGlyph`]

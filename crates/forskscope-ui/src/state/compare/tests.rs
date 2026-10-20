@@ -44,7 +44,7 @@ fn token(tab: &CompareTab) -> LoadToken {
 fn ready_result(can_save: bool) -> LoadResult {
     let right = PathBuf::from("right");
     let save_target =
-        forskscope_core::compare_prep::save_target_from_loaded(&right, &LoadedDocument::empty());
+        forskscope_edit::compare_prep::save_target_from_loaded(&right, &LoadedDocument::empty());
     let save_capability = if can_save {
         SaveCapability::Saveable
     } else {
@@ -168,7 +168,7 @@ fn accepted_ready_result_resets_transient_navigation_state() {
 
 // ── load_and_diff (RFC-077 patches 3-4a: PreparedCompare, CompareRequest) ──
 
-use forskscope_core::compare_prep::{SaveTargetState, TargetExpectation};
+use forskscope_edit::compare_prep::{SaveTargetState, TargetExpectation};
 
 fn temp_dir(tag: &str) -> PathBuf {
     let dir =
@@ -906,7 +906,7 @@ fn a_file_that_decoded_with_replacement_characters_cannot_be_saved_without_the_g
     .unwrap();
     assert_eq!(
         prepared.save_capability,
-        forskscope_core::compare_prep::SaveCapability::SaveableWithGuard,
+        forskscope_edit::compare_prep::SaveCapability::SaveableWithGuard,
         "test setup: the right side must have decoded with replacement characters"
     );
 
@@ -976,7 +976,7 @@ fn a_missing_right_side_can_be_created_by_saving() {
     .unwrap();
     assert_eq!(
         prepared.save_capability,
-        forskscope_core::compare_prep::SaveCapability::Saveable,
+        forskscope_edit::compare_prep::SaveCapability::Saveable,
         "a missing side must not block saving, and must not require a guard"
     );
 
@@ -1122,7 +1122,7 @@ fn a_cleanly_decoded_non_utf8_file_is_not_swept_into_the_new_guard() {
     );
     assert_eq!(
         prepared.save_capability,
-        forskscope_core::compare_prep::SaveCapability::Saveable,
+        forskscope_edit::compare_prep::SaveCapability::Saveable,
         "a clean non-UTF-8 decode must not require F88a's guard — only \
          had_decode_errors does"
     );

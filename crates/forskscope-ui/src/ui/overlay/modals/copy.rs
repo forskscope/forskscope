@@ -27,12 +27,12 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
                     button {
                         onclick: move |_| {
-                            use forskscope_core::dir::{BatchItem, BatchFailurePolicy, batch_copy};
+                            use forskscope_edit::dir::{BatchItem, BatchFailurePolicy, batch_copy};
                             let items = vec![BatchItem { src: op.src.clone(), dst: op.dst.clone() }];
                             let manifest_dir = crate::startup_mode::manifest_dir();
                             let result_spec = match batch_copy(
                                 &items,
-                                forskscope_core::BackupPolicy::SiblingBak,
+                                forskscope_edit::BackupPolicy::SiblingBak,
                                 BatchFailurePolicy::ContinueOnFailure,
                                 manifest_dir.as_deref(),
                             ) {
@@ -44,7 +44,7 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
                                     }
                                     let failure_details = manifest.entries.iter()
                                         .filter_map(|e| {
-                                            if let forskscope_core::dir::EntryOutcome::Failed { error } = &e.outcome {
+                                            if let forskscope_edit::dir::EntryOutcome::Failed { error } = &e.outcome {
                                                 Some(format!("{}: {}", e.dst.display(), error))
                                             } else { None }
                                         })
@@ -90,21 +90,21 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
                     button {
                         onclick: move |_| {
-                            use forskscope_core::dir::{BatchItem, BatchFailurePolicy, batch_copy};
+                            use forskscope_edit::dir::{BatchItem, BatchFailurePolicy, batch_copy};
                             let items: Vec<BatchItem> = spec.items.iter()
                                 .map(|(s, d)| BatchItem { src: s.clone(), dst: d.clone() })
                                 .collect();
                             let manifest_dir = crate::startup_mode::manifest_dir();
                             let result_spec = match batch_copy(
                                 &items,
-                                forskscope_core::BackupPolicy::SiblingBak,
+                                forskscope_edit::BackupPolicy::SiblingBak,
                                 BatchFailurePolicy::ContinueOnFailure,
                                 manifest_dir.as_deref(),
                             ) {
                                 Ok(manifest) => {
                                     let failure_details = manifest.entries.iter()
                                         .filter_map(|e| {
-                                            if let forskscope_core::dir::EntryOutcome::Failed { error } = &e.outcome {
+                                            if let forskscope_edit::dir::EntryOutcome::Failed { error } = &e.outcome {
                                                 Some(format!("{}: {}", e.dst.display(), error))
                                             } else { None }
                                         })

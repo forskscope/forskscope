@@ -6,8 +6,8 @@ use dioxus::prelude::*;
 use forskscope_compare::diff::DiffDocument;
 use forskscope_compare::document::LoadedDocument;
 use forskscope_compare::{DiffOptions, compute_diff};
-use forskscope_core::MergeSession;
-use forskscope_core::compare_prep::{
+use forskscope_edit::MergeSession;
+use forskscope_edit::compare_prep::{
     SaveCapability, SaveTargetSnapshot, save_capability, save_target_from_loaded,
 };
 use forskscope_ui_logic::{CompareTabId, LoadGeneration};

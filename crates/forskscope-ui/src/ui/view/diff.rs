@@ -323,7 +323,7 @@ pub(crate) fn inline_available(opts: &forskscope_compare::DiffOptions) -> bool {
 
 #[derive(Clone, PartialEq)]
 pub struct TabSnapshot {
-    pub hunks: Vec<forskscope_core::merge::MergeHunk>,
+    pub hunks: Vec<forskscope_edit::merge::MergeHunk>,
     pub identical: bool,
     pub char_mode: bool,
     /// `false` when inline diff is unavailable for this tab — see
@@ -616,8 +616,8 @@ mod spreadsheet_warning_tests {
     fn snapshot_with(warnings: Vec<SpreadsheetWarning>, lang: Lang) -> TabSnapshot {
         use crate::state::tab::{CompareLaunchMode, TabState};
         use forskscope_compare::{DiffDocument, DiffOptions};
-        use forskscope_core::MergeSession;
-        use forskscope_core::compare_prep::{SaveCapability, SaveCapabilityBlockReason};
+        use forskscope_edit::MergeSession;
+        use forskscope_edit::compare_prep::{SaveCapability, SaveCapabilityBlockReason};
         use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
         let tab = crate::state::CompareTab {

@@ -259,7 +259,11 @@ fn commit_backup(staged: tempfile::NamedTempFile, bak: &Path, target: &Path) -> 
 ///
 /// F121 B: when `target` already exists its permission bits are carried onto
 /// the replacement before the rename (unix). See [`carry_mode`].
-pub(crate) fn atomic_replace(target: &Path, bytes: &[u8]) -> Result<()> {
+///
+/// `pub`, not `pub(crate)` (RFC-093 §1): `forskscope-desktop`'s settings and
+/// session persistence reuses this same atomic-write primitive from outside
+/// this crate.
+pub fn atomic_replace(target: &Path, bytes: &[u8]) -> Result<()> {
     atomic_replace_checked(target, bytes, || Ok(()))
 }
 

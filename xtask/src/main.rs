@@ -9,7 +9,7 @@
 //!   cargo xtask rfc-sync      — verify ROADMAP.md's RFC table agrees with rfcs/proposed/ (F83)
 //!   cargo xtask ui-logic-connectivity — verify every forskscope-ui-logic crate-root export has a consumer in forskscope-ui (F54)
 //!   cargo xtask ui-logic-docs — verify architecture.md/testing.md's ui-logic module tables match disk (F93)
-//!   cargo xtask xlsx-fixtures           — regenerate the .xlsx test fixtures under forskscope-core (F134)
+//!   cargo xtask xlsx-fixtures           — regenerate the .xlsx test fixtures under forskscope-compare (F134)
 //!   cargo xtask xlsx-fixtures --check   — verify the committed fixtures match what the generator produces
 //!   cargo xtask xlsx-fixtures --scale <dir> — write the size cases (a handful of rows against 40,000; 2,000 rows) to <dir>, never into the repository
 //!   cargo xtask pages-origin-check <index.html> — verify a page loads nothing from another origin (handoff 075 §1)

@@ -1044,7 +1044,7 @@ mod tests {
         assert!(html.contains("b.txt"));
         // Review 174 §3: the app's own words - the same ones
         // deep_compare.rs's status_label reads, via the shared
-        // forskscope_core::dir::status_key - not the report model's own
+        // forskscope_compare::dir::status_key - not the report model's own
         // invented "equal"/"modified" (those stay in to_markdown/to_json
         // only, RFC-092 §6).
         assert!(html.contains("Identical"));

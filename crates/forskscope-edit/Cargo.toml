@@ -1,0 +1,24 @@
+[package]
+name        = "forskscope-edit"
+description = "ForskScope's write path: merge sessions, edit operations, atomic save, and folder batch copy/plan/execute."
+readme      = "../../README.md"
+
+version.workspace       = true
+edition.workspace       = true
+rust-version.workspace  = true
+license.workspace       = true
+authors.workspace       = true
+repository.workspace    = true
+
+[dependencies]
+forskscope-compare           = { workspace = true }
+similar                       = { workspace = true }
+# RFC-077: promoted from dev-dependency for the mergetool save target's
+# no-clobber commit (`save::persist_noclobber`), which needs
+# `NamedTempFile::persist_noclobber` at runtime, not only in tests.
+tempfile                      = { workspace = true }
+
+[target.'cfg(unix)'.dev-dependencies]
+# F138/F143: this crate's own copy of the permission-guard test helper -
+# see its doc comment in src/tests/support.rs.
+libc                           = { workspace = true }

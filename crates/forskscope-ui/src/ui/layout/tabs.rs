@@ -231,8 +231,8 @@ mod tests {
         BomPresence, DiffOptions, FileKind, LoadedDocument, NewlineStyle, TextDocument,
         TextEncoding, compute_diff,
     };
-    use forskscope_core::MergeSession;
-    use forskscope_core::compare_prep::SaveCapability;
+    use forskscope_edit::MergeSession;
+    use forskscope_edit::compare_prep::SaveCapability;
     use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
     use super::TabBar;

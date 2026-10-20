@@ -163,10 +163,10 @@ jobs:
         run: cargo xtask audit-deps
 
       - name: cargo test (headless release gate)
-        run: cargo test -p forskscope-compare -p forskscope-core -p forskscope-report -p forskscope-ui-logic
+        run: cargo test -p forskscope-compare -p forskscope-core -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
 
       - name: cargo clippy (headless release gate)
-        run: cargo clippy -p forskscope-compare -p forskscope-core -p forskscope-report -p forskscope-ui-logic -- -D warnings
+        run: cargo clippy -p forskscope-compare -p forskscope-core -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
 
       - name: cargo test (workspace)
         run: cargo test --workspace
@@ -194,12 +194,12 @@ jobs:
       - name: File permission tests under a non-default umask (F41)
         run: |
           umask 077
-          if ! cargo test -p forskscope-core permissions -- --list 2>/dev/null \
+          if ! cargo test -p forskscope-edit permissions -- --list 2>/dev/null \
               | grep -q '^tests::save_target_tests::persist_noclobber_output_is_not_left_with_tempfiles_narrow_default_permissions: test$'; then
             echo "::error::the \"permissions\" filter no longer matches persist_noclobber_output_is_not_left_with_tempfiles_narrow_default_permissions — F38's umask regression test is no longer covered by this step (F42)"
             exit 1
           fi
-          cargo test -p forskscope-core permissions
+          cargo test -p forskscope-edit permissions
 
       - name: cargo clippy (workspace)
         run: cargo clippy --workspace -- -D warnings

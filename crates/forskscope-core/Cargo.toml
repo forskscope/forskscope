@@ -12,14 +12,14 @@ repository.workspace    = true
 
 [dependencies]
 forskscope-compare           = { workspace = true }
+# RFC-093 §1: `conflict_nav` (view-model, soon `forskscope-ui-logic`) and
+# `persist::schema::repository` (soon `forskscope-desktop`) each still need
+# one write-side type/function during this crate's split - `MergeSession`
+# and `atomic_replace` respectively.
+forskscope-edit               = { workspace = true }
 chrono                       = { workspace = true }
 serde                       = { workspace = true }
 serde_json                  = { workspace = true }
-similar                     = { workspace = true }
-# RFC-077: promoted from dev-dependency for the mergetool save target's
-# no-clobber commit (`save::persist_noclobber`), which needs
-# `NamedTempFile::persist_noclobber` at runtime, not only in tests.
-tempfile                    = { workspace = true }
 
 [target.'cfg(unix)'.dev-dependencies]
 # F138: caps this process's own address space before opening a crafted CFB

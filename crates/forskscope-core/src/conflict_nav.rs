@@ -14,7 +14,7 @@
 //! - `ConflictFilter` lets the UI show only unresolved conflicts without
 //!   rebuilding the full entry list.
 
-use crate::merge::{ConflictId, ConflictStatus, ThreeWayMergeSession};
+use forskscope_edit::merge::{ConflictId, ConflictStatus, ThreeWayMergeSession};
 
 // ── Filter ────────────────────────────────────────────────────────────────────
 

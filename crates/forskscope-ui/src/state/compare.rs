@@ -9,8 +9,8 @@ use forskscope_compare::diff::{DiffDocument, InlineMode};
 use forskscope_compare::document::{LoadOptions, LoadedDocument, load_path};
 use forskscope_compare::file_kind::FileKind;
 use forskscope_compare::{DiffOptions, compute_diff};
-use forskscope_core::MergeSession;
-use forskscope_core::compare_prep::{
+use forskscope_edit::MergeSession;
+use forskscope_edit::compare_prep::{
     PreparedCompare, SaveCapability, SaveCapabilityBlockReason, inspect_save_target,
     save_capability, save_target_from_loaded,
 };

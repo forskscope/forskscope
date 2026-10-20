@@ -9,8 +9,8 @@ use forskscope_compare::{
     BomPresence, DiffOptions, FileKind, LoadedDocument, NewlineStyle, TextDocument, TextEncoding,
     compute_diff,
 };
-use forskscope_core::MergeSession;
-use forskscope_core::compare_prep::{
+use forskscope_edit::MergeSession;
+use forskscope_edit::compare_prep::{
     SaveCapability, SaveTargetSnapshot, SaveTargetState, TargetExpectation,
 };
 use forskscope_ui_logic::{CompareTabId, LoadGeneration};
@@ -478,7 +478,7 @@ fn set_encoding_redecodes_and_updates_the_save_label() {
         assert_eq!(tab.right_doc.diff_text(), "あいう");
         assert_eq!(tab.right_label(), "Shift_JIS");
         match tab.save_target.as_ref().map(|st| &st.state) {
-            Some(forskscope_core::compare_prep::SaveTargetState::Writable {
+            Some(forskscope_edit::compare_prep::SaveTargetState::Writable {
                 encoding_label,
                 ..
             }) => {

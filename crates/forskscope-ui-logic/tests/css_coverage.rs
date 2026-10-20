@@ -29,7 +29,7 @@ fn css_contains_class(css: &str, class: &str) -> bool {
 #[test]
 fn conflict_navigator_css_classes_defined_in_main_css() {
     use forskscope_core::conflict_nav::{ConflictFilter, ConflictNavigator};
-    use forskscope_core::merge::ThreeWayMergeSession;
+    use forskscope_edit::merge::ThreeWayMergeSession;
 
     // Build a session with one conflict and inspect the resulting CSS classes.
     let sess = ThreeWayMergeSession::from_texts("base\n", "left\n", "right\n");

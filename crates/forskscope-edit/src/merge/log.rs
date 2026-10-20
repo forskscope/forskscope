@@ -134,7 +134,7 @@ pub struct TransactionEntry {
 /// Usage pattern:
 ///
 /// ```rust,no_run
-/// # use forskscope_core::merge::{TransactionLog, TransactionKind};
+/// # use forskscope_edit::merge::{TransactionLog, TransactionKind};
 /// let mut log = TransactionLog::new();
 /// // …after each session.apply_left_to_right(id) call:
 /// log.push(TransactionKind::ApplyHunkLeftToRight { hunk_id: 1 });

@@ -9,11 +9,11 @@ use dioxus_core::spawn_forever;
 use forskscope_compare::CoreError;
 use forskscope_compare::encoding::BomPresence;
 use forskscope_compare::error::{AppError, AppErrorKind, RecoveryAction};
-use forskscope_core::compare_prep::{
+use forskscope_edit::compare_prep::{
     SaveTargetBlockReason, SaveTargetSnapshot, SaveTargetState, TargetExpectation,
     inspect_save_target,
 };
-use forskscope_core::save::{
+use forskscope_edit::save::{
     BackupPolicy, SaveOutcome, SaveRequest, TargetPrecondition, save_text,
 };
 use forskscope_ui_logic::SaveErrorView;
@@ -1117,8 +1117,8 @@ mod tests {
         use forskscope_compare::encoding::{NewlineStyle, TextEncoding};
         use forskscope_compare::file_kind::FileKind;
         use forskscope_compare::{DiffOptions, compute_diff};
-        use forskscope_core::MergeSession;
-        use forskscope_core::compare_prep::SaveCapability;
+        use forskscope_edit::MergeSession;
+        use forskscope_edit::compare_prep::SaveCapability;
         use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
         let fp = FileFingerprint::capture(&target, None).unwrap();
@@ -1236,8 +1236,8 @@ mod tests {
         use forskscope_compare::encoding::{NewlineStyle, TextEncoding};
         use forskscope_compare::file_kind::FileKind;
         use forskscope_compare::{DiffOptions, compute_diff};
-        use forskscope_core::MergeSession;
-        use forskscope_core::compare_prep::SaveCapability;
+        use forskscope_edit::MergeSession;
+        use forskscope_edit::compare_prep::SaveCapability;
         use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
         fn doc(content: &str) -> LoadedDocument {

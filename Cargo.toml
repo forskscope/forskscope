@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/forskscope-compare",
     "crates/forskscope-core",
+    "crates/forskscope-edit",
     "crates/forskscope-report",
     "crates/forskscope-ui",
     "crates/forskscope-ui-logic",
@@ -20,6 +21,7 @@ repository      = "https://github.com/forskscope/forskscope"
 [workspace.dependencies]
 forskscope-compare           = { version = "0", path = "crates/forskscope-compare" }
 forskscope-core             = { version = "0", path = "crates/forskscope-core" }
+forskscope-edit             = { version = "0", path = "crates/forskscope-edit" }
 forskscope-report           = { version = "0", path = "crates/forskscope-report" }
 forskscope-ui-logic         = { version = "0", path = "crates/forskscope-ui-logic" }
 

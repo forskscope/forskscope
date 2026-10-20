@@ -480,7 +480,7 @@ fn request_close_file_tab_asks_first_when_dirty() {
             .first()
             .expect("test premise: the differing pair must produce at least one hunk")
             .hunk_id;
-        let mut merge = forskscope_core::MergeSession::from_diff(&diff);
+        let mut merge = forskscope_edit::MergeSession::from_diff(&diff);
         merge
             .apply_left_to_right(hunk_id)
             .expect("test premise: applying the hunk must succeed");

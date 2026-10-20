@@ -2,7 +2,7 @@
 //! §"Conflict navigator table", §"Navigator footer").
 
 use crate::conflict_nav::{ConflictFilter, ConflictNavigator, ConflictStatusDisplay};
-use crate::merge::{ConflictStatus, ThreeWayMergeSession};
+use forskscope_edit::merge::{ConflictStatus, ThreeWayMergeSession};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
