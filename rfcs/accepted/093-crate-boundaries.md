@@ -3,6 +3,12 @@
 **Status.** Accepted — review complete; implementer may start. Moves to `done/`
 when the work ships (RFC-000, 5-folder variant).
 **Accepted.** 2026-10-20 by the project owner.
+**Amended.** 2026-10-20, by the owner's decision: the GUI package `forskscope-ui`
+is renamed **`forskscope`**, so the build command is `cargo build --release -p
+forskscope`. Its directory stays `crates/forskscope-ui`, and its library target
+keeps the name `forskscope_ui`, since a library named like the `forskscope`
+program would collide with it in `cargo doc`. Wherever this RFC says
+`forskscope-ui`, read the package `forskscope`.
 **Scheduling.** `0.195.0`. It lands on `main` first, before RFC-094, with no
 release of its own, and ships inside `0.195.0` together with RFC-094. See `ROADMAP.md` § "Remaining proposed
 RFCs".
