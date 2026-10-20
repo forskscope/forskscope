@@ -162,6 +162,10 @@ jobs:
             exit 1
           }
           Write-Host "Confirmed: 0.193.0 has no check-imports.ps1 at all (git show exit $LASTEXITCODE)."
+          # $LASTEXITCODE is still 128 from the expected-to-fail git show
+          # above - without this, the step itself would report failure even
+          # though both checks passed.
+          exit 0
 
       - name: Checkout state before store-package.ps1
         shell: pwsh
@@ -187,7 +191,11 @@ jobs:
           Write-Host "worktree list:"
           git worktree list
           Write-Host "output folder (target/store/0.193.0):"
-          Get-ChildItem -Recurse "target/store/0.193.0" | ForEach-Object { Write-Host "$($_.FullName): $($_.Length) bytes" }
+          if (Test-Path "target/store/0.193.0") {
+            Get-ChildItem -Recurse "target/store/0.193.0" | ForEach-Object { Write-Host "$($_.FullName): $($_.Length) bytes" }
+          } else {
+            Write-Host "(does not exist)"
+          }
 
       - name: Confirm the MSIX's own manifest reads 0.193.0.0 (content came from the tag)
         shell: pwsh
