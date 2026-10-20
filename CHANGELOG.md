@@ -5,7 +5,59 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.193.1] — Unreleased
+## [0.194.0] — 2026-10-20
+
+**Reports you can hand to someone.**
+
+### Added
+
+- **Export report…, for a file or a folder comparison.** It saves the result as
+  one HTML file, or as a unified diff.
+  - **Self-contained:** the HTML report needs no network, and runs no scripts.
+  - **Prints cleanly:** *Print → Save as PDF* in any browser makes the PDF.
+  - **Readable without colour:** every changed line carries its `−` or `+`
+    mark. The colours follow your *Colour vision* setting.
+  - **Checksums:** it records the SHA-256 of every compared file, so anyone
+    can confirm that it describes exactly those files. It says, too, that this
+    does not prove the report itself is unaltered.
+  - **Paths stay private:** reports show file names only, unless you choose
+    otherwise under *More options*.
+  - **Language:** it is written in English or Japanese, following the app.
+  - **A folder report:**
+    - lists every file with the app's own words: *Identical*, *Different*,
+      *Only on the left*, and the rest;
+    - shows the changes of up to 50 files, or 5 MiB of changes;
+    - names any file whose changes it leaves out.
+- **Export patch…, for a folder comparison.** If any file cannot be read, the
+  export stops and names it, rather than saving a patch that looks complete
+  and is not.
+- **After an export,** a notice offers **Open**.
+- **Cancel, in a folder comparison.**
+  - Files not yet compared then say **Not compared**, and the comparison can
+    still be exported.
+  - A comparison cancelled before the folders were listed says so, and cannot
+    be exported.
+
+**A report always describes the files as saved.** While a comparison has unsaved
+edits, *Export report…* waits for you to save or undo them. If a file changed
+after it was compared, the export asks you to compare again.
+
+### Fixed
+
+- **A failed *Export patch* now says so.** Before, a save that failed (for
+  example, into a read-only folder) looked like a success.
+
+### Internal
+
+- **The release runs the Windows import check itself,** between building and
+  zipping. In 0.193.0 it ran only by hand (F206).
+- **The Store package can be built on a Windows PC with one command:** `pwsh
+  -File ./packaging/windows/store-package.ps1 -Tag <tag>`.
+  - It never switches your checkout.
+  - The packaging scripts come from your checkout. What is packaged comes from
+    the tag.
+  - The scripts require PowerShell 7, and read their files as UTF-8, which
+    Windows PowerShell 5.1 on a Japanese system did not (F207).
 
 ## [0.193.0] — 2026-10-18
 
