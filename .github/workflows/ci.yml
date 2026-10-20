@@ -152,6 +152,15 @@ jobs:
       - name: ui-logic docs check
         run: cargo xtask ui-logic-docs
 
+      # RFC-093 §3: forskscope-compare and forskscope-report never write a
+      # file or spawn a process outside #[cfg(test)]/tests/, and every
+      # workspace crate's direct forskscope-* dependencies stay within
+      # RFC-093 §1's table — see xtask/src/crate_boundaries.rs's own doc
+      # comment for exactly what counts as a write/spawn and how test code
+      # is skipped.
+      - name: crate boundaries check
+        run: cargo xtask crate-boundaries
+
       # F55: cargo audit itself moved to a daily scheduled workflow
       # (audit.yml) — it reads a mutable external database, so a per-push
       # result is a property of the commit and the clock, not just the

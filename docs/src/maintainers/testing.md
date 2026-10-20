@@ -19,7 +19,8 @@ cargo test -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p for
 cargo clippy -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
 
 # Crate-boundary rules: no file writes or process spawns in compare/report
-# outside #[cfg(test)], and the dependency graph matches RFC-093 §1's table
+# outside #[cfg(test)], and every crate's dependencies stay within RFC-093
+# §1's table
 cargo xtask crate-boundaries
 
 # Full workspace gates used by CI when GTK/WebKitGTK dependencies are present

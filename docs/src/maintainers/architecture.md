@@ -18,7 +18,7 @@ without the other, and that absence is a real guarantee: `forskscope-compare`
 and `forskscope-report` are the only crates that can be depended on with a
 compiler-enforced promise of never writing a file or spawning a process
 (`cargo xtask crate-boundaries` checks this on every push, by rule and by
-`cargo metadata`'s dependency graph against the table below); `forskscope-edit`
+`cargo tree`'s resolved dependency graph against the table below); `forskscope-edit`
 is the only crate besides the GUI itself that writes a user's file;
 `forskscope-desktop` is the only one that spawns a process. None of the four
 engine crates depends on Dioxus, Tauri, or any UI framework. `forskscope-ui-logic`
