@@ -375,7 +375,6 @@ fn build_dir_report(
         &entries,
         Some(left_root),
         Some(right_root),
-        None,
         Some(&diff_options),
         report_options,
     );

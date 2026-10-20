@@ -36,14 +36,13 @@ fn simple_report() -> FileComparisonReport {
         &diff,
         Some(&PathBuf::from("/left/old.txt")),
         Some(&PathBuf::from("/right/new.txt")),
-        None,
         opts_default(),
     )
 }
 
 fn identical_report() -> FileComparisonReport {
     let diff = compute_diff("same\n", "same\n", DiffOptions::default());
-    FileComparisonReport::from_diff(&diff, None, None, None, opts_default())
+    FileComparisonReport::from_diff(&diff, None, None, opts_default())
 }
 
 fn dir_entries() -> Vec<RecEntry> {
@@ -186,7 +185,6 @@ fn name_only_mode_strips_absolute_path() {
         &diff,
         Some(&PathBuf::from("/very/sensitive/project/old.txt")),
         Some(&PathBuf::from("/very/sensitive/project/new.txt")),
-        None,
         opts_name_only(),
     );
     let md = report.to_markdown();
@@ -205,7 +203,6 @@ fn absolute_mode_shows_full_path() {
         &diff,
         Some(&PathBuf::from("/root/old.txt")),
         Some(&PathBuf::from("/root/new.txt")),
-        None,
         opts_absolute(),
     );
     let md = report.to_markdown();
@@ -220,8 +217,7 @@ fn absolute_mode_shows_full_path() {
 #[test]
 fn dir_markdown_contains_title() {
     let entries = dir_entries();
-    let report =
-        DirComparisonReport::from_entries(&entries, None, None, None, None, opts_default());
+    let report = DirComparisonReport::from_entries(&entries, None, None, None, opts_default());
     assert!(
         report
             .to_markdown()
@@ -232,8 +228,7 @@ fn dir_markdown_contains_title() {
 #[test]
 fn dir_markdown_summary_counts_are_correct() {
     let entries = dir_entries();
-    let report =
-        DirComparisonReport::from_entries(&entries, None, None, None, None, opts_default());
+    let report = DirComparisonReport::from_entries(&entries, None, None, None, opts_default());
     assert_eq!(report.equal, 1);
     assert_eq!(report.changed, 1);
     assert_eq!(report.left_only, 1);
@@ -263,8 +258,7 @@ fn dir_report_counts_an_empty_one_sided_directory_as_one_sided_with_its_own_text
         left_size: None,
         right_size: None,
     });
-    let report =
-        DirComparisonReport::from_entries(&entries, None, None, None, None, opts_default());
+    let report = DirComparisonReport::from_entries(&entries, None, None, None, opts_default());
     assert_eq!(report.left_only, 2, "c.rs and empty_l");
     assert_eq!(report.right_only, 2, "d.rs and empty_r");
     let row = |path: &str| {
@@ -288,8 +282,7 @@ fn dir_report_counts_an_empty_one_sided_directory_as_one_sided_with_its_own_text
 #[test]
 fn dir_markdown_omits_equal_from_changed_table() {
     let entries = dir_entries();
-    let report =
-        DirComparisonReport::from_entries(&entries, None, None, None, None, opts_default());
+    let report = DirComparisonReport::from_entries(&entries, None, None, None, opts_default());
     let md = report.to_markdown();
     // a.rs is equal — should NOT appear in the changed files table
     assert!(
@@ -303,8 +296,7 @@ fn dir_markdown_omits_equal_from_changed_table() {
 #[test]
 fn dir_markdown_includes_sizes_by_default() {
     let entries = dir_entries();
-    let report =
-        DirComparisonReport::from_entries(&entries, None, None, None, None, opts_default());
+    let report = DirComparisonReport::from_entries(&entries, None, None, None, opts_default());
     let md = report.to_markdown();
     // b.rs has left=200, right=210 bytes
     assert!(
@@ -318,8 +310,7 @@ fn dir_markdown_includes_sizes_by_default() {
 #[test]
 fn dir_json_is_valid_object() {
     let entries = dir_entries();
-    let report =
-        DirComparisonReport::from_entries(&entries, None, None, None, None, opts_default());
+    let report = DirComparisonReport::from_entries(&entries, None, None, None, opts_default());
     let json = report.to_json();
     assert!(json.trim().starts_with('{'));
     assert!(json.trim().ends_with('}'));
@@ -328,8 +319,7 @@ fn dir_json_is_valid_object() {
 #[test]
 fn dir_json_kind_is_directory_comparison() {
     let entries = dir_entries();
-    let report =
-        DirComparisonReport::from_entries(&entries, None, None, None, None, opts_default());
+    let report = DirComparisonReport::from_entries(&entries, None, None, None, opts_default());
     assert!(
         report
             .to_json()
@@ -340,8 +330,7 @@ fn dir_json_kind_is_directory_comparison() {
 #[test]
 fn dir_json_files_array_omits_equal_entries() {
     let entries = dir_entries();
-    let report =
-        DirComparisonReport::from_entries(&entries, None, None, None, None, opts_default());
+    let report = DirComparisonReport::from_entries(&entries, None, None, None, opts_default());
     let json = report.to_json();
     // a.rs is equal — must not appear in the files array as a file row.
     // The summary section may still contain the word "equal" as a count key.
@@ -359,7 +348,7 @@ fn dir_json_files_array_omits_equal_entries() {
 #[test]
 fn identical_files_have_no_differences_summary_sentence() {
     let diff = compute_diff("same\n", "same\n", DiffOptions::default());
-    let report = FileComparisonReport::from_diff(&diff, None, None, None, opts_default());
+    let report = FileComparisonReport::from_diff(&diff, None, None, opts_default());
     assert_eq!(
         report.one_sentence_summary(),
         "No differences — the two files are identical."
@@ -373,7 +362,7 @@ fn a_replace_hunk_summary_sentence_names_lines_not_hunks() {
         "one\nTWO\nthree\n",
         DiffOptions::default(),
     );
-    let report = FileComparisonReport::from_diff(&diff, None, None, None, opts_default());
+    let report = FileComparisonReport::from_diff(&diff, None, None, opts_default());
     let sentence = report.one_sentence_summary();
     // Review 174 §4: no "hunk"/"replaced" jargon - lines only.
     assert_eq!(sentence, "1 change: 1 line removed, 1 line added.");
@@ -384,7 +373,7 @@ fn a_replace_hunk_summary_sentence_names_lines_not_hunks() {
 #[test]
 fn options_at_their_defaults_produce_an_empty_non_default_list_and_a_default_profile_name() {
     let diff = compute_diff("a\nb\n", "a\nB\n", DiffOptions::default());
-    let report = FileComparisonReport::from_diff(&diff, None, None, None, opts_default());
+    let report = FileComparisonReport::from_diff(&diff, None, None, opts_default());
     assert!(report.non_default_options.is_empty());
     assert_eq!(report.profile_name, "Default");
 }
@@ -396,7 +385,7 @@ fn a_non_default_option_is_listed_and_the_profile_falls_back_to_custom() {
         ..DiffOptions::default()
     };
     let diff = compute_diff("Hello\n", "hello\n", options);
-    let report = FileComparisonReport::from_diff(&diff, None, None, None, opts_default());
+    let report = FileComparisonReport::from_diff(&diff, None, None, opts_default());
     assert_eq!(
         report.non_default_options,
         vec![("Case".to_string(), "ignored".to_string())]
@@ -415,18 +404,18 @@ fn an_explicit_profile_name_is_kept_even_with_non_default_options() {
         profile_name: Some("Ignore case".into()),
         ..opts_default()
     };
-    let report = FileComparisonReport::from_diff(&diff, None, None, None, opts);
+    let report = FileComparisonReport::from_diff(&diff, None, None, opts);
     assert_eq!(report.profile_name, "Ignore case");
 }
 
 #[test]
 fn change_hunks_are_populated_for_a_real_change_and_empty_when_identical() {
     let changed = compute_diff("one\ntwo\n", "one\nTWO\n", DiffOptions::default());
-    let report = FileComparisonReport::from_diff(&changed, None, None, None, opts_default());
+    let report = FileComparisonReport::from_diff(&changed, None, None, opts_default());
     assert!(!report.change_hunks.is_empty());
 
     let identical = compute_diff("same\n", "same\n", DiffOptions::default());
-    let report = FileComparisonReport::from_diff(&identical, None, None, None, opts_default());
+    let report = FileComparisonReport::from_diff(&identical, None, None, opts_default());
     assert!(report.change_hunks.is_empty());
 }
 
@@ -435,7 +424,7 @@ fn checksums_are_absent_until_attached_and_present_after() {
     use crate::report::FileChecksum;
 
     let diff = compute_diff("a\n", "b\n", DiffOptions::default());
-    let report = FileComparisonReport::from_diff(&diff, None, None, None, opts_default());
+    let report = FileComparisonReport::from_diff(&diff, None, None, opts_default());
     assert!(report.left_checksum.is_none());
     assert!(report.right_checksum.is_none());
 
@@ -453,8 +442,7 @@ fn checksums_are_absent_until_attached_and_present_after() {
 #[test]
 fn dir_report_with_no_diff_options_has_no_profile_name() {
     let entries = dir_entries();
-    let report =
-        DirComparisonReport::from_entries(&entries, None, None, None, None, opts_default());
+    let report = DirComparisonReport::from_entries(&entries, None, None, None, opts_default());
     assert!(report.profile_name.is_none());
     assert!(report.non_default_options.is_empty());
 }
@@ -465,7 +453,6 @@ fn dir_report_with_diff_options_resolves_a_profile_name() {
     let default_options = DiffOptions::default();
     let report = DirComparisonReport::from_entries(
         &entries,
-        None,
         None,
         None,
         Some(&default_options),
@@ -479,7 +466,6 @@ fn dir_report_with_diff_options_resolves_a_profile_name() {
     };
     let report = DirComparisonReport::from_entries(
         &entries,
-        None,
         None,
         None,
         Some(&ignoring_case),
@@ -500,8 +486,7 @@ fn a_cancelled_scans_unfinished_entry_reads_not_compared_not_computing() {
         left_size: Some(10),
         right_size: Some(10),
     }];
-    let report =
-        DirComparisonReport::from_entries(&entries, None, None, None, None, opts_default());
+    let report = DirComparisonReport::from_entries(&entries, None, None, None, opts_default());
     assert_eq!(report.file_rows[0].status, "not compared");
 }
 
@@ -510,8 +495,7 @@ fn dir_file_row_checksums_and_change_hunks_start_absent_and_are_attachable() {
     use crate::report::FileChecksum;
 
     let entries = dir_entries();
-    let mut report =
-        DirComparisonReport::from_entries(&entries, None, None, None, None, opts_default());
+    let mut report = DirComparisonReport::from_entries(&entries, None, None, None, opts_default());
     assert!(report.file_rows.iter().all(|r| r.left_checksum.is_none()
         && r.right_checksum.is_none()
         && r.change_hunks.is_none()));
@@ -542,7 +526,7 @@ fn dir_file_row_checksums_and_change_hunks_start_absent_and_are_attachable() {
 #[test]
 fn push_note_is_visible_alongside_diff_warnings() {
     let diff = compute_diff("a\n", "b\n", DiffOptions::default());
-    let mut report = FileComparisonReport::from_diff(&diff, None, None, None, opts_default());
+    let mut report = FileComparisonReport::from_diff(&diff, None, None, opts_default());
     let before = report.warnings.len();
     report.push_note("Left file encoding: Shift-JIS (not UTF-8).");
     assert_eq!(report.warnings.len(), before + 1);

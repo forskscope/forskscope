@@ -690,7 +690,6 @@ mod tests {
             &crate::diff::compute_diff("a\n", "b\n", crate::diff::DiffOptions::default()),
             None,
             None,
-            None,
             crate::report::ReportOptions::default(),
         );
         let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
@@ -714,7 +713,6 @@ mod tests {
             &diff,
             None,
             None,
-            None,
             crate::report::ReportOptions::default(),
         );
         let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
@@ -729,7 +727,6 @@ mod tests {
             &crate::diff::compute_diff("a\n", "b\n", crate::diff::DiffOptions::default()),
             None,
             None,
-            None,
             crate::report::ReportOptions::default(),
         );
         let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
@@ -742,7 +739,6 @@ mod tests {
     fn checksums_render_only_when_attached() {
         let report = crate::report::FileComparisonReport::from_diff(
             &crate::diff::compute_diff("a\n", "b\n", crate::diff::DiffOptions::default()),
-            None,
             None,
             None,
             crate::report::ReportOptions::default(),
@@ -809,7 +805,6 @@ mod tests {
         );
         let report = crate::report::FileComparisonReport::from_diff(
             &diff,
-            None,
             None,
             None,
             crate::report::ReportOptions::default(),
@@ -887,7 +882,6 @@ mod tests {
             &diff,
             None,
             None,
-            None,
             crate::report::ReportOptions::default(),
         );
         let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
@@ -907,7 +901,6 @@ mod tests {
         let html = render_file_report(
             &crate::report::FileComparisonReport::from_diff(
                 &crate::diff::compute_diff(&left, &right, crate::diff::DiffOptions::default()),
-                None,
                 None,
                 None,
                 crate::report::ReportOptions::default(),
@@ -938,7 +931,6 @@ mod tests {
             &crate::diff::compute_diff("a\n", "b\n", crate::diff::DiffOptions::default()),
             None,
             None,
-            None,
             crate::report::ReportOptions::default(),
         );
         let html = render_file_report(&report, "0.0.0", "now", false, &|s| {
@@ -958,7 +950,6 @@ mod tests {
             &crate::diff::compute_diff("a\n", "b\n", crate::diff::DiffOptions::default()),
             None,
             None,
-            None,
             crate::report::ReportOptions::default(),
         );
         let standard = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
@@ -972,7 +963,6 @@ mod tests {
     fn an_identical_file_comparison_still_renders_a_complete_page() {
         let report = crate::report::FileComparisonReport::from_diff(
             &crate::diff::compute_diff("same\n", "same\n", crate::diff::DiffOptions::default()),
-            None,
             None,
             None,
             crate::report::ReportOptions::default(),
@@ -1007,7 +997,6 @@ mod tests {
             None,
             None,
             None,
-            None,
             crate::report::ReportOptions::default(),
         );
         let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
@@ -1038,7 +1027,6 @@ mod tests {
             None,
             None,
             None,
-            None,
             crate::report::ReportOptions::default(),
         );
         let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
@@ -1065,7 +1053,6 @@ mod tests {
             None,
             None,
             None,
-            None,
             crate::report::ReportOptions::default(),
         );
         report.change_hunks_omitted.push("huge.txt".into());
@@ -1087,7 +1074,6 @@ mod tests {
         }];
         let report = crate::report::DirComparisonReport::from_entries(
             &entries,
-            None,
             None,
             None,
             None,

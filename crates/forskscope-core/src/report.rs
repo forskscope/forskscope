@@ -18,8 +18,8 @@ pub mod file;
 pub mod html;
 
 pub use changes::{ChangeHunk, ChangeLine, ChangeLineKind, change_hunks_from_diff};
-pub use dir::{BatchSummary, DirComparisonReport, DirFileRow};
-pub use file::{FileComparisonReport, HistoryEntry, HunkSummaryRow, ReportOptions, ReportPathMode};
+pub use dir::{DirComparisonReport, DirFileRow};
+pub use file::{FileComparisonReport, HunkSummaryRow, ReportOptions, ReportPathMode};
 pub use html::{render_dir_report, render_file_report};
 
 use crate::diff::HunkKind;

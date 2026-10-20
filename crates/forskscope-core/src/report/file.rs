@@ -3,7 +3,6 @@
 use super::FileChecksum;
 use super::changes::{ChangeHunk, change_hunks_from_diff};
 use crate::diff::{DiffDocument, DiffOptions, DiffWarning, HunkKind};
-use crate::merge::{TransactionEntry, TransactionLog};
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -27,8 +26,6 @@ pub struct ReportOptions {
     pub path_mode: ReportPathMode,
     /// Include hunk-level detail (line ranges, types).
     pub include_hunks: bool,
-    /// Include merge / operation history from the transaction log.
-    pub include_history: bool,
     /// Include compare option settings.
     pub include_options: bool,
     /// Include diff warnings (large file, deadline, etc.).
@@ -53,7 +50,6 @@ impl Default for ReportOptions {
         Self {
             path_mode: ReportPathMode::NameOnly,
             include_hunks: true,
-            include_history: true,
             include_options: true,
             include_warnings: true,
             include_sizes: true,
@@ -79,7 +75,6 @@ pub struct FileComparisonReport {
     pub lines_deleted: usize,
     pub warnings: Vec<String>,
     pub hunk_rows: Vec<HunkSummaryRow>,
-    pub history: Vec<HistoryEntry>,
     pub options_summary: Vec<(String, String)>,
     pub options: ReportOptions,
     /// Content-carrying, windowed change hunks for the HTML report (RFC-092
@@ -109,13 +104,6 @@ pub struct HunkSummaryRow {
     pub kind: String,
 }
 
-/// One entry in the merge/operation history.
-#[derive(Debug, Clone)]
-pub struct HistoryEntry {
-    pub timestamp_sec: u64,
-    pub label: String,
-}
-
 /// Compare options that differ from `DiffOptions::default()`, in display
 /// order (RFC-092 §3 item 3). Shared with `DirComparisonReport`, since a
 /// folder comparison's "How" section describes the same `DiffOptions`.
@@ -142,13 +130,12 @@ fn plural(n: usize) -> &'static str {
 }
 
 impl FileComparisonReport {
-    /// Build a report from a `DiffDocument`, optional file paths for display,
-    /// an optional `TransactionLog` for history, and rendering options.
+    /// Build a report from a `DiffDocument`, optional file paths for
+    /// display, and rendering options.
     pub fn from_diff(
         diff: &DiffDocument,
         left_path: Option<&Path>,
         right_path: Option<&Path>,
-        log: Option<&TransactionLog>,
         opts: ReportOptions,
     ) -> Self {
         let left_display = super::display_path(left_path, &opts.path_mode, None);
@@ -182,21 +169,6 @@ impl FileComparisonReport {
                     kind: super::hunk_kind_label(h.kind),
                 })
                 .collect()
-        } else {
-            vec![]
-        };
-
-        let history: Vec<HistoryEntry> = if opts.include_history {
-            log.map(|l| {
-                l.active_entries()
-                    .iter()
-                    .map(|e: &TransactionEntry| HistoryEntry {
-                        timestamp_sec: e.timestamp.0,
-                        label: e.label.clone(),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default()
         } else {
             vec![]
         };
@@ -246,7 +218,6 @@ impl FileComparisonReport {
             lines_deleted: diff.stats.lines_deleted,
             warnings,
             hunk_rows,
-            history,
             options_summary,
             change_hunks,
             non_default_options,
@@ -366,14 +337,6 @@ impl FileComparisonReport {
             let _ = writeln!(s);
         }
 
-        if !self.history.is_empty() {
-            let _ = writeln!(s, "## Operation History\n");
-            for e in &self.history {
-                let _ = writeln!(s, "- `{}` {}", e.timestamp_sec, e.label);
-            }
-            let _ = writeln!(s);
-        }
-
         s
     }
 
@@ -430,18 +393,6 @@ impl FileComparisonReport {
                 s,
                 "    {{ \"num\": {}, \"left\": [{},{}], \"right\": [{},{}], \"kind\": {:?} }}{}",
                 h.hunk_num, h.left_start, h.left_end, h.right_start, h.right_end, h.kind, comma
-            );
-        }
-        let _ = writeln!(s, "  ],");
-
-        // history
-        let _ = writeln!(s, "  \"history\": [");
-        for (i, e) in self.history.iter().enumerate() {
-            let comma = if i + 1 < self.history.len() { "," } else { "" };
-            let _ = writeln!(
-                s,
-                "    {{ \"ts\": {}, \"label\": {:?} }}{}",
-                e.timestamp_sec, e.label, comma
             );
         }
         let _ = writeln!(s, "  ]");

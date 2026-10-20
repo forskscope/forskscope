@@ -687,7 +687,6 @@ mod tests {
             &diff,
             Some(&PathBuf::from("/left/report.txt")),
             Some(&PathBuf::from("/right/report.txt")),
-            None,
             ReportOptions::default(),
         )
         .with_checksums(
@@ -754,7 +753,6 @@ mod tests {
             &entries,
             Some(&PathBuf::from("/left")),
             Some(&PathBuf::from("/right")),
-            None,
             Some(&diff_options),
             ReportOptions::default(),
         );

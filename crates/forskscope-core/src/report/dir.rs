@@ -1,10 +1,10 @@
-//! Directory-level comparison report: `DirComparisonReport`, `BatchSummary` (RFC-008, RFC-092).
+//! Directory-level comparison report: `DirComparisonReport` (RFC-008, RFC-092).
 
 use super::FileChecksum;
 use super::changes::ChangeHunk;
 use super::file::{ReportOptions, ReportPathMode, non_default_options_summary};
 use crate::diff::DiffOptions;
-use crate::dir::{BatchManifest, RecEntry, RecStatus};
+use crate::dir::{RecEntry, RecStatus};
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -25,7 +25,6 @@ pub struct DirComparisonReport {
     /// separately from `changed`/`equal`/etc.
     pub unreadable: usize,
     pub file_rows: Vec<DirFileRow>,
-    pub batch_summary: Option<BatchSummary>,
     pub options: ReportOptions,
     /// Compare options that differ from `DiffOptions::default()` (RFC-092
     /// §3 item 3), from the `diff_options` passed to `from_entries` — empty
@@ -73,14 +72,6 @@ pub struct DirFileRow {
     pub change_hunks: Option<Vec<ChangeHunk>>,
 }
 
-/// Summary of a batch copy operation (from `BatchManifest`).
-#[derive(Debug, Clone)]
-pub struct BatchSummary {
-    pub operation_id: String,
-    pub succeeded: usize,
-    pub failed: usize,
-}
-
 impl DirComparisonReport {
     /// Build a directory comparison report.
     ///
@@ -90,7 +81,6 @@ impl DirComparisonReport {
         entries: &[RecEntry],
         left_root: Option<&Path>,
         right_root: Option<&Path>,
-        manifest: Option<&BatchManifest>,
         diff_options: Option<&DiffOptions>,
         opts: ReportOptions,
     ) -> Self {
@@ -174,12 +164,6 @@ impl DirComparisonReport {
             })
             .collect();
 
-        let batch_summary = manifest.map(|m| BatchSummary {
-            operation_id: m.operation_id.to_string(),
-            succeeded: m.succeeded(),
-            failed: m.failed(),
-        });
-
         let non_default_options = diff_options
             .map(non_default_options_summary)
             .unwrap_or_default();
@@ -205,7 +189,6 @@ impl DirComparisonReport {
             symlinks,
             unreadable,
             file_rows,
-            batch_summary,
             non_default_options,
             profile_name,
             change_hunks_omitted: Vec::new(),
@@ -263,14 +246,6 @@ impl DirComparisonReport {
             let _ = writeln!(s);
         }
 
-        if let Some(bs) = &self.batch_summary {
-            let _ = writeln!(s, "## Batch Operation\n");
-            let _ = writeln!(s, "- Operation ID: `{}`", bs.operation_id);
-            let _ = writeln!(s, "- Succeeded: {}", bs.succeeded);
-            let _ = writeln!(s, "- Failed: {}", bs.failed);
-            let _ = writeln!(s);
-        }
-
         s
     }
 
@@ -318,14 +293,6 @@ impl DirComparisonReport {
             );
         }
         let _ = writeln!(s, "  ]");
-
-        if let Some(bs) = &self.batch_summary {
-            let _ = writeln!(s, "  ,\"batch\": {{");
-            let _ = writeln!(s, "    \"operation_id\": {:?},", bs.operation_id);
-            let _ = writeln!(s, "    \"succeeded\": {},", bs.succeeded);
-            let _ = writeln!(s, "    \"failed\": {}", bs.failed);
-            let _ = writeln!(s, "  }}");
-        }
 
         let _ = write!(s, "}}");
         s

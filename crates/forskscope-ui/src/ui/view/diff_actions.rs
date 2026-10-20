@@ -748,7 +748,6 @@ pub fn export_file_report(
                         &diff,
                         left_path.as_deref(),
                         right_path.as_deref(),
-                        None,
                         report_options,
                     )
                     .with_checksums(
