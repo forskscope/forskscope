@@ -2,7 +2,7 @@
 //!
 //! RFC-076 (patch 4): this is a non-serializing view adapter, not an
 //! independent disk format. The canonical, persisted type is
-//! [`forskscope_core::persist::schema::settings::PersistedSettings`]; see
+//! [`forskscope_desktop::persist::schema::settings::PersistedSettings`]; see
 //! [`AppSettings::from_v2`] and [`AppSettings::merge_into_v2`] for the
 //! boundary. `Theme`/`Lang`/`DiffFontFamily`/`DiffAlgorithmSetting`/
 //! `DiffProfile` are UI-only projections of the richer core types
@@ -15,10 +15,10 @@ pub use forskscope_compare::DiffAlgorithm;
 use forskscope_compare::DiffOptions;
 use forskscope_compare::diff::InlineMode;
 use forskscope_compare::{CaseSensitivity, NewlineCompareMode, WhitespaceMode};
-use forskscope_core::persist::schema::settings::{PersistedDiffProfile, PersistedSettings};
-pub use forskscope_core::settings::display::ColourVision;
-use forskscope_core::settings::display::DiffFontFamilySetting;
-use forskscope_core::settings::{LocaleId, ThemeId};
+use forskscope_desktop::persist::schema::settings::{PersistedDiffProfile, PersistedSettings};
+pub use forskscope_desktop::settings::display::ColourVision;
+use forskscope_desktop::settings::display::DiffFontFamilySetting;
+use forskscope_desktop::settings::{LocaleId, ThemeId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Theme {
@@ -179,7 +179,7 @@ impl DiffProfile {
     }
 
     /// Inverse of [`Self::from_v2`]. Matches
-    /// `forskscope_core::persist::schema::settings::ui_builtin_profiles`'s exact
+    /// `forskscope_desktop::persist::schema::settings::ui_builtin_profiles`'s exact
     /// mapping so a round trip through the UI never changes a built-in
     /// profile's canonical shape.
     pub fn to_v2(&self) -> PersistedDiffProfile {

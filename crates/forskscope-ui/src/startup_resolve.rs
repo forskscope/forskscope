@@ -179,7 +179,7 @@ pub(crate) fn redirect_xdg_dirs(location: &DataLocation) {
     for (_, path) in &overrides {
         let _ = std::fs::create_dir_all(path);
     }
-    forskscope_core::env_passthrough::record_before_override(&[
+    forskscope_desktop::env_passthrough::record_before_override(&[
         "XDG_CACHE_HOME",
         "XDG_DATA_HOME",
         "XDG_STATE_HOME",

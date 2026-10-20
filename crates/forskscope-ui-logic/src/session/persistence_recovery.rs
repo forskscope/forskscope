@@ -2,7 +2,7 @@
 //! behavior"). Mirrors [`crate::settings::persistence_recovery`]; see its
 //! module doc for the full rationale.
 
-use forskscope_core::persist::schema::session::runtime::{
+use forskscope_desktop::persist::schema::session::runtime::{
     MigrationCommitOutcome, SessionRuntimeOutcome, SessionRuntimeResolution,
 };
 
@@ -124,8 +124,8 @@ impl SessionRecoveryView {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use forskscope_core::persist::schema::PersistenceError;
-    use forskscope_core::persist::schema::session::PersistedSession;
+    use forskscope_desktop::persist::schema::PersistenceError;
+    use forskscope_desktop::persist::schema::session::PersistedSession;
 
     #[test]
     fn all_recovery_dialog_actions_have_non_empty_labels() {

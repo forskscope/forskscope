@@ -18,6 +18,11 @@
 //! when a guard reports no effect; it panics unless this process is root,
 //! so anything else - the real regression this was meant to catch - fails
 //! the suite instead of passing it silently.
+//!
+//! Duplicated per crate (RFC-093): `forskscope-compare`, `forskscope-edit`,
+//! `forskscope-report` and `forskscope-desktop` each have their own
+//! permission-dependent tests and no shared test-utility crate exists for
+//! this small, `#[cfg(test)]`-only helper.
 
 /// Whether this process can rely on Unix file-permission checks actually
 /// doing something. `false` only when running as root (euid 0) - the one

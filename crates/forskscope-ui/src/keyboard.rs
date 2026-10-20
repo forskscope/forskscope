@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn from_modal_classifies_settings_recovery_as_recovery() {
-        use forskscope_core::persist::schema::settings::runtime::{
+        use forskscope_desktop::persist::schema::settings::runtime::{
             SettingsRuntimeOutcome, SettingsRuntimeResolution,
         };
         let resolution = SettingsRuntimeResolution {
@@ -321,7 +321,7 @@ mod tests {
 
     #[test]
     fn from_modal_classifies_session_recovery_as_recovery() {
-        use forskscope_core::persist::schema::session::runtime::{
+        use forskscope_desktop::persist::schema::session::runtime::{
             SessionRuntimeOutcome, SessionRuntimeResolution,
         };
         let resolution = SessionRuntimeResolution {

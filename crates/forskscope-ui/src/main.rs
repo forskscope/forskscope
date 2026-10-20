@@ -67,7 +67,7 @@ use startup_mode::DATA_LOCATION;
 
 /// Windows-only: the saved language, read without side effects (no
 /// migration write, no recovery flow, no file created) via
-/// [`forskscope_core::persist::schema::settings::SettingsRepository::load`].
+/// [`forskscope_desktop::persist::schema::settings::SettingsRepository::load`].
 /// Falls back to English — matching the owner's 2026-09-17 decision that a
 /// first launch is English — whenever no settings file exists yet or it
 /// cannot be read as a current/migrated value. RFC-091 §3: private mode
@@ -76,9 +76,9 @@ use startup_mode::DATA_LOCATION;
 /// already produces.
 #[cfg(windows)]
 fn saved_lang_no_side_effects() -> state::Lang {
-    use forskscope_core::persist::schema::PersistenceLoad;
-    use forskscope_core::persist::schema::settings::SettingsRepository;
-    use forskscope_core::settings::LocaleId;
+    use forskscope_desktop::persist::schema::PersistenceLoad;
+    use forskscope_desktop::persist::schema::settings::SettingsRepository;
+    use forskscope_desktop::settings::LocaleId;
 
     if startup_mode::is_private() {
         return state::Lang::En;
@@ -138,7 +138,7 @@ fn check_webview2_or_exit() {
             // does not read the XDG_* variables itself, but this process
             // still should not hand an overridden value to a child that
             // outlives it.)
-            forskscope_core::env_passthrough::restore_onto(&mut cmd);
+            forskscope_desktop::env_passthrough::restore_onto(&mut cmd);
             let _ = cmd.spawn();
         }
         std::process::exit(3);
@@ -186,7 +186,7 @@ fn main() {
     // --diagnostics: print platform info and exit without launching the UI.
     // Useful for debugging startup failures and filing bug reports.
     if args.iter().any(|a| a == "--diagnostics") {
-        let info = forskscope_core::platform::PlatformInfo::collect();
+        let info = forskscope_desktop::platform::PlatformInfo::collect();
         println!("{}", info.to_report());
         #[cfg(windows)]
         match wry::webview_version() {

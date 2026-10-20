@@ -48,7 +48,7 @@
 //! re-implement persistence (`persist::schema::settings::SettingsRepository`)
 //! or CSS injection (`ThemeId::css_var_names`), which live in core.
 
-use forskscope_core::settings::ThemeId;
+use forskscope_desktop::settings::ThemeId;
 
 // ── Generic choice ────────────────────────────────────────────────────────────
 

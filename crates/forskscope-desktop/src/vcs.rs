@@ -237,7 +237,7 @@ impl VcsProvider for GitProvider {
 ///
 /// ```rust,no_run
 /// # use std::path::Path;
-/// # use forskscope_core::vcs::detect;
+/// # use forskscope_desktop::vcs::detect;
 /// if let Some(provider) = detect(Path::new("/my/project")) {
 ///     println!("found {}", provider.system_name());
 /// }

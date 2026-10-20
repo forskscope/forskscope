@@ -15,8 +15,8 @@
 //! function its own unit tests call (F169, review 151).
 
 use dioxus::prelude::*;
-use forskscope_core::external_tool::open_url;
-use forskscope_core::platform::PlatformInfo;
+use forskscope_desktop::external_tool::open_url;
+use forskscope_desktop::platform::PlatformInfo;
 use forskscope_ui_logic::{
     AppChannel, CheckFailureReason, CheckOutcome, UpdateAction, UpdateCheckState, Version, decide,
     release_page_url, update_action,

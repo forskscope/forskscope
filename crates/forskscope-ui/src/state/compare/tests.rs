@@ -1,8 +1,8 @@
 use std::fs;
 
 use super::*;
-use forskscope_core::persist::schema::PersistenceLoad;
-use forskscope_core::persist::schema::session::SessionRepository;
+use forskscope_desktop::persist::schema::PersistenceLoad;
+use forskscope_desktop::persist::schema::session::SessionRepository;
 use forskscope_ui_logic::{CompareTabId, LoadGeneration};
 
 fn id(value: u64) -> CompareTabId {

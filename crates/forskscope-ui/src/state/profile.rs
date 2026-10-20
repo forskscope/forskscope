@@ -64,8 +64,8 @@ pub fn remove_profile(store: &mut Store, index: usize) {
 #[cfg(test)]
 mod tests {
     use dioxus::prelude::*;
-    use forskscope_core::persist::schema::PersistenceLoad;
-    use forskscope_core::persist::schema::settings::SettingsRepository;
+    use forskscope_desktop::persist::schema::PersistenceLoad;
+    use forskscope_desktop::persist::schema::settings::SettingsRepository;
 
     use super::select_profile;
     use crate::state::{ConfigRootOverrideGuard, with_test_store};

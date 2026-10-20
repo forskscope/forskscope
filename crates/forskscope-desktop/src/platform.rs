@@ -55,7 +55,7 @@ impl PlatformInfo {
     /// Format as a multi-line diagnostic string suitable for clipboard copy.
     ///
     /// ```
-    /// use forskscope_core::platform::PlatformInfo;
+    /// use forskscope_desktop::platform::PlatformInfo;
     /// let info = PlatformInfo::collect();
     /// let s = info.to_report();
     /// assert!(s.contains("ForskScope"));

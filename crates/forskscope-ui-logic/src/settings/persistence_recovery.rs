@@ -15,7 +15,7 @@
 //! text — the full dialog UI with Exit/Continue/Reset buttons is still
 //! patch 5's job.
 
-use forskscope_core::persist::schema::settings::runtime::{
+use forskscope_desktop::persist::schema::settings::runtime::{
     MigrationCommitOutcome, SettingsRuntimeOutcome, SettingsRuntimeResolution,
 };
 
@@ -137,8 +137,8 @@ impl SettingsRecoveryView {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use forskscope_core::persist::schema::PersistenceError;
-    use forskscope_core::persist::schema::settings::PersistedSettings;
+    use forskscope_desktop::persist::schema::PersistenceError;
+    use forskscope_desktop::persist::schema::settings::PersistedSettings;
 
     #[test]
     fn all_recovery_dialog_actions_have_non_empty_labels() {

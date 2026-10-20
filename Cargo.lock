@@ -1521,7 +1521,14 @@ dependencies = [
 name = "forskscope-core"
 version = "0.194.1"
 dependencies = [
- "chrono",
+ "forskscope-compare",
+ "forskscope-edit",
+]
+
+[[package]]
+name = "forskscope-desktop"
+version = "0.194.1"
+dependencies = [
  "forskscope-compare",
  "forskscope-edit",
  "libc",
@@ -1562,6 +1569,7 @@ dependencies = [
  "dirs-next",
  "forskscope-compare",
  "forskscope-core",
+ "forskscope-desktop",
  "forskscope-edit",
  "forskscope-report",
  "forskscope-ui-logic",
@@ -1580,6 +1588,7 @@ version = "0.194.1"
 dependencies = [
  "forskscope-compare",
  "forskscope-core",
+ "forskscope-desktop",
  "forskscope-edit",
  "libc",
 ]

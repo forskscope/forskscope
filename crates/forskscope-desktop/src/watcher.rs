@@ -141,7 +141,7 @@ pub trait FileChangeMonitor: Send {
 ///
 /// ```
 /// use std::path::PathBuf;
-/// use forskscope_core::watcher::{
+/// use forskscope_desktop::watcher::{
 ///     FileChangeKind, FileChangeMonitor, MockFileChangeMonitor, WatchToken,
 /// };
 ///

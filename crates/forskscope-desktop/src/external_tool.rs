@@ -14,7 +14,7 @@
 //! semicolons, backticks, or other shell-special characters.
 //!
 //! ```rust
-//! # use forskscope_core::external_tool::{
+//! # use forskscope_desktop::external_tool::{
 //! #     ExternalToolCommand, ExternalToolArg, ExternalToolPlaceholder,
 //! #     ToolId, ExpandContext, expand_args,
 //! # };

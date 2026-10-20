@@ -11,11 +11,11 @@ use std::fs;
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
-use forskscope_core::persist::schema::PersistenceLoad;
-use forskscope_core::persist::schema::session::runtime::{
+use forskscope_desktop::persist::schema::PersistenceLoad;
+use forskscope_desktop::persist::schema::session::runtime::{
     MigrationCommitOutcome, SessionRuntimeOutcome, SessionRuntimeResolution,
 };
-use forskscope_core::persist::schema::session::{
+use forskscope_desktop::persist::schema::session::{
     PersistedComparePair, PersistedSession, SessionRepository,
 };
 

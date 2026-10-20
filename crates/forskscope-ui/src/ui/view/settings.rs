@@ -7,11 +7,11 @@ pub mod modal;
 pub mod profile;
 
 use dioxus::prelude::*;
-use forskscope_core::persist::schema::settings::runtime::{
+use forskscope_desktop::persist::schema::settings::runtime::{
     SettingsRuntimeOutcome, SettingsRuntimeResolution, resolve_and_commit,
 };
-use forskscope_core::persist::schema::settings::{PersistedSettings, SettingsRepository};
-use forskscope_core::persist::schema::{PersistenceCommitError, PersistenceIoError};
+use forskscope_desktop::persist::schema::settings::{PersistedSettings, SettingsRepository};
+use forskscope_desktop::persist::schema::{PersistenceCommitError, PersistenceIoError};
 use forskscope_ui_logic::SettingsRecoveryView;
 
 use crate::state::{AppSettings, Lang, Modal, Notice, Store, Theme, config_file_path};

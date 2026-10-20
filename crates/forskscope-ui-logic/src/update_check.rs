@@ -203,7 +203,7 @@ pub fn update_action(channel: AppChannel) -> UpdateAction {
 /// Built only from `version`'s already-validated numeric fields, never
 /// from raw reply text (§4's security bullet): the tag came from the
 /// network, and this URL is handed to a launched subprocess
-/// (`forskscope_core::external_tool::open_url`). A [`Version`] can only
+/// (`forskscope_desktop::external_tool::open_url`). A [`Version`] can only
 /// exist by [`Version::parse`] having already accepted a plain `X.Y.Z`
 /// shape — there is no path from a hostile reply into this string, because
 /// there is no path from a hostile reply into a `Version` at all.

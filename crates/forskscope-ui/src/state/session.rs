@@ -3,13 +3,13 @@
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
-use forskscope_core::persist::schema::session::runtime::{
+use forskscope_desktop::persist::schema::session::runtime::{
     SessionRuntimeOutcome, SessionRuntimeResolution, resolve_and_commit,
 };
-use forskscope_core::persist::schema::session::{
+use forskscope_desktop::persist::schema::session::{
     PersistedComparePair, PersistedSession, SessionRepository,
 };
-use forskscope_core::persist::schema::{PersistenceCommitError, PersistenceIoError};
+use forskscope_desktop::persist::schema::{PersistenceCommitError, PersistenceIoError};
 use forskscope_ui_logic::SessionRecoveryView;
 
 use crate::state::compare::open_compare;

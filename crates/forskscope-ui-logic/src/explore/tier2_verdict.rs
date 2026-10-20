@@ -3,7 +3,7 @@
 //! Tier 1 ([`crate::dir_verdict`]) answers *do these differ?* from names and
 //! sizes, reading no contents. Tier 2 answers *are these identical?*
 //! definitively, by running `recursive_diff_with_rules` (the same walk, same
-//! [`forskscope_core::IgnoreRules`] plumbing tier 1 and the Explorer tree use
+//! [`forskscope_compare::IgnoreRules`] plumbing tier 1 and the Explorer tree use
 //! — F149's "the tree and the walk must answer the same question" applies
 //! here too) and reading every common file's contents.
 //!

@@ -17,12 +17,12 @@
 use dioxus::prelude::*;
 
 use forskscope_compare::error::{AppError, AppErrorKind};
-use forskscope_core::persist::schema::PersistenceCommitError;
-use forskscope_core::persist::schema::session::runtime::{
+use forskscope_desktop::persist::schema::PersistenceCommitError;
+use forskscope_desktop::persist::schema::session::runtime::{
     MigrationCommitOutcome as SessionMigrationCommitOutcome, SessionRuntimeOutcome,
     SessionRuntimeResolution,
 };
-use forskscope_core::persist::schema::settings::runtime::{
+use forskscope_desktop::persist::schema::settings::runtime::{
     MigrationCommitOutcome as SettingsMigrationCommitOutcome, SettingsRuntimeOutcome,
     SettingsRuntimeResolution,
 };
@@ -291,8 +291,8 @@ fn session_recovery_action(
 mod tests {
     use super::*;
     use crate::state::{ConfigRootOverrideGuard, with_test_store};
-    use forskscope_core::persist::schema::session::PersistedSession;
-    use forskscope_core::persist::schema::settings::PersistedSettings;
+    use forskscope_desktop::persist::schema::session::PersistedSession;
+    use forskscope_desktop::persist::schema::settings::PersistedSettings;
 
     #[test]
     fn recovery_failure_message_maps_conflict_to_a_friendly_string_not_the_raw_one() {

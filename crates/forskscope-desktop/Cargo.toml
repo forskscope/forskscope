@@ -1,0 +1,22 @@
+[package]
+name        = "forskscope-desktop"
+description = "ForskScope's desktop integration: settings/session persistence, external tools, Git, file watching, and platform detection."
+readme      = "../../README.md"
+
+version.workspace       = true
+edition.workspace       = true
+rust-version.workspace  = true
+license.workspace       = true
+authors.workspace       = true
+repository.workspace    = true
+
+[dependencies]
+forskscope-compare           = { workspace = true }
+forskscope-edit               = { workspace = true }
+serde                       = { workspace = true }
+serde_json                  = { workspace = true }
+
+[target.'cfg(unix)'.dev-dependencies]
+# F143: this crate's own copy of the permission-guard test helper - see its
+# doc comment in src/tests/support.rs.
+libc                           = { workspace = true }

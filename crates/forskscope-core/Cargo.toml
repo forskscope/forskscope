@@ -1,6 +1,6 @@
 [package]
 name        = "forskscope-core"
-description = "GUI-independent core for ForskScope: file loading, encoding, diff, merge, save safety, and directory comparison."
+description = "GUI-independent core for ForskScope: view-model layer not yet moved to forskscope-ui-logic (RFC-093)."
 readme      = "../../README.md"
 
 version.workspace       = true
@@ -12,18 +12,7 @@ repository.workspace    = true
 
 [dependencies]
 forskscope-compare           = { workspace = true }
-# RFC-093 §1: `conflict_nav` (view-model, soon `forskscope-ui-logic`) and
-# `persist::schema::repository` (soon `forskscope-desktop`) each still need
-# one write-side type/function during this crate's split - `MergeSession`
-# and `atomic_replace` respectively.
+# RFC-093 §1: `conflict_nav` (view-model, soon `forskscope-ui-logic`) still
+# needs one write-side type - `MergeSession`/`ConflictId`/`ConflictStatus`/
+# `ThreeWayMergeSession` - during this crate's split.
 forskscope-edit               = { workspace = true }
-chrono                       = { workspace = true }
-serde                       = { workspace = true }
-serde_json                  = { workspace = true }
-
-[target.'cfg(unix)'.dev-dependencies]
-# F138: caps this process's own address space before opening a crafted CFB
-# header, so the regression this guards against (a huge allocation instead of
-# a declined file) fails loudly rather than passing unnoticed on a machine
-# with room to spare — see tests/f138_decline_before_delegating.rs.
-libc                         = { workspace = true }

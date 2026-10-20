@@ -295,7 +295,7 @@ pub fn App() -> Element {
                                         // merely dismiss - stop it reaching the
                                         // outer div's onclick.
                                         e.stop_propagation();
-                                        if let Err(err) = forskscope_core::external_tool::open_path(&action.path) {
+                                        if let Err(err) = forskscope_desktop::external_tool::open_path(&action.path) {
                                             eprintln!("open_path: {err} (path: {})", action.path);
                                         }
                                         store.toast.set(None);

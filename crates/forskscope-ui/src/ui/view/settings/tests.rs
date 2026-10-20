@@ -6,11 +6,11 @@
 use std::fs;
 use std::path::PathBuf;
 
-use forskscope_core::persist::schema::PersistenceLoad;
-use forskscope_core::persist::schema::settings::runtime::{
+use forskscope_desktop::persist::schema::PersistenceLoad;
+use forskscope_desktop::persist::schema::settings::runtime::{
     MigrationCommitOutcome, SettingsRuntimeOutcome, SettingsRuntimeResolution,
 };
-use forskscope_core::persist::schema::settings::{PersistedSettings, SettingsRepository};
+use forskscope_desktop::persist::schema::settings::{PersistedSettings, SettingsRepository};
 
 use super::{build_save_payload, load_settings, persist_settings, recovery_modal, reset_settings};
 use crate::state::{AppSettings, Modal};
@@ -24,7 +24,7 @@ fn temp_path(tag: &str) -> PathBuf {
 #[test]
 fn build_save_payload_overlays_ui_fields_but_preserves_the_rest() {
     let base = PersistedSettings {
-        density: forskscope_core::settings::display::Density::Spacious,
+        density: forskscope_desktop::settings::display::Density::Spacious,
         show_line_numbers: false,
         ..PersistedSettings::default()
     };
@@ -36,7 +36,7 @@ fn build_save_payload_overlays_ui_fields_but_preserves_the_rest() {
     assert_eq!(merged.context_lines, 9, "UI-editable field must apply");
     assert_eq!(
         merged.density,
-        forskscope_core::settings::display::Density::Spacious,
+        forskscope_desktop::settings::display::Density::Spacious,
         "non-UI-owned field must survive a save the UI has no control over"
     );
     assert!(

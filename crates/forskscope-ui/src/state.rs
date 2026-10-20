@@ -36,9 +36,9 @@ pub use tab::{
 pub use types::{BatchResultSpec, DirOp, LargeLoadPrompt, LargeLoadTarget};
 
 use dioxus::prelude::*;
-use forskscope_core::persist::schema::session::runtime::SessionRuntimeResolution;
-use forskscope_core::persist::schema::settings::PersistedSettings;
-use forskscope_core::persist::schema::settings::runtime::SettingsRuntimeResolution;
+use forskscope_desktop::persist::schema::session::runtime::SessionRuntimeResolution;
+use forskscope_desktop::persist::schema::settings::PersistedSettings;
+use forskscope_desktop::persist::schema::settings::runtime::SettingsRuntimeResolution;
 use forskscope_ui_logic::{CompareTabId, CompareTabIdAllocator, LoadIdentityError};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -215,7 +215,7 @@ pub enum NoticeSeverity {
 pub struct NoticeAction {
     pub label: String,
     /// The file path the action opens, via
-    /// `forskscope_core::external_tool::open_path`.
+    /// `forskscope_desktop::external_tool::open_path`.
     pub path: String,
 }
 
