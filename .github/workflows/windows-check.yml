@@ -119,3 +119,175 @@ jobs:
       - name: Check imports against the allow-list
         shell: pwsh
         run: ./packaging/windows/check-imports.ps1 -ExePath ./target/release/forskscope.exe
+
+  # TEMPORARY (review 177 / handoff 085, F207) - proves, on a real
+  # windows-latest runner, before shipping:
+  #   - #Requires -Version 7.0 refuses Windows PowerShell 5.1 before any of
+  #     a script's own body runs (item 1's falsification);
+  #   - the UTF-8 manifest-read fix actually differs from the old
+  #     Get-Content -Raw -> [xml] read under a forced non-UTF-8 default
+  #     encoding (item 2's regression test);
+  #   - store-package.ps1 builds and validates a tag end to end, never
+  #     switches the caller's checkout, and cleans up its worktree on both
+  #     the passing and the failing path (item 4).
+  # Reverted once proven - see the review reply for the run IDs this
+  # produced.
+  store-package-check:
+    name: "TEMPORARY: store-package.ps1 (review 177 / handoff 085, F207)"
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target/store-build
+          key: windows-store-package-check-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: PowerShell 5.1 refuses the wrong shell (item 1)
+        shell: pwsh
+        run: |
+          $out = & powershell.exe -File ./packaging/windows/check-imports.ps1 -ExePath "does-not-exist.exe" 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          Write-Host "--- powershell.exe (Windows PowerShell 5.1) output ---"
+          Write-Host $out
+          Write-Host "exit code: $code"
+
+          if ($code -eq 0) {
+            Write-Error "Windows PowerShell 5.1 ran check-imports.ps1 to completion instead of refusing it"
+            exit 1
+          }
+          if ($out -notmatch '(?i)requires\s+Windows\s+PowerShell\s+version\s+7\.0') {
+            Write-Error "the failure did not look like a #Requires version refusal:`n$out"
+            exit 1
+          }
+          if ($out -match 'does-not-exist\.exe') {
+            Write-Error "the script's own body ran (it mentioned the ExePath argument) - #Requires did not stop it before execution:`n$out"
+            exit 1
+          }
+          Write-Host "OK: Windows PowerShell 5.1 refused before running anything."
+
+      - name: UTF-8 manifest read regression test (item 2)
+        shell: pwsh
+        run: |
+          # Windows PowerShell 5.1's own default on a non-English system,
+          # for a file with no BOM: the host's ANSI/OEM code page, not
+          # UTF-8 (CP932 on Japanese Windows - F207's exact cause). Forced
+          # here inside pwsh 7, which does not hit the bug itself, so this
+          # step can compare the OLD read against the NEW one under the
+          # same forced settings a 5.1 host would actually have.
+          [Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(932)
+          $PSDefaultParameterValues['*:Encoding'] = 'oem'
+
+          $path = "./packaging/windows/AppxManifest.xml"
+          $expectedDescription = ([xml](Get-Content -Raw -Encoding utf8 $path)).Package.Applications.Application.VisualElements.Description
+
+          $oldReproduced = $false
+          try {
+            [xml]$old = Get-Content -Raw $path
+            $oldDescription = $old.Package.Applications.Application.VisualElements.Description
+            if ($oldDescription -ne $expectedDescription) {
+              Write-Host "OLD method (Get-Content -Raw -> [xml]): parsed, but Description differs under forced OEM encoding - this is the regression:"
+              Write-Host "  expected: $expectedDescription"
+              Write-Host "  got:      $oldDescription"
+              $oldReproduced = $true
+            } else {
+              Write-Host "OLD method: read the same Description even under forced OEM encoding."
+            }
+          } catch {
+            Write-Host "OLD method (Get-Content -Raw -> [xml]): threw under forced OEM encoding: $($_.Exception.Message)"
+            $oldReproduced = $true
+          }
+
+          $new = New-Object System.Xml.XmlDocument
+          $new.Load($path)
+          $newDescription = $new.Package.Applications.Application.VisualElements.Description
+          if ($newDescription -ne $expectedDescription) {
+            Write-Error "NEW method (XmlDocument.Load) did not read the correct Description either - the fix does not hold:`n$newDescription"
+            exit 1
+          }
+          Write-Host "OK: NEW method (XmlDocument.Load) read the correct Description under forced OEM encoding."
+
+          if (-not $oldReproduced) {
+            Write-Host "::warning::could not reproduce the OLD method failing under this pwsh/runner combination - see the review reply for what this means for item 2."
+          }
+
+      - name: Make an uncommitted change, and tag HEAD locally (never pushed)
+        id: setup
+        shell: pwsh
+        run: |
+          "scratch - not committed, proves store-package.ps1 never touches this" |
+            Out-File -FilePath "UNCOMMITTED-SCRATCH.txt" -Encoding utf8
+
+          $version = (Select-String -Path "Cargo.toml" -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          Write-Host "Tagging HEAD locally as $version (never pushed - version-sync and the release workflow both react to a real one)"
+          git tag -f $version
+
+          "tag=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Checkout state before store-package.ps1
+        shell: pwsh
+        run: |
+          Write-Host "branch: $(git branch --show-current)"
+          Write-Host "status:"
+          git status --porcelain
+          Write-Host "worktree list:"
+          git worktree list
+
+      - name: Run store-package.ps1
+        id: run
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          & pwsh -File ./packaging/windows/store-package.ps1 -Tag "${{ steps.setup.outputs.tag }}"
+          "exit_code=$LASTEXITCODE" >> $env:GITHUB_OUTPUT
+          exit $LASTEXITCODE
+
+      - name: Checkout state after store-package.ps1
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host "store-package.ps1 exit code: ${{ steps.run.outputs.exit_code }}"
+          Write-Host "branch: $(git branch --show-current)"
+          Write-Host "status:"
+          git status --porcelain
+          Write-Host "worktree list:"
+          git worktree list
+          Write-Host "output folder (target/store):"
+          if (Test-Path "target/store") {
+            Get-ChildItem -Recurse "target/store" | ForEach-Object { Write-Host "$($_.FullName): $($_.Length) bytes" }
+          } else {
+            Write-Host "(does not exist)"
+          }
+
+      - name: Fail the job if store-package.ps1 itself failed unexpectedly
+        if: steps.run.outputs.exit_code != '0'
+        shell: pwsh
+        run: |
+          Write-Error "store-package.ps1 exited ${{ steps.run.outputs.exit_code }} - see the two checkout-state steps and the run step's own log above"
+          exit 1
+
+      - name: A missing tag stops with the fetch message, and fetches nothing
+        if: always()
+        shell: pwsh
+        run: |
+          $badTag = "9.9.9-does-not-exist-${{ github.run_id }}"
+          $out = & pwsh -File ./packaging/windows/store-package.ps1 -Tag $badTag 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          Write-Host $out
+          Write-Host "exit code: $code"
+
+          if ($code -eq 0) {
+            Write-Error "expected a non-zero exit for a tag that was never fetched"
+            exit 1
+          }
+          if ($out -notmatch "git fetch --tags") {
+            Write-Error "expected the 'Run git fetch --tags first' message:`n$out"
+            exit 1
+          }
+          Write-Host "OK: missing tag stopped with the fetch message, exit $code."
