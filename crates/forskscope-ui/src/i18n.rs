@@ -628,7 +628,7 @@ mod tests {
 
     use forskscope_compare::diff::{DiffOptions, compute_diff};
     use forskscope_compare::dir::{RecEntry, RecStatus};
-    use forskscope_core::report::{
+    use forskscope_report::report::{
         ChangeHunk, DirComparisonReport, FileChecksum, FileComparisonReport, ReportOptions,
         change_hunks_from_diff, render_dir_report, render_file_report,
     };

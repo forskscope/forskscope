@@ -481,10 +481,10 @@ pub(crate) fn algo_val(a: forskscope_compare::DiffAlgorithm) -> &'static str {
 /// `PatchOptions` for an export, with `context_lines` following the user's
 /// settings rather than the library default — the wiring this function
 /// exists to make directly testable (RFC-084 §3).
-fn export_patch_options(store: &Store) -> forskscope_core::patch::PatchOptions {
-    forskscope_core::patch::PatchOptions {
+fn export_patch_options(store: &Store) -> forskscope_report::PatchOptions {
+    forskscope_report::PatchOptions {
         context_lines: store.settings.read().context_lines,
-        ..forskscope_core::patch::PatchOptions::default()
+        ..forskscope_report::PatchOptions::default()
     }
 }
 
@@ -492,7 +492,7 @@ fn export_patch_options(store: &Store) -> forskscope_core::patch::PatchOptions {
 /// Opens a native save dialog, then writes the patch text to the chosen path.
 /// Does nothing if the diff is identical (no changes to export).
 pub fn export_patch(store: &mut Store, index: usize) {
-    use forskscope_core::patch::{patch_from_file_diff, to_unified};
+    use forskscope_report::{patch_from_file_diff, to_unified};
 
     let options = export_patch_options(store);
 
@@ -614,9 +614,9 @@ pub(crate) fn write_export_file(
 fn checksum_if_fingerprinted(
     bytes: Option<&[u8]>,
     has_fingerprint: bool,
-) -> Option<forskscope_core::report::FileChecksum> {
+) -> Option<forskscope_report::report::FileChecksum> {
     if has_fingerprint {
-        bytes.map(forskscope_core::report::FileChecksum::of_bytes)
+        bytes.map(forskscope_report::report::FileChecksum::of_bytes)
     } else {
         None
     }
@@ -639,7 +639,7 @@ pub fn export_file_report(
     store: &mut Store,
     index: usize,
     format: ReportExportFormat,
-    path_mode: forskscope_core::report::ReportPathMode,
+    path_mode: forskscope_report::report::ReportPathMode,
 ) {
     let lang = store.lang();
     let tabs = store.tabs.read();
@@ -683,7 +683,7 @@ pub fn export_file_report(
             export_patch(store, index);
         }
         ReportExportFormat::Html => {
-            let report_options = forskscope_core::report::ReportOptions {
+            let report_options = forskscope_report::report::ReportOptions {
                 path_mode,
                 context_lines: store.settings.read().context_lines,
                 ..Default::default()
@@ -744,7 +744,7 @@ pub fn export_file_report(
                 let path = file.path().to_path_buf();
 
                 let html = tokio::task::spawn_blocking(move || {
-                    let report = forskscope_core::report::FileComparisonReport::from_diff(
+                    let report = forskscope_report::report::FileComparisonReport::from_diff(
                         &diff,
                         left_path.as_deref(),
                         right_path.as_deref(),
@@ -754,7 +754,7 @@ pub fn export_file_report(
                         checksum_if_fingerprinted(left_bytes.as_deref(), left_has_fingerprint),
                         checksum_if_fingerprinted(right_bytes.as_deref(), right_has_fingerprint),
                     );
-                    forskscope_core::report::render_file_report(
+                    forskscope_report::report::render_file_report(
                         &report,
                         env!("CARGO_PKG_VERSION"),
                         &generated_at,
@@ -819,7 +819,7 @@ mod tests {
         assert_eq!(checksum.size, 5);
         assert_eq!(
             checksum.sha256_hex,
-            forskscope_core::checksum::sha256_hex(b"hello")
+            forskscope_report::checksum::sha256_hex(b"hello")
         );
     }
 

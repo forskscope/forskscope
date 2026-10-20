@@ -10,7 +10,7 @@ use dioxus_core::spawn_forever;
 
 use forskscope_compare::CancellationToken;
 use forskscope_compare::dir::{RecEntry, RecStatus};
-use forskscope_core::report::{
+use forskscope_report::report::{
     ChangeHunk, DirComparisonReport, FileChecksum, ReportOptions, ReportPathMode,
     change_hunks_from_diff, render_dir_report,
 };
@@ -222,25 +222,20 @@ async fn start_dir_export(
     match format {
         ReportExportFormat::Patch => {
             let diff_options = forskscope_compare::DiffOptions::default();
-            let patch_options = forskscope_core::patch::PatchOptions {
+            let patch_options = forskscope_report::PatchOptions {
                 context_lines: store.settings.read().context_lines,
                 ..Default::default()
             };
             let lr = left_root.clone();
             let rr = right_root.clone();
             let result = tokio::task::spawn_blocking(move || {
-                forskscope_core::patch::patch_from_directories(
-                    &lr,
-                    &rr,
-                    diff_options,
-                    patch_options,
-                )
+                forskscope_report::patch_from_directories(&lr, &rr, diff_options, patch_options)
             })
             .await;
             store.modal.set(Modal::None);
             match result {
                 Ok(Ok(patch)) => {
-                    let text = forskscope_core::patch::to_unified(&patch);
+                    let text = forskscope_report::to_unified(&patch);
                     match crate::ui::view::diff_actions::write_export_file(
                         &path,
                         text.as_bytes(),

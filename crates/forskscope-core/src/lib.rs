@@ -11,7 +11,6 @@
 //! they must never become an independent source of truth (see RFC-042,
 //! "Core First").
 
-pub mod checksum;
 pub mod command;
 pub mod compare_prep;
 pub mod conflict_nav;
@@ -22,10 +21,8 @@ pub mod env_passthrough;
 pub mod external_tool;
 pub mod line_map;
 pub mod merge;
-pub mod patch;
 pub mod persist;
 pub mod platform;
-pub mod report;
 pub mod save;
 pub mod settings;
 pub mod vcs;
@@ -45,10 +42,6 @@ pub use merge::{
     ConflictId, ConflictStatus, HunkState, MergeConflict, MergeHunk, MergeSession, SessionRevision,
     ThreeWayMergeSession, ThreeWayStats, TransactionEntry, TransactionKind, TransactionLog,
     UnixTimestamp,
-};
-pub use patch::{
-    LineOrigin, PatchDocument, PatchFileChange, PatchFormat, PatchHunk, PatchLine, PatchOptions,
-    PatchSummary, patch_from_directories, patch_from_file_diff, to_unified,
 };
 pub use save::{
     BackupPolicy,

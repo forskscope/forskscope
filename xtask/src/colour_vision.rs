@@ -527,7 +527,7 @@ fn assert_html_report_colours_match_tokens(
     rules: &[Rule],
     problems: &mut Vec<String>,
 ) {
-    let html_path = root.join("crates/forskscope-core/src/report/html.rs");
+    let html_path = root.join("crates/forskscope-report/src/report/html.rs");
     let source = fs::read_to_string(&html_path)
         .unwrap_or_else(|e| panic!("cannot read {}: {e}", html_path.display()));
 

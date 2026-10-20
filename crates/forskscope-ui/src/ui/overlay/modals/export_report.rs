@@ -4,7 +4,7 @@
 //! options ▸" per the owner's rule that detailed settings stay hidden.
 
 use dioxus::prelude::*;
-use forskscope_core::report::ReportPathMode;
+use forskscope_report::report::ReportPathMode;
 
 use crate::i18n::t;
 use crate::state::{Modal, Store};

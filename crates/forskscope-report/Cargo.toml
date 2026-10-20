@@ -1,0 +1,28 @@
+[package]
+name        = "forskscope-report"
+description = "Turns a ForskScope comparison into text: unified diff, Markdown, JSON and HTML reports. Never writes a file."
+readme      = "../../README.md"
+
+version.workspace       = true
+edition.workspace       = true
+rust-version.workspace  = true
+license.workspace       = true
+authors.workspace       = true
+repository.workspace    = true
+
+[dependencies]
+forskscope-compare           = { workspace = true }
+# RFC-092 (handoff 084): comparison-report checksums - SHA-256 of each
+# compared file's bytes as read at export time, so anyone can confirm a
+# report describes exactly those files.
+sha2                         = { workspace = true }
+
+[dev-dependencies]
+tempfile                    = { workspace = true }
+
+[target.'cfg(unix)'.dev-dependencies]
+# F138: caps this process's own address space before opening a crafted CFB
+# header - see forskscope-compare's own tests/f138_decline_before_delegating.rs,
+# which this crate's own permission-guard tests reuse the same support
+# module pattern from.
+libc                         = { workspace = true }

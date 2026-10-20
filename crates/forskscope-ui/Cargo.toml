@@ -21,6 +21,7 @@ path = "src/lib.rs"
 [dependencies]
 forskscope-compare           = { workspace = true }
 forskscope-core             = { workspace = true }
+forskscope-report           = { workspace = true }
 forskscope-ui-logic         = { workspace = true }
 
 dioxus                      = { workspace = true }

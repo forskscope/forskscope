@@ -1526,8 +1526,17 @@ dependencies = [
  "libc",
  "serde",
  "serde_json",
- "sha2",
  "similar",
+ "tempfile",
+]
+
+[[package]]
+name = "forskscope-report"
+version = "0.194.1"
+dependencies = [
+ "forskscope-compare",
+ "libc",
+ "sha2",
  "tempfile",
 ]
 
@@ -1544,6 +1553,7 @@ dependencies = [
  "dirs-next",
  "forskscope-compare",
  "forskscope-core",
+ "forskscope-report",
  "forskscope-ui-logic",
  "libc",
  "native-tls",

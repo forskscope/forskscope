@@ -949,13 +949,14 @@ fn assert_quick_xml_path_is_reviewed() {
     assert_immediate_dependents("quick-xml", &["wayland-scanner ", "calamine "]);
 }
 
-/// RFC-092/handoff 084: `sha2` was already resolved transitively (`wry` ->
-/// `forskscope-ui`); `forskscope-core` now depends on it directly too, for
-/// comparison-report checksums (SHA-256 of each compared file's bytes).
-/// Same crate, same version, no new crypto stack — both paths are accepted
-/// deliberately, a third would not be.
+/// RFC-092/handoff 084, updated by RFC-093 (handoff 086): `sha2` was already
+/// resolved transitively (`wry` -> `forskscope-ui`); `forskscope-report`
+/// depends on it directly too, for comparison-report checksums (SHA-256 of
+/// each compared file's bytes) — moved there from `forskscope-core` as part
+/// of the crate-boundary split. Same crate, same version, no new crypto
+/// stack — both paths are accepted deliberately, a third would not be.
 fn assert_sha2_path_is_reviewed() {
-    assert_immediate_dependents("sha2", &["wry ", "forskscope-core "]);
+    assert_immediate_dependents("sha2", &["wry ", "forskscope-report "]);
 }
 
 fn assert_external_network_crates_absent() {
