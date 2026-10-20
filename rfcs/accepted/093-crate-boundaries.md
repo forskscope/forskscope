@@ -1,8 +1,10 @@
 # RFC 093: Crate Boundaries — a Read-Only Engine, Its Outputs, and Everything That Writes
 
-**Status.** Proposed.
-**Scheduling.** Before RFC-094, on `main`, with no release of its own. It ships
-inside the release that carries RFC-094. See `ROADMAP.md` § "Remaining proposed
+**Status.** Accepted — review complete; implementer may start. Moves to `done/`
+when the work ships (RFC-000, 5-folder variant).
+**Accepted.** 2026-10-20 by the project owner.
+**Scheduling.** `0.195.0`. It lands on `main` first, before RFC-094, with no
+release of its own, and ships inside `0.195.0` together with RFC-094. See `ROADMAP.md` § "Remaining proposed
 RFCs".
 **Tracks.** The owner's questions, 2026-10-20:
 - are the crate boundaries reasonable, and ready for extension?

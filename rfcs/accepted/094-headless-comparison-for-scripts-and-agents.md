@@ -1,7 +1,9 @@
 # RFC 094: Headless Comparison for Scripts and AI Agents
 
-**Status.** Proposed.
-**Scheduling.** After RFC-093. See `ROADMAP.md` § "Remaining proposed RFCs".
+**Status.** Accepted — review complete; implementer may start. Moves to `done/`
+when the work ships (RFC-000, 5-folder variant).
+**Accepted.** 2026-10-20 by the project owner.
+**Scheduling.** `0.195.0`, after RFC-093. See `ROADMAP.md` § "Remaining proposed RFCs".
 **Tracks.** The owner's direction, 2026-10-20:
 - extend ForskScope to support AI agents, through command-line arguments or a
   low-memory server mode;
