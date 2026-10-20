@@ -162,7 +162,12 @@ jobs:
             Write-Error "Windows PowerShell 5.1 ran check-imports.ps1 to completion instead of refusing it"
             exit 1
           }
-          if ($out -notmatch '(?i)requires\s+Windows\s+PowerShell\s+version\s+7\.0') {
+          # Windows PowerShell 5.1's own wording, not a message check-imports.ps1
+          # ever prints itself: "cannot be run because it contained a
+          # '#requires' statement for Windows PowerShell 7.0" plus a
+          # FullyQualifiedErrorId of ScriptRequiresUnmatchedPSVersion - match
+          # on the stable error id, not the prose.
+          if ($out -notmatch 'ScriptRequiresUnmatchedPSVersion') {
             Write-Error "the failure did not look like a #Requires version refusal:`n$out"
             exit 1
           }
@@ -171,6 +176,10 @@ jobs:
             exit 1
           }
           Write-Host "OK: Windows PowerShell 5.1 refused before running anything."
+          # $LASTEXITCODE is still 1 from the refused powershell.exe call
+          # above - without this, the step itself would report failure even
+          # though every check here passed.
+          exit 0
 
       - name: UTF-8 manifest read regression test (item 2)
         shell: pwsh
@@ -291,3 +300,7 @@ jobs:
             exit 1
           }
           Write-Host "OK: missing tag stopped with the fetch message, exit $code."
+          # $LASTEXITCODE is still non-zero from the refused store-package.ps1
+          # call above - without this, the step itself would report failure
+          # even though this is the expected, checked-for outcome.
+          exit 0
