@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.194.1] — Unreleased
+
 ## [0.194.0] — 2026-10-20
 
 **Reports you can hand to someone.**

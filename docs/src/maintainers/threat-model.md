@@ -1,15 +1,15 @@
 # Threat Model and Security Notes
 
-This document records the security posture of ForskScope at **v0.193.0**, the
+This document records the security posture of ForskScope at **v0.194.0**, the
 data flows that carry risk, the controls in place, and the known residual
 concerns. It is a living document; update it when a new data flow is added.
 
-**Review stamp.** Partial revision 2026-10-18, by the architect, after 0.193.0
-(review 171); earlier, 2026-10-15, after the documentation audit (review 160).
+**Review stamp.** Partial revision 2026-10-20, by the architect, after 0.194.0
+(review 177); 2026-10-18, after 0.193.0 (review 171); earlier, 2026-10-15, after the documentation audit (review 160).
 
 - **Updated:** the fundamental position, the threat surface list, §8
   (Distribution, including the website) and the audit history, covering
-  0.186.0 to 0.193.0.
+  0.186.0 to 0.194.0.
 - **Not re-audited:** every other section.
 
 Previous full revision: 2026-09-24, against commit `2bb7ca8`
@@ -866,3 +866,4 @@ really version X of a published crate."
 | v0.191.0 | RFC-088 colour vision, RFC-089 window title; `rustls` 0.23.45 → 0.23.46 | The window title now shows the open comparison's file names to the system (taskbar, window switcher, screen sharing). That is local, and the same convention as every editor. `rustls` fixes RUSTSEC-2026-0346 to -0349. It reaches us only through `dioxus-desktop` → `tungstenite`, not the update check (`native-tls`). The release audit stopped the first tag on these advisories |
 | v0.192.0 | RFC-090 palette, F195 documentation, F197 effects | No data-flow change |
 | v0.193.0 | RFC-091 portable and private modes; the Windows hybrid CRT; F203 `zip` advisories | Where the app writes is decided once at startup, before any thread. On Linux, `XDG_CACHE_HOME`/`XDG_DATA_HOME`/`XDG_STATE_HOME` are redirected into the data location for the web view, and every child process (`git`, the browser opener) gets the user's original values back. Private mode's web-view folder sits under the system temporary directory and is removed on exit. Verified: no write to `$HOME` in either mode (a writable overlay of home stayed empty). The Windows program no longer imports `VCRUNTIME*`; its import gate ran outside the release (F206). RUSTSEC-2026-0367/-0368/-0369 are ignored: `zip` is reached only through `calamine` and, in xtask, `rust_xlsxwriter`, neither of which extracts; `audit-deps` keeps those the only paths, and CI now audits xtask's lockfile (F204) |
+| v0.194.0 | RFC-092 comparison reports; F206 release import gate; F207 Store packaging | A new user-chosen file write: an HTML report or a patch, only by the user's click and a save dialog, never automatic. The report is inert by two defences: every name and line HTML-escaped, and a `default-src 'none'` CSP meta, each tested by removing it. Paths default to file names only. SHA-256 (`sha2`, now a direct dependency, guarded in `audit-deps`) is computed only for the export, from the same bytes the report's changes come from; a file changed since the comparison refuses the export. *Open* starts the system opener on the saved file through `open_path`, never `cmd /C start` (a file name's `&`, `^` or `%` cannot be interpreted), with the user's own environment restored. No network request is added. The release now runs the Windows import gate itself |

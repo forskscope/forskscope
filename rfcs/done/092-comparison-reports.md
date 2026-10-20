@@ -1,7 +1,6 @@
 # RFC 092: Comparison Reports — HTML and Unified Diff, for Files and Folders
 
-**Status.** Accepted — review complete; implementer may start. Moves to `done/`
-when the work ships (RFC-000, 5-folder variant).
+**Status.** Implemented (`0.194.0`, `8078547`; reviews 174–177, F208).
 **Accepted.** 2026-10-17 by the project owner, with one rule: *“Be careful not to
 print noise to users, which results into only confusion.”* That rule governs §3:
 every line in a report must help its reader, and a section or note appears only
