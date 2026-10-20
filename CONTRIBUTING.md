@@ -19,7 +19,7 @@ are welcome; personal attacks are not.
 ```sh
 git clone https://github.com/forskscope/forskscope
 cd forskscope
-cargo test -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
+cargo test -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
 ```
 
 Those five crates run without GTK. The UI crate (`forskscope-ui`) requires
@@ -74,8 +74,8 @@ request for anything beyond a one-line fix.
    changing — `docs/src/maintainers/architecture.md` says which.
 3. **Run the test suite:**
    ```sh
-   cargo test -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
-   cargo clippy -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
+   cargo test -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
+   cargo clippy -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
    ```
    Both must pass with zero failures and zero warnings before opening a PR.
 4. **Check file size.** Split files over 300 ELOC where it helps. Over 500

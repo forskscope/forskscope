@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forskscope.dev/schemas/forskscope.comparison.v1.json",
+  "title": "ForskScope comparison document (forskscope.comparison/1)",
+  "description": "What `forskscope-cli compare --format json` prints, and the structured content `forskscope-cli mcp`'s `compare` tool returns when asked for JSON (RFC-094 §3). Adding a field keeps this schema at /1; removing a field, or changing its meaning, moves to /2 with its own schema file.",
+  "oneOf": [
+    { "$ref": "#/$defs/file_document" },
+    { "$ref": "#/$defs/directory_document" }
+  ],
+  "$defs": {
+    "schema_tag": {
+      "const": "forskscope.comparison/1"
+    },
+    "side_info": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "size", "sha256", "encoding"],
+      "properties": {
+        "name": { "type": "string" },
+        "size": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": ["string", "null"] },
+        "encoding": { "type": "string" }
+      }
+    },
+    "change_line_kind": {
+      "enum": ["context", "removed", "added"]
+    },
+    "change_line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["old_line", "new_line", "kind", "text"],
+      "properties": {
+        "old_line": { "type": ["integer", "null"], "minimum": 0 },
+        "new_line": { "type": ["integer", "null"], "minimum": 0 },
+        "kind": { "$ref": "#/$defs/change_line_kind" },
+        "text": { "type": "string" }
+      }
+    },
+    "change_hunk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["old_start", "old_len", "new_start", "new_len", "lines"],
+      "properties": {
+        "old_start": { "type": "integer", "minimum": 0 },
+        "old_len": { "type": "integer", "minimum": 0 },
+        "new_start": { "type": "integer", "minimum": 0 },
+        "new_len": { "type": "integer", "minimum": 0 },
+        "lines": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/change_line" }
+        }
+      }
+    },
+    "status_identifier": {
+      "description": "One-to-one with the word the app shows for a RecStatus (forskscope_compare::dir::status_key).",
+      "enum": [
+        "identical",
+        "different",
+        "left_only",
+        "right_only",
+        "unreadable",
+        "not_compared",
+        "symlink_not_followed",
+        "left_only_empty_folder",
+        "right_only_empty_folder"
+      ]
+    },
+    "file_document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "kind",
+        "left",
+        "right",
+        "identical",
+        "counts",
+        "changes",
+        "notes"
+      ],
+      "properties": {
+        "schema": { "$ref": "#/$defs/schema_tag" },
+        "kind": { "const": "file" },
+        "left": { "$ref": "#/$defs/side_info" },
+        "right": { "$ref": "#/$defs/side_info" },
+        "identical": { "type": "boolean" },
+        "counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["changes", "lines_removed", "lines_added"],
+          "properties": {
+            "changes": { "type": "integer", "minimum": 0 },
+            "lines_removed": { "type": "integer", "minimum": 0 },
+            "lines_added": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "changes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/change_hunk" }
+        },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "directory_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "status",
+        "left_size",
+        "right_size",
+        "left_sha256",
+        "right_sha256",
+        "changes"
+      ],
+      "properties": {
+        "path": { "type": "string" },
+        "status": { "$ref": "#/$defs/status_identifier" },
+        "left_size": { "type": ["integer", "null"], "minimum": 0 },
+        "right_size": { "type": ["integer", "null"], "minimum": 0 },
+        "left_sha256": { "type": ["string", "null"] },
+        "right_sha256": { "type": ["string", "null"] },
+        "changes": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/change_hunk" }
+        }
+      }
+    },
+    "omitted_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "reason"],
+      "properties": {
+        "path": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    },
+    "directory_document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "kind",
+        "left",
+        "right",
+        "counts",
+        "entries",
+        "omitted"
+      ],
+      "properties": {
+        "schema": { "$ref": "#/$defs/schema_tag" },
+        "kind": { "const": "directory" },
+        "left": { "type": "string" },
+        "right": { "type": "string" },
+        "counts": {
+          "description": "Entry count by status_identifier - a status this scan never produced is simply absent, not listed at zero.",
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/directory_entry" }
+        },
+        "omitted": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/omitted_entry" }
+        }
+      }
+    }
+  }
+}

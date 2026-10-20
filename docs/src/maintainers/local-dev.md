@@ -21,13 +21,13 @@ cargo test -p forskscope-desktop
 cargo test -p forskscope-edit
 cargo test -p forskscope-report
 cargo test -p forskscope-ui-logic
-cargo test -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic  # headless gate
+cargo test -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic  # headless gate
 
 # Full workspace (requires GTK):
 cargo test --workspace
 
 # Lint (run before every commit):
-cargo clippy -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
+cargo clippy -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
 ```
 
 > **Note:** `forskscope-ui` depends on `dioxus-desktop` which requires GTK3
@@ -126,5 +126,5 @@ Verify on MSRV before releasing:
 
 ```sh
 rustup install 1.91
-cargo +1.91 test -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
+cargo +1.91 test -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
 ```

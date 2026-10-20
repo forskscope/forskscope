@@ -13,10 +13,10 @@ cargo test -p forskscope-desktop
 cargo test -p forskscope-ui-logic
 
 # Headless test gate
-cargo test -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
+cargo test -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
 
 # Clippy (must pass without warnings)
-cargo clippy -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
+cargo clippy -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
 
 # Crate-boundary rules: no file writes or process spawns in compare/report
 # outside #[cfg(test)], and every crate's dependencies stay within RFC-093

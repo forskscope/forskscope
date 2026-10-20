@@ -537,5 +537,5 @@ releasing.
 
 ```sh
 rustup install 1.91
-cargo +1.91 test -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
+cargo +1.91 test -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
 ```

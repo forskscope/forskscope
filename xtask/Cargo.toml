@@ -27,3 +27,11 @@ path = "src/main.rs"
 # and lockfile (see `[workspace]` below): nothing here reaches the shipped
 # product's dependency graph.
 rust_xlsxwriter = { version = "=0.99.0", default-features = false }
+# RFC-094 §3: `cargo xtask json-schema` parses `forskscope-cli compare
+# --format json`'s actual output to validate it against
+# docs/schemas/forskscope.comparison.v1.json - DEC-005's "no JSON parser"
+# reasoning (crate_boundaries.rs's own doc comment) is about avoiding a
+# parser where a text-pattern check would do; validating real JSON against
+# a real JSON Schema file has no such substitute, so this is xtask's first
+# and only JSON dependency.
+serde_json = "1"
