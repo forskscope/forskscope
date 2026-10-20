@@ -1520,10 +1520,6 @@ dependencies = [
 [[package]]
 name = "forskscope-core"
 version = "0.194.1"
-dependencies = [
- "forskscope-compare",
- "forskscope-edit",
-]
 
 [[package]]
 name = "forskscope-desktop"
@@ -1568,7 +1564,6 @@ dependencies = [
  "dioxus-swdir-tree",
  "dirs-next",
  "forskscope-compare",
- "forskscope-core",
  "forskscope-desktop",
  "forskscope-edit",
  "forskscope-report",
@@ -1587,7 +1582,6 @@ name = "forskscope-ui-logic"
 version = "0.194.1"
 dependencies = [
  "forskscope-compare",
- "forskscope-core",
  "forskscope-desktop",
  "forskscope-edit",
  "libc",

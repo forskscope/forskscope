@@ -64,12 +64,18 @@
 //! `ProfileChoice`/`profile_presets` — corrected here, review 106 §4: an
 //! earlier version of this comment misattributed it to these two instead.)
 
+pub mod command;
 pub mod compare;
+pub mod conflict_nav;
+pub mod diff_decoration;
 pub mod explore;
+pub mod line_map;
 pub mod session;
 pub mod settings;
 #[cfg(test)]
 mod test_support;
+#[cfg(test)]
+mod tests;
 pub mod update_check;
 
 // compare

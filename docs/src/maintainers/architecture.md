@@ -49,7 +49,7 @@ could be added as a fourth crate without touching core.
 | `watcher` | `FileChangeMonitor` trait, `WatchToken`, `FileChangeEvent`, `WatchError`, `MockFileChangeMonitor` — file-watcher boundary (RFC-036). |
 | `xlsx` | Fail-closed spreadsheet comparison boundary between `sheets-diff` and ForskScope's app model, no `sheets-diff` types in the public API (RFC-058). Suspended for one release over an XML denial-of-service advisory chain, restored at `sheets-diff` 2.5.0 with cancellation polling inside a sheet (RFC-085); now at 3.0.0, which streams its read (F130). |
 
-## `ui-logic` modules (20)
+## `ui-logic` modules (28)
 
 Framework-independent view-model logic. All modules are testable with
 `cargo test -p forskscope-ui-logic` — no GTK or display server required.
@@ -86,7 +86,15 @@ read what a row says a module does; that stays a judgment.
 | `settings::settings_view` | `theme_choices` — theme picker options; `clamp_font_size` — the diff-pane font-size bound the settings modal enforces (F53) (RFC-009, Slice 5). |
 | `settings::field_debounce` | `FieldDebounce`, `FIELD_DEBOUNCE` — the pure debounce state machine behind the ignore-pattern settings fields: a keystroke always overwrites the pending value, and it commits once 400 ms have passed since the last one (handoff 062, F136). |
 | `update_check` | `decide(current, outcome)` — the About dialog's *Check for updates* button: maps a parsed-or-not reply to `Checking` / `UpToDate` / `NewerAvailable` / `AheadOfRelease` / `CouldNotCheck(reason)`, never "up to date" from a failure (F166). `Version::parse` accepts only plain `X.Y.Z`. `AppChannel`/`update_action`/`release_page_url` pick the right instruction and build the release-page URL from the parsed version alone, never from raw reply text (F180/F181, handoff 073). |
-| `test_support` | `permission_guard_failed` — shared by permission-dependent tests across this crate (`explore/deep_filter.rs`, `explore/classify_pair.rs`): panics unless this process is root, so a `chmod`-based test guard that has no effect fails loudly instead of skipping silently (F143, handoff 063 §1). Test-only (`#[cfg(test)]`), duplicated once per crate alongside `forskscope-core`'s and `forskscope-ui`'s own copies - there is no shared test-support crate today. |
+| `test_support` | `permission_guard_failed` — shared by permission-dependent tests across this crate (`explore/deep_filter.rs`, `explore/classify_pair.rs`): panics unless this process is root, so a `chmod`-based test guard that has no effect fails loudly instead of skipping silently (F143, handoff 063 §1). Test-only (`#[cfg(test)]`), duplicated once per crate alongside the other RFC-093 crates' and `forskscope-ui`'s own copies - there is no shared test-support crate today. |
+| `command/registry` | `CommandRegistry` — all `CommandDefinition`s indexed by `CommandId` (RFC-019 §5). Moved in from `forskscope-core` (RFC-093 §1 step 5); not yet wired into `forskscope-ui` - the toolbar/keyboard/command-palette consumer described in `command`'s own module doc was deferred post-v1 and never built. |
+| `conflict_nav` | `ConflictNavigator` — the view-model between `ThreeWayMergeSession` and the four-region conflict-workspace UI: which conflict is focused, the navigator rail, prev/next traversal (RFC-034 §"Conflict navigator"). Moved in from `forskscope-core` (RFC-093 §1 step 5); not yet wired into `forskscope-ui` - `conflict_nav_view` (the rail component) was deleted outright by handoff 033's connectivity cleanup as deferred post-v1 UI, never built. |
+| `diff_decoration` | `DiffDecorationSet` — derived from a `DiffDocument`, describes what to render (CSS classes, gutter symbols) without prescribing how (RFC-024). Moved in from `forskscope-core` (RFC-093 §1 step 5); not yet wired into `forskscope-ui` - see F48's note in `tests/css_coverage.rs`. |
+| `line_map` | `LineMap` — the aligned row sequence a `DiffDocument` renders to (same-height panes, synchronized scrolling, the mini hunk map) (RFC-035). Moved in from `forskscope-core` (RFC-093 §1 step 5); not yet wired into `forskscope-ui`. |
+| `tests/command_tests` | `command.rs`'s and `command/registry.rs`'s tests (RFC-019 §5, §6, §7): kept as its own file rather than split and inlined, since it spans both. Moved in from `forskscope-core` (RFC-093 §1 step 5). |
+| `tests/conflict_nav_tests` | `conflict_nav.rs`'s tests (RFC-034). Moved in from `forskscope-core` (RFC-093 §1 step 5). |
+| `tests/diff_decoration_tests` | `diff_decoration.rs`'s tests (RFC-024). Moved in from `forskscope-core` (RFC-093 §1 step 5). |
+| `tests/line_map_tests` | `line_map.rs`'s tests (RFC-035). Moved in from `forskscope-core` (RFC-093 §1 step 5). |
 
 ## UI modules
 

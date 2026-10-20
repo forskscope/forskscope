@@ -233,7 +233,11 @@ Integration tests in `tests/`:
 
 All tests are inline (`#[cfg(test)]` inside each module file), except
 `compare/load_identity`, which keeps its tests in a sibling `tests.rs`
-(`mod tests;`) because of the fixture setup its fifteen cases share.
+(`mod tests;`) because of the fixture setup its fifteen cases share, and
+`command`/`conflict_nav`/`diff_decoration`/`line_map`, moved in from
+`forskscope-core` with their own external `tests/*_tests.rs` files intact
+(RFC-093 §1 step 5) rather than split and inlined - `command_tests.rs`
+alone spans two source files (`command.rs` and `command/registry.rs`).
 Integration tests live in `tests/css_coverage.rs`.
 
 **Rebuilt against the module tree (`cargo xtask ui-logic-docs`, F93,
@@ -266,6 +270,14 @@ by handoff 033's connectivity cleanup; `compare/load_identity`,
 | `settings/field_debounce` | `FieldDebounce` as a pure state machine on a fake clock: six keystrokes 30 ms apart commit once, not six times; the committed value is the last one typed; typing again before the interval elapses restarts the rest; `due_at` names when the rest will have lasted long enough; a consumed commit does not fire again. | F136 |
 | `update_check` | `Version::parse`: a plain `X.Y.Z` round-trips; a `v` prefix, missing/extra component, pre-release suffix, or a hostile shape (`"0.187.0; rm -rf /"`, `"$(whoami)"`) all reject rather than guess; numeric not lexical ordering (`0.10.0 > 0.9.0`). `decide`: each of the five states from its outcome; the F166 falsification that no failure outcome ever decides `UpToDate`. `AppChannel::from_label`: unset and every unrecognised label fall back to `Direct`. `release_page_url`: built from the version alone, and structurally can only ever contain digits and `.`. | F180/F181 |
 | `test_support` | No tests of its own - a shared helper exercised indirectly by every permission-dependent test in this crate that calls `permission_guard_failed`. | F143 |
+| `command/registry` | Covered by `tests/command_tests`, below (the file spans both `command.rs` and `command/registry.rs`). | RFC-019 §5, §6, §7 |
+| `conflict_nav` | Covered by `tests/conflict_nav_tests`, below. | RFC-034 |
+| `diff_decoration` | Covered by `tests/diff_decoration_tests`, below. | RFC-024 |
+| `line_map` | Covered by `tests/line_map_tests`, below. | RFC-035 |
+| `tests/command_tests` | `AvailabilityRule::evaluate` across every rule variant and `CommandContext` combination; `CommandRegistry` lookup, builtin command coverage, shortcut/category/danger-level invariants. | RFC-019 §5, §6, §7 |
+| `tests/conflict_nav_tests` | `ConflictNavigator` focus/traversal (prev/next, wrap, empty), `ConflictFilter` (all vs. unresolved-only), rail entry glyph/label per `ConflictStatus`. | RFC-034 |
+| `tests/diff_decoration_tests` | `DiffDecorationSet` derivation from a `DiffDocument`; `LineDecorationKind`/`InlineDecoration` CSS class and gutter-symbol stability. | RFC-024 |
+| `tests/line_map_tests` | `LineMap` row alignment, `RowState` gutter symbols, mini-map weights, scroll-anchor clamping, next/prev-changed-row traversal. | RFC-035 |
 
 Doctest in `watcher.rs` (`MockFileChangeMonitor` usage example): 1 test.
 

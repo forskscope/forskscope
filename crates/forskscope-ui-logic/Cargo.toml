@@ -12,12 +12,9 @@ repository.workspace    = true
 
 [dependencies]
 forskscope-compare           = { workspace = true }
-forskscope-core             = { path = "../forskscope-core" }
 forskscope-desktop           = { workspace = true }
-
-[dev-dependencies]
-# tests/css_coverage.rs exercises a ThreeWayMergeSession to cover its CSS
-# classes - the only use of forskscope-edit in this crate.
+# RFC-093 §1: `conflict_nav` needs `MergeSession`/`ConflictId`/
+# `ConflictStatus`/`ThreeWayMergeSession`.
 forskscope-edit               = { workspace = true }
 
 [target.'cfg(unix)'.dev-dependencies]

@@ -20,7 +20,6 @@ path = "src/lib.rs"
 
 [dependencies]
 forskscope-compare           = { workspace = true }
-forskscope-core             = { workspace = true }
 forskscope-desktop           = { workspace = true }
 forskscope-edit             = { workspace = true }
 forskscope-report           = { workspace = true }

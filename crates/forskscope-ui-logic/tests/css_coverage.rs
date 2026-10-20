@@ -1,8 +1,9 @@
 //! CSS class contract coverage test (RFC-034).
 //!
-//! Verifies that every CSS class token produced by `forskscope-core` is
-//! defined somewhere in the main stylesheet. This prevents silent breakage
-//! where a core constant is renamed or added but the CSS is not updated.
+//! Verifies that every CSS class token produced by this crate's view-models
+//! is defined somewhere in the main stylesheet. This prevents silent
+//! breakage where a view-model constant is renamed or added but the CSS is
+//! not updated.
 //!
 //! This test runs without GTK — it reads the CSS file as a static string.
 //!
@@ -11,8 +12,8 @@
 //! `.fs-line-*`/`.fs-inline-*` stylesheet and its `hunk_decorations`
 //! view-model) was deleted rather than wired through — see RFC-024's status
 //! note and 30-contract-diff-decorations.css's header for the reasoning.
-//! `forskscope-core::diff_decoration` itself is untouched; its `css_class()`
-//! methods are still covered by `forskscope-core`'s own unit tests.
+//! `diff_decoration` itself is untouched; its `css_class()` methods are
+//! still covered by this crate's own unit tests.
 
 /// The runtime stylesheet, included at compile time.
 /// Generated from `assets/css/` via `cargo xtask css`.
@@ -28,8 +29,8 @@ fn css_contains_class(css: &str, class: &str) -> bool {
 
 #[test]
 fn conflict_navigator_css_classes_defined_in_main_css() {
-    use forskscope_core::conflict_nav::{ConflictFilter, ConflictNavigator};
     use forskscope_edit::merge::ThreeWayMergeSession;
+    use forskscope_ui_logic::conflict_nav::{ConflictFilter, ConflictNavigator};
 
     // Build a session with one conflict and inspect the resulting CSS classes.
     let sess = ThreeWayMergeSession::from_texts("base\n", "left\n", "right\n");
@@ -92,7 +93,7 @@ fn status_glyph_css_classes_defined_in_main_css() {
 #[test]
 fn row_state_gutter_symbols_are_distinct() {
     // Smoke test: RowState::gutter_symbol must be unique across variants.
-    use forskscope_core::line_map::RowState;
+    use forskscope_ui_logic::line_map::RowState;
     let symbols: std::collections::HashSet<char> = [
         RowState::Equal,
         RowState::Inserted,

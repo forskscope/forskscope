@@ -1,6 +1,6 @@
 [package]
 name        = "forskscope-core"
-description = "GUI-independent core for ForskScope: view-model layer not yet moved to forskscope-ui-logic (RFC-093)."
+description = "Empty under RFC-093; removed outright in step 7."
 readme      = "../../README.md"
 
 version.workspace       = true
@@ -9,10 +9,3 @@ rust-version.workspace  = true
 license.workspace       = true
 authors.workspace       = true
 repository.workspace    = true
-
-[dependencies]
-forskscope-compare           = { workspace = true }
-# RFC-093 §1: `conflict_nav` (view-model, soon `forskscope-ui-logic`) still
-# needs one write-side type - `MergeSession`/`ConflictId`/`ConflictStatus`/
-# `ThreeWayMergeSession` - during this crate's split.
-forskscope-edit               = { workspace = true }
