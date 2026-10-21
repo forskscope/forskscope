@@ -16,12 +16,13 @@ pub mod tab;
 pub(crate) mod tab_nav;
 pub mod types;
 
+pub use compare::{
+    StartupAction, classify_startup_request, close_dir_tab, fs_probe, open_compare,
+    open_compare_request, open_dir_compare, open_startup_mismatch_error, reload_tab,
+};
 pub(crate) use compare::{
     activate_adjacent_tab, activate_tab_at, dir_tab_title, open_compare_request_with_options,
     reload_tab_with_options,
-};
-pub use compare::{
-    close_dir_tab, open_compare, open_compare_request, open_dir_compare, reload_tab,
 };
 pub use profile::{add_profile, remove_profile, select_profile};
 pub(crate) use session::request_close_file_tab;

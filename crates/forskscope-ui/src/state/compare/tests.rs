@@ -3,7 +3,8 @@ use std::fs;
 use super::*;
 use forskscope_desktop::persist::schema::PersistenceLoad;
 use forskscope_desktop::persist::schema::session::SessionRepository;
-use forskscope_ui_logic::{CompareTabId, LoadGeneration};
+use forskscope_ui_logic::{CompareTabId, LoadGeneration, StartupRequest};
+use std::collections::HashMap;
 
 fn id(value: u64) -> CompareTabId {
     CompareTabId::new(value).unwrap()
@@ -1448,4 +1449,205 @@ fn activate_tab_at_a_dir_tab_position_selects_it_and_clears_the_file_index() {
         assert_eq!(*store.active.read(), None);
         assert_eq!(*store.active_dir.read(), Some(0));
     });
+}
+
+// ── F209: classify_startup_request (handoff 088) ────────────────────────────
+//
+// A probe built from a plain map, never touching the real filesystem - the
+// exact five shapes the handoff asks for: file+file, folder+folder,
+// file+folder, folder+file, and a missing path.
+
+fn probe_from(kinds: &[(&str, PathKind)]) -> impl Fn(&Path) -> PathKind {
+    let map: HashMap<PathBuf, PathKind> = kinds
+        .iter()
+        .map(|(name, kind)| (PathBuf::from(name), *kind))
+        .collect();
+    move |path: &Path| map.get(path).copied().unwrap_or(PathKind::Other)
+}
+
+#[test]
+fn two_files_proceed_as_requested_unchanged() {
+    let probe = probe_from(&[("l.txt", PathKind::File), ("r.txt", PathKind::File)]);
+    let request = StartupRequest::Compare {
+        left: PathBuf::from("l.txt"),
+        right: PathBuf::from("r.txt"),
+    };
+    assert_eq!(
+        classify_startup_request(request.clone(), Lang::En, probe),
+        StartupAction::AsRequested(request)
+    );
+}
+
+#[test]
+fn two_folders_open_deep_compare_instead_of_a_file_tab() {
+    let probe = probe_from(&[("l", PathKind::Folder), ("r", PathKind::Folder)]);
+    let request = StartupRequest::Compare {
+        left: PathBuf::from("l"),
+        right: PathBuf::from("r"),
+    };
+    assert_eq!(
+        classify_startup_request(request, Lang::En, probe),
+        StartupAction::CompareFolders {
+            left: PathBuf::from("l"),
+            right: PathBuf::from("r"),
+        }
+    );
+}
+
+#[test]
+fn a_file_left_and_a_folder_right_is_refused_naming_both_sides() {
+    let probe = probe_from(&[("l.txt", PathKind::File), ("r", PathKind::Folder)]);
+    let request = StartupRequest::Compare {
+        left: PathBuf::from("l.txt"),
+        right: PathBuf::from("r"),
+    };
+    match classify_startup_request(request, Lang::En, probe) {
+        StartupAction::Refused {
+            left,
+            right,
+            message,
+        } => {
+            assert_eq!(left, PathBuf::from("l.txt"));
+            assert_eq!(right, PathBuf::from("r"));
+            assert!(message.contains("l.txt"), "{message}");
+            assert!(message.contains('r'), "{message}");
+            assert!(
+                message.contains("A file can only be compared with a file"),
+                "{message}"
+            );
+        }
+        other => panic!("expected Refused, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_folder_left_and_a_file_right_is_refused_naming_both_sides() {
+    let probe = probe_from(&[("l", PathKind::Folder), ("r.txt", PathKind::File)]);
+    let request = StartupRequest::Compare {
+        left: PathBuf::from("l"),
+        right: PathBuf::from("r.txt"),
+    };
+    match classify_startup_request(request, Lang::En, probe) {
+        StartupAction::Refused {
+            left,
+            right,
+            message,
+        } => {
+            assert_eq!(left, PathBuf::from("l"));
+            assert_eq!(right, PathBuf::from("r.txt"));
+            assert!(message.contains("r.txt"), "{message}");
+        }
+        other => panic!("expected Refused, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_missing_path_keeps_todays_open_error_not_a_new_refusal() {
+    // Neither side resolves (an empty probe map, everything PathKind::Other)
+    // - the classification's own scope is telling files and folders
+    // apart, not re-deciding what a missing path means, so this must
+    // proceed exactly as the ordinary open flow already does.
+    let probe = probe_from(&[]);
+    let request = StartupRequest::Compare {
+        left: PathBuf::from("does-not-exist.txt"),
+        right: PathBuf::from("also-missing.txt"),
+    };
+    assert_eq!(
+        classify_startup_request(request.clone(), Lang::En, probe),
+        StartupAction::AsRequested(request)
+    );
+}
+
+#[test]
+fn explorer_classifies_as_explorer() {
+    let probe = probe_from(&[]);
+    assert_eq!(
+        classify_startup_request(StartupRequest::Explorer, Lang::En, probe),
+        StartupAction::Explorer
+    );
+}
+
+#[test]
+fn mergetools_three_files_proceed_as_requested_unchanged() {
+    let probe = probe_from(&[
+        ("local.txt", PathKind::File),
+        ("remote.txt", PathKind::File),
+        ("merged.txt", PathKind::File),
+    ]);
+    let request = StartupRequest::MergeTool {
+        local: PathBuf::from("local.txt"),
+        remote: PathBuf::from("remote.txt"),
+        merged: PathBuf::from("merged.txt"),
+    };
+    assert_eq!(
+        classify_startup_request(request.clone(), Lang::En, probe),
+        StartupAction::AsRequested(request)
+    );
+}
+
+#[test]
+fn a_folder_among_mergetools_three_arguments_is_refused() {
+    // Git never passes a folder to mergetool - checked at every one of
+    // the three positions, not just local/remote: the merged-output
+    // position is just as wrong.
+    let probe = probe_from(&[
+        ("local.txt", PathKind::File),
+        ("remote.txt", PathKind::File),
+        ("merged", PathKind::Folder),
+    ]);
+    let request = StartupRequest::MergeTool {
+        local: PathBuf::from("local.txt"),
+        remote: PathBuf::from("remote.txt"),
+        merged: PathBuf::from("merged"),
+    };
+    match classify_startup_request(request, Lang::En, probe) {
+        StartupAction::Refused {
+            left,
+            right,
+            message,
+        } => {
+            assert_eq!(left, PathBuf::from("local.txt"));
+            assert_eq!(right, PathBuf::from("remote.txt"));
+            assert!(message.contains("merged"), "{message}");
+        }
+        other => panic!("expected Refused, got {other:?}"),
+    }
+}
+
+#[test]
+fn the_japanese_refusal_messages_are_real_translations_not_the_english_fallback() {
+    let probe = probe_from(&[("l.txt", PathKind::File), ("r", PathKind::Folder)]);
+    let request = StartupRequest::Compare {
+        left: PathBuf::from("l.txt"),
+        right: PathBuf::from("r"),
+    };
+    match classify_startup_request(request, Lang::Ja, probe) {
+        StartupAction::Refused { message, .. } => {
+            assert!(
+                message.contains("比較"),
+                "the Japanese message must actually be translated: {message}"
+            );
+        }
+        other => panic!("expected Refused, got {other:?}"),
+    }
+
+    let probe = probe_from(&[
+        ("local.txt", PathKind::File),
+        ("remote.txt", PathKind::File),
+        ("merged", PathKind::Folder),
+    ]);
+    let request = StartupRequest::MergeTool {
+        local: PathBuf::from("local.txt"),
+        remote: PathBuf::from("remote.txt"),
+        merged: PathBuf::from("merged"),
+    };
+    match classify_startup_request(request, Lang::Ja, probe) {
+        StartupAction::Refused { message, .. } => {
+            assert!(
+                message.contains("マージツール"),
+                "the Japanese message must actually be translated: {message}"
+            );
+        }
+        other => panic!("expected Refused, got {other:?}"),
+    }
 }

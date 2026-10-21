@@ -23,6 +23,34 @@ git difftool main..feature
 Git passes the two versions of the file as `$LOCAL` (old) and `$REMOTE`
 (new). ForskScope opens them side by side in the diff workspace.
 
+### Comparing whole trees: `--dir-diff`
+
+`git difftool --dir-diff` compares two entire trees at once — ForskScope
+opens Deep Compare instead of a file tab:
+
+```sh
+git difftool --dir-diff --no-symlinks HEAD
+```
+
+**Always pass `--no-symlinks`** (or set it once in `difftool.forskscope.cmd`
+'s command line, or `git config difftool.forskscope.symlinks false`). Git's
+own documentation explains why this flag exists at all:
+
+> git difftool's default behavior is to create symlinks to the working
+> tree when run in `--dir-diff` mode and the right-hand side of the
+> comparison yields the same content as the file in the working tree.
+>
+> Specifying `--no-symlinks` instructs git difftool to create copies
+> instead. `--no-symlinks` is the default on Windows.
+>
+> — `git help difftool`
+
+ForskScope does not follow symbolic links when comparing folders — every
+file git left as a symlink into the working tree would show as *Symlink
+not followed* instead of being compared at all. `--no-symlinks` makes git
+copy real file content into both temporary trees instead, so Deep Compare
+actually sees it.
+
 ## mergetool (resolve conflicts)
 
 Configure git to use ForskScope for conflict resolution:

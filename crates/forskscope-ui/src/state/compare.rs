@@ -430,14 +430,21 @@ fn wants_access_guidance(error: &forskscope_compare::CoreError) -> bool {
     )
 }
 
+/// A path's own file/folder name, falling back to the full path only when
+/// it has none (e.g. `/`) — shared by every message that names a path
+/// without claiming to show a full path (RFC-027's own display-name
+/// default).
+fn display_name_only(path: &Path) -> String {
+    path.file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string())
+}
+
 /// The text for a side that could not be opened. Guidance is appended here,
 /// by the error's class, and nowhere else: the error tab shows this message
 /// as it is.
 fn open_error(lang: Lang, path: &Path, error: &forskscope_compare::CoreError) -> String {
-    let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| path.display().to_string());
+    let name = display_name_only(path);
     let mut message = format!("{} \"{name}\" — {error}.", t(lang, "Could not open"));
     if wants_access_guidance(error) {
         message.push(' ');
@@ -585,6 +592,212 @@ pub fn open_dir_compare(store: &mut Store, left: PathBuf, right: PathBuf) {
     let idx = store.dir_tabs.read().len() - 1;
     super::session::set_active_tab(store, None);
     store.active_dir.set(Some(idx));
+}
+
+// ── F209: classifying a startup request's paths (handoff 088) ──────────────
+//
+// `forskscope-ui-logic::parse_startup_args` stays pure and reads no file
+// system — it only ever sees argument *counts* (0/2/3), never what a path
+// actually names on disk. Two folders on the command line used to reach
+// the ordinary two-file `open_compare_request` path anyway, which then
+// failed with a raw "not a regular file" I/O error the moment it tried to
+// read a folder as a file. This is the one place that fs-dependent
+// decision — file, folder, or neither — actually lives, and it lives
+// here (in the GUI, not in ui-logic) for exactly that reason.
+
+/// What a startup path names on disk. `Other` covers "does not exist" and
+/// "exists but its kind could not be read" alike — either way, today's
+/// ordinary open error already handles it; F209's own scope is telling
+/// files and folders apart, not re-deciding what a missing path means.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PathKind {
+    File,
+    Folder,
+    Other,
+}
+
+/// The real probe — `fs::metadata`, the same technique
+/// `forskscope-cli compare`'s own file-vs-folder decision already uses
+/// (see that crate's `compare.rs` module doc comment), never
+/// `forskscope_compare::classify`, which reports a directory as "not a
+/// regular file" rather than as a folder.
+pub fn fs_probe(path: &Path) -> PathKind {
+    match fs::metadata(path) {
+        Ok(meta) if meta.is_dir() => PathKind::Folder,
+        Ok(_) => PathKind::File,
+        Err(_) => PathKind::Other,
+    }
+}
+
+/// What a classified startup request should actually do.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StartupAction {
+    Explorer,
+    /// Proceed exactly as today — covers file+file, a missing path on
+    /// either side, and Git mergetool's own ordinary three-file case.
+    /// Unchanged behavior; today's own open error still applies.
+    AsRequested(forskscope_ui_logic::StartupRequest),
+    /// Both sides of a two-argument launch are folders: open Deep Compare
+    /// instead of a file tab.
+    CompareFolders {
+        left: PathBuf,
+        right: PathBuf,
+    },
+    /// Refused in-window, in the app's own words — never a raw I/O error.
+    /// `left`/`right` are what the resulting error tab shows (mergetool's
+    /// own local/remote, when the refusal came from the third argument).
+    Refused {
+        left: PathBuf,
+        right: PathBuf,
+        message: String,
+    },
+}
+
+/// Classifies a parsed `StartupRequest`'s paths with `probe`, never
+/// touching the filesystem itself — a test passes a fake probe, covering
+/// exactly the five shapes handoff 088 asks for: file+file, folder+folder,
+/// file+folder, folder+file, and a missing path.
+pub fn classify_startup_request(
+    request: forskscope_ui_logic::StartupRequest,
+    lang: Lang,
+    probe: impl Fn(&Path) -> PathKind,
+) -> StartupAction {
+    use forskscope_ui_logic::StartupRequest;
+    match request {
+        StartupRequest::Explorer => StartupAction::Explorer,
+        StartupRequest::Compare { left, right } => match (probe(&left), probe(&right)) {
+            (PathKind::Folder, PathKind::Folder) => StartupAction::CompareFolders { left, right },
+            (PathKind::File, PathKind::Folder) => StartupAction::Refused {
+                message: file_folder_mismatch_message(lang, &left, &right, true),
+                left,
+                right,
+            },
+            (PathKind::Folder, PathKind::File) => StartupAction::Refused {
+                message: file_folder_mismatch_message(lang, &left, &right, false),
+                left,
+                right,
+            },
+            _ => StartupAction::AsRequested(StartupRequest::Compare { left, right }),
+        },
+        StartupRequest::MergeTool {
+            local,
+            remote,
+            merged,
+        } => {
+            // Git never passes a folder here — three arguments stay files
+            // only. Checked against all three, not just local/remote: a
+            // folder at the merged-output position is just as wrong.
+            let folder = [&local, &remote, &merged]
+                .into_iter()
+                .find(|path| probe(path) == PathKind::Folder)
+                .cloned();
+            match folder {
+                Some(path) => StartupAction::Refused {
+                    message: mergetool_folder_message(lang, &path),
+                    left: local,
+                    right: remote,
+                },
+                None => StartupAction::AsRequested(StartupRequest::MergeTool {
+                    local,
+                    remote,
+                    merged,
+                }),
+            }
+        }
+    }
+}
+
+/// "A file can only be compared with a file, and a folder with a folder.",
+/// naming which side is which by its own display name — two whole-sentence
+/// template shapes (one per which side is the file), matching this
+/// codebase's established template-then-substitute pattern for a sentence
+/// whose word order a translation cannot simply mirror.
+fn file_folder_mismatch_message(
+    lang: Lang,
+    left: &Path,
+    right: &Path,
+    file_is_left: bool,
+) -> String {
+    // The quotes go in the *substituted* value, not the key - `xtask
+    // i18n`'s own key extraction is line-based and not escape-aware, so a
+    // key containing an escaped quote truncates there and can never
+    // match between "used" and "translated" (see `docs/src/maintainers/
+    // testing.md`'s i18n section). Each branch below passes its own
+    // literal straight to the translator function, not through a
+    // variable, so the audit can see both shapes as used at all.
+    let left_name = format!("\"{}\"", display_name_only(left));
+    let right_name = format!("\"{}\"", display_name_only(right));
+    let template = if file_is_left {
+        t(
+            lang,
+            "A file can only be compared with a file, and a folder with a folder. {left} is a file; {right} is a folder.",
+        )
+    } else {
+        t(
+            lang,
+            "A file can only be compared with a file, and a folder with a folder. {left} is a folder; {right} is a file.",
+        )
+    };
+    template
+        .replace("{left}", &left_name)
+        .replace("{right}", &right_name)
+}
+
+/// The three-argument (mergetool) shape of the same refusal — Git never
+/// passes a folder there, so this names which of the three paths was one.
+fn mergetool_folder_message(lang: Lang, path: &Path) -> String {
+    let name = format!("\"{}\"", display_name_only(path));
+    t(
+        lang,
+        "Git's merge tool compares files only. {name} is a folder.",
+    )
+    .replace("{name}", &name)
+}
+
+/// Opens a file tab exactly as a normal compare would, but already in
+/// `TabState::Error(message)` — no load is ever attempted. Used only for
+/// a startup file/folder mismatch (F209): the tab UI's own error surface
+/// ("where an open error is shown today") shows a message this app wrote,
+/// never the raw "not a regular file" I/O error `load_and_diff` would
+/// otherwise reach.
+pub fn open_startup_mismatch_error(
+    store: &mut Store,
+    left: PathBuf,
+    right: PathBuf,
+    message: String,
+) {
+    let id = match store.allocate_compare_tab_id() {
+        Ok(id) => id,
+        Err(error) => {
+            store.notify(error.to_string());
+            return;
+        }
+    };
+    let title = tab_title(&left, &right, store.lang());
+    let tab = CompareTab {
+        id,
+        load_generation: LoadGeneration::INITIAL,
+        title,
+        left_path: Some(left),
+        right_path: Some(right),
+        state: TabState::Error(message),
+        left_doc: LoadedDocument::empty(),
+        right_doc: LoadedDocument::empty(),
+        diff: DiffDocument::empty(),
+        merge: MergeSession::empty(),
+        diff_options: DiffOptions::default(),
+        can_save: false,
+        save_capability: SaveCapability::Blocked(SaveCapabilityBlockReason::NotMergeableText),
+        spreadsheet_warnings: Vec::new(),
+        char_mode: false,
+        word_wrap: false,
+        focused_change: 0,
+        save_target: None,
+        launch_mode: CompareLaunchMode::Normal,
+    };
+    let idx = store.tabs.read().len();
+    store.tabs.write().push(tab);
+    super::session::set_active_tab(store, Some(idx));
 }
 
 pub fn close_dir_tab(store: &mut Store, index: usize) {

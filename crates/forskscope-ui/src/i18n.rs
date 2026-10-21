@@ -156,6 +156,22 @@ fn ja(key: &str) -> Option<&'static str> {
         "Check that the file exists and you have read permission." => {
             "ファイルが存在し、読み取り権限があることを確認してください。"
         }
+        // F209 (handoff 088): a startup command line naming one file and
+        // one folder is refused in-window - two whole-sentence shapes,
+        // one per which side is the file ({left}/{right}, already
+        // quoted, substituted after translation, not before). The key
+        // itself carries no `\"` - xtask i18n's own key extraction is
+        // line-based and not escape-aware, so an escaped quote in the
+        // key truncates it and breaks the used/translated match.
+        "A file can only be compared with a file, and a folder with a folder. {left} is a file; {right} is a folder." => {
+            "ファイルはファイルと、フォルダーはフォルダーとしか比較できません。{left} はファイルで、{right} はフォルダーです。"
+        }
+        "A file can only be compared with a file, and a folder with a folder. {left} is a folder; {right} is a file." => {
+            "ファイルはファイルと、フォルダーはフォルダーとしか比較できません。{left} はフォルダーで、{right} はファイルです。"
+        }
+        "Git's merge tool compares files only. {name} is a folder." => {
+            "Git のマージツールはファイルのみを比較します。{name} はフォルダーです。"
+        }
         "comparison" => "比較",
         "merge" => "マージ",
         "Previous / next change" => "前 / 次の変更",

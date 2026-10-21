@@ -4,7 +4,9 @@ use dioxus::prelude::*;
 use forskscope_ui_logic::StartupRequest;
 
 use crate::state::{
-    Store, advance_recovery_queue, open_compare_request, resolve_session, restore_tabs,
+    StartupAction, Store, advance_recovery_queue, classify_startup_request, fs_probe,
+    open_compare_request, open_dir_compare, open_startup_mismatch_error, resolve_session,
+    restore_tabs,
 };
 use crate::ui::layout::statusbar::StatusBar;
 use crate::ui::layout::tabs::TabBar;
@@ -66,16 +68,33 @@ pub fn App() -> Element {
         // normal-vs-mergetool save destination is decided; `open_compare_request`
         // installs it atomically with the tab, so there is no window where
         // `right_path` means one thing and the save target means another.
+        //
+        // F209: before that conversion, `classify_startup_request` tells
+        // two folders (open Deep Compare, never a file tab) and a
+        // file/folder mismatch (refused in-window, never a raw I/O error)
+        // apart from an ordinary file+file launch, which proceeds exactly
+        // as before.
         let startup_request = STARTUP_REQUEST
             .get()
             .cloned()
             .unwrap_or(StartupRequest::Explorer);
-        match startup_request.into_compare_request() {
-            Some(request) => open_compare_request(&mut store, request),
-            None => {
+        match classify_startup_request(startup_request, store.lang(), fs_probe) {
+            StartupAction::Explorer => {
                 // No explicit startup pair — restore the previous session (RFC-035).
                 restore_tabs(&mut store, &session_resolution);
             }
+            StartupAction::AsRequested(request) => match request.into_compare_request() {
+                Some(compare_request) => open_compare_request(&mut store, compare_request),
+                None => restore_tabs(&mut store, &session_resolution),
+            },
+            StartupAction::CompareFolders { left, right } => {
+                open_dir_compare(&mut store, left, right);
+            }
+            StartupAction::Refused {
+                left,
+                right,
+                message,
+            } => open_startup_mismatch_error(&mut store, left, right, message),
         }
     });
 
