@@ -4,6 +4,9 @@
 when the Flathub listing is live (RFC-000, 5-folder variant).
 **Proposed.** 2026-10-21 by the architect, at the owner's direction.
 **Accepted.** 2026-10-21 by the project owner.
+**Amended.** 2026-10-21, stage 1's result (§2): two app changes make screen
+readers work (§4.7), and the Flatpak requires Flatpak 1.15.11 or later (§3).
+Pending the owner's confirmation of the minimum version.
 **Scheduling.** After `0.195.0`. **Stage 1 is a gate:** nothing else starts
 until it passes (§2).
 **Tracks.** The owner's direction, 2026-10-21:
@@ -81,7 +84,7 @@ notes) says:
 **No AI-written Flathub manifest exists in this repository, or is offered to
 the owner as a model.**
 - The architect's test manifest is a private, throwaway build aid. It lives
-  in `.git-exclude/tmp/` and is deleted when stage 1 ends.
+  in `.git-exclude/tmp/` and is deleted once the owner's manifest exists.
 - This RFC lists **requirements** for the manifest (§3), never manifest text.
   The owner writes the manifest from Flathub's own documentation.
 
@@ -119,6 +122,29 @@ on the native build succeed:
 **If it cannot pass,** stages 2 and 3 do not start. This RFC waits for the
 upstream fix, and the owner decides whether it stays open.
 
+**Result (2026-10-21, handoff 089 and review 185): the gate passes, with two
+app changes (§4.7).**
+- **WebKitGTK's web-process sandbox is opt-in** for the GTK 3 API
+  (`webkit2gtk-4.1`) that wry uses, and always on for the GTK 4 API GNOME Web
+  uses. wry 0.53 never turns it on.
+- **Without that sandbox,** under Flatpak, the web process cannot own a name
+  on the accessibility bus, so its tree is never linked to the window.
+- **With the sandbox on** (`WEBKIT_FORCE_SANDBOX=1` in the test), WebKit
+  starts the web process through `flatpak-spawn --sandbox` and asks the portal
+  for an accessibility name derived from the application ID.
+  - **The app has no GTK application ID,** so WebKit used a hash
+    (`org.webkit.app-7cbff5…`).
+  - **The portal refused it,** *"doesn't match app id"*, and the app aborted.
+- **With the program name set to the Flatpak ID as well,** the test build,
+  with no network permission, exposed the whole app to AT-SPI:
+  - the toolbar buttons, with their names;
+  - the Explorer's rows, with their action;
+  - a file comparison's *Save merge result* button.
+  
+  Pressing *Use this change* and *Save merge result* through AT-SPI alone
+  changed the host file. The window's Wayland app ID also became the Flatpak
+  ID, which is what desktop integration expects.
+
 ## 3. Requirements for the manifest (the owner writes it)
 
 **The runtime:**
@@ -141,6 +167,17 @@ upstream fix, and the owner decides whether it stays open.
 |---|---|
 | `--socket=wayland`, `--socket=fallback-x11`, `--share=ipc`, `--device=dri` | A graphical app with a GPU-rendered web view. |
 | `--filesystem=home` | **The stated requirement.** A diff and merge tool works on the user's own files and folders: the Explorer browses them, and Save writes back to the files compared. `git difftool` and `git mergetool` start it on files in the user's repositories. |
+
+**The minimum Flatpak version: 1.15.11** (`--require-version` at
+`build-finish`).
+- WebKit's accessible sandbox needs `flatpak-spawn --sandbox-a11y-own-name`,
+  which Flatpak added in 1.15.11.
+- **On an older Flatpak the app would install, but screen readers would get
+  nothing,** and the sandboxed start is untested there.
+- **So the Flatpak is not offered there.** Users of older Flatpak versions use
+  the `.tar.gz`, or their distribution's package.
+- Folder forwarding for `git difftool --dir-diff` needs 1.18. The guide says
+  so (§6), without raising the minimum.
 
 **Not requested:**
 - **No network:** §4.2 makes it unnecessary.
@@ -258,6 +295,32 @@ portal kept it as a sandbox-only temporary file.
   - no update request is ever made;
   - where the app would mention updates, it names the software centre.
 
+### 4.7 Screen readers: the application ID, and WebKit's web-process sandbox
+
+**In a Flatpak** (§4.1), and only there:
+1. **The program name is set to the Flatpak ID,** from `/.flatpak-info`'s
+   `[Application] name=`.
+   - Use `g_set_prgname`, at the start of `main`, before GTK initialises.
+   - WebKit derives the web process's accessibility name from it, and the
+     window's Wayland app ID follows it.
+   - **Not a GTK application ID.** tao registers a unique `GApplication` when
+     given one, and a second launch would hand over to the first. That would
+     break `git difftool`, which starts one process per comparison.
+2. **WebKit's web-process sandbox is turned on.**
+   - Through the web context's `set_sandbox_enabled(true)` if the app can
+     reach it before the first web process starts.
+   - Otherwise, `WEBKIT_FORCE_SANDBOX=1` at the start of `main`, unless the
+     user has set it.
+   - Say in the request which, and why.
+
+**Both are tied to the Flatpak.**
+- **Outside a Flatpak, nothing changes.** The app ID stays `forskscope`, and
+  matches the desktop file's `StartupWMClass` (§5).
+- WebKit's sandbox outside Flatpak needs `bwrap` and `xdg-dbus-proxy` on the
+  host. That is a separate decision, not taken here.
+
+**Comment both in the code,** with the evidence in §2.
+
 ## 5. Listing material (upstream, in this repository)
 
 These files are part of the application, so **AI-written material among them
@@ -349,6 +412,9 @@ is disclosed by the owner** (§1).
 ## Acceptance criteria
 
 1. **Stage 1 passes (§2),** with the AT-SPI checks quoted.
+   - **Done in the test build (§2, Result).**
+   - **Repeated on stage 2's build,** where §4.7 makes the change in code,
+     not through an environment variable or a renamed launch.
 2. **Without network permission,** the app renders. A Flatpak test build is
    shown with no `--share=network`.
 3. **Without the home grant,** the Explorer shows §4.3's message.
