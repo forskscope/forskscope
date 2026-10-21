@@ -602,8 +602,23 @@ fn ja(key: &str) -> Option<&'static str> {
             "キャンセルしました — フォルダーを表示するには再度比較してください。"
         }
         "Compare again, then export." => "再度比較してからエクスポートしてください。",
-        "changed files' content is not shown in this report (the cap of 50 files or 5 MiB of change text was reached)" => {
-            "変更されたファイルの内容はこのレポートには表示されません（50ファイルまたは5 MiBの変更テキストという上限に達しました）"
+        // Review 183 §3.2: report::html::cap_omission_template_key's four
+        // shapes — `n` (files omitted) and `max_files` (the cap actually
+        // applied, which `--max-files` can change) pluralize
+        // independently in English; Japanese needs no such distinction,
+        // so all four map to the same template. {n}/{max_files}/
+        // {max_size} are substituted after translation, not before.
+        "{n} changed file's content is not shown in this report (the cap of {max_files} file or {max_size} of change text was reached):" => {
+            "変更された{n}個のファイルの内容はこのレポートには表示されません（{max_files}ファイルまたは{max_size}の変更テキストという上限に達しました）："
+        }
+        "{n} changed file's content is not shown in this report (the cap of {max_files} files or {max_size} of change text was reached):" => {
+            "変更された{n}個のファイルの内容はこのレポートには表示されません（{max_files}ファイルまたは{max_size}の変更テキストという上限に達しました）："
+        }
+        "{n} changed files' content is not shown in this report (the cap of {max_files} file or {max_size} of change text was reached):" => {
+            "変更された{n}個のファイルの内容はこのレポートには表示されません（{max_files}ファイルまたは{max_size}の変更テキストという上限に達しました）："
+        }
+        "{n} changed files' content is not shown in this report (the cap of {max_files} files or {max_size} of change text was reached):" => {
+            "変更された{n}個のファイルの内容はこのレポートには表示されません（{max_files}ファイルまたは{max_size}の変更テキストという上限に達しました）："
         }
         // report::file's own warning strings (distinct wording from
         // diff.rs's live-UI versions of the same facts - report/file.rs

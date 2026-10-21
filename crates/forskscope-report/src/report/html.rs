@@ -332,6 +332,38 @@ fn localized_summary_sentence(
         .replace("{a}", &a.to_string())
 }
 
+/// Review 183 §3.2: the old sentence was a single fixed string naming
+/// the *default* caps (50 files, 5 MiB) even when `--max-files`/
+/// `--max-change-bytes` set different ones, and used plural wording
+/// ("files'") even when exactly one file was omitted. `n` (files
+/// omitted) and `max_files` (the cap actually applied) are pluralized
+/// independently of each other, the same way `summary_template_key`
+/// pluralizes `d`/`a` independently of `n`.
+fn cap_omission_template_key(n: usize, max_files: usize) -> String {
+    let n_word = if n == 1 {
+        "changed file's content is"
+    } else {
+        "changed files' content is"
+    };
+    let max_files_word = if max_files == 1 { "file" } else { "files" };
+    format!(
+        "{{n}} {n_word} not shown in this report (the cap of {{max_files}} {max_files_word} or {{max_size}} of change text was reached):"
+    )
+}
+
+fn localized_cap_omission_sentence(
+    n: usize,
+    max_files: usize,
+    max_change_bytes: usize,
+    tr: &dyn Fn(&str) -> String,
+) -> String {
+    let key = cap_omission_template_key(n, max_files);
+    tr(&key)
+        .replace("{n}", &n.to_string())
+        .replace("{max_files}", &max_files.to_string())
+        .replace("{max_size}", &super::dir::fmt_size(max_change_bytes as u64))
+}
+
 // ── File report ────────────────────────────────────────────────────────────────
 
 pub fn render_file_report(
@@ -600,10 +632,12 @@ pub fn render_dir_report(
         let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("Notes")));
         let _ = writeln!(
             out,
-            "<p>{} {}:</p>",
-            report.change_hunks_omitted.len(),
-            escape_html(&tr(
-                "changed files' content is not shown in this report (the cap of 50 files or 5 MiB of change text was reached)"
+            "<p>{}</p>",
+            escape_html(&localized_cap_omission_sentence(
+                report.change_hunks_omitted.len(),
+                report.options.max_files_with_content,
+                report.options.max_change_bytes,
+                tr
             ))
         );
         let _ = writeln!(out, "<ul>");
@@ -1104,6 +1138,57 @@ mod tests {
         let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
         assert!(html.contains("huge.txt"));
         assert!(html.contains("1")); // the cap count
+    }
+
+    #[test]
+    fn a_dir_reports_cap_notice_uses_singular_grammar_for_exactly_one_omitted_file() {
+        // Review 183 §3.2: the old sentence read "1 changed files'
+        // content" for exactly one omitted file — never true grammar.
+        use forskscope_compare::dir::{RecEntry, RecStatus};
+        use std::path::PathBuf;
+
+        let entries = vec![RecEntry {
+            rel_path: PathBuf::from("huge.txt"),
+            status: RecStatus::Changed,
+            left_size: Some(1),
+            right_size: Some(1),
+        }];
+        let mut report = crate::report::DirComparisonReport::from_entries(
+            &entries,
+            None,
+            None,
+            None,
+            crate::report::ReportOptions::default(),
+        );
+        report.change_hunks_omitted.push("huge.txt".into());
+        let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        assert!(html.contains("1 changed file&#39;s content"), "{html}");
+        assert!(!html.contains("1 changed files"), "{html}");
+        assert!(html.contains("the cap of 50 files or 5.0 MiB"), "{html}");
+    }
+
+    #[test]
+    fn a_dir_reports_cap_notice_names_a_non_default_cap_actually_applied() {
+        use forskscope_compare::dir::{RecEntry, RecStatus};
+        use std::path::PathBuf;
+
+        let entries = vec![RecEntry {
+            rel_path: PathBuf::from("huge.txt"),
+            status: RecStatus::Changed,
+            left_size: Some(1),
+            right_size: Some(1),
+        }];
+        let options = crate::report::ReportOptions {
+            max_files_with_content: 1,
+            max_change_bytes: 1024,
+            ..Default::default()
+        };
+        let mut report =
+            crate::report::DirComparisonReport::from_entries(&entries, None, None, None, options);
+        report.change_hunks_omitted.push("huge.txt".into());
+        let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        assert!(html.contains("the cap of 1 file or 1.0 KiB"), "{html}");
+        assert!(!html.contains("cap of 1 files"), "{html}");
     }
 
     #[test]

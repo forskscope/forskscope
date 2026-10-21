@@ -1,8 +1,9 @@
 //! Plain-text rendering (review 182 §2) — built from the same report
 //! model `html.rs` renders, following every rule the HTML already
 //! follows: the app's own status words (never "Equal"/"Modified"), a
-//! non-zero-only counts line, no option/profile section, and change
-//! content shown as old/new line numbers with a `−`/`+` mark, never as
+//! non-zero-only counts line, a "How" section naming non-default compare
+//! options only when any apply (review 183 §3.1), and change content
+//! shown as old/new line numbers with a `−`/`+` mark, never as
 //! unexplained jargon ("hunk", a bare range).
 //!
 //! **English only.** `forskscope-cli`, the only caller, has no language
@@ -43,6 +44,21 @@ fn render_hunk(out: &mut String, hunk: &ChangeHunk) {
     }
 }
 
+/// Review 183 §3.1: a non-default compare option (`--ignore-case`,
+/// `--algorithm patience`, …) can change the result without the text
+/// report ever saying so — shown only when at least one option differs
+/// from its default, same condition the HTML "How" section uses.
+fn render_how_section(out: &mut String, non_default_options: &[(String, String)]) {
+    if non_default_options.is_empty() {
+        return;
+    }
+    let _ = writeln!(out, "How");
+    for (k, v) in non_default_options {
+        let _ = writeln!(out, "  {k}: {v}");
+    }
+    let _ = writeln!(out);
+}
+
 /// Plain-text rendering of a single-file comparison.
 pub fn render_file_report_text(report: &FileComparisonReport) -> String {
     let mut out = String::new();
@@ -50,6 +66,7 @@ pub fn render_file_report_text(report: &FileComparisonReport) -> String {
     let _ = writeln!(out, "  Left:  {}", report.left_display);
     let _ = writeln!(out, "  Right: {}", report.right_display);
     let _ = writeln!(out);
+    render_how_section(&mut out, &report.non_default_options);
     let _ = writeln!(out, "{}", report.one_sentence_summary());
 
     if !report.change_hunks.is_empty() {
@@ -96,6 +113,11 @@ pub fn render_dir_report_text(report: &DirComparisonReport) -> String {
         let _ = writeln!(out, "{line}");
     }
 
+    if !report.non_default_options.is_empty() {
+        let _ = writeln!(out);
+        render_how_section(&mut out, &report.non_default_options);
+    }
+
     let interesting: Vec<_> = report
         .file_rows
         .iter()
@@ -135,8 +157,12 @@ pub fn render_dir_report_text(report: &DirComparisonReport) -> String {
         let _ = writeln!(out, "Notes");
         let _ = writeln!(
             out,
-            "  {} changed files' content is not shown in this report (the cap of 50 files or 5 MiB of change text was reached):",
-            report.change_hunks_omitted.len()
+            "  {}",
+            cap_omission_sentence(
+                report.change_hunks_omitted.len(),
+                report.options.max_files_with_content,
+                report.options.max_change_bytes,
+            )
         );
         for name in &report.change_hunks_omitted {
             let _ = writeln!(out, "    - {name}");
@@ -144,6 +170,25 @@ pub fn render_dir_report_text(report: &DirComparisonReport) -> String {
     }
 
     out
+}
+
+/// Review 183 §3.2: names the caps actually applied (`--max-files`/
+/// `--max-change-bytes` can change them from their defaults) instead of
+/// a fixed "50 files or 5 MiB", and pluralizes `n` (files omitted) and
+/// `max_files` (the cap itself) independently — "1 changed file's
+/// content" vs "2 changed files' content", "the cap of 1 file" vs "the
+/// cap of 50 files".
+fn cap_omission_sentence(n: usize, max_files: usize, max_change_bytes: usize) -> String {
+    let n_word = if n == 1 {
+        "changed file's content is"
+    } else {
+        "changed files' content is"
+    };
+    let max_files_word = if max_files == 1 { "file" } else { "files" };
+    format!(
+        "{n} {n_word} not shown in this report (the cap of {max_files} {max_files_word} or {} of change text was reached):",
+        super::dir::fmt_size(max_change_bytes as u64)
+    )
 }
 
 #[cfg(test)]
@@ -183,6 +228,31 @@ mod tests {
         let text = render_file_report_text(&report);
 
         assert!(!text.contains("The changes"));
+        assert!(text.contains("No differences — the two files are identical."));
+    }
+
+    #[test]
+    fn default_options_show_no_how_section() {
+        let diff = compute_diff("one\n", "two\n", DiffOptions::default());
+        let report = FileComparisonReport::from_diff(&diff, None, None, opts());
+        let text = render_file_report_text(&report);
+        assert!(!text.contains("How"), "{text}");
+    }
+
+    #[test]
+    fn a_non_default_option_is_named_even_when_it_is_the_only_reason_nothing_differs() {
+        // Review 183 §3.1: two files differing only by case, compared
+        // with --ignore-case, must not silently read as "No differences"
+        // with no sign that case was ignored.
+        let diff_options = DiffOptions {
+            ignore_case: true,
+            ..Default::default()
+        };
+        let diff = compute_diff("Same\n", "same\n", diff_options);
+        let report = FileComparisonReport::from_diff(&diff, None, None, opts());
+        let text = render_file_report_text(&report);
+        assert!(text.contains("How"), "{text}");
+        assert!(text.contains("Case: ignored"), "{text}");
         assert!(text.contains("No differences — the two files are identical."));
     }
 
@@ -233,6 +303,34 @@ mod tests {
     }
 
     #[test]
+    fn a_folder_comparison_with_default_options_shows_no_how_section() {
+        let entries = dir_entries();
+        let report = DirComparisonReport::from_entries(
+            &entries,
+            None,
+            None,
+            Some(&DiffOptions::default()),
+            opts(),
+        );
+        let text = render_dir_report_text(&report);
+        assert!(!text.contains("How"), "{text}");
+    }
+
+    #[test]
+    fn a_folder_comparison_names_a_non_default_option() {
+        let entries = dir_entries();
+        let diff_options = DiffOptions {
+            ignore_whitespace: true,
+            ..Default::default()
+        };
+        let report =
+            DirComparisonReport::from_entries(&entries, None, None, Some(&diff_options), opts());
+        let text = render_dir_report_text(&report);
+        assert!(text.contains("How"), "{text}");
+        assert!(text.contains("Whitespace: ignored"), "{text}");
+    }
+
+    #[test]
     fn a_folder_changed_files_content_shows_marks_and_line_numbers() {
         let entries = dir_entries();
         let mut report = DirComparisonReport::from_entries(&entries, None, None, None, opts());
@@ -256,7 +354,38 @@ mod tests {
         report.change_hunks_omitted.push("huge.rs".into());
         let text = render_dir_report_text(&report);
         assert!(text.contains("huge.rs"));
-        assert!(text.contains("1 changed files"));
+        // Review 183 §3.2: exactly one omitted file is "1 changed file's
+        // content", never the old fixed sentence's plural "files'".
+        assert!(text.contains("1 changed file's content"), "{text}");
+        assert!(!text.contains("1 changed files"), "{text}");
+        assert!(text.contains("the cap of 50 files or 5.0 MiB"), "{text}");
+    }
+
+    #[test]
+    fn two_omitted_files_use_plural_grammar() {
+        let entries = dir_entries();
+        let mut report = DirComparisonReport::from_entries(&entries, None, None, None, opts());
+        report.change_hunks_omitted.push("huge1.rs".into());
+        report.change_hunks_omitted.push("huge2.rs".into());
+        let text = render_dir_report_text(&report);
+        assert!(text.contains("2 changed files' content"), "{text}");
+    }
+
+    #[test]
+    fn the_caps_omission_notice_names_a_non_default_cap_actually_applied() {
+        // Review 183 §3.2: the old sentence was a fixed "cap of 50 files
+        // or 5 MiB" even when `--max-files`/`--max-change-bytes` set
+        // different ones - the notice must name the caps that actually
+        // applied to this report, singular grammar included.
+        let entries = dir_entries();
+        let mut options = opts();
+        options.max_files_with_content = 1;
+        options.max_change_bytes = 1024;
+        let mut report = DirComparisonReport::from_entries(&entries, None, None, None, options);
+        report.change_hunks_omitted.push("huge.rs".into());
+        let text = render_dir_report_text(&report);
+        assert!(text.contains("the cap of 1 file or 1.0 KiB"), "{text}");
+        assert!(!text.contains("cap of 1 files"), "{text}");
     }
 
     #[test]
