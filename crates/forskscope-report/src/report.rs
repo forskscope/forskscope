@@ -1,28 +1,27 @@
 //! Comparison report types for file and directory diffs (RFC-006, RFC-008).
-//! File-level report lives in `file`; directory-level in `dir`.
-//!
-//! ## Schema versioning (F31, decided 2026-08-13)
-//!
-//! `FileComparisonReport::to_json`/`DirComparisonReport::to_json` hand-roll
-//! JSON with no schema envelope, deliberately, for the same reason
-//! `dir::batch::BatchManifest` does (see its module doc): both are built
-//! only from live in-memory data (`from_diff`/`from_entries`), and nothing
-//! in ForskScope ever parses an exported report JSON file back in. They are
-//! a write-only export for the user — something to save, share, or feed to
-//! another tool — not something this app reloads across versions, so there
-//! is no read path a schema version would protect.
+//! File-level report lives in `file`; directory-level in `dir`. Three
+//! renderers read the same model: `html` (the saved report, unchanged),
+//! `text` (plain text, RFC-094 §2's `--format text`, review 182 §2), and
+//! `json` (the versioned `forskscope.comparison/1` contract, RFC-094
+//! §3). The old hand-rolled `to_markdown`/`to_json` methods this module
+//! once carried directly on `FileComparisonReport`/`DirComparisonReport`
+//! are gone (review 182 §2): `to_markdown` violated RFC-092's own display
+//! rules (zero-count noise, raw jargon, options shown at their defaults,
+//! and no change content at all), and `to_json` is superseded by the
+//! versioned contract `json` now builds.
 
 pub mod changes;
 pub mod dir;
 pub mod file;
 pub mod html;
 pub mod json;
+pub mod text;
 
 pub use changes::{ChangeHunk, ChangeLine, ChangeLineKind, change_hunks_from_diff};
 pub use dir::{BuildOutcome, DirComparisonReport, DirFileRow, build_dir_report};
 pub use file::{
     DEFAULT_MAX_CHANGE_TEXT_BYTES, DEFAULT_MAX_CHANGED_FILES_WITH_CONTENT, FileComparisonReport,
-    HunkSummaryRow, ReportOptions, ReportPathMode, build_file_report, checksum_if_fingerprinted,
+    ReportOptions, ReportPathMode, build_file_report, checksum_if_fingerprinted,
 };
 pub use html::{render_dir_report, render_file_report};
 pub use json::{
@@ -30,8 +29,8 @@ pub use json::{
     JsonChangeHunk, JsonChangeLine, JsonChangeLineKind, OmittedEntry, SideInfo,
     dir_comparison_document, file_comparison_document, status_identifier,
 };
+pub use text::{render_dir_report_text, render_file_report_text};
 
-use forskscope_compare::diff::HunkKind;
 use std::path::Path;
 
 /// Size and SHA-256 of one compared file's bytes, as read at export time
@@ -79,15 +78,5 @@ pub(crate) fn display_path(
             }
             file::ReportPathMode::Absolute => p.display().to_string(),
         },
-    }
-}
-
-/// Human-readable hunk kind label. Shared by both report types.
-pub(crate) fn hunk_kind_label(kind: HunkKind) -> String {
-    match kind {
-        HunkKind::Equal => "equal".into(),
-        HunkKind::Insert => "insert".into(),
-        HunkKind::Delete => "delete".into(),
-        HunkKind::Replace => "replace".into(),
     }
 }

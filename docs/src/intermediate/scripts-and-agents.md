@@ -48,9 +48,11 @@ flag. Comparing a file against a folder is refused (exit code `2`).
 forskscope-cli compare old.txt new.txt --format html > report.html
 ```
 
-- **`text`** (the default): a short Markdown-flavored summary — meant for
-  a person reading a terminal, not for a script to parse. Use `json` for
-  that.
+- **`text`** (the default): a plain-text summary — what was compared, the
+  one-sentence summary, and the changes themselves (old/new line numbers,
+  a `−`/`+` mark, context lines), in the app's own words. Meant for a
+  person reading a terminal, not for a script to parse — use `json` for
+  that. **Always in English:** `forskscope-cli` has no language setting.
 - **`json`**: the versioned `forskscope.comparison/1` document, below.
 - **`patch`**: a unified diff, compatible with `patch -p1` and
   `git apply`. For a file comparison this is byte-for-byte what the GUI's

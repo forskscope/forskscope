@@ -141,7 +141,10 @@ fn head(title: &str, p: &Palette) -> String {
 
 const FOOT: &str = "</body>\n</html>\n";
 
-fn mark_for(kind: ChangeLineKind) -> &'static str {
+/// `pub(super)`, not private: `report::text` (review 182 §2) reuses this
+/// exact mark so the plain-text renderer's `−`/`+`/` ` agree with the
+/// HTML's, never a second definition that could drift from it.
+pub(super) fn mark_for(kind: ChangeLineKind) -> &'static str {
     match kind {
         ChangeLineKind::Context => " ",
         ChangeLineKind::Delete => "\u{2212}", // U+2212 MINUS SIGN, not a hyphen - RFC-092 §3's "− and + marks"
@@ -430,7 +433,11 @@ pub fn render_file_report(
 /// every count given is zero, so a caller can decide what that means (a
 /// "No files." substitute for the main counts, or simply nothing for the
 /// already-optional Symlink/Unreadable line).
-fn counts_line(tr: &dyn Fn(&str) -> String, counts: &[(&str, usize)]) -> Option<String> {
+///
+/// `pub(super)`: `report::text` (review 182 §2) calls this with an
+/// identity translator, so the plain-text renderer's counts line is
+/// built from the exact same non-zero-only rule, never a second one.
+pub(super) fn counts_line(tr: &dyn Fn(&str) -> String, counts: &[(&str, usize)]) -> Option<String> {
     let parts: Vec<String> = counts
         .iter()
         .filter(|(_, n)| *n > 0)
@@ -654,12 +661,12 @@ fn render_dir_file_row(
         "<tr><td>{}</td><td>{}</td>{sizes}<td>{checksums}</td></tr>",
         escape_html(&row.path),
         // review 174 §3: the same `status_key` Deep Compare's live view
-        // reads, not `row.status` (the machine word `to_markdown`/
-        // `to_json` keep - RFC-092 §6, those two stay as they are). A
-        // report never renders while its scan is still live (export is
-        // disabled until it finishes or is cancelled), so `in_progress` is
-        // always `false` here - a `Computing` row always reads "Not
-        // compared", never "Comparing…", in a report.
+        // reads - `report::text` (review 182 §2) reads it too, so no
+        // renderer can show a word that drifts from another's. A report
+        // never renders while its scan is still live (export is disabled
+        // until it finishes or is cancelled), so `in_progress` is always
+        // `false` here - a `Computing` row always reads "Not compared",
+        // never "Comparing…", in a report.
         escape_html(&tr(forskscope_compare::dir::status_key(
             row.rec_status,
             false
@@ -1044,9 +1051,7 @@ mod tests {
         assert!(html.contains("b.txt"));
         // Review 174 §3: the app's own words - the same ones
         // deep_compare.rs's status_label reads, via the shared
-        // forskscope_compare::dir::status_key - not the report model's own
-        // invented "equal"/"modified" (those stay in to_markdown/to_json
-        // only, RFC-092 §6).
+        // forskscope_compare::dir::status_key.
         assert!(html.contains("Identical"));
         assert!(html.contains("Different"));
 

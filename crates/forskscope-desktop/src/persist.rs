@@ -5,14 +5,18 @@
 //! `PersistenceLoad` — see its module doc for the full design.
 //!
 //! This module does not claim to cover every file ForskScope writes:
-//! `dir::batch::BatchManifest::to_json`, `report::{file,dir}`'s `to_json`,
-//! and `patch::to_unified` all produce unversioned output. **Decided (F31,
-//! 2026-08-13; extended to `patch` per review 058 §5.2): all three stay
-//! explicitly unversioned** — see their module docs for the reasoning (in
-//! short: nothing ever reads a batch manifest, an exported report, or an
-//! exported patch back into this app, so there is no read path for a
-//! schema version to protect; `patch`'s case is stronger still, since
-//! unified diff is a fixed external format with its own consumers).
+//! `dir::batch::BatchManifest::to_json`, `report::html`/`report::text`'s
+//! rendered output, and `patch::to_unified` all produce unversioned
+//! output. **Decided (F31, 2026-08-13; extended to `patch` per review 058
+//! §5.2): all three stay explicitly unversioned** — see their module docs
+//! for the reasoning (in short: nothing ever reads a batch manifest, an
+//! exported report, or an exported patch back into this app, so there is
+//! no read path for a schema version to protect; `patch`'s case is
+//! stronger still, since unified diff is a fixed external format with its
+//! own consumers). `report::json`'s `forskscope.comparison/1` (RFC-094
+//! §3, superseding the old `report::{file,dir}::to_json` this comment
+//! once named) is the one report surface that *is* versioned, for exactly
+//! the opposite reason: an agent reading it back is the point.
 //!
 //! RFC-031's original `VersionedEnvelope`/`SchemaName`/`MigrationPolicy`
 //! wrapper and the v1 settings/session records it carried (`UserSettings`,

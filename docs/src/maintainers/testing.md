@@ -227,7 +227,7 @@ Tests live in `crates/forskscope-report/src/tests/` and are declared in `tests.r
 |---|---|---|
 | `build_tests` | `build_dir_report`/`BuildOutcome` (read-hash-diff every entry, stale-on-re-read refusal, the content cap); `checksum_if_fingerprinted`; `build_file_report`'s own `from_diff` + `with_checksums` wiring. Moved in from `forskscope-ui` (RFC-093 §1 step 6). | RFC-092 §5 |
 | `patch_tests` | `patch_from_file_diff`, `to_unified`; GNU `patch` round-trip integration. | RFC-039 |
-| `report_tests` | `FileComparisonReport`, `DirComparisonReport`, Markdown/JSON output. | RFC-027 |
+| `report_tests` | `FileComparisonReport`/`DirComparisonReport`'s model: counts, path privacy, the one-sentence summary, options/profile resolution, checksums, change hunks. Rendering tests (`html`, `text`, `json`) are inline in those modules instead (review 182 §2). | RFC-027 |
 | `support` | No tests of its own — shared `chmod`-based "make this unreadable" helpers for every permission-dependent test in this crate. | F143 |
 
 Integration tests in `tests/`:

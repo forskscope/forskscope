@@ -7,7 +7,6 @@ use super::file::{ReportOptions, ReportPathMode, non_default_options_summary};
 use forskscope_compare::CancellationToken;
 use forskscope_compare::diff::DiffOptions;
 use forskscope_compare::dir::{RecEntry, RecStatus};
-use std::fmt::Write as _;
 use std::path::Path;
 
 // ── Directory comparison report ───────────────────────────────────────────────
@@ -51,13 +50,11 @@ pub struct DirComparisonReport {
 #[derive(Debug, Clone)]
 pub struct DirFileRow {
     pub path: String,
-    /// The machine word `to_markdown`/`to_json` render unchanged (RFC-092
-    /// §6: out of UI scope, kept as-is — review 174 §3). The HTML renderer
-    /// reads `rec_status` instead, through the same `status_key` Deep
-    /// Compare's own live view reads, so the two can't drift apart.
-    pub status: String,
-    /// The raw status this row's `status`/HTML-report word were both
-    /// derived from (review 174 §3).
+    /// Every renderer (HTML, plain text) reads this through the same
+    /// `status_key` Deep Compare's own live view reads, so no renderer can
+    /// show a word that drifts from another's (review 174 §3, review 182
+    /// §2: the old `to_markdown`/`to_json`'s own, different machine word
+    /// is gone with them).
     pub rec_status: RecStatus,
     pub left_size: Option<u64>,
     pub right_size: Option<u64>,
@@ -99,52 +96,23 @@ impl DirComparisonReport {
         let file_rows: Vec<DirFileRow> = entries
             .iter()
             .map(|e| {
-                let status = match e.status {
-                    RecStatus::Equal => {
-                        equal += 1;
-                        "equal".into()
-                    }
-                    RecStatus::Changed => {
-                        changed += 1;
-                        "modified".into()
-                    }
-                    RecStatus::LeftOnly => {
-                        left_only += 1;
-                        "left only".into()
-                    }
-                    RecStatus::RightOnly => {
-                        right_only += 1;
-                        "right only".into()
-                    }
-                    // F135: an empty directory present on one side only -
-                    // counted alongside the ordinary one-sided files
-                    // (it genuinely is one-sided), with its own status
-                    // text so the row does not claim a file was found.
-                    RecStatus::LeftOnlyDir => {
-                        left_only += 1;
-                        "left only (empty directory)".into()
-                    }
-                    RecStatus::RightOnlyDir => {
-                        right_only += 1;
-                        "right only (empty directory)".into()
-                    }
-                    RecStatus::Symlink => {
-                        symlinks += 1;
-                        "symlink".into()
-                    }
-                    RecStatus::Unreadable => {
-                        unreadable += 1;
-                        "unreadable".into()
-                    }
-                    // F77/RFC-092 §0: this status survives only from a scan
-                    // that was cancelled mid-flight — a *finished* report
-                    // can never legitimately show "computing" (something
-                    // still in progress), so this is the report-only label
-                    // for "its comparison never completed", distinct from
-                    // deep_compare.rs's own live "Comparing…" label for the
-                    // same `RecStatus::Computing` while a scan is running.
-                    RecStatus::Computing => "not compared".into(),
-                };
+                // F135: an empty one-sided directory counts alongside the
+                // ordinary one-sided files (it genuinely is one-sided) -
+                // `rec_status` (`LeftOnlyDir`/`RightOnlyDir`) is what lets
+                // a renderer still say "(empty folder)" rather than
+                // claiming a file was found; this count just needs the
+                // side. `Computing` survives only from a scan cancelled
+                // mid-flight (F77/RFC-092 §0) and is counted nowhere - a
+                // *finished* report has nothing "still in progress".
+                match e.status {
+                    RecStatus::Equal => equal += 1,
+                    RecStatus::Changed => changed += 1,
+                    RecStatus::LeftOnly | RecStatus::LeftOnlyDir => left_only += 1,
+                    RecStatus::RightOnly | RecStatus::RightOnlyDir => right_only += 1,
+                    RecStatus::Symlink => symlinks += 1,
+                    RecStatus::Unreadable => unreadable += 1,
+                    RecStatus::Computing => {}
+                }
                 let path = match opts.path_mode {
                     ReportPathMode::NameOnly => e
                         .rel_path
@@ -155,7 +123,6 @@ impl DirComparisonReport {
                 };
                 DirFileRow {
                     path,
-                    status,
                     rec_status: e.status,
                     left_size: e.left_size,
                     right_size: e.right_size,
@@ -196,108 +163,6 @@ impl DirComparisonReport {
             change_hunks_omitted: Vec::new(),
             options: opts,
         }
-    }
-
-    // ── Markdown ──────────────────────────────────────────────────────────────
-
-    pub fn to_markdown(&self) -> String {
-        let mut s = String::new();
-        let _ = writeln!(s, "# ForskScope Directory Comparison Report\n");
-        let _ = writeln!(s, "## Summary\n");
-        let _ = writeln!(s, "| Field | Count |");
-        let _ = writeln!(s, "|---|---:|");
-        let _ = writeln!(s, "| Left  | `{}` |", self.left_display);
-        let _ = writeln!(s, "| Right | `{}` |", self.right_display);
-        let _ = writeln!(s, "| Total entries | {} |", self.total);
-        let _ = writeln!(s, "| Equal         | {} |", self.equal);
-        let _ = writeln!(s, "| Modified      | {} |", self.changed);
-        let _ = writeln!(s, "| Left only     | {} |", self.left_only);
-        let _ = writeln!(s, "| Right only    | {} |", self.right_only);
-        if self.symlinks > 0 {
-            let _ = writeln!(s, "| Symlinks      | {} |", self.symlinks);
-        }
-        if self.unreadable > 0 {
-            let _ = writeln!(s, "| Unreadable    | {} |", self.unreadable);
-        }
-        let _ = writeln!(s);
-
-        // Only include non-equal rows in the report by default.
-        let interesting: Vec<&DirFileRow> = self
-            .file_rows
-            .iter()
-            .filter(|r| r.status != "equal")
-            .collect();
-
-        if !interesting.is_empty() {
-            let _ = writeln!(s, "## Changed Files\n");
-            if self.options.include_sizes {
-                let _ = writeln!(s, "| Path | Status | Left size | Right size |");
-                let _ = writeln!(s, "|---|---|---:|---:|");
-                for r in &interesting {
-                    let ls = r.left_size.map(fmt_size).unwrap_or_else(|| "—".into());
-                    let rs = r.right_size.map(fmt_size).unwrap_or_else(|| "—".into());
-                    let _ = writeln!(s, "| `{}` | {} | {} | {} |", r.path, r.status, ls, rs);
-                }
-            } else {
-                let _ = writeln!(s, "| Path | Status |");
-                let _ = writeln!(s, "|---|---|");
-                for r in &interesting {
-                    let _ = writeln!(s, "| `{}` | {} |", r.path, r.status);
-                }
-            }
-            let _ = writeln!(s);
-        }
-
-        s
-    }
-
-    // ── JSON ──────────────────────────────────────────────────────────────────
-
-    pub fn to_json(&self) -> String {
-        let mut s = String::new();
-        let _ = writeln!(s, "{{");
-        let _ = writeln!(s, "  \"schema_version\": 1,");
-        let _ = writeln!(s, "  \"app_version\": {:?},", env!("CARGO_PKG_VERSION"));
-        let _ = writeln!(s, "  \"kind\": \"directory_comparison\",");
-        let _ = writeln!(s, "  \"summary\": {{");
-        let _ = writeln!(s, "    \"left\": {:?},", self.left_display);
-        let _ = writeln!(s, "    \"right\": {:?},", self.right_display);
-        let _ = writeln!(s, "    \"total\": {},", self.total);
-        let _ = writeln!(s, "    \"equal\": {},", self.equal);
-        let _ = writeln!(s, "    \"changed\": {},", self.changed);
-        let _ = writeln!(s, "    \"left_only\": {},", self.left_only);
-        let _ = writeln!(s, "    \"right_only\": {},", self.right_only);
-        let _ = writeln!(s, "    \"symlinks\": {},", self.symlinks);
-        let _ = writeln!(s, "    \"unreadable\": {}", self.unreadable);
-        let _ = writeln!(s, "  }},");
-
-        // changed files
-        let _ = writeln!(s, "  \"files\": [");
-        let interesting: Vec<&DirFileRow> = self
-            .file_rows
-            .iter()
-            .filter(|r| r.status != "equal")
-            .collect();
-        for (i, r) in interesting.iter().enumerate() {
-            let comma = if i + 1 < interesting.len() { "," } else { "" };
-            let ls = r
-                .left_size
-                .map(|n| n.to_string())
-                .unwrap_or_else(|| "null".into());
-            let rs = r
-                .right_size
-                .map(|n| n.to_string())
-                .unwrap_or_else(|| "null".into());
-            let _ = writeln!(
-                s,
-                "    {{ \"path\": {:?}, \"status\": {:?}, \"left_bytes\": {}, \"right_bytes\": {} }}{}",
-                r.path, r.status, ls, rs, comma
-            );
-        }
-        let _ = writeln!(s, "  ]");
-
-        let _ = write!(s, "}}");
-        s
     }
 }
 

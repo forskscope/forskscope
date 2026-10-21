@@ -30,7 +30,8 @@ use forskscope_compare::{CancellationToken, IgnoreRules};
 use forskscope_report::report::{
     BuildOutcome, FileChecksum, FileComparisonDocument, FileCounts, ReportOptions, ReportPathMode,
     SideInfo, build_dir_report, build_file_report, dir_comparison_document,
-    file_comparison_document, render_dir_report, render_file_report,
+    file_comparison_document, render_dir_report, render_dir_report_text, render_file_report,
+    render_file_report_text,
 };
 use forskscope_report::{
     PatchOptions, patch_from_binary_notice, patch_from_directories_with_rules,
@@ -299,7 +300,7 @@ fn compare_files(opts: &Options) -> i32 {
                 right_checksum,
             );
             match opts.format {
-                Format::Text => println!("{}", report.to_markdown()),
+                Format::Text => print!("{}", render_file_report_text(&report)),
                 Format::Json => {
                     let left_encoding = left
                         .text
@@ -466,7 +467,7 @@ fn compare_dirs(opts: &Options) -> i32 {
         && report.symlinks == 0;
 
     match opts.format {
-        Format::Text => println!("{}", report.to_markdown()),
+        Format::Text => print!("{}", render_dir_report_text(&report)),
         Format::Json => {
             let doc = dir_comparison_document(&report);
             println!(
