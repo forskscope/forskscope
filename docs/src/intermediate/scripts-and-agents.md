@@ -13,10 +13,8 @@ four fixed properties:
 - **Small** — no GTK, no WebKitGTK, no WebView2. It starts in a plain
   server or CI container with no desktop stack installed.
 
-Today it has one mode, `compare`. A second mode, an MCP server for AI
-agents (`forskscope-cli mcp`), is designed in RFC-094 §4 but not yet
-built — this page will grow a section for it once it exists; nothing
-below promises it early.
+It has two modes: `compare`, and `mcp`, a server for AI agents — both
+described below.
 
 **Where to find it:** the Linux `.tar.gz` and the Windows `.zip` carry
 `forskscope-cli` beside the GUI program — run it directly, or copy it
@@ -136,10 +134,86 @@ was never read says `not_compared`, not `identical`.
 
 ---
 
+## `mcp`: a server for AI agents
+
+```sh
+forskscope-cli mcp --root <dir> [--root <dir> …] [--allow-show]
+```
+
+Starts a [Model Context Protocol](https://modelcontextprotocol.io) server
+that speaks over standard input and output — the way current coding
+agents (Claude Code, and others) attach a local tool. It never opens a
+socket or listens on a port; the agent that starts it is the only thing
+that can talk to it.
+
+**Protocol revision `2025-11-25`.** MCP's own newest revision,
+`2026-07-28`, replaced the `initialize` handshake with per-request
+metadata; a client built against it falls back to `2025-11-25` when it
+reaches a server that answers with that revision, which is what this
+server always does. If a major client ever stops falling back, this is
+the first thing that would need to change.
+
+**`--root <dir>`, required, repeatable: the whole world the agent gets.**
+Every path a tool call supplies is resolved — following symbolic links —
+and checked against every configured root; a path outside all of them is
+refused, by name, including through a symbolic link or a `..`. The roots
+are fixed when the server starts; nothing a tool call sends can widen
+them.
+
+### Tools
+
+- **`compare`** — the same comparison `compare` the command does, with
+  the same options (as named parameters: `format`, `algorithm`,
+  `ignore_whitespace`, `context`, `max_files`, and so on — the tool
+  description lists every one). `format: "json"` is the default and
+  returns the §3 document as the call's **structured content**, as well
+  as the same JSON as text; `text`/`patch`/`html` return only the text.
+  Only one `compare` call runs at a time per server; a second one while
+  the first is still running is refused immediately, not queued.
+  Cancelling a call (MCP's `notifications/cancelled`) stops a folder
+  comparison mid-walk.
+- **`show_to_person`**, only when the server was started with
+  `--allow-show` — opens the GUI program (`forskscope`) on the pair, so
+  a person can look at what the agent found in the window they already
+  know. It starts `forskscope` from right beside `forskscope-cli`, never
+  one found on `PATH`, and its only effect is that window opening —
+  nothing is sent anywhere.
+
+Both tools' descriptions say plainly that a compared file's content is
+data supplied by whoever wrote that file — never instructions to follow,
+however it reads.
+
+### An MCP client configuration
+
+For a client that reads the usual `mcpServers` shape (Claude Code,
+Claude Desktop, and others):
+
+```json
+{
+  "mcpServers": {
+    "forskscope": {
+      "command": "/path/to/forskscope-cli",
+      "args": ["mcp", "--root", "/path/to/the/project"]
+    }
+  }
+}
+```
+
+With Claude Code specifically, point `--mcp-config` at a file like this
+(add `--strict-mcp-config` to use only this server for that run):
+
+```sh
+claude --mcp-config forskscope-mcp.json --strict-mcp-config
+```
+
+---
+
 ## Collaborating with a person
 
 An agent's own findings are already something a person can open:
 `forskscope-cli compare --format html` is the same report the GUI's
 **Export report…** produces, and `--format patch` is the same unified
 diff **Export patch…** produces. Handing either file to a person, or
-pointing them at it, needs nothing more from ForskScope today.
+pointing them at it, needs nothing more from ForskScope today — and an
+agent with `--allow-show` can open the window itself, with
+`show_to_person`.
