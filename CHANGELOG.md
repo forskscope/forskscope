@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.194.1] — Unreleased
 
+### Security
+
+- **`rustls-webpki` 0.103.15 → 0.103.16,** for RUSTSEC-2026-0382. It reaches
+  ForskScope only through `dioxus-desktop` → `tungstenite` → `rustls`, not through
+  *Check for updates* (`native-tls`). This was a lockfile update only.
+
 ## [0.194.0] — 2026-10-20
 
 **Reports you can hand to someone.**
