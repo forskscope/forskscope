@@ -39,23 +39,33 @@ use forskscope_report::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Format {
+pub(crate) enum Format {
     Text,
     Json,
     Patch,
     Html,
 }
 
-struct Options {
-    left: PathBuf,
-    right: PathBuf,
-    format: Format,
-    diff_options: DiffOptions,
-    context_lines: usize,
-    ignore_rules: IgnoreRules,
-    path_mode: ReportPathMode,
-    max_files: usize,
-    max_change_bytes: usize,
+pub(crate) struct Options {
+    pub(crate) left: PathBuf,
+    pub(crate) right: PathBuf,
+    pub(crate) format: Format,
+    pub(crate) diff_options: DiffOptions,
+    pub(crate) context_lines: usize,
+    pub(crate) ignore_rules: IgnoreRules,
+    pub(crate) path_mode: ReportPathMode,
+    pub(crate) max_files: usize,
+    pub(crate) max_change_bytes: usize,
+}
+
+/// What a comparison produced, independent of how it is delivered - the
+/// CLI's own `run` prints `output` and turns `identical` into an exit
+/// code; the `mcp` module (review 182 §1) wraps the same `output` as a
+/// tool result instead. Shared so neither path re-derives the other's
+/// comparison logic (`execute`, below) — never a second copy of it.
+pub(crate) struct ExecOutcome {
+    pub(crate) output: String,
+    pub(crate) identical: bool,
 }
 
 pub fn run(args: &[String]) -> i32 {
@@ -67,37 +77,42 @@ pub fn run(args: &[String]) -> i32 {
         }
     };
 
-    let left_meta = fs::metadata(&opts.left);
-    let right_meta = fs::metadata(&opts.right);
-    let (left_meta, right_meta) = match (left_meta, right_meta) {
-        (Ok(l), Ok(r)) => (l, r),
-        (Err(e), _) => {
-            eprintln!("forskscope-cli compare: {}: {e}", opts.left.display());
-            return 2;
+    match execute(&opts, &CancellationToken::new()) {
+        Ok(outcome) => {
+            print!("{}", outcome.output);
+            if outcome.identical { 0 } else { 1 }
         }
-        (_, Err(e)) => {
-            eprintln!("forskscope-cli compare: {}: {e}", opts.right.display());
-            return 2;
-        }
-    };
-
-    match (left_meta.is_dir(), right_meta.is_dir()) {
-        (true, true) => compare_dirs(&opts),
-        (false, false) => compare_files(&opts),
-        _ => {
-            eprintln!(
-                "forskscope-cli compare: cannot compare a file against a folder ({}, {})",
-                opts.left.display(),
-                opts.right.display()
-            );
+        Err(msg) => {
+            eprintln!("forskscope-cli compare: {msg}");
             2
         }
     }
 }
 
+/// The comparison itself, decided from the paths and reusable by both the
+/// CLI's own `run` and the `mcp` module's `compare` tool. `token` lets a
+/// caller cancel a folder comparison mid-walk (RFC-094 §4) - the CLI
+/// passes a token nothing ever cancels.
+pub(crate) fn execute(opts: &Options, token: &CancellationToken) -> Result<ExecOutcome, String> {
+    let left_meta =
+        fs::metadata(&opts.left).map_err(|e| format!("{}: {e}", opts.left.display()))?;
+    let right_meta =
+        fs::metadata(&opts.right).map_err(|e| format!("{}: {e}", opts.right.display()))?;
+
+    match (left_meta.is_dir(), right_meta.is_dir()) {
+        (true, true) => compare_dirs(opts, token),
+        (false, false) => compare_files(opts),
+        _ => Err(format!(
+            "cannot compare a file against a folder ({}, {})",
+            opts.left.display(),
+            opts.right.display()
+        )),
+    }
+}
+
 // ── Argument parsing ─────────────────────────────────────────────────────────
 
-fn parse(args: &[String]) -> Result<Options, String> {
+pub(crate) fn parse(args: &[String]) -> Result<Options, String> {
     let mut positionals: Vec<&str> = Vec::new();
     let mut format = Format::Text;
     let mut diff_options = DiffOptions::default();
@@ -174,7 +189,7 @@ fn next_value<'a>(args: &'a [String], i: &mut usize, flag: &str) -> Result<&'a s
         .ok_or_else(|| format!("{flag} requires a value"))
 }
 
-fn parse_format(value: &str) -> Result<Format, String> {
+pub(crate) fn parse_format(value: &str) -> Result<Format, String> {
     match value {
         "text" => Ok(Format::Text),
         "json" => Ok(Format::Json),
@@ -186,7 +201,7 @@ fn parse_format(value: &str) -> Result<Format, String> {
     }
 }
 
-fn parse_algorithm(value: &str) -> Result<DiffAlgorithm, String> {
+pub(crate) fn parse_algorithm(value: &str) -> Result<DiffAlgorithm, String> {
     match value {
         "myers" => Ok(DiffAlgorithm::Myers),
         "patience" => Ok(DiffAlgorithm::Patience),
@@ -198,7 +213,7 @@ fn parse_algorithm(value: &str) -> Result<DiffAlgorithm, String> {
     }
 }
 
-fn parse_path_mode(value: &str) -> Result<ReportPathMode, String> {
+pub(crate) fn parse_path_mode(value: &str) -> Result<ReportPathMode, String> {
     match value {
         "names" => Ok(ReportPathMode::NameOnly),
         "relative" => Ok(ReportPathMode::Relative),
@@ -209,7 +224,7 @@ fn parse_path_mode(value: &str) -> Result<ReportPathMode, String> {
     }
 }
 
-fn parse_usize(value: &str, flag: &str) -> Result<usize, String> {
+pub(crate) fn parse_usize(value: &str, flag: &str) -> Result<usize, String> {
     value
         .parse::<usize>()
         .map_err(|_| format!("{flag}: expected a non-negative integer, got `{value}`"))
@@ -217,7 +232,7 @@ fn parse_usize(value: &str, flag: &str) -> Result<usize, String> {
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
-fn timestamp() -> String {
+pub(crate) fn timestamp() -> String {
     chrono::Local::now()
         .format("%Y-%m-%d %H:%M %:z")
         .to_string()
@@ -225,11 +240,11 @@ fn timestamp() -> String {
 
 /// Identity translator: `forskscope-cli` carries no i18n (RFC-094: it
 /// reads no settings, including a language setting).
-fn tr(s: &str) -> String {
+pub(crate) fn tr(s: &str) -> String {
     s.to_string()
 }
 
-fn report_options(opts: &Options) -> ReportOptions {
+pub(crate) fn report_options(opts: &Options) -> ReportOptions {
     ReportOptions {
         path_mode: opts.path_mode,
         context_lines: opts.context_lines,
@@ -241,24 +256,14 @@ fn report_options(opts: &Options) -> ReportOptions {
 
 // ── File comparison ──────────────────────────────────────────────────────────
 
-fn compare_files(opts: &Options) -> i32 {
+fn compare_files(opts: &Options) -> Result<ExecOutcome, String> {
     let load_opts = LoadOptions {
         allow_missing: false,
     };
-    let left = match load_path(&opts.left, load_opts) {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("forskscope-cli compare: {}: {e}", opts.left.display());
-            return 2;
-        }
-    };
-    let right = match load_path(&opts.right, load_opts) {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("forskscope-cli compare: {}: {e}", opts.right.display());
-            return 2;
-        }
-    };
+    let left =
+        load_path(&opts.left, load_opts).map_err(|e| format!("{}: {e}", opts.left.display()))?;
+    let right =
+        load_path(&opts.right, load_opts).map_err(|e| format!("{}: {e}", opts.right.display()))?;
 
     let both_text = matches!(left.kind, FileKind::Text) && matches!(right.kind, FileKind::Text);
     if !both_text {
@@ -268,19 +273,19 @@ fn compare_files(opts: &Options) -> i32 {
     let diff = compute_diff(left.diff_text(), right.diff_text(), opts.diff_options);
     let identical = diff.is_identical();
 
-    match opts.format {
+    let output = match opts.format {
         Format::Patch => {
             let patch_opts = PatchOptions {
                 context_lines: opts.context_lines,
                 ..PatchOptions::default()
             };
             let rel = display_name(&opts.right, opts.path_mode);
-            if let Some(patch) = patch_from_file_diff(rel, &diff, patch_opts) {
-                print!("{}", to_unified(&patch));
-            }
             // Identical: nothing to export, matching the GUI's own
             // "Files are identical — nothing to export." (no file is
             // written there either; here, nothing is printed).
+            patch_from_file_diff(rel, &diff, patch_opts)
+                .map(|patch| to_unified(&patch))
+                .unwrap_or_default()
         }
         Format::Text | Format::Json | Format::Html => {
             let left_checksum = left
@@ -300,7 +305,7 @@ fn compare_files(opts: &Options) -> i32 {
                 right_checksum,
             );
             match opts.format {
-                Format::Text => print!("{}", render_file_report_text(&report)),
+                Format::Text => render_file_report_text(&report),
                 Format::Json => {
                     let left_encoding = left
                         .text
@@ -313,30 +318,30 @@ fn compare_files(opts: &Options) -> i32 {
                         .map(|t| t.encoding.label.clone())
                         .unwrap_or_default();
                     let doc = file_comparison_document(&report, &left_encoding, &right_encoding);
-                    println!(
-                        "{}",
+                    format!(
+                        "{}\n",
                         doc.to_json_string().expect("document is serializable")
-                    );
+                    )
                 }
-                Format::Html => {
-                    let html = render_file_report(
+                Format::Html => format!(
+                    "{}\n",
+                    render_file_report(
                         &report,
                         env!("CARGO_PKG_VERSION"),
                         &timestamp(),
                         false,
-                        &tr,
-                    );
-                    println!("{html}");
-                }
+                        &tr
+                    )
+                ),
                 Format::Patch => unreachable!("handled above"),
             }
         }
-    }
+    };
 
-    if identical { 0 } else { 1 }
+    Ok(ExecOutcome { output, identical })
 }
 
-fn kind_label(kind: &FileKind) -> &'static str {
+pub(crate) fn kind_label(kind: &FileKind) -> &'static str {
     match kind {
         FileKind::ExcelXlsx => "workbook",
         FileKind::Binary => "binary",
@@ -344,33 +349,34 @@ fn kind_label(kind: &FileKind) -> &'static str {
     }
 }
 
-fn compare_files_status_only(opts: &Options, left_kind: &FileKind, right_kind: &FileKind) -> i32 {
+fn compare_files_status_only(
+    opts: &Options,
+    left_kind: &FileKind,
+    right_kind: &FileKind,
+) -> Result<ExecOutcome, String> {
     let identical = match file_digest_equal(&opts.left, &opts.right) {
         Ok(b) => b,
-        Err(e) => {
-            eprintln!("forskscope-cli compare: {e}");
-            return 2;
-        }
+        Err(e) => return Err(e.to_string()),
     };
     let left_name = display_name(&opts.left, opts.path_mode);
     let right_name = display_name(&opts.right, opts.path_mode);
 
-    match opts.format {
+    let output = match opts.format {
         Format::Patch => {
-            if !identical {
+            if identical {
+                String::new()
+            } else {
                 let doc = patch_from_binary_notice(right_name);
-                print!("{}", to_unified(&doc));
+                to_unified(&doc)
             }
         }
-        Format::Text => {
-            println!(
-                "{} and {} are {} ({} content — status only, RFC-094)",
-                left_name,
-                right_name,
-                if identical { "identical" } else { "different" },
-                kind_label(left_kind),
-            );
-        }
+        Format::Text => format!(
+            "{} and {} are {} ({} content — status only, RFC-094)\n",
+            left_name,
+            right_name,
+            if identical { "identical" } else { "different" },
+            kind_label(left_kind),
+        ),
         Format::Json => {
             let side = |path: &Path, name: String, kind: &FileKind| -> SideInfo {
                 let size = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
@@ -400,41 +406,32 @@ fn compare_files_status_only(opts: &Options, left_kind: &FileKind, right_kind: &
                     "binary or workbook content: status only, no detailed diff (RFC-094)".into(),
                 ],
             };
-            println!(
-                "{}",
+            format!(
+                "{}\n",
                 doc.to_json_string().expect("document is serializable")
-            );
+            )
         }
         Format::Html => {
-            eprintln!(
-                "forskscope-cli compare: --format html has no detailed diff for binary or \
-                 workbook content; use --format text or json for a status-only result"
+            return Err(
+                "--format html has no detailed diff for binary or workbook content; use \
+                 --format text or json for a status-only result"
+                    .to_string(),
             );
-            return 2;
         }
-    }
+    };
 
-    if identical { 0 } else { 1 }
+    Ok(ExecOutcome { output, identical })
 }
 
 // ── Folder comparison ────────────────────────────────────────────────────────
 
-fn compare_dirs(opts: &Options) -> i32 {
-    let token = CancellationToken::new();
-    let scan = recursive_diff_with_rules(&opts.left, &opts.right, &token, &opts.ignore_rules);
+fn compare_dirs(opts: &Options, token: &CancellationToken) -> Result<ExecOutcome, String> {
+    let scan = recursive_diff_with_rules(&opts.left, &opts.right, token, &opts.ignore_rules);
     if scan.left_root_unreadable {
-        eprintln!(
-            "forskscope-cli compare: {}: could not be read",
-            opts.left.display()
-        );
-        return 2;
+        return Err(format!("{}: could not be read", opts.left.display()));
     }
     if scan.right_root_unreadable {
-        eprintln!(
-            "forskscope-cli compare: {}: could not be read",
-            opts.right.display()
-        );
-        return 2;
+        return Err(format!("{}: could not be read", opts.right.display()));
     }
 
     let outcome = build_dir_report(
@@ -443,20 +440,16 @@ fn compare_dirs(opts: &Options) -> i32 {
         scan.entries,
         opts.diff_options,
         report_options(opts),
-        &token,
+        token,
         &mut |_, _| {},
     );
     let report = match outcome {
         BuildOutcome::Report(r) => *r,
-        BuildOutcome::Cancelled => {
-            eprintln!("forskscope-cli compare: comparison was cancelled");
-            return 2;
-        }
+        BuildOutcome::Cancelled => return Err("comparison was cancelled".to_string()),
         BuildOutcome::Stale(path) => {
-            eprintln!(
-                "forskscope-cli compare: {path}: changed while being read; refusing a stale result"
-            );
-            return 2;
+            return Err(format!(
+                "{path}: changed while being read; refusing a stale result"
+            ));
         }
     };
 
@@ -466,46 +459,41 @@ fn compare_dirs(opts: &Options) -> i32 {
         && report.unreadable == 0
         && report.symlinks == 0;
 
-    match opts.format {
-        Format::Text => print!("{}", render_dir_report_text(&report)),
+    let output = match opts.format {
+        Format::Text => render_dir_report_text(&report),
         Format::Json => {
             let doc = dir_comparison_document(&report);
-            println!(
-                "{}",
+            format!(
+                "{}\n",
                 doc.to_json_string().expect("document is serializable")
-            );
+            )
         }
         Format::Patch => {
             let patch_opts = PatchOptions {
                 context_lines: opts.context_lines,
                 ..PatchOptions::default()
             };
-            match patch_from_directories_with_rules(
+            let doc = patch_from_directories_with_rules(
                 &opts.left,
                 &opts.right,
                 opts.diff_options,
                 patch_opts,
                 &opts.ignore_rules,
-            ) {
-                Ok(doc) => {
-                    if !doc.is_empty() {
-                        print!("{}", to_unified(&doc));
-                    }
-                }
-                Err(e) => {
-                    eprintln!("forskscope-cli compare: {e}");
-                    return 2;
-                }
+            )
+            .map_err(|e| e.to_string())?;
+            if doc.is_empty() {
+                String::new()
+            } else {
+                to_unified(&doc)
             }
         }
-        Format::Html => {
-            let html =
-                render_dir_report(&report, env!("CARGO_PKG_VERSION"), &timestamp(), false, &tr);
-            println!("{html}");
-        }
-    }
+        Format::Html => format!(
+            "{}\n",
+            render_dir_report(&report, env!("CARGO_PKG_VERSION"), &timestamp(), false, &tr)
+        ),
+    };
 
-    if identical { 0 } else { 1 }
+    Ok(ExecOutcome { output, identical })
 }
 
 /// A path's display name under `--paths` (RFC-094 §2): `names` (default)
@@ -513,7 +501,7 @@ fn compare_dirs(opts: &Options) -> i32 {
 /// no root to be relative *to* for a single top-level path pair — falls
 /// back to the file name, the same fallback `report::display_path` uses
 /// for `Relative` with no root.
-fn display_name(path: &Path, mode: ReportPathMode) -> String {
+pub(crate) fn display_name(path: &Path, mode: ReportPathMode) -> String {
     match mode {
         ReportPathMode::Absolute => path.display().to_string(),
         ReportPathMode::NameOnly | ReportPathMode::Relative => path
