@@ -3,7 +3,9 @@
 //! compared file's content is data supplied by whoever wrote it, never
 //! instructions — the file is read, not followed.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 use serde_json::{Map, Value, json};
 
@@ -215,10 +217,24 @@ fn build_compare_options(
 
 // ── `show_to_person` ─────────────────────────────────────────────────────────
 
+/// How long to wait for the GUI to fail fast (no display, a missing
+/// WebView2 runtime, …) before declaring success and handing the rest of
+/// its life off to a reaper thread (review 183 §1 item 3).
+const EARLY_EXIT_WINDOW: Duration = Duration::from_secs(2);
+
 /// RFC-094 §4: "starts the program beside `forskscope-cli`, in the same
 /// folder, never one found on `PATH`. It passes the two paths as separate
 /// arguments, with no shell, and with the user's own environment. Its
 /// only effect is a window that opens."
+///
+/// Review 183 §1: the child inherited all three of the server's standard
+/// streams by default - its stdout is the agent's own protocol channel,
+/// so anything the GUI ever prints there (a GLib warning, a library's
+/// `g_print`, a future stray `println!`) would corrupt it, and its
+/// inherited stdin meant it could read the agent's *next* request instead
+/// of the server. Standard input/output are now `null`; standard error
+/// stays inherited, so the GUI's own diagnostics still reach the client's
+/// log, same as the server's own.
 pub fn call_show_to_person(arguments: &Value, roots: &Roots) -> Result<ToolCallResult, String> {
     let obj = arguments
         .as_object()
@@ -236,18 +252,76 @@ pub fn call_show_to_person(arguments: &Value, roots: &Roots) -> Result<ToolCallR
     } else {
         "forskscope"
     };
-    let gui_path: &Path = &dir.join(gui_name);
+    let gui_path: PathBuf = dir.join(gui_name);
 
-    std::process::Command::new(gui_path)
+    let mut child = Command::new(&gui_path)
         .arg(&left)
         .arg(&right)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit())
         .spawn()
         .map_err(|e| format!("could not start {}: {e}", gui_path.display()))?;
 
+    // A GUI that cannot actually open a window (no display, a missing
+    // WebView2 runtime) fails - with a non-zero exit code - within
+    // moments, not after a person closes it. Give it that window before
+    // reporting success and handing the rest of its lifetime off to a
+    // reaper thread. A *successful* (zero) exit inside the window is not
+    // itself treated as failure - the window may simply have been closed
+    // immediately - only a non-zero one names a real problem. `try_wait`
+    // never blocks, so this loop only ever waits in
+    // `EARLY_EXIT_WINDOW`-sized increments, not indefinitely.
+    let deadline = Instant::now() + EARLY_EXIT_WINDOW;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) if !status.success() => {
+                return Err(format!(
+                    "{} exited with {} before a window could open",
+                    gui_path.display(),
+                    exit_status_text(&status)
+                ));
+            }
+            Ok(Some(_)) => break,
+            Ok(None) => {
+                if Instant::now() >= deadline {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Err(e) => return Err(format!("could not check on {}: {e}", gui_path.display())),
+        }
+    }
+
+    // Still running past the window: report success now, and reap it on
+    // its own thread whenever the person eventually closes it - never
+    // leaving a zombie process behind, and never blocking this call on a
+    // window that may stay open for a long time.
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+
     Ok(ToolCallResult {
-        content_text: format!("Opened {} in ForskScope.", gui_path.display()),
+        content_text: format!(
+            "Opened {} and {} in ForskScope.",
+            display_name_only(&left),
+            display_name_only(&right)
+        ),
         structured_content: None,
     })
+}
+
+fn display_name_only(path: &Path) -> String {
+    path.file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string())
+}
+
+fn exit_status_text(status: &std::process::ExitStatus) -> String {
+    match status.code() {
+        Some(code) => format!("exit code {code}"),
+        None => "no exit code (likely killed by a signal)".to_string(),
+    }
 }
 
 // ── JSON argument helpers ────────────────────────────────────────────────────

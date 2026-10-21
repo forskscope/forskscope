@@ -165,12 +165,32 @@ const WRITE_FN_NAMES: &[&str] = &[
     "set_permissions",
 ];
 
+/// Review 183 §2.6: the threat model's no-network argument for
+/// `forskscope-cli` ("linking only `libc.so.6`/`libgcc_s.so.1` means
+/// there is no I/O driver for a socket call to come from") does not
+/// follow on its own — `socket`/`connect` are in `libc`, and `std::net`
+/// needs no runtime at all. This rule backs the `LD_PRELOAD` shim's
+/// finding with a check that can fail on its own: no occurrence of
+/// `std::net` or the Unix/Windows raw-socket extension modules,
+/// anywhere, in the three crates that make up the no-network promise.
+/// Unlike rule 1/2 (`forskscope-compare`/`forskscope-report` only, since
+/// `forskscope-edit`/`forskscope-desktop` are allowed to write/spawn),
+/// this rule also covers `forskscope-cli` — the program the promise is
+/// actually about.
+const NO_NET_CRATES: &[&str] = &["forskscope-compare", "forskscope-report", "forskscope-cli"];
+const NET_PATTERNS: &[&str] = &["std::net", "std::os::unix::net", "std::os::windows::net"];
+
 pub fn run(root: &Path) {
     let mut problems = Vec::new();
 
     for crate_name in ["forskscope-compare", "forskscope-report"] {
         let src = root.join("crates").join(crate_name).join("src");
         check_no_writes_or_spawns(&src, crate_name, &mut problems);
+    }
+
+    for crate_name in NO_NET_CRATES {
+        let src = root.join("crates").join(crate_name).join("src");
+        check_no_net(&src, crate_name, &mut problems);
     }
 
     check_dependency_graph(root, &mut problems);
@@ -180,7 +200,7 @@ pub fn run(root: &Path) {
             eprintln!("{problem}");
         }
         eprintln!(
-            "crate-boundaries check failed: {} problem(s) (RFC-093 §1/§3)",
+            "crate-boundaries check failed: {} problem(s) (RFC-093 §1/§3, RFC-094 criterion 5)",
             problems.len()
         );
         process::exit(1);
@@ -188,9 +208,39 @@ pub fn run(root: &Path) {
 
     println!(
         "crate-boundaries check passed: forskscope-compare and forskscope-report write no file \
-         and spawn no process outside #[cfg(test)]/tests/, and every workspace crate's direct \
-         forskscope-* dependencies stay within RFC-093 §1's table."
+         and spawn no process outside #[cfg(test)]/tests/; forskscope-compare, forskscope-report \
+         and forskscope-cli never name std::net or the platform raw-socket modules; and every \
+         workspace crate's direct forskscope-* dependencies stay within RFC-093 §1's table."
     );
+}
+
+/// RFC-094 criterion 5 / review 183 §2.6. Unlike rule 1's `fs::write`
+/// patterns, a bare `use std::net::TcpStream;` import already contains
+/// the substring `std::net` itself, so no separate import-evasion check
+/// is needed the way rule 1 needed one for `fs::write`'s qualified-call
+/// patterns.
+fn check_no_net(src_root: &Path, crate_name: &str, problems: &mut Vec<String>) {
+    for path in collect_production_rs_files(src_root) {
+        let Ok(raw) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let stripped = strip_comments_and_strings(&raw);
+        let stripped = blank_inline_cfg_test_blocks(&stripped);
+        let rel = path
+            .strip_prefix(src_root)
+            .unwrap_or(&path)
+            .display()
+            .to_string();
+
+        for pattern in NET_PATTERNS {
+            if stripped.contains(pattern) {
+                problems.push(format!(
+                    "{crate_name}/src/{rel}: found `{pattern}` outside #[cfg(test)]/tests/ \
+                     (RFC-094 criterion 5: {crate_name} never names the networking stack)"
+                ));
+            }
+        }
+    }
 }
 
 fn check_no_writes_or_spawns(src_root: &Path, crate_name: &str, problems: &mut Vec<String>) {

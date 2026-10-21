@@ -27,6 +27,12 @@ use super::tools;
 /// which a client built against this fixed revision cannot speak.
 const PROTOCOL_VERSION: &str = "2025-11-25";
 
+/// Review 183 §2.1: a client that already knows `2025-06-18` must not be
+/// forced onto a revision it has never heard of - the subset this server
+/// uses is the same in both. Not `2025-03-26`: that revision requires
+/// JSON-RPC batches, which this server never speaks.
+const ALSO_ANSWERED_VERSION: &str = "2025-06-18";
+
 /// RFC-094 §4's hostile-input list (review 182 §1): "a message over a
 /// size cap (say 4 MiB)."
 const MAX_MESSAGE_BYTES: usize = 4 * 1024 * 1024;
@@ -69,6 +75,14 @@ pub fn serve(roots: Vec<PathBuf>, allow_show: bool) {
     for message in rx {
         match message {
             Incoming::Eof => {
+                // Review 183 §2.4: nobody will read the answer once
+                // stdin has closed - cancel whatever is running before
+                // waiting for it, rather than letting a large folder
+                // walk run to completion for a client that has already
+                // gone.
+                if let Some((_, token)) = in_flight.lock().unwrap().as_ref() {
+                    token.cancel();
+                }
                 wait_for_in_flight(&in_flight);
                 break;
             }
@@ -124,7 +138,7 @@ fn handle_line(bytes: &[u8], roots: &Roots, allow_show: bool, in_flight: &InFlig
     let params = obj.get("params").cloned().unwrap_or(Value::Null);
 
     match method {
-        "initialize" => respond_or_invalid_request(id, initialize_result()),
+        "initialize" => respond_or_invalid_request(id, initialize_result(&params)),
         "notifications/initialized" => {}
         "ping" => respond_or_invalid_request(id, json!({})),
         "tools/list" => respond_or_invalid_request(id, tools::list_result(allow_show)),
@@ -186,9 +200,42 @@ fn handle_tools_call(
             let roots = roots.clone();
             let in_flight = Arc::clone(in_flight);
             thread::spawn(move || {
-                let result = tools::call_compare(&arguments, &roots, &token);
-                respond_tool_result(id, result);
-                *in_flight.lock().unwrap() = None;
+                // Review 183 §2.3: this guard's `Drop` releases the slot
+                // on every exit path, including a panic unwinding through
+                // `catch_unwind` below - that's the safety net. But a
+                // local dropped at the end of a scope runs *after* every
+                // statement in that scope, including the
+                // `respond_tool_result`/`send_error` calls below - so on
+                // the ordinary path we drop it explicitly, right after
+                // the call returns and before any response is written,
+                // so a client that sends its next `compare` the moment
+                // it reads this answer is never refused as "Busy" for a
+                // slot this process has already finished with.
+                let release_on_drop = ReleaseInFlightOnDrop(&in_flight);
+
+                let outcome =
+                    std::panic::catch_unwind(|| tools::call_compare(&arguments, &roots, &token));
+
+                // Review 183 §2.2: 2025-11-25 says a receiver of
+                // `notifications/cancelled` SHOULD NOT send a response
+                // for the cancelled request - checked after the call
+                // returns (whatever it returned), since cancellation
+                // can race the comparison's own completion.
+                let was_cancelled = token.is_cancelled();
+                drop(release_on_drop);
+                if was_cancelled {
+                    return;
+                }
+                match outcome {
+                    Ok(result) => respond_tool_result(id, result),
+                    Err(payload) => {
+                        send_error(
+                            Some(id),
+                            -32603,
+                            &format!("Internal error: {}", panic_message(&payload)),
+                        );
+                    }
+                }
             });
         }
         "show_to_person" if allow_show => {
@@ -225,6 +272,29 @@ fn respond_tool_result(id: Value, result: Result<tools::ToolCallResult, String>)
     }
 }
 
+/// Clears the one-comparison-at-a-time slot when dropped - on a normal
+/// return, an early `return`, or a panic unwinding through
+/// `catch_unwind` (review 183 §2.3: "a panic in the worker never clears
+/// `in_flight`" was the defect this guarantees against, structurally,
+/// not by remembering to clear it on every path by hand).
+struct ReleaseInFlightOnDrop<'a>(&'a InFlight);
+
+impl Drop for ReleaseInFlightOnDrop<'_> {
+    fn drop(&mut self) {
+        *self.0.lock().unwrap() = None;
+    }
+}
+
+fn panic_message(payload: &Box<dyn std::any::Any + Send>) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
+        s.to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "the comparison panicked with no message".to_string()
+    }
+}
+
 fn handle_cancelled(params: &Value, in_flight: &InFlight) {
     let Some(request_id) = params.get("requestId") else {
         return;
@@ -236,9 +306,15 @@ fn handle_cancelled(params: &Value, in_flight: &InFlight) {
     }
 }
 
-fn initialize_result() -> Value {
+fn initialize_result(params: &Value) -> Value {
+    let requested = params.get("protocolVersion").and_then(Value::as_str);
+    let version = if requested == Some(ALSO_ANSWERED_VERSION) {
+        ALSO_ANSWERED_VERSION
+    } else {
+        PROTOCOL_VERSION
+    };
     json!({
-        "protocolVersion": PROTOCOL_VERSION,
+        "protocolVersion": version,
         "capabilities": { "tools": {} },
         "serverInfo": {
             "name": "forskscope-cli",
@@ -376,5 +452,39 @@ mod tests {
     #[test]
     fn empty_input_yields_no_lines() {
         assert_eq!(read_all(b"", 100), Vec::<String>::new());
+    }
+
+    // ── Review 183 §2.3: the slot is released on every exit path ──────────────
+
+    #[test]
+    fn release_in_flight_on_drop_clears_the_slot_on_an_ordinary_return() {
+        let in_flight: InFlight =
+            Arc::new(Mutex::new(Some((Value::Null, CancellationToken::new()))));
+        {
+            let _guard = ReleaseInFlightOnDrop(&in_flight);
+        }
+        assert!(in_flight.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn release_in_flight_on_drop_clears_the_slot_even_when_the_guarded_work_panics() {
+        // Review 183 §2.3: "a panic in the worker ... never clears
+        // in_flight. The server then refuses every later compare." -
+        // this is the exact guarantee the guard exists for, proven
+        // without needing a real panic anywhere in the engine: the
+        // guard's own `Drop` must run during unwinding, same as it does
+        // on an ordinary return above.
+        let in_flight: InFlight =
+            Arc::new(Mutex::new(Some((Value::Null, CancellationToken::new()))));
+        let in_flight_for_closure = Arc::clone(&in_flight);
+        let result = std::panic::catch_unwind(move || {
+            let _guard = ReleaseInFlightOnDrop(&in_flight_for_closure);
+            panic!("simulated panic inside the guarded region");
+        });
+        assert!(result.is_err());
+        assert!(
+            in_flight.lock().unwrap().is_none(),
+            "the slot must be released even though the guarded closure panicked"
+        );
     }
 }

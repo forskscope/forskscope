@@ -123,6 +123,149 @@ fn show_to_person_spawns_the_sibling_gui_binary_with_the_two_paths_no_shell() {
 }
 
 #[test]
+fn a_gui_that_writes_to_its_own_stdout_never_corrupts_the_protocol_stream() {
+    // Review 183 §1: the child used to inherit the server's own stdout -
+    // its protocol channel. A fake GUI that writes noise to stdout (the
+    // way a stray println!, a GLib warning, or g_print could) must never
+    // have that noise read back as a JSON-RPC message.
+    let stage = tempfile::tempdir().unwrap();
+    let cli_copy = stage.path().join("forskscope-cli");
+    fs::copy(real_bin(), &cli_copy).unwrap();
+
+    let fake_gui = stage.path().join("forskscope");
+    fs::write(
+        &fake_gui,
+        "#!/bin/sh\necho GUI-STDOUT-NOISE this is not json\n",
+    )
+    .unwrap();
+    let mut perms = fs::metadata(&fake_gui).unwrap().permissions();
+    perms.set_mode(0o755);
+    fs::set_permissions(&fake_gui, perms).unwrap();
+
+    let root = tempfile::tempdir().unwrap();
+    let left = root.path().join("a.txt");
+    let right = root.path().join("b.txt");
+    fs::write(&left, "x").unwrap();
+    fs::write(&right, "y").unwrap();
+
+    let mut child = Command::new(&cli_copy)
+        .args([
+            "mcp",
+            "--root",
+            root.path().to_str().unwrap(),
+            "--allow-show",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    let mut stdin = child.stdin.take().unwrap();
+    let mut stdout = BufReader::new(child.stdout.take().unwrap());
+
+    send(
+        &mut stdin,
+        serde_json::json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}),
+    );
+    recv(&mut stdout);
+
+    send(
+        &mut stdin,
+        serde_json::json!({
+            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": {"name": "show_to_person", "arguments": {
+                "left": left.to_str().unwrap(), "right": right.to_str().unwrap()
+            }}
+        }),
+    );
+    let show_response = recv(&mut stdout);
+    assert_eq!(show_response["id"], 2);
+    assert_eq!(show_response["result"]["isError"], false, "{show_response}");
+
+    // The very next line read, after whatever the fake GUI printed, must
+    // be the ping's own answer - not the GUI's noise, and not garbage.
+    send(
+        &mut stdin,
+        serde_json::json!({"jsonrpc": "2.0", "id": 3, "method": "ping"}),
+    );
+    let ping_response = recv(&mut stdout);
+    assert_eq!(
+        ping_response,
+        serde_json::json!({"jsonrpc": "2.0", "id": 3, "result": {}}),
+        "the GUI's stdout noise must never reach the protocol stream"
+    );
+
+    drop(stdin);
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+#[test]
+fn a_gui_that_exits_non_zero_quickly_is_reported_as_an_error() {
+    let stage = tempfile::tempdir().unwrap();
+    let cli_copy = stage.path().join("forskscope-cli");
+    fs::copy(real_bin(), &cli_copy).unwrap();
+
+    let fake_gui = stage.path().join("forskscope");
+    fs::write(&fake_gui, "#!/bin/sh\nexit 1\n").unwrap();
+    let mut perms = fs::metadata(&fake_gui).unwrap().permissions();
+    perms.set_mode(0o755);
+    fs::set_permissions(&fake_gui, perms).unwrap();
+
+    let root = tempfile::tempdir().unwrap();
+    let left = root.path().join("a.txt");
+    let right = root.path().join("b.txt");
+    fs::write(&left, "x").unwrap();
+    fs::write(&right, "y").unwrap();
+
+    let mut child = Command::new(&cli_copy)
+        .args([
+            "mcp",
+            "--root",
+            root.path().to_str().unwrap(),
+            "--allow-show",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    let mut stdin = child.stdin.take().unwrap();
+    let mut stdout = BufReader::new(child.stdout.take().unwrap());
+
+    send(
+        &mut stdin,
+        serde_json::json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}),
+    );
+    recv(&mut stdout);
+
+    send(
+        &mut stdin,
+        serde_json::json!({
+            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": {"name": "show_to_person", "arguments": {
+                "left": left.to_str().unwrap(), "right": right.to_str().unwrap()
+            }}
+        }),
+    );
+    let response = recv(&mut stdout);
+    assert_eq!(response["result"]["isError"], true, "{response}");
+    assert!(
+        response["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("exit code 1"),
+        "{response}"
+    );
+
+    drop(stdin);
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+#[test]
 fn show_to_person_is_absent_from_tools_list_without_allow_show() {
     let root = tempfile::tempdir().unwrap();
     let mut child = Command::new(real_bin())

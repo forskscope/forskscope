@@ -16,7 +16,7 @@ fn bin() -> &'static str {
 
 struct Server {
     child: Child,
-    stdin: ChildStdin,
+    stdin: Option<ChildStdin>,
     stdout: BufReader<ChildStdout>,
 }
 
@@ -26,30 +26,39 @@ impl Server {
     }
 
     fn start_with_args(extra: &[&str]) -> Self {
+        Self::start_with_args_and_cwd(extra, None)
+    }
+
+    fn start_with_args_and_cwd(extra: &[&str], cwd: Option<&std::path::Path>) -> Self {
         let mut args = vec!["mcp"];
         args.extend_from_slice(extra);
-        let mut child = Command::new(bin())
+        let mut command = Command::new(bin());
+        command
             .args(&args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("forskscope-cli mcp should start");
+            .stderr(Stdio::piped());
+        if let Some(cwd) = cwd {
+            command.current_dir(cwd);
+        }
+        let mut child = command.spawn().expect("forskscope-cli mcp should start");
         let stdin = child.stdin.take().unwrap();
         let stdout = BufReader::new(child.stdout.take().unwrap());
         Self {
             child,
-            stdin,
+            stdin: Some(stdin),
             stdout,
         }
     }
 
     fn send(&mut self, value: serde_json::Value) {
-        writeln!(self.stdin, "{}", serde_json::to_string(&value).unwrap()).unwrap();
+        let stdin = self.stdin.as_mut().expect("stdin was already closed");
+        writeln!(stdin, "{}", serde_json::to_string(&value).unwrap()).unwrap();
     }
 
     fn send_raw(&mut self, line: &str) {
-        writeln!(self.stdin, "{line}").unwrap();
+        let stdin = self.stdin.as_mut().expect("stdin was already closed");
+        writeln!(stdin, "{line}").unwrap();
     }
 
     fn recv(&mut self) -> serde_json::Value {
@@ -66,6 +75,29 @@ impl Server {
         let resp = self.recv();
         assert_eq!(resp["result"]["protocolVersion"], "2025-11-25");
         self.send(serde_json::json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+    }
+
+    /// Closes the server's stdin, the way a real client does when it is
+    /// finished with it - review 183 §2.4's own trigger ("when standard
+    /// input reaches end of file").
+    fn close_stdin(&mut self) {
+        self.stdin = None;
+    }
+
+    /// Polls for the child's own exit, without `kill`ing it, up to
+    /// `timeout`. `None` means it was still running when the budget ran
+    /// out.
+    fn wait_for_exit(&mut self, timeout: std::time::Duration) -> Option<std::process::ExitStatus> {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            if let Ok(Some(status)) = self.child.try_wait() {
+                return Some(status);
+            }
+            if std::time::Instant::now() >= deadline {
+                return None;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
     }
 }
 
@@ -100,6 +132,35 @@ fn initialize_names_the_decided_protocol_revision_and_the_server() {
         resp["result"]["capabilities"]["tools"],
         serde_json::json!({})
     );
+}
+
+#[test]
+fn a_client_asking_for_2025_06_18_is_answered_with_2025_06_18() {
+    let root = tempfile::tempdir().unwrap();
+    let mut server = Server::start(root.path().to_str().unwrap());
+    server.send(serde_json::json!({
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}
+    }));
+    let resp = server.recv();
+    assert_eq!(resp["result"]["protocolVersion"], "2025-06-18", "{resp}");
+}
+
+#[test]
+fn a_client_asking_for_anything_else_is_answered_with_2025_11_25() {
+    let root = tempfile::tempdir().unwrap();
+    for requested in ["2024-11-05", "2025-03-26", "2026-07-28", "nonsense"] {
+        let mut server = Server::start(root.path().to_str().unwrap());
+        server.send(serde_json::json!({
+            "jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "params": {"protocolVersion": requested, "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}
+        }));
+        let resp = server.recv();
+        assert_eq!(
+            resp["result"]["protocolVersion"], "2025-11-25",
+            "requested {requested}: {resp}"
+        );
+    }
 }
 
 #[test]
@@ -331,6 +392,100 @@ fn a_path_escaping_the_root_through_a_symlink_is_refused() {
     assert_eq!(resp["result"]["isError"], true, "{resp}");
 }
 
+#[test]
+fn a_symlink_inside_a_compared_folder_is_not_followed_and_its_target_content_is_absent() {
+    // Review 183 §0/§2.5: the engine's own F80 rule ("ForskScope does not
+    // follow cross-root symlinks") already holds for a folder compared
+    // over MCP, checked live by hand - this is the test for it. The
+    // symlink is one-sided (left only) on purpose: `RecStatus::Symlink`
+    // takes precedence over "left only" for a path that is a symlink on
+    // either side, per its own doc comment.
+    let root = tempfile::tempdir().unwrap();
+    let left_dir = root.path().join("left");
+    let right_dir = root.path().join("right");
+    fs::create_dir(&left_dir).unwrap();
+    fs::create_dir(&right_dir).unwrap();
+    fs::write(left_dir.join("ok.txt"), "same\n").unwrap();
+    fs::write(right_dir.join("ok.txt"), "same\n").unwrap();
+
+    let outside = tempfile::tempdir().unwrap();
+    let secret = outside.path().join("secret.txt");
+    fs::write(&secret, "SECRET-CONTENT-MUST-NOT-APPEAR\n").unwrap();
+    let link = left_dir.join("link.txt");
+    std::os::unix::fs::symlink(&secret, &link).unwrap();
+
+    let mut server = Server::start(root.path().to_str().unwrap());
+    server.initialize();
+    server.send(serde_json::json!({
+        "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+        "params": {"name": "compare", "arguments": {
+            "left": left_dir.to_str().unwrap(), "right": right_dir.to_str().unwrap()
+        }}
+    }));
+    let resp = server.recv();
+    assert_eq!(resp["result"]["isError"], false, "{resp}");
+    let structured = &resp["result"]["structuredContent"];
+    let entries = structured["entries"].as_array().unwrap();
+    let link_entry = entries
+        .iter()
+        .find(|e| e["path"] == "link.txt")
+        .unwrap_or_else(|| panic!("the symlink must be listed as its own entry: {structured}"));
+    assert_eq!(link_entry["status"], "symlink_not_followed", "{link_entry}");
+
+    let whole_document = serde_json::to_string(structured).unwrap();
+    assert!(
+        !whole_document.contains("SECRET-CONTENT-MUST-NOT-APPEAR"),
+        "the symlink's target content must never appear in the result: {whole_document}"
+    );
+}
+
+#[test]
+fn a_relative_path_resolves_against_the_servers_cwd_and_escaping_that_way_is_refused() {
+    // RFC-094 §4 / review 183 §2.5: a relative path is resolved the same
+    // way `canonicalize` resolves any relative path - against the
+    // process's own current working directory, never against a root.
+    // One that escapes every root that way must be refused exactly like
+    // an absolute one.
+    let root = tempfile::tempdir().unwrap();
+    let (left, _) = file_pair(root.path());
+
+    let cwd = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    fs::write(outside.path().join("secret.txt"), "s").unwrap();
+    let relative_escape = format!(
+        "../{}/secret.txt",
+        outside.path().file_name().unwrap().to_str().unwrap()
+    );
+    // `cwd` and `outside` are siblings (both direct children of the
+    // system temp directory), so this really does resolve outside the
+    // sandbox root above once canonicalized.
+    assert!(
+        cwd.path().parent() == outside.path().parent(),
+        "test assumption: cwd and outside must be siblings"
+    );
+
+    let mut server = Server::start_with_args_and_cwd(
+        &["--root", root.path().to_str().unwrap()],
+        Some(cwd.path()),
+    );
+    server.initialize();
+    server.send(serde_json::json!({
+        "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+        "params": {"name": "compare", "arguments": {
+            "left": left.to_str().unwrap(), "right": relative_escape
+        }}
+    }));
+    let resp = server.recv();
+    assert_eq!(resp["result"]["isError"], true, "{resp}");
+    assert!(
+        resp["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("outside every configured --root directory"),
+        "{resp}"
+    );
+}
+
 // ── "One comparison runs at a time" + cancellation ─────────────────────────────
 
 /// Enough files that a folder comparison takes a real, measurable amount
@@ -395,7 +550,97 @@ fn a_second_compare_while_one_runs_is_rejected_busy_and_the_first_still_complete
 }
 
 #[test]
-fn cancelling_an_in_flight_comparison_stops_it() {
+fn cancelling_an_in_flight_comparison_stops_it_with_no_response_at_all() {
+    // Review 183 §2.2: 2025-11-25 says a receiver of
+    // `notifications/cancelled` SHOULD NOT send a response for the
+    // cancelled request - so there is nothing to `recv()` for "cmp1"
+    // itself. What proves the comparison actually stopped (not just that
+    // the server went quiet) is everything *after* the cancellation:
+    // `ping` is still answered, and a brand new `compare` is accepted
+    // (not refused as "Busy") well before the slow pair would have
+    // finished on its own.
+    let (left, right) = slow_folder_pair();
+    let mut server = Server::start_with_args(&[
+        "--root",
+        left.path().to_str().unwrap(),
+        "--root",
+        right.path().to_str().unwrap(),
+    ]);
+    server.initialize();
+
+    server.send(serde_json::json!({
+        "jsonrpc": "2.0", "id": "cmp1", "method": "tools/call",
+        "params": {"name": "compare", "arguments": {
+            "left": left.path().to_str().unwrap(), "right": right.path().to_str().unwrap()
+        }}
+    }));
+    server.send(serde_json::json!({
+        "jsonrpc": "2.0", "method": "notifications/cancelled",
+        "params": {"requestId": "cmp1"}
+    }));
+    server.send(serde_json::json!({"jsonrpc": "2.0", "id": "ping1", "method": "ping"}));
+
+    let after_cancel = server.recv();
+    assert_eq!(
+        after_cancel["id"], "ping1",
+        "ping must still be answered right after cancelling: {after_cancel}"
+    );
+
+    // The worker thread notices the cancellation and releases the slot
+    // on its own schedule, not instantly - poll with short-lived probe
+    // calls (each either an immediate "Busy" or a real, accepted
+    // comparison) until one is accepted, bounded well under the time the
+    // slow pair takes to run to completion on its own (~0.4-0.5s
+    // locally), so this proves the slot freed promptly, not merely
+    // "eventually, after the original walk would have finished anyway."
+    let budget = std::time::Instant::now() + std::time::Duration::from_millis(300);
+    let mut accepted_id = None;
+    let mut probe = 0;
+    while std::time::Instant::now() < budget {
+        probe += 1;
+        let id = format!("probe{probe}");
+        let ping_id = format!("ping-{id}");
+        server.send(serde_json::json!({
+            "jsonrpc": "2.0", "id": id, "method": "tools/call",
+            "params": {"name": "compare", "arguments": {
+                "left": left.path().to_str().unwrap(), "right": right.path().to_str().unwrap()
+            }}
+        }));
+        server.send(serde_json::json!({"jsonrpc": "2.0", "id": ping_id.clone(), "method": "ping"}));
+
+        let first = server.recv();
+        if first["id"] == id {
+            // Refused as Busy, synchronously - its own ping answers next.
+            assert_eq!(first["error"]["code"], -32000, "{first}");
+            let ping_answer = server.recv();
+            assert_eq!(ping_answer["id"], ping_id);
+            continue;
+        }
+        // Accepted: nothing was written for `id` yet, so the ping
+        // dispatched right behind it answered first.
+        assert_eq!(first["id"], ping_id, "{first}");
+        accepted_id = Some(id);
+        break;
+    }
+    let accepted_id =
+        accepted_id.expect("a compare should have been accepted well within the budget");
+
+    let result = server.recv();
+    assert_eq!(result["id"], accepted_id);
+    assert_eq!(result["result"]["isError"], false, "{result}");
+    assert_ne!(after_cancel["id"], "cmp1");
+    assert_ne!(result["id"], "cmp1");
+}
+
+#[test]
+fn closing_stdin_cancels_a_running_comparison_so_the_server_exits_promptly() {
+    // Review 183 §2.4: "the client has gone, so nobody will read the
+    // answer. A large folder walk keeps the process alive for nothing."
+    // Without cancelling on EOF, this test would take as long as the
+    // slow pair's own full walk (~0.4-0.5s locally) to exit, if it exited
+    // at all before the process-level `kill` in `Server::drop` stepped
+    // in; with it, closing stdin should make the server notice almost
+    // immediately.
     let (left, right) = slow_folder_pair();
     let mut server = Server::start_with_args(&[
         "--root",
@@ -411,19 +656,23 @@ fn cancelling_an_in_flight_comparison_stops_it() {
             "left": left.path().to_str().unwrap(), "right": right.path().to_str().unwrap()
         }}
     }));
-    server.send(serde_json::json!({
-        "jsonrpc": "2.0", "method": "notifications/cancelled",
-        "params": {"requestId": "cmp"}
-    }));
+    // Give the worker thread a moment to actually start walking, so this
+    // proves cancelling a comparison already in flight, not merely one
+    // that never got the chance to begin.
+    std::thread::sleep(std::time::Duration::from_millis(5));
 
-    let resp = server.recv();
-    assert_eq!(resp["id"], "cmp");
-    assert_eq!(resp["result"]["isError"], true, "{resp}");
+    let start = std::time::Instant::now();
+    server.close_stdin();
+    let status = server.wait_for_exit(std::time::Duration::from_secs(2));
+    let elapsed = start.elapsed();
+
     assert!(
-        resp["result"]["content"][0]["text"]
-            .as_str()
-            .unwrap()
-            .contains("cancelled")
+        status.is_some(),
+        "the server must exit on its own once stdin closes, not hang until killed"
+    );
+    assert!(
+        elapsed < std::time::Duration::from_millis(300),
+        "closing stdin should cancel the running comparison and exit promptly, took {elapsed:?}"
     );
 }
 
@@ -444,6 +693,34 @@ fn a_comparison_completes_normally_once_the_previous_one_is_done() {
             }}
         }));
         let resp = server.recv();
+        assert_eq!(resp["result"]["isError"], false, "run {id}: {resp}");
+    }
+}
+
+#[test]
+fn a_tight_back_to_back_loop_of_compares_never_sees_busy() {
+    // Review 183 §2.3: "a client that sends its next compare the moment
+    // it reads the answer can be refused as Busy, even though nothing is
+    // running" was the defect - the slot used to be released *after* the
+    // response was written, so a client fast enough to react to its own
+    // answer could race the server's own cleanup. Releasing the slot
+    // first (this reply's fix) means sending the next call the instant
+    // this one's answer arrives must never be refused.
+    let root = tempfile::tempdir().unwrap();
+    let (left, right) = file_pair(root.path());
+    let mut server = Server::start(root.path().to_str().unwrap());
+    server.initialize();
+
+    for id in 0..50 {
+        server.send(serde_json::json!({
+            "jsonrpc": "2.0", "id": id, "method": "tools/call",
+            "params": {"name": "compare", "arguments": {
+                "left": left.to_str().unwrap(), "right": right.to_str().unwrap()
+            }}
+        }));
+        let resp = server.recv();
+        assert_eq!(resp["id"], id);
+        assert!(resp.get("error").is_none(), "run {id} was refused: {resp}");
         assert_eq!(resp["result"]["isError"], false, "run {id}: {resp}");
     }
 }
