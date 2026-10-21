@@ -1373,6 +1373,7 @@ were in `proposed/`. Nothing checks this — see **F83**.
 | 016 | Slice 8 | Editor bridge security and contract |
 | 093 | `0.195.0`, landing on `main` first | Crate boundaries: a read-only engine (`forskscope-compare`), its outputs (`forskscope-report`), the only writer (`forskscope-edit`), the app's own state (`forskscope-desktop`) — **accepted 2026-10-20** |
 | 094 | `0.195.0`, after RFC-093 | Headless comparison for scripts and AI agents: `forskscope-cli compare` (text, versioned JSON, patch, HTML) and `forskscope-cli mcp` (stdio, read-only, roots) — **accepted 2026-10-20** |
+| 095 | After `0.195.0`; stage 1 (screen readers in the sandbox) is a gate | ForskScope as a Flatpak on Flathub: home folder access required, no network permission, the owner writes the manifest — **proposed 2026-10-21** |
 | 025 | Slice 8 | Editor adapter prototype and kill-switch |
 | 026 | Post-slice-3 | Cross-platform WebView compatibility |
 | 030 | Post-slice-5 | User documentation and onboarding |
