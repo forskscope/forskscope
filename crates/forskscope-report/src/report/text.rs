@@ -102,15 +102,28 @@ pub fn render_dir_report_text(report: &DirComparisonReport) -> String {
         (status_key(RecStatus::LeftOnly, false), report.left_only),
         (status_key(RecStatus::RightOnly, false), report.right_only),
     ];
-    let line = counts_line(&identity, &main_counts).unwrap_or_else(|| "No files.".into());
-    let _ = writeln!(out, "{line}");
-
     let extra_counts = [
         (status_key(RecStatus::Symlink, false), report.symlinks),
         (status_key(RecStatus::Unreadable, false), report.unreadable),
     ];
-    if let Some(line) = counts_line(&identity, &extra_counts) {
-        let _ = writeln!(out, "{line}");
+    let main_line = counts_line(&identity, &main_counts);
+    let extra_line = counts_line(&identity, &extra_counts);
+    // Review 184 §3.2: "No files." must mean every count is zero,
+    // symlinks and unreadable entries included - not just the four main
+    // ones. A folder whose only entry is unreadable used to print "No
+    // files." directly above "Unreadable: 1", contradicting itself.
+    match (&main_line, &extra_line) {
+        (None, None) => {
+            let _ = writeln!(out, "No files.");
+        }
+        _ => {
+            if let Some(line) = &main_line {
+                let _ = writeln!(out, "{line}");
+            }
+            if let Some(line) = &extra_line {
+                let _ = writeln!(out, "{line}");
+            }
+        }
     }
 
     if !report.non_default_options.is_empty() {
@@ -400,5 +413,29 @@ mod tests {
         let text = render_dir_report_text(&report);
         assert!(!text.contains(": 0"));
         assert!(!text.contains("Files"), "no entries to list:\n{text}");
+    }
+
+    #[test]
+    fn a_genuinely_empty_folder_says_no_files() {
+        let report = DirComparisonReport::from_entries(&[], None, None, None, opts());
+        let text = render_dir_report_text(&report);
+        assert!(text.contains("No files."), "{text}");
+    }
+
+    #[test]
+    fn a_folder_whose_only_entry_is_unreadable_never_says_no_files_beside_its_own_count() {
+        // Review 184 §3.2: the four main counts are all zero here, but
+        // there is genuinely one entry (unreadable) - "No files." right
+        // above "Unreadable: 1" would contradict itself.
+        let entries = vec![RecEntry {
+            rel_path: PathBuf::from("n.txt"),
+            status: RecStatus::Unreadable,
+            left_size: None,
+            right_size: None,
+        }];
+        let report = DirComparisonReport::from_entries(&entries, None, None, None, opts());
+        let text = render_dir_report_text(&report);
+        assert!(text.contains("Unreadable: 1"), "{text}");
+        assert!(!text.contains("No files."), "{text}");
     }
 }

@@ -239,8 +239,17 @@ fn handle_tools_call(
             });
         }
         "show_to_person" if allow_show => {
-            let result = tools::call_show_to_person(&arguments, roots);
-            respond_tool_result(id, result);
+            // Review 184 §3.1: `call_show_to_person`'s own early-exit wait
+            // (up to `EARLY_EXIT_WINDOW`) used to run on this dispatch
+            // thread - the same thread that answers every other message -
+            // so a `ping` or a `compare` cancellation sent right after it
+            // waited out the window too. It takes no slot of its own
+            // (unlike `compare` above), so this is just a thread spawn.
+            let roots = roots.clone();
+            thread::spawn(move || {
+                let result = tools::call_show_to_person(&arguments, &roots);
+                respond_tool_result(id, result);
+            });
         }
         "show_to_person" => send_error(
             Some(id),

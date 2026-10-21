@@ -266,6 +266,86 @@ fn a_gui_that_exits_non_zero_quickly_is_reported_as_an_error() {
 }
 
 #[test]
+fn a_ping_sent_right_after_show_to_person_is_answered_well_under_its_own_early_exit_window() {
+    // Review 184 §3.1: call_show_to_person's own early-exit wait (up to
+    // EARLY_EXIT_WINDOW, 2s) used to run on the dispatch thread - the
+    // same thread that answers every other message - so a ping sent
+    // right after it waited out the window too. A fake GUI that stays
+    // alive (never exits within the window) forces the full wait; this
+    // proves ping is answered immediately regardless, not merely that it
+    // happens to be fast in the common case.
+    let stage = tempfile::tempdir().unwrap();
+    let cli_copy = stage.path().join("forskscope-cli");
+    fs::copy(real_bin(), &cli_copy).unwrap();
+
+    let fake_gui = stage.path().join("forskscope");
+    fs::write(&fake_gui, "#!/bin/sh\nsleep 10\n").unwrap();
+    let mut perms = fs::metadata(&fake_gui).unwrap().permissions();
+    perms.set_mode(0o755);
+    fs::set_permissions(&fake_gui, perms).unwrap();
+
+    let root = tempfile::tempdir().unwrap();
+    let left = root.path().join("a.txt");
+    let right = root.path().join("b.txt");
+    fs::write(&left, "x").unwrap();
+    fs::write(&right, "y").unwrap();
+
+    let mut child = Command::new(&cli_copy)
+        .args([
+            "mcp",
+            "--root",
+            root.path().to_str().unwrap(),
+            "--allow-show",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    let mut stdin = child.stdin.take().unwrap();
+    let mut stdout = BufReader::new(child.stdout.take().unwrap());
+
+    send(
+        &mut stdin,
+        serde_json::json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}),
+    );
+    recv(&mut stdout);
+
+    send(
+        &mut stdin,
+        serde_json::json!({
+            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": {"name": "show_to_person", "arguments": {
+                "left": left.to_str().unwrap(), "right": right.to_str().unwrap()
+            }}
+        }),
+    );
+    let start = std::time::Instant::now();
+    send(
+        &mut stdin,
+        serde_json::json!({"jsonrpc": "2.0", "id": 3, "method": "ping"}),
+    );
+    let response = recv(&mut stdout);
+    let elapsed = start.elapsed();
+
+    assert_eq!(
+        response,
+        serde_json::json!({"jsonrpc": "2.0", "id": 3, "result": {}}),
+        "the first line back must be ping's own answer, not show_to_person's \
+         (still running against a GUI that stays alive): {response}"
+    );
+    assert!(
+        elapsed < std::time::Duration::from_millis(500),
+        "ping must not wait out show_to_person's own early-exit window: {elapsed:?}"
+    );
+
+    drop(stdin);
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+#[test]
 fn show_to_person_is_absent_from_tools_list_without_allow_show() {
     let root = tempfile::tempdir().unwrap();
     let mut child = Command::new(real_bin())

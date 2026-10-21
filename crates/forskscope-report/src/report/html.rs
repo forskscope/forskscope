@@ -461,10 +461,12 @@ pub fn render_file_report(
 
 /// Joins `label: count` for every non-zero count (review 175 §3) —
 /// `"Only on the left: 0"` is noise this report must not print, the same
-/// rule already applied to the summary sentence's own numbers. `None` when
-/// every count given is zero, so a caller can decide what that means (a
-/// "No files." substitute for the main counts, or simply nothing for the
-/// already-optional Symlink/Unreadable line).
+/// rule already applied to the summary sentence's own numbers. `None`
+/// when every count given is zero, so a caller can decide what that
+/// means. Review 184 §3.2: "No files." is only true when *both* the main
+/// counts and the Symlink/Unreadable counts come back `None` — a folder
+/// whose only entry is unreadable must show that count, never "No
+/// files." printed right above it.
 ///
 /// `pub(super)`: `report::text` (review 182 §2) calls this with an
 /// identity translator, so the plain-text renderer's counts line is
@@ -540,9 +542,6 @@ pub fn render_dir_report(
             report.right_only,
         ),
     ];
-    let line = counts_line(tr, &main_counts).unwrap_or_else(|| escape_html(&tr("No files.")));
-    let _ = writeln!(out, "<p>{line}</p>");
-
     let extra_counts = [
         (
             forskscope_compare::dir::status_key(forskscope_compare::dir::RecStatus::Symlink, false),
@@ -556,8 +555,24 @@ pub fn render_dir_report(
             report.unreadable,
         ),
     ];
-    if let Some(line) = counts_line(tr, &extra_counts) {
-        let _ = writeln!(out, "<p>{line}</p>");
+    let main_line = counts_line(tr, &main_counts);
+    let extra_line = counts_line(tr, &extra_counts);
+    // Review 184 §3.2: "No files." must mean every count is zero,
+    // symlinks and unreadable entries included - not just the four main
+    // ones. A folder whose only entry is unreadable used to print "No
+    // files." directly above "Unreadable: 1", contradicting itself.
+    match (&main_line, &extra_line) {
+        (None, None) => {
+            let _ = writeln!(out, "<p>{}</p>", escape_html(&tr("No files.")));
+        }
+        _ => {
+            if let Some(line) = &main_line {
+                let _ = writeln!(out, "<p>{line}</p>");
+            }
+            if let Some(line) = &extra_line {
+                let _ = writeln!(out, "<p>{line}</p>");
+            }
+        }
     }
 
     if let Some(name) = &report.profile_name {
@@ -1117,6 +1132,32 @@ mod tests {
     }
 
     #[test]
+    fn a_folder_whose_only_entry_is_unreadable_never_says_no_files_beside_its_own_count() {
+        // Review 184 §3.2: the four main counts are all zero here, but
+        // there is genuinely one entry (unreadable) - "No files." right
+        // above "Unreadable: 1" would contradict itself.
+        use forskscope_compare::dir::{RecEntry, RecStatus};
+        use std::path::PathBuf;
+
+        let entries = vec![RecEntry {
+            rel_path: PathBuf::from("n.txt"),
+            status: RecStatus::Unreadable,
+            left_size: None,
+            right_size: None,
+        }];
+        let report = crate::report::DirComparisonReport::from_entries(
+            &entries,
+            None,
+            None,
+            None,
+            crate::report::ReportOptions::default(),
+        );
+        let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        assert!(html.contains("Unreadable: 1"), "{html}");
+        assert!(!html.contains("No files."), "{html}");
+    }
+
+    #[test]
     fn a_dir_reports_cap_notice_names_every_omitted_file() {
         use forskscope_compare::dir::{RecEntry, RecStatus};
         use std::path::PathBuf;
@@ -1189,6 +1230,66 @@ mod tests {
         let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
         assert!(html.contains("the cap of 1 file or 1.0 KiB"), "{html}");
         assert!(!html.contains("cap of 1 files"), "{html}");
+    }
+
+    /// Review 184 §3.3: `cap_omission_template_key`'s four shapes (`n`/
+    /// `max_files` each singular or plural) all map to the same Japanese
+    /// text (i18n.rs's own entries, copied here verbatim) - Japanese
+    /// needs no such distinction. Before this test, only whichever single
+    /// shape another test happened to exercise was ever proven
+    /// translated; `cargo xtask i18n` cannot cover this at all (it only
+    /// scans `forskscope-ui/src`), so this loop is the only coverage any
+    /// of the four shapes gets.
+    #[test]
+    fn every_cap_omission_shape_is_a_real_japanese_translation_not_the_english_fallback() {
+        use forskscope_compare::dir::{RecEntry, RecStatus};
+        use std::path::PathBuf;
+
+        let ja = |s: &str| -> String {
+            match s {
+                "{n} changed file's content is not shown in this report (the cap of {max_files} file or {max_size} of change text was reached):" |
+                "{n} changed file's content is not shown in this report (the cap of {max_files} files or {max_size} of change text was reached):" |
+                "{n} changed files' content is not shown in this report (the cap of {max_files} file or {max_size} of change text was reached):" |
+                "{n} changed files' content is not shown in this report (the cap of {max_files} files or {max_size} of change text was reached):" => {
+                    "変更された{n}個のファイルの内容はこのレポートには表示されません（{max_files}ファイルまたは{max_size}の変更テキストという上限に達しました）：".to_string()
+                }
+                other => other.to_string(),
+            }
+        };
+
+        for omitted_count in [1usize, 2] {
+            for max_files in [1usize, 50] {
+                let entries: Vec<RecEntry> = (0..omitted_count)
+                    .map(|i| RecEntry {
+                        rel_path: PathBuf::from(format!("huge{i}.txt")),
+                        status: RecStatus::Changed,
+                        left_size: Some(1),
+                        right_size: Some(1),
+                    })
+                    .collect();
+                let options = crate::report::ReportOptions {
+                    max_files_with_content: max_files,
+                    ..Default::default()
+                };
+                let mut report = crate::report::DirComparisonReport::from_entries(
+                    &entries, None, None, None, options,
+                );
+                for i in 0..omitted_count {
+                    report.change_hunks_omitted.push(format!("huge{i}.txt"));
+                }
+                let html = render_dir_report(&report, "0.0.0", "now", false, &ja);
+                assert!(
+                    html.contains("変更された") && html.contains("ファイルの内容"),
+                    "n={omitted_count}, max_files={max_files}: expected the real Japanese \
+                     translation, got: {html}"
+                );
+                assert!(
+                    !html.contains("changed file"),
+                    "n={omitted_count}, max_files={max_files}: the raw English template \
+                     must not leak through: {html}"
+                );
+            }
+        }
     }
 
     #[test]
