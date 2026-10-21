@@ -81,7 +81,7 @@ forskscope-cli compare old.txt new.txt --format html > report.html
   list in `text`/`html`). A binary or workbook (`.xlsx`) file inside a
   folder, or compared directly as the two top-level paths, reports its
   status only (`identical`/`different`), never a detailed diff — the
-  same rule the GUI's own folder reports and reports already follow.
+  same rule the GUI's own folder reports already follow.
 
 ### Exit codes
 
@@ -90,7 +90,7 @@ Follows `diff`:
 | Code | Meaning |
 |---|---|
 | `0` | Everything was compared, and found the same. |
-| `1` | Something differs, or something was not compared — an unreadable file, a symlink not followed. Not compared is not the same. |
+| `1` | Something differs, or something was not compared — an unreadable file, a symlink not followed. An entry that was not compared is never counted as the same. |
 | `2` | An error or a refusal — one line naming the path and the reason is printed to standard error. |
 
 A missing path, or a file compared against a folder, is exit code `2`,
@@ -178,8 +178,8 @@ them.
   a person can look at what the agent found in the window they already
   know. It starts `forskscope` from right beside `forskscope-cli`, never
   one found on `PATH`, and its only effect is that window opening —
-  nothing is sent anywhere. Two folders need `forskscope` to open Deep
-  Compare directly from a two-path command line; that lands with F209.
+  nothing is sent anywhere. Two folders open the folder comparison, the
+  same as two files open a file comparison.
 
 Both tools' descriptions say plainly that a compared file's content is
 data supplied by whoever wrote that file — never instructions to follow,
