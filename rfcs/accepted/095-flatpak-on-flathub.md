@@ -6,7 +6,7 @@ when the Flathub listing is live (RFC-000, 5-folder variant).
 **Accepted.** 2026-10-21 by the project owner.
 **Amended.** 2026-10-21, stage 1's result (§2): two app changes make screen
 readers work (§4.7), and the Flatpak requires Flatpak 1.15.11 or later (§3).
-Pending the owner's confirmation of the minimum version.
+The minimum version was confirmed by the owner on 2026-10-21.
 **Scheduling.** After `0.195.0`. **Stage 1 is a gate:** nothing else starts
 until it passes (§2).
 **Tracks.** The owner's direction, 2026-10-21:
