@@ -174,6 +174,18 @@ forskscope-cli mcp --root <dir> [--root <dir> …] [--allow-show]
 
 - **Transport:** MCP over standard input and output, at the protocol revision
   current when this is implemented. The guide names that revision.
+  - *Clarified 2026-10-21 (architect, review 182):*
+    - **The current revision, 2026-07-28, is stateless.** It drops the
+      `initialize` handshake, and its clients fall back to `initialize` when
+      they reach a server on 2025-11-25 or earlier.
+    - **The server therefore implements 2025-11-25,** which both client
+      generations can use today.
+    - **Supporting 2026-07-28 natively is a later step.** It is triggered when
+      a major client stops falling back.
+    - **By the measurement rule below,** the protocol is **hand-written**, with
+      no new dependency. `rmcp` would add 48 crates and an async runtime
+      (`tokio` I/O with `mio` and `socket2`), and its stdio server alone
+      measured larger than the whole `compare` program.
   - JSON-RPC requests in.
   - Nothing else on standard output.
   - Diagnostics on standard error.
