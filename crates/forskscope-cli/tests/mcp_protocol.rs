@@ -392,6 +392,7 @@ fn a_path_escaping_the_root_through_a_symlink_is_refused() {
     assert_eq!(resp["result"]["isError"], true, "{resp}");
 }
 
+#[cfg(unix)]
 #[test]
 fn a_symlink_inside_a_compared_folder_is_not_followed_and_its_target_content_is_absent() {
     // Review 183 §0/§2.5: the engine's own F80 rule ("ForskScope does not
@@ -400,6 +401,13 @@ fn a_symlink_inside_a_compared_folder_is_not_followed_and_its_target_content_is_
     // symlink is one-sided (left only) on purpose: `RecStatus::Symlink`
     // takes precedence over "left only" for a path that is a symlink on
     // either side, per its own doc comment.
+    //
+    // Unix only: `std::os::unix::fs::symlink` has no portable
+    // equivalent in this test file (Windows needs
+    // `symlink_file`/`symlink_dir` chosen by target type, and needs the
+    // process to hold the privilege to create one) - the engine's own
+    // F80 behavior this proves is platform-independent; only the test's
+    // own setup is Unix-specific.
     let root = tempfile::tempdir().unwrap();
     let left_dir = root.path().join("left");
     let right_dir = root.path().join("right");
