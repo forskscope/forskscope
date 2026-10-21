@@ -20,9 +20,12 @@ forskscope-report             = { workspace = true }
 # HTML report's `generated_at` timestamp only (RFC-092's own format) -
 # already resolved transitively; this is this crate's own direct use.
 chrono                        = { workspace = true }
+# RFC-094 §4 / review 182 §1: the hand-written mcp server's own JSON-RPC
+# framing - already resolved transitively (forskscope-report's own
+# versioned JSON contract), and the measured, decided alternative to
+# pulling in rmcp's 48 extra crates and async runtime. No new dependency
+# to the workspace, only a new edge to one already in it.
+serde_json                   = { workspace = true }
 
 [dev-dependencies]
 tempfile                    = { workspace = true }
-# Test-only: parsing `--format json` output to check its shape, not a
-# runtime dependency of the program itself.
-serde_json                   = { workspace = true }

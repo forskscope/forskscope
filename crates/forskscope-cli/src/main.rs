@@ -4,6 +4,7 @@
 //!
 //! ```text
 //! forskscope-cli compare <left> <right> [options]
+//! forskscope-cli mcp --root <dir> [--root <dir> …] [--allow-show]
 //! forskscope-cli --version | --help
 //! ```
 //!
@@ -12,6 +13,7 @@
 //! from nothing and ends with nothing kept (RFC-094's "stateless" property).
 
 mod compare;
+mod mcp;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -27,6 +29,7 @@ fn main() {
 
     let exit_code = match args.first().map(String::as_str) {
         Some("compare") => compare::run(&args[1..]),
+        Some("mcp") => mcp::run(&args[1..]),
         Some(other) => {
             eprintln!("forskscope-cli: unrecognized command `{other}` (see --help)");
             2
@@ -43,6 +46,8 @@ fn print_help() {
     print!(
         "Usage:\n  \
          forskscope-cli compare <left> <right> [options]   Compare two files or two folders\n  \
+         forskscope-cli mcp --root <dir> [--root <dir> …] [--allow-show]\n  \
+         \x20                                                   Serve MCP over stdio for an AI agent\n  \
          forskscope-cli --version, -V                       Print the version and exit\n  \
          forskscope-cli --help, -h                           Print this message and exit\n\n\
          compare options:\n  \

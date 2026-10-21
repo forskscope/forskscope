@@ -427,6 +427,18 @@ fn compare_files_status_only(
 
 fn compare_dirs(opts: &Options, token: &CancellationToken) -> Result<ExecOutcome, String> {
     let scan = recursive_diff_with_rules(&opts.left, &opts.right, token, &opts.ignore_rules);
+    // `recursive_diff_with_rules`'s own doc comment: "the caller can
+    // distinguish a cancelled result from a completed one by checking
+    // `token.is_cancelled()` afterwards" - checked here, before
+    // `build_dir_report`, because that function's own cancellation check
+    // runs only inside its per-entry loop. A scan cancelled early enough
+    // to produce zero (or very few) entries would otherwise reach that
+    // loop with nothing - or almost nothing - to iterate, never observe
+    // the cancellation, and return a misleadingly "successful" empty
+    // report instead of saying the comparison was cancelled.
+    if token.is_cancelled() {
+        return Err("comparison was cancelled".to_string());
+    }
     if scan.left_root_unreadable {
         return Err(format!("{}: could not be read", opts.left.display()));
     }
