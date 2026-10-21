@@ -31,6 +31,32 @@ fn recv(stdout: &mut BufReader<std::process::ChildStdout>) -> serde_json::Value 
     serde_json::from_str(&line).expect("a JSON-RPC line")
 }
 
+/// Spawning a binary moments after `fs::copy` finished writing it
+/// occasionally races a kernel-level "still open for write" window
+/// (`ErrorKind::ExecutableFileBusy`, "Text file busy") under heavy
+/// parallel I/O — seen intermittently both locally and in CI, on a
+/// freshly-copied binary that is otherwise complete and valid; retrying
+/// resolves it within milliseconds. Never seen on `real_bin()` itself
+/// (already fully written long before any test runs), so only the four
+/// call sites that spawn a *copy* use this.
+fn spawn_retrying_busy(cmd: &mut Command) -> std::process::Child {
+    const ATTEMPTS: u32 = 5;
+    for attempt in 0..ATTEMPTS {
+        match cmd.spawn() {
+            Ok(child) => return child,
+            Err(e)
+                if e.kind() == std::io::ErrorKind::ExecutableFileBusy && attempt + 1 < ATTEMPTS =>
+            {
+                std::thread::sleep(std::time::Duration::from_millis(
+                    20 * u64::from(attempt + 1),
+                ));
+            }
+            Err(e) => panic!("spawn failed: {e}"),
+        }
+    }
+    unreachable!("the loop above always returns or panics")
+}
+
 #[test]
 fn show_to_person_spawns_the_sibling_gui_binary_with_the_two_paths_no_shell() {
     let stage = tempfile::tempdir().unwrap();
@@ -58,18 +84,18 @@ fn show_to_person_spawns_the_sibling_gui_binary_with_the_two_paths_no_shell() {
     fs::write(&left, "x").unwrap();
     fs::write(&right, "y").unwrap();
 
-    let mut child = Command::new(&cli_copy)
-        .args([
-            "mcp",
-            "--root",
-            root.path().to_str().unwrap(),
-            "--allow-show",
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("the copied forskscope-cli should run");
+    let mut child = spawn_retrying_busy(
+        Command::new(&cli_copy)
+            .args([
+                "mcp",
+                "--root",
+                root.path().to_str().unwrap(),
+                "--allow-show",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    );
 
     let mut stdin = child.stdin.take().unwrap();
     let mut stdout = BufReader::new(child.stdout.take().unwrap());
@@ -148,18 +174,18 @@ fn a_gui_that_writes_to_its_own_stdout_never_corrupts_the_protocol_stream() {
     fs::write(&left, "x").unwrap();
     fs::write(&right, "y").unwrap();
 
-    let mut child = Command::new(&cli_copy)
-        .args([
-            "mcp",
-            "--root",
-            root.path().to_str().unwrap(),
-            "--allow-show",
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
+    let mut child = spawn_retrying_busy(
+        Command::new(&cli_copy)
+            .args([
+                "mcp",
+                "--root",
+                root.path().to_str().unwrap(),
+                "--allow-show",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    );
 
     let mut stdin = child.stdin.take().unwrap();
     let mut stdout = BufReader::new(child.stdout.take().unwrap());
@@ -219,18 +245,18 @@ fn a_gui_that_exits_non_zero_quickly_is_reported_as_an_error() {
     fs::write(&left, "x").unwrap();
     fs::write(&right, "y").unwrap();
 
-    let mut child = Command::new(&cli_copy)
-        .args([
-            "mcp",
-            "--root",
-            root.path().to_str().unwrap(),
-            "--allow-show",
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
+    let mut child = spawn_retrying_busy(
+        Command::new(&cli_copy)
+            .args([
+                "mcp",
+                "--root",
+                root.path().to_str().unwrap(),
+                "--allow-show",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    );
 
     let mut stdin = child.stdin.take().unwrap();
     let mut stdout = BufReader::new(child.stdout.take().unwrap());
@@ -290,18 +316,18 @@ fn a_ping_sent_right_after_show_to_person_is_answered_well_under_its_own_early_e
     fs::write(&left, "x").unwrap();
     fs::write(&right, "y").unwrap();
 
-    let mut child = Command::new(&cli_copy)
-        .args([
-            "mcp",
-            "--root",
-            root.path().to_str().unwrap(),
-            "--allow-show",
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
+    let mut child = spawn_retrying_busy(
+        Command::new(&cli_copy)
+            .args([
+                "mcp",
+                "--root",
+                root.path().to_str().unwrap(),
+                "--allow-show",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    );
 
     let mut stdin = child.stdin.take().unwrap();
     let mut stdout = BufReader::new(child.stdout.take().unwrap());
