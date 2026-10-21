@@ -124,6 +124,11 @@ forskscope-cli --version | --help
   - **1:** different;
   - **2:** an error or a refusal, with **one line on standard error** that
     names the path and the reason.
+  - *Clarified 2026-10-21 (architect, review 183):* **0 only when everything
+    was compared and found the same.** An entry that was not compared (an
+    unreadable file, a symbolic link not followed) is not *the same*, so the
+    code is 1, and the output names the entry. 2 stays for a comparison that
+    could not run at all.
 - **Nothing is read but the two paths,** and nothing is written.
 
 ### 3. The JSON format: versioned, and the app's own vocabulary
@@ -182,6 +187,10 @@ forskscope-cli mcp --root <dir> [--root <dir> …] [--allow-show]
       generations can use today.
     - **Supporting 2026-07-28 natively is a later step.** It is triggered when
       a major client stops falling back.
+    - *Clarified (review 183):* the server also answers a client that asks
+      for **2025-06-18** with that revision. The subset this server uses is the
+      same in both, and older clients reject a revision they do not know.
+      Earlier revisions are not offered: 2025-03-26 requires JSON-RPC batches.
     - **By the measurement rule below,** the protocol is **hand-written**, with
       no new dependency. `rmcp` would add 48 crates and an async runtime
       (`tokio` I/O with `mio` and `socket2`), and its stdio server alone
@@ -294,6 +303,9 @@ would be its own small decision, later.
    project's Linux machine. An equivalent observer is accepted if it can fail:
    for example, an `LD_PRELOAD` library logging every `socket` and `connect`
    call, shown catching a deliberate socket in a test build.
+   *Clarified (review 183):* the observer is backed by a structural check:
+   `crate-boundaries` fails on `std::net` or `std::os::*::net` in
+   `forskscope-compare`, `forskscope-report` and `forskscope-cli`.
 6. **No writes:** a run of each mode, against a home folder overlaid as
    writable, leaves the overlay empty. This is the RFC-091 method.
 7. **The guide page and the threat model** describe exactly the behaviour
