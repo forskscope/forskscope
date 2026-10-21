@@ -8,10 +8,11 @@ set -euo pipefail
 
 VER="$(awk '/^\[workspace\.package\]/{f=1} f&&/^version[[:space:]]*=/{gsub(/[^0-9.]/,""); print; exit}' Cargo.toml)"
 BINARY="target/x86_64-pc-windows-msvc/release/forskscope.exe"
+CLI_BINARY="target/x86_64-pc-windows-msvc/release/forskscope-cli.exe"
 OUT="target/forskscope-v$VER-windows-x64.zip"
 STAGE="target/forskscope-v$VER-windows-x64"
 
-if [[ ! -f "$BINARY" ]]; then
+if [[ ! -f "$BINARY" ]] || [[ ! -f "$CLI_BINARY" ]]; then
     echo "Build first: cargo build --release --target x86_64-pc-windows-msvc"
     exit 1
 fi
@@ -19,6 +20,8 @@ fi
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 cp "$BINARY" "$STAGE/forskscope.exe"
+# RFC-094 §1: the Windows .zip carries forskscope-cli beside the GUI.
+cp "$CLI_BINARY" "$STAGE/forskscope-cli.exe"
 cp README.md LICENSE NOTICE CHANGELOG.md "$STAGE/"
 
 if command -v zip &>/dev/null; then
