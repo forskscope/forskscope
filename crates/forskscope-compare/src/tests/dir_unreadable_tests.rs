@@ -66,6 +66,19 @@ fn restore_perms(dir: &std::path::Path, mode: u32) {
     let _ = fs::set_permissions(dir, fs::Permissions::from_mode(mode));
 }
 
+/// `chmod 000` on `path` itself, so `File::open` fails while `fs::metadata`
+/// still succeeds (the entry is still listed on both sides; only the
+/// content read fails) - F211's own defect shape, distinct from
+/// `make_child_metadata_unreadable`'s "path resolution itself fails",
+/// which never reaches the digest comparison at all. Returns `false`
+/// (skip) if the change had no effect, e.g. running as root.
+#[cfg(unix)]
+fn make_file_content_unreadable(path: &std::path::Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o000));
+    fs::File::open(path).is_err()
+}
+
 // ── §8.1: an unreadable file appears as Unreadable, not absent ──────────────
 
 #[cfg(unix)]
@@ -258,6 +271,56 @@ fn an_unreadable_directory_appears_as_unreadable_and_its_parent_still_lists() {
     );
 
     restore_perms(&blocked_dir, 0o755);
+    let _ = fs::remove_dir_all(&base);
+}
+
+// ── F211: a file whose content cannot be read is Unreadable, never
+//    Different ───────────────────────────────────────────────────────────────
+//
+// Both sides exist and have the same size, so metadata succeeds on both
+// and the merge reaches the digest comparison itself (unlike the §8.1
+// tests above, where metadata fails first and the entry never gets this
+// far). Only `File::open` on one side fails - the exact shape the old
+// `Err(_) => Changed` fallback misreported as a verdict.
+
+#[cfg(unix)]
+#[test]
+fn a_file_unreadable_only_at_the_content_level_is_unreadable_not_different() {
+    let base = tmp("content-unreadable");
+    let left = base.join("l");
+    let right = base.join("r");
+    fs::create_dir_all(&left).unwrap();
+    fs::create_dir_all(&right).unwrap();
+    // Same length on both sides, and genuinely different bytes - were the
+    // content actually read, this would be `Changed`, so a passing test
+    // here is proof the read never happened, not a coincidence of equal
+    // content.
+    write(&left, "n.txt", "left-content");
+    write(&right, "n.txt", "right-conten");
+
+    let blocked = right.join("n.txt");
+    if !make_file_content_unreadable(&blocked) {
+        super::support::permission_guard_failed();
+        restore_perms(&blocked, 0o644);
+        let _ = fs::remove_dir_all(&base);
+        return;
+    }
+
+    let scan = recursive_diff_with_cancel(&left, &right, &CancellationToken::new());
+    let entry = scan
+        .entries
+        .iter()
+        .find(|e| e.rel_path == std::path::Path::new("n.txt"));
+
+    assert_eq!(
+        entry.map(|e| e.status),
+        Some(RecStatus::Unreadable),
+        "F211: a file that exists on both sides but cannot be read must be \
+         Unreadable, never a verdict of Different: {:?}",
+        scan.entries
+    );
+
+    restore_perms(&blocked, 0o644);
     let _ = fs::remove_dir_all(&base);
 }
 

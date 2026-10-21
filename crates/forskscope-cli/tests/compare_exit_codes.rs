@@ -137,6 +137,75 @@ fn json_output_parses_as_the_versioned_schema() {
     assert_eq!(doc["identical"], false);
 }
 
+// F211: a file that exists on both sides but cannot be read must be
+// `unreadable`/"Unreadable", never a verdict of "different" - exit code 1
+// either way (review 183's exit-code clarification: "not compared" is not
+// "the same"), but the status itself must say why, not assert a measurement
+// that was never taken. `chmod 000` does not stop root, so this is
+// `#[cfg(unix)]` and skips, with an explicit message, if run as root -
+// `forskscope-compare`'s own permission-guard tests follow the same rule,
+// for the same reason (a suite running as root would otherwise pass this
+// for the wrong reason).
+#[cfg(unix)]
+#[test]
+fn an_unreadable_file_inside_a_folder_is_reported_unreadable_never_different() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let left = tempfile::tempdir().unwrap();
+    let right = tempfile::tempdir().unwrap();
+    // Same length, different bytes - were the content actually read, this
+    // would be "different", so passing here is proof the read never
+    // happened, not a coincidence of equal content.
+    write(left.path(), "n.txt", "left-content");
+    write(right.path(), "n.txt", "right-conten");
+
+    let blocked = right.path().join("n.txt");
+    std::fs::set_permissions(&blocked, std::fs::Permissions::from_mode(0o000)).unwrap();
+    if std::fs::File::open(&blocked).is_ok() {
+        eprintln!(
+            "skipping an_unreadable_file_inside_a_folder_is_reported_unreadable_never_different: \
+             chmod 000 had no effect (running as root?)"
+        );
+        std::fs::set_permissions(&blocked, std::fs::Permissions::from_mode(0o644)).unwrap();
+        return;
+    }
+
+    let json_out = run(&[
+        "compare",
+        &left.path().display().to_string(),
+        &right.path().display().to_string(),
+        "--format",
+        "json",
+    ]);
+    let text_out = run(&[
+        "compare",
+        &left.path().display().to_string(),
+        &right.path().display().to_string(),
+        "--format",
+        "text",
+    ]);
+    std::fs::set_permissions(&blocked, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+    assert_eq!(
+        json_out.status.code(),
+        Some(1),
+        "not compared is not the same"
+    );
+    let doc: serde_json::Value = serde_json::from_slice(&json_out.stdout).expect("valid JSON");
+    let entries = doc["entries"].as_array().expect("a directory document");
+    let entry = entries
+        .iter()
+        .find(|e| e["path"] == "n.txt")
+        .unwrap_or_else(|| panic!("n.txt must be listed: {doc}"));
+    assert_eq!(entry["status"], "unreadable", "{doc}");
+
+    assert_eq!(text_out.status.code(), Some(1));
+    let text = String::from_utf8_lossy(&text_out.stdout);
+    assert!(text.contains("n.txt"), "{text}");
+    assert!(text.contains("Unreadable"), "{text}");
+    assert!(!text.contains("Different"), "{text}");
+}
+
 #[test]
 fn version_and_help_exit_zero_and_write_nothing_to_stderr() {
     let out = run(&["--version"]);

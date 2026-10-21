@@ -560,14 +560,14 @@ fn walk_and_merge(
                 // listing). `Cancelled` leaves the entry at `Computing`
                 // rather than asserting a verdict nothing established -
                 // the same reasoning as `DigestOutcome`'s own doc comment.
-                // An I/O error still collapses to `Changed`, unchanged
-                // from before this handoff (a different, already-tracked
-                // finding - F76 - not this one; see the review request).
+                // F211: an I/O error is `Unreadable`, not a verdict - a
+                // file nobody could read was never actually found to
+                // differ (RecStatus::Unreadable's own doc comment).
                 match file_digest_equal_with_cancel(&left_path, &right_path, token) {
                     Ok(DigestOutcome::Equal) => existing.status = RecStatus::Equal,
                     Ok(DigestOutcome::Different) => existing.status = RecStatus::Changed,
                     Ok(DigestOutcome::Cancelled) => existing.status = RecStatus::Computing,
-                    Err(_) => existing.status = RecStatus::Changed,
+                    Err(_) => existing.status = RecStatus::Unreadable,
                 }
                 existing.right_size = Some(right_size);
             } else {

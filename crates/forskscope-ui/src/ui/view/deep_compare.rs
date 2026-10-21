@@ -227,20 +227,9 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                     let outcome = tokio::task::spawn_blocking(move || {
                         file_digest_equal_with_cancel(&lp, &rp, &file_token)
                     })
-                    .await
-                    // A join error (the blocking task panicked) has no
-                    // real verdict either - same fallback the old code
-                    // used for any failure.
-                    .unwrap_or(Ok(DigestOutcome::Different));
-                    let status = match outcome {
-                        Ok(DigestOutcome::Equal) => RecStatus::Equal,
-                        Ok(DigestOutcome::Different) => RecStatus::Changed,
-                        Err(_) => RecStatus::Changed,
-                        Ok(DigestOutcome::Cancelled) => {
-                            // Established nothing - the root change that
-                            // cancelled this already superseded this run.
-                            return;
-                        }
+                    .await;
+                    let Some(status) = digest_task_status(outcome) else {
+                        return;
                     };
                     apply_epoch_result(&mut e2.write(), &rel, status, stamp, &epoch_signal.read());
                     let next = *cp2.read() + 1;
@@ -549,6 +538,32 @@ fn DeepRow(
 /// verdict from superseded roots. `can_copy_left_to_right`/
 /// `BatchCopyButtons`/`can_cmp` all key off `entry.status`, so a stale
 /// `Equal` here is a real data-safety defect (F78 §2), not a display glitch.
+/// Resolves a phase-2 digest task's own result to a verdict, or `None` for
+/// "no verdict" - takes the plain `spawn_blocking`/`spawn_blocking`-join
+/// result directly (not a `Signal`, nothing Dioxus-specific) so a test can
+/// drive it without an async runtime beyond a plain `tokio::runtime` (F211).
+///
+/// `None` covers two cases the caller must treat alike: a cancelled
+/// comparison (`Ok(Ok(DigestOutcome::Cancelled))` - established nothing,
+/// the root change that cancelled this already superseded this run) and a
+/// join error (`Err(_)` - the blocking task itself panicked, which has no
+/// real verdict either). Before this handoff, a join error fell back to
+/// `Some(RecStatus::Changed)` - asserting a verdict nothing ever measured.
+///
+/// An I/O error (`Ok(Err(_))`) is `RecStatus::Unreadable`, not a verdict -
+/// a file nobody could read was never actually found to differ.
+fn digest_task_status(
+    outcome: Result<Result<DigestOutcome, forskscope_compare::CoreError>, tokio::task::JoinError>,
+) -> Option<RecStatus> {
+    match outcome {
+        Err(_) => None,
+        Ok(Ok(DigestOutcome::Equal)) => Some(RecStatus::Equal),
+        Ok(Ok(DigestOutcome::Different)) => Some(RecStatus::Changed),
+        Ok(Ok(DigestOutcome::Cancelled)) => None,
+        Ok(Err(_)) => Some(RecStatus::Unreadable),
+    }
+}
+
 /// Takes `entries` and `epoch` directly (not `Signal`s) so a test can drive
 /// it without a Dioxus runtime, mirroring `explorer.rs`'s
 /// `apply_epoch_result`.
@@ -960,6 +975,71 @@ mod tests {
             &epoch,
         );
         assert_eq!(entries[0].status, RecStatus::Equal);
+    }
+
+    // F211: `digest_task_status` is the one place a digest task's own
+    // result becomes a verdict (or no verdict) - tested directly, no
+    // Dioxus runtime needed, the same reasoning `apply_epoch_result`'s own
+    // tests above already follow.
+
+    #[test]
+    fn a_real_measurement_becomes_its_own_verdict() {
+        assert_eq!(
+            digest_task_status(Ok(Ok(DigestOutcome::Equal))),
+            Some(RecStatus::Equal)
+        );
+        assert_eq!(
+            digest_task_status(Ok(Ok(DigestOutcome::Different))),
+            Some(RecStatus::Changed)
+        );
+    }
+
+    #[test]
+    fn a_cancelled_comparison_gives_no_verdict() {
+        assert_eq!(digest_task_status(Ok(Ok(DigestOutcome::Cancelled))), None);
+    }
+
+    #[test]
+    fn an_io_error_is_unreadable_never_a_verdict_of_different() {
+        let io_err = std::io::Error::other("permission denied");
+        let core_err = forskscope_compare::CoreError::io(
+            Path::new("blocked.txt"),
+            forskscope_compare::IoOperation::Read,
+            &io_err,
+        );
+        assert_eq!(
+            digest_task_status(Ok(Err(core_err))),
+            Some(RecStatus::Unreadable),
+            "F211: an I/O error must be Unreadable, never a verdict of Different"
+        );
+    }
+
+    #[test]
+    fn a_panicked_digest_task_gives_no_verdict_never_different() {
+        // F211: before this handoff, a join error (the blocking task
+        // itself panicked) fell back to `Some(RecStatus::Changed)` -
+        // asserting a verdict nothing ever measured. A real `JoinError`
+        // has no public constructor, so this spawns a task that actually
+        // panics and joins it for real - the same `tokio::runtime`
+        // pattern `dir_pane.rs`'s own tests already use for async code,
+        // no Dioxus runtime involved.
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        let join_result = rt.block_on(async {
+            tokio::task::spawn_blocking(
+                || -> Result<DigestOutcome, forskscope_compare::CoreError> {
+                    panic!("simulated digest-task panic");
+                },
+            )
+            .await
+        });
+        assert!(join_result.is_err(), "the task must actually have panicked");
+        assert_eq!(
+            digest_task_status(join_result),
+            None,
+            "F211: a panicked digest task must give no verdict, never Different"
+        );
     }
 
     // F80 §7.1: every `RecStatus` variant must yield a non-empty
