@@ -509,6 +509,58 @@ reachable from a file name.
 - The two non-string interpolations are integers by construction and were not
   examined further.
 
+### 10. `forskscope-cli`: headless comparison (RFC-094)
+
+A second, separate program — not a mode of `forskscope-ui`'s binary, and
+not linked against it. Today it has one entry point, `compare`; an MCP
+server (`mcp`) is designed in RFC-094 §4 but not yet built, so this
+section describes `compare` only and will grow when `mcp` lands.
+
+**Flow:** two paths from `argv` → file-vs-folder decided from the paths
+themselves (`fs::metadata`, never `forskscope_compare::classify`, which
+would report a directory as "not a regular file" rather than as a
+folder — see `compare.rs`'s own module doc) → the same
+`load_path`/`compute_diff`/`recursive_diff_with_rules` the GUI's own
+entry points 1 and 2 above use → one of four formats printed to standard
+output.
+
+**Controls:**
+- **No network:** confirmed with an `LD_PRELOAD` shim logging every
+  `socket`/`connect` call (neither is installed on the project's Linux
+  machine for a real `strace`) — silent across every `--format` and both
+  a file and a folder comparison; the same shim, pointed at a throwaway
+  program that deliberately opens a socket, logs both calls, so the
+  absence above is something the check could have failed to show.
+- **No writes:** confirmed with the RFC-091 writable-overlay method
+  (`bwrap` over `$HOME`) — the overlay stayed empty after a real
+  comparison; the same overlay, pointed at a command that deliberately
+  touches a file in `$HOME`, is not empty, so again the method can fail.
+- **Reads no settings, writes no session:** unlike `forskscope-ui`, this
+  program does not link `forskscope-desktop` at all (`cargo xtask
+  crate-boundaries` enforces the dependency list this depends on), so
+  there is no settings/session code path to call even by accident.
+- **No shell:** paths are opened with `std::fs`/the engine's own
+  `load_path`, never passed through `sh -c` or a shell-invoked child
+  process. `forskscope-cli` spawns no process at all today.
+- A path that does not exist, or a file compared against a folder, is
+  refused (exit code `2`) before anything is read.
+
+**Residual concerns:** the same ones entries 1 and 2 above already carry
+for `load_path`/`classify`/`recursive_diff_with_rules`, since this is the
+same code reading the same kind of input — a symlink farm, an oversized
+file hitting the diff engine's deadline policy. Nothing here is new risk
+beyond "a script or an agent, not a person at a keyboard, decides which
+two paths to hand the same read-only engine the GUI already runs."
+
+**Not yet covered — entry points RFC-094 §4 names for `mcp`, pending that
+build:** paths an agent supplies over the protocol, bounded by
+`--root`s rather than by a person clicking a file picker; comparison
+content returned to an agent, which is untrusted data (the GUI's own
+"no `dangerous_inner_html`" posture in entry 9 is the closest existing
+precedent, not a substitute); and the opt-in `show_to_person` GUI launch,
+which starts `forskscope` beside `forskscope-cli` in the same directory,
+never one found on `PATH`.
+
 ---
 
 ## What ForskScope deliberately does not do
