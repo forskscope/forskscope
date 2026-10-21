@@ -837,6 +837,46 @@ mod tests {
         assert!(ja("a string that is definitely not in the ja table").is_none());
     }
 
+    /// Review 185 §1: `report::html::cap_omission_template_key`'s four
+    /// shapes (`n`/`max_files` each singular or plural) - checked against
+    /// the real `ja()` table above, not a test-local copy of the
+    /// translations (the defect review 185 found in the previous version
+    /// of this test, which lived in `forskscope-report` and could never
+    /// fail against a real missing entry since its own translator closure
+    /// held its own copy of all four strings).
+    #[test]
+    fn every_cap_omission_shape_in_japanese_has_a_real_translation() {
+        for omitted_count in [1usize, 2] {
+            for max_files in [1usize, 50] {
+                let entries: Vec<RecEntry> = (0..omitted_count)
+                    .map(|i| RecEntry {
+                        rel_path: PathBuf::from(format!("huge{i}.txt")),
+                        status: RecStatus::Changed,
+                        left_size: Some(1),
+                        right_size: Some(1),
+                    })
+                    .collect();
+                let options = ReportOptions {
+                    max_files_with_content: max_files,
+                    ..ReportOptions::default()
+                };
+                let mut report =
+                    DirComparisonReport::from_entries(&entries, None, None, None, options);
+                for i in 0..omitted_count {
+                    report.change_hunks_omitted.push(format!("huge{i}.txt"));
+                }
+                let keys = requested_ja_keys(Box::new(|tr| {
+                    render_dir_report(&report, "0.194.0", "now", false, tr)
+                }));
+                assert!(
+                    !keys.is_empty(),
+                    "n={omitted_count}, max_files={max_files}: the renderer requested nothing"
+                );
+                assert_every_requested_key_has_a_real_ja_entry(&keys);
+            }
+        }
+    }
+
     /// Review 175 §2: the checksum caveat sentence, rendered through the
     /// real `t(Lang::Ja, …)`, must carry `<code>sha256sum</code>` and no
     /// literal backtick in either language - not just in a mock-translator

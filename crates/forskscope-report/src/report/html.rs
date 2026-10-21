@@ -1232,66 +1232,6 @@ mod tests {
         assert!(!html.contains("cap of 1 files"), "{html}");
     }
 
-    /// Review 184 §3.3: `cap_omission_template_key`'s four shapes (`n`/
-    /// `max_files` each singular or plural) all map to the same Japanese
-    /// text (i18n.rs's own entries, copied here verbatim) - Japanese
-    /// needs no such distinction. Before this test, only whichever single
-    /// shape another test happened to exercise was ever proven
-    /// translated; `cargo xtask i18n` cannot cover this at all (it only
-    /// scans `forskscope-ui/src`), so this loop is the only coverage any
-    /// of the four shapes gets.
-    #[test]
-    fn every_cap_omission_shape_is_a_real_japanese_translation_not_the_english_fallback() {
-        use forskscope_compare::dir::{RecEntry, RecStatus};
-        use std::path::PathBuf;
-
-        let ja = |s: &str| -> String {
-            match s {
-                "{n} changed file's content is not shown in this report (the cap of {max_files} file or {max_size} of change text was reached):" |
-                "{n} changed file's content is not shown in this report (the cap of {max_files} files or {max_size} of change text was reached):" |
-                "{n} changed files' content is not shown in this report (the cap of {max_files} file or {max_size} of change text was reached):" |
-                "{n} changed files' content is not shown in this report (the cap of {max_files} files or {max_size} of change text was reached):" => {
-                    "変更された{n}個のファイルの内容はこのレポートには表示されません（{max_files}ファイルまたは{max_size}の変更テキストという上限に達しました）：".to_string()
-                }
-                other => other.to_string(),
-            }
-        };
-
-        for omitted_count in [1usize, 2] {
-            for max_files in [1usize, 50] {
-                let entries: Vec<RecEntry> = (0..omitted_count)
-                    .map(|i| RecEntry {
-                        rel_path: PathBuf::from(format!("huge{i}.txt")),
-                        status: RecStatus::Changed,
-                        left_size: Some(1),
-                        right_size: Some(1),
-                    })
-                    .collect();
-                let options = crate::report::ReportOptions {
-                    max_files_with_content: max_files,
-                    ..Default::default()
-                };
-                let mut report = crate::report::DirComparisonReport::from_entries(
-                    &entries, None, None, None, options,
-                );
-                for i in 0..omitted_count {
-                    report.change_hunks_omitted.push(format!("huge{i}.txt"));
-                }
-                let html = render_dir_report(&report, "0.0.0", "now", false, &ja);
-                assert!(
-                    html.contains("変更された") && html.contains("ファイルの内容"),
-                    "n={omitted_count}, max_files={max_files}: expected the real Japanese \
-                     translation, got: {html}"
-                );
-                assert!(
-                    !html.contains("changed file"),
-                    "n={omitted_count}, max_files={max_files}: the raw English template \
-                     must not leak through: {html}"
-                );
-            }
-        }
-    }
-
     #[test]
     fn a_cancelled_scans_unfinished_entry_renders_not_compared() {
         use forskscope_compare::dir::{RecEntry, RecStatus};
