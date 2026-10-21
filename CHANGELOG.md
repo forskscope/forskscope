@@ -5,13 +5,74 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.194.1] — Unreleased
+## [0.195.0] — 2026-10-22
+
+**For scripts and AI agents.**
+
+### Added
+
+- **`forskscope-cli`, a second program for scripts and AI agents.** It ships
+  beside `forskscope` in every release: the Linux `.tar.gz`, the Windows
+  `.zip`, the macOS app bundle and the AUR package.
+  - **Read-only:** it is not built from the code that writes, so it cannot
+    save, merge or apply anything.
+  - **No network:** it opens no socket.
+  - **Stateless:** it reads no settings, and writes nothing.
+  - **Small:** no GTK, no WebKitGTK, no WebView2. It runs on a server or in a
+    CI container with no desktop installed.
+- **`forskscope-cli compare <left> <right>`** compares two files or two
+  folders.
+  - **Output:** plain text (the default), versioned JSON, a unified diff, or
+    the same HTML report as *Export report…*.
+  - **Exit codes:**
+    - `0` when everything was compared and found the same;
+    - `1` when something differs, or could not be compared;
+    - `2` on an error, with one line naming the path and the reason.
+  - **The JSON** (`forskscope.comparison/1`) has a published schema, and uses
+    the app's own words for every status.
+- **`forskscope-cli mcp --root <dir>`,** a Model Context Protocol server over
+  standard input and output, for AI agents such as Claude Code.
+  - **Paths must be inside the folders you name with `--root`,** following
+    symbolic links. Anything else is refused.
+  - **Its `compare` tool** returns the same result as the command.
+  - **With `--allow-show`,** a `show_to_person` tool opens the comparison in
+    ForskScope's window, so you can look at what the agent found.
+  - **Protocol revisions:** 2025-11-25, and 2025-06-18 for clients that ask
+    for it.
+- **Two folders on the command line open the folder comparison.** So
+  `git difftool --dir-diff --no-symlinks` works, and the guide shows how. A
+  file and a folder are refused with a message that says which is which.
+
+See *Using ForskScope from scripts and AI agents* in the guide.
+
+### Fixed
+
+- **An unreadable file in a folder comparison is reported as *Unreadable*.**
+  Before, it was reported as *Different*, and the batch *Copy to right* and
+  *Copy to left* included it.
+- **A folder report no longer says *No files.*** above a list of files that
+  could not be read or followed.
+- **The folder report's note about left-out changes** now reads correctly for
+  a single file.
 
 ### Security
 
 - **`rustls-webpki` 0.103.15 → 0.103.16,** for RUSTSEC-2026-0382. It reaches
-  ForskScope only through `dioxus-desktop` → `tungstenite` → `rustls`, not through
-  *Check for updates* (`native-tls`). This was a lockfile update only.
+  ForskScope only through `dioxus-desktop` → `tungstenite` → `rustls`, not
+  through *Check for updates* (`native-tls`). This was a lockfile update only.
+
+### Internal
+
+- **The code is split by what it may do (RFC-093):**
+  - `forskscope-compare`, the read-only engine;
+  - `forskscope-report`, the outputs;
+  - `forskscope-edit`, the only code that writes your files;
+  - `forskscope-desktop`, the app's own settings and session.
+  - **A `crate-boundaries` check** enforces it: no writing, no processes and
+    no networking in the engine and the outputs, and no networking in
+    `forskscope-cli`.
+- **The GUI package is now `forskscope`,** so `cargo build --release -p
+  forskscope` builds the app.
 
 ## [0.194.0] — 2026-10-20
 
