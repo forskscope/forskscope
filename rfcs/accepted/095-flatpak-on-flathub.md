@@ -1,7 +1,9 @@
 # RFC 095: ForskScope as a Flatpak on Flathub
 
-**Status.** Proposed.
+**Status.** Accepted — review complete; implementer may start. Moves to `done/`
+when the Flathub listing is live (RFC-000, 5-folder variant).
 **Proposed.** 2026-10-21 by the architect, at the owner's direction.
+**Accepted.** 2026-10-21 by the project owner.
 **Scheduling.** After `0.195.0`. **Stage 1 is a gate:** nothing else starts
 until it passes (§2).
 **Tracks.** The owner's direction, 2026-10-21:
