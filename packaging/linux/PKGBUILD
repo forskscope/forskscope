@@ -36,12 +36,15 @@ build() {
     # updates button - FORSKSCOPE_CHANNEL tells the About dialog to say so
     # ("Update with your AUR helper") instead of linking a GitHub download.
     export FORSKSCOPE_CHANNEL=aur
+    # No -p: builds every workspace member's default target, which now
+    # includes forskscope-cli (RFC-094) beside the GUI's forskscope.
     cargo build --release --locked
 }
 
 package() {
     cd "$pkgname-$pkgver"
     install -Dm755 "target/release/forskscope" "$pkgdir/usr/bin/forskscope"
+    install -Dm755 "target/release/forskscope-cli" "$pkgdir/usr/bin/forskscope-cli"
     install -Dm644 "packaging/linux/forskscope.desktop" \
         "$pkgdir/usr/share/applications/forskscope.desktop"
     install -Dm644 "LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"

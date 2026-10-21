@@ -18,6 +18,16 @@ agents (`forskscope-cli mcp`), is designed in RFC-094 §4 but not yet
 built — this page will grow a section for it once it exists; nothing
 below promises it early.
 
+**Where to find it:** the Linux `.tar.gz` and the Windows `.zip` carry
+`forskscope-cli` beside the GUI program — run it directly, or copy it
+somewhere on `PATH`. The AUR package installs it at `/usr/bin/forskscope-cli`.
+On macOS it sits inside the app bundle, at
+`ForskScope.app/Contents/MacOS/forskscope-cli` — to use it from a
+terminal or a script, either call it by that full path, or put a symlink
+to it on your `PATH` (for example, `ln -s
+"/Applications/ForskScope.app/Contents/MacOS/forskscope-cli"
+/usr/local/bin/forskscope-cli`).
+
 ---
 
 ## `compare`

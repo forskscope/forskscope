@@ -149,8 +149,37 @@ jobs:
             target
           key: linux-release-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build release binary
-        run: cargo build --release --locked -p forskscope
+      - name: Build release binaries
+        run: cargo build --release --locked -p forskscope -p forskscope-cli
+
+      # RFC-094 §1 acceptance criterion 1: forskscope-cli "on Linux ...
+      # links only the C runtime" - checked the same way the GUI's own 16
+      # libraries are checked below (readelf against the actual linked
+      # binary, not the dependency graph `audit-deps` already covers).
+      # libc.so.6 and libgcc_s.so.1 (Rust's own unwinder) are what this
+      # binary links today; /lib64/ld-linux-x86-64.so.2 is the ELF
+      # interpreter, not a NEEDED entry, so it is checked separately.
+      # Falsify by adding any dependency that pulls in GTK, WebKitGTK, or
+      # anything beyond the two libraries below.
+      - name: forskscope-cli links only the C runtime (RFC-094 §1)
+        run: |
+          EXPECTED="libgcc_s.so.1
+          libc.so.6"
+          ACTUAL=$(readelf -d target/release/forskscope-cli \
+            | grep NEEDED \
+            | sed -E 's/.*\[(.*)\]/\1/')
+          DIFF=$(diff <(echo "$EXPECTED" | sed 's/^ *//' | sort) <(echo "$ACTUAL" | sort)) || true
+          if [ -n "$DIFF" ]; then
+            echo "::error::target/release/forskscope-cli links more than the C runtime:"
+            echo "$DIFF"
+            exit 1
+          fi
+          INTERP=$(readelf -l target/release/forskscope-cli | grep -o '/lib64/ld-linux-x86-64.so.2')
+          if [ -z "$INTERP" ]; then
+            echo "::error::target/release/forskscope-cli's ELF interpreter is not /lib64/ld-linux-x86-64.so.2"
+            exit 1
+          fi
+          echo "forskscope-cli links only libc/libgcc_s, interpreter $INTERP."
 
       # F179/F180: the graph check in `cargo xtask audit-deps` reports what
       # Cargo intends; this reports what the linker actually produced
@@ -207,7 +236,11 @@ jobs:
         run: |
           VER="${GITHUB_REF_NAME}"
           tar -czf "forskscope-v${VER}-linux-x86_64.tar.gz" \
-              -C target/release forskscope
+              -C target/release forskscope forskscope-cli
+
+      # RFC-094 §1: "The release log reports both programs' sizes."
+      - name: Report binary sizes
+        run: ls -la target/release/forskscope target/release/forskscope-cli
 
       - uses: actions/upload-artifact@v7
         with:
@@ -241,13 +274,17 @@ jobs:
       # must keep agreeing with this. 13.0 matches the Info.plist value already
       # in place; see this slice's review request for the open question on
       # whether that floor itself should change.
-      - name: Build release binary
+      - name: Build release binaries
         env:
           MACOSX_DEPLOYMENT_TARGET: "13.0"
-        run: cargo build --release --locked --target aarch64-apple-darwin -p forskscope
+        run: cargo build --release --locked --target aarch64-apple-darwin -p forskscope -p forskscope-cli
 
       - name: Package
         run: bash packaging/macos/build-dmg.sh
+
+      # RFC-094 §1: "The release log reports both programs' sizes."
+      - name: Report binary sizes
+        run: ls -la target/aarch64-apple-darwin/release/forskscope target/aarch64-apple-darwin/release/forskscope-cli
 
       - uses: actions/upload-artifact@v7
         with:
@@ -273,8 +310,8 @@ jobs:
             target
           key: windows-release-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build release binary
-        run: cargo build --release --locked -p forskscope
+      - name: Build release binaries
+        run: cargo build --release --locked -p forskscope -p forskscope-cli
 
       # RFC-091 §4 / F206: the hybrid-CRT import gate, run on the exact
       # binary this release packages - before Package, so a failing binary
@@ -284,6 +321,12 @@ jobs:
         shell: pwsh
         run: ./packaging/windows/check-imports.ps1 -ExePath ./target/release/forskscope.exe
 
+      # RFC-094 §1 acceptance criterion 1: "Windows' import gate passes" -
+      # the same script, same allow-list, against forskscope-cli.exe.
+      - name: Check forskscope-cli's imports against the allow-list
+        shell: pwsh
+        run: ./packaging/windows/check-imports.ps1 -ExePath ./target/release/forskscope-cli.exe
+
       - name: Package
         shell: bash
         run: |
@@ -292,8 +335,14 @@ jobs:
           rm -rf "$STAGE"
           mkdir -p "$STAGE"
           cp target/release/forskscope.exe "$STAGE/forskscope.exe"
+          cp target/release/forskscope-cli.exe "$STAGE/forskscope-cli.exe"
           cp README.md LICENSE NOTICE CHANGELOG.md "$STAGE/"
           (cd target && 7z a "../forskscope-v${VER}-windows-x64.zip" "$(basename "$STAGE")/")
+
+      # RFC-094 §1: "The release log reports both programs' sizes."
+      - name: Report binary sizes
+        shell: pwsh
+        run: Get-ChildItem target/release/forskscope.exe, target/release/forskscope-cli.exe | Select-Object Name, Length
 
       - uses: actions/upload-artifact@v7
         with:

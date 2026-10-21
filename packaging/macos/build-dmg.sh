@@ -8,18 +8,27 @@ set -euo pipefail
 
 VER="$(awk '/^\[workspace\.package\]/{f=1} f&&/^version[[:space:]]*=/{gsub(/[^0-9.]/,""); print; exit}' Cargo.toml)"
 BINARY="target/aarch64-apple-darwin/release/forskscope"
+CLI_BINARY="target/aarch64-apple-darwin/release/forskscope-cli"
 DMG_DIR="target/dmg"
 APP_DIR="$DMG_DIR/ForskScope.app/Contents/MacOS"
 OUT="target/forskscope-v$VER-macos-aarch64.dmg"
 
 if [[ ! -f "$BINARY" ]]; then
-    echo "Build first: cargo build --release --target aarch64-apple-darwin"
+    echo "Build first: cargo build --release --target aarch64-apple-darwin -p forskscope -p forskscope-cli"
+    exit 1
+fi
+if [[ ! -f "$CLI_BINARY" ]]; then
+    echo "Build first: cargo build --release --target aarch64-apple-darwin -p forskscope -p forskscope-cli"
     exit 1
 fi
 
 rm -rf "$DMG_DIR"
 mkdir -p "$APP_DIR"
 cp "$BINARY" "$APP_DIR/forskscope"
+# RFC-094 §1: "On macOS it sits inside the bundle, at
+# ForskScope.app/Contents/MacOS/forskscope-cli." - the guide
+# (scripts-and-agents.md) says how to put it on PATH.
+cp "$CLI_BINARY" "$APP_DIR/forskscope-cli"
 
 # Minimal Info.plist
 cat > "$DMG_DIR/ForskScope.app/Contents/Info.plist" << 'PLIST'

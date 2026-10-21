@@ -113,9 +113,16 @@ jobs:
             target
           key: windows-crt-check-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build release binary
-        run: cargo build --release --locked -p forskscope
+      - name: Build release binaries
+        run: cargo build --release --locked -p forskscope -p forskscope-cli
 
       - name: Check imports against the allow-list
         shell: pwsh
         run: ./packaging/windows/check-imports.ps1 -ExePath ./target/release/forskscope.exe
+
+      # RFC-094 §1 acceptance criterion 1: forskscope-cli's own imports,
+      # dispatchable the same way as the GUI's above - proven here before
+      # it ships in a release.
+      - name: Check forskscope-cli's imports against the allow-list
+        shell: pwsh
+        run: ./packaging/windows/check-imports.ps1 -ExePath ./target/release/forskscope-cli.exe
