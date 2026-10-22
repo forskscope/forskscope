@@ -119,3 +119,36 @@ jobs:
       - name: Check imports against the allow-list
         shell: pwsh
         run: ./packaging/windows/check-imports.ps1 -ExePath ./target/release/forskscope.exe
+
+  # TEMPORARY (review 187 §1): rehearses release.yml's new "release binary
+  # never reads the show_to_person test override" check against a real
+  # ubuntu-latest runner before it ships in a real release - mirrors
+  # F206's own temporary-job precedent (review 172,
+  # bea5053f60b2d715873bd05b0df8faaf8c8f3cd1) and this handoff's own
+  # earlier Linux rehearsal (review 187's predecessor, RFC-096 §6 step 6).
+  # Reverted once the passing run is recorded in the review response.
+  release-check-rehearsal:
+    name: "TEMPORARY: show_to_person release-check rehearsal (review 187 §1)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            pkg-config libssl-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release --locked -p forskscope
+
+      - name: Release binary never reads the show_to_person test override (review 187 §1)
+        run: |
+          if strings target/release/forskscope | grep -qF FORSKSCOPE_SHOW_TO_PERSON_EXE_FOR_TEST; then
+            echo "::error::target/release/forskscope contains FORSKSCOPE_SHOW_TO_PERSON_EXE_FOR_TEST - a release build must always start current_exe(), never a switch that changes what show_to_person executes"
+            exit 1
+          fi
+          echo "confirmed absent"
