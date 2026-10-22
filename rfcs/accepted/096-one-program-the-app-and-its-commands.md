@@ -1,8 +1,10 @@
 # RFC 096: One Program — the App and Its Commands
 
-**Status.** Proposed.
+**Status.** Accepted — review complete; implementer may start. Moves to `done/`
+when the work ships (RFC-000, 5-folder variant).
 **Proposed.** 2026-10-22 by the architect. The owner approved the design in
 discussion the same day.
+**Accepted.** 2026-10-22 by the project owner.
 **Scheduling.** `0.196.0`, before RFC-095 stage 2's documentation.
 **Supersedes.** RFC-094 §1's second program and §5's packaging. RFC-094's
 commands, JSON contract, MCP server and guarantees stay. Only where they live

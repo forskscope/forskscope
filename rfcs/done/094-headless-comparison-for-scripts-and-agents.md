@@ -1,6 +1,7 @@
 # RFC 094: Headless Comparison for Scripts and AI Agents
 
 **Status.** Implemented (`0.195.0`, `10ca2ac`; reviews 182–186).
+**Superseded in part.** RFC-096 (accepted 2026-10-22) replaces §1's second program and §5's packaging with one executable: `forskscope compare` and `forskscope mcp`.
 **Accepted.** 2026-10-20 by the project owner.
 **Scheduling.** `0.195.0`, after RFC-093. See `ROADMAP.md` § "Remaining proposed RFCs".
 **Tracks.** The owner's direction, 2026-10-20:
