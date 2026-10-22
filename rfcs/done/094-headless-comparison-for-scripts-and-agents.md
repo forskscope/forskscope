@@ -1,7 +1,6 @@
 # RFC 094: Headless Comparison for Scripts and AI Agents
 
-**Status.** Accepted — review complete; implementer may start. Moves to `done/`
-when the work ships (RFC-000, 5-folder variant).
+**Status.** Implemented (`0.195.0`, `10ca2ac`; reviews 182–186).
 **Accepted.** 2026-10-20 by the project owner.
 **Scheduling.** `0.195.0`, after RFC-093. See `ROADMAP.md` § "Remaining proposed RFCs".
 **Tracks.** The owner's direction, 2026-10-20:

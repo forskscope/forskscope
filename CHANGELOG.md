@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.195.1] — Unreleased
+
 ## [0.195.0] — 2026-10-22
 
 **For scripts and AI agents.**

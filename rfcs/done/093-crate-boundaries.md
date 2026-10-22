@@ -1,7 +1,6 @@
 # RFC 093: Crate Boundaries — a Read-Only Engine, Its Outputs, and Everything That Writes
 
-**Status.** Accepted — review complete; implementer may start. Moves to `done/`
-when the work ships (RFC-000, 5-folder variant).
+**Status.** Implemented (`0.195.0`, `10ca2ac`; reviews 180, 181).
 **Accepted.** 2026-10-20 by the project owner.
 **Amended.** 2026-10-20, by the owner's decision: the GUI package `forskscope-ui`
 is renamed **`forskscope`**, so the build command is `cargo build --release -p
