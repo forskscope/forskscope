@@ -248,15 +248,26 @@ pub fn call_show_to_person(arguments: &Value, roots: &Roots) -> Result<ToolCallR
     // separate programs let it. There is no sibling any more; the app
     // and this subcommand are the one program.
     //
-    // This one environment variable is the seam: read only here, set
-    // only by this crate's own tests (never by a real MCP client, which
-    // has no reason to), overriding what executable `show_to_person`
-    // starts without touching anything else about it.
+    // Review 187 §1: this one environment variable is the seam, but it
+    // is compiled into debug builds only (`#[cfg(debug_assertions)]`) —
+    // a release binary must always use `current_exe()`, by construction,
+    // never a switch that changes what it executes. An MCP client's own
+    // configuration (`"env"` in `mcpServers`, or whatever started the
+    // client) controls this process's environment, so "set only by this
+    // crate's own tests" is a hope about who sets it, not a property of
+    // the binary — only compiling the read out of release builds is.
+    // release.yml's own check fails the build if this variable's name
+    // appears in the release binary at all (falsified and rehearsed,
+    // review 187 §1).
+    #[cfg(debug_assertions)]
     let gui_path: PathBuf = match std::env::var_os("FORSKSCOPE_SHOW_TO_PERSON_EXE_FOR_TEST") {
         Some(path) => PathBuf::from(path),
         None => std::env::current_exe()
             .map_err(|e| format!("could not locate this program's own path: {e}"))?,
     };
+    #[cfg(not(debug_assertions))]
+    let gui_path: PathBuf = std::env::current_exe()
+        .map_err(|e| format!("could not locate this program's own path: {e}"))?;
     call_show_to_person_starting(arguments, roots, &gui_path)
 }
 

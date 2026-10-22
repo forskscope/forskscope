@@ -2,27 +2,18 @@
 
 **`forskscope compare`** and **`forskscope mcp`** are two subcommands of
 the same `forskscope` program, built to be driven by a script or an AI
-agent rather than a person at a window (RFC-096; one program, not a
-second one — `0.195.0`'s separate `forskscope-cli` is gone). They have
-three fixed properties:
+agent rather than a person at a window. They have three fixed properties:
 
-- **Read-only by construction** — neither is built from the code that
-  writes, so neither can save, merge, or apply a patch (RFC-096 §2: this
-  guarantee lives in `forskscope-commands`'s own dependency graph, kept
-  honest by `cargo xtask crate-boundaries`).
+- **Read-only** — neither can save, merge, or apply a patch. The commands
+  are built only on the comparison engine, and a build check enforces
+  it.
 - **No network** — neither opens a socket nor listens on a port.
 - **Stateless** — neither reads settings nor writes a session; every run
   starts from nothing and leaves nothing behind.
 
-Unlike `0.195.0`'s `forskscope-cli`, neither subcommand is small: this
-one executable links the same GTK and WebKitGTK the window does, even
-though a subcommand never opens one, so **on Linux it still needs those
-libraries installed** — it does not run on a server or CI container with
-no desktop stack. A build with no desktop dependency at all is a future,
-separate decision, not something either subcommand does today.
-
-They have two modes: `compare`, and `mcp`, a server for AI agents — both
-described below.
+**On Linux, they need the same desktop libraries the window does,** so
+they do not run on a server or CI container with no desktop stack
+installed.
 
 **Where to find it:** the same `forskscope` the window opens from — the
 Linux `.tar.gz`, the Windows `.zip`, the AUR package's

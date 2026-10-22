@@ -152,6 +152,20 @@ jobs:
       - name: Build release binaries
         run: cargo build --release --locked -p forskscope
 
+      # Review 187 §1: `call_show_to_person`'s test-only override
+      # (`FORSKSCOPE_SHOW_TO_PERSON_EXE_FOR_TEST`) is compiled only into
+      # debug builds (`#[cfg(debug_assertions)]`) - this is the check on
+      # what the linker actually produced, the same reasoning the
+      # library-list check below already follows (review 151's lesson: a
+      # check on a copy is not a check on the thing). Falsify by reverting
+      # that `#[cfg]` to an unconditional read.
+      - name: Release binary never reads the show_to_person test override (review 187 §1)
+        run: |
+          if strings target/release/forskscope | grep -qF FORSKSCOPE_SHOW_TO_PERSON_EXE_FOR_TEST; then
+            echo "::error::target/release/forskscope contains FORSKSCOPE_SHOW_TO_PERSON_EXE_FOR_TEST - a release build must always start current_exe(), never a switch that changes what show_to_person executes"
+            exit 1
+          fi
+
       # F179/F180: the graph check in `cargo xtask audit-deps` reports what
       # Cargo intends; this reports what the linker actually produced
       # (review 151's lesson - a check on a copy is not a check on the

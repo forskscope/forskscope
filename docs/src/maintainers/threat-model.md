@@ -604,21 +604,29 @@ new dependency, protocol revision `2025-11-25` or `2025-06-18`):**
   sibling binary (RFC-096 §3 removed that lookup: there is only one
   executable now), as two separate `Command` arguments with no shell —
   there is no shell here at all, so no injection surface for a path to
-  land on. The child's standard input and output are both `null`, not
-  inherited: the GUI can read neither the agent's next request nor leak
-  output onto the agent's own protocol channel; only standard error
-  stays inherited, for its own diagnostics. Tested two ways: narrow unit
-  tests call the launch logic directly with a fake script in place of a
-  real executable, and a protocol-level test starts the real compiled
-  `forskscope mcp` with a test-only environment variable
-  (`FORSKSCOPE_SHOW_TO_PERSON_EXE_FOR_TEST`, read only by this code,
-  never set by a real MCP client) pointing `show_to_person` at a
-  stand-in script instead of `current_exe()` — both confirm the two
-  paths arrive as separate, unmodified arguments, and that a stand-in
-  GUI writing to its own stdout never corrupts the next protocol
-  message. The real, unfaked launch — opening the actual window from
-  the actual compiled executable — is verified live, separately,
-  through AT-SPI.
+  land on. **In a release build, `current_exe()` is the only path this
+  code can take, by construction** (review 187 §1): a test-only override
+  that lets `show_to_person` start a different executable
+  (`FORSKSCOPE_SHOW_TO_PERSON_EXE_FOR_TEST`) exists only inside
+  `#[cfg(debug_assertions)]` — an MCP client's own configuration (or
+  whatever started the client) controls this process's environment, so
+  "no real client sets this" was never a property of the binary, only of
+  who happens to be running it; compiling the read out of release builds
+  is. `release.yml`'s own gate fails the build if that variable's name
+  appears in the release binary at all, falsified against a build that
+  reads it unconditionally. The child's standard input and output are
+  both `null`, not inherited: the GUI can read neither the agent's next
+  request nor leak output onto the agent's own protocol channel; only
+  standard error stays inherited, for its own diagnostics. Tested two
+  ways: narrow unit tests call the launch logic directly with a fake
+  script in place of a real executable, and a protocol-level test starts
+  the real compiled, debug-profile `forskscope mcp` with that debug-only
+  override pointing `show_to_person` at a stand-in script instead of
+  `current_exe()` — both confirm the two paths arrive as separate,
+  unmodified arguments, and that a stand-in GUI writing to its own stdout
+  never corrupts the next protocol message. The real, unfaked launch —
+  opening the actual window from the actual compiled executable — is
+  verified live, separately, through AT-SPI.
 - **Hostile protocol input never crashes the server:** a malformed line,
   an unknown method, a message over a 4 MiB cap (capped while reading,
   not after — a hostile line with no newline at all cannot force
