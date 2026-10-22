@@ -230,6 +230,70 @@ fn a_path_that_is_not_a_document_portal_path_has_no_attribute() {
     assert_eq!(document_portal_host_path(&path), None);
 }
 
+// ── RFC-095 §4.5: is_document_portal_file ───────────────────────────────────
+
+#[test]
+#[cfg(target_os = "linux")]
+fn a_forwarded_file_in_a_flatpak_is_a_document_portal_file() {
+    use crate::platform::is_document_portal_file;
+
+    let dir = tmp("is-doc-portal-yes");
+    let path = dir.join("forwarded.txt");
+    std::fs::write(&path, "x").unwrap();
+    rustix::fs::setxattr(
+        &path,
+        "user.document-portal.host-path",
+        b"/home/alice/forwarded.txt",
+        rustix::fs::XattrFlags::empty(),
+    )
+    .unwrap();
+    let in_flatpak = FlatpakInfo {
+        in_flatpak: true,
+        app_id: None,
+        home_granted: true,
+    };
+    assert!(is_document_portal_file(&in_flatpak, &path));
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn the_same_file_outside_a_flatpak_is_not_a_document_portal_file() {
+    use crate::platform::is_document_portal_file;
+
+    let dir = tmp("is-doc-portal-no-flatpak");
+    let path = dir.join("forwarded.txt");
+    std::fs::write(&path, "x").unwrap();
+    rustix::fs::setxattr(
+        &path,
+        "user.document-portal.host-path",
+        b"/home/alice/forwarded.txt",
+        rustix::fs::XattrFlags::empty(),
+    )
+    .unwrap();
+    let not_flatpak = FlatpakInfo {
+        in_flatpak: false,
+        app_id: None,
+        home_granted: false,
+    };
+    assert!(!is_document_portal_file(&not_flatpak, &path));
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn an_ordinary_file_in_a_flatpak_is_not_a_document_portal_file() {
+    use crate::platform::is_document_portal_file;
+
+    let dir = tmp("is-doc-portal-ordinary");
+    let path = dir.join("ordinary.txt");
+    std::fs::write(&path, "x").unwrap();
+    let in_flatpak = FlatpakInfo {
+        in_flatpak: true,
+        app_id: None,
+        home_granted: true,
+    };
+    assert!(!is_document_portal_file(&in_flatpak, &path));
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn tmp(tag: &str) -> std::path::PathBuf {

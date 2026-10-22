@@ -283,13 +283,25 @@ fn build_request(
         }
     };
 
+    // RFC-095 §4.5: a document-portal file's backup would report success
+    // but never reach the host - the portal keeps it as a sandbox-only
+    // temporary copy - so it is not attempted at all for one. Outside a
+    // Flatpak, is_document_portal_file is always false and this is the
+    // same SiblingBak as before.
+    let flatpak = forskscope_desktop::platform::flatpak();
+    let backup = if forskscope_desktop::platform::is_document_portal_file(&flatpak, &tgt) {
+        BackupPolicy::None
+    } else {
+        BackupPolicy::SiblingBak
+    };
+
     RequestOutcome::Ready(SaveRequest {
         target: tgt,
         content: tab.merge.result_text(),
         encoding_label,
         bom,
         precondition,
-        backup: BackupPolicy::SiblingBak,
+        backup,
     })
 }
 

@@ -73,6 +73,8 @@ fn ja(key: &str) -> Option<&'static str> {
         "Or use a permissions manager such as Flatseal. Then restart ForskScope." => {
             "または Flatseal などの権限管理アプリを使用してください。その後 ForskScope を再起動してください。"
         }
+        "No backup" => "バックアップなし",
+        "No backup can be kept for this file." => "このファイルのバックアップは保存できません。",
         "Compare" => "比較",
         "··· {n} unchanged lines — click to expand ···" => {
             "··· {n} 行変更なし — クリックして展開 ···"

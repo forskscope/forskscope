@@ -49,11 +49,19 @@ pub fn StatusBar() -> Element {
                     .file_name()
                     .map(|n| n.to_string_lossy().into_owned())
                     .unwrap_or_else(|| "—".into());
+                // RFC-095 §4.5: beside the save-target line, one short
+                // sentence when this file's backup will be skipped -
+                // never silently, since the backup would otherwise look
+                // like it succeeded.
+                let flatpak = forskscope_desktop::platform::flatpak();
+                let no_backup =
+                    forskscope_desktop::platform::is_document_portal_file(&flatpak, &st.path);
                 (
                     short,
                     forskscope_desktop::platform::display_path(&st.path)
                         .display()
                         .to_string(),
+                    no_backup,
                 )
             });
             (
@@ -73,9 +81,15 @@ pub fn StatusBar() -> Element {
                 if !enc.is_empty() { span { "{enc}" } }
                 if !stats.is_empty() { span { class: "stats", "{stats}" } }
                 if dirty { span { class: "dirty", {t(lang, "unsaved")} } }
-                if let Some((short, full)) = save_target {
+                if let Some((short, full, no_backup)) = save_target {
                     span { class: "save-target", title: "{full}",
                         {format!("{}: {short}", t(lang, "Save target"))}
+                    }
+                    if no_backup {
+                        span { class: "save-target-no-backup",
+                            title: t(lang, "No backup can be kept for this file."),
+                            "⚠ " {t(lang, "No backup")}
+                        }
                     }
                 }
             }

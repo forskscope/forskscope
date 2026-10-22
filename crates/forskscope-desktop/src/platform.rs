@@ -221,6 +221,20 @@ pub fn display_path(path: &std::path::Path) -> std::path::PathBuf {
     document_portal_host_path(path).unwrap_or_else(|| path.to_path_buf())
 }
 
+/// RFC-095 §4.5: `true` when `path` is a document-portal file — carries
+/// the `user.document-portal.host-path` attribute (above), in a Flatpak.
+/// The document portal keeps such a file as a sandbox-only temporary
+/// copy of a backup written beside it, so a caller about to make one
+/// (`<name>.bak`) should skip it instead: the backup would report
+/// success but never reach the host. Always `false` outside a Flatpak.
+/// Takes `flatpak` as a parameter rather than calling [`flatpak`] again
+/// here — the caller already has it (every Flatpak behaviour reads it
+/// once), and passing it in keeps this testable with a plain, in-memory
+/// [`FlatpakInfo`] value, never a real sandbox.
+pub fn is_document_portal_file(flatpak: &FlatpakInfo, path: &std::path::Path) -> bool {
+    flatpak.in_flatpak && document_portal_host_path(path).is_some()
+}
+
 /// Reads `path`'s `user.document-portal.host-path` extended attribute —
 /// present on a file or folder Flatpak's document portal forwarded into
 /// the sandbox (RFC-095 §4.4), holding the real path on the host. `None`

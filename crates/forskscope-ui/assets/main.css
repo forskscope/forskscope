@@ -226,6 +226,7 @@ select option { background: var(--surface); color: var(--text); }
 .statusbar .dirty { color: var(--warn); }
 .statusbar .stats { color: var(--ok); font-size: 11px; }
 .statusbar .save-target { color: var(--muted); }
+.statusbar .save-target-no-backup { color: var(--warn); cursor: default; }
 .local-only { cursor: default; user-select: none; }
 .mode-indicator { cursor: default; user-select: none; }
 
