@@ -5,6 +5,10 @@
 //! - **Rule 1.** `forskscope-compare` and `forskscope-report` never write a
 //!   file outside `#[cfg(test)]`/`tests/`.
 //! - **Rule 2.** Neither crate ever spawns a process, anywhere.
+//!   `forskscope-commands` (RFC-096 §2) is held to a looser version of
+//!   this same rule: it may spawn a process only from
+//!   `call_show_to_person_starting` in `mcp/tools.rs` — `show_to_person`'s
+//!   one launch of this program's own executable — and nowhere else.
 //! - **Rule 3.** Every workspace crate's direct `forskscope-*` dependencies
 //!   are a subset of what RFC-093 §1's table allows it to depend on - the
 //!   table is a ceiling, not a floor a crate must exercise every cell of,
@@ -12,7 +16,7 @@
 //!   and `forskscope-report`, today) is not itself a violation. A
 //!   dependency the table does not list at all fails it, and so does a
 //!   workspace crate RFC-093 §1 does not name at all (a future
-//!   `forskscope-cli`, say, added here without ever being added to the
+//!   `forskscope-foo`, say, added here without ever being added to the
 //!   table, or a crate renamed on one side and not the other).
 //!
 //! ## What counts as test code, and how the skip is done
@@ -94,10 +98,12 @@ fn expected_dependency_table() -> BTreeMap<&'static str, &'static [&'static str]
         ("forskscope-compare", &[] as &[&str]),
         ("forskscope-report", &["forskscope-compare"] as &[&str]),
         (
-            // RFC-094 §1: the headless program - depends only on the
-            // read-only engine and report crates, nothing from edit,
-            // desktop, ui-logic or ui.
-            "forskscope-cli",
+            // RFC-096 §2 (formerly the `forskscope-cli` binary, RFC-094
+            // §1): the `compare`/`mcp` subcommand library - depends only
+            // on the read-only engine and report crates, nothing from
+            // edit, desktop, ui-logic or ui. The app crate depends on this
+            // one only to dispatch to it; no code here calls into the app.
+            "forskscope-commands",
             &["forskscope-compare", "forskscope-report"] as &[&str],
         ),
         ("forskscope-edit", &["forskscope-compare"] as &[&str]),
@@ -119,6 +125,7 @@ fn expected_dependency_table() -> BTreeMap<&'static str, &'static [&'static str]
             // named forskscope, matching the program it builds.
             "forskscope",
             &[
+                "forskscope-commands",
                 "forskscope-compare",
                 "forskscope-report",
                 "forskscope-edit",
@@ -166,7 +173,7 @@ const WRITE_FN_NAMES: &[&str] = &[
 ];
 
 /// Review 183 §2.6: the threat model's no-network argument for
-/// `forskscope-cli` ("linking only `libc.so.6`/`libgcc_s.so.1` means
+/// `forskscope-commands` ("linking only `libc.so.6`/`libgcc_s.so.1` means
 /// there is no I/O driver for a socket call to come from") does not
 /// follow on its own — `socket`/`connect` are in `libc`, and `std::net`
 /// needs no runtime at all. This rule backs the `LD_PRELOAD` shim's
@@ -175,10 +182,30 @@ const WRITE_FN_NAMES: &[&str] = &[
 /// anywhere, in the three crates that make up the no-network promise.
 /// Unlike rule 1/2 (`forskscope-compare`/`forskscope-report` only, since
 /// `forskscope-edit`/`forskscope-desktop` are allowed to write/spawn),
-/// this rule also covers `forskscope-cli` — the program the promise is
-/// actually about.
-const NO_NET_CRATES: &[&str] = &["forskscope-compare", "forskscope-report", "forskscope-cli"];
+/// this rule also covers `forskscope-commands` (RFC-096 §2, formerly
+/// `forskscope-cli`, RFC-094 §1) — the crate the promise is actually
+/// about.
+const NO_NET_CRATES: &[&str] = &[
+    "forskscope-compare",
+    "forskscope-report",
+    "forskscope-commands",
+];
 const NET_PATTERNS: &[&str] = &["std::net", "std::os::unix::net", "std::os::windows::net"];
+
+/// RFC-096 §2: the one file and function `forskscope-commands` is allowed
+/// to spawn a process from — `show_to_person`'s launch of this program's
+/// own executable — named here rather than left as a bare exemption, so a
+/// second call site anywhere else in the crate still fails
+/// [`check_no_spawn_outside_named_exception`].
+const PROCESS_SPAWN_EXCEPTION_FILE: &str = "mcp/tools.rs";
+const PROCESS_SPAWN_EXCEPTION_FN: &str = "call_show_to_person_starting";
+/// The crate's own spawn site uses a bare `use std::process::Command`
+/// import and then `Command::new(...)`, which carries none of rule 2's
+/// `process::Command` substring (the same bare-import evasion shape rule
+/// 1 already has a dedicated catch for, [`find_fs_write_fn_imports`]) -
+/// so this pattern is checked for on its own, in addition to
+/// [`PROCESS_SPAWN_PATTERN`].
+const COMMAND_NEW_PATTERN: &str = "Command::new(";
 
 pub fn run(root: &Path) {
     let mut problems = Vec::new();
@@ -186,6 +213,11 @@ pub fn run(root: &Path) {
     for crate_name in ["forskscope-compare", "forskscope-report"] {
         let src = root.join("crates").join(crate_name).join("src");
         check_no_writes_or_spawns(&src, crate_name, &mut problems);
+    }
+
+    {
+        let src = root.join("crates").join("forskscope-commands").join("src");
+        check_no_spawn_outside_named_exception(&src, "forskscope-commands", &mut problems);
     }
 
     for crate_name in NO_NET_CRATES {
@@ -200,7 +232,8 @@ pub fn run(root: &Path) {
             eprintln!("{problem}");
         }
         eprintln!(
-            "crate-boundaries check failed: {} problem(s) (RFC-093 §1/§3, RFC-094 criterion 5)",
+            "crate-boundaries check failed: {} problem(s) (RFC-093 §1/§3, RFC-094 criterion 5, \
+             RFC-096 §2)",
             problems.len()
         );
         process::exit(1);
@@ -208,10 +241,96 @@ pub fn run(root: &Path) {
 
     println!(
         "crate-boundaries check passed: forskscope-compare and forskscope-report write no file \
-         and spawn no process outside #[cfg(test)]/tests/; forskscope-compare, forskscope-report \
-         and forskscope-cli never name std::net or the platform raw-socket modules; and every \
+         and spawn no process outside #[cfg(test)]/tests/; forskscope-commands spawns a process \
+         only from show_to_person's own launch; forskscope-compare, forskscope-report and \
+         forskscope-commands never name std::net or the platform raw-socket modules; and every \
          workspace crate's direct forskscope-* dependencies stay within RFC-093 §1's table."
     );
+}
+
+/// RFC-096 §2's looser version of rule 2, for `forskscope-commands` only:
+/// a process spawn is allowed from exactly one named file and function
+/// ([`PROCESS_SPAWN_EXCEPTION_FILE`]/[`PROCESS_SPAWN_EXCEPTION_FN`]) and
+/// nowhere else in the crate. That function's body is blanked out of its
+/// own file before either spawn pattern is searched for, the same way
+/// [`blank_inline_cfg_test_blocks`] blanks a test module - so a second
+/// spawn added anywhere outside that one function, in that file or any
+/// other, still fails.
+fn check_no_spawn_outside_named_exception(
+    src_root: &Path,
+    crate_name: &str,
+    problems: &mut Vec<String>,
+) {
+    for path in collect_production_rs_files(src_root) {
+        let Ok(raw) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let stripped = strip_comments_and_strings(&raw);
+        let stripped = blank_inline_cfg_test_blocks(&stripped);
+        let rel = path
+            .strip_prefix(src_root)
+            .unwrap_or(&path)
+            .display()
+            .to_string();
+
+        let checked = if rel == PROCESS_SPAWN_EXCEPTION_FILE {
+            blank_named_fn_body(&stripped, PROCESS_SPAWN_EXCEPTION_FN)
+        } else {
+            stripped
+        };
+
+        if checked.contains(PROCESS_SPAWN_PATTERN) || checked.contains(COMMAND_NEW_PATTERN) {
+            problems.push(format!(
+                "{crate_name}/src/{rel}: found a process spawn outside \
+                 `{PROCESS_SPAWN_EXCEPTION_FN}` in {PROCESS_SPAWN_EXCEPTION_FILE} (rule 2, \
+                 RFC-096 §2: {crate_name} spawns a process only from show_to_person's own \
+                 launch)"
+            ));
+        }
+    }
+}
+
+/// Blanks the body of the first `fn <fn_name>(` found in `src` (already
+/// comment/string/cfg-test-stripped), from its opening `{` through the
+/// matching closing `}` - brace-depth counted the same way
+/// [`blank_inline_cfg_test_blocks`] counts a test module's braces. `src`
+/// is returned unchanged if the function is not found (a rename or
+/// removal then surfaces as an ordinary rule-2 violation at its real
+/// call site, rather than silently keeping an exception for code that no
+/// longer exists).
+fn blank_named_fn_body(src: &str, fn_name: &str) -> String {
+    let needle = format!("fn {fn_name}(");
+    let Some(start) = src.find(&needle) else {
+        return src.to_string();
+    };
+    let after = &src[start..];
+    let Some(open) = after.find('{') else {
+        return src.to_string();
+    };
+    let bytes = after.as_bytes();
+    let mut depth: i64 = 0;
+    let mut i = open;
+    let mut close = None;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    close = Some(i + 1);
+                    break;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    let end = close.unwrap_or(after.len());
+    let mut out = String::with_capacity(src.len());
+    out.push_str(&src[..start]);
+    out.push_str(&" ".repeat(end));
+    out.push_str(&after[end..]);
+    out
 }
 
 /// RFC-094 criterion 5 / review 183 §2.6. Unlike rule 1's `fs::write`
@@ -650,6 +769,81 @@ mod tests {
                 .iter()
                 .all(|p| !p.to_string_lossy().contains("tests/"))
         );
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn blank_named_fn_body_removes_only_that_function() {
+        let src = "fn a() { Command::new(\"x\"); }\nfn call_show_to_person_starting() { Command::new(\"y\"); }\nfn b() {}";
+        let blanked = blank_named_fn_body(src, "call_show_to_person_starting");
+        assert!(blanked.contains("fn a() { Command::new(\"x\"); }"));
+        assert!(!blanked.contains("Command::new(\"y\")"));
+        assert!(blanked.contains("fn b()"));
+    }
+
+    #[test]
+    fn blank_named_fn_body_handles_nested_braces() {
+        let src =
+            "fn call_show_to_person_starting() { if true { Command::new(\"y\"); } }\nfn after() {}";
+        let blanked = blank_named_fn_body(src, "call_show_to_person_starting");
+        assert!(!blanked.contains("Command::new"));
+        assert!(blanked.contains("fn after()"));
+    }
+
+    #[test]
+    fn blank_named_fn_body_leaves_src_unchanged_when_the_function_is_not_found() {
+        let src = "fn a() { Command::new(\"x\"); }";
+        assert_eq!(
+            blank_named_fn_body(src, "call_show_to_person_starting"),
+            src
+        );
+    }
+
+    #[test]
+    fn check_no_spawn_outside_named_exception_allows_the_one_named_call_site() {
+        let dir = std::env::temp_dir().join(format!(
+            "fsk-xtask-spawn-exception-allowed-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        fs::create_dir_all(dir.join("mcp")).unwrap();
+        fs::write(
+            dir.join("mcp").join("tools.rs"),
+            "fn call_show_to_person_starting() { std::process::Command::new(\"x\").spawn(); }",
+        )
+        .unwrap();
+
+        let mut problems = Vec::new();
+        check_no_spawn_outside_named_exception(&dir, "forskscope-commands", &mut problems);
+        assert!(problems.is_empty(), "{problems:?}");
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn check_no_spawn_outside_named_exception_catches_a_second_call_site() {
+        let dir = std::env::temp_dir().join(format!(
+            "fsk-xtask-spawn-exception-caught-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        fs::create_dir_all(dir.join("mcp")).unwrap();
+        fs::write(
+            dir.join("mcp").join("tools.rs"),
+            "fn call_show_to_person_starting() { std::process::Command::new(\"x\").spawn(); }",
+        )
+        .unwrap();
+        fs::write(
+            dir.join("lib.rs"),
+            "fn elsewhere() { std::process::Command::new(\"y\").spawn(); }",
+        )
+        .unwrap();
+
+        let mut problems = Vec::new();
+        check_no_spawn_outside_named_exception(&dir, "forskscope-commands", &mut problems);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("lib.rs"));
 
         fs::remove_dir_all(&dir).ok();
     }

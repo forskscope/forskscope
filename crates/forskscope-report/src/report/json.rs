@@ -253,12 +253,12 @@ pub fn dir_comparison_document(report: &DirComparisonReport) -> DirComparisonDoc
 }
 
 impl FileComparisonDocument {
-    /// Pretty-printed JSON, `forskscope-cli compare --format json`'s exact
-    /// output for a file comparison - kept here so the CLI needs no direct
-    /// `serde_json` dependency of its own (RFC-094 §1: "nothing from this
-    /// workspace" beyond `forskscope-compare`/`forskscope-report"; this
-    /// keeps its *external* dependency list minimal too, in the same
-    /// spirit).
+    /// Pretty-printed JSON, `forskscope compare --format json`'s exact
+    /// output for a file comparison - kept here so `forskscope-commands`
+    /// needs no direct `serde_json` dependency of its own (RFC-094 §1:
+    /// "nothing from this workspace" beyond
+    /// `forskscope-compare`/`forskscope-report"; this keeps its *external*
+    /// dependency list minimal too, in the same spirit).
     pub fn to_json_string(&self) -> serde_json::Result<String> {
         serde_json::to_string_pretty(self)
     }

@@ -6,8 +6,9 @@
 //! shown as old/new line numbers with a `−`/`+` mark, never as
 //! unexplained jargon ("hunk", a bare range).
 //!
-//! **English only.** `forskscope-cli`, the only caller, has no language
-//! setting — see the user guide. This replaces the old `to_markdown`
+//! **English only.** `forskscope-commands`'s `compare` subcommand, the
+//! only caller, has no language setting — see the user guide. This
+//! replaces the old `to_markdown`
 //! (and `to_json`, superseded by `report::json`'s versioned contract),
 //! removed in the same change that added this module: neither followed
 //! RFC-092's own rules (zero-count noise, jargon, options shown even at

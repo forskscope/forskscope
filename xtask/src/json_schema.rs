@@ -1,6 +1,6 @@
-//! `cargo xtask json-schema` (RFC-094 §3): builds `forskscope-cli`, runs
-//! `compare --format json` against a real file pair and a real folder
-//! pair, and validates both emitted documents against
+//! `cargo xtask json-schema` (RFC-094 §3, RFC-096 §5): builds `forskscope`,
+//! runs its `compare --format json` subcommand against a real file pair
+//! and a real folder pair, and validates both emitted documents against
 //! `docs/schemas/forskscope.comparison.v1.json` — a minimal JSON Schema
 //! subset interpreter, not a hardcoded duplicate of the schema's rules, so
 //! a change to the schema file changes what this gate accepts. Falsify by
@@ -27,15 +27,15 @@ pub fn run(root: &Path) {
         .unwrap_or_else(|e| panic!("{}: invalid JSON: {e}", schema_path.display()));
 
     let build = Command::new("cargo")
-        .args(["build", "--quiet", "-p", "forskscope-cli"])
+        .args(["build", "--quiet", "-p", "forskscope"])
         .current_dir(root)
         .status()
-        .unwrap_or_else(|e| panic!("failed to run cargo build -p forskscope-cli: {e}"));
+        .unwrap_or_else(|e| panic!("failed to run cargo build -p forskscope: {e}"));
     if !build.success() {
-        eprintln!("cargo build -p forskscope-cli failed");
+        eprintln!("cargo build -p forskscope failed");
         process::exit(1);
     }
-    let bin = root.join("target/debug/forskscope-cli");
+    let bin = root.join("target/debug/forskscope");
 
     let scratch = root.join("target/json-schema-check");
     let _ = fs::remove_dir_all(&scratch);
@@ -90,7 +90,7 @@ pub fn run(root: &Path) {
 
     println!(
         "json-schema check passed: a real file comparison and a real directory comparison, \
-         both run through forskscope-cli compare --format json, validate against \
+         both run through forskscope compare --format json, validate against \
          docs/schemas/forskscope.comparison.v1.json."
     );
 }

@@ -17,7 +17,7 @@
 //!   cargo xtask colour-vision — verify every removed/added colour pair stays distinguishable under simulated colour vision deficiency (RFC-088 §3)
 //!   cargo xtask keyboard-docs — verify the in-app keyboard reference and keyboard.md name the same set of keys (handoff 079 §3, F165)
 //!   cargo xtask crate-boundaries — verify forskscope-compare/-report never write a file or spawn a process, and every crate's dependency graph matches RFC-093 §1's table
-//!   cargo xtask json-schema  — verify forskscope-cli compare --format json's output against docs/schemas/forskscope.comparison.v1.json (RFC-094 §3)
+//!   cargo xtask json-schema  — verify forskscope compare --format json's output against docs/schemas/forskscope.comparison.v1.json (RFC-094 §3, RFC-096 §5)
 //!
 //! CSS source files under assets/css/ are assembled in alphabetical order.
 //! The numeric prefix on each filename (00-, 01-, …) encodes the cascade order.
@@ -238,7 +238,7 @@ fn run_audit_deps() {
 fn assert_no_direct_zip_dependency() {
     let manifests = [
         "Cargo.toml",
-        "crates/forskscope-cli/Cargo.toml",
+        "crates/forskscope-commands/Cargo.toml",
         "crates/forskscope-compare/Cargo.toml",
         "crates/forskscope-desktop/Cargo.toml",
         "crates/forskscope-edit/Cargo.toml",
@@ -755,7 +755,7 @@ fn run_version_sync(expected_version: Option<&str>) {
 
     let cargo_lock = read_file(&root.join("Cargo.lock"));
     for package in [
-        "forskscope-cli",
+        "forskscope-commands",
         "forskscope-compare",
         "forskscope-desktop",
         "forskscope-edit",

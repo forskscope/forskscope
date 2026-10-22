@@ -617,8 +617,8 @@ pub enum PathKind {
 }
 
 /// The real probe — `fs::metadata`, the same technique
-/// `forskscope-cli compare`'s own file-vs-folder decision already uses
-/// (see that crate's `compare.rs` module doc comment), never
+/// `forskscope compare`'s own file-vs-folder decision already uses
+/// (see `forskscope-commands`'s `compare.rs` module doc comment), never
 /// `forskscope_compare::classify`, which reports a directory as "not a
 /// regular file" rather than as a folder.
 pub fn fs_probe(path: &Path) -> PathKind {
