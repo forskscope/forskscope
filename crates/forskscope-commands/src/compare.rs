@@ -1,4 +1,4 @@
-//! `forskscope-cli compare <left> <right> [options]` (RFC-094 §2/§3).
+//! `forskscope compare <left> <right> [options]` (RFC-094 §2/§3, RFC-096).
 //!
 //! Two files or two folders, decided from the paths before either is
 //! loaded (a file against a folder is refused) — never through
@@ -69,10 +69,19 @@ pub(crate) struct ExecOutcome {
 }
 
 pub fn run(args: &[String]) -> i32 {
+    // RFC-096 §1: `forskscope compare --help` shows this subcommand's own
+    // options, not the app's — checked here, inside the one entry point
+    // that owns this subcommand's own argument list, rather than by a
+    // caller scanning for it before dispatch.
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        print_help();
+        return 0;
+    }
+
     let opts = match parse(args) {
         Ok(o) => o,
         Err(msg) => {
-            eprintln!("forskscope-cli compare: {msg}");
+            eprintln!("forskscope compare: {msg}");
             return 2;
         }
     };
@@ -83,10 +92,31 @@ pub fn run(args: &[String]) -> i32 {
             if outcome.identical { 0 } else { 1 }
         }
         Err(msg) => {
-            eprintln!("forskscope-cli compare: {msg}");
+            eprintln!("forskscope compare: {msg}");
             2
         }
     }
+}
+
+fn print_help() {
+    print!(
+        "Usage:\n  \
+         forskscope compare <left> <right> [options]   Compare two files or two folders\n\n\
+         Options:\n  \
+         \x20 --format text|json|patch|html   Output format (default: text)\n  \
+         \x20 --algorithm myers|patience|lcs|histogram   Diff algorithm (default: myers)\n  \
+         \x20 --ignore-whitespace             Ignore whitespace differences\n  \
+         \x20 --ignore-case                   Ignore case differences\n  \
+         \x20 --ignore-newlines               Ignore newline-style (CRLF/LF) differences\n  \
+         \x20 --context <n>                   Unified-diff context lines (default: 3)\n  \
+         \x20 --ignore-ext <a,b,...>          Folder comparison: skip these extensions\n  \
+         \x20 --ignore-dir <a,b,...>          Folder comparison: skip these directory names\n  \
+         \x20 --hide-dotfiles                 Folder comparison: skip hidden entries\n  \
+         \x20 --paths names|relative|full     How paths are shown (default: names)\n  \
+         \x20 --max-files <n>                 Folder JSON: cap on files with full change content (default: 50)\n  \
+         \x20 --max-change-bytes <n>          Folder JSON: cap on change text bytes (default: 5242880)\n\n\
+         Exit codes: 0 same, 1 different, 2 error or refusal.\n"
+    );
 }
 
 /// The comparison itself, decided from the paths and reusable by both the
@@ -238,7 +268,7 @@ pub(crate) fn timestamp() -> String {
         .to_string()
 }
 
-/// Identity translator: `forskscope-cli` carries no i18n (RFC-094: it
+/// Identity translator: this subcommand carries no i18n (RFC-094: it
 /// reads no settings, including a language setting).
 pub(crate) fn tr(s: &str) -> String {
     s.to_string()

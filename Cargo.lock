@@ -1529,7 +1529,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "forskscope-cli"
+name = "forskscope-commands"
 version = "0.195.1"
 dependencies = [
  "chrono",

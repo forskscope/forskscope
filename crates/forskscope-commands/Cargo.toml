@@ -1,6 +1,6 @@
 [package]
-name        = "forskscope-cli"
-description = "Headless ForskScope: compare two files or two folders from a script, or serve an MCP tool over stdio (RFC-094). Depends only on forskscope-compare and forskscope-report."
+name        = "forskscope-commands"
+description = "forskscope's compare and mcp subcommands (RFC-096): print a comparison, or serve an MCP tool over stdio. Depends only on forskscope-compare and forskscope-report."
 readme      = "../../README.md"
 
 version.workspace       = true
@@ -9,10 +9,6 @@ rust-version.workspace  = true
 license.workspace       = true
 authors.workspace       = true
 repository.workspace    = true
-
-[[bin]]
-name = "forskscope-cli"
-path = "src/main.rs"
 
 [dependencies]
 forskscope-compare            = { workspace = true }

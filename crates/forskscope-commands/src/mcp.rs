@@ -1,6 +1,6 @@
-//! `forskscope-cli mcp --root <dir> [--root <dir> …] [--allow-show]`
-//! (RFC-094 §4): an MCP server over standard input/output, for AI
-//! agents. Hand-written, with no new dependency (review 182 §1's
+//! `forskscope mcp --root <dir> [--root <dir> …] [--allow-show]`
+//! (RFC-094 §4, RFC-096): an MCP server over standard input/output, for
+//! AI agents. Hand-written, with no new dependency (review 182 §1's
 //! decision, after measuring `rmcp` — see
 //! `.git-exclude/review-request/162a-mcp-library.md`), at protocol
 //! revision `2025-11-25` (review 182 §1: the newest revision that still
@@ -20,15 +20,33 @@ mod tools;
 use std::path::PathBuf;
 
 pub fn run(args: &[String]) -> i32 {
+    // RFC-096 §1: `forskscope mcp --help` shows this subcommand's own
+    // options, not the app's.
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        print_help();
+        return 0;
+    }
+
     let (roots, allow_show) = match parse_args(args) {
         Ok(v) => v,
         Err(msg) => {
-            eprintln!("forskscope-cli mcp: {msg}");
+            eprintln!("forskscope mcp: {msg}");
             return 2;
         }
     };
     jsonrpc::serve(roots, allow_show);
     0
+}
+
+fn print_help() {
+    print!(
+        "Usage:\n  \
+         forskscope mcp --root <dir> [--root <dir> …] [--allow-show]\n\n\
+         \x20 --root <dir>    A directory the agent may compare within or\n  \
+         \x20                 below; repeatable, at least one is required\n  \
+         \x20 --allow-show    Also offer the show_to_person tool, which\n  \
+         \x20                 opens the app on a pair for a person to see\n"
+    );
 }
 
 fn parse_args(args: &[String]) -> Result<(Vec<PathBuf>, bool), String> {

@@ -87,7 +87,7 @@ pub fn serve(roots: Vec<PathBuf>, allow_show: bool) {
                 break;
             }
             Incoming::IoError(e) => {
-                eprintln!("forskscope-cli mcp: stdin read error: {e}");
+                eprintln!("forskscope mcp: stdin read error: {e}");
                 break;
             }
             Incoming::TooLarge => {
@@ -326,7 +326,7 @@ fn initialize_result(params: &Value) -> Value {
         "protocolVersion": version,
         "capabilities": { "tools": {} },
         "serverInfo": {
-            "name": "forskscope-cli",
+            "name": "forskscope",
             "version": env!("CARGO_PKG_VERSION"),
         },
     })
