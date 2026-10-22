@@ -665,9 +665,10 @@ carries, not one specific to this program.
 **An outer boundary, not a replacement for anything above.** Every entry
 in this document still applies inside the Flatpak; the sandbox adds a
 layer the other distribution forms do not have, built from a small,
-auditable set of permissions (`packaging/linux/io.github.forskscope.
-forskscope.metainfo.xml` lists them; the actual Flathub manifest, which
-the owner writes, is the authority on what ships).
+auditable set of permissions (RFC-095 §3; the Flathub manifest, which the
+owner writes, is the authority on what ships). **Not published yet:** this
+entry describes how the app behaves inside a Flatpak, ready for RFC-095's
+Flathub submission.
 
 - **No network permission is requested at all** (RFC-095 §3: "Not
   requested" — `--share=network` is absent). *Check for updates* (entry

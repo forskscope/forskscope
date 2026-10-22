@@ -38,43 +38,6 @@ sudo pacman -S webkit2gtk-4.1 gtk3                      # Arch
 > glibc at least as new as that build runner's. Measured on an Arch-based
 > machine: it starts there too. It has not been run on other distributions.
 
-### Flatpak
-
-ForskScope is on Flathub: **[`io.github.forskscope.forskscope`](https://flathub.org/apps/io.github.forskscope.forskscope)**.
-
-```sh
-flatpak install flathub io.github.forskscope.forskscope
-flatpak run io.github.forskscope.forskscope
-```
-
-It carries its own runtime, so it runs the same on Fedora, Ubuntu, Debian,
-openSUSE and others — no WebKitGTK package to install yourself. Updates
-come from Flathub, through your software centre (GNOME Software, KDE
-Discover, …) or `flatpak update`, not ForskScope's own *Check for
-updates*, which this build does not offer.
-
-> **Needs `flatpak` 1.15.11 or later.** An older Flatpak installs it, but
-> screen readers get nothing and the sandboxed start-up path is untested
-> there — use the prebuilt binary or the AUR package instead. `flatpak
-> --version` tells you which you have.
-
-**Needs access to your home folder.** A diff and merge tool works on your
-own files and folders, so the Flatpak asks for `--filesystem=home` — the
-same files the other Linux packages can already reach, since they run
-outside a sandbox entirely. Without that grant, the Explorer is replaced
-by one message instead of browsing an empty sandbox "home":
-
-```sh
-flatpak override --user --filesystem=home io.github.forskscope.forskscope
-```
-
-or use a permissions manager such as
-[Flatseal](https://flathub.org/apps/com.github.tchx84.Flatseal). Restart
-ForskScope afterward. A comparison already open by path — including one
-`git difftool`/`git mergetool` started (see [Git
-integration](../intermediate/git-integration.md)) — needs no home grant:
-file forwarding reaches it through Flatpak's document portal instead.
-
 ### Arch Linux
 
 ForskScope is on the AUR: **[`forskscope`](https://aur.archlinux.org/packages/forskscope)**.
