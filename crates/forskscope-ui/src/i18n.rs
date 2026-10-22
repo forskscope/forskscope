@@ -65,6 +65,14 @@ fn ja(key: &str) -> Option<&'static str> {
             "左右にフォルダーを選択し、比較するアイテムを選んでください。"
         }
         "Nothing leaves this computer." => "ファイルはこのコンピューターの外に出ません。",
+        "Home folder access needed" => "ホームフォルダーへのアクセスが必要です",
+        "ForskScope needs access to your home folder to browse and compare your files." => {
+            "ForskScope がファイルを閲覧・比較するには、ホームフォルダーへのアクセスが必要です。"
+        }
+        "To restore it, run:" => "復元するには、次を実行してください:",
+        "Or use a permissions manager such as Flatseal. Then restart ForskScope." => {
+            "または Flatseal などの権限管理アプリを使用してください。その後 ForskScope を再起動してください。"
+        }
         "Compare" => "比較",
         "··· {n} unchanged lines — click to expand ···" => {
             "··· {n} 行変更なし — クリックして展開 ···"

@@ -99,6 +99,7 @@ pub use explore::deep_filter::{
     DeepCompareSummary, DeepFilter, apply_filter, demote_entries_under_an_unreadable_root,
 };
 pub use explore::dir_verdict::{DirVerdict, dir_verdict};
+pub use explore::home_access::{ExplorerAccess, explorer_access};
 pub use explore::status::{RowStatusKind, StatusGlyph};
 pub use explore::sync_panes::mirror_target;
 pub use explore::tier1_trigger::{TIER1_DEBOUNCE, Tier1Action, Tier1Trigger};

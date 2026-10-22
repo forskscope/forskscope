@@ -93,7 +93,7 @@ without a display server.
 | `vcs` | `VcsProvider` trait + `GitProvider` — read-only VCS context (status, file at revision, merge base). `detect(path)` (RFC-038). |
 | `watcher` | `FileChangeMonitor` trait, `WatchToken`, `FileChangeEvent`, `WatchError`, `MockFileChangeMonitor` — file-watcher boundary (RFC-036). |
 
-## `ui-logic` modules (28)
+## `ui-logic` modules (29)
 
 Framework-independent view-model logic. All modules are testable with
 `cargo test -p forskscope-ui-logic` — no GTK or display server required.
@@ -114,6 +114,7 @@ read what a row says a module does; that stays a judgment.
 | `explore::align` | `compute_aligned_rows` — merges two flat tree row lists into an aligned two-pane sequence (RFC-059); `pair_by_index` — the compact pairing, by position (RFC-068, handoff 071). |
 | `explore::classify_pair` | `EntryClassification`, `classify_two_files` — a file pair's equality classification under the automatic-digest cap (RFC-080 §5 / F77, moved from `forskscope-ui` by F145). |
 | `explore::dir_verdict` | `DirVerdict`, `dir_verdict` — what a fast recursive listing can conclude about a directory pair: `Different`, `MetadataMatch` (names and sizes match, contents unread) or `Unknown`, with the precedence written down (RFC-080 tier 1). |
+| `explore::home_access` | `ExplorerAccess`, `explorer_access` — whether the Explorer shows the directory browser or RFC-095 §4.3's home-required message, decided from a `FlatpakInfo` value alone (no filesystem read here). |
 | `explore::tier1_trigger` | `Tier1Trigger`, `TIER1_DEBOUNCE` — the pure debounce state machine deciding when a tier-1 walk starts: a row must be rested on for 250 ms, and moving through rows starts none (RFC-080 §5). |
 | `explore::tier2_verdict` | `Tier2Verdict`, `tier2_verdict` — what a full, content-reading recursive comparison can conclude about a directory pair: `Identical`, `Different` or `Unknown` — the only tier entitled to claim identity (RFC-080 tier 2). |
 | `explore::deep_filter` | `DeepFilter`, `DeepCompareSummary`, `apply_filter` — filter state and counts for recursive directory compare (RFC-037, RFC-038). |

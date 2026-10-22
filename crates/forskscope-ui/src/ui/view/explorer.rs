@@ -632,6 +632,52 @@ pub fn Explorer() -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
 
+    // RFC-095 §4.3: in a Flatpak without the home grant, the Explorer
+    // cannot show the user's own files — the sandbox's "home" holds only
+    // `.local`/`.var` — so it is replaced by this one message, never a
+    // browser over that empty home. The decision itself
+    // (`explorer_access`) is a pure function in `forskscope-ui-logic`,
+    // tested there without a Dioxus component or a real sandbox; this
+    // component only reads the real Flatpak state once and renders.
+    // `flatpak().in_flatpak` is fixed for the whole process, so this
+    // branch is the same on every render of this component instance,
+    // and the hooks below it always run in the same order — nothing
+    // here violates Dioxus's hook-ordering rule. Outside a Flatpak this
+    // is always `Available`: nothing changes there. A comparison already
+    // open by path (§4.3: "comparisons started with paths still open")
+    // is a different tab/component, unaffected.
+    let flatpak = forskscope_desktop::platform::flatpak();
+    if forskscope_ui_logic::explorer_access(&flatpak)
+        == forskscope_ui_logic::ExplorerAccess::HomeRequired
+    {
+        return rsx! {
+            div { class: "explorer",
+                div { class: "explorer-empty",
+                    div { class: "explorer-empty-icon", "🔒" }
+                    p { class: "explorer-empty-title",
+                        {t(lang, "Home folder access needed")}
+                    }
+                    p { class: "explorer-empty-hint",
+                        {t(
+                            lang,
+                            "ForskScope needs access to your home folder to browse and compare your files.",
+                        )}
+                    }
+                    p { class: "explorer-empty-hint", {t(lang, "To restore it, run:")} }
+                    code { class: "path-display",
+                        "flatpak override --user --filesystem=home io.github.forskscope.forskscope"
+                    }
+                    p { class: "explorer-empty-hint",
+                        {t(
+                            lang,
+                            "Or use a permissions manager such as Flatseal. Then restart ForskScope.",
+                        )}
+                    }
+                }
+            }
+        };
+    }
+
     // F112: the rules the scans use are a shared handle the executors read at each
     // scan request, and a memo that changes only when the rules do. The two tree
     // effects below read the memo, so a settings change re-runs them — rebuilding
