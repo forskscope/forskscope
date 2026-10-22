@@ -95,7 +95,7 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 076 | [Versioned Runtime Settings and Session Persistence](./done/076-versioned-runtime-persistence.md) | post-v0.165.1 stabilization |
 | 077 | [Git Mergetool Save-Target Model](./done/077-mergetool-save-target-model.md) | post-v0.165.1 stabilization |
 
-## Proposed (9)
+## Proposed (10)
 
 These are the RFCs not yet accepted, all from the early design phase:
 
@@ -106,7 +106,7 @@ These are the RFCs not yet accepted, all from the early design phase:
 - **Governance and roadmap:** RFC-041 and 042.
 
 RFCs from the 2026 stabilization program and later are under **Accepted** or
-**Implemented**, not here.
+**Implemented**, not here, except RFC-096, proposed 2026-10-22.
 
 | ID | Title | Category | Progress |
 |----|-------|----------|----------|
@@ -119,6 +119,7 @@ RFCs from the 2026 stabilization program and later are under **Accepted** or
 | 040 | [Editor Adapter Verification Harness and Golden Corpus](./proposed/040-editor-adapter-verification-harness-and-golden-corpus.md) | Editor adapter | Blocked on RFC-004 |
 | 041 | [v1.0 Product Stabilization and RFC Governance](./proposed/041-v1-product-stabilization-and-rfc-governance.md) | Governance | 12/16 checklist items done; 4 require GTK or deferred |
 | 042 | [Roadmap and RFC Execution Plan](./proposed/042-roadmap-and-rfc-execution-plan.md) | Governance | Living document — pre-GTK verification phase |
+| 096 | [One Program — the App and Its Commands](./proposed/096-one-program-the-app-and-its-commands.md) | Platform/packaging | Proposed 2026-10-22 |
 
 ## Archive (1)
 
