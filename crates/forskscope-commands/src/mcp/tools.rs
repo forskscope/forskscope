@@ -409,6 +409,80 @@ mod tests {
         std::fs::set_permissions(path, perms).unwrap();
     }
 
+    /// Review 188's own follow-up: a script this test just wrote and
+    /// `chmod`'d can transiently fail to exec with `ExecutableFileBusy`
+    /// ("Text file busy") under full workspace-test load - the same
+    /// kernel-accounting race the old `fs::copy`-then-spawn tests needed
+    /// a retry for, now hitting a freshly-written-then-exec'd script
+    /// instead of a freshly-copied binary. `call_show_to_person_starting`
+    /// itself never retries - a real launch failure stays a tool error -
+    /// so the retry lives here, around the whole call, bounded at 5
+    /// attempts with a short backoff.
+    fn call_show_to_person_starting_retrying_busy(
+        arguments: &Value,
+        roots: &Roots,
+        gui_path: &Path,
+    ) -> Result<ToolCallResult, String> {
+        let busy = std::io::Error::from_raw_os_error(26).to_string();
+        for attempt in 1..=5u64 {
+            match call_show_to_person_starting(arguments, roots, gui_path) {
+                Err(e) if e.contains(&busy) && attempt < 5 => {
+                    std::thread::sleep(std::time::Duration::from_millis(20 * attempt));
+                }
+                result => return result,
+            }
+        }
+        unreachable!()
+    }
+
+    #[test]
+    fn retrying_busy_recovers_once_a_real_executablefilebusy_clears() {
+        // Deterministic, not relying on the flaky parallel-load race
+        // itself: opening the script for writing and keeping that
+        // handle open makes the kernel refuse to exec it with
+        // `ExecutableFileBusy` ("Text file busy") synchronously, every
+        // time, for as long as the handle stays open - the same
+        // condition the race under load produces, held open on purpose
+        // here instead of by accident.
+        let stage = tempfile::tempdir().unwrap();
+        let script = stage.path().join("stand-in.sh");
+        write_script(&script, "#!/bin/sh\nexit 0\n");
+
+        let root = tempfile::tempdir().unwrap();
+        let left = root.path().join("a.txt");
+        let right = root.path().join("b.txt");
+        std::fs::write(&left, "x").unwrap();
+        std::fs::write(&right, "y").unwrap();
+        let roots = Roots::new(vec![root.path().to_path_buf()]);
+        let arguments = json!({
+            "left": left.to_str().unwrap(),
+            "right": right.to_str().unwrap(),
+        });
+
+        let held_open = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&script)
+            .unwrap();
+        // Falsification: with the handle held open and no retry, the
+        // plain call fails with exactly the busy error this helper
+        // looks for.
+        let direct_error = call_show_to_person_starting(&arguments, &roots, &script).unwrap_err();
+        assert!(
+            direct_error.contains(&std::io::Error::from_raw_os_error(26).to_string()),
+            "{direct_error}"
+        );
+
+        std::thread::spawn({
+            let held_open = held_open;
+            move || {
+                std::thread::sleep(std::time::Duration::from_millis(60));
+                drop(held_open);
+            }
+        });
+        let result = call_show_to_person_starting_retrying_busy(&arguments, &roots, &script);
+        assert!(result.is_ok(), "{result:?}");
+    }
+
     #[test]
     fn starts_the_two_paths_as_separate_arguments_no_shell() {
         let stage = tempfile::tempdir().unwrap();
@@ -430,7 +504,8 @@ mod tests {
             "left": left.to_str().unwrap(),
             "right": right.to_str().unwrap(),
         });
-        let result = call_show_to_person_starting(&arguments, &roots, &script).unwrap();
+        let result =
+            call_show_to_person_starting_retrying_busy(&arguments, &roots, &script).unwrap();
         assert!(!result.to_json()["isError"].as_bool().unwrap());
 
         let logged = std::fs::read_to_string(&log_path).unwrap();
@@ -458,7 +533,8 @@ mod tests {
             "left": left.to_str().unwrap(),
             "right": right.to_str().unwrap(),
         });
-        let error = call_show_to_person_starting(&arguments, &roots, &script).unwrap_err();
+        let error =
+            call_show_to_person_starting_retrying_busy(&arguments, &roots, &script).unwrap_err();
         assert!(error.contains("exit code 7"), "{error}");
     }
 

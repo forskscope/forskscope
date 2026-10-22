@@ -11,9 +11,15 @@
 //!
 //! RFC-096: moved here from `forskscope-cli`'s own `tests/`, adapted —
 //! no more `fs::copy`/sibling-binary setup (the real compiled binary is
-//! run directly, the same as `mcp_protocol.rs` already does, so the old
-//! `ErrorKind::ExecutableFileBusy` retry this file used to need for a
-//! freshly-copied binary no longer applies).
+//! run directly, the same as `mcp_protocol.rs` already does). The old
+//! `fs::copy`-then-spawn race is gone, but review 188's own follow-up
+//! found an analogous one: the real server process can transiently fail
+//! to exec a stand-in script this test just wrote and `chmod`'d, under
+//! full workspace-test load, the same `ExecutableFileBusy` ("Text file
+//! busy") the old retry targeted. `call_show_to_person` itself never
+//! retries — a real launch failure stays a tool error — so the retry
+//! lives here instead, around the whole `tools/call` round trip
+//! ([`call_show_to_person_retrying_busy`]).
 //!
 //! Unix only: the stand-in "GUI" is a shell script, and `PermissionsExt`
 //! is Unix-specific. `show_to_person`'s own code has no Unix-only branch
@@ -63,6 +69,44 @@ fn write_stand_in_gui(path: &std::path::Path, script: &str) {
     fs::set_permissions(path, perms).unwrap();
 }
 
+/// Review 188's own follow-up: sends `show_to_person` and, if the server
+/// reports a launch failure that is the transient `ExecutableFileBusy`
+/// ("Text file busy") race rather than a real one, sends it again —
+/// bounded at 5 attempts with a short backoff, the same shape as
+/// `forskscope-commands`'s own
+/// `call_show_to_person_starting_retrying_busy`. The server itself never
+/// retries internally; this is the test retrying the call, not the
+/// product retrying the launch.
+fn call_show_to_person_retrying_busy(
+    stdin: &mut std::process::ChildStdin,
+    stdout: &mut BufReader<std::process::ChildStdout>,
+    id: i64,
+    left: &str,
+    right: &str,
+) -> serde_json::Value {
+    let busy = std::io::Error::from_raw_os_error(26).to_string();
+    for attempt in 1..=5u64 {
+        send(
+            stdin,
+            serde_json::json!({
+                "jsonrpc": "2.0", "id": id, "method": "tools/call",
+                "params": {"name": "show_to_person", "arguments": {"left": left, "right": right}}
+            }),
+        );
+        let response = recv(stdout);
+        let is_busy = response["result"]["isError"] == true
+            && response["result"]["content"][0]["text"]
+                .as_str()
+                .is_some_and(|t| t.contains(&busy));
+        if is_busy && attempt < 5 {
+            std::thread::sleep(std::time::Duration::from_millis(20 * attempt));
+            continue;
+        }
+        return response;
+    }
+    unreachable!()
+}
+
 #[test]
 fn show_to_person_starts_the_stand_in_with_the_two_paths_no_shell() {
     let stage = tempfile::tempdir().unwrap();
@@ -93,22 +137,13 @@ fn show_to_person_starts_the_stand_in_with_the_two_paths_no_shell() {
     );
     recv(&mut stdout);
 
-    send(
+    let response = call_show_to_person_retrying_busy(
         &mut stdin,
-        serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {
-                "name": "show_to_person",
-                "arguments": {
-                    "left": left.to_str().unwrap(),
-                    "right": right.to_str().unwrap(),
-                }
-            }
-        }),
+        &mut stdout,
+        2,
+        left.to_str().unwrap(),
+        right.to_str().unwrap(),
     );
-    let response = recv(&mut stdout);
     assert_eq!(
         response["result"]["isError"], false,
         "show_to_person should succeed: {response}"
@@ -164,16 +199,13 @@ fn a_gui_that_writes_to_its_own_stdout_never_corrupts_the_protocol_stream() {
     );
     recv(&mut stdout);
 
-    send(
+    let show_response = call_show_to_person_retrying_busy(
         &mut stdin,
-        serde_json::json!({
-            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
-            "params": {"name": "show_to_person", "arguments": {
-                "left": left.to_str().unwrap(), "right": right.to_str().unwrap()
-            }}
-        }),
+        &mut stdout,
+        2,
+        left.to_str().unwrap(),
+        right.to_str().unwrap(),
     );
-    let show_response = recv(&mut stdout);
     assert_eq!(show_response["id"], 2);
     assert_eq!(show_response["result"]["isError"], false, "{show_response}");
 
@@ -218,16 +250,13 @@ fn a_gui_that_exits_non_zero_quickly_is_reported_as_an_error() {
     );
     recv(&mut stdout);
 
-    send(
+    let response = call_show_to_person_retrying_busy(
         &mut stdin,
-        serde_json::json!({
-            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
-            "params": {"name": "show_to_person", "arguments": {
-                "left": left.to_str().unwrap(), "right": right.to_str().unwrap()
-            }}
-        }),
+        &mut stdout,
+        2,
+        left.to_str().unwrap(),
+        right.to_str().unwrap(),
     );
-    let response = recv(&mut stdout);
     assert_eq!(response["result"]["isError"], true, "{response}");
     assert!(
         response["result"]["content"][0]["text"]
