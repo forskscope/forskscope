@@ -32,17 +32,18 @@ if [[ "$(uname)" == "Linux" ]]; then
 fi
 
 # ── Rust build ───────────────────────────────────────────────────────────────
-# No -p: builds every workspace member's default target, which now
-# includes forskscope-cli (RFC-094) beside the GUI's forskscope.
+# No -p: builds every workspace member's default target. RFC-096 §1:
+# one executable - forskscope - with compare/mcp dispatched as its own
+# subcommands; forskscope-commands is a library, not a separate binary.
 echo "Building release binaries…"
 cargo build --release --locked
-echo "Binaries: target/release/forskscope, target/release/forskscope-cli"
+echo "Binary: target/release/forskscope"
 
 # ── Platform-specific binary archive ────────────────────────────────────────
 if [[ "$(uname)" == "Linux" ]]; then
     OUT="target/forskscope-v$VER-linux-x86_64.tar.gz"
-    tar -czf "$OUT" -C target/release forskscope forskscope-cli
-    echo "Linux binary archive: $OUT (forskscope + forskscope-cli)"
+    tar -czf "$OUT" -C target/release forskscope
+    echo "Linux binary archive: $OUT (forskscope)"
 elif [[ "$(uname)" == "Darwin" ]]; then
     echo "For macOS DMG: bash packaging/macos/build-dmg.sh"
 fi
