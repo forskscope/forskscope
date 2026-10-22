@@ -7,12 +7,21 @@
 //! forskscope <left> <right>        # Two-file diff (git difftool compatible)
 //! forskscope <local> <remote> <merged>  # git mergetool: diff local vs remote,
 //!                                       # save result to <merged>
+//! forskscope compare <left> <right> [options]  # Print a comparison; no window
+//! forskscope mcp --root <dir> [--allow-show]   # MCP server for AI agents; no window
 //! forskscope --diagnostics         # Print platform diagnostics and exit
 //! forskscope --version | -V        # Print the version and exit
 //! forskscope --help | -h           # Print this usage and exit
 //! forskscope --data-dir <path> ... # Portable: keep everything in <path>
 //! forskscope --private ...         # Private: read and keep nothing
 //! ```
+//!
+//! RFC-096 §1: `compare` and `mcp`, exactly as the first argument, hand
+//! over to [`forskscope_commands`] before anything below in `main` runs
+//! — no GTK, tao, web view, settings, data folder, or Flatpak start-up
+//! change (RFC-095 §4.2/§4.7). A file literally named `compare` or `mcp`
+//! is written `./compare`/`./mcp`; `git difftool`/`git mergetool` always
+//! pass a temporary path first, so they cannot collide with either name.
 //!
 //! Any other argument count is a startup error (non-zero exit), not a
 //! silent fallback to the Explorer workspace (RFC-077). F150 (issue #146): a
@@ -145,8 +154,61 @@ fn check_webview2_or_exit() {
     }
 }
 
+/// RFC-096 §4: a subcommand's own output must reach the console it was
+/// launched from, but the app is a windowed program
+/// (`windows_subsystem = "windows"`), which starts with no console of
+/// its own. Piped use — how MCP clients start a subcommand, and the
+/// shape `git difftool`/`git mergetool` themselves use for the app's
+/// own mode — must change nothing. `GetFileType` on the standard output
+/// handle tells a real console apart from a redirected one: a disk file
+/// (`FILE_TYPE_DISK`) or a pipe (`FILE_TYPE_PIPE`) means "already
+/// redirected, leave it exactly as the parent set it up"; anything else
+/// (a real console, or no handle at all) means "attach, so the parent's
+/// own console shows this process's output." A failed `AttachConsole`
+/// (no parent console to attach to — launched with no terminal at all)
+/// is left unhandled on purpose: there is nothing to attach to, and the
+/// subcommand still runs exactly as it would without this function
+/// existing — its output simply has nowhere to be seen.
+#[cfg(windows)]
+fn attach_parent_console_if_not_redirected() {
+    use windows_sys::Win32::Storage::FileSystem::{FILE_TYPE_DISK, FILE_TYPE_PIPE, GetFileType};
+    use windows_sys::Win32::System::Console::{
+        ATTACH_PARENT_PROCESS, AttachConsole, GetStdHandle, STD_OUTPUT_HANDLE,
+    };
+
+    // SAFETY: GetStdHandle/GetFileType/AttachConsole are plain Win32
+    // calls with no preconditions beyond a valid process — every one of
+    // these functions already tolerates an invalid/absent handle by
+    // design (that is exactly the "no console at all" case this
+    // function leaves alone).
+    unsafe {
+        let handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        let file_type = GetFileType(handle);
+        if file_type != FILE_TYPE_DISK && file_type != FILE_TYPE_PIPE {
+            AttachConsole(ATTACH_PARENT_PROCESS);
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+
+    // RFC-096 §1: the first argument decides, before anything else in
+    // `main` — see this module's own doc comment for what "before
+    // anything else" guarantees.
+    match args.first().map(String::as_str) {
+        Some("compare") => {
+            #[cfg(windows)]
+            attach_parent_console_if_not_redirected();
+            std::process::exit(forskscope_commands::compare::run(&args[1..]));
+        }
+        Some("mcp") => {
+            #[cfg(windows)]
+            attach_parent_console_if_not_redirected();
+            std::process::exit(forskscope_commands::mcp::run(&args[1..]));
+        }
+        _ => {}
+    }
 
     // F150: `--version`/`-V` and `--help`/`-h`, handled the same way
     // `--diagnostics` already is - before `parse_startup_args` ever sees
@@ -161,6 +223,8 @@ fn main() {
              forskscope                              Open the Explorer workspace\n  \
              forskscope <left> <right>                Compare two files (git difftool compatible)\n  \
              forskscope <local> <remote> <merged>     git mergetool: diff local vs remote, save to merged\n  \
+             forskscope compare <left> <right> [opts] Print a comparison; no window (see forskscope compare --help)\n  \
+             forskscope mcp --root <dir> [--allow-show]  MCP server for AI agents; no window (see forskscope mcp --help)\n  \
              forskscope --diagnostics                 Print platform diagnostics and exit\n  \
              forskscope --version, -V                 Print the version and exit\n  \
              forskscope --help, -h                    Print this message and exit\n"

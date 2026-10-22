@@ -20,6 +20,7 @@ authors         = ["nabbisen"]
 repository      = "https://github.com/forskscope/forskscope"
 
 [workspace.dependencies]
+forskscope-commands          = { version = "0", path = "crates/forskscope-commands" }
 forskscope-compare           = { version = "0", path = "crates/forskscope-compare" }
 forskscope-desktop           = { version = "0", path = "crates/forskscope-desktop" }
 forskscope-edit             = { version = "0", path = "crates/forskscope-edit" }
@@ -51,6 +52,12 @@ rfd                         = { version = "0.17", default-features = true }
 # forskscope-report by RFC-093 §1 step 2 - no new crypto stack either way.
 # audit-deps' reviewed set names forskscope-report as a second accepted path.
 sha2                        = "0.10"
+# RFC-096 §4: already resolved transitively (wry/tao's own Windows build)
+# at 0.61.x; its first direct, declared use is forskscope-ui's own
+# Windows-only console attach for a subcommand run from a terminal
+# (AttachConsole/GetStdHandle/GetFileType) - no new Windows API surface
+# in the dependency tree, only a new edge to one already there.
+windows-sys                 = { version = "0.61", default-features = false, features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Console"] }
 # RFC-085: default features off deliberately - chrono/cli/serde are all
 # optional and unused here; audit-deps' reviewed set assumes exactly the
 # calamine -> quick-xml -> zip chain this default-features build pulls.
