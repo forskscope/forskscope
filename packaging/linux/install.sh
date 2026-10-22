@@ -24,6 +24,16 @@ install -Dm755 "$BINARY" "$PREFIX/bin/forskscope"
 install -Dm644 "$SCRIPT_DIR/packaging/linux/io.github.forskscope.forskscope.desktop" \
     "$PREFIX/share/applications/io.github.forskscope.forskscope.desktop"
 echo "Installed: $PREFIX/bin/forskscope"
+
+# Review 189 §3.1: the desktop file was renamed from forskscope.desktop to
+# io.github.forskscope.forskscope.desktop (RFC-095 §5) - an install over an
+# older copy under this same prefix would otherwise leave both, showing two
+# ForskScope entries in the menu.
+OLD_DESKTOP_FILE="$PREFIX/share/applications/forskscope.desktop"
+if [[ -f "$OLD_DESKTOP_FILE" ]]; then
+    rm -f "$OLD_DESKTOP_FILE"
+    echo "Removed old desktop entry: $OLD_DESKTOP_FILE"
+fi
 # RFC-096 §1: one executable - `forskscope compare`/`forskscope mcp` are
 # this same binary's own subcommands, not separate programs to install.
 

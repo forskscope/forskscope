@@ -120,6 +120,16 @@ jobs:
       - name: Version metadata sync check
         run: cargo xtask version-sync "${GITHUB_REF_NAME}"
 
+      # Review 189 §3.2: the metainfo's release list (RFC-095 §5) has no
+      # gate of its own - a cut that forgot to add the new <release> entry
+      # would still pass version-sync (Cargo.toml's version always leads
+      # the metainfo's, between releases) and ship a Flathub-facing
+      # changelog one release behind. Checked here, against the tag, not
+      # in version-sync - see metainfo_release.rs's own doc comment for why
+      # the two checks don't merge.
+      - name: AppStream metainfo release entry matches the tag
+        run: cargo xtask metainfo-release "${GITHUB_REF_NAME}"
+
       - name: i18n coverage check
         run: cargo xtask i18n
 

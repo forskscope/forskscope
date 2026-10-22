@@ -18,6 +18,7 @@
 //!   cargo xtask keyboard-docs — verify the in-app keyboard reference and keyboard.md name the same set of keys (handoff 079 §3, F165)
 //!   cargo xtask crate-boundaries — verify forskscope-compare/-report never write a file or spawn a process, and every crate's dependency graph matches RFC-093 §1's table
 //!   cargo xtask json-schema  — verify forskscope compare --format json's output against docs/schemas/forskscope.comparison.v1.json (RFC-094 §3, RFC-096 §5)
+//!   cargo xtask metainfo-release <tag> — verify the AppStream metainfo's first <release> entry names <tag> (RFC-095 §5, review 189 §3)
 //!
 //! CSS source files under assets/css/ are assembled in alphabetical order.
 //! The numeric prefix on each filename (00-, 01-, …) encodes the cascade order.
@@ -27,6 +28,7 @@ mod colour_vision;
 mod crate_boundaries;
 mod json_schema;
 mod keyboard_docs;
+mod metainfo_release;
 mod pages_check;
 mod rfc_sync;
 mod ui_logic_connectivity;
@@ -75,6 +77,9 @@ fn main() {
         Some("keyboard-docs") if args.len() == 1 => keyboard_docs::run(&workspace_root()),
         Some("crate-boundaries") if args.len() == 1 => crate_boundaries::run(&workspace_root()),
         Some("json-schema") if args.len() == 1 => json_schema::run(&workspace_root()),
+        Some("metainfo-release") if args.len() == 2 => {
+            metainfo_release::run(&workspace_root(), &args[1])
+        }
         Some(cmd) => {
             eprintln!("unknown command: {cmd}");
             print_usage();
@@ -102,6 +107,7 @@ fn print_usage() {
     eprintln!("       cargo xtask keyboard-docs");
     eprintln!("       cargo xtask crate-boundaries");
     eprintln!("       cargo xtask json-schema");
+    eprintln!("       cargo xtask metainfo-release <tag>");
 }
 
 pub(crate) fn workspace_root() -> PathBuf {

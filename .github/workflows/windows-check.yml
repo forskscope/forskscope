@@ -119,3 +119,30 @@ jobs:
       - name: Check imports against the allow-list
         shell: pwsh
         run: ./packaging/windows/check-imports.ps1 -ExePath ./target/release/forskscope.exe
+
+  # TEMPORARY (review 189 §3.2): rehearses the new "AppStream metainfo
+  # release entry matches the tag" check (release.yml) against a real
+  # ubuntu-latest runner, including its falsification, before it ships in
+  # a real release - mirrors the review-187 rehearsal precedent
+  # (3ee3c5dae7b6ed6a3320573e17617b73ed8a5e5c, itself mirroring F206's,
+  # review 172). Reverted once the passing/falsifying run is recorded in
+  # the review response.
+  metainfo-release-check-rehearsal:
+    name: "TEMPORARY: metainfo-release check rehearsal (review 189 §3.2)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Passes against the tag the metainfo's first <release> actually names
+        working-directory: xtask
+        run: cargo run --quiet -- metainfo-release 0.195.0
+
+      - name: Falsifies against a tag the metainfo has no <release> entry for
+        working-directory: xtask
+        run: |
+          if cargo run --quiet -- metainfo-release 0.196.0; then
+            echo "::error::metainfo-release 0.196.0 should have failed - the metainfo has no 0.196.0 <release> entry yet"
+            exit 1
+          fi
+          echo "confirmed: refused a tag with no matching <release> entry"
