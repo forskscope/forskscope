@@ -190,6 +190,68 @@ fn attach_parent_console_if_not_redirected() {
     }
 }
 
+/// RFC-095 §4.2/§4.7: the three Flatpak-only start-up changes, in the
+/// order the RFC gives them, each a no-op outside a Flatpak
+/// ([`forskscope_desktop::platform::flatpak`] — every Flatpak behaviour
+/// calls that, never checks `/.flatpak-info` itself). Called once, as
+/// the very first thing in `main` after RFC-096 §1's subcommand
+/// dispatch returns — see the call site's own comment for why that
+/// still counts as "before any thread starts."
+#[cfg(target_os = "linux")]
+fn apply_flatpak_startup_changes() {
+    let flatpak = forskscope_desktop::platform::flatpak();
+    if !flatpak.in_flatpak {
+        return;
+    }
+
+    // §4.7 point 1: the program name becomes the Flatpak app ID, never a
+    // GTK application ID — `tao` registers a unique `GApplication` when
+    // given one, which would make the app single-instance; a second
+    // `git difftool` launch would then hand over to the already-running
+    // first one instead of opening its own window. `glib::set_prgname`
+    // must run before GTK initialises, which nothing above this point
+    // has done.
+    if let Some(app_id) = &flatpak.app_id {
+        glib::set_prgname(Some(app_id.as_str()));
+    }
+
+    // §4.2: WebKit's network process asks GLib for a proxy before it
+    // connects anywhere — including to Dioxus's own 127.0.0.1 WebSocket,
+    // which delivers the interface inside the sandbox. Without network
+    // permission, the proxy portal's answer is "no route at all"
+    // (`Address enumeration completed (out of addresses)`), and the
+    // window stays blank. `dummy` means direct connections, which loses
+    // nothing here: the web view only ever loads the app's own content.
+    // The user's own value, if set, always wins.
+    if std::env::var_os("GIO_USE_PROXY_RESOLVER").is_none() {
+        // SAFETY: this is the first thing `main` does after RFC-096's
+        // subcommand dispatch returns — nothing before this point has
+        // spawned a thread, so no other thread can be reading or
+        // writing the process environment concurrently.
+        unsafe {
+            std::env::set_var("GIO_USE_PROXY_RESOLVER", "dummy");
+        }
+    }
+
+    // §4.7 point 2: WebKitGTK's web-process sandbox is opt-in for the
+    // GTK 3 API (`webkit2gtk-4.1`) `wry` uses here, and only inside that
+    // sandbox can the web process own a name on the accessibility bus
+    // (RFC-095 §2's stage-1 result) — without it, a screen-reader user
+    // meets an empty window. `wry`'s own public API exposes no
+    // `WebContext` before the first web view exists (its internal
+    // `WebContextImpl` field is private), so
+    // `webkit2gtk::WebContext::set_sandbox_enabled(true)` is unreachable
+    // from this codebase today; `WEBKIT_FORCE_SANDBOX=1` — the same
+    // variable stage 1's own test build used — is the one lever actually
+    // available. The user's own value, if set, always wins.
+    if std::env::var_os("WEBKIT_FORCE_SANDBOX").is_none() {
+        // SAFETY: see above — still before any other thread exists.
+        unsafe {
+            std::env::set_var("WEBKIT_FORCE_SANDBOX", "1");
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
@@ -209,6 +271,15 @@ fn main() {
         }
         _ => {}
     }
+
+    // RFC-095 §4.2/§4.7: Flatpak-only start-up changes, before anything
+    // else below — the next line after this one is the first to read an
+    // argument flag or touch a path, and nothing above this point (the
+    // subcommand dispatch, just returned from above) spawns a thread or
+    // touches GTK/GLib/WebKit, so this is still "before any thread
+    // starts," as the RFC asks. A no-op outside a Flatpak.
+    #[cfg(target_os = "linux")]
+    apply_flatpak_startup_changes();
 
     // F150: `--version`/`-V` and `--help`/`-h`, handled the same way
     // `--diagnostics` already is - before `parse_startup_args` ever sees

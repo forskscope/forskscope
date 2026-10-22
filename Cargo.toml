@@ -58,6 +58,13 @@ sha2                        = "0.10"
 # (AttachConsole/GetStdHandle/GetFileType) - no new Windows API surface
 # in the dependency tree, only a new edge to one already there.
 windows-sys                 = { version = "0.61", default-features = false, features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Console"] }
+# RFC-095 §4.7: already resolved transitively (gtk/webkit2gtk -> wry's
+# Linux build) at 0.18.x; its first direct, declared use is
+# forskscope-ui's own Flatpak-only `glib::set_prgname` (the program name
+# becomes the Flatpak app ID, before GTK initialises) - no new GLib
+# binding surface in the dependency tree, only a new edge to one already
+# there.
+glib                         = { version = "0.18", default-features = false }
 # RFC-085: default features off deliberately - chrono/cli/serde are all
 # optional and unused here; audit-deps' reviewed set assumes exactly the
 # calamine -> quick-xml -> zip chain this default-features build pulls.

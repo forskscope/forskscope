@@ -1520,6 +1520,7 @@ dependencies = [
  "forskscope-edit",
  "forskscope-report",
  "forskscope-ui-logic",
+ "glib",
  "libc",
  "native-tls",
  "rfd",
