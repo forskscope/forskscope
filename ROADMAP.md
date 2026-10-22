@@ -1374,7 +1374,7 @@ were in `proposed/`. Nothing checks this — see **F83**.
 | 010 | Post-slice-5 | Packaging, diagnostics, QA |
 | 016 | Slice 8 | Editor bridge security and contract |
 | 096 | `0.196.0`, before RFC-095 stage 2's documentation | One program: `forskscope compare` and `forskscope mcp` replace `forskscope-cli`; read-only kept by the dependency gate — **accepted 2026-10-22**; **done on `main`** (reviews 187, 188); the guide's Windows terminal text waits for the owner's run |
-| 095 | After `0.195.0`; stage 1 (screen readers in the sandbox) is a gate | ForskScope as a Flatpak on Flathub: home folder access required, no network permission, the owner writes the manifest — **accepted 2026-10-21**; stage 1 passed (review 185); stage 2 handed off (090) for `0.196.0` |
+| 095 | After `0.195.0`; stage 1 (screen readers in the sandbox) is a gate | ForskScope as a Flatpak on Flathub: home folder access required, no network permission, the owner writes the manifest — **accepted 2026-10-21**; stage 1 passed (review 185); stage 2 done on `main` (review 189), shipping in `0.196.0`; **stage 3, the Flathub submission, deferred by the owner (2026-10-22)** so the one program ships first |
 | 025 | Slice 8 | Editor adapter prototype and kill-switch |
 | 026 | Post-slice-3 | Cross-platform WebView compatibility |
 | 030 | Post-slice-5 | User documentation and onboarding |
