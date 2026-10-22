@@ -83,6 +83,47 @@ throughout, so it's never ambiguous which file a save affects. After
 ForskScope closes, git marks the conflict as resolved if `$MERGED` was
 written successfully.
 
+## Flatpak
+
+The [Flatpak build](../users/installation.md#flatpak) needs **file
+forwarding**: git's own temporary files for a diff or a merge live in
+`/tmp`, which no Flatpak permission exposes, so `flatpak run` has to hand
+each path through the sandbox boundary itself, marked with `@@ … @@`:
+
+```sh
+git config --global difftool.forskscope.cmd \
+  'flatpak run --file-forwarding io.github.forskscope.forskscope @@ "$LOCAL" @@ @@ "$REMOTE" @@'
+```
+
+```sh
+git config --global mergetool.forskscope.cmd \
+  'flatpak run --file-forwarding io.github.forskscope.forskscope @@ "$LOCAL" @@ @@ "$REMOTE" @@ @@ "$MERGED" @@'
+```
+
+Verified in the test build: `flatpak run --file-forwarding
+io.github.forskscope.forskscope.Spike @@ left.txt @@ @@ right.txt @@`
+opened the two forwarded files, titled `left.txt ↔ right.txt`, with no
+`--filesystem=home` grant at all — **a comparison opened this way needs no
+home access.** The header and the save-target line show the real path on
+your machine (`/…/left.txt`, not the sandbox's own internal path) — see
+[the threat model's Flatpak
+entry](../maintainers/threat-model.md#11-the-flatpak-sandbox-rfc-095)
+for why. **No backup is made for a file opened this way** — the
+status bar says so (`⚠ No backup`) — but **the save itself still reaches
+your real file**: confirmed by saving a change and reading it back from
+outside the sandbox.
+
+`--dir-diff` works the same way, still with `--no-symlinks`:
+
+```sh
+git difftool --dir-diff --no-symlinks HEAD
+```
+
+**Folder forwarding needs Flatpak 1.18 or later** — on an older Flatpak,
+`--dir-diff` with a Flatpak-packaged ForskScope will not forward the
+temporary trees it builds. `flatpak --version` tells you which you have;
+the prebuilt binary or the AUR package work on any version.
+
 ## JJ (Jujutsu)
 
 JJ also supports external diff and merge tools via its configuration.

@@ -22,7 +22,10 @@ Linux `.tar.gz`, the Windows `.zip`, the AUR package's
 terminal or a script, either use that full path, or put a symlink to it
 on your `PATH` (for example, `ln -s
 "/Applications/ForskScope.app/Contents/MacOS/forskscope"
-/usr/local/bin/forskscope`).
+/usr/local/bin/forskscope`). On the [Flatpak
+build](../users/installation.md#flatpak), run `flatpak run
+io.github.forskscope.forskscope compare …` or `… mcp …` — see the `mcp`
+section below for the exact form an MCP client needs.
 
 ---
 
@@ -200,6 +203,28 @@ Claude Desktop, and others):
   }
 }
 ```
+
+**On the [Flatpak build](../users/installation.md#flatpak),** run it as
+`flatpak run io.github.forskscope.forskscope mcp --root <dir>` (no
+`--command=`, since `mcp` is this one program's own subcommand, not a
+separate program to name):
+
+```json
+{
+  "mcpServers": {
+    "forskscope": {
+      "command": "flatpak",
+      "args": ["run", "io.github.forskscope.forskscope", "mcp", "--root", "/path/to/the/project"]
+    }
+  }
+}
+```
+
+**`--root` must be inside the home folder** (or another folder you have
+separately granted) — paths sent inside MCP messages are not forwarded
+the way `git difftool`/`git mergetool`'s file arguments are, so there is
+no portal-based path here for a root outside the sandbox's own view to
+resolve through.
 
 With Claude Code specifically, point `--mcp-config` at a file like this
 (add `--strict-mcp-config` to use only this server for that run):

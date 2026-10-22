@@ -660,6 +660,74 @@ this server to set up such a race; the risk is from another process on
 the same machine, the same class of risk any read-then-use path check
 carries, not one specific to this program.
 
+### 11. The Flatpak sandbox (RFC-095)
+
+**An outer boundary, not a replacement for anything above.** Every entry
+in this document still applies inside the Flatpak; the sandbox adds a
+layer the other distribution forms do not have, built from a small,
+auditable set of permissions (`packaging/linux/io.github.forskscope.
+forskscope.metainfo.xml` lists them; the actual Flathub manifest, which
+the owner writes, is the authority on what ships).
+
+- **No network permission is requested at all** (RFC-095 §3: "Not
+  requested" — `--share=network` is absent). *Check for updates* (entry
+  10's sibling concern, but for the app itself) is not offered in a
+  Flatpak (RFC-095 §4.6) — the button and its result area do not exist,
+  so there is no code path to the one HTTPS request this app ever makes.
+  Verified live, in a real Flatpak build, with an `LD_PRELOAD` shim
+  logging every `connect()` call by address family and destination: the
+  only `AF_INET` connection seen across app start-up, a file comparison
+  and a save was to `127.0.0.1` — Dioxus's own WebSocket, delivering the
+  interface to the web view inside the sandbox (§4.2, below), not
+  anything reaching outside the sandbox's own network namespace, which
+  has no route out at all without `--share=network`.
+- **The home permission is the one access this needs beyond the
+  sandbox's own private storage** (RFC-095 §3: "`--filesystem=home` —
+  the stated requirement"). `platform::flatpak()` reads
+  `/.flatpak-info`'s own `[Context] filesystems=` list once, rather than
+  trusting a cached assumption, so a user who later revokes the grant
+  (`flatpak override --user --nofilesystem=home …`) sees the Explorer's
+  home-required message on the next launch, not a stale "still granted"
+  state. Verified live: with the grant, the Explorer opened normally;
+  without it, replaced by the one message, both confirmed by reading the
+  accessible tree, not just a screenshot.
+- **§4.2's `GIO_USE_PROXY_RESOLVER=dummy`** is set at the very start of
+  `main`, in a Flatpak only, before GTK/WebKit initialise, and only if
+  the user has not already set it. Without it, WebKit's network process
+  asks Flatpak's proxy portal for a route before connecting anywhere —
+  including to Dioxus's own loopback WebSocket above — and with no
+  network permission the portal's answer is no route at all, leaving the
+  window blank. `dummy` means direct connections, which costs nothing
+  here: the web view never loads anything but the app's own content, in
+  or out of a Flatpak.
+- **A file or folder forwarded through the document portal** (`git
+  difftool`/`git mergetool --file-forwarding`, entry 10's own "paths an
+  agent supplies" note does not apply here, since this is person-driven
+  git integration, not the MCP server) is read and written at its
+  sandbox path throughout — `display_path` (RFC-095 §4.4) only changes
+  what a person is shown, never what a read or write touches. The one
+  behavioural difference: **no backup is attempted for such a file**
+  (RFC-095 §4.5) — the document portal keeps a sibling `<name>.bak`
+  write as a sandbox-only temporary file that never reaches the host,
+  so claiming one succeeded would be false. Both confirmed live: saving
+  a change to a forwarded file changed the real file on the host, no
+  `.bak` was created, and the status bar said so before the save ran.
+- **The program ID becomes the Flatpak app ID** (`g_set_prgname`, RFC-095
+  §4.7, stage 1's own finding) so WebKit's web-process sandbox can own a
+  name on the accessibility bus — without it, a screen-reader user meets
+  an empty window. Verified live: the window's own Wayland `app_id`
+  matched the Flatpak ID, and the full accessible tree (toolbar buttons,
+  Explorer rows, a file comparison's own controls) was reachable and
+  actionable through AT-SPI, not just registered.
+
+**Residual concerns:** the same ones entries 1, 2 and 7 already carry for
+`load_path`/`classify`/the write path, since Flatpak changes where a file
+sits, never how it is read, diffed or written. The document portal's own
+TOCTOU-shaped window (a file replaced between the portal handing out a
+path and this app reading it) is the portal's own concern, not something
+this app's read-only diff/reads add risk to beyond what reading any file
+on a shared machine already carries.
+
 ---
 
 ## What ForskScope deliberately does not do
