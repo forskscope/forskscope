@@ -222,19 +222,20 @@ fn build_compare_options(
 /// its life off to a reaper thread (review 183 §1 item 3).
 const EARLY_EXIT_WINDOW: Duration = Duration::from_secs(2);
 
-/// RFC-094 §4: "starts the program beside `forskscope-cli`, in the same
-/// folder, never one found on `PATH`. It passes the two paths as separate
-/// arguments, with no shell, and with the user's own environment. Its
-/// only effect is a window that opens."
+/// RFC-096 §3: starts `std::env::current_exe()` — the same executable,
+/// since this subcommand and the app it opens are one program now — with
+/// the two paths as separate arguments and no subcommand. That is
+/// exactly the app's own two-file launch (RFC-077), so it opens the app.
+/// The "beside it" lookup RFC-094 §4 described (a separate `forskscope`
+/// binary next to `forskscope-cli`) is gone: there is no second binary
+/// to find any more.
 ///
-/// Review 183 §1: the child inherited all three of the server's standard
-/// streams by default - its stdout is the agent's own protocol channel,
-/// so anything the GUI ever prints there (a GLib warning, a library's
-/// `g_print`, a future stray `println!`) would corrupt it, and its
-/// inherited stdin meant it could read the agent's *next* request instead
-/// of the server. Standard input/output are now `null`; standard error
-/// stays inherited, so the GUI's own diagnostics still reach the client's
-/// log, same as the server's own.
+/// Unchanged from RFC-094 §4/review 183 §1: no shell; the user's own
+/// environment; standard input/output `null` so the child can neither
+/// corrupt the agent's own protocol channel (its stdout) nor read the
+/// agent's *next* request (its stdin) — standard error stays inherited,
+/// so the opened window's own diagnostics still reach the client's log,
+/// same as this server's own; the early-exit report; the reaping thread.
 pub fn call_show_to_person(arguments: &Value, roots: &Roots) -> Result<ToolCallResult, String> {
     let obj = arguments
         .as_object()
@@ -242,17 +243,8 @@ pub fn call_show_to_person(arguments: &Value, roots: &Roots) -> Result<ToolCallR
     let left = roots.resolve(str_field(obj, "left", None)?.ok_or("`left` is required")?)?;
     let right = roots.resolve(str_field(obj, "right", None)?.ok_or("`right` is required")?)?;
 
-    let exe = std::env::current_exe()
-        .map_err(|e| format!("could not locate forskscope-cli's own path: {e}"))?;
-    let dir = exe
-        .parent()
-        .ok_or_else(|| "forskscope-cli's own path has no parent directory".to_string())?;
-    let gui_name = if cfg!(windows) {
-        "forskscope.exe"
-    } else {
-        "forskscope"
-    };
-    let gui_path: PathBuf = dir.join(gui_name);
+    let gui_path: PathBuf = std::env::current_exe()
+        .map_err(|e| format!("could not locate this program's own path: {e}"))?;
 
     let mut child = Command::new(&gui_path)
         .arg(&left)
