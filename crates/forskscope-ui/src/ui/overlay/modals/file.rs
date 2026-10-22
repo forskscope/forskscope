@@ -27,7 +27,9 @@ use crate::ui::view::diff_actions::handle_save_recovery_action;
 pub fn OverwriteModal(index: usize, target: PathBuf) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
-    let path_display = target.display().to_string();
+    let path_display = forskscope_desktop::platform::display_path(&target)
+        .display()
+        .to_string();
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "File changed on disk"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
@@ -100,7 +102,9 @@ pub fn SaveAsModal(index: usize, initial_path: String) -> Element {
 pub fn ConfirmSaveAsOverwriteModal(index: usize, target: PathBuf) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
-    let path_display = target.display().to_string();
+    let path_display = forskscope_desktop::platform::display_path(&target)
+        .display()
+        .to_string();
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Save As"), onmounted: super::focus_autofocus_button,
             div { class: "modal",

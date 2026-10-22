@@ -49,7 +49,12 @@ pub fn StatusBar() -> Element {
                     .file_name()
                     .map(|n| n.to_string_lossy().into_owned())
                     .unwrap_or_else(|| "—".into());
-                (short, st.path.display().to_string())
+                (
+                    short,
+                    forskscope_desktop::platform::display_path(&st.path)
+                        .display()
+                        .to_string(),
+                )
             });
             (
                 format!("{left} ↔ {right}"),

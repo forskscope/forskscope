@@ -175,7 +175,14 @@ fn dispatch(store: &mut Store, index: usize, outcome: RequestOutcome) {
                 AppErrorKind::UnsavableAfterDecodeLoss,
                 "one or both loaded sides required decode substitutions",
             );
-            let view = SaveErrorView::from_error(&app_err, Some(target.display().to_string()));
+            let view = SaveErrorView::from_error(
+                &app_err,
+                Some(
+                    forskscope_desktop::platform::display_path(&target)
+                        .display()
+                        .to_string(),
+                ),
+            );
             store.modal.set(Modal::SaveError(index, target, view));
         }
     }
@@ -388,8 +395,14 @@ fn handle_result(
         }
         Err(e) => {
             let app_err = AppError::from_core(&e);
-            let view =
-                SaveErrorView::from_error(&app_err, Some(request.target.display().to_string()));
+            let view = SaveErrorView::from_error(
+                &app_err,
+                Some(
+                    forskscope_desktop::platform::display_path(&request.target)
+                        .display()
+                        .to_string(),
+                ),
+            );
             store
                 .modal
                 .set(Modal::SaveError(index, request.target.clone(), view));
@@ -733,7 +746,8 @@ pub fn export_file_report(
                         right_bytes.as_deref(),
                         right_has_fingerprint,
                     );
-                    let report = forskscope_report::report::build_file_report(
+                    let path_mode = report_options.path_mode;
+                    let mut report = forskscope_report::report::build_file_report(
                         &diff,
                         left_path.as_deref(),
                         right_path.as_deref(),
@@ -741,6 +755,23 @@ pub fn export_file_report(
                         left_checksum,
                         right_checksum,
                     );
+                    // RFC-095 §4.4: same correction as the directory
+                    // report's own (export_dir_report.rs) - `Absolute`
+                    // ("full") mode shows the sandbox path for a
+                    // forwarded file in a Flatpak; forskscope-report
+                    // cannot read `/.flatpak-info` itself.
+                    if path_mode == forskscope_report::report::ReportPathMode::Absolute {
+                        if let Some(p) = left_path.as_deref() {
+                            report.left_display = forskscope_desktop::platform::display_path(p)
+                                .display()
+                                .to_string();
+                        }
+                        if let Some(p) = right_path.as_deref() {
+                            report.right_display = forskscope_desktop::platform::display_path(p)
+                                .display()
+                                .to_string();
+                        }
+                    }
                     forskscope_report::report::render_file_report(
                         &report,
                         env!("CARGO_PKG_VERSION"),

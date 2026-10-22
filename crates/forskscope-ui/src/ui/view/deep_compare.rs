@@ -268,10 +268,14 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
         div { class: "deep-compare",
             div { class: "deep-roots",
                 span { class: "deep-root-label", {t(lang, "Left")}": " }
-                span { class: "deep-root-path", {left_root.display().to_string()} }
+                span { class: "deep-root-path",
+                    {forskscope_desktop::platform::display_path(&left_root).display().to_string()}
+                }
                 span { class: "deep-root-sep", " ↔ " }
                 span { class: "deep-root-label", {t(lang, "Right")}": " }
-                span { class: "deep-root-path", {right_root.display().to_string()} }
+                span { class: "deep-root-path",
+                    {forskscope_desktop::platform::display_path(&right_root).display().to_string()}
+                }
             }
             div { class: "deep-compare-toolbar",
                 span { class: "deep-label", {t(lang, "Deep compare")} }

@@ -293,7 +293,27 @@ async fn start_dir_export(
             cancel_token.set(None);
 
             match outcome {
-                Ok(BuildOutcome::Report(report)) => {
+                Ok(BuildOutcome::Report(mut report)) => {
+                    // RFC-095 §4.4: `Absolute` ("full") mode shows the
+                    // report's own `left_root`/`right_root` as given to
+                    // `build_dir_report` — the sandbox path, in a
+                    // Flatpak, for a forwarded folder. forskscope-report
+                    // cannot read `/.flatpak-info` itself
+                    // (crate-boundaries: it depends on nothing in this
+                    // app), so the one header string `build_dir_report`
+                    // already computed is corrected here, after the
+                    // fact — display only; `lr`/`rr` themselves, already
+                    // used above to read every entry, are untouched.
+                    if path_mode == ReportPathMode::Absolute {
+                        report.left_display =
+                            forskscope_desktop::platform::display_path(&left_root)
+                                .display()
+                                .to_string();
+                        report.right_display =
+                            forskscope_desktop::platform::display_path(&right_root)
+                                .display()
+                                .to_string();
+                    }
                     let color_vision_safe = matches!(
                         store.settings.read().colour_vision,
                         ColourVision::RedGreenSafe

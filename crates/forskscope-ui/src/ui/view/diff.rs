@@ -257,19 +257,29 @@ fn DiffHeader(index: usize) -> Element {
             None => return rsx! {},
         };
         let merged = match &tab.launch_mode {
-            crate::state::tab::CompareLaunchMode::MergeTool { merged } => {
-                Some(merged.display().to_string())
-            }
+            crate::state::tab::CompareLaunchMode::MergeTool { merged } => Some(
+                forskscope_desktop::platform::display_path(merged)
+                    .display()
+                    .to_string(),
+            ),
             crate::state::tab::CompareLaunchMode::Normal => None,
         };
         (
             tab.left_path
                 .as_ref()
-                .map(|p| p.display().to_string())
+                .map(|p| {
+                    forskscope_desktop::platform::display_path(p)
+                        .display()
+                        .to_string()
+                })
                 .unwrap_or_else(|| "—".into()),
             tab.right_path
                 .as_ref()
-                .map(|p| p.display().to_string())
+                .map(|p| {
+                    forskscope_desktop::platform::display_path(p)
+                        .display()
+                        .to_string()
+                })
                 .unwrap_or_else(|| "—".into()),
             merged,
         )
