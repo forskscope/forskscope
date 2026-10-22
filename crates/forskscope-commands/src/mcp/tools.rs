@@ -17,6 +17,7 @@ use super::roots::Roots;
 /// (`to_json`). `structured_content` is set only for `compare --format
 /// json` — RFC-094 §4: "returns the §3 document as structured content,
 /// or the text."
+#[derive(Debug)]
 pub struct ToolCallResult {
     content_text: String,
     structured_content: Option<Value>,
@@ -237,16 +238,48 @@ const EARLY_EXIT_WINDOW: Duration = Duration::from_secs(2);
 /// so the opened window's own diagnostics still reach the client's log,
 /// same as this server's own; the early-exit report; the reaping thread.
 pub fn call_show_to_person(arguments: &Value, roots: &Roots) -> Result<ToolCallResult, String> {
+    // RFC-096 §3/§5: `current_exe()` is now the same executable this
+    // subcommand runs inside, so an integration test that spawns the
+    // real compiled binary and talks real JSON-RPC to it — to prove the
+    // protocol-level properties around `show_to_person` (its own thread,
+    // not blocking `ping`; the opened child's stdout never corrupting
+    // the server's own) — can no longer fake `current_exe()` by placing
+    // a stand-in sibling binary next to a copy, the way RFC-094's two
+    // separate programs let it. There is no sibling any more; the app
+    // and this subcommand are the one program.
+    //
+    // This one environment variable is the seam: read only here, set
+    // only by this crate's own tests (never by a real MCP client, which
+    // has no reason to), overriding what executable `show_to_person`
+    // starts without touching anything else about it.
+    let gui_path: PathBuf = match std::env::var_os("FORSKSCOPE_SHOW_TO_PERSON_EXE_FOR_TEST") {
+        Some(path) => PathBuf::from(path),
+        None => std::env::current_exe()
+            .map_err(|e| format!("could not locate this program's own path: {e}"))?,
+    };
+    call_show_to_person_starting(arguments, roots, &gui_path)
+}
+
+/// The actual implementation, taking the executable to start as its own
+/// parameter rather than resolving it itself — reachable directly by a
+/// narrow unit test that only needs the launch mechanics (arguments,
+/// stdio, the early-exit window, reaping), with no server process and no
+/// protocol involved at all. `call_show_to_person`, above, is the one
+/// production caller; the real, unfaked path — `current_exe()` starting
+/// the real app — is exercised live, through AT-SPI, as part of this
+/// handoff's own verification.
+fn call_show_to_person_starting(
+    arguments: &Value,
+    roots: &Roots,
+    gui_path: &Path,
+) -> Result<ToolCallResult, String> {
     let obj = arguments
         .as_object()
         .ok_or_else(|| "`arguments` must be a JSON object".to_string())?;
     let left = roots.resolve(str_field(obj, "left", None)?.ok_or("`left` is required")?)?;
     let right = roots.resolve(str_field(obj, "right", None)?.ok_or("`right` is required")?)?;
 
-    let gui_path: PathBuf = std::env::current_exe()
-        .map_err(|e| format!("could not locate this program's own path: {e}"))?;
-
-    let mut child = Command::new(&gui_path)
+    let mut child = Command::new(gui_path)
         .arg(&left)
         .arg(&right)
         .stdin(Stdio::null())
@@ -345,5 +378,102 @@ fn usize_field(obj: &Map<String, Value>, key: &str, default: usize) -> Result<us
             .as_u64()
             .map(|n| n as usize)
             .ok_or_else(|| format!("`{key}` must be a non-negative integer")),
+    }
+}
+
+/// RFC-096: the launch mechanics (arguments, no shell, stdio, the
+/// early-exit window, reaping) proven directly against a stand-in
+/// script, through `call_show_to_person_starting`'s own seam - no
+/// server process, no protocol, no `current_exe()` involved at all.
+/// Unix only: the stand-in is a shell script.
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn write_script(path: &Path, script: &str) {
+        std::fs::write(path, script).unwrap();
+        let mut perms = std::fs::metadata(path).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(path, perms).unwrap();
+    }
+
+    #[test]
+    fn starts_the_two_paths_as_separate_arguments_no_shell() {
+        let stage = tempfile::tempdir().unwrap();
+        let log_path = stage.path().join("argv.log");
+        let script = stage.path().join("stand-in.sh");
+        write_script(
+            &script,
+            &format!("#!/bin/sh\nfor a in \"$@\"; do echo \"ARG:$a\"; done > {log_path:?}\n"),
+        );
+
+        let root = tempfile::tempdir().unwrap();
+        let left = root.path().join("a.txt");
+        let right = root.path().join("b.txt");
+        std::fs::write(&left, "x").unwrap();
+        std::fs::write(&right, "y").unwrap();
+        let roots = Roots::new(vec![root.path().to_path_buf()]);
+
+        let arguments = json!({
+            "left": left.to_str().unwrap(),
+            "right": right.to_str().unwrap(),
+        });
+        let result = call_show_to_person_starting(&arguments, &roots, &script).unwrap();
+        assert!(!result.to_json()["isError"].as_bool().unwrap());
+
+        let logged = std::fs::read_to_string(&log_path).unwrap();
+        assert_eq!(
+            logged,
+            format!("ARG:{}\nARG:{}\n", left.display(), right.display()),
+            "the stand-in must receive exactly the two paths, as separate arguments"
+        );
+    }
+
+    #[test]
+    fn a_non_zero_quick_exit_is_reported_as_an_error_naming_the_exit_code() {
+        let stage = tempfile::tempdir().unwrap();
+        let script = stage.path().join("stand-in.sh");
+        write_script(&script, "#!/bin/sh\nexit 7\n");
+
+        let root = tempfile::tempdir().unwrap();
+        let left = root.path().join("a.txt");
+        let right = root.path().join("b.txt");
+        std::fs::write(&left, "x").unwrap();
+        std::fs::write(&right, "y").unwrap();
+        let roots = Roots::new(vec![root.path().to_path_buf()]);
+
+        let arguments = json!({
+            "left": left.to_str().unwrap(),
+            "right": right.to_str().unwrap(),
+        });
+        let error = call_show_to_person_starting(&arguments, &roots, &script).unwrap_err();
+        assert!(error.contains("exit code 7"), "{error}");
+    }
+
+    #[test]
+    fn a_path_outside_every_root_is_refused_before_anything_is_started() {
+        let root = tempfile::tempdir().unwrap();
+        let elsewhere = tempfile::tempdir().unwrap();
+        let left = elsewhere.path().join("a.txt");
+        let right = root.path().join("b.txt");
+        std::fs::write(&left, "x").unwrap();
+        std::fs::write(&right, "y").unwrap();
+        let roots = Roots::new(vec![root.path().to_path_buf()]);
+
+        let arguments = json!({
+            "left": left.to_str().unwrap(),
+            "right": right.to_str().unwrap(),
+        });
+        let error = call_show_to_person_starting(
+            &arguments,
+            &roots,
+            Path::new("/this/path/is/never/reached"),
+        )
+        .unwrap_err();
+        assert!(
+            error.contains("outside every configured --root directory"),
+            "{error}"
+        );
     }
 }
