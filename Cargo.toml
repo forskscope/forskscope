@@ -65,6 +65,12 @@ windows-sys                 = { version = "0.61", default-features = false, feat
 # binding surface in the dependency tree, only a new edge to one already
 # there.
 glib                         = { version = "0.18", default-features = false }
+# RFC-095 §4.4: already resolved transitively (gethostname/tempfile) at
+# 1.x; its first direct, declared use is forskscope-desktop's own
+# Flatpak-only read of the `user.document-portal.host-path` extended
+# attribute (`getxattr`, the "fs" feature) - a safe wrapper over the raw
+# syscall, no hand-rolled unsafe FFI, and no new crate version.
+rustix                       = { version = "1", default-features = false, features = ["fs"] }
 # RFC-085: default features off deliberately - chrono/cli/serde are all
 # optional and unused here; audit-deps' reviewed set assumes exactly the
 # calamine -> quick-xml -> zip chain this default-features build pulls.

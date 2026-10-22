@@ -1564,6 +1564,7 @@ dependencies = [
  "forskscope-compare",
  "forskscope-edit",
  "libc",
+ "rustix",
  "serde",
  "serde_json",
 ]

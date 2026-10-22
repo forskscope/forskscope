@@ -16,6 +16,10 @@ forskscope-edit               = { workspace = true }
 serde                       = { workspace = true }
 serde_json                  = { workspace = true }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# RFC-095 §4.4: platform::document_portal_host_path's getxattr read.
+rustix                        = { workspace = true }
+
 [target.'cfg(unix)'.dev-dependencies]
 # F143: this crate's own copy of the permission-guard test helper - see its
 # doc comment in src/tests/support.rs.

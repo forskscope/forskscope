@@ -1,7 +1,9 @@
-//! Tests for platform diagnostic info (RFC-026) and Flatpak detection
-//! (RFC-095 §4.1).
+//! Tests for platform diagnostic info (RFC-026), Flatpak detection
+//! (RFC-095 §4.1) and document-portal host paths (RFC-095 §4.4).
 
 use crate::platform::{FlatpakInfo, PlatformInfo, flatpak_at, parse_flatpak_info};
+#[cfg(target_os = "linux")]
+use crate::platform::{display_path, document_portal_host_path};
 
 #[test]
 fn collect_does_not_panic() {
@@ -158,6 +160,74 @@ fn a_real_flatpak_info_reflects_a_run_time_override() {
         "[Application]\nname=io.github.forskscope.forskscope\n[Context]\nfilesystems=;xdg-run/dconf:ro;\n",
     );
     assert!(!flatpak_at(&revoked).home_granted);
+}
+
+// ── RFC-095 §4.4: document-portal host paths ────────────────────────────────
+
+#[test]
+#[cfg(target_os = "linux")]
+fn the_attribute_absent_falls_back_to_the_path_itself() {
+    let dir = tmp("doc-portal-absent");
+    let path = dir.join("plain-file.txt");
+    std::fs::write(&path, "x").unwrap();
+    assert_eq!(document_portal_host_path(&path), None);
+    assert_eq!(display_path(&path), path);
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn the_attribute_present_is_read_back() {
+    let dir = tmp("doc-portal-present");
+    let path = dir.join("forwarded.txt");
+    std::fs::write(&path, "x").unwrap();
+    let host_path = "/home/alice/Documents/forwarded.txt";
+    rustix::fs::setxattr(
+        &path,
+        "user.document-portal.host-path",
+        host_path.as_bytes(),
+        rustix::fs::XattrFlags::empty(),
+    )
+    .unwrap();
+    assert_eq!(
+        document_portal_host_path(&path),
+        Some(std::path::PathBuf::from(host_path))
+    );
+    assert_eq!(display_path(&path), std::path::PathBuf::from(host_path));
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn a_non_utf8_value_is_still_returned_losslessly() {
+    use std::os::unix::ffi::OsStrExt;
+
+    let dir = tmp("doc-portal-non-utf8");
+    let path = dir.join("forwarded.txt");
+    std::fs::write(&path, "x").unwrap();
+    // A lone 0xFF byte is not valid UTF-8 in any position - but Path on
+    // Unix makes no UTF-8 promise, so this must still round-trip exactly.
+    let raw: &[u8] = b"/home/alice/\xffbroken";
+    rustix::fs::setxattr(
+        &path,
+        "user.document-portal.host-path",
+        raw,
+        rustix::fs::XattrFlags::empty(),
+    )
+    .unwrap();
+    let got = document_portal_host_path(&path).unwrap();
+    assert_eq!(got.as_os_str().as_bytes(), raw);
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn a_path_that_is_not_a_document_portal_path_has_no_attribute() {
+    // Same precondition as "the attribute absent" above, from a
+    // differently-named test matching RFC-095 §4.1's own planned-input
+    // list ("a path that is not a document-portal path") - a plain file
+    // this process itself created has never been near the portal.
+    let dir = tmp("doc-portal-not-a-portal-path");
+    let path = dir.join("never-forwarded.txt");
+    std::fs::write(&path, "x").unwrap();
+    assert_eq!(document_portal_host_path(&path), None);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -205,3 +205,43 @@ fn config_dir_hint() -> String {
         "unknown".into()
     }
 }
+
+// ── RFC-095 §4.4: real paths, not document-portal paths ─────────────────────
+
+#[cfg(target_os = "linux")]
+const DOCUMENT_PORTAL_HOST_PATH_ATTR: &str = "user.document-portal.host-path";
+
+/// The path to show for `path`: its document-portal host path (below)
+/// when present, `path` itself otherwise. **Display only** — every
+/// actual read or write keeps using `path`, never this function's
+/// result. Call this wherever a path reaches the screen: tab titles,
+/// headers, the save target, status messages, the HTML report's `full`
+/// paths.
+pub fn display_path(path: &std::path::Path) -> std::path::PathBuf {
+    document_portal_host_path(path).unwrap_or_else(|| path.to_path_buf())
+}
+
+/// Reads `path`'s `user.document-portal.host-path` extended attribute —
+/// present on a file or folder Flatpak's document portal forwarded into
+/// the sandbox (RFC-095 §4.4), holding the real path on the host. `None`
+/// when the attribute is absent, when `path` is not a document-portal
+/// path at all, or (outside Linux, where this attribute cannot exist) on
+/// every call. A value that is not valid UTF-8 is still returned,
+/// losslessly, as an [`OsStr`](std::ffi::OsStr)-based path — `Path`/
+/// `PathBuf` make no UTF-8 promise on Unix, and `Path::display` already
+/// renders a non-UTF-8 path losslessly, the same as any other.
+#[cfg(target_os = "linux")]
+pub fn document_portal_host_path(path: &std::path::Path) -> Option<std::path::PathBuf> {
+    use std::os::unix::ffi::OsStrExt;
+
+    let mut buf = [0u8; 4096];
+    let len = rustix::fs::getxattr(path, DOCUMENT_PORTAL_HOST_PATH_ATTR, &mut buf[..]).ok()?;
+    Some(std::path::PathBuf::from(std::ffi::OsStr::from_bytes(
+        &buf[..len],
+    )))
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn document_portal_host_path(_path: &std::path::Path) -> Option<std::path::PathBuf> {
+    None
+}
