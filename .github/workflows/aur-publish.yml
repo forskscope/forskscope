@@ -132,7 +132,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Copy build inputs the PKGBUILD's package() step needs
-        run: cp packaging/linux/forskscope.desktop "$GITHUB_WORKSPACE/aur-work/"
+        run: cp packaging/linux/io.github.forskscope.forskscope.desktop "$GITHUB_WORKSPACE/aur-work/"
 
       - name: Build the package (makepkg --syncdeps --noconfirm)
         run: |

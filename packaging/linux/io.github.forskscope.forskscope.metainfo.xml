@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- RFC-095 §5: AppStream metainfo for the Flathub listing (and every
+     other Linux package using the same icon/desktop-file IDs, the AUR
+     package included). Screenshots are linked from the 0.196.0 tag -
+     see this file's own review request for what flatpak-builder-lint
+     does with those URLs before that tag exists. -->
+<component type="desktop-application">
+  <id>io.github.forskscope.forskscope</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <name>ForskScope</name>
+  <summary>Compare and merge files and folders, locally</summary>
+  <description>
+    <p>
+      ForskScope is a local-first diff and merge tool. It opens two files
+      side by side, highlights every changed line, and lets you apply
+      changes from one side to the other one at a time. It also compares
+      two folders, recursively, through a two-pane Explorer.
+    </p>
+    <p>
+      Everything runs on your own computer: no account, no upload, no
+      telemetry. The one exception is the optional "Check for updates"
+      button in the About dialog, which sends a single request to GitHub
+      for the latest version number, and only when you click it.
+    </p>
+    <p>
+      ForskScope works as a Git difftool and mergetool, and can be driven
+      from a script or an AI agent (the bundled "compare" and "mcp"
+      subcommands).
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.forskscope.forskscope.desktop</launchable>
+  <url type="homepage">https://forskscope.github.io/forskscope/</url>
+  <url type="bugtracker">https://github.com/forskscope/forskscope/issues</url>
+  <url type="vcs-browser">https://github.com/forskscope/forskscope</url>
+  <developer id="io.github.forskscope">
+    <name>nabbisen</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <screenshots>
+    <screenshot type="default">
+      <caption>The two-pane Explorer, browsing a folder to compare.</caption>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.0/packaging/linux/screenshots/explorer.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Comparing two files, with every changed line highlighted.</caption>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.0/packaging/linux/screenshots/file-comparison.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Comparing two folders recursively.</caption>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.0/packaging/linux/screenshots/folder-comparison.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>An exported HTML comparison report.</caption>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.0/packaging/linux/screenshots/html-report.png</image>
+    </screenshot>
+  </screenshots>
+  <releases>
+    <release version="0.195.0" date="2026-10-22">
+      <description>
+        <p>For scripts and AI agents.</p>
+      </description>
+    </release>
+    <release version="0.194.0" date="2026-10-20">
+      <description>
+        <p>Reports you can hand to someone.</p>
+      </description>
+    </release>
+    <release version="0.193.0" date="2026-10-18">
+      <description>
+        <p>Carry it with you.</p>
+      </description>
+    </release>
+    <release version="0.192.0" date="2026-10-15">
+      <description>
+        <p>The documentation says what the app does, and replaced lines stay distinct.</p>
+      </description>
+    </release>
+    <release version="0.191.0" date="2026-10-15">
+      <description>
+        <p>Colours for red-green colour blindness, and one bar at the top.</p>
+      </description>
+    </release>
+  </releases>
+  <categories>
+    <category>Development</category>
+    <category>Utility</category>
+  </categories>
+  <keywords>
+    <keyword>diff</keyword>
+    <keyword>merge</keyword>
+    <keyword>compare</keyword>
+  </keywords>
+</component>

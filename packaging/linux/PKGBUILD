@@ -45,8 +45,17 @@ build() {
 package() {
     cd "$pkgname-$pkgver"
     install -Dm755 "target/release/forskscope" "$pkgdir/usr/bin/forskscope"
-    install -Dm644 "packaging/linux/forskscope.desktop" \
-        "$pkgdir/usr/share/applications/forskscope.desktop"
+    install -Dm644 "packaging/linux/io.github.forskscope.forskscope.desktop" \
+        "$pkgdir/usr/share/applications/io.github.forskscope.forskscope.desktop"
+    # RFC-095 §5: no real icon exists yet (the owner has not decided who
+    # draws it) - installed under the same hicolor/hicolor-id convention
+    # the Flatpak uses once it does, so `Icon=` in the desktop file above
+    # needs no change when it lands.
+    local icon="packaging/linux/icons/hicolor/scalable/apps/io.github.forskscope.forskscope.svg"
+    if [[ -f "$icon" ]]; then
+        install -Dm644 "$icon" \
+            "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.github.forskscope.forskscope.svg"
+    fi
     install -Dm644 "LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
     install -Dm644 "NOTICE" "$pkgdir/usr/share/licenses/$pkgname/NOTICE"
 }

@@ -126,6 +126,36 @@ jobs:
       - name: i18n coverage check
         run: cargo xtask i18n
 
+      # RFC-095 §5: flatpak-builder-lint's "appstream" command is a thin
+      # wrapper over `appstreamcli validate --explain <path>` (read from
+      # its own source, flatpak_builder_lint/{cli,appstream}.py) - no
+      # Flathub-specific severity overrides apply to this command type,
+      # and critically, no --no-net either, so it fetches every
+      # screenshot URL. This metainfo's screenshots are linked from the
+      # 0.196.0 tag (RFC-095 §5: "never a branch"), which does not exist
+      # until the release, so a plain network-checking run would fail
+      # here on every push until then with screenshot-image-not-found -
+      # not a defect in the file, just this gate running before the tag
+      # it describes exists. `--no-net` skips only that network-liveness
+      # check; `--strict` is still passed so every other finding
+      # (missing OARS rating, licenses, releases, launchable, …) fails
+      # the build exactly as if it were run through the wrapper -
+      # verified locally: removing <content_rating> is "I:"
+      # (informational) under plain appstreamcli and does not fail on
+      # its own, but does fail under --strict, which is what makes the
+      # falsification in RFC-095/handoff 090 ("remove the OARS rating,
+      # and it fails") true. Pinned by digest, and `appstreamcli` itself
+      # (not the `flatpak-builder-lint` Python entrypoint) is run inside
+      # the same image, which carries it as a dependency.
+      - name: AppStream metainfo lint (RFC-095 §5)
+        run: |
+          docker run --rm \
+            -v "$PWD:/mnt:ro" \
+            --entrypoint appstreamcli \
+            ghcr.io/flathub/flatpak-builder-lint@sha256:309982ccd3fee0f6e11a55a5235efeed60e46addd209057c537362437dfa5dd5 \
+            validate --no-net --strict --explain \
+            /mnt/packaging/linux/io.github.forskscope.forskscope.metainfo.xml
+
       # F83: ROADMAP.md's "Remaining proposed RFCs" table and
       # rfcs/proposed/ had drifted apart in both directions with nothing
       # catching it. This check fails on either direction of drift, and on
