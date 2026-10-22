@@ -509,12 +509,25 @@ reachable from a file name.
 - The two non-string interpolations are integers by construction and were not
   examined further.
 
-### 10. `forskscope-cli`: headless comparison (RFC-094)
+### 10. `forskscope compare`/`forskscope mcp`: the subcommand entry points (RFC-094, RFC-096)
 
-A second, separate program — not a mode of `forskscope-ui`'s binary, and
-not linked against it. Two entry points: `compare` (described first,
-below) and `mcp`, an MCP server for AI agents (its own entry points
-follow after).
+Two subcommands of the one `forskscope` executable (RFC-096 §1: the
+first argument decides, before anything the app uses starts) — not a
+separate program any more, unlike `0.195.0`'s `forskscope-cli`. Two
+entry points: `compare` (described first, below) and `mcp`, an MCP
+server for AI agents (its own entry points follow after).
+
+**The read-only guarantee now lives at the source level, not in a
+separate binary (RFC-096 §2).** Both subcommands' own code is
+`forskscope-commands`, a library crate whose dependencies are exactly
+`forskscope-compare` and `forskscope-report` — nothing from
+`forskscope-edit`, `forskscope-desktop`, `forskscope-ui-logic` or the
+app itself. `cargo xtask crate-boundaries` enforces this dependency list
+on every push, the same gate RFC-094 relied on for the formerly separate
+binary. The one executable that contains this code also links the
+writing code, for the app's own use — the guarantee is that neither
+`compare` nor `mcp` can *reach* it, by the dependency graph, not that
+the bytes are absent from the file.
 
 **Flow:** two paths from `argv` → file-vs-folder decided from the paths
 themselves (`fs::metadata`, never `forskscope_compare::classify`, which
@@ -535,13 +548,19 @@ output.
   (`bwrap` over `$HOME`) — the overlay stayed empty after a real
   comparison; the same overlay, pointed at a command that deliberately
   touches a file in `$HOME`, is not empty, so again the method can fail.
-- **Reads no settings, writes no session:** unlike `forskscope-ui`, this
-  program does not link `forskscope-desktop` at all (`cargo xtask
-  crate-boundaries` enforces the dependency list this depends on), so
-  there is no settings/session code path to call even by accident.
+- **Reads no settings, writes no session through this code path:**
+  `forskscope-commands` does not depend on `forskscope-desktop` at all
+  (`cargo xtask crate-boundaries` enforces the dependency list this
+  depends on) — even though the one executable that contains this code
+  also links `forskscope-desktop` for the app's own settings/session
+  use, there is no such code path reachable from `compare` or `mcp`'s
+  own code, even by accident.
 - **No shell:** paths are opened with `std::fs`/the engine's own
   `load_path`, never passed through `sh -c` or a shell-invoked child
-  process. `forskscope-cli` spawns no process at all today.
+  process. `compare` spawns no process at all. `mcp` spawns exactly
+  one, described under `show_to_person` below — `crate-boundaries`
+  fails the build on any other process spawn anywhere in
+  `forskscope-commands` (RFC-096 §2).
 - A path that does not exist, or a file compared against a folder, is
   refused (exit code `2`) before anything is read.
 
@@ -578,18 +597,28 @@ new dependency, protocol revision `2025-11-25` or `2025-06-18`):**
   content never appears anywhere in the result — tested directly, with a
   one-sided symlink pointing outside every configured root.
 - **The opt-in `show_to_person` GUI launch** — registered as a tool only
-  when the server is started with `--allow-show`; starts `forskscope`
-  from `std::env::current_exe()`'s own directory (beside
-  `forskscope-cli`), never a binary found on `PATH`, as two separate
-  `Command` arguments with no shell — there is no shell here at all, so
-  no injection surface for a path to land on. The child's standard input
-  and output are both `null`, not inherited: the GUI can read neither
-  the agent's next request nor leak output onto the agent's own protocol
-  channel; only standard error stays inherited, for its own diagnostics.
-  Tested with a fake sibling binary in place of the real GUI, confirming
-  the two paths arrive as separate, unmodified arguments, and that a
-  fake GUI writing to its own stdout never corrupts the next protocol
-  message.
+  when the server is started with `--allow-show`; starts
+  `std::env::current_exe()` — this same running executable, with no
+  subcommand, which is the same two-path launch form entries 1/2 above
+  already accept — never a binary found on `PATH` and never a separate
+  sibling binary (RFC-096 §3 removed that lookup: there is only one
+  executable now), as two separate `Command` arguments with no shell —
+  there is no shell here at all, so no injection surface for a path to
+  land on. The child's standard input and output are both `null`, not
+  inherited: the GUI can read neither the agent's next request nor leak
+  output onto the agent's own protocol channel; only standard error
+  stays inherited, for its own diagnostics. Tested two ways: narrow unit
+  tests call the launch logic directly with a fake script in place of a
+  real executable, and a protocol-level test starts the real compiled
+  `forskscope mcp` with a test-only environment variable
+  (`FORSKSCOPE_SHOW_TO_PERSON_EXE_FOR_TEST`, read only by this code,
+  never set by a real MCP client) pointing `show_to_person` at a
+  stand-in script instead of `current_exe()` — both confirm the two
+  paths arrive as separate, unmodified arguments, and that a stand-in
+  GUI writing to its own stdout never corrupts the next protocol
+  message. The real, unfaked launch — opening the actual window from
+  the actual compiled executable — is verified live, separately,
+  through AT-SPI.
 - **Hostile protocol input never crashes the server:** a malformed line,
   an unknown method, a message over a 4 MiB cap (capped while reading,
   not after — a hostile line with no newline at all cannot force
@@ -601,10 +630,10 @@ new dependency, protocol revision `2025-11-25` or `2025-06-18`):**
   shim logging every `socket`/`connect` call stayed silent across a full
   `initialize`/`tools/list`/`tools/call`/`ping` session, backed by a
   structural check (`cargo xtask crate-boundaries`) that fails the build
-  if `forskscope-compare`, `forskscope-report`, or `forskscope-cli` ever
-  names `std::net` or the platform raw-socket modules anywhere outside a
-  test — a check that can fail on its own, not only a property the shim
-  run happened not to exercise.
+  if `forskscope-compare`, `forskscope-report`, or `forskscope-commands`
+  ever names `std::net` or the platform raw-socket modules anywhere
+  outside a test — a check that can fail on its own, not only a
+  property the shim run happened not to exercise.
 - **No writes, re-verified for `mcp` specifically:** the same RFC-091
   writable-overlay method, run around a full `mcp` session instead of a
   `compare` run, left the overlay empty.
@@ -621,7 +650,7 @@ could, between those two steps, replace what the resolved path points
 at (a TOCTOU window). The agent itself has no write capability through
 this server to set up such a race; the risk is from another process on
 the same machine, the same class of risk any read-then-use path check
-carries, not one specific to `forskscope-cli`.
+carries, not one specific to this program.
 
 ---
 

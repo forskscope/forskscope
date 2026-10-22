@@ -25,7 +25,7 @@ pub enum ReportPathMode {
 /// `build_dir_report` (which would push that function over clippy's
 /// `too_many_arguments` limit — the same reasoning
 /// `build_file_report`/`checksum_if_fingerprinted`'s split already follows
-/// for checksums). RFC-094 §3's `forskscope-cli compare --max-files`/
+/// for checksums). RFC-094 §3's `forskscope compare --max-files`/
 /// `--max-change-bytes` set these two fields directly; the GUI
 /// (`export_dir_report.rs`) never sets them, so it keeps these defaults
 /// unchanged.

@@ -1,8 +1,9 @@
 # CLI Reference
 
-This page covers the GUI program's own command line (`forskscope`). For a
-separate, headless program built for scripts and AI agents — no GTK, no
-window, prints to standard output only — see
+This page covers `forskscope` with no subcommand — the GUI. The same
+executable also has two subcommands built for scripts and AI agents, with
+no GTK, no window, and output to standard output only: `forskscope
+compare` and `forskscope mcp`. See
 [Using ForskScope from scripts and AI agents](./scripts-and-agents.md).
 
 ## Startup modes

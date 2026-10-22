@@ -19,7 +19,7 @@ are welcome; personal attacks are not.
 ```sh
 git clone https://github.com/forskscope/forskscope
 cd forskscope
-cargo test -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
+cargo test -p forskscope-commands -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
 ```
 
 Those five crates run without GTK. The UI crate (`forskscope-ui`) requires
@@ -35,7 +35,7 @@ package list.
 crates/
   forskscope-compare/     # Read-only comparison engine (load, diff, folder scan); no Dioxus dependency
   forskscope-report/      # Report/patch/checksum building, returns text and bytes, never writes a file
-  forskscope-cli/         # The headless program forskscope-cli (RFC-094): depends only on compare + report
+  forskscope-commands/    # forskscope's own compare/mcp subcommands (RFC-096 §2): depends only on compare + report
   forskscope-edit/        # The write path: merge sessions, edit ops, atomic save, batch copy
   forskscope-desktop/     # Settings/session persistence, external tools, Git, file watching
   forskscope-ui-logic/    # Pure view-model layer, built on the four crates above; no GTK dependency
@@ -50,8 +50,10 @@ Dioxus or GTK.** Every other crate stays testable without a display server.
 Within that, each engine crate has its own narrower rule, enforced by
 `cargo xtask crate-boundaries`: `forskscope-compare` and `forskscope-report`
 never write a file or spawn a process; `forskscope-edit` is the only crate
-besides the GUI itself that writes a user's file; `forskscope-desktop` is
-the only one that spawns a process.
+besides the GUI itself that writes a user's file; `forskscope-desktop`
+spawns a process freely, and `forskscope-commands` spawns exactly one
+(`show_to_person`'s launch of this program's own executable) and nothing
+else.
 
 ---
 
@@ -75,8 +77,8 @@ request for anything beyond a one-line fix.
    changing — `docs/src/maintainers/architecture.md` says which.
 3. **Run the test suite:**
    ```sh
-   cargo test -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
-   cargo clippy -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
+   cargo test -p forskscope-commands -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
+   cargo clippy -p forskscope-commands -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
    ```
    Both must pass with zero failures and zero warnings before opening a PR.
 4. **Check file size.** Split files over 300 ELOC where it helps. Over 500

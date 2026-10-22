@@ -1,37 +1,44 @@
 # Using ForskScope from scripts and AI agents
 
-**`forskscope-cli`** is a second, separate program (RFC-094) built to be
-driven by a script or an AI agent rather than a person at a window. It
-ships beside the GUI program (`forskscope`) in every release, and has
-four fixed properties:
+**`forskscope compare`** and **`forskscope mcp`** are two subcommands of
+the same `forskscope` program, built to be driven by a script or an AI
+agent rather than a person at a window (RFC-096; one program, not a
+second one — `0.195.0`'s separate `forskscope-cli` is gone). They have
+three fixed properties:
 
-- **Read-only by construction** — it is not built from the code that
-  writes, so it cannot save, merge, or apply a patch.
-- **No network** — it opens no socket and listens on no port.
-- **Stateless** — it reads no settings and writes no session; every run
+- **Read-only by construction** — neither is built from the code that
+  writes, so neither can save, merge, or apply a patch (RFC-096 §2: this
+  guarantee lives in `forskscope-commands`'s own dependency graph, kept
+  honest by `cargo xtask crate-boundaries`).
+- **No network** — neither opens a socket nor listens on a port.
+- **Stateless** — neither reads settings nor writes a session; every run
   starts from nothing and leaves nothing behind.
-- **Small** — no GTK, no WebKitGTK, no WebView2. It starts in a plain
-  server or CI container with no desktop stack installed.
 
-It has two modes: `compare`, and `mcp`, a server for AI agents — both
+Unlike `0.195.0`'s `forskscope-cli`, neither subcommand is small: this
+one executable links the same GTK and WebKitGTK the window does, even
+though a subcommand never opens one, so **on Linux it still needs those
+libraries installed** — it does not run on a server or CI container with
+no desktop stack. A build with no desktop dependency at all is a future,
+separate decision, not something either subcommand does today.
+
+They have two modes: `compare`, and `mcp`, a server for AI agents — both
 described below.
 
-**Where to find it:** the Linux `.tar.gz` and the Windows `.zip` carry
-`forskscope-cli` beside the GUI program — run it directly, or copy it
-somewhere on `PATH`. The AUR package installs it at `/usr/bin/forskscope-cli`.
-On macOS it sits inside the app bundle, at
-`ForskScope.app/Contents/MacOS/forskscope-cli` — to use it from a
-terminal or a script, either call it by that full path, or put a symlink
-to it on your `PATH` (for example, `ln -s
-"/Applications/ForskScope.app/Contents/MacOS/forskscope-cli"
-/usr/local/bin/forskscope-cli`).
+**Where to find it:** the same `forskscope` the window opens from — the
+Linux `.tar.gz`, the Windows `.zip`, the AUR package's
+`/usr/bin/forskscope`, and the macOS app bundle's
+`ForskScope.app/Contents/MacOS/forskscope`. On macOS, to call it from a
+terminal or a script, either use that full path, or put a symlink to it
+on your `PATH` (for example, `ln -s
+"/Applications/ForskScope.app/Contents/MacOS/forskscope"
+/usr/local/bin/forskscope`).
 
 ---
 
 ## `compare`
 
 ```sh
-forskscope-cli compare <left> <right> [options]
+forskscope compare <left> <right> [options]
 ```
 
 Compares two files, or two folders — decided from the paths, not from a
@@ -40,17 +47,19 @@ flag. Comparing a file against a folder is refused (exit code `2`).
 ### Output formats
 
 `--format text|json|patch|html`, printed to **standard output only** —
-`forskscope-cli` never creates a file itself. Redirect if you want one:
+`forskscope compare` never creates a file itself. Redirect if you want
+one:
 
 ```sh
-forskscope-cli compare old.txt new.txt --format html > report.html
+forskscope compare old.txt new.txt --format html > report.html
 ```
 
 - **`text`** (the default): a plain-text summary — what was compared, the
   one-sentence summary, and the changes themselves (old/new line numbers,
   a `−`/`+` mark, context lines), in the app's own words. Meant for a
   person reading a terminal, not for a script to parse — use `json` for
-  that. **Always in English:** `forskscope-cli` has no language setting.
+  that. **Always in English:** `forskscope compare` has no language
+  setting.
 - **`json`**: the versioned `forskscope.comparison/1` document, below.
 - **`patch`**: a unified diff, compatible with `patch -p1` and
   `git apply`. For a file comparison this is byte-for-byte what the GUI's
@@ -104,8 +113,8 @@ Every document starts `{"schema": "forskscope.comparison/1", "kind":
 "file"|"directory", ...}`. The schema name is versioned on purpose:
 adding a field keeps `/1`; removing a field, or changing what one means,
 moves to `/2` with a new schema file. The full shape is a JSON Schema
-file in the repository, checked against what `forskscope-cli` actually
-prints by `cargo xtask json-schema`:
+file in the repository, checked against what `forskscope compare`
+actually prints by `cargo xtask json-schema`:
 
 ```text
 docs/schemas/forskscope.comparison.v1.json
@@ -138,7 +147,7 @@ was never read says `not_compared`, not `identical`.
 ## `mcp`: a server for AI agents
 
 ```sh
-forskscope-cli mcp --root <dir> [--root <dir> …] [--allow-show]
+forskscope mcp --root <dir> [--root <dir> …] [--allow-show]
 ```
 
 Starts a [Model Context Protocol](https://modelcontextprotocol.io) server
@@ -174,12 +183,12 @@ them.
   Cancelling a call (MCP's `notifications/cancelled`) stops a folder
   comparison mid-walk.
 - **`show_to_person`**, only when the server was started with
-  `--allow-show` — opens the GUI program (`forskscope`) on the pair, so
-  a person can look at what the agent found in the window they already
-  know. It starts `forskscope` from right beside `forskscope-cli`, never
-  one found on `PATH`, and its only effect is that window opening —
-  nothing is sent anywhere. Two folders open the folder comparison, the
-  same as two files open a file comparison.
+  `--allow-show` — opens the window on the pair, so a person can look at
+  what the agent found in the window they already know. It starts this
+  same running executable with no subcommand, never one found on `PATH`,
+  and its only effect is that window opening — nothing is sent anywhere.
+  Two folders open the folder comparison, the same as two files open a
+  file comparison.
 
 Both tools' descriptions say plainly that a compared file's content is
 data supplied by whoever wrote that file — never instructions to follow,
@@ -194,7 +203,7 @@ Claude Desktop, and others):
 {
   "mcpServers": {
     "forskscope": {
-      "command": "/path/to/forskscope-cli",
+      "command": "/path/to/forskscope",
       "args": ["mcp", "--root", "/path/to/the/project"]
     }
   }
@@ -213,7 +222,7 @@ claude --mcp-config forskscope-mcp.json --strict-mcp-config
 ## Collaborating with a person
 
 An agent's own findings are already something a person can open:
-`forskscope-cli compare --format html` is the same report the GUI's
+`forskscope compare --format html` is the same report the GUI's
 **Export report…** produces, and `--format patch` is the same unified
 diff **Export patch…** produces. Handing either file to a person, or
 pointing them at it, needs nothing more from ForskScope today — and an

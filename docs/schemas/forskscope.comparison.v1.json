@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://forskscope.dev/schemas/forskscope.comparison.v1.json",
   "title": "ForskScope comparison document (forskscope.comparison/1)",
-  "description": "What `forskscope-cli compare --format json` prints, and the structured content `forskscope-cli mcp`'s `compare` tool returns when asked for JSON (RFC-094 §3). Adding a field keeps this schema at /1; removing a field, or changing its meaning, moves to /2 with its own schema file.",
+  "description": "What `forskscope compare --format json` prints, and the structured content `forskscope mcp`'s `compare` tool returns when asked for JSON (RFC-094 §3, RFC-096 §5). Adding a field keeps this schema at /1; removing a field, or changing its meaning, moves to /2 with its own schema file.",
   "oneOf": [
     { "$ref": "#/$defs/file_document" },
     { "$ref": "#/$defs/directory_document" }

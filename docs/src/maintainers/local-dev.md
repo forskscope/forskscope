@@ -21,13 +21,13 @@ cargo test -p forskscope-desktop
 cargo test -p forskscope-edit
 cargo test -p forskscope-report
 cargo test -p forskscope-ui-logic
-cargo test -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic  # headless gate
+cargo test -p forskscope-commands -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic  # headless gate
 
 # Full workspace (requires GTK):
 cargo test --workspace
 
 # Lint (run before every commit):
-cargo clippy -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
+cargo clippy -p forskscope-commands -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
 ```
 
 > **Note:** `forskscope-ui` depends on `dioxus-desktop` which requires GTK3
@@ -52,7 +52,7 @@ cargo run -p forskscope
 crates/
   forskscope-compare/src/   # load, diff, folder scan - no writes, no process spawn
   forskscope-report/src/    # report/patch/checksum building - returns text/bytes
-  forskscope-cli/src/       # the headless program forskscope-cli (RFC-094): depends only on compare + report
+  forskscope-commands/src/  # forskscope's own compare/mcp subcommands (RFC-096 §2): depends only on compare + report
   forskscope-edit/src/      # merge sessions, edit ops, atomic save, batch copy
   forskscope-desktop/src/   # settings/session persistence, external tools, Git, watcher
   forskscope-ui-logic/src/
@@ -127,5 +127,5 @@ Verify on MSRV before releasing:
 
 ```sh
 rustup install 1.91
-cargo +1.91 test -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
+cargo +1.91 test -p forskscope-commands -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
 ```

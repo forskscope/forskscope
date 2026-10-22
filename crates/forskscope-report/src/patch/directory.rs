@@ -44,7 +44,7 @@ pub fn patch_from_directories(
 
 /// Like [`patch_from_directories`] but skips what `rules` ignore, the same
 /// relationship `recursive_diff_with_rules` has to `recursive_diff`
-/// (RFC-094 §2: `forskscope-cli compare`'s `--ignore-ext`/`--ignore-dir`/
+/// (RFC-094 §2: `forskscope compare`'s `--ignore-ext`/`--ignore-dir`/
 /// `--hide-dotfiles` must shape every output format alike, `patch`
 /// included - the file set a patch covers must be the same one a text,
 /// JSON or HTML report of the same comparison would show).

@@ -27,8 +27,8 @@ niri msg action screenshot-window --id <WINDOW_ID> --path "$PWD/.git-exclude/run
 The full headless test suite must pass before running UI smoke tests:
 
 ```sh
-cargo test -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
-cargo clippy -p forskscope-cli -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
+cargo test -p forskscope-commands -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic
+cargo clippy -p forskscope-commands -p forskscope-compare -p forskscope-desktop -p forskscope-edit -p forskscope-report -p forskscope-ui-logic -- -D warnings
 ```
 
 ---

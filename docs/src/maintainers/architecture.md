@@ -1,17 +1,18 @@
 # Architecture
 
-ForskScope is a Cargo workspace with seven crates (RFC-093, RFC-094).
+ForskScope is a Cargo workspace with seven crates (RFC-093, RFC-094,
+RFC-096).
 
 ```text
 forskscope/
   crates/
     forskscope-compare/    read-only comparison engine: load, diff, folder scan - never writes a file, never spawns a process
     forskscope-report/     report/patch/checksum building - returns text and bytes, the caller writes them
-    forskscope-cli/        the headless program forskscope-cli: compare from a script or an MCP agent (RFC-094)
+    forskscope-commands/   forskscope's own compare/mcp subcommands, for a script or an MCP agent (RFC-096 §2)
     forskscope-edit/       the write path: merge sessions, edit ops, atomic save, folder batch copy/plan/execute
     forskscope-desktop/    settings/session persistence, external tools, Git, file watching, platform detection
     forskscope-ui-logic/   view-model layer, no Dioxus/GTK dependency
-    forskscope-ui/         Dioxus 0.7 desktop frontend (shell, workspaces, dialogs)
+    forskscope-ui/         Dioxus 0.7 desktop frontend (shell, workspaces, dialogs), and the one executable (RFC-096 §1)
 ```
 
 A boundary pays only where some program or crate can depend on one side
@@ -21,7 +22,10 @@ compiler-enforced promise of never writing a file or spawning a process
 (`cargo xtask crate-boundaries` checks this on every push, by rule and by
 `cargo tree`'s resolved dependency graph against the table below); `forskscope-edit`
 is the only crate besides the GUI itself that writes a user's file;
-`forskscope-desktop` is the only one that spawns a process. None of the four
+`forskscope-desktop` spawns a process freely, and `forskscope-commands`
+spawns exactly one (`show_to_person`'s launch of this program's own
+executable) and nothing else — also enforced by `crate-boundaries`
+(RFC-096 §2). None of the four
 engine crates depends on Dioxus, Tauri, or any UI framework. `forskscope-ui-logic`
 holds pure presentation logic, built on the four engine crates, testable
 without a display server.
@@ -30,11 +34,11 @@ without a display server.
 |---|---|---|---|---|
 | `forskscope-compare` | document loading/decoding/classifying with fingerprints; line diff + comparison profile; folder listing, recursive comparison, digests; workbook comparison (feature `spreadsheet`, on by default); ignore rules; jobs/cancellation; errors | No | No | — |
 | `forskscope-report` | unified diff (`patch`); Markdown/JSON/HTML reports; SHA-256; building a report from disk (`build_dir_report`, `build_file_report`); the versioned `forskscope.comparison/1` JSON contract (`report::json`, RFC-094 §3) | No (returns text/bytes, caller writes) | No | compare |
-| `forskscope-cli` | the headless program `forskscope-cli`: `compare` (RFC-094 §2) prints text/JSON/patch/HTML to standard output only | No | No | compare, report |
+| `forskscope-commands` | `forskscope`'s own `compare`/`mcp` subcommands (RFC-096 §2, formerly the headless program `forskscope-cli`, RFC-094): `compare` prints text/JSON/patch/HTML to standard output only | No | Only `show_to_person`'s one launch of this program's own executable | compare, report |
 | `forskscope-edit` | merge sessions incl. three-way; edit operations; atomic save with fingerprint preconditions; folder batch-copy/plan/execute; `compare_prep`'s save-target half | Yes, only crate that writes user files | No | compare |
 | `forskscope-desktop` | settings/session persistence; settings display types; external tools; Git; file watching; platform detection; env pass-through | Only its own settings/session | Yes: external tools, Git, system opener | compare, edit |
 | `forskscope-ui-logic` | GUI view-models incl. `command`, `diff_decoration`, `line_map`, `conflict_nav` | No | No | compare, report, edit, desktop |
-| `forskscope-ui` | the GUI program `forskscope` | — | — | all of the above |
+| `forskscope-ui` | the one executable `forskscope`: the GUI with no subcommand, dispatching to `forskscope-commands` for `compare`/`mcp` (RFC-096 §1) | — | — | all of the above |
 
 ## `forskscope-compare` modules
 
@@ -60,12 +64,12 @@ without a display server.
 | `patch` | `PatchDocument`, unified-diff export from file and directory diffs (RFC-039). |
 | `report` | `FileComparisonReport` + `DirComparisonReport` — Markdown/JSON/HTML report export (RFC-027, RFC-092). `build_dir_report`/`BuildOutcome` and `build_file_report`/`checksum_if_fingerprinted` read, hash and diff the compared files to assemble a report, written by the caller (RFC-092 §5, moved from `forskscope-ui` in RFC-093 §1 step 6). |
 
-## `forskscope-cli` modules
+## `forskscope-commands` modules
 
 | Module | Responsibility |
 |---|---|
-| `main` | `--version`/`--help`, command dispatch. Hand-written argument parsing, no parser framework. |
-| `compare` | `compare <left> <right> [options]` (RFC-094 §2): file-vs-folder decided from the paths; `--format text\|json\|patch\|html`; exit codes follow `diff`. Binary/workbook files report status only. |
+| `lib` | Crate root: `pub mod compare; pub mod mcp;` - one entry point per subcommand (`run(args) -> i32`), dispatched to by `forskscope-ui`'s own `main` before anything the app uses starts (RFC-096 §1). |
+| `compare` | `compare <left> <right> [options]` (RFC-096 §2, formerly RFC-094 §2): file-vs-folder decided from the paths; `--format text\|json\|patch\|html`; exit codes follow `diff`. Binary/workbook files report status only. |
 
 ## `forskscope-edit` modules
 
