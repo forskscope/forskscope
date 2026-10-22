@@ -153,6 +153,10 @@ pub fn AboutModal() -> Element {
         t(lang, "Check for updates")
     };
     let channel = app_channel();
+    // RFC-095 §4.6: in a Flatpak, updates come from Flathub through the
+    // user's software centre - the menu entry and its setting are not
+    // shown, and no update request is ever made.
+    let in_flatpak = forskscope_desktop::platform::flatpak().in_flatpak;
 
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "About ForskScope"),
@@ -171,26 +175,32 @@ pub fn AboutModal() -> Element {
                         }
                     }
                 }
-                div { class: "update-check",
-                    button {
-                        disabled: checking,
-                        onclick: move |_| {
-                            update_state.set(Some(UpdateCheckState::Checking));
-                            spawn(async move {
-                                let outcome = tokio::task::spawn_blocking(check_for_updates)
-                                    .await
-                                    .unwrap_or(CheckOutcome::Unreachable);
-                                update_state.set(Some(decide(Version::current(), outcome)));
-                            });
-                        },
-                        "{button_label}"
+                if in_flatpak {
+                    p { class: "update-check-message",
+                        {t(lang, "Updates come from Flathub, through your software centre.")}
                     }
-                    if let Some(state) = &*update_state.read() {
-                        if !matches!(state, UpdateCheckState::Checking) {
-                            p { class: "update-check-message", "{update_check_message(lang, state)}" }
+                } else {
+                    div { class: "update-check",
+                        button {
+                            disabled: checking,
+                            onclick: move |_| {
+                                update_state.set(Some(UpdateCheckState::Checking));
+                                spawn(async move {
+                                    let outcome = tokio::task::spawn_blocking(check_for_updates)
+                                        .await
+                                        .unwrap_or(CheckOutcome::Unreachable);
+                                    update_state.set(Some(decide(Version::current(), outcome)));
+                                });
+                            },
+                            "{button_label}"
                         }
-                        if let UpdateCheckState::NewerAvailable { latest, .. } = state {
-                            {newer_available_action(lang, channel, *latest)}
+                        if let Some(state) = &*update_state.read() {
+                            if !matches!(state, UpdateCheckState::Checking) {
+                                p { class: "update-check-message", "{update_check_message(lang, state)}" }
+                            }
+                            if let UpdateCheckState::NewerAvailable { latest, .. } = state {
+                                {newer_available_action(lang, channel, *latest)}
+                            }
                         }
                     }
                 }

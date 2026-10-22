@@ -370,6 +370,9 @@ fn ja(key: &str) -> Option<&'static str> {
         "Copied." => "コピーしました。",
         "Check for updates" => "更新を確認",
         "Checking…" => "確認中…",
+        "Updates come from Flathub, through your software centre." => {
+            "更新は Flathub から、お使いのソフトウェアセンター経由で届きます。"
+        }
         "You have the latest version ({version})." => "最新バージョンです（{version}）。",
         "{version} is available." => "{version} が利用可能です。",
         "This build is newer than the latest release ({version})." => {
