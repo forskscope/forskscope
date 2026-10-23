@@ -1,7 +1,6 @@
 # RFC 096: One Program — the App and Its Commands
 
-**Status.** Accepted — review complete; implementer may start. Moves to `done/`
-when the work ships (RFC-000, 5-folder variant).
+**Status.** Implemented (`0.196.0`, `1845c02`; reviews 187, 188, 190).
 **Proposed.** 2026-10-22 by the architect. The owner approved the design in
 discussion the same day.
 **Accepted.** 2026-10-22 by the project owner.

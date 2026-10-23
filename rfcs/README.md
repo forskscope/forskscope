@@ -7,7 +7,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Accepted (7)
+## Accepted (6)
 
 Review complete; the implementer may start. Distinct from **Proposed**, which
 is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
@@ -19,12 +19,12 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 079 | [Microsoft Store Submission Automation](./accepted/079-microsoft-store-submission-automation.md) | Accepted |
 | 081 | [AUR Publication Automation](./accepted/081-aur-publication-automation.md) | Accepted |
 | 095 | [ForskScope as a Flatpak on Flathub](./accepted/095-flatpak-on-flathub.md) | Accepted 2026-10-21 |
-| 096 | [One Program — the App and Its Commands](./accepted/096-one-program-the-app-and-its-commands.md) | Accepted 2026-10-22 |
 
-## Implemented (70)
+## Implemented (71)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
+| 096 | [One Program — the App and Its Commands](./done/096-one-program-the-app-and-its-commands.md) | Implemented — `0.196.0` |
 | 094 | [Headless Comparison for Scripts and AI Agents](./done/094-headless-comparison-for-scripts-and-agents.md) | Implemented — `0.195.0` |
 | 093 | [Crate Boundaries — a Read-Only Engine, Its Outputs, and Everything That Writes](./done/093-crate-boundaries.md) | Implemented — `0.195.0` |
 | 092 | [Comparison Reports — HTML and Unified Diff, for Files and Folders](./done/092-comparison-reports.md) | Implemented — `0.194.0` |
