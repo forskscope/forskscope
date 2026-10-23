@@ -15,6 +15,26 @@ agent rather than a person at a window. They have three fixed properties:
 they do not run on a server or CI container with no desktop stack
 installed.
 
+**On Windows, ForskScope is a windowed program, so a terminal does not
+wait for it.** Run directly in PowerShell, the prompt comes back before the
+output appears, and the exit code is not recorded. Scripts and AI agents
+are not affected: they read the output through a pipe, which works as
+usual. To read a result yourself in PowerShell, from the folder that holds
+`forskscope.exe`, wait for it:
+
+```powershell
+$p = Start-Process -FilePath .\forskscope.exe -ArgumentList "compare","left.txt","right.txt" -NoNewWindow -Wait -PassThru
+$p.ExitCode
+```
+
+Piping the output into another command also waits, and sets
+`$LASTEXITCODE`:
+
+```powershell
+.\forskscope.exe compare left.txt right.txt --format json | Select-String schema
+$LASTEXITCODE
+```
+
 **Where to find it:** the same `forskscope` the window opens from — the
 Linux `.tar.gz`, the Windows `.zip`, the AUR package's
 `/usr/bin/forskscope`, and the macOS app bundle's

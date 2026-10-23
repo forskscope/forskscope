@@ -56,6 +56,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.196.0" date="2026-10-24">
+      <description>
+        <p>One program: the app, and its commands for scripts and AI agents.</p>
+      </description>
+    </release>
     <release version="0.195.0" date="2026-10-22">
       <description>
         <p>For scripts and AI agents.</p>

@@ -5,7 +5,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.195.1] — Unreleased
+## [0.196.0] — 2026-10-24
+
+**One program.**
+
+### Changed
+
+- **`forskscope-cli` is replaced by two subcommands of `forskscope` itself:**
+  `forskscope compare` and `forskscope mcp`. Every release again carries one
+  program.
+  - **What they do is unchanged:** the same output, exit codes, JSON format
+    and MCP tools.
+  - **In scripts,** write `forskscope compare` where you wrote
+    `forskscope-cli compare`.
+  - **In an MCP client's configuration,** set `"command"` to `forskscope`,
+    and start `"args"` with `"mcp"`.
+  - **`show_to_person` opens the same program** in its window.
+  - **On Linux, the subcommands need the same desktop libraries as the
+    app.**
+  - **On Windows, a terminal does not wait for them.** Scripts and AI agents,
+    which read through a pipe, are not affected. The guide shows how to wait
+    for a result in PowerShell.
+- **The Linux desktop entry is now `io.github.forskscope.forskscope.desktop`.**
+  `install.sh` removes the old `forskscope.desktop`.
+
+### Internal
+
+- **Prepared for Flatpak (RFC-095).** Not published yet. Inside a Flatpak
+  only, the app:
+  - needs no network permission;
+  - asks plainly for home folder access when it is missing;
+  - shows real paths for files handed over by other programs;
+  - never claims a backup it cannot keep;
+  - leaves updates to the software centre;
+  - stays usable with screen readers.
+  
+  Outside a Flatpak, nothing changes.
+- **Store listing material:** an AppStream metainfo file and screenshots,
+  with a lint check in CI.
+- **New release checks:**
+  - the metainfo names the version being released;
+  - the release program contains no test-only switch.
+- **`forskscope-cli` became the library `forskscope-commands`.** The
+  `crate-boundaries` check keeps it from reaching the code that writes, from
+  networking, and from starting any process but `show_to_person`'s one.
 
 ## [0.195.0] — 2026-10-22
 
