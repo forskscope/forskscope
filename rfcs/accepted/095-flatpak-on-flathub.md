@@ -477,6 +477,13 @@ is disclosed by the owner** (§1).
 
 1. **The icon:** made by the owner, commissioned, or drafted here and
    disclosed?
+   - **Decided (owner, 2026-10-25): drafted here, and disclosed.** The
+     architect traced the owner's logo into an SVG, with opaque shapes on a
+     light tile, so it reads on dark backgrounds too. The owner reviewed and
+     approved it.
+   - **The file:**
+     `packaging/linux/icons/hicolor/scalable/apps/io.github.forskscope.forskscope.svg`.
+   - **The Flathub submission discloses it** as AI-made.
 2. **The Flathub release cadence:**
    - every release, or minor releases only?
    - ForskScope releases every few days, and Flathub discourages
