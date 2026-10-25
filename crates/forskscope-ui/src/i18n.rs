@@ -18,6 +18,8 @@ fn ja(key: &str) -> Option<&'static str> {
     let v = match key {
         "Explorer" => "エクスプローラー",
         "Open tabs" => "開いているタブ",
+        "Expand folder" => "フォルダーを展開",
+        "Collapse folder" => "フォルダーを折りたたむ",
         "Settings" => "設定",
         "Compare selected files" => "選択したファイルを比較",
         "Compare selected directories" => "選択したディレクトリを比較",

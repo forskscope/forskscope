@@ -580,8 +580,36 @@ pub fn TreeRow(
             class: "{rc}", role: "row", style: "padding-left: {indent}px",
             onclick:       move |_| { if !binary_blocked { on_select.call(()); } },
             ondoubleclick: move |_| { if !binary_blocked { on_dblclick.call(()); } },
-            span { class: "tree-caret",
-                onclick: move |e| { e.stop_propagation(); on_toggle.call(()); }, "{caret}" }
+            if is_dir {
+                // F212: an accessible button, not a bare `span` with an
+                // `onclick` - that gave a screen-reader user no name, no
+                // role and no expanded/collapsed state for a folder, even
+                // though keyboard users could already reach it via the
+                // arrow keys (dioxus-swdir-tree-core's own `Right`/`Left`
+                // handling). `role: "button"` on the `span`, not a real
+                // `<button>` element: a real button's native platform
+                // chrome (WebKit's own `-webkit-appearance`, measured, not
+                // assumed - `magick compare -metric AE` on the Explorer
+                // before/after this change, same demo folder, same
+                // backend, same size) imposed intrinsic sizing no CSS
+                // reset fully closed, drifting every row's height by a
+                // sub-pixel amount that compounded down the list.
+                // `tabindex="-1"` keeps it out of Tab order - arrow-key
+                // navigation inside the tree stays the keyboard path, and
+                // nothing here needs native Enter/Space activation (the
+                // caret has no form semantics to begin with); this only
+                // adds the accessible name/state for AT-SPI/screen readers
+                // and a mouse/touch target with a real role.
+                span {
+                    class: "tree-caret", role: "button", tabindex: "-1",
+                    aria_label: if is_expanded { t(lang, "Collapse folder") } else { t(lang, "Expand folder") },
+                    aria_expanded: if is_expanded { "true" } else { "false" },
+                    onclick: move |e| { e.stop_propagation(); on_toggle.call(()); },
+                    "{caret}"
+                }
+            } else {
+                span { class: "tree-caret", aria_hidden: "true", "{caret}" }
+            }
             span { class: "tree-icon",  "{icon}" }
             span { class: "tree-label", "{name}" }
             if binary_blocked {
@@ -1050,6 +1078,127 @@ mod tests {
             aria_labels.iter().any(|l| l == "Left pane — tmp"),
             "expected the group aria-label \"Left pane — tmp\" among \
              {aria_labels:?}"
+        );
+    }
+
+    // ── TreeRow's caret accessibility (F212) ─────────────────────────────────
+    //
+    // Before this fix, a folder's expand/collapse caret was a bare `<span>`
+    // with an `onclick` - no name, no role, no expanded/collapsed state for
+    // a screen reader, even though sighted mouse users and keyboard users
+    // (the arrow keys, handled in `dioxus-swdir-tree-core`) could both
+    // already reach it. Falsify by reverting the `button`/`aria_label`/
+    // `aria_expanded` change in `TreeRow` and re-running these.
+
+    fn root_collapsed_folder() -> Element {
+        rsx! {
+            TreeRow {
+                lang: Lang::En, path: PathBuf::from("/tmp/folder"),
+                is_dir: true, is_expanded: false, is_selected: false, depth: 0,
+                status: None,
+                on_toggle: move |_| {}, on_select: move |_| {},
+                on_dblclick: move |_| {}, on_verify: move |_| {},
+            }
+        }
+    }
+
+    fn root_expanded_folder() -> Element {
+        rsx! {
+            TreeRow {
+                lang: Lang::En, path: PathBuf::from("/tmp/folder"),
+                is_dir: true, is_expanded: true, is_selected: false, depth: 0,
+                status: None,
+                on_toggle: move |_| {}, on_select: move |_| {},
+                on_dblclick: move |_| {}, on_verify: move |_| {},
+            }
+        }
+    }
+
+    fn root_file_row() -> Element {
+        rsx! {
+            TreeRow {
+                lang: Lang::En, path: PathBuf::from("/tmp/file.txt"),
+                is_dir: false, is_expanded: false, is_selected: false, depth: 0,
+                status: None,
+                on_toggle: move |_| {}, on_select: move |_| {},
+                on_dblclick: move |_| {}, on_verify: move |_| {},
+            }
+        }
+    }
+
+    fn tree_row_attrs(root: fn() -> Element) -> Vec<(&'static str, String)> {
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+
+        mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name,
+                    value: dioxus_core::AttributeValue::Text(s),
+                    ..
+                } => Some((*name, s.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_collapsed_folder_row_announces_expand_folder_collapsed() {
+        let attrs = tree_row_attrs(root_collapsed_folder);
+        assert!(
+            attrs
+                .iter()
+                .any(|(n, v)| *n == "aria-label" && v == "Expand folder"),
+            "expected an aria-label \"Expand folder\" among {attrs:?}"
+        );
+        assert!(
+            attrs
+                .iter()
+                .any(|(n, v)| *n == "aria-expanded" && v == "false"),
+            "expected aria-expanded \"false\" among {attrs:?}"
+        );
+    }
+
+    #[test]
+    fn an_expanded_folder_row_announces_collapse_folder_expanded() {
+        let attrs = tree_row_attrs(root_expanded_folder);
+        assert!(
+            attrs
+                .iter()
+                .any(|(n, v)| *n == "aria-label" && v == "Collapse folder"),
+            "expected an aria-label \"Collapse folder\" among {attrs:?}"
+        );
+        assert!(
+            attrs
+                .iter()
+                .any(|(n, v)| *n == "aria-expanded" && v == "true"),
+            "expected aria-expanded \"true\" among {attrs:?}"
+        );
+    }
+
+    // `aria-hidden="true"` on a file row's caret placeholder (`dir_pane.rs`'s
+    // non-`is_dir` branch) is a literal, not an `if`-computed value, so
+    // dioxus bakes it into the compiled template rather than emitting it as
+    // a `SetAttribute` mutation here — the same limit `path_bar_aria_labels`
+    // already notes: whether a *static* attribute reaches the rendered DOM
+    // is an AT-SPI/UIA assertion, not something this mutation stream can
+    // see. What this test asserts instead is the substantive contract: a
+    // file row carries none of the folder caret's expand/collapse
+    // semantics.
+    #[test]
+    fn a_file_row_carries_no_expand_state() {
+        let attrs = tree_row_attrs(root_file_row);
+        assert!(
+            !attrs.iter().any(|(n, _)| *n == "aria-expanded"),
+            "a file row has nothing to expand/collapse; found aria-expanded among {attrs:?}"
+        );
+        assert!(
+            !attrs.iter().any(
+                |(n, v)| *n == "aria-label" && (v == "Expand folder" || v == "Collapse folder")
+            ),
+            "a file row must not carry a folder caret label; found one among {attrs:?}"
         );
     }
 

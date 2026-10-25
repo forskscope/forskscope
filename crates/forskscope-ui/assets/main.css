@@ -444,7 +444,10 @@ code.path-display {
 .tree-row { display: flex; align-items: center; gap: .3rem; padding: .15rem .4rem; cursor: pointer; user-select: none; white-space: nowrap; min-height: var(--row-h); }
 .tree-row:hover   { background: var(--surface-3); }
 .tree-row.selected { background: color-mix(in srgb, var(--accent) 18%, transparent); }
-.tree-caret { width: 1em; text-align: center; flex-shrink: 0; color: var(--muted); }
+/* F212: `.tree-caret` is a `<span role="button">` for a folder row (still
+   a plain `<span>` for a file row) - unchanged from a plain span, visually,
+   since `role`/`aria-*`/`tabindex` carry no rendering weight of their own. */
+.tree-caret { width: 1em; text-align: center; flex-shrink: 0; color: var(--muted); cursor: pointer; }
 .tree-icon  { flex-shrink: 0; font-size: 13px; }
 .tree-label { overflow: hidden; text-overflow: ellipsis; }
 
