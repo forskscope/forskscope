@@ -47,10 +47,10 @@ package() {
     install -Dm755 "target/release/forskscope" "$pkgdir/usr/bin/forskscope"
     install -Dm644 "packaging/linux/io.github.forskscope.forskscope.desktop" \
         "$pkgdir/usr/share/applications/io.github.forskscope.forskscope.desktop"
-    # RFC-095 §5: no real icon exists yet (the owner has not decided who
-    # draws it) - installed under the same hicolor/hicolor-id convention
-    # the Flatpak uses once it does, so `Icon=` in the desktop file above
-    # needs no change when it lands.
+    # RFC-095 §5: the icon, installed under the same hicolor convention the
+    # Flatpak uses, so `Icon=` in the desktop file above needs no change.
+    # The guard stays: a source tree without it (a sparse checkout) still
+    # packages, just without an icon, rather than failing the build.
     local icon="packaging/linux/icons/hicolor/scalable/apps/io.github.forskscope.forskscope.svg"
     if [[ -f "$icon" ]]; then
         install -Dm644 "$icon" \

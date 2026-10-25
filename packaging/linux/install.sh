@@ -8,9 +8,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 BINARY="$SCRIPT_DIR/target/release/forskscope"
-# RFC-095 §5: the icon's SVG source, once it exists - its own file name
-# matches the app ID, the Flathub/hicolor convention, so `Icon=` in the
-# desktop file below needs no change once it lands.
+# RFC-095 §5: the icon's SVG source - its own file name matches the app ID,
+# the Flathub/hicolor convention, so `Icon=` in the desktop file below needs
+# no change.
 ICON="$SCRIPT_DIR/packaging/linux/icons/hicolor/scalable/apps/io.github.forskscope.forskscope.svg"
 PREFIX="${1:-$HOME/.local}"
 
@@ -39,16 +39,16 @@ fi
 
 echo "Desktop entry: $PREFIX/share/applications/io.github.forskscope.forskscope.desktop"
 
-# RFC-095 §5: no real icon exists yet (the owner has not decided who
-# draws it) - installed once it does, under the same name the desktop
-# file's `Icon=` already names, so nothing else here needs to change
-# when it lands.
+# RFC-095 §5: the icon, under the same name the desktop file's `Icon=`
+# already names. The guard stays even though the file now exists in a
+# normal checkout - a missing icon (a sparse or partial checkout) still
+# reports itself here, not a hard failure.
 if [[ -f "$ICON" ]]; then
     install -Dm644 "$ICON" \
         "$PREFIX/share/icons/hicolor/scalable/apps/io.github.forskscope.forskscope.svg"
     echo "Icon: $PREFIX/share/icons/hicolor/scalable/apps/io.github.forskscope.forskscope.svg"
 else
-    echo "Icon: none yet (RFC-095 §5 Open questions 1) - $ICON not found"
+    echo "Icon: not found at $ICON (expected in a normal checkout)"
 fi
 
 echo

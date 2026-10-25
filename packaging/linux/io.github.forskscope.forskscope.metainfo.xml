@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- RFC-095 §5: AppStream metainfo for the Flathub listing (and every
      other Linux package using the same icon/desktop-file IDs, the AUR
-     package included). Screenshots are linked from the 0.196.0 tag -
+     package included). Screenshots are linked from the 0.196.1 tag -
      see this file's own review request for what flatpak-builder-lint
      does with those URLs before that tag exists. -->
 <component type="desktop-application">
@@ -40,19 +40,19 @@
   <screenshots>
     <screenshot type="default">
       <caption>The two-pane Explorer, browsing a folder to compare.</caption>
-      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.0/packaging/linux/screenshots/explorer.png</image>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.1/packaging/linux/screenshots/explorer.png</image>
     </screenshot>
     <screenshot>
       <caption>Comparing two files, with every changed line highlighted.</caption>
-      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.0/packaging/linux/screenshots/file-comparison.png</image>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.1/packaging/linux/screenshots/file-comparison.png</image>
     </screenshot>
     <screenshot>
       <caption>Comparing two folders recursively.</caption>
-      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.0/packaging/linux/screenshots/folder-comparison.png</image>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.1/packaging/linux/screenshots/folder-comparison.png</image>
     </screenshot>
     <screenshot>
       <caption>An exported HTML comparison report.</caption>
-      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.0/packaging/linux/screenshots/html-report.png</image>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.1/packaging/linux/screenshots/html-report.png</image>
     </screenshot>
   </screenshots>
   <releases>
