@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.196.2] — Unreleased
+
 ## [0.196.1] — 2026-10-27
 
 **An icon, and folders a screen reader can open.**
