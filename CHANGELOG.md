@@ -5,7 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.196.1] — Unreleased
+## [0.196.1] — 2026-10-27
+
+**An icon, and folders a screen reader can open.**
+
+### Added
+
+- **ForskScope has an app icon.** On Linux, the AUR package and `install.sh`
+  install it, so your desktop's menus show it.
+
+### Fixed
+
+- **Screen readers can open and close folders in the Explorer** (F212). Each
+  folder's arrow is announced as "Expand folder" or "Collapse folder", with
+  whether the folder is open. Nothing changes on screen.
+- **On Linux, ForskScope is listed once in desktop menus.** Its desktop
+  file named two main categories, so some menus could show it twice.
+
+### Internal
+
+- **The Flathub listing material is ready (RFC-095):** the icon, retaken
+  screenshots, and the metainfo linking them from this release's tag.
+  ForskScope is not on Flathub yet.
 
 ## [0.196.0] — 2026-10-24
 
