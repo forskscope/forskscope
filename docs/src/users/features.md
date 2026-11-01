@@ -141,9 +141,32 @@ See [Git integration](../intermediate/git-integration.md) for full setup.
 
 ---
 
+## Scripts and AI agents
+
+ForskScope is also two commands for a script or an AI agent, in the same
+program:
+
+- **`forskscope compare`** prints a comparison as text, versioned JSON, a
+  patch or an HTML report, with `diff`-style exit codes.
+- **`forskscope mcp`** is a Model Context Protocol server, so an AI agent can
+  compare inside the folders you name with `--root`.
+
+Both are read-only (a build check keeps them from writing), open no network
+connection, and keep nothing between runs. With `--allow-show`, the agent can
+open the ForskScope window on what it found, and you review and merge there.
+See [Using ForskScope from scripts and AI agents](../intermediate/scripts-and-agents.md).
+
+---
+
 ## Appearance and localisation
 
 - Three built-in themes: **Dark** (default), **Light**, **Night**.
+- A **red–green safe** colour palette (Settings → Colour vision). In either
+  palette every change also carries a `+`/`−`/`=`/`≠` mark, so colour is never
+  the only cue.
+- Buttons, rows and their states are **named for assistive technology**, and
+  moving between changes, applying them, searching and switching panes all
+  work from the [keyboard](../intermediate/keyboard.md).
 - Configurable **diff font size** (8–32 pt).
 - Configurable **diff font family** — five presets: Monospace (default),
   Sans-serif, Serif, Courier New, Consolas / Menlo.
