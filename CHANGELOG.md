@@ -5,7 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.196.2] — Unreleased
+## [0.196.2] — 2026-11-01
+
+**The listing tells the whole story.**
 
 ### Changed
 

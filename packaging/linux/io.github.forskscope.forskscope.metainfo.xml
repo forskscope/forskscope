@@ -60,6 +60,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.196.2" date="2026-11-01">
+      <description>
+        <p>The description says that ForskScope works with AI agents and leaves the decisions to you.</p>
+      </description>
+    </release>
     <release version="0.196.1" date="2026-10-27">
       <description>
         <p>An app icon, and folders a screen reader can open and close.</p>
