@@ -18,15 +18,19 @@
       two folders, recursively, through a two-pane Explorer.
     </p>
     <p>
-      Everything runs on your own computer: no account, no upload, no
-      telemetry. The one exception is the optional "Check for updates"
-      button in the About dialog, which sends a single request to GitHub
-      for the latest version number, and only when you click it.
+      Everything runs on your own computer, and nothing is sent anywhere
+      unless you ask: no account, no upload, no telemetry.
     </p>
     <p>
-      ForskScope works as a Git difftool and mergetool, and can be driven
-      from a script or an AI agent (the bundled "compare" and "mcp"
-      subcommands).
+      It also works with AI agents, and leaves the decisions to you.
+      Through its "compare" and "mcp" commands, an agent can compare files
+      and folders and open the ForskScope window on what it found, but it
+      cannot change a file. You review and merge.
+    </p>
+    <p>
+      ForskScope works as a Git difftool and mergetool. Every change is
+      marked by a sign as well as a colour, a red–green safe palette is
+      available, and the interface is in English and Japanese.
     </p>
   </description>
   <launchable type="desktop-id">io.github.forskscope.forskscope.desktop</launchable>

@@ -87,6 +87,7 @@ pre code { background: none; border: 0; padding: 0; }
 footer { border-top: 1px solid var(--border); }
 footer .wrap { padding-block: 26px 40px; font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px 24px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.agent-points { margin-top: 18px; }
 </style>
 </head>
 <body>
@@ -104,7 +105,7 @@ footer .wrap { padding-block: 26px 40px; font-size: 14px; color: var(--muted); d
 <main>
   <div class="wrap hero">
     <h1>Compare and merge files and folders, side by side.</h1>
-    <p class="lead">ForskScope is a desktop app for Linux, macOS and Windows. Open two files or two folders, see what changed, and apply changes from one side to the other. Everything runs on your computer.</p>
+    <p class="lead">ForskScope is a desktop app for Linux, macOS and Windows. Open two files or two folders, see what changed, and apply changes from one side to the other. Everything runs on your computer. An AI agent can compare for you, and you decide what changes.</p>
     <div class="actions">
       <a class="btn primary" href="#download">Download</a>
       <a class="btn ghost" href="guide/">Read the guide</a>
@@ -125,10 +126,11 @@ footer .wrap { padding-block: 26px 40px; font-size: 14px; color: var(--muted); d
       <p class="col">ForskScope began as one more option among the GUI tools for comparing and merging files on Linux, where its author found the choices too few.</p>
       <ul class="why">
         <li><b>Your files stay on your computer.</b><span>No accounts, no uploads, no telemetry. The only network request is the one you make by clicking <i>Check for updates</i>.</span></li>
+        <li><b>Work with an AI agent, and keep the decisions.</b><span>An agent can compare files and folders through ForskScope, but it cannot change a file. It can open the window on what it found, so you review and merge with your own eyes.</span></li>
         <li><b>Start from folders, not only files.</b><span>The Explorer shows two directory trees side by side, marks each file as identical, different or on one side only, and opens any pair you pick.</span></li>
         <li><b>It does not claim more than it checked.</b><span>A file is marked identical only after its contents were compared. When only the sizes match, it says so, and <i>Verify</i> reads every byte to find out.</span></li>
         <li><b>Spreadsheets too.</b><span><code>.xlsx</code> workbooks are compared sheet by sheet and cell by cell, read-only, with rows lined up by content where that shows fewer changes.</span></li>
-        <li><b>Keyboard first.</b><span>Move between changes, apply them, search, and switch panes without the mouse.</span></li>
+        <li><b>Made to be usable by everyone.</b><span>Every change has a mark as well as a colour, and a red–green safe palette is one setting away. Moving between changes, applying them, searching and switching panes all work without the mouse. Buttons, rows and their states are named for assistive technology. In English and Japanese.</span></li>
         <li><b>Works with Git.</b><span>Use it as <code>git difftool</code> and <code>git mergetool</code>. The guide shows the settings.</span></li>
         <li><b>Carry it with you.</b><span>On Windows and Linux, ForskScope is a single program file with no installer. Put a folder named <code>forskscope-data</code> beside it, and it keeps everything of its own in that folder, not in your home folder. That suits a USB drive, or a desktop where your home folder is read-only. Or start it with <code>--private</code>, and it keeps nothing after it closes.</span></li>
       </ul>
@@ -148,6 +150,21 @@ footer .wrap { padding-block: 26px 40px; font-size: 14px; color: var(--muted); d
           <span><b>–</b> folder, contents not compared yet</span>
         </div>
       </figure>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Working with an AI agent</h2>
+      <p class="col">Let an AI agent do the searching, and keep the decisions yourself. The same <code>forskscope</code> program gives an agent its own way in.</p>
+      <ul class="why agent-points">
+        <li><b>It can look, but not change.</b><span>An agent compares files and folders with <code>forskscope compare</code> or ForskScope's MCP server. Neither can write a file, and a build check keeps it that way. Neither opens a network connection or keeps anything between runs.</span></li>
+        <li><b>It sees only what you allow.</b><span>The MCP server reads only inside the folders you name with <code>--root</code>.</span></li>
+        <li><b>It shows you what it found.</b><span>With <code>--allow-show</code>, the agent opens the ForskScope window on the pair it found. Its HTML report and patch are the same ones you would export yourself.</span></li>
+        <li><b>You decide.</b><span>Merging and saving happen in the window, by you.</span></li>
+      </ul>
+      <pre><code>forskscope mcp --root ~/my-project --allow-show</code></pre>
+      <p class="col"><a href="guide/intermediate/scripts-and-agents.html">How to connect an agent</a></p>
     </div>
   </section>
 

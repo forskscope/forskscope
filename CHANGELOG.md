@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.196.2] — Unreleased
 
+### Changed
+
+- **The Linux listing text says that ForskScope works with AI agents** and
+  leaves the decisions to people, and names its accessibility. It no longer
+  mentions *Check for updates*, which the Flatpak does not have.
+
 ## [0.196.1] — 2026-10-27
 
 **An icon, and folders a screen reader can open.**
