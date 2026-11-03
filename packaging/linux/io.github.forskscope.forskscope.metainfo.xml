@@ -60,6 +60,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.196.3" date="2026-11-03">
+      <description>
+        <p>Spreadsheet comparison uses an updated archive library, which fixes four security advisories. ForskScope was never affected by them.</p>
+      </description>
+    </release>
     <release version="0.196.2" date="2026-11-01">
       <description>
         <p>The description says that ForskScope works with AI agents and leaves the decisions to you.</p>

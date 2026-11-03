@@ -5,7 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.196.3] — Unreleased
+## [0.196.3] — 2026-11-03
+
+**No exception left in the advisory audit for `zip`.**
+
+### Security
+
+- **ForskScope now reads workbooks through `zip` 9**, which fixes four
+  advisories for `zip` 8.6.0 (RUSTSEC-2026-0367, -0368, -0369 and the new
+  -0429). All four concern extracting an archive to disk, which ForskScope
+  never does, so no release was affected. The audit's exception for the first
+  three is gone, and no new one was needed. Comparing workbooks is unchanged.
 
 ## [0.196.2] — 2026-11-01
 
