@@ -211,18 +211,8 @@ fn run_audit_deps() {
     // mode F65 records.
     assert_immediate_dependents("sheets-diff", &["forskscope-compare "]);
     assert_immediate_dependents("calamine", &["sheets-diff "]);
-    // F213 (handoff 093): zip's own shape stays guarded on the same
-    // footing as sheets-diff's and calamine's above — reached only
-    // through calamine, whatever advisories apply to whichever version is
-    // currently resolved (F140: this checks shape, not advisories). What
-    // was removed here is the machinery that existed only to bound the
-    // RUSTSEC-2026-0367/-0368/-0369 ignore in .cargo/audit.toml
-    // (`assert_no_direct_zip_dependency`, `report_if_zip_resolves_fixed`,
-    // `assert_xtask_zip_dependent_is_rust_xlsxwriter`): zip 9 (via
-    // sheets-diff 3.6.1 and rust_xlsxwriter 0.102.0) fixes all four
-    // advisories that named zip 8.6.0, the ignore list no longer
-    // mentions zip at all, and there is nothing left for that machinery
-    // to bound.
+    // zip is reached only through calamine (F140: shape, not advisories).
+    // The threat model's "What defends it" relies on this.
     assert_immediate_dependents("zip", &["calamine "]);
     println!(
         "security dependency path check passed: sensitive dependencies are reached only \
