@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.196.4] — Unreleased
+
 ## [0.196.3] — 2026-11-03
 
 **No exception left in the advisory audit for `zip`.**

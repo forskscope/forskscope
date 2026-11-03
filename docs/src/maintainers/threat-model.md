@@ -1,6 +1,6 @@
 # Threat Model and Security Notes
 
-This document records the security posture of ForskScope at **v0.196.2**, the
+This document records the security posture of ForskScope at **v0.196.3**, the
 data flows that carry risk, the controls in place, and the known residual
 concerns. It is a living document; update it when a new data flow is added.
 
@@ -1094,3 +1094,4 @@ really version X of a published crate."
 | v0.196.0 | RFC-096 one program; RFC-095 stage 2 (Flatpak preparation, unpublished) | `forskscope-cli` is gone: `compare` and `mcp` are subcommands of the one executable, dispatched before anything the app starts (no GTK, settings or data folder; shown with no display and by the writable overlay). The executable now contains the writing code, so read-only is kept at the source: `forskscope-commands` may depend only on the engine and outputs, with no `std::net` and no process but `show_to_person`'s one launch, all enforced and falsified in `crate-boundaries`. `show_to_person` starts `current_exe()` only; a test override is compiled out of release builds, and the release fails if its name appears in the binary. Flatpak-only start-up changes (program name, direct proxy resolution, WebKit's web-process sandbox) run only inside a Flatpak and never for a subcommand (entry 11). No network request is added |
 | v0.196.1 | F212; the app icon and the Flathub listing material | No new data flow. A folder's expand arrow gains a role, a label and its expanded state for assistive technology; the action it exposes is the click it already had. The icon is a static SVG installed by the packages; the screenshots and metainfo are listing material. The desktop file names one menu category |
 | v0.196.2 | The listing text | No change to the programs. The AppStream description is rewritten; it promises no network contact unless the user asks, which both the app and the Flatpak keep |
+| v0.196.3 | F213: `sheets-diff` 3.6.0 → 3.6.1; `zip` 9 | No new data flow and no behaviour change. The `.xlsx` chain is now `calamine 0.38.0`, `quick-xml 0.42.0`, `zip 9.2.3`, which fixes RUSTSEC-2026-0367/-0368/-0369/-0429 (archive extraction, never called here). The three `zip` exceptions are removed from `.cargo/audit.toml` and none is added; `audit-deps` still asserts `zip` is reached only through `calamine`. **New transitive crates:** `nix` 0.31.3 and `cfg_aliases` 0.2.2, through `zip`, on macOS and the BSDs only, used only by `zip`'s extraction code. The build tooling's `rust_xlsxwriter` moves to 0.102 (`zip` 9); it does not ship |
