@@ -77,8 +77,8 @@ written to `Signal<Vec<CompareTab>>` via a `spawn_blocking` task.
 - Text vs. binary cross-comparison (one side text, other binary) is blocked with
   a clear error message.
 - `.xlsx` files are **parsed** since v0.169.0 (`d492557`, RFC-085): a pair of
-  workbooks goes through `sheets-diff` 3.6.0 (`calamine 0.36.1`,
-  `quick-xml 0.41.0`, `zip 8.6.0`) under the bounds set in
+  workbooks goes through `sheets-diff` 3.6.1 (`calamine 0.38.0`,
+  `quick-xml 0.42.0`, `zip 9.2.3`) under the bounds set in
   `crates/forskscope-compare/src/xlsx.rs`. A comparison that cannot finish — a
   corrupt workbook, or one that reaches a size bound — is shown as an error,
   never as an identical result. What the parser defends against and what it
@@ -781,10 +781,10 @@ Key crates touching file I/O or process execution:
 | `tungstenite` | 0.28 | Dioxus desktop transport dependency | Accepted only via `dioxus-desktop`; no app-authored remote connections |
 | `native-tls` | 0.2 | Dioxus desktop's transport TLS, and (F180, handoff 073) the update-check request's TLS | Two reviewed paths: via `dioxus-desktop` (no app-authored connection), and directly from `forskscope` (the GUI package, `forskscope-ui` until RFC-093's amendment) for one bounded, user-clicked HTTPS GET — see "Accepted outbound request: update check" |
 | `quick-xml` | 0.39.4 | Wayland protocol code generation through GTK/Dioxus stack | Build-time/proc-macro path; not reachable from user-supplied files. Carries the two advisories ignored in `.cargo/audit.toml` |
-| `sheets-diff` | 3.6.0 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0; 3.0.0 since F130, 3.2.0 since F138, 3.3.0 since F154, 3.4.0 since F173, 3.5.0 since F132, 3.6.0 since F177) | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-compare` only (`audit-deps` asserts it) |
-| `calamine` | 0.36.1 | Workbook reader under `sheets-diff` | **Parses user-supplied XML and archives.** Read as a stream by `sheets-diff` 2.5.1 and later, so memory follows the populated cells (it did not through 2.5.0). Immediate dependent: `sheets-diff` only |
-| `quick-xml` | 0.41.0 | XML parsing under `calamine` | **Reachable from user-supplied files.** Not covered by the `.cargo/audit.toml` ignore list (which names 0.39 only) |
-| `zip` | 8.6.0 | Archive reading under `calamine` | **Reachable from user-supplied files.** Compressed size is bounded (50 MiB); expansion is not |
+| `sheets-diff` | 3.6.1 | `.xlsx` structural comparison (RFC-085, re-enabled in v0.169.0; 3.0.0 since F130, 3.2.0 since F138, 3.3.0 since F154, 3.4.0 since F173, 3.5.0 since F132, 3.6.0 since F177, 3.6.1 since F213) | **Parses user-supplied workbooks.** Bounded by `CellBounds` and `Limits::hardened()`; see "Enabled third-party parser". Immediate dependent: `forskscope-compare` only (`audit-deps` asserts it) |
+| `calamine` | 0.38.0 | Workbook reader under `sheets-diff` | **Parses user-supplied XML and archives.** Read as a stream by `sheets-diff` 2.5.1 and later, so memory follows the populated cells (it did not through 2.5.0). Immediate dependent: `sheets-diff` only |
+| `quick-xml` | 0.42.0 | XML parsing under `calamine` | **Reachable from user-supplied files.** Not covered by the `.cargo/audit.toml` ignore list (which names 0.39 only) |
+| `zip` | 9.2.3 | Archive reading under `calamine` | **Reachable from user-supplied files.** Compressed size is bounded (50 MiB); expansion is not |
 | `rustls` | 0.23.45 | TLS library compiled into `tungstenite` (v0.171.0: RUSTSEC-2026-0285) | Framework transport only, see "Accepted local WebView transport"; not reachable from file content |
 | `tempfile` | 3.27.0 | RFC-077: promoted from a `forskscope-core` dev-dependency to a normal one (now `forskscope-edit`'s, since RFC-093 §1 step 3) for the Git mergetool save target's no-clobber commit (`save::persist_noclobber`, using `NamedTempFile::persist_noclobber`) | Local filesystem only — creates a same-directory temp file and commits or discards it; no network data flow; re-audited with `cargo xtask audit-deps` and `cargo audit` after promotion, no new advisories |
 | `muda` | 0.17.2 (vendored, F179) | `dioxus-desktop`'s native-menu crate | **Patched, path dependency** — see "Vendored crate" below |
@@ -909,7 +909,7 @@ parts (sheets, shared strings, workbook metadata), through
 never evaluated. `.xlsx` is read-only in every path.
 
 **What defends it:**
-- The dependency chain (`quick-xml 0.41.0`, `zip 8.6.0`) carries no advisory
+- The dependency chain (`quick-xml 0.42.0`, `zip 9.2.3`) carries no advisory
   known to `cargo audit` today; `audit.yml` re-checks daily. `quick-xml 0.39`
   remains only through `wayland-scanner`, and `cargo xtask audit-deps` asserts
   both facts (the immediate dependents of `sheets-diff`, `calamine`, `zip` and

@@ -74,7 +74,7 @@ rustix                       = { version = "1", default-features = false, featur
 # RFC-085: default features off deliberately - chrono/cli/serde are all
 # optional and unused here; audit-deps' reviewed set assumes exactly the
 # calamine -> quick-xml -> zip chain this default-features build pulls.
-sheets-diff                 = "3.6.0"
+sheets-diff                 = "3.6.1"
 similar                     = "3.2"
 
 chrono                      = "0.4"
