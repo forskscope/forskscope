@@ -19,6 +19,7 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 079 | [Microsoft Store Submission Automation](./accepted/079-microsoft-store-submission-automation.md) | Accepted |
 | 081 | [AUR Publication Automation](./accepted/081-aur-publication-automation.md) | Accepted |
 | 095 | [ForskScope as a Flatpak on Flathub](./accepted/095-flatpak-on-flathub.md) | Accepted 2026-10-21 |
+| 097 | [Readable for Everyone — Text Size, Contrast and Visible Controls](./accepted/097-readable-for-everyone.md) | Accepted 2026-11-04 |
 
 ## Implemented (71)
 
