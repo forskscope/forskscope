@@ -58,6 +58,10 @@ cargo xtask audit-deps
 # simulated colour vision deficiency (RFC-088, RFC-090)
 cargo xtask colour-vision
 
+# No text/control below WCAG contrast, no control edge below 3:1, no text
+# below 12px, outside a documented, reasoned allowlist (F214-F216)
+cargo xtask contrast
+
 # The in-app keyboard reference and keyboard.md name the same keys (F165)
 cargo xtask keyboard-docs
 

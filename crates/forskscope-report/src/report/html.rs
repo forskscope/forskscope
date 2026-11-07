@@ -72,7 +72,7 @@ const STANDARD: Palette = Palette {
     del_mark: "#cf222e",
     ins_mark: "#1a7f37",
     rep_bg: "#fff3cd",
-    warn: "#9a6700",
+    warn: "#8e5f00",
 };
 
 const RED_GREEN_SAFE: Palette = Palette {
@@ -81,7 +81,7 @@ const RED_GREEN_SAFE: Palette = Palette {
     del_mark: "#944800",
     ins_mark: "#0a5fd6",
     rep_bg: "#abbab7",
-    warn: "#9a6700",
+    warn: "#8e5f00",
 };
 
 fn palette(color_vision_safe: bool) -> &'static Palette {

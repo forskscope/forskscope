@@ -21,7 +21,9 @@
   background: var(--surface-2); border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.mode-btn { padding: .2rem .7rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); cursor: pointer; font-size: 12px; }
+/* F215: this fill (--surface) sits directly on the same --surface-2 the
+   toolbar itself uses, so there is no fill contrast to lean on. */
+.mode-btn { padding: .2rem .7rem; border: 1px solid var(--control-border); border-radius: 4px; background: var(--surface); cursor: pointer; font-size: 12px; }
 .mode-btn.active { background: color-mix(in srgb, var(--accent) 15%, var(--surface-3)); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
 /* ── Aligned two-pane tree (RFC-054) ── */
@@ -40,7 +42,7 @@
    Compare (12-view-directory-report.css) defines its own bare `.status-equal`
    etc. for a different row shape (`.dir-status`); the compound form keeps
    these two views' rules from depending on file concatenation order. */
-.tree-status { margin-left: auto; padding-right: .4rem; font-size: 11px; flex-shrink: 0; }
+.tree-status { margin-left: auto; padding-right: .4rem; font-size: 12px; flex-shrink: 0; }
 .tree-status.status-equal      { color: var(--ins-mark, #4a6); }
 .tree-status.status-different  { color: var(--warn, #c90); }
 .tree-status.status-left-only  { color: var(--muted); }
@@ -65,14 +67,20 @@
    like `.deep-compare-btn`, not a call to action - verifying is optional,
    not expected of every row. */
 .tree-verify-btn {
-  margin-left: .4rem; padding: .1rem .4rem; font-size: 10px;
+  margin-left: .4rem; padding: .1rem .4rem; font-size: 12px;
   border-radius: 4px; flex-shrink: 0;
 }
 
 /* ── Binary-blocked row (RFC-066) ── */
-.tree-row.binary-blocked { opacity: .5; cursor: default; }
+/* F214 (handoff 094): was `opacity: .5` - at 4.5:1-compliant colours, an
+   opacity that low pulls text and the "BIN" badge below 4.5:1/3:1 against
+   every surface underneath (1.96/3.16 measured, light theme). The row
+   shows it is blocked through `--muted` colour instead - already >= 4.44:1
+   against every surface in every theme - plus the badge, which carried
+   `--muted` on its own `--surface-3` fill all along. */
+.tree-row.binary-blocked { color: var(--muted); cursor: default; }
 .tree-status.st-binary {
-  font-size: 9px; font-weight: 700; letter-spacing: .04em;
+  font-size: 12px; font-weight: 700; letter-spacing: .04em;
   color: var(--muted); background: var(--surface-3);
   border: 1px solid var(--border); border-radius: 3px;
   padding: 0 .3rem; margin-left: .3rem; cursor: help;
@@ -102,7 +110,9 @@
 .filter-dot.on { background: var(--accent); }
 .filter-input { flex: 1; min-width: 0; font-size: 12px; height: 24px; padding: 0 .4rem; }
 .filter-check { display: flex; align-items: center; gap: .25rem; font-size: 12px; color: var(--text); cursor: pointer; white-space: nowrap; user-select: none; }
-.filter-clear { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 11px; color: var(--muted); background: none; border: 1px solid var(--border); }
+/* F214/F215: font-size 11px -> 12px; border/background:none has no fill
+   at all to lean on, so the edge alone identifies it. */
+.filter-clear { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 12px; color: var(--muted); background: none; border: 1px solid var(--control-border); }
 .filter-clear:hover { color: var(--text); border-color: var(--accent); }
 
 

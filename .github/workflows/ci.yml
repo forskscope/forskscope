@@ -105,6 +105,11 @@ jobs:
       - name: Colour vision check
         run: cargo xtask colour-vision
 
+      # F214-F216: no text/control below WCAG contrast, no control edge
+      # below 3:1, no text below 12px, outside a documented allowlist.
+      - name: Contrast check
+        run: cargo xtask contrast
+
       # F165: the in-app keyboard reference and docs/src/intermediate/
       # keyboard.md drifted furthest of anything review 160 found (Enter's
       # real behaviour, the Ctrl+/ gating note). This checks the two lists

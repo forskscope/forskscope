@@ -19,4 +19,6 @@
 .fsk-conflict-right      { color: var(--ins-mark); }
 .fsk-conflict-both       { color: var(--ok); }
 .fsk-conflict-manual     { color: var(--accent); }
-.fsk-conflict-ignored    { color: var(--muted); opacity: .6; }
+/* F214 (handoff 094): was `opacity: .6` (~2.6:1) on an already-compliant
+   `--muted` - the opacity was the defect, not the colour. */
+.fsk-conflict-ignored    { color: var(--muted); }

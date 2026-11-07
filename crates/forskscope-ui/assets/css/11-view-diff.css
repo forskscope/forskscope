@@ -56,7 +56,7 @@
    destructive control — just states where a save writes ---- */
 .diff-mergetool-result {
   padding: .2rem .6rem; background: var(--surface-2);
-  border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted);
+  border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted);
   flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .diff-mergetool-result .result-path { color: var(--text); }
@@ -66,7 +66,7 @@
   display: flex;
   background: var(--surface-2);
   border-bottom: 2px solid var(--border);
-  font-size: 11px; color: var(--muted); font-weight: 600;
+  font-size: 12px; color: var(--muted); font-weight: 600;
   letter-spacing: .04em; text-transform: uppercase;
   user-select: none;
   overflow: hidden;
@@ -181,7 +181,7 @@
   background: var(--surface);
   white-space: nowrap;
 }
-.diff-act button { padding: 0 .25rem; font-size: 11px; }
+.diff-act button { padding: 0 .25rem; font-size: 12px; }
 /* The merge button sits inside a diff-line-height (24px) table row. The global
    `button { min-height: var(--control-h) }` (36px) would force the act row
    taller than the diff rows and break per-line alignment. Constrain the button
@@ -193,9 +193,9 @@
   line-height: 1;
   padding: 0 .3rem;
 }
-.apply-btn-label { font-size: 10px; font-weight: 600; letter-spacing: .02em; }
+.apply-btn-label { font-size: 12px; font-weight: 600; letter-spacing: .02em; }
 /* The "applied" check also lives in the act cell — keep it within line height. */
-.applied { padding: 0 .35rem; color: var(--ok); font-size: 11px; line-height: var(--line-h); }
+.applied { padding: 0 .35rem; color: var(--ok); font-size: 12px; line-height: var(--line-h); }
 
 /* ---- gutter (table-cell) ---- */
 .pane-gutter {
@@ -218,7 +218,7 @@
   display: table-cell;
   width: 1.2ch;
   text-align: center;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--muted);
   user-select: none;
@@ -265,7 +265,7 @@
   display: inline-block;
   margin-right: 0.8ch;
   padding: 0 0.5ch;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--warn);
   border: 1px solid var(--warn);
   border-radius: 3px;
@@ -306,10 +306,13 @@
   line-height: var(--line-h);
   width: 100%;
   padding: .2rem .6rem; margin: 0;
-  text-align: center; font-size: 11px; font-family: inherit;
+  text-align: center; font-size: 12px; font-family: inherit;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--muted); background: var(--surface-2);
-  border: 1px dashed var(--border); border-radius: 4px;
+  /* F215: a real <button> (F196), not a divider, despite the dashed
+     styling - WCAG 1.4.11 applies, so its edge is --control-border, not
+     --border, the same as every other button. */
+  border: 1px dashed var(--control-border); border-radius: 4px;
   cursor: pointer; user-select: none;
 }
 .collapse-divider:hover { color: var(--accent); border-color: var(--accent); }
@@ -323,7 +326,7 @@
   height: calc(var(--line-h) + .4rem + 2px);
   line-height: var(--line-h);
   padding: .2rem .6rem; margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   border: 1px solid transparent;
   visibility: hidden;
 }
@@ -343,9 +346,11 @@
   background: var(--surface-2); border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.search-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--text); font-size: 13px; }
+.search-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--control-border); border-radius: 3px; background: var(--surface); color: var(--text); font-size: 13px; }
 .search-count { font-size: 12px; color: var(--muted); min-width: 6ch; text-align: center; }
 .search-count.no-matches { color: var(--warn); }
-.search-nav { padding: .1rem .35rem; font-size: 11px; cursor: pointer; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); }
+/* F214/F215: font-size 11px -> 12px; fill (--surface) sits directly on
+   the search bar's own --surface-2, so the edge carries identification. */
+.search-nav { padding: .1rem .35rem; font-size: 12px; cursor: pointer; border: 1px solid var(--control-border); border-radius: 3px; background: var(--surface); }
 .search-nav:disabled { opacity: .4; cursor: default; }
 .search-close { padding: .1rem .4rem; font-size: 14px; cursor: pointer; }

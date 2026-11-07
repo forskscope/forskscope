@@ -104,8 +104,11 @@ code.path-display {
   outline: var(--focus-ring) solid var(--focus); outline-offset: 1px;
 }
 .profile-name { flex: 1; font-size: 13px; font-family: ui-monospace, monospace; white-space: pre; cursor: pointer; }
-.profile-delete { opacity: .4; padding: 0 .3rem; font-size: 12px; }
-.profile-delete:hover { opacity: 1; }
+/* F214 (handoff 094): was `opacity: .4` / `:hover { opacity: 1 }` (2.41:1,
+   light) - the button's own text colour (`--text` on its `--surface-3`
+   fill, via the base `button` rule) clears 4.5:1 with no help from
+   opacity at all (9.4-13.1:1, measured), so both rules are simply gone. */
+.profile-delete { padding: 0 .3rem; font-size: 12px; }
 .add-profile-form { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-top: .25rem; }
 .profile-check { display: flex; align-items: center; gap: .2rem; font-size: 12px; color: var(--muted); cursor: pointer; }
 /* F168 §2.2: nested one level deeper than .advanced-toggle, so it reads as
@@ -160,7 +163,7 @@ code.path-display {
 .path-more-btn { margin-left: .15rem; color: var(--muted); }
 .path-segments { display: flex; align-items: center; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
 .path-segments .bc-seg { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.path-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 3px; font-size: 12px; min-width: 6ch; }
+.path-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--control-border); background: var(--surface); color: var(--text); border-radius: 3px; font-size: 12px; min-width: 6ch; }
 .path-input.error { border-color: var(--del-mark, #e05); }
 .path-input:focus { outline: 2px solid var(--accent); }
 
@@ -187,7 +190,7 @@ code.path-display {
 }
 .pathbar-menu-item:hover { background: var(--surface-3); }
 .pathbar-menu-label { flex: 1; min-width: 0; }
-.pathbar-menu-shortcut { color: var(--muted); font-size: 11px; flex-shrink: 0; white-space: nowrap; }
+.pathbar-menu-shortcut { color: var(--muted); font-size: 12px; flex-shrink: 0; white-space: nowrap; }
 
 /* ---- tree rows ---- */
 .tree-row { display: flex; align-items: center; gap: .3rem; padding: .15rem .4rem; cursor: pointer; user-select: none; white-space: nowrap; min-height: var(--row-h); }

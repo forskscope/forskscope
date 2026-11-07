@@ -15,6 +15,7 @@
 //!   cargo xtask pages-origin-check <index.html> — verify a page loads nothing from another origin (handoff 075 §1)
 //!   cargo xtask pages-link-check <site-dir>     — verify every relative link/image in a built site resolves (handoff 075 §3)
 //!   cargo xtask colour-vision — verify every removed/added colour pair stays distinguishable under simulated colour vision deficiency (RFC-088 §3)
+//!   cargo xtask contrast — verify the readability floor: WCAG contrast for declared token pairs, no opacity below 1 and no font-size below 12px outside their reasoned allowlists (F214/F215/F216, handoff 094)
 //!   cargo xtask keyboard-docs — verify the in-app keyboard reference and keyboard.md name the same set of keys (handoff 079 §3, F165)
 //!   cargo xtask crate-boundaries — verify forskscope-compare/-report never write a file or spawn a process, and every crate's dependency graph matches RFC-093 §1's table
 //!   cargo xtask json-schema  — verify forskscope compare --format json's output against docs/schemas/forskscope.comparison.v1.json (RFC-094 §3, RFC-096 §5)
@@ -25,7 +26,9 @@
 //! To add a file: create it with the appropriate prefix; run `cargo xtask css`.
 
 mod colour_vision;
+mod contrast;
 mod crate_boundaries;
+mod css_shared;
 mod json_schema;
 mod keyboard_docs;
 mod metainfo_release;
@@ -74,6 +77,7 @@ fn main() {
             pages_check::run_link_check(Path::new(&args[1]));
         }
         Some("colour-vision") if args.len() == 1 => colour_vision::run(&workspace_root()),
+        Some("contrast") if args.len() == 1 => contrast::run(&workspace_root()),
         Some("keyboard-docs") if args.len() == 1 => keyboard_docs::run(&workspace_root()),
         Some("crate-boundaries") if args.len() == 1 => crate_boundaries::run(&workspace_root()),
         Some("json-schema") if args.len() == 1 => json_schema::run(&workspace_root()),
@@ -104,6 +108,7 @@ fn print_usage() {
     eprintln!("       cargo xtask pages-origin-check <index.html>");
     eprintln!("       cargo xtask pages-link-check <site-dir>");
     eprintln!("       cargo xtask colour-vision");
+    eprintln!("       cargo xtask contrast");
     eprintln!("       cargo xtask keyboard-docs");
     eprintln!("       cargo xtask crate-boundaries");
     eprintln!("       cargo xtask json-schema");

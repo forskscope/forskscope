@@ -32,36 +32,13 @@ use std::fs;
 use std::path::Path;
 use std::process;
 
-// ── sRGB / linear / XYZ / Lab ───────────────────────────────────────────────
+use crate::css_shared::{
+    Rgb, Rule, contrast_ratio, find_decl, hex_to_srgb, parse_rules, srgb_to_linear,
+};
 
-type Rgb = (f64, f64, f64);
-
-fn hex_to_srgb(hex: &str) -> Rgb {
-    let hex = hex.trim_start_matches('#');
-    assert_eq!(hex.len(), 6, "expected a 6-digit hex colour, got {hex:?}");
-    let chan = |range: std::ops::Range<usize>| {
-        u8::from_str_radix(&hex[range], 16)
-            .unwrap_or_else(|e| panic!("bad hex colour {hex:?}: {e}")) as f64
-            / 255.0
-    };
-    (chan(0..2), chan(2..4), chan(4..6))
-}
-
-fn srgb_channel_to_linear(c: f64) -> f64 {
-    if c <= 0.04045 {
-        c / 12.92
-    } else {
-        ((c + 0.055) / 1.055).powf(2.4)
-    }
-}
-
-fn srgb_to_linear((r, g, b): Rgb) -> Rgb {
-    (
-        srgb_channel_to_linear(r),
-        srgb_channel_to_linear(g),
-        srgb_channel_to_linear(b),
-    )
-}
+// ── linear / XYZ / Lab (colour-vision-deficiency simulation only -
+//    sRGB/linear and WCAG contrast live in css_shared, shared with
+//    contrast.rs) ───────────────────────────────────────────────────────
 
 /// sRGB primaries to CIEXYZ, D65 white point (the standard sRGB→XYZ matrix).
 fn linear_to_xyz((r, g, b): Rgb) -> Rgb {
@@ -151,86 +128,6 @@ fn simulated_delta_e(hex1: &str, hex2: &str, sim: Simulation) -> f64 {
         )))
     };
     delta_e76(lab(hex1), lab(hex2))
-}
-
-// ── WCAG contrast ────────────────────────────────────────────────────────
-
-fn relative_luminance(hex: &str) -> f64 {
-    let (r, g, b) = srgb_to_linear(hex_to_srgb(hex));
-    0.2126 * r + 0.7152 * g + 0.0722 * b
-}
-
-fn contrast_ratio(hex1: &str, hex2: &str) -> f64 {
-    let (l1, l2) = (relative_luminance(hex1), relative_luminance(hex2));
-    let (lighter, darker) = if l1 >= l2 { (l1, l2) } else { (l2, l1) };
-    (lighter + 0.05) / (darker + 0.05)
-}
-
-// ── Parsing 01-tokens.css ────────────────────────────────────────────────
-
-/// One `.selector { --name: value; ... }` rule, in source order.
-struct Rule {
-    selector: String,
-    decls: Vec<(String, String)>,
-}
-
-/// Strips every `/* ... */` comment. Comment text ahead of a selector (for
-/// example this file's own section banners) would otherwise become part of
-/// the "selector" the naive scan below extracts, failing the `starts_with
-/// ('.')` check and silently dropping the whole rule — caught by running
-/// this gate against the real file, not by inspection, when the
-/// `.cv-rgsafe` rules right after a banner comment resolved to nothing.
-fn strip_comments(css: &str) -> String {
-    let mut out = String::with_capacity(css.len());
-    let mut rest = css;
-    while let Some(start) = rest.find("/*") {
-        out.push_str(&rest[..start]);
-        rest = match rest[start..].find("*/") {
-            Some(end) => &rest[start + end + 2..],
-            None => "",
-        };
-    }
-    out.push_str(rest);
-    out
-}
-
-/// A line-oriented scan, not a general CSS parser: good enough for a file
-/// that is hand-written and has no nested rules.
-fn parse_rules(css: &str) -> Vec<Rule> {
-    let css = strip_comments(css);
-    let mut rules = Vec::new();
-    let mut rest = css.as_str();
-    while let Some(open) = rest.find('{') {
-        let selector = rest[..open].trim().to_string();
-        let after = &rest[open + 1..];
-        let close = after
-            .find('}')
-            .unwrap_or_else(|| panic!("unterminated CSS rule for selector {selector:?}"));
-        let body = &after[..close];
-        if selector.starts_with('.') {
-            let decls = body
-                .split(';')
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .filter_map(|decl| decl.split_once(':'))
-                .map(|(name, value)| (name.trim().to_string(), value.trim().to_string()))
-                .filter(|(name, _)| name.starts_with("--"))
-                .collect();
-            rules.push(Rule { selector, decls });
-        }
-        rest = &after[close + 1..];
-    }
-    rules
-}
-
-fn find_decl<'a>(rules: &'a [Rule], selector: &str, var: &str) -> Option<&'a str> {
-    rules
-        .iter()
-        .find(|r| r.selector == selector)?
-        .decls
-        .iter()
-        .find(|(name, _)| name == var)
-        .map(|(_, value)| value.as_str())
 }
 
 const TOKENS: [&str; 6] = [
@@ -574,12 +471,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hex_to_srgb_parses_pure_white_and_black() {
-        assert_eq!(hex_to_srgb("#ffffff"), (1.0, 1.0, 1.0));
-        assert_eq!(hex_to_srgb("#000000"), (0.0, 0.0, 0.0));
-    }
-
-    #[test]
     fn delta_e_of_a_colour_against_itself_is_zero() {
         assert_eq!(
             simulated_delta_e("#4d2e14", "#4d2e14", Simulation::Normal),
@@ -587,19 +478,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn contrast_ratio_of_black_on_white_is_the_wcag_maximum() {
-        let ratio = contrast_ratio("#000000", "#ffffff");
-        assert!((ratio - 21.0).abs() < 0.01, "got {ratio}");
-    }
-
-    #[test]
-    fn contrast_ratio_is_symmetric_in_its_two_arguments() {
-        assert_eq!(
-            contrast_ratio("#123456", "#abcdef"),
-            contrast_ratio("#abcdef", "#123456")
-        );
-    }
+    // `hex_to_srgb`/`contrast_ratio` themselves are tested in
+    // `css_shared.rs`, where they now live.
 
     /// Falsify by changing a `.theme-dark.cv-rgsafe` token to its
     /// `.theme-dark` value in `01-tokens.css`: this parses it right back

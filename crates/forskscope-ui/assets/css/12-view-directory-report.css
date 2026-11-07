@@ -29,7 +29,10 @@
 .deep-row { display: flex; align-items: center; gap: .5rem; padding: .2rem .6rem; cursor: pointer; font-size: 13px; }
 .deep-row:hover { background: var(--surface-3); }
 .deep-path { flex: 1; font-family: ui-monospace, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.deep-compare-btn { padding: .15rem .4rem; font-size: 11px; opacity: .7; border-radius: 4px; }
+/* F216: font-size 11px -> 12px. The opacity (.7, revealed to 1 on hover)
+   stays - F214's exemption for a hover-revealed control; RFC-097 stage 3
+   is where this control's own future is decided, not here. */
+.deep-compare-btn { padding: .15rem .4rem; font-size: 12px; opacity: .7; border-radius: 4px; }
 .deep-row:hover .deep-compare-btn { opacity: 1; }
 .deep-scanning { padding: 1.5rem; text-align: center; color: var(--muted); }
 .deep-progress { color: var(--muted); }
@@ -39,10 +42,12 @@
 .status-equal   { color: var(--ok); }
 .status-different { color: var(--warn); }
 .status-left-only, .status-right-only { color: var(--muted); }
-.status-computing { color: var(--muted); opacity: .6; }
+/* F214 (handoff 094): was `opacity: .6` (2.60:1, light) on an already-
+   compliant `--muted` - the opacity was the defect, not the colour. */
+.status-computing { color: var(--muted); }
 .status-symlink { color: var(--muted); font-style: italic; }
 .status-unreadable { color: var(--err); }
 
 /* ── Filter buttons ── */
-.filter-btn { padding: .2rem .5rem; border-radius: 6px; font-size: 12px; background: var(--surface-3); border: 1px solid var(--border); cursor: pointer; }
+.filter-btn { padding: .2rem .5rem; border-radius: 6px; font-size: 12px; background: var(--surface-3); border: 1px solid var(--control-border); cursor: pointer; }
 .filter-btn.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }

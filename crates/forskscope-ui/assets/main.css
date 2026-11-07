@@ -41,25 +41,58 @@ body,
   --focus-ring: 2px;
 }
 
+/* F214/F215 (handoff 094): --accent (dark, light), --warn/--ok (light),
+   --err (dark, light) and --muted (dark) were raised just enough to clear
+   4.5:1 against every surface that colour is actually painted on as text
+   (--surface-2 and --surface-3, the tighter of the two, including a tree
+   row's hover background) - measured with `cargo xtask contrast`, not by
+   eye; the first run after fixing F214's own listed failures still found
+   two more (dark --muted and dark/light --err on --surface-3), exactly
+   the "treat the list as a starting point" the handoff warned of. night's
+   accent/warn/ok/err/muted and every theme's --del-mark/--ins-mark were
+   already compliant and are unchanged (colour-vision's own ΔE floor still
+   binds the mark pair, so those were never free to move for contrast
+   alone).
+   --err equalled --del-mark in every theme before this change (the same
+   red, no comment explaining why) - fixing --err's own text-contrast
+   failure broke that coincidence on purpose: they serve unrelated
+   purposes (status/error text here, a diff hunk's own mark there) under
+   different requirements (4.5 text contrast vs colour-vision's ΔE +
+   3.0 mark contrast), so there was no reason to keep them locked together
+   once one of the two actually needed to move.
+   --focus is a separate token - it happens to equal the old --accent in
+   dark/light, but focus rings have their own, looser 3:1 non-text
+   requirement (WCAG 1.4.11), already met, so it was left alone rather
+   than changed on the assumption the pairing was load-bearing.
+   --control-border (F215) is new: at least 3:1 against every one of
+   --surface/--surface-2/--surface-3, for every control edge that isn't a
+   decorative divider. It reuses --muted's own *original* value - already
+   proven to clear that bar with margin - as its own, independently-
+   tunable token, not a `var(--muted)` alias, so the two can diverge
+   later (as --muted itself then did, in dark) without one dragging the
+   other. */
 .theme-dark {
   --surface: #1e1f22; --surface-2: #2b2d31; --surface-3: #36383d;
-  --text: #e6e6e6; --muted: #9aa0a6; --border: #3a3d42; --accent: #4f8cff;
+  --text: #e6e6e6; --muted: #9da3a9; --border: #3a3d42; --accent: #6fa1ff;
+  --control-border: #9aa0a6;
   --equal: transparent; --del-bg: #4a2326; --ins-bg: #1f3b29;
   --del-mark: #ff6b6b; --ins-mark: #5fd28a; --rep-bg: #3a3320;
   --danger-bg: #5c1e1e;
-  --ok: #5fd28a; --warn: #e0b341; --err: #ff6b6b; --focus: #4f8cff;
+  --ok: #5fd28a; --warn: #e0b341; --err: #ff7777; --focus: #4f8cff;
 }
 .theme-light {
   --surface: #ffffff; --surface-2: #f3f4f6; --surface-3: #e8eaed;
-  --text: #1f2328; --muted: #5c636a; --border: #d0d7de; --accent: #0969da;
+  --text: #1f2328; --muted: #5c636a; --border: #d0d7de; --accent: #0964cf;
+  --control-border: #5c636a;
   --equal: transparent; --del-bg: #ffd7d5; --ins-bg: #d3f5e0;
   --del-mark: #cf222e; --ins-mark: #1a7f37; --rep-bg: #fff3cd;
   --danger-bg: #ffd5d5;
-  --ok: #1a7f37; --warn: #9a6700; --err: #cf222e; --focus: #0969da;
+  --ok: #187734; --warn: #8e5f00; --err: #c9212d; --focus: #0969da;
 }
 .theme-night {
   --surface: #0d1117; --surface-2: #161b22; --surface-3: #21262d;
   --text: #c9d1d9; --muted: #8b949e; --border: #30363d; --accent: #58a6ff;
+  --control-border: #8b949e;
   --equal: transparent; --del-bg: #3c1618; --ins-bg: #12321f;
   --del-mark: #f85149; --ins-mark: #3fb950; --rep-bg: #2a2415;
   --danger-bg: #4a1515;
@@ -132,18 +165,28 @@ body,
 }
 
 .spacer { flex: 1; }
+/* F215 (handoff 094): a button's own fill (`--surface-3`) never clears
+   3:1 against the surfaces it actually sits on (1.08-1.42:1, measured
+   against `--surface`/`--surface-2` in every theme) - no button here
+   identifies itself by fill contrast alone, so every one needs its edge
+   to carry that weight. `--control-border`, not `--border` (a divider
+   colour, 1.08-1.55:1 everywhere, WCAG 1.4.11 asks 3:1 for "what
+   identifies a control"). */
 button {
   background: var(--surface-3); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px;
+  border: 1px solid var(--control-border); border-radius: 6px;
   padding: .25rem .6rem; cursor: pointer; font-size: 13px;
   min-height: var(--control-h);
 }
 button:hover:not(:disabled) { border-color: var(--accent); }
 button:disabled { opacity: .45; cursor: default; }
 button:focus-visible { outline: var(--focus-ring) solid var(--focus); outline-offset: 2px; }
+/* F215: every text field and every `SelectField` dropdown in the app goes
+   through this one rule (no per-field class overrides it) - fixed here
+   once, not once per field. */
 input, select {
   background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px; padding: .25rem .4rem;
+  border: 1px solid var(--control-border); border-radius: 6px; padding: .25rem .4rem;
 }
 input:focus-visible, select:focus-visible {
   outline: var(--focus-ring) solid var(--focus); outline-offset: 2px;
@@ -224,7 +267,7 @@ select option { background: var(--surface); color: var(--text); }
   flex-shrink: 0;
 }
 .statusbar .dirty { color: var(--warn); }
-.statusbar .stats { color: var(--ok); font-size: 11px; }
+.statusbar .stats { color: var(--ok); font-size: 12px; }
 .statusbar .save-target { color: var(--muted); }
 .statusbar .save-target-no-backup { color: var(--warn); cursor: default; }
 .local-only { cursor: default; user-select: none; }
@@ -355,8 +398,11 @@ code.path-display {
   outline: var(--focus-ring) solid var(--focus); outline-offset: 1px;
 }
 .profile-name { flex: 1; font-size: 13px; font-family: ui-monospace, monospace; white-space: pre; cursor: pointer; }
-.profile-delete { opacity: .4; padding: 0 .3rem; font-size: 12px; }
-.profile-delete:hover { opacity: 1; }
+/* F214 (handoff 094): was `opacity: .4` / `:hover { opacity: 1 }` (2.41:1,
+   light) - the button's own text colour (`--text` on its `--surface-3`
+   fill, via the base `button` rule) clears 4.5:1 with no help from
+   opacity at all (9.4-13.1:1, measured), so both rules are simply gone. */
+.profile-delete { padding: 0 .3rem; font-size: 12px; }
 .add-profile-form { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-top: .25rem; }
 .profile-check { display: flex; align-items: center; gap: .2rem; font-size: 12px; color: var(--muted); cursor: pointer; }
 /* F168 §2.2: nested one level deeper than .advanced-toggle, so it reads as
@@ -411,7 +457,7 @@ code.path-display {
 .path-more-btn { margin-left: .15rem; color: var(--muted); }
 .path-segments { display: flex; align-items: center; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
 .path-segments .bc-seg { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.path-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 3px; font-size: 12px; min-width: 6ch; }
+.path-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--control-border); background: var(--surface); color: var(--text); border-radius: 3px; font-size: 12px; min-width: 6ch; }
 .path-input.error { border-color: var(--del-mark, #e05); }
 .path-input:focus { outline: 2px solid var(--accent); }
 
@@ -438,7 +484,7 @@ code.path-display {
 }
 .pathbar-menu-item:hover { background: var(--surface-3); }
 .pathbar-menu-label { flex: 1; min-width: 0; }
-.pathbar-menu-shortcut { color: var(--muted); font-size: 11px; flex-shrink: 0; white-space: nowrap; }
+.pathbar-menu-shortcut { color: var(--muted); font-size: 12px; flex-shrink: 0; white-space: nowrap; }
 
 /* ---- tree rows ---- */
 .tree-row { display: flex; align-items: center; gap: .3rem; padding: .15rem .4rem; cursor: pointer; user-select: none; white-space: nowrap; min-height: var(--row-h); }
@@ -475,7 +521,9 @@ code.path-display {
   background: var(--surface-2); border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.mode-btn { padding: .2rem .7rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); cursor: pointer; font-size: 12px; }
+/* F215: this fill (--surface) sits directly on the same --surface-2 the
+   toolbar itself uses, so there is no fill contrast to lean on. */
+.mode-btn { padding: .2rem .7rem; border: 1px solid var(--control-border); border-radius: 4px; background: var(--surface); cursor: pointer; font-size: 12px; }
 .mode-btn.active { background: color-mix(in srgb, var(--accent) 15%, var(--surface-3)); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
 /* ── Aligned two-pane tree (RFC-054) ── */
@@ -494,7 +542,7 @@ code.path-display {
    Compare (12-view-directory-report.css) defines its own bare `.status-equal`
    etc. for a different row shape (`.dir-status`); the compound form keeps
    these two views' rules from depending on file concatenation order. */
-.tree-status { margin-left: auto; padding-right: .4rem; font-size: 11px; flex-shrink: 0; }
+.tree-status { margin-left: auto; padding-right: .4rem; font-size: 12px; flex-shrink: 0; }
 .tree-status.status-equal      { color: var(--ins-mark, #4a6); }
 .tree-status.status-different  { color: var(--warn, #c90); }
 .tree-status.status-left-only  { color: var(--muted); }
@@ -519,14 +567,20 @@ code.path-display {
    like `.deep-compare-btn`, not a call to action - verifying is optional,
    not expected of every row. */
 .tree-verify-btn {
-  margin-left: .4rem; padding: .1rem .4rem; font-size: 10px;
+  margin-left: .4rem; padding: .1rem .4rem; font-size: 12px;
   border-radius: 4px; flex-shrink: 0;
 }
 
 /* ── Binary-blocked row (RFC-066) ── */
-.tree-row.binary-blocked { opacity: .5; cursor: default; }
+/* F214 (handoff 094): was `opacity: .5` - at 4.5:1-compliant colours, an
+   opacity that low pulls text and the "BIN" badge below 4.5:1/3:1 against
+   every surface underneath (1.96/3.16 measured, light theme). The row
+   shows it is blocked through `--muted` colour instead - already >= 4.44:1
+   against every surface in every theme - plus the badge, which carried
+   `--muted` on its own `--surface-3` fill all along. */
+.tree-row.binary-blocked { color: var(--muted); cursor: default; }
 .tree-status.st-binary {
-  font-size: 9px; font-weight: 700; letter-spacing: .04em;
+  font-size: 12px; font-weight: 700; letter-spacing: .04em;
   color: var(--muted); background: var(--surface-3);
   border: 1px solid var(--border); border-radius: 3px;
   padding: 0 .3rem; margin-left: .3rem; cursor: help;
@@ -556,7 +610,9 @@ code.path-display {
 .filter-dot.on { background: var(--accent); }
 .filter-input { flex: 1; min-width: 0; font-size: 12px; height: 24px; padding: 0 .4rem; }
 .filter-check { display: flex; align-items: center; gap: .25rem; font-size: 12px; color: var(--text); cursor: pointer; white-space: nowrap; user-select: none; }
-.filter-clear { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 11px; color: var(--muted); background: none; border: 1px solid var(--border); }
+/* F214/F215: font-size 11px -> 12px; border/background:none has no fill
+   at all to lean on, so the edge alone identifies it. */
+.filter-clear { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 12px; color: var(--muted); background: none; border: 1px solid var(--control-border); }
 .filter-clear:hover { color: var(--text); border-color: var(--accent); }
 
 
@@ -653,7 +709,7 @@ code.path-display {
    destructive control — just states where a save writes ---- */
 .diff-mergetool-result {
   padding: .2rem .6rem; background: var(--surface-2);
-  border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted);
+  border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted);
   flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .diff-mergetool-result .result-path { color: var(--text); }
@@ -663,7 +719,7 @@ code.path-display {
   display: flex;
   background: var(--surface-2);
   border-bottom: 2px solid var(--border);
-  font-size: 11px; color: var(--muted); font-weight: 600;
+  font-size: 12px; color: var(--muted); font-weight: 600;
   letter-spacing: .04em; text-transform: uppercase;
   user-select: none;
   overflow: hidden;
@@ -778,7 +834,7 @@ code.path-display {
   background: var(--surface);
   white-space: nowrap;
 }
-.diff-act button { padding: 0 .25rem; font-size: 11px; }
+.diff-act button { padding: 0 .25rem; font-size: 12px; }
 /* The merge button sits inside a diff-line-height (24px) table row. The global
    `button { min-height: var(--control-h) }` (36px) would force the act row
    taller than the diff rows and break per-line alignment. Constrain the button
@@ -790,9 +846,9 @@ code.path-display {
   line-height: 1;
   padding: 0 .3rem;
 }
-.apply-btn-label { font-size: 10px; font-weight: 600; letter-spacing: .02em; }
+.apply-btn-label { font-size: 12px; font-weight: 600; letter-spacing: .02em; }
 /* The "applied" check also lives in the act cell — keep it within line height. */
-.applied { padding: 0 .35rem; color: var(--ok); font-size: 11px; line-height: var(--line-h); }
+.applied { padding: 0 .35rem; color: var(--ok); font-size: 12px; line-height: var(--line-h); }
 
 /* ---- gutter (table-cell) ---- */
 .pane-gutter {
@@ -815,7 +871,7 @@ code.path-display {
   display: table-cell;
   width: 1.2ch;
   text-align: center;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--muted);
   user-select: none;
@@ -862,7 +918,7 @@ code.path-display {
   display: inline-block;
   margin-right: 0.8ch;
   padding: 0 0.5ch;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--warn);
   border: 1px solid var(--warn);
   border-radius: 3px;
@@ -903,10 +959,13 @@ code.path-display {
   line-height: var(--line-h);
   width: 100%;
   padding: .2rem .6rem; margin: 0;
-  text-align: center; font-size: 11px; font-family: inherit;
+  text-align: center; font-size: 12px; font-family: inherit;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: var(--muted); background: var(--surface-2);
-  border: 1px dashed var(--border); border-radius: 4px;
+  /* F215: a real <button> (F196), not a divider, despite the dashed
+     styling - WCAG 1.4.11 applies, so its edge is --control-border, not
+     --border, the same as every other button. */
+  border: 1px dashed var(--control-border); border-radius: 4px;
   cursor: pointer; user-select: none;
 }
 .collapse-divider:hover { color: var(--accent); border-color: var(--accent); }
@@ -920,7 +979,7 @@ code.path-display {
   height: calc(var(--line-h) + .4rem + 2px);
   line-height: var(--line-h);
   padding: .2rem .6rem; margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   border: 1px solid transparent;
   visibility: hidden;
 }
@@ -940,10 +999,12 @@ code.path-display {
   background: var(--surface-2); border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.search-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--text); font-size: 13px; }
+.search-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--control-border); border-radius: 3px; background: var(--surface); color: var(--text); font-size: 13px; }
 .search-count { font-size: 12px; color: var(--muted); min-width: 6ch; text-align: center; }
 .search-count.no-matches { color: var(--warn); }
-.search-nav { padding: .1rem .35rem; font-size: 11px; cursor: pointer; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); }
+/* F214/F215: font-size 11px -> 12px; fill (--surface) sits directly on
+   the search bar's own --surface-2, so the edge carries identification. */
+.search-nav { padding: .1rem .35rem; font-size: 12px; cursor: pointer; border: 1px solid var(--control-border); border-radius: 3px; background: var(--surface); }
 .search-nav:disabled { opacity: .4; cursor: default; }
 .search-close { padding: .1rem .4rem; font-size: 14px; cursor: pointer; }
 
@@ -979,7 +1040,10 @@ code.path-display {
 .deep-row { display: flex; align-items: center; gap: .5rem; padding: .2rem .6rem; cursor: pointer; font-size: 13px; }
 .deep-row:hover { background: var(--surface-3); }
 .deep-path { flex: 1; font-family: ui-monospace, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.deep-compare-btn { padding: .15rem .4rem; font-size: 11px; opacity: .7; border-radius: 4px; }
+/* F216: font-size 11px -> 12px. The opacity (.7, revealed to 1 on hover)
+   stays - F214's exemption for a hover-revealed control; RFC-097 stage 3
+   is where this control's own future is decided, not here. */
+.deep-compare-btn { padding: .15rem .4rem; font-size: 12px; opacity: .7; border-radius: 4px; }
 .deep-row:hover .deep-compare-btn { opacity: 1; }
 .deep-scanning { padding: 1.5rem; text-align: center; color: var(--muted); }
 .deep-progress { color: var(--muted); }
@@ -989,12 +1053,14 @@ code.path-display {
 .status-equal   { color: var(--ok); }
 .status-different { color: var(--warn); }
 .status-left-only, .status-right-only { color: var(--muted); }
-.status-computing { color: var(--muted); opacity: .6; }
+/* F214 (handoff 094): was `opacity: .6` (2.60:1, light) on an already-
+   compliant `--muted` - the opacity was the defect, not the colour. */
+.status-computing { color: var(--muted); }
 .status-symlink { color: var(--muted); font-style: italic; }
 .status-unreadable { color: var(--err); }
 
 /* ── Filter buttons ── */
-.filter-btn { padding: .2rem .5rem; border-radius: 6px; font-size: 12px; background: var(--surface-3); border: 1px solid var(--border); cursor: pointer; }
+.filter-btn { padding: .2rem .5rem; border-radius: 6px; font-size: 12px; background: var(--surface-3); border: 1px solid var(--control-border); cursor: pointer; }
 .filter-btn.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
 /* @source css/20-overlays.css */
@@ -1025,7 +1091,9 @@ code.path-display {
 .fsk-conflict-right      { color: var(--ins-mark); }
 .fsk-conflict-both       { color: var(--ok); }
 .fsk-conflict-manual     { color: var(--accent); }
-.fsk-conflict-ignored    { color: var(--muted); opacity: .6; }
+/* F214 (handoff 094): was `opacity: .6` (~2.6:1) on an already-compliant
+   `--muted` - the opacity was the defect, not the colour. */
+.fsk-conflict-ignored    { color: var(--muted); }
 
 /* @source css/90-responsive.css */
 /* ── 90-responsive ──────────────────────────────────────────────────────────

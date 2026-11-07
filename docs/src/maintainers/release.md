@@ -31,8 +31,8 @@ rebuilds for it. That is worth doing only when the app changed.
      written.
    - It covers the tests, the three `clippy` forms, both `fmt --check`s, and
      every `cargo xtask` gate (`css --check`, `i18n`, `colour-vision`,
-     `keyboard-docs`, `xlsx-fixtures --check`, `audit-deps`, `version-sync`,
-     `rfc-sync`, `ui-logic-connectivity`, `ui-logic-docs`).
+     `contrast`, `keyboard-docs`, `xlsx-fixtures --check`, `audit-deps`,
+     `version-sync`, `rfc-sync`, `ui-logic-connectivity`, `ui-logic-docs`).
 2. **The security audit passes** under the checked-in policy: `cargo audit`.
    - The release workflow runs it again and stops on any advisory published
      since. That is how the first `0.191.0` tag stopped: four `rustls`

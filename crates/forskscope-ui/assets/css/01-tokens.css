@@ -12,25 +12,58 @@
   --focus-ring: 2px;
 }
 
+/* F214/F215 (handoff 094): --accent (dark, light), --warn/--ok (light),
+   --err (dark, light) and --muted (dark) were raised just enough to clear
+   4.5:1 against every surface that colour is actually painted on as text
+   (--surface-2 and --surface-3, the tighter of the two, including a tree
+   row's hover background) - measured with `cargo xtask contrast`, not by
+   eye; the first run after fixing F214's own listed failures still found
+   two more (dark --muted and dark/light --err on --surface-3), exactly
+   the "treat the list as a starting point" the handoff warned of. night's
+   accent/warn/ok/err/muted and every theme's --del-mark/--ins-mark were
+   already compliant and are unchanged (colour-vision's own ΔE floor still
+   binds the mark pair, so those were never free to move for contrast
+   alone).
+   --err equalled --del-mark in every theme before this change (the same
+   red, no comment explaining why) - fixing --err's own text-contrast
+   failure broke that coincidence on purpose: they serve unrelated
+   purposes (status/error text here, a diff hunk's own mark there) under
+   different requirements (4.5 text contrast vs colour-vision's ΔE +
+   3.0 mark contrast), so there was no reason to keep them locked together
+   once one of the two actually needed to move.
+   --focus is a separate token - it happens to equal the old --accent in
+   dark/light, but focus rings have their own, looser 3:1 non-text
+   requirement (WCAG 1.4.11), already met, so it was left alone rather
+   than changed on the assumption the pairing was load-bearing.
+   --control-border (F215) is new: at least 3:1 against every one of
+   --surface/--surface-2/--surface-3, for every control edge that isn't a
+   decorative divider. It reuses --muted's own *original* value - already
+   proven to clear that bar with margin - as its own, independently-
+   tunable token, not a `var(--muted)` alias, so the two can diverge
+   later (as --muted itself then did, in dark) without one dragging the
+   other. */
 .theme-dark {
   --surface: #1e1f22; --surface-2: #2b2d31; --surface-3: #36383d;
-  --text: #e6e6e6; --muted: #9aa0a6; --border: #3a3d42; --accent: #4f8cff;
+  --text: #e6e6e6; --muted: #9da3a9; --border: #3a3d42; --accent: #6fa1ff;
+  --control-border: #9aa0a6;
   --equal: transparent; --del-bg: #4a2326; --ins-bg: #1f3b29;
   --del-mark: #ff6b6b; --ins-mark: #5fd28a; --rep-bg: #3a3320;
   --danger-bg: #5c1e1e;
-  --ok: #5fd28a; --warn: #e0b341; --err: #ff6b6b; --focus: #4f8cff;
+  --ok: #5fd28a; --warn: #e0b341; --err: #ff7777; --focus: #4f8cff;
 }
 .theme-light {
   --surface: #ffffff; --surface-2: #f3f4f6; --surface-3: #e8eaed;
-  --text: #1f2328; --muted: #5c636a; --border: #d0d7de; --accent: #0969da;
+  --text: #1f2328; --muted: #5c636a; --border: #d0d7de; --accent: #0964cf;
+  --control-border: #5c636a;
   --equal: transparent; --del-bg: #ffd7d5; --ins-bg: #d3f5e0;
   --del-mark: #cf222e; --ins-mark: #1a7f37; --rep-bg: #fff3cd;
   --danger-bg: #ffd5d5;
-  --ok: #1a7f37; --warn: #9a6700; --err: #cf222e; --focus: #0969da;
+  --ok: #187734; --warn: #8e5f00; --err: #c9212d; --focus: #0969da;
 }
 .theme-night {
   --surface: #0d1117; --surface-2: #161b22; --surface-3: #21262d;
   --text: #c9d1d9; --muted: #8b949e; --border: #30363d; --accent: #58a6ff;
+  --control-border: #8b949e;
   --equal: transparent; --del-bg: #3c1618; --ins-bg: #12321f;
   --del-mark: #f85149; --ins-mark: #3fb950; --rep-bg: #2a2415;
   --danger-bg: #4a1515;
