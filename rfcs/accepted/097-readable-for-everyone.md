@@ -5,6 +5,10 @@
 older users (layout, typography, colour).
 **Accepted.** 2026-11-04 by the project owner ("Your recommendation is
 accepted and authorized").
+**Amended.** 2026-11-07 by the architect, from stage 1's measurement
+(reply 177, review 199): the platforms already apply the system's text
+size, so *Text size* has no *System* choice. It enlarges the app on top of
+whatever the system sets (§1.1, §1.4).
 **Scheduling.** Stage 1 in `0.197.0`; stages 2 and 3 in `0.198.0`. The
 defect fixes found by the same audit (F214–F216, handoff 094) come first, in
 `0.196.4`, and are not part of this RFC.
@@ -74,18 +78,19 @@ separately. This RFC covers what is **new**.
 
 ### 1.1 The setting
 
-**Settings → *Text size*:** *System*, 100 %, 125 %, 150 %, 175 %, 200 %. It
+**Settings → *Text size*:** 100 %, 125 %, 150 %, 175 %, 200 %. It
 scales the whole web view through the platform zoom (wry's
 `WebView::zoom`, reached from Dioxus as the desktop context's `webview`). So
 every part grows together: text, controls, click targets and the code panes.
 - ***Diff font size* stays** and still sets the code panes' size relative to
   the rest. Its label and help text say so.
-- ***System* uses the platform's text-scaling factor,** but only where stage
-  1's measurement (§1.4) shows that it can be read reliably and isn't already
-  applied. Elsewhere *System* isn't offered, and the default is 100 %.
-- **The default is *System* where it is offered, else 100 %.** With no
-  system factor, *System* is 100 %. So nobody's app changes size unless their
-  system already asks for larger text.
+- **The sizes are relative to what the platform already gives the app,**
+  and the default is 100 %, which is today's size. Where the system sets a
+  larger text size, the platform applies it before this setting (§1.4,
+  measured), so the two combine and nothing is applied twice.
+- **There is no *System* choice** (amended 2026-11-07). It would have
+  rendered exactly as 100 % does, and two names for one size would only
+  confuse. The app doesn't read the system's factor at all.
 
 ### 1.2 Keyboard
 
@@ -99,18 +104,18 @@ the default.
 ### 1.3 Persistence
 
 - **The persisted settings gain one field, added with a default:**
-  - an older settings file loads unchanged, as *System*/100 %;
+  - an older settings file loads unchanged, as 100 %;
   - a value outside the steps loads as the nearest step.
 - **It goes through the same versioned schema** and isolation rules as every
   other setting.
 
-### 1.4 Measure before relying on the system (gate for *System*)
+### 1.4 Measure before relying on the system
 
-On each platform, before *System* is offered there, show what happens:
+On each platform, show what happens:
 - **Linux:** GNOME's text scaling (`text-scaling-factor`; GTK's
   `gtk-xft-dpi`) and KDE's font DPI.
 - **Windows:** *Make text bigger*.
-- **macOS:** there is no system-wide text scale, so *System* is not offered.
+- **macOS:** there is no system-wide text scale.
 
 Answer two questions:
 1. Does today's app already grow with the system's factor?
@@ -119,6 +124,17 @@ Answer two questions:
 **If the app already grows, *System* must not apply the factor a second
 time.** If reading the factor needs a new dependency, stop and report: I
 decide.
+
+**Result (reply 177, 2026-11-07):**
+- **Windows:** the app already grows. At *Make text bigger* 125 %, a label
+  was 1.22× its height at 100 %; WebView2 applies it.
+- **Linux, GNOME on Wayland:** the app already grows. `gtk-xft-dpi` went
+  ×1.25 and the Explorer's rows went 33 → 41 px; WebKitGTK applies it.
+- **Linux, X11, and KDE:** not measured. Without an XSettings daemon the
+  factor doesn't reach GTK, and KDE's tools weren't available.
+- **So *System* was dropped (§1.1).** Nothing in the app depends on the X11
+  or KDE result. The guide claims the system's text size applies only where
+  it was measured.
 
 ### 1.5 Layout at every size
 
@@ -213,8 +229,9 @@ Each stage's handoff carries:
 
 ## Risks
 
-- **Double scaling on Linux,** if WebKitGTK already follows the font DPI.
-  §1.4 measures before *System* is offered.
+- **Double scaling,** if the platform already follows the system's text
+  size. §1.4 measured that it does on Windows and GNOME/Wayland, so the app
+  never applies the system's factor itself.
 - **Toolbar overflow at 200 %.** Covered by §1.5's scenarios and stage 3's
   rule for folding labels.
 - **A changed default surprises an existing user.** It doesn't happen: new
