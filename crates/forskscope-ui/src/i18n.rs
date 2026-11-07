@@ -323,6 +323,13 @@ fn ja(key: &str) -> Option<&'static str> {
             "ファイルは同一です — エクスポートする内容がありません。"
         }
         "unsaved" => "未保存",
+        "Text size" => "文字サイズ",
+        "Enlarges everything in ForskScope, on top of your system's text size. Diff font size (below) sets the code panes relative to it." => {
+            "ForskScope全体を拡大します。お使いのシステムの文字サイズに加えて適用されます。差分フォントサイズ（下）は、これを基準にコードパネルのサイズを設定します。"
+        }
+        "Increase text size" => "文字サイズを大きくする",
+        "Decrease text size" => "文字サイズを小さくする",
+        "Reset text size to 100%" => "文字サイズを100%に戻す",
         "Theme" => "テーマ",
         "Colour vision" => "色覚",
         "Standard" => "標準",

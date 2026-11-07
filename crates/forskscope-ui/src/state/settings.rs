@@ -206,6 +206,10 @@ impl DiffProfile {
 
 #[derive(Debug, Clone)]
 pub struct AppSettings {
+    /// RFC-097 stage 1: the whole app's zoom, as a percentage of
+    /// ForskScope's own default (100/125/150/175/200). Applied via
+    /// `webview.zoom()` — see `app.rs`.
+    pub text_size: u32,
     pub theme: Theme,
     /// RFC-088: a second, independent axis beside `theme` — it combines
     /// with every theme rather than adding new ones.
@@ -261,6 +265,7 @@ impl AppSettings {
     /// (RFC-076) into this view type.
     pub fn from_v2(v2: &PersistedSettings) -> Self {
         Self {
+            text_size: v2.text_size,
             theme: match v2.theme {
                 ThemeId::Dark => Theme::Dark,
                 ThemeId::Light => Theme::Light,
@@ -304,6 +309,7 @@ impl AppSettings {
     /// change without resetting fields the UI has no control over.
     pub fn merge_into_v2(&self, base: &PersistedSettings) -> PersistedSettings {
         PersistedSettings {
+            text_size: self.text_size,
             theme: match self.theme {
                 Theme::Dark => ThemeId::Dark,
                 Theme::Light => ThemeId::Light,

@@ -8,6 +8,25 @@ the dialog.
 
 ## Appearance
 
+### Text size
+
+| Value | Description |
+|-------|-------------|
+| **100%** (default) | Today's size. |
+| 125%, 150%, 175%, 200% | Enlarges the whole app — text, controls, click targets and the code panes — on top of whatever your system's own text size already does. |
+
+This is relative, not absolute: it adds to your system's own text-scaling
+setting rather than replacing it, so two people with different system
+settings who both pick the same ForskScope text size still see different
+final sizes, each scaled from their own system's.
+
+*Diff font size* (below) still sets the code panes' size relative to the
+rest, as it always has.
+
+Changes take effect immediately. Also adjustable without opening Settings:
+**Ctrl+=**/**Ctrl++** (larger), **Ctrl+-** (smaller), **Ctrl+0** (reset to
+100%) — see the [Keyboard Reference](../intermediate/keyboard.md#text-size).
+
 ### Theme
 
 | Value | Description |

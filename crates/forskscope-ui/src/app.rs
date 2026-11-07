@@ -155,6 +155,25 @@ pub fn App() -> Element {
         }
     }
 
+    // RFC-097 stage 1 (handoff 095 §2): the whole web view zooms by the
+    // Text size setting — `wry::WebView::zoom`, reached here as
+    // `set_zoom_level` on the same `desktop` context used for the window
+    // title above. Same reason, same shape as that guard: called directly
+    // in the render body rather than from a `use_effect`, so this applies
+    // on the very first render (as early as "before the first paint" can
+    // mean in a webview-hosted app) as well as on every later change, with
+    // no dependency on this integration's effect queue actually flushing.
+    // `0u32` as the sentinel guarantees the first render always differs
+    // from a real step (100-200) and so always applies once at startup.
+    let last_text_size = use_hook(|| std::rc::Rc::new(std::cell::RefCell::new(0u32)));
+    {
+        let text_size = store.settings.read().text_size;
+        if *last_text_size.borrow() != text_size {
+            desktop.set_zoom_level(f64::from(text_size) / 100.0);
+            *last_text_size.borrow_mut() = text_size;
+        }
+    }
+
     let theme_class = store.settings.read().theme.css_class();
     // RFC-088: a second, independent root class — "" for Standard, so the
     // root carries no extra class and only the theme's own tokens apply.
@@ -236,6 +255,27 @@ pub fn App() -> Element {
                     GlobalKeyAction::OpenKeyboardRef => store.modal.set(crate::state::Modal::KeyboardRef),
                     GlobalKeyAction::NextTab => crate::state::activate_adjacent_tab(&mut store, true),
                     GlobalKeyAction::PrevTab => crate::state::activate_adjacent_tab(&mut store, false),
+                    GlobalKeyAction::TextSizeUp => {
+                        let next = forskscope_ui_logic::step_text_size(
+                            store.settings.read().text_size,
+                            1,
+                        );
+                        store.settings.write().text_size = next;
+                        crate::ui::view::settings::persist(store);
+                    }
+                    GlobalKeyAction::TextSizeDown => {
+                        let next = forskscope_ui_logic::step_text_size(
+                            store.settings.read().text_size,
+                            -1,
+                        );
+                        store.settings.write().text_size = next;
+                        crate::ui::view::settings::persist(store);
+                    }
+                    GlobalKeyAction::TextSizeReset => {
+                        store.settings.write().text_size =
+                            forskscope_desktop::settings::display::TEXT_SIZE_DEFAULT;
+                        crate::ui::view::settings::persist(store);
+                    }
                     GlobalKeyAction::OpenSearch => {
                         // Ctrl+F: the search bar inside DiffWorkspace handles its own
                         // context; we use document::eval to click the search button.

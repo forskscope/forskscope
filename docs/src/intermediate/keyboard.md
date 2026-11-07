@@ -1,10 +1,10 @@
 # Keyboard Reference
 
-Every shortcut below except **Escape**, the **Tabs**, **Explorer** and **Modals** sections
-needs a **file-comparison tab to be active**. In the Explorer (the screen ForskScope starts
-on) and in a Directory Report tab, **Ctrl+/**, **Ctrl+W** and every Diff-view shortcut do
-nothing — but switching tabs (below) works from anywhere, with no active comparison tab
-needed.
+Every shortcut below except **Escape**, the **Tabs**, **Text size**, **Explorer** and
+**Modals** sections needs a **file-comparison tab to be active**. In the Explorer (the
+screen ForskScope starts on) and in a Directory Report tab, **Ctrl+/**, **Ctrl+W** and every
+Diff-view shortcut do nothing — but switching tabs and changing text size (below) work from
+anywhere, with no active comparison tab needed.
 
 ## Needs an active comparison tab
 
@@ -21,6 +21,18 @@ from any screen.
 | Shortcut | Action |
 |----------|--------|
 | **Escape**   | Close an open dialog — except a startup recovery dialog, which needs an explicit choice. (The search bar has its own **Esc**; see Tips.) |
+
+## Text size
+
+Enlarges the whole app, controls included — the system's own text size, if it has one,
+still applies underneath (see [Settings → *Text size*](../users/settings.md#text-size)).
+Works from anywhere, with no active comparison tab needed.
+
+| Shortcut | Action |
+|----------|--------|
+| **Ctrl+=** / **Ctrl++** | Increase text size one step |
+| **Ctrl+-**              | Decrease text size one step |
+| **Ctrl+0**              | Reset text size to 100% |
 
 ## Diff view
 

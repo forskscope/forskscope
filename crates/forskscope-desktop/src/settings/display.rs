@@ -128,6 +128,32 @@ impl ColourVision {
     }
 }
 
+// ── Text size (RFC-097 stage 1) ────────────────────────────────────────────────
+
+/// Whole-app zoom steps, as a percentage of ForskScope's own default — not a
+/// reflection of the system's own text scale. Handoff 095's measurement
+/// (reply 177) found the platform already applies its own text-scaling
+/// factor automatically, on both measured platforms (Windows' *Make text
+/// bigger*, GNOME on Wayland's `text-scaling-factor`), with no app code at
+/// all; a second, app-level *System* option would have applied it twice,
+/// and would otherwise have rendered identically to 100% anyway (review
+/// 199) — so there is no *System* choice here, only this plain, relative
+/// scale on top of whatever the platform already does.
+pub const TEXT_SIZE_STEPS: [u32; 5] = [100, 125, 150, 175, 200];
+pub const TEXT_SIZE_DEFAULT: u32 = 100;
+
+/// Snaps an arbitrary persisted value to the nearest step (handoff 095 §4:
+/// "a value outside the steps loads as the nearest step"). The five steps
+/// are all 25 apart, so no input is ever exactly equidistant between two of
+/// them — there is no tie to break.
+pub fn nearest_text_size_step(value: u32) -> u32 {
+    TEXT_SIZE_STEPS
+        .iter()
+        .copied()
+        .min_by_key(|&step| step.abs_diff(value))
+        .unwrap_or(TEXT_SIZE_DEFAULT)
+}
+
 // ── Density / display ─────────────────────────────────────────────────────────
 
 /// UI layout density (RFC-009 §4 `AppearanceSettings`).
@@ -256,5 +282,30 @@ impl LocaleId {
     }
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nearest_text_size_step_is_exact_on_a_real_step() {
+        for &step in &TEXT_SIZE_STEPS {
+            assert_eq!(nearest_text_size_step(step), step);
+        }
+    }
+
+    #[test]
+    fn nearest_text_size_step_snaps_a_value_outside_the_steps() {
+        assert_eq!(nearest_text_size_step(0), 100);
+        assert_eq!(nearest_text_size_step(110), 100);
+        assert_eq!(
+            nearest_text_size_step(113),
+            125,
+            "113 is closer to 125 than 100"
+        );
+        assert_eq!(nearest_text_size_step(190), 200);
+        assert_eq!(nearest_text_size_step(9999), 200);
     }
 }

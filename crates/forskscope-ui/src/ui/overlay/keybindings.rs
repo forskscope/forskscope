@@ -61,6 +61,9 @@ pub fn KeyboardRefModal() -> Element {
                         KbRow { keys: "Ctrl + W",       desc: t(lang, "Close the active comparison tab") }
                         KbRow { keys: "Ctrl + /",       desc: t(lang, "This keyboard reference") }
                         KbRow { keys: "Escape",         desc: t(lang, "Close modal / search bar") }
+                        KbRow { keys: "Ctrl + = / Ctrl + +", desc: t(lang, "Increase text size") }
+                        KbRow { keys: "Ctrl + -",       desc: t(lang, "Decrease text size") }
+                        KbRow { keys: "Ctrl + 0",       desc: t(lang, "Reset text size to 100%") }
                     }
                 }
                 div { class: "actions",

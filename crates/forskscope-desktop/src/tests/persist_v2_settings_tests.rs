@@ -24,6 +24,7 @@ const SETTINGS_V2_FIXTURE: &str = include_str!("fixtures/persistence/settings-v2
 
 fn sample_v2() -> PersistedSettings {
     PersistedSettings {
+        text_size: 125,
         theme: ThemeId::Night,
         colour_vision: ColourVision::RedGreenSafe,
         language: LocaleId::english(),
@@ -108,6 +109,7 @@ fn current_v2_tolerates_unknown_payload_fields() {
 #[test]
 fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
     let expected = PersistedSettings {
+        text_size: 150,
         theme: ThemeId::Night,
         colour_vision: ColourVision::RedGreenSafe,
         language: LocaleId::japanese(),
@@ -192,6 +194,25 @@ fn a_pre_colour_vision_v2_file_loads_with_the_standard_palette() {
     match load_settings(&raw) {
         PersistenceLoad::Current { value } => {
             assert_eq!(value.colour_vision, ColourVision::Standard);
+        }
+        other => panic!("expected Current, got {other:?}"),
+    }
+}
+
+/// RFC-097 stage 1 (handoff 095 §4): a v2 settings file written before
+/// `text_size` existed (every release through `0.196.x`) has no such key
+/// in its payload at all. `#[serde(default)]` is what makes a *missing*
+/// field fall back to 100% rather than fail to parse. Falsify by removing
+/// `#[serde(default = "default_text_size")]` from the field: this fails to
+/// parse and the match hits the `other` arm.
+#[test]
+fn a_pre_text_size_v2_file_loads_at_100_percent() {
+    let mut payload = serde_json::to_value(sample_v2()).unwrap();
+    payload.as_object_mut().unwrap().remove("text_size");
+    let raw = envelope_for(2, &payload);
+    match load_settings(&raw) {
+        PersistenceLoad::Current { value } => {
+            assert_eq!(value.text_size, 100);
         }
         other => panic!("expected Current, got {other:?}"),
     }
@@ -376,6 +397,56 @@ fn out_of_range_diff_font_size_clamps() {
     match load_settings(&raw) {
         PersistenceLoad::Current { value } => assert_eq!(value.diff_font_size, 8),
         other => panic!("expected Current, got {other:?}"),
+    }
+}
+
+/// Handoff 095 §4: "a value outside the steps loads as the nearest step" —
+/// distinct from `diff_font_size`'s plain range clamp above, this snaps to
+/// the nearest of five discrete steps, not to a continuous range's edges.
+#[test]
+fn out_of_range_text_size_snaps_to_the_nearest_step() {
+    let mut too_small = sample_v2();
+    too_small.text_size = 0;
+    let raw = envelope_for(2, &serde_json::to_value(&too_small).unwrap());
+    match load_settings(&raw) {
+        PersistenceLoad::Current { value } => assert_eq!(value.text_size, 100),
+        other => panic!("expected Current, got {other:?}"),
+    }
+
+    let mut mid = sample_v2();
+    mid.text_size = 113;
+    let raw = envelope_for(2, &serde_json::to_value(&mid).unwrap());
+    match load_settings(&raw) {
+        PersistenceLoad::Current { value } => assert_eq!(value.text_size, 125),
+        other => panic!("expected Current, got {other:?}"),
+    }
+
+    let mut too_large = sample_v2();
+    too_large.text_size = 9999;
+    let raw = envelope_for(2, &serde_json::to_value(&too_large).unwrap());
+    match load_settings(&raw) {
+        PersistenceLoad::Current { value } => assert_eq!(value.text_size, 200),
+        other => panic!("expected Current, got {other:?}"),
+    }
+}
+
+/// Handoff 095 §4: "a round trip keeps each step" — every one of the five
+/// steps, not a sample, survives a save/load cycle unchanged.
+#[test]
+fn every_text_size_step_round_trips() {
+    for &step in &crate::settings::display::TEXT_SIZE_STEPS {
+        let mut value = sample_v2();
+        value.text_size = step;
+        let raw = envelope_for(2, &serde_json::to_value(&value).unwrap());
+        match load_settings(&raw) {
+            PersistenceLoad::Current { value: loaded } => {
+                assert_eq!(
+                    loaded.text_size, step,
+                    "step {step} must round-trip exactly"
+                )
+            }
+            other => panic!("expected Current, got {other:?}"),
+        }
     }
 }
 

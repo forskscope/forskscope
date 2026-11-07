@@ -39,7 +39,8 @@
 //!   - `startup`: `StartupRequest` CLI parsing and mergetool-to-`CompareRequest`
 //!     conversion (RFC-077).
 //! - [`settings`] — settings form logic:
-//!   - `settings_view`: theme picker choices and the shared font-size clamp.
+//!   - `settings_view`: theme picker choices, the shared font-size clamp,
+//!     and the text-size step logic (RFC-097 stage 1).
 //!   - `field_debounce`: `FieldDebounce` (F136) — debounces a text field that
 //!     is cheap to display but expensive to commit (the ignore-pattern
 //!     fields, whose commit triggers an Explorer rescan).
@@ -117,7 +118,7 @@ pub use settings::persistence_recovery::{
     RecoveryDialogAction as SettingsRecoveryDialogAction, SettingsRecoveryView,
     action_label as settings_recovery_action_label,
 };
-pub use settings::settings_view::{clamp_font_size, theme_choices};
+pub use settings::settings_view::{clamp_font_size, step_text_size, theme_choices};
 
 // update_check
 pub use update_check::{

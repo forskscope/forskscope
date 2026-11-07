@@ -13,6 +13,7 @@
 - [Merging changes](./users/merging.md)
 - [Explorer panes](./users/explorer.md)
 - [Settings](./users/settings.md)
+- [Accessibility](./users/accessibility.md)
 - [Known limitations](./users/known-limitations.md)
 - [Troubleshooting](./users/troubleshooting.md)
 - [FAQ](./users/faq.md)

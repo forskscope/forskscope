@@ -1,8 +1,10 @@
 //! Settings form view-model (RFC-009, Slice 5).
 //!
 //! Provides the *picker metadata* the settings dialog needs: what options
-//! appear in the theme `<select>` dropdown, and the shared font-size clamp
-//! (F53). No I/O; pure derivation from core's `ThemeId`.
+//! appear in the theme `<select>` dropdown, the shared font-size clamp
+//! (F53), and the text-size step logic Ctrl+=/Ctrl+- use (RFC-097 stage 1,
+//! handoff 095 §3). No I/O; pure derivation from core's `ThemeId`/
+//! `TEXT_SIZE_STEPS`.
 //!
 //! ## Why a separate module?
 //!
@@ -49,6 +51,7 @@
 //! or CSS injection (`ThemeId::css_var_names`), which live in core.
 
 use forskscope_desktop::settings::ThemeId;
+use forskscope_desktop::settings::display::{TEXT_SIZE_STEPS, nearest_text_size_step};
 
 // ── Generic choice ────────────────────────────────────────────────────────────
 
@@ -95,6 +98,25 @@ pub const FONT_SIZE_MAX: u32 = 32;
 /// Clamp a raw font size to the valid range.
 pub fn clamp_font_size(size: u32) -> u8 {
     size.clamp(FONT_SIZE_MIN, FONT_SIZE_MAX) as u8
+}
+
+// ── Text size (RFC-097 stage 1, handoff 095 §3) ────────────────────────────────
+
+/// Steps `current` to the next/previous entry in `TEXT_SIZE_STEPS` (Ctrl+=/
+/// Ctrl+-), clamping at the ends rather than wrapping: a step past 200% or
+/// below 100% returns 200%/100% unchanged, not the opposite end. `current`
+/// is rounded to its nearest step first (the same rule persistence applies
+/// to a loaded value), so a value that drifted off-step by any means still
+/// steps from the step it is closest to, rather than snapping somewhere
+/// surprising.
+pub fn step_text_size(current: u32, delta: i32) -> u32 {
+    let nearest = nearest_text_size_step(current);
+    let idx = TEXT_SIZE_STEPS
+        .iter()
+        .position(|&step| step == nearest)
+        .unwrap_or(0);
+    let new_idx = (idx as i32 + delta).clamp(0, TEXT_SIZE_STEPS.len() as i32 - 1);
+    TEXT_SIZE_STEPS[new_idx as usize]
 }
 
 #[cfg(test)]
@@ -156,5 +178,46 @@ mod tests {
         // the modal and the helper disagree about what the product ships.
         assert_eq!(FONT_SIZE_MIN, 8);
         assert_eq!(FONT_SIZE_MAX, 32);
+    }
+
+    // ── step_text_size ────────────────────────────────────────────────────────
+
+    #[test]
+    fn step_text_size_moves_one_step_at_a_time() {
+        assert_eq!(step_text_size(100, 1), 125);
+        assert_eq!(step_text_size(125, 1), 150);
+        assert_eq!(step_text_size(150, -1), 125);
+    }
+
+    #[test]
+    fn step_text_size_stops_at_the_ends_rather_than_wrapping() {
+        assert_eq!(
+            step_text_size(200, 1),
+            200,
+            "a step up from the top must stay at the top, not wrap to the bottom"
+        );
+        assert_eq!(
+            step_text_size(100, -1),
+            100,
+            "a step down from the bottom must stay at the bottom, not wrap to the top"
+        );
+    }
+
+    #[test]
+    fn step_text_size_rounds_an_off_step_value_before_stepping() {
+        // 113 is nearest to 125; stepping up from there lands on 150, not
+        // on 125 (which a naive "round after stepping" could also produce
+        // from a different off-step input, so this specifically checks the
+        // round-first order).
+        assert_eq!(step_text_size(113, 1), 150);
+    }
+
+    #[test]
+    fn step_text_size_never_returns_a_value_outside_the_step_list() {
+        for &start in &TEXT_SIZE_STEPS {
+            for delta in [-1, 1] {
+                assert!(TEXT_SIZE_STEPS.contains(&step_text_size(start, delta)));
+            }
+        }
     }
 }

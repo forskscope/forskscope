@@ -24,7 +24,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{PersistenceError, PersistenceLoad};
 use crate::settings::display::{
-    ColourVision, Density, DiffFontFamilySetting, FontFamilySetting, LocaleId, ThemeId,
+    ColourVision, Density, DiffFontFamilySetting, FontFamilySetting, LocaleId, TEXT_SIZE_DEFAULT,
+    ThemeId, nearest_text_size_step,
 };
 use forskscope_compare::diff::{
     CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode,
@@ -60,6 +61,11 @@ const CONTEXT_LINES_MAX: usize = 20;
 /// that the UI and core each already track separately.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PersistedSettings {
+    /// RFC-097 stage 1: the whole app's zoom, as a percentage of
+    /// ForskScope's own default — the first item of the appearance group
+    /// in the Settings dialog, ahead of `theme` below.
+    #[serde(default = "default_text_size")]
+    pub text_size: u32,
     pub theme: ThemeId,
     /// RFC-088: a second, independent axis beside `theme` — it combines with
     /// every theme rather than adding new ones.
@@ -157,6 +163,7 @@ pub struct PersistedDiffProfile {
 impl Default for PersistedSettings {
     fn default() -> Self {
         Self {
+            text_size: default_text_size(),
             theme: ThemeId::default(),
             colour_vision: ColourVision::default(),
             language: LocaleId::english(),
@@ -206,6 +213,9 @@ fn default_appearance_font_size() -> u8 {
 /// drag the other along.
 fn default_diff_font_size() -> u32 {
     14
+}
+fn default_text_size() -> u32 {
+    TEXT_SIZE_DEFAULT
 }
 
 // ── Routing ──────────────────────────────────────────────────────────────
@@ -318,6 +328,8 @@ fn migrate_from_v0(v0: LegacyAppSettingsV0) -> PersistedSettings {
         .collect();
 
     normalize(PersistedSettings {
+        // v0 has no text-size concept; the product-wide default applies.
+        text_size: default_text_size(),
         theme: match v0.theme {
             LegacyThemeV0::Dark => ThemeId::Dark,
             LegacyThemeV0::Light => ThemeId::Light,
@@ -409,6 +421,7 @@ fn ui_builtin_profiles() -> Vec<PersistedDiffProfile> {
 /// Normalizes invalid indexes/ranges without dropping otherwise valid fields
 /// (RFC-076 §"Validation").
 fn normalize(mut v2: PersistedSettings) -> PersistedSettings {
+    v2.text_size = nearest_text_size_step(v2.text_size);
     v2.appearance_font_size = v2.appearance_font_size.clamp(FONT_SIZE_MIN, FONT_SIZE_MAX);
     v2.diff_font_size = v2
         .diff_font_size

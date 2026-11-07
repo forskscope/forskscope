@@ -102,6 +102,29 @@ pub fn SettingsModal() -> Element {
                 }
 
                 // ── Appearance ────────────────────────────────────────────────
+                // RFC-097 stage 1 (handoff 095 §2): first item of the group.
+                // Handoff 095's own measurement (reply 177, review 199)
+                // found no *System* choice belongs here — the platform
+                // already applies its own text scale automatically, so this
+                // is a plain, relative scale on top of whatever that is.
+                div { class: "field",
+                    span { {t(lang, "Text size")} }
+                    SelectField {
+                        value: cur.text_size.to_string(),
+                        title: t(lang, "Enlarges everything in ForskScope, on top of your system's text size. Diff font size (below) sets the code panes relative to it."),
+                        options: forskscope_desktop::settings::display::TEXT_SIZE_STEPS
+                            .iter()
+                            .map(|s| SelectOption::new(s.to_string(), format!("{s}%")))
+                            .collect::<Vec<_>>(),
+                        onchange: move |v: String| {
+                            if let Ok(n) = v.parse::<u32>() {
+                                store.settings.write().text_size =
+                                    forskscope_desktop::settings::display::nearest_text_size_step(n);
+                                super::persist(store);
+                            }
+                        },
+                    }
+                }
                 div { class: "field",
                     span { {t(lang, "Theme")} }
                     SelectField {
@@ -436,6 +459,53 @@ mod tests {
         assert!(
             labels.iter().any(|a| a.contains("About ForskScope")),
             "the About control must keep its accessible name, got {labels:?}"
+        );
+    }
+
+    /// Review 200 §4: the *Text size* field must show whatever
+    /// `store.settings.text_size` holds — including a value a keyboard
+    /// shortcut just wrote, not the modal's own default — since Ctrl+=/
+    /// Ctrl+-/Ctrl+0 now work while Settings is open. This checks the half
+    /// a unit test can see: the `<select>`'s own `value` attribute (a
+    /// dynamic, interpolated string, so it is a real `SetAttribute`
+    /// mutation here, the same as `aria-label` above) reflects a
+    /// non-default `AppSettings.text_size` at mount, rather than a
+    /// hardcoded 100 — a stand-in for "the dialog re-renders after the
+    /// shortcut mutates the store", which this harness has no established
+    /// way to simulate (no test in this crate re-renders after a later
+    /// signal write; every one constructs the initial state it checks, the
+    /// same shape `move_together_aria_pressed_is_true_when_sync_is_on` and
+    /// its `_off` counterpart use in `explorer/filter.rs`).
+    #[test]
+    fn the_text_size_field_reflects_a_non_default_setting() {
+        fn root() -> Element {
+            let settings = AppSettings {
+                text_size: 125,
+                ..AppSettings::default()
+            };
+            use_context_provider(|| Store::new(settings, Default::default(), false));
+            rsx! {
+                SettingsModal {}
+            }
+        }
+
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+
+        let values: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute { name, value, .. } if *name == "value" => {
+                    Some(format!("{value:?}"))
+                }
+                _ => None,
+            })
+            .collect();
+
+        assert!(
+            values.iter().any(|v| v.contains("125")),
+            "the Text size select's value must reflect text_size=125, got {values:?}"
         );
     }
 }

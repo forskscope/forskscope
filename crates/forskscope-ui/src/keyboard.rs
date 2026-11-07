@@ -70,13 +70,22 @@ pub(crate) enum GlobalKeyAction {
     /// [`global_key_action`]'s own doc for why the gate moved.
     NextTab,
     PrevTab,
+    /// RFC-097 stage 1 (handoff 095 §3): Ctrl+=/Ctrl++ and Ctrl+- step the
+    /// Text size setting one step up/down; Ctrl+0 resets it to 100%. Like
+    /// `NextTab`/`PrevTab`, these need no active comparison tab — text
+    /// size is an app-wide setting, not a diff-view one.
+    TextSizeUp,
+    TextSizeDown,
+    TextSizeReset,
 }
 
 /// The decision RFC-060 guards: Escape closes an ordinary modal but never a
 /// recovery one; every other global shortcut is swallowed while any modal is
 /// open (P0-1: e.g. Ctrl+S must not write the file behind an overwrite
-/// dialog); with no modal open and no active tab, only Escape-shaped
-/// no-ops make sense.
+/// dialog) — except text size (RFC-097 stage 1, review 200 §4), which
+/// changes nothing in the document or in a pending choice and so works in
+/// any modal state; with no modal open and no active tab, only
+/// Escape-shaped no-ops and text size make sense.
 pub(crate) fn global_key_action(
     key: &Key,
     mods: Modifiers,
@@ -91,6 +100,30 @@ pub(crate) fn global_key_action(
         } else {
             A::Ignore
         };
+    }
+
+    // RFC-097 stage 1 (handoff 095 §3, review 200 §4): text size works in
+    // *any* modal state, including a recovery dialog — unlike every other
+    // global shortcut below, it changes nothing in the open document or in
+    // a pending recovery choice, so there is no P0-1-shaped reason to
+    // swallow it here. Checked before the modal gate below (which every
+    // other shortcut still passes through unchanged) for exactly that
+    // reason. The open Settings dialog's own *Text size* field shows the
+    // new value immediately: it re-reads `store.settings` on every render,
+    // and a change here re-renders it the same as any other settings edit
+    // does. "=" and "+" both mean "step up" — Ctrl+Shift+= is reported as
+    // "+" on layouts where Shift changes the character (and is exactly how
+    // a JIS keyboard's Ctrl+Shift+; arrives), and both must do the same
+    // thing.
+    if mods.contains(Modifiers::CONTROL)
+        && let Key::Character(s) = key
+    {
+        match s.as_str() {
+            "=" | "+" => return A::TextSizeUp,
+            "-" => return A::TextSizeDown,
+            "0" => return A::TextSizeReset,
+            _ => {}
+        }
     }
 
     if modal.is_open() {
@@ -517,6 +550,103 @@ mod tests {
                 false,
             ),
             GlobalKeyAction::PrevTab,
+        );
+    }
+
+    // ── RFC-097 stage 1 (handoff 095 §3): text size from anywhere ──────────
+
+    /// Like tab switching, text size needs no active comparison tab —
+    /// falsify by moving this match below the `!has_active_tab` gate: this
+    /// then fails with `Ignore`.
+    #[test]
+    fn ctrl_equals_and_plus_both_step_text_size_up_with_no_active_tab() {
+        for ch in ["=", "+"] {
+            assert_eq!(
+                global_key_action(
+                    &Key::Character(ch.into()),
+                    Modifiers::CONTROL,
+                    ModalState::None,
+                    false,
+                ),
+                GlobalKeyAction::TextSizeUp,
+                "Ctrl+{ch} must step text size up",
+            );
+        }
+    }
+
+    #[test]
+    fn ctrl_minus_steps_text_size_down_with_no_active_tab() {
+        assert_eq!(
+            global_key_action(
+                &Key::Character("-".into()),
+                Modifiers::CONTROL,
+                ModalState::None,
+                false
+            ),
+            GlobalKeyAction::TextSizeDown,
+        );
+    }
+
+    #[test]
+    fn ctrl_zero_resets_text_size_with_no_active_tab() {
+        assert_eq!(
+            global_key_action(
+                &Key::Character("0".into()),
+                Modifiers::CONTROL,
+                ModalState::None,
+                false
+            ),
+            GlobalKeyAction::TextSizeReset,
+        );
+    }
+
+    /// Review 200 §4: unlike every other global shortcut, text size
+    /// changes nothing in the document or in a pending choice, so it works
+    /// in any modal state — including a recovery dialog, where every other
+    /// shortcut stays blocked. Settings is exactly where someone is most
+    /// likely to try it, since that's where the field lives.
+    #[test]
+    fn text_size_shortcuts_work_in_any_modal_state() {
+        for modal in [ModalState::Other, ModalState::Recovery] {
+            assert_eq!(
+                global_key_action(&Key::Character("=".into()), Modifiers::CONTROL, modal, true),
+                GlobalKeyAction::TextSizeUp,
+                "Ctrl+= must work with {modal:?} open",
+            );
+        }
+    }
+
+    /// Review 200 §3: on a JIS (Japanese) keyboard, the physical keys for
+    /// "=" and "+" need Shift (Ctrl+Shift+`-` arrives as "=", Ctrl+Shift+`;`
+    /// as "+") where a US keyboard's Ctrl+= needs none — `winit`/`dioxus`
+    /// deliver the already layout-translated character, not a raw scancode,
+    /// so `global_key_action`'s `mods.contains(CONTROL)` check (which
+    /// allows Shift to also be held) already covers this with no special
+    /// case. Pins the code-reading conclusion the review asked for, rather
+    /// than a live JIS-layout test.
+    #[test]
+    fn ctrl_shift_equals_still_steps_text_size_up() {
+        assert_eq!(
+            global_key_action(
+                &Key::Character("=".into()),
+                Modifiers::CONTROL | Modifiers::SHIFT,
+                ModalState::None,
+                false,
+            ),
+            GlobalKeyAction::TextSizeUp,
+        );
+    }
+
+    #[test]
+    fn plain_equals_without_control_is_not_a_text_size_step() {
+        assert_eq!(
+            global_key_action(
+                &Key::Character("=".into()),
+                Modifiers::empty(),
+                ModalState::None,
+                true
+            ),
+            GlobalKeyAction::Ignore,
         );
     }
 

@@ -5,6 +5,7 @@
   "created_unix": 1700000000,
   "updated_unix": 1700000100,
   "payload": {
+    "text_size": 150,
     "theme": "night",
     "colour_vision": "red-green-safe",
     "language": "ja",
