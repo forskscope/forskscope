@@ -202,6 +202,14 @@ There is no setting for this; the system's preference is enough.
   If a row's three buttons then read as noise, reduce their number and keep
   them visible. Any reduction is a design proposal for me first.
 - ***Redo* sits beside *Undo*,** not under *More*.
+- **Help text visible, not tooltip-only.** The Settings dialog's help
+  sentences (*Text size*, *Enable binary comparison*, *Remember Explorer
+  directories*) are `title` tooltips today, which a sighted user who
+  doesn't hover never sees. Show them as a short line under the field.
+  Added 2026-11-08, review 203.
+- **No italic body text.** The Explorer's hint ("Choose a file or folder on
+  each side to compare") is italic, and italics are harder to read. Use
+  `--muted` upright text. Added 2026-11-08, review 203.
 - **Click targets** are at least 24×24 px at 100 % (WCAG 2.5.8). The
   toolbar's main controls are at least 32 px tall. The *Use* button in the
   merge gutter is included.
