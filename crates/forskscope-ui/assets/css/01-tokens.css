@@ -41,13 +41,30 @@
    proven to clear that bar with margin - as its own, independently-
    tunable token, not a `var(--muted)` alias, so the two can diverge
    later (as --muted itself then did, in dark) without one dragging the
-   other. */
+   other.
+
+   Review 196 found the first `contrast` gate's own pair table didn't cover
+   every pair the CSS actually draws (tinted `color-mix()` backgrounds, the
+   diff's red/green/amber rows, a solid --accent fill) - once it did, three
+   more failures turned up:
+   - light --ins-mark (#1a7f37) is also the Explorer's "equal" status glyph
+     (`.tree-status.status-equal`, a text use, not a mark use) and missed
+     4.5:1 against --surface-3 at 4.21 - darkened to #187533 (4.80 on
+     --surface-3), still 3:1+ as a mark against --ins-bg and still far
+     past colour-vision's ΔE floor against --del-mark.
+   - --rep-mark is new: `.hunk-rep .diff-mark` used --warn, which has no
+     red-green-safe override, so under cv-rgsafe in Light it measured
+     2.76 against --rep-bg's own cv-rgsafe value (#abbab7) - below even
+     the 3:1 a mark needs. --rep-mark gives that one selector its own,
+     independently-overridable token (default: this theme's --warn, so no
+     other pairing moves) - see its Light-only cv-rgsafe override below. */
 .theme-dark {
   --surface: #1e1f22; --surface-2: #2b2d31; --surface-3: #36383d;
   --text: #e6e6e6; --muted: #9da3a9; --border: #3a3d42; --accent: #6fa1ff;
   --control-border: #9aa0a6;
   --equal: transparent; --del-bg: #4a2326; --ins-bg: #1f3b29;
   --del-mark: #ff6b6b; --ins-mark: #5fd28a; --rep-bg: #3a3320;
+  --rep-mark: #e0b341;
   --danger-bg: #5c1e1e;
   --ok: #5fd28a; --warn: #e0b341; --err: #ff7777; --focus: #4f8cff;
 }
@@ -56,7 +73,8 @@
   --text: #1f2328; --muted: #5c636a; --border: #d0d7de; --accent: #0964cf;
   --control-border: #5c636a;
   --equal: transparent; --del-bg: #ffd7d5; --ins-bg: #d3f5e0;
-  --del-mark: #cf222e; --ins-mark: #1a7f37; --rep-bg: #fff3cd;
+  --del-mark: #cf222e; --ins-mark: #187533; --rep-bg: #fff3cd;
+  --rep-mark: #8e5f00;
   --danger-bg: #ffd5d5;
   --ok: #187734; --warn: #8e5f00; --err: #c9212d; --focus: #0969da;
 }
@@ -66,6 +84,7 @@
   --control-border: #8b949e;
   --equal: transparent; --del-bg: #3c1618; --ins-bg: #12321f;
   --del-mark: #f85149; --ins-mark: #3fb950; --rep-bg: #2a2415;
+  --rep-mark: #d29922;
   --danger-bg: #4a1515;
   --ok: #3fb950; --warn: #d29922; --err: #f85149; --focus: #58a6ff;
 }
@@ -79,7 +98,12 @@
    token (including --warn, already told apart from these by hue and
    glyph) is unchanged. `cargo xtask colour-vision` measures these pairs
    against 01-tokens.css directly, so a value here is the value the gate
-   checks. */
+   checks.
+   --rep-mark (review 196 §3) only overrides in Light: that is the one
+   combination (Light, red-green-safe) where the base theme's --rep-mark
+   (equal to --warn) fails 3:1 against this block's own --rep-bg (2.76);
+   dark and night's red-green-safe --rep-bg already clear 3:1 against
+   their unchanged --rep-mark (4.34-4.45), so they take no override. */
 .theme-dark.cv-rgsafe {
   --del-bg: #4d2e14; --ins-bg: #14304d;
   --del-mark: #ff9b4a; --ins-mark: #5aa9ff;
@@ -88,7 +112,7 @@
 .theme-light.cv-rgsafe {
   --del-bg: #ffe2c7; --ins-bg: #d4e6ff;
   --del-mark: #944800; --ins-mark: #0a5fd6;
-  --rep-bg: #abbab7;
+  --rep-bg: #abbab7; --rep-mark: #805600;
 }
 .theme-night.cv-rgsafe {
   --del-bg: #3d2410; --ins-bg: #10284a;

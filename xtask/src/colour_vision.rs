@@ -130,21 +130,22 @@ fn simulated_delta_e(hex1: &str, hex2: &str, sim: Simulation) -> f64 {
     delta_e76(lab(hex1), lab(hex2))
 }
 
-const TOKENS: [&str; 6] = [
+const TOKENS: [&str; 7] = [
     "--text",
     "--del-bg",
     "--ins-bg",
     "--del-mark",
     "--ins-mark",
     "--rep-bg",
+    "--rep-mark",
 ];
 
-/// The six tokens this gate needs, resolved for one theme × palette
+/// The seven tokens this gate needs, resolved for one theme × palette
 /// combination: the palette's own override where `01-tokens.css` declares
 /// one (`.theme-X.cv-rgsafe`), else the base theme's value — exactly CSS's
 /// own cascade, since `.theme-X.cv-rgsafe` has higher specificity and the
 /// browser resolves it the same way.
-fn resolve(rules: &[Rule], theme: &str, rgsafe: bool) -> [String; 6] {
+fn resolve(rules: &[Rule], theme: &str, rgsafe: bool) -> [String; 7] {
     let base_sel = format!(".theme-{theme}");
     let rgsafe_sel = format!(".theme-{theme}.cv-rgsafe");
     TOKENS.map(|var| {
@@ -233,7 +234,8 @@ pub fn run(root: &Path) {
 
     for &theme in &THEMES {
         for &rgsafe in &[false, true] {
-            let [text, del_bg, ins_bg, del_mark, ins_mark, rep_bg] = resolve(&rules, theme, rgsafe);
+            let [text, del_bg, ins_bg, del_mark, ins_mark, rep_bg, rep_mark] =
+                resolve(&rules, theme, rgsafe);
             let palette = if rgsafe { "red-green-safe" } else { "standard" };
 
             let sims: &[Simulation] = if rgsafe {
@@ -341,6 +343,22 @@ pub fn run(root: &Path) {
                 &ins_bg,
                 MARK_CONTRAST_MIN,
             );
+            // Review 196 §3: `.hunk-rep .diff-mark` used `--warn`, which has
+            // no red-green-safe override, and in Light that measured 2.76
+            // against this block's own `--rep-bg` — below even a mark's
+            // 3:1. `--rep-mark` is its own token now, checked here (and
+            // separately in `contrast.rs`'s own pair table, so both gates
+            // see it) so a future `--rep-bg` or `--rep-mark` change can't
+            // reopen this gap unseen.
+            check_contrast(
+                &mut problems,
+                &ctx,
+                "rep-mark",
+                &rep_mark,
+                "rep-bg",
+                &rep_bg,
+                MARK_CONTRAST_MIN,
+            );
         }
     }
 
@@ -373,6 +391,12 @@ pub fn run(root: &Path) {
 // `Palette` as a Rust type, so this reads html.rs's own source text and
 // pulls the six `field: "#hex"` lines out of each const block, the same
 // text-scan style `parse_rules` already uses for the CSS side.
+//
+// `rep_mark`/`--rep-mark` replaced `warn`/`--warn` (review 196 §3): the
+// report's `.hunk-rep .diff-mark` colour now tracks the same token the live
+// app's own rule does, so this check still asks the one question that
+// matters - does the copy match the source it was copied from - rather
+// than a field whose live-app rule had already moved on.
 
 const REPORT_PALETTE_FIELDS: [(&str, &str); 6] = [
     ("del_bg", "--del-bg"),
@@ -380,7 +404,7 @@ const REPORT_PALETTE_FIELDS: [(&str, &str); 6] = [
     ("del_mark", "--del-mark"),
     ("ins_mark", "--ins-mark"),
     ("rep_bg", "--rep-bg"),
-    ("warn", "--warn"),
+    ("rep_mark", "--rep-mark"),
 ];
 
 /// Pulls `field: "#hex",` lines for one `const NAME: Palette = Palette { ...
@@ -442,8 +466,10 @@ fn assert_html_report_colours_match_tokens(
             };
             // Same cascade `resolve()` uses: the palette's own override
             // where `01-tokens.css` declares one, else the base theme's
-            // value (`--warn` never has a `.cv-rgsafe` override - "already
-            // told apart from these by hue and glyph").
+            // value - most fields have none (`.theme-light.cv-rgsafe`
+            // overrides only del/ins/rep's own backgrounds and marks, plus
+            // `--rep-mark`, review 196 §3), so `.or_else` falls back to the
+            // base for those.
             let token_value = if rgsafe {
                 find_decl(rules, rgsafe_sel, css_var)
                     .or_else(|| find_decl(rules, base_sel, css_var))
@@ -489,7 +515,8 @@ mod tests {
     #[test]
     fn resolve_falls_back_to_the_base_theme_when_the_palette_has_no_override() {
         let css = ".theme-dark { --text: #e6e6e6; --del-bg: #111111; --ins-bg: #222222; \
-                    --del-mark: #333333; --ins-mark: #444444; --rep-bg: #555555; }\n\
+                    --del-mark: #333333; --ins-mark: #444444; --rep-bg: #555555; \
+                    --rep-mark: #666666; }\n\
                     .theme-dark.cv-rgsafe { --del-bg: #999999; }";
         let rules = parse_rules(css);
         let standard = resolve(&rules, "dark", false);

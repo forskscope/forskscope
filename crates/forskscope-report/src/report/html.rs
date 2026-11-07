@@ -54,25 +54,28 @@ pub fn escape_html(s: &str) -> String {
 
 /// Light-theme diff colour tokens (RFC-088/090's `.theme-light` /
 /// `.theme-light.cv-rgsafe`, `crates/forskscope-ui/assets/css/01-tokens.css`).
-/// `warn` (used for a replace hunk's mark) has no red-green-safe override in
-/// the source tokens either — "already told apart from these by hue and
-/// glyph" — so both palettes share the same value.
+/// `rep_mark` (used for a replace hunk's mark) was `warn` until review 196
+/// found that token had no red-green-safe override, so this report's
+/// red-green-safe replace mark shared the Standard palette's own failure
+/// (2.76 against `rep_bg`, below even a mark's 3:1) — its own token,
+/// `--rep-mark`, gives Light's red-green-safe case the darker value it
+/// needs without moving `--warn` itself.
 struct Palette {
     del_bg: &'static str,
     ins_bg: &'static str,
     del_mark: &'static str,
     ins_mark: &'static str,
     rep_bg: &'static str,
-    warn: &'static str,
+    rep_mark: &'static str,
 }
 
 const STANDARD: Palette = Palette {
     del_bg: "#ffd7d5",
     ins_bg: "#d3f5e0",
     del_mark: "#cf222e",
-    ins_mark: "#1a7f37",
+    ins_mark: "#187533",
     rep_bg: "#fff3cd",
-    warn: "#8e5f00",
+    rep_mark: "#8e5f00",
 };
 
 const RED_GREEN_SAFE: Palette = Palette {
@@ -81,7 +84,7 @@ const RED_GREEN_SAFE: Palette = Palette {
     del_mark: "#944800",
     ins_mark: "#0a5fd6",
     rep_bg: "#abbab7",
-    warn: "#8e5f00",
+    rep_mark: "#805600",
 };
 
 fn palette(color_vision_safe: bool) -> &'static Palette {
@@ -112,7 +115,7 @@ th, td {{ border: 1px solid #d0d7de; padding: 0.3em 0.6em; text-align: left; fon
 .hunk-ins {{ background: {ins_bg}; }}
 .hunk-ins .diff-mark {{ color: {ins_mark}; }}
 .hunk-rep {{ background: {rep_bg}; }}
-.hunk-rep .diff-mark {{ color: {warn}; }}
+.hunk-rep .diff-mark {{ color: {rep_mark}; }}
 mark.ins {{ background: {ins_bg}; text-decoration: underline; }}
 mark.del {{ background: {del_bg}; text-decoration: line-through; }}
 .checksum {{ font-family: ui-monospace, monospace; font-size: 0.9em; word-break: break-all; }}
@@ -127,7 +130,7 @@ mark.del {{ background: {del_bg}; text-decoration: line-through; }}
         del_mark = p.del_mark,
         ins_mark = p.ins_mark,
         rep_bg = p.rep_bg,
-        warn = p.warn,
+        rep_mark = p.rep_mark,
     )
 }
 

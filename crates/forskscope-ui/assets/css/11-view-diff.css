@@ -227,7 +227,11 @@
 }
 .hunk-del .diff-mark { color: var(--del-mark); }
 .hunk-ins .diff-mark { color: var(--ins-mark); }
-.hunk-rep .diff-mark { color: var(--warn); }
+/* Review 196 §3: was --warn, which has no red-green-safe override -
+   in Light that measured 2.76 against --rep-bg's own cv-rgsafe value,
+   below even a mark's 3:1. --rep-mark is its own token (01-tokens.css),
+   defaulting to this theme's --warn so nothing else moves. */
+.hunk-rep .diff-mark { color: var(--rep-mark); }
 
 /* ---- cell (table-cell) ----
    width:100% makes the content cell absorb all remaining table width, so the
@@ -255,9 +259,13 @@
 
 .hunk.focused { outline: 2px solid var(--focus); outline-offset: -2px; }
 
-/* Inline character-level spans */
-.in-del { background: color-mix(in srgb, var(--del-mark) 30%, transparent); text-decoration: line-through; }
-.in-ins { background: color-mix(in srgb, var(--ins-mark) 30%, transparent); }
+/* Inline character-level spans. Review 196 §1 found 30% put --text below
+   4.5:1 over this span assumed on --rep-bg in Night, red-green-safe
+   (4.48); every red-green-safe combination measured tighter than its
+   Standard counterpart here, so 25% (4.84-5.99 red-green-safe, 6.03-10.01
+   Standard) gives every one of them margin, not just the one that failed. */
+.in-del { background: color-mix(in srgb, var(--del-mark) 25%, transparent); text-decoration: line-through; }
+.in-ins { background: color-mix(in srgb, var(--ins-mark) 25%, transparent); }
 
 /* A changed pair too long for character-level highlighting (F120): a badge,
    so a skipped pair never reads as "no character-level differences". */
@@ -271,9 +279,14 @@
   border-radius: 3px;
 }
 
-/* Search match highlight */
-.diff-row.match { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.diff-row.match .cell { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* Search match highlight. Review 196 §1: `.diff-row.match` has equal
+   specificity to every `.hunk-X .diff-row` background rule and is declared
+   later, so a match always wins outright - never a layer over a hunk
+   colour - and what actually shows through `transparent` is always
+   whatever sits behind the row itself, --surface (spelled out, not
+   `transparent`, so the `contrast` gate's coverage check can see it). */
+.diff-row.match { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.diff-row.match .cell { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 
 /* Word-wrap mode: table fills column width, cells wrap, no horizontal scroll */
 .diff-scroll.wrap .diff-col-left,
@@ -332,10 +345,15 @@
 }
 
 /* ---- warning banner ---- */
+/* Review 196 §1: sits directly in .diff-wrap's flex column with nothing
+   else painting behind it, so `transparent` always resolves to --surface -
+   spelled out so the `contrast` gate's coverage check can see it, with no
+   change to the rendered colour. The border stays `transparent`: a
+   border isn't a text/background pairing this gate checks. */
 .diff-warning-banner {
   display: flex; align-items: center; gap: .4rem;
   padding: .35rem .7rem;
-  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  background: color-mix(in srgb, var(--warn) 14%, var(--surface));
   border-bottom: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
   font-size: 12px; color: var(--text); flex-shrink: 0;
 }

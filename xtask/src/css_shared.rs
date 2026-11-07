@@ -38,15 +38,19 @@ pub fn srgb_to_linear((r, g, b): Rgb) -> Rgb {
 
 // ── WCAG contrast ────────────────────────────────────────────────────────
 
-pub fn relative_luminance(hex: &str) -> f64 {
-    let (r, g, b) = srgb_to_linear(hex_to_srgb(hex));
+pub fn relative_luminance_rgb((r, g, b): Rgb) -> f64 {
+    let (r, g, b) = srgb_to_linear((r, g, b));
     0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
-pub fn contrast_ratio(hex1: &str, hex2: &str) -> f64 {
-    let (l1, l2) = (relative_luminance(hex1), relative_luminance(hex2));
+pub fn contrast_ratio_rgb(rgb1: Rgb, rgb2: Rgb) -> f64 {
+    let (l1, l2) = (relative_luminance_rgb(rgb1), relative_luminance_rgb(rgb2));
     let (lighter, darker) = if l1 >= l2 { (l1, l2) } else { (l2, l1) };
     (lighter + 0.05) / (darker + 0.05)
+}
+
+pub fn contrast_ratio(hex1: &str, hex2: &str) -> f64 {
+    contrast_ratio_rgb(hex_to_srgb(hex1), hex_to_srgb(hex2))
 }
 
 // ── Parsing a token CSS file ────────────────────────────────────────────
@@ -116,6 +120,26 @@ pub fn find_decl<'a>(rules: &'a [Rule], selector: &str, var: &str) -> Option<&'a
         .map(|(_, value)| value.as_str())
 }
 
+/// One custom property, resolved for one theme × colour-vision combination:
+/// the palette's own override where `.theme-X.cv-rgsafe` declares one, else
+/// the base `.theme-X` value — the same cascade `colour_vision.rs`'s own
+/// `resolve()` applies to its fixed six (now seven) tokens, generalised to
+/// any `--name` so `contrast.rs` can resolve whichever tokens its pair
+/// table's CSS values happen to name.
+pub fn resolve_token(rules: &[Rule], theme: &str, rgsafe: bool, var: &str) -> String {
+    let base_sel = format!(".theme-{theme}");
+    let base = find_decl(rules, &base_sel, var)
+        .unwrap_or_else(|| panic!("{base_sel} has no {var} declaration in 01-tokens.css"));
+    if rgsafe {
+        let rgsafe_sel = format!(".theme-{theme}.cv-rgsafe");
+        find_decl(rules, &rgsafe_sel, var)
+            .unwrap_or(base)
+            .to_string()
+    } else {
+        base.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -136,6 +160,36 @@ mod tests {
         let a = contrast_ratio("#336699", "#ffffff");
         let b = contrast_ratio("#ffffff", "#336699");
         assert!((a - b).abs() < 1e-9);
+    }
+
+    #[test]
+    fn contrast_ratio_rgb_agrees_with_the_hex_form() {
+        let hex = contrast_ratio("#336699", "#ffffff");
+        let rgb = contrast_ratio_rgb(hex_to_srgb("#336699"), hex_to_srgb("#ffffff"));
+        assert!((hex - rgb).abs() < 1e-9);
+    }
+
+    #[test]
+    fn resolve_token_falls_back_to_the_base_theme_when_the_palette_has_no_override() {
+        let css = ".theme-dark { --x: #111111; }\n.theme-dark.cv-rgsafe { --x: #999999; }";
+        let rules = parse_rules(css);
+        assert_eq!(resolve_token(&rules, "dark", false, "--x"), "#111111");
+        assert_eq!(
+            resolve_token(&rules, "dark", true, "--x"),
+            "#999999",
+            "the override must win"
+        );
+    }
+
+    #[test]
+    fn resolve_token_falls_back_when_rgsafe_is_true_but_declares_no_override() {
+        let css = ".theme-dark { --y: #222222; }";
+        let rules = parse_rules(css);
+        assert_eq!(
+            resolve_token(&rules, "dark", true, "--y"),
+            "#222222",
+            "a token with no override falls back to the base"
+        );
     }
 
     #[test]

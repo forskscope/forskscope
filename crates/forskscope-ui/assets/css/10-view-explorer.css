@@ -21,11 +21,6 @@
   background: var(--surface-2); border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-/* F215: this fill (--surface) sits directly on the same --surface-2 the
-   toolbar itself uses, so there is no fill contrast to lean on. */
-.mode-btn { padding: .2rem .7rem; border: 1px solid var(--control-border); border-radius: 4px; background: var(--surface); cursor: pointer; font-size: 12px; }
-.mode-btn.active { background: color-mix(in srgb, var(--accent) 15%, var(--surface-3)); border-color: var(--accent); color: var(--accent); font-weight: 600; }
-
 /* ── Aligned two-pane tree (RFC-054) ── */
 .explorer-browse { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 .explorer-path-bars { display: grid; grid-template-columns: 1fr 1fr; flex-shrink: 0; }
@@ -103,7 +98,9 @@
    kept moving the other pane on every navigation. Styled from the
    attribute itself, not a class kept in sync by hand, so what a screen
    reader hears and what the eye sees read the same one value. */
-.filter-toggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); }
+/* Review 196 §1/§3: 12% put --accent's own text below 4.5:1 on this fill
+   in both Dark (4.41) and Light (4.32) - 8% clears both (4.75/4.55). */
+.filter-toggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); }
 /* F187: always rendered (reserves its space so *Move together* never
    shifts when a filter turns on or off); only its colour changes. */
 .filter-dot { display: inline-block; width: 6px; height: 6px; margin-left: .3rem; border-radius: 50%; background: transparent; vertical-align: middle; }
@@ -142,9 +139,12 @@
    The pane-root bar/cells are gone; the path bar is now the focus
    indicator (an accent underline and a light accent tint) and the click
    target that focuses a pane — see `PathBar`'s own `onclick`. */
+/* Review 196 §1/§3: 10% put --accent's own text (the breadcrumb links)
+   below 4.5:1 in Light (4.46) - 8% matches .filter-toggle's own fix and
+   clears it (4.55), consistent across this view's two accent tints. */
 .path-bar.pane-focused {
   border-bottom: 2px solid var(--focus);
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
 }
 
 /* ── Directory report back bar ── */

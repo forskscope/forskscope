@@ -92,7 +92,11 @@ code.path-display {
 .profile-list { display: flex; flex-direction: column; gap: .2rem; margin: .25rem 0; }
 .profile-row { position: relative; display: flex; align-items: center; gap: .3rem; padding: .2rem .35rem; border-radius: 5px; cursor: pointer; }
 .profile-row:hover { background: var(--surface-3); }
-.profile-row.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* Review 196 §1: `transparent` here always resolves to `.modal`'s own
+   --surface (nothing else sits behind a profile row) - spelled out so the
+   `contrast` gate's coverage check can see what this actually draws,
+   with no change to the rendered colour. */
+.profile-row.active { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 /* RFC-087 §3: a native radio, so the browser gives arrow-key selection and
    change events for free — appearance alone is hidden (not display:none, so
    it stays focusable and in the Tab order); `▸ `/`  ` in the label is still
@@ -195,7 +199,13 @@ code.path-display {
 /* ---- tree rows ---- */
 .tree-row { display: flex; align-items: center; gap: .3rem; padding: .15rem .4rem; cursor: pointer; user-select: none; white-space: nowrap; min-height: var(--row-h); }
 .tree-row:hover   { background: var(--surface-3); }
-.tree-row.selected { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+/* Review 196 §1/§3: 18% over `--surface` (spelled out, not `transparent` -
+   nothing else sits behind a tree row; `.selected` wins the cascade over
+   `:hover`'s --surface-3 by source order either way) put a selected row's
+   warn/ins-mark/err status glyph below 4.5:1 in Light (and err in Night) -
+   4.25/3.89/4.30 and 4.23. 10% clears all three with margin (4.81-7.68)
+   while staying a visible tint; still selected "by eye" in the capture. */
+.tree-row.selected { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 /* F212: `.tree-caret` is a `<span role="button">` for a folder row (still
    a plain `<span>` for a file row) - unchanged from a plain span, visually,
    since `role`/`aria-*`/`tabindex` carry no rendering weight of their own. */
