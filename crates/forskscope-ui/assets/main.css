@@ -285,11 +285,37 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 /* ---- status bar ---- */
+/* Review 203 §2 (F218): always one line - items used to wrap their own
+   text at a short enough width ("UTF-" / "8", "+2 /" / "-1"). flex-wrap
+   stays nowrap (the default; named here so it reads as deliberate) and
+   overflow:hidden on the bar itself means an item that still doesn't fit
+   is clipped at the bar's own edge rather than pushed onto a second line. */
 .statusbar {
-  display: flex; gap: 1rem; padding: .25rem .6rem; background: var(--surface-2);
-  border-top: 1px solid var(--border); font-size: 12px; color: var(--muted);
-  flex-shrink: 0;
+  display: flex; flex-wrap: nowrap; gap: 1rem; padding: .25rem .6rem;
+  background: var(--surface-2); border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--muted); flex-shrink: 0; overflow: hidden;
 }
+/* Every item: no internal wrap, ellipsis if its own box is narrower than
+   its text. `:not(.spacer)` leaves the pusher's own `{ flex: 1; }` rule
+   (above) alone - this rule's own flex-shrink would otherwise win over it
+   by specificity and cancel its flex-grow.
+   First verified capture at the narrowest viewport (400x280) showed why
+   flex-shrink:0 on every non-.pair item was wrong: once .pair reached
+   zero width, there was still more to shrink, and a flex-shrink:0 item
+   has no give at all - the bar's own overflow:hidden just sliced it
+   off bluntly ("Local on", "Loc", no ellipsis), instead of ellipsizing
+   it. flex-shrink:1 here (vs .pair's own, much larger factor below) lets
+   every item join in once .pair's own share of the shrink is used up,
+   each still shrinking toward its own ellipsis rather than a raw clip. */
+.statusbar > span:not(.spacer) {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0; flex-shrink: 1;
+}
+/* The file-pair label: by far the largest flex-shrink factor, so in
+   practice it absorbs nearly all of the squeeze on its own first - "the
+   file-pair label first," per the review - with the other items (above)
+   only giving up real width once .pair's own is already exhausted. */
+.statusbar .pair { flex-grow: 1; flex-shrink: 100; min-width: 0; }
 .statusbar .dirty { color: var(--warn); }
 .statusbar .stats { color: var(--ok); font-size: 12px; }
 .statusbar .save-target { color: var(--muted); }
@@ -560,10 +586,19 @@ code.path-display {
 }
 
 /* ── Aligned two-pane tree (RFC-054) ── */
-.explorer-browse { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+/* Review 203 §2 (F218): overflow-y:auto (was hidden) so this view scrolls
+   as a whole - path bars, filter bar and footer included - when a short
+   enough window can't fit them plus .explorer-tree's own 6-row floor
+   below; 00-reset.css's "no document-level scroll" is unaffected, since
+   this is the view's own container, not the document. Mirrors
+   .diff-wrap's identical fix in 11-view-diff.css. */
+.explorer-browse { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 .explorer-path-bars { display: grid; grid-template-columns: 1fr 1fr; flex-shrink: 0; }
-/* One scroller for both layouts (handoff 071): compact differs from aligned only in its row pairs. */
-.explorer-tree { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+/* One scroller for both layouts (handoff 071): compact differs from aligned only in its row pairs.
+   Review 203 §2 (F218): min-height floors at 6 rows - was 0, which let this
+   shrink to nothing at a short enough window; .explorer-browse's own
+   scroll above takes over instead when even that doesn't fit. */
+.explorer-tree { flex: 1; min-height: calc(6 * var(--row-h)); overflow-y: auto; display: flex; flex-direction: column; }
 .aligned-row { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid transparent; }
 .pane-half { min-width: 0; overflow: hidden; border-right: 1px solid var(--border); }
 .pane-half:last-child { border-right: none; }
@@ -693,9 +728,18 @@ code.path-display {
    Compare/diff workspace layout.
 
    Scroll ownership inside the Compare view:
-     .diff-wrap      flex column, flex:1 1 auto — fills .body slot
-     .diff-scroll    flex:1 1 auto, overflow-y:auto — SOLE vertical scroll owner
+     .diff-wrap      flex column, flex:1 1 auto — fills .body slot; also its
+                      own, outer overflow-y:auto (review 203 §2, F218) - see
+                      the note at its own rule for when this actually engages
+     .diff-scroll    flex:1 1 auto, overflow-y:auto — SOLE vertical scroll
+                      owner for the diff content itself (not the toolbar/
+                      header rows above it, which .diff-wrap's own scroll
+                      covers if even they don't fit)
      .diff-columns   display:grid — column placement only, no scroll
+     .diff-col-left-wrap/-right-wrap  no overflow set (deliberately, so a
+                      sticky .pane-label-inline inside targets .diff-scroll,
+                      the real scroll owner, not a closer one of its own —
+                      review 203 §2, F217)
      .diff-col-left  overflow-x:auto — owns left horizontal scroll
      .diff-col-act   fixed action column, no scroll
      .diff-col-right overflow-x:auto — owns right horizontal scroll
@@ -714,12 +758,23 @@ code.path-display {
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* ---- diff-wrap: fills .body slot ---- */
+/* Review 203 §2 (F218): at a short enough window (system scale stacked with
+   Text size can reach ~400x280 in 1000x700), the toolbar/header/label rows
+   above .diff-scroll are all flex-shrink:0 and .diff-scroll's own floor
+   (its min-height below) together could exceed what .diff-wrap is given -
+   previously it just clipped (overflow:hidden), showing zero diff lines.
+   overflow-y:auto here means .diff-wrap itself scrolls as a whole (the
+   toolbar scrolls out of view too) exactly when that happens, so the diff
+   lines stay reachable rather than clipped - 00-reset.css's "no document-
+   level scroll" is unaffected, since this is a view's own container, not
+   the document. overflow-x stays hidden, unchanged from before. */
 .diff-wrap {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;   /* fill .body flex slot — must be on own rule for WebKit */
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* ---- diff toolbar ---- */
@@ -767,12 +822,24 @@ code.path-display {
 .diff-pane-labels .pane-label-act   { flex: 0 0 6ch; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
 .diff-pane-labels .pane-label-right { flex: 1; padding: .2rem .4rem; }
 
-/* ---- diff-scroll: sole vertical scroll owner ---- */
+/* ---- per-column inline label (review 203 §2, F217) ----
+   Hidden at every width except the stacked one (90-responsive.css), where
+   it replaces .diff-pane-labels above as each column's own label - see
+   this file's own header comment for why it lives in .diff-col-left-wrap/
+   -right-wrap rather than inside .diff-col-left/-right themselves. */
+.pane-label-inline {
+  display: none;
+}
+
+/* ---- diff-scroll: sole vertical scroll owner for the diff content ---- */
 .diff-scroll {
   font-family: var(--diff-ff, ui-monospace, monospace);
   font-size: var(--diff-fs, 14px);
   flex: 1 1 auto;
-  min-height: 0;
+  /* Review 203 §2 (F218): never below 6 lines' worth - below that, let
+     .diff-wrap's own scroll (above) take over instead of shrinking this
+     to nothing. */
+  min-height: calc(6 * var(--line-h));
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -800,22 +867,33 @@ code.path-display {
    row's background ends at the old viewport edge and leaves an uncoloured gap
    to the right. CSS table rows always span the full table width, so the hunk
    background fills the entire line regardless of text length. */
+/* Review 203 §2 (F217): the border moved here from .diff-col-left/-right
+   themselves, so it still spans the full height including
+   .pane-label-inline (stacked layout only) without a gap at the label. */
+.diff-col-left-wrap {
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+
 .diff-col-left {
   min-width: 0;
   overflow-x: auto;
   overflow-y: visible;
-  border-right: 1px solid var(--border);
 }
 
 .diff-col-act {
   overflow: visible;
 }
 
+.diff-col-right-wrap {
+  min-width: 0;
+  border-left: 1px solid var(--border);
+}
+
 .diff-col-right {
   min-width: 0;
   overflow-x: auto;
   overflow-y: visible;
-  border-left: 1px solid var(--border);
 }
 
 /* The table inside each scrolling column. */
@@ -1071,13 +1149,20 @@ code.path-display {
    on its own rule (same reason as .explorer and .diff-wrap).
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* Review 203 §2 (F218): overflow-y:auto (was hidden) so this view scrolls
+   as a whole - roots/toolbar/stats included - when a short enough window
+   can't fit them plus .deep-table's own 6-row floor below; 00-reset.css's
+   "no document-level scroll" is unaffected, since this is the view's own
+   container, not the document. Mirrors .diff-wrap's identical fix in
+   11-view-diff.css. */
 .deep-compare {
   grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;   /* fill .body flex slot */
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .deep-roots {
@@ -1092,7 +1177,10 @@ code.path-display {
 .deep-compare-toolbar { display: flex; align-items: center; gap: .4rem; padding: .35rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .deep-label { font-size: 12px; color: var(--muted); margin-right: .5rem; }
 .deep-stats { padding: .25rem .6rem; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.deep-table { flex: 1; overflow: auto; min-height: 0; }
+/* Review 203 §2 (F218): min-height floors at 6 rows - was 0, which let
+   this shrink to nothing at a short enough window; .deep-compare's own
+   scroll above takes over instead when even that doesn't fit. */
+.deep-table { flex: 1; overflow: auto; min-height: calc(6 * var(--row-h)); }
 .deep-row { display: flex; align-items: center; gap: .5rem; padding: .2rem .6rem; cursor: pointer; font-size: 13px; }
 .deep-row:hover { background: var(--surface-3); }
 .deep-path { flex: 1; font-family: ui-monospace, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1175,25 +1263,49 @@ code.path-display {
     flex-direction: column;
   }
 
-  .diff-col-left,
-  .diff-col-right {
+  /* Review 203 §2 (F217): the wraps, not .diff-col-left/-right themselves,
+     are .diff-columns's direct children now - stacking applies to them. */
+  .diff-col-left-wrap,
+  .diff-col-right-wrap {
     flex: none;
     width: 100%;
     min-width: 0;
-    overflow-x: auto;
     border-left: none;
     border-right: none;
   }
 
-  .diff-col-left { border-bottom: 2px solid var(--border); }
+  .diff-col-left,
+  .diff-col-right {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .diff-col-left-wrap { border-bottom: 2px solid var(--border); }
 
   .diff-col-act { flex: none; width: 100%; overflow: visible; }
 
-  /* ── Pane labels ── */
-  .diff-pane-labels { flex-direction: column; min-width: 100%; }
-  .diff-pane-labels .pane-label-left { border-right: none; border-bottom: 1px solid var(--border); }
-  .diff-pane-labels .pane-label-act  { flex: none; border: none; border-bottom: 1px solid var(--border); }
-  .diff-pane-labels .pane-label-right { text-align: left; }
+  /* ── Pane labels ──
+     Review 203 §2 (F217): the external, side-by-side label row made no
+     sense once the columns themselves stack - both labels ended up
+     stacked *above* both columns, so the label directly over the left
+     column's own lines read "Right / New" (wrong - see this file's own
+     usual counterpart, 11-view-diff.css, for the full account).
+     .pane-label-inline (one per column, inside its own wrap) replaces it
+     here: visible only at this width, and sticky so it stays above that
+     column's own lines while they scroll past it. */
+  .diff-pane-labels { display: none; }
+  .pane-label-inline {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--surface-2);
+    padding: .2rem .4rem;
+    font-size: 12px; color: var(--muted); font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    user-select: none;
+    border-bottom: 1px solid var(--border);
+  }
 
   /* ── File header ── */
   .diff-file-header { flex-wrap: wrap; }

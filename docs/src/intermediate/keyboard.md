@@ -32,7 +32,7 @@ Works from anywhere, with no active comparison tab needed.
 |----------|--------|
 | **Ctrl+=** / **Ctrl++** | Increase text size one step |
 | **Ctrl+-**              | Decrease text size one step |
-| **Ctrl+0**              | Reset text size to 100% |
+| **Ctrl+0 (zero)**       | Reset text size to 100% — not **Ctrl+O** (open a folder), above |
 
 ## Diff view
 

@@ -23,11 +23,30 @@
 //! `keys:` string and every bold span on `" / "`, then strip all
 //! whitespace from what's left (so `"Ctrl + Z"` and `"Ctrl+Z"` compare
 //! equal). The two sets must then be identical.
+//!
+//! **A trailing `(...)`/`（...）` is not part of a key's identity**
+//! (review 203 §3): `"Ctrl + 0 (zero)"` and `"Ctrl + 0（ゼロ）"` both name
+//! the same key as plain `"Ctrl + 0"` — the annotation only disambiguates
+//! it from "Ctrl + O" in a monospace font, in whichever language the
+//! in-app dialog is showing. Dropping everything from the first `(`/`（`
+//! onward, after the whitespace strip above, is what lets
+//! `keybindings.rs`'s two language-conditional `KbRow` calls for this one
+//! row (there is no single literal `keys: "..."` this scanner could see
+//! through a `lang == Lang::Ja` branch either way) and `keyboard.md`'s one
+//! English line agree on one canonical key, instead of three.
 
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 use std::process;
+
+/// Drops a trailing disambiguating annotation like `"(zero)"`/`"（ゼロ）"`
+/// — everything from the first `(` or `（` onward — so it is never part of
+/// the key identity either extraction function records. See this module's
+/// own doc comment for why.
+fn strip_trailing_parenthetical(key: &str) -> &str {
+    key.find(['(', '（']).map_or(key, |i| &key[..i])
+}
 
 /// Every individual key named in `keybindings.rs`'s `KbRow { keys: "...",
 /// ... }` rows, split and normalized as the module doc describes.
@@ -57,6 +76,7 @@ fn keys_in_app_reference(src: &str) -> BTreeSet<String> {
         let raw = &after_open[..close];
         for part in raw.split(" / ") {
             let normalized: String = part.chars().filter(|c| !c.is_whitespace()).collect();
+            let normalized = strip_trailing_parenthetical(&normalized).to_string();
             if !normalized.is_empty() {
                 keys.insert(normalized);
             }
@@ -93,6 +113,7 @@ fn keys_in_docs(src: &str) -> BTreeSet<String> {
             let span = &after_open[..close];
             for part in span.split(" / ") {
                 let normalized: String = part.chars().filter(|c| !c.is_whitespace()).collect();
+                let normalized = strip_trailing_parenthetical(&normalized).to_string();
                 if !normalized.is_empty() {
                     keys.insert(normalized);
                 }
@@ -165,6 +186,29 @@ mod tests {
             keys_in_app_reference(src),
             BTreeSet::from(["Ctrl+Z".to_string()])
         );
+    }
+
+    /// Review 203 §3: `"Ctrl + 0 (zero)"` and `"Ctrl + 0（ゼロ）"` must
+    /// both collapse to the same `"Ctrl+0"` as the bare key, in either
+    /// extraction function — this is what lets `keybindings.rs`'s two
+    /// language-conditional `KbRow` calls and `keyboard.md`'s one English
+    /// line agree. Falsify by removing the `strip_trailing_parenthetical`
+    /// call from `keys_in_app_reference`: this then returns
+    /// `"Ctrl+0(zero)"` instead of `"Ctrl+0"`.
+    #[test]
+    fn a_trailing_parenthetical_does_not_change_the_key_identity() {
+        let src = r#"KbRow { keys: "Ctrl + 0 (zero)", desc: "x" }"#;
+        assert_eq!(
+            keys_in_app_reference(src),
+            BTreeSet::from(["Ctrl+0".to_string()])
+        );
+        let src_ja = r#"KbRow { keys: "Ctrl + 0（ゼロ）", desc: "x" }"#;
+        assert_eq!(
+            keys_in_app_reference(src_ja),
+            BTreeSet::from(["Ctrl+0".to_string()])
+        );
+        let md = "| **Ctrl+0 (zero)** | Reset |";
+        assert_eq!(keys_in_docs(md), BTreeSet::from(["Ctrl+0".to_string()]));
     }
 
     #[test]

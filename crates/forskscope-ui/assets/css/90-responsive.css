@@ -21,25 +21,49 @@
     flex-direction: column;
   }
 
-  .diff-col-left,
-  .diff-col-right {
+  /* Review 203 §2 (F217): the wraps, not .diff-col-left/-right themselves,
+     are .diff-columns's direct children now - stacking applies to them. */
+  .diff-col-left-wrap,
+  .diff-col-right-wrap {
     flex: none;
     width: 100%;
     min-width: 0;
-    overflow-x: auto;
     border-left: none;
     border-right: none;
   }
 
-  .diff-col-left { border-bottom: 2px solid var(--border); }
+  .diff-col-left,
+  .diff-col-right {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .diff-col-left-wrap { border-bottom: 2px solid var(--border); }
 
   .diff-col-act { flex: none; width: 100%; overflow: visible; }
 
-  /* ── Pane labels ── */
-  .diff-pane-labels { flex-direction: column; min-width: 100%; }
-  .diff-pane-labels .pane-label-left { border-right: none; border-bottom: 1px solid var(--border); }
-  .diff-pane-labels .pane-label-act  { flex: none; border: none; border-bottom: 1px solid var(--border); }
-  .diff-pane-labels .pane-label-right { text-align: left; }
+  /* ── Pane labels ──
+     Review 203 §2 (F217): the external, side-by-side label row made no
+     sense once the columns themselves stack - both labels ended up
+     stacked *above* both columns, so the label directly over the left
+     column's own lines read "Right / New" (wrong - see this file's own
+     usual counterpart, 11-view-diff.css, for the full account).
+     .pane-label-inline (one per column, inside its own wrap) replaces it
+     here: visible only at this width, and sticky so it stays above that
+     column's own lines while they scroll past it. */
+  .diff-pane-labels { display: none; }
+  .pane-label-inline {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--surface-2);
+    padding: .2rem .4rem;
+    font-size: 12px; color: var(--muted); font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    user-select: none;
+    border-bottom: 1px solid var(--border);
+  }
 
   /* ── File header ── */
   .diff-file-header { flex-wrap: wrap; }

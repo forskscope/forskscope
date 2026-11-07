@@ -133,11 +133,37 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 /* ---- status bar ---- */
+/* Review 203 §2 (F218): always one line - items used to wrap their own
+   text at a short enough width ("UTF-" / "8", "+2 /" / "-1"). flex-wrap
+   stays nowrap (the default; named here so it reads as deliberate) and
+   overflow:hidden on the bar itself means an item that still doesn't fit
+   is clipped at the bar's own edge rather than pushed onto a second line. */
 .statusbar {
-  display: flex; gap: 1rem; padding: .25rem .6rem; background: var(--surface-2);
-  border-top: 1px solid var(--border); font-size: 12px; color: var(--muted);
-  flex-shrink: 0;
+  display: flex; flex-wrap: nowrap; gap: 1rem; padding: .25rem .6rem;
+  background: var(--surface-2); border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--muted); flex-shrink: 0; overflow: hidden;
 }
+/* Every item: no internal wrap, ellipsis if its own box is narrower than
+   its text. `:not(.spacer)` leaves the pusher's own `{ flex: 1; }` rule
+   (above) alone - this rule's own flex-shrink would otherwise win over it
+   by specificity and cancel its flex-grow.
+   First verified capture at the narrowest viewport (400x280) showed why
+   flex-shrink:0 on every non-.pair item was wrong: once .pair reached
+   zero width, there was still more to shrink, and a flex-shrink:0 item
+   has no give at all - the bar's own overflow:hidden just sliced it
+   off bluntly ("Local on", "Loc", no ellipsis), instead of ellipsizing
+   it. flex-shrink:1 here (vs .pair's own, much larger factor below) lets
+   every item join in once .pair's own share of the shrink is used up,
+   each still shrinking toward its own ellipsis rather than a raw clip. */
+.statusbar > span:not(.spacer) {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0; flex-shrink: 1;
+}
+/* The file-pair label: by far the largest flex-shrink factor, so in
+   practice it absorbs nearly all of the squeeze on its own first - "the
+   file-pair label first," per the review - with the other items (above)
+   only giving up real width once .pair's own is already exhausted. */
+.statusbar .pair { flex-grow: 1; flex-shrink: 100; min-width: 0; }
 .statusbar .dirty { color: var(--warn); }
 .statusbar .stats { color: var(--ok); font-size: 12px; }
 .statusbar .save-target { color: var(--muted); }

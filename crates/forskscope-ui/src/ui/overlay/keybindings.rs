@@ -3,7 +3,7 @@
 use dioxus::prelude::*;
 
 use crate::i18n::t;
-use crate::state::{Modal, Store};
+use crate::state::{Lang, Modal, Store};
 
 #[component]
 pub fn KeyboardRefModal() -> Element {
@@ -63,7 +63,21 @@ pub fn KeyboardRefModal() -> Element {
                         KbRow { keys: "Escape",         desc: t(lang, "Close modal / search bar") }
                         KbRow { keys: "Ctrl + = / Ctrl + +", desc: t(lang, "Increase text size") }
                         KbRow { keys: "Ctrl + -",       desc: t(lang, "Decrease text size") }
-                        KbRow { keys: "Ctrl + 0",       desc: t(lang, "Reset text size to 100%") }
+                        // Review 203 §3: "Ctrl + O" (open a folder, above) and
+                        // "Ctrl + 0" read the same in this dialog's monospace
+                        // font — the people Text size is for are the likeliest
+                        // to confuse them. The "(zero)"/"（ゼロ）" annotation is
+                        // language-specific, so this needs two literal KbRow
+                        // calls (one per branch), not one conditional `keys`
+                        // value `cargo xtask keyboard-docs`'s own text scanner
+                        // could see through either way - see its own doc
+                        // comment on why a trailing parenthetical doesn't count
+                        // as part of the key's identity.
+                        if lang == Lang::Ja {
+                            KbRow { keys: "Ctrl + 0（ゼロ）", desc: t(lang, "Reset text size to 100%") }
+                        } else {
+                            KbRow { keys: "Ctrl + 0 (zero)", desc: t(lang, "Reset text size to 100%") }
+                        }
                     }
                 }
                 div { class: "actions",

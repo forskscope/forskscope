@@ -17,10 +17,19 @@
 }
 
 /* ── Aligned two-pane tree (RFC-054) ── */
-.explorer-browse { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+/* Review 203 §2 (F218): overflow-y:auto (was hidden) so this view scrolls
+   as a whole - path bars, filter bar and footer included - when a short
+   enough window can't fit them plus .explorer-tree's own 6-row floor
+   below; 00-reset.css's "no document-level scroll" is unaffected, since
+   this is the view's own container, not the document. Mirrors
+   .diff-wrap's identical fix in 11-view-diff.css. */
+.explorer-browse { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 .explorer-path-bars { display: grid; grid-template-columns: 1fr 1fr; flex-shrink: 0; }
-/* One scroller for both layouts (handoff 071): compact differs from aligned only in its row pairs. */
-.explorer-tree { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+/* One scroller for both layouts (handoff 071): compact differs from aligned only in its row pairs.
+   Review 203 §2 (F218): min-height floors at 6 rows - was 0, which let this
+   shrink to nothing at a short enough window; .explorer-browse's own
+   scroll above takes over instead when even that doesn't fit. */
+.explorer-tree { flex: 1; min-height: calc(6 * var(--row-h)); overflow-y: auto; display: flex; flex-direction: column; }
 .aligned-row { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid transparent; }
 .pane-half { min-width: 0; overflow: hidden; border-right: 1px solid var(--border); }
 .pane-half:last-child { border-right: none; }

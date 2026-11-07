@@ -77,9 +77,13 @@ pub fn StatusBar() -> Element {
     rsx! {
         div { class: "statusbar", role: "status",
             if let Some((pair, enc, stats, dirty, save_target)) = context {
-                span { "{pair}" }
-                if !enc.is_empty() { span { "{enc}" } }
-                if !stats.is_empty() { span { class: "stats", "{stats}" } }
+                // Review 203 §2 (F218): `title` keeps each item's full text
+                // as an accessible name once the bar's own CSS can ellipsize
+                // it — `.pair` is the one that actually shrinks under
+                // pressure (02-layout-shell.css).
+                span { class: "pair", title: "{pair}", "{pair}" }
+                if !enc.is_empty() { span { title: "{enc}", "{enc}" } }
+                if !stats.is_empty() { span { class: "stats", title: "{stats}", "{stats}" } }
                 if dirty { span { class: "dirty", {t(lang, "unsaved")} } }
                 if let Some((short, full, no_backup)) = save_target {
                     span { class: "save-target", title: "{full}",

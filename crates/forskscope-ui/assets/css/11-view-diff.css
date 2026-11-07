@@ -2,9 +2,18 @@
    Compare/diff workspace layout.
 
    Scroll ownership inside the Compare view:
-     .diff-wrap      flex column, flex:1 1 auto — fills .body slot
-     .diff-scroll    flex:1 1 auto, overflow-y:auto — SOLE vertical scroll owner
+     .diff-wrap      flex column, flex:1 1 auto — fills .body slot; also its
+                      own, outer overflow-y:auto (review 203 §2, F218) - see
+                      the note at its own rule for when this actually engages
+     .diff-scroll    flex:1 1 auto, overflow-y:auto — SOLE vertical scroll
+                      owner for the diff content itself (not the toolbar/
+                      header rows above it, which .diff-wrap's own scroll
+                      covers if even they don't fit)
      .diff-columns   display:grid — column placement only, no scroll
+     .diff-col-left-wrap/-right-wrap  no overflow set (deliberately, so a
+                      sticky .pane-label-inline inside targets .diff-scroll,
+                      the real scroll owner, not a closer one of its own —
+                      review 203 §2, F217)
      .diff-col-left  overflow-x:auto — owns left horizontal scroll
      .diff-col-act   fixed action column, no scroll
      .diff-col-right overflow-x:auto — owns right horizontal scroll
@@ -23,12 +32,23 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* ---- diff-wrap: fills .body slot ---- */
+/* Review 203 §2 (F218): at a short enough window (system scale stacked with
+   Text size can reach ~400x280 in 1000x700), the toolbar/header/label rows
+   above .diff-scroll are all flex-shrink:0 and .diff-scroll's own floor
+   (its min-height below) together could exceed what .diff-wrap is given -
+   previously it just clipped (overflow:hidden), showing zero diff lines.
+   overflow-y:auto here means .diff-wrap itself scrolls as a whole (the
+   toolbar scrolls out of view too) exactly when that happens, so the diff
+   lines stay reachable rather than clipped - 00-reset.css's "no document-
+   level scroll" is unaffected, since this is a view's own container, not
+   the document. overflow-x stays hidden, unchanged from before. */
 .diff-wrap {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;   /* fill .body flex slot — must be on own rule for WebKit */
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* ---- diff toolbar ---- */
@@ -76,12 +96,24 @@
 .diff-pane-labels .pane-label-act   { flex: 0 0 6ch; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
 .diff-pane-labels .pane-label-right { flex: 1; padding: .2rem .4rem; }
 
-/* ---- diff-scroll: sole vertical scroll owner ---- */
+/* ---- per-column inline label (review 203 §2, F217) ----
+   Hidden at every width except the stacked one (90-responsive.css), where
+   it replaces .diff-pane-labels above as each column's own label - see
+   this file's own header comment for why it lives in .diff-col-left-wrap/
+   -right-wrap rather than inside .diff-col-left/-right themselves. */
+.pane-label-inline {
+  display: none;
+}
+
+/* ---- diff-scroll: sole vertical scroll owner for the diff content ---- */
 .diff-scroll {
   font-family: var(--diff-ff, ui-monospace, monospace);
   font-size: var(--diff-fs, 14px);
   flex: 1 1 auto;
-  min-height: 0;
+  /* Review 203 §2 (F218): never below 6 lines' worth - below that, let
+     .diff-wrap's own scroll (above) take over instead of shrinking this
+     to nothing. */
+  min-height: calc(6 * var(--line-h));
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -109,22 +141,33 @@
    row's background ends at the old viewport edge and leaves an uncoloured gap
    to the right. CSS table rows always span the full table width, so the hunk
    background fills the entire line regardless of text length. */
+/* Review 203 §2 (F217): the border moved here from .diff-col-left/-right
+   themselves, so it still spans the full height including
+   .pane-label-inline (stacked layout only) without a gap at the label. */
+.diff-col-left-wrap {
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+
 .diff-col-left {
   min-width: 0;
   overflow-x: auto;
   overflow-y: visible;
-  border-right: 1px solid var(--border);
 }
 
 .diff-col-act {
   overflow: visible;
 }
 
+.diff-col-right-wrap {
+  min-width: 0;
+  border-left: 1px solid var(--border);
+}
+
 .diff-col-right {
   min-width: 0;
   overflow-x: auto;
   overflow-y: visible;
-  border-left: 1px solid var(--border);
 }
 
 /* The table inside each scrolling column. */

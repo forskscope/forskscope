@@ -153,6 +153,22 @@ pub fn DiffWorkspace(index: usize) -> Element {
                 div {
                     class: "diff-columns",
                     onmounted: move |_| { install_hscroll_sync(index); },
+                    // Review 203 §2 (F217): below 720px, `.diff-columns` stacks
+                    // the three columns vertically and the external, side-by-
+                    // side `.diff-pane-labels` header stops making sense (both
+                    // labels end up stacked *above* both columns, so the label
+                    // directly over the left column's own lines reads "Right /
+                    // New" - wrong). `.pane-label-inline` (hidden at every
+                    // width but this one, 90-responsive.css) lives inside each
+                    // column's own wrapper instead, so it is the stacked
+                    // layout's own per-column label - sticky there, so it
+                    // stays above that column's lines while they scroll -
+                    // and never participates in the wide layout at all, which
+                    // keeps the external `.diff-pane-labels` row exactly as it
+                    // was there (confirmed: review 203's own regression check,
+                    // pixel-exact at 100% in 1000x700).
+                    div { class: "diff-col-left-wrap",
+                    span { class: "pane-label-inline", aria_hidden: "true", {t(lang, "Left / Old")} }
                     div { class: "diff-col-left", id: "diff-col-left-{index}",
                     div { class: "diff-col-table",
                     for hunk in snap.hunks.iter() {
@@ -166,7 +182,8 @@ pub fn DiffWorkspace(index: usize) -> Element {
                         }
                     }
                     } // .diff-col-table
-                }
+                    } // .diff-col-left
+                    } // .diff-col-left-wrap
                 div { class: "diff-col-act",
                     div { class: "diff-col-table",
                     for hunk in snap.hunks.iter() {
@@ -181,7 +198,9 @@ pub fn DiffWorkspace(index: usize) -> Element {
                     }
                     } // .diff-col-table
                 }
-                div { class: "diff-col-right", id: "diff-col-right-{index}",
+                    div { class: "diff-col-right-wrap",
+                    span { class: "pane-label-inline", aria_hidden: "true", {t(lang, "Right / New")} }
+                    div { class: "diff-col-right", id: "diff-col-right-{index}",
                     div { class: "diff-col-table",
                     for hunk in snap.hunks.iter() {
                         HunkBlock {
@@ -194,7 +213,8 @@ pub fn DiffWorkspace(index: usize) -> Element {
                         }
                     }
                     } // .diff-col-table
-                }
+                    } // .diff-col-right
+                    } // .diff-col-right-wrap
                 } // .diff-columns
             }
         }

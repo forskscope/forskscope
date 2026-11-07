@@ -4,13 +4,20 @@
    on its own rule (same reason as .explorer and .diff-wrap).
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* Review 203 §2 (F218): overflow-y:auto (was hidden) so this view scrolls
+   as a whole - roots/toolbar/stats included - when a short enough window
+   can't fit them plus .deep-table's own 6-row floor below; 00-reset.css's
+   "no document-level scroll" is unaffected, since this is the view's own
+   container, not the document. Mirrors .diff-wrap's identical fix in
+   11-view-diff.css. */
 .deep-compare {
   grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;   /* fill .body flex slot */
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .deep-roots {
@@ -25,7 +32,10 @@
 .deep-compare-toolbar { display: flex; align-items: center; gap: .4rem; padding: .35rem .6rem; background: var(--surface-2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .deep-label { font-size: 12px; color: var(--muted); margin-right: .5rem; }
 .deep-stats { padding: .25rem .6rem; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.deep-table { flex: 1; overflow: auto; min-height: 0; }
+/* Review 203 §2 (F218): min-height floors at 6 rows - was 0, which let
+   this shrink to nothing at a short enough window; .deep-compare's own
+   scroll above takes over instead when even that doesn't fit. */
+.deep-table { flex: 1; overflow: auto; min-height: calc(6 * var(--row-h)); }
 .deep-row { display: flex; align-items: center; gap: .5rem; padding: .2rem .6rem; cursor: pointer; font-size: 13px; }
 .deep-row:hover { background: var(--surface-3); }
 .deep-path { flex: 1; font-family: ui-monospace, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
