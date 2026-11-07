@@ -521,9 +521,18 @@ code.path-display {
    nothing else sits behind a tree row; `.selected` wins the cascade over
    `:hover`'s --surface-3 by source order either way) put a selected row's
    warn/ins-mark/err status glyph below 4.5:1 in Light (and err in Night) -
-   4.25/3.89/4.30 and 4.23. 10% clears all three with margin (4.81-7.68)
-   while staying a visible tint; still selected "by eye" in the capture. */
-.tree-row.selected { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+   4.25/3.89/4.30 and 4.23. 10% clears all three with margin (4.81-7.68).
+   Review 197 §1: the 10% tint alone was too weak a selection signal -
+   against a hovered row's --surface-3 it measured 1.05:1 in Light (and
+   was already true in Dark), so a row under the mouse looked more
+   selected than the actual selection. The leading-edge --accent bar below
+   is the real indicator now (>=3:1 against this background in every
+   theme, 4.88-6.52 measured) and doesn't depend on hover state at all;
+   the tint stays at 10% only to keep the status glyphs' own margin. */
+.tree-row.selected {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  box-shadow: inset 3px 0 0 0 var(--accent);
+}
 /* F212: `.tree-caret` is a `<span role="button">` for a folder row (still
    a plain `<span>` for a file row) - unchanged from a plain span, visually,
    since `role`/`aria-*`/`tabindex` carry no rendering weight of their own. */
@@ -550,11 +559,6 @@ code.path-display {
   overflow: hidden;    /* internal elements own their own scroll */
 }
 
-.explorer-modes {
-  display: flex; gap: .4rem; padding: .4rem .6rem;
-  background: var(--surface-2); border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
 /* ── Aligned two-pane tree (RFC-054) ── */
 .explorer-browse { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 .explorer-path-bars { display: grid; grid-template-columns: 1fr 1fr; flex-shrink: 0; }

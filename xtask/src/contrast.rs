@@ -139,10 +139,22 @@ const PAIRS: &[Pair] = &[
     Pair { label: "--text on the warning banner (.diff-warning-banner)", fg: "var(--text)", bg: "color-mix(in srgb, var(--warn) 14%, var(--surface))", assumed_over: None, min: TEXT_MIN },
     Pair { label: "--text on .profile-row.active",  fg: "var(--text)",   bg: "color-mix(in srgb, var(--accent) 12%, var(--surface))",   assumed_over: None, min: TEXT_MIN },
     // `.tree-row.selected`: 18% put warn/ins-mark/err below 4.5:1 in Light
-    // (and err in Night) - 10% (review 196 §3) clears all three.
+    // (and err in Night) - 10% (review 196 §3) clears all three. Review
+    // 197 §1 asked that --text/--muted be tabled too (a real pair on a
+    // background that was about to change again, not just "checked"),
+    // and that the row's own selection indicator - the leading-edge
+    // --accent bar (03-components.css), not the tint - get its own entry.
     Pair { label: "--warn on a selected tree row",     fg: "var(--warn)",     bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN },
     Pair { label: "--ins-mark on a selected tree row", fg: "var(--ins-mark)", bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN },
     Pair { label: "--err on a selected tree row",      fg: "var(--err)",      bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN },
+    Pair { label: "--text on a selected tree row",     fg: "var(--text)",     bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN },
+    Pair { label: "--muted on a selected tree row",    fg: "var(--muted)",    bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN },
+    // The selection indicator itself (`box-shadow: inset 3px 0 0 0
+    // var(--accent)`) - not a `color:`/`background:` value, so check 4
+    // never requires this entry, the same way --control-border's own
+    // entries aren't check-4-required; hand-added because WCAG 1.4.11
+    // still applies to it.
+    Pair { label: "the selected-row indicator (box-shadow)", fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: CONTROL_MIN },
     // `.filter-toggle[aria-pressed="true"]`/`.path-bar.pane-focused`: 12%/
     // 10% put --accent's own text below 4.5:1 (4.41/4.32 dark/light;
     // 4.46 light) - both now 8% (review 196 §3).

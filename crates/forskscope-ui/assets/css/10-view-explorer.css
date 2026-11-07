@@ -16,11 +16,6 @@
   overflow: hidden;    /* internal elements own their own scroll */
 }
 
-.explorer-modes {
-  display: flex; gap: .4rem; padding: .4rem .6rem;
-  background: var(--surface-2); border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
 /* ── Aligned two-pane tree (RFC-054) ── */
 .explorer-browse { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 .explorer-path-bars { display: grid; grid-template-columns: 1fr 1fr; flex-shrink: 0; }
