@@ -1511,7 +1511,7 @@ dependencies = [
 
 [[package]]
 name = "forskscope"
-version = "0.197.0"
+version = "0.197.1"
 dependencies = [
  "app-json-settings",
  "chrono",
@@ -1540,7 +1540,7 @@ dependencies = [
 
 [[package]]
 name = "forskscope-commands"
-version = "0.197.0"
+version = "0.197.1"
 dependencies = [
  "chrono",
  "forskscope-compare",
@@ -1551,7 +1551,7 @@ dependencies = [
 
 [[package]]
 name = "forskscope-compare"
-version = "0.197.0"
+version = "0.197.1"
 dependencies = [
  "chardetng",
  "chrono",
@@ -1565,7 +1565,7 @@ dependencies = [
 
 [[package]]
 name = "forskscope-desktop"
-version = "0.197.0"
+version = "0.197.1"
 dependencies = [
  "forskscope-compare",
  "forskscope-edit",
@@ -1577,7 +1577,7 @@ dependencies = [
 
 [[package]]
 name = "forskscope-edit"
-version = "0.197.0"
+version = "0.197.1"
 dependencies = [
  "forskscope-compare",
  "libc",
@@ -1587,7 +1587,7 @@ dependencies = [
 
 [[package]]
 name = "forskscope-report"
-version = "0.197.0"
+version = "0.197.1"
 dependencies = [
  "forskscope-compare",
  "libc",
@@ -1599,7 +1599,7 @@ dependencies = [
 
 [[package]]
 name = "forskscope-ui-logic"
-version = "0.197.0"
+version = "0.197.1"
 dependencies = [
  "forskscope-compare",
  "forskscope-desktop",

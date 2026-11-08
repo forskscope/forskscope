@@ -1,6 +1,6 @@
 # Threat Model and Security Notes
 
-This document records the security posture of ForskScope at **v0.196.3**, the
+This document records the security posture of ForskScope at **v0.197.0**, the
 data flows that carry risk, the controls in place, and the known residual
 concerns. It is a living document; update it when a new data flow is added.
 
@@ -1095,3 +1095,4 @@ really version X of a published crate."
 | v0.196.1 | F212; the app icon and the Flathub listing material | No new data flow. A folder's expand arrow gains a role, a label and its expanded state for assistive technology; the action it exposes is the click it already had. The icon is a static SVG installed by the packages; the screenshots and metainfo are listing material. The desktop file names one menu category |
 | v0.196.2 | The listing text | No change to the programs. The AppStream description is rewritten; it promises no network contact unless the user asks, which both the app and the Flatpak keep |
 | v0.196.3 | F213: `sheets-diff` 3.6.0 → 3.6.1; `zip` 9 | No new data flow and no behaviour change. The `.xlsx` chain is now `calamine 0.38.0`, `quick-xml 0.42.0`, `zip 9.2.3`, which fixes RUSTSEC-2026-0367/-0368/-0369/-0429 (archive extraction, never called here). The three `zip` exceptions are removed from `.cargo/audit.toml` and none is added; `audit-deps` still asserts `zip` is reached only through `calamine`. **New transitive crates:** `nix` 0.31.3 and `cfg_aliases` 0.2.2, through `zip`, on macOS and the BSDs only, used only by `zip`'s extraction code. The build tooling's `rust_xlsxwriter` moves to 0.102 (`zip` 9); it does not ship |
+| v0.197.0 | RFC-097 stage 1 (*Text size*); F214–F219 | No new data flow, no network and no new dependency. *Text size* is one more field in the existing settings file (`text_size`, one of five steps; an out-of-range value snaps to the nearest), applied as the web view's zoom. The app never reads the system's text-scaling factor: the platforms apply it themselves (measured on Windows and GNOME/Wayland). The web view's own zoom keys stay off (wry's default, verified live on Windows), so the only zoom is the saved one. The contrast, layout and gutter fixes are CSS and markup only. A new CI gate, `cargo xtask contrast`, runs in the build tooling and does not ship |
