@@ -97,6 +97,23 @@ pub fn HunkBlock(
                         left_no: row.left.as_ref().and_then(|l| l.original_line_number),
                         kind: hunk.kind, char_mode, lang,
                     } }
+                    // F219 (review 205, handoff 096): the divider used to be
+                    // the only child here - .diff-col-table's own table
+                    // layout wraps a lone non-table child in one anonymous
+                    // table-row/table-cell pair, landing it in column 1, the
+                    // gutter, same as every other row's line number. Its
+                    // nowrap text set that *shared* column's width (for
+                    // every row in the table, not just this one), pushing
+                    // every real line's own gutter+content rightward.
+                    // These two empty placeholders - already real table
+                    // cells (.pane-gutter/.diff-mark's own CSS) - make this
+                    // a normal three-cell row instead: the divider's anonymous
+                    // cell lands in column 3, the content column, exactly
+                    // where a very long diff line already can (triggering
+                    // the same horizontal scroll, not a reflow), and column
+                    // 1 never sees the divider's text at all.
+                    div { class: "pane-gutter" }
+                    span { class: "diff-mark", aria_hidden: "true" }
                     button {
                         class: "collapse-divider",
                         // F196: a real button, not a div — Enter and Space
