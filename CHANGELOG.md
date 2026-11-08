@@ -5,7 +5,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.196.4] — Unreleased
+## [0.197.0] — 2026-11-08
+
+**Larger text, and easier to read.**
+
+### Added
+
+- **Text size** (Settings → *Text size*): 100 % to 200 %. It enlarges the
+  whole app, text, buttons and the code panes together, on top of your
+  system's own text size. **Ctrl+=** makes it larger, **Ctrl+-** smaller,
+  and **Ctrl+0** (zero) resets it, from anywhere, including with a dialog
+  open. The size is saved.
+
+### Changed
+
+- **Text and buttons are easier to read in every theme.** Text now meets
+  the WCAG AA contrast minimum (4.5:1) in every theme and colour-vision
+  option, and the edges of fields and buttons 3:1. Several did not before,
+  including the *Compare* button in Dark, links, status symbols on a
+  selected row, and the rows of files that cannot be compared.
+- **No text is smaller than 12 px.** Badges, the *Use* button, the diff's
+  marks and parts of the status bar were between 9 and 11 px.
+- **The selected row in the Explorer has a blue bar on its left edge,** so
+  it can't be mistaken for the row under the pointer.
+- **The status bar stays on one line.** When it is short of room, file
+  names are shortened first. The encoding and the change counts are always
+  shown whole.
+
+### Fixed
+
+- **In a narrow window, each side's label sits above its own lines** (F217).
+  The old side's lines were shown under *RIGHT / NEW*.
+- **In a small window, a comparison keeps its lines** (F218). The view now
+  scrolls, instead of the lines being squeezed out.
+- **A collapsed "unchanged lines" section no longer pushes the old side's
+  line numbers across the pane** (F219).
+- **Replaced lines are easier to see with the red–green-safe colours in
+  Light**, in the app and in HTML reports.
+
+### Internal
+
+- **`cargo xtask contrast`** checks, in CI, every colour pair the
+  stylesheets draw in every theme and colour-vision mode. It also fails on
+  any background it doesn't cover, on reduced opacity, and on text below
+  12 px.
 
 ## [0.196.3] — 2026-11-03
 

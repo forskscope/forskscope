@@ -60,6 +60,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.197.0" date="2026-11-08">
+      <description>
+        <p>A text size setting from 100 % to 200 %, stronger contrast in every theme, and no text smaller than 12 px.</p>
+      </description>
+    </release>
     <release version="0.196.3" date="2026-11-03">
       <description>
         <p>Spreadsheet comparison uses an updated archive library, which fixes four security advisories. ForskScope was never affected by them.</p>

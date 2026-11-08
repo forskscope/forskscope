@@ -12,7 +12,7 @@ the dialog.
 
 | Value | Description |
 |-------|-------------|
-| **100%** (default) | Today's size. |
+| **100%** (default) | The standard size. |
 | 125%, 150%, 175%, 200% | Enlarges the whole app — text, controls, click targets and the code panes — on top of whatever your system's own text size already does. |
 
 This is relative, not absolute: it adds to your system's own text-scaling

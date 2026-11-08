@@ -1,33 +1,35 @@
 # Accessibility
 
-ForskScope's accessibility work ships in stages (RFC-097). This page covers
-what has shipped so far.
+## Text size
+
+Settings → *Text size* enlarges the whole app: text, controls, click
+targets and the code panes together. It adds to whatever your system
+already does. See [Settings → Text size](settings.md#text-size) for the
+setting, and the [Keyboard Reference](../intermediate/keyboard.md#text-size)
+for **Ctrl+=**/**Ctrl++**/**Ctrl+-**/**Ctrl+0**.
+
+### Your system's own text size
+
+On **Windows** (*Settings → Accessibility → Text size*) and on **GNOME in a
+Wayland session** (*Large Text*, or `text-scaling-factor`), your system's
+text size already applies to ForskScope by itself. ForskScope's *Text
+size* adds to it.
+
+Other systems and desktops haven't been checked. If your system's text
+size doesn't seem to reach ForskScope, use ForskScope's *Text size*: it
+works the same everywhere.
 
 ---
 
-## Text size
+## Contrast and text
 
-Settings → *Text size* enlarges the whole app — text, controls, click
-targets and the code panes together, not just the diff panes' own font size
-— on top of whatever your system already does. See
-[Settings → Text size](settings.md#text-size) for the setting itself, and
-the [Keyboard Reference](../intermediate/keyboard.md#text-size) for
-**Ctrl+=**/**Ctrl++**/**Ctrl+-**/**Ctrl+0**.
+In every theme and colour-vision option:
+- text meets the WCAG AA contrast minimum of 4.5:1;
+- the edges of fields and buttons meet 3:1;
+- no text is smaller than 12 px.
 
-### Does your system's own text size already reach ForskScope?
-
-Before adding *Text size*, this was measured directly rather than assumed —
-on **Windows** (*Settings → Accessibility → Text size*, "Make text
-bigger") and on **GNOME, Wayland session** (`text-scaling-factor`), both
-already apply automatically, with no setting or code of ForskScope's own
-involved. ForskScope's own *Text size* setting adds to that; it does not
-replace or duplicate it.
-
-This was measured only on those two: Windows and GNOME on Wayland. No other
-combination — X11 sessions, KDE, or any other desktop environment — has
-been measured, so none is named here one way or the other. If your system
-has its own text-scaling setting and it does not seem to reach ForskScope,
-ForskScope's own *Text size* setting still works regardless.
+A check in the project's build verifies this on every change. Disabled
+buttons are the exception, as WCAG allows: they are dimmed on purpose.
 
 ---
 
