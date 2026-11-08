@@ -133,43 +133,77 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 /* ---- status bar ---- */
-/* Review 203 §2 (F218): always one line - items used to wrap their own
+/* Review 203/204 §2 (F218): always one line - items used to wrap their own
    text at a short enough width ("UTF-" / "8", "+2 /" / "-1"). flex-wrap
    stays nowrap (the default; named here so it reads as deliberate) and
-   overflow:hidden on the bar itself means an item that still doesn't fit
-   is clipped at the bar's own edge rather than pushed onto a second line. */
+   overflow:hidden on the bar itself is the last resort for an item this
+   rule set doesn't already shrink or hide cleanly. */
 .statusbar {
   display: flex; flex-wrap: nowrap; gap: 1rem; padding: .25rem .6rem;
   background: var(--surface-2); border-top: 1px solid var(--border);
   font-size: 12px; color: var(--muted); flex-shrink: 0; overflow: hidden;
 }
-/* Every item: no internal wrap, ellipsis if its own box is narrower than
-   its text. `:not(.spacer)` leaves the pusher's own `{ flex: 1; }` rule
-   (above) alone - this rule's own flex-shrink would otherwise win over it
-   by specificity and cancel its flex-grow.
-   First verified capture at the narrowest viewport (400x280) showed why
-   flex-shrink:0 on every non-.pair item was wrong: once .pair reached
-   zero width, there was still more to shrink, and a flex-shrink:0 item
-   has no give at all - the bar's own overflow:hidden just sliced it
-   off bluntly ("Local on", "Loc", no ellipsis), instead of ellipsizing
-   it. flex-shrink:1 here (vs .pair's own, much larger factor below) lets
-   every item join in once .pair's own share of the shrink is used up,
-   each still shrinking toward its own ellipsis rather than a raw clip. */
+/* Review 204 §2.2: three different behaviours under pressure, not one -
+   the first full fix (review 203) ellipsized every item, and a one- or
+   two-character fragment ("U…") said nothing. The rule now:
+   - .pair and .save-target: truncate with an ellipsis, in that priority
+     order (flex-shrink below) - their own text is genuinely too long to
+     ever show in full on a narrow window, so a fragment is still useful.
+   - .enc/.stats/.dirty: never truncate - short, fixed-format, and the
+     information itself ("UTF-8", "+2 / -1", "unsaved"); a fragment of
+     one of these is actively worse than not showing it at all.
+   - .mode-indicator/.local-only: whole, or not at all (below) - fixed
+     labels, not data; .local-only hides first, .mode-indicator only once
+     that alone isn't enough. */
 .statusbar > span:not(.spacer) {
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  min-width: 0; flex-shrink: 1;
+  white-space: nowrap; overflow: hidden; min-width: 0; flex-shrink: 0;
 }
-/* The file-pair label: by far the largest flex-shrink factor, so in
-   practice it absorbs nearly all of the squeeze on its own first - "the
-   file-pair label first," per the review - with the other items (above)
-   only giving up real width once .pair's own is already exhausted. */
-.statusbar .pair { flex-grow: 1; flex-shrink: 100; min-width: 0; }
+.statusbar .pair, .statusbar .save-target {
+  text-overflow: ellipsis; min-width: 0;
+}
+/* The file-pair label: a much larger flex-shrink factor than .save-target,
+   so in practice it absorbs nearly all of the squeeze on its own first -
+   "the file-pair label first," per the review - before .save-target gives
+   up any of its own width. */
+.statusbar .pair { flex-grow: 1; flex-shrink: 100; }
+.statusbar .save-target { flex-shrink: 10; color: var(--muted); }
 .statusbar .dirty { color: var(--warn); }
 .statusbar .stats { color: var(--ok); font-size: 12px; }
-.statusbar .save-target { color: var(--muted); }
 .statusbar .save-target-no-backup { color: var(--warn); cursor: default; }
 .local-only { cursor: default; user-select: none; }
 .mode-indicator { cursor: default; user-select: none; }
+
+/* Review 204 §2.2: "whole, or not at all" - visually hidden exactly like
+   .sr-only (never display:none/visibility:hidden, which would also drop
+   the accessible name the review asked to keep), triggered by the window
+   itself narrowing rather than a measurement of the space actually left
+   (this app has no ResizeObserver-driven layout anywhere else either) -
+   an approximation, not a guarantee for every possible file-pair length.
+   .local-only (every state, a passive reassurance already repeated in
+   Settings - RFC-091 §3) gives way first; .mode-indicator (Portable/
+   Private - the more operationally significant of the two, and
+   conditional already) only once that alone isn't enough.
+   First tuning (420px/320px) was measured wrong, found live: at 400px
+   (mode-indicator, file comparison) "Portable" showed as "Portab", no
+   ellipsis - the 320px threshold was narrower than this real content
+   ever needed; at 500px (local-only, mergetool - its own save-target is
+   longer than a plain file comparison's) the lock glyph showed with no
+   "Local only" after it - 420px was too narrow there too. Both raised
+   past both observed failure points, margin included; mergetool's own
+   longer text is why local-only's own threshold sits so far above
+   mode-indicator's. */
+@media (max-width: 520px) {
+  .statusbar .local-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+}
+@media (max-width: 450px) {
+  .statusbar .mode-indicator {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+}
 
 /* Accessible-only labels must not participate in grid or flex layout. */
 .sr-only {

@@ -59,6 +59,12 @@
     z-index: 1;
     background: var(--surface-2);
     padding: .2rem .4rem;
+    /* Review 204 §2.4: this lives inside .diff-scroll, which sets the
+       diff's own monospace font (--diff-ff) - without its own
+       font-family it inherited that instead of the interface face the
+       side-by-side .diff-pane-labels (00-reset.css's html/body/#main)
+       uses, so the two layouts read as two different apps. */
+    font-family: system-ui, sans-serif;
     font-size: 12px; color: var(--muted); font-weight: 600;
     letter-spacing: .04em; text-transform: uppercase;
     user-select: none;

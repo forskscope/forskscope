@@ -77,13 +77,16 @@ pub fn StatusBar() -> Element {
     rsx! {
         div { class: "statusbar", role: "status",
             if let Some((pair, enc, stats, dirty, save_target)) = context {
-                // Review 203 §2 (F218): `title` keeps each item's full text
-                // as an accessible name once the bar's own CSS can ellipsize
-                // it — `.pair` is the one that actually shrinks under
-                // pressure (02-layout-shell.css).
+                // Review 204 §2.2 (F218): only `.pair` and `.save-target`
+                // ever ellipsize (02-layout-shell.css) — `title` keeps each
+                // one's full text as an accessible name once it does. `enc`/
+                // `stats`/`dirty` never truncate at all (short, fixed-format,
+                // and the information itself — a fragment of "UTF-8" or
+                // "+2 / -1" is worse than not showing it), so they need no
+                // `title`: the visible text is always the whole text.
                 span { class: "pair", title: "{pair}", "{pair}" }
-                if !enc.is_empty() { span { title: "{enc}", "{enc}" } }
-                if !stats.is_empty() { span { class: "stats", title: "{stats}", "{stats}" } }
+                if !enc.is_empty() { span { class: "enc", "{enc}" } }
+                if !stats.is_empty() { span { class: "stats", "{stats}" } }
                 if dirty { span { class: "dirty", {t(lang, "unsaved")} } }
                 if let Some((short, full, no_backup)) = save_target {
                     span { class: "save-target", title: "{full}",
