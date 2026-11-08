@@ -9,6 +9,10 @@ accepted and authorized").
 (reply 177, review 199): the platforms already apply the system's text
 size, so *Text size* has no *System* choice. It enlarges the app on top of
 whatever the system sets (§1.1, §1.4).
+**Amended.** 2026-11-08, by the owner's acceptance of the 0.198.0 scope:
+stage 3 reconciles "no control hidden until hover" with the owner's F162
+rule. Controls are **revealed by state, never by pointer** (§Stage 3).
+Stage 2 measures before relying on any system preference, as stage 1 did.
 **Scheduling.** Stage 1 in `0.197.0`; stages 2 and 3 in `0.198.0`. The
 defect fixes found by the same audit (F214–F216, handoff 094) come first, in
 `0.196.4`, and are not part of this RFC.
@@ -192,15 +196,29 @@ There is no setting for this; the system's preference is enough.
   the labels don't fit at 200 % in 1000×700, a label may fold into its
   symbol only at sizes where it can't fit, and never at 100 %.
 - **A key to the Explorer's status symbols,** visible without hovering, in
-  the Explorer itself (for example, in its bottom bar while nothing is
-  selected). It is one short line, translated. Its place is proposed with
-  captures.
-- **No control hidden until hover:**
-  - the × shows on every tab;
-  - the folder-comparison row buttons show at full strength.
+  the Explorer itself, translated. **It names only the symbols currently on
+  screen**, by the same principle as below. There are nine in all, too many
+  for a fixed line. Its place is proposed with captures.
+- **Revealed by state, never by pointer** (amended 2026-11-08, reconciling
+  the owner's F162 rule):
+  - **A control may appear only when the state makes it relevant,** such as
+    a selected row or a condition being met (F162; RFC-080's *Verify* is the
+    precedent).
+  - **When it is shown, it is at full strength,** and it stays until the
+    state changes.
+  - **The pointer's position alone never reveals or hides a control.**
+    Older users, keyboard users and touch users miss what only hover shows.
 
-  If a row's three buttons then read as noise, reduce their number and keep
-  them visible. Any reduction is a design proposal for me first.
+  Applied:
+  - **The tab ×** shows on every tab, since closing applies to any tab.
+  - **Deep Compare's row actions** (*Compare*, *Copy to right*, *Copy to
+    left*) show **only on the selected row,** at full strength: three
+    buttons, not three per row.
+    - Deep Compare gains row selection: a click selects, and a double-click
+      or Enter opens the comparison, as in the Explorer.
+    - The first row is selected when the list appears, so the actions are
+      visible from the start.
+    - The selected row is marked by the Explorer's accent bar.
 - ***Redo* sits beside *Undo*,** not under *More*.
 - **Help text visible, not tooltip-only.** The Settings dialog's help
   sentences (*Text size*, *Enable binary comparison*, *Remember Explorer
