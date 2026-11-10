@@ -8,6 +8,7 @@
 
 use std::path::{Path, PathBuf};
 
+use dioxus::html::input_data::keyboard_types::Key;
 use dioxus::prelude::*;
 
 use forskscope_compare::IgnoreRules;
@@ -18,6 +19,7 @@ use forskscope_compare::dir::{
 use forskscope_ui_logic::{DeepCompareSummary, DeepFilter, apply_filter};
 
 use crate::i18n::t;
+use crate::keyboard::focus_handle;
 use crate::state::{DirOp, Lang, Modal, Store, open_compare};
 use crate::ui::view::digest_epoch::{DigestEpoch, EpochStamp};
 
@@ -80,6 +82,20 @@ fn row_in_progress(state: CancelState, in_flight: bool) -> bool {
     in_flight && state == CancelState::None
 }
 
+/// RFC-097 stage 3 §3: "the first row is selected when the list appears,
+/// and again whenever a filter change removes the selected row." `current`
+/// is kept as long as it is still in `visible`; otherwise the first visible
+/// row takes over, or `None` if nothing is visible at all. A plain function
+/// over plain data (not a `Signal`), like `row_in_progress`/`export_disabled`
+/// above, so it is directly testable without a Dioxus runtime.
+fn fixed_up_selection(visible: &[PathBuf], current: Option<&Path>) -> Option<PathBuf> {
+    if current.is_some_and(|sel| visible.iter().any(|p| p.as_path() == sel)) {
+        current.map(Path::to_path_buf)
+    } else {
+        visible.first().cloned()
+    }
+}
+
 #[component]
 pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> Element {
     // Clone once outside all closures so the props aren't moved piecemeal.
@@ -116,6 +132,18 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
     // Only a phase-2 (digest) cancel leaves a real, exportable partial
     // result, with its unfinished rows reading "Not compared" (§2a).
     let mut cancel_state: Signal<CancelState> = use_signal(|| CancelState::None);
+    // RFC-097 stage 3 §3: the selected row's identity (`rel_path`), the one
+    // this view's row actions are shown on. `None` only before the first
+    // row ever appears - the fixup effect below sets it to the first
+    // visible row as soon as `entries`/`filter` give it one, and again
+    // whenever a filter change removes whichever row was selected.
+    let mut selected: Signal<Option<PathBuf>> = use_signal(|| None);
+    // RFC-087's `tab_handles` pattern (`state.rs`), keyed by `rel_path`
+    // instead of tab position: each row's own `MountedData`, captured on
+    // mount, so Up/Down can move real DOM focus (roving tabindex) rather
+    // than only the `selected` signal.
+    let row_handles: Signal<std::collections::HashMap<PathBuf, std::rc::Rc<MountedData>>> =
+        use_signal(std::collections::HashMap::new);
     let mut store = use_context::<Store>();
     // F78: owns the generation guard, the cancellation token shared by
     // both phases, and the concurrency bound this view already had -
@@ -237,6 +265,25 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                 });
             }
         });
+    });
+
+    // RFC-097 stage 3 §3: "the first row is selected when the list appears,
+    // and again whenever a filter change removes the selected row." Tracks
+    // `entries`/`filter` itself (not the render body's own `visible`, a
+    // plain `Vec` computed below) so it reruns exactly when either one
+    // actually changes - recomputing the filter here is cheap, and doing
+    // so is what makes `entries.read()`/`filter.read()` register as this
+    // effect's dependencies.
+    use_effect(move || {
+        let f = *filter.read();
+        let snap = entries.read();
+        let visible_now: Vec<PathBuf> = apply_filter(&snap, f)
+            .into_iter()
+            .map(|e| e.rel_path.clone())
+            .collect();
+        drop(snap);
+        let current = selected.peek().clone();
+        selected.set(fixed_up_selection(&visible_now, current.as_deref()));
     });
 
     let f = *filter.read();
@@ -384,10 +431,21 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                         }
                     }
                 }
-                div { class: "deep-table",
-                    for entry in visible {
+                // RFC-097 stage 3 §3: `role="grid"`, one `role="row"` per
+                // entry - the pattern the handoff names explicitly, chosen
+                // over `listbox`/`option` because those may not contain
+                // interactive children (the per-row buttons). Each row
+                // owns a roving `tabindex` (RFC-087's own pattern, keyed by
+                // `rel_path` instead of tab position): only the selected
+                // row is a Tab stop, so "Tab reaches the list" always lands
+                // on it directly, and a further Tab reaches its own
+                // buttons next in the DOM.
+                div {
+                    class: "deep-table", role: "grid",
+                    aria_label: t(lang, "Folder comparison results"),
+                    for (idx, entry) in visible.iter().enumerate() {
                         DeepRow {
-                            entry, lang,
+                            entry: entry.clone(), lang,
                             left_root: left_root.clone(), right_root: right_root.clone(),
                             // review 174 §2a: `is_scan` is always false in
                             // this branch (`listing_cancelled` and
@@ -399,6 +457,9 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                             // same row must read "Not compared", not
                             // "Comparing…".
                             in_progress: row_in_progress(state, in_flight),
+                            selected, row_handles,
+                            prev: (idx > 0).then(|| visible[idx - 1].rel_path.clone()),
+                            next: visible.get(idx + 1).map(|e| e.rel_path.clone()),
                         }
                     }
                 }
@@ -452,6 +513,20 @@ fn DeepRow(
     left_root: PathBuf,
     right_root: PathBuf,
     in_progress: bool,
+    /// RFC-097 stage 3 §3: the selected row's `rel_path`, shared by every
+    /// row - this one's own selection is a comparison against `entry`, not
+    /// a separate `bool` prop, so there is exactly one row selected by
+    /// construction.
+    mut selected: Signal<Option<PathBuf>>,
+    /// RFC-087's `tab_handles` pattern, keyed by `rel_path` - lets Up/Down
+    /// move real DOM focus onto the newly-selected row (roving tabindex),
+    /// not only the `selected` signal.
+    mut row_handles: Signal<std::collections::HashMap<PathBuf, std::rc::Rc<MountedData>>>,
+    /// The previous/next row's `rel_path` in filtered order, computed once
+    /// by the caller (`visible` already has the order; re-deriving it per
+    /// row here would need the whole list anyway).
+    prev: Option<PathBuf>,
+    next: Option<PathBuf>,
 ) -> Element {
     let mut store = use_context::<Store>();
     let (icon, cls) = status_glyph(entry.status);
@@ -473,58 +548,121 @@ fn DeepRow(
     // `aria_label` is the pattern F74 established in `dir_pane.rs`;
     // `title` kept for the mouse tooltip.
     let label = status_label(entry.status, in_progress, lang);
+    let is_selected = selected.read().as_deref() == Some(entry.rel_path.as_path());
+    let row_class = if is_selected { "deep-row selected" } else { "deep-row" };
+    // RFC-097 stage 3 §3: "the selected row is announced with its path and
+    // status" - an explicit row-level `aria_label` rather than letting the
+    // row's accessible name fall out of its children's text (which would
+    // also run the action buttons' own labels into it on the selected row).
+    let row_label = format!("{path_str}, {label}");
+    let rel_for_handle = entry.rel_path.clone();
+    let rel_for_select = entry.rel_path.clone();
+    let e2d = entry.clone();
+    let lr_d = left_root.clone();
+    let rr_d = right_root.clone();
+    let e2k = entry.clone();
+    let lr_k = left_root.clone();
+    let rr_k = right_root.clone();
     rsx! {
-        div { class: "deep-row",
-            span {
-                class: "dir-status {cls}",
-                role: "img",
-                aria_label: "{label}",
-                title: "{label}",
-                "{icon}"
-            }
-            span { class: "deep-path", "{path_str}" }
-            span { class: "dir-size", {size_label(&entry)} }
-            if can_cmp {
-                button { class: "deep-compare-btn",
-                    onclick: move |_| {
-                        let (lp, rp) = left_then_right(&e2, &lr_cmp, &rr_cmp);
-                        open_compare(&mut store, lp, rp);
-                    },
-                    {t(lang, "Compare")}
+        div {
+            class: "{row_class}",
+            role: "row",
+            tabindex: if is_selected { "0" } else { "-1" },
+            aria_selected: if is_selected { "true" } else { "false" },
+            aria_label: "{row_label}",
+            onmounted: move |e| { row_handles.write().insert(rel_for_handle.clone(), e.data()); },
+            onclick: move |_| { selected.set(Some(rel_for_select.clone())); },
+            ondoubleclick: move |_| {
+                if can_cmp {
+                    let (lp, rp) = left_then_right(&e2d, &lr_d, &rr_d);
+                    open_compare(&mut store, lp, rp);
                 }
-            }
-            if copy_left_to_right {
-                {
-                    let entry3 = entry.clone();
-                    let l = left_root.clone();
-                    let r = right_root.clone();
-                    rsx! {
-                        button {
-                            class: "deep-compare-btn",
-                            title: t(lang, "Copy to right"),
-                            onclick: move |_| {
-                                let (src, dst) = left_then_right(&entry3, &l, &r);
-                                store.modal.set(Modal::ConfirmDirOp(DirOp { src, dst, label: String::new() }));
-                            },
-                            {t(lang, "Copy to right")}
+            },
+            onkeydown: move |e: Event<KeyboardData>| {
+                match e.key() {
+                    Key::Enter => {
+                        e.prevent_default();
+                        if can_cmp {
+                            let (lp, rp) = left_then_right(&e2k, &lr_k, &rr_k);
+                            open_compare(&mut store, lp, rp);
                         }
                     }
+                    Key::ArrowUp => {
+                        if let Some(target) = prev.clone() {
+                            e.prevent_default();
+                            selected.set(Some(target.clone()));
+                            focus_handle(row_handles.read().get(&target).cloned());
+                        }
+                    }
+                    Key::ArrowDown => {
+                        if let Some(target) = next.clone() {
+                            e.prevent_default();
+                            selected.set(Some(target.clone()));
+                            focus_handle(row_handles.read().get(&target).cloned());
+                        }
+                    }
+                    _ => {}
                 }
+            },
+            span { class: "deep-cell", role: "gridcell",
+                span {
+                    class: "dir-status {cls}",
+                    role: "img",
+                    aria_label: "{label}",
+                    title: "{label}",
+                    "{icon}"
+                }
+                span { class: "deep-path", "{path_str}" }
+                span { class: "dir-size", {size_label(&entry)} }
             }
-            if copy_right_to_left {
-                {
-                    let entry4 = entry.clone();
-                    let l = left_root.clone();
-                    let r = right_root.clone();
-                    rsx! {
-                        button {
-                            class: "deep-compare-btn",
-                            title: t(lang, "Copy to left"),
-                            onclick: move |_| {
-                                let (src, dst) = right_then_left(&entry4, &l, &r);
-                                store.modal.set(Modal::ConfirmDirOp(DirOp { src, dst, label: String::new() }));
+            if is_selected && (can_cmp || copy_left_to_right || copy_right_to_left) {
+                span { class: "deep-actions", role: "gridcell",
+                    if can_cmp {
+                        button { class: "deep-compare-btn",
+                            onclick: move |e| {
+                                e.stop_propagation();
+                                let (lp, rp) = left_then_right(&e2, &lr_cmp, &rr_cmp);
+                                open_compare(&mut store, lp, rp);
                             },
-                            {t(lang, "Copy to left")}
+                            {t(lang, "Compare")}
+                        }
+                    }
+                    if copy_left_to_right {
+                        {
+                            let entry3 = entry.clone();
+                            let l = left_root.clone();
+                            let r = right_root.clone();
+                            rsx! {
+                                button {
+                                    class: "deep-compare-btn",
+                                    title: t(lang, "Copy to right"),
+                                    onclick: move |e| {
+                                        e.stop_propagation();
+                                        let (src, dst) = left_then_right(&entry3, &l, &r);
+                                        store.modal.set(Modal::ConfirmDirOp(DirOp { src, dst, label: String::new() }));
+                                    },
+                                    {t(lang, "Copy to right")}
+                                }
+                            }
+                        }
+                    }
+                    if copy_right_to_left {
+                        {
+                            let entry4 = entry.clone();
+                            let l = left_root.clone();
+                            let r = right_root.clone();
+                            rsx! {
+                                button {
+                                    class: "deep-compare-btn",
+                                    title: t(lang, "Copy to left"),
+                                    onclick: move |e| {
+                                        e.stop_propagation();
+                                        let (src, dst) = right_then_left(&entry4, &l, &r);
+                                        store.modal.set(Modal::ConfirmDirOp(DirOp { src, dst, label: String::new() }));
+                                    },
+                                    {t(lang, "Copy to left")}
+                                }
+                            }
                         }
                     }
                 }
@@ -752,6 +890,7 @@ fn BatchCopyButtons(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::state::AppSettings;
 
     // ── Review 174 §2b: Cancel's two untrue states, at the state level ─────
 
@@ -1212,5 +1351,154 @@ mod tests {
         assert_eq!(status_glyph(RecStatus::Equal).0, '=');
         assert_eq!(status_glyph(RecStatus::Changed).0, '≠');
         assert_eq!(status_glyph(RecStatus::Computing).0, '…');
+    }
+
+    // ── fixed_up_selection (RFC-097 stage 3 §3) ───────────────────────────────
+
+    // Falsify by returning `current.map(Path::to_path_buf)` unconditionally
+    // (never falling back): a removed-by-filter selection then stays
+    // selected, pointing at a row no longer in `visible` - confirmed; restored.
+    #[test]
+    fn a_selection_the_filter_removed_falls_back_to_the_first_visible_row() {
+        let visible = vec![PathBuf::from("a.txt"), PathBuf::from("b.txt")];
+        let gone = PathBuf::from("c.txt"); // was selected, no longer visible
+        assert_eq!(
+            fixed_up_selection(&visible, Some(&gone)),
+            Some(PathBuf::from("a.txt"))
+        );
+    }
+
+    #[test]
+    fn a_selection_still_visible_is_kept_exactly_as_is() {
+        let visible = vec![PathBuf::from("a.txt"), PathBuf::from("b.txt")];
+        assert_eq!(
+            fixed_up_selection(&visible, Some(&PathBuf::from("b.txt"))),
+            Some(PathBuf::from("b.txt"))
+        );
+    }
+
+    // The list's first appearance: nothing was ever selected.
+    #[test]
+    fn no_prior_selection_picks_the_first_visible_row() {
+        let visible = vec![PathBuf::from("only.txt")];
+        assert_eq!(
+            fixed_up_selection(&visible, None),
+            Some(PathBuf::from("only.txt"))
+        );
+    }
+
+    #[test]
+    fn an_empty_list_selects_nothing() {
+        assert_eq!(fixed_up_selection(&[], None), None);
+        assert_eq!(fixed_up_selection(&[], Some(&PathBuf::from("gone"))), None);
+    }
+
+    // ── DeepRow markup (RFC-097 stage 3 §3) ───────────────────────────────────
+
+    fn root_with(props: (RecEntry, Option<PathBuf>)) -> Element {
+        let (e, selected_path) = props;
+        use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+        let selected = Signal::new_in_scope(selected_path, ScopeId::ROOT);
+        let row_handles = Signal::new_in_scope(std::collections::HashMap::new(), ScopeId::ROOT);
+        rsx! {
+            DeepRow {
+                entry: e, lang: Lang::En,
+                left_root: PathBuf::from("/l"), right_root: PathBuf::from("/r"),
+                in_progress: false,
+                selected, row_handles,
+                prev: None, next: None,
+            }
+        }
+    }
+
+    fn deep_row_text_nodes(selected_path: Option<PathBuf>) -> (Vec<String>, Vec<(String, String)>) {
+        let e = entry_with_status("sub/changed.txt", RecStatus::Changed);
+        let mut vdom = VirtualDom::new_with_props(root_with, (e, selected_path));
+        let mutations = vdom.rebuild_to_vec();
+        let texts: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        let attrs: Vec<(String, String)> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute { name, value, .. } => {
+                    Some((name.to_string(), format!("{value:?}")))
+                }
+                _ => None,
+            })
+            .collect();
+        (texts, attrs)
+    }
+
+    /// Falsify by dropping the `is_selected &&` half of the actions' guard
+    /// (leaving only the status checks): "Compare" then renders on an
+    /// unselected row too - confirmed; restored.
+    #[test]
+    fn an_unselected_row_renders_no_action_buttons() {
+        let (texts, attrs) = deep_row_text_nodes(None);
+        assert!(
+            !texts.iter().any(|t| t == "Compare"),
+            "an unselected row must show no actions, got {texts:?}"
+        );
+        assert!(
+            !texts.iter().any(|t| t == "Copy to right" || t == "Copy to left"),
+            "an unselected row must show no copy actions, got {texts:?}"
+        );
+        assert!(
+            attrs
+                .iter()
+                .any(|(n, v)| n == "tabindex" && v.contains("-1")),
+            "an unselected row must not be a Tab stop, got {attrs:?}"
+        );
+        assert!(
+            attrs
+                .iter()
+                .any(|(n, v)| n == "aria-selected" && v.contains("false")),
+            "an unselected row must carry aria-selected=false, got {attrs:?}"
+        );
+    }
+
+    /// The converse: the selected row shows every action its status allows,
+    /// at full strength (RFC-097 stage 3's own wording) - not dimmed, just
+    /// present or absent. Falsify by requiring `is_selected` on nothing: the
+    /// "Compare" assertion then fails to distinguish from the unselected
+    /// case above (both would pass regardless of the guard).
+    #[test]
+    fn the_selected_row_shows_every_action_its_status_allows() {
+        let (texts, attrs) = deep_row_text_nodes(Some(PathBuf::from("sub/changed.txt")));
+        assert!(
+            texts.iter().any(|t| t == "Compare"),
+            "the selected row must show Compare, got {texts:?}"
+        );
+        assert!(
+            texts.iter().any(|t| t == "Copy to right"),
+            "the selected row must show Copy to right, got {texts:?}"
+        );
+        assert!(
+            texts.iter().any(|t| t == "Copy to left"),
+            "the selected row must show Copy to left, got {texts:?}"
+        );
+        assert!(
+            attrs.iter().any(|(n, v)| n == "tabindex" && v.contains('0') && !v.contains("-1")),
+            "the selected row must be the one Tab stop, got {attrs:?}"
+        );
+        assert!(
+            attrs
+                .iter()
+                .any(|(n, v)| n == "aria-selected" && v.contains("true")),
+            "the selected row must carry aria-selected=true, got {attrs:?}"
+        );
+        assert!(
+            attrs.iter().any(|(n, v)|
+                n == "aria-label" && v.contains("sub/changed.txt") && v.contains("Different")
+            ),
+            "the selected row's own label must carry its path and status, got {attrs:?}"
+        );
     }
 }

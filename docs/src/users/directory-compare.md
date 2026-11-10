@@ -46,9 +46,22 @@ The Directory Report below uses the same icons.
 
 ---
 
+## Selecting a row
+
+One row in the Directory Report's table is always selected — the first row
+when the list appears, and again whenever a filter change removes whichever
+row was selected. Only the selected row shows its action buttons (**Compare**,
+**Copy to right**, **Copy to left** — whichever apply); every other row shows
+none, so nothing is ever a call to action until you've actually landed on it.
+
+- **Click** a row to select it.
+- **Double-click** a row, or press **Enter** on the selected row, to open its
+  comparison — the same as clicking its **Compare** button, where one appears.
+- **↑** / **↓** move the selection up and down the visible list.
+
 ## Copying files between sides
 
-Every file row in Directory Report that is not equal shows explicit direction buttons:
+The selected file row, when it is not equal, shows explicit direction buttons:
 
 - **Copy to right** — copies the left-side file to the right directory.
 - **Copy to left** — copies the right-side file to the left directory.
@@ -80,7 +93,7 @@ An **empty directory present on only one side** is listed too, under the same `�
 | Status icon | One of the [status icons](#explorer-panes) above: `=` equal, `≠` different, `←` left only, `→` right only, `…` computing, `⊘` unreadable, `↗` symlink not followed |
 | Path | Relative path from the root |
 | Size | File size (or `old → new` if sizes differ) |
-| Compare button | Opens a file comparison for differing files |
+| Compare button | Opens a file comparison for differing files — shown on the selected row only (see [Selecting a row](#selecting-a-row)) |
 
 **Filtering results:** use the **Different / All / Equal only** buttons (same as browse mode).
 

@@ -42,12 +42,23 @@
 .deep-table { flex: 1; overflow: auto; min-height: calc(6 * var(--row-h)); }
 .deep-row { display: flex; align-items: center; gap: .5rem; padding: .2rem .6rem; cursor: pointer; font-size: 13px; }
 .deep-row:hover { background: var(--surface-3); }
+/* RFC-097 stage 3 §3: the Explorer's own selected-row treatment
+   (03-components.css's `.tree-row.selected`) - same tint, same leading
+   accent bar, same reasoning (review 197 §1: the tint alone measured too
+   weak a signal against a hovered row's --surface-3). */
+.deep-row.selected {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  box-shadow: inset 3px 0 0 0 var(--accent);
+}
+.deep-row:focus-visible { outline: var(--focus-ring) solid var(--focus); outline-offset: -2px; }
+.deep-cell { display: flex; align-items: center; gap: .5rem; flex: 1; min-width: 0; }
+.deep-actions { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
 .deep-path { flex: 1; font-family: ui-monospace, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* F216: font-size 11px -> 12px. The opacity (.7, revealed to 1 on hover)
-   stays - F214's exemption for a hover-revealed control; RFC-097 stage 3
-   is where this control's own future is decided, not here. */
-.deep-compare-btn { padding: .15rem .4rem; font-size: 12px; opacity: .7; border-radius: 4px; }
-.deep-row:hover .deep-compare-btn { opacity: 1; }
+/* F216: font-size 11px -> 12px. RFC-097 stage 3 §3: no longer hover-only -
+   these only render on the selected row at all (`DeepRow`'s own
+   `is_selected` gate), so there is no resting-vs-hover state left to
+   dim between. */
+.deep-compare-btn { padding: .15rem .4rem; font-size: 12px; border-radius: 4px; }
 .deep-scanning { padding: 1.5rem; text-align: center; color: var(--muted); }
 .deep-progress { color: var(--muted); }
 

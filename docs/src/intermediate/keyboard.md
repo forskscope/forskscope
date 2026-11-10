@@ -13,8 +13,8 @@ anywhere, with no active comparison tab needed.
 | **Ctrl+/**   | Open this keyboard reference |
 | **Ctrl+W**   | Close the active comparison tab |
 
-The **?** button at the right end of the tab bar opens the same reference
-from any screen.
+The **? Shortcuts** button at the right end of the tab bar opens the same
+reference from any screen.
 
 ## Anywhere
 
@@ -59,6 +59,16 @@ Works from anywhere, with no active comparison tab needed.
 | **Ctrl+F** | Open / close inline search bar |
 | **F3** | Next search match |
 | **Shift+F3** | Previous search match |
+
+## Deep Compare
+
+The folder-comparison list (RFC-097): one row is always selected, and only the selected
+row shows its actions (*Compare*, *Copy to right*, *Copy to left*).
+
+| Shortcut | Action |
+|----------|--------|
+| **↑ / ↓** | Move the selected row |
+| **Enter** | Open the comparison for the selected row, if available |
 
 ## Tabs
 

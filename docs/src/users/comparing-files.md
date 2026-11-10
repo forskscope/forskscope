@@ -48,8 +48,8 @@ Colour-coding reinforces the symbols but is never the sole indicator — every c
 
 | Action | Shortcut |
 |--------|----------|
-| Next change | **F8** or **▶** button |
-| Previous change | **F7** or **◀** button |
+| Next change | **F8** or the **▶ Next change** button |
+| Previous change | **F7** or the **◀ Previous change** button |
 | Jump to hunk on screen | Click the hunk or use ▲/▼ in the centre gutter |
 
 The status bar shows the total count of insertions and deletions: `+12 / -5`.
@@ -58,7 +58,7 @@ The status bar shows the total count of insertions and deletions: `+12 / -5`.
 
 ## Search within the diff
 
-Press **Ctrl+F** or click the 🔍 button to open the search bar. Type any substring; every matching row highlights in both panes simultaneously. The bar shows a live match count. **F3** / **Shift+F3** step through matches from elsewhere in the tab, but while focus is in the search box itself, use **Enter** / **Shift+Enter** instead — the box takes every key typed into it, F3 included. **Esc** closes the bar from either place.
+Press **Ctrl+F** or click the **🔍 Search** button to open the search bar. Type any substring; every matching row highlights in both panes simultaneously. The bar shows a live match count. **F3** / **Shift+F3** step through matches from elsewhere in the tab, but while focus is in the search box itself, use **Enter** / **Shift+Enter** instead — the box takes every key typed into it, F3 included. **Esc** closes the bar from either place.
 
 ---
 

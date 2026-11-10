@@ -260,6 +260,11 @@ will open:
 
 The **Compare ▶** button is enabled only when both picks are set.
 
+Above the targets label, a **status key** lists only the icons actually
+visible in either pane right now, each with the same wording as that
+icon's own row label — never all nine at once. It updates as you browse
+or filter, and disappears entirely once nothing is visible.
+
 ---
 
 ## Async tab opening

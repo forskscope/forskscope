@@ -27,13 +27,17 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
     rsx! {
         // ── Primary toolbar ───────────────────────────────────────────────────
         div { class: "diff-toolbar",
+            // RFC-097 stage 3 §1: a symbol alone wasn't enough — the words
+            // stay beside the kept symbol, not in place of it.
             button {
+                aria_label: t(lang, "F7 — Previous change"),
                 onclick: move |_| crate::ui::view::diff_actions::move_focus(&mut store, index, -1),
-                title: t(lang, "F7 — Previous change"), "◀"
+                "◀ " {t(lang, "Previous change")}
             }
             button {
+                aria_label: t(lang, "F8 — Next change"),
                 onclick: move |_| crate::ui::view::diff_actions::move_focus(&mut store, index,  1),
-                title: t(lang, "F8 — Next change"), "▶"
+                "▶ " {t(lang, "Next change")}
             }
             span { class: "info", "{pos}" }
             span { class: "spacer" }
@@ -45,6 +49,16 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     },
                     aria_label: t(lang, "Undo last merge action (Ctrl+Z)"),
                     {t(lang, "Undo")}
+                }
+                // RFC-097 stage 3 §4: beside Undo now, not under More — same
+                // enabled/disabled logic (`!snap.can_redo`), Ctrl+Y unchanged.
+                button {
+                    disabled: !snap.can_redo,
+                    onclick: move |_| {
+                        if let Some(tab) = store.tabs.write().get_mut(index) { let _ = tab.merge.redo(); }
+                    },
+                    aria_label: t(lang, "Redo last undone merge action (Ctrl+Y)"),
+                    {t(lang, "Redo")}
                 }
                 button {
                     disabled: !snap.is_dirty,
@@ -80,10 +94,9 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
             }
             button {
                 id: "search-open-btn",
-                title: t(lang, "Search within diff (Ctrl+F)"),
-                aria_label: t(lang, "Open search bar"),
+                aria_label: t(lang, "Search within diff (Ctrl+F)"),
                 onclick: move |_| { search_ctx.write().active ^= true; },
-                "🔍"
+                "🔍 " {t(lang, "Search")}
             }
             if snap.can_save {
                 button {
@@ -142,13 +155,6 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                         if let Some(tab) = store.tabs.write().get_mut(index) { tab.word_wrap ^= true; }
                     },
                     {format!("{}: {}", t(lang, "Wrap"), t(lang, if snap.word_wrap { "on" } else { "off" }))}
-                }
-                button {
-                    disabled: !snap.can_redo,
-                    onclick: move |_| {
-                        if let Some(tab) = store.tabs.write().get_mut(index) { let _ = tab.merge.redo(); }
-                    },
-                    {t(lang, "Redo")}
                 }
                 button {
                     onclick: move |_| {
@@ -255,5 +261,175 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+
+    use super::*;
+    use crate::state::AppSettings;
+
+    fn snap(can_save: bool, can_undo: bool, can_redo: bool) -> TabSnapshot {
+        TabSnapshot {
+            hunks: Vec::new(),
+            identical: false,
+            char_mode: false,
+            inline_available: false,
+            word_wrap: false,
+            can_save,
+            is_dirty: false,
+            can_undo,
+            can_redo,
+            font_size: 14,
+            font_family: "monospace",
+            focused_id: None,
+            focused_change: 0,
+            changes: 0,
+            ignore_whitespace: false,
+            ignore_case: false,
+            context_lines: 3,
+            algorithm: forskscope_compare::DiffAlgorithm::Myers,
+            warnings: Vec::new(),
+            readonly_notice: String::new(),
+            right_is_text: true,
+            right_encoding_label: "UTF-8".to_string(),
+        }
+    }
+
+    fn root(snap: TabSnapshot) -> Element {
+        use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+        use_context_provider(|| Signal::new_in_scope(SearchCtx::default(), ScopeId::ROOT));
+        rsx! { Toolbar { index: 0, snap, lang: Lang::En } }
+    }
+
+    /// RFC-097 stage 3 §1: ◀/▶ keep their symbol and gain `aria_label`s
+    /// naming the action in words ("Previous change"/"Next change" are the
+    /// *visible* words; the existing F7/F8-prefixed keys stay as the
+    /// accessible names, unchanged from before this handoff). Falsify by
+    /// removing either `aria_label`: the corresponding assertion fails.
+    #[test]
+    fn previous_and_next_change_keep_their_f7_f8_accessible_names() {
+        let mut vdom = VirtualDom::new_with_props(root, snap(true, true, true));
+        let mutations = vdom.rebuild_to_vec();
+        let labels: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "aria-label",
+                    value,
+                    ..
+                } => Some(format!("{value:?}")),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            labels.iter().any(|l| l.contains("F7 — Previous change")),
+            "got {labels:?}"
+        );
+        assert!(
+            labels.iter().any(|l| l.contains("F8 — Next change")),
+            "got {labels:?}"
+        );
+    }
+
+    /// The Search button's `title`/duplicate `aria_label` ("Open search
+    /// bar") are gone - it now reuses the same "Search within diff
+    /// (Ctrl+F)" key that was already its `title`, as its one accessible
+    /// name, and gains visible "Search" text. Falsify by restoring the old
+    /// separate "Open search bar" aria_label: the second assertion then
+    /// fails (both labels would be present).
+    #[test]
+    fn the_search_button_has_one_accessible_name_and_visible_text() {
+        let mut vdom = VirtualDom::new_with_props(root, snap(true, true, true));
+        let mutations = vdom.rebuild_to_vec();
+        let labels: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "aria-label",
+                    value,
+                    ..
+                } => Some(format!("{value:?}")),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            labels.iter().any(|l| l.contains("Search within diff (Ctrl+F)")),
+            "got {labels:?}"
+        );
+        assert!(
+            !labels.iter().any(|l| l.contains("Open search bar")),
+            "the old, now-duplicate aria_label must be gone, got {labels:?}"
+        );
+
+        let texts: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            texts.iter().any(|t| t.contains("Search")),
+            "the Search button must show the word, got {texts:?}"
+        );
+    }
+
+    /// *Redo* beside *Undo*, both rendered whenever `can_save`: a plain
+    /// mutation check of the initial render, same as the other two tests
+    /// above.
+    #[test]
+    fn redo_renders_beside_undo_when_the_tab_can_save() {
+        let mut vdom = VirtualDom::new_with_props(root, snap(true, true, true));
+        let mutations = vdom.rebuild_to_vec();
+        let texts: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(texts.iter().any(|t| t.as_str() == "Redo"), "got {texts:?}");
+        assert!(texts.iter().any(|t| t.as_str() == "Undo"), "got {texts:?}");
+    }
+
+    /// RFC-097 stage 3 §4: *Redo* moved out of the Advanced disclosure
+    /// panel, beside *Undo* — its visible-text expression must now appear
+    /// exactly once in the source, not twice. The Advanced panel only
+    /// renders after a click `rebuild_to_vec()` never simulates (it starts
+    /// collapsed, with no prop to open it), so a duplicate left behind
+    /// there is invisible to a mutation-based test; a source scan is the
+    /// only thing left to check, the same reasoning `select_field.rs`'s own
+    /// source-scan test documents. Falsify by re-adding the old Redo button
+    /// inside the advanced panel: the count then becomes 2.
+    ///
+    /// The needle is assembled from two literals, deliberately never
+    /// spelling out the translation call as one contiguous token in this
+    /// file's own source — `cargo xtask i18n` scans raw bytes for exactly
+    /// that shape and would otherwise mistake this test's needle for a
+    /// second, untranslatable usage site.
+    #[test]
+    fn redo_is_defined_exactly_once_in_the_toolbar_source() {
+        let src = fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("src/ui/view/diff/toolbar.rs"),
+        )
+        .unwrap();
+        // Only the `rsx!`/component source above this test module, not this
+        // module's own test text - cut at the `#[cfg(test)]` marker.
+        let component_src = src.split("#[cfg(test)]").next().unwrap();
+        let needle = format!("{}{}", "{t", "(lang, \"Redo\")}");
+        let count = component_src.matches(needle.as_str()).count();
+        assert_eq!(
+            count, 1,
+            "exactly one Redo visible-text expression must exist in the \
+             toolbar's component source, found {count}"
+        );
     }
 }

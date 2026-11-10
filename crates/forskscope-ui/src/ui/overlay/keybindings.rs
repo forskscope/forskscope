@@ -46,6 +46,13 @@ pub fn KeyboardRefModal() -> Element {
                     }
                 }
                 div { class: "kb-section",
+                    h3 { {t(lang, "Deep Compare")} }
+                    div { class: "kb-table",
+                        KbRow { keys: "↑ / ↓",  desc: t(lang, "Move the selected row") }
+                        KbRow { keys: "Enter",   desc: t(lang, "Open the comparison for the selected row, if available") }
+                    }
+                }
+                div { class: "kb-section",
                     h3 { {t(lang, "Tabs")} }
                     div { class: "kb-table",
                         KbRow { keys: "Ctrl + Tab / Ctrl + PageDown",         desc: t(lang, "Next tab, from anywhere (wraps, includes Explorer)") }

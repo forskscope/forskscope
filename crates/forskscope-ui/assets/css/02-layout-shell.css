@@ -114,9 +114,17 @@ select option { background: var(--surface); color: var(--text); }
   padding: .35rem .5rem .35rem .6rem; user-select: none;
   display: flex; align-items: center; gap: .25rem;
 }
-.tab-close { padding: .15rem .35rem; font-size: 14px; opacity: 0; border-radius: 4px; transition: opacity .1s; flex-shrink: 0; }
-.tab-slot:hover .tab-close, .tab-slot:has(.tab.active) .tab-close { opacity: .6; }
-.tab-slot:hover .tab-close:hover { opacity: 1; background: var(--danger-bg); }
+/* RFC-097 stage 3 §3: full strength on every tab, always - revealed by
+   state (there is none to reveal by here; it's simply always relevant),
+   never by pointer. The hover/active-only opacity this used to carry is
+   gone; only the hover background (below) still changes on hover. */
+/* RFC-097 stage 3 §5: measured at 22px wide (live capture, 100%,
+   1000x700) - under the 24px floor by 2px now that it's shown at full
+   strength on every tab, not just a hover-only nicety. `.35rem` ->
+   `.45rem` horizontal padding clears it (measured 25px after, same
+   method). */
+.tab-close { padding: .15rem .45rem; font-size: 14px; border-radius: 4px; flex-shrink: 0; }
+.tab-close:hover { background: var(--danger-bg); }
 .dirty-dot { color: var(--warn); font-size: 10px; line-height: 1; }
 .tab-loading-spinner { display: inline-block; font-size: 10px; animation: spin 1.2s linear infinite; }
 

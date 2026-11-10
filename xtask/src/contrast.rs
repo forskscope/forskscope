@@ -155,6 +155,10 @@ const PAIRS: &[Pair] = &[
     // entries aren't check-4-required; hand-added because WCAG 1.4.11
     // still applies to it.
     Pair { label: "the selected-row indicator (box-shadow)", fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: CONTROL_MIN },
+    // RFC-097 stage 3 §3: Deep Compare's selected row carries the same
+    // indicator, over the same background - same reasoning as the
+    // Explorer's own entry just above, not re-derived.
+    Pair { label: "the Deep Compare selected-row indicator (box-shadow)", fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: CONTROL_MIN },
     // `.filter-toggle[aria-pressed="true"]`/`.path-bar.pane-focused`: 12%/
     // 10% put --accent's own text below 4.5:1 (4.41/4.32 dark/light;
     // 4.46 light) - both now 8% (review 196 §3).
@@ -376,28 +380,6 @@ const OPACITY_ALLOWLIST: &[Allowed] = &[
     Allowed {
         selector: ".search-nav:disabled",
         reason: "disabled",
-    },
-    Allowed {
-        selector: ".tab-close",
-        reason: "hover-revealed control: invisible until hover/active, RFC-097 stage 3 \
-                 removes this interaction pattern rather than fixing its resting contrast",
-    },
-    Allowed {
-        selector: ".tab-slot:hover .tab-close, .tab-slot:has(.tab.active) .tab-close",
-        reason: "hover-revealed control, RFC-097 stage 3",
-    },
-    Allowed {
-        selector: ".tab-slot:hover .tab-close:hover",
-        reason: "hover-revealed control, RFC-097 stage 3",
-    },
-    Allowed {
-        selector: ".deep-compare-btn",
-        reason: "hover-revealed control: dimmed at rest, full at hover, RFC-097 stage 3 \
-                 removes this interaction pattern rather than fixing its resting contrast",
-    },
-    Allowed {
-        selector: ".deep-row:hover .deep-compare-btn",
-        reason: "hover-revealed control, RFC-097 stage 3",
     },
 ];
 

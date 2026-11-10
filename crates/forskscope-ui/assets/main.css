@@ -266,9 +266,17 @@ select option { background: var(--surface); color: var(--text); }
   padding: .35rem .5rem .35rem .6rem; user-select: none;
   display: flex; align-items: center; gap: .25rem;
 }
-.tab-close { padding: .15rem .35rem; font-size: 14px; opacity: 0; border-radius: 4px; transition: opacity .1s; flex-shrink: 0; }
-.tab-slot:hover .tab-close, .tab-slot:has(.tab.active) .tab-close { opacity: .6; }
-.tab-slot:hover .tab-close:hover { opacity: 1; background: var(--danger-bg); }
+/* RFC-097 stage 3 §3: full strength on every tab, always - revealed by
+   state (there is none to reveal by here; it's simply always relevant),
+   never by pointer. The hover/active-only opacity this used to carry is
+   gone; only the hover background (below) still changes on hover. */
+/* RFC-097 stage 3 §5: measured at 22px wide (live capture, 100%,
+   1000x700) - under the 24px floor by 2px now that it's shown at full
+   strength on every tab, not just a hover-only nicety. `.35rem` ->
+   `.45rem` horizontal padding clears it (measured 25px after, same
+   method). */
+.tab-close { padding: .15rem .45rem; font-size: 14px; border-radius: 4px; flex-shrink: 0; }
+.tab-close:hover { background: var(--danger-bg); }
 .dirty-dot { color: var(--warn); font-size: 10px; line-height: 1; }
 .tab-loading-spinner { display: inline-block; font-size: 10px; animation: spin 1.2s linear infinite; }
 
@@ -400,6 +408,11 @@ select option { background: var(--surface); color: var(--text); }
 .modal .field > span:first-child { flex: 1 1 auto; min-width: 0; }
 .modal .field > select,
 .modal .field > input { flex-shrink: 0; }
+/* RFC-097 stage 3 §6: the field's own help text, visible instead of a
+   `title` tooltip - sits right under its `.field` row (its next sibling
+   in markup, never a flex child of `.field` itself, so it reads as a full
+   width line, not squeezed beside the control). */
+.field-help { margin: -.3rem 0 .5rem; font-size: 12px; color: var(--muted); }
 .modal .actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
 .modal-wide { min-width: min(540px, 90vw); }
 
@@ -721,15 +734,24 @@ code.path-display {
 
 
 /* ── Explorer footer ── */
+/* RFC-097 stage 3 §2: a column, so the status key sits on its own line
+   above the targets/Compare row and never competes with Compare for width
+   at 200% - the key may wrap to a second line there, the targets/Compare
+   row never does (F212/review 196 pattern: measured, not assumed). */
 .explorer-footer {
-  display: flex; align-items: center; gap: .5rem; padding: .4rem .6rem;
+  display: flex; flex-direction: column; gap: .2rem; padding: .4rem .6rem;
   background: var(--surface-2); border-top: 1px solid var(--border);
-  flex-shrink: 0; min-height: var(--control-h);
+  flex-shrink: 0;
 }
+.explorer-footer-main { display: flex; align-items: center; gap: .5rem; min-height: var(--control-h); }
+.explorer-status-key { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.status-key-item { white-space: nowrap; }
+.status-key-glyph { font-weight: 600; }
+.status-key-sep { color: var(--muted); }
 .targets-label { flex: 1; display: flex; align-items: center; gap: .2rem; overflow: hidden; min-width: 0; font-size: 12px; }
 .targets-pick { color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 24ch; }
 .targets-sep  { color: var(--muted); flex-shrink: 0; }
-.targets-hint { color: var(--muted); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.targets-hint { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .compare-btn { flex-shrink: 0; font-weight: 600; padding: .25rem .8rem; border-color: var(--accent); color: var(--accent); }
 .compare-btn:not(:disabled):hover { background: var(--accent); color: var(--surface); }
@@ -1221,12 +1243,23 @@ code.path-display {
 .deep-table { flex: 1; overflow: auto; min-height: calc(6 * var(--row-h)); }
 .deep-row { display: flex; align-items: center; gap: .5rem; padding: .2rem .6rem; cursor: pointer; font-size: 13px; }
 .deep-row:hover { background: var(--surface-3); }
+/* RFC-097 stage 3 §3: the Explorer's own selected-row treatment
+   (03-components.css's `.tree-row.selected`) - same tint, same leading
+   accent bar, same reasoning (review 197 §1: the tint alone measured too
+   weak a signal against a hovered row's --surface-3). */
+.deep-row.selected {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  box-shadow: inset 3px 0 0 0 var(--accent);
+}
+.deep-row:focus-visible { outline: var(--focus-ring) solid var(--focus); outline-offset: -2px; }
+.deep-cell { display: flex; align-items: center; gap: .5rem; flex: 1; min-width: 0; }
+.deep-actions { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
 .deep-path { flex: 1; font-family: ui-monospace, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* F216: font-size 11px -> 12px. The opacity (.7, revealed to 1 on hover)
-   stays - F214's exemption for a hover-revealed control; RFC-097 stage 3
-   is where this control's own future is decided, not here. */
-.deep-compare-btn { padding: .15rem .4rem; font-size: 12px; opacity: .7; border-radius: 4px; }
-.deep-row:hover .deep-compare-btn { opacity: 1; }
+/* F216: font-size 11px -> 12px. RFC-097 stage 3 §3: no longer hover-only -
+   these only render on the selected row at all (`DeepRow`'s own
+   `is_selected` gate), so there is no resting-vs-hover state left to
+   dim between. */
+.deep-compare-btn { padding: .15rem .4rem; font-size: 12px; border-radius: 4px; }
 .deep-scanning { padding: 1.5rem; text-align: center; color: var(--muted); }
 .deep-progress { color: var(--muted); }
 

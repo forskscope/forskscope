@@ -111,7 +111,7 @@ pub fn SettingsModal() -> Element {
                     span { {t(lang, "Text size")} }
                     SelectField {
                         value: cur.text_size.to_string(),
-                        title: t(lang, "Enlarges everything in ForskScope, on top of your system's text size. Diff font size (below) sets the code panes relative to it."),
+                        aria_describedby: "text-size-help",
                         options: forskscope_desktop::settings::display::TEXT_SIZE_STEPS
                             .iter()
                             .map(|s| SelectOption::new(s.to_string(), format!("{s}%")))
@@ -124,6 +124,11 @@ pub fn SettingsModal() -> Element {
                             }
                         },
                     }
+                }
+                // RFC-097 stage 3 §6: a visible line, not a `title` tooltip a
+                // sighted user who never hovers would never see (review 203).
+                p { class: "field-help", id: "text-size-help",
+                    {t(lang, "Enlarges everything in ForskScope, on top of your system's text size. Diff font size (below) sets the code panes relative to it.")}
                 }
                 div { class: "field",
                     span { {t(lang, "Theme")} }
@@ -231,12 +236,15 @@ pub fn SettingsModal() -> Element {
                         input {
                             r#type: "checkbox",
                             checked: cur.enable_binary_comparison,
-                            title: t(lang, "When off, binary files cannot be compared and are shown as non-actionable in the Explorer."),
+                            aria_describedby: "binary-cmp-help",
                             onchange: move |e| {
                                 store.settings.write().enable_binary_comparison = e.checked();
                                 super::persist(store);
                             }
                         }
+                    }
+                    p { class: "field-help", id: "binary-cmp-help",
+                        {t(lang, "When off, binary files cannot be compared and are shown as non-actionable in the Explorer.")}
                     }
                     div { class: "field",
                         span { {t(lang, "Explorer layout")} }
@@ -262,7 +270,7 @@ pub fn SettingsModal() -> Element {
                         input {
                             r#type: "checkbox",
                             checked: cur.remember_explorer_dirs,
-                            title: t(lang, "When on, the Explorer reopens the last directory shown in each pane. When off, it always starts at your home directory."),
+                            aria_describedby: "remember-dirs-help",
                             onchange: move |e| {
                                 let on = e.checked();
                                 {
@@ -278,6 +286,9 @@ pub fn SettingsModal() -> Element {
                                 super::persist(store);
                             }
                         }
+                    }
+                    p { class: "field-help", id: "remember-dirs-help",
+                        {t(lang, "When on, the Explorer reopens the last directory shown in each pane. When off, it always starts at your home directory.")}
                     }
                     div { class: "field",
                         span { {t(lang, "Context lines")} }
@@ -345,19 +356,22 @@ pub fn SettingsModal() -> Element {
                     // F149: hidden entries are shown by default; this hides them —
                     // in the Explorer tree and in every comparison that reads a
                     // directory (recursive compare, Deep Compare, RFC-080 tier 1),
-                    // not only the tree. Title text says so, per the handoff: this
-                    // is not a display-only setting.
+                    // not only the tree. The help line below says so, per the
+                    // handoff: this is not a display-only setting.
                     div { class: "field",
                         span { {t(lang, "Hide hidden files")} }
                         input {
                             r#type: "checkbox",
                             checked: cur.hide_dotfiles,
-                            title: t(lang, "Also excludes hidden files and folders from comparisons — recursive compare, Deep Compare, and the Explorer's quick folder check. Off by default, so .gitignore, .env, and similar files are included."),
+                            aria_describedby: "hide-dotfiles-help",
                             onchange: move |e| {
                                 store.settings.write().hide_dotfiles = e.checked();
                                 super::persist(store);
                             }
                         }
+                    }
+                    p { class: "field-help", id: "hide-dotfiles-help",
+                        {t(lang, "Also excludes hidden files and folders from comparisons — recursive compare, Deep Compare, and the Explorer's quick folder check. Off by default, so .gitignore, .env, and similar files are included.")}
                     }
 
                     // ── Compare profiles (RFC-087 §3: a radio group) ───────────
@@ -506,6 +520,55 @@ mod tests {
         assert!(
             values.iter().any(|v| v.contains("125")),
             "the Text size select's value must reflect text_size=125, got {values:?}"
+        );
+    }
+
+    /// RFC-097 stage 3 §6: the *Text size* help sentence is a visible line
+    /// linked by `aria-describedby`, not a `title` tooltip - checked
+    /// end-to-end (the `<select>`'s own attribute, the id it points at, and
+    /// that the `<p>` carrying that id is actually rendered with the help
+    /// text), not just that neither attribute is literally named `title`
+    /// somewhere in the file. Falsify by reverting `SelectField`'s
+    /// `aria_describedby` back to `title`: the first assertion then fails
+    /// (no `aria-describedby` attribute at all).
+    #[test]
+    fn the_text_size_help_is_linked_not_only_a_tooltip() {
+        fn root() -> Element {
+            use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+            rsx! { SettingsModal {} }
+        }
+
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+
+        let describedby: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "aria-describedby",
+                    value,
+                    ..
+                } => Some(format!("{value:?}")),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            describedby.iter().any(|v| v.contains("text-size-help")),
+            "the Text size select must carry aria-describedby=\"text-size-help\", got {describedby:?}"
+        );
+
+        let texts: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            texts.iter().any(|t| t.starts_with("Enlarges everything in ForskScope")),
+            "the linked help text itself must actually be rendered, got {texts:?}"
         );
     }
 }

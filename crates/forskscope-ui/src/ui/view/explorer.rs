@@ -34,8 +34,8 @@ use crate::ui::view::dir_pane::{
     FilteringExecutor, NavHistory, PathBar, SharedIgnoreRules, home_dir, navigate_to, short_name,
 };
 use forskscope_ui_logic::{
-    DirVerdict, EntryClassification, FlatRow, Tier1Action, Tier1Trigger, Tier2Verdict,
-    classify_two_files, dir_verdict, mirror_target, tier2_verdict,
+    AlignedRow, DirVerdict, EntryClassification, FlatRow, RowData, RowStatusKind, Tier1Action,
+    Tier1Trigger, Tier2Verdict, classify_two_files, dir_verdict, mirror_target, tier2_verdict,
 };
 
 use filter::{FilterBar, rows_for_layout};
@@ -256,6 +256,80 @@ pub fn row_evidence(
         }
         other => other,
     }
+}
+
+/// RFC-097 stage 3 §2: the distinct status kinds shown by any visible row in
+/// either pane right now, each paired with the `is_dir` of the row it was
+/// first seen on (`status_kind_label`'s wording differs by `is_dir` for
+/// `MetadataMatch` — RFC-080 §4 — so the key must carry one to reuse the
+/// row's own words, never a paraphrase). Computed from the same live
+/// `digest_map`/`tier1_map` every row's own badge renders from, so the key
+/// updates exactly when the rows do — it is not cached separately.
+/// Deliberately ignores a cached binary-blocked flag and re-sniffs instead
+/// (`file_kind::classify`): a row rendering the "bin" badge shows no status
+/// glyph, and the key must not either, regardless of whether `binary_cache`
+/// happened to be warm yet for that path.
+pub fn visible_status_kinds(
+    rows: &[AlignedRow],
+    digest_map: &HashMap<DigestKey, EqualityEvidence>,
+    tier1: &Tier1Map,
+    binary_enabled: bool,
+    l_root: &Path,
+    r_root: &Path,
+) -> Vec<(RowStatusKind, bool)> {
+    fn note(
+        seen: &mut Vec<(RowStatusKind, bool)>,
+        row: &RowData,
+        base: Option<EqualityEvidence>,
+        tier1: &Tier1Map,
+        binary_enabled: bool,
+        l_root: &Path,
+        r_root: &Path,
+    ) {
+        if !row.is_dir && !binary_enabled {
+            let is_binary = matches!(
+                forskscope_compare::file_kind::classify(&row.abs_path),
+                Ok(forskscope_compare::file_kind::FileKind::Binary)
+            );
+            if is_binary {
+                return;
+            }
+        }
+        let evidence = row_evidence(base, tier1, l_root, r_root, &row.rel_path);
+        if let Some(kind) = evidence.as_ref().map(RowStatusKind::from_evidence)
+            && !seen.iter().any(|(k, _)| *k == kind)
+        {
+            seen.push((kind, row.is_dir));
+        }
+    }
+
+    let mut seen = Vec::new();
+    for (left, right) in rows {
+        if let Some(row) = left {
+            let base = digest_map
+                .get(&DigestKey::Common(row.rel_path.clone()))
+                .cloned();
+            note(&mut seen, row, base, tier1, binary_enabled, l_root, r_root);
+        }
+        if let Some(row) = right {
+            let common = digest_map
+                .get(&DigestKey::Common(row.rel_path.clone()))
+                .cloned();
+            let right_only = digest_map
+                .get(&DigestKey::RightOnly(row.rel_path.clone()))
+                .cloned();
+            note(
+                &mut seen,
+                row,
+                common.or(right_only),
+                tier1,
+                binary_enabled,
+                l_root,
+                r_root,
+            );
+        }
+    }
+    seen
 }
 
 /// The directory row a tier-1 walk would be started for: the first selected
@@ -1134,6 +1208,14 @@ pub fn Explorer() -> Element {
         &digest_map.read(),
         &mut binary_cache,
     );
+    let status_key = visible_status_kinds(
+        &rows,
+        &digest_map.read(),
+        &tier1_map.read(),
+        binary_enabled,
+        &l_root_snap,
+        &r_root_snap,
+    );
 
     rsx! {
         div { class: "explorer",
@@ -1184,7 +1266,7 @@ pub fn Explorer() -> Element {
                 }
 
                 // ── Footer ────────────────────────────────────────────────
-                ExplorerFooter { lang, left_pick, right_pick }
+                ExplorerFooter { lang, left_pick, right_pick, status_key }
 
                 // A tier-1 result is announced, not silently swapped in (RFC-080
                 // §6). The app's only other polite region is the toast, which is
@@ -1935,4 +2017,148 @@ mod tests {
     // no direct unit test either) - their pure decisions
     // (`tier2_dir_evidence`, `tier2_dir_outcome`) are tested above instead,
     // and the dispatch itself is checked in the real app (review request).
+
+    // ── visible_status_kinds (RFC-097 stage 3 §2) ─────────────────────────────
+
+    fn row(rel: &str, is_dir: bool) -> RowData {
+        RowData {
+            abs_path: std::path::PathBuf::from("/does/not/exist").join(rel),
+            rel_path: std::path::PathBuf::from(rel),
+            is_dir,
+            is_expanded: false,
+            is_selected: false,
+            depth: 0,
+        }
+    }
+
+    // Falsify by changing the dedup check from `!seen.iter().any(...)` to
+    // always pushing: this then fails on the duplicate `Equal` row (confirmed;
+    // restored).
+    #[test]
+    fn each_distinct_kind_is_listed_once_in_first_seen_order() {
+        let l_root = std::path::PathBuf::from("/l");
+        let r_root = std::path::PathBuf::from("/r");
+        let mut digest_map = HashMap::new();
+        digest_map.insert(
+            DigestKey::Common(std::path::PathBuf::from("a.txt")),
+            EqualityEvidence::DigestEqual,
+        );
+        digest_map.insert(
+            DigestKey::Common(std::path::PathBuf::from("b.txt")),
+            EqualityEvidence::DigestDifferent,
+        );
+        digest_map.insert(
+            DigestKey::Common(std::path::PathBuf::from("c.txt")),
+            EqualityEvidence::DigestEqual, // same kind as a.txt - must not repeat
+        );
+        digest_map.insert(
+            DigestKey::RightOnly(std::path::PathBuf::from("d.txt")),
+            EqualityEvidence::RightOnly,
+        );
+        let rows: Vec<AlignedRow> = vec![
+            (Some(row("a.txt", false)), None),
+            (Some(row("b.txt", false)), None),
+            (Some(row("c.txt", false)), None),
+            (None, Some(row("d.txt", false))),
+        ];
+
+        let kinds = visible_status_kinds(
+            &rows,
+            &digest_map,
+            &Tier1Map::new(),
+            /* binary_enabled */ true,
+            &l_root,
+            &r_root,
+        );
+
+        assert_eq!(
+            kinds,
+            vec![
+                (RowStatusKind::Equal, false),
+                (RowStatusKind::Different, false),
+                (RowStatusKind::RightOnly, false),
+            ],
+            "the repeated Equal (c.txt) must not add a second entry, and \
+             order must follow first appearance"
+        );
+    }
+
+    // Falsify by dropping the `!row.is_dir && !binary_enabled` guard's
+    // `classify` check (always `false`): the blocked file then wrongly
+    // appears in the key (confirmed; restored).
+    #[test]
+    fn a_binary_blocked_file_contributes_no_entry() {
+        let base = temp_dir("status-key-binary-blocked");
+        let path = base.join("bin.dat");
+        // A NUL byte is enough for `file_kind::classify` to call this binary.
+        std::fs::write(&path, [0u8, 1, 2, 3]).unwrap();
+
+        let mut digest_map = HashMap::new();
+        digest_map.insert(
+            DigestKey::Common(std::path::PathBuf::from("bin.dat")),
+            EqualityEvidence::DigestDifferent,
+        );
+        let rows: Vec<AlignedRow> = vec![(
+            Some(RowData {
+                abs_path: path.clone(),
+                rel_path: std::path::PathBuf::from("bin.dat"),
+                is_dir: false,
+                is_expanded: false,
+                is_selected: false,
+                depth: 0,
+            }),
+            None,
+        )];
+
+        let blocked = visible_status_kinds(
+            &rows,
+            &digest_map,
+            &Tier1Map::new(),
+            /* binary_enabled */ false,
+            &base,
+            &base,
+        );
+        assert_eq!(
+            blocked,
+            Vec::new(),
+            "a row rendering the \"bin\" badge must contribute no status glyph"
+        );
+
+        let allowed = visible_status_kinds(
+            &rows,
+            &digest_map,
+            &Tier1Map::new(),
+            /* binary_enabled */ true,
+            &base,
+            &base,
+        );
+        assert_eq!(
+            allowed,
+            vec![(RowStatusKind::Different, false)],
+            "once binary comparison is enabled, the same row's status is shown"
+        );
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    // Falsify by hard-coding `is_dir: false` when pushing into `seen`: the
+    // directory's `MetadataMatch` row then reads with the file-form wording
+    // ("Size matches…") instead of the directory-form one — this surfaces
+    // in `footer.rs`, not here, but the `bool` this test checks is exactly
+    // what that wording is chosen from (confirmed; restored).
+    #[test]
+    fn metadata_match_keeps_the_is_dir_it_was_first_seen_on() {
+        let l_root = std::path::PathBuf::from("/l");
+        let r_root = std::path::PathBuf::from("/r");
+        let mut digest_map = HashMap::new();
+        digest_map.insert(
+            DigestKey::Common(std::path::PathBuf::from("sub")),
+            EqualityEvidence::MetadataMatch,
+        );
+        let rows: Vec<AlignedRow> = vec![(Some(row("sub", true)), None)];
+
+        let kinds = visible_status_kinds(&rows, &digest_map, &Tier1Map::new(), true, &l_root, &r_root);
+
+        assert_eq!(kinds, vec![(RowStatusKind::MetadataMatch, true)]);
+    }
 }

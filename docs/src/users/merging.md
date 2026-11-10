@@ -36,7 +36,7 @@ Clicking it copies the left-side content into the right-side result buffer for t
 | Action | Shortcut |
 |--------|----------|
 | Undo last apply | **Ctrl+Z** or the **Undo** button |
-| Redo (re-apply undone) | **Ctrl+Y** or the **Redo** button (in More ▼) |
+| Redo (re-apply undone) | **Ctrl+Y** or the **Redo** button, next to **Undo** |
 
 Undo restores the result buffer exactly to its state before the last apply. Redo re-applies it. The undo/redo stack persists for the entire session until you close the tab or reload.
 

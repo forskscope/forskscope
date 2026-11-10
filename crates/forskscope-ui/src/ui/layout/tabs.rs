@@ -70,7 +70,8 @@ pub fn TabBar() -> Element {
             }
             button {
                 onclick: move |_| store.modal.set(Modal::KeyboardRef),
-                title: t(lang, "Keyboard shortcuts (Ctrl+/)"), "?"
+                aria_label: t(lang, "Keyboard shortcuts (Ctrl+/)"),
+                "? " {t(lang, "Shortcuts")}
             }
         }
     }
@@ -374,6 +375,55 @@ mod tests {
         assert!(
             labels.iter().any(|v| v.contains("unsaved")),
             "a dirty tab's accessible name must say it is unsaved, got {labels:?}"
+        );
+    }
+
+    /// RFC-097 stage 3 §1: the tab bar's "?" gains visible "Shortcuts" text
+    /// while keeping "Keyboard shortcuts (Ctrl+/)" as its accessible name
+    /// (unchanged from before this handoff - no separate "Shortcuts"-only
+    /// aria_label was introduced). Falsify by removing the explicit
+    /// `aria_label` now that the button's text content changed: the
+    /// assertion then fails (nothing names "Keyboard shortcuts (Ctrl+/)"
+    /// anymore - the accessible name would silently become "? Shortcuts",
+    /// the visible text, instead).
+    #[test]
+    fn the_shortcuts_button_keeps_its_existing_accessible_name() {
+        fn root() -> Element {
+            use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+            rsx! { TabBar {} }
+        }
+
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+
+        let labels: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "aria-label",
+                    value,
+                    ..
+                } => Some(format!("{value:?}")),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            labels.iter().any(|l| l.contains("Keyboard shortcuts (Ctrl+/)")),
+            "got {labels:?}"
+        );
+
+        let texts: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            texts.iter().any(|t| t.contains("Shortcuts")),
+            "the button must show the word \"Shortcuts\", got {texts:?}"
         );
     }
 }

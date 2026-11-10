@@ -49,12 +49,14 @@ pub fn SelectField(
     #[props(default)] title: Option<String>,
     #[props(default)] id: Option<String>,
     #[props(default)] aria_label: Option<String>,
+    #[props(default)] aria_describedby: Option<String>,
 ) -> Element {
     rsx! {
         select {
             title,
             id,
             aria_label,
+            aria_describedby,
             value: "{value}",
             onchange: move |e| onchange.call(e.value()),
             for opt in options {
