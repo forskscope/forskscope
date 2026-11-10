@@ -229,8 +229,16 @@ select option { background: var(--surface); color: var(--text); }
 /* RFC-089: Settings/? sit at the bar's own bottom edge, level with the
    tabs, not stretched to the bar's full height (flex's default
    align-items: stretch). A little breathing room under them keeps them
-   off the border the tabs themselves touch. */
-.tabbar > button { margin-bottom: .3rem; }
+   off the border the tabs themselves touch.
+   Review 208 §3: RFC-097 stage 3 gave the "?" button a second word
+   ("Shortcuts") - at 200% text size the button's own width shrank below
+   its two-word content's natural width, and the default `button { ... }`
+   rule (02-layout-shell.css) carries no `white-space`, so "Shortcuts"
+   wrapped onto its own line, taller than *Settings* beside it.
+   `white-space: nowrap` keeps both buttons one line each; `.tabbar`'s own
+   `max-height: 3rem` already bounds the row, so a button that can't fit
+   its text at some width still clips rather than growing the bar. */
+.tabbar > button { margin-bottom: .3rem; white-space: nowrap; }
 /* The `role="tablist"` element itself (RFC-087): the actual flex row the
    tab slots sit in. A plain div has no layout of its own, so without this
    the tablist wrapper rendered as a block box and every `.tab-slot` inside
@@ -315,11 +323,53 @@ select option { background: var(--surface); color: var(--text); }
    - .mode-indicator/.local-only: whole, or not at all (below) - fixed
      labels, not data; .local-only hides first, .mode-indicator only once
      that alone isn't enough. */
+/* F220 (review 208 §2): no sizing property lives on this catch-all that
+   `.pair`/`.save-target` also need their own value for, on purpose.
+   `.statusbar > span:not(.spacer)` and `.statusbar .pair`/`.statusbar
+   .save-target` both match `.pair`/`.save-target`, and `:not(.spacer)`
+   carries its argument's own specificity - a class - so this selector's
+   specificity (2 classes, 1 element) is HIGHER than `.statusbar .pair`'s
+   (2 classes, 0 elements) despite reading as the more "general" rule. A
+   `flex-shrink: 0` here silently overrode `.pair`'s `100` and
+   `.save-target`'s `10` below - both sat at the browser's own flex
+   default (`1`) in practice, firm enough that neither ever actually
+   shrank or ellipsized, and the 520px/450px thresholds two rules down
+   were tuned against that bug rather than against the truncation they
+   were meant to measure (review 208 found this from a live 200% capture;
+   review 205 missed it, reasoning about intended behaviour rather than
+   the resolved cascade).
+
+   F221, a second instance of the same bug, found live while measuring
+   the first fix: this rule's `min-width: 0` has the identical
+   specificity edge over `.statusbar .pair, .statusbar .save-target`'s
+   own `min-width`, so a floor given there (first tried as `4ch`, then
+   `8ch`) rendered as if it were under 1ch regardless of the value - only
+   an `!important` override (a throwaway debug rule, never shipped) broke
+   the tie and showed the floor actually working, which is what exposed
+   the cascade as the real cause rather than the `ch` unit or the flex
+   maths. Fixed the same way as `flex-shrink`: by giving `min-width: 0`
+   to each "whole, or not at all" item **by name** instead of by this
+   catch-all, so there is no specificity race left on *any* property for
+   a future edit to lose - not just the one review 208 happened to find. */
 .statusbar > span:not(.spacer) {
-  white-space: nowrap; overflow: hidden; min-width: 0; flex-shrink: 0;
+  white-space: nowrap; overflow: hidden;
 }
+/* F221: `min-width: 8ch`, not `0`. With the cascade bug above also fixed
+   for this property, `.pair`'s flex-shrink: 100 still so outweighs
+   `.save-target`'s 10 that with a long enough name and a narrow enough
+   window, `.pair` shrank to a bare 0px - not cut text, not an ellipsis,
+   simply gone, with `.save-target` sitting there alone. A floor keeps a
+   few characters plus the ellipsis on screen instead, satisfying "the
+   pair, then the save target, ellipsized when needed" literally - if
+   the window is narrower than even this floor allows, `.statusbar`'s own
+   `overflow: hidden` is still the last-resort clip, same as any other
+   item this rule set doesn't shrink or hide cleanly. Measured live
+   (800x560 at 200%, effective ~400px, the long-name fixture, both file
+   comparison and mergetool mode): clearly legible, several characters
+   plus `…`, with `.save-target` still showing its own shortened form
+   alongside it. */
 .statusbar .pair, .statusbar .save-target {
-  text-overflow: ellipsis; min-width: 0;
+  text-overflow: ellipsis; min-width: 8ch;
 }
 /* The file-pair label: a much larger flex-shrink factor than .save-target,
    so in practice it absorbs nearly all of the squeeze on its own first -
@@ -327,11 +377,12 @@ select option { background: var(--surface); color: var(--text); }
    up any of its own width. */
 .statusbar .pair { flex-grow: 1; flex-shrink: 100; }
 .statusbar .save-target { flex-shrink: 10; color: var(--muted); }
-.statusbar .dirty { color: var(--warn); }
-.statusbar .stats { color: var(--ok); font-size: 12px; }
-.statusbar .save-target-no-backup { color: var(--warn); cursor: default; }
-.local-only { cursor: default; user-select: none; }
-.mode-indicator { cursor: default; user-select: none; }
+.statusbar .enc { flex-shrink: 0; }
+.statusbar .dirty { color: var(--warn); flex-shrink: 0; }
+.statusbar .stats { color: var(--ok); font-size: 12px; flex-shrink: 0; }
+.statusbar .save-target-no-backup { color: var(--warn); cursor: default; flex-shrink: 0; }
+.local-only { cursor: default; user-select: none; flex-shrink: 0; }
+.mode-indicator { cursor: default; user-select: none; flex-shrink: 0; }
 
 /* Review 204 §2.2: "whole, or not at all" - visually hidden exactly like
    .sr-only (never display:none/visibility:hidden, which would also drop
