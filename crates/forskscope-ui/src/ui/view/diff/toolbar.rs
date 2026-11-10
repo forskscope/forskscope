@@ -359,7 +359,9 @@ mod tests {
             })
             .collect();
         assert!(
-            labels.iter().any(|l| l.contains("Search within diff (Ctrl+F)")),
+            labels
+                .iter()
+                .any(|l| l.contains("Search within diff (Ctrl+F)")),
             "got {labels:?}"
         );
         assert!(

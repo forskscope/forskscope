@@ -2157,7 +2157,8 @@ mod tests {
         );
         let rows: Vec<AlignedRow> = vec![(Some(row("sub", true)), None)];
 
-        let kinds = visible_status_kinds(&rows, &digest_map, &Tier1Map::new(), true, &l_root, &r_root);
+        let kinds =
+            visible_status_kinds(&rows, &digest_map, &Tier1Map::new(), true, &l_root, &r_root);
 
         assert_eq!(kinds, vec![(RowStatusKind::MetadataMatch, true)]);
     }

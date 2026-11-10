@@ -409,7 +409,9 @@ mod tests {
             })
             .collect();
         assert!(
-            labels.iter().any(|l| l.contains("Keyboard shortcuts (Ctrl+/)")),
+            labels
+                .iter()
+                .any(|l| l.contains("Keyboard shortcuts (Ctrl+/)")),
             "got {labels:?}"
         );
 

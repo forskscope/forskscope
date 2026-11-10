@@ -549,7 +549,11 @@ fn DeepRow(
     // `title` kept for the mouse tooltip.
     let label = status_label(entry.status, in_progress, lang);
     let is_selected = selected.read().as_deref() == Some(entry.rel_path.as_path());
-    let row_class = if is_selected { "deep-row selected" } else { "deep-row" };
+    let row_class = if is_selected {
+        "deep-row selected"
+    } else {
+        "deep-row"
+    };
     // RFC-097 stage 3 §3: "the selected row is announced with its path and
     // status" - an explicit row-level `aria_label` rather than letting the
     // row's accessible name fall out of its children's text (which would
@@ -1447,7 +1451,9 @@ mod tests {
             "an unselected row must show no actions, got {texts:?}"
         );
         assert!(
-            !texts.iter().any(|t| t == "Copy to right" || t == "Copy to left"),
+            !texts
+                .iter()
+                .any(|t| t == "Copy to right" || t == "Copy to left"),
             "an unselected row must show no copy actions, got {texts:?}"
         );
         assert!(
@@ -1485,7 +1491,9 @@ mod tests {
             "the selected row must show Copy to left, got {texts:?}"
         );
         assert!(
-            attrs.iter().any(|(n, v)| n == "tabindex" && v.contains('0') && !v.contains("-1")),
+            attrs
+                .iter()
+                .any(|(n, v)| n == "tabindex" && v.contains('0') && !v.contains("-1")),
             "the selected row must be the one Tab stop, got {attrs:?}"
         );
         assert!(
@@ -1495,9 +1503,9 @@ mod tests {
             "the selected row must carry aria-selected=true, got {attrs:?}"
         );
         assert!(
-            attrs.iter().any(|(n, v)|
-                n == "aria-label" && v.contains("sub/changed.txt") && v.contains("Different")
-            ),
+            attrs.iter().any(|(n, v)| n == "aria-label"
+                && v.contains("sub/changed.txt")
+                && v.contains("Different")),
             "the selected row's own label must carry its path and status, got {attrs:?}"
         );
     }

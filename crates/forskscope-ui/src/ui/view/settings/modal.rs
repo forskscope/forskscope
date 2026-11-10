@@ -567,7 +567,9 @@ mod tests {
             })
             .collect();
         assert!(
-            texts.iter().any(|t| t.starts_with("Enlarges everything in ForskScope")),
+            texts
+                .iter()
+                .any(|t| t.starts_with("Enlarges everything in ForskScope")),
             "the linked help text itself must actually be rendered, got {texts:?}"
         );
     }

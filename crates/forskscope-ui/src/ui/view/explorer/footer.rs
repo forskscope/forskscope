@@ -144,7 +144,9 @@ mod tests {
         let mut vdom = VirtualDom::new_with_props(root, Vec::new());
         let mutations = vdom.rebuild_to_vec();
         assert!(
-            !texts(&mutations).iter().any(|t| t == "Different" || t == "Identical — contents compared"),
+            !texts(&mutations)
+                .iter()
+                .any(|t| t == "Different" || t == "Identical — contents compared"),
             "an empty status_key must render no row label"
         );
     }
@@ -165,10 +167,7 @@ mod tests {
         );
         let mutations = vdom.rebuild_to_vec();
         let all_text = texts(&mutations).join(" | ");
-        assert!(
-            all_text.contains("Different"),
-            "got {all_text:?}"
-        );
+        assert!(all_text.contains("Different"), "got {all_text:?}");
         assert!(
             all_text.contains("Names and sizes match; contents not compared"),
             "a dir-form MetadataMatch must use the dir wording, got {all_text:?}"
