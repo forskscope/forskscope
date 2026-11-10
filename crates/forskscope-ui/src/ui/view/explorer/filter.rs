@@ -139,7 +139,16 @@ fn entry_name_matches(rel: &Path, query: &str) -> bool {
 }
 
 /// Entry: whether the file at `path` is binary, cached per path.
-fn is_binary_cached(path: &PathBuf, binary_cache: &mut Signal<HashMap<PathBuf, bool>>) -> bool {
+///
+/// `pub(crate)`: also the status key's own binary check
+/// (`explorer.rs::visible_status_kinds`), which must read this exact
+/// cache - not re-sniff on its own - so a row and the key it is counted
+/// in never disagree about whether that row even shows a status glyph
+/// (review 207 §1).
+pub(crate) fn is_binary_cached(
+    path: &PathBuf,
+    binary_cache: &mut Signal<HashMap<PathBuf, bool>>,
+) -> bool {
     let cached = binary_cache.read().get(path).copied();
     cached.unwrap_or_else(|| {
         let b = matches!(

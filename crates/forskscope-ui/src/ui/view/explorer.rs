@@ -265,43 +265,39 @@ pub fn row_evidence(
 /// row's own words, never a paraphrase). Computed from the same live
 /// `digest_map`/`tier1_map` every row's own badge renders from, so the key
 /// updates exactly when the rows do — it is not cached separately.
-/// Deliberately ignores a cached binary-blocked flag and re-sniffs instead
-/// (`file_kind::classify`): a row rendering the "bin" badge shows no status
-/// glyph, and the key must not either, regardless of whether `binary_cache`
-/// happened to be warm yet for that path.
+///
+/// Review 207 §1: the binary check goes through `filter::is_binary_cached`
+/// — the exact function and cache every row's own `bin` badge already
+/// reads through — rather than a direct `file_kind::classify` of its own.
+/// The earlier version re-sniffed every visible file on every Explorer
+/// render (an `fs::metadata` plus a read, on the UI thread, per row, per
+/// render); reading the shared cache instead means a file is read at most
+/// once, ever, and the key can never disagree with the row it is counted
+/// from about whether that row even shows a status glyph.
 pub fn visible_status_kinds(
     rows: &[AlignedRow],
     digest_map: &HashMap<DigestKey, EqualityEvidence>,
     tier1: &Tier1Map,
     binary_enabled: bool,
+    mut binary_cache: Signal<HashMap<PathBuf, bool>>,
     l_root: &Path,
     r_root: &Path,
 ) -> Vec<(RowStatusKind, bool)> {
-    fn note(
-        seen: &mut Vec<(RowStatusKind, bool)>,
-        row: &RowData,
-        base: Option<EqualityEvidence>,
-        tier1: &Tier1Map,
-        binary_enabled: bool,
-        l_root: &Path,
-        r_root: &Path,
-    ) {
-        if !row.is_dir && !binary_enabled {
-            let is_binary = matches!(
-                forskscope_compare::file_kind::classify(&row.abs_path),
-                Ok(forskscope_compare::file_kind::FileKind::Binary)
-            );
-            if is_binary {
+    let mut note =
+        |seen: &mut Vec<(RowStatusKind, bool)>, row: &RowData, base: Option<EqualityEvidence>| {
+            if !row.is_dir
+                && !binary_enabled
+                && filter::is_binary_cached(&row.abs_path, &mut binary_cache)
+            {
                 return;
             }
-        }
-        let evidence = row_evidence(base, tier1, l_root, r_root, &row.rel_path);
-        if let Some(kind) = evidence.as_ref().map(RowStatusKind::from_evidence)
-            && !seen.iter().any(|(k, _)| *k == kind)
-        {
-            seen.push((kind, row.is_dir));
-        }
-    }
+            let evidence = row_evidence(base, tier1, l_root, r_root, &row.rel_path);
+            if let Some(kind) = evidence.as_ref().map(RowStatusKind::from_evidence)
+                && !seen.iter().any(|(k, _)| *k == kind)
+            {
+                seen.push((kind, row.is_dir));
+            }
+        };
 
     let mut seen = Vec::new();
     for (left, right) in rows {
@@ -309,7 +305,7 @@ pub fn visible_status_kinds(
             let base = digest_map
                 .get(&DigestKey::Common(row.rel_path.clone()))
                 .cloned();
-            note(&mut seen, row, base, tier1, binary_enabled, l_root, r_root);
+            note(&mut seen, row, base);
         }
         if let Some(row) = right {
             let common = digest_map
@@ -318,15 +314,7 @@ pub fn visible_status_kinds(
             let right_only = digest_map
                 .get(&DigestKey::RightOnly(row.rel_path.clone()))
                 .cloned();
-            note(
-                &mut seen,
-                row,
-                common.or(right_only),
-                tier1,
-                binary_enabled,
-                l_root,
-                r_root,
-            );
+            note(&mut seen, row, common.or(right_only));
         }
     }
     seen
@@ -1213,6 +1201,7 @@ pub fn Explorer() -> Element {
         &digest_map.read(),
         &tier1_map.read(),
         binary_enabled,
+        binary_cache,
         &l_root_snap,
         &r_root_snap,
     );
@@ -2031,114 +2020,197 @@ mod tests {
         }
     }
 
+    /// A fresh, empty `binary_cache` signal - every `visible_status_kinds`
+    /// test needs one, and review 207 §1's fix means that can no longer be
+    /// a plain function parameter the caller skips past; it needs a live
+    /// scope to construct (`use_signal`), hence `with_test_store`.
+    fn empty_binary_cache() -> Signal<HashMap<PathBuf, bool>> {
+        Signal::new_in_scope(HashMap::new(), ScopeId::ROOT)
+    }
+
     // Falsify by changing the dedup check from `!seen.iter().any(...)` to
     // always pushing: this then fails on the duplicate `Equal` row (confirmed;
     // restored).
     #[test]
     fn each_distinct_kind_is_listed_once_in_first_seen_order() {
-        let l_root = std::path::PathBuf::from("/l");
-        let r_root = std::path::PathBuf::from("/r");
-        let mut digest_map = HashMap::new();
-        digest_map.insert(
-            DigestKey::Common(std::path::PathBuf::from("a.txt")),
-            EqualityEvidence::DigestEqual,
-        );
-        digest_map.insert(
-            DigestKey::Common(std::path::PathBuf::from("b.txt")),
-            EqualityEvidence::DigestDifferent,
-        );
-        digest_map.insert(
-            DigestKey::Common(std::path::PathBuf::from("c.txt")),
-            EqualityEvidence::DigestEqual, // same kind as a.txt - must not repeat
-        );
-        digest_map.insert(
-            DigestKey::RightOnly(std::path::PathBuf::from("d.txt")),
-            EqualityEvidence::RightOnly,
-        );
-        let rows: Vec<AlignedRow> = vec![
-            (Some(row("a.txt", false)), None),
-            (Some(row("b.txt", false)), None),
-            (Some(row("c.txt", false)), None),
-            (None, Some(row("d.txt", false))),
-        ];
+        crate::state::with_test_store(|_store| {
+            let l_root = std::path::PathBuf::from("/l");
+            let r_root = std::path::PathBuf::from("/r");
+            let mut digest_map = HashMap::new();
+            digest_map.insert(
+                DigestKey::Common(std::path::PathBuf::from("a.txt")),
+                EqualityEvidence::DigestEqual,
+            );
+            digest_map.insert(
+                DigestKey::Common(std::path::PathBuf::from("b.txt")),
+                EqualityEvidence::DigestDifferent,
+            );
+            digest_map.insert(
+                DigestKey::Common(std::path::PathBuf::from("c.txt")),
+                EqualityEvidence::DigestEqual, // same kind as a.txt - must not repeat
+            );
+            digest_map.insert(
+                DigestKey::RightOnly(std::path::PathBuf::from("d.txt")),
+                EqualityEvidence::RightOnly,
+            );
+            let rows: Vec<AlignedRow> = vec![
+                (Some(row("a.txt", false)), None),
+                (Some(row("b.txt", false)), None),
+                (Some(row("c.txt", false)), None),
+                (None, Some(row("d.txt", false))),
+            ];
 
-        let kinds = visible_status_kinds(
-            &rows,
-            &digest_map,
-            &Tier1Map::new(),
-            /* binary_enabled */ true,
-            &l_root,
-            &r_root,
-        );
+            let kinds = visible_status_kinds(
+                &rows,
+                &digest_map,
+                &Tier1Map::new(),
+                /* binary_enabled */ true,
+                empty_binary_cache(),
+                &l_root,
+                &r_root,
+            );
 
-        assert_eq!(
-            kinds,
-            vec![
-                (RowStatusKind::Equal, false),
-                (RowStatusKind::Different, false),
-                (RowStatusKind::RightOnly, false),
-            ],
-            "the repeated Equal (c.txt) must not add a second entry, and \
-             order must follow first appearance"
-        );
+            assert_eq!(
+                kinds,
+                vec![
+                    (RowStatusKind::Equal, false),
+                    (RowStatusKind::Different, false),
+                    (RowStatusKind::RightOnly, false),
+                ],
+                "the repeated Equal (c.txt) must not add a second entry, and \
+                 order must follow first appearance"
+            );
+        });
     }
 
     // Falsify by dropping the `!row.is_dir && !binary_enabled` guard's
-    // `classify` check (always `false`): the blocked file then wrongly
-    // appears in the key (confirmed; restored).
+    // cache check (always `false`): the blocked file then wrongly appears
+    // in the key (confirmed; restored).
     #[test]
     fn a_binary_blocked_file_contributes_no_entry() {
-        let base = temp_dir("status-key-binary-blocked");
-        let path = base.join("bin.dat");
-        // A NUL byte is enough for `file_kind::classify` to call this binary.
-        std::fs::write(&path, [0u8, 1, 2, 3]).unwrap();
+        crate::state::with_test_store(|_store| {
+            let base = temp_dir("status-key-binary-blocked");
+            let path = base.join("bin.dat");
+            // A NUL byte is enough for `file_kind::classify` to call this binary.
+            std::fs::write(&path, [0u8, 1, 2, 3]).unwrap();
 
-        let mut digest_map = HashMap::new();
-        digest_map.insert(
-            DigestKey::Common(std::path::PathBuf::from("bin.dat")),
-            EqualityEvidence::DigestDifferent,
-        );
-        let rows: Vec<AlignedRow> = vec![(
-            Some(RowData {
-                abs_path: path.clone(),
-                rel_path: std::path::PathBuf::from("bin.dat"),
-                is_dir: false,
-                is_expanded: false,
-                is_selected: false,
-                depth: 0,
-            }),
-            None,
-        )];
+            let mut digest_map = HashMap::new();
+            digest_map.insert(
+                DigestKey::Common(std::path::PathBuf::from("bin.dat")),
+                EqualityEvidence::DigestDifferent,
+            );
+            let rows: Vec<AlignedRow> = vec![(
+                Some(RowData {
+                    abs_path: path.clone(),
+                    rel_path: std::path::PathBuf::from("bin.dat"),
+                    is_dir: false,
+                    is_expanded: false,
+                    is_selected: false,
+                    depth: 0,
+                }),
+                None,
+            )];
 
-        let blocked = visible_status_kinds(
-            &rows,
-            &digest_map,
-            &Tier1Map::new(),
-            /* binary_enabled */ false,
-            &base,
-            &base,
-        );
-        assert_eq!(
-            blocked,
-            Vec::new(),
-            "a row rendering the \"bin\" badge must contribute no status glyph"
-        );
+            let blocked = visible_status_kinds(
+                &rows,
+                &digest_map,
+                &Tier1Map::new(),
+                /* binary_enabled */ false,
+                empty_binary_cache(),
+                &base,
+                &base,
+            );
+            assert_eq!(
+                blocked,
+                Vec::new(),
+                "a row rendering the \"bin\" badge must contribute no status glyph"
+            );
 
-        let allowed = visible_status_kinds(
-            &rows,
-            &digest_map,
-            &Tier1Map::new(),
-            /* binary_enabled */ true,
-            &base,
-            &base,
-        );
-        assert_eq!(
-            allowed,
-            vec![(RowStatusKind::Different, false)],
-            "once binary comparison is enabled, the same row's status is shown"
-        );
+            let allowed = visible_status_kinds(
+                &rows,
+                &digest_map,
+                &Tier1Map::new(),
+                /* binary_enabled */ true,
+                empty_binary_cache(),
+                &base,
+                &base,
+            );
+            assert_eq!(
+                allowed,
+                vec![(RowStatusKind::Different, false)],
+                "once binary comparison is enabled, the same row's status is shown"
+            );
 
-        let _ = std::fs::remove_dir_all(&base);
+            let _ = std::fs::remove_dir_all(&base);
+        });
+    }
+
+    // Review 207 §1: the key must read the *same* cache the rows fill
+    // (`filter::is_binary_cached`), never re-sniff on its own - so a
+    // second call for the same rows reads no file. Falsify by reverting to
+    // a direct `file_kind::classify` call: deleting the file between the
+    // two calls then makes the second call's "is it binary" read fail
+    // (`classify` on a missing path returns `FileKind::Missing`, not
+    // `Binary`), wrongly un-blocking the row - this test then fails.
+    #[test]
+    fn a_binary_file_is_read_at_most_once_across_repeated_calls() {
+        crate::state::with_test_store(|_store| {
+            let base = temp_dir("status-key-binary-cached-once");
+            let path = base.join("bin.dat");
+            std::fs::write(&path, [0u8, 1, 2, 3]).unwrap();
+
+            let mut digest_map = HashMap::new();
+            digest_map.insert(
+                DigestKey::Common(std::path::PathBuf::from("bin.dat")),
+                EqualityEvidence::DigestDifferent,
+            );
+            let rows: Vec<AlignedRow> = vec![(
+                Some(RowData {
+                    abs_path: path.clone(),
+                    rel_path: std::path::PathBuf::from("bin.dat"),
+                    is_dir: false,
+                    is_expanded: false,
+                    is_selected: false,
+                    depth: 0,
+                }),
+                None,
+            )];
+            let binary_cache = empty_binary_cache();
+
+            let first = visible_status_kinds(
+                &rows,
+                &digest_map,
+                &Tier1Map::new(),
+                false,
+                binary_cache,
+                &base,
+                &base,
+            );
+            assert_eq!(first, Vec::new(), "blocked on the first call");
+
+            // The file is gone, so a fresh sniff would no longer see it as
+            // binary at all (`classify` reads `FileKind::Missing` for an
+            // absent path) - the cached answer must still be used.
+            std::fs::remove_file(&path).unwrap();
+
+            let second = visible_status_kinds(
+                &rows,
+                &digest_map,
+                &Tier1Map::new(),
+                false,
+                binary_cache,
+                &base,
+                &base,
+            );
+            assert_eq!(
+                second,
+                Vec::new(),
+                "the cached verdict must survive the file's removal - a second \
+                 call must not re-read it"
+            );
+
+            let _ = std::fs::remove_dir_all(&base);
+        });
     }
 
     // Falsify by hard-coding `is_dir: false` when pushing into `seen`: the
@@ -2148,18 +2220,27 @@ mod tests {
     // what that wording is chosen from (confirmed; restored).
     #[test]
     fn metadata_match_keeps_the_is_dir_it_was_first_seen_on() {
-        let l_root = std::path::PathBuf::from("/l");
-        let r_root = std::path::PathBuf::from("/r");
-        let mut digest_map = HashMap::new();
-        digest_map.insert(
-            DigestKey::Common(std::path::PathBuf::from("sub")),
-            EqualityEvidence::MetadataMatch,
-        );
-        let rows: Vec<AlignedRow> = vec![(Some(row("sub", true)), None)];
+        crate::state::with_test_store(|_store| {
+            let l_root = std::path::PathBuf::from("/l");
+            let r_root = std::path::PathBuf::from("/r");
+            let mut digest_map = HashMap::new();
+            digest_map.insert(
+                DigestKey::Common(std::path::PathBuf::from("sub")),
+                EqualityEvidence::MetadataMatch,
+            );
+            let rows: Vec<AlignedRow> = vec![(Some(row("sub", true)), None)];
 
-        let kinds =
-            visible_status_kinds(&rows, &digest_map, &Tier1Map::new(), true, &l_root, &r_root);
+            let kinds = visible_status_kinds(
+                &rows,
+                &digest_map,
+                &Tier1Map::new(),
+                true,
+                empty_binary_cache(),
+                &l_root,
+                &r_root,
+            );
 
-        assert_eq!(kinds, vec![(RowStatusKind::MetadataMatch, true)]);
+            assert_eq!(kinds, vec![(RowStatusKind::MetadataMatch, true)]);
+        });
     }
 }

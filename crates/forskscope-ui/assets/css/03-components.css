@@ -117,7 +117,11 @@ code.path-display {
    light) - the button's own text colour (`--text` on its `--surface-3`
    fill, via the base `button` rule) clears 4.5:1 with no help from
    opacity at all (9.4-13.1:1, measured), so both rules are simply gone. */
-.profile-delete { padding: 0 .3rem; font-size: 12px; }
+/* RFC-097 stage 3 §5 (review 207 §3): `padding: 0 .3rem` around a 12px
+   glyph measures about 17px wide - under the 24px floor. `min-width`
+   closes it by construction; height already comes from `--control-h`
+   (the base `button` rule). */
+.profile-delete { padding: 0 .3rem; font-size: 12px; min-width: 24px; }
 .add-profile-form { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-top: .25rem; }
 .profile-check { display: flex; align-items: center; gap: .2rem; font-size: 12px; color: var(--muted); cursor: pointer; }
 /* F168 §2.2: nested one level deeper than .advanced-toggle, so it reads as
@@ -139,7 +143,17 @@ code.path-display {
   padding: .3rem .6rem; background: var(--surface-2);
   border-bottom: 1px solid var(--border); font-size: 12px; min-height: 28px;
 }
-.bc-seg { background: none; border: none; color: var(--accent); cursor: pointer; padding: .1rem .2rem; border-radius: 3px; font-size: 12px; }
+/* RFC-097 stage 3 §5 (review 207 §3): 12px text with `.1rem` vertical
+   padding measures about 18px tall - under the 24px floor. `min-height`
+   closes it by construction; `display: inline-flex` + centering keeps the
+   now-taller box's text centred rather than sitting at its old, shorter
+   natural height. */
+.bc-seg {
+  background: none; border: none; color: var(--accent); cursor: pointer;
+  padding: .1rem .2rem; border-radius: 3px; font-size: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 24px;
+}
 .bc-seg:hover { background: var(--surface-3); }
 .bc-root { background: none; border: none; color: var(--muted); cursor: pointer; padding: .1rem .4rem; border-radius: 3px; font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
 .bc-root:hover { color: var(--accent); background: var(--surface-3); }
@@ -171,7 +185,12 @@ code.path-display {
 .path-btn:disabled { color: var(--muted); cursor: default; }
 .path-more-btn { margin-left: .15rem; color: var(--muted); }
 .path-segments { display: flex; align-items: center; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
-.path-segments .bc-seg { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* `min-width: 24px`, not `0`: a segment must still shrink to fit a long
+   path (F205's own reason this override exists), but never below the
+   click-target floor §5 asks for - 24px is small enough that a genuinely
+   long name still truncates well before it, and large enough that a
+   short one is never squeezed under it. */
+.path-segments .bc-seg { flex-shrink: 1; min-width: 24px; overflow: hidden; text-overflow: ellipsis; }
 .path-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--control-border); background: var(--surface); color: var(--text); border-radius: 3px; font-size: 12px; min-width: 6ch; }
 .path-input.error { border-color: var(--del-mark, #e05); }
 .path-input:focus { outline: 2px solid var(--accent); }
