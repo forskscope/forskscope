@@ -163,6 +163,19 @@ Theme gains *System*, which follows the platform's light/dark preference.
   The stage-2 handoff measures how WebKitGTK 4.1 reports it there before the
   design relies on `prefers-color-scheme`.
 
+**Decided from stage 2's measurement** (reply 184, review 210,
+2026-11-12):
+- **Windows:** the web view reports `prefers-color-scheme`, so *System*
+  is offered there.
+- **Linux:** WebKitGTK 4.1 (GTK 3) doesn't follow the desktop's dark
+  style. The app reads the **settings portal** itself
+  (`org.freedesktop.appearance`, `color-scheme`) through `gio`, which is
+  already in the build, and follows its `SettingChanged`. *System* is
+  offered only when the portal answers at start-up. This covers GNOME, KDE
+  and the Flatpak.
+- **macOS:** not offered until it is measured on real hardware. A CI runner
+  reported no change.
+
 ### 2.2 Contrast: *Standard* or *High*
 
 A third axis beside the theme and colour vision, combined with every theme
