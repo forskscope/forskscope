@@ -31,11 +31,33 @@ Changes take effect immediately. Also adjustable without opening Settings:
 
 | Value | Description |
 |-------|-------------|
-| **Dark** (default) | Dark background, light text. Suitable for low-light environments. |
-| **Light** | Light background, dark text. Matches light system themes. |
-| **Night** | Deeper blacks, higher contrast. |
+| **System** | Light or Dark, following your system's light/dark setting, and switching when it changes. |
+| **Dark** | Dark background, light text. Suitable for low-light environments. |
+| **Light** | Light background, dark text. |
+| **Night** | Deeper blacks. |
+
+*System* is offered on **Windows**, and on **Linux** desktops that provide
+the standard settings service (GNOME and KDE do, and so does the Flatpak).
+It isn't offered on macOS yet. A new install starts on *System* where it is
+offered, and on *Dark* elsewhere. A theme you have already chosen is kept.
+
+If *System* was chosen on a computer that offers it, and the same settings
+are used where it isn't (for example a portable copy), the list shows
+*System (not available here; Dark is used)*, and your choice is kept for the
+next time it is available.
 
 Changes take effect immediately.
+
+### Contrast
+
+| Value | Description |
+|-------|-------------|
+| **Standard** (default) | The usual contrast, which meets WCAG AA in every theme. |
+| **High** | Stronger contrast: secondary text and the diff's lines at 7:1 or more, field and button edges and the diff's marks at 4.5:1 or more, a thicker focus ring, and disabled buttons with a dashed edge. |
+| **System** | *High* when your system asks for more contrast, otherwise *Standard*. |
+
+Combines with every theme and colour-vision choice. Changes take effect
+immediately.
 
 ### Colour vision
 

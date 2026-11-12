@@ -128,9 +128,9 @@ const PAIRS: &[Pair] = &[
     Pair { label: "--ins-mark on --surface-2 (status text)", fg: "var(--ins-mark)", bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: None },
     Pair { label: "--ins-mark on --surface-3 (status text)", fg: "var(--ins-mark)", bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: None },
     // ── Text on a diff hunk's own row background ──
-    Pair { label: "--text on --del-bg",   fg: "var(--text)",  bg: "var(--del-bg)", assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--text on --ins-bg",   fg: "var(--text)",  bg: "var(--ins-bg)", assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--text on --rep-bg",   fg: "var(--text)",  bg: "var(--rep-bg)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--text on --del-bg",   fg: "var(--text)",  bg: "var(--del-bg)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--text on --ins-bg",   fg: "var(--text)",  bg: "var(--ins-bg)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--text on --rep-bg",   fg: "var(--text)",  bg: "var(--rep-bg)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     // `.pane-gutter`'s line numbers: --muted, overridden to --del-bg/--ins-bg
     // on a del/ins row (no rep-bg variant - a replace hunk's gutter keeps
     // the del/ins split per side, never --rep-bg itself).

@@ -31,6 +31,31 @@ In every theme and colour-vision option:
 A check in the project's build verifies this on every change. Disabled
 buttons are the exception, as WCAG allows: they are dimmed on purpose.
 
+For more, choose [Settings → Contrast → High](settings.md#contrast), or
+*System* to follow your system's contrast setting.
+
+### Windows contrast themes
+
+Under a Windows contrast theme, Windows replaces the app's colours with the
+theme's own. Changed lines then keep a bar in the theme's highlight colour
+beside their line numbers, as well as their `−`/`+` marks.
+
+---
+
+## Light and dark
+
+[Settings → Theme → System](settings.md#theme) follows your system's
+light/dark setting, on Windows and on Linux desktops with the standard
+settings service.
+
+---
+
+## Less motion
+
+When your system asks for reduced motion, the loading spinners stop turning.
+Their progress is still shown in words. There is no setting for this in
+ForskScope: it follows the system on Windows, macOS and Linux.
+
 ---
 
 ## Colour vision
