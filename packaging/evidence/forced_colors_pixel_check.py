@@ -76,7 +76,7 @@ def row_text(row) -> str:
         return ""
 
 
-def is_in_focused_hunk(row) -> bool:
+def is_in_focused_hunk(row) -> tuple[bool, list[str]]:
     """Walks up from `row` (bounded, so a tree-shape surprise can't loop
     forever) looking for an ancestor whose own `class_name` contains
     "focused" - `hunk.rs` puts that literal class on the hunk `<div>`
@@ -86,25 +86,35 @@ def is_in_focused_hunk(row) -> bool:
     live (run 43153383758): the first hunk is focused by default, and
     its own `outline-offset: -2px` still reaches far enough into the
     gutter's left edge to be sampled there regardless of how narrow the
-    strip is."""
+    strip is.
+
+    Returns the walked chain of class names too (as actually measured,
+    not assumed) - the `.hunk` `<div>` carries no explicit ARIA role
+    (unlike `.diff-row`'s own `role="row"`, the reason its class comes
+    through UIA ClassName at all per `windows_harness.py`'s own note),
+    so whether Chromium's accessibility tree keeps it as a distinct node
+    - and under what class_name - needs to be read off a live run
+    rather than guessed."""
+    chain = []
     node = row
     for _ in range(6):
         try:
             node = node.parent()
         except Exception:  # noqa: BLE001
-            return False
+            break
         if node is None:
-            return False
+            break
         try:
             class_name = node.element_info.class_name or ""
         except Exception:  # noqa: BLE001
             class_name = ""
+        chain.append(class_name)
         if "focused" in class_name:
-            return True
+            return True, chain
         if class_name == "diff-wrap":
             # Past the hunk level entirely - no point climbing further.
-            return False
-    return False
+            break
+    return False, chain
 
 
 def changed_row_tops(win) -> list[int]:
@@ -219,24 +229,29 @@ def main() -> int:
             text = row_text(row)
             changed = is_changed_top(rect.top)
             colour = dominant_colour(x0, y0, y1)
+            ancestor_chain: list[str] = []
             if not changed:
                 kind = "unchanged"
                 unchanged_colours.add(colour)
-            elif is_in_focused_hunk(row):
-                # Review 212 §1's own sanctioned second option: the
-                # default-focused hunk's row gets its own check (still
-                # must differ from the canvas) rather than being forced
-                # into the shared-bar-colour assertion the other changed
-                # rows get - its own outline sits right at the gutter's
-                # sampled edge regardless of how narrow the strip is.
-                kind = "changed-focused"
-                focused_changed_colours.add(colour)
             else:
-                kind = "changed"
-                changed_colours.add(colour)
+                focused, ancestor_chain = is_in_focused_hunk(row)
+                if focused:
+                    # Review 212 §1's own sanctioned second option: the
+                    # default-focused hunk's row gets its own check
+                    # (still must differ from the canvas) rather than
+                    # being forced into the shared-bar-colour assertion
+                    # the other changed rows get - its own outline sits
+                    # right at the gutter's sampled edge regardless of
+                    # how narrow the strip is.
+                    kind = "changed-focused"
+                    focused_changed_colours.add(colour)
+                else:
+                    kind = "changed"
+                    changed_colours.add(colour)
             print(
                 f"GUTTER: {kind} row text={text!r} rect=({x0 + 1},{y0})-({x0 + 3},{y1}) "
                 f"dominant_colour={colour}"
+                + (f" ancestor_classes={ancestor_chain}" if changed else "")
             )
 
         # Review 212 §1's own stronger assertion: not just "disjoint from
