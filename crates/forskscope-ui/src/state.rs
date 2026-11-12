@@ -364,6 +364,15 @@ impl Store {
     pub fn lang(&self) -> Lang {
         self.settings.read().language
     }
+    /// Seeds `system_color_scheme` with a value already known at startup
+    /// (`ui::view::settings::load`'s own bounded, synchronous Linux read,
+    /// review 211 §3) - every other `Store::new` call site (tests, inline
+    /// component demos) leaves it at `new`'s own default, `None`, since
+    /// none of them read a real OS preference. Only `app.rs`'s real
+    /// startup path calls this.
+    pub(crate) fn seed_system_color_scheme(&mut self, value: Option<SystemColorScheme>) {
+        self.system_color_scheme.set(value);
+    }
     pub(crate) fn allocate_compare_tab_id(&mut self) -> Result<CompareTabId, LoadIdentityError> {
         self.compare_tab_ids.write().allocate()
     }

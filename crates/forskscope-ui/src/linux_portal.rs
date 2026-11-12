@@ -52,14 +52,14 @@ fn parse_reply_value(value: &glib::Variant) -> Option<SystemColorScheme> {
         .map(parse_color_scheme_value)
 }
 
-fn read_color_scheme(proxy: &gio::DBusProxy) -> Option<SystemColorScheme> {
+fn read_color_scheme(proxy: &gio::DBusProxy, timeout_msec: i32) -> Option<SystemColorScheme> {
     let args = (NAMESPACE, KEY).to_variant();
     let reply = proxy
         .call_sync(
             "ReadOne",
             Some(&args),
             gio::DBusCallFlags::NONE,
-            5000,
+            timeout_msec,
             gio::Cancellable::NONE,
         )
         .or_else(|_| {
@@ -68,7 +68,7 @@ fn read_color_scheme(proxy: &gio::DBusProxy) -> Option<SystemColorScheme> {
                 "Read",
                 Some(&args),
                 gio::DBusCallFlags::NONE,
-                5000,
+                timeout_msec,
                 gio::Cancellable::NONE,
             )
         })
@@ -103,7 +103,7 @@ pub(crate) fn watch_color_scheme(tx: tokio::sync::mpsc::UnboundedSender<SystemCo
             return;
         };
 
-        if let Some(scheme) = read_color_scheme(&proxy) {
+        if let Some(scheme) = read_color_scheme(&proxy, 5000) {
             let _ = tx.send(scheme);
         }
 
@@ -125,6 +125,49 @@ pub(crate) fn watch_color_scheme(tx: tokio::sync::mpsc::UnboundedSender<SystemCo
 
         glib::MainLoop::new(Some(&context), false).run();
     });
+}
+
+/// RFC-097 stage 2 §2.1, review 211 §3: a bounded, synchronous read, used
+/// only once at startup, *before* settings resolve - never a substitute
+/// for [`watch_color_scheme`]'s own async, unbounded subscription, which
+/// still starts afterward regardless of what this returns. Exists so a
+/// saved `Theme::System` (or a brand-new install) renders its *first*
+/// paint correctly on Linux, rather than flashing `Dark` for one frame
+/// while the async reader is still connecting - review 211 measured that
+/// flash live (reply 185's own fake-portal captures, taken before this
+/// fix, started on `Dark` even for a portal seeded at value 2/light).
+///
+/// `timeout_ms` bounds *wall-clock* time, not just the D-Bus call's own
+/// timeout: `for_bus_sync` itself takes no deadline parameter, so the
+/// whole read runs on a detached thread and this function gives up (and
+/// returns `None`, read as "no portal" - the same outcome a real absence
+/// produces) if nothing comes back in time. The thread is not joined; on
+/// a timeout it keeps running until the D-Bus call itself gives up
+/// (`read_color_scheme`'s own `timeout_msec`, passed through unchanged)
+/// and then exits quietly - one short-lived leaked thread, once per
+/// process start, never accumulating.
+pub(crate) fn read_color_scheme_once_with_timeout(timeout_ms: u64) -> Option<SystemColorScheme> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let context = glib::MainContext::new();
+        let result = context.with_thread_default(|| {
+            let proxy = gio::DBusProxy::for_bus_sync(
+                gio::BusType::Session,
+                gio::DBusProxyFlags::NONE,
+                None,
+                BUS_NAME,
+                OBJECT_PATH,
+                SETTINGS_IFACE,
+                gio::Cancellable::NONE,
+            )
+            .ok()?;
+            read_color_scheme(&proxy, timeout_ms.min(i32::MAX as u64) as i32)
+        });
+        let _ = tx.send(result.ok().flatten());
+    });
+    rx.recv_timeout(std::time::Duration::from_millis(timeout_ms))
+        .ok()
+        .flatten()
 }
 
 #[cfg(test)]

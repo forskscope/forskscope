@@ -300,19 +300,33 @@
 .hunk-ins .diff-row { background: var(--ins-bg); }
 .hunk-rep .diff-row { background: var(--rep-bg); }
 
-/* F222 (review 210 §2.4): under `forced-colors: active` (a Windows
-   contrast theme - measured live and reported, reply 184/review 210
-   §1.2), the system replaces every row's own background with its own
-   palette, so the three rules above all paint the same flat colour -
-   changed rows were then distinguishable only by their -/+ marks
-   (measured in that same capture). A system-colour leading bar restores
-   that at a glance, without `forced-color-adjust: none` (which would
-   override the user's own chosen system palette instead of working
-   within it - the handoff's own explicit instruction). `Highlight` is a
-   forced-colors system colour keyword, not a custom value, so it stays
-   meaningful under the same mode that strips the backgrounds above. */
+/* F222 (review 210 §2.4, fixed per review 211 §1): under `forced-colors:
+   active` (a Windows contrast theme - measured live and reported, reply
+   184/review 210 §1.2), the system replaces every row's own background
+   with its own palette, so the three rules above all paint the same
+   flat colour - changed rows were then distinguishable only by their
+   -/+ marks (measured in that same capture). A system-colour leading
+   bar restores that at a glance, without `forced-color-adjust: none`
+   (which would override the user's own chosen system palette instead of
+   working within it - the handoff's own explicit instruction).
+   `Highlight` is a forced-colors system colour keyword, not a custom
+   value, so it stays meaningful under the same mode that strips the
+   backgrounds above.
+
+   Review 211's own finding: the first attempt put this on `.diff-row`,
+   which is `display: table-row` - in CSS's default *separate* border
+   model a table row's own border is never drawn, only a cell's is, so
+   that rule was silently inert (confirmed live: no bar in the capture,
+   despite the rule matching). `box-shadow` (the Explorer selected-row
+   technique) is itself removed under `forced-colors`, so it isn't a
+   substitute either. The marker now lives on `.pane-gutter`, a real
+   table-cell, scoped by the HUNK's own class rather than the gutter's
+   own `.del`/`.ins` modifier - an Insert hunk's *left* gutter carries
+   neither modifier (nothing to show a line number for), and it still
+   needs the bar so the row's changed status is visible from either
+   side, not only the side with content. */
 @media (forced-colors: active) {
-  .hunk-del .diff-row, .hunk-ins .diff-row, .hunk-rep .diff-row {
+  .hunk-del .pane-gutter, .hunk-ins .pane-gutter, .hunk-rep .pane-gutter {
     border-left: 4px solid Highlight;
   }
 }
@@ -435,9 +449,12 @@
    the search bar's own --surface-2, so the edge carries identification. */
 .search-nav { padding: .1rem .35rem; font-size: 12px; cursor: pointer; border: 1px solid var(--control-border); border-radius: 3px; background: var(--surface); }
 .search-nav:disabled { opacity: .4; cursor: default; }
-/* RFC-097 stage 2 §2.2: same High-contrast replacement as `button:disabled`
-   (02-layout-shell.css) - solid colour, not opacity. */
+/* RFC-097 stage 2 §2.2, fixed per review 211 §4: same High-contrast
+   treatment as `button:disabled` (02-layout-shell.css) - `--muted-standard`
+   text, a dashed elevated border, not a solid colour at the same weight
+   as an enabled control. */
 .contrast-high .search-nav:disabled {
-  opacity: 1; color: var(--muted); border-color: var(--control-border);
+  opacity: 1; color: var(--muted-standard);
+  border-color: var(--control-border); border-style: dashed;
 }
 .search-close { padding: .1rem .4rem; font-size: 14px; cursor: pointer; }

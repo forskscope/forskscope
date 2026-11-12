@@ -88,7 +88,11 @@ pub fn persist_settings(
 /// [`crate::startup_mode::is_portable_read_only`], overriding whatever the
 /// resolution would otherwise have decided — "reads what it can... saves
 /// nothing", not "starts from defaults" the way Private does.
-pub fn load() -> (AppSettings, SettingsRuntimeResolution) {
+pub fn load() -> (
+    AppSettings,
+    SettingsRuntimeResolution,
+    Option<crate::state::SystemColorScheme>,
+) {
     if crate::startup_mode::is_private() {
         let resolution = SettingsRuntimeResolution {
             value: PersistedSettings::default(),
@@ -97,39 +101,69 @@ pub fn load() -> (AppSettings, SettingsRuntimeResolution) {
             raw_bytes: None,
         };
         let settings = AppSettings::from_v2(&resolution.value);
-        return (settings, resolution);
+        return (settings, resolution, None);
     }
-    let (settings, mut resolution) = load_settings(&repository());
+    let (settings, mut resolution, initial_system_color_scheme) = load_settings(&repository());
     if crate::startup_mode::is_portable_read_only() {
         resolution.write_disabled = true;
     }
-    (settings, resolution)
+    (settings, resolution, initial_system_color_scheme)
 }
 
 /// The repository-explicit half of [`load`], exposed for direct testing.
-pub fn load_settings(repo: &SettingsRepository) -> (AppSettings, SettingsRuntimeResolution) {
+///
+/// Review 211 §3: the Linux portal is read synchronously, with a short
+/// bound, *before* settings resolve here - only when it can actually
+/// change the outcome (the saved theme is `System`, or the install is
+/// `Fresh`), not on every Linux launch regardless of theme. This fixes
+/// two things measured live in reply 185's own captures:
+/// - **the flash:** a saved `System` used to render `Dark` for one frame
+///   (the async portal reader, `state::settings::
+///   spawn_system_preference_bridges`, only starts after the app mounts)
+///   before snapping to the real value;
+/// - **the fresh-install default:** `44830f7`'s own fix could only ever
+///   answer `true`/`false` for Windows (synchronous there with no portal
+///   at all) - Linux now gets a real answer too, instead of always
+///   falling back to Dark.
+///
+/// The async reader still starts afterward regardless (`app.rs`'s
+/// `onmounted`) and takes over for any *later* change — this is a
+/// one-time seed for first paint, not a replacement for it.
+pub fn load_settings(
+    repo: &SettingsRepository,
+) -> (
+    AppSettings,
+    SettingsRuntimeResolution,
+    Option<crate::state::SystemColorScheme>,
+) {
     let mut resolution = resolve_and_commit(repo);
+    let is_fresh = matches!(resolution.outcome, SettingsRuntimeOutcome::Fresh);
+    let saved_is_system = resolution.value.theme == forskscope_desktop::settings::ThemeId::System;
+
+    let initial_system_color_scheme = if is_fresh || saved_is_system {
+        crate::state::settings::synchronous_linux_color_scheme_read()
+    } else {
+        None
+    };
+
     // RFC-097 stage 2 §2.1: "System is the default only for a settings
     // file that never saved a theme" - `Fresh` is exactly that (no file
     // existed at all; `Incompatible`/`CorruptPreserved` also resolve to
     // temporary defaults, but an actual theme choice may be sitting
-    // unreadable in that file, so neither counts). Windows-only: it's
-    // the one platform `system_theme_offered` can answer synchronously,
-    // with no portal round trip to wait on - Linux's own answer isn't
-    // known yet this early (the portal read happens after the app
-    // mounts, `state::settings::spawn_system_preference_bridges`), so a
-    // fresh Linux install still starts at Dark even where the portal
-    // would, once asked, have answered. Not applied to a persisted
-    // `ThemeId::System` already on disk - that's handled by
-    // `resolved_theme_css_class` at render time regardless of how it
-    // was reached.
-    if matches!(resolution.outcome, SettingsRuntimeOutcome::Fresh)
-        && crate::state::settings::system_theme_offered(crate::state::settings::host_os(), false)
+    // unreadable in that file, so neither counts). Not applied to a
+    // persisted `ThemeId::System` already on disk - that's handled by
+    // `resolved_theme_css_class` at render time regardless of how it was
+    // reached.
+    if is_fresh
+        && crate::state::settings::system_theme_offered(
+            crate::state::settings::host_os(),
+            initial_system_color_scheme.is_some(),
+        )
     {
         resolution.value.theme = forskscope_desktop::settings::ThemeId::System;
     }
     let settings = AppSettings::from_v2(&resolution.value);
-    (settings, resolution)
+    (settings, resolution, initial_system_color_scheme)
 }
 
 /// Maps a settings load's resolution to a one-time startup toast: an

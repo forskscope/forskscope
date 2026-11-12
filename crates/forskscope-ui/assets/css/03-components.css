@@ -194,6 +194,10 @@ code.path-display {
 .path-btn { background: none; border: 1px solid transparent; border-radius: 3px; padding: .1rem .35rem; cursor: pointer; color: var(--text); font-size: 13px; line-height: 1.2; }
 .path-btn:hover:not(:disabled) { background: var(--surface-3); border-color: var(--border); }
 .path-btn:disabled { color: var(--muted); cursor: default; }
+/* Review 211 §4: same `--muted-standard` pin as `.compare-btn:disabled`
+   (10-view-explorer.css) - `--muted` alone would pick up the elevated
+   High value too. */
+.contrast-high .path-btn:disabled { color: var(--muted-standard); }
 .path-more-btn { margin-left: .15rem; color: var(--muted); }
 .path-segments { display: flex; align-items: center; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
 /* `min-width: 24px`, not `0`: a segment must still shrink to fit a long

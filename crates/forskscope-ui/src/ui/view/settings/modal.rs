@@ -135,13 +135,24 @@ pub fn SettingsModal() -> Element {
                     span { {t(lang, "Theme")} }
                     SelectField {
                         value: tv(cur.theme).to_string(),
-                        options: theme_choices(system_theme_offered(
+                        options: {
+                            let offered = system_theme_offered(
                                 host_os(),
                                 store.system_color_scheme.read().is_some(),
-                            ))
-                            .into_iter()
-                            .map(|c| SelectOption::new(c.value, c.label))
-                            .collect::<Vec<_>>(),
+                            );
+                            // RFC-097 stage 2 §2.1 / review 211 §3: a saved
+                            // System that isn't offered *this session* must
+                            // still be listed, selected, with a label saying
+                            // what actually renders - never silently dropped,
+                            // which would show Dark as selected while the
+                            // persisted value still says system.
+                            let saved_unavailable_system =
+                                !offered && cur.theme == crate::state::Theme::System;
+                            theme_choices(offered, saved_unavailable_system)
+                                .into_iter()
+                                .map(|c| SelectOption::new(c.value, t(lang, c.label)))
+                                .collect::<Vec<_>>()
+                        },
                         onchange: move |v: String| {
                             store.settings.write().theme = tf(&v);
                             super::persist(store);

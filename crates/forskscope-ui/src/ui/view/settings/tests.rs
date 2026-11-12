@@ -94,7 +94,7 @@ fn load_settings_resolves_missing_file_as_fresh_defaults() {
     let _ = fs::remove_file(&path);
     let repo = SettingsRepository::new(path);
 
-    let (settings, resolution) = load_settings(&repo);
+    let (settings, resolution, _initial_system_color_scheme) = load_settings(&repo);
 
     assert!(!resolution.write_disabled);
     assert_eq!(
@@ -117,10 +117,18 @@ fn a_fresh_install_defaults_to_system_theme_exactly_where_it_is_synchronously_of
     let _ = fs::remove_file(&path);
     let repo = SettingsRepository::new(path);
 
-    let (settings, _resolution) = load_settings(&repo);
+    let (settings, _resolution, initial_system_color_scheme) = load_settings(&repo);
 
-    let offered =
-        crate::state::settings::system_theme_offered(crate::state::settings::host_os(), false);
+    // Whatever `load_settings` itself just read synchronously (Windows:
+    // always `None` here, decided with no I/O; Linux: a real, bounded
+    // portal read, whose answer depends on whether this environment has
+    // one reachable - this asserts load_settings resolved the theme
+    // consistently with its *own* reading, not a hardcoded expectation
+    // that would only ever hold on one kind of CI runner).
+    let offered = crate::state::settings::system_theme_offered(
+        crate::state::settings::host_os(),
+        initial_system_color_scheme.is_some(),
+    );
     if offered {
         assert_eq!(settings.theme, crate::state::Theme::System);
     } else {
@@ -138,7 +146,7 @@ fn a_corrupt_file_does_not_get_the_fresh_install_system_default() {
     fs::write(&path, "not valid json").unwrap();
     let repo = SettingsRepository::new(path);
 
-    let (settings, resolution) = load_settings(&repo);
+    let (settings, resolution, _initial_system_color_scheme) = load_settings(&repo);
 
     assert!(matches!(
         resolution.outcome,
@@ -162,10 +170,45 @@ fn load_settings_round_trips_through_persist_settings() {
     };
     persist_settings(&payload, &repo).expect("persist_settings must succeed");
 
-    let (settings, _resolution) = load_settings(&repo);
+    let (settings, _resolution, _initial_system_color_scheme) = load_settings(&repo);
 
     assert_eq!(settings.context_lines, 8);
     assert!(settings.explorer_compact);
+}
+
+/// Review 211 §3: the synchronous portal read only runs "when the saved
+/// theme is System, or the install is new" - never on an ordinary launch
+/// with an explicit Dark/Light/Night saved, which must stay as fast as
+/// it always was, not pay a bounded-but-real wait on every single start.
+/// A real `gio` D-Bus round trip (even one that fails fast, no portal
+/// reachable) is not literally zero-cost, so this times an *ordinary*
+/// load against the ~250ms budget `synchronous_linux_color_scheme_read`
+/// allows itself, rather than asserting zero I/O directly (which would
+/// need mocking `gio` itself, not attempted here).
+#[test]
+fn an_ordinary_saved_theme_does_not_pay_the_portal_reads_own_budget() {
+    let path = temp_path("load-ordinary-theme-is-fast");
+    let payload = PersistedSettings {
+        theme: forskscope_desktop::settings::ThemeId::Night,
+        ..PersistedSettings::default()
+    };
+    let repo = SettingsRepository::new(path);
+    persist_settings(&payload, &repo).expect("persist_settings must succeed");
+
+    let start = std::time::Instant::now();
+    let (settings, _resolution, initial_system_color_scheme) = load_settings(&repo);
+    let elapsed = start.elapsed();
+
+    assert_eq!(settings.theme, crate::state::Theme::Night);
+    assert_eq!(
+        initial_system_color_scheme, None,
+        "a saved Night theme must never trigger the portal read at all"
+    );
+    assert!(
+        elapsed < std::time::Duration::from_millis(200),
+        "an ordinary saved theme took {elapsed:?} - the portal read's own \
+         250ms budget must not run at all for this case"
+    );
 }
 
 // ── RFC-076 patch 6: reset_settings / recovery_modal ──────────────────────

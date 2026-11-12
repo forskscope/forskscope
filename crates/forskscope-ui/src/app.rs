@@ -27,12 +27,13 @@ pub static STARTUP_REQUEST: std::sync::OnceLock<StartupRequest> = std::sync::Onc
 #[component]
 pub fn App() -> Element {
     let mut store = use_context_provider(|| {
-        let (settings, resolution) = load();
+        let (settings, resolution, initial_system_color_scheme) = load();
         let mut store = Store::new(
             settings,
             resolution.value.clone(),
             resolution.write_disabled,
         );
+        store.seed_system_color_scheme(initial_system_color_scheme);
         if let Some(notice) = crate::ui::view::settings::recovery_notice(&resolution) {
             store.toast.set(Some(notice));
         }

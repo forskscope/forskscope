@@ -127,6 +127,22 @@ pub(crate) fn system_theme_offered(os: HostOs, portal_scheme_known: bool) -> boo
 /// `linux_portal` (the web view's own query doesn't track it there,
 /// measured); macOS: nothing wired yet, since `Theme::System` isn't offered
 /// there.
+/// Review 211 §3: a bounded, synchronous Linux-only read of the settings
+/// portal, used once at startup, before settings resolve (`ui::view::
+/// settings::load_settings`) - `None` on every other platform (no portal
+/// to ask), always, with no runtime `cfg!` branch needed at the call
+/// site. See `linux_portal::read_color_scheme_once_with_timeout`'s own
+/// doc comment for why this exists alongside (not instead of) the async
+/// reader `spawn_system_preference_bridges` starts later.
+#[cfg(target_os = "linux")]
+pub(crate) fn synchronous_linux_color_scheme_read() -> Option<SystemColorScheme> {
+    crate::linux_portal::read_color_scheme_once_with_timeout(250)
+}
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn synchronous_linux_color_scheme_read() -> Option<SystemColorScheme> {
+    None
+}
+
 pub fn spawn_system_preference_bridges(mut store: crate::state::Store) {
     spawn_media_query_bridge("(prefers-contrast: more)", move |matches| {
         store.system_prefers_contrast_more.set(Some(matches));

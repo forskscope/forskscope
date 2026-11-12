@@ -196,6 +196,16 @@ const PAIRS: &[Pair] = &[
     Pair { label: "--control-border on --surface",   fg: "var(--control-border)", bg: "var(--surface)",   assumed_over: None, min: CONTROL_MIN, high_min: Some(HIGH_MARK_MIN) },
     Pair { label: "--control-border on --surface-2", fg: "var(--control-border)", bg: "var(--surface-2)", assumed_over: None, min: CONTROL_MIN, high_min: Some(HIGH_MARK_MIN) },
     Pair { label: "--control-border on --surface-3", fg: "var(--control-border)", bg: "var(--surface-3)", assumed_over: None, min: CONTROL_MIN, high_min: Some(HIGH_MARK_MIN) },
+    // Review 211 §4: disabled-control text (`button:disabled`/`.search-nav:
+    // disabled`/`.compare-btn:disabled`/`.path-btn:disabled`) is pinned to
+    // `--muted-standard`, never raised by `.contrast-high` - the RFC's own
+    // floor for a disabled control is 3:1, so that is `high_min` here too
+    // (not 7:1, `--muted`'s own ordinary-text floor): the point of this
+    // token is that it does *not* move between contrast levels, so both
+    // columns check the same, already-comfortably-clearing value.
+    Pair { label: "disabled text (--muted-standard) on --surface",   fg: "var(--muted-standard)", bg: "var(--surface)",   assumed_over: None, min: CONTROL_MIN, high_min: Some(CONTROL_MIN) },
+    Pair { label: "disabled text (--muted-standard) on --surface-2", fg: "var(--muted-standard)", bg: "var(--surface-2)", assumed_over: None, min: CONTROL_MIN, high_min: Some(CONTROL_MIN) },
+    Pair { label: "disabled text (--muted-standard) on --surface-3", fg: "var(--muted-standard)", bg: "var(--surface-3)", assumed_over: None, min: CONTROL_MIN, high_min: Some(CONTROL_MIN) },
 ];
 
 const THEMES: [&str; 3] = ["dark", "light", "night"];
@@ -689,8 +699,8 @@ mod tests {
     fn compliant_theme(selector: &str) -> String {
         format!(
             "{selector} {{ --surface: #000000; --surface-2: #000000; --surface-3: #101010; \
-             --text: #ffffff; --muted: #ffffff; --accent: #111111; --warn: #ffffff; \
-             --ok: #ffffff; --err: #ffffff; --control-border: #ffffff; \
+             --text: #ffffff; --muted: #ffffff; --muted-standard: #ffffff; --accent: #111111; \
+             --warn: #ffffff; --ok: #ffffff; --err: #ffffff; --control-border: #ffffff; \
              --del-bg: #000000; --ins-bg: #000000; --rep-bg: #000000; --danger-bg: #000000; \
              --del-mark: #ffffff; --ins-mark: #ffffff; --rep-mark: #ffffff; }}\n"
         )

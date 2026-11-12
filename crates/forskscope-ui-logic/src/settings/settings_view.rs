@@ -72,12 +72,28 @@ pub struct SelectChoice {
 /// from measurement: Windows always; Linux once the settings portal has
 /// answered this session; not yet on macOS) — this function stays pure
 /// derivation, with no OS check of its own.
-pub fn theme_choices(system_offered: bool) -> Vec<SelectChoice> {
+///
+/// `saved_is_unavailable_system` (review 211 §3): the *saved* theme is
+/// `System`, but it isn't offered in *this* session (no portal answered
+/// in time, or an unmeasured platform) — the choice still has to appear,
+/// selected, with its value unchanged (never silently reset to `Dark`,
+/// the class of bug 0.193.0 fixed: "dropdowns show the current value"),
+/// but its label says what will actually happen: `Dark` is what renders
+/// here. Mutually exclusive with `system_offered` in practice (the
+/// caller only ever has one true at a time), but accepting both as plain
+/// bools keeps this a pure, exhaustively-testable derivation rather than
+/// a three-way enum only one caller builds.
+pub fn theme_choices(system_offered: bool, saved_is_unavailable_system: bool) -> Vec<SelectChoice> {
     let mut choices = vec![];
     if system_offered {
         choices.push(SelectChoice {
             value: ThemeId::System.as_str(),
             label: "System",
+        });
+    } else if saved_is_unavailable_system {
+        choices.push(SelectChoice {
+            value: ThemeId::System.as_str(),
+            label: "System (not available here; Dark is used)",
         });
     }
     choices.extend([
@@ -161,7 +177,7 @@ mod tests {
 
     #[test]
     fn theme_choices_covers_all_three_themes_when_system_is_not_offered() {
-        let choices = theme_choices(false);
+        let choices = theme_choices(false, false);
         assert_eq!(choices.len(), 3, "must have exactly three themes");
         let values: Vec<_> = choices.iter().map(|c| c.value).collect();
         assert!(values.contains(&"dark"), "must include dark");
@@ -169,13 +185,13 @@ mod tests {
         assert!(values.contains(&"night"), "must include night");
         assert!(
             !values.contains(&"system"),
-            "system must not appear when not offered"
+            "system must not appear when not offered and nothing is saved as system"
         );
     }
 
     #[test]
     fn theme_choices_adds_system_when_offered() {
-        let choices = theme_choices(true);
+        let choices = theme_choices(true, false);
         assert_eq!(choices.len(), 4, "must have exactly four themes");
         let values: Vec<_> = choices.iter().map(|c| c.value).collect();
         assert!(values.contains(&"system"), "must include system");
@@ -184,9 +200,51 @@ mod tests {
         assert!(values.contains(&"night"), "must include night");
     }
 
+    /// Review 211 §3: a saved `System` that isn't offered here must still
+    /// appear, selected, with the real outcome in its own label - never
+    /// silently absent, which would show `Dark` as selected in the
+    /// `<select>` while the persisted value still says `system` (the
+    /// class of bug 0.193.0 fixed).
+    #[test]
+    fn theme_choices_keeps_a_saved_system_value_with_an_unavailable_label() {
+        let choices = theme_choices(false, true);
+        assert_eq!(
+            choices.len(),
+            4,
+            "system must still appear, alongside the other three"
+        );
+        let system = choices
+            .iter()
+            .find(|c| c.value == "system")
+            .expect("a saved, unavailable system choice must still be listed");
+        assert_eq!(
+            system.label, "System (not available here; Dark is used)",
+            "the label must say what will actually render, not just \"System\""
+        );
+    }
+
+    #[test]
+    fn system_offered_wins_over_saved_unavailable_when_somehow_both_are_true() {
+        // Not a real caller shape (system_theme_offered and "saved system,
+        // unavailable" are mutually exclusive in practice), but the
+        // function must still resolve to exactly one System entry, not
+        // two, if it's ever called this way.
+        let choices = theme_choices(true, true);
+        assert_eq!(
+            choices.iter().filter(|c| c.value == "system").count(),
+            1,
+            "must never list System twice"
+        );
+        assert_eq!(
+            choices.iter().find(|c| c.value == "system").unwrap().label,
+            "System",
+            "offered must win over the unavailable label"
+        );
+    }
+
     #[test]
     fn theme_choice_values_match_theme_id_as_str() {
-        for choice in theme_choices(true) {
+        for choice in theme_choices(true, false) {
             let tid = ThemeId::from_id(choice.value)
                 .expect("every theme value must parse with ThemeId::from_id");
             assert_eq!(tid.as_str(), choice.value);
@@ -195,14 +253,14 @@ mod tests {
 
     #[test]
     fn theme_choices_labels_are_non_empty() {
-        for c in theme_choices(true) {
+        for c in theme_choices(true, false) {
             assert!(!c.label.is_empty(), "theme {} must have a label", c.value);
         }
     }
 
     #[test]
     fn no_duplicate_values_in_theme_choices() {
-        let mut values: Vec<_> = theme_choices(true).iter().map(|c| c.value).collect();
+        let mut values: Vec<_> = theme_choices(true, false).iter().map(|c| c.value).collect();
         let before = values.len();
         values.dedup();
         assert_eq!(

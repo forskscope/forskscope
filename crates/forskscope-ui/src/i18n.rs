@@ -341,6 +341,13 @@ fn ja(key: &str) -> Option<&'static str> {
         "Decrease text size" => "文字サイズを小さくする",
         "Reset text size to 100%" => "文字サイズを100%に戻す",
         "Theme" => "テーマ",
+        "Dark" => "ダーク",
+        "Light" => "ライト",
+        "Night" => "ナイト",
+        "System" => "システム",
+        "System (not available here; Dark is used)" => {
+            "システム（この環境では利用できません。ダークを使用）"
+        }
         "Contrast" => "コントラスト",
         "Colour vision" => "色覚",
         "Standard" => "標準",

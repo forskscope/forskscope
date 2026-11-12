@@ -91,6 +91,7 @@ body,
   --surface: #1e1f22; --surface-2: #2b2d31; --surface-3: #36383d;
   --text: #e6e6e6; --muted: #9da3a9; --border: #3a3d42; --accent: #6fa1ff;
   --control-border: #9aa0a6;
+  --muted-standard: #9da3a9;
   --equal: transparent; --del-bg: #4a2326; --ins-bg: #1f3b29;
   --del-mark: #ff6b6b; --ins-mark: #5fd28a; --rep-bg: #3a3320;
   --rep-mark: #e0b341;
@@ -101,6 +102,7 @@ body,
   --surface: #ffffff; --surface-2: #f3f4f6; --surface-3: #e8eaed;
   --text: #1f2328; --muted: #5c636a; --border: #d0d7de; --accent: #0964cf;
   --control-border: #5c636a;
+  --muted-standard: #5c636a;
   --equal: transparent; --del-bg: #ffd7d5; --ins-bg: #d3f5e0;
   --del-mark: #cf222e; --ins-mark: #187533; --rep-bg: #fff3cd;
   --rep-mark: #8e5f00;
@@ -111,6 +113,7 @@ body,
   --surface: #0d1117; --surface-2: #161b22; --surface-3: #21262d;
   --text: #c9d1d9; --muted: #8b949e; --border: #30363d; --accent: #58a6ff;
   --control-border: #8b949e;
+  --muted-standard: #8b949e;
   --equal: transparent; --del-bg: #3c1618; --ins-bg: #12321f;
   --del-mark: #f85149; --ins-mark: #3fb950; --rep-bg: #2a2415;
   --rep-mark: #d29922;
@@ -161,24 +164,43 @@ body,
 
    `--muted` (secondary text) moves to "at the main text's colour or close
    to it" - not literally `var(--text)`, which would make disabled
-   controls (which use `--muted`, not `--text`, for their own label -
-   `.compare-btn:disabled`/`.path-btn:disabled` already do, `button:
-   disabled`/`.search-nav:disabled` gain it below) visually identical to
-   an enabled one. Each theme's own value here was chosen to clear 7:1
-   against its tightest surface (`--surface-3`) with margin, computed, not
-   eyeballed: dark 7.80, light 7.95, night 9.10.
+   controls visually identical to an enabled one (the earlier, wrong
+   reasoning here — review 211 §4 measured the actual result: giving
+   disabled controls this *same* elevated value, at full opacity, made
+   them look enabled too, just via a different token). Each theme's own
+   value here was chosen to clear 7:1 against its tightest surface
+   (`--surface-3`) with margin, computed, not eyeballed: dark 7.80, light
+   7.95, night 9.10. Ordinary secondary text (labels, hints) uses this
+   raised value; disabled controls deliberately do not — see
+   `--muted-standard` below.
 
    `--control-border` (control edges, ≥4.5:1) reuses the same elevated
    value - it already clears 4.5:1 with to spare at that ratio in every
    theme (the lowest, light's own, is 7.23 against `--surface-3`), so
    there is no reason to give it a second, independently-tuned colour.
+   Disabled controls' *border* uses this elevated value too (only their
+   text is pinned to Standard's dimmer tone) - see below.
 
-   Disabled controls "stay at least 3:1" rather than the Standard
-   allowlist's blanket opacity exemption: `button:disabled`/`.search-nav:
-   disabled`'s own opacity-based dimming is replaced here with the same
-   `--muted`/`--control-border` solid colours `.compare-btn:disabled`/
-   `.path-btn:disabled` already use with no opacity at all - one mechanism
-   for "disabled" everywhere in High, not two. */
+   `--muted-standard`: each theme's own `--muted` value, frozen - never
+   overridden by `.contrast-high` (declared once, at the theme level,
+   with its own literal value, the same "independently-tunable token, not
+   a `var(--muted)` alias" reasoning `--control-border` already uses one
+   line up, for the same reason: a `var(--muted)` alias would track
+   whatever `--muted` currently resolves to, including the *High*
+   override, which is exactly the value this token exists to not use).
+   Disabled controls (`button:disabled`/`.search-nav:disabled`/
+   `.compare-btn:disabled`/`.path-btn:disabled`) use this for their own
+   text under `.contrast-high`, so a disabled control doesn't quietly
+   become unreadable from "secondary text" alone getting brighter, while
+   their border (`--control-border`, elevated) and a `border-style:
+   dashed` — a cue that doesn't depend on colour at all — keep "disabled"
+   visible as its own state instead of looking enabled (review 211 §4:
+   opacity 1 plus the elevated `--muted` measured as indistinguishable
+   from an enabled control in the worst-case capture). The RFC's own
+   floor for disabled controls is 3:1, not 7:1 — `--muted-standard`
+   clears 3:1 (and comfortably more, 4.5+, measured) against every
+   surface in every theme without being raised at all, so nothing here
+   needed its own new colour. */
 .contrast-high { --focus-ring: 3px; }
 
 .theme-dark.contrast-high {
@@ -272,13 +294,18 @@ button {
 }
 button:hover:not(:disabled) { border-color: var(--accent); }
 button:disabled { opacity: .45; cursor: default; }
-/* RFC-097 stage 2 §2.2: High contrast's disabled controls "stay at least
-   3:1", not opacity-exempt - replaces the dimming above with the same
-   solid `--muted`/`--control-border` colours `.compare-btn:disabled`/
-   `.path-btn:disabled` already use with no opacity at all (01-tokens.css's
-   `.contrast-high` comment). */
+/* RFC-097 stage 2 §2.2, fixed per review 211 §4: High contrast's disabled
+   controls "stay at least 3:1", not opacity-exempt - but opacity 1 with
+   the elevated `--muted` measured as looking enabled (review 211's own
+   worst-case capture: Undo/Redo/Save were indistinguishable from active
+   buttons). Text now pins to `--muted-standard` (never raised by
+   `.contrast-high`, still ≥3:1 everywhere - 01-tokens.css's own comment),
+   the border to the elevated `--control-border` but dashed - a cue that
+   doesn't depend on colour at all, so "disabled" reads as its own state
+   rather than a dimmer copy of "enabled". */
 .contrast-high button:disabled {
-  opacity: 1; color: var(--muted); border-color: var(--control-border);
+  opacity: 1; color: var(--muted-standard);
+  border-color: var(--control-border); border-style: dashed;
 }
 button:focus-visible { outline: var(--focus-ring) solid var(--focus); outline-offset: 2px; }
 /* F215: every text field and every `SelectField` dropdown in the app goes
@@ -707,6 +734,10 @@ code.path-display {
 .path-btn { background: none; border: 1px solid transparent; border-radius: 3px; padding: .1rem .35rem; cursor: pointer; color: var(--text); font-size: 13px; line-height: 1.2; }
 .path-btn:hover:not(:disabled) { background: var(--surface-3); border-color: var(--border); }
 .path-btn:disabled { color: var(--muted); cursor: default; }
+/* Review 211 §4: same `--muted-standard` pin as `.compare-btn:disabled`
+   (10-view-explorer.css) - `--muted` alone would pick up the elevated
+   High value too. */
+.contrast-high .path-btn:disabled { color: var(--muted-standard); }
 .path-more-btn { margin-left: .15rem; color: var(--muted); }
 .path-segments { display: flex; align-items: center; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
 /* `min-width: 24px`, not `0`: a segment must still shrink to fit a long
@@ -917,6 +948,11 @@ code.path-display {
 .compare-btn { flex-shrink: 0; font-weight: 600; padding: .25rem .8rem; border-color: var(--accent); color: var(--accent); }
 .compare-btn:not(:disabled):hover { background: var(--accent); color: var(--surface); }
 .compare-btn:disabled { border-color: var(--border); color: var(--muted); }
+/* Review 211 §4: `--muted` alone would quietly pick up the elevated High
+   value too (the same "looks enabled" confusion found on button:disabled
+   - 01-tokens.css's own comment) - pinned to `--muted-standard` under
+   `.contrast-high`, same as every other disabled control. */
+.contrast-high .compare-btn:disabled { color: var(--muted-standard); }
 
 /* ── Empty state ── */
 .explorer-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 2rem 1.5rem; text-align: center; gap: .5rem; color: var(--muted); }
@@ -1243,19 +1279,33 @@ code.path-display {
 .hunk-ins .diff-row { background: var(--ins-bg); }
 .hunk-rep .diff-row { background: var(--rep-bg); }
 
-/* F222 (review 210 §2.4): under `forced-colors: active` (a Windows
-   contrast theme - measured live and reported, reply 184/review 210
-   §1.2), the system replaces every row's own background with its own
-   palette, so the three rules above all paint the same flat colour -
-   changed rows were then distinguishable only by their -/+ marks
-   (measured in that same capture). A system-colour leading bar restores
-   that at a glance, without `forced-color-adjust: none` (which would
-   override the user's own chosen system palette instead of working
-   within it - the handoff's own explicit instruction). `Highlight` is a
-   forced-colors system colour keyword, not a custom value, so it stays
-   meaningful under the same mode that strips the backgrounds above. */
+/* F222 (review 210 §2.4, fixed per review 211 §1): under `forced-colors:
+   active` (a Windows contrast theme - measured live and reported, reply
+   184/review 210 §1.2), the system replaces every row's own background
+   with its own palette, so the three rules above all paint the same
+   flat colour - changed rows were then distinguishable only by their
+   -/+ marks (measured in that same capture). A system-colour leading
+   bar restores that at a glance, without `forced-color-adjust: none`
+   (which would override the user's own chosen system palette instead of
+   working within it - the handoff's own explicit instruction).
+   `Highlight` is a forced-colors system colour keyword, not a custom
+   value, so it stays meaningful under the same mode that strips the
+   backgrounds above.
+
+   Review 211's own finding: the first attempt put this on `.diff-row`,
+   which is `display: table-row` - in CSS's default *separate* border
+   model a table row's own border is never drawn, only a cell's is, so
+   that rule was silently inert (confirmed live: no bar in the capture,
+   despite the rule matching). `box-shadow` (the Explorer selected-row
+   technique) is itself removed under `forced-colors`, so it isn't a
+   substitute either. The marker now lives on `.pane-gutter`, a real
+   table-cell, scoped by the HUNK's own class rather than the gutter's
+   own `.del`/`.ins` modifier - an Insert hunk's *left* gutter carries
+   neither modifier (nothing to show a line number for), and it still
+   needs the bar so the row's changed status is visible from either
+   side, not only the side with content. */
 @media (forced-colors: active) {
-  .hunk-del .diff-row, .hunk-ins .diff-row, .hunk-rep .diff-row {
+  .hunk-del .pane-gutter, .hunk-ins .pane-gutter, .hunk-rep .pane-gutter {
     border-left: 4px solid Highlight;
   }
 }
@@ -1378,10 +1428,13 @@ code.path-display {
    the search bar's own --surface-2, so the edge carries identification. */
 .search-nav { padding: .1rem .35rem; font-size: 12px; cursor: pointer; border: 1px solid var(--control-border); border-radius: 3px; background: var(--surface); }
 .search-nav:disabled { opacity: .4; cursor: default; }
-/* RFC-097 stage 2 §2.2: same High-contrast replacement as `button:disabled`
-   (02-layout-shell.css) - solid colour, not opacity. */
+/* RFC-097 stage 2 §2.2, fixed per review 211 §4: same High-contrast
+   treatment as `button:disabled` (02-layout-shell.css) - `--muted-standard`
+   text, a dashed elevated border, not a solid colour at the same weight
+   as an enabled control. */
 .contrast-high .search-nav:disabled {
-  opacity: 1; color: var(--muted); border-color: var(--control-border);
+  opacity: 1; color: var(--muted-standard);
+  border-color: var(--control-border); border-style: dashed;
 }
 .search-close { padding: .1rem .4rem; font-size: 14px; cursor: pointer; }
 

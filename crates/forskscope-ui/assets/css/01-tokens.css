@@ -62,6 +62,7 @@
   --surface: #1e1f22; --surface-2: #2b2d31; --surface-3: #36383d;
   --text: #e6e6e6; --muted: #9da3a9; --border: #3a3d42; --accent: #6fa1ff;
   --control-border: #9aa0a6;
+  --muted-standard: #9da3a9;
   --equal: transparent; --del-bg: #4a2326; --ins-bg: #1f3b29;
   --del-mark: #ff6b6b; --ins-mark: #5fd28a; --rep-bg: #3a3320;
   --rep-mark: #e0b341;
@@ -72,6 +73,7 @@
   --surface: #ffffff; --surface-2: #f3f4f6; --surface-3: #e8eaed;
   --text: #1f2328; --muted: #5c636a; --border: #d0d7de; --accent: #0964cf;
   --control-border: #5c636a;
+  --muted-standard: #5c636a;
   --equal: transparent; --del-bg: #ffd7d5; --ins-bg: #d3f5e0;
   --del-mark: #cf222e; --ins-mark: #187533; --rep-bg: #fff3cd;
   --rep-mark: #8e5f00;
@@ -82,6 +84,7 @@
   --surface: #0d1117; --surface-2: #161b22; --surface-3: #21262d;
   --text: #c9d1d9; --muted: #8b949e; --border: #30363d; --accent: #58a6ff;
   --control-border: #8b949e;
+  --muted-standard: #8b949e;
   --equal: transparent; --del-bg: #3c1618; --ins-bg: #12321f;
   --del-mark: #f85149; --ins-mark: #3fb950; --rep-bg: #2a2415;
   --rep-mark: #d29922;
@@ -132,24 +135,43 @@
 
    `--muted` (secondary text) moves to "at the main text's colour or close
    to it" - not literally `var(--text)`, which would make disabled
-   controls (which use `--muted`, not `--text`, for their own label -
-   `.compare-btn:disabled`/`.path-btn:disabled` already do, `button:
-   disabled`/`.search-nav:disabled` gain it below) visually identical to
-   an enabled one. Each theme's own value here was chosen to clear 7:1
-   against its tightest surface (`--surface-3`) with margin, computed, not
-   eyeballed: dark 7.80, light 7.95, night 9.10.
+   controls visually identical to an enabled one (the earlier, wrong
+   reasoning here — review 211 §4 measured the actual result: giving
+   disabled controls this *same* elevated value, at full opacity, made
+   them look enabled too, just via a different token). Each theme's own
+   value here was chosen to clear 7:1 against its tightest surface
+   (`--surface-3`) with margin, computed, not eyeballed: dark 7.80, light
+   7.95, night 9.10. Ordinary secondary text (labels, hints) uses this
+   raised value; disabled controls deliberately do not — see
+   `--muted-standard` below.
 
    `--control-border` (control edges, ≥4.5:1) reuses the same elevated
    value - it already clears 4.5:1 with to spare at that ratio in every
    theme (the lowest, light's own, is 7.23 against `--surface-3`), so
    there is no reason to give it a second, independently-tuned colour.
+   Disabled controls' *border* uses this elevated value too (only their
+   text is pinned to Standard's dimmer tone) - see below.
 
-   Disabled controls "stay at least 3:1" rather than the Standard
-   allowlist's blanket opacity exemption: `button:disabled`/`.search-nav:
-   disabled`'s own opacity-based dimming is replaced here with the same
-   `--muted`/`--control-border` solid colours `.compare-btn:disabled`/
-   `.path-btn:disabled` already use with no opacity at all - one mechanism
-   for "disabled" everywhere in High, not two. */
+   `--muted-standard`: each theme's own `--muted` value, frozen - never
+   overridden by `.contrast-high` (declared once, at the theme level,
+   with its own literal value, the same "independently-tunable token, not
+   a `var(--muted)` alias" reasoning `--control-border` already uses one
+   line up, for the same reason: a `var(--muted)` alias would track
+   whatever `--muted` currently resolves to, including the *High*
+   override, which is exactly the value this token exists to not use).
+   Disabled controls (`button:disabled`/`.search-nav:disabled`/
+   `.compare-btn:disabled`/`.path-btn:disabled`) use this for their own
+   text under `.contrast-high`, so a disabled control doesn't quietly
+   become unreadable from "secondary text" alone getting brighter, while
+   their border (`--control-border`, elevated) and a `border-style:
+   dashed` — a cue that doesn't depend on colour at all — keep "disabled"
+   visible as its own state instead of looking enabled (review 211 §4:
+   opacity 1 plus the elevated `--muted` measured as indistinguishable
+   from an enabled control in the worst-case capture). The RFC's own
+   floor for disabled controls is 3:1, not 7:1 — `--muted-standard`
+   clears 3:1 (and comfortably more, 4.5+, measured) against every
+   surface in every theme without being raised at all, so nothing here
+   needed its own new colour. */
 .contrast-high { --focus-ring: 3px; }
 
 .theme-dark.contrast-high {
