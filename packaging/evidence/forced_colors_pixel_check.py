@@ -31,11 +31,14 @@ from windows_harness import (  # noqa: E402
     wait_for_row_shape,
 )
 
-# left.txt/right.txt (five lines each) - the row count `wait_for_row_shape`
-# polls for, the same F57-safe pattern every other harness case here uses
-# rather than a flat `sleep()`: a single tree walk right after `connect()`
-# can catch WebView2 mid-render and see a partial row set.
-EXPECTED_ROWS_PER_PANE = 5
+# Six rows per pane, not five: the delete ("four", left-only) and the
+# insert ("six", right-only) each get their own row, with the *other*
+# side rendered empty rather than merging into the replace row ("two"/
+# "TWO") - the row count `wait_for_row_shape` polls for, the same
+# F57-safe pattern every other harness case here uses rather than a flat
+# `sleep()`: a single tree walk right after `connect()` can catch
+# WebView2 mid-render and see a partial row set.
+EXPECTED_ROWS_PER_PANE = 6
 
 COLOR_HIGHLIGHT = 13
 # A changed row always carries one of these three fixture lines on
