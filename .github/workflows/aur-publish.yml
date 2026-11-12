@@ -105,9 +105,14 @@ jobs:
       # arrays directly out of the checked-out PKGBUILD (the same way
       # makepkg itself reads them) rather than hand-duplicating the list
       # here, where it would silently drift from the file it describes.
+      # F223: a full upgrade (-Syu), never -Sy alone. Arch does not support
+      # partial upgrades: `-Sy` refreshes the package lists, and the next
+      # `-S` can then pull a library newer than the rest of the container
+      # was built against. OpenSSL 4.1 did exactly that on 2026-11-12,
+      # breaking curl and pacman themselves mid-transaction.
       - name: Install namcap and the package's own build/run dependencies
         run: |
-          pacman -Sy --noconfirm --needed namcap git
+          pacman -Syu --noconfirm --needed namcap git
           # shellcheck disable=SC1091
           source packaging/linux/PKGBUILD
           pacman -S --noconfirm --needed "${makedepends[@]}" "${depends[@]}"
