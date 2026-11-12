@@ -76,45 +76,30 @@ def row_text(row) -> str:
         return ""
 
 
-def is_in_focused_hunk(row) -> tuple[bool, list[str]]:
-    """Walks up from `row` (bounded, so a tree-shape surprise can't loop
-    forever) looking for an ancestor whose own `class_name` contains
-    "focused" - `hunk.rs` puts that literal class on the hunk `<div>`
-    wrapping every row in it (`HunkBlock`'s own `class` variable) when
-    it's the focused hunk. Needed because narrowing the gutter sample
-    (review 212 §1) didn't fully clear the contamination on its own,
-    live (run 43153383758): the first hunk is focused by default, and
-    its own `outline-offset: -2px` still reaches far enough into the
-    gutter's left edge to be sampled there regardless of how narrow the
-    strip is.
+def is_focused_top(top: int, focused_top: int | None) -> bool:
+    """Whether a row at this `top` belongs to the default-focused hunk.
 
-    Returns the walked chain of class names too (as actually measured,
-    not assumed) - the `.hunk` `<div>` carries no explicit ARIA role
-    (unlike `.diff-row`'s own `role="row"`, the reason its class comes
-    through UIA ClassName at all per `windows_harness.py`'s own note),
-    so whether Chromium's accessibility tree keeps it as a distinct node
-    - and under what class_name - needs to be read off a live run
-    rather than guessed."""
-    chain = []
-    node = row
-    for _ in range(6):
-        try:
-            node = node.parent()
-        except Exception:  # noqa: BLE001
-            break
-        if node is None:
-            break
-        try:
-            class_name = node.element_info.class_name or ""
-        except Exception:  # noqa: BLE001
-            class_name = ""
-        chain.append(class_name)
-        if "focused" in class_name:
-            return True, chain
-        if class_name == "diff-wrap":
-            # Past the hunk level entirely - no point climbing further.
-            break
-    return False, chain
+    An ancestor-class walk (looking for `.hunk.focused`, as `hunk.rs`
+    renders it) was tried first and measured, live (run 43156562572),
+    to be a dead end: `row.parent()` landed on `.diff-wrap` in a single
+    hop, with no `.hunk` node in between at all - the UIA ClassName note
+    in `windows_harness.py` explains why: `.diff-row` carries its class
+    through only because it has an explicit `role="row"`; `.hunk` has no
+    such role, and Chromium's accessibility tree drops a presentation-
+    only `display: table-row-group` div with none, so its own class
+    never reaches this script by any ancestor walk.
+
+    Used instead: `diff.rs::TabSnapshot::from_tab`'s own `ids` is built
+    by filtering `tab.merge.hunks()` - already in document order - down
+    to changed hunks, and `tab.focused_change` (`state/tab.rs`, `diff/
+    toolbar.rs`, `compare.rs`) starts at `0` on every tab's own
+    initialization. So the default-focused hunk is, by that
+    initialization code, always the *first* changed hunk in document
+    order - the topmost one - not a coincidence of this one fixture:
+    confirmed identical across two separate real runs now
+    (43153383758, 43156562572), both times the topmost changed row
+    ("two"/"TWO") carrying the outline's colour and no other."""
+    return focused_top is not None and abs(top - focused_top) <= 2
 
 
 def changed_row_tops(win) -> list[int]:
@@ -192,6 +177,12 @@ def main() -> int:
         # status rather than being read as "unchanged" for having no
         # text of its own.
         changed_tops = changed_row_tops(win)
+        # `diff.rs`'s own `tab.focused_change = 0` default plus its
+        # `ids` list being built in document order (see `is_focused_top`'s
+        # own doc) means the topmost changed row is always the default-
+        # focused one - never guessed, `changed_tops` is itself already
+        # read off the live tree.
+        focused_top = min(changed_tops) if changed_tops else None
 
         def is_changed_top(top: int) -> bool:
             return any(abs(top - ct) <= 2 for ct in changed_tops)
@@ -229,29 +220,24 @@ def main() -> int:
             text = row_text(row)
             changed = is_changed_top(rect.top)
             colour = dominant_colour(x0, y0, y1)
-            ancestor_chain: list[str] = []
             if not changed:
                 kind = "unchanged"
                 unchanged_colours.add(colour)
+            elif is_focused_top(rect.top, focused_top):
+                # Review 212 §1's own sanctioned second option: the
+                # default-focused hunk's row gets its own check (still
+                # must differ from the canvas) rather than being forced
+                # into the shared-bar-colour assertion the other changed
+                # rows get - its own outline sits right at the gutter's
+                # sampled edge regardless of how narrow the strip is.
+                kind = "changed-focused"
+                focused_changed_colours.add(colour)
             else:
-                focused, ancestor_chain = is_in_focused_hunk(row)
-                if focused:
-                    # Review 212 §1's own sanctioned second option: the
-                    # default-focused hunk's row gets its own check
-                    # (still must differ from the canvas) rather than
-                    # being forced into the shared-bar-colour assertion
-                    # the other changed rows get - its own outline sits
-                    # right at the gutter's sampled edge regardless of
-                    # how narrow the strip is.
-                    kind = "changed-focused"
-                    focused_changed_colours.add(colour)
-                else:
-                    kind = "changed"
-                    changed_colours.add(colour)
+                kind = "changed"
+                changed_colours.add(colour)
             print(
                 f"GUTTER: {kind} row text={text!r} rect=({x0 + 1},{y0})-({x0 + 3},{y1}) "
                 f"dominant_colour={colour}"
-                + (f" ancestor_classes={ancestor_chain}" if changed else "")
             )
 
         # Review 212 §1's own stronger assertion: not just "disjoint from
