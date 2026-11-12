@@ -2,17 +2,20 @@
 """F222 (review 211 §1) - scratch-branch-only Windows verification.
 
 Proves the fix *by machine, not by eye*: finds every `.diff-row`'s own
-accessible rectangle, crops the screenshot to each row's gutter column's
-leftmost pixels, and reads the dominant colour there - once for every
-known *changed* row (the fixture's own delete/insert/replace lines) and
-once for every known *unchanged* one. The fix is confirmed if the set of
-changed-row gutter colours is disjoint from the set of unchanged-row
-gutter colours - a relative comparison, not a match against a value read
-via `GetSysColor` from this (message-loop-less) launcher process, which
-measured live (run 43146676172) as the *system's* default accent colour
-even under a real contrast theme (the theme's own repaint notification
-has nowhere to land without a window message pump) - printed here only
-as a diagnostic, never the basis of pass/fail.
+accessible rectangle, crops the screenshot to a narrow strip just inside
+the gutter cell's own left edge (not the focused hunk's own outline,
+which sits right at that edge too - review 212 §1's own finding), and
+reads the dominant colour there - once for every known *changed* row
+(the fixture's own delete/insert/replace lines) and once for every known
+*unchanged* one. The fix is confirmed only if **every** changed row
+shares the *same* one colour and that colour never appears on an
+unchanged row - not merely "differs somewhere", which a focus outline
+alone could also satisfy with no bar at all. Not a match against a value
+read via `GetSysColor` from this (message-loop-less) launcher process,
+which measured live (run 43146676172) as the *system's* default accent
+colour even under a real contrast theme (the theme's own repaint
+notification has nowhere to land without a window message pump) -
+printed here only as a diagnostic, never the basis of pass/fail.
 
 Usage: forced_colors_pixel_check.py <binary> <data-dir> <left> <right> <capture-png>
 Prints one `GUTTER:` line per row, in document order, with its own text,
@@ -147,15 +150,21 @@ def main() -> int:
             return any(abs(top - ct) <= 2 for ct in changed_tops)
 
         def dominant_colour(x0, y0, y1):
-            # Trims 2px off the row's own top/bottom (anti-aliased
-            # gridline pixels at a row boundary would otherwise pollute
-            # the count) and widens the strip to 6px (a few pixels of
-            # tolerance on exactly where the gutter's own left edge
-            # lands, rather than trusting .diff-row's rectangle to the
-            # pixel).
+            # Review 212 §1: the first version sampled 6px from the row's
+            # own left edge (x0 to x0+6) - wide enough to also catch the
+            # focused hunk's own outline (`.hunk.focused`'s `outline-
+            # offset: -2px` draws *inside* the hunk's border box, right
+            # at that same edge), which is why the "TWO" row - inside the
+            # first, default-focused hunk - sampled white (the outline's
+            # own colour) instead of the bar's. Narrowed to 2px, inset 1px
+            # from the true edge (x0+1 to x0+3): still solidly inside the
+            # 4px `border-left` the fix itself paints, but past where a
+            # -2px-offset outline can reach. Trims 3px off the row's own
+            # top/bottom too (anti-aliased gridline pixels at a row
+            # boundary would otherwise pollute the count).
             counts: dict[tuple[int, int, int], int] = {}
-            for y in range(max(y0 + 2, 0), min(y1 - 2, img.height)):
-                for x in range(max(x0, 0), min(x0 + 6, img.width)):
+            for y in range(max(y0 + 3, 0), min(y1 - 3, img.height)):
+                for x in range(max(x0 + 1, 0), min(x0 + 3, img.width)):
                     c = pixels[x, y]
                     counts[c] = counts.get(c, 0) + 1
             if not counts:
@@ -174,15 +183,24 @@ def main() -> int:
             colour = dominant_colour(x0, y0, y1)
             kind = "changed" if changed else "unchanged"
             print(
-                f"GUTTER: {kind} row text={text!r} rect=({x0},{y0})-({x0 + 6},{y1}) "
+                f"GUTTER: {kind} row text={text!r} rect=({x0 + 1},{y0})-({x0 + 3},{y1}) "
                 f"dominant_colour={colour}"
             )
             (changed_colours if changed else unchanged_colours).add(colour)
 
+        # Review 212 §1's own stronger assertion: not just "disjoint from
+        # unchanged" (a focus outline alone would already satisfy that
+        # with no bar at all) but every changed row sampling the *same*
+        # one colour, and that colour being neither the canvas colour nor
+        # (by the same disjointness) a text colour either.
+        one_colour = len(changed_colours) == 1
+        bar_colour = next(iter(changed_colours)) if one_colour else None
         overlap = changed_colours & unchanged_colours
         distinguishable = bool(changed_colours) and bool(unchanged_colours) and not overlap
         print(f"RESULT: changed_row_gutter_colours={sorted(changed_colours)}")
         print(f"RESULT: unchanged_row_gutter_colours={sorted(unchanged_colours)}")
+        print(f"RESULT: all_changed_rows_share_one_colour={one_colour}")
+        print(f"RESULT: shared_bar_colour={bar_colour}")
         print(f"RESULT: changed_rows_are_distinguishable_by_gutter_colour={distinguishable}")
         return 0
     finally:

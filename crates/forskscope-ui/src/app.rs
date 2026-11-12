@@ -118,6 +118,41 @@ pub fn App() -> Element {
     // called unconditionally at the top level, every render, in the same
     // order — never from inside a conditional or a closure.
     let desktop = dioxus_desktop::use_window();
+    // Review 212 §2: Windows' own light/dark preference is read from
+    // tao's window frame, not the web view's `matchMedia` - measured live
+    // that `WM_SETTINGCHANGE`'s broadcast repaints tao's own titlebar but
+    // never reaches WebView2's query (`state::settings::
+    // spawn_system_preference_bridges`'s own doc comment has the full
+    // story). `use_window`/`use_wry_event_handler` are real hooks and
+    // must be called unconditionally, every render, in the same order -
+    // `#[cfg(target_os = "windows")]` on the whole block is fine (that's
+    // resolved at compile time, so the call order is still identical
+    // across every render on whichever platform actually built it).
+    #[cfg(target_os = "windows")]
+    {
+        use_hook(|| {
+            store.system_color_scheme.set(Some(
+                crate::state::settings::tao_theme_to_system_color_scheme(desktop.theme()),
+            ));
+        });
+        dioxus_desktop::use_wry_event_handler({
+            let window_id = desktop.window.id();
+            let mut store = store;
+            move |event, _| {
+                if let dioxus_desktop::tao::event::Event::WindowEvent {
+                    window_id: event_window_id,
+                    event: dioxus_desktop::tao::event::WindowEvent::ThemeChanged(theme),
+                    ..
+                } = event
+                    && *event_window_id == window_id
+                {
+                    store.system_color_scheme.set(Some(
+                        crate::state::settings::tao_theme_to_system_color_scheme(*theme),
+                    ));
+                }
+            }
+        });
+    }
     // `Rc<RefCell<_>>`, not a bare `RefCell<_>`: `use_hook` clones its
     // stored value on every call (its `State: Clone` bound), and cloning a
     // bare `RefCell` would hand back an independent copy each render —

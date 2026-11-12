@@ -167,7 +167,7 @@ pub fn SettingsModal() -> Element {
                     SelectField {
                         value: cur.contrast.as_str().to_string(),
                         options: contrast_choices().into_iter()
-                            .map(|c| SelectOption::new(c.value, c.label))
+                            .map(|c| SelectOption::new(c.value, t(lang, c.label)))
                             .collect::<Vec<_>>(),
                         onchange: move |v: String| {
                             store.settings.write().contrast =

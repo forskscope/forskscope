@@ -61,6 +61,25 @@ pub enum SystemColorScheme {
     Dark,
 }
 
+/// Review 212 §2: Windows' own light/dark preference is read from tao's
+/// window frame, not the web view - `dioxus_desktop::tao::window::Theme`
+/// is a separate, two-variant enum (no "no preference" case; `Light` is
+/// its own `#[default]`), so this is a total, trivial mapping, pure and
+/// unit-testable with no window or event loop involved. Its only caller
+/// (`app.rs`) is `#[cfg(target_os = "windows")]`-gated; `cfg_attr` here
+/// keeps it unit-testable from any platform without a Windows-only build
+/// warning under `-D warnings` (the same shape `webview2.rs`'s own
+/// `Decision` uses for the same reason).
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+pub(crate) fn tao_theme_to_system_color_scheme(
+    theme: dioxus_desktop::tao::window::Theme,
+) -> SystemColorScheme {
+    match theme {
+        dioxus_desktop::tao::window::Theme::Dark => SystemColorScheme::Dark,
+        _ => SystemColorScheme::Light,
+    }
+}
+
 /// RFC-097 stage 2 §2.1: resolves `Theme::System` to the OS's reported
 /// light/dark preference, falling back to `Dark` when no reading is
 /// available yet (a startup race) or at all (an unmeasured platform or a
@@ -120,13 +139,20 @@ pub(crate) fn system_theme_offered(os: HostOs, portal_scheme_known: bool) -> boo
 
 /// Starts the live OS-preference bridges once, from `app.rs`'s `onmounted`:
 /// `prefers-contrast: more` through the web view's own `matchMedia` on
-/// every platform (measured to work everywhere, reply 184/review 210), and
-/// the OS light/dark preference through whichever channel each platform
-/// actually has it — Windows: the same `matchMedia` trick, on
-/// `prefers-color-scheme`; Linux: the freedesktop settings portal, via
+/// every platform (measured to work everywhere, reply 184/review 210).
+/// The OS light/dark preference is *not* bridged here at all any more on
+/// Windows — review 212 §2 measured live that `WM_SETTINGCHANGE`'s
+/// broadcast reaches tao's own window frame (it repainted) but never
+/// reaches WebView2's `matchMedia`, which stayed on whatever it read at
+/// launch. `app.rs` now seeds and updates `system_color_scheme` on
+/// Windows directly from tao's `Window::theme()`/`WindowEvent::
+/// ThemeChanged` instead (`use_window`/`use_wry_event_handler`, both
+/// genuine Dioxus hooks that have to be called from the component body,
+/// not from here). Linux still reads the freedesktop settings portal via
 /// `linux_portal` (the web view's own query doesn't track it there,
-/// measured); macOS: nothing wired yet, since `Theme::System` isn't offered
-/// there.
+/// measured, and tao's own Linux theme detection follows the same GTK
+/// property this app never sets, so it wouldn't fare any better); macOS:
+/// nothing wired yet, since `Theme::System` isn't offered there.
 /// Review 211 §3: a bounded, synchronous Linux-only read of the settings
 /// portal, used once at startup, before settings resolve (`ui::view::
 /// settings::load_settings`) - `None` on every other platform (no portal
@@ -147,16 +173,6 @@ pub fn spawn_system_preference_bridges(mut store: crate::state::Store) {
     spawn_media_query_bridge("(prefers-contrast: more)", move |matches| {
         store.system_prefers_contrast_more.set(Some(matches));
     });
-
-    if host_os() == HostOs::Windows {
-        spawn_media_query_bridge("(prefers-color-scheme: dark)", move |matches| {
-            store.system_color_scheme.set(Some(if matches {
-                SystemColorScheme::Dark
-            } else {
-                SystemColorScheme::Light
-            }));
-        });
-    }
 
     #[cfg(target_os = "linux")]
     {
@@ -689,6 +705,24 @@ mod tests {
     #[test]
     fn system_falls_back_to_dark_with_no_reading_yet() {
         assert_eq!(resolved_theme_css_class(Theme::System, None), "theme-dark");
+    }
+
+    // ── Review 212 §2: tao_theme_to_system_color_scheme ─────────────────────
+
+    #[test]
+    fn tao_dark_maps_to_system_dark() {
+        assert_eq!(
+            tao_theme_to_system_color_scheme(dioxus_desktop::tao::window::Theme::Dark),
+            SystemColorScheme::Dark
+        );
+    }
+
+    #[test]
+    fn tao_light_maps_to_system_light() {
+        assert_eq!(
+            tao_theme_to_system_color_scheme(dioxus_desktop::tao::window::Theme::Light),
+            SystemColorScheme::Light
+        );
     }
 
     // ── RFC-097 stage 2 §2.1: system_theme_offered ─────────────────────────

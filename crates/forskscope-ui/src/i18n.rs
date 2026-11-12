@@ -349,6 +349,7 @@ fn ja(key: &str) -> Option<&'static str> {
             "システム（この環境では利用できません。ダークを使用）"
         }
         "Contrast" => "コントラスト",
+        "High" => "高",
         "Colour vision" => "色覚",
         "Standard" => "標準",
         "Red–green safe (blue and orange)" => "赤緑の区別に配慮（青とオレンジ）",
@@ -936,5 +937,58 @@ mod tests {
                 "{lang:?}: a literal backtick leaked into the rendered page"
             );
         }
+    }
+
+    /// Review 212 §5: `theme_choices`/`contrast_choices`' labels are passed
+    /// through `t(lang, c.label)` at the call site (`ui::view::settings::
+    /// modal`), not a literal `t(lang, "...")` the i18n audit's static scan
+    /// can see - so a missing or accidentally-identical entry would ship
+    /// silently unless something checks the real table directly, the same
+    /// "never a stand-in translator" rule review 174 §5 already established
+    /// for `forskscope-report`'s own renderer strings. Every label from
+    /// every branch of `theme_choices` (`system_offered`/
+    /// `saved_is_unavailable_system`, all four combinations) and from
+    /// `contrast_choices` must have a *real*, different-from-English `ja()`
+    /// entry - not merely present (a label this specific, e.g. "Dark" or
+    /// "System", has no legitimate universal-term reason to read identical
+    /// in Japanese, unlike `forskscope-report`'s own "SHA-256" case).
+    /// Falsify by removing any one entry this test checks: it fails with
+    /// that exact label named, not a silent pass.
+    #[test]
+    fn every_theme_and_contrast_choice_label_has_a_real_distinct_ja_translation() {
+        use forskscope_ui_logic::{contrast_choices, theme_choices};
+
+        let mut labels: Vec<&str> = Vec::new();
+        for system_offered in [false, true] {
+            for saved_is_unavailable_system in [false, true] {
+                for c in theme_choices(system_offered, saved_is_unavailable_system) {
+                    labels.push(c.label);
+                }
+            }
+        }
+        for c in contrast_choices() {
+            labels.push(c.label);
+        }
+        labels.sort_unstable();
+        labels.dedup();
+
+        let mut missing = Vec::new();
+        let mut untranslated = Vec::new();
+        for label in labels {
+            match ja(label) {
+                None => missing.push(label),
+                Some(translated) if translated == label => untranslated.push(label),
+                Some(_) => {}
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "these labels have no ja() entry at all: {missing:?}"
+        );
+        assert!(
+            untranslated.is_empty(),
+            "these labels' ja() entry is identical to the English key, not a real \
+             translation: {untranslated:?}"
+        );
     }
 }
