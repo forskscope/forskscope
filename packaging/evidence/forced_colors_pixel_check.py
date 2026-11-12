@@ -2,19 +2,23 @@
 """F222 (review 211 §1) - scratch-branch-only Windows verification.
 
 Proves the fix *by machine, not by eye*: finds every `.diff-row`'s own
-accessible rectangle (`windows_harness.collect_diff_rows`, already used
-elsewhere in this harness for exactly this kind of pixel-precise
-geometry check), crops the screenshot to each row's gutter column's
-leftmost 4px, and counts pixels matching the system's actual `Highlight`
-colour (read live via `GetSysColor`, never assumed) - once for a known
-*changed* row (the fixture's own delete/insert/replace lines) and once
-for a known *unchanged* one.
+accessible rectangle, crops the screenshot to each row's gutter column's
+leftmost pixels, and reads the dominant colour there - once for every
+known *changed* row (the fixture's own delete/insert/replace lines) and
+once for every known *unchanged* one. The fix is confirmed if the set of
+changed-row gutter colours is disjoint from the set of unchanged-row
+gutter colours - a relative comparison, not a match against a value read
+via `GetSysColor` from this (message-loop-less) launcher process, which
+measured live (run 43146676172) as the *system's* default accent colour
+even under a real contrast theme (the theme's own repaint notification
+has nowhere to land without a window message pump) - printed here only
+as a diagnostic, never the basis of pass/fail.
 
 Usage: forced_colors_pixel_check.py <binary> <data-dir> <left> <right> <capture-png>
 Prints one `GUTTER:` line per row, in document order, with its own text,
 its changed/unchanged classification (by y-position, matched against
 where this fixture's own known changed lines were found - not guessed),
-and the matching-pixel count in its 4px gutter strip.
+and its gutter strip's dominant colour.
 """
 
 from __future__ import annotations
@@ -128,9 +132,6 @@ def main() -> int:
         img = Image.open(capture_path).convert("RGB")
         pixels = img.load()
 
-        def matches_highlight(rgb, tolerance=24):
-            return all(abs(a - b) <= tolerance for a, b in zip(rgb, highlight))
-
         ordered = sorted(rows, key=lambda r: (r.rectangle().top, r.rectangle().left))
 
         # An insert/delete's empty side carries no text at all (nothing to
@@ -145,8 +146,24 @@ def main() -> int:
         def is_changed_top(top: int) -> bool:
             return any(abs(top - ct) <= 2 for ct in changed_tops)
 
-        any_changed_has_bar = False
-        any_unchanged_has_bar = False
+        def dominant_colour(x0, y0, y1):
+            # Trims 2px off the row's own top/bottom (anti-aliased
+            # gridline pixels at a row boundary would otherwise pollute
+            # the count) and widens the strip to 6px (a few pixels of
+            # tolerance on exactly where the gutter's own left edge
+            # lands, rather than trusting .diff-row's rectangle to the
+            # pixel).
+            counts: dict[tuple[int, int, int], int] = {}
+            for y in range(max(y0 + 2, 0), min(y1 - 2, img.height)):
+                for x in range(max(x0, 0), min(x0 + 6, img.width)):
+                    c = pixels[x, y]
+                    counts[c] = counts.get(c, 0) + 1
+            if not counts:
+                return (0, 0, 0)
+            return max(counts, key=lambda c: counts[c])
+
+        changed_colours = set()
+        unchanged_colours = set()
         for row in ordered:
             rect = row.rectangle()
             x0 = rect.left - win_rect.left
@@ -154,25 +171,19 @@ def main() -> int:
             y1 = rect.bottom - win_rect.top
             text = row_text(row)
             changed = is_changed_top(rect.top)
-            count = 0
-            total = 0
-            for y in range(max(y0, 0), min(y1, img.height)):
-                for x in range(max(x0, 0), min(x0 + 4, img.width)):
-                    total += 1
-                    if matches_highlight(pixels[x, y]):
-                        count += 1
+            colour = dominant_colour(x0, y0, y1)
             kind = "changed" if changed else "unchanged"
             print(
-                f"GUTTER: {kind} row text={text!r} rect=({x0},{y0})-({x0 + 4},{y1}) "
-                f"highlight_px={count}/{total}"
+                f"GUTTER: {kind} row text={text!r} rect=({x0},{y0})-({x0 + 6},{y1}) "
+                f"dominant_colour={colour}"
             )
-            if changed and count > 0:
-                any_changed_has_bar = True
-            if not changed and count > 0:
-                any_unchanged_has_bar = True
+            (changed_colours if changed else unchanged_colours).add(colour)
 
-        print(f"RESULT: any_changed_row_has_highlight_bar={any_changed_has_bar}")
-        print(f"RESULT: any_unchanged_row_has_highlight_bar={any_unchanged_has_bar}")
+        overlap = changed_colours & unchanged_colours
+        distinguishable = bool(changed_colours) and bool(unchanged_colours) and not overlap
+        print(f"RESULT: changed_row_gutter_colours={sorted(changed_colours)}")
+        print(f"RESULT: unchanged_row_gutter_colours={sorted(unchanged_colours)}")
+        print(f"RESULT: changed_rows_are_distinguishable_by_gutter_colour={distinguishable}")
         return 0
     finally:
         terminate(proc)
