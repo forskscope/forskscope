@@ -7,15 +7,21 @@ the gutter cell's own left edge (not the focused hunk's own outline,
 which sits right at that edge too - review 212 §1's own finding), and
 reads the dominant colour there - once for every known *changed* row
 (the fixture's own delete/insert/replace lines) and once for every known
-*unchanged* one. The fix is confirmed only if **every** changed row
-shares the *same* one colour and that colour never appears on an
-unchanged row - not merely "differs somewhere", which a focus outline
-alone could also satisfy with no bar at all. Not a match against a value
-read via `GetSysColor` from this (message-loop-less) launcher process,
-which measured live (run 43146676172) as the *system's* default accent
-colour even under a real contrast theme (the theme's own repaint
-notification has nowhere to land without a window message pump) -
-printed here only as a diagnostic, never the basis of pass/fail.
+*unchanged* one. The fix is confirmed only if every *non-focused*
+changed row shares the *same* one colour and that colour never appears
+on an unchanged row - not merely "differs somewhere", which a focus
+outline alone could also satisfy with no bar at all. The one changed
+row that sits inside the default-focused hunk is checked separately
+(review 212 §1's own sanctioned second option, "give it its own
+expected value"): its own `outline-offset: -2px` reaches the gutter's
+sampled edge regardless of how narrow the strip is, so it's only
+required to differ from the canvas, not to match the other rows' shared
+bar colour. Not a match against a value read via `GetSysColor` from
+this (message-loop-less) launcher process, which measured live (run
+43146676172) as the *system's* default accent colour even under a real
+contrast theme (the theme's own repaint notification has nowhere to
+land without a window message pump) - printed here only as a
+diagnostic, never the basis of pass/fail.
 
 Usage: forced_colors_pixel_check.py <binary> <data-dir> <left> <right> <capture-png>
 Prints one `GUTTER:` line per row, in document order, with its own text,
@@ -68,6 +74,37 @@ def row_text(row) -> str:
         return (row.window_text() or "").strip()
     except Exception:  # noqa: BLE001
         return ""
+
+
+def is_in_focused_hunk(row) -> bool:
+    """Walks up from `row` (bounded, so a tree-shape surprise can't loop
+    forever) looking for an ancestor whose own `class_name` contains
+    "focused" - `hunk.rs` puts that literal class on the hunk `<div>`
+    wrapping every row in it (`HunkBlock`'s own `class` variable) when
+    it's the focused hunk. Needed because narrowing the gutter sample
+    (review 212 §1) didn't fully clear the contamination on its own,
+    live (run 43153383758): the first hunk is focused by default, and
+    its own `outline-offset: -2px` still reaches far enough into the
+    gutter's left edge to be sampled there regardless of how narrow the
+    strip is."""
+    node = row
+    for _ in range(6):
+        try:
+            node = node.parent()
+        except Exception:  # noqa: BLE001
+            return False
+        if node is None:
+            return False
+        try:
+            class_name = node.element_info.class_name or ""
+        except Exception:  # noqa: BLE001
+            class_name = ""
+        if "focused" in class_name:
+            return True
+        if class_name == "diff-wrap":
+            # Past the hunk level entirely - no point climbing further.
+            return False
+    return False
 
 
 def changed_row_tops(win) -> list[int]:
@@ -172,6 +209,7 @@ def main() -> int:
             return max(counts, key=lambda c: counts[c])
 
         changed_colours = set()
+        focused_changed_colours = set()
         unchanged_colours = set()
         for row in ordered:
             rect = row.rectangle()
@@ -181,27 +219,47 @@ def main() -> int:
             text = row_text(row)
             changed = is_changed_top(rect.top)
             colour = dominant_colour(x0, y0, y1)
-            kind = "changed" if changed else "unchanged"
+            if not changed:
+                kind = "unchanged"
+                unchanged_colours.add(colour)
+            elif is_in_focused_hunk(row):
+                # Review 212 §1's own sanctioned second option: the
+                # default-focused hunk's row gets its own check (still
+                # must differ from the canvas) rather than being forced
+                # into the shared-bar-colour assertion the other changed
+                # rows get - its own outline sits right at the gutter's
+                # sampled edge regardless of how narrow the strip is.
+                kind = "changed-focused"
+                focused_changed_colours.add(colour)
+            else:
+                kind = "changed"
+                changed_colours.add(colour)
             print(
                 f"GUTTER: {kind} row text={text!r} rect=({x0 + 1},{y0})-({x0 + 3},{y1}) "
                 f"dominant_colour={colour}"
             )
-            (changed_colours if changed else unchanged_colours).add(colour)
 
         # Review 212 §1's own stronger assertion: not just "disjoint from
         # unchanged" (a focus outline alone would already satisfy that
-        # with no bar at all) but every changed row sampling the *same*
-        # one colour, and that colour being neither the canvas colour nor
-        # (by the same disjointness) a text colour either.
+        # with no bar at all) but every NON-focused changed row sampling
+        # the *same* one colour, and that colour being neither the canvas
+        # colour nor (by the same disjointness) a text colour either. The
+        # focused hunk's own row(s) are checked separately, just for not
+        # being the canvas colour - its outline, not the bar, is what a
+        # sample there would catch regardless of geometry.
         one_colour = len(changed_colours) == 1
         bar_colour = next(iter(changed_colours)) if one_colour else None
         overlap = changed_colours & unchanged_colours
         distinguishable = bool(changed_colours) and bool(unchanged_colours) and not overlap
+        focused_overlap = focused_changed_colours & unchanged_colours
+        focused_distinguishable = bool(focused_changed_colours) and not focused_overlap
         print(f"RESULT: changed_row_gutter_colours={sorted(changed_colours)}")
+        print(f"RESULT: focused_changed_row_gutter_colours={sorted(focused_changed_colours)}")
         print(f"RESULT: unchanged_row_gutter_colours={sorted(unchanged_colours)}")
         print(f"RESULT: all_changed_rows_share_one_colour={one_colour}")
         print(f"RESULT: shared_bar_colour={bar_colour}")
         print(f"RESULT: changed_rows_are_distinguishable_by_gutter_colour={distinguishable}")
+        print(f"RESULT: focused_changed_row_is_distinguishable={focused_distinguishable}")
         return 0
     finally:
         terminate(proc)
