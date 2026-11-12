@@ -103,6 +103,54 @@ fn load_settings_resolves_missing_file_as_fresh_defaults() {
     );
 }
 
+/// RFC-097 stage 2 §2.1: "System is the default only for a settings file
+/// that never saved a theme" - a missing file is exactly that. Whether
+/// the resolved theme is actually `System` depends on
+/// `system_theme_offered`'s own answer for *this* host (`true` only on
+/// Windows, synchronously - Linux's portal answer isn't known yet this
+/// early), so this asserts the invariant symmetrically rather than
+/// hardcoding a platform, which would only ever exercise one branch
+/// depending on which OS runs the suite.
+#[test]
+fn a_fresh_install_defaults_to_system_theme_exactly_where_it_is_synchronously_offered() {
+    let path = temp_path("load-missing-theme-default");
+    let _ = fs::remove_file(&path);
+    let repo = SettingsRepository::new(path);
+
+    let (settings, _resolution) = load_settings(&repo);
+
+    let offered =
+        crate::state::settings::system_theme_offered(crate::state::settings::host_os(), false);
+    if offered {
+        assert_eq!(settings.theme, crate::state::Theme::System);
+    } else {
+        assert_eq!(settings.theme, crate::state::Theme::Dark);
+    }
+}
+
+/// The same rule must not apply to a file that merely failed to parse -
+/// an actual theme choice may be sitting unreadable in it, so guessing
+/// System (even where offered) would silently discard that choice rather
+/// than merely resolving an absence.
+#[test]
+fn a_corrupt_file_does_not_get_the_fresh_install_system_default() {
+    let path = temp_path("load-corrupt-theme-default");
+    fs::write(&path, "not valid json").unwrap();
+    let repo = SettingsRepository::new(path);
+
+    let (settings, resolution) = load_settings(&repo);
+
+    assert!(matches!(
+        resolution.outcome,
+        SettingsRuntimeOutcome::CorruptPreserved { .. }
+    ));
+    assert_eq!(
+        settings.theme,
+        crate::state::Theme::Dark,
+        "a corrupt file must fall back to the universal default, never guess System"
+    );
+}
+
 #[test]
 fn load_settings_round_trips_through_persist_settings() {
     let path = temp_path("round-trip");

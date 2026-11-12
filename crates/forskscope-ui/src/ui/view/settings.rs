@@ -108,7 +108,26 @@ pub fn load() -> (AppSettings, SettingsRuntimeResolution) {
 
 /// The repository-explicit half of [`load`], exposed for direct testing.
 pub fn load_settings(repo: &SettingsRepository) -> (AppSettings, SettingsRuntimeResolution) {
-    let resolution = resolve_and_commit(repo);
+    let mut resolution = resolve_and_commit(repo);
+    // RFC-097 stage 2 §2.1: "System is the default only for a settings
+    // file that never saved a theme" - `Fresh` is exactly that (no file
+    // existed at all; `Incompatible`/`CorruptPreserved` also resolve to
+    // temporary defaults, but an actual theme choice may be sitting
+    // unreadable in that file, so neither counts). Windows-only: it's
+    // the one platform `system_theme_offered` can answer synchronously,
+    // with no portal round trip to wait on - Linux's own answer isn't
+    // known yet this early (the portal read happens after the app
+    // mounts, `state::settings::spawn_system_preference_bridges`), so a
+    // fresh Linux install still starts at Dark even where the portal
+    // would, once asked, have answered. Not applied to a persisted
+    // `ThemeId::System` already on disk - that's handled by
+    // `resolved_theme_css_class` at render time regardless of how it
+    // was reached.
+    if matches!(resolution.outcome, SettingsRuntimeOutcome::Fresh)
+        && crate::state::settings::system_theme_offered(crate::state::settings::host_os(), false)
+    {
+        resolution.value.theme = forskscope_desktop::settings::ThemeId::System;
+    }
     let settings = AppSettings::from_v2(&resolution.value);
     (settings, resolution)
 }
