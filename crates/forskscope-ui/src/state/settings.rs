@@ -11,13 +11,14 @@
 
 use std::path::PathBuf;
 
+use dioxus::prelude::{WritableExt, spawn};
 pub use forskscope_compare::DiffAlgorithm;
 use forskscope_compare::DiffOptions;
 use forskscope_compare::diff::InlineMode;
 use forskscope_compare::{CaseSensitivity, NewlineCompareMode, WhitespaceMode};
 use forskscope_desktop::persist::schema::settings::{PersistedDiffProfile, PersistedSettings};
-pub use forskscope_desktop::settings::display::ColourVision;
 use forskscope_desktop::settings::display::DiffFontFamilySetting;
+pub use forskscope_desktop::settings::display::{ColourVision, Contrast};
 use forskscope_desktop::settings::{LocaleId, ThemeId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,16 +26,156 @@ pub enum Theme {
     Dark,
     Light,
     Night,
+    /// RFC-097 stage 2 §2.1: follows the OS light/dark preference. Has no
+    /// class of its own — see [`resolved_theme_css_class`], which is what
+    /// actually renders it.
+    System,
 }
 
 impl Theme {
+    /// `Dark`/`Light`/`Night` always return their own fixed class. `System`
+    /// has no context-free class to return (it depends on the live OS
+    /// reading) — this is the same safe, non-reactive fallback
+    /// [`resolved_theme_css_class`] falls back to when no reading is
+    /// available, so a caller with no access to that reading (there is
+    /// none today; this method has no caller of its own left once
+    /// `app.rs` switched to `resolved_theme_css_class`, kept for
+    /// `Theme`'s own completeness) never gets a nonsensical class.
     pub fn css_class(self) -> &'static str {
         match self {
             Self::Dark => "theme-dark",
             Self::Light => "theme-light",
             Self::Night => "theme-night",
+            Self::System => "theme-dark",
         }
     }
+}
+
+/// The OS's own reported light/dark preference, independent of how it was
+/// learned (the web view's `prefers-color-scheme` on Windows; the settings
+/// portal's `color-scheme` key on Linux — RFC-097 stage 2 §2.1, decided
+/// from measurement, reply 184/review 210).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SystemColorScheme {
+    Light,
+    Dark,
+}
+
+/// RFC-097 stage 2 §2.1: resolves `Theme::System` to the OS's reported
+/// light/dark preference, falling back to `Dark` when no reading is
+/// available yet (a startup race) or at all (an unmeasured platform or a
+/// session where the Linux settings portal never answered). `Dark`/
+/// `Light`/`Night` ignore `system_scheme` entirely — only `System` depends
+/// on anything outside the setting itself.
+pub fn resolved_theme_css_class(
+    theme: Theme,
+    system_scheme: Option<SystemColorScheme>,
+) -> &'static str {
+    match theme {
+        Theme::System => match system_scheme {
+            Some(SystemColorScheme::Light) => "theme-light",
+            Some(SystemColorScheme::Dark) | None => "theme-dark",
+        },
+        other => other.css_class(),
+    }
+}
+
+/// A parameter rather than a bare `cfg!` branch inside the match, so every
+/// arm is unit-testable regardless of which OS runs the suite — the same
+/// split `forskscope_desktop::external_tool`'s `TargetOs`/`host_target_os`
+/// uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HostOs {
+    Windows,
+    Linux,
+    MacOs,
+    Other,
+}
+
+pub(crate) fn host_os() -> HostOs {
+    if cfg!(target_os = "windows") {
+        HostOs::Windows
+    } else if cfg!(target_os = "linux") {
+        HostOs::Linux
+    } else if cfg!(target_os = "macos") {
+        HostOs::MacOs
+    } else {
+        HostOs::Other
+    }
+}
+
+/// RFC-097 stage 2 §2.1, decided from measurement (reply 184, review 210):
+/// Windows always offers *System* (the web view's own `prefers-color-scheme`
+/// query is always present there); Linux offers it only once the settings
+/// portal has answered at least once this session (`portal_scheme_known`);
+/// macOS doesn't offer it at all yet (a CI runner reported no change, and
+/// it hasn't been measured on real hardware).
+pub(crate) fn system_theme_offered(os: HostOs, portal_scheme_known: bool) -> bool {
+    match os {
+        HostOs::Windows => true,
+        HostOs::Linux => portal_scheme_known,
+        HostOs::MacOs | HostOs::Other => false,
+    }
+}
+
+/// Starts the live OS-preference bridges once, from `app.rs`'s `onmounted`:
+/// `prefers-contrast: more` through the web view's own `matchMedia` on
+/// every platform (measured to work everywhere, reply 184/review 210), and
+/// the OS light/dark preference through whichever channel each platform
+/// actually has it — Windows: the same `matchMedia` trick, on
+/// `prefers-color-scheme`; Linux: the freedesktop settings portal, via
+/// `linux_portal` (the web view's own query doesn't track it there,
+/// measured); macOS: nothing wired yet, since `Theme::System` isn't offered
+/// there.
+pub fn spawn_system_preference_bridges(mut store: crate::state::Store) {
+    spawn_media_query_bridge("(prefers-contrast: more)", move |matches| {
+        store.system_prefers_contrast_more.set(Some(matches));
+    });
+
+    if host_os() == HostOs::Windows {
+        spawn_media_query_bridge("(prefers-color-scheme: dark)", move |matches| {
+            store.system_color_scheme.set(Some(if matches {
+                SystemColorScheme::Dark
+            } else {
+                SystemColorScheme::Light
+            }));
+        });
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        spawn(async move {
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+            std::thread::spawn(move || crate::linux_portal::watch_color_scheme(tx));
+            while let Some(scheme) = rx.recv().await {
+                store.system_color_scheme.set(Some(scheme));
+            }
+        });
+    }
+}
+
+/// Spawns a task that reads `feature_query` (a literal CSS media-feature
+/// string, e.g. `"(prefers-contrast: more)"`) once, then keeps listening
+/// for `change` events on it for the rest of the session — the standard
+/// shape for turning a live CSS media query into Dioxus-reactive state,
+/// since `document::eval`'s own one-shot `.await` only reads a value once.
+/// `dioxus.send(...)` is the JS-side half of this channel (its own docs'
+/// example is exactly this: send from JS, `Eval::recv` in Rust).
+fn spawn_media_query_bridge(
+    feature_query: &'static str,
+    mut on_change: impl FnMut(bool) + 'static,
+) {
+    spawn(async move {
+        let js = format!(
+            "const mq = matchMedia('{feature_query}'); \
+             dioxus.send(mq.matches); \
+             mq.addEventListener('change', e => dioxus.send(e.matches));"
+        );
+        let mut eval = dioxus::document::eval(&js);
+        while let Ok(matches) = eval.recv::<bool>().await {
+            on_change(matches);
+        }
+    });
 }
 
 /// RFC-088 §2: the root class the red–green-safe palette combines with the
@@ -46,6 +187,40 @@ pub fn colour_vision_css_class(cv: ColourVision) -> &'static str {
     match cv {
         ColourVision::Standard => "",
         ColourVision::RedGreenSafe => "cv-rgsafe",
+    }
+}
+
+/// RFC-097 stage 2 §2.2: the root class the *High* contrast level combines
+/// with the theme (and colour-vision) class to override — `""` for
+/// `Standard`, so the root carries no extra class and only the theme's own
+/// tokens apply.
+pub fn contrast_css_class(contrast: Contrast) -> &'static str {
+    match contrast {
+        Contrast::Standard | Contrast::System => "",
+        Contrast::High => "contrast-high",
+    }
+}
+
+/// RFC-097 stage 2 §2.2: resolves `Contrast::System` to `prefers-contrast:
+/// more`'s live reading, falling back to `Standard` when no reading is
+/// available yet (a startup race — every platform measured this query
+/// works, reply 184/review 210, so there is no "unsupported platform"
+/// case to fall back from the way `Theme::System` has). Sets the *same*
+/// `.contrast-high` class the explicit choice uses — never a second,
+/// parallel media-query copy of the *High* tokens, which would drift from
+/// the gated one (review 210 §2.2). `Standard`/`High` ignore
+/// `prefers_contrast_more` entirely — only `System` depends on anything
+/// outside the setting itself.
+pub fn resolved_contrast_css_class(
+    contrast: Contrast,
+    prefers_contrast_more: Option<bool>,
+) -> &'static str {
+    match contrast {
+        Contrast::System => match prefers_contrast_more {
+            Some(true) => "contrast-high",
+            Some(false) | None => "",
+        },
+        other => contrast_css_class(other),
     }
 }
 
@@ -214,6 +389,9 @@ pub struct AppSettings {
     /// RFC-088: a second, independent axis beside `theme` — it combines
     /// with every theme rather than adding new ones.
     pub colour_vision: ColourVision,
+    /// RFC-097 stage 2 §2.2: a third, independent axis beside `theme` and
+    /// `colour_vision`.
+    pub contrast: Contrast,
     pub language: Lang,
     pub diff_font_size: u32,
     /// Font family used in the diff panes (RFC-070). Default: Monospace.
@@ -270,8 +448,10 @@ impl AppSettings {
                 ThemeId::Dark => Theme::Dark,
                 ThemeId::Light => Theme::Light,
                 ThemeId::Night => Theme::Night,
+                ThemeId::System => Theme::System,
             },
             colour_vision: v2.colour_vision,
+            contrast: v2.contrast,
             language: if v2.language == LocaleId::japanese() {
                 Lang::Ja
             } else {
@@ -314,8 +494,10 @@ impl AppSettings {
                 Theme::Dark => ThemeId::Dark,
                 Theme::Light => ThemeId::Light,
                 Theme::Night => ThemeId::Night,
+                Theme::System => ThemeId::System,
             },
             colour_vision: self.colour_vision,
+            contrast: self.contrast,
             language: match self.language {
                 Lang::En => LocaleId::english(),
                 Lang::Ja => LocaleId::japanese(),
@@ -453,5 +635,107 @@ mod tests {
             };
             assert_eq!(profile.to_diff_options().inline_mode, inline_mode);
         }
+    }
+
+    // ── RFC-097 stage 2 §2.1: Theme::System resolution ─────────────────────
+
+    #[test]
+    fn dark_light_night_ignore_the_system_reading_entirely() {
+        for scheme in [
+            None,
+            Some(SystemColorScheme::Light),
+            Some(SystemColorScheme::Dark),
+        ] {
+            assert_eq!(resolved_theme_css_class(Theme::Dark, scheme), "theme-dark");
+            assert_eq!(
+                resolved_theme_css_class(Theme::Light, scheme),
+                "theme-light"
+            );
+            assert_eq!(
+                resolved_theme_css_class(Theme::Night, scheme),
+                "theme-night"
+            );
+        }
+    }
+
+    #[test]
+    fn system_resolves_to_the_live_reading() {
+        assert_eq!(
+            resolved_theme_css_class(Theme::System, Some(SystemColorScheme::Light)),
+            "theme-light"
+        );
+        assert_eq!(
+            resolved_theme_css_class(Theme::System, Some(SystemColorScheme::Dark)),
+            "theme-dark"
+        );
+    }
+
+    #[test]
+    fn system_falls_back_to_dark_with_no_reading_yet() {
+        assert_eq!(resolved_theme_css_class(Theme::System, None), "theme-dark");
+    }
+
+    // ── RFC-097 stage 2 §2.1: system_theme_offered ─────────────────────────
+
+    #[test]
+    fn windows_always_offers_system_theme() {
+        assert!(system_theme_offered(HostOs::Windows, false));
+        assert!(system_theme_offered(HostOs::Windows, true));
+    }
+
+    #[test]
+    fn linux_offers_system_theme_only_once_the_portal_has_answered() {
+        assert!(!system_theme_offered(HostOs::Linux, false));
+        assert!(system_theme_offered(HostOs::Linux, true));
+    }
+
+    #[test]
+    fn macos_and_other_never_offer_system_theme_yet() {
+        assert!(!system_theme_offered(HostOs::MacOs, false));
+        assert!(!system_theme_offered(HostOs::MacOs, true));
+        assert!(!system_theme_offered(HostOs::Other, false));
+        assert!(!system_theme_offered(HostOs::Other, true));
+    }
+
+    // ── RFC-097 stage 2 §2.2: contrast classes ──────────────────────────────
+
+    #[test]
+    fn contrast_css_class_is_empty_for_standard_and_system() {
+        assert_eq!(contrast_css_class(Contrast::Standard), "");
+        assert_eq!(contrast_css_class(Contrast::System), "");
+    }
+
+    #[test]
+    fn contrast_css_class_is_contrast_high_for_high() {
+        assert_eq!(contrast_css_class(Contrast::High), "contrast-high");
+    }
+
+    #[test]
+    fn standard_and_high_ignore_the_live_reading_entirely() {
+        for reading in [None, Some(false), Some(true)] {
+            assert_eq!(resolved_contrast_css_class(Contrast::Standard, reading), "");
+            assert_eq!(
+                resolved_contrast_css_class(Contrast::High, reading),
+                "contrast-high"
+            );
+        }
+    }
+
+    #[test]
+    fn system_contrast_resolves_to_the_live_reading() {
+        assert_eq!(
+            resolved_contrast_css_class(Contrast::System, Some(true)),
+            "contrast-high",
+            "System sets the identical class High uses (review 210 §2.2)"
+        );
+        assert_eq!(
+            resolved_contrast_css_class(Contrast::System, Some(false)),
+            ""
+        );
+    }
+
+    #[test]
+    fn system_contrast_falls_back_to_standard_with_no_reading_yet() {
+        assert_eq!(resolved_contrast_css_class(Contrast::System, None), "");
     }
 }

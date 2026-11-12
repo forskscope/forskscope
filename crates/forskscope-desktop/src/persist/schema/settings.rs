@@ -24,8 +24,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{PersistenceError, PersistenceLoad};
 use crate::settings::display::{
-    ColourVision, Density, DiffFontFamilySetting, FontFamilySetting, LocaleId, TEXT_SIZE_DEFAULT,
-    ThemeId, nearest_text_size_step,
+    ColourVision, Contrast, Density, DiffFontFamilySetting, FontFamilySetting, LocaleId,
+    TEXT_SIZE_DEFAULT, ThemeId, nearest_text_size_step,
 };
 use forskscope_compare::diff::{
     CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode,
@@ -71,6 +71,12 @@ pub struct PersistedSettings {
     /// every theme rather than adding new ones.
     #[serde(default)]
     pub colour_vision: ColourVision,
+    /// RFC-097 stage 2 §2.2: a third, independent axis beside `theme` and
+    /// `colour_vision`. `#[serde(default)]` resolves to `Standard` (its
+    /// `#[default]` variant) for a file saved before this field existed —
+    /// an accessibility boost is never applied without an explicit choice.
+    #[serde(default)]
+    pub contrast: Contrast,
     pub language: LocaleId,
 
     /// Diff-pane font size (UI-owned).
@@ -166,6 +172,7 @@ impl Default for PersistedSettings {
             text_size: default_text_size(),
             theme: ThemeId::default(),
             colour_vision: ColourVision::default(),
+            contrast: Contrast::default(),
             language: LocaleId::english(),
             diff_font_size: default_diff_font_size(),
             diff_font_family: DiffFontFamilySetting::default(),
@@ -337,6 +344,8 @@ fn migrate_from_v0(v0: LegacyAppSettingsV0) -> PersistedSettings {
         },
         // v0 has no colour-vision concept; the product-wide default applies.
         colour_vision: ColourVision::default(),
+        // v0 has no contrast concept; the product-wide default applies.
+        contrast: Contrast::default(),
         language: match v0.language {
             LegacyLangV0::En => LocaleId::english(),
             LegacyLangV0::Ja => LocaleId::japanese(),

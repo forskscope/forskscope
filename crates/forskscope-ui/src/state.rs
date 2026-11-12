@@ -28,7 +28,8 @@ pub use profile::{add_profile, remove_profile, select_profile};
 pub(crate) use session::request_close_file_tab;
 pub use session::{close_tab, resolve_session, restore_tabs, save_session};
 pub use settings::{
-    AppSettings, BatchCopySpec, ColourVision, DiffAlgorithmSetting, DiffFontFamily, Lang, Theme,
+    AppSettings, BatchCopySpec, ColourVision, Contrast, DiffAlgorithmSetting, DiffFontFamily, Lang,
+    SystemColorScheme, Theme,
 };
 pub use tab::{
     CompareTab, TabState, change_diff_options, change_encoding, set_diff_options, set_encoding,
@@ -287,6 +288,17 @@ pub struct Store {
     pub dir_tabs: Signal<Vec<(PathBuf, PathBuf)>>,
     pub active_dir: Signal<Option<usize>>,
     pub settings: Signal<AppSettings>,
+    /// RFC-097 stage 2 §2.1: the OS's own reported light/dark preference,
+    /// live-updated by a platform-specific task started once at startup
+    /// (`app.rs`) — `None` until it has reported at least once this
+    /// session. Feeds `Theme::System` (`resolved_theme_css_class`) and
+    /// `system_theme_offered` (Linux: offered once this has gone `Some`).
+    pub system_color_scheme: Signal<Option<SystemColorScheme>>,
+    /// RFC-097 stage 2 §2.2: `prefers-contrast: more`'s live reading,
+    /// identically sourced and updated on every platform (measured to work
+    /// everywhere, unlike `system_color_scheme`). Feeds `Contrast::System`
+    /// (`resolved_contrast_css_class`).
+    pub system_prefers_contrast_more: Signal<Option<bool>>,
     /// The last-resolved canonical settings (RFC-076), cached so `persist()`
     /// can merge UI-editable changes onto it without resetting fields the UI
     /// has no control over. See `AppSettings::merge_into_v2`.
@@ -336,6 +348,8 @@ impl Store {
             dir_tabs: Signal::new_in_scope(Vec::new(), ScopeId::ROOT),
             active_dir: Signal::new_in_scope(None, ScopeId::ROOT),
             settings: Signal::new_in_scope(settings, ScopeId::ROOT),
+            system_color_scheme: Signal::new_in_scope(None, ScopeId::ROOT),
+            system_prefers_contrast_more: Signal::new_in_scope(None, ScopeId::ROOT),
             settings_v2_base: Signal::new_in_scope(settings_v2_base, ScopeId::ROOT),
             settings_write_disabled: Signal::new_in_scope(settings_write_disabled, ScopeId::ROOT),
             session_write_disabled: Signal::new_in_scope(false, ScopeId::ROOT),

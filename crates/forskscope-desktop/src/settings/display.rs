@@ -16,6 +16,14 @@ pub enum ThemeId {
     Dark,
     Light,
     Night,
+    /// RFC-097 stage 2 §2.1: follows the platform's light/dark preference
+    /// where the measurement (reply 184, review 210) found it reaches the
+    /// app — Windows always, Linux once the settings portal has answered
+    /// this session, never yet on macOS. Resolves to `Dark` or `Light`;
+    /// `Night` is never auto-selected. Offered only where measured, and
+    /// is the default only for a settings file that never saved a theme
+    /// (an existing `Dark`/`Light`/`Night`/`System` is always kept).
+    System,
 }
 
 impl ThemeId {
@@ -24,6 +32,7 @@ impl ThemeId {
             Self::Dark => "dark",
             Self::Light => "light",
             Self::Night => "night",
+            Self::System => "system",
         }
     }
 
@@ -32,13 +41,14 @@ impl ThemeId {
             "dark" => Some(Self::Dark),
             "light" => Some(Self::Light),
             "night" => Some(Self::Night),
+            "system" => Some(Self::System),
             _ => None,
         }
     }
 
     /// All built-in themes in display order.
     pub fn all() -> &'static [Self] {
-        &[Self::Dark, Self::Light, Self::Night]
+        &[Self::Dark, Self::Light, Self::Night, Self::System]
     }
 }
 
@@ -73,6 +83,12 @@ impl ThemeTokens {
             ThemeId::Dark => "dark",
             ThemeId::Light => "light",
             ThemeId::Night => "night",
+            // `System` has no token set of its own - it always resolves to
+            // `Dark` or `Light` before anything reads CSS variables (see
+            // `forskscope_ui::state::settings::resolved_theme_css_class`).
+            // This function is otherwise unused (dead per F75's connectivity
+            // audit); the arm exists only so the match stays exhaustive.
+            ThemeId::System => "dark",
         };
         vec![
             ("--fsk-app-bg", prefix),
@@ -125,6 +141,56 @@ impl ColourVision {
 
     pub fn all() -> &'static [Self] {
         &[Self::Standard, Self::RedGreenSafe]
+    }
+}
+
+// ── Contrast ──────────────────────────────────────────────────────────────────
+
+/// Contrast-level choice (RFC-097 stage 2 §2.2): a third, independent axis
+/// beside [`ThemeId`] and [`ColourVision`] — it combines with every theme
+/// and colour-vision mode rather than adding new ones, the same way
+/// `ColourVision` does (RFC-088).
+///
+/// `System` is a setting choice, not a render level: it resolves to
+/// `Standard` or `High` from `prefers-contrast: more` where the platform
+/// reports it (measured on every platform, reply 184/review 210), exactly
+/// as `ThemeId::System` resolves to `Dark`/`Light`. `Standard` is the
+/// default for both a new install and a settings file saved before this
+/// field existed — an accessibility boost is never applied without an
+/// explicit choice, matching `ColourVision`'s own default.
+///
+/// Part of the settings v2 on-disk schema (RFC-076): renaming a variant or
+/// changing its serde representation is a schema change and requires a
+/// version bump, not just a Rust-level rename.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Contrast {
+    #[default]
+    Standard,
+    High,
+    System,
+}
+
+impl Contrast {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Standard => "standard",
+            Self::High => "high",
+            Self::System => "system",
+        }
+    }
+
+    pub fn from_id(s: &str) -> Option<Self> {
+        match s {
+            "standard" => Some(Self::Standard),
+            "high" => Some(Self::High),
+            "system" => Some(Self::System),
+            _ => None,
+        }
+    }
+
+    pub fn all() -> &'static [Self] {
+        &[Self::Standard, Self::High, Self::System]
     }
 }
 

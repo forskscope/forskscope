@@ -120,24 +120,55 @@ pub fn find_decl<'a>(rules: &'a [Rule], selector: &str, var: &str) -> Option<&'a
         .map(|(_, value)| value.as_str())
 }
 
-/// One custom property, resolved for one theme × colour-vision combination:
-/// the palette's own override where `.theme-X.cv-rgsafe` declares one, else
-/// the base `.theme-X` value — the same cascade `colour_vision.rs`'s own
-/// `resolve()` applies to its fixed six (now seven) tokens, generalised to
-/// any `--name` so `contrast.rs` can resolve whichever tokens its pair
-/// table's CSS values happen to name.
-pub fn resolve_token(rules: &[Rule], theme: &str, rgsafe: bool, var: &str) -> String {
+/// One custom property, resolved for one theme × colour-vision × contrast
+/// combination: `01-tokens.css`'s own cascade, generalised to any `--name`
+/// so `contrast.rs` can resolve whichever tokens its pair table's CSS
+/// values happen to name (RFC-097 stage 2 §2.2 added `contrast_high` to
+/// what RFC-088 left as a two-axis cascade).
+///
+/// Applied least to most specific, exactly matching real CSS specificity
+/// (`.theme-X` < `.theme-X.contrast-high` = `.theme-X.cv-rgsafe` (tied,
+/// broken by *declaration order* in `01-tokens.css`: `.cv-rgsafe` blocks
+/// come first, `.contrast-high` blocks after, so `.contrast-high` wins a
+/// genuine tie) < `.theme-X.cv-rgsafe.contrast-high`) — a value only
+/// overrides when the rule that would declare it actually exists; a
+/// selector with no declaration for `var` never masks a less specific
+/// one that does. `01-tokens.css`'s own `.theme-light.cv-rgsafe.
+/// contrast-high` comment explains why a same-specificity tie was closed
+/// by restating the correct value explicitly, rather than relied on here
+/// (F220's own lesson: never let two same-specificity rules race for one
+/// property on one element) — this function's ordering below exists to
+/// match that restated value, not to be the thing that decides it.
+pub fn resolve_token(
+    rules: &[Rule],
+    theme: &str,
+    rgsafe: bool,
+    contrast_high: bool,
+    var: &str,
+) -> String {
     let base_sel = format!(".theme-{theme}");
-    let base = find_decl(rules, &base_sel, var)
+    let mut resolved = find_decl(rules, &base_sel, var)
         .unwrap_or_else(|| panic!("{base_sel} has no {var} declaration in 01-tokens.css"));
-    if rgsafe {
-        let rgsafe_sel = format!(".theme-{theme}.cv-rgsafe");
-        find_decl(rules, &rgsafe_sel, var)
-            .unwrap_or(base)
-            .to_string()
-    } else {
-        base.to_string()
+
+    if contrast_high {
+        let sel = format!(".theme-{theme}.contrast-high");
+        if let Some(v) = find_decl(rules, &sel, var) {
+            resolved = v;
+        }
     }
+    if rgsafe {
+        let sel = format!(".theme-{theme}.cv-rgsafe");
+        if let Some(v) = find_decl(rules, &sel, var) {
+            resolved = v;
+        }
+    }
+    if rgsafe && contrast_high {
+        let sel = format!(".theme-{theme}.cv-rgsafe.contrast-high");
+        if let Some(v) = find_decl(rules, &sel, var) {
+            resolved = v;
+        }
+    }
+    resolved.to_string()
 }
 
 #[cfg(test)]
@@ -173,9 +204,12 @@ mod tests {
     fn resolve_token_falls_back_to_the_base_theme_when_the_palette_has_no_override() {
         let css = ".theme-dark { --x: #111111; }\n.theme-dark.cv-rgsafe { --x: #999999; }";
         let rules = parse_rules(css);
-        assert_eq!(resolve_token(&rules, "dark", false, "--x"), "#111111");
         assert_eq!(
-            resolve_token(&rules, "dark", true, "--x"),
+            resolve_token(&rules, "dark", false, false, "--x"),
+            "#111111"
+        );
+        assert_eq!(
+            resolve_token(&rules, "dark", true, false, "--x"),
             "#999999",
             "the override must win"
         );
@@ -186,9 +220,52 @@ mod tests {
         let css = ".theme-dark { --y: #222222; }";
         let rules = parse_rules(css);
         assert_eq!(
-            resolve_token(&rules, "dark", true, "--y"),
+            resolve_token(&rules, "dark", true, false, "--y"),
             "#222222",
             "a token with no override falls back to the base"
+        );
+    }
+
+    // ── RFC-097 stage 2 §2.2: the third (contrast) axis ─────────────────────
+
+    #[test]
+    fn resolve_token_applies_the_contrast_high_override() {
+        let css = ".theme-dark { --x: #111111; }\n.theme-dark.contrast-high { --x: #eeeeee; }";
+        let rules = parse_rules(css);
+        assert_eq!(
+            resolve_token(&rules, "dark", false, false, "--x"),
+            "#111111"
+        );
+        assert_eq!(
+            resolve_token(&rules, "dark", false, true, "--x"),
+            "#eeeeee",
+            "the contrast-high override must win"
+        );
+    }
+
+    #[test]
+    fn resolve_token_prefers_the_triple_override_over_either_pair_alone() {
+        let css = ".theme-dark { --x: #111111; }\n\
+                   .theme-dark.cv-rgsafe { --x: #222222; }\n\
+                   .theme-dark.contrast-high { --x: #333333; }\n\
+                   .theme-dark.cv-rgsafe.contrast-high { --x: #444444; }";
+        let rules = parse_rules(css);
+        assert_eq!(
+            resolve_token(&rules, "dark", true, true, "--x"),
+            "#444444",
+            "both axes active must resolve to the selector naming both, not either alone"
+        );
+    }
+
+    #[test]
+    fn resolve_token_contrast_high_alone_does_not_leak_into_rgsafe_only() {
+        let css = ".theme-dark { --x: #111111; }\n.theme-dark.contrast-high { --x: #eeeeee; }";
+        let rules = parse_rules(css);
+        assert_eq!(
+            resolve_token(&rules, "dark", true, false, "--x"),
+            "#111111",
+            "rgsafe alone, with no cv-rgsafe override declared, must still fall back to the \
+             base - not to a contrast-high value that doesn't apply here"
         );
     }
 

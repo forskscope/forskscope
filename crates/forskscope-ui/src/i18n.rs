@@ -341,6 +341,7 @@ fn ja(key: &str) -> Option<&'static str> {
         "Decrease text size" => "文字サイズを小さくする",
         "Reset text size to 100%" => "文字サイズを100%に戻す",
         "Theme" => "テーマ",
+        "Contrast" => "コントラスト",
         "Colour vision" => "色覚",
         "Standard" => "標準",
         "Red–green safe (blue and orange)" => "赤緑の区別に配慮（青とオレンジ）",

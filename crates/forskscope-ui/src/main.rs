@@ -56,6 +56,8 @@
 mod app;
 mod i18n;
 mod keyboard;
+#[cfg(target_os = "linux")]
+mod linux_portal;
 mod startup_mode;
 mod startup_resolve;
 mod state;

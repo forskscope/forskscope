@@ -174,18 +174,32 @@ pub fn App() -> Element {
         }
     }
 
-    let theme_class = store.settings.read().theme.css_class();
+    // RFC-097 stage 2 §2.1: Theme::System resolves through the live OS
+    // reading (Windows/Linux only — see the onmounted tasks below), never
+    // through a context-free class.
+    let theme_class = crate::state::settings::resolved_theme_css_class(
+        store.settings.read().theme,
+        *store.system_color_scheme.read(),
+    );
     // RFC-088: a second, independent root class — "" for Standard, so the
     // root carries no extra class and only the theme's own tokens apply.
     let cv_class =
         crate::state::settings::colour_vision_css_class(store.settings.read().colour_vision);
+    // RFC-097 stage 2 §2.2: Contrast::System resolves through the same
+    // live `prefers-contrast: more` reading every platform measured
+    // (reply 184/review 210) — sets the identical `.contrast-high` class
+    // the explicit choice uses, never a second copy of its tokens.
+    let contrast_class = crate::state::settings::resolved_contrast_css_class(
+        store.settings.read().contrast,
+        *store.system_prefers_contrast_more.read(),
+    );
     let active = *store.active.read();
     let toast = store.toast.read().cloned();
 
     rsx! {
         style { {MAIN_CSS} }
         div {
-            class: "app {theme_class} {cv_class}",
+            class: "app {theme_class} {cv_class} {contrast_class}",
             id: "app-root",
             tabindex: "-1",
             onmounted: move |_| {
@@ -194,6 +208,7 @@ pub fn App() -> Element {
                         "document.getElementById('app-root')?.focus();"
                     ).await;
                 });
+                crate::state::settings::spawn_system_preference_bridges(store);
             },
             // RFC-060/handoff 020: the decision of what a global keypress
             // should do lives in `crate::keyboard::global_key_action`, a

@@ -65,6 +65,15 @@ windows-sys                 = { version = "0.61", default-features = false, feat
 # binding surface in the dependency tree, only a new edge to one already
 # there.
 glib                         = { version = "0.18", default-features = false }
+# RFC-097 stage 2 §2.1: already resolved transitively (gtk/webkit2gtk ->
+# wry's Linux build), at the same 0.18.x as `glib` above; its first
+# direct, declared use is `linux_portal`'s read of the freedesktop
+# settings portal (`org.freedesktop.portal.Settings`) for `System` theme
+# on Linux, since WebKitGTK 4.1 (GTK 3) doesn't report
+# `prefers-color-scheme` itself (measured, reply 184/review 210) - no new
+# GLib/GIO binding surface in the dependency tree, only a new edge to one
+# already there.
+gio                          = { version = "0.18", default-features = false }
 # RFC-095 §4.4: already resolved transitively (gethostname/tempfile) at
 # 1.x; its first direct, declared use is forskscope-desktop's own
 # Flatpak-only read of the `user.document-portal.host-path` extended

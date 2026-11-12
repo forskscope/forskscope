@@ -149,6 +149,74 @@ body,
   --rep-bg: #2c4042;
 }
 
+/* ── Contrast (RFC-097 stage 2 §2.2) ──
+   A third, independent axis beside the theme and colour-vision classes,
+   combined the same way `.cv-rgsafe` is: `.contrast-high` overrides only
+   the tokens *High* raises, every other token unchanged. `cargo xtask
+   contrast` measures these pairs against this file directly, the same way
+   it already measures the base/cv-rgsafe pairs above.
+
+   `--focus-ring` doesn't depend on the theme's own colours at all, so one
+   rule covers every theme (the handoff's own "3 px" floor, up from 2px).
+
+   `--muted` (secondary text) moves to "at the main text's colour or close
+   to it" - not literally `var(--text)`, which would make disabled
+   controls (which use `--muted`, not `--text`, for their own label -
+   `.compare-btn:disabled`/`.path-btn:disabled` already do, `button:
+   disabled`/`.search-nav:disabled` gain it below) visually identical to
+   an enabled one. Each theme's own value here was chosen to clear 7:1
+   against its tightest surface (`--surface-3`) with margin, computed, not
+   eyeballed: dark 7.80, light 7.95, night 9.10.
+
+   `--control-border` (control edges, ≥4.5:1) reuses the same elevated
+   value - it already clears 4.5:1 with to spare at that ratio in every
+   theme (the lowest, light's own, is 7.23 against `--surface-3`), so
+   there is no reason to give it a second, independently-tuned colour.
+
+   Disabled controls "stay at least 3:1" rather than the Standard
+   allowlist's blanket opacity exemption: `button:disabled`/`.search-nav:
+   disabled`'s own opacity-based dimming is replaced here with the same
+   `--muted`/`--control-border` solid colours `.compare-btn:disabled`/
+   `.path-btn:disabled` already use with no opacity at all - one mechanism
+   for "disabled" everywhere in High, not two. */
+.contrast-high { --focus-ring: 3px; }
+
+.theme-dark.contrast-high {
+  --muted: #cfd3d8; --control-border: var(--muted);
+}
+.theme-light.contrast-high {
+  --muted: #3f464c; --control-border: var(--muted);
+  /* Standard's light --del-mark (#cf222e) is 4.06:1 against --del-bg -
+     the one diff-mark pair that doesn't already clear 4.5:1 without an
+     override (measured; every other theme/cv-rgsafe pair already does,
+     see the cv-rgsafe overrides below for the three that don't). */
+  --del-mark: #a81d26;
+}
+.theme-night.contrast-high {
+  --muted: #c2c9d0; --control-border: var(--muted);
+}
+
+/* The three cv-rgsafe `--rep-mark` pairs that don't already clear 4.5:1
+   against their own cv-rgsafe `--rep-bg` (measured: dark 4.45, light
+   3.21, night 4.34 - the rest of cv-rgsafe's own del/ins marks already
+   clear it, 4.57-5.85). Each still combines with its theme's own
+   `.contrast-high` block above for `--muted`/`--control-border` - this
+   compound selector only needs to add what it alone changes. */
+.theme-dark.cv-rgsafe.contrast-high { --rep-mark: #ecc064; }
+.theme-light.cv-rgsafe.contrast-high {
+  --rep-mark: #4a3200;
+  /* Restates cv-rgsafe's own already-compliant del-mark (5.32:1 against
+     its own --del-bg, measured) explicitly, at this selector's higher
+     (3-class) specificity - .theme-light.contrast-high's own del-mark
+     override below is for the *standard* palette's --del-bg, a
+     different colour, and must never be allowed to win here on a
+     same-specificity, source-order coin flip (F220's own lesson: never
+     let two same-specificity rules race for one property on one
+     element). */
+  --del-mark: #944800;
+}
+.theme-night.cv-rgsafe.contrast-high { --rep-mark: #e3b04e; }
+
 /* @source css/02-layout-shell.css */
 /* ── 02-layout-shell ────────────────────────────────────────────────────────
    App chrome: the persistent frame that wraps every workspace.
@@ -204,6 +272,14 @@ button {
 }
 button:hover:not(:disabled) { border-color: var(--accent); }
 button:disabled { opacity: .45; cursor: default; }
+/* RFC-097 stage 2 §2.2: High contrast's disabled controls "stay at least
+   3:1", not opacity-exempt - replaces the dimming above with the same
+   solid `--muted`/`--control-border` colours `.compare-btn:disabled`/
+   `.path-btn:disabled` already use with no opacity at all (01-tokens.css's
+   `.contrast-high` comment). */
+.contrast-high button:disabled {
+  opacity: 1; color: var(--muted); border-color: var(--control-border);
+}
 button:focus-visible { outline: var(--focus-ring) solid var(--focus); outline-offset: 2px; }
 /* F215: every text field and every `SelectField` dropdown in the app goes
    through this one rule (no per-field class overrides it) - fixed here
@@ -523,6 +599,17 @@ code.path-display {
 .diff-loading-spinner { display: inline-block; font-size: 18px; line-height: 1; animation: spin 1.2s linear infinite; }
 .diff-error { padding: 1.5rem; }
 
+/* RFC-097 stage 2 §2.3: both spinners (this one, and .tab-loading-spinner
+   in 02-layout-shell.css) stop rotating under prefers-reduced-motion. Each
+   keeps its own static glyph; progress is already shown by text alongside
+   it either way ("Loading {title}…" here, a translated ", loading" suffix
+   for the tab one) - nothing else to swap in once the spin itself stops.
+   No app setting: the system's own preference is enough (there is nothing
+   for a user to choose here beyond what the OS already reports). */
+@media (prefers-reduced-motion: reduce) {
+  .diff-loading-spinner, .tab-loading-spinner { animation: none; }
+}
+
 /* ---- settings ---- */
 .advanced-toggle {
   background: none; border: none; color: var(--muted); cursor: pointer;
@@ -630,7 +717,11 @@ code.path-display {
 .path-segments .bc-seg { flex-shrink: 1; min-width: 24px; overflow: hidden; text-overflow: ellipsis; }
 .path-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--control-border); background: var(--surface); color: var(--text); border-radius: 3px; font-size: 12px; min-width: 6ch; }
 .path-input.error { border-color: var(--del-mark, #e05); }
-.path-input:focus { outline: 2px solid var(--accent); }
+/* RFC-097 stage 2 §2.2: same fix as .hunk.focused (11-view-diff.css) - a
+   hardcoded 2px, now var(--focus-ring), so High contrast's 3px floor
+   actually reaches every focus indicator in the app, not just the ones
+   that already read the token. */
+.path-input:focus { outline: var(--focus-ring) solid var(--accent); }
 
 /* ── ⋯ path-bar menu (F185, handoff 074 §2.1 — small and local, not #111's
    future context-menu framework) ──
@@ -1152,7 +1243,28 @@ code.path-display {
 .hunk-ins .diff-row { background: var(--ins-bg); }
 .hunk-rep .diff-row { background: var(--rep-bg); }
 
-.hunk.focused { outline: 2px solid var(--focus); outline-offset: -2px; }
+/* F222 (review 210 §2.4): under `forced-colors: active` (a Windows
+   contrast theme - measured live and reported, reply 184/review 210
+   §1.2), the system replaces every row's own background with its own
+   palette, so the three rules above all paint the same flat colour -
+   changed rows were then distinguishable only by their -/+ marks
+   (measured in that same capture). A system-colour leading bar restores
+   that at a glance, without `forced-color-adjust: none` (which would
+   override the user's own chosen system palette instead of working
+   within it - the handoff's own explicit instruction). `Highlight` is a
+   forced-colors system colour keyword, not a custom value, so it stays
+   meaningful under the same mode that strips the backgrounds above. */
+@media (forced-colors: active) {
+  .hunk-del .diff-row, .hunk-ins .diff-row, .hunk-rep .diff-row {
+    border-left: 4px solid Highlight;
+  }
+}
+
+/* RFC-097 stage 2 §2.2: was a hardcoded 2px, not var(--focus-ring) - the
+   one focus ring in the app that didn't already read the token, found
+   while giving High contrast a real 3px to raise it to (01-tokens.css's
+   .contrast-high). */
+.hunk.focused { outline: var(--focus-ring) solid var(--focus); outline-offset: -2px; }
 
 /* Inline character-level spans. Review 196 §1 found 30% put --text below
    4.5:1 over this span assumed on --rep-bg in Night, red-green-safe
@@ -1266,6 +1378,11 @@ code.path-display {
    the search bar's own --surface-2, so the edge carries identification. */
 .search-nav { padding: .1rem .35rem; font-size: 12px; cursor: pointer; border: 1px solid var(--control-border); border-radius: 3px; background: var(--surface); }
 .search-nav:disabled { opacity: .4; cursor: default; }
+/* RFC-097 stage 2 §2.2: same High-contrast replacement as `button:disabled`
+   (02-layout-shell.css) - solid colour, not opacity. */
+.contrast-high .search-nav:disabled {
+  opacity: 1; color: var(--muted); border-color: var(--control-border);
+}
 .search-close { padding: .1rem .4rem; font-size: 14px; cursor: pointer; }
 
 /* @source css/12-view-directory-report.css */

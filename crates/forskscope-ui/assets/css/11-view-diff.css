@@ -300,7 +300,28 @@
 .hunk-ins .diff-row { background: var(--ins-bg); }
 .hunk-rep .diff-row { background: var(--rep-bg); }
 
-.hunk.focused { outline: 2px solid var(--focus); outline-offset: -2px; }
+/* F222 (review 210 §2.4): under `forced-colors: active` (a Windows
+   contrast theme - measured live and reported, reply 184/review 210
+   §1.2), the system replaces every row's own background with its own
+   palette, so the three rules above all paint the same flat colour -
+   changed rows were then distinguishable only by their -/+ marks
+   (measured in that same capture). A system-colour leading bar restores
+   that at a glance, without `forced-color-adjust: none` (which would
+   override the user's own chosen system palette instead of working
+   within it - the handoff's own explicit instruction). `Highlight` is a
+   forced-colors system colour keyword, not a custom value, so it stays
+   meaningful under the same mode that strips the backgrounds above. */
+@media (forced-colors: active) {
+  .hunk-del .diff-row, .hunk-ins .diff-row, .hunk-rep .diff-row {
+    border-left: 4px solid Highlight;
+  }
+}
+
+/* RFC-097 stage 2 §2.2: was a hardcoded 2px, not var(--focus-ring) - the
+   one focus ring in the app that didn't already read the token, found
+   while giving High contrast a real 3px to raise it to (01-tokens.css's
+   .contrast-high). */
+.hunk.focused { outline: var(--focus-ring) solid var(--focus); outline-offset: -2px; }
 
 /* Inline character-level spans. Review 196 §1 found 30% put --text below
    4.5:1 over this span assumed on --rep-bg in Night, red-green-safe
@@ -414,4 +435,9 @@
    the search bar's own --surface-2, so the edge carries identification. */
 .search-nav { padding: .1rem .35rem; font-size: 12px; cursor: pointer; border: 1px solid var(--control-border); border-radius: 3px; background: var(--surface); }
 .search-nav:disabled { opacity: .4; cursor: default; }
+/* RFC-097 stage 2 §2.2: same High-contrast replacement as `button:disabled`
+   (02-layout-shell.css) - solid colour, not opacity. */
+.contrast-high .search-nav:disabled {
+  opacity: 1; color: var(--muted); border-color: var(--control-border);
+}
 .search-close { padding: .1rem .4rem; font-size: 14px; cursor: pointer; }

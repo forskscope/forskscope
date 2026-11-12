@@ -63,6 +63,7 @@ windows-sys                  = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 glib                         = { workspace = true }
+gio                          = { workspace = true }
 
 [dev-dependencies]
 # RFC-096: the binary-level `compare`/`mcp` tests moved here from

@@ -1,23 +1,24 @@
-//! RFC-076 F26: per-variant serialization assertions for the eleven schema
+//! RFC-076 F26: per-variant serialization assertions for the twelve schema
 //! enums [`crate::persist::schema::settings::PersistedSettings`] reuses
 //! directly as canonical v2 wire types.
 //!
 //! Five of these enums (`WhitespaceMode`, `NewlineCompareMode`,
 //! `CaseSensitivity`, `InlineMode`, `DiffAlgorithm`) only ever appear on
 //! `profiles`, a list field — the golden fixture's multiple profile entries
-//! already exercise every variant. The other six (`ThemeId`, `ColourVision`
-//! (RFC-088), `Density`, `FontFamilySetting`, `DiffFontFamilySetting`,
-//! `NewlinePolicy`) appear only on scalar fields, where a payload holds
-//! exactly one value: the fixture can pin only whichever variant happens to
-//! be on disk, so twelve variants were provably unpinned (review 036's
-//! mutation-testing finding, registered as F26) — renaming `ThemeId::Dark`
-//! passed all 969 tests before this file existed. These tests assert every
-//! variant's exact wire string directly, independent of any fixture, so a
-//! rename of any variant — scalar-field or list-field — fails here
-//! regardless of which value a fixture happens to hold.
+//! already exercise every variant. The other seven (`ThemeId`, `ColourVision`
+//! (RFC-088), `Contrast` (RFC-097 stage 2), `Density`, `FontFamilySetting`,
+//! `DiffFontFamilySetting`, `NewlinePolicy`) appear only on scalar fields,
+//! where a payload holds exactly one value: the fixture can pin only
+//! whichever variant happens to be on disk, so twelve variants were provably
+//! unpinned (review 036's mutation-testing finding, registered as F26) —
+//! renaming `ThemeId::Dark` passed all 969 tests before this file existed.
+//! These tests assert every variant's exact wire string directly,
+//! independent of any fixture, so a rename of any variant — scalar-field or
+//! list-field — fails here regardless of which value a fixture happens to
+//! hold.
 
 use crate::settings::display::{
-    ColourVision, Density, DiffFontFamilySetting, FontFamilySetting, ThemeId,
+    ColourVision, Contrast, Density, DiffFontFamilySetting, FontFamilySetting, ThemeId,
 };
 use forskscope_compare::diff::{
     CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode,
@@ -45,12 +46,22 @@ fn theme_id_variants_have_exact_wire_strings() {
     assert_wire_string(ThemeId::Dark, "dark");
     assert_wire_string(ThemeId::Light, "light");
     assert_wire_string(ThemeId::Night, "night");
+    // RFC-097 stage 2 §2.1.
+    assert_wire_string(ThemeId::System, "system");
 }
 
 #[test]
 fn colour_vision_variants_have_exact_wire_strings() {
     assert_wire_string(ColourVision::Standard, "standard");
     assert_wire_string(ColourVision::RedGreenSafe, "red-green-safe");
+}
+
+// RFC-097 stage 2 §2.2.
+#[test]
+fn contrast_variants_have_exact_wire_strings() {
+    assert_wire_string(Contrast::Standard, "standard");
+    assert_wire_string(Contrast::High, "high");
+    assert_wire_string(Contrast::System, "system");
 }
 
 #[test]

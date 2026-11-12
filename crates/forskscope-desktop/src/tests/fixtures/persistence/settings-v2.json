@@ -8,6 +8,7 @@
     "text_size": 150,
     "theme": "night",
     "colour_vision": "red-green-safe",
+    "contrast": "high",
     "language": "ja",
     "diff_font_size": 15,
     "diff_font_family": "consolas",

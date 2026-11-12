@@ -206,12 +206,14 @@ pub(crate) fn tv(t: Theme) -> &'static str {
         Theme::Dark => "dark",
         Theme::Light => "light",
         Theme::Night => "night",
+        Theme::System => "system",
     }
 }
 pub(crate) fn tf(s: &str) -> Theme {
     match s {
         "light" => Theme::Light,
         "night" => Theme::Night,
+        "system" => Theme::System,
         _ => Theme::Dark,
     }
 }

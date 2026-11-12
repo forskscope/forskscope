@@ -119,3 +119,71 @@
   --del-mark: #f0883e; --ins-mark: #4fa3ff;
   --rep-bg: #2c4042;
 }
+
+/* ── Contrast (RFC-097 stage 2 §2.2) ──
+   A third, independent axis beside the theme and colour-vision classes,
+   combined the same way `.cv-rgsafe` is: `.contrast-high` overrides only
+   the tokens *High* raises, every other token unchanged. `cargo xtask
+   contrast` measures these pairs against this file directly, the same way
+   it already measures the base/cv-rgsafe pairs above.
+
+   `--focus-ring` doesn't depend on the theme's own colours at all, so one
+   rule covers every theme (the handoff's own "3 px" floor, up from 2px).
+
+   `--muted` (secondary text) moves to "at the main text's colour or close
+   to it" - not literally `var(--text)`, which would make disabled
+   controls (which use `--muted`, not `--text`, for their own label -
+   `.compare-btn:disabled`/`.path-btn:disabled` already do, `button:
+   disabled`/`.search-nav:disabled` gain it below) visually identical to
+   an enabled one. Each theme's own value here was chosen to clear 7:1
+   against its tightest surface (`--surface-3`) with margin, computed, not
+   eyeballed: dark 7.80, light 7.95, night 9.10.
+
+   `--control-border` (control edges, ≥4.5:1) reuses the same elevated
+   value - it already clears 4.5:1 with to spare at that ratio in every
+   theme (the lowest, light's own, is 7.23 against `--surface-3`), so
+   there is no reason to give it a second, independently-tuned colour.
+
+   Disabled controls "stay at least 3:1" rather than the Standard
+   allowlist's blanket opacity exemption: `button:disabled`/`.search-nav:
+   disabled`'s own opacity-based dimming is replaced here with the same
+   `--muted`/`--control-border` solid colours `.compare-btn:disabled`/
+   `.path-btn:disabled` already use with no opacity at all - one mechanism
+   for "disabled" everywhere in High, not two. */
+.contrast-high { --focus-ring: 3px; }
+
+.theme-dark.contrast-high {
+  --muted: #cfd3d8; --control-border: var(--muted);
+}
+.theme-light.contrast-high {
+  --muted: #3f464c; --control-border: var(--muted);
+  /* Standard's light --del-mark (#cf222e) is 4.06:1 against --del-bg -
+     the one diff-mark pair that doesn't already clear 4.5:1 without an
+     override (measured; every other theme/cv-rgsafe pair already does,
+     see the cv-rgsafe overrides below for the three that don't). */
+  --del-mark: #a81d26;
+}
+.theme-night.contrast-high {
+  --muted: #c2c9d0; --control-border: var(--muted);
+}
+
+/* The three cv-rgsafe `--rep-mark` pairs that don't already clear 4.5:1
+   against their own cv-rgsafe `--rep-bg` (measured: dark 4.45, light
+   3.21, night 4.34 - the rest of cv-rgsafe's own del/ins marks already
+   clear it, 4.57-5.85). Each still combines with its theme's own
+   `.contrast-high` block above for `--muted`/`--control-border` - this
+   compound selector only needs to add what it alone changes. */
+.theme-dark.cv-rgsafe.contrast-high { --rep-mark: #ecc064; }
+.theme-light.cv-rgsafe.contrast-high {
+  --rep-mark: #4a3200;
+  /* Restates cv-rgsafe's own already-compliant del-mark (5.32:1 against
+     its own --del-bg, measured) explicitly, at this selector's higher
+     (3-class) specificity - .theme-light.contrast-high's own del-mark
+     override below is for the *standard* palette's --del-bg, a
+     different colour, and must never be allowed to win here on a
+     same-specificity, source-order coin flip (F220's own lesson: never
+     let two same-specificity rules race for one property on one
+     element). */
+  --del-mark: #944800;
+}
+.theme-night.cv-rgsafe.contrast-high { --rep-mark: #e3b04e; }

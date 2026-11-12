@@ -2,12 +2,13 @@
 //! (RFC-009, RFC-057, RFC-063 C6).
 
 use dioxus::prelude::*;
-use forskscope_ui_logic::{FieldDebounce, clamp_font_size, theme_choices};
+use forskscope_ui_logic::{FieldDebounce, clamp_font_size, contrast_choices, theme_choices};
 
 use super::profile::AddProfileInline;
 use super::{lf, lv, tf, tv};
 use crate::i18n::t;
-use crate::state::{Modal, Store};
+use crate::state::settings::{host_os, system_theme_offered};
+use crate::state::{Contrast, Modal, Store};
 use crate::ui::component::select_field::{SelectField, SelectOption};
 
 /// F136: starts (or restarts) the rest for one ignore-pattern field. `draft`
@@ -134,11 +135,32 @@ pub fn SettingsModal() -> Element {
                     span { {t(lang, "Theme")} }
                     SelectField {
                         value: tv(cur.theme).to_string(),
-                        options: theme_choices().into_iter()
+                        options: theme_choices(system_theme_offered(
+                                host_os(),
+                                store.system_color_scheme.read().is_some(),
+                            ))
+                            .into_iter()
                             .map(|c| SelectOption::new(c.value, c.label))
                             .collect::<Vec<_>>(),
                         onchange: move |v: String| {
                             store.settings.write().theme = tf(&v);
+                            super::persist(store);
+                        },
+                    }
+                }
+                // RFC-097 stage 2 §2.2, directly under Theme, the same
+                // placement RFC-088 gave Colour vision ("a user who needs
+                // it must find it without knowing it exists").
+                div { class: "field",
+                    span { {t(lang, "Contrast")} }
+                    SelectField {
+                        value: cur.contrast.as_str().to_string(),
+                        options: contrast_choices().into_iter()
+                            .map(|c| SelectOption::new(c.value, c.label))
+                            .collect::<Vec<_>>(),
+                        onchange: move |v: String| {
+                            store.settings.write().contrast =
+                                Contrast::from_id(&v).unwrap_or_default();
                             super::persist(store);
                         },
                     }

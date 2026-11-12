@@ -64,10 +64,26 @@ struct Pair {
     /// assumption review 196 asked every such entry to carry.
     assumed_over: Option<&'static str>,
     min: f64,
+    /// RFC-097 stage 2 §2.2: the tighter floor *High* contrast raises this
+    /// pair to, checked instead of `min` under the `contrast-high` axis.
+    /// `None` for every pair *High* doesn't touch at all (most of them —
+    /// nothing about those tokens changes under `.contrast-high`, so the
+    /// same `min` applies in both contrast levels).
+    high_min: Option<f64>,
 }
 
 const TEXT_MIN: f64 = 4.5;
 const CONTROL_MIN: f64 = 3.0;
+/// RFC-097 stage 2 §2.2: "secondary text (--muted) to at least 7:1 on
+/// every surface" (handoff 098 §2.2).
+const HIGH_TEXT_MIN: f64 = 7.0;
+/// "control edges and the diff's marks to at least 4.5:1" (handoff 098
+/// §2.2) - the same floor `TEXT_MIN` already uses for ordinary text, but
+/// named separately so the two can diverge later without one dragging
+/// the other (the same reasoning F215's own `--control-border` comment,
+/// 01-tokens.css, gives for not aliasing a value that happens to equal
+/// another one today).
+const HIGH_MARK_MIN: f64 = 4.5;
 
 /// Every foreground token this app actually paints with `color:`, against
 /// every background expression it is actually painted on with `background`/
@@ -79,24 +95,28 @@ const CONTROL_MIN: f64 = 3.0;
 #[rustfmt::skip]
 const PAIRS: &[Pair] = &[
     // ── Plain text/mark on a plain surface ──
-    Pair { label: "--text on --surface",            fg: "var(--text)",   bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--text on --surface-2",          fg: "var(--text)",   bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--text on --surface-3",          fg: "var(--text)",   bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--muted on --surface",           fg: "var(--muted)",  bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--muted on --surface-2",         fg: "var(--muted)",  bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--muted on --surface-3",         fg: "var(--muted)",  bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--accent on --surface",          fg: "var(--accent)", bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--accent on --surface-2",        fg: "var(--accent)", bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--accent on --surface-3",        fg: "var(--accent)", bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--warn on --surface",            fg: "var(--warn)",   bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--warn on --surface-2",          fg: "var(--warn)",   bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--warn on --surface-3",          fg: "var(--warn)",   bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--ok on --surface",              fg: "var(--ok)",     bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--ok on --surface-2",            fg: "var(--ok)",     bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--ok on --surface-3",             fg: "var(--ok)",     bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--err on --surface",             fg: "var(--err)",    bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--err on --surface-2",           fg: "var(--err)",    bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--err on --surface-3",           fg: "var(--err)",    bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN },
+    Pair { label: "--text on --surface",            fg: "var(--text)",   bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--text on --surface-2",          fg: "var(--text)",   bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--text on --surface-3",          fg: "var(--text)",   bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    // RFC-097 stage 2 §2.2: High raises secondary text to "the main text's
+    // colour or close to it, at least 7:1" on every surface it appears on
+    // - these three, the diff gutter's two below, and a selected tree
+    // row's own --muted entry further down all gain high_min: Some(HIGH_TEXT_MIN).
+    Pair { label: "--muted on --surface",           fg: "var(--muted)",  bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--muted on --surface-2",         fg: "var(--muted)",  bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--muted on --surface-3",         fg: "var(--muted)",  bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--accent on --surface",          fg: "var(--accent)", bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--accent on --surface-2",        fg: "var(--accent)", bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--accent on --surface-3",        fg: "var(--accent)", bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--warn on --surface",            fg: "var(--warn)",   bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--warn on --surface-2",          fg: "var(--warn)",   bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--warn on --surface-3",          fg: "var(--warn)",   bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--ok on --surface",              fg: "var(--ok)",     bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--ok on --surface-2",            fg: "var(--ok)",     bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--ok on --surface-3",             fg: "var(--ok)",     bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--err on --surface",             fg: "var(--err)",    bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--err on --surface-2",           fg: "var(--err)",    bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--err on --surface-3",           fg: "var(--err)",    bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: None },
     // --ins-mark doubles as the Explorer's "equal" status glyph
     // (`.tree-status.status-equal`) - a *text* use, F216 already treats
     // Explorer status symbols as text, so it needs the same three pairs
@@ -104,74 +124,78 @@ const PAIRS: &[Pair] = &[
     // standard-palette value missed --surface-3 here: 4.21, fixed to
     // #187533, now 4.80 - the mark-on-its-own-background use below is
     // unaffected, still comfortably over 3:1.)
-    Pair { label: "--ins-mark on --surface (status text)",   fg: "var(--ins-mark)", bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--ins-mark on --surface-2 (status text)", fg: "var(--ins-mark)", bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--ins-mark on --surface-3 (status text)", fg: "var(--ins-mark)", bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN },
+    Pair { label: "--ins-mark on --surface (status text)",   fg: "var(--ins-mark)", bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--ins-mark on --surface-2 (status text)", fg: "var(--ins-mark)", bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--ins-mark on --surface-3 (status text)", fg: "var(--ins-mark)", bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: None },
     // ── Text on a diff hunk's own row background ──
-    Pair { label: "--text on --del-bg",   fg: "var(--text)",  bg: "var(--del-bg)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--text on --ins-bg",   fg: "var(--text)",  bg: "var(--ins-bg)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--text on --rep-bg",   fg: "var(--text)",  bg: "var(--rep-bg)", assumed_over: None, min: TEXT_MIN },
+    Pair { label: "--text on --del-bg",   fg: "var(--text)",  bg: "var(--del-bg)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--text on --ins-bg",   fg: "var(--text)",  bg: "var(--ins-bg)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--text on --rep-bg",   fg: "var(--text)",  bg: "var(--rep-bg)", assumed_over: None, min: TEXT_MIN, high_min: None },
     // `.pane-gutter`'s line numbers: --muted, overridden to --del-bg/--ins-bg
     // on a del/ins row (no rep-bg variant - a replace hunk's gutter keeps
     // the del/ins split per side, never --rep-bg itself).
-    Pair { label: "--muted on --del-bg (gutter)", fg: "var(--muted)", bg: "var(--del-bg)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--muted on --ins-bg (gutter)", fg: "var(--muted)", bg: "var(--ins-bg)", assumed_over: None, min: TEXT_MIN },
+    Pair { label: "--muted on --del-bg (gutter)", fg: "var(--muted)", bg: "var(--del-bg)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--muted on --ins-bg (gutter)", fg: "var(--muted)", bg: "var(--ins-bg)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     // ── Marks on their own row background (3:1; colour-vision's ΔE floor
     // also binds these, but review 196 asked that they be in THIS table
     // too, so nothing drops out if colour-vision's own list ever changes) ──
-    Pair { label: "--del-mark on --del-bg", fg: "var(--del-mark)", bg: "var(--del-bg)", assumed_over: None, min: CONTROL_MIN },
-    Pair { label: "--ins-mark on --ins-bg", fg: "var(--ins-mark)", bg: "var(--ins-bg)", assumed_over: None, min: CONTROL_MIN },
+    // RFC-097 stage 2 §2.2: High raises "control edges and the diff's
+    // marks to at least 4.5:1" (handoff 098 §2.2) - these three marks
+    // gain high_min: Some(HIGH_MARK_MIN), alongside --control-border below.
+    Pair { label: "--del-mark on --del-bg", fg: "var(--del-mark)", bg: "var(--del-bg)", assumed_over: None, min: CONTROL_MIN, high_min: Some(HIGH_MARK_MIN) },
+    Pair { label: "--ins-mark on --ins-bg", fg: "var(--ins-mark)", bg: "var(--ins-bg)", assumed_over: None, min: CONTROL_MIN, high_min: Some(HIGH_MARK_MIN) },
     // --rep-mark (review 196 §3): its own token now, not --warn, which had
     // no red-green-safe override and measured 2.76 here in Light.
-    Pair { label: "--rep-mark on --rep-bg", fg: "var(--rep-mark)", bg: "var(--rep-bg)", assumed_over: None, min: CONTROL_MIN },
+    Pair { label: "--rep-mark on --rep-bg", fg: "var(--rep-mark)", bg: "var(--rep-bg)", assumed_over: None, min: CONTROL_MIN, high_min: Some(HIGH_MARK_MIN) },
     // ── Inline character-level spans (`.in-del`/`.in-ins`): only ever
     // rendered inside a Replace hunk's row (`pair_inline`, hunk.rs, gated
     // on `HunkKind::Replace`) - ASSUMED_OVER states that, rather than the
     // search-match override (`.diff-row.match .cell`) that could in
     // principle also apply to the same cell at the same time; review 196
     // accepted this as the primary case to table. ──
-    Pair { label: "--text on .in-del",  fg: "var(--text)", bg: "color-mix(in srgb, var(--del-mark) 25%, transparent)", assumed_over: Some("var(--rep-bg)"), min: TEXT_MIN },
-    Pair { label: "--text on .in-ins",  fg: "var(--text)", bg: "color-mix(in srgb, var(--ins-mark) 25%, transparent)", assumed_over: Some("var(--rep-bg)"), min: TEXT_MIN },
+    Pair { label: "--text on .in-del",  fg: "var(--text)", bg: "color-mix(in srgb, var(--del-mark) 25%, transparent)", assumed_over: Some("var(--rep-bg)"), min: TEXT_MIN, high_min: None },
+    Pair { label: "--text on .in-ins",  fg: "var(--text)", bg: "color-mix(in srgb, var(--ins-mark) 25%, transparent)", assumed_over: Some("var(--rep-bg)"), min: TEXT_MIN, high_min: None },
     // ── Tinted backgrounds whose real backdrop is fixed, so the CSS now
     // names it directly instead of `transparent` (see this module's own
     // doc comment) ──
-    Pair { label: "--text on a search match (.diff-row.match)",    fg: "var(--text)",   bg: "color-mix(in srgb, var(--accent) 12%, var(--surface))",   assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--text on the warning banner (.diff-warning-banner)", fg: "var(--text)", bg: "color-mix(in srgb, var(--warn) 14%, var(--surface))", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--text on .profile-row.active",  fg: "var(--text)",   bg: "color-mix(in srgb, var(--accent) 12%, var(--surface))",   assumed_over: None, min: TEXT_MIN },
+    Pair { label: "--text on a search match (.diff-row.match)",    fg: "var(--text)",   bg: "color-mix(in srgb, var(--accent) 12%, var(--surface))",   assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--text on the warning banner (.diff-warning-banner)", fg: "var(--text)", bg: "color-mix(in srgb, var(--warn) 14%, var(--surface))", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--text on .profile-row.active",  fg: "var(--text)",   bg: "color-mix(in srgb, var(--accent) 12%, var(--surface))",   assumed_over: None, min: TEXT_MIN, high_min: None },
     // `.tree-row.selected`: 18% put warn/ins-mark/err below 4.5:1 in Light
     // (and err in Night) - 10% (review 196 §3) clears all three. Review
     // 197 §1 asked that --text/--muted be tabled too (a real pair on a
     // background that was about to change again, not just "checked"),
     // and that the row's own selection indicator - the leading-edge
     // --accent bar (03-components.css), not the tint - get its own entry.
-    Pair { label: "--warn on a selected tree row",     fg: "var(--warn)",     bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--ins-mark on a selected tree row", fg: "var(--ins-mark)", bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--err on a selected tree row",      fg: "var(--err)",      bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--text on a selected tree row",     fg: "var(--text)",     bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--muted on a selected tree row",    fg: "var(--muted)",    bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN },
+    Pair { label: "--warn on a selected tree row",     fg: "var(--warn)",     bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--ins-mark on a selected tree row", fg: "var(--ins-mark)", bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--err on a selected tree row",      fg: "var(--err)",      bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--text on a selected tree row",     fg: "var(--text)",     bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--muted on a selected tree row",    fg: "var(--muted)",    bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     // The selection indicator itself (`box-shadow: inset 3px 0 0 0
     // var(--accent)`) - not a `color:`/`background:` value, so check 4
     // never requires this entry, the same way --control-border's own
     // entries aren't check-4-required; hand-added because WCAG 1.4.11
     // still applies to it.
-    Pair { label: "the selected-row indicator (box-shadow)", fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: CONTROL_MIN },
+    Pair { label: "the selected-row indicator (box-shadow)", fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: CONTROL_MIN, high_min: None },
     // RFC-097 stage 3 §3: Deep Compare's selected row carries the same
     // indicator, over the same background - same reasoning as the
     // Explorer's own entry just above, not re-derived.
-    Pair { label: "the Deep Compare selected-row indicator (box-shadow)", fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: CONTROL_MIN },
+    Pair { label: "the Deep Compare selected-row indicator (box-shadow)", fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: CONTROL_MIN, high_min: None },
     // `.filter-toggle[aria-pressed="true"]`/`.path-bar.pane-focused`: 12%/
     // 10% put --accent's own text below 4.5:1 (4.41/4.32 dark/light;
     // 4.46 light) - both now 8% (review 196 §3).
-    Pair { label: "--accent on *Filter* pressed",       fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 8%, var(--surface-2))", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--accent on the focused pane's path bar", fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 8%, var(--surface-2))", assumed_over: None, min: TEXT_MIN },
+    Pair { label: "--accent on *Filter* pressed",       fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 8%, var(--surface-2))", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--accent on the focused pane's path bar", fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 8%, var(--surface-2))", assumed_over: None, min: TEXT_MIN, high_min: None },
     // ── Solid token-on-token fills elsewhere in the app ──
-    Pair { label: "--text on --danger-bg (tab close, hover)", fg: "var(--text)",    bg: "var(--danger-bg)", assumed_over: None, min: TEXT_MIN },
-    Pair { label: "--surface on --accent (*Compare*, hover)",  fg: "var(--surface)", bg: "var(--accent)",    assumed_over: None, min: TEXT_MIN },
+    Pair { label: "--text on --danger-bg (tab close, hover)", fg: "var(--text)",    bg: "var(--danger-bg)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--surface on --accent (*Compare*, hover)",  fg: "var(--surface)", bg: "var(--accent)",    assumed_over: None, min: TEXT_MIN, high_min: None },
     // ── Control edges (F215; not a `color:`/`background:` pairing, so
-    // check 4 never requires these, but they still need their own 3:1) ──
-    Pair { label: "--control-border on --surface",   fg: "var(--control-border)", bg: "var(--surface)",   assumed_over: None, min: CONTROL_MIN },
-    Pair { label: "--control-border on --surface-2", fg: "var(--control-border)", bg: "var(--surface-2)", assumed_over: None, min: CONTROL_MIN },
-    Pair { label: "--control-border on --surface-3", fg: "var(--control-border)", bg: "var(--surface-3)", assumed_over: None, min: CONTROL_MIN },
+    // check 4 never requires these, but they still need their own 3:1 -
+    // 4.5:1 under High, RFC-097 stage 2 §2.2) ──
+    Pair { label: "--control-border on --surface",   fg: "var(--control-border)", bg: "var(--surface)",   assumed_over: None, min: CONTROL_MIN, high_min: Some(HIGH_MARK_MIN) },
+    Pair { label: "--control-border on --surface-2", fg: "var(--control-border)", bg: "var(--surface-2)", assumed_over: None, min: CONTROL_MIN, high_min: Some(HIGH_MARK_MIN) },
+    Pair { label: "--control-border on --surface-3", fg: "var(--control-border)", bg: "var(--surface-3)", assumed_over: None, min: CONTROL_MIN, high_min: Some(HIGH_MARK_MIN) },
 ];
 
 const THEMES: [&str; 3] = ["dark", "light", "night"];
@@ -179,6 +203,11 @@ const THEMES: [&str; 3] = ["dark", "light", "night"];
 /// overrides six tokens in `.theme-light` only, several of which now appear
 /// in `PAIRS`, so both passes of every theme are checked, not just one.
 const PALETTES: [(&str, bool); 2] = [("standard", false), ("red-green-safe", true)];
+/// RFC-097 stage 2 §2.2: the third, independent axis — every theme ×
+/// colour-vision combination is now also checked at both contrast levels
+/// (3 × 2 × 2 = 12), `.contrast-high`'s own tokens resolved from
+/// `01-tokens.css` the same way `.cv-rgsafe`'s always have been.
+const CONTRASTS: [(&str, bool); 2] = [("standard", false), ("high", true)];
 
 /// Splits `s` on the first top-level comma - one not inside a `(...)` - so
 /// a nested `color-mix(...)` in `c1`'s own position doesn't fool a naive
@@ -210,17 +239,18 @@ fn resolve_css_color(
     rules: &[crate::css_shared::Rule],
     theme: &str,
     rgsafe: bool,
+    contrast_high: bool,
     assumed_over: Option<&str>,
 ) -> Rgb {
     let expr = expr.trim();
     if expr == "transparent" {
         let base = assumed_over
             .unwrap_or_else(|| panic!("`transparent` in {expr:?} has no stated assumed backdrop"));
-        return resolve_css_color(base, rules, theme, rgsafe, assumed_over);
+        return resolve_css_color(base, rules, theme, rgsafe, contrast_high, assumed_over);
     }
     if let Some(inner) = expr.strip_prefix("var(").and_then(|s| s.strip_suffix(')')) {
-        let value = resolve_token(rules, theme, rgsafe, inner.trim());
-        return resolve_css_color(&value, rules, theme, rgsafe, assumed_over);
+        let value = resolve_token(rules, theme, rgsafe, contrast_high, inner.trim());
+        return resolve_css_color(&value, rules, theme, rgsafe, contrast_high, assumed_over);
     }
     if expr.starts_with('#') {
         return hex_to_srgb(expr);
@@ -242,8 +272,8 @@ fn resolve_css_color(
             .unwrap_or_else(|| panic!("expected a percentage in {expr:?}, got {pct:?}"))
             .parse()
             .unwrap_or_else(|e| panic!("bad percentage in {expr:?}: {e}"));
-        let c1 = resolve_css_color(color1, rules, theme, rgsafe, assumed_over);
-        let c2 = resolve_css_color(part2, rules, theme, rgsafe, assumed_over);
+        let c1 = resolve_css_color(color1, rules, theme, rgsafe, contrast_high, assumed_over);
+        let c2 = resolve_css_color(part2, rules, theme, rgsafe, contrast_high, assumed_over);
         let p = pct / 100.0;
         return (
             p * c1.0 + (1.0 - p) * c2.0,
@@ -262,16 +292,37 @@ fn check_pairs(root: &Path, problems: &mut Vec<String>) {
 
     for &theme in &THEMES {
         for &(palette, rgsafe) in &PALETTES {
-            for pair in PAIRS {
-                let fg = resolve_css_color(pair.fg, &rules, theme, rgsafe, pair.assumed_over);
-                let bg = resolve_css_color(pair.bg, &rules, theme, rgsafe, pair.assumed_over);
-                let ratio = contrast_ratio_rgb(fg, bg);
-                if ratio < pair.min {
-                    problems.push(format!(
-                        "{theme}/{palette}: {} ({} on {}) has contrast {ratio:.2}, below the \
-                         required {:.1}",
-                        pair.label, pair.fg, pair.bg, pair.min
-                    ));
+            for &(contrast_label, contrast_high) in &CONTRASTS {
+                for pair in PAIRS {
+                    let min = if contrast_high {
+                        pair.high_min.unwrap_or(pair.min)
+                    } else {
+                        pair.min
+                    };
+                    let fg = resolve_css_color(
+                        pair.fg,
+                        &rules,
+                        theme,
+                        rgsafe,
+                        contrast_high,
+                        pair.assumed_over,
+                    );
+                    let bg = resolve_css_color(
+                        pair.bg,
+                        &rules,
+                        theme,
+                        rgsafe,
+                        contrast_high,
+                        pair.assumed_over,
+                    );
+                    let ratio = contrast_ratio_rgb(fg, bg);
+                    if ratio < min {
+                        problems.push(format!(
+                            "{theme}/{palette}/{contrast_label}: {} ({} on {}) has contrast \
+                             {ratio:.2}, below the required {min:.1}",
+                            pair.label, pair.fg, pair.bg
+                        ));
+                    }
                 }
             }
         }
@@ -574,14 +625,16 @@ pub fn run(root: &Path) {
     }
 
     println!(
-        "contrast check passed: every declared pair meets its WCAG minimum in every theme × \
-         colour-vision combination ({} pairs x {} themes x {} palettes); no `opacity` below 1 \
-         and no `font-size` below 12px outside their reasoned allowlists ({} opacity, {} \
-         font-size); every `color:`/`background:` value in assets/css/*.css is covered by a \
-         pair or BACKGROUND_VALUE_ALLOWLIST ({} entries):",
+        "contrast check passed: every declared pair meets its WCAG minimum (its own High floor, \
+         under contrast-high) in every theme × colour-vision × contrast combination ({} pairs x \
+         {} themes x {} palettes x {} contrast levels); no `opacity` below 1 and no `font-size` \
+         below 12px outside their reasoned allowlists ({} opacity, {} font-size); every \
+         `color:`/`background:` value in assets/css/*.css is covered by a pair or \
+         BACKGROUND_VALUE_ALLOWLIST ({} entries):",
         PAIRS.len(),
         THEMES.len(),
         PALETTES.len(),
+        CONTRASTS.len(),
         OPACITY_ALLOWLIST.len(),
         FONT_SIZE_ALLOWLIST.len(),
         BACKGROUND_VALUE_ALLOWLIST.len(),
@@ -675,6 +728,7 @@ mod tests {
             &rules,
             "dark",
             false,
+            false,
             None,
         );
         assert!((rgb.0 - 0.5).abs() < 1e-9);
@@ -685,7 +739,7 @@ mod tests {
     #[test]
     fn resolve_css_color_resolves_transparent_against_its_stated_backdrop() {
         let rules = Vec::new();
-        let rgb = resolve_css_color("transparent", &rules, "dark", false, Some("#336699"));
+        let rgb = resolve_css_color("transparent", &rules, "dark", false, false, Some("#336699"));
         assert_eq!(rgb, hex_to_srgb("#336699"));
     }
 
@@ -693,7 +747,7 @@ mod tests {
     #[should_panic(expected = "no stated assumed backdrop")]
     fn resolve_css_color_panics_on_transparent_with_no_assumed_backdrop() {
         let rules = Vec::new();
-        resolve_css_color("transparent", &rules, "dark", false, None);
+        resolve_css_color("transparent", &rules, "dark", false, false, None);
     }
 
     #[test]

@@ -11,7 +11,7 @@
 use crate::persist::schema::PersistenceLoad;
 use crate::persist::schema::settings::{PersistedDiffProfile, PersistedSettings, load_settings};
 use crate::settings::display::{
-    ColourVision, Density, DiffFontFamilySetting, FontFamilySetting, LocaleId, ThemeId,
+    ColourVision, Contrast, Density, DiffFontFamilySetting, FontFamilySetting, LocaleId, ThemeId,
 };
 use forskscope_compare::diff::{
     CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode,
@@ -27,6 +27,7 @@ fn sample_v2() -> PersistedSettings {
         text_size: 125,
         theme: ThemeId::Night,
         colour_vision: ColourVision::RedGreenSafe,
+        contrast: Contrast::High,
         language: LocaleId::english(),
         diff_font_size: 15,
         diff_font_family: DiffFontFamilySetting::Consolas,
@@ -112,6 +113,7 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
         text_size: 150,
         theme: ThemeId::Night,
         colour_vision: ColourVision::RedGreenSafe,
+        contrast: Contrast::High,
         language: LocaleId::japanese(),
         diff_font_size: 15,
         diff_font_family: DiffFontFamilySetting::Consolas,
@@ -199,6 +201,25 @@ fn a_pre_colour_vision_v2_file_loads_with_the_standard_palette() {
     }
 }
 
+/// RFC-097 stage 2 §2.2: a v2 settings file written before `contrast`
+/// existed (every release through `0.197.x`) has no such key in its payload
+/// at all. `#[serde(default)]` is what makes a *missing* field fall back to
+/// `Contrast::Standard` rather than fail to parse. Falsify by removing
+/// `#[serde(default)]` from the field: this fails to parse and the match
+/// hits the `other` arm.
+#[test]
+fn a_pre_contrast_v2_file_loads_at_standard() {
+    let mut payload = serde_json::to_value(sample_v2()).unwrap();
+    payload.as_object_mut().unwrap().remove("contrast");
+    let raw = envelope_for(2, &payload);
+    match load_settings(&raw) {
+        PersistenceLoad::Current { value } => {
+            assert_eq!(value.contrast, Contrast::Standard);
+        }
+        other => panic!("expected Current, got {other:?}"),
+    }
+}
+
 /// RFC-097 stage 1 (handoff 095 §4): a v2 settings file written before
 /// `text_size` existed (every release through `0.196.x`) has no such key
 /// in its payload at all. `#[serde(default)]` is what makes a *missing*
@@ -254,6 +275,7 @@ fn legacy_v0_fixture_migrates_every_field_exactly() {
             assert_eq!(value.density, Density::default());
             assert_eq!(value.performance, PerformanceLimits::default());
             assert_eq!(value.colour_vision, ColourVision::default());
+            assert_eq!(value.contrast, Contrast::default());
         }
         other => panic!("expected MigratedLegacy, got {other:?}"),
     }

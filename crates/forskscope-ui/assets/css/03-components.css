@@ -86,6 +86,17 @@ code.path-display {
 .diff-loading-spinner { display: inline-block; font-size: 18px; line-height: 1; animation: spin 1.2s linear infinite; }
 .diff-error { padding: 1.5rem; }
 
+/* RFC-097 stage 2 §2.3: both spinners (this one, and .tab-loading-spinner
+   in 02-layout-shell.css) stop rotating under prefers-reduced-motion. Each
+   keeps its own static glyph; progress is already shown by text alongside
+   it either way ("Loading {title}…" here, a translated ", loading" suffix
+   for the tab one) - nothing else to swap in once the spin itself stops.
+   No app setting: the system's own preference is enough (there is nothing
+   for a user to choose here beyond what the OS already reports). */
+@media (prefers-reduced-motion: reduce) {
+  .diff-loading-spinner, .tab-loading-spinner { animation: none; }
+}
+
 /* ---- settings ---- */
 .advanced-toggle {
   background: none; border: none; color: var(--muted); cursor: pointer;
@@ -193,7 +204,11 @@ code.path-display {
 .path-segments .bc-seg { flex-shrink: 1; min-width: 24px; overflow: hidden; text-overflow: ellipsis; }
 .path-input { flex: 1; padding: .2rem .4rem; border: 1px solid var(--control-border); background: var(--surface); color: var(--text); border-radius: 3px; font-size: 12px; min-width: 6ch; }
 .path-input.error { border-color: var(--del-mark, #e05); }
-.path-input:focus { outline: 2px solid var(--accent); }
+/* RFC-097 stage 2 §2.2: same fix as .hunk.focused (11-view-diff.css) - a
+   hardcoded 2px, now var(--focus-ring), so High contrast's 3px floor
+   actually reaches every focus indicator in the app, not just the ones
+   that already read the token. */
+.path-input:focus { outline: var(--focus-ring) solid var(--accent); }
 
 /* ── ⋯ path-bar menu (F185, handoff 074 §2.1 — small and local, not #111's
    future context-menu framework) ──

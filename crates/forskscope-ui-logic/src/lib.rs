@@ -118,7 +118,9 @@ pub use settings::persistence_recovery::{
     RecoveryDialogAction as SettingsRecoveryDialogAction, SettingsRecoveryView,
     action_label as settings_recovery_action_label,
 };
-pub use settings::settings_view::{clamp_font_size, step_text_size, theme_choices};
+pub use settings::settings_view::{
+    clamp_font_size, contrast_choices, step_text_size, theme_choices,
+};
 
 // update_check
 pub use update_check::{

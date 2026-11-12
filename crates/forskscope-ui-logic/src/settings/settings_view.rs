@@ -51,7 +51,7 @@
 //! or CSS injection (`ThemeId::css_var_names`), which live in core.
 
 use forskscope_desktop::settings::ThemeId;
-use forskscope_desktop::settings::display::{TEXT_SIZE_STEPS, nearest_text_size_step};
+use forskscope_desktop::settings::display::{Contrast, TEXT_SIZE_STEPS, nearest_text_size_step};
 
 // ── Generic choice ────────────────────────────────────────────────────────────
 
@@ -67,9 +67,20 @@ pub struct SelectChoice {
 
 // ── Theme choices ─────────────────────────────────────────────────────────────
 
-/// All available theme choices, in display order.
-pub fn theme_choices() -> Vec<SelectChoice> {
-    vec![
+/// All available theme choices, in display order. `system_offered` is the
+/// caller's own platform/runtime decision (RFC-097 stage 2 §2.1, decided
+/// from measurement: Windows always; Linux once the settings portal has
+/// answered this session; not yet on macOS) — this function stays pure
+/// derivation, with no OS check of its own.
+pub fn theme_choices(system_offered: bool) -> Vec<SelectChoice> {
+    let mut choices = vec![];
+    if system_offered {
+        choices.push(SelectChoice {
+            value: ThemeId::System.as_str(),
+            label: "System",
+        });
+    }
+    choices.extend([
         SelectChoice {
             value: ThemeId::Dark.as_str(),
             label: "Dark",
@@ -81,6 +92,29 @@ pub fn theme_choices() -> Vec<SelectChoice> {
         SelectChoice {
             value: ThemeId::Night.as_str(),
             label: "Night",
+        },
+    ]);
+    choices
+}
+
+// ── Contrast choices ──────────────────────────────────────────────────────────
+
+/// All available contrast choices, in display order. Unlike [`theme_choices`],
+/// *System* is offered unconditionally — every platform measured
+/// `prefers-contrast: more` reaching the web view (reply 184/review 210).
+pub fn contrast_choices() -> Vec<SelectChoice> {
+    vec![
+        SelectChoice {
+            value: Contrast::System.as_str(),
+            label: "System",
+        },
+        SelectChoice {
+            value: Contrast::Standard.as_str(),
+            label: "Standard",
+        },
+        SelectChoice {
+            value: Contrast::High.as_str(),
+            label: "High",
         },
     ]
 }
@@ -126,10 +160,25 @@ mod tests {
     // ── theme_choices ─────────────────────────────────────────────────────────
 
     #[test]
-    fn theme_choices_covers_all_three_themes() {
-        let choices = theme_choices();
+    fn theme_choices_covers_all_three_themes_when_system_is_not_offered() {
+        let choices = theme_choices(false);
         assert_eq!(choices.len(), 3, "must have exactly three themes");
         let values: Vec<_> = choices.iter().map(|c| c.value).collect();
+        assert!(values.contains(&"dark"), "must include dark");
+        assert!(values.contains(&"light"), "must include light");
+        assert!(values.contains(&"night"), "must include night");
+        assert!(
+            !values.contains(&"system"),
+            "system must not appear when not offered"
+        );
+    }
+
+    #[test]
+    fn theme_choices_adds_system_when_offered() {
+        let choices = theme_choices(true);
+        assert_eq!(choices.len(), 4, "must have exactly four themes");
+        let values: Vec<_> = choices.iter().map(|c| c.value).collect();
+        assert!(values.contains(&"system"), "must include system");
         assert!(values.contains(&"dark"), "must include dark");
         assert!(values.contains(&"light"), "must include light");
         assert!(values.contains(&"night"), "must include night");
@@ -137,7 +186,7 @@ mod tests {
 
     #[test]
     fn theme_choice_values_match_theme_id_as_str() {
-        for choice in theme_choices() {
+        for choice in theme_choices(true) {
             let tid = ThemeId::from_id(choice.value)
                 .expect("every theme value must parse with ThemeId::from_id");
             assert_eq!(tid.as_str(), choice.value);
@@ -146,20 +195,64 @@ mod tests {
 
     #[test]
     fn theme_choices_labels_are_non_empty() {
-        for c in theme_choices() {
+        for c in theme_choices(true) {
             assert!(!c.label.is_empty(), "theme {} must have a label", c.value);
         }
     }
 
     #[test]
     fn no_duplicate_values_in_theme_choices() {
-        let mut values: Vec<_> = theme_choices().iter().map(|c| c.value).collect();
+        let mut values: Vec<_> = theme_choices(true).iter().map(|c| c.value).collect();
         let before = values.len();
         values.dedup();
         assert_eq!(
             values.len(),
             before,
             "theme choices must have unique values"
+        );
+    }
+
+    // ── contrast_choices ──────────────────────────────────────────────────────
+
+    #[test]
+    fn contrast_choices_covers_all_three_levels() {
+        let choices = contrast_choices();
+        assert_eq!(choices.len(), 3, "must have exactly three contrast choices");
+        let values: Vec<_> = choices.iter().map(|c| c.value).collect();
+        assert!(values.contains(&"system"), "must include system");
+        assert!(values.contains(&"standard"), "must include standard");
+        assert!(values.contains(&"high"), "must include high");
+    }
+
+    #[test]
+    fn contrast_choice_values_match_contrast_as_str() {
+        for choice in contrast_choices() {
+            let c = Contrast::from_id(choice.value)
+                .expect("every contrast value must parse with Contrast::from_id");
+            assert_eq!(c.as_str(), choice.value);
+        }
+    }
+
+    #[test]
+    fn contrast_choices_labels_are_non_empty() {
+        for c in contrast_choices() {
+            assert!(
+                !c.label.is_empty(),
+                "contrast {} must have a label",
+                c.value
+            );
+        }
+    }
+
+    #[test]
+    fn no_duplicate_values_in_contrast_choices() {
+        let mut values: Vec<_> = contrast_choices().iter().map(|c| c.value).collect();
+        let before = values.len();
+        values.dedup();
+        assert_eq!(
+            values.len(),
+            before,
+            "contrast choices must have unique values"
         );
     }
 
