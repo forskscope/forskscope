@@ -12,9 +12,9 @@ for a known *unchanged* one.
 
 Usage: forced_colors_pixel_check.py <binary> <data-dir> <left> <right> <capture-png>
 Prints one `GUTTER:` line per row, in document order, with its own text,
-its changed/unchanged classification (from that text - this fixture's
-exact lines are known, not guessed), and the matching-pixel count in its
-4px gutter strip.
+its changed/unchanged classification (by y-position, matched against
+where this fixture's own known changed lines were found - not guessed),
+and the matching-pixel count in its 4px gutter strip.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from windows_harness import (  # noqa: E402
     connect,
+    find_by_text_containing,
     launch,
     terminate,
     wait_for_row_shape,
@@ -60,6 +61,24 @@ def row_text(row) -> str:
         return (row.window_text() or "").strip()
     except Exception:  # noqa: BLE001
         return ""
+
+
+def changed_row_tops(win) -> list[int]:
+    """The `.rectangle().top` of each known-changed fixture line, found
+    directly by its own text (`find_by_text_containing`, the same proven
+    anchor this harness's `find_leaf_rect`/p03 already use) - `.diff-row`
+    elements themselves measured empty (`row.window_text()`) on every
+    row, live (run 43145780040), so classification goes by the content
+    cell's own text instead, not the row element's."""
+    tops = []
+    for fragment in CHANGED_LINE_FRAGMENTS:
+        elem = find_by_text_containing(win, fragment)
+        if elem is not None:
+            try:
+                tops.append(elem.rectangle().top)
+            except Exception:  # noqa: BLE001
+                pass
+    return tops
 
 
 def main() -> int:
@@ -114,24 +133,17 @@ def main() -> int:
 
         ordered = sorted(rows, key=lambda r: (r.rectangle().top, r.rectangle().left))
 
-        # Group left/right rows at the same y into one logical "line" -
-        # an insert/delete's empty side carries no text at all (nothing
-        # to show a line number for, the exact case review 211 §1 asked
-        # to check), so classifying *per element* by its own text would
-        # wrongly call that empty side "unchanged". Classifying by the
-        # y-group instead means the empty side inherits its paired
-        # side's real status.
-        groups: dict[int, list] = {}
-        for row in ordered:
-            top = row.rectangle().top
-            key = next((k for k in groups if abs(k - top) <= 2), top)
-            groups.setdefault(key, []).append(row)
-        group_changed: dict[int, bool] = {
-            key: any(
-                any(frag in row_text(r) for frag in CHANGED_LINE_FRAGMENTS) for r in members
-            )
-            for key, members in groups.items()
-        }
+        # An insert/delete's empty side carries no text at all (nothing to
+        # show a line number for, the exact case review 211 §1 asked to
+        # check) - found by its own fixture-line text instead
+        # (`changed_row_tops`), then matched to whichever row(s) share
+        # that y, so the empty side inherits its paired side's real
+        # status rather than being read as "unchanged" for having no
+        # text of its own.
+        changed_tops = changed_row_tops(win)
+
+        def is_changed_top(top: int) -> bool:
+            return any(abs(top - ct) <= 2 for ct in changed_tops)
 
         any_changed_has_bar = False
         any_unchanged_has_bar = False
@@ -141,8 +153,7 @@ def main() -> int:
             y0 = rect.top - win_rect.top
             y1 = rect.bottom - win_rect.top
             text = row_text(row)
-            group_key = next((k for k in groups if abs(k - rect.top) <= 2), rect.top)
-            changed = group_changed[group_key]
+            changed = is_changed_top(rect.top)
             count = 0
             total = 0
             for y in range(max(y0, 0), min(y1, img.height)):
