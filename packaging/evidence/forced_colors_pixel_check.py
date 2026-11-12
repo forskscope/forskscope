@@ -21,16 +21,21 @@ from __future__ import annotations
 
 import ctypes
 import sys
-import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from windows_harness import (  # noqa: E402
-    collect_diff_rows,
     connect,
     launch,
     terminate,
+    wait_for_row_shape,
 )
+
+# left.txt/right.txt (five lines each) - the row count `wait_for_row_shape`
+# polls for, the same F57-safe pattern every other harness case here uses
+# rather than a flat `sleep()`: a single tree walk right after `connect()`
+# can catch WebView2 mid-render and see a partial row set.
+EXPECTED_ROWS_PER_PANE = 5
 
 COLOR_HIGHLIGHT = 13
 # A changed row always carries one of these three fixture lines on
@@ -78,11 +83,13 @@ def main() -> int:
     )
     try:
         _app, win = connect(proc.pid)
-        time.sleep(2)  # let the diff fully render before reading rows
-
-        rows = collect_diff_rows(win)
+        _frame, left_rows, right_rows = wait_for_row_shape(win, EXPECTED_ROWS_PER_PANE)
+        rows = left_rows + right_rows
         if not rows:
-            print("FAIL: no .diff-row elements found", file=sys.stderr)
+            print(
+                f"FAIL: no .diff-row elements found (wanted {EXPECTED_ROWS_PER_PANE} per pane)",
+                file=sys.stderr,
+            )
             return 1
 
         win_rect = win.rectangle()
