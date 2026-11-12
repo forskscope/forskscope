@@ -1,6 +1,6 @@
 # RFC 097: Readable for Everyone — Text Size, Contrast and Visible Controls
 
-**Status.** Accepted.
+**Status.** Implemented: stage 1 in `0.197.0` (`545298f`; reviews 199–206), stages 2–3 in `0.198.0` (reviews 207–213).
 **Proposed.** 2026-11-04 by the architect, from the owner's question about
 older users (layout, typography, colour).
 **Accepted.** 2026-11-04 by the project owner ("Your recommendation is

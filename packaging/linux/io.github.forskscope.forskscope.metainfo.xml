@@ -60,6 +60,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.198.0" date="2026-11-12">
+      <description>
+        <p>A System theme and a High contrast option, words beside the toolbar's symbols, and selectable rows in folder comparisons.</p>
+      </description>
+    </release>
     <release version="0.197.0" date="2026-11-08">
       <description>
         <p>A text size setting from 100 % to 200 %, stronger contrast in every theme, and no text smaller than 12 px.</p>

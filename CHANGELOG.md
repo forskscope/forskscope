@@ -5,7 +5,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.197.1] — Unreleased
+## [0.198.0] — 2026-11-12
+
+**Readable for everyone, part 2.**
+
+### Added
+
+- **A *System* theme** follows your computer's light/dark setting, and
+  switches when it changes. It's offered on Windows, and on Linux desktops
+  that provide the standard settings service (GNOME and KDE, and inside the
+  Flatpak). A new install starts on it where it is offered. A theme you
+  have already chosen is kept.
+- **Contrast** (Settings → *Contrast*): *Standard*, *High*, or *System*,
+  which follows your system's contrast setting. *High* raises secondary text
+  and the diff's lines to 7:1 or more, and field and button edges and the
+  diff's marks to 4.5:1 or more. It also thickens the focus ring and gives
+  disabled buttons a dashed edge.
+- **Rows in a folder comparison can be selected.** Click a row to select
+  it. Double-click it, or press Enter, to open it. Up and Down move the
+  selection. The row's buttons appear on the selected row.
+- **A key to the Explorer's symbols,** naming those currently on screen.
+
+### Changed
+
+- **The comparison toolbar shows words beside its symbols:** *Previous
+  change*, *Next change* and *Search*. The "?" button reads *Shortcuts*.
+- ***Redo* sits beside *Undo*.**
+- **Settings help text is shown under each field,** not only on hover.
+- **No button appears only on hover.** Every tab shows its ×.
+- **Click targets are at least 24 px.**
+- **The Explorer's hint is no longer in italics.**
+- **When your system asks for less motion,** the loading spinners stop
+  turning.
+
+### Fixed
+
+- **The status bar shortens long file names** instead of cutting off the
+  label at its end (F220, since 0.197.0).
+- **Under a Windows contrast theme, changed lines keep a bar** in the
+  theme's highlight colour beside their line numbers (F222). Before, only
+  their marks set them apart.
 
 ## [0.197.0] — 2026-11-08
 
