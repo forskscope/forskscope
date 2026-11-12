@@ -1575,7 +1575,11 @@ def p12(binary, break_mode=False):
                 flush=True,
             )
 
-            r = ui("select_popup_item", "2", "日本語", timeout=20)
+            # RFC-097 stage 2 inserted a Contrast popup (#2) between Theme
+            # (#1) and Colour vision (#3), so Language is now popup #4, not
+            # #2 - the same ordinal-by-position reasoning this harness
+            # already uses for Theme, updated for the new field.
+            r = ui("select_popup_item", "4", "日本語", timeout=20)
             if not r.startswith("SELECTED"):
                 print(f"FAIL: could not select Language=日本語: {r}", file=sys.stderr)
                 return 1
@@ -1583,7 +1587,7 @@ def p12(binary, break_mode=False):
             r = poll_ui(
                 "get_value",
                 "AXPopUpButton",
-                "2",
+                "4",
                 predicate=lambda r: r == "VALUE: 日本語",
                 timeout=10,
             )
@@ -1666,7 +1670,7 @@ def p12(binary, break_mode=False):
             r = poll_ui(
                 "get_value",
                 "AXPopUpButton",
-                "2",
+                "4",
                 predicate=lambda r: r == "VALUE: 日本語",
                 timeout=10,
             )

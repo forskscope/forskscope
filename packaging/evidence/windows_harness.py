@@ -2977,12 +2977,13 @@ def p12(binary, break_mode=False):
     confirms tab restore happens only on a no-args relaunch, not one with
     explicit CLI paths.
 
-    Settings dialog controls are located ordinally (first `ComboBox` =
-    Theme, second = Language), not by accessible name: neither `<select>`
-    carries an `aria-label`/`<label for>` in `settings/modal.rs`, so
-    there is nothing for UIA to expose beyond the generic ComboBox role -
-    a real, reported harness limitation (see the module docstring), not
-    an assumption. The font-size number input is set via
+    Settings dialog controls are located ordinally - Theme, Contrast
+    (RFC-097 stage 2), Colour vision, Language, in that order, so Theme is
+    index 0 and Language is index 3 - not by accessible name: none of
+    these `<select>`s carries an `aria-label`/`<label for>` in
+    `settings/modal.rs`, so there is nothing for UIA to expose beyond the
+    generic ComboBox role - a real, reported harness limitation (see the
+    module docstring), not an assumption. The font-size number input is set via
     `set_edit_text()` (UIA's ValuePattern.SetValue), the same
     pattern-based-not-synthesized approach as every other interaction in
     this harness.
@@ -3030,18 +3031,18 @@ def p12(binary, break_mode=False):
 
             deadline = time.monotonic() + LAUNCH_TIMEOUT_S
             combos = []
-            while time.monotonic() < deadline and len(combos) < 2:
+            while time.monotonic() < deadline and len(combos) < 4:
                 try:
                     combos = win.descendants(control_type="ComboBox")
                 except Exception:  # noqa: BLE001
                     combos = []
-                if len(combos) < 2:
+                if len(combos) < 4:
                     time.sleep(POLL_INTERVAL_S)
-            if len(combos) < 2:
-                print(f"FAIL: expected at least 2 ComboBox controls (Theme, Language) in the Settings dialog, found {len(combos)}", file=sys.stderr)
+            if len(combos) < 4:
+                print(f"FAIL: expected at least 4 ComboBox controls (Theme, Contrast, Colour vision, Language) in the Settings dialog, found {len(combos)}", file=sys.stderr)
                 debug_dump(collect_texts(win))
                 return 1
-            theme_combo, lang_combo = combos[0], combos[1]
+            theme_combo, lang_combo = combos[0], combos[3]
             theme_path = select_dropdown(theme_combo, "Light")
             lang_path = select_dropdown(lang_combo, "日本語")
 
@@ -3100,8 +3101,8 @@ def p12(binary, break_mode=False):
 
             wait_for_first(win, "ComboBox", timeout_s=LAUNCH_TIMEOUT_S)
             combos = win.descendants(control_type="ComboBox")
-            if not combos or len(combos) < 2:
-                print(f"FAIL: expected at least 2 ComboBox controls after restart, found {len(combos or [])}", file=sys.stderr)
+            if not combos or len(combos) < 4:
+                print(f"FAIL: expected at least 4 ComboBox controls after restart, found {len(combos or [])}", file=sys.stderr)
                 return 1
             # window_text() alone was empirically found (M5-B) not to
             # reliably reflect a <select>'s current value for this UIA
@@ -3111,8 +3112,8 @@ def p12(binary, break_mode=False):
             if not _combo_shows(combos[0], "Light"):
                 print(f"FAIL: restored Theme combobox does not show Light: {_combo_readback(combos[0])!r}", file=sys.stderr)
                 return 1
-            if not _combo_shows(combos[1], "日本語"):
-                print(f"FAIL: restored Language combobox does not show 日本語: {_combo_readback(combos[1])!r}", file=sys.stderr)
+            if not _combo_shows(combos[3], "日本語"):
+                print(f"FAIL: restored Language combobox does not show 日本語: {_combo_readback(combos[3])!r}", file=sys.stderr)
                 return 1
             edits = find_number_inputs(win)
             if not edits or not _combo_shows(edits[0], "18"):
