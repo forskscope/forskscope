@@ -5,7 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.198.1] — Unreleased
+## [0.198.1] — 2026-11-15
+
+**The Linux listing shows the app as it is now.**
+
+### Changed
+
+- **The Linux listing's screenshots are retaken** for the current
+  interface: the toolbar's words, *Shortcuts*, the Explorer's symbol key,
+  and the folder comparison's buttons on the selected row. The app itself
+  doesn't change.
+
+### Internal
+
+- **The AUR publish no longer fails when Arch Linux updates a core
+  library** (F223). Its build check now upgrades the whole container
+  before installing.
 
 ## [0.198.0] — 2026-11-12
 

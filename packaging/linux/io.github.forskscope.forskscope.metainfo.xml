@@ -44,22 +44,27 @@
   <screenshots>
     <screenshot type="default">
       <caption>The two-pane Explorer, browsing a folder to compare.</caption>
-      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.1/packaging/linux/screenshots/explorer.png</image>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.198.1/packaging/linux/screenshots/explorer.png</image>
     </screenshot>
     <screenshot>
       <caption>Comparing two files, with every changed line highlighted.</caption>
-      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.1/packaging/linux/screenshots/file-comparison.png</image>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.198.1/packaging/linux/screenshots/file-comparison.png</image>
     </screenshot>
     <screenshot>
       <caption>Comparing two folders recursively.</caption>
-      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.1/packaging/linux/screenshots/folder-comparison.png</image>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.198.1/packaging/linux/screenshots/folder-comparison.png</image>
     </screenshot>
     <screenshot>
       <caption>An exported HTML comparison report.</caption>
-      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.196.1/packaging/linux/screenshots/html-report.png</image>
+      <image>https://raw.githubusercontent.com/forskscope/forskscope/0.198.1/packaging/linux/screenshots/html-report.png</image>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.198.1" date="2026-11-15">
+      <description>
+        <p>The screenshots show the current interface. The app itself doesn't change.</p>
+      </description>
+    </release>
     <release version="0.198.0" date="2026-11-12">
       <description>
         <p>A System theme and a High contrast option, words beside the toolbar's symbols, and selectable rows in folder comparisons.</p>
