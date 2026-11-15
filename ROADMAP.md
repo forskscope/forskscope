@@ -1391,6 +1391,7 @@ were in `proposed/`. Nothing checks this — see **F83**.
 | 010 | Post-slice-5 | Packaging, diagnostics, QA |
 | 016 | Slice 8 | Editor bridge security and contract |
 | 095 | After `0.195.0`; stage 1 (screen readers in the sandbox) is a gate | ForskScope as a Flatpak on Flathub: home folder access required, no network permission, the owner writes the manifest — **accepted 2026-10-21**; stage 1 passed (review 185); stage 2 done on `main` (review 189), shipping in `0.196.0`; **stage 3, the Flathub submission, deferred by the owner (2026-10-22)** so the one program ships first |
+| 098 | After `0.198.0`; tooling, no release of its own | Layout checks in CI: the real app under a virtual display measures its own views (overflow, clipped labels, off-screen controls, 24 px targets, rendered contrast, 12 px text) for every text size × language × theme × contrast × colour vision × window size, on every push — **proposed 2026-11-15**, awaiting the owner |
 | 025 | Slice 8 | Editor adapter prototype and kill-switch |
 | 026 | Post-slice-3 | Cross-platform WebView compatibility |
 | 030 | Post-slice-5 | User documentation and onboarding |
