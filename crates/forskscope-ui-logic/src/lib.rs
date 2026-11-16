@@ -65,10 +65,13 @@
 //! toolbar profile picker was a separate deletion, `settings_view`'s
 //! `ProfileChoice`/`profile_presets` — corrected here, review 106 §4: an
 //! earlier version of this comment misattributed it to these two instead.)
+//! **F51 (0.199.0):** the `conflict_nav` module itself (the view-model
+//! `conflict_nav_view` would have rendered) went the same way, for the same
+//! reason — RFC-034's four-region workspace UI was never built, so nothing
+//! ever called it. It also returns from git history with that feature.
 
 pub mod command;
 pub mod compare;
-pub mod conflict_nav;
 pub mod diff_decoration;
 pub mod explore;
 pub mod line_map;

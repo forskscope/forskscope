@@ -1524,32 +1524,6 @@ code.path-display {
    Base .scrim and .modal rules are in 03-components.css.
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* @source css/30-contract-diff-decorations.css */
-/* ── 30-contract-diff-decorations ───────────────────────────────────────────
-   ConflictNavigator CSS class contract (RFC-034).
-
-   F48: this file used to also carry a `.diff-row.fs-line-*` / `.fs-inline-*`
-   block for RFC-024's DiffDecorationSet contract. That DOM never existed —
-   hunk.rs emits only "diff-row" / "diff-row match" and its own separate,
-   already-live per-hunk background contract (11-view-diff.css: .hunk-del/
-   .hunk-ins/.hunk-rep, .pane-gutter, .in-del/.in-ins). The stylesheet, the
-   forskscope-ui-logic::compare::hunk_decorations view-model that fed it, and
-   the two css_coverage tests asserting the classes existed were removed
-   rather than wired through — see RFC-024's status note for the reasoning.
-   forskscope-ui-logic::diff_decoration's DiffDecorationSet/LineDecorationKind/
-   InlineDecorationKind model itself was kept: it is self-contained, tested
-   independently of any renderer, and remains RFC-024's actual "core
-   complete" deliverable.
-   ─────────────────────────────────────────────────────────────────────────── */
-.fsk-conflict-unresolved { color: var(--warn); font-weight: bold; }
-.fsk-conflict-left       { color: var(--ins-mark); }
-.fsk-conflict-right      { color: var(--ins-mark); }
-.fsk-conflict-both       { color: var(--ok); }
-.fsk-conflict-manual     { color: var(--accent); }
-/* F214 (handoff 094): was `opacity: .6` (~2.6:1) on an already-compliant
-   `--muted` - the opacity was the defect, not the colour. */
-.fsk-conflict-ignored    { color: var(--muted); }
-
 /* @source css/90-responsive.css */
 /* ── 90-responsive ──────────────────────────────────────────────────────────
    Responsive overrides for viewports narrower than 720 px.

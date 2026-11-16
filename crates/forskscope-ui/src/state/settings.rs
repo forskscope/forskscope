@@ -269,10 +269,10 @@ pub enum Lang {
 ///
 /// F168: every field here is exactly what [`PersistedDiffProfile`] holds —
 /// `from_v2`/`to_v2` is a lossless round trip for any value either side can
-/// produce, including ones the dialog itself never writes (`whitespace:
-/// IgnoreTrailing`/`IgnoreBlankLines`, `algorithm: Lcs`), so a profile a
-/// future dialog control or a hand-edited `settings.json` sets is carried
-/// through unchanged rather than silently narrowed on the next save.
+/// produce, including ones the dialog itself never writes (`algorithm:
+/// Lcs`), so a profile a future dialog control or a hand-edited
+/// `settings.json` sets is carried through unchanged rather than silently
+/// narrowed on the next save.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiffProfile {
     pub name: String,
@@ -347,12 +347,9 @@ impl DiffProfile {
         DiffOptions {
             // `DiffOptions.ignore_whitespace` is a single bool the engine
             // treats as "strip every whitespace character" — see
-            // `engine.rs`'s `line_key`. It cannot tell `IgnoreTrailing` or
-            // `IgnoreBlankLines` apart from `IgnoreAll`; all three collapse
-            // to the same comparison today. `self.whitespace` still carries
-            // the distinct value losslessly (ignore_whitespace below is
-            // derived, not stored), so a later engine change can make the
-            // distinction real without another migration.
+            // `engine.rs`'s `line_key`. `WhitespaceMode` itself now has only
+            // `Significant`/`IgnoreAll` (F191, 0.199.0 retired the other two,
+            // which never meant anything finer than this).
             ignore_whitespace: self.whitespace != WhitespaceMode::Significant,
             ignore_case: self.ignore_case,
             algorithm: algo,
@@ -588,12 +585,8 @@ mod tests {
 
     // ── F168 §2.1: lossless round trip ─────────────────────────────────────
 
-    const ALL_WHITESPACE: [WhitespaceMode; 4] = [
-        WhitespaceMode::Significant,
-        WhitespaceMode::IgnoreTrailing,
-        WhitespaceMode::IgnoreAll,
-        WhitespaceMode::IgnoreBlankLines,
-    ];
+    const ALL_WHITESPACE: [WhitespaceMode; 2] =
+        [WhitespaceMode::Significant, WhitespaceMode::IgnoreAll];
     const ALL_NEWLINES: [NewlineCompareMode; 2] = [
         NewlineCompareMode::Significant,
         NewlineCompareMode::IgnoreDifference,
@@ -640,11 +633,10 @@ mod tests {
 
     /// F168: every value `PersistedDiffProfile` can hold survives a trip
     /// through the UI's `DiffProfile`, not just the ones the dialog itself
-    /// writes — 4×2×2×3×4×2 = 384 combinations, not samples. Falsify by
-    /// reintroducing any one of the three old collapses (e.g. `from_v2`
-    /// folding `WhitespaceMode::IgnoreTrailing` to `IgnoreAll`, or `to_v2`
-    /// hardcoding `inline_mode: InlineMode::Lazy`, or `DiffAlgorithm::Lcs`
-    /// folding to `Myers`): this fails on the matching combination.
+    /// writes — 2×2×2×3×4×2 = 192 combinations, not samples. Falsify by
+    /// reintroducing either old collapse (e.g. `to_v2` hardcoding
+    /// `inline_mode: InlineMode::Lazy`, or `DiffAlgorithm::Lcs` folding to
+    /// `Myers`): this fails on the matching combination.
     #[test]
     fn every_persisted_profile_round_trips_through_the_ui_type_exactly() {
         for p in every_persisted_profile() {

@@ -31,7 +31,6 @@ use forskscope_compare::diff::{
     CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode,
 };
 use forskscope_compare::encoding::NewlinePolicy;
-use forskscope_compare::job::PerformanceLimits;
 use legacy::{
     LegacyAppSettingsV0, LegacyDiffAlgorithmV0, LegacyDiffFontFamilyV0, LegacyLangV0, LegacyThemeV0,
 };
@@ -59,6 +58,16 @@ const CONTEXT_LINES_MAX: usize = 20;
 /// The canonical, converged settings payload. See the module doc for why
 /// some fields look duplicated — they represent genuinely distinct settings
 /// that the UI and core each already track separately.
+///
+/// F126 (0.199.0): there is no `performance` field. One existed through
+/// 0.198.x (`performance: PerformanceLimits`), always written with
+/// `PerformanceLimits::default()` and never read — `forskscope_ui_logic`'s
+/// `load_guard` uses the type's own constants directly, not a persisted
+/// value. No `#[serde(deny_unknown_fields)]` is set here, so an older file
+/// that still has a `"performance"` object in its payload loads exactly as
+/// `current_v2_tolerates_unknown_payload_fields` already proves for any
+/// unrecognized field: ignored, not an error. `PerformanceLimits` itself
+/// stays, in `forskscope_compare::job`, as the code's own constants.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PersistedSettings {
     /// RFC-097 stage 1: the whole app's zoom, as a percentage of
@@ -136,8 +145,6 @@ pub struct PersistedSettings {
     pub restore_session: bool,
     #[serde(default = "default_recent_limit")]
     pub recent_limit: usize,
-    #[serde(default)]
-    pub performance: PerformanceLimits,
 }
 
 /// One named compare preset in v2 shape. Modeled on the core's richer
@@ -195,7 +202,6 @@ impl Default for PersistedSettings {
             newline_policy: NewlinePolicy::default(),
             restore_session: true,
             recent_limit: default_recent_limit(),
-            performance: PerformanceLimits::default(),
         }
     }
 }
@@ -380,7 +386,6 @@ fn migrate_from_v0(v0: LegacyAppSettingsV0) -> PersistedSettings {
         newline_policy: NewlinePolicy::default(),
         restore_session: true,
         recent_limit: default_recent_limit(),
-        performance: PerformanceLimits::default(),
     })
 }
 

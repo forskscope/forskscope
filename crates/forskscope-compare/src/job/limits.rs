@@ -1,7 +1,5 @@
 //! File size classification and performance limits (RFC-013 §5).
 
-use serde::{Deserialize, Serialize};
-
 // ── RFC-013 §5: File size classification and performance limits ───────────────
 
 /// Classification of a file by size, used to select the diff strategy
@@ -52,9 +50,12 @@ impl FileSizeClass {
 /// behaviour (RFC-013 §5 "Threshold Policy"). All byte values are inclusive
 /// upper bounds for the named class.
 ///
-/// Part of the settings v2 on-disk schema (RFC-076); a field rename is a
-/// schema change, not just a Rust-level rename.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// F126 (0.199.0): no longer part of the settings v2 on-disk schema —
+/// `PersistedSettings` used to carry a `performance` field of this shape,
+/// always written as `Self::default()` and never read back
+/// (`persist::schema::settings`'s own doc comment on the removal). These
+/// are the app's own constants now, not `Serialize`/`Deserialize`.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PerformanceLimits {
     /// Upper bound (inclusive) for `FileSizeClass::Small` (bytes).
     pub max_eager_text_bytes: u64,
@@ -65,11 +66,10 @@ pub struct PerformanceLimits {
     pub large_text_threshold_bytes: u64,
     /// Most characters either side of one changed line pair may have and
     /// still be refined character by character. **Despite the name this is
-    /// per side of a line pair, not per hunk**: the name is a persisted key
-    /// (RFC-076), so it stays. Defaults to
+    /// per side of a line pair, not per hunk.** Defaults to
     /// [`crate::diff::MAX_INLINE_CHARS_PER_SIDE`], which is the number the
     /// renderer obeys; like every field of this block, the app reads the
-    /// default, not a stored value.
+    /// default, not a stored value (F126).
     pub max_inline_diff_chars_per_hunk: usize,
     /// Maximum directory entries to compare without backgrounding.
     pub max_directory_entries_eager: usize,

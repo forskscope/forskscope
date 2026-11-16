@@ -116,9 +116,29 @@ fn inline_mode_variants_have_exact_wire_strings() {
 #[test]
 fn whitespace_mode_variants_have_exact_wire_strings() {
     assert_wire_string(WhitespaceMode::Significant, "significant");
-    assert_wire_string(WhitespaceMode::IgnoreTrailing, "ignore-trailing");
     assert_wire_string(WhitespaceMode::IgnoreAll, "ignore-all");
-    assert_wire_string(WhitespaceMode::IgnoreBlankLines, "ignore-blank-lines");
+}
+
+/// F191 (0.199.0): `IgnoreTrailing` and `IgnoreBlankLines` were retired —
+/// both always behaved exactly as `IgnoreAll` (`to_diff_options` never told
+/// them apart). A settings file written before this release can still hold
+/// either wire string; it must load as `IgnoreAll`, not refuse to load, and
+/// a re-save must never write the retired name back out. Falsify by
+/// removing either `#[serde(alias = ...)]` on `IgnoreAll`: loading fails
+/// with a deserialization error instead of an equality mismatch.
+#[test]
+fn retired_whitespace_mode_wire_values_load_as_ignore_all_and_resave_as_ignore_all() {
+    for old_wire in ["\"ignore-trailing\"", "\"ignore-blank-lines\""] {
+        let loaded: WhitespaceMode = serde_json::from_str(old_wire).unwrap_or_else(|e| {
+            panic!("{old_wire} must still load, not error ({e})");
+        });
+        assert_eq!(loaded, WhitespaceMode::IgnoreAll);
+        let resaved = serde_json::to_string(&loaded).unwrap();
+        assert_eq!(
+            resaved, "\"ignore-all\"",
+            "a re-save must never write the retired wire name {old_wire} back out"
+        );
+    }
 }
 
 #[test]

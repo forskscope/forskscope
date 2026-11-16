@@ -1,4 +1,4 @@
-//! CSS class contract coverage test (RFC-034).
+//! CSS class contract coverage test.
 //!
 //! Verifies that every CSS class token produced by this crate's view-models
 //! is defined somewhere in the main stylesheet. This prevents silent
@@ -11,9 +11,16 @@
 //! `InlineDecorationKind` CSS classes. That contract's DOM side (the
 //! `.fs-line-*`/`.fs-inline-*` stylesheet and its `hunk_decorations`
 //! view-model) was deleted rather than wired through — see RFC-024's status
-//! note and 30-contract-diff-decorations.css's header for the reasoning.
-//! `diff_decoration` itself is untouched; its `css_class()` methods are
-//! still covered by this crate's own unit tests.
+//! note for the reasoning. `diff_decoration` itself is untouched; its
+//! `css_class()` methods are still covered by this crate's own unit tests.
+//!
+//! F51 (0.199.0): this file also used to cover RFC-034's `ConflictNavigator`
+//! classes (`.fsk-conflict-*`, formerly `30-contract-diff-decorations.css`).
+//! That contract's DOM side never existed either — the four-region
+//! conflict-workspace UI `ConflictNavigator` was built for was never wired
+//! into `forskscope-ui` — so the view-model, its CSS and this test's own
+//! `conflict_navigator_css_classes_defined_in_main_css` were all deleted;
+//! see RFC-034's status note for the reasoning.
 
 /// The runtime stylesheet, included at compile time.
 /// Generated from `assets/css/` via `cargo xtask css`.
@@ -25,43 +32,6 @@ fn css_contains_class(css: &str, class: &str) -> bool {
     // This is a simple substring search — sufficient for a flat CSS file.
     let selector = format!(".{class}");
     css.contains(&selector)
-}
-
-#[test]
-fn conflict_navigator_css_classes_defined_in_main_css() {
-    use forskscope_edit::merge::ThreeWayMergeSession;
-    use forskscope_ui_logic::conflict_nav::{ConflictFilter, ConflictNavigator};
-
-    // Build a session with one conflict and inspect the resulting CSS classes.
-    let sess = ThreeWayMergeSession::from_texts("base\n", "left\n", "right\n");
-    let nav = ConflictNavigator::build(&sess, None, ConflictFilter::All);
-
-    // The navigator entries carry the css_class for the current status.
-    // For a fresh session, all conflicts are Unresolved.
-    for entry in &nav.entries {
-        let class = entry.css_class();
-        assert!(
-            css_contains_class(MAIN_CSS, class),
-            "main.css must define CSS class .{class} (from ConflictNavigatorEntry::css_class)"
-        );
-    }
-
-    // Also verify the other statuses that can appear after resolution.
-    // We test them by checking the literal class names from the source.
-    let static_classes = [
-        "fsk-conflict-unresolved",
-        "fsk-conflict-left",
-        "fsk-conflict-right",
-        "fsk-conflict-both",
-        "fsk-conflict-manual",
-        "fsk-conflict-ignored",
-    ];
-    for class in &static_classes {
-        assert!(
-            css_contains_class(MAIN_CSS, class),
-            "main.css must define CSS class .{class}"
-        );
-    }
 }
 
 // F82: the shared status vocabulary's CSS class must exist in main.css for

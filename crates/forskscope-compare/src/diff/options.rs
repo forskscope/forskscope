@@ -72,24 +72,29 @@ impl Default for DiffOptions {
 ///
 /// Part of the settings v2 on-disk schema (RFC-076); a variant rename is a
 /// schema change, not just a Rust-level rename.
+///
+/// F191 (0.199.0): `IgnoreTrailing` and `IgnoreBlankLines` were retired —
+/// `to_diff_options` always mapped both to the same single `ignore_whitespace`
+/// flag as `IgnoreAll`, so they never behaved as their names promised. The
+/// `#[serde(alias = ...)]` below keeps a settings file written with either
+/// old wire value loading exactly as it already behaved, with no schema
+/// version bump (the same "stays compatible without moving the version"
+/// precedent `ColourVision`/`ThemeId::System` and `text_size`'s own
+/// `nearest_text_size_step` normalization already follow): this is not a
+/// rename of a live distinction, which is what the version-bump rule above
+/// guards against, but two names being retired in favour of the one they
+/// always meant. Loading never writes the old names back out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum WhitespaceMode {
     /// Every whitespace character is significant. Default.
     #[default]
     Significant,
-    /// Intended: trailing whitespace on a line is ignored. **Not implemented
-    /// as such (F191):** `to_diff_options` maps every mode except
-    /// `Significant` to `ignore_whitespace`, so this behaves as `IgnoreAll`.
-    IgnoreTrailing,
     /// All whitespace characters are removed before lines are compared, so
     /// leading, trailing and internal whitespace differences are ignored. An
     /// added or removed blank line is still a change.
+    #[serde(alias = "ignore-trailing", alias = "ignore-blank-lines")]
     IgnoreAll,
-    /// Intended: lines that are entirely blank are ignored. **Not implemented
-    /// as such (F191):** behaves as `IgnoreAll`, and an added blank line is
-    /// still reported as an insertion.
-    IgnoreBlankLines,
 }
 
 /// How newline style differences are treated during comparison (RFC-028).
@@ -163,18 +168,6 @@ impl CompareProfile {
         }
     }
 
-    /// Loose Text: ignore trailing whitespace and newline differences.
-    pub fn loose_text() -> Self {
-        Self {
-            name: "Loose Text".into(),
-            whitespace: WhitespaceMode::IgnoreTrailing,
-            newlines: NewlineCompareMode::IgnoreDifference,
-            case: CaseSensitivity::Sensitive,
-            inline_mode: InlineMode::Lazy,
-            algorithm: DiffAlgorithm::Myers,
-        }
-    }
-
     /// Large File Safe: line diff only, inline disabled.
     pub fn large_file_safe() -> Self {
         Self {
@@ -216,7 +209,6 @@ impl CompareProfile {
         vec![
             Self::default_profile(),
             Self::code_review(),
-            Self::loose_text(),
             Self::large_file_safe(),
         ]
     }

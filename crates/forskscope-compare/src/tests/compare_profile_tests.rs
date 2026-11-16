@@ -31,15 +31,6 @@ fn code_review_profile_uses_histogram_algorithm() {
     );
 }
 
-// ── Loose Text profile ────────────────────────────────────────────────────────
-
-#[test]
-fn loose_text_ignores_trailing_whitespace_and_newlines() {
-    let p = CompareProfile::loose_text();
-    assert_eq!(p.whitespace, WhitespaceMode::IgnoreTrailing);
-    assert_eq!(p.newlines, NewlineCompareMode::IgnoreDifference);
-}
-
 // ── Large File Safe profile ───────────────────────────────────────────────────
 
 #[test]
@@ -55,8 +46,8 @@ fn large_file_safe_disables_inline_diff() {
 // ── All presets ───────────────────────────────────────────────────────────────
 
 #[test]
-fn all_presets_returns_four_profiles() {
-    assert_eq!(CompareProfile::all_presets().len(), 4);
+fn all_presets_returns_three_profiles() {
+    assert_eq!(CompareProfile::all_presets().len(), 3);
 }
 
 #[test]
@@ -92,9 +83,19 @@ fn default_profile_to_diff_options_has_expected_flags() {
 }
 
 #[test]
-fn loose_text_to_diff_options_enables_ignore_whitespace() {
-    let opts = CompareProfile::loose_text().to_diff_options();
-    assert!(opts.ignore_whitespace, "loose text: whitespace ignored");
+fn ignore_all_whitespace_profile_enables_ignore_whitespace() {
+    let p = CompareProfile {
+        name: "Custom".into(),
+        whitespace: WhitespaceMode::IgnoreAll,
+        newlines: NewlineCompareMode::Significant,
+        case: CaseSensitivity::Sensitive,
+        inline_mode: InlineMode::Lazy,
+        algorithm: DiffAlgorithm::Myers,
+    };
+    assert!(
+        p.to_diff_options().ignore_whitespace,
+        "IgnoreAll whitespace must set ignore_whitespace"
+    );
 }
 
 #[test]

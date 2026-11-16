@@ -17,7 +17,6 @@ use forskscope_compare::diff::{
     CaseSensitivity, DiffAlgorithm, InlineMode, NewlineCompareMode, WhitespaceMode,
 };
 use forskscope_compare::encoding::NewlinePolicy;
-use forskscope_compare::job::PerformanceLimits;
 
 const SETTINGS_V0_FIXTURE: &str = include_str!("fixtures/persistence/settings-v0.json");
 const SETTINGS_V2_FIXTURE: &str = include_str!("fixtures/persistence/settings-v2.json");
@@ -58,7 +57,6 @@ fn sample_v2() -> PersistedSettings {
         newline_policy: NewlinePolicy::Preserve,
         restore_session: true,
         recent_limit: 20,
-        performance: PerformanceLimits::default(),
     }
 }
 
@@ -107,6 +105,13 @@ fn current_v2_tolerates_unknown_payload_fields() {
 /// the new name. This test can: it fails the moment any enum variant's wire
 /// representation changes, since every enum reachable from the payload
 /// appears in this fixture at least once.
+///
+/// F126 (0.199.0): the fixture file's own `"performance": {...}` object is
+/// deliberately left in place, unlike `expected` below, which has no
+/// `performance` field at all (removed, F126). That mismatch is the point:
+/// this is exactly what a file written before 0.199.0 looks like, and it
+/// must still parse to `expected` with that object silently ignored, not
+/// fail or get a resurrected field.
 #[test]
 fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
     let expected = PersistedSettings {
@@ -134,8 +139,14 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
                 built_in: true,
             },
             PersistedDiffProfile {
+                // F191 (0.199.0): this fixture entry's own on-disk
+                // `"whitespace": "ignore-trailing"` is deliberately left
+                // untouched — it is exactly what a file written before
+                // 0.199.0 holds, and parsing it to `IgnoreAll` (not an
+                // error, not the removed variant) is the behaviour this
+                // golden fixture now pins.
                 name: "Trailing whitespace, insensitive, no inline".into(),
-                whitespace: WhitespaceMode::IgnoreTrailing,
+                whitespace: WhitespaceMode::IgnoreAll,
                 newlines: NewlineCompareMode::IgnoreDifference,
                 case: CaseSensitivity::Insensitive,
                 inline_mode: InlineMode::None,
@@ -152,8 +163,11 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
                 built_in: false,
             },
             PersistedDiffProfile {
+                // F191 (0.199.0): same as the "ignore-trailing" entry
+                // above — `"ignore-blank-lines"` is left on disk here and
+                // must still parse, now to `IgnoreAll`.
                 name: "Ignore blank lines, histogram".into(),
-                whitespace: WhitespaceMode::IgnoreBlankLines,
+                whitespace: WhitespaceMode::IgnoreAll,
                 newlines: NewlineCompareMode::Significant,
                 case: CaseSensitivity::Sensitive,
                 inline_mode: InlineMode::Lazy,
@@ -173,12 +187,48 @@ fn current_v2_golden_fixture_parses_to_the_exact_expected_struct() {
         newline_policy: NewlinePolicy::ForceLf,
         restore_session: false,
         recent_limit: 7,
-        performance: PerformanceLimits::default(),
     };
     match load_settings(SETTINGS_V2_FIXTURE) {
         PersistenceLoad::Current { value } => assert_eq!(value, expected),
         other => panic!("expected Current, got {other:?}"),
     }
+}
+
+/// F126 (0.199.0): `PersistedSettings` has no `performance` field — it was
+/// written (always `PerformanceLimits::default()`) and never read, so a
+/// file with a `"performance"` object (any file from before 0.199.0) must
+/// still load, with the object silently ignored, and a re-save must not
+/// write it back. Falsify by re-adding the field: `serde_json::to_value`
+/// below would then include `"performance"` and the final assertion fails.
+#[test]
+fn a_file_with_a_performance_block_loads_and_saves_without_it() {
+    let mut payload = serde_json::to_value(sample_v2()).unwrap();
+    payload.as_object_mut().unwrap().insert(
+        "performance".into(),
+        serde_json::json!({
+            "max_eager_text_bytes": 1,
+            "medium_text_threshold_bytes": 2,
+            "large_text_threshold_bytes": 3,
+            "max_inline_diff_chars_per_hunk": 4,
+            "max_directory_entries_eager": 5,
+            "max_eager_lines": 6,
+        }),
+    );
+    let raw = envelope_for(2, &payload);
+    let loaded = match load_settings(&raw) {
+        PersistenceLoad::Current { value } => value,
+        other => panic!("expected Current despite a performance block, got {other:?}"),
+    };
+    assert_eq!(
+        loaded,
+        sample_v2(),
+        "the ignored block must change nothing else"
+    );
+    let resaved = serde_json::to_value(&loaded).unwrap();
+    assert!(
+        !resaved.as_object().unwrap().contains_key("performance"),
+        "a re-save must never write performance back out: {resaved}"
+    );
 }
 
 /// RFC-088: a v2 settings file written before `colour_vision` existed (every
@@ -273,7 +323,6 @@ fn legacy_v0_fixture_migrates_every_field_exactly() {
             assert!(!value.hide_dotfiles);
             // Core-only fields not present in v0 fall back to core defaults.
             assert_eq!(value.density, Density::default());
-            assert_eq!(value.performance, PerformanceLimits::default());
             assert_eq!(value.colour_vision, ColourVision::default());
             assert_eq!(value.contrast, Contrast::default());
         }

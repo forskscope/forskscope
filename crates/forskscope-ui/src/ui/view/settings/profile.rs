@@ -16,12 +16,13 @@ use crate::ui::component::select_field::{SelectField, SelectOption};
 /// whitespace" rename. "More options ▸", collapsed by default, holds only
 /// the character-level-highlighting control — not a whitespace-mode
 /// selector. `DiffOptions.ignore_whitespace` is a single bool the engine
-/// reads as "strip every whitespace character" (`engine.rs`'s `line_key`);
-/// `IgnoreTrailing` and `IgnoreBlankLines` would behave identically to
-/// `IgnoreAll` today, so offering them as distinct choices would say
-/// something untrue about what picking one does. `whitespace: WhitespaceMode`
-/// already carries losslessly (§2.1) for whenever the engine gains that
-/// distinction; naming it here as a choice must wait for that.
+/// reads as "strip every whitespace character" (`engine.rs`'s `line_key`),
+/// and `WhitespaceMode` itself now has only one non-default choice
+/// (`IgnoreAll`) after F191 (0.199.0) retired `IgnoreTrailing`/
+/// `IgnoreBlankLines`, which never behaved as their names promised — so
+/// there is nothing finer to offer here yet. `whitespace: WhitespaceMode`
+/// is still the field the dialog writes, not the bool directly, for
+/// whenever the engine gains a real distinction to name as a choice.
 #[component]
 pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
     let mut store = use_context::<Store>();

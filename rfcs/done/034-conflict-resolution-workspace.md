@@ -1,6 +1,6 @@
 # RFC 034: Conflict Resolution Workspace
 
-**Status.** Implemented (v0.64.0) — core complete; four-region workspace UI, keyboard nav, action bar deferred to UI layer
+**Status.** Implemented (v0.64.0) — core complete; four-region workspace UI, keyboard nav, action bar deferred to UI layer. The navigator view-model below (`conflict_nav`) shipped as dead code and was removed in 0.199.0 (F51), because the four-region workspace UI it was meant to back was never built. `ThreeWayMergeSession` (the three-way merge model itself) is unaffected and stays live.
 
 ## Status
 Proposed. Originally sketched in RFC package v0.4; rewritten for the v0.41+

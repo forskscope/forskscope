@@ -37,7 +37,7 @@ without a display server.
 | `forskscope-commands` | `forskscope`'s own `compare`/`mcp` subcommands (RFC-096 §2, formerly the headless program `forskscope-cli`, RFC-094): `compare` prints text/JSON/patch/HTML to standard output only | No | Only `show_to_person`'s one launch of this program's own executable | compare, report |
 | `forskscope-edit` | merge sessions incl. three-way; edit operations; atomic save with fingerprint preconditions; folder batch-copy/plan/execute; `compare_prep`'s save-target half | Yes, only crate that writes user files | No | compare |
 | `forskscope-desktop` | settings/session persistence; settings display types; external tools; Git; file watching; platform detection; env pass-through | Only its own settings/session | Yes: external tools, Git, system opener | compare, edit |
-| `forskscope-ui-logic` | GUI view-models incl. `command`, `diff_decoration`, `line_map`, `conflict_nav` | No | No | compare, report, edit, desktop |
+| `forskscope-ui-logic` | GUI view-models incl. `command`, `diff_decoration`, `line_map` | No | No | compare, report, edit, desktop |
 | `forskscope-ui` | the one executable `forskscope`: the GUI with no subcommand, dispatching to `forskscope-commands` for `compare`/`mcp` (RFC-096 §1) | — | — | all of the above |
 
 ## `forskscope-compare` modules
@@ -93,7 +93,7 @@ without a display server.
 | `vcs` | `VcsProvider` trait + `GitProvider` — read-only VCS context (status, file at revision, merge base). `detect(path)` (RFC-038). |
 | `watcher` | `FileChangeMonitor` trait, `WatchToken`, `FileChangeEvent`, `WatchError`, `MockFileChangeMonitor` — file-watcher boundary (RFC-036). |
 
-## `ui-logic` modules (29)
+## `ui-logic` modules (27)
 
 Framework-independent view-model logic. All modules are testable with
 `cargo test -p forskscope-ui-logic` — no GTK or display server required.
@@ -108,6 +108,10 @@ every push, that the module names listed in this table and in `testing.md`'s,
 and this heading's count, match the leaf modules on disk, and it reports a
 table row it cannot read a module name from instead of ignoring it. It does not
 read what a row says a module does; that stays a judgment.
+**F51 (0.199.0):** `conflict_nav` and `tests/conflict_nav_tests` themselves
+were deleted next — the module `conflict_nav_view` would have rendered,
+not just that renderer, since the four-region workspace UI it was for was
+never built either. The count below dropped from 29 to 27.
 
 | Module | Purpose |
 |---|---|
@@ -133,11 +137,9 @@ read what a row says a module does; that stays a judgment.
 | `update_check` | `decide(current, outcome)` — the About dialog's *Check for updates* button: maps a parsed-or-not reply to `Checking` / `UpToDate` / `NewerAvailable` / `AheadOfRelease` / `CouldNotCheck(reason)`, never "up to date" from a failure (F166). `Version::parse` accepts only plain `X.Y.Z`. `AppChannel`/`update_action`/`release_page_url` pick the right instruction and build the release-page URL from the parsed version alone, never from raw reply text (F180/F181, handoff 073). |
 | `test_support` | `permission_guard_failed` — shared by permission-dependent tests across this crate (`explore/deep_filter.rs`, `explore/classify_pair.rs`): panics unless this process is root, so a `chmod`-based test guard that has no effect fails loudly instead of skipping silently (F143, handoff 063 §1). Test-only (`#[cfg(test)]`), duplicated once per crate alongside the other RFC-093 crates' and `forskscope-ui`'s own copies - there is no shared test-support crate today. |
 | `command/registry` | `CommandRegistry` — all `CommandDefinition`s indexed by `CommandId` (RFC-019 §5). Moved in from `forskscope-core` (RFC-093 §1 step 5); not yet wired into `forskscope-ui` - the toolbar/keyboard/command-palette consumer described in `command`'s own module doc was deferred post-v1 and never built. |
-| `conflict_nav` | `ConflictNavigator` — the view-model between `ThreeWayMergeSession` and the four-region conflict-workspace UI: which conflict is focused, the navigator rail, prev/next traversal (RFC-034 §"Conflict navigator"). Moved in from `forskscope-core` (RFC-093 §1 step 5); not yet wired into `forskscope-ui` - `conflict_nav_view` (the rail component) was deleted outright by handoff 033's connectivity cleanup as deferred post-v1 UI, never built. |
 | `diff_decoration` | `DiffDecorationSet` — derived from a `DiffDocument`, describes what to render (CSS classes, gutter symbols) without prescribing how (RFC-024). Moved in from `forskscope-core` (RFC-093 §1 step 5); not yet wired into `forskscope-ui` - see F48's note in `tests/css_coverage.rs`. |
 | `line_map` | `LineMap` — the aligned row sequence a `DiffDocument` renders to (same-height panes, synchronized scrolling, the mini hunk map) (RFC-035). Moved in from `forskscope-core` (RFC-093 §1 step 5); not yet wired into `forskscope-ui`. |
 | `tests/command_tests` | `command.rs`'s and `command/registry.rs`'s tests (RFC-019 §5, §6, §7): kept as its own file rather than split and inlined, since it spans both. Moved in from `forskscope-core` (RFC-093 §1 step 5). |
-| `tests/conflict_nav_tests` | `conflict_nav.rs`'s tests (RFC-034). Moved in from `forskscope-core` (RFC-093 §1 step 5). |
 | `tests/diff_decoration_tests` | `diff_decoration.rs`'s tests (RFC-024). Moved in from `forskscope-core` (RFC-093 §1 step 5). |
 | `tests/line_map_tests` | `line_map.rs`'s tests (RFC-035). Moved in from `forskscope-core` (RFC-093 §1 step 5). |
 

@@ -188,7 +188,7 @@ The suites, for orientation:
 | `forskscope-compare`/`-report`/`-edit`/`-desktop` integration | `crates/<crate>/tests/` — `diff_corpus`, `f138_decline_before_delegating` (compare); `patch_apply` (report, shells out to real `git apply` and `patch -p1`); `merge_corpus` (edit) |
 | `forskscope-commands` unit | `crates/forskscope-commands/src/mcp/tools.rs`'s own `#[cfg(test)]` module — `call_show_to_person_starting` against a fake script, no server/protocol machinery (RFC-096 §5) |
 | `forskscope-ui` integration (`compare`/`mcp`) | `crates/forskscope-ui/tests/` — `compare_exit_codes.rs` (every exit-code path, via the compiled `forskscope compare` subcommand); `patch_matches_gui_export.rs` (stdout byte-compared against `patch_from_file_diff` + `to_unified` directly, RFC-094 §2); `mcp_protocol.rs`; `mcp_show_to_person.rs` — moved here from the removed `forskscope-cli`'s own `tests/` (RFC-096 §5) |
-| `forskscope-ui-logic` unit | inline `#[cfg(test)]` modules, plus `command`/`conflict_nav`/`diff_decoration`/`line_map`'s external `tests/*_tests.rs` files (moved in from the old `forskscope-core`, RFC-093 §1 step 5) |
+| `forskscope-ui-logic` unit | inline `#[cfg(test)]` modules, plus `command`/`diff_decoration`/`line_map`'s external `tests/*_tests.rs` files (moved in from the old `forskscope-core`, RFC-093 §1 step 5) |
 | `forskscope-ui-logic` integration | `crates/forskscope-ui-logic/tests/css_coverage.rs` |
 | `forskscope-ui` lib and bin | inline `#[cfg(test)]` modules, compiled twice (library and binary targets) |
 | doctests | `forskscope-compare`, `forskscope-edit`, `forskscope-desktop` |
@@ -291,11 +291,11 @@ Tests live in `crates/forskscope-desktop/src/tests/` and are declared in `tests.
 All tests are inline (`#[cfg(test)]` inside each module file), except
 `compare/load_identity`, which keeps its tests in a sibling `tests.rs`
 (`mod tests;`) because of the fixture setup its fifteen cases share, and
-`command`/`conflict_nav`/`diff_decoration`/`line_map`, moved in from
-`forskscope-core` with their own external `tests/*_tests.rs` files intact
-(RFC-093 §1 step 5) rather than split and inlined - `command_tests.rs`
-alone spans two source files (`command.rs` and `command/registry.rs`).
-Integration tests live in `tests/css_coverage.rs`.
+`command`/`diff_decoration`/`line_map`, moved in from `forskscope-core`
+with their own external `tests/*_tests.rs` files intact (RFC-093 §1 step
+5) rather than split and inlined - `command_tests.rs` alone spans two
+source files (`command.rs` and `command/registry.rs`). Integration tests
+live in `tests/css_coverage.rs`.
 
 **Rebuilt against the module tree (`cargo xtask ui-logic-docs`, F93,
 review 106 §4), not the prior table**: `command_bar`, `hunk_decorations`,
@@ -303,7 +303,11 @@ review 106 §4), not the prior table**: `command_bar`, `hunk_decorations`,
 and never removed here; `conflict_nav_view` and `palette_view` were deleted
 by handoff 033's connectivity cleanup; `compare/load_identity`,
 `compare/startup`, `session/persistence_recovery` and
-`settings/persistence_recovery` existed but were never listed.
+`settings/persistence_recovery` existed but were never listed. **F51
+(0.199.0):** `conflict_nav` (moved in alongside the other three above) and
+`tests/conflict_nav_tests` were deleted outright next, the same way
+`conflict_nav_view` had been — the four-region workspace UI the whole
+contract was for was never built.
 
 | File | Covers | RFC |
 |---|---|---|
@@ -329,11 +333,9 @@ by handoff 033's connectivity cleanup; `compare/load_identity`,
 | `update_check` | `Version::parse`: a plain `X.Y.Z` round-trips; a `v` prefix, missing/extra component, pre-release suffix, or a hostile shape (`"0.187.0; rm -rf /"`, `"$(whoami)"`) all reject rather than guess; numeric not lexical ordering (`0.10.0 > 0.9.0`). `decide`: each of the five states from its outcome; the F166 falsification that no failure outcome ever decides `UpToDate`. `AppChannel::from_label`: unset and every unrecognised label fall back to `Direct`. `release_page_url`: built from the version alone, and structurally can only ever contain digits and `.`. | F180/F181 |
 | `test_support` | No tests of its own - a shared helper exercised indirectly by every permission-dependent test in this crate that calls `permission_guard_failed`. | F143 |
 | `command/registry` | Covered by `tests/command_tests`, below (the file spans both `command.rs` and `command/registry.rs`). | RFC-019 §5, §6, §7 |
-| `conflict_nav` | Covered by `tests/conflict_nav_tests`, below. | RFC-034 |
 | `diff_decoration` | Covered by `tests/diff_decoration_tests`, below. | RFC-024 |
 | `line_map` | Covered by `tests/line_map_tests`, below. | RFC-035 |
 | `tests/command_tests` | `AvailabilityRule::evaluate` across every rule variant and `CommandContext` combination; `CommandRegistry` lookup, builtin command coverage, shortcut/category/danger-level invariants. | RFC-019 §5, §6, §7 |
-| `tests/conflict_nav_tests` | `ConflictNavigator` focus/traversal (prev/next, wrap, empty), `ConflictFilter` (all vs. unresolved-only), rail entry glyph/label per `ConflictStatus`. | RFC-034 |
 | `tests/diff_decoration_tests` | `DiffDecorationSet` derivation from a `DiffDocument`; `LineDecorationKind`/`InlineDecoration` CSS class and gutter-symbol stability. | RFC-024 |
 | `tests/line_map_tests` | `LineMap` row alignment, `RowState` gutter symbols, mini-map weights, scroll-anchor clamping, next/prev-changed-row traversal. | RFC-035 |
 
