@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.198.2] — Unreleased
+
 ## [0.198.1] — 2026-11-15
 
 **The Linux listing shows the app as it is now.**
