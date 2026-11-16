@@ -5,6 +5,9 @@
 the same day.
 **Accepted.** 2026-11-16 by the project owner ("Yes. All approved."),
 with both open questions decided as proposed (§Decisions).
+**Amended.** 2026-11-17 by the architect (review 216): a seventh check,
+label placement, so F217's shape is caught; and the matrix measured per
+check, on the axes each depends on.
 **Scheduling.** The first handoff of the `0.199.0` cycle (handoff 101). It is tooling, not a product feature, so it
 needs no release of its own. The checks start gating `main` as soon as they
 land.
@@ -112,6 +115,7 @@ Inside the page, for every element of the view:
 | **Hit area** | an interactive element (`button`, `[role=button]`, `a`, `input`, `select`, `[tabindex]`) under 24 × 24 CSS px | WCAG 2.5.8's spacing exception, by named selector and stated reason |
 | **Rendered contrast** | each text node's computed `color` against its effective background, walking up the tree and compositing `color-mix` and opacity as rendered: 4.5:1 (7:1 under *High*), 3:1 for control edges | the `contrast` gate's own exemptions (disabled controls; under *High*, their own 3:1 floor) |
 | **Text size** | computed `font-size` below 12 px at text size 100 % | the `contrast` gate's non-text glyph list |
+| **Label placement** (added 2026-11-17, review 216) | a labelled region's *visible* label isn't over that region: no horizontal overlap, or below the region's top, or another labelled region in between | none |
 
 **Every allowance is a named entry with its reason.** A new one is a review
 decision, as with the existing gates' allowlists.
@@ -128,7 +132,7 @@ decision, as with the existing gates' allowlists.
 | Window | 1000×700 (the listing's size), 800×560, 1366×768 |
 | View | the Explorer, a file comparison with a collapsed region, Deep Compare with a selected row, the mergetool layout, Settings with *Advanced* open, *Shortcuts* |
 
-That is 5 × 2 × 3 × 2 × 2 × 3 × 6 = 2,160 measurements. Colour vision and
+That is 5 × 2 × 3 × 2 × 2 × 3 × 6 = 2,160 measurements if every check ran on every axis. **They don't need to** (amended 2026-11-17, review 216): the layout checks need text size × language × window × view at one colour setting (180), and rendered contrast needs theme × colour vision × contrast × view at two layouts, one side by side and one stacked (144). That is about a minute in all, so everything runs on every push. Colour vision and
 theme change only colours, so the layout checks can run with both at a
 single value, and only the rendered-contrast check needs the full colour
 axes. The plan states which checks run on which axes, so the cost stays
