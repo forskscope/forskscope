@@ -153,6 +153,16 @@ pub fn App() -> Element {
             }
         });
     }
+    // RFC-098 stage A (handoff 101): a no-op in every ordinary build
+    // (feature off) and a no-op even with the feature on unless
+    // `layout_probe::PLAN_ENV_VAR` is set - `use_hook` itself must still
+    // run unconditionally, every render, in the same order as every other
+    // hook above (resolved at compile time by the `#[cfg]`, same as the
+    // Windows-only block above it).
+    #[cfg(feature = "layout-probe")]
+    use_hook(|| {
+        crate::layout_probe::maybe_start(store);
+    });
     // `Rc<RefCell<_>>`, not a bare `RefCell<_>`: `use_hook` clones its
     // stored value on every call (its `State: Clone` bound), and cloning a
     // bare `RefCell` would hand back an independent copy each render —

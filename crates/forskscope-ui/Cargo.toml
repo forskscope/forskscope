@@ -22,6 +22,14 @@ path = "src/main.rs"
 name = "forskscope_ui"
 path = "src/lib.rs"
 
+[features]
+# RFC-098 stage A (handoff 101): a test-only, in-process layout
+# measurement probe (src/layout_probe.rs), driven by `cargo xtask
+# layout-check`. Off by default. A release.yml check that this feature is
+# never on in a published build - the same pattern already used for the
+# show_to_person test seam - is stage B's own work, not yet added.
+layout-probe = []
+
 [dependencies]
 forskscope-commands          = { workspace = true }
 forskscope-compare           = { workspace = true }

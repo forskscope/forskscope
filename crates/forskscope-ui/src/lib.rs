@@ -8,6 +8,8 @@
 pub mod app;
 pub mod i18n;
 pub mod keyboard;
+#[cfg(feature = "layout-probe")]
+pub mod layout_probe;
 #[cfg(target_os = "linux")]
 pub mod linux_portal;
 pub mod startup_mode;
