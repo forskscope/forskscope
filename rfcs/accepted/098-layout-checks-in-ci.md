@@ -1,9 +1,11 @@
 # RFC 098: Layout Checks in CI — Every Size, Language and Theme, on Every Push
 
-**Status.** Proposed.
+**Status.** Accepted.
 **Proposed.** 2026-11-15 by the architect. The owner asked for the draft
 the same day.
-**Scheduling.** After `0.198.0`. It is tooling, not a product feature, so it
+**Accepted.** 2026-11-16 by the project owner ("Yes. All approved."),
+with both open questions decided as proposed (§Decisions).
+**Scheduling.** The first handoff of the `0.199.0` cycle (handoff 101). It is tooling, not a product feature, so it
 needs no release of its own. The checks start gating `main` as soon as they
 land.
 **Tracks.** The owner's *Test Optimization Rules* (GUI rules, 2026-11-11):
@@ -202,7 +204,11 @@ the matrix is cut by the rule above, never by dropping a check.
   checker that wouldn't have caught the defects we found by hand isn't
   doing its job.
 
-## Open questions for the owner
+## Decisions (owner, 2026-11-16)
+
+Both were accepted as proposed:
+
+_The questions, as they were put:_
 
 1. **Every push, or every push plus a nightly full matrix?** The rules say
    every CI run. If the measured cost is over budget, I'd propose the full
