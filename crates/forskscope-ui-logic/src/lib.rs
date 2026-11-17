@@ -41,9 +41,11 @@
 //! - [`settings`] — settings form logic:
 //!   - `settings_view`: theme picker choices, the shared font-size clamp,
 //!     and the text-size step logic (RFC-097 stage 1).
-//!   - `field_debounce`: `FieldDebounce` (F136) — debounces a text field that
-//!     is cheap to display but expensive to commit (the ignore-pattern
-//!     fields, whose commit triggers an Explorer rescan).
+//!   - `ignore_list`: `IgnoreListKind`/`current_entries`/`add_entries`/
+//!     `remove_entry` (RFC-099 §3) — parsing and editing the two
+//!     ignore-list fields as badges, sharing
+//!     `forskscope_compare::ignore`'s own per-token normalization rather
+//!     than copying it.
 //!   - `persistence_recovery`: `SettingsRecoveryView` — RFC-076 migration/
 //!     incompatibility/corruption dialog content.
 //! - [`session`] — session persistence logic:
@@ -69,6 +71,12 @@
 //! `conflict_nav_view` would have rendered) went the same way, for the same
 //! reason — RFC-034's four-region workspace UI was never built, so nothing
 //! ever called it. It also returns from git history with that feature.
+//! **RFC-099 §3 (0.199.0):** `field_debounce`'s own `FieldDebounce` (F136)
+//! is gone the same way, for a different reason than F51/conflict_nav -
+//! not never-built, but made unnecessary: the ignore-list fields it
+//! debounced now commit on an explicit add or remove (`ignore_list`,
+//! above), never on a keystroke, so the per-keystroke-commit defect it
+//! existed to fix cannot recur and nothing calls it any more.
 
 pub mod command;
 pub mod compare;
@@ -116,7 +124,7 @@ pub use session::persistence_recovery::{
 };
 
 // settings
-pub use settings::field_debounce::FieldDebounce;
+pub use settings::ignore_list::{IgnoreListKind, add_entries, current_entries, remove_entry};
 pub use settings::persistence_recovery::{
     RecoveryDialogAction as SettingsRecoveryDialogAction, SettingsRecoveryView,
     action_label as settings_recovery_action_label,

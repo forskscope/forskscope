@@ -1,4 +1,46 @@
 use crate::IgnoreRules;
+use crate::ignore::{normalize_dir_token, normalize_extension_token};
+
+// ── RFC-099 §3: the per-token functions `from_settings` is now built on,
+// and the Settings dialog's own ignore-list badges share directly. ──
+
+#[test]
+fn normalize_extension_token_trims_drops_the_dot_and_lowercases() {
+    assert_eq!(
+        normalize_extension_token("  .TMP  "),
+        Some("tmp".to_string())
+    );
+    assert_eq!(
+        normalize_extension_token("class"),
+        Some("class".to_string())
+    );
+    assert_eq!(normalize_extension_token("..o"), Some("o".to_string()));
+}
+
+#[test]
+fn normalize_extension_token_is_none_for_an_empty_result() {
+    assert_eq!(normalize_extension_token(""), None);
+    assert_eq!(normalize_extension_token("   "), None);
+    assert_eq!(normalize_extension_token("."), None);
+}
+
+#[test]
+fn normalize_dir_token_trims_but_keeps_case() {
+    assert_eq!(
+        normalize_dir_token("  target  "),
+        Some("target".to_string())
+    );
+    assert_eq!(
+        normalize_dir_token("Node_Modules"),
+        Some("Node_Modules".to_string())
+    );
+}
+
+#[test]
+fn normalize_dir_token_is_none_for_an_empty_result() {
+    assert_eq!(normalize_dir_token(""), None);
+    assert_eq!(normalize_dir_token("   "), None);
+}
 
 #[test]
 fn empty_rules_ignore_nothing() {

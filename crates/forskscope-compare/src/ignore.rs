@@ -54,13 +54,11 @@ impl IgnoreRules {
     pub fn from_settings(extensions_csv: &str, dirs_csv: &str) -> Self {
         let file_extensions = extensions_csv
             .split(',')
-            .map(|s| s.trim().trim_start_matches('.').to_lowercase())
-            .filter(|s| !s.is_empty())
+            .filter_map(normalize_extension_token)
             .collect();
         let dir_patterns = dirs_csv
             .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
+            .filter_map(normalize_dir_token)
             .collect();
         Self {
             file_extensions,
@@ -102,6 +100,29 @@ impl IgnoreRules {
     pub fn is_dir_ignored(&self, name: &str) -> bool {
         self.dir_patterns.iter().any(|p| glob_match(p, name))
     }
+}
+
+/// Normalizes one file-extension token exactly as [`IgnoreRules::from_settings`]
+/// does: trim, drop any leading dots, lower-case. `None` for a token that
+/// is empty after trimming — nothing to add.
+///
+/// RFC-099 §3: shared with the Settings dialog's own ignore-list badges
+/// (`forskscope-ui-logic`'s `ignore_list` module), so a badge's own
+/// displayed, normalized form and what this engine actually matches
+/// against can never drift apart — one function, not two copies of the
+/// same three steps.
+pub fn normalize_extension_token(raw: &str) -> Option<String> {
+    let s = raw.trim().trim_start_matches('.').to_lowercase();
+    (!s.is_empty()).then_some(s)
+}
+
+/// Normalizes one directory-pattern token exactly as
+/// [`IgnoreRules::from_settings`] does: trim only (case-sensitive, POSIX
+/// convention — see the module doc). `None` for a token that is empty
+/// after trimming.
+pub fn normalize_dir_token(raw: &str) -> Option<String> {
+    let s = raw.trim().to_string();
+    (!s.is_empty()).then_some(s)
 }
 
 /// Wildcard matcher supporting up to two `*` characters.

@@ -44,8 +44,38 @@
 /* RFC-097 stage 3 §6: the field's own help text, visible instead of a
    `title` tooltip - sits right under its `.field` row (its next sibling
    in markup, never a flex child of `.field` itself, so it reads as a full
-   width line, not squeezed beside the control). */
+   width line, not squeezed beside the control). RFC-099 §3's own add/
+   remove announcement (`role="status"`/`aria-live="polite"`) reuses this
+   same class and placement. */
 .field-help { margin: -.3rem 0 .5rem; font-size: 12px; color: var(--muted); }
+
+/* RFC-099 §3: the ignore lists as badges. The label sits on its own line
+   above (`display: block`, not `.modal .field`'s own row layout - a
+   badge row needs to wrap under the label, not sit beside it). */
+.modal .field.ignore-list-field { display: block; }
+.ignore-badges {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .3rem;
+  margin-top: .35rem;
+}
+/* `display: contents`: the list box itself generates no box of its own,
+   so its own `<li>` children lay out as if they were `.ignore-badges`'
+   own direct flex children (wrapping alongside the input after them) -
+   the badges are still a real `<ul>`/`<li>` list to assistive tech,
+   `display: contents` only changes box generation, not the accessibility
+   tree. */
+.ignore-badge-list { display: contents; list-style: none; margin: 0; padding: 0; }
+.ignore-badge {
+  display: flex; align-items: center; gap: .2rem;
+  min-height: 24px; padding: 0 .2rem 0 .55rem;
+  background: var(--surface-3); border: 1px solid var(--control-border);
+  border-radius: 12px; font-size: 12px; white-space: nowrap;
+}
+.ignore-badges input {
+  flex: 1 1 8rem; min-width: 8rem; min-height: 24px;
+  padding: .1rem .4rem; font-size: 12px;
+  border: 1px solid var(--control-border); border-radius: 3px;
+  background: var(--surface); color: var(--text);
+}
 .modal .actions {
   display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem;
   position: sticky; bottom: 0; z-index: 1; background: var(--surface);

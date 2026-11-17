@@ -275,6 +275,14 @@ fn ja(key: &str) -> Option<&'static str> {
         }
         "Ignore file extensions" => "除外ファイル拡張子",
         "Ignore directory names" => "除外ディレクトリ名",
+        // RFC-099 §3: the ignore lists as badges. "Remove"/"Added"/
+        // "Removed" are composed with the entry's own text at the call
+        // site (`t()` has no interpolation), not stored as separate keys
+        // per entry.
+        "Remove" => "削除",
+        "Added" => "追加しました",
+        "Removed" => "削除しました",
+        "Already in the list" => "すでにリストにあります",
         "Hide hidden files" => "隠しファイルを非表示にする",
         "Also excludes hidden files and folders from comparisons — recursive compare, Deep Compare, and the Explorer's quick folder check. Off by default, so .gitignore, .env, and similar files are included." => {
             "隠しファイルやフォルダーは、比較(再帰比較・ディープ比較・エクスプローラーのクイックフォルダー確認)からも除外されます。デフォルトではオフになっており、.gitignore や .env などのファイルも比較対象に含まれます。"

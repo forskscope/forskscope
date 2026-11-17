@@ -1,44 +1,132 @@
 //! Settings modal dialog: appearance, advanced options, and compare profiles
 //! (RFC-009, RFC-057, RFC-063 C6).
 
+use dioxus::html::input_data::keyboard_types::Key;
 use dioxus::prelude::*;
-use forskscope_ui_logic::{FieldDebounce, clamp_font_size, contrast_choices, theme_choices};
+use forskscope_ui_logic::{
+    IgnoreListKind, add_entries, clamp_font_size, contrast_choices, current_entries, remove_entry,
+    theme_choices,
+};
 
 use super::profile::AddProfileInline;
 use super::{lf, lv, tf, tv};
 use crate::i18n::t;
 use crate::state::settings::{host_os, system_theme_offered};
-use crate::state::{Contrast, Modal, Store};
+use crate::state::{Contrast, Lang, Modal, Store};
 use crate::ui::component::select_field::{SelectField, SelectOption};
 
-/// F136: starts (or restarts) the rest for one ignore-pattern field. `draft`
-/// is set immediately, so the input stays responsive to every keystroke;
-/// `debounce` and the spawned check decide when (if ever, before the next
-/// keystroke) `commit` actually runs — the `store.settings` write that
-/// `AppSettings::ignore_rules()` and the Explorer's tree-rebuild effects
-/// react to, which is the expensive step this exists to debounce, not the
-/// field's own display.
-fn debounce_ignore_field_input(
-    value: String,
-    mut draft: Signal<String>,
-    mut debounce: Signal<FieldDebounce<String>>,
-    clock: std::time::Instant,
-    mut commit: impl FnMut(String) + 'static,
-) {
-    draft.set(value.clone());
-    let now = clock.elapsed();
-    debounce.write().changed(now, value);
-    spawn(async move {
-        let delay = debounce
-            .peek()
-            .due_at()
-            .map(|due| due.saturating_sub(now))
-            .unwrap_or_default();
-        tokio::time::sleep(delay + std::time::Duration::from_millis(5)).await;
-        if let Some(committed) = debounce.write().tick(clock.elapsed()) {
-            commit(committed);
+/// RFC-099 §3: one ignore-list field (*Ignore file extensions* or *Ignore
+/// directory names*), shown as badges with an input after them. `csv` is
+/// this render's own current, committed value (read from `store.settings`
+/// by the caller, not held locally) — `on_change` is called with the new
+/// text to store and persist on every add or remove; there is nothing
+/// left to debounce (F136's own module doc; `forskscope-ui-logic::
+/// settings::ignore_list`'s doc comment has the full reasoning), since
+/// nothing here writes on a keystroke that isn't itself an add or a
+/// remove.
+#[component]
+fn IgnoreListField(
+    lang: Lang,
+    label: String,
+    label_id: String,
+    placeholder: String,
+    kind: IgnoreListKind,
+    csv: String,
+    on_change: EventHandler<String>,
+) -> Element {
+    let mut typed = use_signal(String::new);
+    let mut announcement: Signal<Option<String>> = use_signal(|| None);
+    let entries = current_entries(&csv, kind);
+
+    let mut try_add = move |raw: String, csv: String| {
+        let outcome = add_entries(&csv, &raw, kind);
+        if !outcome.added.is_empty() {
+            on_change.call(outcome.csv);
+            announcement.set(Some(format!(
+                "{}: {}",
+                t(lang, "Added"),
+                outcome.added.join(", ")
+            )));
+        } else if !outcome.duplicates.is_empty() {
+            announcement.set(Some(t(lang, "Already in the list")));
         }
-    });
+        typed.set(String::new());
+    };
+
+    rsx! {
+        div { class: "field ignore-list-field",
+            span { id: "{label_id}", {label} }
+            div { class: "ignore-badges",
+                ul { class: "ignore-badge-list",
+                    for entry in entries {
+                        li { class: "ignore-badge", key: "{entry}",
+                            span { "{entry}" }
+                            button {
+                                class: "icon-btn",
+                                aria_label: format!("{} {entry}", t(lang, "Remove")),
+                                onclick: {
+                                    let entry = entry.clone();
+                                    let csv = csv.clone();
+                                    move |_| {
+                                        on_change.call(remove_entry(&csv, &entry, kind));
+                                        announcement
+                                            .set(Some(format!("{}: {entry}", t(lang, "Removed"))));
+                                    }
+                                },
+                                "×"
+                            }
+                        }
+                    }
+                }
+                input {
+                    r#type: "text",
+                    "aria-labelledby": "{label_id}",
+                    placeholder: "{placeholder}",
+                    value: "{typed}",
+                    oninput: {
+                        let csv = csv.clone();
+                        move |e: Event<FormData>| {
+                            let value = e.value();
+                            if value.contains(',') {
+                                try_add(value, csv.clone());
+                            } else {
+                                typed.set(value);
+                            }
+                        }
+                    },
+                    onkeydown: {
+                        let csv = csv.clone();
+                        move |e: Event<KeyboardData>| {
+                            // `value` must be its own statement: `peek()`'s
+                            // borrow guard is a temporary of the full
+                            // enclosing statement, otherwise, so it would
+                            // still be held (a live `Ref`) while `try_add`
+                            // tries its own `.set()` inside the same call -
+                            // found live, a real `AlreadyBorrowed` panic
+                            // the type system alone never catches.
+                            let value = typed.peek().clone();
+                            if e.key() == Key::Enter && !value.trim().is_empty() {
+                                e.prevent_default();
+                                try_add(value, csv.clone());
+                            }
+                        }
+                    },
+                    onblur: {
+                        let csv = csv.clone();
+                        move |_| {
+                            let value = typed.peek().clone();
+                            if !value.trim().is_empty() {
+                                try_add(value, csv.clone());
+                            }
+                        }
+                    },
+                }
+            }
+            if let Some(msg) = announcement.read().as_deref() {
+                p { class: "field-help", role: "status", "aria-live": "polite", "{msg}" }
+            }
+        }
+    }
 }
 
 #[component]
@@ -50,17 +138,6 @@ pub fn SettingsModal() -> Element {
     let mut show_new_profile = use_signal(|| false);
     // Progressive disclosure: Advanced hidden by default (RFC-063 C6).
     let mut show_advanced = use_signal(|| false);
-
-    // F136: a fresh `SettingsModal` mounts each time the dialog opens
-    // (`Modal::Settings => rsx! { SettingsModal {} }`), so initializing from
-    // `cur` here is always the current committed value - there is no reset
-    // action reachable from inside this open dialog that this would need to
-    // react to mid-edit.
-    let ext_draft: Signal<String> = use_signal(|| cur.ignore_extensions.clone());
-    let ext_debounce: Signal<FieldDebounce<String>> = use_signal(FieldDebounce::default);
-    let dirs_draft: Signal<String> = use_signal(|| cur.ignore_dirs.clone());
-    let dirs_debounce: Signal<FieldDebounce<String>> = use_signal(FieldDebounce::default);
-    let clock = use_hook(std::time::Instant::now);
 
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Settings"),
@@ -347,44 +424,30 @@ pub fn SettingsModal() -> Element {
                         }
                     }
 
-                    // ── Ignore patterns (RFC-056) ─────────────────────────────
-                    // F136: the displayed value is the draft, updated on
-                    // every keystroke; the `store.settings` write (and the
-                    // Explorer rescan it triggers) is debounced - see
-                    // `debounce_ignore_field_input`'s own doc comment.
-                    div { class: "field",
-                        span { {t(lang, "Ignore file extensions")} }
-                        input {
-                            r#type: "text",
-                            placeholder: t(lang, "o, class, tmp  (comma separated, no dot needed)"),
-                            value: "{ext_draft}",
-                            oninput: move |e| {
-                                debounce_ignore_field_input(
-                                    e.value(), ext_draft, ext_debounce, clock,
-                                    move |value| {
-                                        store.settings.write().ignore_extensions = value;
-                                        super::persist(store);
-                                    },
-                                );
-                            }
-                        }
+                    // ── Ignore patterns (RFC-056; badges, RFC-099 §3) ──────────
+                    IgnoreListField {
+                        lang,
+                        label: t(lang, "Ignore file extensions"),
+                        label_id: "ignore-extensions-label",
+                        placeholder: t(lang, "o, class, tmp  (comma separated, no dot needed)"),
+                        kind: IgnoreListKind::Extension,
+                        csv: cur.ignore_extensions.clone(),
+                        on_change: move |value| {
+                            store.settings.write().ignore_extensions = value;
+                            super::persist(store);
+                        },
                     }
-                    div { class: "field",
-                        span { {t(lang, "Ignore directory names")} }
-                        input {
-                            r#type: "text",
-                            placeholder: t(lang, "target, node_modules, *.cache  (* wildcard allowed)"),
-                            value: "{dirs_draft}",
-                            oninput: move |e| {
-                                debounce_ignore_field_input(
-                                    e.value(), dirs_draft, dirs_debounce, clock,
-                                    move |value| {
-                                        store.settings.write().ignore_dirs = value;
-                                        super::persist(store);
-                                    },
-                                );
-                            }
-                        }
+                    IgnoreListField {
+                        lang,
+                        label: t(lang, "Ignore directory names"),
+                        label_id: "ignore-dirs-label",
+                        placeholder: t(lang, "target, node_modules, *.cache  (* wildcard allowed)"),
+                        kind: IgnoreListKind::DirPattern,
+                        csv: cur.ignore_dirs.clone(),
+                        on_change: move |value| {
+                            store.settings.write().ignore_dirs = value;
+                            super::persist(store);
+                        },
                     }
                     // F149: hidden entries are shown by default; this hides them —
                     // in the Explorer tree and in every comparison that reads a
