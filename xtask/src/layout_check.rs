@@ -90,6 +90,44 @@ struct Fixtures {
     merge_merged: PathBuf,
 }
 
+/// Review 220 §2.5: a run invoked bare (no `session.sh`, no `xvfb-run
+/// dbus-run-session` wrapper around it) inherits the *caller's* own
+/// `DBUS_SESSION_BUS_ADDRESS` - the real desktop's session bus, locally,
+/// since `Command::new` passes the parent's environment through
+/// unchanged by default. RFC-097 stage 2's own startup portal read
+/// (`org.freedesktop.portal.Settings`, for the colour scheme) then asks
+/// the *maintainer's real desktop*, not the isolated plan - exactly the
+/// gap review 185's own portal investigation found and named
+/// `.git-exclude/gui/no-activation-session.conf` for. That file can't be
+/// read here: CI's checkout never has `.git-exclude/` at all. Writing
+/// the identical rules into `target/` from code, the same way fixtures
+/// already are, is the equivalent the review itself asked for - no
+/// `<standard_session_servicedirs/>` at all, so a call to an unowned
+/// name fails immediately (`ServiceUnknown`) instead of activating any
+/// real service, portal included, on what `dbus-run-session` believes
+/// is a fresh, empty bus.
+const NO_ACTIVATION_SESSION_CONF: &str = r#"<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <type>session</type>
+  <keep_umask/>
+  <listen>unix:tmpdir=/tmp</listen>
+  <auth>EXTERNAL</auth>
+  <policy context="default">
+    <allow send_destination="*" eavesdrop="true"/>
+    <allow eavesdrop="true"/>
+    <allow own="*"/>
+  </policy>
+</busconfig>
+"#;
+
+fn write_no_activation_conf(out_dir: &Path) -> PathBuf {
+    let path = out_dir.join("no-activation-session.conf");
+    fs::write(&path, NO_ACTIVATION_SESSION_CONF)
+        .unwrap_or_else(|e| panic!("cannot write {}: {e}", path.display()));
+    path
+}
+
 pub fn run(root: &Path, opts: &RunOptions) {
     if let Some(defect) = &opts.inject {
         run_inject(root, opts, defect);
@@ -104,6 +142,7 @@ pub fn run(root: &Path, opts: &RunOptions) {
     let _ = fs::remove_dir_all(&opts.out_dir);
     fs::create_dir_all(&opts.out_dir)
         .unwrap_or_else(|e| panic!("cannot create {}: {e}", opts.out_dir.display()));
+    let bus_conf = write_no_activation_conf(&opts.out_dir);
 
     let fixtures_dir = opts.out_dir.join("fixtures");
     let (file_left, file_right) = write_file_comparison_fixture(&fixtures_dir);
@@ -143,7 +182,7 @@ pub fn run(root: &Path, opts: &RunOptions) {
         );
 
         println!("layout-check: running layout checks, window {window_label}...");
-        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir);
+        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf);
         per_window_ms.push((format!("layout {window_label}"), elapsed.as_millis()));
 
         for row in read_jsonl(&results_path) {
@@ -173,7 +212,7 @@ pub fn run(root: &Path, opts: &RunOptions) {
         println!(
             "layout-check: running rendered contrast, window {window_label} at {text_size}%..."
         );
-        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir);
+        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf);
         per_window_ms.push((
             format!("contrast {window_label}@{text_size}%"),
             elapsed.as_millis(),
@@ -194,11 +233,19 @@ pub fn run(root: &Path, opts: &RunOptions) {
 /// back off. Reverted by [`InjectedDefect`]'s own `Drop`, panic or not.
 const INJECT_CSS_PATH: &str = "crates/forskscope-ui/assets/css/03-components.css";
 
-/// One CSS rule per [`INJECTABLE_DEFECTS`] entry, each scoped to the
-/// Settings dialog's own *Advanced* section (`.modal .actions button` -
-/// its "Close" button - or the ignore-extensions field's own label),
-/// since Settings is the one view every `--inject` run opens: real,
-/// reachable elements, not a synthetic fixture of their own.
+/// One CSS rule per [`INJECTABLE_DEFECTS`] entry. Most are scoped to
+/// the Settings dialog's own *Advanced* section (`.modal .actions
+/// button` - its "Close" button - or `#text-size-help`), since Settings
+/// is the view every `--inject` run opens by default: real, reachable
+/// elements, not a synthetic fixture of their own.
+///
+/// `label-placement` is the one exception (review 220 §2.4/§4):
+/// `label_placement` no longer examines Settings' own form fields at
+/// all, only the diff view's own `data-layout-labels` regions - so
+/// [`run_inject_guarded`] opens file comparison instead, just for this
+/// one defect, and the rule below targets `#pane-label-left-0`, the
+/// side-by-side header's own label (the layout's active one at this
+/// view's default, wide window size).
 fn injected_rule(defect: &str) -> Option<&'static str> {
     Some(match defect {
         // "Close" (5 glyphs) doesn't fit 10px either way - the same
@@ -222,7 +269,7 @@ fn injected_rule(defect: &str) -> Option<&'static str> {
              background: #808080 !important; }"
         }
         "label-placement" => {
-            "#ignore-extensions-label { position: relative !important; top: 500px !important; }"
+            "#pane-label-left-0 { position: relative !important; top: 500px !important; }"
         }
         // The regression this whole round started from (review 217/218),
         // reproduced directly: nothing above the scrim to answer "what's
@@ -233,9 +280,15 @@ fn injected_rule(defect: &str) -> Option<&'static str> {
         "dialog-occlusion" => {
             "body::before { content: ''; position: fixed; inset: 0; z-index: 99999; }"
         }
-        "overlap" => {
-            "#ignore-extensions-label { position: relative !important; top: 60px !important; }"
-        }
+        // Review 220 §2.1: the previous target, `#ignore-extensions-
+        // label`, sits far enough down Settings' own *Advanced* section
+        // that `many_ignore_entries`' own long badge lists scroll it
+        // out of the modal's visible area entirely - exactly the
+        // clipped-away shape `visibleRect` now correctly excludes from
+        // every check, this one included, so the old target stopped
+        // proving anything. `#text-size-help` sits right under the
+        // dialog's own, always-visible first field instead.
+        "overlap" => "#text-size-help { position: relative !important; top: 60px !important; }",
         _ => return None,
     })
 }
@@ -347,23 +400,40 @@ fn run_inject_guarded(
     let _ = fs::remove_dir_all(&opts.out_dir);
     fs::create_dir_all(&opts.out_dir)
         .unwrap_or_else(|e| panic!("cannot create {}: {e}", opts.out_dir.display()));
+    let bus_conf = write_no_activation_conf(&opts.out_dir);
     let bin = build_binary(root, opts.release);
     let plan_path = opts.out_dir.join("plan-inject.json");
     let results_path = opts.out_dir.join("results-inject.jsonl");
     let data_dir = opts.out_dir.join("data-inject");
-    // Settings only, every injected rule's own target - not
+    // One view only, every injected rule's own target - not
     // `all_views_json`'s full six: a prior view's own DOM found live to
     // still answer `querySelectorAll` from inside `#app-root` after
     // switching away from it (nothing unmounts it, only the active
     // view changes), which doesn't belong in a one-check-at-a-time
-    // falsification at all.
+    // falsification at all. `label-placement` opens file comparison
+    // instead of Settings (see `injected_rule`'s own doc comment) -
+    // every other defect still targets Settings' own *Advanced*
+    // section.
+    let (view_kind, view_name) = if defect == "label-placement" {
+        let fixtures_dir = opts.out_dir.join("fixtures");
+        let (left, right) = write_file_comparison_fixture(&fixtures_dir);
+        (
+            serde_json::json!({"kind": "file-comparison", "left": left, "right": right}),
+            "file-comparison",
+        )
+    } else {
+        (
+            serde_json::json!({
+                "kind": "settings",
+                "ignore_extensions": many_ignore_entries("ext"),
+                "ignore_dirs": many_ignore_entries("dir"),
+            }),
+            "settings",
+        )
+    };
     let plan = serde_json::json!({
         "results_path": results_path,
-        "views": [{
-            "kind": "settings",
-            "ignore_extensions": many_ignore_entries("ext"),
-            "ignore_dirs": many_ignore_entries("dir"),
-        }],
+        "views": [view_kind],
         "text_sizes": [100],
         "languages": ["en"],
         "window_size": "1000x700",
@@ -371,15 +441,15 @@ fn run_inject_guarded(
     fs::write(&plan_path, serde_json::to_string_pretty(&plan).unwrap())
         .unwrap_or_else(|e| panic!("cannot write {}: {e}", plan_path.display()));
 
-    println!("layout-check: --inject {defect} - running Settings only...");
-    launch_and_wait(&bin, &plan_path, &data_dir);
+    println!("layout-check: --inject {defect} - running {view_name} only...");
+    launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf);
     let rows = read_jsonl(&results_path);
 
     let settings_row = rows
         .iter()
-        .find(|r| r.get("view").and_then(|v| v.as_str()) == Some("settings"));
+        .find(|r| r.get("view").and_then(|v| v.as_str()) == Some(view_name));
     let Some(row) = settings_row else {
-        eprintln!("layout-check: --inject {defect}: the Settings row itself is missing");
+        eprintln!("layout-check: --inject {defect}: the {view_name} row itself is missing");
         return false;
     };
     let found = row
@@ -605,14 +675,28 @@ fn write_contrast_plan(
 /// from the plan itself, applied in process (review 216 §4) - no
 /// external resize step, no `xdotool` dependency, no `DISPLAY` check.
 /// Returns the wall-clock time from launch to exit.
-fn launch_and_wait(bin: &Path, plan_path: &Path, data_dir: &Path) -> Duration {
+///
+/// Review 220 §2.5: wrapped in `dbus-run-session --config-file
+/// <bus_conf>`, every launch, locally and in CI alike - a bare
+/// `Command::new(bin)` inherits the caller's own
+/// `DBUS_SESSION_BUS_ADDRESS` unchanged, which is the real desktop's
+/// session bus on a plain local run. `dbus-run-session` gives this
+/// child its own fresh bus and sets the env var to it; `--config-file`
+/// (see [`NO_ACTIVATION_SESSION_CONF`]) is what then stops that fresh
+/// bus from activating any real service, the portal included, the
+/// moment something asks for a name nobody on it owns yet.
+fn launch_and_wait(bin: &Path, plan_path: &Path, data_dir: &Path, bus_conf: &Path) -> Duration {
     fs::create_dir_all(data_dir.join("xdg/config")).unwrap();
     fs::create_dir_all(data_dir.join("xdg/state")).unwrap();
     fs::create_dir_all(data_dir.join("xdg/cache")).unwrap();
     fs::create_dir_all(data_dir.join("xdg/data")).unwrap();
 
     let start = Instant::now();
-    let mut child = Command::new(bin)
+    let mut child = Command::new("dbus-run-session")
+        .arg("--config-file")
+        .arg(bus_conf)
+        .arg("--")
+        .arg(bin)
         .arg("--data-dir")
         .arg(data_dir)
         .env("FORSKSCOPE_LAYOUT_PROBE_PLAN", plan_path)
@@ -629,7 +713,7 @@ fn launch_and_wait(bin: &Path, plan_path: &Path, data_dir: &Path) -> Duration {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("failed to launch forskscope");
+        .expect("failed to launch forskscope under dbus-run-session");
 
     let timeout = Duration::from_secs(60);
     let exited = wait_with_timeout(&mut child, timeout);

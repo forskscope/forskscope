@@ -139,9 +139,9 @@ pub fn DiffWorkspace(index: usize) -> Element {
                 Notice { kind: NoticeKind::Ok, {t(lang, "Files are identical")} }
             }
             div { class: "diff-pane-labels", aria_hidden: "true",
-                span { class: "pane-label-left",  {t(lang, "Left / Old")} }
+                span { class: "pane-label-left", id: "pane-label-left-{index}", {t(lang, "Left / Old")} }
                 span { class: "pane-label-act" }
-                span { class: "pane-label-right", {t(lang, "Right / New")} }
+                span { class: "pane-label-right", id: "pane-label-right-{index}", {t(lang, "Right / New")} }
             }
             div {
                 class: "{wrap_class}",
@@ -168,8 +168,29 @@ pub fn DiffWorkspace(index: usize) -> Element {
                     // was there (confirmed: review 203's own regression check,
                     // pixel-exact at 100% in 1000x700).
                     div { class: "diff-col-left-wrap",
-                    span { class: "pane-label-inline", aria_hidden: "true", {t(lang, "Left / Old")} }
-                    div { class: "diff-col-left", id: "diff-col-left-{index}",
+                    span { class: "pane-label-inline", id: "pane-label-left-inline-{index}", aria_hidden: "true", {t(lang, "Left / Old")} }
+                    div {
+                        class: "diff-col-left", id: "diff-col-left-{index}",
+                        // Review 220 §4 (F217): the two candidate labels for
+                        // this column - the side-by-side header
+                        // (`pane-label-left-{index}`) and the stacked
+                        // layout's own per-column label
+                        // (`pane-label-left-inline-{index}`) - exactly one
+                        // of which CSS shows at any given width
+                        // (90-responsive.css's own `display: none` pair).
+                        // `aria-labelledby` would need to name just one
+                        // (both reference the same text regardless of
+                        // visibility, so naming both reads as "Left / Old
+                        // Left / Old" - duplicated, not a real screen-
+                        // reader improvement) and isn't the thing the
+                        // probe's own geometry check needs anyway: it has
+                        // to examine whichever label is *visible right
+                        // now*, which differs by layout. A data attribute,
+                        // not `aria-labelledby`, for that reason -
+                        // `layout_probe.rs`'s own label_placement check
+                        // reads it, picks whichever referenced id has a
+                        // non-zero box, and checks that one's position.
+                        "data-layout-labels": "pane-label-left-{index} pane-label-left-inline-{index}",
                     div { class: "diff-col-table",
                     for hunk in snap.hunks.iter() {
                         HunkBlock {
@@ -199,8 +220,10 @@ pub fn DiffWorkspace(index: usize) -> Element {
                     } // .diff-col-table
                 }
                     div { class: "diff-col-right-wrap",
-                    span { class: "pane-label-inline", aria_hidden: "true", {t(lang, "Right / New")} }
-                    div { class: "diff-col-right", id: "diff-col-right-{index}",
+                    span { class: "pane-label-inline", id: "pane-label-right-inline-{index}", aria_hidden: "true", {t(lang, "Right / New")} }
+                    div {
+                        class: "diff-col-right", id: "diff-col-right-{index}",
+                        "data-layout-labels": "pane-label-right-{index} pane-label-right-inline-{index}",
                     div { class: "diff-col-table",
                     for hunk in snap.hunks.iter() {
                         HunkBlock {
