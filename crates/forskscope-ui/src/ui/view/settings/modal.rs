@@ -429,7 +429,7 @@ pub fn SettingsModal() -> Element {
                         lang,
                         label: t(lang, "Ignore file extensions"),
                         label_id: "ignore-extensions-label",
-                        placeholder: t(lang, "o, class, tmp  (comma separated, no dot needed)"),
+                        placeholder: t(lang, "Add an extension (no dot needed)"),
                         kind: IgnoreListKind::Extension,
                         csv: cur.ignore_extensions.clone(),
                         on_change: move |value| {
@@ -441,7 +441,7 @@ pub fn SettingsModal() -> Element {
                         lang,
                         label: t(lang, "Ignore directory names"),
                         label_id: "ignore-dirs-label",
-                        placeholder: t(lang, "target, node_modules, *.cache  (* wildcard allowed)"),
+                        placeholder: t(lang, "Add a folder name or pattern"),
                         kind: IgnoreListKind::DirPattern,
                         csv: cur.ignore_dirs.clone(),
                         on_change: move |value| {

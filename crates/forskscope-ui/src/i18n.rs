@@ -267,12 +267,12 @@ fn ja(key: &str) -> Option<&'static str> {
         }
         "App" => "アプリ",
         "Search…" => "検索…",
-        "o, class, tmp  (comma separated, no dot needed)" => {
-            "o, class, tmp（カンマ区切り、ドット不要）"
-        }
-        "target, node_modules, *.cache  (* wildcard allowed)" => {
-            "target, node_modules, *.cache（* ワイルドカード可）"
-        }
+        // RFC-099 §3, review 217 §3: replaces the old free-text field's
+        // own placeholder ("o, class, tmp (comma separated, no dot
+        // needed)"), which described a field the badges replaced and
+        // was cut off at 200% besides.
+        "Add an extension (no dot needed)" => "拡張子を追加（ドット不要）",
+        "Add a folder name or pattern" => "フォルダー名またはパターンを追加",
         "Ignore file extensions" => "除外ファイル拡張子",
         "Ignore directory names" => "除外ディレクトリ名",
         // RFC-099 §3: the ignore lists as badges. "Remove"/"Added"/

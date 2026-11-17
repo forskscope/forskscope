@@ -548,10 +548,29 @@ select option { background: var(--surface); color: var(--text); }
    Reusable components shared across multiple views.
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* ---- modal / scrim ---- */
+/* ── z-index, every value in the app, lowest to highest ──
+   F225 (review 217 §2): `.scrim` had none at all (`auto`) - a sticky,
+   explicitly-`z-index: 1` element anywhere else in the page (found live:
+   `.pane-label-inline`'s own stacked pane label, 90-responsive.css,
+   F217's own fix) paints above an `auto`-stacked box regardless of DOM
+   order, so in the stacked layout (the norm at 200% and in narrow
+   windows, exactly where F224's own captures were taken) the label
+   painted across every open dialog. Shipped in 0.198.0 with F217
+   (`3fa950c`), never with a dialog open at the same time anyone
+   happened to look.
+   - `1`: `.modal h2:first-child`/`.modal-header-row:first-child`,
+     `.modal .actions` (F224's own sticky header/footer) and
+     `.pane-label-inline` (F217) - each only needs to sit above its own
+     scrolling siblings, not above everything else in the app.
+   - `20`: `.pathbar-menu-catcher`.
+   - `21`: `.pathbar-menu` (above its own catcher).
+   - `100`: `.scrim` - above every one of the above. A path-bar menu and
+     a modal are never open together, so `100` only has to clear `21`
+     with margin for whatever this list grows to next, not race it. */
 .scrim {
   position: fixed; inset: 0; background: rgba(0,0,0,.45);
   display: flex; align-items: center; justify-content: center;
+  z-index: 100;
 }
 /* F224 (review 216 §4, handoff 103 §4): `.modal` had no max-height or
    scroll of its own, and `.scrim` (fixed, flex-centred) just centres it
