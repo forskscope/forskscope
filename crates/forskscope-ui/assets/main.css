@@ -533,10 +533,19 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 /* ---- toast ---- */
+/* F225 round 2 (review 218 §2): `.scrim`'s own z-index: 100 (03-components.css)
+   put every toast under it by default, with nothing to say otherwise - the
+   toast used to paint above the scrim by DOM order alone (rendered after
+   ModalLayer in app.rs), which review 217's "above every in-app stacking
+   value" never accounted for. The toast is the one surface meant to sit
+   above an open dialog (it is transient, dismissed by a click, and the
+   app's only error notice), so it gets the next value above `.scrim`'s own
+   100 - see 03-components.css's own list for the rest. */
 .toast {
   position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
   background: var(--surface-3); border: 1px solid var(--accent); color: var(--text);
   padding: .5rem .9rem; border-radius: 8px; max-width: 80%; cursor: pointer;
+  z-index: 110;
 }
 .toast-success { border-color: var(--ok); }
 .toast-info    { border-color: var(--accent); }
@@ -566,7 +575,12 @@ select option { background: var(--surface); color: var(--text); }
    - `21`: `.pathbar-menu` (above its own catcher).
    - `100`: `.scrim` - above every one of the above. A path-bar menu and
      a modal are never open together, so `100` only has to clear `21`
-     with margin for whatever this list grows to next, not race it. */
+     with margin for whatever this list grows to next, not race it.
+   - `110`: `.toast` (02-layout-shell.css) - the one surface above a
+     dialog (review 218 §2). It is transient, dismissed by a click, and
+     the app's only error notice; F62's save-error toast can be raised
+     while Settings is open, and at 200% the dialog covers the window's
+     own bottom edge, where the toast sits. */
 .scrim {
   position: fixed; inset: 0; background: rgba(0,0,0,.45);
   display: flex; align-items: center; justify-content: center;
@@ -650,6 +664,14 @@ select option { background: var(--surface); color: var(--text); }
   border: 1px solid var(--control-border); border-radius: 3px;
   background: var(--surface); color: var(--text);
 }
+/* RFC-099 §3, round 2 (review 218 §3): a visible-only line under the
+   badge row for "Already in the list" - never "Added"/"Removed", which
+   the badge itself already shows. `.field-help`'s own `margin: -.3rem 0
+   .5rem` (above) assumes it sits directly under a label, and under a
+   badge row it instead pulls this text up into the badges themselves -
+   that's F225's own class of defect a third time. This stays in normal
+   flow with no negative margin. */
+.ignore-list-notice { margin: .35rem 0 0; font-size: 12px; color: var(--muted); }
 /* Same reasoning as the sticky heading above, the other edge: pulled out
    to the scrollport's own bottom/side edges and re-padded, so nothing
    scrolling past shows through underneath. */

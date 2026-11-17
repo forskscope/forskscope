@@ -35,20 +35,33 @@ fn IgnoreListField(
     on_change: EventHandler<String>,
 ) -> Element {
     let mut typed = use_signal(String::new);
-    let mut announcement: Signal<Option<String>> = use_signal(|| None);
+    // RFC-099 §3, round 2 (review 218 §3): two separate signals, not one.
+    // `live_message` backs the screen-reader-only region below, which
+    // stays mounted (empty) from the very first render — a region
+    // inserted together with its own first message is reliably announced
+    // as a *change* only the second time onward, found live in review
+    // 218's own harness, so the live region itself must already exist
+    // before the first add. `duplicate_notice` is sighted-only: the
+    // *visible* line is "Already in the list" alone — the badge itself
+    // already shows an add or a remove, so repeating that in text is
+    // noise a sighted user doesn't need.
+    let mut live_message = use_signal(String::new);
+    let mut duplicate_notice = use_signal(|| false);
     let entries = current_entries(&csv, kind);
 
     let mut try_add = move |raw: String, csv: String| {
         let outcome = add_entries(&csv, &raw, kind);
         if !outcome.added.is_empty() {
             on_change.call(outcome.csv);
-            announcement.set(Some(format!(
+            live_message.set(format!(
                 "{}: {}",
                 t(lang, "Added"),
                 outcome.added.join(", ")
-            )));
+            ));
+            duplicate_notice.set(false);
         } else if !outcome.duplicates.is_empty() {
-            announcement.set(Some(t(lang, "Already in the list")));
+            live_message.set(t(lang, "Already in the list"));
+            duplicate_notice.set(true);
         }
         typed.set(String::new());
     };
@@ -69,8 +82,8 @@ fn IgnoreListField(
                                     let csv = csv.clone();
                                     move |_| {
                                         on_change.call(remove_entry(&csv, &entry, kind));
-                                        announcement
-                                            .set(Some(format!("{}: {entry}", t(lang, "Removed"))));
+                                        live_message.set(format!("{}: {entry}", t(lang, "Removed")));
+                                        duplicate_notice.set(false);
                                     }
                                 },
                                 "×"
@@ -86,6 +99,11 @@ fn IgnoreListField(
                     oninput: {
                         let csv = csv.clone();
                         move |e: Event<FormData>| {
+                            // Review 218 §3: cleared on every keystroke, not
+                            // only a successful add — "Already in the list"
+                            // describes the text as typed a moment ago, not
+                            // the text now being changed.
+                            duplicate_notice.set(false);
                             let value = e.value();
                             if value.contains(',') {
                                 try_add(value, csv.clone());
@@ -122,8 +140,13 @@ fn IgnoreListField(
                     },
                 }
             }
-            if let Some(msg) = announcement.read().as_deref() {
-                p { class: "field-help", role: "status", "aria-live": "polite", "{msg}" }
+            // Always mounted, even with nothing to say yet (review 218
+            // §3) — a region a screen reader already knows about is
+            // reliably announced on a text *change*; one inserted
+            // together with its first message is not.
+            p { class: "sr-only", role: "status", "aria-live": "polite", "{live_message}" }
+            if *duplicate_notice.read() {
+                p { class: "ignore-list-notice", "aria-hidden": "true", {t(lang, "Already in the list")} }
             }
         }
     }
@@ -668,6 +691,100 @@ mod tests {
                 .iter()
                 .any(|t| t.starts_with("Enlarges everything in ForskScope")),
             "the linked help text itself must actually be rendered, got {texts:?}"
+        );
+    }
+
+    /// Review 218 §3: the ignore-list live region is mounted — empty —
+    /// from the very first render, and holds the real announcement after
+    /// a real add, driven through the actual `oninput` listener (not a
+    /// hand call to a private closure), the same `handle_event` mechanism
+    /// `dioxus-core`'s own `event_propagation.rs` test uses. Falsify by
+    /// reverting the live region to the old `if let Some(msg) = ...`
+    /// shape: the first assertion (a `CreateTextNode` with an empty
+    /// value, present at the very first mount) fails, since that shape
+    /// renders no such node until the first message exists.
+    #[test]
+    fn the_ignore_list_live_region_is_always_present_and_updates_on_add() {
+        use dioxus::html::{PlatformEventData, SerializedFormData};
+        use dioxus_core::ElementId;
+        use std::any::Any;
+        use std::rc::Rc;
+
+        set_event_converter(Box::new(dioxus::html::SerializedHtmlEventConverter));
+
+        fn root() -> Element {
+            let csv = use_signal(String::new);
+            rsx! {
+                IgnoreListField {
+                    lang: Lang::En,
+                    label: "Ignore file extensions".to_string(),
+                    label_id: "test-ignore-extensions".to_string(),
+                    placeholder: "Add an extension".to_string(),
+                    kind: IgnoreListKind::Extension,
+                    csv: csv.read().clone(),
+                    on_change: move |v: String| csv.clone().set(v),
+                }
+            }
+        }
+
+        let mut dom = VirtualDom::new(root);
+        let first = dom.rebuild_to_vec();
+
+        // The live region exists, with an empty text node, before any
+        // add — not absent, the way the old `if let Some(msg)` shape
+        // left it until the first message.
+        let empty_text_ids: Vec<ElementId> = first
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, id } if value.is_empty() => {
+                    Some(*id)
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            empty_text_ids.len(),
+            1,
+            "expected exactly one empty text node (the live region) at first mount, got {:?}",
+            first.edits
+        );
+        let live_region_text_id = empty_text_ids[0];
+
+        let input_id = first
+            .edits
+            .iter()
+            .find_map(|m| match m {
+                dioxus_core::Mutation::NewEventListener { name, id } if name == "input" => {
+                    Some(*id)
+                }
+                _ => None,
+            })
+            .expect("the input must register an oninput listener");
+
+        // Drive the real listener, as the browser would: an `input`
+        // event carrying a comma, which `IgnoreListField`'s own
+        // `oninput` routes straight to `try_add`.
+        let event = Event::new(
+            Rc::new(PlatformEventData::new(Box::new(SerializedFormData::new(
+                "tmp, log".to_string(),
+                Vec::new(),
+            )))) as Rc<dyn Any>,
+            true,
+        );
+        dom.runtime().handle_event("input", event, input_id);
+        let after_add = dom.render_immediate_to_vec();
+
+        let live_region_text_after_add = after_add.edits.iter().find_map(|m| match m {
+            dioxus_core::Mutation::SetText { value, id } if *id == live_region_text_id => {
+                Some(value.clone())
+            }
+            _ => None,
+        });
+        assert_eq!(
+            live_region_text_after_add.as_deref(),
+            Some("Added: tmp, log"),
+            "the live region must hold the real announcement after a real add, got {after_add:?}"
         );
     }
 }

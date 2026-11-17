@@ -138,11 +138,23 @@ pub enum ViewPlan {
     /// `ignore_extensions`/`ignore_dirs`, if given, seed the two
     /// ignore-list fields before opening — RFC-099 §3's own verification
     /// asks for the badge lists "at 200% holding many entries".
+    ///
+    /// `raise_toast`, if set, calls [`Store::notify`] right after opening
+    /// the dialog — an error toast, the same severity and the same
+    /// insert-with-text timing as F62's real "Could not save settings"
+    /// (review 218 §2: a probe-level proof that no visible surface sits
+    /// above `.toast`, falsified against the regression `b723d41`
+    /// shipped — `.scrim`'s own `z-index: 100` with nothing on `.toast`
+    /// to answer it). An error [`Notice`](crate::state::Notice) never
+    /// auto-dismisses, so it stays up for this view's whole text-size/
+    /// language loop, not just the combination that raised it.
     Settings {
         #[serde(default)]
         ignore_extensions: Option<String>,
         #[serde(default)]
         ignore_dirs: Option<String>,
+        #[serde(default)]
+        raise_toast: bool,
     },
 }
 
@@ -207,6 +219,29 @@ pub struct Finding {
     pub client_height: f64,
 }
 
+/// Whether `.toast` (if raised — [`ViewPlan::Settings`]'s own
+/// `raise_toast`) is actually on top at its own centre point — review
+/// 218 §2's probe-level proof that no visible surface, in particular an
+/// open dialog's own scrim, sits above it. `present: false` means no
+/// toast was raised at all (`raise_toast` was unset, or it auto-
+/// dismissed — never true for an error [`Notice`](crate::state::Notice),
+/// the only severity this field is ever set with).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ToastCheck {
+    pub present: bool,
+    /// `true` when `document.elementFromPoint` at the toast's own centre
+    /// returns something other than the toast or one of its descendants
+    /// — meaning some other box paints above it there. Always `false`
+    /// when `present` is `false`.
+    #[serde(default)]
+    pub occluded: bool,
+    /// A short description of whatever `elementFromPoint` actually hit,
+    /// when `occluded` — the same `tag.class` shape [`Finding::element`]
+    /// uses. `None` when `present` is `false` or the toast itself was hit.
+    #[serde(default)]
+    pub hit: Option<String>,
+}
+
 /// One combination's own measurement, appended as one line of
 /// [`Plan::results_path`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -263,6 +298,11 @@ pub struct ResultRow {
     /// producing an empty, misleadingly-clean row.
     #[serde(default)]
     pub error: Option<String>,
+    /// See [`ToastCheck`]. Always present (not an `Option`) once a
+    /// measurement actually ran — `Default` only for the early-return
+    /// rows above, where the script never ran at all.
+    #[serde(default)]
+    pub toast_check: ToastCheck,
 }
 
 fn parse_lang(s: &str) -> Lang {
@@ -383,6 +423,7 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
         ViewPlan::Settings {
             ignore_extensions,
             ignore_dirs,
+            raise_toast,
         } => {
             if let Some(v) = ignore_extensions {
                 store.settings.write().ignore_extensions = v.clone();
@@ -391,6 +432,9 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
                 store.settings.write().ignore_dirs = v.clone();
             }
             store.modal.set(Modal::Settings);
+            if *raise_toast {
+                store.notify("layout-probe: Could not save settings: test toast");
+            }
         }
     }
 }
@@ -449,6 +493,7 @@ async fn measure_one(
                 overflow: Vec::new(),
                 clipped: Vec::new(),
                 error: Some(format!("eval did not return: {e:?}")),
+                toast_check: ToastCheck::default(),
             };
         }
     };
@@ -466,6 +511,7 @@ async fn measure_one(
             overflow: m.overflow,
             clipped: m.clipped,
             error: m.error,
+            toast_check: m.toast_check,
         },
         Err(e) => ResultRow {
             view: view.name().to_string(),
@@ -479,6 +525,7 @@ async fn measure_one(
             overflow: Vec::new(),
             clipped: Vec::new(),
             error: Some(format!("could not parse measurement JSON {raw:?}: {e}")),
+            toast_check: ToastCheck::default(),
         },
     }
 }
@@ -560,6 +607,8 @@ struct MeasurementOutcome {
     clipped: Vec<Finding>,
     #[serde(default)]
     error: Option<String>,
+    #[serde(default)]
+    toast_check: ToastCheck,
 }
 
 /// The measurement script run in the page for one combination. Returns
@@ -690,7 +739,25 @@ fn measurement_script(ready_selector: &str) -> String {
         }}
       }}
     }}
-    dioxus.send(JSON.stringify({{settled, settle_ms, overflow, clipped}}));
+    // Review 218 §2: a probe-level proof that `.toast`, when raised, is
+    // actually hit at its own centre point - not covered by `.scrim` or
+    // anything else. `elementFromPoint` answers "what's really on top
+    // here", the same question a screenshot leaves to a human eye.
+    let toast_check = {{present: false, occluded: false, hit: null}};
+    const toastEl = document.querySelector('.toast');
+    if (toastEl) {{
+      const r = toastEl.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const hit = document.elementFromPoint(cx, cy);
+      const isToast = hit === toastEl || toastEl.contains(hit);
+      toast_check = {{
+        present: true,
+        occluded: !isToast,
+        hit: isToast || !hit ? null : describe(hit, -1),
+      }};
+    }}
+    dioxus.send(JSON.stringify({{settled, settle_ms, overflow, clipped, toast_check}}));
   }})();
 }})()"#
     )
@@ -751,6 +818,7 @@ mod tests {
         let settings = ViewPlan::Settings {
             ignore_extensions: None,
             ignore_dirs: None,
+            raise_toast: false,
         };
         for selector in [fc.ready_selector(), settings.ready_selector()] {
             assert!(
@@ -764,5 +832,38 @@ mod tests {
     fn measurement_script_embeds_the_given_selector_once() {
         let script = measurement_script(".diff-wrap");
         assert!(script.contains("querySelector('.diff-wrap')"));
+    }
+
+    #[test]
+    fn measurement_script_checks_the_toast_with_element_from_point() {
+        let script = measurement_script(".diff-wrap");
+        assert!(script.contains("elementFromPoint"));
+        assert!(script.contains("querySelector('.toast')"));
+        assert!(script.contains("toast_check"));
+    }
+
+    #[test]
+    fn settings_plan_deserializes_raise_toast_and_defaults_it_false() {
+        let raw = r#"{"kind": "settings", "raise_toast": true}"#;
+        let view: ViewPlan = serde_json::from_str(raw).expect("must parse");
+        let ViewPlan::Settings { raise_toast, .. } = view else {
+            panic!("expected Settings");
+        };
+        assert!(raise_toast);
+
+        let raw = r#"{"kind": "settings"}"#;
+        let view: ViewPlan = serde_json::from_str(raw).expect("must parse");
+        let ViewPlan::Settings { raise_toast, .. } = view else {
+            panic!("expected Settings");
+        };
+        assert!(!raise_toast);
+    }
+
+    #[test]
+    fn toast_check_default_is_not_present_and_not_occluded() {
+        let check = ToastCheck::default();
+        assert!(!check.present);
+        assert!(!check.occluded);
+        assert_eq!(check.hit, None);
     }
 }

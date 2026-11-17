@@ -294,10 +294,19 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 /* ---- toast ---- */
+/* F225 round 2 (review 218 §2): `.scrim`'s own z-index: 100 (03-components.css)
+   put every toast under it by default, with nothing to say otherwise - the
+   toast used to paint above the scrim by DOM order alone (rendered after
+   ModalLayer in app.rs), which review 217's "above every in-app stacking
+   value" never accounted for. The toast is the one surface meant to sit
+   above an open dialog (it is transient, dismissed by a click, and the
+   app's only error notice), so it gets the next value above `.scrim`'s own
+   100 - see 03-components.css's own list for the rest. */
 .toast {
   position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
   background: var(--surface-3); border: 1px solid var(--accent); color: var(--text);
   padding: .5rem .9rem; border-radius: 8px; max-width: 80%; cursor: pointer;
+  z-index: 110;
 }
 .toast-success { border-color: var(--ok); }
 .toast-info    { border-color: var(--accent); }
