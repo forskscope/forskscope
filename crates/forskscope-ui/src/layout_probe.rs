@@ -130,8 +130,20 @@ pub enum ViewPlan {
     /// button makes (`state::open_compare`).
     FileComparison { left: PathBuf, right: PathBuf },
     /// Opens the Settings dialog (`store.modal.set(Modal::Settings)`),
-    /// the same call the tab bar's own "Settings" button makes.
-    Settings,
+    /// the same call the tab bar's own "Settings" button makes, with
+    /// *Advanced* opened (a real DOM click on `.advanced-toggle`, run
+    /// once before the text-size/language loop starts — `show_advanced`
+    /// is a plain local UI signal, not one of `Store`'s, so this is the
+    /// one view the plan can't drive purely through signal writes).
+    /// `ignore_extensions`/`ignore_dirs`, if given, seed the two
+    /// ignore-list fields before opening — RFC-099 §3's own verification
+    /// asks for the badge lists "at 200% holding many entries".
+    Settings {
+        #[serde(default)]
+        ignore_extensions: Option<String>,
+        #[serde(default)]
+        ignore_dirs: Option<String>,
+    },
 }
 
 /// Where the measurement script walks every combination's own DOM from —
@@ -156,7 +168,7 @@ impl ViewPlan {
     fn name(&self) -> &'static str {
         match self {
             Self::FileComparison { .. } => "file-comparison",
-            Self::Settings => "settings",
+            Self::Settings { .. } => "settings",
         }
     }
 
@@ -172,7 +184,7 @@ impl ViewPlan {
             // `ui/view/diff.rs`'s `DiffWorkspace` root (`div.diff-wrap`).
             Self::FileComparison { .. } => ".diff-wrap",
             // `ui/view/settings/modal.rs`'s own dialog heading id.
-            Self::Settings => "#settings-title",
+            Self::Settings { .. } => "#settings-title",
         }
     }
 }
@@ -340,6 +352,7 @@ async fn run(mut store: Store, desktop: dioxus_desktop::DesktopContext, plan_pat
 
     for view in &plan.views {
         open_view(&mut store, view);
+        open_view_followup(view).await;
         for &text_size in &plan.text_sizes {
             store.settings.write().text_size = text_size;
             for language in &plan.languages {
@@ -367,16 +380,36 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
             store.modal.set(Modal::None);
             open_compare(store, left.clone(), right.clone());
         }
-        ViewPlan::Settings => {
+        ViewPlan::Settings {
+            ignore_extensions,
+            ignore_dirs,
+        } => {
+            if let Some(v) = ignore_extensions {
+                store.settings.write().ignore_extensions = v.clone();
+            }
+            if let Some(v) = ignore_dirs {
+                store.settings.write().ignore_dirs = v.clone();
+            }
             store.modal.set(Modal::Settings);
         }
+    }
+}
+
+/// Run once, right after [`open_view`], for a view whose own content
+/// needs a real DOM click, not a signal write, to appear at all —
+/// today, only `Settings`' own `.advanced-toggle` (its `show_advanced`
+/// is a plain local UI signal). A no-op `document::eval` for every other
+/// view.
+async fn open_view_followup(view: &ViewPlan) {
+    if let ViewPlan::Settings { .. } = view {
+        retry_eval("document.querySelector('.advanced-toggle')?.click();").await;
     }
 }
 
 fn close_view(store: &mut Store, view: &ViewPlan) {
     match view {
         ViewPlan::FileComparison { .. } => {}
-        ViewPlan::Settings => store.modal.set(Modal::None),
+        ViewPlan::Settings { .. } => store.modal.set(Modal::None),
     }
 }
 
@@ -461,8 +494,17 @@ const RECV_RETRIES: u32 = 5;
 /// function's doc comment for why. Its own result is never read either
 /// way, only whether a round trip happened at all.
 async fn retry_eval_true() {
+    retry_eval("true").await;
+}
+
+/// Runs `script` for its side effect only, retried the same way
+/// [`retry_recv`] is (a fresh `document::eval` each attempt, since a
+/// failed one's own `GenerationalBox` is gone) — shared by the
+/// throwaway tick above and [`open_view_followup`]'s own real DOM
+/// click, neither of which has a return value worth reading.
+async fn retry_eval(script: &str) {
     for attempt in 0..=RECV_RETRIES {
-        if dioxus::document::eval("true").await.is_ok() {
+        if dioxus::document::eval(script).await.is_ok() {
             return;
         }
         if attempt < RECV_RETRIES {
@@ -706,7 +748,11 @@ mod tests {
             left: "a".into(),
             right: "b".into(),
         };
-        for selector in [fc.ready_selector(), ViewPlan::Settings.ready_selector()] {
+        let settings = ViewPlan::Settings {
+            ignore_extensions: None,
+            ignore_dirs: None,
+        };
+        for selector in [fc.ready_selector(), settings.ready_selector()] {
             assert!(
                 selector.starts_with('.') || selector.starts_with('#'),
                 "{selector} must select by class or id, not an attribute value"

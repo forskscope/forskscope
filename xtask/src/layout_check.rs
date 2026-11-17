@@ -198,6 +198,16 @@ fn write_mergetool_fixture(dir: &Path) {
 
 // ── Plan ─────────────────────────────────────────────────────────────────
 
+/// RFC-099 §3's own verification: the ignore-list badges "at 200 % holding
+/// many entries" - twenty of each, long enough to need several wrapped
+/// lines at every window size this matrix covers.
+fn many_ignore_entries(prefix: &str) -> String {
+    (1..=20)
+        .map(|i| format!("{prefix}-entry-{i}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 fn write_plan(
     plan_path: &Path,
     results_path: &Path,
@@ -211,7 +221,11 @@ fn write_plan(
         "results_path": results_path,
         "views": [
             {"kind": "file-comparison", "left": left, "right": right},
-            {"kind": "settings"},
+            {
+                "kind": "settings",
+                "ignore_extensions": many_ignore_entries("ext"),
+                "ignore_dirs": many_ignore_entries("dir"),
+            },
         ],
         "text_sizes": text_sizes,
         "languages": languages,
