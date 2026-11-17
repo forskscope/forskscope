@@ -1,16 +1,27 @@
-//! RFC-098 stage A (handoff 101): `cargo xtask layout-check` — the
-//! `layout-probe`'s own driver.
+//! RFC-098 stage B (handoff 101, after review 216's answer to `188`):
+//! `cargo xtask layout-check` — the `layout-probe`'s own driver.
 //!
-//! Generates fixtures, writes a plan, builds `forskscope` with the
-//! `layout-probe` feature, runs it once per window size (the RFC's own
-//! design: "the window size is the one thing set at launch"), and reports
-//! every finding plus the cost figures the RFC's own matrix decision
-//! needs.
+//! Generates fixtures, writes the plans, builds `forskscope` with the
+//! `layout-probe` feature, runs the matrix, and reports every finding
+//! plus the cost figures.
 //!
-//! **Not yet implemented here (stage B, after the architect's answer to
-//! `188`):** `--inject <defect>`; the full check set (off-screen controls,
-//! hit area, rendered contrast, text size); the remaining views (Explorer,
-//! Deep Compare, mergetool, *Shortcuts*); CI wiring on every push.
+//! **Two axis groups, review 216 §2's own split** — "layout checks need
+//! text size × language × window × view at one colour setting; rendered
+//! contrast needs the full colour axes at two layouts" — so this driver
+//! writes two different shapes of plan, one window (or layout) at a
+//! time, rather than one plan trying to be both:
+//! - [`write_layout_checks_plan`]: one per [`DEFAULT_WINDOWS`] entry,
+//!   the full text-size/language sweep, Light/Standard/Standard fixed.
+//! - [`write_contrast_plan`]: one per [`CONTRAST_LAYOUTS`] entry, the
+//!   full theme/contrast/colour-vision sweep, one fixed text size/
+//!   window pair, English only.
+//!
+//! Both run every check the probe computes (it has no notion of "this
+//! check belongs to that axis group" - the economy is entirely in which
+//! combinations each plan enumerates, not in the measurement script).
+//!
+//! **Not yet implemented here:** `--inject <defect>`; the release-binary
+//! marker check; CI wiring on every push; the retroactive proof.
 
 use std::fs;
 use std::io::{BufRead, BufReader};
@@ -18,19 +29,41 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-/// The RFC's own matrix (§3), minus the colour axes this one check
-/// doesn't need (neither overflow nor clipped text depends on colour).
-/// `"WxH"`, read back by the probe itself (`layout_probe::parse_window_size`);
-/// the driver no longer parses or applies these numbers itself, since
-/// review 216 §4 moved the resize in process, through the desktop
-/// context, rather than an external resize after launch.
+/// The RFC's own matrix (§3), minus the colour axes the layout checks
+/// don't need (neither overflow nor clipped text, nor any of stage B's
+/// own six, depends on colour). `"WxH"`, read back by the probe itself
+/// (`layout_probe::parse_window_size`); the driver no longer parses or
+/// applies these numbers itself, since review 216 §4 moved the resize
+/// in process, through the desktop context, rather than an external
+/// resize after launch.
 const DEFAULT_WINDOWS: &[&str] = &["1000x700", "800x560", "1366x768"];
 const DEFAULT_TEXT_SIZES: &[u32] = &[100, 125, 150, 175, 200];
 const DEFAULT_LANGUAGES: &[&str] = &["en", "ja"];
 
+/// Rendered contrast's own two layouts (RFC-098 §3): side by side at
+/// the listing's own size, and stacked - "where elements appear and
+/// hide" - at a narrow window and a large text size together, review
+/// 216 §2's exact pair. `(window, text_size)`.
+const CONTRAST_LAYOUTS: &[(&str, u32)] = &[("1000x700", 100), ("800x560", 200)];
+const CONTRAST_THEMES: &[&str] = &["dark", "light", "night"];
+const CONTRAST_CONTRASTS: &[&str] = &["standard", "high"];
+const CONTRAST_COLOUR_VISIONS: &[&str] = &["standard", "red-green-safe"];
+
 pub struct RunOptions {
     pub release: bool,
     pub out_dir: PathBuf,
+}
+
+/// Every fixture path stage B's own views need, generated once and
+/// reused by every plan this run writes.
+struct Fixtures {
+    file_left: PathBuf,
+    file_right: PathBuf,
+    folder_left: PathBuf,
+    folder_right: PathBuf,
+    merge_local: PathBuf,
+    merge_remote: PathBuf,
+    merge_merged: PathBuf,
 }
 
 pub fn run(root: &Path, opts: &RunOptions) {
@@ -45,13 +78,18 @@ pub fn run(root: &Path, opts: &RunOptions) {
         .unwrap_or_else(|e| panic!("cannot create {}: {e}", opts.out_dir.display()));
 
     let fixtures_dir = opts.out_dir.join("fixtures");
-    let (left, right) = write_file_comparison_fixture(&fixtures_dir);
-    // Stage B's own views need these two too; generated now so the
-    // generator itself (and its determinism) is proven before anything
-    // depends on it, even though this round's one check doesn't open
-    // either yet.
-    write_folder_fixture(&fixtures_dir);
-    write_mergetool_fixture(&fixtures_dir);
+    let (file_left, file_right) = write_file_comparison_fixture(&fixtures_dir);
+    let (folder_left, folder_right) = write_folder_fixture(&fixtures_dir);
+    let (merge_local, merge_remote, merge_merged) = write_mergetool_fixture(&fixtures_dir);
+    let fixtures = Fixtures {
+        file_left,
+        file_right,
+        folder_left,
+        folder_right,
+        merge_local,
+        merge_remote,
+        merge_merged,
+    };
 
     let bin = build_binary(root, opts.release);
 
@@ -59,23 +97,59 @@ pub fn run(root: &Path, opts: &RunOptions) {
     let mut per_window_ms: Vec<(String, u128)> = Vec::new();
 
     for &window_label in DEFAULT_WINDOWS {
-        let plan_path = opts.out_dir.join(format!("plan-{window_label}.json"));
-        let results_path = opts.out_dir.join(format!("results-{window_label}.jsonl"));
-        let data_dir = opts.out_dir.join(format!("data-{window_label}"));
+        let plan_path = opts
+            .out_dir
+            .join(format!("plan-layout-{window_label}.json"));
+        let results_path = opts
+            .out_dir
+            .join(format!("results-layout-{window_label}.jsonl"));
+        let data_dir = opts.out_dir.join(format!("data-layout-{window_label}"));
 
-        write_plan(
+        write_layout_checks_plan(
             &plan_path,
             &results_path,
-            &left,
-            &right,
+            &fixtures,
             DEFAULT_TEXT_SIZES,
             DEFAULT_LANGUAGES,
             window_label,
         );
 
-        println!("layout-check: running window {window_label}...");
+        println!("layout-check: running layout checks, window {window_label}...");
         let elapsed = launch_and_wait(&bin, &plan_path, &data_dir);
-        per_window_ms.push((window_label.to_string(), elapsed.as_millis()));
+        per_window_ms.push((format!("layout {window_label}"), elapsed.as_millis()));
+
+        for row in read_jsonl(&results_path) {
+            all_rows.push(row);
+        }
+    }
+
+    for &(window_label, text_size) in CONTRAST_LAYOUTS {
+        let plan_path = opts
+            .out_dir
+            .join(format!("plan-contrast-{window_label}-{text_size}.json"));
+        let results_path = opts
+            .out_dir
+            .join(format!("results-contrast-{window_label}-{text_size}.jsonl"));
+        let data_dir = opts
+            .out_dir
+            .join(format!("data-contrast-{window_label}-{text_size}"));
+
+        write_contrast_plan(
+            &plan_path,
+            &results_path,
+            &fixtures,
+            text_size,
+            window_label,
+        );
+
+        println!(
+            "layout-check: running rendered contrast, window {window_label} at {text_size}%..."
+        );
+        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir);
+        per_window_ms.push((
+            format!("contrast {window_label}@{text_size}%"),
+            elapsed.as_millis(),
+        ));
 
         for row in read_jsonl(&results_path) {
             all_rows.push(row);
@@ -137,10 +211,9 @@ fn write_file_comparison_fixture(dir: &Path) -> (PathBuf, PathBuf) {
 
 /// A folder pair exercising every status a fixture can produce, built the
 /// same shape as `.git-exclude/fixtures/dirs/status-all` (not reused
-/// directly - CI cannot see `.git-exclude/`, the RFC's own point 2). Not
-/// opened by this round's own plan (no view for it yet); generated so the
-/// generator itself is proven ahead of stage B needing it.
-fn write_folder_fixture(dir: &Path) {
+/// directly - CI cannot see `.git-exclude/`, the RFC's own point 2).
+/// Returns `(left, right)`, opened by stage B's own Deep Compare view.
+fn write_folder_fixture(dir: &Path) -> (PathBuf, PathBuf) {
     let left = dir.join("folder-comparison-left");
     let right = dir.join("folder-comparison-right");
     for d in [&left, &right] {
@@ -172,12 +245,13 @@ fn write_folder_fixture(dir: &Path) {
         "would be chmod 000 by a driver\n",
     )
     .unwrap();
+    (left, right)
 }
 
 /// A three-way merge triple (local/remote/merged), one conflicting region.
-/// Not opened by this round's own plan; see `write_folder_fixture`'s own
-/// note.
-fn write_mergetool_fixture(dir: &Path) {
+/// Returns `(local, remote, merged)`, opened by stage B's own mergetool
+/// view.
+fn write_mergetool_fixture(dir: &Path) -> (PathBuf, PathBuf, PathBuf) {
     let base_lines = ["one", "two", "three", "four", "five"];
     let local = dir.join("mergetool-local.txt");
     let remote = dir.join("mergetool-remote.txt");
@@ -194,6 +268,7 @@ fn write_mergetool_fixture(dir: &Path) {
     // mergetool CLI mode does before any conflict is resolved by hand.
     fs::write(&merged, local_lines.join("\n") + "\n")
         .unwrap_or_else(|e| panic!("cannot write {}: {e}", merged.display()));
+    (local, remote, merged)
 }
 
 // ── Plan ─────────────────────────────────────────────────────────────────
@@ -208,27 +283,71 @@ fn many_ignore_entries(prefix: &str) -> String {
         .join(", ")
 }
 
-fn write_plan(
+/// RFC-098 §3's own view list - the Explorer, a file comparison with a
+/// collapsed region, Deep Compare with a selected row (automatic, RFC-097
+/// stage 3 §3), the mergetool layout, Settings with *Advanced* open, and
+/// *Shortcuts* - shared by both plan shapes below, since every check runs
+/// against every view regardless of which axis group is sweeping.
+fn all_views_json(fixtures: &Fixtures) -> serde_json::Value {
+    serde_json::json!([
+        {"kind": "explorer"},
+        {"kind": "file-comparison", "left": fixtures.file_left, "right": fixtures.file_right},
+        {"kind": "deep-compare", "left": fixtures.folder_left, "right": fixtures.folder_right},
+        {
+            "kind": "merge-tool",
+            "local": fixtures.merge_local,
+            "remote": fixtures.merge_remote,
+            "merged": fixtures.merge_merged,
+        },
+        {
+            "kind": "settings",
+            "ignore_extensions": many_ignore_entries("ext"),
+            "ignore_dirs": many_ignore_entries("dir"),
+        },
+        {"kind": "shortcuts"},
+    ])
+}
+
+/// The layout-checks axis group (review 216 §2): text size × language ×
+/// window × view, at one fixed colour setting (Light/Standard/Standard -
+/// the probe's own defaults when a plan omits these axes entirely).
+fn write_layout_checks_plan(
     plan_path: &Path,
     results_path: &Path,
-    left: &Path,
-    right: &Path,
+    fixtures: &Fixtures,
     text_sizes: &[u32],
     languages: &[&str],
     window_label: &str,
 ) {
     let plan = serde_json::json!({
         "results_path": results_path,
-        "views": [
-            {"kind": "file-comparison", "left": left, "right": right},
-            {
-                "kind": "settings",
-                "ignore_extensions": many_ignore_entries("ext"),
-                "ignore_dirs": many_ignore_entries("dir"),
-            },
-        ],
+        "views": all_views_json(fixtures),
         "text_sizes": text_sizes,
         "languages": languages,
+        "window_size": window_label,
+    });
+    fs::write(plan_path, serde_json::to_string_pretty(&plan).unwrap())
+        .unwrap_or_else(|e| panic!("cannot write {}: {e}", plan_path.display()));
+}
+
+/// The rendered-contrast axis group (review 216 §2): theme × colour
+/// vision × contrast × view, at one fixed (window, text size) layout -
+/// English only, since the contrast check doesn't read any text.
+fn write_contrast_plan(
+    plan_path: &Path,
+    results_path: &Path,
+    fixtures: &Fixtures,
+    text_size: u32,
+    window_label: &str,
+) {
+    let plan = serde_json::json!({
+        "results_path": results_path,
+        "views": all_views_json(fixtures),
+        "text_sizes": [text_size],
+        "languages": ["en"],
+        "themes": CONTRAST_THEMES,
+        "contrasts": CONTRAST_CONTRASTS,
+        "colour_visions": CONTRAST_COLOUR_VISIONS,
         "window_size": window_label,
     });
     fs::write(plan_path, serde_json::to_string_pretty(&plan).unwrap())
@@ -339,6 +458,14 @@ fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
             .get("window_size")
             .and_then(|v| v.as_str())
             .unwrap_or("?");
+        let theme = row.get("theme").and_then(|v| v.as_str()).unwrap_or("?");
+        let contrast = row.get("contrast").and_then(|v| v.as_str()).unwrap_or("?");
+        let colour_vision = row
+            .get("colour_vision")
+            .and_then(|v| v.as_str())
+            .unwrap_or("?");
+        let combo =
+            format!("{view} {window} {text_size}% {language} {theme}/{contrast}/{colour_vision}");
 
         if let Some(ms) = row.get("probe_ms").and_then(|v| v.as_f64()) {
             probe_ms_values.push(ms);
@@ -346,25 +473,48 @@ fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
 
         if let Some(err) = row.get("error").and_then(|v| v.as_str()) {
             failures += 1;
-            println!("FAIL [{view} {window} {text_size}% {language}]: probe error: {err}");
+            println!("FAIL [{combo}]: probe error: {err}");
             continue;
         }
         if row.get("settled").and_then(|v| v.as_bool()) == Some(false) {
             failures += 1;
-            println!(
-                "FAIL [{view} {window} {text_size}% {language}]: never settled within the timeout"
-            );
+            println!("FAIL [{combo}]: never settled within the timeout");
         }
-        for kind in ["overflow", "clipped"] {
+        // RFC-098 §2's own nine checks - every one reported the same
+        // generic way: a list of findings, each already carrying its
+        // own human-readable description (`element`/`text`/`detail`,
+        // or `element`/`text`/the scroll-vs-client box for the two
+        // stage A checks), so the report never needs to know a given
+        // check's own shape beyond its name here.
+        for kind in [
+            "overflow",
+            "clipped",
+            "off_screen",
+            "hit_area",
+            "small_text",
+            "rendered_contrast",
+            "label_placement",
+            "dialog_occlusion",
+            "overlap",
+        ] {
             if let Some(list) = row.get(kind).and_then(|v| v.as_array()) {
                 for finding in list {
                     failures += 1;
                     println!(
-                        "FAIL [{view} {window} {text_size}% {language}] {kind}: {}",
+                        "FAIL [{combo}] {kind}: {}",
                         serde_json::to_string(finding).unwrap_or_default()
                     );
                 }
             }
+        }
+        if let Some(toast) = row.get("toast_check")
+            && toast.get("occluded").and_then(|v| v.as_bool()) == Some(true)
+        {
+            failures += 1;
+            println!(
+                "FAIL [{combo}] toast_check: {}",
+                serde_json::to_string(toast).unwrap_or_default()
+            );
         }
     }
 

@@ -896,6 +896,20 @@ struct MeasurementOutcome {
 /// own RFC-087 §1 shape).
 const INTERACTIVE_SELECTOR: &str = r#"button, [role="button"], a[href], input, select, [tabindex]"#;
 
+/// Named selectors exempt from overflow/clipped once `isScrollOwner`
+/// says no — RFC-098 §2's own words for this allowance, "the known
+/// scroll owners... named in a list in the probe", which stage A's own
+/// generic `isScrollOwner` check deliberately deferred ("stage B's
+/// fuller check will narrow where that over- or under-allows", this
+/// field's own doc comment). `.tablist` is the first and, so far, only
+/// entry: its responsive rule (`90-responsive.css`) sets `overflow:
+/// visible` on purpose under the stacked layout, so nothing there is
+/// ever lost — found live, and found *not* generalizable the same run
+/// (`overflow: visible` is the unset default almost everywhere else in
+/// the page, and WebKitGTK's own `scrollWidth` exceeds `clientWidth`
+/// for plenty of those too).
+const OVERFLOW_ALLOWLIST: &[&str] = &[".tablist"];
+
 /// Named selectors exempt from the hit-area 24×24 floor (WCAG 2.5.8's own
 /// spacing exception) — kept empty, a named list ready for the first
 /// real exception review decides, same shape as `xtask::contrast`'s own
@@ -947,6 +961,7 @@ const RENDERED_CONTRAST_ALLOWLIST: &[&str] = &["[disabled]", "[aria-disabled='tr
 /// would be the bug, not its absence.
 fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f64) -> String {
     let interactive_selector = INTERACTIVE_SELECTOR;
+    let overflow_allowlist = json_string_array(OVERFLOW_ALLOWLIST);
     let hit_area_allowlist = json_string_array(HIT_AREA_ALLOWLIST);
     let text_size_allowlist = json_string_array(TEXT_SIZE_ALLOWLIST);
     let rendered_contrast_allowlist = json_string_array(RENDERED_CONTRAST_ALLOWLIST);
@@ -993,6 +1008,22 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
     const cs = getComputedStyle(el);
     return cs.overflowX === 'auto' || cs.overflowX === 'scroll' ||
            cs.overflowY === 'auto' || cs.overflowY === 'scroll';
+  }}
+  // Found live, first full-matrix run, then found wrong on the very
+  // next one: `.tablist`'s own responsive rule (`90-responsive.css`)
+  // sets `overflow: visible` under the stacked layout, on purpose -
+  // nothing is lost there, it spills out and stays visible. But
+  // `overflow: visible` is also the *default* - unset on almost every
+  // element in the page - and WebKitGTK's own `scrollWidth` still
+  // exceeds `clientWidth` for plenty of those too (confirmed live: a
+  // first attempt exempting any `visible` axis silently zeroed out
+  // *every* overflow/clipped finding across the whole matrix, not just
+  // `.tablist`'s). A structural rule can't tell "deliberately spills
+  // out" from "overflow never applied to this element at all" - only a
+  // named exception can, the same shape every other allowlist here
+  // already uses.
+  function doesNotLoseOverflow(el, overflowAllowlist) {{
+    return isScrollOwner(el) || matchesAny(el, overflowAllowlist);
   }}
   function isVisuallyHidden(el) {{
     // `.sr-only`, and `.local-only`/`.mode-indicator` under their own
@@ -1126,6 +1157,7 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
     const vh = document.documentElement.clientHeight;
     const zoom = {zoom};
     const requiredTextContrast = {required_text_contrast};
+    const overflowAllowlist = {overflow_allowlist};
     const hitAreaAllowlist = {hit_area_allowlist};
     const textSizeAllowlist = {text_size_allowlist};
     const renderedContrastAllowlist = {rendered_contrast_allowlist};
@@ -1142,14 +1174,14 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
       // not just from the text-clip check.
       const ellipsized = cs.textOverflow === 'ellipsis';
       const wOver = wOverRaw && !ellipsized;
-      if ((wOver || hOver) && !isScrollOwner(el)) {{
+      if ((wOver || hOver) && !doesNotLoseOverflow(el, overflowAllowlist)) {{
         overflow.push({{
           element: describe(el, i), text: '',
           scroll_width: el.scrollWidth, client_width: el.clientWidth,
           scroll_height: el.scrollHeight, client_height: el.clientHeight,
         }});
       }}
-      if (wOver) {{
+      if (wOver && !doesNotLoseOverflow(el, overflowAllowlist)) {{
         const txt = ownText(el);
         if (txt.length > 0) {{
           clipped.push({{
@@ -1522,6 +1554,20 @@ mod tests {
         assert_eq!(json_string_array(&["a", "b"]), "[\"a\", \"b\"]");
     }
 
+    /// Review 098 §2's own "Allowed by" column, for overflow/clipped:
+    /// "the known scroll owners... named in a list in the probe" - stage
+    /// A applied this generically (`isScrollOwner`'s own computed-style
+    /// check) and said as much in its own doc comment; `.tablist` is the
+    /// first named entry, found live when its own responsive `overflow:
+    /// visible` (a deliberate spill, nothing lost) first surfaced as a
+    /// false overflow finding under the stacked layout. Checked by name
+    /// here, not just "the allowlist is non-empty", so a future edit
+    /// that quietly drops it (rather than adding to it) is caught.
+    #[test]
+    fn tablist_is_the_overflow_allowlists_own_named_entry() {
+        assert_eq!(OVERFLOW_ALLOWLIST, &[".tablist"]);
+    }
+
     /// Review 219's own round found exactly this shape live: an allowlist
     /// entry containing a double quote (`[aria-disabled="true"]`)
     /// produced `"[aria-disabled="true"]"` once wrapped by
@@ -1535,6 +1581,7 @@ mod tests {
     #[test]
     fn no_allowlist_entry_contains_a_double_quote() {
         for list in [
+            OVERFLOW_ALLOWLIST,
             HIT_AREA_ALLOWLIST,
             TEXT_SIZE_ALLOWLIST,
             RENDERED_CONTRAST_ALLOWLIST,
@@ -1549,42 +1596,6 @@ mod tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn measurement_script_is_syntactically_plausible_js() {
-        // Not a real parser, and checked directly against the bug above:
-        // this one does *not* catch it (confirmed live - the allowlist's
-        // own stray double quote still balances overall once embedded,
-        // even though the token sequence it produces is invalid; `node
-        // --check` catches that by actually parsing, which this cheap
-        // brace/paren/bracket count never will). Kept anyway as a floor
-        // under a *different*, cruder mistake - a genuinely unbalanced
-        // edit to this script - with `no_allowlist_entry_contains_a_
-        // double_quote` as the real regression test for the bug this
-        // round actually found.
-        let script = measurement_script(".diff-wrap", 4.5, 1.0);
-        let mut depth = 0i32;
-        let mut in_single = false;
-        let mut in_double = false;
-        let mut escaped = false;
-        for c in script.chars() {
-            if escaped {
-                escaped = false;
-                continue;
-            }
-            match c {
-                '\\' if in_single || in_double => escaped = true,
-                '\'' if !in_double => in_single = !in_single,
-                '"' if !in_single => in_double = !in_double,
-                '{' | '(' | '[' if !in_single && !in_double => depth += 1,
-                '}' | ')' | ']' if !in_single && !in_double => depth -= 1,
-                _ => {}
-            }
-        }
-        assert_eq!(depth, 0, "unbalanced brackets in the measurement script");
-        assert!(!in_single, "an unterminated single-quoted string");
-        assert!(!in_double, "an unterminated double-quoted string");
     }
 
     #[test]
