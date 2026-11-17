@@ -775,6 +775,7 @@ fn read_jsonl(path: &Path) -> Vec<serde_json::Value> {
 fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
     let mut failures = 0usize;
     let mut probe_ms_values: Vec<f64> = Vec::new();
+    let mut total_recv_retries = 0u64;
 
     for row in rows {
         let view = row.get("view").and_then(|v| v.as_str()).unwrap_or("?");
@@ -795,6 +796,9 @@ fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
 
         if let Some(ms) = row.get("probe_ms").and_then(|v| v.as_f64()) {
             probe_ms_values.push(ms);
+        }
+        if let Some(retries) = row.get("recv_retries").and_then(|v| v.as_u64()) {
+            total_recv_retries += retries;
         }
 
         if let Some(err) = row.get("error").and_then(|v| v.as_str()) {
@@ -849,6 +853,12 @@ fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
         "layout-check: {} combinations measured, {failures} failures.",
         rows.len()
     );
+    // Review 220 §3: `recv_retries` (the "eval did not return" mitigation,
+    // review 216 §4) was already recorded per measurement but never
+    // summed anywhere a run's own log shows it - a retry firing at all
+    // means the race it works around is still there, so the total is
+    // worth seeing on every run, not just when something failed outright.
+    println!("layout-check: total recv_retries across the run: {total_recv_retries}");
     if !probe_ms_values.is_empty() {
         let sum: f64 = probe_ms_values.iter().sum();
         let mean = sum / probe_ms_values.len() as f64;
