@@ -678,17 +678,41 @@ async fn open_view_followup(view: &ViewPlan) {
         // settle condition was already built to avoid for the view
         // itself. Polls for the toggle the same way, then clicks once
         // it actually exists.
+        //
+        // Found live again, 1 run in 6-8 of repeated flake checks at
+        // 800x560: resolving right after `toggle.click()` races the
+        // signal write's own re-render - the click's mutation can
+        // still be in flight when `settle()` starts observing
+        // immediately after this awaits, so it can miss the mutation
+        // entirely and report a clean-looking Settings row with
+        // Advanced never actually open. A first fix (poll for
+        // `#binary-cmp-help`, the *first* element the advanced section
+        // renders) only narrowed the window: that element landing
+        // doesn't mean the rest of the section's own, much larger
+        // subtree (the ignore-list fields, their badges, the profile
+        // list) has finished reconciling too - confirmed by the
+        // flake's own shape, always a fraction of the expected count,
+        // never zero. Now polls for `.new-profile-btn`, the advanced
+        // section's own last static element (`modal.rs`'s own
+        // `if *show_advanced.read()` block, right before `end
+        // show_advanced`) - everything above it in source order is
+        // already in the tree once this one is.
         retry_eval(
             r#"(function() {
   return new Promise((resolve) => {
     const deadline = performance.now() + 5000;
-    function tick() {
+    function waitForToggle() {
       const toggle = document.querySelector('.advanced-toggle');
-      if (toggle) { toggle.click(); resolve(true); }
+      if (toggle) { toggle.click(); waitForOpen(); }
       else if (performance.now() > deadline) { resolve(false); }
-      else { requestAnimationFrame(tick); }
+      else { requestAnimationFrame(waitForToggle); }
     }
-    requestAnimationFrame(tick);
+    function waitForOpen() {
+      if (document.querySelector('.new-profile-btn')) { resolve(true); }
+      else if (performance.now() > deadline) { resolve(false); }
+      else { requestAnimationFrame(waitForOpen); }
+    }
+    requestAnimationFrame(waitForToggle);
   });
 })()"#,
         )
