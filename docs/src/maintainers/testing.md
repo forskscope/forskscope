@@ -62,6 +62,13 @@ cargo xtask colour-vision
 # below 12px, outside a documented, reasoned allowlist (F214-F216)
 cargo xtask contrast
 
+# The same checks as above, but against the real, rendered app rather than
+# CSS source text, across nine kinds of layout defect and every view
+# (RFC-098; see "Checking rendered layout in the running app" below). Not
+# yet a hard CI gate - reply 189 reports a pre-existing backlog, still
+# awaiting triage, so a local run can and will show known findings
+cargo xtask layout-check
+
 # The in-app keyboard reference and keyboard.md name the same keys (F165)
 cargo xtask keyboard-docs
 
@@ -438,6 +445,63 @@ sandboxed procedure's own invented fixtures.
 (`dispatch_go_up`) does reproduce its borrow panic in a unit test, because the
 test calls the same function the key handler calls. The webview dispatch itself
 is not covered by any unit test, so the running app is the only check for it.
+
+## Checking rendered layout in the running app
+
+`cargo xtask layout-check` (RFC-098) drives the real, built app and measures
+nine kinds of layout defect against its actual rendered output, not against
+CSS source text the way `cargo xtask contrast`/`colour-vision` do. It needs
+no accessibility bus and no `wtype` — unlike the keyboard section above, it
+measures entirely in-process, through `layout_probe.rs` (built only behind
+the `layout-probe` Cargo feature) and a single `document::eval` call per
+combination, so it is also usable headless under `xvfb-run` (CI's own job
+runs this way; see `.github/workflows/ci.yml`'s `layout-check` job).
+
+**The nine checks**, every one against the real, rendered DOM: overflow,
+clipped text, off-screen controls, hit area (a touch/click target under
+24×24px), small text (effective font size under 12px, 100% text size only),
+rendered contrast (WCAG, against the resolved `color`/`background-color`,
+not CSS source), label placement (an `aria-labelledby` target not
+horizontally aligned with, or below, its label), dialog occlusion (nothing
+but a toast may cover an open dialog), and overlap (two elements with their
+own text or interactive role occupying the same pixels, outside a dialog's
+own scrim).
+
+**The matrix is two axis groups, not one flat product** (`xtask/src/
+layout_check.rs`'s own module doc has the full design): layout checks run at
+text size × language × window × view, one fixed colour setting; rendered
+contrast runs at theme × colour vision × contrast × view, at two fixed
+(window, text size) layouts, English only. Both groups cover all six views
+today: Explorer, file comparison, Deep Compare, the merge tool, Settings
+(with many ignore-list entries, to populate the advanced section's own
+badges), and the keyboard shortcuts reference.
+
+**`--inject <defect>`** plants one named CSS rule on Settings' own reachable
+elements (one shape per check: an overflowing label, an undersized button, a
+same-colour pair, 8px text, and so on), confirms the matching check's own
+field comes back non-empty, then reverts — a `Drop` guard that also
+regenerates `main.css`, so a run that fails partway never leaves the tree
+dirty. Run it to sanity-check a change to the probe's own measurement script,
+not as part of the normal gate set:
+
+```
+cargo xtask layout-check --inject overlap
+```
+
+`cargo xtask layout-check --help`-equivalent (`xtask/src/main.rs`'s own
+`print_usage`) lists every defect name.
+
+**Not yet built:** a screenshot capture on failure. Every check today is a
+measurement (numbers, element selectors), never an image — a finding's own
+`detail` field is read, not looked at.
+
+**Not yet a hard CI gate.** The job runs on every push and pull request, and
+its own log shows every finding every time, but `continue-on-error` keeps a
+pre-existing, untriaged backlog (2,706 findings as of reply 189, the view
+this check first ran against in full) from failing builds that didn't cause
+any of them. Fixing that backlog, and deciding how a future finding should
+be gated once it's clear, is tracked separately — not something this file
+decides.
 
 ## The `.xlsx` corpus, and the sizes it covers
 
