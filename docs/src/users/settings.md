@@ -48,6 +48,15 @@ next time it is available.
 
 Changes take effect immediately.
 
+**The window's title bar follows this choice too, not only the content:**
+
+| Platform | What follows |
+|----------|--------------|
+| **Windows** | The title bar, through the system's own dark title bar. |
+| **macOS** | The window's appearance. |
+| **Linux, GTK's own title bar** (client-side — GNOME, and the Flatpak) | Follows, and so do GTK-drawn dialogs (for example the file picker). |
+| **Linux, a title bar the desktop draws itself** (server-side — KDE by default) | Stays as the desktop draws it; the app has no title bar of its own to change there. |
+
 ### Contrast
 
 | Value | Description |
