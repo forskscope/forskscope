@@ -26,7 +26,7 @@
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{self, Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 /// The RFC's own matrix (§3), minus the colour axes the layout checks
@@ -52,7 +52,31 @@ const CONTRAST_COLOUR_VISIONS: &[&str] = &["standard", "red-green-safe"];
 pub struct RunOptions {
     pub release: bool,
     pub out_dir: PathBuf,
+    /// RFC-098 §4's own "falsifiable: an `--inject <defect>` flag" -
+    /// one of [`INJECTABLE_DEFECTS`]'s own names. When set, `run` skips
+    /// the full matrix entirely and instead plants that one defect,
+    /// confirms the matching check reports it, then reverts the patch
+    /// (a `Drop` guard, so a panic mid-check still restores the source
+    /// tree) and exits - local and CI-dispatch only, per the RFC, never
+    /// the default push-triggered job.
+    pub inject: Option<String>,
 }
+
+/// `(name, check)` - every `--inject` name `run_inject` understands,
+/// and which [`ResultRow`] field (by name, matching `report`'s own
+/// list) the planted defect must show up in. Printed by `--inject` with
+/// no name, or an unrecognized one, so the flag is self-documenting.
+const INJECTABLE_DEFECTS: &[(&str, &str)] = &[
+    ("overflow", "overflow"),
+    ("clipped", "clipped"),
+    ("off-screen", "off_screen"),
+    ("hit-area", "hit_area"),
+    ("text-size", "small_text"),
+    ("rendered-contrast", "rendered_contrast"),
+    ("label-placement", "label_placement"),
+    ("dialog-occlusion", "dialog_occlusion"),
+    ("overlap", "overlap"),
+];
 
 /// Every fixture path stage B's own views need, generated once and
 /// reused by every plan this run writes.
@@ -67,6 +91,10 @@ struct Fixtures {
 }
 
 pub fn run(root: &Path, opts: &RunOptions) {
+    if let Some(defect) = &opts.inject {
+        run_inject(root, opts, defect);
+        return;
+    }
     // Review 216 §4: "every run starts empty" - a stale prior run's own
     // data dirs (tabs accumulated on disk) must never carry forward, not
     // just between window sizes within one run (handled per-window
@@ -157,6 +185,220 @@ pub fn run(root: &Path, opts: &RunOptions) {
     }
 
     report(&all_rows, &per_window_ms);
+}
+
+// ── --inject ─────────────────────────────────────────────────────────────
+
+/// Appends to `03-components.css` (already loaded by every view) - never
+/// a new file, so there's nothing to delete, only a known suffix to cut
+/// back off. Reverted by [`InjectedDefect`]'s own `Drop`, panic or not.
+const INJECT_CSS_PATH: &str = "crates/forskscope-ui/assets/css/03-components.css";
+
+/// One CSS rule per [`INJECTABLE_DEFECTS`] entry, each scoped to the
+/// Settings dialog's own *Advanced* section (`.modal .actions button` -
+/// its "Close" button - or the ignore-extensions field's own label),
+/// since Settings is the one view every `--inject` run opens: real,
+/// reachable elements, not a synthetic fixture of their own.
+fn injected_rule(defect: &str) -> Option<&'static str> {
+    Some(match defect {
+        // "Close" (5 glyphs) doesn't fit 10px either way - the same
+        // rule proves both: an overflowing box (`overflow`) with its
+        // own text actually cut off (`clipped`), not ellipsized.
+        "overflow" | "clipped" => {
+            ".modal .actions button { max-width: 10px !important; \
+             white-space: nowrap !important; overflow: hidden !important; }"
+        }
+        "off-screen" => {
+            ".modal .actions button { position: fixed !important; \
+             left: -9999px !important; top: -9999px !important; }"
+        }
+        "hit-area" => {
+            ".modal .actions button { min-width: 1px !important; min-height: 1px !important; \
+             width: 10px !important; height: 10px !important; padding: 0 !important; }"
+        }
+        "text-size" => ".modal .actions button { font-size: 8px !important; }",
+        "rendered-contrast" => {
+            ".modal .actions button { color: #808080 !important; \
+             background: #808080 !important; }"
+        }
+        "label-placement" => {
+            "#ignore-extensions-label { position: relative !important; top: 500px !important; }"
+        }
+        // The regression this whole round started from (review 217/218),
+        // reproduced directly: nothing above the scrim to answer "what's
+        // on top" once something else claims a higher stacking value -
+        // here, a full-viewport `::before` on `body`, not even a real
+        // element, which `elementFromPoint` still resolves to `body`
+        // itself over the dialog's own box.
+        "dialog-occlusion" => {
+            "body::before { content: ''; position: fixed; inset: 0; z-index: 99999; }"
+        }
+        "overlap" => {
+            "#ignore-extensions-label { position: relative !important; top: 60px !important; }"
+        }
+        _ => return None,
+    })
+}
+
+struct InjectedDefect {
+    root: PathBuf,
+    path: PathBuf,
+    original: String,
+}
+
+impl Drop for InjectedDefect {
+    fn drop(&mut self) {
+        // Found live, first run: reverting only the source file left
+        // `main.css` - a generated, but still tracked, artifact - with
+        // the injected rule baked in and no further step to notice.
+        // `cargo xtask css --check` would have failed on the very next
+        // unrelated commit, for a reason nothing in that commit caused.
+        if fs::write(&self.path, &self.original).is_err() {
+            eprintln!(
+                "layout-check: FAILED to revert the injected defect at {} - restore it by hand \
+                 from git (git checkout -- {})",
+                self.path.display(),
+                self.path.display()
+            );
+            return;
+        }
+        let status = Command::new("cargo")
+            .current_dir(&self.root)
+            .arg("xtask")
+            .arg("css")
+            .status();
+        if !matches!(status, Ok(s) if s.success()) {
+            eprintln!(
+                "layout-check: reverted {} but could not regenerate main.css ({status:?}) - run \
+                 `cargo xtask css` by hand",
+                self.path.display()
+            );
+        }
+    }
+}
+
+/// The thin, guard-free half of `--inject`: resolve the name, then exit.
+/// `std::process::exit` never runs a `Drop` impl - calling it from
+/// anywhere still holding [`InjectedDefect`] would skip the revert
+/// entirely (found live, the first run that failed to catch anything:
+/// the injected rule stayed in the tree, since the early `exit(1)` on
+/// that path never gave the guard a chance to run). So every exit call
+/// lives here, *outside* [`run_inject_guarded`]'s own scope - that
+/// function only ever returns a `bool`, letting its guard drop by
+/// ordinary scope exit before this caller decides whether to exit at
+/// all.
+fn run_inject(root: &Path, opts: &RunOptions, defect: &str) {
+    let Some(rule) = injected_rule(defect) else {
+        eprintln!("layout-check: unknown --inject defect {defect:?}. Known defects:");
+        for (name, _) in INJECTABLE_DEFECTS {
+            eprintln!("  {name}");
+        }
+        process::exit(2);
+    };
+    let field = INJECTABLE_DEFECTS
+        .iter()
+        .find(|(name, _)| *name == defect)
+        .map(|(_, field)| *field)
+        .expect("injected_rule and INJECTABLE_DEFECTS name the same set");
+
+    if !run_inject_guarded(root, opts, defect, rule, field) {
+        process::exit(1);
+    }
+}
+
+/// Plants `rule`, builds and runs Settings-only, and reports whether
+/// `field` came back non-empty - `true` only on a clean catch. Every
+/// return path here (`?`-shaped early returns included) drops its own
+/// `_guard` on the way out, reverting the CSS and regenerating
+/// `main.css` to match, so the caller is free to exit however it likes
+/// once this returns.
+fn run_inject_guarded(
+    root: &Path,
+    opts: &RunOptions,
+    defect: &str,
+    rule: &str,
+    field: &str,
+) -> bool {
+    let css_path = root.join(INJECT_CSS_PATH);
+    let original = fs::read_to_string(&css_path)
+        .unwrap_or_else(|e| panic!("cannot read {}: {e}", css_path.display()));
+    fs::write(
+        &css_path,
+        format!("{original}\n/* --inject {defect}, reverted after this run */\n{rule}\n"),
+    )
+    .unwrap_or_else(|e| panic!("cannot write {}: {e}", css_path.display()));
+    let _guard = InjectedDefect {
+        root: root.to_path_buf(),
+        path: css_path,
+        original,
+    };
+
+    let status = Command::new("cargo")
+        .current_dir(root)
+        .arg("xtask")
+        .arg("css")
+        .status()
+        .expect("failed to run cargo xtask css");
+    if !status.success() {
+        eprintln!("layout-check: --inject could not regenerate main.css");
+        return false;
+    }
+
+    let _ = fs::remove_dir_all(&opts.out_dir);
+    fs::create_dir_all(&opts.out_dir)
+        .unwrap_or_else(|e| panic!("cannot create {}: {e}", opts.out_dir.display()));
+    let bin = build_binary(root, opts.release);
+    let plan_path = opts.out_dir.join("plan-inject.json");
+    let results_path = opts.out_dir.join("results-inject.jsonl");
+    let data_dir = opts.out_dir.join("data-inject");
+    // Settings only, every injected rule's own target - not
+    // `all_views_json`'s full six: a prior view's own DOM found live to
+    // still answer `querySelectorAll` from inside `#app-root` after
+    // switching away from it (nothing unmounts it, only the active
+    // view changes), which doesn't belong in a one-check-at-a-time
+    // falsification at all.
+    let plan = serde_json::json!({
+        "results_path": results_path,
+        "views": [{
+            "kind": "settings",
+            "ignore_extensions": many_ignore_entries("ext"),
+            "ignore_dirs": many_ignore_entries("dir"),
+        }],
+        "text_sizes": [100],
+        "languages": ["en"],
+        "window_size": "1000x700",
+    });
+    fs::write(&plan_path, serde_json::to_string_pretty(&plan).unwrap())
+        .unwrap_or_else(|e| panic!("cannot write {}: {e}", plan_path.display()));
+
+    println!("layout-check: --inject {defect} - running Settings only...");
+    launch_and_wait(&bin, &plan_path, &data_dir);
+    let rows = read_jsonl(&results_path);
+
+    let settings_row = rows
+        .iter()
+        .find(|r| r.get("view").and_then(|v| v.as_str()) == Some("settings"));
+    let Some(row) = settings_row else {
+        eprintln!("layout-check: --inject {defect}: the Settings row itself is missing");
+        return false;
+    };
+    let found = row
+        .get(field)
+        .and_then(|v| v.as_array())
+        .is_some_and(|a| !a.is_empty());
+
+    if found {
+        println!(
+            "layout-check: --inject {defect} - CAUGHT. {field}: {}",
+            serde_json::to_string(&row[field]).unwrap_or_default()
+        );
+        true
+    } else {
+        eprintln!(
+            "layout-check: --inject {defect} - NOT caught. {field} was empty. Full row: {row}"
+        );
+        false
+    }
 }
 
 fn build_binary(root: &Path, release: bool) -> PathBuf {

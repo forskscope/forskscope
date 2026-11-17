@@ -94,9 +94,18 @@ fn main() {
                 .and_then(|i| args.get(i + 1))
                 .map(PathBuf::from)
                 .unwrap_or_else(|| workspace_root().join("target/layout-check"));
+            let inject = args
+                .iter()
+                .position(|a| a == "--inject")
+                .and_then(|i| args.get(i + 1))
+                .cloned();
             layout_check::run(
                 &workspace_root(),
-                &layout_check::RunOptions { release, out_dir },
+                &layout_check::RunOptions {
+                    release,
+                    out_dir,
+                    inject,
+                },
             );
         }
         Some(cmd) => {
@@ -128,7 +137,9 @@ fn print_usage() {
     eprintln!("       cargo xtask crate-boundaries");
     eprintln!("       cargo xtask json-schema");
     eprintln!("       cargo xtask metainfo-release <tag>");
-    eprintln!("       cargo xtask layout-check [--release] [--out-dir <dir>]");
+    eprintln!("       cargo xtask layout-check [--release] [--out-dir <dir>] [--inject <defect>]");
+    eprintln!("         <defect> is one of: overflow, clipped, off-screen, hit-area, text-size,");
+    eprintln!("         rendered-contrast, label-placement, dialog-occlusion, overlap");
 }
 
 pub(crate) fn workspace_root() -> PathBuf {

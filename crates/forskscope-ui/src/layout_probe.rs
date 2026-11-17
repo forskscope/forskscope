@@ -665,7 +665,34 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
 /// view.
 async fn open_view_followup(view: &ViewPlan) {
     if let ViewPlan::Settings { .. } = view {
-        retry_eval("document.querySelector('.advanced-toggle')?.click();").await;
+        // Found live, first `--inject label-placement` attempt: a bare
+        // `document.querySelector('.advanced-toggle')?.click()`, with
+        // no wait of its own, ran before `open_view`'s own
+        // `store.modal.set` had rendered anything at all - `?.` means a
+        // still-missing toggle is not an error, so `retry_eval`'s own
+        // retry-on-`EvalError` never fires either. The click silently
+        // no-ops, *Advanced* never opens, and nothing downstream (the
+        // ignore-list fields, their own badges) is ever there to
+        // measure - reported as a clean row, not as a failure, which is
+        // exactly the "suspiciously clean" shape this probe's own
+        // settle condition was already built to avoid for the view
+        // itself. Polls for the toggle the same way, then clicks once
+        // it actually exists.
+        retry_eval(
+            r#"(function() {
+  return new Promise((resolve) => {
+    const deadline = performance.now() + 5000;
+    function tick() {
+      const toggle = document.querySelector('.advanced-toggle');
+      if (toggle) { toggle.click(); resolve(true); }
+      else if (performance.now() > deadline) { resolve(false); }
+      else { requestAnimationFrame(tick); }
+    }
+    requestAnimationFrame(tick);
+  });
+})()"#,
+        )
+        .await;
     }
 }
 
@@ -1197,9 +1224,23 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
       // `getBoundingClientRect()`.
       if (el.matches('{interactive_selector}') && isReachable(el)) {{
         const r = el.getBoundingClientRect();
+        // Found live (`--inject off-screen`, first run: a scrollable
+        // `.modal` - F224's own `overflow-y: auto` - sits above every
+        // one of its descendants, so a `position: fixed` button inside
+        // it was wrongly exempted as "reachable by scrolling" even
+        // though fixed positioning is always viewport-relative; no
+        // ancestor's own scroll offset ever moves it. `position:
+        // absolute` is the same story in practice here - this app
+        // never positions one against anything other than its own
+        // viewport-relative containing block either. Only a `static`/
+        // `relative` box (ordinary flow) can actually be scrolled back
+        // into view by an ancestor.
+        const inNormalFlow = cs.position !== 'fixed' && cs.position !== 'absolute';
         let hasScrollableAncestor = false;
-        for (let p = el.parentElement; p; p = p.parentElement) {{
-          if (isScrollOwner(p)) {{ hasScrollableAncestor = true; break; }}
+        if (inNormalFlow) {{
+          for (let p = el.parentElement; p; p = p.parentElement) {{
+            if (isScrollOwner(p)) {{ hasScrollableAncestor = true; break; }}
+          }}
         }}
         if (!hasScrollableAncestor &&
             (r.right <= 0 || r.bottom <= 0 || r.left >= vw || r.top >= vh)) {{
@@ -1369,20 +1410,22 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
           continue;
         }}
       }}
-      // Found live (first run against a real view): with a dialog open,
-      // the background view behind its scrim still has every element
-      // "in the DOM tree with overlapping coordinates" - the Explorer's
-      // own tree, say, under the Settings dialog - but none of it is
-      // actually *visible*; the scrim paints over it. A box the scrim
-      // (or anything else) covers isn't a candidate for "two visible
-      // boxes crossing" at all, so a point inside its own rect must
-      // actually hit it (or a descendant) to count.
-      if (rect.width > 0 && rect.height > 0) {{
-        const cx = Math.min(Math.max(rect.left + rect.width / 2, 0), vw - 1);
-        const cy = Math.min(Math.max(rect.top + rect.height / 2, 0), vh - 1);
-        const hit = document.elementFromPoint(cx, cy);
-        if (!hit || !(hit === el || el.contains(hit) || hit.contains(el))) {{ continue; }}
-      }}
+      // Found live (first full-matrix run): with a dialog open, the
+      // background view behind its scrim still has every element "in
+      // the DOM tree with overlapping coordinates" - the Explorer's own
+      // tree, say, under the Settings dialog - but none of it is
+      // actually *visible*; the scrim paints over it, and that's by
+      // design, not the "two visible boxes crossing" this check means.
+      // Narrowed to specifically the scrim, not "whatever
+      // elementFromPoint returns" generically (found wrong the very
+      // next run, `--inject overlap`: that broader form also excluded
+      // the *overlapping* element itself whenever it was the one
+      // painted over - exactly the shape this check exists to catch,
+      // not exclude. A real sibling-on-sibling overlap never puts one
+      // of the pair behind a `.scrim`, so this only ever fires for the
+      // dialog case.
+      const scrimEl = document.querySelector('.scrim');
+      if (scrimEl && !scrimEl.contains(el)) {{ continue; }}
       overlapCandidates.push({{ el, index: i, rect }});
     }}
     const overlap = [];
