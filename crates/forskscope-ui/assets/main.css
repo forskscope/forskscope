@@ -573,8 +573,17 @@ select option { background: var(--surface); color: var(--text); }
   min-width: 22rem; max-width: 30rem; padding: 1rem;
   max-height: calc(100vh - 4rem); overflow-y: auto;
 }
+/* `margin`/`padding` here pull the sticky box out to the scrollport's
+   own edge and re-add the same inset as padding, so its own opaque
+   background fully covers `.modal`'s own top padding once scrolled -
+   found live (a real capture, Light/red-green-safe/200%): without this,
+   `position: sticky; top: 0` alone sticks the box at the padding box's
+   own inner edge, leaving that 1rem of padding as a gap scrolled
+   content kept showing through, cut off, above the "stuck" heading. */
 .modal h2:first-child, .modal > .modal-header-row:first-child {
-  position: sticky; top: 0; z-index: 1; background: var(--surface);
+  position: sticky; top: -1rem; z-index: 1; background: var(--surface);
+  margin-top: -1rem; margin-left: -1rem; margin-right: -1rem;
+  padding-top: 1rem; padding-left: 1rem; padding-right: 1rem;
 }
 .modal h2 { margin: 0 0 .75rem; font-size: 1rem; }
 .modal .field {
@@ -622,9 +631,14 @@ select option { background: var(--surface); color: var(--text); }
   border: 1px solid var(--control-border); border-radius: 3px;
   background: var(--surface); color: var(--text);
 }
+/* Same reasoning as the sticky heading above, the other edge: pulled out
+   to the scrollport's own bottom/side edges and re-padded, so nothing
+   scrolling past shows through underneath. */
 .modal .actions {
   display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem;
-  position: sticky; bottom: 0; z-index: 1; background: var(--surface);
+  position: sticky; bottom: -1rem; z-index: 1; background: var(--surface);
+  margin-bottom: -1rem; margin-left: -1rem; margin-right: -1rem;
+  padding-bottom: 1rem; padding-left: 1rem; padding-right: 1rem;
 }
 .modal-wide { min-width: min(540px, 90vw); }
 
