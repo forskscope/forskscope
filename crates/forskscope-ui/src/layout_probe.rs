@@ -73,9 +73,13 @@ use std::io::Write as _;
 use std::path::PathBuf;
 
 use dioxus::prelude::*;
+use forskscope_ui_logic::{CompareRequest, SaveDestination};
 use serde::{Deserialize, Serialize};
 
-use crate::state::{Lang, Modal, Store, open_compare};
+use crate::state::{
+    ColourVision, Contrast, Lang, Modal, Store, Theme, close_dir_tab, open_compare,
+    open_compare_request, open_dir_compare,
+};
 
 /// The only environment variable this build reads outside normal
 /// settings/session paths, and the literal string `release.yml`'s own
@@ -112,6 +116,22 @@ pub struct Plan {
     pub text_sizes: Vec<u32>,
     /// `"en"` / `"ja"`, mapped to [`Lang`] by [`parse_lang`].
     pub languages: Vec<String>,
+    /// `"dark"`/`"light"`/`"night"`/`"system"`, mapped by [`parse_theme`].
+    /// Stage B (handoff 101, review 216 §2): the layout checks only need
+    /// one value here (their own axes are text size × language × window
+    /// × view); the rendered-contrast check is what needs every theme.
+    /// Defaults to `["light"]` so a stage-A-shaped plan, with this field
+    /// absent, measures exactly what it always did.
+    #[serde(default = "default_single_axis_light")]
+    pub themes: Vec<String>,
+    /// `"standard"`/`"high"`/`"system"`, mapped by [`Contrast::from_id`].
+    /// Same reasoning and default (`["standard"]`) as `themes`.
+    #[serde(default = "default_single_axis_standard")]
+    pub contrasts: Vec<String>,
+    /// `"standard"`/`"red-green-safe"`, mapped by [`ColourVision::from_id`].
+    /// Same reasoning and default (`["standard"]`) as `themes`.
+    #[serde(default = "default_single_axis_standard")]
+    pub colour_visions: Vec<String>,
     /// `"WxH"` in logical pixels (e.g. `"1000x700"`), applied once via
     /// [`dioxus_desktop::DesktopContext::window`]'s own `set_inner_size`
     /// before the first view opens, and recorded into every
@@ -119,6 +139,14 @@ pub struct Plan {
     /// whatever size it already launched with.
     #[serde(default)]
     pub window_size: Option<String>,
+}
+
+fn default_single_axis_light() -> Vec<String> {
+    vec!["light".to_string()]
+}
+
+fn default_single_axis_standard() -> Vec<String> {
+    vec!["standard".to_string()]
 }
 
 /// One view to open and measure, with whatever its own fixture needs.
@@ -156,6 +184,33 @@ pub enum ViewPlan {
         #[serde(default)]
         raise_toast: bool,
     },
+    /// The Explorer workspace, the default view (`Modal::None`, no tab
+    /// open) — nothing to navigate to, since it's where the app already
+    /// is at startup.
+    Explorer,
+    /// Deep Compare, opened the same way the Explorer's own folder-compare
+    /// action does (`state::open_dir_compare`). RFC-097 stage 3 §3's own
+    /// first-row auto-selection ("the first row is selected when the list
+    /// appears") means this view needs no DOM click of its own, unlike
+    /// Settings' *Advanced* — the settle wait's own `ready_selector`
+    /// below is what actually waits for the scan to finish and a row to
+    /// land selected.
+    DeepCompare { left: PathBuf, right: PathBuf },
+    /// Git mergetool mode (RFC-077): local vs remote, saving to a distinct
+    /// `merged` path — `open_compare_request` with `SaveDestination::
+    /// Explicit`, the same conversion `main()`'s own three-argument
+    /// startup path uses. Renders through the same `DiffWorkspace` as
+    /// `FileComparison`, with the mergetool-only affordances RFC-077
+    /// adds, so it is measured as a view of its own, not folded into
+    /// `FileComparison`'s own rows.
+    MergeTool {
+        local: PathBuf,
+        remote: PathBuf,
+        merged: PathBuf,
+    },
+    /// *Shortcuts* (`store.modal.set(Modal::KeyboardRef)`), the tab bar's
+    /// own "? Shortcuts" button.
+    Shortcuts,
 }
 
 /// Where the measurement script walks every combination's own DOM from —
@@ -181,6 +236,10 @@ impl ViewPlan {
         match self {
             Self::FileComparison { .. } => "file-comparison",
             Self::Settings { .. } => "settings",
+            Self::Explorer => "explorer",
+            Self::DeepCompare { .. } => "deep-compare",
+            Self::MergeTool { .. } => "mergetool",
+            Self::Shortcuts => "shortcuts",
         }
     }
 
@@ -193,10 +252,21 @@ impl ViewPlan {
     /// "where does the DOM walk start".
     fn ready_selector(&self) -> &'static str {
         match self {
-            // `ui/view/diff.rs`'s `DiffWorkspace` root (`div.diff-wrap`).
-            Self::FileComparison { .. } => ".diff-wrap",
+            // `ui/view/diff.rs`'s `DiffWorkspace` root (`div.diff-wrap`),
+            // shared by plain compare and mergetool mode alike.
+            Self::FileComparison { .. } | Self::MergeTool { .. } => ".diff-wrap",
             // `ui/view/settings/modal.rs`'s own dialog heading id.
             Self::Settings { .. } => "#settings-title",
+            // `ui/view/explorer.rs`'s real (non-private-mode-empty) root.
+            Self::Explorer => ".explorer-browse",
+            // `ui/view/deep_compare.rs`: the scan has finished and RFC-097
+            // stage 3 §3's own first-row auto-selection has landed, not
+            // merely `.deep-compare` (present the instant the scanning
+            // placeholder itself mounts, well before there is anything
+            // to measure).
+            Self::DeepCompare { .. } => ".deep-table [aria-selected=\"true\"]",
+            // `ui/overlay/keybindings.rs`'s `KeyboardRefModal`.
+            Self::Shortcuts => ".kb-table",
         }
     }
 }
@@ -217,6 +287,22 @@ pub struct Finding {
     pub client_width: f64,
     pub scroll_height: f64,
     pub client_height: f64,
+}
+
+/// One finding from a stage B check whose own measured value doesn't fit
+/// [`Finding`]'s scroll/client box shape — hit area, off-screen controls,
+/// text size, rendered contrast, label placement and overlap all report
+/// through this instead. `detail` is free text (e.g. "18×20px, needs
+/// 24×24" or "contrast 3.1:1 against #1e1f22, needs 4.5:1") rather than
+/// a fixed numeric shape, since each check's own "what's wrong" reads
+/// differently and a human is who reads it, in `cargo xtask
+/// layout-check`'s own report.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Measurement {
+    pub element: String,
+    #[serde(default)]
+    pub text: String,
+    pub detail: String,
 }
 
 /// Whether `.toast` (if raised — [`ViewPlan::Settings`]'s own
@@ -249,6 +335,11 @@ pub struct ResultRow {
     pub view: String,
     pub text_size: u32,
     pub language: String,
+    /// `"dark"`/`"light"`/`"night"` — the resolved value the rendered-
+    /// contrast check actually ran against this combination with.
+    pub theme: String,
+    pub contrast: String,
+    pub colour_vision: String,
     #[serde(default)]
     pub window_size: Option<String>,
     /// `false` means the settle wait hit [`SETTLE_TIMEOUT_MS`] without a
@@ -292,6 +383,59 @@ pub struct ResultRow {
     /// finds deliberately clipped, the same as `overflow` above. F220's
     /// own status-bar rules are a stage B refinement, not modeled here.
     pub clipped: Vec<Finding>,
+    /// Interactive elements (`button`, `[role=button]`, `a`, `input`,
+    /// `select`, `[tabindex]`) with any part of their own box outside
+    /// the viewport, excluding any with a scrollable ancestor (named the
+    /// same way `isScrollOwner` already does for `overflow`) that could
+    /// still bring them into view. No allowance (RFC-098 §2).
+    #[serde(default)]
+    pub off_screen: Vec<Measurement>,
+    /// The same interactive-element selector as `off_screen`, under
+    /// 24×24 CSS px. Allowed by [`HIT_AREA_ALLOWLIST`], WCAG 2.5.8's own
+    /// spacing exception, by named selector.
+    #[serde(default)]
+    pub hit_area: Vec<Measurement>,
+    /// Computed `font-size` under 12px at text size 100% (meaningless at
+    /// any other text size, which scales every font — the script skips
+    /// the check there rather than report it). Allowed by
+    /// [`TEXT_SIZE_ALLOWLIST`], the same two non-text-glyph selectors
+    /// `xtask::contrast`'s own `FONT_SIZE_ALLOWLIST` names. Named
+    /// `small_text`, not `text_size` — that name is already
+    /// [`ResultRow::text_size`], the axis value itself.
+    #[serde(default)]
+    pub small_text: Vec<Measurement>,
+    /// Each text node's own computed `color` against its effective
+    /// background (walking up for the first ancestor with its own fully
+    /// opaque `background-color`, compositing partial alpha on the way),
+    /// against 4.5:1 (7:1 under *High*) — or, for a control's own
+    /// border, 3:1 against its adjacent background. Allowed by
+    /// [`RENDERED_CONTRAST_ALLOWLIST`] (disabled controls; under *High*,
+    /// their own 3:1 floor — the same exemptions `xtask::contrast`'s
+    /// static gate already carries).
+    #[serde(default)]
+    pub rendered_contrast: Vec<Measurement>,
+    /// A labelled region (`[aria-labelledby]`) whose own visible label
+    /// doesn't sit where review 216 §3 requires: horizontal overlap with
+    /// the region, at or above its top, with no other labelled region's
+    /// box in between. No allowance.
+    #[serde(default)]
+    pub label_placement: Vec<Measurement>,
+    /// With a dialog (`.modal`'s own containing `.scrim`) open, a grid of
+    /// points sampled inside the dialog's box whose `elementFromPoint`
+    /// hits something that is neither the dialog nor its descendant —
+    /// review 217/218/219's own check, generalized from the one-point
+    /// [`ToastCheck`] above to the RFC's full grid shape. Allowed by
+    /// `.toast` (review 218 §2's own reasoning: transient, dismissed by
+    /// a click, the app's only error notice).
+    #[serde(default)]
+    pub dialog_occlusion: Vec<Measurement>,
+    /// Two visible boxes, each holding text or interactive, neither
+    /// containing the other, both in normal flow (not sticky, fixed or
+    /// absolute), intersecting by more than 1px in both axes. Parts
+    /// clipped out by their own scroll container are skipped. No
+    /// allowance (review 218 §4).
+    #[serde(default)]
+    pub overlap: Vec<Measurement>,
     /// Set when the view's own root selector was never found at all
     /// (e.g. a navigation call that didn't actually open it) — a probe
     /// defect, not a layout finding, reported rather than silently
@@ -300,7 +444,11 @@ pub struct ResultRow {
     pub error: Option<String>,
     /// See [`ToastCheck`]. Always present (not an `Option`) once a
     /// measurement actually ran — `Default` only for the early-return
-    /// rows above, where the script never ran at all.
+    /// rows above, where the script never ran at all. Kept alongside the
+    /// more general `dialog_occlusion` above: review 219 §1 already
+    /// approved this one-point proof's own shape specifically for
+    /// `raise_toast`, so it stays as its own targeted check rather than
+    /// being folded in and losing that approval's exact shape.
     #[serde(default)]
     pub toast_check: ToastCheck,
 }
@@ -312,6 +460,19 @@ fn parse_lang(s: &str) -> Lang {
     }
 }
 
+/// Parses a plan's own `themes` entry. Defaults to `Theme::Light`, the
+/// same value [`default_single_axis_light`] seeds a plan with, for
+/// anything unrecognized rather than failing the whole run over one bad
+/// value.
+fn parse_theme(s: &str) -> Theme {
+    match s {
+        "dark" => Theme::Dark,
+        "night" => Theme::Night,
+        "system" => Theme::System,
+        _ => Theme::Light,
+    }
+}
+
 /// Parses a plan's own `"WxH"` window size into logical pixels. `None`
 /// on anything else, rather than a default — a malformed plan value
 /// should be reported (`run`'s own caller does), not silently measured
@@ -319,6 +480,17 @@ fn parse_lang(s: &str) -> Lang {
 fn parse_window_size(s: &str) -> Option<(f64, f64)> {
     let (w, h) = s.split_once('x')?;
     Some((w.trim().parse().ok()?, h.trim().parse().ok()?))
+}
+
+/// Renders a fixed list of selectors as a JS array-of-strings literal,
+/// for embedding one of the named allowlists directly into the
+/// measurement script's own source — these never contain a quote or
+/// backslash (they're all plain CSS attribute/class selectors this
+/// module itself defines), so no escaping beyond the wrapping quotes is
+/// needed.
+fn json_string_array(items: &[&str]) -> String {
+    let quoted: Vec<String> = items.iter().map(|s| format!("\"{s}\"")).collect();
+    format!("[{}]", quoted.join(", "))
 }
 
 /// Starts the probe if [`PLAN_ENV_VAR`] is set to a readable plan file;
@@ -397,16 +569,38 @@ async fn run(mut store: Store, desktop: dioxus_desktop::DesktopContext, plan_pat
             store.settings.write().text_size = text_size;
             for language in &plan.languages {
                 store.settings.write().language = parse_lang(language);
-                let row = measure_one(view, text_size, language, plan.window_size.clone()).await;
-                let line = match serde_json::to_string(&row) {
-                    Ok(l) => l,
-                    Err(e) => {
-                        eprintln!("layout-probe: could not serialize a result row: {e}");
-                        continue;
+                for theme in &plan.themes {
+                    store.settings.write().theme = parse_theme(theme);
+                    for contrast in &plan.contrasts {
+                        store.settings.write().contrast =
+                            Contrast::from_id(contrast).unwrap_or_default();
+                        for colour_vision in &plan.colour_visions {
+                            store.settings.write().colour_vision =
+                                ColourVision::from_id(colour_vision).unwrap_or_default();
+                            let row = measure_one(
+                                view,
+                                text_size,
+                                language,
+                                theme,
+                                contrast,
+                                colour_vision,
+                                plan.window_size.clone(),
+                            )
+                            .await;
+                            let line = match serde_json::to_string(&row) {
+                                Ok(l) => l,
+                                Err(e) => {
+                                    eprintln!(
+                                        "layout-probe: could not serialize a result row: {e}"
+                                    );
+                                    continue;
+                                }
+                            };
+                            if let Err(e) = writeln!(results_file, "{line}") {
+                                eprintln!("layout-probe: could not write a result row: {e}");
+                            }
+                        }
                     }
-                };
-                if let Err(e) = writeln!(results_file, "{line}") {
-                    eprintln!("layout-probe: could not write a result row: {e}");
                 }
             }
         }
@@ -436,6 +630,31 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
                 store.notify("layout-probe: Could not save settings: test toast");
             }
         }
+        ViewPlan::Explorer => {
+            store.modal.set(Modal::None);
+        }
+        ViewPlan::DeepCompare { left, right } => {
+            store.modal.set(Modal::None);
+            open_dir_compare(store, left.clone(), right.clone());
+        }
+        ViewPlan::MergeTool {
+            local,
+            remote,
+            merged,
+        } => {
+            store.modal.set(Modal::None);
+            open_compare_request(
+                store,
+                CompareRequest {
+                    left_input: local.clone(),
+                    right_input: remote.clone(),
+                    save_destination: SaveDestination::Explicit(merged.clone()),
+                },
+            );
+        }
+        ViewPlan::Shortcuts => {
+            store.modal.set(Modal::KeyboardRef);
+        }
     }
 }
 
@@ -452,15 +671,27 @@ async fn open_view_followup(view: &ViewPlan) {
 
 fn close_view(store: &mut Store, view: &ViewPlan) {
     match view {
-        ViewPlan::FileComparison { .. } => {}
-        ViewPlan::Settings { .. } => store.modal.set(Modal::None),
+        ViewPlan::FileComparison { .. } | ViewPlan::MergeTool { .. } | ViewPlan::Explorer => {}
+        // Found live, first full-matrix run: `app.rs`'s own view match
+        // picks Deep Compare whenever `active_dir` is `Some`, *before*
+        // even looking at `active` (the file-tab index) - left set, it
+        // silently kept every later view in the same plan run pinned to
+        // Deep Compare, each one then failing its own `ready_selector`
+        // (reported as "view did not open", not as a Deep-Compare-
+        // shaped row, which is what made it non-obvious at first).
+        ViewPlan::DeepCompare { .. } => close_dir_tab(store, 0),
+        ViewPlan::Settings { .. } | ViewPlan::Shortcuts => store.modal.set(Modal::None),
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn measure_one(
     view: &ViewPlan,
     text_size: u32,
     language: &str,
+    theme: &str,
+    contrast: &str,
+    colour_vision: &str,
     window_size: Option<String>,
 ) -> ResultRow {
     // A `store.settings.write()` just before this call schedules a
@@ -477,7 +708,11 @@ async fn measure_one(
     // settle wait's `MutationObserver` would otherwise never see).
     retry_eval_true().await;
     let start = std::time::Instant::now();
-    let script = measurement_script(view.ready_selector());
+    // 7:1 under *High* (RFC-098 §2's own text-contrast row); the
+    // control-edge 3:1 floor is unaffected by *High*, per the same row.
+    let required_text_contrast = if contrast == "high" { 7.0 } else { 4.5 };
+    let zoom = f64::from(text_size) / 100.0;
+    let script = measurement_script(view.ready_selector(), required_text_contrast, zoom);
     let (raw, recv_retries) = match retry_recv(&script).await {
         Ok(r) => r,
         Err((e, recv_retries)) => {
@@ -485,6 +720,9 @@ async fn measure_one(
                 view: view.name().to_string(),
                 text_size,
                 language: language.to_string(),
+                theme: theme.to_string(),
+                contrast: contrast.to_string(),
+                colour_vision: colour_vision.to_string(),
                 window_size,
                 settled: false,
                 settle_ms: 0.0,
@@ -492,6 +730,13 @@ async fn measure_one(
                 recv_retries,
                 overflow: Vec::new(),
                 clipped: Vec::new(),
+                off_screen: Vec::new(),
+                hit_area: Vec::new(),
+                small_text: Vec::new(),
+                rendered_contrast: Vec::new(),
+                label_placement: Vec::new(),
+                dialog_occlusion: Vec::new(),
+                overlap: Vec::new(),
                 error: Some(format!("eval did not return: {e:?}")),
                 toast_check: ToastCheck::default(),
             };
@@ -503,6 +748,9 @@ async fn measure_one(
             view: view.name().to_string(),
             text_size,
             language: language.to_string(),
+            theme: theme.to_string(),
+            contrast: contrast.to_string(),
+            colour_vision: colour_vision.to_string(),
             window_size,
             settled: m.settled,
             settle_ms: m.settle_ms,
@@ -510,6 +758,13 @@ async fn measure_one(
             recv_retries,
             overflow: m.overflow,
             clipped: m.clipped,
+            off_screen: m.off_screen,
+            hit_area: m.hit_area,
+            small_text: m.small_text,
+            rendered_contrast: m.rendered_contrast,
+            label_placement: m.label_placement,
+            dialog_occlusion: m.dialog_occlusion,
+            overlap: m.overlap,
             error: m.error,
             toast_check: m.toast_check,
         },
@@ -517,6 +772,9 @@ async fn measure_one(
             view: view.name().to_string(),
             text_size,
             language: language.to_string(),
+            theme: theme.to_string(),
+            contrast: contrast.to_string(),
+            colour_vision: colour_vision.to_string(),
             window_size,
             settled: false,
             settle_ms: 0.0,
@@ -524,6 +782,13 @@ async fn measure_one(
             recv_retries,
             overflow: Vec::new(),
             clipped: Vec::new(),
+            off_screen: Vec::new(),
+            hit_area: Vec::new(),
+            small_text: Vec::new(),
+            rendered_contrast: Vec::new(),
+            label_placement: Vec::new(),
+            dialog_occlusion: Vec::new(),
+            overlap: Vec::new(),
             error: Some(format!("could not parse measurement JSON {raw:?}: {e}")),
             toast_check: ToastCheck::default(),
         },
@@ -606,10 +871,53 @@ struct MeasurementOutcome {
     #[serde(default)]
     clipped: Vec<Finding>,
     #[serde(default)]
+    off_screen: Vec<Measurement>,
+    #[serde(default)]
+    hit_area: Vec<Measurement>,
+    #[serde(default)]
+    small_text: Vec<Measurement>,
+    #[serde(default)]
+    rendered_contrast: Vec<Measurement>,
+    #[serde(default)]
+    label_placement: Vec<Measurement>,
+    #[serde(default)]
+    dialog_occlusion: Vec<Measurement>,
+    #[serde(default)]
+    overlap: Vec<Measurement>,
+    #[serde(default)]
     error: Option<String>,
     #[serde(default)]
     toast_check: ToastCheck,
 }
+
+/// Selector for every element the hit-area/off-screen checks treat as an
+/// interactive target — the RFC's own list, minus anything a sighted or
+/// keyboard user could never reach anyway (`tabindex="-1"`, the tab ×'s
+/// own RFC-087 §1 shape).
+const INTERACTIVE_SELECTOR: &str = r#"button, [role="button"], a[href], input, select, [tabindex]"#;
+
+/// Named selectors exempt from the hit-area 24×24 floor (WCAG 2.5.8's own
+/// spacing exception) — kept empty, a named list ready for the first
+/// real exception review decides, same shape as `xtask::contrast`'s own
+/// allowlists.
+const HIT_AREA_ALLOWLIST: &[&str] = &[];
+
+/// Named selectors exempt from the 12px text-size floor — the exact two
+/// non-text glyphs `xtask::contrast`'s own `FONT_SIZE_ALLOWLIST` names
+/// (review 098 §2's own "Allowed by" column points at that list by
+/// name); kept in sync by hand, since the probe runs in the page and the
+/// static gate runs over CSS source, with no shared Rust type between
+/// them to enforce it.
+const TEXT_SIZE_ALLOWLIST: &[&str] = &[".dirty-dot", ".tab-loading-spinner"];
+
+/// Named selectors exempt from the rendered-contrast floor — disabled
+/// controls (the `contrast` gate's own exemption: a disabled control's
+/// lower contrast is the platform's own convention for "inert", not a
+/// defect).
+// Single quotes around the attribute value, not double: `json_string_array`
+// wraps each entry in double quotes for the JS array literal it embeds,
+// and a double quote inside that would collide with its own.
+const RENDERED_CONTRAST_ALLOWLIST: &[&str] = &["[disabled]", "[aria-disabled='true']"];
 
 /// The measurement script run in the page for one combination. Returns
 /// (via `dioxus.send`) one JSON string matching [`MeasurementOutcome`].
@@ -622,7 +930,26 @@ struct MeasurementOutcome {
 /// (`tag.class#n`) rather than a full unique CSS selector — sufficient
 /// for a human reading a failure, and far cheaper than computing one
 /// precisely for every candidate element.
-fn measurement_script(ready_selector: &str) -> String {
+///
+/// `required_text_contrast` is 7.0 under *High*, 4.5 otherwise (RFC-098
+/// §2's own text-contrast row) — computed by the caller, which already
+/// knows the plan's own `contrast` value; the control-edge floor is the
+/// fixed `3.0` the same row gives, unaffected by *High*.
+///
+/// `zoom` (`text_size / 100`) is read only to gate the text-size check
+/// to exactly 100% — not to normalize any measured pixel value. Found
+/// live: `wry`'s own zoom does not change what `getBoundingClientRect`/
+/// `getComputedStyle().fontSize` report for an individual element's own
+/// absolute-px box (confirmed by comparing the same control's box at
+/// 100% and 200% directly) — only the viewport's own `clientWidth`/
+/// `clientHeight` shrinks in CSS-px terms, which is what the settle
+/// condition's own poll already relies on. A normalizing division here
+/// would be the bug, not its absence.
+fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f64) -> String {
+    let interactive_selector = INTERACTIVE_SELECTOR;
+    let hit_area_allowlist = json_string_array(HIT_AREA_ALLOWLIST);
+    let text_size_allowlist = json_string_array(TEXT_SIZE_ALLOWLIST);
+    let rendered_contrast_allowlist = json_string_array(RENDERED_CONTRAST_ALLOWLIST);
     format!(
         r#"(function() {{
   function settle(readySelector, quietMs, timeoutMs) {{
@@ -689,7 +1016,89 @@ fn measurement_script(ready_selector: &str) -> String {
       ? '.' + el.className.trim().split(/\s+/).join('.') : '';
     return el.tagName.toLowerCase() + cls + '#' + index;
   }}
+  function matchesAny(el, selectors) {{
+    return selectors.some((s) => el.matches(s));
+  }}
+  // Review 098 §2's own interactive-element check both share: a control
+  // nothing can actually reach doesn't need an on-screen position or a
+  // minimum size, so neither check should report one. Disabled and
+  // aria-hidden are already excluded elsewhere (isVisuallyHidden covers
+  // aria-hidden's own clip-rect shape); tabindex="-1" is the one this
+  // selector alone would otherwise wrongly include (RFC-087 §1's tab ×).
+  function isReachable(el) {{
+    if (isVisuallyHidden(el)) {{ return false; }}
+    if (el.matches('[tabindex="-1"]')) {{ return false; }}
+    if ('disabled' in el && el.disabled) {{ return false; }}
+    return true;
+  }}
+  // RFC-098 §2's own WCAG relative-luminance contrast ratio - the exact
+  // formula `xtask::css_shared::contrast_ratio_rgb` already uses for the
+  // static gate, reimplemented here because the probe needs it against
+  // *rendered*, already-resolved colour (var()/color-mix() included,
+  // for free, by getComputedStyle), not CSS source text.
+  function srgbChannelToLinear(c) {{
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }}
+  function relativeLuminance(r, g, b) {{
+    const lr = srgbChannelToLinear(r / 255);
+    const lg = srgbChannelToLinear(g / 255);
+    const lb = srgbChannelToLinear(b / 255);
+    return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+  }}
+  function contrastRatio(rgb1, rgb2) {{
+    const l1 = relativeLuminance(rgb1[0], rgb1[1], rgb1[2]);
+    const l2 = relativeLuminance(rgb2[0], rgb2[1], rgb2[2]);
+    const lighter = Math.max(l1, l2);
+    const darker = Math.min(l1, l2);
+    return (lighter + 0.05) / (darker + 0.05);
+  }}
+  // Parses `getComputedStyle(...).color`/`.backgroundColor`'s own
+  // resolved form - always `rgb(r, g, b)` or `rgba(r, g, b, a)` once the
+  // browser has resolved every `var()`/`color-mix()` in it - into
+  // [r, g, b, a], a in [0, 1].
+  function parseRgba(s) {{
+    const m = s.match(/rgba?\(([^)]+)\)/);
+    if (!m) {{ return null; }}
+    const parts = m[1].split(',').map((p) => parseFloat(p.trim()));
+    return [parts[0], parts[1], parts[2], parts.length > 3 ? parts[3] : 1];
+  }}
+  // Walks up from `el` compositing each ancestor's own
+  // `background-color` alpha onto the next, stopping at the first fully
+  // opaque one (or the document root, assumed white if even that has
+  // none - WebKitGTK's own canvas default). This is the "effective
+  // background" RFC-098 §2's own rendered-contrast row asks for; it does
+  // not separately walk `opacity` (a different compositing mechanism
+  // from a background colour's own alpha channel) - an element under a
+  // non-1 `opacity` is a disabled/hover-revealed control already in
+  // `RENDERED_CONTRAST_ALLOWLIST` or excluded by `isReachable`-style
+  // reasoning in practice, not a gap this check's own scope needs to
+  // close itself.
+  function effectiveBackground(el) {{
+    let r = 255, g = 255, b = 255;
+    let node = el;
+    while (node) {{
+      const bg = parseRgba(getComputedStyle(node).backgroundColor || 'rgba(0,0,0,0)');
+      if (bg) {{
+        const [br, bgc, bb, ba] = bg;
+        if (ba > 0) {{
+          r = br * ba + r * (1 - ba);
+          g = bgc * ba + g * (1 - ba);
+          b = bb * ba + b * (1 - ba);
+          if (ba >= 0.999) {{ break; }}
+        }}
+      }}
+      node = node.parentElement;
+    }}
+    return [r, g, b];
+  }}
   return (async () => {{
+    // Review 098 stage B: a runtime error anywhere below - in this
+    // script's own new checks especially, each walking live computed
+    // style rather than a fixed shape - used to leave `dioxus.send`
+    // never called at all, and `eval.recv()` has no timeout of its own:
+    // a silent hang, not a reported failure. Caught here and reported
+    // as `error` instead, the same as the two explicit checks above.
+    try {{
     const t0 = performance.now();
     const settled = await settle('{ready_selector}', {SETTLE_QUIET_MS}, {SETTLE_TIMEOUT_MS});
     const settle_ms = performance.now() - t0;
@@ -708,6 +1117,18 @@ fn measurement_script(ready_selector: &str) -> String {
     }}
     const overflow = [];
     const clipped = [];
+    const off_screen = [];
+    const hit_area = [];
+    const small_text = [];
+    const rendered_contrast = [];
+    const labelled = []; // {{el, index, label}} - gathered for label_placement after the loop
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const zoom = {zoom};
+    const requiredTextContrast = {required_text_contrast};
+    const hitAreaAllowlist = {hit_area_allowlist};
+    const textSizeAllowlist = {text_size_allowlist};
+    const renderedContrastAllowlist = {rendered_contrast_allowlist};
     const all = root.querySelectorAll('*');
     for (let i = 0; i < all.length; i++) {{
       const el = all[i];
@@ -738,7 +1159,221 @@ fn measurement_script(ready_selector: &str) -> String {
           }});
         }}
       }}
+
+      // Off-screen controls and hit area (RFC-098 §2): the same
+      // interactive candidates, two different questions about the same
+      // `getBoundingClientRect()`.
+      if (el.matches('{interactive_selector}') && isReachable(el)) {{
+        const r = el.getBoundingClientRect();
+        let hasScrollableAncestor = false;
+        for (let p = el.parentElement; p; p = p.parentElement) {{
+          if (isScrollOwner(p)) {{ hasScrollableAncestor = true; break; }}
+        }}
+        if (!hasScrollableAncestor &&
+            (r.right <= 0 || r.bottom <= 0 || r.left >= vw || r.top >= vh)) {{
+          off_screen.push({{
+            element: describe(el, i), text: ownText(el).slice(0, 80),
+            detail: 'box at (' + Math.round(r.left) + ',' + Math.round(r.top) + ') ' +
+              Math.round(r.width) + 'x' + Math.round(r.height) +
+              ', viewport ' + vw + 'x' + vh,
+          }});
+        }}
+        // Found live, first run against a real view: `wry`'s own zoom
+        // (`set_zoom_level`, what `text_size` drives) does not change
+        // what `getBoundingClientRect` reports for an individual
+        // element's own absolute-px box - a 36px-tall button measures
+        // 36 at every text size, confirmed by comparing the same button
+        // at 100% and 200% directly. Only the *viewport's* own
+        // `clientWidth`/`clientHeight` shrinks in CSS-px terms (the
+        // settle condition's own reason for polling it), which is what
+        // lets a `max-width` media query flip the stacked layout - a
+        // fixed-px control's own size is unaffected either way. No
+        // normalisation, then: the raw box is already the right unit.
+        const w = r.width;
+        const h = r.height;
+        if (w > 0 && h > 0 && (w < 23.5 || h < 23.5) &&
+            !matchesAny(el, hitAreaAllowlist)) {{
+          hit_area.push({{
+            element: describe(el, i), text: ownText(el).slice(0, 80),
+            detail: w.toFixed(1) + 'x' + h.toFixed(1) + 'px, needs 24x24',
+          }});
+        }}
+      }}
+
+      // Text size (RFC-098 §2): the RFC's own reason for scoping this to
+      // text size 100% is that every font scales with zoom elsewhere -
+      // found NOT true live (hit area, just above): a fixed-px
+      // `font-size` reads the same raw value at every text size, same
+      // as a fixed-px control's own box. Kept scoped to 100% anyway,
+      // exactly as the RFC states, since this is a report-worthy
+      // discrepancy in its own reasoning, not licence to re-decide the
+      // check's scope here.
+      const ownTxt = ownText(el);
+      if (Math.abs(zoom - 1) < 0.001 && ownTxt.length > 0 &&
+          !matchesAny(el, textSizeAllowlist)) {{
+        const fontPx = parseFloat(cs.fontSize);
+        if (fontPx < 12) {{
+          small_text.push({{
+            element: describe(el, i), text: ownTxt.slice(0, 80),
+            detail: 'font-size ' + fontPx + 'px, needs >= 12px',
+          }});
+        }}
+      }}
+
+      // Rendered contrast (RFC-098 §2): every element with its own
+      // direct text, against its effective (composited) background.
+      if (ownTxt.length > 0 && !matchesAny(el, renderedContrastAllowlist)) {{
+        const fg = parseRgba(cs.color);
+        if (fg && fg[3] > 0.01) {{
+          const bg = effectiveBackground(el);
+          const ratio = contrastRatio([fg[0], fg[1], fg[2]], bg);
+          if (ratio < requiredTextContrast) {{
+            rendered_contrast.push({{
+              element: describe(el, i), text: ownTxt.slice(0, 80),
+              detail: 'contrast ' + ratio.toFixed(2) + ':1 against rgb(' +
+                bg.map((c) => Math.round(c)).join(',') + '), needs ' +
+                requiredTextContrast + ':1',
+            }});
+          }}
+        }}
+      }}
+
+      // Gathered for label placement, below - every region a visible
+      // label is attached to via `aria-labelledby`.
+      const labelledbyId = el.getAttribute('aria-labelledby');
+      if (labelledbyId) {{
+        const labelEl = document.getElementById(labelledbyId);
+        if (labelEl && !isVisuallyHidden(labelEl)) {{
+          labelled.push({{ el, index: i, labelEl }});
+        }}
+      }}
     }}
+
+    // Label placement (review 216 §3): a labelled region's own visible
+    // label must overlap it horizontally, sit at or above its top, and
+    // have no other labelled region's box lying between them.
+    const label_placement = [];
+    for (const {{ el, index, labelEl }} of labelled) {{
+      const regionRect = el.getBoundingClientRect();
+      const labelRect = labelEl.getBoundingClientRect();
+      const horizontalOverlap = labelRect.left < regionRect.right &&
+        labelRect.right > regionRect.left;
+      const aboveOrAtTop = labelRect.top <= regionRect.top + 1;
+      let reason = null;
+      if (!horizontalOverlap) {{ reason = 'label has no horizontal overlap with its region'; }}
+      else if (!aboveOrAtTop) {{ reason = 'label sits below the region it names'; }}
+      else {{
+        for (const other of labelled) {{
+          if (other.el === el) {{ continue; }}
+          const otherRect = other.el.getBoundingClientRect();
+          if (otherRect.top >= labelRect.bottom && otherRect.bottom <= regionRect.top) {{
+            reason = 'another labelled region (' + describe(other.el, other.index) +
+              ') sits between the label and its own region';
+            break;
+          }}
+        }}
+      }}
+      if (reason) {{
+        label_placement.push({{ element: describe(el, index), text: ownText(labelEl).slice(0, 80), detail: reason }});
+      }}
+    }}
+
+    // Review 217/218/219: nothing covers an open dialog - a grid of
+    // points sampled inside the dialog's own box must each hit the
+    // dialog or a descendant, except `.toast` (the app's only error
+    // notice, transient and dismissed by a click, review 218 §2).
+    const dialog_occlusion = [];
+    const dialogEl = document.querySelector('.scrim .modal');
+    if (dialogEl) {{
+      const r = dialogEl.getBoundingClientRect();
+      const steps = 5;
+      for (let gx = 1; gx < steps; gx++) {{
+        for (let gy = 1; gy < steps; gy++) {{
+          const px = r.left + (r.width * gx) / steps;
+          const py = r.top + (r.height * gy) / steps;
+          if (px < 0 || py < 0 || px >= vw || py >= vh) {{ continue; }}
+          const hit = document.elementFromPoint(px, py);
+          if (!hit) {{ continue; }}
+          const isDialog = hit === dialogEl || dialogEl.contains(hit);
+          const isToast = hit.closest && hit.closest('.toast') !== null;
+          if (!isDialog && !isToast) {{
+            dialog_occlusion.push({{
+              element: 'point(' + Math.round(px) + ',' + Math.round(py) + ')',
+              text: '', detail: 'hit ' + describe(hit, -1) + ' instead of the dialog',
+            }});
+          }}
+        }}
+      }}
+    }}
+
+    // Overlap (review 218 §4): two visible boxes, each with their own
+    // text or interactive, neither containing the other, both in
+    // normal flow, intersecting by more than 1px in both axes. Scoped
+    // to the same candidates `small_text`/`rendered_contrast` already
+    // walk past (own text) plus the interactive set, not every element
+    // in the tree - a defect here is about two *contentful* boxes
+    // crossing, not any two boxes at all.
+    const overlapCandidates = [];
+    for (let i = 0; i < all.length; i++) {{
+      const el = all[i];
+      if (isVisuallyHidden(el)) {{ continue; }}
+      const cs = getComputedStyle(el);
+      if (cs.position === 'sticky' || cs.position === 'fixed' || cs.position === 'absolute') {{ continue; }}
+      const hasOwnText = ownText(el).length > 0;
+      const isInteractive = el.matches('{interactive_selector}') && isReachable(el);
+      if (!hasOwnText && !isInteractive) {{ continue; }}
+      // Clipped out by its own scroll container doesn't count (RFC-098
+      // §2's own allowance for this check) - visible only within that
+      // container's own box.
+      let clippingAncestor = null;
+      for (let p = el.parentElement; p; p = p.parentElement) {{
+        if (isScrollOwner(p)) {{ clippingAncestor = p; break; }}
+      }}
+      const rect = el.getBoundingClientRect();
+      if (clippingAncestor) {{
+        const cr = clippingAncestor.getBoundingClientRect();
+        if (rect.bottom <= cr.top || rect.top >= cr.bottom ||
+            rect.right <= cr.left || rect.left >= cr.right) {{
+          continue;
+        }}
+      }}
+      // Found live (first run against a real view): with a dialog open,
+      // the background view behind its scrim still has every element
+      // "in the DOM tree with overlapping coordinates" - the Explorer's
+      // own tree, say, under the Settings dialog - but none of it is
+      // actually *visible*; the scrim paints over it. A box the scrim
+      // (or anything else) covers isn't a candidate for "two visible
+      // boxes crossing" at all, so a point inside its own rect must
+      // actually hit it (or a descendant) to count.
+      if (rect.width > 0 && rect.height > 0) {{
+        const cx = Math.min(Math.max(rect.left + rect.width / 2, 0), vw - 1);
+        const cy = Math.min(Math.max(rect.top + rect.height / 2, 0), vh - 1);
+        const hit = document.elementFromPoint(cx, cy);
+        if (!hit || !(hit === el || el.contains(hit) || hit.contains(el))) {{ continue; }}
+      }}
+      overlapCandidates.push({{ el, index: i, rect }});
+    }}
+    const overlap = [];
+    for (let a = 0; a < overlapCandidates.length; a++) {{
+      for (let b = a + 1; b < overlapCandidates.length; b++) {{
+        const ca = overlapCandidates[a];
+        const cb = overlapCandidates[b];
+        if (ca.el.contains(cb.el) || cb.el.contains(ca.el)) {{ continue; }}
+        const ra = ca.rect;
+        const rb = cb.rect;
+        const xOverlap = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
+        const yOverlap = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
+        if (xOverlap > 1 && yOverlap > 1) {{
+          overlap.push({{
+            element: describe(ca.el, ca.index),
+            text: ownText(ca.el).slice(0, 80),
+            detail: 'overlaps ' + describe(cb.el, cb.index) + ' by ' +
+              Math.round(xOverlap) + 'x' + Math.round(yOverlap) + 'px',
+          }});
+        }}
+      }}
+    }}
+
     // Review 218 §2: a probe-level proof that `.toast`, when raised, is
     // actually hit at its own centre point - not covered by `.scrim` or
     // anything else. `elementFromPoint` answers "what's really on top
@@ -757,7 +1392,16 @@ fn measurement_script(ready_selector: &str) -> String {
         hit: isToast || !hit ? null : describe(hit, -1),
       }};
     }}
-    dioxus.send(JSON.stringify({{settled, settle_ms, overflow, clipped, toast_check}}));
+    dioxus.send(JSON.stringify({{
+      settled, settle_ms, overflow, clipped, off_screen, hit_area, small_text,
+      rendered_contrast, label_placement, dialog_occlusion, overlap, toast_check,
+    }}));
+    }} catch (e) {{
+      dioxus.send(JSON.stringify({{
+        settled: false, settle_ms: 0, overflow: [], clipped: [],
+        error: 'measurement script threw: ' + (e && e.stack ? e.stack : String(e)),
+      }}));
+    }}
   }})();
 }})()"#
     )
@@ -801,6 +1445,34 @@ mod tests {
         assert_eq!(plan.views[1].name(), "settings");
         assert_eq!(plan.text_sizes, vec![100, 200]);
         assert_eq!(plan.window_size.as_deref(), Some("1000x700"));
+        // Stage B's own axes, left out of this plan entirely: each
+        // defaults to the single value stage A's own matrix always ran
+        // at, so an old plan (this one's own shape) still measures
+        // exactly what it always did.
+        assert_eq!(plan.themes, vec!["light".to_string()]);
+        assert_eq!(plan.contrasts, vec!["standard".to_string()]);
+        assert_eq!(plan.colour_visions, vec!["standard".to_string()]);
+    }
+
+    #[test]
+    fn stage_b_view_kinds_deserialize_and_name_themselves() {
+        let raw = r#"{
+            "results_path": "/tmp/results.jsonl",
+            "views": [
+                {"kind": "explorer"},
+                {"kind": "deep-compare", "left": "/l", "right": "/r"},
+                {"kind": "merge-tool", "local": "/l", "remote": "/rm", "merged": "/m"},
+                {"kind": "shortcuts"}
+            ],
+            "text_sizes": [100],
+            "languages": ["en"]
+        }"#;
+        let plan: Plan = serde_json::from_str(raw).expect("plan must parse");
+        let names: Vec<&str> = plan.views.iter().map(ViewPlan::name).collect();
+        assert_eq!(
+            names,
+            vec!["explorer", "deep-compare", "mergetool", "shortcuts"]
+        );
     }
 
     #[test]
@@ -830,13 +1502,94 @@ mod tests {
 
     #[test]
     fn measurement_script_embeds_the_given_selector_once() {
-        let script = measurement_script(".diff-wrap");
+        let script = measurement_script(".diff-wrap", 4.5, 1.0);
         assert!(script.contains("querySelector('.diff-wrap')"));
     }
 
     #[test]
+    fn parse_theme_defaults_to_light_for_an_unrecognized_value() {
+        assert_eq!(parse_theme("dark"), Theme::Dark);
+        assert_eq!(parse_theme("light"), Theme::Light);
+        assert_eq!(parse_theme("night"), Theme::Night);
+        assert_eq!(parse_theme("system"), Theme::System);
+        assert_eq!(parse_theme("xx"), Theme::Light);
+    }
+
+    #[test]
+    fn json_string_array_renders_a_valid_js_array_literal() {
+        assert_eq!(json_string_array(&[]), "[]");
+        assert_eq!(json_string_array(&["a"]), "[\"a\"]");
+        assert_eq!(json_string_array(&["a", "b"]), "[\"a\", \"b\"]");
+    }
+
+    /// Review 219's own round found exactly this shape live: an allowlist
+    /// entry containing a double quote (`[aria-disabled="true"]`)
+    /// produced `"[aria-disabled="true"]"` once wrapped by
+    /// `json_string_array` for the measurement script's own JS source —
+    /// invalid syntax, which made the *whole* `document::eval` never
+    /// call `dioxus.send` at all, hanging `eval.recv()` forever (no
+    /// timeout of its own) rather than failing visibly. Falsify by
+    /// reverting `RENDERED_CONTRAST_ALLOWLIST`'s own single quotes back
+    /// to double: this test catches the shape directly, instead of
+    /// waiting to find it again as a silent hang.
+    #[test]
+    fn no_allowlist_entry_contains_a_double_quote() {
+        for list in [
+            HIT_AREA_ALLOWLIST,
+            TEXT_SIZE_ALLOWLIST,
+            RENDERED_CONTRAST_ALLOWLIST,
+        ] {
+            for entry in list {
+                assert!(
+                    !entry.contains('"'),
+                    "{entry:?} has a double quote, which collides with \
+                     json_string_array's own wrapping quotes once embedded \
+                     in the measurement script - use single quotes for an \
+                     attribute selector's value instead"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn measurement_script_is_syntactically_plausible_js() {
+        // Not a real parser, and checked directly against the bug above:
+        // this one does *not* catch it (confirmed live - the allowlist's
+        // own stray double quote still balances overall once embedded,
+        // even though the token sequence it produces is invalid; `node
+        // --check` catches that by actually parsing, which this cheap
+        // brace/paren/bracket count never will). Kept anyway as a floor
+        // under a *different*, cruder mistake - a genuinely unbalanced
+        // edit to this script - with `no_allowlist_entry_contains_a_
+        // double_quote` as the real regression test for the bug this
+        // round actually found.
+        let script = measurement_script(".diff-wrap", 4.5, 1.0);
+        let mut depth = 0i32;
+        let mut in_single = false;
+        let mut in_double = false;
+        let mut escaped = false;
+        for c in script.chars() {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            match c {
+                '\\' if in_single || in_double => escaped = true,
+                '\'' if !in_double => in_single = !in_single,
+                '"' if !in_single => in_double = !in_double,
+                '{' | '(' | '[' if !in_single && !in_double => depth += 1,
+                '}' | ')' | ']' if !in_single && !in_double => depth -= 1,
+                _ => {}
+            }
+        }
+        assert_eq!(depth, 0, "unbalanced brackets in the measurement script");
+        assert!(!in_single, "an unterminated single-quoted string");
+        assert!(!in_double, "an unterminated double-quoted string");
+    }
+
+    #[test]
     fn measurement_script_checks_the_toast_with_element_from_point() {
-        let script = measurement_script(".diff-wrap");
+        let script = measurement_script(".diff-wrap", 4.5, 1.0);
         assert!(script.contains("elementFromPoint"));
         assert!(script.contains("querySelector('.toast')"));
         assert!(script.contains("toast_check"));
