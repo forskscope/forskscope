@@ -99,6 +99,28 @@ pub fn resolved_theme_css_class(
     }
 }
 
+/// RFC-099 §2: the same resolution `resolved_theme_css_class` already
+/// does, as tao's own two-variant window theme instead of a CSS class -
+/// `app.rs` passes this to `tao::window::Window::set_theme`, always
+/// `Some(_)`, never `None` (which tao treats as light on Linux, silently
+/// undoing the desktop's own dark setting - the RFC's own explicit
+/// warning). `Dark` and `Night` both resolve to tao's `Dark`, matching
+/// `Theme::css_class`'s own grouping of the two as visually dark themes.
+pub fn resolved_tao_theme(
+    theme: Theme,
+    system_scheme: Option<SystemColorScheme>,
+) -> dioxus_desktop::tao::window::Theme {
+    use dioxus_desktop::tao::window::Theme as TaoTheme;
+    match theme {
+        Theme::Dark | Theme::Night => TaoTheme::Dark,
+        Theme::Light => TaoTheme::Light,
+        Theme::System => match system_scheme {
+            Some(SystemColorScheme::Light) => TaoTheme::Light,
+            Some(SystemColorScheme::Dark) | None => TaoTheme::Dark,
+        },
+    }
+}
+
 /// A parameter rather than a bare `cfg!` branch inside the match, so every
 /// arm is unit-testable regardless of which OS runs the suite — the same
 /// split `forskscope_desktop::external_tool`'s `TargetOs`/`host_target_os`
@@ -697,6 +719,38 @@ mod tests {
     #[test]
     fn system_falls_back_to_dark_with_no_reading_yet() {
         assert_eq!(resolved_theme_css_class(Theme::System, None), "theme-dark");
+    }
+
+    // ── RFC-099 §2: resolved_tao_theme ───────────────────────────────────────
+
+    #[test]
+    fn dark_and_night_both_resolve_to_tao_dark() {
+        use dioxus_desktop::tao::window::Theme as TaoTheme;
+        assert_eq!(resolved_tao_theme(Theme::Dark, None), TaoTheme::Dark);
+        assert_eq!(resolved_tao_theme(Theme::Night, None), TaoTheme::Dark);
+    }
+
+    #[test]
+    fn light_resolves_to_tao_light_regardless_of_system_scheme() {
+        use dioxus_desktop::tao::window::Theme as TaoTheme;
+        assert_eq!(
+            resolved_tao_theme(Theme::Light, Some(SystemColorScheme::Dark)),
+            TaoTheme::Light
+        );
+    }
+
+    #[test]
+    fn system_resolves_to_the_live_tao_reading_or_dark_with_none() {
+        use dioxus_desktop::tao::window::Theme as TaoTheme;
+        assert_eq!(
+            resolved_tao_theme(Theme::System, Some(SystemColorScheme::Light)),
+            TaoTheme::Light
+        );
+        assert_eq!(
+            resolved_tao_theme(Theme::System, Some(SystemColorScheme::Dark)),
+            TaoTheme::Dark
+        );
+        assert_eq!(resolved_tao_theme(Theme::System, None), TaoTheme::Dark);
     }
 
     // ── Review 212 §2: tao_theme_to_system_color_scheme ─────────────────────

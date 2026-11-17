@@ -66,7 +66,6 @@
   --equal: transparent; --del-bg: #4a2326; --ins-bg: #1f3b29;
   --del-mark: #ff6b6b; --ins-mark: #5fd28a; --rep-bg: #3a3320;
   --rep-mark: #e0b341;
-  --danger-bg: #5c1e1e;
   --ok: #5fd28a; --warn: #e0b341; --err: #ff7777; --focus: #4f8cff;
 }
 .theme-light {
@@ -77,7 +76,6 @@
   --equal: transparent; --del-bg: #ffd7d5; --ins-bg: #d3f5e0;
   --del-mark: #cf222e; --ins-mark: #187533; --rep-bg: #fff3cd;
   --rep-mark: #8e5f00;
-  --danger-bg: #ffd5d5;
   --ok: #187734; --warn: #8e5f00; --err: #c9212d; --focus: #0969da;
 }
 .theme-night {
@@ -88,7 +86,6 @@
   --equal: transparent; --del-bg: #3c1618; --ins-bg: #12321f;
   --del-mark: #f85149; --ins-mark: #3fb950; --rep-bg: #2a2415;
   --rep-mark: #d29922;
-  --danger-bg: #4a1515;
   --ok: #3fb950; --warn: #d29922; --err: #f85149; --focus: #58a6ff;
 }
 

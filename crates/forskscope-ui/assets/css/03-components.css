@@ -7,9 +7,28 @@
   position: fixed; inset: 0; background: rgba(0,0,0,.45);
   display: flex; align-items: center; justify-content: center;
 }
+/* F224 (review 216 §4, handoff 103 §4): `.modal` had no max-height or
+   scroll of its own, and `.scrim` (fixed, flex-centred) just centres it
+   - at large text sizes a dialog taller than the window lost its own
+   title and action buttons off both edges, with nothing to scroll to
+   reach them (RFC-098's probe caught it live: `div.scrim` height
+   overflow, 15-165px, reply 188). Every dialog here already puts its
+   own heading first and its own actions row last (`.modal .actions`
+   below is a descendant selector on purpose - `export_dir_report.rs`'s
+   own two phases each nest their own actions row one level deeper, not
+   as a direct child), so the heading and the actions row stay visible
+   (`position: sticky`) while whatever sits between them scrolls,
+   rather than the whole dialog scrolling - RFC-099 §4's own "if the
+   structure allows it" branch, not "otherwise". The margin leaves the
+   scrim visible around every edge, so a capped dialog still reads as a
+   floating overlay, not the whole window. */
 .modal {
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
   min-width: 22rem; max-width: 30rem; padding: 1rem;
+  max-height: calc(100vh - 4rem); overflow-y: auto;
+}
+.modal h2:first-child, .modal > .modal-header-row:first-child {
+  position: sticky; top: 0; z-index: 1; background: var(--surface);
 }
 .modal h2 { margin: 0 0 .75rem; font-size: 1rem; }
 .modal .field {
@@ -27,10 +46,53 @@
    in markup, never a flex child of `.field` itself, so it reads as a full
    width line, not squeezed beside the control). */
 .field-help { margin: -.3rem 0 .5rem; font-size: 12px; color: var(--muted); }
-.modal .actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
+.modal .actions {
+  display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem;
+  position: sticky; bottom: 0; z-index: 1; background: var(--surface);
+}
 .modal-wide { min-width: min(540px, 90vw); }
 
 .modal-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
+
+/* RFC-099 §1: one shared, borderless-at-rest style for every "×" - the
+   tab close button, the search bar's close button, the Explorer
+   filter's clear button (its own glyph changes from "✕" to this same
+   "×"), the Settings profile delete button, and the ignore-list
+   badges' own remove buttons (§3). Replaces each one's own ad hoc
+   border/fill/size rule (`.tab-close`/`.search-close`/`.filter-clear`/
+   `.profile-delete` each keep their own class only as an identifying
+   hook now, not for appearance) and the general `button` rule's own
+   `min-height: var(--control-h)` (36px), which is what made the tab
+   close button taller than its own 2.2rem (35.2px) `.tab-slot` -
+   `cargo xtask layout-check`'s own overflow check caught this live
+   (review 216 §5), tracked as an expected failure until this change. A
+   plain class beats the element selector `button` on every overlapping
+   property with no `!important` needed (one class outranks one
+   element), and `border: none` here makes `button:hover`'s own
+   `border-color: var(--accent)` harmless - there is no border width for
+   a colour to show on. */
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; min-height: 24px; padding: 0;
+  border: none; background: none; border-radius: 4px;
+  color: var(--muted); font-size: 14px; line-height: 1; cursor: pointer;
+}
+.icon-btn:hover {
+  background: color-mix(in srgb, var(--text) 14%, transparent); color: var(--text);
+}
+.icon-btn:focus-visible { outline: var(--focus-ring) solid var(--focus); outline-offset: 2px; }
+/* `--text` on the selected tab, `--muted` everywhere else (`.icon-btn`
+   above already gives every other surface `--muted` at rest - this is
+   the one surface where "selected" changes it). */
+.tab-slot:has(.tab.active) .icon-btn { color: var(--text); }
+/* Forced colours (a Windows contrast theme): system colours only, same
+   requirement F222 already met for the diff's own changed-row marker -
+   `ButtonText`/`Highlight` stay meaningful precisely because nothing
+   here overrides them with a custom value. */
+@media (forced-colors: active) {
+  .icon-btn { color: ButtonText; }
+  .icon-btn:hover { background: none; outline: 1px solid Highlight; }
+}
 .modal-header-row h2 { margin: 0; }
 .new-profile-btn { margin-top: .5rem; font-size: 12px; }
 
@@ -128,11 +190,10 @@ code.path-display {
    light) - the button's own text colour (`--text` on its `--surface-3`
    fill, via the base `button` rule) clears 4.5:1 with no help from
    opacity at all (9.4-13.1:1, measured), so both rules are simply gone. */
-/* RFC-097 stage 3 §5 (review 207 §3): `padding: 0 .3rem` around a 12px
-   glyph measures about 17px wide - under the 24px floor. `min-width`
-   closes it by construction; height already comes from `--control-h`
-   (the base `button` rule). */
-.profile-delete { padding: 0 .3rem; font-size: 12px; min-width: 24px; }
+/* RFC-097 stage 3 §5 (review 207 §3)'s own 24px floor is `.icon-btn`'s
+   own `min-width`/`min-height` now (RFC-099 §1) - `.profile-delete`
+   keeps its class only to identify the control, not for its own
+   appearance any more. */
 .add-profile-form { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-top: .25rem; }
 .profile-check { display: flex; align-items: center; gap: .2rem; font-size: 12px; color: var(--muted); cursor: pointer; }
 /* F168 §2.2: nested one level deeper than .advanced-toggle, so it reads as

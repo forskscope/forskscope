@@ -111,10 +111,11 @@
 .filter-dot.on { background: var(--accent); }
 .filter-input { flex: 1; min-width: 0; font-size: 12px; height: 24px; padding: 0 .4rem; }
 .filter-check { display: flex; align-items: center; gap: .25rem; font-size: 12px; color: var(--text); cursor: pointer; white-space: nowrap; user-select: none; }
-/* F214/F215: font-size 11px -> 12px; border/background:none has no fill
-   at all to lean on, so the edge alone identifies it. */
-.filter-clear { flex: 0 0 auto; min-height: 24px; padding: 0 .35rem; font-size: 12px; color: var(--muted); background: none; border: 1px solid var(--control-border); }
-.filter-clear:hover { color: var(--text); border-color: var(--accent); }
+/* RFC-099 §1: `.icon-btn` (03-components.css) gives this its own
+   appearance now (no border at rest - a neutral hover tint identifies
+   it instead); `.filter-clear` keeps its class, and `flex: 0 0 auto`,
+   only to identify and lay out the control. */
+.filter-clear { flex: 0 0 auto; }
 
 
 /* ── Explorer footer ── */

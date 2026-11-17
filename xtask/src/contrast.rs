@@ -188,8 +188,16 @@ const PAIRS: &[Pair] = &[
     Pair { label: "--accent on *Filter* pressed",       fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 8%, var(--surface-2))", assumed_over: None, min: TEXT_MIN, high_min: None },
     Pair { label: "--accent on the focused pane's path bar", fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 8%, var(--surface-2))", assumed_over: None, min: TEXT_MIN, high_min: None },
     // ── Solid token-on-token fills elsewhere in the app ──
-    Pair { label: "--text on --danger-bg (tab close, hover)", fg: "var(--text)",    bg: "var(--danger-bg)", assumed_over: None, min: TEXT_MIN, high_min: None },
     Pair { label: "--surface on --accent (*Compare*, hover)",  fg: "var(--surface)", bg: "var(--accent)",    assumed_over: None, min: TEXT_MIN, high_min: None },
+    // RFC-099 §1: `.icon-btn`'s own hover tint, not a token - mixed into
+    // `transparent`, so it needs the surfaces it's actually painted over
+    // named explicitly, the same shape as `.in-del`/`.in-ins` below. Every
+    // icon button sits on one of these three (the tab bar, at rest or
+    // selected; the search bar; every plain surface - the filter bar,
+    // Settings, the badges in §3).
+    Pair { label: "--text on .icon-btn:hover (--surface)",   fg: "var(--text)", bg: "color-mix(in srgb, var(--text) 14%, transparent)", assumed_over: Some("var(--surface)"),   min: TEXT_MIN, high_min: None },
+    Pair { label: "--text on .icon-btn:hover (--surface-2)", fg: "var(--text)", bg: "color-mix(in srgb, var(--text) 14%, transparent)", assumed_over: Some("var(--surface-2)"), min: TEXT_MIN, high_min: None },
+    Pair { label: "--text on .icon-btn:hover (--surface-3)", fg: "var(--text)", bg: "color-mix(in srgb, var(--text) 14%, transparent)", assumed_over: Some("var(--surface-3)"), min: TEXT_MIN, high_min: None },
     // ── Control edges (F215; not a `color:`/`background:` pairing, so
     // check 4 never requires these, but they still need their own 3:1 -
     // 4.5:1 under High, RFC-097 stage 2 §2.2) ──
@@ -701,7 +709,7 @@ mod tests {
             "{selector} {{ --surface: #000000; --surface-2: #000000; --surface-3: #101010; \
              --text: #ffffff; --muted: #ffffff; --muted-standard: #ffffff; --accent: #111111; \
              --warn: #ffffff; --ok: #ffffff; --err: #ffffff; --control-border: #ffffff; \
-             --del-bg: #000000; --ins-bg: #000000; --rep-bg: #000000; --danger-bg: #000000; \
+             --del-bg: #000000; --ins-bg: #000000; --rep-bg: #000000; \
              --del-mark: #ffffff; --ins-mark: #ffffff; --rep-mark: #ffffff; }}\n"
         )
     }

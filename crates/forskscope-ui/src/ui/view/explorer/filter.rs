@@ -85,14 +85,15 @@ pub fn FilterBar(
                 }
                 if !filter_query.read().is_empty() || *filter_hide_bin.read() || *filter_hide_eq.read() {
                     button {
-                        class: "filter-clear",
+                        class: "filter-clear icon-btn",
                         title: t(lang, "Clear filter"),
+                        aria_label: t(lang, "Clear filter"),
                         onclick: move |_| {
                             filter_query.set(String::new());
                             filter_hide_bin.set(false);
                             filter_hide_eq.set(false);
                         },
-                        "✕"
+                        "×"
                     }
                 }
             }

@@ -457,4 +457,6 @@
   opacity: 1; color: var(--muted-standard);
   border-color: var(--control-border); border-style: dashed;
 }
-.search-close { padding: .1rem .4rem; font-size: 14px; cursor: pointer; }
+/* RFC-099 §1: `.icon-btn` (03-components.css) gives this its own
+   appearance now; `.search-close` keeps its class only to identify the
+   control. */

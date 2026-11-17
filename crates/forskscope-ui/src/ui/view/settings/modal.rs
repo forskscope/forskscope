@@ -433,8 +433,9 @@ pub fn SettingsModal() -> Element {
                                     }
                                     if !p.built_in {
                                         button {
-                                            class: "profile-delete",
+                                            class: "profile-delete icon-btn",
                                             title: t(lang, "Delete profile"),
+                                            aria_label: t(lang, "Delete profile"),
                                             onclick: move |_| crate::state::remove_profile(&mut store, i),
                                             "×"
                                         }

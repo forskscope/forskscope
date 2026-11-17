@@ -200,7 +200,7 @@ fn FileTabItem(
             },
             close_button: rsx! {
                 button {
-                    class: "tab-close",
+                    class: "tab-close icon-btn",
                     tabindex: "-1",
                     // RFC-087 §1: "stay mouse-only" - see `TabItem`'s own
                     // doc comment for why this button is a sibling of the
@@ -461,7 +461,7 @@ fn DirTabItem(
             },
             close_button: rsx! {
                 button {
-                    class: "tab-close",
+                    class: "tab-close icon-btn",
                     tabindex: "-1",
                     // RFC-087 §1 / see `TabItem`'s doc comment.
                     aria_hidden: "true",

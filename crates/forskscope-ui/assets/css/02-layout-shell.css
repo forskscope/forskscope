@@ -134,18 +134,27 @@ select option { background: var(--surface); color: var(--text); }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
   padding: .35rem .5rem .35rem .6rem; user-select: none;
   display: flex; align-items: center; gap: .25rem;
+  /* RFC-099 §1's own icon-btn change (review 216 §5) removed the bigger
+     of two independent overflow sources in `.tab-slot` (36px tall, from
+     the general `button` rule's own `min-height`); this is the other
+     one, found live measuring the first - this rule's own default
+     ("normal") line-height, about 17px at 14px font, plus its own
+     11.2px of vertical padding, needs ~28px, still over the 23.6px
+     `.tab-slot`'s own 2.2rem height leaves for content once its border
+     and padding are subtracted. `line-height: 1` (the same fix already
+     applied to `.icon-btn`) brings a 14px line box down to 14px. */
+  line-height: 1;
 }
 /* RFC-097 stage 3 §3: full strength on every tab, always - revealed by
    state (there is none to reveal by here; it's simply always relevant),
    never by pointer. The hover/active-only opacity this used to carry is
    gone; only the hover background (below) still changes on hover. */
-/* RFC-097 stage 3 §5: measured at 22px wide (live capture, 100%,
-   1000x700) - under the 24px floor by 2px now that it's shown at full
-   strength on every tab, not just a hover-only nicety. `.35rem` ->
-   `.45rem` horizontal padding clears it (measured 25px after, same
-   method). */
-.tab-close { padding: .15rem .45rem; font-size: 14px; border-radius: 4px; flex-shrink: 0; }
-.tab-close:hover { background: var(--danger-bg); }
+/* RFC-097 stage 3 §5's own 24px floor, and RFC-099 §1's own borderless,
+   non-"danger-red" style, both now live on `.icon-btn` - `.tab-close`
+   keeps its class only to identify the control (and as the selector
+   RFC-087's own `aria-hidden`/`tabindex="-1"` doc comments reference),
+   never for its own appearance. */
+.tab-close { flex-shrink: 0; }
 .dirty-dot { color: var(--warn); font-size: 10px; line-height: 1; }
 .tab-loading-spinner { display: inline-block; font-size: 10px; animation: spin 1.2s linear infinite; }
 

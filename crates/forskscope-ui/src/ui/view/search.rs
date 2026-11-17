@@ -122,7 +122,7 @@ pub fn SearchBar() -> Element {
             }
 
             button {
-                class: "search-close",
+                class: "search-close icon-btn",
                 "aria-label": t(lang, "Close search bar"),
                 onclick: move |_| {
                     let mut c = ctx.write();

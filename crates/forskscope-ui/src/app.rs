@@ -220,6 +220,32 @@ pub fn App() -> Element {
         }
     }
 
+    // RFC-099 §2: the window's own title bar (and on Linux, any other
+    // GTK-drawn chrome) follows ForskScope's own resolved theme, not only
+    // the desktop's — same guarded-write shape as the zoom level above,
+    // for the same reason (applies on the very first render as well as
+    // every later change, with no dependency on an effect ever flushing).
+    // `None` as the sentinel, not a `Theme` value: tao's own `set_theme`
+    // takes `Option<tao::window::Theme>`, and passing `None` to *it* means
+    // "follow the OS" (and is read as light on Linux regardless of the
+    // desktop's own dark setting — the RFC's own explicit warning) — a
+    // different thing entirely from this guard's own "never applied yet".
+    let last_window_theme = use_hook(|| {
+        std::rc::Rc::new(std::cell::RefCell::new(
+            None::<dioxus_desktop::tao::window::Theme>,
+        ))
+    });
+    {
+        let resolved = crate::state::settings::resolved_tao_theme(
+            store.settings.read().theme,
+            *store.system_color_scheme.read(),
+        );
+        if *last_window_theme.borrow() != Some(resolved) {
+            desktop.window.set_theme(Some(resolved));
+            *last_window_theme.borrow_mut() = Some(resolved);
+        }
+    }
+
     // RFC-097 stage 2 §2.1: Theme::System resolves through the live OS
     // reading (Windows/Linux only — see the onmounted tasks below), never
     // through a context-free class.
