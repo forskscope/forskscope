@@ -7,7 +7,8 @@ the same day.
 with both open questions decided as proposed (§Decisions).
 **Amended.** 2026-11-17 by the architect (review 216): a seventh check,
 label placement, so F217's shape is caught; and the matrix measured per
-check, on the axes each depends on.
+check, on the axes each depends on. Review 217 added an eighth, nothing
+covers an open dialog, after F225.
 **Scheduling.** The first handoff of the `0.199.0` cycle (handoff 101). It is tooling, not a product feature, so it
 needs no release of its own. The checks start gating `main` as soon as they
 land.
@@ -116,6 +117,7 @@ Inside the page, for every element of the view:
 | **Rendered contrast** | each text node's computed `color` against its effective background, walking up the tree and compositing `color-mix` and opacity as rendered: 4.5:1 (7:1 under *High*), 3:1 for control edges | the `contrast` gate's own exemptions (disabled controls; under *High*, their own 3:1 floor) |
 | **Text size** | computed `font-size` below 12 px at text size 100 % | the `contrast` gate's non-text glyph list |
 | **Label placement** (added 2026-11-17, review 216) | a labelled region's *visible* label isn't over that region: no horizontal overlap, or below the region's top, or another labelled region in between | none |
+| **Nothing covers an open dialog** (added 2026-11-17, review 217) | with a dialog open, a point sampled inside the dialog's box hits an element that isn't the dialog or its descendant (`elementFromPoint` over a grid) | none |
 
 **Every allowance is a named entry with its reason.** A new one is a review
 decision, as with the existing gates' allowlists.
