@@ -161,7 +161,7 @@ pub fn App() -> Element {
     // Windows-only block above it).
     #[cfg(feature = "layout-probe")]
     use_hook(|| {
-        crate::layout_probe::maybe_start(store);
+        crate::layout_probe::maybe_start(store, desktop.clone());
     });
     // `Rc<RefCell<_>>`, not a bare `RefCell<_>`: `use_hook` clones its
     // stored value on every call (its `State: Clone` bound), and cloning a

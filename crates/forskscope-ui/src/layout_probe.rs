@@ -31,10 +31,12 @@
 //! [`PLAN_ENV_VAR`] names a JSON file (its path, not its content — kept
 //! out of the environment's own size limits and easy to inspect/diff as
 //! a CI artifact). See [`Plan`] for the exact shape. The window size is
-//! deliberately not a plan field: the RFC's own design sets it once, at
-//! launch, through the real OS window geometry (the driver's job, not
-//! this module's) — "one app run per window size" is what keeps the
-//! matrix from paying a process launch for every combination.
+//! set once, in process, before the matrix starts (review 216 §4:
+//! through the same [`dioxus_desktop::DesktopContext`] `app.rs` already
+//! holds for the window title and the zoom level, not by an external
+//! driver resizing the real OS window after launch) — "one app run per
+//! window size" is what keeps the matrix from paying a process launch
+//! for every combination.
 //!
 //! ## Settle condition
 //!
@@ -110,8 +112,11 @@ pub struct Plan {
     pub text_sizes: Vec<u32>,
     /// `"en"` / `"ja"`, mapped to [`Lang`] by [`parse_lang`].
     pub languages: Vec<String>,
-    /// Recorded into every [`ResultRow`] for traceability; this module
-    /// never acts on it; the driver sets the real window size at launch.
+    /// `"WxH"` in logical pixels (e.g. `"1000x700"`), applied once via
+    /// [`dioxus_desktop::DesktopContext::window`]'s own `set_inner_size`
+    /// before the first view opens, and recorded into every
+    /// [`ResultRow`] for traceability. `None` leaves the window at
+    /// whatever size it already launched with.
     #[serde(default)]
     pub window_size: Option<String>,
 }
@@ -213,6 +218,14 @@ pub struct ResultRow {
     /// view resettling on every push is a layout-check design question
     /// for stage B, not a per-measurement cost.
     pub probe_ms: f64,
+    /// How many times [`retry_recv`] had to re-issue the real measurement
+    /// eval after `EvalError::Finished` before one came back (0 means
+    /// the first attempt succeeded). See `retry_recv`'s own doc comment
+    /// for the mechanism; surfaced here, not just logged, so a report
+    /// reading [`Plan::results_path`] can see exactly how often the race
+    /// bit and be honest about it rather than a silent retry hiding it.
+    #[serde(default)]
+    pub recv_retries: u32,
     /// Boxes with content wider/taller than themselves, excluding:
     /// - any element whose own computed `overflow-x`/`overflow-y` is
     ///   `auto` or `scroll` (a real scroll owner, not a defect — the
@@ -247,18 +260,38 @@ fn parse_lang(s: &str) -> Lang {
     }
 }
 
+/// Parses a plan's own `"WxH"` window size into logical pixels. `None`
+/// on anything else, rather than a default — a malformed plan value
+/// should be reported (`run`'s own caller does), not silently measured
+/// against the wrong size.
+fn parse_window_size(s: &str) -> Option<(f64, f64)> {
+    let (w, h) = s.split_once('x')?;
+    Some((w.trim().parse().ok()?, h.trim().parse().ok()?))
+}
+
 /// Starts the probe if [`PLAN_ENV_VAR`] is set to a readable plan file;
 /// otherwise does nothing, so a normal `layout-probe` build with the
 /// variable unset behaves exactly like a build without the feature at
 /// all. Called once from `app.rs`'s own startup `use_hook`, after the
 /// window exists (the probe's own navigation and the measurement script
 /// both need a live page).
-pub fn maybe_start(store: Store) {
+pub fn maybe_start(store: Store, desktop: dioxus_desktop::DesktopContext) {
     let Ok(plan_path) = std::env::var(PLAN_ENV_VAR) else {
         return;
     };
-    spawn(async move {
-        run(store, PathBuf::from(plan_path)).await;
+    // `spawn_forever`, not `spawn` (review 216 §4; the same F208 shape
+    // `keyboard::focus_handle` and `state::compare` already found): a
+    // plain `spawn` ties this task to whichever component scope is
+    // current at the moment it's called, and the probe's own loop calls
+    // `store.modal.set` to open and close views as it goes - once a view
+    // it opened unmounts, a `spawn`-ed task following it is dropped
+    // mid-combination, which is the intermittent "eval did not return:
+    // Finished" the stage A reply reported honestly rather than hid.
+    // `spawn_forever` runs detached, at `ScopeId(0)` (`Store::new`'s own
+    // doc comment), so no view opening or closing anywhere in the plan
+    // can ever tear down the probe's own task.
+    dioxus_core::spawn_forever(async move {
+        run(store, desktop, PathBuf::from(plan_path)).await;
         // A probe run has nothing left to do once its matrix is measured;
         // there is no interactive session to hand control back to, unlike
         // every normal launch. `main()`'s own `atexit` cleanup (removing
@@ -268,7 +301,7 @@ pub fn maybe_start(store: Store) {
     });
 }
 
-async fn run(mut store: Store, plan_path: PathBuf) {
+async fn run(mut store: Store, desktop: dioxus_desktop::DesktopContext, plan_path: PathBuf) {
     let plan: Plan = match std::fs::read_to_string(&plan_path) {
         Ok(raw) => match serde_json::from_str(&raw) {
             Ok(plan) => plan,
@@ -282,6 +315,17 @@ async fn run(mut store: Store, plan_path: PathBuf) {
             return;
         }
     };
+
+    if let Some(size) = &plan.window_size {
+        match parse_window_size(size) {
+            Some((w, h)) => desktop
+                .window
+                .set_inner_size(dioxus_desktop::tao::dpi::LogicalSize::new(w, h)),
+            None => eprintln!(
+                "layout-probe: window_size {size:?} is not \"WxH\" - window left at its launch size"
+            ),
+        }
+    }
 
     let mut results_file = match std::fs::File::create(&plan.results_path) {
         Ok(f) => f,
@@ -354,13 +398,12 @@ async fn measure_one(
     // mutates asynchronously - a zoom level change in particular, applied
     // via `wry`'s own `set_zoom_level` rather than a DOM mutation the
     // settle wait's `MutationObserver` would otherwise never see).
-    let _ = dioxus::document::eval("true").await;
+    retry_eval_true().await;
     let start = std::time::Instant::now();
     let script = measurement_script(view.ready_selector());
-    let mut eval = dioxus::document::eval(&script);
-    let raw: String = match eval.recv().await {
-        Ok(raw) => raw,
-        Err(e) => {
+    let (raw, recv_retries) = match retry_recv(&script).await {
+        Ok(r) => r,
+        Err((e, recv_retries)) => {
             return ResultRow {
                 view: view.name().to_string(),
                 text_size,
@@ -369,6 +412,7 @@ async fn measure_one(
                 settled: false,
                 settle_ms: 0.0,
                 probe_ms: start.elapsed().as_secs_f64() * 1000.0,
+                recv_retries,
                 overflow: Vec::new(),
                 clipped: Vec::new(),
                 error: Some(format!("eval did not return: {e:?}")),
@@ -385,6 +429,7 @@ async fn measure_one(
             settled: m.settled,
             settle_ms: m.settle_ms,
             probe_ms,
+            recv_retries,
             overflow: m.overflow,
             clipped: m.clipped,
             error: m.error,
@@ -397,11 +442,70 @@ async fn measure_one(
             settled: false,
             settle_ms: 0.0,
             probe_ms,
+            recv_retries,
             overflow: Vec::new(),
             clipped: Vec::new(),
             error: Some(format!("could not parse measurement JSON {raw:?}: {e}")),
         },
     }
+}
+
+/// How many times [`retry_recv`] (and the throwaway tick before it) will
+/// re-issue a fresh `document::eval` after `EvalError::Finished` before
+/// giving up. See [`retry_recv`]'s own doc comment for why a retry, not a
+/// one-line fix, is the right shape here.
+const RECV_RETRIES: u32 = 5;
+
+/// The guaranteed-first-tick throwaway eval `measure_one`'s own doc
+/// comment describes, retried the same way [`retry_recv`] is - see that
+/// function's doc comment for why. Its own result is never read either
+/// way, only whether a round trip happened at all.
+async fn retry_eval_true() {
+    for attempt in 0..=RECV_RETRIES {
+        if dioxus::document::eval("true").await.is_ok() {
+            return;
+        }
+        if attempt < RECV_RETRIES {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    }
+}
+
+/// Issues `script` as a fresh `document::eval` and awaits its result,
+/// retrying from scratch (a new `Eval`, since a failed one's own
+/// `GenerationalBox` is gone) up to [`RECV_RETRIES`] times on
+/// `EvalError::Finished` specifically.
+///
+/// Found live (stage B reliability work, review 216 §4): `Finished` means
+/// `dioxus_document::Eval`'s own backing `GenerationalBox` - owned by a
+/// fresh, scope-independent `generational_box::Owner` created per query,
+/// never by the Dioxus component scope the `spawn_forever` fix already
+/// ruled out - has already been invalidated by the time this code tries
+/// to read it. Tracing `dioxus-desktop`'s own `native_eval.js`: the
+/// per-query JS channel object's cleanup IPC message
+/// (`QueryResultData::Drop`, which drops that `Owner`) is posted from a
+/// `window.FinalizationRegistry` callback - fired whenever the JS engine
+/// happens to garbage-collect that now-unreferenced object, with no
+/// guaranteed ordering against this code's own poll of the result. A
+/// script run many times in a row, as this probe's own loop does, makes
+/// that collection more likely to land mid-measurement than a page that
+/// evals rarely. There is no single-line fix for *when* a JS engine
+/// decides to collect garbage; retrying with a fresh query is the
+/// resilient shape until or unless `dioxus_document`/`dioxus-desktop`
+/// close this race upstream.
+async fn retry_recv(script: &str) -> Result<(String, u32), (dioxus::document::EvalError, u32)> {
+    let mut last_err = None;
+    for attempt in 0..=RECV_RETRIES {
+        let mut eval = dioxus::document::eval(script);
+        match eval.recv().await {
+            Ok(raw) => return Ok((raw, attempt)),
+            Err(e) => last_err = Some(e),
+        }
+        if attempt < RECV_RETRIES {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    }
+    Err((last_err.expect("loop runs at least once"), RECV_RETRIES))
 }
 
 #[derive(Debug, Deserialize)]
@@ -559,6 +663,15 @@ mod tests {
         assert_eq!(parse_lang("en"), Lang::En);
         assert_eq!(parse_lang("ja"), Lang::Ja);
         assert_eq!(parse_lang("xx"), Lang::En);
+    }
+
+    #[test]
+    fn parse_window_size_reads_w_x_h_and_rejects_the_rest() {
+        assert_eq!(parse_window_size("1000x700"), Some((1000.0, 700.0)));
+        assert_eq!(parse_window_size(" 800 x 560 "), Some((800.0, 560.0)));
+        assert_eq!(parse_window_size("1000"), None);
+        assert_eq!(parse_window_size("1000x700x3"), None);
+        assert_eq!(parse_window_size("widexhigh"), None);
     }
 
     #[test]

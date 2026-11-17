@@ -20,11 +20,11 @@ use std::time::{Duration, Instant};
 
 /// The RFC's own matrix (§3), minus the colour axes this one check
 /// doesn't need (neither overflow nor clipped text depends on colour).
-const DEFAULT_WINDOWS: &[(&str, u32, u32)] = &[
-    ("1000x700", 1000, 700),
-    ("800x560", 800, 560),
-    ("1366x768", 1366, 768),
-];
+/// `"WxH"`, read back by the probe itself (`layout_probe::parse_window_size`);
+/// the driver no longer parses or applies these numbers itself, since
+/// review 216 §4 moved the resize in process, through the desktop
+/// context, rather than an external resize after launch.
+const DEFAULT_WINDOWS: &[&str] = &["1000x700", "800x560", "1366x768"];
 const DEFAULT_TEXT_SIZES: &[u32] = &[100, 125, 150, 175, 200];
 const DEFAULT_LANGUAGES: &[&str] = &["en", "ja"];
 
@@ -34,6 +34,13 @@ pub struct RunOptions {
 }
 
 pub fn run(root: &Path, opts: &RunOptions) {
+    // Review 216 §4: "every run starts empty" - a stale prior run's own
+    // data dirs (tabs accumulated on disk) must never carry forward, not
+    // just between window sizes within one run (handled per-window
+    // below already) but across separate invocations at the same
+    // `--out-dir`, which is exactly the shape that hid F218 on a first
+    // retroactive-proof attempt.
+    let _ = fs::remove_dir_all(&opts.out_dir);
     fs::create_dir_all(&opts.out_dir)
         .unwrap_or_else(|e| panic!("cannot create {}: {e}", opts.out_dir.display()));
 
@@ -51,11 +58,10 @@ pub fn run(root: &Path, opts: &RunOptions) {
     let mut all_rows: Vec<serde_json::Value> = Vec::new();
     let mut per_window_ms: Vec<(String, u128)> = Vec::new();
 
-    for &(window_label, w, h) in DEFAULT_WINDOWS {
+    for &window_label in DEFAULT_WINDOWS {
         let plan_path = opts.out_dir.join(format!("plan-{window_label}.json"));
         let results_path = opts.out_dir.join(format!("results-{window_label}.jsonl"));
         let data_dir = opts.out_dir.join(format!("data-{window_label}"));
-        let _ = fs::remove_dir_all(&data_dir); // F57-style: never a stale prior run's tabs.
 
         write_plan(
             &plan_path,
@@ -67,8 +73,8 @@ pub fn run(root: &Path, opts: &RunOptions) {
             window_label,
         );
 
-        println!("layout-check: running window {window_label} ({w}x{h})...");
-        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir, w, h);
+        println!("layout-check: running window {window_label}...");
+        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir);
         per_window_ms.push((window_label.to_string(), elapsed.as_millis()));
 
         for row in read_jsonl(&results_path) {
@@ -218,12 +224,13 @@ fn write_plan(
 // ── Launch ───────────────────────────────────────────────────────────────
 
 /// Launches `bin` with the plan env var set and an isolated `--data-dir`/
-/// XDG set, resizes its window to `w`x`h` if a `DISPLAY` exists (CI's own
-/// `xvfb-run`, or a nested session locally), and waits for it to exit -
-/// the probe calls `std::process::exit(0)` itself once its own matrix is
-/// measured, so this never sends a signal on the success path. Returns
-/// the wall-clock time from launch to exit.
-fn launch_and_wait(bin: &Path, plan_path: &Path, data_dir: &Path, w: u32, h: u32) -> Duration {
+/// XDG set, and waits for it to exit - the probe calls
+/// `std::process::exit(0)` itself once its own matrix is measured, so
+/// this never sends a signal on the success path. The window size comes
+/// from the plan itself, applied in process (review 216 §4) - no
+/// external resize step, no `xdotool` dependency, no `DISPLAY` check.
+/// Returns the wall-clock time from launch to exit.
+fn launch_and_wait(bin: &Path, plan_path: &Path, data_dir: &Path) -> Duration {
     fs::create_dir_all(data_dir.join("xdg/config")).unwrap();
     fs::create_dir_all(data_dir.join("xdg/state")).unwrap();
     fs::create_dir_all(data_dir.join("xdg/cache")).unwrap();
@@ -249,14 +256,6 @@ fn launch_and_wait(bin: &Path, plan_path: &Path, data_dir: &Path, w: u32, h: u32
         .spawn()
         .expect("failed to launch forskscope");
 
-    if std::env::var("DISPLAY").is_ok() {
-        resize_via_xdotool(&child, w, h);
-    } else {
-        eprintln!(
-            "layout-check: DISPLAY not set - window stays at its own default size, not {w}x{h}"
-        );
-    }
-
     let timeout = Duration::from_secs(60);
     let exited = wait_with_timeout(&mut child, timeout);
     if !exited {
@@ -269,43 +268,6 @@ fn launch_and_wait(bin: &Path, plan_path: &Path, data_dir: &Path, w: u32, h: u32
         let _ = child.wait();
     }
     start.elapsed()
-}
-
-/// Best-effort: polls for the launched process's own window for up to 5s,
-/// then asks the X server to resize it directly - verified live (handoff
-/// 101 §Stage A) to work with **no window manager running at all**: a
-/// bare `xdotool windowsize` resize request reaches the window over core
-/// X11 regardless of whether anything is managing it, which is exactly
-/// `xvfb-run`'s own shape (a virtual framebuffer, no window manager).
-fn resize_via_xdotool(child: &Child, w: u32, h: u32) {
-    let pid = child.id().to_string();
-    let mut win_id = None;
-    for _ in 0..25 {
-        let out = Command::new("xdotool")
-            .args(["search", "--pid", &pid, "--onlyvisible"])
-            .output();
-        if let Ok(out) = out
-            && out.status.success()
-        {
-            let id = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !id.is_empty() {
-                win_id = Some(id);
-                break;
-            }
-        }
-        std::thread::sleep(Duration::from_millis(200));
-    }
-    let Some(win_id) = win_id else {
-        eprintln!("layout-check: could not find forskscope's own window to resize (pid {pid})");
-        return;
-    };
-    let status = Command::new("xdotool")
-        .args(["windowsize", &win_id, &w.to_string(), &h.to_string()])
-        .status();
-    match status {
-        Ok(s) if s.success() => {}
-        other => eprintln!("layout-check: xdotool windowsize failed: {other:?}"),
-    }
 }
 
 fn wait_with_timeout(child: &mut Child, timeout: Duration) -> bool {
