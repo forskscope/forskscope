@@ -99,11 +99,20 @@ fn IgnoreListField(
                     oninput: {
                         let csv = csv.clone();
                         move |e: Event<FormData>| {
-                            // Review 218 §3: cleared on every keystroke, not
-                            // only a successful add — "Already in the list"
-                            // describes the text as typed a moment ago, not
-                            // the text now being changed.
+                            // Review 218 §3 / review 219 §2: cleared on
+                            // every keystroke, not only a successful add —
+                            // "Already in the list" describes the text as
+                            // typed a moment ago, not the text now being
+                            // changed. `live_message` goes with it:
+                            // without this, typing the same duplicate
+                            // twice in a row (with at least one keystroke
+                            // of its own between them, as retyping the
+                            // same text always has) left the live
+                            // region's text unchanged the second time,
+                            // so there was nothing to announce as a
+                            // change.
                             duplicate_notice.set(false);
+                            live_message.set(String::new());
                             let value = e.value();
                             if value.contains(',') {
                                 try_add(value, csv.clone());
@@ -785,6 +794,124 @@ mod tests {
             live_region_text_after_add.as_deref(),
             Some("Added: tmp, log"),
             "the live region must hold the real announcement after a real add, got {after_add:?}"
+        );
+    }
+
+    /// Review 219 §2: typing the same duplicate twice left the live
+    /// region's own text unchanged the second time ("Already in the
+    /// list" both times), so there was nothing for a screen reader to
+    /// announce as a change. `oninput` now clears `live_message` (not
+    /// only `duplicate_notice`) on every keystroke, so retyping the same
+    /// text — at least one keystroke of its own, every real retype has
+    /// one — commits the clear in its own render before the repeated
+    /// add's own render sets the message again. Falsify by reverting
+    /// that one line: the second `SetText` assertion below finds none
+    /// (the signal's value never actually changes from the first
+    /// duplicate's, so Dioxus emits no mutation for it).
+    ///
+    /// Scope: this covers retyping, the realistic path (every `onblur`/
+    /// `onkeydown` add is already preceded by an `oninput` of its own,
+    /// which is where the clear lives). It does *not* cover two whole-
+    /// string `oninput` events back to back with no keystroke between
+    /// them (e.g. two full pastes) — the clear and the re-set then both
+    /// land in the one render Dioxus coalesces, so the net value never
+    /// changes and nothing is announced the second time. Found and left
+    /// open; narrow enough, and distant enough from how a person
+    /// actually types, not to hold up this fix.
+    #[test]
+    fn the_ignore_list_live_region_announces_a_repeated_duplicate() {
+        use dioxus::html::{PlatformEventData, SerializedFormData};
+        use std::any::Any;
+        use std::rc::Rc;
+
+        set_event_converter(Box::new(dioxus::html::SerializedHtmlEventConverter));
+
+        fn root() -> Element {
+            // Seeded with "tmp" already in the list, so every add below is
+            // a duplicate from the first one.
+            let csv = use_signal(|| "tmp".to_string());
+            rsx! {
+                IgnoreListField {
+                    lang: Lang::En,
+                    label: "Ignore file extensions".to_string(),
+                    label_id: "test-ignore-extensions".to_string(),
+                    placeholder: "Add an extension".to_string(),
+                    kind: IgnoreListKind::Extension,
+                    csv: csv.read().clone(),
+                    on_change: move |v: String| csv.clone().set(v),
+                }
+            }
+        }
+
+        let mut dom = VirtualDom::new(root);
+        let first = dom.rebuild_to_vec();
+        let live_region_text_id = first
+            .edits
+            .iter()
+            .find_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, id } if value.is_empty() => {
+                    Some(*id)
+                }
+                _ => None,
+            })
+            .expect("the live region's own empty text node must exist at first mount");
+        let input_id = first
+            .edits
+            .iter()
+            .find_map(|m| match m {
+                dioxus_core::Mutation::NewEventListener { name, id } if name == "input" => {
+                    Some(*id)
+                }
+                _ => None,
+            })
+            .expect("the input must register an oninput listener");
+
+        // Each keystroke is its own `input` event, as a real browser sends
+        // them — "t", "tm", "tmp", "tmp," — not one event with the whole
+        // string, so the clear-then-set each do happen in their own render.
+        let mut send = |value: &str| {
+            let event = Event::new(
+                Rc::new(PlatformEventData::new(Box::new(SerializedFormData::new(
+                    value.to_string(),
+                    Vec::new(),
+                )))) as Rc<dyn Any>,
+                true,
+            );
+            dom.runtime().handle_event("input", event, input_id);
+            dom.render_immediate_to_vec()
+        };
+
+        for partial in ["t", "tm", "tmp"] {
+            send(partial);
+        }
+        let after_first_duplicate = send("tmp,");
+        let first_text = after_first_duplicate.edits.iter().find_map(|m| match m {
+            dioxus_core::Mutation::SetText { value, id } if *id == live_region_text_id => {
+                Some(value.clone())
+            }
+            _ => None,
+        });
+        assert_eq!(
+            first_text.as_deref(),
+            Some("Already in the list"),
+            "the first duplicate must announce, got {after_first_duplicate:?}"
+        );
+
+        for partial in ["t", "tm", "tmp"] {
+            send(partial);
+        }
+        let after_second_duplicate = send("tmp,");
+        let second_text = after_second_duplicate.edits.iter().find_map(|m| match m {
+            dioxus_core::Mutation::SetText { value, id } if *id == live_region_text_id => {
+                Some(value.clone())
+            }
+            _ => None,
+        });
+        assert_eq!(
+            second_text.as_deref(),
+            Some("Already in the list"),
+            "the second, repeated duplicate must announce too (a real SetText \
+             mutation, not just an unchanged value), got {after_second_duplicate:?}"
         );
     }
 }
