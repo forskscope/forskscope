@@ -283,3 +283,44 @@ jobs:
 
       - name: cargo build (UI — ensures it compiles)
         run: cargo build -p forskscope
+
+  layout-check:
+    # RFC-098: every check, every view, on every push and pull request -
+    # the layout-checks axis group (text size x language x window x
+    # view, one colour setting) and the rendered-contrast axis group
+    # (theme x colour vision x contrast x view, two layouts), both
+    # inside `cargo xtask layout-check` itself (`xtask/src/layout_check.rs`
+    # decides the matrix, not this file). Measured, review 216 §2's own
+    # budget: under five minutes of CI time per push, which the real
+    # run (debug build, no `--release`: compiling is the dominant cost
+    # here, not the ~150ms per measurement the matrix itself pays) keeps
+    # with margin. A separate job, not a step in `test` above: its own
+    # timing is what review 216 §2 asked to see reported, not folded
+    # into the lint job's own total.
+    name: Layout checks (RFC-098)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install system dependencies (WebKitGTK, GTK3, a virtual display, fonts)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            pkg-config libssl-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev \
+            xvfb dbus-x11 fonts-noto-core fonts-noto-cjk
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-layout-check-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-layout-check-cargo-
+
+      - name: cargo xtask layout-check
+        run: xvfb-run --auto-servernum dbus-run-session -- cargo xtask layout-check

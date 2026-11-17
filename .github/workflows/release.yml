@@ -176,6 +176,21 @@ jobs:
             exit 1
           fi
 
+      # RFC-098 §"The probe": `layout_probe` is a test-only, in-process
+      # measurement harness built only with the `layout-probe` Cargo
+      # feature, off by default - this is the check on what the linker
+      # actually produced for *this* job's own build (no `--features`
+      # given above), the same reasoning as the show_to_person check
+      # just above. Falsify by adding `--features layout-probe` to the
+      # build step above: this check then fails, since the marker
+      # string is compiled in.
+      - name: Release binary never contains the layout-probe harness (RFC-098)
+        run: |
+          if strings target/release/forskscope | grep -qF FORSKSCOPE_LAYOUT_PROBE_PLAN; then
+            echo "::error::target/release/forskscope contains FORSKSCOPE_LAYOUT_PROBE_PLAN - the layout-probe feature must never be built into a release"
+            exit 1
+          fi
+
       # F179/F180: the graph check in `cargo xtask audit-deps` reports what
       # Cargo intends; this reports what the linker actually produced
       # (review 151's lesson - a check on a copy is not a check on the
