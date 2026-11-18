@@ -772,10 +772,158 @@ fn read_jsonl(path: &Path) -> Vec<serde_json::Value> {
 
 // ── Report ───────────────────────────────────────────────────────────────
 
+/// One triaged, unfixed finding (review 221 §3's own decision) that
+/// the gate must not fail the build over, matched by check kind and
+/// the element's own description with its trailing `#<index>` cut off
+/// (the index shifts across builds and views; the tag and classes
+/// before it don't - confirmed by the seven-run determinism check
+/// this same reply's §2 also required). `view`, when set, narrows a
+/// match that would otherwise be ambiguous - F228's own bare `input`
+/// (no class of its own) only means one of its three checkboxes
+/// inside Settings' own hit-area list, at exactly their 12×12 box;
+/// `input.profile-radio` carries its own class and never collides.
+struct ExpectedFailure {
+    f_number: &'static str,
+    kind: &'static str,
+    view: Option<&'static str>,
+    element_base: &'static str,
+    detail_contains: Option<&'static str>,
+}
+
+/// Review 221 §3's own decided triage: four findings, registered
+/// (`ROADMAP.md`) and not yet fixed - the owner's scope call, not a
+/// probe decision. Each stays on this list exactly as long as the
+/// finding itself does; removing the fix removes the finding, and
+/// `report`'s own "an expected failure stopped happening" check (not
+/// this list - a gate silently drifting out of date would defeat the
+/// entire point of naming them) then requires removing the entry too.
+const EXPECTED_FAILURES: &[ExpectedFailure] = &[
+    ExpectedFailure {
+        f_number: "F227",
+        kind: "hit_area",
+        view: None,
+        element_base: "button.bc-root",
+        detail_contains: None,
+    },
+    ExpectedFailure {
+        f_number: "F227",
+        kind: "hit_area",
+        view: None,
+        element_base: "button.path-btn",
+        detail_contains: None,
+    },
+    ExpectedFailure {
+        f_number: "F227",
+        kind: "hit_area",
+        view: None,
+        element_base: "button.apply-btn",
+        detail_contains: None,
+    },
+    ExpectedFailure {
+        f_number: "F228",
+        kind: "hit_area",
+        view: Some("settings"),
+        element_base: "input",
+        detail_contains: Some("12.0x12.0px"),
+    },
+    ExpectedFailure {
+        f_number: "F229",
+        kind: "rendered_contrast",
+        view: None,
+        element_base: "span.stats",
+        detail_contains: None,
+    },
+    ExpectedFailure {
+        f_number: "F229",
+        kind: "rendered_contrast",
+        view: None,
+        element_base: "button.bc-seg",
+        detail_contains: None,
+    },
+    ExpectedFailure {
+        f_number: "F229",
+        kind: "rendered_contrast",
+        view: None,
+        element_base: "button.filter-btn.active",
+        detail_contains: None,
+    },
+    ExpectedFailure {
+        f_number: "F229",
+        kind: "rendered_contrast",
+        view: None,
+        element_base: "span.tree-status.status-equal",
+        detail_contains: None,
+    },
+    ExpectedFailure {
+        f_number: "F229",
+        kind: "rendered_contrast",
+        view: None,
+        element_base: "span.tree-status.status-different",
+        detail_contains: None,
+    },
+    ExpectedFailure {
+        f_number: "F229",
+        kind: "rendered_contrast",
+        view: None,
+        element_base: "span.status-key-glyph.status-equal",
+        detail_contains: None,
+    },
+    ExpectedFailure {
+        f_number: "F229",
+        kind: "rendered_contrast",
+        view: None,
+        element_base: "span.status-key-glyph.status-different",
+        detail_contains: None,
+    },
+    ExpectedFailure {
+        f_number: "F229",
+        kind: "rendered_contrast",
+        view: None,
+        element_base: "span.dir-status.status-different",
+        detail_contains: None,
+    },
+    ExpectedFailure {
+        f_number: "F230",
+        kind: "overflow",
+        view: None,
+        element_base: "div.explorer-footer",
+        detail_contains: None,
+    },
+    ExpectedFailure {
+        f_number: "F230",
+        kind: "overflow",
+        view: None,
+        element_base: "div.explorer-status-key",
+        detail_contains: None,
+    },
+];
+
+/// `"button.bc-root#18"` -> `"button.bc-root"` - the index past the
+/// last `#` is never part of an [`ExpectedFailure`]'s own match.
+fn element_base(element: &str) -> &str {
+    element.rsplit_once('#').map_or(element, |(base, _)| base)
+}
+
+fn matches_expected(
+    expected: &ExpectedFailure,
+    kind: &str,
+    view: &str,
+    element: &str,
+    detail: Option<&str>,
+) -> bool {
+    expected.kind == kind
+        && expected.view.is_none_or(|v| v == view)
+        && expected.element_base == element_base(element)
+        && expected
+            .detail_contains
+            .is_none_or(|needle| detail.is_some_and(|d| d.contains(needle)))
+}
+
 fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
     let mut failures = 0usize;
     let mut probe_ms_values: Vec<f64> = Vec::new();
     let mut total_recv_retries = 0u64;
+    let mut expected_seen = vec![false; EXPECTED_FAILURES.len()];
 
     for row in rows {
         let view = row.get("view").and_then(|v| v.as_str()).unwrap_or("?");
@@ -829,11 +977,29 @@ fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
         ] {
             if let Some(list) = row.get(kind).and_then(|v| v.as_array()) {
                 for finding in list {
-                    failures += 1;
-                    println!(
-                        "FAIL [{combo}] {kind}: {}",
-                        serde_json::to_string(finding).unwrap_or_default()
-                    );
+                    let element = finding
+                        .get("element")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let detail = finding.get("detail").and_then(|v| v.as_str());
+                    let matched = EXPECTED_FAILURES
+                        .iter()
+                        .enumerate()
+                        .find(|(_, e)| matches_expected(e, kind, view, element, detail));
+                    if let Some((idx, expected)) = matched {
+                        expected_seen[idx] = true;
+                        println!(
+                            "EXPECTED [{combo}] {kind} ({}): {}",
+                            expected.f_number,
+                            serde_json::to_string(finding).unwrap_or_default()
+                        );
+                    } else {
+                        failures += 1;
+                        println!(
+                            "FAIL [{combo}] {kind}: {}",
+                            serde_json::to_string(finding).unwrap_or_default()
+                        );
+                    }
                 }
             }
         }
@@ -844,6 +1010,27 @@ fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
             println!(
                 "FAIL [{combo}] toast_check: {}",
                 serde_json::to_string(toast).unwrap_or_default()
+            );
+        }
+    }
+
+    // Review 221 §3's own rule: "the gate fails if one stops failing" -
+    // an expected-failure list that can silently go stale would defeat
+    // the entire point of naming findings on it, so an entry nothing
+    // in this run ever matched is itself a failure, loud about exactly
+    // which F-number and why.
+    for (idx, expected) in EXPECTED_FAILURES.iter().enumerate() {
+        if !expected_seen[idx] {
+            failures += 1;
+            println!(
+                "FAIL: expected failure {} ({} {}{}) did not occur this run - remove it from EXPECTED_FAILURES",
+                expected.f_number,
+                expected.kind,
+                expected.element_base,
+                expected
+                    .view
+                    .map(|v| format!(", view {v}"))
+                    .unwrap_or_default()
             );
         }
     }
@@ -875,5 +1062,101 @@ fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
 
     if failures > 0 {
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn element_base_cuts_the_trailing_index_only() {
+        assert_eq!(element_base("button.bc-root#18"), "button.bc-root");
+        assert_eq!(element_base("input#48"), "input");
+        assert_eq!(element_base("div.a.b.c#1149"), "div.a.b.c");
+        // No `#` at all - nothing to cut.
+        assert_eq!(element_base("point(273,136)"), "point(273,136)");
+    }
+
+    #[test]
+    fn matches_expected_requires_kind_and_base_and_honours_view_and_detail() {
+        let f227 = &EXPECTED_FAILURES[0];
+        assert_eq!(f227.f_number, "F227");
+        assert!(matches_expected(
+            f227,
+            "hit_area",
+            "explorer",
+            "button.bc-root#18",
+            None
+        ));
+        // Wrong kind.
+        assert!(!matches_expected(
+            f227,
+            "overflow",
+            "explorer",
+            "button.bc-root#18",
+            None
+        ));
+        // Wrong base (a different control entirely).
+        assert!(!matches_expected(
+            f227,
+            "hit_area",
+            "explorer",
+            "button.path-btn#16",
+            None
+        ));
+
+        let f228 = EXPECTED_FAILURES
+            .iter()
+            .find(|e| e.f_number == "F228")
+            .expect("F228 is on the list");
+        assert_eq!(f228.view, Some("settings"));
+        assert!(matches_expected(
+            f228,
+            "hit_area",
+            "settings",
+            "input#48",
+            Some("12.0x12.0px, needs 24x24")
+        ));
+        // Right base, wrong view - F228 is Settings-only.
+        assert!(!matches_expected(
+            f228,
+            "hit_area",
+            "shortcuts",
+            "input#48",
+            Some("12.0x12.0px, needs 24x24")
+        ));
+        // Right base and view, but the wrong size - a different,
+        // untriaged bare `input` finding must not slip through as F228.
+        assert!(!matches_expected(
+            f228,
+            "hit_area",
+            "settings",
+            "input#48",
+            Some("18.0x18.0px, needs 24x24")
+        ));
+        // `input.profile-radio` carries its own class, so its own base
+        // never collides with F228's bare `input`.
+        assert!(!matches_expected(
+            f228,
+            "hit_area",
+            "settings",
+            "input.profile-radio#206",
+            Some("12.0x12.0px, needs 24x24")
+        ));
+    }
+
+    /// Every entry's own `f_number` is one of the four review 221 §3
+    /// actually decided - catches a typo or a fifth, undecided entry
+    /// added without a review to back it.
+    #[test]
+    fn every_expected_failure_names_a_decided_f_number() {
+        for e in EXPECTED_FAILURES {
+            assert!(
+                ["F227", "F228", "F229", "F230"].contains(&e.f_number),
+                "unexpected F-number on the list: {}",
+                e.f_number
+            );
+        }
     }
 }
