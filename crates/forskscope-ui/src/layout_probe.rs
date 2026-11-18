@@ -961,21 +961,20 @@ const INTERACTIVE_SELECTOR: &str = r#"button, [role="button"], a[href], input, s
 /// the page, and WebKitGTK's own `scrollWidth` exceeds `clientWidth`
 /// for plenty of those too).
 ///
-/// `.scrim`: review 220 §2's own "div.scrim overflow in every Settings
-/// combination" question, answered. `.scrim` (`03-components.css`) is
-/// `position: fixed; inset: 0; display: flex; align-items: center` with
-/// no `overflow` of its own at all — a flex-centering backdrop, not a
-/// scroll owner, and never meant to be one. `.modal` (F224's own fix)
-/// is the one that actually scrolls: confirmed live, Settings at
-/// 800×560/200%, `.modal`'s own `clientHeight` (167px) sits under its
-/// `max-height` (169px) exactly as F224 intended, while `.scrim`'s
-/// `scrollHeight` (817px) still reports `.modal`'s full, *unclipped*
-/// layout extent - a flex container's own `scrollHeight` reflects a
-/// clipped child's intrinsic content size, not its rendered, clipped
-/// one, a browser quirk this check has no way to tell apart from a
-/// real one short of this exact named case. Nothing paints outside
-/// either box; F224 does not reopen.
-const OVERFLOW_ALLOWLIST: &[&str] = &[".tablist", ".scrim"];
+/// Review 221 §2.2 refused a `.scrim` entry proposed here (reply
+/// 189b): it would have exempted exactly the regression F224 is about
+/// (a dialog taller than the window) rather than catching it.
+/// `.scrim`'s own `scrollHeight` reflecting `.modal`'s full, unclipped
+/// intrinsic size is real (confirmed live: a flex item's default
+/// `min-height: auto` means a flex parent's layout still accounts for
+/// its full content size even when the item's own `overflow-y: auto`
+/// correctly clips what's actually painted) - but nothing paints
+/// outside either box, so it names a measurement quirk, not a defect.
+/// F224's own property - the dialog's border box inside the viewport -
+/// is now checked directly instead, not through this allowlist-and-
+/// scroll-size mechanism at all (the dedicated check right before
+/// `dialog_occlusion`, below).
+const OVERFLOW_ALLOWLIST: &[&str] = &[".tablist"];
 
 /// Named selectors exempt from the hit-area 24×24 floor (WCAG 2.5.8's own
 /// spacing exception) — kept empty, a named list ready for the first
@@ -1039,7 +1038,34 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
       let last = performance.now();
       let lastWidth = document.documentElement.clientWidth;
       let lastHeight = document.documentElement.clientHeight;
-      const obs = new MutationObserver(() => {{ last = performance.now(); }});
+      // Review 221 §2.1's own lesson, found to extend past hit area:
+      // a text-size change applies as a native webview zoom level
+      // (`wry`'s own `set_zoom_level`), which isn't guaranteed to have
+      // actually reflowed the page by the time this script's own first
+      // tick runs, even though the Rust side already called it before
+      // this script was even sent - found live (a five-run determinism
+      // check after that fix): one run in several measured a Settings
+      // field at close to its 100% width while every other run already
+      // had it at 200%'s own narrower one, both window and text size
+      // otherwise identical. An `expectedVw`/`expectedVh` check
+      // (window size ÷ zoom) was tried and reverted: the system's own
+      // display scale factor (confirmed live, this sandbox: ~0.834,
+      // consistent across every text size, so a real factor, not
+      // noise) means `clientWidth` never equals that raw arithmetic at
+      // all, by a margin far past any reasonable tolerance - guessing
+      // the factor would be worse than not checking, since a wrong
+      // guess times out every run instead of flaking on a few. Kept
+      // scroll-position-independent and tolerant instead, the same
+      // shape as §2.1's own fix: requires *two* consecutive quiet
+      // windows before resolving, not one - a value that only looks
+      // settled because polling started after a fast transition
+      // already finished still passes a single window, but a
+      // transition still arriving late enough to beat the first
+      // window needs to then also sit still through a second one,
+      // which a value that's still conceptually "in flight" rarely
+      // does by coincidence.
+      let quietWindowsPassed = 0;
+      const obs = new MutationObserver(() => {{ last = performance.now(); quietWindowsPassed = 0; }});
       obs.observe(document.body, {{childList: true, subtree: true, attributes: true, characterData: true}});
       const deadline = performance.now() + timeoutMs;
       function tick() {{
@@ -1052,7 +1078,7 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
         const w = document.documentElement.clientWidth;
         const h = document.documentElement.clientHeight;
         if (w !== lastWidth || h !== lastHeight) {{
-          last = now; lastWidth = w; lastHeight = h;
+          last = now; lastWidth = w; lastHeight = h; quietWindowsPassed = 0;
         }}
         // The view's own navigation call (`open_compare`/`modal.set`) is
         // a signal write too, same as text-size/language - a render it
@@ -1064,8 +1090,12 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
         // inside the same loop the quiet-period check already runs in,
         // costs nothing extra and needs no second round trip.
         const ready = !readySelector || document.querySelector(readySelector) !== null;
-        if (ready && now - last > quietMs) {{ obs.disconnect(); resolve(true); }}
-        else if (now > deadline) {{ obs.disconnect(); resolve(false); }}
+        if (ready && now - last > quietMs) {{
+          quietWindowsPassed += 1;
+          last = now;
+          if (quietWindowsPassed >= 2) {{ obs.disconnect(); resolve(true); return; }}
+        }}
+        if (now > deadline) {{ obs.disconnect(); resolve(false); }}
         else {{ requestAnimationFrame(tick); }}
       }}
       requestAnimationFrame(tick);
@@ -1257,12 +1287,25 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
       }}));
       return;
     }}
-    const root = document.querySelector('{MEASURE_ROOT_SELECTOR}');
-    if (!root) {{
+    const appRoot = document.querySelector('{MEASURE_ROOT_SELECTOR}');
+    if (!appRoot) {{
       const out = JSON.stringify({{settled, settle_ms, overflow: [], clipped: [], error: 'measure root not found: {MEASURE_ROOT_SELECTOR}'}});
       dioxus.send(out);
       return;
     }}
+    // Review 221 §2.3: with a dialog open, the view behind the scrim
+    // is inert and dimmed by design - `button.apply-btn`/`span.diff-
+    // mark` findings in the *Settings*/*Shortcuts* rows were really
+    // the comparison view sitting underneath, counted a second time
+    // under the wrong row, and (rendered contrast especially) measured
+    // without the scrim's own dimming ever applied, so the ratio
+    // didn't describe anything actually on screen. Every check but
+    // `dialog_occlusion` (which already proves nothing covers the
+    // dialog, so it needs the full tree to check *against*) now walks
+    // only the dialog's own subtree whenever one is open, not
+    // `#app-root`'s whole tree.
+    const dialogRootEl = document.querySelector('.scrim .modal');
+    const root = dialogRootEl || appRoot;
     const overflow = [];
     const clipped = [];
     const off_screen = [];
@@ -1313,63 +1356,77 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
       // interactive candidates, two different questions about the same
       // `getBoundingClientRect()`.
       if (el.matches('{interactive_selector}') && isReachable(el)) {{
-        // Found live (`--inject off-screen`, first run: a scrollable
-        // `.modal` - F224's own `overflow-y: auto` - sits above every
-        // one of its descendants, so a `position: fixed` button inside
-        // it was wrongly exempted as "reachable by scrolling" even
-        // though fixed positioning is always viewport-relative; no
-        // ancestor's own scroll offset ever moves it.
-        //
-        // Found wrong the other way, review 220 §2.1/§2.3:
-        // `input.profile-radio` is `position: absolute` too, but *not*
-        // viewport-relative like the button above - its containing
-        // block is its own row (the nearest `position`-anything
-        // ancestor CSS gives it, not necessarily the viewport), which
-        // scrolls with the modal exactly as an ordinary flow element
-        // would. "Absolute always escapes clipping" was this sandbox's
-        // own one example, not a rule `position: absolute` keeps in
-        // general - only `fixed` is unconditionally viewport-relative.
-        // Clipping (not scroll-reachability) applies to a `absolute`
-        // descendant the same as flow, so it goes through the same
-        // walk; `fixed` alone stays exempt.
-        const vr = cs.position !== 'fixed' ? visibleRect(el) : el.getBoundingClientRect();
-        if (!isClippedAway(vr)) {{
-          let r = el.getBoundingClientRect();
-          // Review 220 §2.3: `input.profile-radio` (and any input like
-          // it) is visually hidden by size and opacity, not by the
-          // clip-rect technique `isVisuallyHidden` already recognises -
-          // `appearance: none; position: absolute; width: 1px; height:
-          // 1px; opacity: 0` (03-components.css), kept focusable on
-          // purpose, with its own `<label for>` carrying the visible,
-          // clickable text. Measuring the input alone reports its own
-          // 1x1 box as a hit-area failure; measuring it as the union of
-          // the input and that label - which already is what a user
-          // can actually see and click, native `<label for>` behaviour
-          // included - reports the real, reachable target instead. A
-          // visible, reasonably-sized input gains nothing or little
-          // from the union (its own box already dominates), so this
-          // applies unconditionally rather than gating on size first.
-          if (el.tagName === 'INPUT' && el.id) {{
-            const labelEl = document.querySelector('label[for="' + el.id + '"]');
-            if (labelEl && !isVisuallyHidden(labelEl)) {{
-              const lr = labelEl.getBoundingClientRect();
-              if (lr.width > 0 && lr.height > 0) {{
-                const left = Math.min(r.left, lr.left);
-                const top = Math.min(r.top, lr.top);
-                const right = Math.max(r.right, lr.right);
-                const bottom = Math.max(r.bottom, lr.bottom);
-                r = {{ left, top, right, bottom, width: right - left, height: bottom - top }};
-              }}
+        let r = el.getBoundingClientRect();
+        // Review 220 §2.3: `input.profile-radio` (and any input like
+        // it) is visually hidden by size and opacity, not by the
+        // clip-rect technique `isVisuallyHidden` already recognises -
+        // `appearance: none; position: absolute; width: 1px; height:
+        // 1px; opacity: 0` (03-components.css), kept focusable on
+        // purpose, with its own `<label for>` carrying the visible,
+        // clickable text. Measuring the input alone reports its own
+        // 1x1 box as a hit-area failure; measuring it as the union of
+        // the input and that label - which already is what a user
+        // can actually see and click, native `<label for>` behaviour
+        // included - reports the real, reachable target instead. A
+        // visible, reasonably-sized input gains nothing or little
+        // from the union (its own box already dominates), so this
+        // applies unconditionally rather than gating on size first.
+        if (el.tagName === 'INPUT' && el.id) {{
+          const labelEl = document.querySelector('label[for="' + el.id + '"]');
+          if (labelEl && !isVisuallyHidden(labelEl)) {{
+            const lr = labelEl.getBoundingClientRect();
+            if (lr.width > 0 && lr.height > 0) {{
+              const left = Math.min(r.left, lr.left);
+              const top = Math.min(r.top, lr.top);
+              const right = Math.max(r.right, lr.right);
+              const bottom = Math.max(r.bottom, lr.bottom);
+              r = {{ left, top, right, bottom, width: right - left, height: bottom - top }};
             }}
           }}
-          if (r.right <= 0 || r.bottom <= 0 || r.left >= vw || r.top >= vh) {{
-            off_screen.push({{
-              element: describe(el, i), text: ownText(el).slice(0, 80),
-              detail: 'box at (' + Math.round(r.left) + ',' + Math.round(r.top) + ') ' +
-                Math.round(r.width) + 'x' + Math.round(r.height) +
-                ', viewport ' + vw + 'x' + vh,
-            }});
-          }}
+        }}
+        // Off-screen (RFC-098 §2) keeps the clipped box (review 221
+        // §2.1's own instruction: "Overlap and Off-screen keep the
+        // clipped box"). Found live (`--inject off-screen`, first run:
+        // a scrollable `.modal` - F224's own `overflow-y: auto` - sits
+        // above every one of its descendants, so a `position: fixed`
+        // button inside it was wrongly exempted as "reachable by
+        // scrolling" even though fixed positioning is always viewport-
+        // relative; no ancestor's own scroll offset ever moves it.
+        // Found wrong the other way, review 220 §2.3: `input.profile-
+        // radio` is `position: absolute` too, but *not* viewport-
+        // relative like the button above - its containing block is its
+        // own row, which scrolls with the modal exactly as an ordinary
+        // flow element would. "Absolute always escapes clipping" was
+        // this sandbox's own one example, not a rule `position:
+        // absolute` keeps in general - only `fixed` is unconditionally
+        // viewport-relative.
+        const vr = cs.position !== 'fixed' ? visibleRect(el) : r;
+        if (!isClippedAway(vr) &&
+            (r.right <= 0 || r.bottom <= 0 || r.left >= vw || r.top >= vh)) {{
+          off_screen.push({{
+            element: describe(el, i), text: ownText(el).slice(0, 80),
+            detail: 'box at (' + Math.round(r.left) + ',' + Math.round(r.top) + ') ' +
+              Math.round(r.width) + 'x' + Math.round(r.height) +
+              ', viewport ' + vw + 'x' + vh,
+          }});
+        }}
+        // Hit area (RFC-098 §2): the element's own box, with its
+        // label's (above), full stop - review 221 §2.1's own finding.
+        // Clipping decided whether it's *considered at all* here too,
+        // once (via the same `isClippedAway(vr)` gate off-screen still
+        // uses above) - wrong, found live: the only difference across
+        // five otherwise-identical CI runs was always the same shape,
+        // a Settings checkbox reported in some attempts and not
+        // others, two lines at a time. A control's size doesn't change
+        // when it's partly scrolled out of view - you scroll it in -
+        // but `.modal`'s own scroll position settling a few px
+        // differently run to run flipped `isClippedAway` between empty
+        // and not, at exactly the checkbox's own edge. `isReachable`
+        // (tabindex="-1", disabled, `isVisuallyHidden`'s clip-rect
+        // technique) and `w > 0 && h > 0` below already cover "never
+        // rendered at all" without depending on a scroll container's
+        // own, inherently transient, current offset.
+        {{
           // Found live, first run against a real view: `wry`'s own zoom
           // (`set_zoom_level`, what `text_size` drives) does not change
           // what `getBoundingClientRect` reports for an individual
@@ -1486,6 +1543,35 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
       }}
     }}
 
+    // Review 221 §2.2: F224's own property, checked directly - with a
+    // dialog open, its border box lies inside the viewport - rather
+    // than through the generic scroll-vs-client overflow check above,
+    // which `.modal`'s own flex-item `min-height: auto` default (a
+    // documented CSS quirk: a flex child's `overflow-y: auto` clips
+    // its own *rendered* box correctly, confirmed live - `.modal`'s
+    // own clientHeight sits right at its max-height - but the flex
+    // parent's layout still accounts for the item's full, unclipped
+    // intrinsic content size) made an unreliable way to catch this one
+    // specific shape: `.scrim`'s own scrollHeight reflected that
+    // intrinsic size, not anything actually painted outside either
+    // box, and a named allowance for `.scrim` would have exempted the
+    // one thing this is for. Named directly, on the dialog's own box
+    // against the viewport, it has no such false-positive path, and
+    // reuses `Finding`'s own scroll/client shape (the edge position
+    // against the viewport's own size on each axis, not a scroll
+    // size) rather than adding a new result field for one check.
+    const dialogForOverflow = document.querySelector('.scrim .modal');
+    if (dialogForOverflow) {{
+      const dr = dialogForOverflow.getBoundingClientRect();
+      if (dr.top < 0 || dr.bottom > vh || dr.left < 0 || dr.right > vw) {{
+        overflow.push({{
+          element: describe(dialogForOverflow, -1), text: '',
+          scroll_width: dr.right, client_width: vw,
+          scroll_height: dr.bottom, client_height: vh,
+        }});
+      }}
+    }}
+
     // Review 217/218/219: nothing covers an open dialog - a grid of
     // points sampled inside the dialog's own box must each hit the
     // dialog or a descendant, except `.toast` (the app's only error
@@ -1543,22 +1629,16 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
       // as off-screen/hit area just above.
       const rect = cs.position !== 'fixed' ? visibleRect(el) : el.getBoundingClientRect();
       if (isClippedAway(rect)) {{ continue; }}
-      // Found live (first full-matrix run): with a dialog open, the
-      // background view behind its scrim still has every element "in
-      // the DOM tree with overlapping coordinates" - the Explorer's own
-      // tree, say, under the Settings dialog - but none of it is
-      // actually *visible*; the scrim paints over it, and that's by
-      // design, not the "two visible boxes crossing" this check means.
-      // Narrowed to specifically the scrim, not "whatever
-      // elementFromPoint returns" generically (found wrong the very
-      // next run, `--inject overlap`: that broader form also excluded
-      // the *overlapping* element itself whenever it was the one
-      // painted over - exactly the shape this check exists to catch,
-      // not exclude. A real sibling-on-sibling overlap never puts one
-      // of the pair behind a `.scrim`, so this only ever fires for the
-      // dialog case.
-      const scrimEl = document.querySelector('.scrim');
-      if (scrimEl && !scrimEl.contains(el)) {{ continue; }}
+      // Found live (first full-matrix run), fixed differently since
+      // (review 221 §2.3): with a dialog open, the background view
+      // behind its scrim used to still have every element "in the DOM
+      // tree with overlapping coordinates" - the Explorer's own tree,
+      // say, under the Settings dialog - but none of it was actually
+      // *visible*, by design. A per-candidate `.scrim`-containment
+      // check here (narrowed, after an earlier, broader form wrongly
+      // excluded genuinely overlapping pairs too) is now redundant:
+      // `root` itself is the dialog's own subtree whenever one is
+      // open, so the background is never in `all` to begin with.
       overlapCandidates.push({{ el, index: i, rect, layer: layerOf(el) }});
     }}
     const overlap = [];
@@ -1741,14 +1821,15 @@ mod tests {
     /// check) and said as much in its own doc comment; `.tablist` is the
     /// first named entry, found live when its own responsive `overflow:
     /// visible` (a deliberate spill, nothing lost) first surfaced as a
-    /// false overflow finding under the stacked layout. `.scrim` is the
-    /// second (review 220 §2, `OVERFLOW_ALLOWLIST`'s own doc comment has
-    /// the full reason). Checked by name here, not just "the allowlist
-    /// is non-empty", so a future edit that quietly drops one (rather
-    /// than adding to it) is caught.
+    /// false overflow finding under the stacked layout. A `.scrim` entry
+    /// (reply 189b) was refused by review 221 §2.2 - it would have
+    /// exempted the exact regression F224 is about, not just a false
+    /// positive - so it's checked by name as *absent*, not present:
+    /// `.tablist` alone, so a future edit that quietly re-adds an
+    /// allowance for the dialog backdrop is caught too.
     #[test]
-    fn tablist_and_scrim_are_the_overflow_allowlists_own_named_entries() {
-        assert_eq!(OVERFLOW_ALLOWLIST, &[".tablist", ".scrim"]);
+    fn tablist_is_the_overflow_allowlists_only_named_entry() {
+        assert_eq!(OVERFLOW_ALLOWLIST, &[".tablist"]);
     }
 
     /// Review 219's own round found exactly this shape live: an allowlist
