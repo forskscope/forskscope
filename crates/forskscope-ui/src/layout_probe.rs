@@ -762,8 +762,23 @@ async fn measure_one(
     // 7:1 under *High* (RFC-098 §2's own text-contrast row); the
     // control-edge 3:1 floor is unaffected by *High*, per the same row.
     let required_text_contrast = if contrast == "high" { 7.0 } else { 4.5 };
+    // Review 221 §3: `.diff-mark`'s own, lower floor - `xtask::contrast`'s
+    // `CONTROL_MIN`/`HIGH_MARK_MIN` for this exact pair, not the text row
+    // above. Computed here, not as a plain constant pair passed straight
+    // through, so it stays next to `required_text_contrast`'s own *High*
+    // branch - the two are meant to be read together, not independently.
+    let required_mark_contrast = if contrast == "high" {
+        RENDERED_CONTRAST_MARK_HIGH_MIN
+    } else {
+        RENDERED_CONTRAST_MARK_MIN
+    };
     let zoom = f64::from(text_size) / 100.0;
-    let script = measurement_script(view.ready_selector(), required_text_contrast, zoom);
+    let script = measurement_script(
+        view.ready_selector(),
+        required_text_contrast,
+        required_mark_contrast,
+        zoom,
+    );
     let (raw, recv_retries) = match retry_recv(&script).await {
         Ok(r) => r,
         Err((e, recv_retries)) => {
@@ -999,6 +1014,29 @@ const TEXT_SIZE_ALLOWLIST: &[&str] = &[".dirty-dot", ".tab-loading-spinner"];
 // and a double quote inside that would collide with its own.
 const RENDERED_CONTRAST_ALLOWLIST: &[&str] = &["[disabled]", "[aria-disabled='true']"];
 
+/// Review 221 §3's own decision on reply 189b's row 5: `.diff-mark`
+/// ("−"/"+" on its own hunk-row background) is a mark, not text - not
+/// an exemption from rendered contrast, a different, lower floor
+/// within it, matching `xtask::contrast`'s own already-reviewed
+/// classification for this exact use (`--del-mark on --del-bg`/
+/// `--ins-mark on --ins-bg`, `CONTROL_MIN`/`HIGH_MARK_MIN`, not
+/// `TEXT_MIN`/`HIGH_TEXT_MIN`) so the dynamic probe and the static
+/// gate agree on what this glyph is. One list, `.diff-mark` only, per
+/// review 221 §3's own instruction - a future entry is a review
+/// decision, not something this probe adds on its own judgment.
+const RENDERED_CONTRAST_MARK_SELECTOR: &[&str] = &[".diff-mark"];
+/// `xtask::contrast::CONTROL_MIN` kept in step by hand, not shared
+/// code - the probe measures rendered colour through the DOM, the
+/// static gate parses CSS source text, and the two have never shared
+/// a threshold constant. Changing one without the other is exactly
+/// the "do both gates agree" question review 221 §3 raised; a stray
+/// edit to just one is now the drift to watch for, not a borrow
+/// checker error to catch it.
+const RENDERED_CONTRAST_MARK_MIN: f64 = 3.0;
+/// `xtask::contrast::HIGH_MARK_MIN`, same caveat as
+/// [`RENDERED_CONTRAST_MARK_MIN`] just above.
+const RENDERED_CONTRAST_MARK_HIGH_MIN: f64 = 4.5;
+
 /// The measurement script run in the page for one combination. Returns
 /// (via `dioxus.send`) one JSON string matching [`MeasurementOutcome`].
 /// `ready_selector` only confirms the expected view actually opened
@@ -1025,12 +1063,18 @@ const RENDERED_CONTRAST_ALLOWLIST: &[&str] = &["[disabled]", "[aria-disabled='tr
 /// `clientHeight` shrinks in CSS-px terms, which is what the settle
 /// condition's own poll already relies on. A normalizing division here
 /// would be the bug, not its absence.
-fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f64) -> String {
+fn measurement_script(
+    ready_selector: &str,
+    required_text_contrast: f64,
+    required_mark_contrast: f64,
+    zoom: f64,
+) -> String {
     let interactive_selector = INTERACTIVE_SELECTOR;
     let overflow_allowlist = json_string_array(OVERFLOW_ALLOWLIST);
     let hit_area_allowlist = json_string_array(HIT_AREA_ALLOWLIST);
     let text_size_allowlist = json_string_array(TEXT_SIZE_ALLOWLIST);
     let rendered_contrast_allowlist = json_string_array(RENDERED_CONTRAST_ALLOWLIST);
+    let rendered_contrast_mark_selector = json_string_array(RENDERED_CONTRAST_MARK_SELECTOR);
     format!(
         r#"(function() {{
   function settle(readySelector, quietMs, timeoutMs) {{
@@ -1317,10 +1361,12 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
     const vh = document.documentElement.clientHeight;
     const zoom = {zoom};
     const requiredTextContrast = {required_text_contrast};
+    const requiredMarkContrast = {required_mark_contrast};
     const overflowAllowlist = {overflow_allowlist};
     const hitAreaAllowlist = {hit_area_allowlist};
     const textSizeAllowlist = {text_size_allowlist};
     const renderedContrastAllowlist = {rendered_contrast_allowlist};
+    const renderedContrastMarkSelector = {rendered_contrast_mark_selector};
     const all = root.querySelectorAll('*');
     for (let i = 0; i < all.length; i++) {{
       const el = all[i];
@@ -1473,17 +1519,25 @@ fn measurement_script(ready_selector: &str, required_text_contrast: f64, zoom: f
 
       // Rendered contrast (RFC-098 §2): every element with its own
       // direct text, against its effective (composited) background.
+      // Review 221 §3: `.diff-mark` ("−"/"+" on its own hunk-row
+      // background) is a mark, not text - `xtask::contrast`'s own,
+      // already-reviewed classification for this exact use
+      // (`RENDERED_CONTRAST_MARK_SELECTOR`'s own doc comment has the
+      // full reason), so it's held to that lower floor here too,
+      // instead of the text one every other own-text element gets.
       if (ownTxt.length > 0 && !matchesAny(el, renderedContrastAllowlist)) {{
         const fg = parseRgba(cs.color);
         if (fg && fg[3] > 0.01) {{
           const bg = effectiveBackground(el);
           const ratio = contrastRatio([fg[0], fg[1], fg[2]], bg);
-          if (ratio < requiredTextContrast) {{
+          const isMark = matchesAny(el, renderedContrastMarkSelector);
+          const required = isMark ? requiredMarkContrast : requiredTextContrast;
+          if (ratio < required) {{
             rendered_contrast.push({{
               element: describe(el, i), text: ownTxt.slice(0, 80),
               detail: 'contrast ' + ratio.toFixed(2) + ':1 against rgb(' +
                 bg.map((c) => Math.round(c)).join(',') + '), needs ' +
-                requiredTextContrast + ':1',
+                required + ':1',
             }});
           }}
         }}
@@ -1795,7 +1849,7 @@ mod tests {
 
     #[test]
     fn measurement_script_embeds_the_given_selector_once() {
-        let script = measurement_script(".diff-wrap", 4.5, 1.0);
+        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0);
         assert!(script.contains("querySelector('.diff-wrap')"));
     }
 
@@ -1864,7 +1918,7 @@ mod tests {
 
     #[test]
     fn measurement_script_checks_the_toast_with_element_from_point() {
-        let script = measurement_script(".diff-wrap", 4.5, 1.0);
+        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0);
         assert!(script.contains("elementFromPoint"));
         assert!(script.contains("querySelector('.toast')"));
         assert!(script.contains("toast_check"));
