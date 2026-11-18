@@ -298,13 +298,17 @@ jobs:
     # timing is what review 216 §2 asked to see reported, not folded
     # into the lint job's own total.
     #
-    # Not yet a hard gate: the first real run found 2,706 pre-existing
-    # findings (reply 189), none fixed in this round - exiting non-zero
-    # here would fail every push until that whole backlog is triaged,
-    # which isn't this job's call. `continue-on-error` keeps the job
-    # running and its own step always visible with every finding in
-    # the log, without blocking merges, until the architect decides how
-    # going forward should be gated (e.g. a committed baseline, so only
+    # Not yet a hard gate: the first real run found 2,033 pre-existing
+    # findings (reply 189), most of them the checker's own false
+    # positives rather than real defects - review 220's own triage,
+    # reply 189b, found and fixed five named checker-fidelity bugs that
+    # took CI's own count to 609. What's left is still untriaged
+    # (reply 189b's own table), and exiting non-zero here would fail
+    # every push until it is, which isn't this job's call.
+    # `continue-on-error` keeps the job running and its own step always
+    # visible with every finding in the log, without blocking merges,
+    # until the architect decides how going forward should be gated
+    # (e.g. a committed baseline, so only
     # a *new* finding fails the build) - reply 189 asks.
     name: Layout checks (RFC-098)
     runs-on: ubuntu-latest

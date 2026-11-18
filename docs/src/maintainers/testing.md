@@ -497,11 +497,13 @@ measurement (numbers, element selectors), never an image — a finding's own
 
 **Not yet a hard CI gate.** The job runs on every push and pull request, and
 its own log shows every finding every time, but `continue-on-error` keeps a
-pre-existing, untriaged backlog (2,706 findings as of reply 189, the view
-this check first ran against in full) from failing builds that didn't cause
-any of them. Fixing that backlog, and deciding how a future finding should
-be gated once it's clear, is tracked separately — not something this file
-decides.
+pre-existing, untriaged backlog (609 findings on CI as of reply 189b, down
+from 2,033 in reply 189 — most of that drop was the checker's own false
+positives, fixed at their cause, not a sudden wave of app fixes; see
+189/189b's own checker-fix and triage sections) from failing builds that
+didn't cause any of them. Fixing what's left of that backlog, and deciding
+how a future finding should be gated once it's clear, is tracked separately
+— not something this file decides.
 
 ## The `.xlsx` corpus, and the sizes it covers
 
