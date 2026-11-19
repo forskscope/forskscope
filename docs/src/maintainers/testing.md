@@ -67,7 +67,13 @@ cargo xtask contrast
 # (RFC-098; see "Checking rendered layout in the running app" below). A
 # hard gate as of review 222 - a finding not on its own
 # EXPECTED_FAILURES list (xtask/src/layout_check.rs) fails the build,
-# and so does a listed one that stops occurring
+# and so does a listed one that stops occurring.
+#
+# Opens real forskscope windows and, on an unexpected failure, screenshots
+# one - never run this from a normal desktop shell (review 223 §2.2): it
+# refuses outside CI or this project's own nested session,
+# .git-exclude/gui/session.sh --fixture <any> --backend x11 -- cargo xtask
+# layout-check
 cargo xtask layout-check
 
 # The in-app keyboard reference and keyboard.md name the same keys (F165)
@@ -458,6 +464,21 @@ the `layout-probe` Cargo feature) and a single `document::eval` call per
 combination, so it is also usable headless under `xvfb-run` (CI's own job
 runs this way; see `.github/workflows/ci.yml`'s `layout-check` job).
 
+**Never run from a normal desktop shell (review 223 §2.2).** It opens real
+`forskscope` windows — the full matrix launches it five times, a capture
+re-launch (below) once more per unexpected finding — and on an unexpected
+finding, screenshots one of them; from a plain shell there is no way to
+tell this run's own window from the maintainer's own, real session, so
+`require_private_display` (`xtask/src/layout_check.rs`) refuses to run
+unless `$CI` is set (CI's own Xvfb) or both `$FORSKSCOPE_GUI_SESSION` and
+`$NIRI_SOCKET` are (this project's own nested `niri` session,
+`.git-exclude/gui/session.sh`, which now exports both):
+
+```sh
+.git-exclude/gui/session.sh --fixture <any> --backend x11 -- \
+  cargo xtask layout-check
+```
+
 **The nine checks**, every one against the real, rendered DOM: overflow,
 clipped text, off-screen controls, hit area (a touch/click target under
 24×24px), small text (effective font size under 12px, 100% text size only),
@@ -511,6 +532,16 @@ combination, always worth a look), which is how it was falsified: `import
 -window root` under this project's own nested-`niri` dev sessions fails
 outright ("missing an image filename") where the `niri` route succeeds and
 writes a real screenshot of the failing view.
+
+**The `niri` route finds the probe's own window by process id, never by
+its app id** (review 223 §2.2): this project's own nested session is
+still a real, shared compositor the maintainer's own, real ForskScope
+could also be open in — app id alone (`"Forskscope"`) would pick
+whichever window niri lists first, which can be either one.
+`capture_via_niri` instead reads the probe's own pid from
+`dbus_run_session`'s own direct child (unambiguous — no two running
+processes ever share one) and matches `niri msg -j windows`'s own `pid`
+field against it.
 
 **A hard CI gate as of review 222.** The job runs on every push and pull
 request, and exits non-zero on anything not named on

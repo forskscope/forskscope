@@ -23,6 +23,7 @@
 //! **Not yet implemented here:** `--inject <defect>`; the release-binary
 //! marker check; CI wiring on every push; the retroactive proof.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -128,7 +129,50 @@ fn write_no_activation_conf(out_dir: &Path) -> PathBuf {
     path
 }
 
+/// Review 223 §2.2: this launches real `forskscope` windows - many of
+/// them, and on an unexpected failure, screenshots one - so it must
+/// never run against the caller's own, real display: a plain desktop
+/// shell has no way to tell "this run's own window" from the
+/// maintainer's real session, and `capture_via_niri` (before this
+/// review) took the *first* window sharing its app id, which can be
+/// either one. Two private displays this driver is allowed to use,
+/// checked before anything else runs or builds:
+/// - **CI:** `$CI`, set by GitHub Actions on every job, every runner -
+///   its own Xvfb.
+/// - **Locally:** inside `.git-exclude/gui/session.sh`'s own nested
+///   `niri` - both `$FORSKSCOPE_GUI_SESSION` (the marker session.sh now
+///   exports) and `$NIRI_SOCKET` (its own IPC socket, which
+///   `capture_via_niri` also needs) must be set; neither alone proves
+///   the other, so both are required.
+///
+/// Refuses outright otherwise - never falls back to the caller's own
+/// display for any reason.
+fn require_private_display() {
+    let ci = std::env::var_os("CI").is_some();
+    let in_session = std::env::var_os("FORSKSCOPE_GUI_SESSION").is_some()
+        && std::env::var_os("NIRI_SOCKET").is_some();
+    if ci || in_session {
+        return;
+    }
+    eprintln!(
+        "layout-check: refusing to run - no private display.\n\
+         \n\
+         This launches real forskscope windows, and on an unexpected finding,\n\
+         screenshots one. From a normal desktop shell there is no way to tell\n\
+         this run's own window from your own real session, so it never runs\n\
+         there.\n\
+         \n\
+         Run it in CI (already wired, .github/workflows/ci.yml), or locally\n\
+         inside this project's own nested session:\n\
+         \n\
+         .git-exclude/gui/session.sh --fixture <any> --backend x11 -- \\\n\
+           cargo xtask layout-check [--inject <defect>]"
+    );
+    process::exit(2);
+}
+
 pub fn run(root: &Path, opts: &RunOptions) {
+    require_private_display();
     if let Some(defect) = &opts.inject {
         run_inject(root, opts, defect);
         return;
@@ -843,65 +887,88 @@ fn write_capture_plan(
         .unwrap_or_else(|e| panic!("cannot write {}: {e}", plan_path.display()));
 }
 
-/// The app's own window title bar (`niri msg -j windows`, live check):
-/// `app_id` comes back `"Forskscope"`, not the binary's own lowercase
-/// name - wry/gtk's own doing, not this crate's, so matched exactly as
-/// observed rather than guessed at or lowercased.
-const NIRI_APP_ID: &str = "Forskscope";
-
 /// Review 220 §5's own two routes, picked by what's actually running
 /// underneath, not by a fixed CI/local split - found live: CI's own
 /// Xvfb is a plain, uncomposited X server, where the root window
 /// really does hold every pixel on screen, so `import -window root`
 /// reads it correctly; this project's own local sessions run under a
-/// nested `niri`, a Wayland compositor whose X11 side (XWayland) never
-/// paints a composited frame to its own root window at all - `import
-/// -window root` under it reads nothing and fails outright ("missing
-/// an image filename", confirmed live, not a guess). `WAYLAND_DISPLAY`
-/// being set is what actually distinguishes the two, not a hostname
-/// or a CI env var.
-fn capture_screen(capture_path: &Path) {
+/// nested `niri` (`require_private_display`, review 223 §2.2), a
+/// Wayland compositor whose X11 side (XWayland) never paints a
+/// composited frame to its own root window at all - `import -window
+/// root` under it reads nothing and fails outright ("missing an image
+/// filename", confirmed live, not a guess). `WAYLAND_DISPLAY` being set
+/// is what actually distinguishes the two, not a hostname or a CI env
+/// var.
+///
+/// `before`: only used on the local route, to find the probe's own
+/// window and no other - see [`capture_via_niri`].
+fn capture_screen(capture_path: &Path, before: &BTreeSet<u64>) {
     if std::env::var("WAYLAND_DISPLAY").is_ok() {
-        capture_via_niri(capture_path);
+        capture_via_niri(capture_path, before);
     } else {
         capture_via_import(capture_path);
     }
 }
 
-/// Finds the app's own window by [`NIRI_APP_ID`] (`niri msg -j
-/// windows`) and hands its `id` to niri's own `screenshot-window`
-/// ([[niri-screenshot-for-gui-testing]], confirmed live: the path
-/// must be absolute, which [`capture_failures`]/[`run_inject_guarded`]
-/// already pass).
-fn capture_via_niri(capture_path: &Path) {
+/// The `id` of every currently open window with [`NIRI_APP_ID`]
+/// (`niri msg -j windows`) - [`capture_via_niri`]'s own "before" and
+/// "after" snapshot.
+fn forskscope_window_ids() -> Option<BTreeSet<u64>> {
     let output = Command::new("niri")
         .arg("msg")
         .arg("-j")
         .arg("windows")
         .output();
     let windows: serde_json::Value = match output {
-        Ok(o) if o.status.success() => match serde_json::from_slice(&o.stdout) {
-            Ok(v) => v,
-            Err(e) => {
-                eprintln!(
-                    "layout-check: could not parse `niri msg -j windows`: {e} - no screenshot"
-                );
-                return;
-            }
-        },
-        other => {
-            eprintln!("layout-check: `niri msg -j windows` failed ({other:?}) - no screenshot");
-            return;
-        }
+        Ok(o) if o.status.success() => serde_json::from_slice(&o.stdout).ok()?,
+        _ => return None,
     };
-    let window_id = windows.as_array().and_then(|wins| {
-        wins.iter()
-            .find(|w| w.get("app_id").and_then(|v| v.as_str()) == Some(NIRI_APP_ID))
-            .and_then(|w| w.get("id"))
-            .and_then(|v| v.as_u64())
-    });
-    let Some(window_id) = window_id else {
-        eprintln!("layout-check: no niri window with app_id {NIRI_APP_ID:?} found - no screenshot");
+    Some(
+        windows
+            .as_array()?
+            .iter()
+            .filter(|w| w.get("app_id").and_then(|v| v.as_str()) == Some(NIRI_APP_ID))
+            .filter_map(|w| w.get("id").and_then(serde_json::Value::as_u64))
+            .collect(),
+    )
+}
+
+/// The app's own window title bar (`niri msg -j windows`, live check):
+/// `app_id` comes back `"Forskscope"`, not the binary's own lowercase
+/// name - wry/gtk's own doing, not this crate's, so matched exactly as
+/// observed rather than guessed at or lowercased.
+const NIRI_APP_ID: &str = "Forskscope";
+
+/// Finds the app's own window as the one `id` that's new since
+/// `before` - **not** `niri msg -j windows`'s own `pid` field, review
+/// 223 §2.2's own first attempt, reverted after it was built and run
+/// live: under the X11 backend this driver always launches with,
+/// every X11 window's own `pid` comes back as **`xwayland-satellite`'s
+/// own pid** (niri's own X11-compatibility proxy - a single, shared
+/// process every X11 client connects through), not the client
+/// application's - confirmed by `ps` naming that exact process at that
+/// exact pid, with no real `forskscope` process sharing it, across two
+/// separate forskscope windows that both reported it. `pid`-matching
+/// can't disambiguate two X11 clients from each other at all under
+/// this backend; a before/after `id` diff doesn't depend on `pid`
+/// being meaningful in the first place - this run's own window is
+/// whichever one with [`NIRI_APP_ID`] wasn't open before this launch,
+/// the maintainer's own real one (if open) stays in `before` either
+/// way. Refuses - no screenshot, not a guess - on zero or more than
+/// one new window, same as an unreachable niri or an unparsable
+/// response.
+fn capture_via_niri(capture_path: &Path, before: &BTreeSet<u64>) {
+    let Some(after) = forskscope_window_ids() else {
+        eprintln!("layout-check: `niri msg -j windows` failed or was unparsable - no screenshot");
+        return;
+    };
+    let new_windows: Vec<u64> = after.difference(before).copied().collect();
+    let [window_id] = new_windows[..] else {
+        eprintln!(
+            "layout-check: expected exactly one new niri window with app id {NIRI_APP_ID:?} \
+             since this launch began, found {new_windows:?} (before: {before:?}, after: \
+             {after:?}) - no screenshot"
+        );
         return;
     };
     let status = Command::new("niri")
@@ -958,6 +1025,10 @@ fn launch_and_capture(
     fs::create_dir_all(data_dir.join("xdg/cache")).unwrap();
     fs::create_dir_all(data_dir.join("xdg/data")).unwrap();
 
+    // Taken before this launch's own child exists, so this run's own
+    // window is never among them - `capture_via_niri`'s own "before".
+    let before_windows = forskscope_window_ids().unwrap_or_default();
+
     let mut child = Command::new("dbus-run-session")
         .arg("--config-file")
         .arg(bus_conf)
@@ -997,7 +1068,7 @@ fn launch_and_capture(
         std::thread::sleep(Duration::from_millis(100));
     }
 
-    capture_screen(capture_path);
+    capture_screen(capture_path, &before_windows);
 
     if !wait_with_timeout(&mut child, Duration::from_secs(10)) {
         let _ = child.kill();
@@ -1414,6 +1485,36 @@ fn report(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Review 223 §2.2's own before/after diff, as a pure set operation -
+    /// the live niri/screenshot side (`capture_via_niri` itself) needs a
+    /// real compositor to exercise at all, but the rule it applies to
+    /// whatever `forskscope_window_ids` returns before and after does
+    /// not. A pre-existing window (the maintainer's own, real
+    /// ForskScope, say) must stay out of the result even when it is
+    /// still open in `after` - it was already in `before`.
+    #[test]
+    fn new_windows_is_the_set_difference_not_the_after_set() {
+        let before: BTreeSet<u64> = [7].into_iter().collect();
+        let after: BTreeSet<u64> = [7, 12].into_iter().collect();
+        let new_windows: Vec<u64> = after.difference(&before).copied().collect();
+        assert_eq!(new_windows, vec![12]);
+    }
+
+    /// Two new windows (or zero) is never "the one this run opened" -
+    /// `capture_via_niri`'s own refusal, exercised here as the same
+    /// slice-pattern match it uses, since asserting on its own
+    /// `eprintln!` output would mean parsing stderr instead of testing
+    /// the actual decision.
+    #[test]
+    fn exactly_one_new_window_is_required() {
+        fn matches_exactly_one(new_windows: &[u64]) -> bool {
+            matches!(new_windows, [_])
+        }
+        assert!(!matches_exactly_one(&[]));
+        assert!(matches_exactly_one(&[12]));
+        assert!(!matches_exactly_one(&[12, 13]));
+    }
 
     #[test]
     fn element_base_cuts_the_trailing_index_only() {
