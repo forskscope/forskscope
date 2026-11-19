@@ -317,13 +317,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install system dependencies (WebKitGTK, GTK3, a virtual display, fonts)
+      - name: Install system dependencies (WebKitGTK, GTK3, a virtual display, fonts, a screenshot tool)
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             pkg-config libssl-dev \
             libwebkit2gtk-4.1-dev libgtk-3-dev \
-            xvfb dbus-x11 fonts-noto-core fonts-noto-cjk
+            xvfb dbus-x11 fonts-noto-core fonts-noto-cjk \
+            imagemagick
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -348,3 +349,21 @@ jobs:
       # this runner has no display of its own.
       - name: cargo xtask layout-check
         run: xvfb-run --auto-servernum -- cargo xtask layout-check
+
+      # Review 220 §5: once an unexpected finding exists, a second,
+      # targeted launch of just that combination (`capture_failures`,
+      # `xtask/src/layout_check.rs`) screenshots it via `import -window
+      # root` - CI's own Xvfb is a plain, uncomposited X server, so the
+      # root window really does hold the composited frame (unlike this
+      # project's own local, Wayland/niri sessions - see
+      # `capture_screen`'s own doc comment). `if: failure()`: the
+      # directory only has anything in it when the step above already
+      # failed, so uploading on every push regardless would publish an
+      # empty artifact on every green run for nothing.
+      - name: Upload layout-check failure captures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: layout-check-failure-captures
+          path: target/layout-check/failure-captures/
+          if-no-files-found: ignore

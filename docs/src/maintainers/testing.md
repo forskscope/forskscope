@@ -492,9 +492,25 @@ cargo xtask layout-check --inject overlap
 `cargo xtask layout-check --help`-equivalent (`xtask/src/main.rs`'s own
 `print_usage`) lists every defect name.
 
-**Not yet built:** a screenshot capture on failure. Every check today is a
-measurement (numbers, element selectors), never an image — a finding's own
-`detail` field is read, not looked at.
+**Capture on an unexpected failure** (review 220 §5): when a finding isn't
+on `EXPECTED_FAILURES`, a second, targeted launch reopens that exact
+combination (view, text size, language, theme, contrast, colour vision,
+window — `capture_failures`/`write_capture_plan`), pauses it on screen
+(`layout_probe::Plan::pause_before_exit_ms`), and screenshots it to
+`target/layout-check/failure-captures/`. Two capture routes, picked by
+`$WAYLAND_DISPLAY`, not by a fixed CI/local split: CI's own Xvfb is a
+plain, uncomposited X server, so `import -window root` reads the composited
+frame straight off its root window; this project's own local sessions run
+under a nested `niri` (Wayland), whose XWayland side never paints a
+composited frame to its root window at all, so `niri msg action
+screenshot-window --id <id> --path <absolute path>` is used there instead
+(`capture_screen`, `xtask/src/layout_check.rs`). CI uploads the directory
+as the `layout-check-failure-captures` artifact, only `if: failure()`.
+`--inject <defect>` exercises the same capture path unconditionally (one
+combination, always worth a look), which is how it was falsified: `import
+-window root` under this project's own nested-`niri` dev sessions fails
+outright ("missing an image filename") where the `niri` route succeeds and
+writes a real screenshot of the failing view.
 
 **A hard CI gate as of review 222.** The job runs on every push and pull
 request, and exits non-zero on anything not named on

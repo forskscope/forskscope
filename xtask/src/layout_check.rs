@@ -223,7 +223,13 @@ pub fn run(root: &Path, opts: &RunOptions) {
         }
     }
 
-    report(&all_rows, &per_window_ms);
+    let (any_failures, failing_rows) = report(&all_rows, &per_window_ms);
+    if !failing_rows.is_empty() {
+        capture_failures(&opts.out_dir, &fixtures, &bin, &bus_conf, &failing_rows);
+    }
+    if any_failures {
+        std::process::exit(1);
+    }
 }
 
 // ── --inject ─────────────────────────────────────────────────────────────
@@ -437,12 +443,28 @@ fn run_inject_guarded(
         "text_sizes": [100],
         "languages": ["en"],
         "window_size": "1000x700",
+        // Review 220 §5's own falsification: one `--inject` run, one
+        // combination, always worth a look - not conditioned on
+        // `found` below the way the real matrix's capture is, since
+        // there is nothing else here to filter by.
+        "pause_before_exit_ms": CAPTURE_PAUSE_MS,
     });
     fs::write(&plan_path, serde_json::to_string_pretty(&plan).unwrap())
         .unwrap_or_else(|e| panic!("cannot write {}: {e}", plan_path.display()));
 
     println!("layout-check: --inject {defect} - running {view_name} only...");
-    launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf);
+    let captures_dir = opts.out_dir.join("failure-captures");
+    fs::create_dir_all(&captures_dir)
+        .unwrap_or_else(|e| panic!("cannot create {}: {e}", captures_dir.display()));
+    let capture_path = captures_dir.join(format!("inject-{defect}.png"));
+    launch_and_capture(
+        &bin,
+        &plan_path,
+        &data_dir,
+        &bus_conf,
+        &results_path,
+        &capture_path,
+    );
     let rows = read_jsonl(&results_path);
 
     let settings_row = rows
@@ -729,6 +751,295 @@ fn launch_and_wait(bin: &Path, plan_path: &Path, data_dir: &Path, bus_conf: &Pat
     start.elapsed()
 }
 
+// ── Capture on failure (review 220 §5) ──────────────────────────────────
+
+/// How long the probe keeps a captured combination's view open and
+/// settled, after its own measurement, before closing and exiting
+/// (`layout_probe::Plan::pause_before_exit_ms`) - long enough for
+/// [`launch_and_capture`]'s own poll-then-`import` sequence to finish
+/// comfortably, nowhere near `launch_and_wait`'s own 60s launch
+/// timeout.
+const CAPTURE_PAUSE_MS: u64 = 3000;
+
+/// A filesystem-safe name for one result row's own combination,
+/// unique enough across a run's full matrix to never collide: every
+/// axis the row carries, in the same order [`report`]'s own `combo`
+/// string prints them.
+fn combo_slug(row: &serde_json::Value) -> String {
+    let view = row.get("view").and_then(|v| v.as_str()).unwrap_or("view");
+    let window = row
+        .get("window_size")
+        .and_then(|v| v.as_str())
+        .unwrap_or("window")
+        .replace('x', "-");
+    let text_size = row.get("text_size").and_then(|v| v.as_u64()).unwrap_or(0);
+    let language = row
+        .get("language")
+        .and_then(|v| v.as_str())
+        .unwrap_or("lang");
+    let theme = row.get("theme").and_then(|v| v.as_str()).unwrap_or("theme");
+    let contrast = row
+        .get("contrast")
+        .and_then(|v| v.as_str())
+        .unwrap_or("contrast");
+    let colour_vision = row
+        .get("colour_vision")
+        .and_then(|v| v.as_str())
+        .unwrap_or("cv");
+    format!("{view}-{window}-{text_size}pct-{language}-{theme}-{contrast}-{colour_vision}")
+}
+
+/// Rebuilds, from one already-measured row, the one-combination plan
+/// that reopens exactly that same view/text-size/language/theme/
+/// contrast/colour-vision/window - the view JSON itself pulled back
+/// out of [`all_views_json`] by its own `kind`, not reconstructed by
+/// hand, so a `FileComparison`/`DeepCompare`/`MergeTool` view's own
+/// fixture paths carry over correctly instead of a bare `{"kind":
+/// ...}` that would open the wrong (or no) fixture.
+fn write_capture_plan(
+    plan_path: &Path,
+    results_path: &Path,
+    fixtures: &Fixtures,
+    row: &serde_json::Value,
+) {
+    let view_kind = row
+        .get("view")
+        .and_then(|v| v.as_str())
+        .unwrap_or("explorer");
+    let views = all_views_json(fixtures);
+    let view_json = views
+        .as_array()
+        .expect("all_views_json always returns a JSON array")
+        .iter()
+        .find(|v| v.get("kind").and_then(|k| k.as_str()) == Some(view_kind))
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({"kind": view_kind}));
+    let text_size = row.get("text_size").and_then(|v| v.as_u64()).unwrap_or(100);
+    let language = row.get("language").and_then(|v| v.as_str()).unwrap_or("en");
+    let theme = row.get("theme").and_then(|v| v.as_str()).unwrap_or("light");
+    let contrast = row
+        .get("contrast")
+        .and_then(|v| v.as_str())
+        .unwrap_or("standard");
+    let colour_vision = row
+        .get("colour_vision")
+        .and_then(|v| v.as_str())
+        .unwrap_or("standard");
+
+    let mut plan = serde_json::json!({
+        "results_path": results_path,
+        "views": [view_json],
+        "text_sizes": [text_size],
+        "languages": [language],
+        "themes": [theme],
+        "contrasts": [contrast],
+        "colour_visions": [colour_vision],
+        "pause_before_exit_ms": CAPTURE_PAUSE_MS,
+    });
+    if let Some(window_size) = row.get("window_size").and_then(|v| v.as_str()) {
+        plan["window_size"] = serde_json::json!(window_size);
+    }
+    fs::write(plan_path, serde_json::to_string_pretty(&plan).unwrap())
+        .unwrap_or_else(|e| panic!("cannot write {}: {e}", plan_path.display()));
+}
+
+/// The app's own window title bar (`niri msg -j windows`, live check):
+/// `app_id` comes back `"Forskscope"`, not the binary's own lowercase
+/// name - wry/gtk's own doing, not this crate's, so matched exactly as
+/// observed rather than guessed at or lowercased.
+const NIRI_APP_ID: &str = "Forskscope";
+
+/// Review 220 §5's own two routes, picked by what's actually running
+/// underneath, not by a fixed CI/local split - found live: CI's own
+/// Xvfb is a plain, uncomposited X server, where the root window
+/// really does hold every pixel on screen, so `import -window root`
+/// reads it correctly; this project's own local sessions run under a
+/// nested `niri`, a Wayland compositor whose X11 side (XWayland) never
+/// paints a composited frame to its own root window at all - `import
+/// -window root` under it reads nothing and fails outright ("missing
+/// an image filename", confirmed live, not a guess). `WAYLAND_DISPLAY`
+/// being set is what actually distinguishes the two, not a hostname
+/// or a CI env var.
+fn capture_screen(capture_path: &Path) {
+    if std::env::var("WAYLAND_DISPLAY").is_ok() {
+        capture_via_niri(capture_path);
+    } else {
+        capture_via_import(capture_path);
+    }
+}
+
+/// Finds the app's own window by [`NIRI_APP_ID`] (`niri msg -j
+/// windows`) and hands its `id` to niri's own `screenshot-window`
+/// ([[niri-screenshot-for-gui-testing]], confirmed live: the path
+/// must be absolute, which [`capture_failures`]/[`run_inject_guarded`]
+/// already pass).
+fn capture_via_niri(capture_path: &Path) {
+    let output = Command::new("niri")
+        .arg("msg")
+        .arg("-j")
+        .arg("windows")
+        .output();
+    let windows: serde_json::Value = match output {
+        Ok(o) if o.status.success() => match serde_json::from_slice(&o.stdout) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!(
+                    "layout-check: could not parse `niri msg -j windows`: {e} - no screenshot"
+                );
+                return;
+            }
+        },
+        other => {
+            eprintln!("layout-check: `niri msg -j windows` failed ({other:?}) - no screenshot");
+            return;
+        }
+    };
+    let window_id = windows.as_array().and_then(|wins| {
+        wins.iter()
+            .find(|w| w.get("app_id").and_then(|v| v.as_str()) == Some(NIRI_APP_ID))
+            .and_then(|w| w.get("id"))
+            .and_then(|v| v.as_u64())
+    });
+    let Some(window_id) = window_id else {
+        eprintln!("layout-check: no niri window with app_id {NIRI_APP_ID:?} found - no screenshot");
+        return;
+    };
+    let status = Command::new("niri")
+        .arg("msg")
+        .arg("action")
+        .arg("screenshot-window")
+        .arg("--id")
+        .arg(window_id.to_string())
+        .arg("--path")
+        .arg(capture_path)
+        .status();
+    if !matches!(status, Ok(s) if s.success()) {
+        eprintln!("layout-check: niri screenshot-window failed ({status:?}) - no screenshot");
+    }
+}
+
+/// CI's own Xvfb route: the root window itself holds every composited
+/// pixel on an uncomposited X server, against whichever `$DISPLAY`
+/// this process itself inherited (the same one the child, with no
+/// `DISPLAY` override of its own, is actually drawing to).
+fn capture_via_import(capture_path: &Path) {
+    let status = Command::new("import")
+        .arg("-window")
+        .arg("root")
+        .arg(capture_path)
+        .status();
+    if !matches!(status, Ok(s) if s.success()) {
+        eprintln!(
+            "layout-check: `import -window root {}` failed ({status:?}) - no screenshot",
+            capture_path.display()
+        );
+    }
+}
+
+/// Launches `bin` the same way [`launch_and_wait`] does, but doesn't
+/// block on exit first: this plan's own single combination pauses,
+/// settled, for [`CAPTURE_PAUSE_MS`] after writing its one result row
+/// (`layout_probe::Plan::pause_before_exit_ms`), so polling
+/// `results_path` for that row's arrival is this function's own
+/// signal that there's something on screen worth capturing yet - see
+/// [`capture_screen`]. Never panics on a capture failure (a missing
+/// `import` binary locally, say) - a missing screenshot is a worse
+/// report, not a worse run.
+fn launch_and_capture(
+    bin: &Path,
+    plan_path: &Path,
+    data_dir: &Path,
+    bus_conf: &Path,
+    results_path: &Path,
+    capture_path: &Path,
+) {
+    fs::create_dir_all(data_dir.join("xdg/config")).unwrap();
+    fs::create_dir_all(data_dir.join("xdg/state")).unwrap();
+    fs::create_dir_all(data_dir.join("xdg/cache")).unwrap();
+    fs::create_dir_all(data_dir.join("xdg/data")).unwrap();
+
+    let mut child = Command::new("dbus-run-session")
+        .arg("--config-file")
+        .arg(bus_conf)
+        .arg("--")
+        .arg(bin)
+        .arg("--data-dir")
+        .arg(data_dir)
+        .env("FORSKSCOPE_LAYOUT_PROBE_PLAN", plan_path)
+        .env("XDG_CONFIG_HOME", data_dir.join("xdg/config"))
+        .env("XDG_STATE_HOME", data_dir.join("xdg/state"))
+        .env("XDG_CACHE_HOME", data_dir.join("xdg/cache"))
+        .env("XDG_DATA_HOME", data_dir.join("xdg/data"))
+        .env("GTK_A11Y", "none")
+        .env("GDK_BACKEND", "x11")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to launch forskscope under dbus-run-session");
+
+    let poll_start = Instant::now();
+    let poll_timeout = Duration::from_secs(30);
+    loop {
+        if !read_jsonl(results_path).is_empty() {
+            break;
+        }
+        if poll_start.elapsed() > poll_timeout {
+            eprintln!(
+                "layout-check: capture for {} never produced a result row within {}s - no \
+                 screenshot",
+                capture_path.display(),
+                poll_timeout.as_secs()
+            );
+            let _ = child.kill();
+            let _ = child.wait();
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+
+    capture_screen(capture_path);
+
+    if !wait_with_timeout(&mut child, Duration::from_secs(10)) {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+}
+
+/// One capture per failing row (review 220 §5): a screenshot is only
+/// worth the time once the real matrix already knows which exact
+/// combinations had an unexpected finding, not every one of the
+/// hundreds that merely had an *expected* one - this is the second,
+/// targeted re-launch that follows, never the matrix's own.
+fn capture_failures(
+    out_dir: &Path,
+    fixtures: &Fixtures,
+    bin: &Path,
+    bus_conf: &Path,
+    failing_rows: &[serde_json::Value],
+) {
+    let captures_dir = out_dir.join("failure-captures");
+    fs::create_dir_all(&captures_dir)
+        .unwrap_or_else(|e| panic!("cannot create {}: {e}", captures_dir.display()));
+    for (i, row) in failing_rows.iter().enumerate() {
+        let slug = combo_slug(row);
+        let plan_path = out_dir.join(format!("plan-capture-{i}.json"));
+        let results_path = out_dir.join(format!("results-capture-{i}.jsonl"));
+        let data_dir = out_dir.join(format!("data-capture-{i}"));
+        let capture_path = captures_dir.join(format!("{slug}.png"));
+
+        write_capture_plan(&plan_path, &results_path, fixtures, row);
+        println!("layout-check: capturing a screenshot of the failing combination [{slug}]...");
+        launch_and_capture(
+            bin,
+            &plan_path,
+            &data_dir,
+            bus_conf,
+            &results_path,
+            &capture_path,
+        );
+    }
+}
+
 fn wait_with_timeout(child: &mut Child, timeout: Duration) -> bool {
     let start = Instant::now();
     loop {
@@ -935,13 +1246,27 @@ fn matches_expected(
             .is_none_or(|needle| detail.is_some_and(|d| d.contains(needle)))
 }
 
-fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
+/// Prints every finding, `EXPECTED` or `FAIL`, and the run's own cost
+/// figures - unchanged from before review 220 §5. Returns `(any
+/// failures at all, one clone of each row that had at least one
+/// *unexpected* failure)` - the two differ when the only failure is
+/// the "expected failure didn't occur" check below, which names an
+/// `EXPECTED_FAILURES` entry, not a row, so there is nothing of its
+/// own to screenshot. Never exits itself now, so the caller can act
+/// on the row list (review 220 §5's own capture) before deciding
+/// whether to exit non-zero.
+fn report(
+    rows: &[serde_json::Value],
+    per_window_ms: &[(String, u128)],
+) -> (bool, Vec<serde_json::Value>) {
     let mut failures = 0usize;
     let mut probe_ms_values: Vec<f64> = Vec::new();
     let mut total_recv_retries = 0u64;
     let mut expected_seen = vec![false; EXPECTED_FAILURES.len()];
+    let mut failing_rows: Vec<serde_json::Value> = Vec::new();
 
     for row in rows {
+        let mut row_has_unexpected_failure = false;
         let view = row.get("view").and_then(|v| v.as_str()).unwrap_or("?");
         let text_size = row.get("text_size").and_then(|v| v.as_u64()).unwrap_or(0);
         let language = row.get("language").and_then(|v| v.as_str()).unwrap_or("?");
@@ -968,10 +1293,12 @@ fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
         if let Some(err) = row.get("error").and_then(|v| v.as_str()) {
             failures += 1;
             println!("FAIL [{combo}]: probe error: {err}");
+            failing_rows.push(row.clone());
             continue;
         }
         if row.get("settled").and_then(|v| v.as_bool()) == Some(false) {
             failures += 1;
+            row_has_unexpected_failure = true;
             println!("FAIL [{combo}]: never settled within the timeout");
         }
         // RFC-098 §2's own nine checks - every one reported the same
@@ -1011,6 +1338,7 @@ fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
                         );
                     } else {
                         failures += 1;
+                        row_has_unexpected_failure = true;
                         println!(
                             "FAIL [{combo}] {kind}: {}",
                             serde_json::to_string(finding).unwrap_or_default()
@@ -1023,10 +1351,14 @@ fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
             && toast.get("occluded").and_then(|v| v.as_bool()) == Some(true)
         {
             failures += 1;
+            row_has_unexpected_failure = true;
             println!(
                 "FAIL [{combo}] toast_check: {}",
                 serde_json::to_string(toast).unwrap_or_default()
             );
+        }
+        if row_has_unexpected_failure {
+            failing_rows.push(row.clone());
         }
     }
 
@@ -1076,9 +1408,7 @@ fn report(rows: &[serde_json::Value], per_window_ms: &[(String, u128)]) {
         println!("layout-check: window {window} - whole app run took {ms}ms");
     }
 
-    if failures > 0 {
-        std::process::exit(1);
-    }
+    (failures > 0, failing_rows)
 }
 
 #[cfg(test)]

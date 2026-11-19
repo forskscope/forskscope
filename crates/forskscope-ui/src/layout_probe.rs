@@ -139,6 +139,17 @@ pub struct Plan {
     /// whatever size it already launched with.
     #[serde(default)]
     pub window_size: Option<String>,
+    /// Review 220 §5 (capture on failure): how long to keep the view
+    /// open, settled, after writing its own last result row, before
+    /// `close_view`/`process::exit` run - for the driver's own, single-
+    /// combination capture plan (built after the real matrix run
+    /// already knows which exact combination needs a screenshot) to
+    /// have a window to take one in, from outside, while that
+    /// combination is still on screen. `None` (every other plan) skips
+    /// the wait entirely; closing and exiting immediately is still
+    /// correct for a run nothing outside it is watching.
+    #[serde(default)]
+    pub pause_before_exit_ms: Option<u64>,
 }
 
 fn default_single_axis_light() -> Vec<String> {
@@ -637,6 +648,9 @@ async fn run(mut store: Store, desktop: dioxus_desktop::DesktopContext, plan_pat
                     }
                 }
             }
+        }
+        if let Some(pause_ms) = plan.pause_before_exit_ms {
+            tokio::time::sleep(std::time::Duration::from_millis(pause_ms)).await;
         }
         close_view(&mut store, view);
     }
