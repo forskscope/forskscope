@@ -228,11 +228,19 @@
 /* The merge button sits inside a diff-line-height (24px) table row. The global
    `button { min-height: var(--control-h) }` (36px) would force the act row
    taller than the diff rows and break per-line alignment. Constrain the button
-   to the line height so every act row matches its left/right counterparts. */
+   to the line height so every act row matches its left/right counterparts.
+   F227: the previous `calc(var(--line-h) - 2px)` measured 22px, 2px short
+   of the 24px target floor (WCAG 2.5.8) - `var(--line-h)` itself (24px,
+   exactly what `.diff-act-row`/`.diff-act` already size their own row and
+   cell to, both above) meets the floor without growing past either one -
+   a table row/cell's own `height` is a minimum, not a cap, so only a
+   child *taller* than it would have pushed the row open; this child
+   matches it exactly. The overlap and label-placement checks (RFC-098)
+   are what would catch a per-line misalignment if it ever did. */
 .apply-btn {
   display: inline-flex; align-items: center; gap: .15rem;
   min-height: 0;
-  height: calc(var(--line-h) - 2px);
+  height: var(--line-h);
   line-height: 1;
   padding: 0 .3rem;
 }

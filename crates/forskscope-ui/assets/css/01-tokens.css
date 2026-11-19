@@ -171,8 +171,23 @@
    needed its own new colour. */
 .contrast-high { --focus-ring: 3px; }
 
+/* F229 (handoff 104): --accent/--ok/--warn/--ins-mark (as text) measured
+   4.6-6.7:1 under Standard's own values - below the 7:1 *High* already
+   promises every other piece of text (review 097 stage 2 §2.2's own
+   scope, until this gap). Each value here is this theme's own base hue,
+   lightened or darkened (never shifted toward another token's own hue,
+   so the breadcrumb/accent, the = status glyph and the ≠ one all stay as
+   distinguishable from each other and from --text as they already were)
+   until it clears 7:1 against its own tightest surface, `--surface-3`,
+   with margin (computed: worst case 7.15, the accent/*Filter*-pressed
+   tint pair below; every plain --surface* pair itself clears at least
+   7.15) - `contrast.rs`'s own `high_min: Some(HIGH_TEXT_MIN)`, newly
+   added to every pair these four feed as text, is what the gate now
+   checks this against. --ok and --ins-mark share one new value in each
+   theme, the same way they already share their base one. */
 .theme-dark.contrast-high {
   --muted: #cfd3d8; --control-border: var(--muted);
+  --accent: #afcbff; --ok: #85dda6; --warn: #e8c773; --ins-mark: #85dda6;
 }
 .theme-light.contrast-high {
   --muted: #3f464c; --control-border: var(--muted);
@@ -181,9 +196,11 @@
      override (measured; every other theme/cv-rgsafe pair already does,
      see the cv-rgsafe overrides below for the three that don't). */
   --del-mark: #a81d26;
+  --accent: #064793; --ok: #125726; --warn: #654400; --ins-mark: #125726;
 }
 .theme-night.contrast-high {
   --muted: #c2c9d0; --control-border: var(--muted);
+  --accent: #77b6ff; --ok: #5ec86d; --warn: #dfa939; --ins-mark: #5ec86d;
 }
 
 /* The three cv-rgsafe `--rep-mark` pairs that don't already clear 4.5:1
@@ -192,7 +209,25 @@
    clear it, 4.57-5.85). Each still combines with its theme's own
    `.contrast-high` block above for `--muted`/`--control-border` - this
    compound selector only needs to add what it alone changes. */
-.theme-dark.cv-rgsafe.contrast-high { --rep-mark: #ecc064; }
+/* F229: --ins-mark needs the same treatment here - .theme-X.cv-rgsafe
+   (its own blue, review 163) and .theme-X.contrast-high (its own raised
+   green, above) are both 2-class selectors that would otherwise race by
+   source order alone when both apply at once (F220's own lesson, same
+   as --rep-mark/--del-mark below) - this 3-class rule wins outright
+   instead, lightened/darkened from cv-rgsafe's own blue (never the
+   green), so "blue under red-green-safe" still holds under *High* too. */
+/* F229, found live building it: raising --ins-mark here (above) dropped
+   "--text on .in-ins" (25%-ins-mark-over-rep-bg) under 4.5 in dark and
+   night - lightening the mark to clear 7:1 on its own also lightened
+   what it tints .in-ins's own background toward, converging with --text
+   instead of away from it (light's own darkened ins-mark moves the
+   opposite way, so it never had this problem). --rep-bg darkened here,
+   only for this exact combination, re-opens the gap: dark/night
+   measured 8.84/7.94 (--text on --rep-bg, ≥7 still), 6.46/6.18
+   (--rep-mark on --rep-bg, ≥4.5), 5.05/4.88 (.in-ins, ≥4.5), 5.73/5.40
+   (.in-del, which this also feeds, ≥4.5 - its own floor regardless of
+   *High*). */
+.theme-dark.cv-rgsafe.contrast-high { --rep-mark: #ecc064; --ins-mark: #a4d0ff; --rep-bg: #2b403d; }
 .theme-light.cv-rgsafe.contrast-high {
   --rep-mark: #4a3200;
   /* Restates cv-rgsafe's own already-compliant del-mark (5.32:1 against
@@ -204,5 +239,6 @@
      let two same-specificity rules race for one property on one
      element). */
   --del-mark: #944800;
+  --ins-mark: #0747a0;
 }
-.theme-night.cv-rgsafe.contrast-high { --rep-mark: #e3b04e; }
+.theme-night.cv-rgsafe.contrast-high { --rep-mark: #e3b04e; --ins-mark: #75b7ff; --rep-bg: #27383a; }

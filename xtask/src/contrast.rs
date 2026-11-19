@@ -105,15 +105,20 @@ const PAIRS: &[Pair] = &[
     Pair { label: "--muted on --surface",           fg: "var(--muted)",  bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     Pair { label: "--muted on --surface-2",         fg: "var(--muted)",  bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     Pair { label: "--muted on --surface-3",         fg: "var(--muted)",  bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
-    Pair { label: "--accent on --surface",          fg: "var(--accent)", bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--accent on --surface-2",        fg: "var(--accent)", bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--accent on --surface-3",        fg: "var(--accent)", bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--warn on --surface",            fg: "var(--warn)",   bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--warn on --surface-2",          fg: "var(--warn)",   bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--warn on --surface-3",          fg: "var(--warn)",   bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--ok on --surface",              fg: "var(--ok)",     bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--ok on --surface-2",            fg: "var(--ok)",     bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--ok on --surface-3",             fg: "var(--ok)",     bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    // F229 (handoff 104): these three, --warn's and --ok's own three
+    // below, and --ins-mark's own "(status text)" three further down all
+    // gain high_min: Some(HIGH_TEXT_MIN) too - the same RFC-097 promise
+    // as --muted above, not yet asked of these four when that stage
+    // shipped.
+    Pair { label: "--accent on --surface",          fg: "var(--accent)", bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--accent on --surface-2",        fg: "var(--accent)", bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--accent on --surface-3",        fg: "var(--accent)", bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--warn on --surface",            fg: "var(--warn)",   bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--warn on --surface-2",          fg: "var(--warn)",   bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--warn on --surface-3",          fg: "var(--warn)",   bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--ok on --surface",              fg: "var(--ok)",     bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--ok on --surface-2",            fg: "var(--ok)",     bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--ok on --surface-3",             fg: "var(--ok)",     bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     Pair { label: "--err on --surface",             fg: "var(--err)",    bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: None },
     Pair { label: "--err on --surface-2",           fg: "var(--err)",    bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: None },
     Pair { label: "--err on --surface-3",           fg: "var(--err)",    bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: None },
@@ -124,9 +129,9 @@ const PAIRS: &[Pair] = &[
     // standard-palette value missed --surface-3 here: 4.21, fixed to
     // #187533, now 4.80 - the mark-on-its-own-background use below is
     // unaffected, still comfortably over 3:1.)
-    Pair { label: "--ins-mark on --surface (status text)",   fg: "var(--ins-mark)", bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--ins-mark on --surface-2 (status text)", fg: "var(--ins-mark)", bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--ins-mark on --surface-3 (status text)", fg: "var(--ins-mark)", bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: None },
+    Pair { label: "--ins-mark on --surface (status text)",   fg: "var(--ins-mark)", bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--ins-mark on --surface-2 (status text)", fg: "var(--ins-mark)", bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--ins-mark on --surface-3 (status text)", fg: "var(--ins-mark)", bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     // ── Text on a diff hunk's own row background ──
     Pair { label: "--text on --del-bg",   fg: "var(--text)",  bg: "var(--del-bg)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     Pair { label: "--text on --ins-bg",   fg: "var(--text)",  bg: "var(--ins-bg)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
@@ -167,8 +172,11 @@ const PAIRS: &[Pair] = &[
     // background that was about to change again, not just "checked"),
     // and that the row's own selection indicator - the leading-edge
     // --accent bar (03-components.css), not the tint - get its own entry.
-    Pair { label: "--warn on a selected tree row",     fg: "var(--warn)",     bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--ins-mark on a selected tree row", fg: "var(--ins-mark)", bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN, high_min: None },
+    // F229: both gain high_min: Some(HIGH_TEXT_MIN) too - verified against
+    // this tinted background directly, not assumed from the plain-surface
+    // pairs above (worst case measured: 7.53, light's own --ins-mark).
+    Pair { label: "--warn on a selected tree row",     fg: "var(--warn)",     bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--ins-mark on a selected tree row", fg: "var(--ins-mark)", bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     Pair { label: "--err on a selected tree row",      fg: "var(--err)",      bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN, high_min: None },
     Pair { label: "--text on a selected tree row",     fg: "var(--text)",     bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN, high_min: None },
     Pair { label: "--muted on a selected tree row",    fg: "var(--muted)",    bg: "color-mix(in srgb, var(--accent) 10%, var(--surface))", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
@@ -185,8 +193,10 @@ const PAIRS: &[Pair] = &[
     // `.filter-toggle[aria-pressed="true"]`/`.path-bar.pane-focused`: 12%/
     // 10% put --accent's own text below 4.5:1 (4.41/4.32 dark/light;
     // 4.46 light) - both now 8% (review 196 §3).
-    Pair { label: "--accent on *Filter* pressed",       fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 8%, var(--surface-2))", assumed_over: None, min: TEXT_MIN, high_min: None },
-    Pair { label: "--accent on the focused pane's path bar", fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 8%, var(--surface-2))", assumed_over: None, min: TEXT_MIN, high_min: None },
+    // F229: both gain high_min: Some(HIGH_TEXT_MIN) too - the tightest of
+    // every pair this round touches (7.06, light), still comfortably over.
+    Pair { label: "--accent on *Filter* pressed",       fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 8%, var(--surface-2))", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    Pair { label: "--accent on the focused pane's path bar", fg: "var(--accent)", bg: "color-mix(in srgb, var(--accent) 8%, var(--surface-2))", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     // ── Solid token-on-token fills elsewhere in the app ──
     Pair { label: "--surface on --accent (*Compare*, hover)",  fg: "var(--surface)", bg: "var(--accent)",    assumed_over: None, min: TEXT_MIN, high_min: None },
     // RFC-099 §1: `.icon-btn`'s own hover tint, not a token - mixed into

@@ -62,7 +62,7 @@ Changes take effect immediately.
 | Value | Description |
 |-------|-------------|
 | **Standard** (default) | The usual contrast, which meets WCAG AA in every theme. |
-| **High** | Stronger contrast: secondary text and the diff's lines at 7:1 or more, field and button edges and the diff's marks at 4.5:1 or more, a thicker focus ring, and disabled buttons with a dashed edge. |
+| **High** | Stronger contrast: all text at 7:1 or more, field and button edges and the diff's marks at 4.5:1 or more, a thicker focus ring, and disabled buttons with a dashed edge. |
 | **System** | *High* when your system asks for more contrast, otherwise *Standard*. |
 
 Combines with every theme and colour-vision choice. Changes take effect

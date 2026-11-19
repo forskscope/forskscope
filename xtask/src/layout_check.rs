@@ -1207,129 +1207,13 @@ struct ExpectedFailure {
     detail_contains: Option<&'static str>,
 }
 
-/// Review 221 §3's own decided triage: four findings, registered
-/// (`ROADMAP.md`) and not yet fixed - the owner's scope call, not a
-/// probe decision. Each stays on this list exactly as long as the
-/// finding itself does; removing the fix removes the finding, and
-/// `report`'s own "an expected failure stopped happening" check (not
-/// this list - a gate silently drifting out of date would defeat the
-/// entire point of naming them) then requires removing the entry too.
-const EXPECTED_FAILURES: &[ExpectedFailure] = &[
-    ExpectedFailure {
-        f_number: "F227",
-        kind: "hit_area",
-        view: None,
-        element_base: "button.bc-root",
-        detail_contains: None,
-    },
-    ExpectedFailure {
-        f_number: "F227",
-        kind: "hit_area",
-        view: None,
-        element_base: "button.path-btn",
-        detail_contains: None,
-    },
-    ExpectedFailure {
-        f_number: "F227",
-        kind: "hit_area",
-        view: None,
-        element_base: "button.apply-btn",
-        detail_contains: None,
-    },
-    ExpectedFailure {
-        f_number: "F228",
-        kind: "hit_area",
-        view: Some("settings"),
-        element_base: "input",
-        detail_contains: Some("12.0x12.0px"),
-    },
-    ExpectedFailure {
-        f_number: "F229",
-        kind: "rendered_contrast",
-        view: None,
-        element_base: "span.stats",
-        detail_contains: None,
-    },
-    ExpectedFailure {
-        f_number: "F229",
-        kind: "rendered_contrast",
-        view: None,
-        element_base: "button.bc-seg",
-        detail_contains: None,
-    },
-    ExpectedFailure {
-        f_number: "F229",
-        kind: "rendered_contrast",
-        view: None,
-        element_base: "button.filter-btn.active",
-        detail_contains: None,
-    },
-    ExpectedFailure {
-        f_number: "F229",
-        kind: "rendered_contrast",
-        view: None,
-        element_base: "span.tree-status.status-equal",
-        detail_contains: None,
-    },
-    ExpectedFailure {
-        f_number: "F229",
-        kind: "rendered_contrast",
-        view: None,
-        element_base: "span.tree-status.status-different",
-        detail_contains: None,
-    },
-    ExpectedFailure {
-        f_number: "F229",
-        kind: "rendered_contrast",
-        view: None,
-        element_base: "span.status-key-glyph.status-equal",
-        detail_contains: None,
-    },
-    ExpectedFailure {
-        f_number: "F229",
-        kind: "rendered_contrast",
-        view: None,
-        element_base: "span.status-key-glyph.status-different",
-        detail_contains: None,
-    },
-    ExpectedFailure {
-        f_number: "F229",
-        kind: "rendered_contrast",
-        view: None,
-        element_base: "span.dir-status.status-different",
-        detail_contains: None,
-    },
-    ExpectedFailure {
-        f_number: "F230",
-        kind: "overflow",
-        view: None,
-        element_base: "div.explorer-footer",
-        detail_contains: None,
-    },
-    ExpectedFailure {
-        f_number: "F230",
-        kind: "overflow",
-        view: None,
-        element_base: "div.explorer-status-key",
-        detail_contains: None,
-    },
-    // Review 221 §3, registered by review 222 §2: the row (`.profile-
-    // row`) is 24px tall with `cursor: pointer`, but only the label's
-    // own text (~15px, centred in the row by its flex alignment)
-    // actually responds - a click in the row's own padding does
-    // nothing. `element_base` alone is enough; `input.profile-radio`
-    // is its own, unique class, and its own size scales with text
-    // size (unlike F228's fixed-size native checkboxes), so no
-    // `detail_contains` could narrow it further without missing some
-    // text sizes.
-    ExpectedFailure {
-        f_number: "F231",
-        kind: "hit_area",
-        view: Some("settings"),
-        element_base: "input.profile-radio",
-        detail_contains: None,
-    },
-];
+/// Review 221 §3's own decided triage, F227–F231 (handoff 104) the
+/// last five registered here - every one now fixed, so this list is
+/// empty: the gate's own "an expected failure stopped happening" check
+/// (below) would otherwise fail loudly on its own if a fix were ever
+/// reverted without also restoring the matching entry here, the same
+/// as it did for each of these five the moment its own fix landed.
+const EXPECTED_FAILURES: &[ExpectedFailure] = &[];
 
 /// `"button.bc-root#18"` -> `"button.bc-root"` - the index past the
 /// last `#` is never part of an [`ExpectedFailure`]'s own match.
@@ -1562,10 +1446,20 @@ mod tests {
 
     #[test]
     fn matches_expected_requires_kind_and_base_and_honours_view_and_detail() {
-        let f227 = &EXPECTED_FAILURES[0];
-        assert_eq!(f227.f_number, "F227");
+        // `matches_expected` is pure - exercised here against its own,
+        // local fixtures (the exact shape F227/F228 once had on
+        // `EXPECTED_FAILURES`, now empty, handoff 104) rather than real
+        // entries on the list, so this test stays meaningful whether or
+        // not anything is currently registered there.
+        let no_view_entry = ExpectedFailure {
+            f_number: "FTEST",
+            kind: "hit_area",
+            view: None,
+            element_base: "button.bc-root",
+            detail_contains: None,
+        };
         assert!(matches_expected(
-            f227,
+            &no_view_entry,
             "hit_area",
             "explorer",
             "button.bc-root#18",
@@ -1573,7 +1467,7 @@ mod tests {
         ));
         // Wrong kind.
         assert!(!matches_expected(
-            f227,
+            &no_view_entry,
             "overflow",
             "explorer",
             "button.bc-root#18",
@@ -1581,46 +1475,48 @@ mod tests {
         ));
         // Wrong base (a different control entirely).
         assert!(!matches_expected(
-            f227,
+            &no_view_entry,
             "hit_area",
             "explorer",
             "button.path-btn#16",
             None
         ));
 
-        let f228 = EXPECTED_FAILURES
-            .iter()
-            .find(|e| e.f_number == "F228")
-            .expect("F228 is on the list");
-        assert_eq!(f228.view, Some("settings"));
+        let view_and_detail_entry = ExpectedFailure {
+            f_number: "FTEST2",
+            kind: "hit_area",
+            view: Some("settings"),
+            element_base: "input",
+            detail_contains: Some("12.0x12.0px"),
+        };
         assert!(matches_expected(
-            f228,
+            &view_and_detail_entry,
             "hit_area",
             "settings",
             "input#48",
             Some("12.0x12.0px, needs 24x24")
         ));
-        // Right base, wrong view - F228 is Settings-only.
+        // Right base, wrong view.
         assert!(!matches_expected(
-            f228,
+            &view_and_detail_entry,
             "hit_area",
             "shortcuts",
             "input#48",
             Some("12.0x12.0px, needs 24x24")
         ));
         // Right base and view, but the wrong size - a different,
-        // untriaged bare `input` finding must not slip through as F228.
+        // untriaged bare `input` finding must not slip through.
         assert!(!matches_expected(
-            f228,
+            &view_and_detail_entry,
             "hit_area",
             "settings",
             "input#48",
             Some("18.0x18.0px, needs 24x24")
         ));
         // `input.profile-radio` carries its own class, so its own base
-        // never collides with F228's bare `input`.
+        // never collides with a bare `input`.
         assert!(!matches_expected(
-            f228,
+            &view_and_detail_entry,
             "hit_area",
             "settings",
             "input.profile-radio#206",
@@ -1628,17 +1524,15 @@ mod tests {
         ));
     }
 
-    /// Every entry's own `f_number` is one of the five reviews 221 §3
-    /// and 222 §2 actually decided - catches a typo or a sixth,
-    /// undecided entry added without a review to back it.
+    /// `EXPECTED_FAILURES` is empty (handoff 104: F227-F231, the only
+    /// entries it ever held, are all fixed) - falsify by adding any
+    /// entry back without a review to back it.
     #[test]
-    fn every_expected_failure_names_a_decided_f_number() {
-        for e in EXPECTED_FAILURES {
-            assert!(
-                ["F227", "F228", "F229", "F230", "F231"].contains(&e.f_number),
-                "unexpected F-number on the list: {}",
-                e.f_number
-            );
-        }
+    fn expected_failures_is_empty() {
+        assert!(
+            EXPECTED_FAILURES.is_empty(),
+            "EXPECTED_FAILURES should be empty - every triaged finding is fixed; a new \
+             entry needs its own review to back it, not a silent addition"
+        );
     }
 }

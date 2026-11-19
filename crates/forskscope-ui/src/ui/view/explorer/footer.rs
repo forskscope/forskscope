@@ -50,7 +50,14 @@ pub fn ExplorerFooter(
                                 aria_hidden: "true",
                                 "{kind.glyph()}"
                             }
-                            " "
+                            // F230: a non-breaking space, not a plain one -
+                            // `.status-key-item` no longer forbids wrapping
+                            // (a long label, Japanese especially, needs to
+                            // wrap across lines rather than overflow), so
+                            // this is what keeps the glyph glued to its own
+                            // label's first character instead of landing
+                            // alone at the end of a line.
+                            "\u{a0}"
                             {status_kind_label(*kind, lang, *is_dir)}
                         }
                     }

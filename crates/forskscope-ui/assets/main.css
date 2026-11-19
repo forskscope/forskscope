@@ -200,8 +200,23 @@ body,
    needed its own new colour. */
 .contrast-high { --focus-ring: 3px; }
 
+/* F229 (handoff 104): --accent/--ok/--warn/--ins-mark (as text) measured
+   4.6-6.7:1 under Standard's own values - below the 7:1 *High* already
+   promises every other piece of text (review 097 stage 2 §2.2's own
+   scope, until this gap). Each value here is this theme's own base hue,
+   lightened or darkened (never shifted toward another token's own hue,
+   so the breadcrumb/accent, the = status glyph and the ≠ one all stay as
+   distinguishable from each other and from --text as they already were)
+   until it clears 7:1 against its own tightest surface, `--surface-3`,
+   with margin (computed: worst case 7.15, the accent/*Filter*-pressed
+   tint pair below; every plain --surface* pair itself clears at least
+   7.15) - `contrast.rs`'s own `high_min: Some(HIGH_TEXT_MIN)`, newly
+   added to every pair these four feed as text, is what the gate now
+   checks this against. --ok and --ins-mark share one new value in each
+   theme, the same way they already share their base one. */
 .theme-dark.contrast-high {
   --muted: #cfd3d8; --control-border: var(--muted);
+  --accent: #afcbff; --ok: #85dda6; --warn: #e8c773; --ins-mark: #85dda6;
 }
 .theme-light.contrast-high {
   --muted: #3f464c; --control-border: var(--muted);
@@ -210,9 +225,11 @@ body,
      override (measured; every other theme/cv-rgsafe pair already does,
      see the cv-rgsafe overrides below for the three that don't). */
   --del-mark: #a81d26;
+  --accent: #064793; --ok: #125726; --warn: #654400; --ins-mark: #125726;
 }
 .theme-night.contrast-high {
   --muted: #c2c9d0; --control-border: var(--muted);
+  --accent: #77b6ff; --ok: #5ec86d; --warn: #dfa939; --ins-mark: #5ec86d;
 }
 
 /* The three cv-rgsafe `--rep-mark` pairs that don't already clear 4.5:1
@@ -221,7 +238,25 @@ body,
    clear it, 4.57-5.85). Each still combines with its theme's own
    `.contrast-high` block above for `--muted`/`--control-border` - this
    compound selector only needs to add what it alone changes. */
-.theme-dark.cv-rgsafe.contrast-high { --rep-mark: #ecc064; }
+/* F229: --ins-mark needs the same treatment here - .theme-X.cv-rgsafe
+   (its own blue, review 163) and .theme-X.contrast-high (its own raised
+   green, above) are both 2-class selectors that would otherwise race by
+   source order alone when both apply at once (F220's own lesson, same
+   as --rep-mark/--del-mark below) - this 3-class rule wins outright
+   instead, lightened/darkened from cv-rgsafe's own blue (never the
+   green), so "blue under red-green-safe" still holds under *High* too. */
+/* F229, found live building it: raising --ins-mark here (above) dropped
+   "--text on .in-ins" (25%-ins-mark-over-rep-bg) under 4.5 in dark and
+   night - lightening the mark to clear 7:1 on its own also lightened
+   what it tints .in-ins's own background toward, converging with --text
+   instead of away from it (light's own darkened ins-mark moves the
+   opposite way, so it never had this problem). --rep-bg darkened here,
+   only for this exact combination, re-opens the gap: dark/night
+   measured 8.84/7.94 (--text on --rep-bg, ≥7 still), 6.46/6.18
+   (--rep-mark on --rep-bg, ≥4.5), 5.05/4.88 (.in-ins, ≥4.5), 5.73/5.40
+   (.in-del, which this also feeds, ≥4.5 - its own floor regardless of
+   *High*). */
+.theme-dark.cv-rgsafe.contrast-high { --rep-mark: #ecc064; --ins-mark: #a4d0ff; --rep-bg: #2b403d; }
 .theme-light.cv-rgsafe.contrast-high {
   --rep-mark: #4a3200;
   /* Restates cv-rgsafe's own already-compliant del-mark (5.32:1 against
@@ -233,8 +268,9 @@ body,
      let two same-specificity rules race for one property on one
      element). */
   --del-mark: #944800;
+  --ins-mark: #0747a0;
 }
-.theme-night.cv-rgsafe.contrast-high { --rep-mark: #e3b04e; }
+.theme-night.cv-rgsafe.contrast-high { --rep-mark: #e3b04e; --ins-mark: #75b7ff; --rep-bg: #27383a; }
 
 /* @source css/02-layout-shell.css */
 /* ── 02-layout-shell ────────────────────────────────────────────────────────
@@ -637,6 +673,22 @@ select option { background: var(--surface); color: var(--text); }
    never touch — the label is the one that wraps, since the control stays
    legible only at or near its natural width. */
 .modal .field > span:first-child { flex: 1 1 auto; min-width: 0; }
+/* F228: the three checkboxes' own field names its words with a real
+   `<label for>` now, not a bare `span` - RFC-098's own hit-area check
+   unions an `<input>` with exactly that association
+   (`querySelector('label[for="' + el.id + '"]')`; a `<label>` merely
+   *wrapping* the input and its words, tried first, never matched it at
+   all, so the union never applied). A separate rule from `span:first-
+   child` above, not folded in: `min-height`/`display: flex` here would
+   otherwise grow *every* other field's own row too, not just these
+   three - measured live, the plain label (~16.7px, its own text line)
+   still fell short of the union's 24px floor even once it carried the
+   union at all; `.profile-name`'s own fix (03-components.css) is the
+   same shape, for the same reason. */
+.modal .field > label:first-child {
+  flex: 1 1 auto; min-width: 0; min-height: 24px;
+  display: flex; align-items: center;
+}
 .modal .field > select,
 .modal .field > input { flex-shrink: 0; }
 /* RFC-097 stage 3 §6: the field's own help text, visible instead of a
@@ -809,7 +861,14 @@ code.path-display {
 .advanced-toggle:hover { color: var(--accent); }
 
 .profile-list { display: flex; flex-direction: column; gap: .2rem; margin: .25rem 0; }
-.profile-row { position: relative; display: flex; align-items: center; gap: .3rem; padding: .2rem .35rem; border-radius: 5px; cursor: pointer; }
+/* F231: `min-height` is this row's own 24px floor (WCAG 2.5.8) - without
+   it, a short font's own line height could still leave the row (and so
+   `.profile-name`'s own stretched box below) under it. */
+.profile-row {
+  position: relative; display: flex; align-items: center; gap: .3rem;
+  padding: .2rem .35rem; border-radius: 5px; cursor: pointer;
+  min-height: 24px;
+}
 .profile-row:hover { background: var(--surface-3); }
 /* Review 196 §1: `transparent` here always resolves to `.modal`'s own
    --surface (nothing else sits behind a profile row) - spelled out so the
@@ -826,7 +885,26 @@ code.path-display {
 .profile-row:has(.profile-radio:focus-visible) {
   outline: var(--focus-ring) solid var(--focus); outline-offset: 1px;
 }
-.profile-name { flex: 1; font-size: 13px; font-family: ui-monospace, monospace; white-space: pre; cursor: pointer; }
+/* F231: the row itself (`.profile-row`, above) carries `cursor:
+   pointer` and the hover/active fill, but had no click handler of its
+   own - only this label (associated with the radio by `for`, which is
+   what RFC-098's own hit-area check unions an `<input>` with) and the
+   radio's own, visually-hidden 1px box actually responded, and this
+   label's own box, unstretched, was just its text's line height
+   (~15px), centred in the row by the parent's own `align-items:
+   center` - a click in the row's own padding, which looks exactly as
+   clickable as the rest of the row, did nothing. `align-self: stretch`
+   alone, measured live, did not fill the row - this `min-height: 24px`
+   (matching `.profile-row`'s own, above) is what actually does; kept
+   together since either alone, measured, left the union short.
+   `display: flex; align-items: center` keeps its own text centred
+   within the taller box either way. */
+.profile-name {
+  flex: 1; font-size: 13px; font-family: ui-monospace, monospace;
+  white-space: pre; cursor: pointer;
+  align-self: stretch; display: flex; align-items: center;
+  min-height: 24px;
+}
 /* F214 (handoff 094): was `opacity: .4` / `:hover { opacity: 1 }` (2.41:1,
    light) - the button's own text colour (`--text` on its `--surface-3`
    fill, via the base `button` rule) clears 4.5:1 with no help from
@@ -868,7 +946,18 @@ code.path-display {
   min-height: 24px;
 }
 .bc-seg:hover { background: var(--surface-3); }
-.bc-root { background: none; border: none; color: var(--muted); cursor: pointer; padding: .1rem .4rem; border-radius: 3px; font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
+/* F227: measured about 18px wide (the glyph plus its own padding),
+   under the 24px target floor (WCAG 2.5.8) - `.bc-seg`'s own
+   `min-height`/flex-centering shape above, applied to width instead,
+   since this control's own height (36px, the global `button`'s own
+   `min-height`) already clears it. */
+.bc-root {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  padding: .1rem .4rem; border-radius: 3px; font-size: 13px; font-weight: 700;
+  letter-spacing: -.02em;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px;
+}
 .bc-root:hover { color: var(--accent); background: var(--surface-3); }
 .bc-sep { color: var(--muted); padding: 0 .05rem; }
 .bc-current { color: var(--text); font-weight: 600; padding: .1rem .2rem; }
@@ -893,7 +982,17 @@ code.path-display {
   background: var(--surface-2); border-bottom: 1px solid var(--border);
   min-height: 32px; flex-wrap: nowrap; overflow: hidden; flex-shrink: 0;
 }
-.path-btn { background: none; border: 1px solid transparent; border-radius: 3px; padding: .1rem .35rem; cursor: pointer; color: var(--text); font-size: 13px; line-height: 1.2; }
+/* F227: the ←/→/↑ glyphs measured 23.2-23.7px wide, 0.3-0.8px short of
+   the 24px target floor (WCAG 2.5.8) - the same `min-width` +
+   flex-centering shape as `.bc-root` above; this control's own height
+   already clears it the same way. */
+.path-btn {
+  background: none; border: 1px solid transparent; border-radius: 3px;
+  padding: .1rem .35rem; cursor: pointer; color: var(--text); font-size: 13px;
+  line-height: 1.2;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px;
+}
 .path-btn:hover:not(:disabled) { background: var(--surface-3); border-color: var(--border); }
 .path-btn:disabled { color: var(--muted); cursor: default; }
 /* Review 211 §4: same `--muted-standard` pin as `.compare-btn:disabled`
@@ -1100,7 +1199,15 @@ code.path-display {
 }
 .explorer-footer-main { display: flex; align-items: center; gap: .5rem; min-height: var(--control-h); }
 .explorer-status-key { font-size: 12px; color: var(--muted); line-height: 1.4; }
-.status-key-item { white-space: nowrap; }
+/* F230: `NotCompared`'s own Japanese wording ("ディレクトリの中身は比較
+   されていません — ディープ比較を使用してください") measured wider than
+   the key's own box by itself, at 800×560/200% - `white-space: nowrap`
+   (removed) let it overflow sideways instead of wrapping, the only item
+   on its own line with no neighbour to break at. The glyph stays glued
+   to its label's own first character with `\u{00A0}` (`footer.rs`,
+   between them) instead, rather than keeping the whole item unbreakable -
+   a line break can now fall anywhere after that, same as any other text,
+   never splitting the glyph from what it marks. */
 .status-key-glyph { font-weight: 600; }
 .status-key-sep { color: var(--muted); }
 .targets-label { flex: 1; display: flex; align-items: center; gap: .2rem; overflow: hidden; min-width: 0; font-size: 12px; }
@@ -1370,11 +1477,19 @@ code.path-display {
 /* The merge button sits inside a diff-line-height (24px) table row. The global
    `button { min-height: var(--control-h) }` (36px) would force the act row
    taller than the diff rows and break per-line alignment. Constrain the button
-   to the line height so every act row matches its left/right counterparts. */
+   to the line height so every act row matches its left/right counterparts.
+   F227: the previous `calc(var(--line-h) - 2px)` measured 22px, 2px short
+   of the 24px target floor (WCAG 2.5.8) - `var(--line-h)` itself (24px,
+   exactly what `.diff-act-row`/`.diff-act` already size their own row and
+   cell to, both above) meets the floor without growing past either one -
+   a table row/cell's own `height` is a minimum, not a cap, so only a
+   child *taller* than it would have pushed the row open; this child
+   matches it exactly. The overlap and label-placement checks (RFC-098)
+   are what would catch a per-line misalignment if it ever did. */
 .apply-btn {
   display: inline-flex; align-items: center; gap: .15rem;
   min-height: 0;
-  height: calc(var(--line-h) - 2px);
+  height: var(--line-h);
   line-height: 1;
   padding: 0 .3rem;
 }

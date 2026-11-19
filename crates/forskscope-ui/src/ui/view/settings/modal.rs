@@ -373,10 +373,21 @@ pub fn SettingsModal() -> Element {
                 }
 
                 if *show_advanced.read() {
+                    // F228: a real `<label for>` names the checkbox (the
+                    // words become its accessible name, no bare
+                    // "checkbox" announcement) and are part of its own
+                    // click target natively, no handler of its own
+                    // needed. A `<label>` merely *wrapping* the input
+                    // was tried first and reverted: RFC-098's own
+                    // hit-area check unions an `<input>` with exactly a
+                    // `label[for="<id>"]`, never a wrapping one, so the
+                    // finding stayed - `for`/`id` is what the check
+                    // (and native screen readers) both already know.
                     div { class: "field",
-                        span { {t(lang, "Enable binary comparison")} }
+                        label { r#for: "binary-cmp-checkbox", {t(lang, "Enable binary comparison")} }
                         input {
                             r#type: "checkbox",
+                            id: "binary-cmp-checkbox",
                             checked: cur.enable_binary_comparison,
                             aria_describedby: "binary-cmp-help",
                             onchange: move |e| {
@@ -408,9 +419,10 @@ pub fn SettingsModal() -> Element {
                         }
                     }
                     div { class: "field",
-                        span { {t(lang, "Remember Explorer directories")} }
+                        label { r#for: "remember-dirs-checkbox", {t(lang, "Remember Explorer directories")} }
                         input {
                             r#type: "checkbox",
+                            id: "remember-dirs-checkbox",
                             checked: cur.remember_explorer_dirs,
                             aria_describedby: "remember-dirs-help",
                             onchange: move |e| {
@@ -487,9 +499,10 @@ pub fn SettingsModal() -> Element {
                     // not only the tree. The help line below says so, per the
                     // handoff: this is not a display-only setting.
                     div { class: "field",
-                        span { {t(lang, "Hide hidden files")} }
+                        label { r#for: "hide-dotfiles-checkbox", {t(lang, "Hide hidden files")} }
                         input {
                             r#type: "checkbox",
+                            id: "hide-dotfiles-checkbox",
                             checked: cur.hide_dotfiles,
                             aria_describedby: "hide-dotfiles-help",
                             onchange: move |e| {
@@ -912,6 +925,281 @@ mod tests {
             Some("Already in the list"),
             "the second, repeated duplicate must announce too (a real SetText \
              mutation, not just an unchanged value), got {after_second_duplicate:?}"
+        );
+    }
+
+    /// Clicks the real *Advanced*/*Hide advanced* toggle through its own
+    /// registered `onclick` listener (`dom.runtime().handle_event`, the
+    /// same mechanism the ignore-list live-region test above already
+    /// uses for `oninput`) - never a direct call to `show_advanced.set`,
+    /// which would prove the signal works, not that the button's own
+    /// listener is wired to it. Returns the mutations from opening it,
+    /// which is when the three checkboxes below first render at all.
+    fn open_advanced(
+        dom: &mut VirtualDom,
+        first: &dioxus_core::Mutations,
+    ) -> dioxus_core::Mutations {
+        use dioxus::html::{PlatformEventData, SerializedHtmlEventConverter, SerializedMouseData};
+        use std::any::Any;
+        use std::rc::Rc;
+
+        set_event_converter(Box::new(SerializedHtmlEventConverter));
+
+        // At first mount (before Advanced ever opens), the `onclick`
+        // listeners appear in this exact DOM order: the scrim, the
+        // modal's own `stop_propagation`, the *About* control, the
+        // *Advanced* toggle itself, then the bottom *Close* button -
+        // nothing else is clickable yet (every other control inside
+        // Advanced doesn't exist until it opens). The second-to-last one
+        // is always the toggle, regardless of how many non-`onclick`
+        // fields (`SelectField`s, mostly) sit between the top of the
+        // dialog and it.
+        let click_ids: Vec<dioxus_core::ElementId> = first
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::NewEventListener { name, id } if name == "click" => {
+                    Some(*id)
+                }
+                _ => None,
+            })
+            .collect();
+        let toggle_id =
+            *click_ids.iter().rev().nth(1).expect(
+                "expected at least the scrim, About, the toggle and Close to register onclick",
+            );
+        let event = Event::new(
+            Rc::new(PlatformEventData::new(Box::new(
+                SerializedMouseData::default(),
+            ))) as Rc<dyn Any>,
+            true,
+        );
+        dom.runtime().handle_event("click", event, toggle_id);
+        dom.render_immediate_to_vec()
+    }
+
+    /// F228 (handoff 104): each checkbox's own accessible name comes from
+    /// its wrapping `<label>`'s own text (RFC-009 §7's own i18n layer,
+    /// `t(lang, ...)`), not a bare `aria-label` this harness could check
+    /// directly — the words are a dynamic `CreateTextNode`, present once
+    /// *Advanced* opens, in both languages the real i18n table carries.
+    /// Falsify by renaming the English key with no matching Japanese
+    /// entry added: `t()` falls back to the English key itself, making
+    /// the Japanese assertion fail (a literal, untranslated string, not
+    /// `i18n.rs`'s own Japanese text).
+    #[test]
+    fn each_checkbox_label_carries_its_own_words_in_both_languages() {
+        fn text_nodes(m: &dioxus_core::Mutations) -> Vec<String> {
+            m.edits
+                .iter()
+                .filter_map(|e| match e {
+                    dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                    _ => None,
+                })
+                .collect()
+        }
+
+        for (lang, binary_cmp, remember_dirs, hide_dotfiles) in [
+            (
+                Lang::En,
+                "Enable binary comparison",
+                "Remember Explorer directories",
+                "Hide hidden files",
+            ),
+            (
+                Lang::Ja,
+                "バイナリ比較を有効にする",
+                "エクスプローラーのディレクトリを記憶する",
+                "隠しファイルを非表示にする",
+            ),
+        ] {
+            fn root(lang: Lang) -> Element {
+                let settings = AppSettings {
+                    language: lang,
+                    ..AppSettings::default()
+                };
+                use_context_provider(|| Store::new(settings, Default::default(), false));
+                rsx! { SettingsModal {} }
+            }
+            let mut vdom = VirtualDom::new_with_props(root, lang);
+            let first = vdom.rebuild_to_vec();
+            let opened = open_advanced(&mut vdom, &first);
+            let texts = text_nodes(&opened);
+            for (label, words) in [
+                ("binary comparison", binary_cmp),
+                ("remember dirs", remember_dirs),
+                ("hide dotfiles", hide_dotfiles),
+            ] {
+                assert!(
+                    texts.iter().any(|t| t == words),
+                    "{label} ({lang:?}): expected {words:?} among the words Advanced \
+                     renders, got {texts:?}"
+                );
+            }
+        }
+    }
+
+    /// F228: the existing `onchange` handler on `enable_binary_comparison`
+    /// still flips the real setting when a real `change` event reaches it
+    /// — unchanged behaviour, re-confirmed here because the markup around
+    /// it changed (a bare `<span>` named by nothing, to a real `<label
+    /// for>` that is both its accessible name and, via RFC-098's own
+    /// hit-area union, part of its own click target - the actual fix):
+    /// giving the input an `id` and pairing it with the label's own
+    /// `for` must not have detached the listener from the input itself.
+    /// Falsify by wrapping the checkbox's own `onchange` in a condition
+    /// that never fires: `enable_binary_comparison` then stays `false`
+    /// after a real `change` event says `true`, failing the assertion.
+    #[test]
+    fn the_labelled_checkbox_still_toggles_the_real_setting() {
+        use dioxus::html::{PlatformEventData, SerializedFormData};
+        use std::any::Any;
+        use std::rc::Rc;
+
+        // `Store::new` creates `Signal`s "in scope" at `ScopeId::ROOT`,
+        // which needs a live runtime to register against - built inside
+        // `root`, same as every other test in this file, never before
+        // `VirtualDom::new` exists (a bare `fn() -> Element` besides,
+        // with no capture allowed). `Store` is `Clone + Copy` (every
+        // field is a `Signal`), so this thread-local - set once, the
+        // first and only time `root` itself runs - hands back a handle
+        // to the exact same underlying signals the real `onchange`
+        // handler writes to, not a copy taken before the event ran;
+        // each test runs on its own thread (`cargo test`'s own default),
+        // so nothing else ever touches this cell.
+        thread_local! {
+            static STORE: std::cell::Cell<Option<Store>> = const { std::cell::Cell::new(None) };
+        }
+        fn root() -> Element {
+            let store = Store::new(AppSettings::default(), Default::default(), false);
+            STORE.set(Some(store));
+            use_context_provider(move || store);
+            rsx! { SettingsModal {} }
+        }
+
+        let mut vdom = VirtualDom::new(root);
+        let first = vdom.rebuild_to_vec();
+        let opened = open_advanced(&mut vdom, &first);
+
+        let checkbox_id = opened
+            .edits
+            .iter()
+            .find_map(|m| match m {
+                dioxus_core::Mutation::NewEventListener { name, id } if name == "change" => {
+                    Some(*id)
+                }
+                _ => None,
+            })
+            .expect("the binary-comparison checkbox must register an onchange listener");
+
+        // `FormData::checked()` (dioxus-html) is `value().parse::<bool>()
+        // .unwrap_or(false)` - "true" is how a real checked change event
+        // communicates it, the same `SerializedFormData` shape the
+        // ignore-list live-region test above already uses for `oninput`.
+        let event = Event::new(
+            Rc::new(PlatformEventData::new(Box::new(SerializedFormData::new(
+                "true".to_string(),
+                Vec::new(),
+            )))) as Rc<dyn Any>,
+            true,
+        );
+        vdom.runtime().handle_event("change", event, checkbox_id);
+        let _ = vdom.render_immediate_to_vec();
+
+        // Reading a `Signal` needs an active `RuntimeGuard`, which
+        // `in_runtime` provides - a bare read outside it panics with
+        // "must be called from inside a Dioxus runtime".
+        let enabled = vdom.in_runtime(|| {
+            let store = STORE.get().expect("root must have run and set STORE");
+            store.settings.read().enable_binary_comparison
+        });
+        assert!(
+            enabled,
+            "a real change event (checked: true) must flip enable_binary_comparison"
+        );
+    }
+
+    /// F231 (handoff 104): the fix itself is pure CSS (`.profile-name`'s
+    /// own `min-height`/`align-self: stretch`, `03-components.css`) -
+    /// the radio's own `onchange` handler was never touched, so this
+    /// re-confirms it still selects the right profile through a real
+    /// event, the same shape as
+    /// `the_labelled_checkbox_still_toggles_the_real_setting` above for
+    /// F228. The row filling to become the actual click target (what
+    /// the fix changes) is a rendered-layout claim, not an event-wiring
+    /// one — RFC-098's own hit-area check is the evidence
+    /// for that half, named in this handoff's own evidence plan, not a
+    /// unit test's to repeat.
+    #[test]
+    fn selecting_the_second_profile_still_updates_the_real_setting() {
+        use dioxus::html::{PlatformEventData, SerializedFormData};
+        use std::any::Any;
+        use std::rc::Rc;
+
+        thread_local! {
+            static STORE2: std::cell::Cell<Option<Store>> = const { std::cell::Cell::new(None) };
+        }
+        fn root() -> Element {
+            let mut settings = AppSettings::default();
+            // Exactly two profiles, regardless of how many built-in ones
+            // `AppSettings::default()` ships today - the second profile's
+            // own radio is then unambiguously index 1, the assertion
+            // below.
+            settings.profiles.truncate(1);
+            let mut second = settings
+                .profiles
+                .first()
+                .expect("AppSettings::default() ships at least one built-in profile")
+                .clone();
+            second.name = "Second".to_string();
+            second.built_in = false;
+            settings.profiles.push(second);
+            let store = Store::new(settings, Default::default(), false);
+            STORE2.set(Some(store));
+            use_context_provider(move || store);
+            rsx! { SettingsModal {} }
+        }
+
+        let mut vdom = VirtualDom::new(root);
+        let first = vdom.rebuild_to_vec();
+        let opened = open_advanced(&mut vdom, &first);
+
+        // The two profile radios' own `onchange` listeners are the last
+        // "change" listeners Advanced registers (every checkbox and
+        // `SelectField` above the profile list in DOM order registers
+        // one too) - the second profile's own radio is the very last.
+        let radio_ids: Vec<dioxus_core::ElementId> = opened
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::NewEventListener { name, id } if name == "change" => {
+                    Some(*id)
+                }
+                _ => None,
+            })
+            .collect();
+        let second_radio_id = *radio_ids
+            .last()
+            .expect("the second profile's own radio must register an onchange listener");
+
+        let event = Event::new(
+            Rc::new(PlatformEventData::new(Box::new(SerializedFormData::new(
+                "true".to_string(),
+                Vec::new(),
+            )))) as Rc<dyn Any>,
+            true,
+        );
+        vdom.runtime()
+            .handle_event("change", event, second_radio_id);
+        let _ = vdom.render_immediate_to_vec();
+
+        let active_profile = vdom.in_runtime(|| {
+            let store = STORE2.get().expect("root must have run and set STORE2");
+            store.settings.read().active_profile
+        });
+        assert_eq!(
+            active_profile, 1,
+            "a real change event on the second profile's own radio must select it"
         );
     }
 }

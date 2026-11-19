@@ -82,6 +82,22 @@
    never touch — the label is the one that wraps, since the control stays
    legible only at or near its natural width. */
 .modal .field > span:first-child { flex: 1 1 auto; min-width: 0; }
+/* F228: the three checkboxes' own field names its words with a real
+   `<label for>` now, not a bare `span` - RFC-098's own hit-area check
+   unions an `<input>` with exactly that association
+   (`querySelector('label[for="' + el.id + '"]')`; a `<label>` merely
+   *wrapping* the input and its words, tried first, never matched it at
+   all, so the union never applied). A separate rule from `span:first-
+   child` above, not folded in: `min-height`/`display: flex` here would
+   otherwise grow *every* other field's own row too, not just these
+   three - measured live, the plain label (~16.7px, its own text line)
+   still fell short of the union's 24px floor even once it carried the
+   union at all; `.profile-name`'s own fix (03-components.css) is the
+   same shape, for the same reason. */
+.modal .field > label:first-child {
+  flex: 1 1 auto; min-width: 0; min-height: 24px;
+  display: flex; align-items: center;
+}
 .modal .field > select,
 .modal .field > input { flex-shrink: 0; }
 /* RFC-097 stage 3 §6: the field's own help text, visible instead of a
@@ -254,7 +270,14 @@ code.path-display {
 .advanced-toggle:hover { color: var(--accent); }
 
 .profile-list { display: flex; flex-direction: column; gap: .2rem; margin: .25rem 0; }
-.profile-row { position: relative; display: flex; align-items: center; gap: .3rem; padding: .2rem .35rem; border-radius: 5px; cursor: pointer; }
+/* F231: `min-height` is this row's own 24px floor (WCAG 2.5.8) - without
+   it, a short font's own line height could still leave the row (and so
+   `.profile-name`'s own stretched box below) under it. */
+.profile-row {
+  position: relative; display: flex; align-items: center; gap: .3rem;
+  padding: .2rem .35rem; border-radius: 5px; cursor: pointer;
+  min-height: 24px;
+}
 .profile-row:hover { background: var(--surface-3); }
 /* Review 196 §1: `transparent` here always resolves to `.modal`'s own
    --surface (nothing else sits behind a profile row) - spelled out so the
@@ -271,7 +294,26 @@ code.path-display {
 .profile-row:has(.profile-radio:focus-visible) {
   outline: var(--focus-ring) solid var(--focus); outline-offset: 1px;
 }
-.profile-name { flex: 1; font-size: 13px; font-family: ui-monospace, monospace; white-space: pre; cursor: pointer; }
+/* F231: the row itself (`.profile-row`, above) carries `cursor:
+   pointer` and the hover/active fill, but had no click handler of its
+   own - only this label (associated with the radio by `for`, which is
+   what RFC-098's own hit-area check unions an `<input>` with) and the
+   radio's own, visually-hidden 1px box actually responded, and this
+   label's own box, unstretched, was just its text's line height
+   (~15px), centred in the row by the parent's own `align-items:
+   center` - a click in the row's own padding, which looks exactly as
+   clickable as the rest of the row, did nothing. `align-self: stretch`
+   alone, measured live, did not fill the row - this `min-height: 24px`
+   (matching `.profile-row`'s own, above) is what actually does; kept
+   together since either alone, measured, left the union short.
+   `display: flex; align-items: center` keeps its own text centred
+   within the taller box either way. */
+.profile-name {
+  flex: 1; font-size: 13px; font-family: ui-monospace, monospace;
+  white-space: pre; cursor: pointer;
+  align-self: stretch; display: flex; align-items: center;
+  min-height: 24px;
+}
 /* F214 (handoff 094): was `opacity: .4` / `:hover { opacity: 1 }` (2.41:1,
    light) - the button's own text colour (`--text` on its `--surface-3`
    fill, via the base `button` rule) clears 4.5:1 with no help from
@@ -313,7 +355,18 @@ code.path-display {
   min-height: 24px;
 }
 .bc-seg:hover { background: var(--surface-3); }
-.bc-root { background: none; border: none; color: var(--muted); cursor: pointer; padding: .1rem .4rem; border-radius: 3px; font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
+/* F227: measured about 18px wide (the glyph plus its own padding),
+   under the 24px target floor (WCAG 2.5.8) - `.bc-seg`'s own
+   `min-height`/flex-centering shape above, applied to width instead,
+   since this control's own height (36px, the global `button`'s own
+   `min-height`) already clears it. */
+.bc-root {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  padding: .1rem .4rem; border-radius: 3px; font-size: 13px; font-weight: 700;
+  letter-spacing: -.02em;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px;
+}
 .bc-root:hover { color: var(--accent); background: var(--surface-3); }
 .bc-sep { color: var(--muted); padding: 0 .05rem; }
 .bc-current { color: var(--text); font-weight: 600; padding: .1rem .2rem; }
@@ -338,7 +391,17 @@ code.path-display {
   background: var(--surface-2); border-bottom: 1px solid var(--border);
   min-height: 32px; flex-wrap: nowrap; overflow: hidden; flex-shrink: 0;
 }
-.path-btn { background: none; border: 1px solid transparent; border-radius: 3px; padding: .1rem .35rem; cursor: pointer; color: var(--text); font-size: 13px; line-height: 1.2; }
+/* F227: the ←/→/↑ glyphs measured 23.2-23.7px wide, 0.3-0.8px short of
+   the 24px target floor (WCAG 2.5.8) - the same `min-width` +
+   flex-centering shape as `.bc-root` above; this control's own height
+   already clears it the same way. */
+.path-btn {
+  background: none; border: 1px solid transparent; border-radius: 3px;
+  padding: .1rem .35rem; cursor: pointer; color: var(--text); font-size: 13px;
+  line-height: 1.2;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px;
+}
 .path-btn:hover:not(:disabled) { background: var(--surface-3); border-color: var(--border); }
 .path-btn:disabled { color: var(--muted); cursor: default; }
 /* Review 211 §4: same `--muted-standard` pin as `.compare-btn:disabled`
