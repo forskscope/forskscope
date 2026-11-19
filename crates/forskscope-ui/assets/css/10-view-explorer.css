@@ -129,7 +129,22 @@
   flex-shrink: 0;
 }
 .explorer-footer-main { display: flex; align-items: center; gap: .5rem; min-height: var(--control-h); }
-.explorer-status-key { font-size: 12px; color: var(--muted); line-height: 1.4; }
+/* F230: `display: flex; flex-wrap: wrap` - with the plain block this
+   used to be, a wrapped `span.status-key-item` (below) is still one
+   inline box spanning two lines, and `getBoundingClientRect()` on an
+   inline box that wraps covers its *full* width on every line it
+   touches, including the empty stretch past its own short second
+   line - CI's own narrower font metrics (Xvfb, not this machine's)
+   wrapped `NotCompared`'s own long Japanese wording, and that bounding
+   box then "overlapped" every sibling sharing its second line, a false
+   positive from the check reading one wrapped inline box's rect, not a
+   real covering of pixels (confirmed on CI, run `44561474698`; missed
+   locally, since this machine's own fonts never wrapped that item at
+   the sizes tried). A flex item never spans two of its own container's
+   *lines* - `flex-wrap: wrap` moves it to the next line whole, so only
+   its own internal text (not its box) wraps within one flex line, and
+   each sibling on that line keeps its own, non-overlapping flex slot. */
+.explorer-status-key { font-size: 12px; color: var(--muted); line-height: 1.4; display: flex; flex-wrap: wrap; }
 /* F230: `NotCompared`'s own Japanese wording ("ディレクトリの中身は比較
    されていません — ディープ比較を使用してください") measured wider than
    the key's own box by itself, at 800×560/200% - `white-space: nowrap`
@@ -138,7 +153,11 @@
    to its label's own first character with `\u{00A0}` (`footer.rs`,
    between them) instead, rather than keeping the whole item unbreakable -
    a line break can now fall anywhere after that, same as any other text,
-   never splitting the glyph from what it marks. */
+   never splitting the glyph from what it marks. `min-width: 0` (a flex
+   item defaults to `min-width: auto`, its own unwrapped content width,
+   which would keep it from ever actually wrapping) is what lets this
+   text wrap at all once the item is a flex item (above). */
+.status-key-item { min-width: 0; max-width: 100%; }
 .status-key-glyph { font-weight: 600; }
 .status-key-sep { color: var(--muted); }
 .targets-label { flex: 1; display: flex; align-items: center; gap: .2rem; overflow: hidden; min-width: 0; font-size: 12px; }
