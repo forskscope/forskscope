@@ -72,8 +72,8 @@ cargo xtask contrast
 # Opens real forskscope windows and, on an unexpected failure, screenshots
 # one - never run this from a normal desktop shell (review 223 §2.2): it
 # refuses outside CI or this project's own nested session,
-# .git-exclude/gui/session.sh --fixture <any> --backend x11 -- cargo xtask
-# layout-check
+# .git-exclude/gui/session.sh --fixture <any> --backend x11 --no-app --
+# cargo xtask layout-check
 cargo xtask layout-check
 
 # The in-app keyboard reference and keyboard.md name the same keys (F165)
@@ -464,18 +464,25 @@ the `layout-probe` Cargo feature) and a single `document::eval` call per
 combination, so it is also usable headless under `xvfb-run` (CI's own job
 runs this way; see `.github/workflows/ci.yml`'s `layout-check` job).
 
-**Never run from a normal desktop shell (review 223 §2.2).** It opens real
-`forskscope` windows — the full matrix launches it five times, a capture
-re-launch (below) once more per unexpected finding — and on an unexpected
-finding, screenshots one of them; from a plain shell there is no way to
-tell this run's own window from the maintainer's own, real session, so
-`require_private_display` (`xtask/src/layout_check.rs`) refuses to run
-unless `$CI` is set (CI's own Xvfb) or both `$FORSKSCOPE_GUI_SESSION` and
-`$NIRI_SOCKET` are (this project's own nested `niri` session,
-`.git-exclude/gui/session.sh`, which now exports both):
+**Never run from a normal desktop shell (review 223 §2.2, review 224 §2).**
+It opens real `forskscope` windows — the full matrix launches it five
+times, a capture re-launch (below) once more per unexpected finding — and
+on an unexpected finding, screenshots one of them; from a plain shell
+there is no way to tell this run's own window from the maintainer's own,
+real session, so `require_private_display` (`xtask/src/layout_check.rs`)
+refuses to run unless `$GITHUB_ACTIONS == "true"` and `$DISPLAY` are set
+(CI's own Xvfb — not the generic `$CI`, which a developer's own shell can
+also set) or `$FORSKSCOPE_GUI_SESSION`, `$NIRI_SOCKET` and
+`$SESSION_X11_DISPLAY` all are (this project's own nested `niri` session,
+`.git-exclude/gui/session.sh`, which now exports all three). Every launch
+sets `DISPLAY` explicitly from that value — never the caller's own,
+inherited one, even once the checks above already passed. `--no-app`
+(review 224 §2.3) starts the session itself with no app of its own, since
+this driver launches its own (one, or several short-lived ones) — without
+it, every local run would be a second instance alongside session.sh's:
 
 ```sh
-.git-exclude/gui/session.sh --fixture <any> --backend x11 -- \
+.git-exclude/gui/session.sh --fixture <any> --backend x11 --no-app -- \
   cargo xtask layout-check
 ```
 

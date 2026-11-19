@@ -129,30 +129,39 @@ fn write_no_activation_conf(out_dir: &Path) -> PathBuf {
     path
 }
 
-/// Review 223 §2.2: this launches real `forskscope` windows - many of
-/// them, and on an unexpected failure, screenshots one - so it must
-/// never run against the caller's own, real display: a plain desktop
-/// shell has no way to tell "this run's own window" from the
-/// maintainer's real session, and `capture_via_niri` (before this
-/// review) took the *first* window sharing its app id, which can be
-/// either one. Two private displays this driver is allowed to use,
-/// checked before anything else runs or builds:
-/// - **CI:** `$CI`, set by GitHub Actions on every job, every runner -
-///   its own Xvfb.
+/// Review 223 §2.2's own two private displays, review 224 §2's own
+/// three corrections to how each is proven:
+/// - **CI:** `$GITHUB_ACTIONS == "true"`, set only by GitHub Actions
+///   itself - review 224 §2.2 found the generic `$CI` (the previous
+///   check) is common enough that a developer's own shell can set it
+///   too, passing this check on a real desktop. Paired with `$DISPLAY`
+///   (which `xvfb-run` sets, CI's own private Xvfb).
 /// - **Locally:** inside `.git-exclude/gui/session.sh`'s own nested
-///   `niri` - both `$FORSKSCOPE_GUI_SESSION` (the marker session.sh now
-///   exports) and `$NIRI_SOCKET` (its own IPC socket, which
-///   `capture_via_niri` also needs) must be set; neither alone proves
-///   the other, so both are required.
+///   `niri` - both `$FORSKSCOPE_GUI_SESSION` and `$NIRI_SOCKET` must be
+///   set (neither alone proves the other), paired with
+///   `$SESSION_X11_DISPLAY` (session.sh's own nested X11 socket).
 ///
-/// Refuses outright otherwise - never falls back to the caller's own
-/// display for any reason.
-fn require_private_display() {
-    let ci = std::env::var_os("CI").is_some();
-    let in_session = std::env::var_os("FORSKSCOPE_GUI_SESSION").is_some()
-        && std::env::var_os("NIRI_SOCKET").is_some();
-    if ci || in_session {
-        return;
+/// Returns the one `DISPLAY` value every launch must now set
+/// explicitly (review 224 §2.1): `GDK_BACKEND=x11` alone never set
+/// `DISPLAY` on its own - a launch with no explicit `.env("DISPLAY",
+/// ...)` silently keeps whatever `$DISPLAY` the caller's own shell
+/// had, real desktop included, even once every check above already
+/// passed. Refuses outright otherwise - never falls back to the
+/// caller's own display for any reason, called before anything else
+/// runs or builds.
+fn require_private_display() -> String {
+    if std::env::var("GITHUB_ACTIONS").as_deref() == Ok("true")
+        && let Ok(display) = std::env::var("DISPLAY")
+        && !display.is_empty()
+    {
+        return display;
+    }
+    if std::env::var_os("FORSKSCOPE_GUI_SESSION").is_some()
+        && std::env::var_os("NIRI_SOCKET").is_some()
+        && let Ok(display) = std::env::var("SESSION_X11_DISPLAY")
+        && !display.is_empty()
+    {
+        return display;
     }
     eprintln!(
         "layout-check: refusing to run - no private display.\n\
@@ -163,18 +172,19 @@ fn require_private_display() {
          there.\n\
          \n\
          Run it in CI (already wired, .github/workflows/ci.yml), or locally\n\
-         inside this project's own nested session:\n\
+         inside this project's own nested session, which starts no app of its\n\
+         own (review 224 §2.3 - this driver launches its own):\n\
          \n\
-         .git-exclude/gui/session.sh --fixture <any> --backend x11 -- \\\n\
+         .git-exclude/gui/session.sh --fixture <any> --backend x11 --no-app -- \\\n\
            cargo xtask layout-check [--inject <defect>]"
     );
     process::exit(2);
 }
 
 pub fn run(root: &Path, opts: &RunOptions) {
-    require_private_display();
+    let display = require_private_display();
     if let Some(defect) = &opts.inject {
-        run_inject(root, opts, defect);
+        run_inject(root, opts, defect, &display);
         return;
     }
     // Review 216 §4: "every run starts empty" - a stale prior run's own
@@ -226,7 +236,7 @@ pub fn run(root: &Path, opts: &RunOptions) {
         );
 
         println!("layout-check: running layout checks, window {window_label}...");
-        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf);
+        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf, &display);
         per_window_ms.push((format!("layout {window_label}"), elapsed.as_millis()));
 
         for row in read_jsonl(&results_path) {
@@ -256,7 +266,7 @@ pub fn run(root: &Path, opts: &RunOptions) {
         println!(
             "layout-check: running rendered contrast, window {window_label} at {text_size}%..."
         );
-        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf);
+        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf, &display);
         per_window_ms.push((
             format!("contrast {window_label}@{text_size}%"),
             elapsed.as_millis(),
@@ -269,7 +279,14 @@ pub fn run(root: &Path, opts: &RunOptions) {
 
     let (any_failures, failing_rows) = report(&all_rows, &per_window_ms);
     if !failing_rows.is_empty() {
-        capture_failures(&opts.out_dir, &fixtures, &bin, &bus_conf, &failing_rows);
+        capture_failures(
+            &opts.out_dir,
+            &fixtures,
+            &bin,
+            &bus_conf,
+            &failing_rows,
+            &display,
+        );
     }
     if any_failures {
         std::process::exit(1);
@@ -390,7 +407,7 @@ impl Drop for InjectedDefect {
 /// function only ever returns a `bool`, letting its guard drop by
 /// ordinary scope exit before this caller decides whether to exit at
 /// all.
-fn run_inject(root: &Path, opts: &RunOptions, defect: &str) {
+fn run_inject(root: &Path, opts: &RunOptions, defect: &str, display: &str) {
     let Some(rule) = injected_rule(defect) else {
         eprintln!("layout-check: unknown --inject defect {defect:?}. Known defects:");
         for (name, _) in INJECTABLE_DEFECTS {
@@ -404,7 +421,7 @@ fn run_inject(root: &Path, opts: &RunOptions, defect: &str) {
         .map(|(_, field)| *field)
         .expect("injected_rule and INJECTABLE_DEFECTS name the same set");
 
-    if !run_inject_guarded(root, opts, defect, rule, field) {
+    if !run_inject_guarded(root, opts, defect, rule, field, display) {
         process::exit(1);
     }
 }
@@ -421,6 +438,7 @@ fn run_inject_guarded(
     defect: &str,
     rule: &str,
     field: &str,
+    display: &str,
 ) -> bool {
     let css_path = root.join(INJECT_CSS_PATH);
     let original = fs::read_to_string(&css_path)
@@ -508,6 +526,7 @@ fn run_inject_guarded(
         &bus_conf,
         &results_path,
         &capture_path,
+        display,
     );
     let rows = read_jsonl(&results_path);
 
@@ -751,7 +770,18 @@ fn write_contrast_plan(
 /// (see [`NO_ACTIVATION_SESSION_CONF`]) is what then stops that fresh
 /// bus from activating any real service, the portal included, the
 /// moment something asks for a name nobody on it owns yet.
-fn launch_and_wait(bin: &Path, plan_path: &Path, data_dir: &Path, bus_conf: &Path) -> Duration {
+///
+/// `display`: [`require_private_display`]'s own return value, set
+/// explicitly (review 224 §2.1) - `GDK_BACKEND=x11` alone never sets
+/// `DISPLAY`, so without this a launch silently keeps whatever
+/// `$DISPLAY` this process itself inherited, real desktop included.
+fn launch_and_wait(
+    bin: &Path,
+    plan_path: &Path,
+    data_dir: &Path,
+    bus_conf: &Path,
+    display: &str,
+) -> Duration {
     fs::create_dir_all(data_dir.join("xdg/config")).unwrap();
     fs::create_dir_all(data_dir.join("xdg/state")).unwrap();
     fs::create_dir_all(data_dir.join("xdg/cache")).unwrap();
@@ -776,6 +806,7 @@ fn launch_and_wait(bin: &Path, plan_path: &Path, data_dir: &Path, bus_conf: &Pat
         // connection attempt that can never complete.
         .env("GTK_A11Y", "none")
         .env("GDK_BACKEND", "x11")
+        .env("DISPLAY", display)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -1019,6 +1050,7 @@ fn launch_and_capture(
     bus_conf: &Path,
     results_path: &Path,
     capture_path: &Path,
+    display: &str,
 ) {
     fs::create_dir_all(data_dir.join("xdg/config")).unwrap();
     fs::create_dir_all(data_dir.join("xdg/state")).unwrap();
@@ -1043,6 +1075,7 @@ fn launch_and_capture(
         .env("XDG_DATA_HOME", data_dir.join("xdg/data"))
         .env("GTK_A11Y", "none")
         .env("GDK_BACKEND", "x11")
+        .env("DISPLAY", display)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -1087,6 +1120,7 @@ fn capture_failures(
     bin: &Path,
     bus_conf: &Path,
     failing_rows: &[serde_json::Value],
+    display: &str,
 ) {
     let captures_dir = out_dir.join("failure-captures");
     fs::create_dir_all(&captures_dir)
@@ -1107,6 +1141,7 @@ fn capture_failures(
             bus_conf,
             &results_path,
             &capture_path,
+            display,
         );
     }
 }
