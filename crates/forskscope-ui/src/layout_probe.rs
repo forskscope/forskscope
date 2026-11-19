@@ -828,6 +828,7 @@ async fn measure_one(
         required_mark_contrast,
         zoom,
         before_zoom_width,
+        text_size,
     );
     let (raw, recv_retries) = match retry_recv(&script).await {
         Ok(r) => r,
@@ -1143,6 +1144,7 @@ fn measurement_script(
     required_mark_contrast: f64,
     zoom: f64,
     before_zoom_width: Option<f64>,
+    text_size: u32,
 ) -> String {
     let interactive_selector = INTERACTIVE_SELECTOR;
     let overflow_allowlist = json_string_array(OVERFLOW_ALLOWLIST);
@@ -1233,13 +1235,20 @@ fn measurement_script(
   // never guaranteed to be *before* the render the Rust side's write
   // already scheduled, so if the zoom beat this call here, there's
   // nothing left to wait for either way.
+  // Review 223 §2.1: resolves `true` once the width has actually
+  // changed (or there was nothing to wait for - `beforeWidth === null`),
+  // `false` on the deadline passing with it still unchanged - the
+  // caller's own signal to report a probe error instead of measuring a
+  // view that's still showing the *previous* combination's layout. A
+  // silent `resolve()` either way, the previous shape, let that exact
+  // failure through disguised as a passing measurement.
   function waitForZoomChange(beforeWidth, timeoutMs) {{
     return new Promise((resolve) => {{
-      if (beforeWidth === null) {{ resolve(); return; }}
+      if (beforeWidth === null) {{ resolve(true); return; }}
       const deadline = performance.now() + timeoutMs;
       function tick() {{
-        if (document.documentElement.clientWidth !== beforeWidth) {{ resolve(); return; }}
-        if (performance.now() > deadline) {{ resolve(); return; }}
+        if (document.documentElement.clientWidth !== beforeWidth) {{ resolve(true); return; }}
+        if (performance.now() > deadline) {{ resolve(false); return; }}
         requestAnimationFrame(tick);
       }}
       requestAnimationFrame(tick);
@@ -1422,7 +1431,15 @@ fn measurement_script(
     // as `error` instead, the same as the two explicit checks above.
     try {{
     const t0 = performance.now();
-    await waitForZoomChange({before_zoom_width_js}, {SETTLE_TIMEOUT_MS});
+    const beforeZoomWidth = {before_zoom_width_js};
+    const zoomChanged = await waitForZoomChange(beforeZoomWidth, {SETTLE_TIMEOUT_MS});
+    if (!zoomChanged) {{
+      dioxus.send(JSON.stringify({{
+        settled: false, settle_ms: performance.now() - t0, overflow: [], clipped: [],
+        error: 'zoom from ' + beforeZoomWidth + ' never applied (text size {text_size}%)',
+      }}));
+      return;
+    }}
     const settled = await settle('{ready_selector}', {SETTLE_QUIET_MS}, {SETTLE_TIMEOUT_MS});
     const settle_ms = performance.now() - t0;
     if (!document.querySelector('{ready_selector}')) {{
@@ -1950,7 +1967,7 @@ mod tests {
 
     #[test]
     fn measurement_script_embeds_the_given_selector_once() {
-        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0, None);
+        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0, None, 100);
         assert!(script.contains("querySelector('.diff-wrap')"));
     }
 
@@ -2019,7 +2036,7 @@ mod tests {
 
     #[test]
     fn measurement_script_checks_the_toast_with_element_from_point() {
-        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0, None);
+        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0, None, 100);
         assert!(script.contains("elementFromPoint"));
         assert!(script.contains("querySelector('.toast')"));
         assert!(script.contains("toast_check"));
