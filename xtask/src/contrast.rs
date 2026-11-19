@@ -915,6 +915,87 @@ mod tests {
         );
     }
 
+    /// Review 222 §4: `layout_probe.rs`'s own rendered-contrast
+    /// floors (`RENDERED_CONTRAST_MARK_MIN`/`_HIGH_MIN`, and the two
+    /// literals in its own `required_text_contrast` line) are copied
+    /// by hand from this file's `CONTROL_MIN`/`HIGH_MARK_MIN`/
+    /// `TEXT_MIN`/`HIGH_TEXT_MIN` - the drift reply 189c's own doc
+    /// comments there named as the risk of that, made to fail here
+    /// instead of staying a comment nobody re-checks. Reads the real,
+    /// committed source text (the same `env!("CARGO_MANIFEST_DIR")`
+    /// convention `keyboard_docs.rs`'s own "the real files agree
+    /// today" test already uses, for the same reason: a synthetic
+    /// fixture would prove this parser works, not that the two files
+    /// actually agree) rather than a copy, so an edit to either file
+    /// without the other is what this falsifies, not a hand-written
+    /// stand-in for one of them. Falsify by changing any one of the
+    /// four values on either side.
+    #[test]
+    fn layout_probes_own_mirrored_contrast_floors_match_this_files() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("xtask/ is inside the workspace root");
+        let probe_src = fs::read_to_string(root.join("crates/forskscope-ui/src/layout_probe.rs"))
+            .expect("read layout_probe.rs");
+
+        let mark_min = extract_f64_after(&probe_src, "const RENDERED_CONTRAST_MARK_MIN: f64 = ");
+        assert_eq!(
+            mark_min, CONTROL_MIN,
+            "RENDERED_CONTRAST_MARK_MIN vs CONTROL_MIN"
+        );
+
+        let high_mark_min =
+            extract_f64_after(&probe_src, "const RENDERED_CONTRAST_MARK_HIGH_MIN: f64 = ");
+        assert_eq!(
+            high_mark_min, HIGH_MARK_MIN,
+            "RENDERED_CONTRAST_MARK_HIGH_MIN vs HIGH_MARK_MIN"
+        );
+
+        // `let required_text_contrast = if contrast == "high" { 7.0 } else { 4.5 };`
+        // - both literals on the same line, so the second search starts
+        // just after the first literal ends, not from the start of the
+        // string (which would just find the same `{ ` again).
+        let marker = "required_text_contrast = if contrast == \"high\" { ";
+        let after_marker = probe_src
+            .find(marker)
+            .expect("required_text_contrast line not found")
+            + marker.len();
+        let high_text_min = extract_f64_after(&probe_src[after_marker..], "");
+        assert_eq!(
+            high_text_min, HIGH_TEXT_MIN,
+            "required_text_contrast's High literal vs HIGH_TEXT_MIN"
+        );
+        let after_high = after_marker
+            + probe_src[after_marker..]
+                .find(' ')
+                .expect("a digit then a space after the High literal");
+        let text_min = extract_f64_after(&probe_src[after_high..], "} else { ");
+        assert_eq!(
+            text_min, TEXT_MIN,
+            "required_text_contrast's Standard literal vs TEXT_MIN"
+        );
+    }
+
+    /// `marker` followed immediately by a decimal number - the number
+    /// is everything up to the first character that isn't a digit or
+    /// `.`. Panics (a test failure, not a silently-wrong assertion)
+    /// if `marker` isn't found or what follows isn't a number -
+    /// either means this test's own parsing fell out of step with
+    /// `layout_probe.rs`'s own source shape, as much a signal to look
+    /// at as a real mismatch would be.
+    fn extract_f64_after(src: &str, marker: &str) -> f64 {
+        let after = src.find(marker).unwrap_or_else(|| {
+            panic!("marker {marker:?} not found in layout_probe.rs - did its source shape change?")
+        }) + marker.len();
+        let rest = &src[after..];
+        let end = rest
+            .find(|c: char| !c.is_ascii_digit() && c != '.')
+            .unwrap_or(rest.len());
+        rest[..end]
+            .parse()
+            .unwrap_or_else(|_| panic!("{:?} after {marker:?} isn't a number", &rest[..end]))
+    }
+
     // ── test fixture: a throwaway crates/forskscope-ui/assets/css/ tree,
     //    the same std::env::temp_dir() + pid + line!() convention
     //    crate_boundaries.rs's own tests already use - no tempfile

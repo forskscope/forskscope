@@ -562,10 +562,43 @@ async fn run(mut store: Store, desktop: dioxus_desktop::DesktopContext, plan_pat
         }
     };
 
+    // Review 222 §4: a deterministic signal for "has the zoom this
+    // text-size change applies actually landed", in place of the
+    // display-scale-dependent `expectedVw`/`expectedVh` review 221 §2.1
+    // tried and reverted. Tracked once for the whole plan, across every
+    // view - `set_zoom_level` is a webview-level setting, not scoped to
+    // whatever view is currently open, so a text size already reached
+    // under an earlier view needs no second wait under a later one.
+    //
+    // Found live: seeded at `None`, the plan's own first text size -
+    // whenever it's 100, `app.rs`'s own startup render (its own "0u32
+    // sentinel... first render always differs from a real step"
+    // comment) has already applied that zoom before this loop's own
+    // first write even runs, which is then a no-op `Signal` write that
+    // never calls `set_zoom_level` again - nothing ever changes
+    // `clientWidth` away from what this loop reads as "before", so
+    // the wait ran out its own full timeout, every time, for no
+    // reason. Seeded from the app's own actual current value instead,
+    // read directly off the signal - no eval needed, this side of the
+    // page already knows it.
+    let mut last_text_size_applied: Option<u32> = Some(store.settings.read().text_size);
+
     for view in &plan.views {
         open_view(&mut store, view);
         open_view_followup(view).await;
         for &text_size in &plan.text_sizes {
+            // Captured *before* the write just below schedules the
+            // render that calls `set_zoom_level` (`app.rs`'s own
+            // render-body guard) - `measure_one`'s own settle wait
+            // then polls for this value to change, rather than for a
+            // computed target it would otherwise have to get exactly
+            // right on every display.
+            let before_zoom_width = if last_text_size_applied == Some(text_size) {
+                None
+            } else {
+                last_text_size_applied = Some(text_size);
+                Some(read_client_width().await)
+            };
             store.settings.write().text_size = text_size;
             for language in &plan.languages {
                 store.settings.write().language = parse_lang(language);
@@ -585,6 +618,7 @@ async fn run(mut store: Store, desktop: dioxus_desktop::DesktopContext, plan_pat
                                 contrast,
                                 colour_vision,
                                 plan.window_size.clone(),
+                                before_zoom_width,
                             )
                             .await;
                             let line = match serde_json::to_string(&row) {
@@ -744,6 +778,7 @@ async fn measure_one(
     contrast: &str,
     colour_vision: &str,
     window_size: Option<String>,
+    before_zoom_width: Option<f64>,
 ) -> ResultRow {
     // A `store.settings.write()` just before this call schedules a
     // re-render; Dioxus flushes it on this same async executor's own
@@ -778,6 +813,7 @@ async fn measure_one(
         required_text_contrast,
         required_mark_contrast,
         zoom,
+        before_zoom_width,
     );
     let (raw, recv_retries) = match retry_recv(&script).await {
         Ok(r) => r,
@@ -873,6 +909,30 @@ const RECV_RETRIES: u32 = 5;
 /// way, only whether a round trip happened at all.
 async fn retry_eval_true() {
     retry_eval("true").await;
+}
+
+/// Review 222 §4: `document.documentElement.clientWidth`, read before
+/// a text-size change is applied - the "before" half of the
+/// deterministic zoom wait `measurement_script`'s own settle condition
+/// uses, in place of a computed, display-scale-dependent target
+/// (review 221 §2.1's own `expectedVw`/`expectedVh`, tried and
+/// reverted). `0.0` on a parse failure or a retry exhaustion: the
+/// wait this feeds then degrades to "wait until it changes from 0",
+/// which a real `clientWidth` always does, so a transient read
+/// failure here costs one extra, harmless tick, not a hang.
+async fn read_client_width() -> f64 {
+    // `retry_recv`'s own `.recv()` waits for an explicit `dioxus.send`
+    // call, the same channel every other script using it (the
+    // measurement script itself) already ends with - found live, the
+    // hard way: a bare expression here, with no `dioxus.send` of its
+    // own, never delivered anything through that channel at all, so
+    // `.recv()` hung indefinitely (it has no timeout of its own,
+    // `retry_recv`'s own doc comment already says so) instead of
+    // returning a parse failure.
+    match retry_recv("dioxus.send(JSON.stringify(document.documentElement.clientWidth))").await {
+        Ok((raw, _)) => raw.parse().unwrap_or(0.0),
+        Err(_) => 0.0,
+    }
 }
 
 /// Runs `script` for its side effect only, retried the same way
@@ -1068,6 +1128,7 @@ fn measurement_script(
     required_text_contrast: f64,
     required_mark_contrast: f64,
     zoom: f64,
+    before_zoom_width: Option<f64>,
 ) -> String {
     let interactive_selector = INTERACTIVE_SELECTOR;
     let overflow_allowlist = json_string_array(OVERFLOW_ALLOWLIST);
@@ -1075,6 +1136,7 @@ fn measurement_script(
     let text_size_allowlist = json_string_array(TEXT_SIZE_ALLOWLIST);
     let rendered_contrast_allowlist = json_string_array(RENDERED_CONTRAST_ALLOWLIST);
     let rendered_contrast_mark_selector = json_string_array(RENDERED_CONTRAST_MARK_SELECTOR);
+    let before_zoom_width_js = before_zoom_width.map_or("null".to_string(), |v| v.to_string());
     format!(
         r#"(function() {{
   function settle(readySelector, quietMs, timeoutMs) {{
@@ -1141,6 +1203,30 @@ fn measurement_script(
         }}
         if (now > deadline) {{ obs.disconnect(); resolve(false); }}
         else {{ requestAnimationFrame(tick); }}
+      }}
+      requestAnimationFrame(tick);
+    }});
+  }}
+  // Review 222 §4: a deterministic precondition for `settle` above,
+  // not a replacement for it - "wait until it changes" needs no
+  // computed target, so it carries no display-scale dependency for
+  // `beforeWidth` (read on the Rust side, before the text-size change
+  // that applies a new zoom was even written) to get wrong. `null`
+  // (this combination's own zoom is unchanged from the previous one,
+  // or there's nothing to wait for - `--inject`'s own plan never
+  // resizes) resolves immediately, same as a width that already
+  // differs by the time this runs - this script's own first tick is
+  // never guaranteed to be *before* the render the Rust side's write
+  // already scheduled, so if the zoom beat this call here, there's
+  // nothing left to wait for either way.
+  function waitForZoomChange(beforeWidth, timeoutMs) {{
+    return new Promise((resolve) => {{
+      if (beforeWidth === null) {{ resolve(); return; }}
+      const deadline = performance.now() + timeoutMs;
+      function tick() {{
+        if (document.documentElement.clientWidth !== beforeWidth) {{ resolve(); return; }}
+        if (performance.now() > deadline) {{ resolve(); return; }}
+        requestAnimationFrame(tick);
       }}
       requestAnimationFrame(tick);
     }});
@@ -1322,6 +1408,7 @@ fn measurement_script(
     // as `error` instead, the same as the two explicit checks above.
     try {{
     const t0 = performance.now();
+    await waitForZoomChange({before_zoom_width_js}, {SETTLE_TIMEOUT_MS});
     const settled = await settle('{ready_selector}', {SETTLE_QUIET_MS}, {SETTLE_TIMEOUT_MS});
     const settle_ms = performance.now() - t0;
     if (!document.querySelector('{ready_selector}')) {{
@@ -1849,7 +1936,7 @@ mod tests {
 
     #[test]
     fn measurement_script_embeds_the_given_selector_once() {
-        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0);
+        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0, None);
         assert!(script.contains("querySelector('.diff-wrap')"));
     }
 
@@ -1918,7 +2005,7 @@ mod tests {
 
     #[test]
     fn measurement_script_checks_the_toast_with_element_from_point() {
-        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0);
+        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0, None);
         assert!(script.contains("elementFromPoint"));
         assert!(script.contains("querySelector('.toast')"));
         assert!(script.contains("toast_check"));
