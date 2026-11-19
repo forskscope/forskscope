@@ -64,9 +64,10 @@ cargo xtask contrast
 
 # The same checks as above, but against the real, rendered app rather than
 # CSS source text, across nine kinds of layout defect and every view
-# (RFC-098; see "Checking rendered layout in the running app" below). Not
-# yet a hard CI gate - reply 189 reports a pre-existing backlog, still
-# awaiting triage, so a local run can and will show known findings
+# (RFC-098; see "Checking rendered layout in the running app" below). A
+# hard gate as of review 222 - a finding not on its own
+# EXPECTED_FAILURES list (xtask/src/layout_check.rs) fails the build,
+# and so does a listed one that stops occurring
 cargo xtask layout-check
 
 # The in-app keyboard reference and keyboard.md name the same keys (F165)
@@ -495,15 +496,16 @@ cargo xtask layout-check --inject overlap
 measurement (numbers, element selectors), never an image — a finding's own
 `detail` field is read, not looked at.
 
-**Not yet a hard CI gate.** The job runs on every push and pull request, and
-its own log shows every finding every time, but `continue-on-error` keeps a
-pre-existing, untriaged backlog (609 findings on CI as of reply 189b, down
-from 2,033 in reply 189 — most of that drop was the checker's own false
-positives, fixed at their cause, not a sudden wave of app fixes; see
-189/189b's own checker-fix and triage sections) from failing builds that
-didn't cause any of them. Fixing what's left of that backlog, and deciding
-how a future finding should be gated once it's clear, is tracked separately
-— not something this file decides.
+**A hard CI gate as of review 222.** The job runs on every push and pull
+request, and exits non-zero on anything not named on
+`EXPECTED_FAILURES` (`xtask/src/layout_check.rs`) — five findings today
+(F227–F231), each a registered, scope-pending defect (`ROADMAP.md`),
+not something this check decides for itself. An entry nothing in a run
+matches is itself a failure: a list that could go stale silently would
+defeat the entire point of naming findings on it. Getting here from the
+first real run's own 2,033 findings (reply 189) took five named
+checker-fidelity fixes (replies 189b/189c) — almost all of that count
+was the checker's own false positives, not a sudden wave of app fixes.
 
 ## The `.xlsx` corpus, and the sizes it covers
 

@@ -896,6 +896,22 @@ const EXPECTED_FAILURES: &[ExpectedFailure] = &[
         element_base: "div.explorer-status-key",
         detail_contains: None,
     },
+    // Review 221 §3, registered by review 222 §2: the row (`.profile-
+    // row`) is 24px tall with `cursor: pointer`, but only the label's
+    // own text (~15px, centred in the row by its flex alignment)
+    // actually responds - a click in the row's own padding does
+    // nothing. `element_base` alone is enough; `input.profile-radio`
+    // is its own, unique class, and its own size scales with text
+    // size (unlike F228's fixed-size native checkboxes), so no
+    // `detail_contains` could narrow it further without missing some
+    // text sizes.
+    ExpectedFailure {
+        f_number: "F231",
+        kind: "hit_area",
+        view: Some("settings"),
+        element_base: "input.profile-radio",
+        detail_contains: None,
+    },
 ];
 
 /// `"button.bc-root#18"` -> `"button.bc-root"` - the index past the
@@ -1146,14 +1162,14 @@ mod tests {
         ));
     }
 
-    /// Every entry's own `f_number` is one of the four review 221 §3
-    /// actually decided - catches a typo or a fifth, undecided entry
-    /// added without a review to back it.
+    /// Every entry's own `f_number` is one of the five reviews 221 §3
+    /// and 222 §2 actually decided - catches a typo or a sixth,
+    /// undecided entry added without a review to back it.
     #[test]
     fn every_expected_failure_names_a_decided_f_number() {
         for e in EXPECTED_FAILURES {
             assert!(
-                ["F227", "F228", "F229", "F230"].contains(&e.f_number),
+                ["F227", "F228", "F229", "F230", "F231"].contains(&e.f_number),
                 "unexpected F-number on the list: {}",
                 e.f_number
             );

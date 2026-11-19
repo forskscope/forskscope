@@ -46,9 +46,19 @@
    structure allows it" branch, not "otherwise". The margin leaves the
    scrim visible around every edge, so a capped dialog still reads as a
    floating overlay, not the whole window. */
+/* F224's own tidy, not a new finding (reviews 221 §2.2, 222 §1):
+   `.scrim`'s own `scrollHeight` (measured live, Settings at
+   800x560/200%: 817px) kept exceeding its `clientHeight` even after
+   `.modal`'s `clientHeight` was confirmed sitting right at its own
+   `max-height`, nothing painted outside either box - `.scrim` is
+   `display: flex`, and `min-height: 0` here, measured live, removes
+   that mismatch entirely. Named by what was observed, not by citing
+   the flexbox spec's own automatic minimum for a scroll container
+   (already 0 there) - whatever produces this without it looks like
+   this engine's own behaviour, not the spec's. */
 .modal {
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-  min-width: 22rem; max-width: 30rem; padding: 1rem;
+  min-width: 22rem; max-width: 30rem; padding: 1rem; min-height: 0;
   max-height: calc(100vh - 4rem); overflow-y: auto;
 }
 /* `margin`/`padding` here pull the sticky box out to the scrollport's
