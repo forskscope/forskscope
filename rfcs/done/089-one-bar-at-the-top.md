@@ -2,6 +2,7 @@
 
 **Status.** Implemented (`0.191.0`, `e3a5a26`/`3f3b409`; reviews 162–163).
 **Accepted.** 2026-10-15 by the project owner.
+**Amended.** 2026-11-21 by the project owner: *Settings* takes the far end of the bar, after *? Shortcuts* (the order had been carried over from the removed header and never weighed). Settings is the control people look for, and the end of the bar is the easiest place to find and hit. Implemented in `0.199.0` (handoff 105).
 **Scheduling.** `0.191.0`. See `ROADMAP.md` §
 "Remaining proposed RFCs".
 **Tracks.** The owner's question, 2026-10-14: is the app header row optimized
@@ -54,8 +55,9 @@ not adopted.
 - `Header` is removed from the shell. `app.rs` renders the `TabBar` first.
 - Inside the tab bar, after the tab list:
   - a flexible spacer;
-  - **Settings**: the same text button, same label, same action;
-  - **?**: same title and action, *Keyboard shortcuts (Ctrl+/)*.
+  - **?**: same title and action, *Keyboard shortcuts (Ctrl+/)*;
+  - **Settings**: the same text button, same label, same action, **at the
+    far end** (amended 2026-11-21; first placed before *?*).
 - **The two buttons are outside `role="tablist"`** (RFC-087), as siblings of the
   list inside the bar, so the tab list's arrow-key navigation never lands on
   them. They are ordinary Tab stops after the tab list.
