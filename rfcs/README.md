@@ -7,7 +7,7 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Accepted (7)
+## Accepted (5)
 
 Review complete; the implementer may start. Distinct from **Proposed**, which
 is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
@@ -19,13 +19,13 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 079 | [Microsoft Store Submission Automation](./accepted/079-microsoft-store-submission-automation.md) | Accepted |
 | 081 | [AUR Publication Automation](./accepted/081-aur-publication-automation.md) | Accepted |
 | 095 | [ForskScope as a Flatpak on Flathub](./accepted/095-flatpak-on-flathub.md) | Accepted 2026-10-21 |
-| 098 | [Layout Checks in CI — Every Size, Language and Theme, on Every Push](./accepted/098-layout-checks-in-ci.md) | Accepted 2026-11-16 |
-| 099 | [Quieter Close Buttons, a Title Bar That Follows the Theme, and Ignore Lists as Badges](./accepted/099-quieter-controls-and-ignore-lists.md) | Accepted 2026-11-16 |
 
-## Implemented (72)
+## Implemented (74)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
+| 099 | [Quieter Close Buttons, a Title Bar That Follows the Theme, and Ignore Lists as Badges](./done/099-quieter-controls-and-ignore-lists.md) | Implemented — `0.199.0` |
+| 098 | [Layout Checks in CI — Every Size, Language and Theme, on Every Push](./done/098-layout-checks-in-ci.md) | Implemented — `0.199.0` |
 | 097 | [Readable for Everyone — Text Size, Contrast and Visible Controls](./done/097-readable-for-everyone.md) | Implemented — `0.197.0`, `0.198.0` |
 | 096 | [One Program — the App and Its Commands](./done/096-one-program-the-app-and-its-commands.md) | Implemented — `0.196.0` |
 | 094 | [Headless Comparison for Scripts and AI Agents](./done/094-headless-comparison-for-scripts-and-agents.md) | Implemented — `0.195.0` |

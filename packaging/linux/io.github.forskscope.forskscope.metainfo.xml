@@ -60,6 +60,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.199.0" date="2026-11-21">
+      <description>
+        <p>Quieter close buttons, ignore lists shown as removable badges, a title bar that follows the theme, and fixes for large text sizes and High contrast.</p>
+      </description>
+    </release>
     <release version="0.198.1" date="2026-11-15">
       <description>
         <p>The screenshots show the current interface. The app itself doesn't change.</p>

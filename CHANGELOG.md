@@ -5,7 +5,55 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.198.2] — Unreleased
+## [0.199.0] — 2026-11-21
+
+**Quieter controls, and every layout checked on every change.**
+
+### Changed
+
+- **Every × button has one quiet style:** the tab's ×, the search's
+  close, the filter's clear, and a profile's delete. There is no border
+  at rest, a soft tint when you point at it, and a target of at least
+  24 px. The filter's clear and the profile's delete now have names for
+  screen readers.
+- **The ignore lists in Settings show each entry as a badge** with its
+  own remove button. Press Enter or type a comma to add an entry, or just
+  leave the field. Pasting `a, b, c` adds three. An entry already in the
+  list isn't added twice. They are saved exactly as before.
+- **The window's title bar follows the app's theme** on Windows, and on
+  Linux where the app draws its own title bar.
+- ***Settings* sits at the far end of the tab bar,** after *Shortcuts*.
+- **Under *High* contrast, all text reaches 7:1,** including the change
+  counts, the path bar, the active filter, and the = and ≠ symbols
+  (F229).
+- **Larger click targets:** the path bar's "/" and "↑", and the diff's
+  *Use* buttons, are at least 24 px (F227). Clicking anywhere on a
+  compare profile's row selects it (F231).
+
+### Fixed
+
+- **A dialog taller than the window scrolls,** and its title and *Close*
+  stay in view (F224). Before, at large text sizes, Settings lost both
+  off the window's edges.
+- **In the narrow, stacked layout, the diff's side labels no longer draw
+  over an open dialog** (F225, since 0.198.0).
+- **Three Settings checkboxes now have names for screen readers,** and
+  clicking their words toggles them (F228).
+- **The Explorer's footer wraps** in Japanese at large text sizes,
+  instead of running off the window (F230).
+
+### Internal
+
+- **Every push is checked in the running app** at every window size,
+  text size, language, theme, contrast and colour vision: nothing
+  overflows, is cut off, sits off-screen or covers a dialog, targets are
+  at least 24 px, and text meets its contrast. The build fails on any new
+  finding (RFC-098).
+- **Removed what promised more than it did:** two whitespace modes that
+  always behaved as *ignore all whitespace* (settings that name them load
+  as that; F191), five performance values that were saved but never read
+  (F126), and an unused conflict-navigator component (F51).
+
 
 ## [0.198.1] — 2026-11-15
 

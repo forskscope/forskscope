@@ -1,6 +1,6 @@
 # RFC 099: Quieter Close Buttons, a Title Bar That Follows the Theme, and Ignore Lists as Badges
 
-**Status.** Accepted.
+**Status.** Implemented in `0.199.0` (handoff 103; reviews 217–219).
 **Proposed.** 2026-11-16 by the architect, from the `0.199.0` scope:
 - the owner noted that "border of close button in tabs can be beautified";
 - and asked for the two ignore lists to be "shown as badges with removing

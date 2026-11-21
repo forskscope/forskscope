@@ -1,6 +1,6 @@
 # RFC 098: Layout Checks in CI — Every Size, Language and Theme, on Every Push
 
-**Status.** Accepted.
+**Status.** Implemented in `0.199.0` (handoff 101; reviews 216–225). The gate has run on every push since `5ba4ff3`.
 **Proposed.** 2026-11-15 by the architect. The owner asked for the draft
 the same day.
 **Accepted.** 2026-11-16 by the project owner ("Yes. All approved."),
