@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.199.1] — Unreleased
+
 ## [0.199.0] — 2026-11-21
 
 **Quieter controls, and every layout checked on every change.**
