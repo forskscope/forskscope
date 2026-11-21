@@ -13,8 +13,8 @@ anywhere, with no active comparison tab needed.
 | **Ctrl+/**   | Open this keyboard reference |
 | **Ctrl+W**   | Close the active comparison tab |
 
-The **? Shortcuts** button at the right end of the tab bar opens the same
-reference from any screen.
+The **? Shortcuts** button, just before **Settings** at the right end of the
+tab bar, opens the same reference from any screen.
 
 ## Anywhere
 

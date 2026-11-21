@@ -63,15 +63,21 @@ pub fn TabBar() -> Element {
             // RFC-087's arrow-key navigation (scoped to `role="tablist"`'s
             // own children) cannot reach them — ordinary Tab stops after
             // the tab list instead. They replace the removed `Header`.
+            // RFC-089, amended 2026-11-21 (handoff 105): *Settings* takes
+            // the far end of the bar, after *? Shortcuts* — the order
+            // carried over from the removed header and was never weighed
+            // on its own. The DOM order is the Tab order, so this swap is
+            // the whole fix; nothing about either button's own label,
+            // accessible name, action or style changes.
             span { class: "spacer" }
-            button {
-                onclick: move |_| store.modal.set(Modal::Settings),
-                {t(lang, "Settings")}
-            }
             button {
                 onclick: move |_| store.modal.set(Modal::KeyboardRef),
                 aria_label: t(lang, "Keyboard shortcuts (Ctrl+/)"),
                 "? " {t(lang, "Shortcuts")}
+            }
+            button {
+                onclick: move |_| store.modal.set(Modal::Settings),
+                {t(lang, "Settings")}
             }
         }
     }
@@ -426,6 +432,47 @@ mod tests {
         assert!(
             texts.iter().any(|t| t.contains("Shortcuts")),
             "the button must show the word \"Shortcuts\", got {texts:?}"
+        );
+    }
+
+    /// RFC-089, amended 2026-11-21 (handoff 105): *Settings* is the last of
+    /// the two header buttons, after *? Shortcuts* — the DOM order is the
+    /// Tab order, so this is checked on the mutation stream's own order:
+    /// dioxus emits `CreateTextNode` for each button's dynamic label as it
+    /// builds the tree top to bottom, so the "Shortcuts" text node's own
+    /// index in the stream must come before "Settings"'s. Falsify by
+    /// swapping the two buttons back in `TabBar`'s `rsx!`: the "Settings"
+    /// text node would then come first, failing the assertion.
+    #[test]
+    fn settings_is_the_tab_bars_last_button() {
+        fn root() -> Element {
+            use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+            rsx! { TabBar {} }
+        }
+
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+
+        let texts: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+
+        let shortcuts_pos = texts
+            .iter()
+            .position(|t| t.contains("Shortcuts"))
+            .expect("the Shortcuts button's own text must be present");
+        let settings_pos = texts
+            .iter()
+            .position(|t| t.contains("Settings"))
+            .expect("the Settings button's own text must be present");
+        assert!(
+            settings_pos > shortcuts_pos,
+            "Settings must come after Shortcuts in DOM order, got texts {texts:?}"
         );
     }
 }
