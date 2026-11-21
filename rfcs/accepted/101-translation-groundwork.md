@@ -1,6 +1,6 @@
 # RFC 101: Translation Groundwork — Whole Sentences, Plurals, Catalogs and a Pseudo-Language
 
-**Status.** Proposed.
+**Status.** Accepted.
 **Proposed.** 2026-11-21 by the architect. The owner asked whether to add
 right-to-left support and more languages, weighing maintenance cost
 against usability. The answer:
@@ -10,8 +10,9 @@ against usability. The answer:
 
 The owner accepted that direction the same day ("All accepted. Proceed.").
 This document is the design for that acceptance.
-**Scheduling.** After RFC-100. **`0.200.0` or `0.201.0`, by the owner's
-scope decision.**
+**Accepted.** 2026-11-21 by the project owner ("Yes. Both accepted.").
+**Scheduling.** Stage A (the measurement) in the `0.200.0` cycle (handoff
+110); stages B and C in `0.201.0` (owner's scope, 2026-11-21).
 **Touches.**
 - `crates/forskscope-ui`: `i18n.rs`, and every call site that assembles a
   sentence;

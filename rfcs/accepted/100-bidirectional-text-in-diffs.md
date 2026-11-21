@@ -1,13 +1,15 @@
 # RFC 100: Bidirectional Text in Diffs — Show the Invisible, Keep Each Line in Place
 
-**Status.** Proposed.
+**Status.** Accepted.
 **Proposed.** 2026-11-21 by the architect, for **F234**. The owner asked
 about right-to-left support. The answer separated a right-to-left
 *interface*, which is deferred, from right-to-left *content* in the files
 being compared, which matters to every user and is fixed here. The owner
 accepted that direction the same day ("All accepted. Proceed."). This
 document is the design for that acceptance.
-**Scheduling.** `0.200.0`.
+**Accepted.** 2026-11-21 by the project owner ("Yes. Both accepted."), with
+`0.200.0`'s scope.
+**Scheduling.** `0.200.0` (handoff 108).
 **Touches.**
 - `crates/forskscope-compare`: one detector;
 - `crates/forskscope-ui`: the diff and merge views, the status bar, the

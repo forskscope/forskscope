@@ -147,7 +147,7 @@ ForskScope's interface is in English and Japanese. Both are maintained by
 the project. **A wrong or out-of-date translation confuses people more
 than English does,** so a new language is added on these terms
 (owner-accepted 2026-11-21; the groundwork is
-[RFC 101](rfcs/proposed/101-translation-groundwork.md)):
+[RFC 101](rfcs/accepted/101-translation-groundwork.md)):
 
 - **A named native speaker commits to reviewing it,** for every release
   that changes the interface's text. Open an issue to offer.
