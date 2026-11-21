@@ -141,6 +141,31 @@ and open an issue about this file.
 
 ---
 
+## Translations
+
+ForskScope's interface is in English and Japanese. Both are maintained by
+the project. **A wrong or out-of-date translation confuses people more
+than English does,** so a new language is added on these terms
+(owner-accepted 2026-11-21; the groundwork is
+[RFC 101](rfcs/proposed/101-translation-groundwork.md)):
+
+- **A named native speaker commits to reviewing it,** for every release
+  that changes the interface's text. Open an issue to offer.
+- **The whole interface is translated** before the language is offered.
+  It must pass the `i18n` audit, the layout checks and the reviewer's
+  read-through in the running app.
+- **Machine translation is welcome as a first draft,** never as the
+  finished text. The reviewer reads every message in context.
+- **The interface is translated; the user guide stays in English.**
+- **If a language's reviewer steps down** and the language falls a release
+  behind, it is removed from the language list, and its users see English
+  until a reviewer returns.
+- **Right-to-left languages** (Arabic, Hebrew, Persian, Urdu) also need a
+  right-to-left interface. That gets its own RFC, started when such a
+  language has a committed reviewer.
+
+---
+
 ## RFC governance
 
 RFC numbers are never reused. Lifecycle changes (moving an RFC between
