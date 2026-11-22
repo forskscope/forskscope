@@ -1086,6 +1086,33 @@ const INTERACTIVE_SELECTOR: &str = r#"button, [role="button"], a[href], input, s
 /// `dialog_occlusion`, below).
 const OVERFLOW_ALLOWLIST: &[&str] = &[".tablist"];
 
+/// Named selectors allowed to overflow, but only up to a bound in CSS
+/// pixels on each axis — not an unconditional exemption like
+/// [`OVERFLOW_ALLOWLIST`] above, since that would turn the check off for
+/// the selector entirely.
+///
+/// `.modal .field select`: a `<select>` is drawn natively, so its own
+/// selected text is never a DOM node this probe (or any DOM-based check)
+/// can read — this small overflow number is the only signal available at
+/// all that a selected value might not fit its box (review 232 §2, F233).
+/// 2px is the bound the review approved: big enough for the sub-pixel
+/// rounding `scrollWidth`/`clientWidth` already carry everywhere else in
+/// this file (the generic check below already tolerates 1px for exactly
+/// that reason), small enough that a value genuinely clipped — the thing
+/// this allowance exists to still catch — still fails.
+const BOUNDED_OVERFLOW_ALLOWLIST: &[(&str, f64)] = &[(".modal .field select", 2.0)];
+
+/// Renders [`BOUNDED_OVERFLOW_ALLOWLIST`] as a JS array of `{selector,
+/// max}` objects, for embedding into the measurement script the same way
+/// [`json_string_array`] embeds a plain selector list.
+fn json_bounded_overflow_array(items: &[(&str, f64)]) -> String {
+    let entries: Vec<String> = items
+        .iter()
+        .map(|(selector, max)| format!("{{selector: \"{selector}\", max: {max}}}"))
+        .collect();
+    format!("[{}]", entries.join(", "))
+}
+
 /// Named selectors exempt from the hit-area 24×24 floor (WCAG 2.5.8's own
 /// spacing exception) — kept empty, a named list ready for the first
 /// real exception review decides, same shape as `xtask::contrast`'s own
@@ -1168,6 +1195,7 @@ fn measurement_script(
 ) -> String {
     let interactive_selector = INTERACTIVE_SELECTOR;
     let overflow_allowlist = json_string_array(OVERFLOW_ALLOWLIST);
+    let bounded_overflow_allowlist = json_bounded_overflow_array(BOUNDED_OVERFLOW_ALLOWLIST);
     let hit_area_allowlist = json_string_array(HIT_AREA_ALLOWLIST);
     let text_size_allowlist = json_string_array(TEXT_SIZE_ALLOWLIST);
     let rendered_contrast_allowlist = json_string_array(RENDERED_CONTRAST_ALLOWLIST);
@@ -1294,6 +1322,19 @@ fn measurement_script(
   // already uses.
   function doesNotLoseOverflow(el, overflowAllowlist) {{
     return isScrollOwner(el) || matchesAny(el, overflowAllowlist);
+  }}
+  // F233 (review 232 §2): a bounded allowance, not an exemption - `el`
+  // still fails if its own overflow on *either* axis is more than that
+  // entry's own `max`, so a value genuinely too wide or tall for its box
+  // (the thing this check exists to catch) still gets reported.
+  function withinBoundedOverflow(el, boundedOverflowAllowlist) {{
+    for (const entry of boundedOverflowAllowlist) {{
+      if (!el.matches(entry.selector)) {{ continue; }}
+      const wOver = Math.max(0, el.scrollWidth - el.clientWidth);
+      const hOver = Math.max(0, el.scrollHeight - el.clientHeight);
+      if (wOver <= entry.max && hOver <= entry.max) {{ return true; }}
+    }}
+    return false;
   }}
   // Review 220 §2.1: off-screen, hit area and overlap all used to
   // compare `getBoundingClientRect()` boxes with no regard for
@@ -1501,6 +1542,7 @@ fn measurement_script(
     const requiredTextContrast = {required_text_contrast};
     const requiredMarkContrast = {required_mark_contrast};
     const overflowAllowlist = {overflow_allowlist};
+    const boundedOverflowAllowlist = {bounded_overflow_allowlist};
     const hitAreaAllowlist = {hit_area_allowlist};
     const textSizeAllowlist = {text_size_allowlist};
     const renderedContrastAllowlist = {rendered_contrast_allowlist};
@@ -1518,7 +1560,8 @@ fn measurement_script(
       // not just from the text-clip check.
       const ellipsized = cs.textOverflow === 'ellipsis';
       const wOver = wOverRaw && !ellipsized;
-      if ((wOver || hOver) && !doesNotLoseOverflow(el, overflowAllowlist)) {{
+      if ((wOver || hOver) && !doesNotLoseOverflow(el, overflowAllowlist)
+          && !withinBoundedOverflow(el, boundedOverflowAllowlist)) {{
         overflow.push({{
           element: describe(el, i), text: '',
           scroll_width: el.scrollWidth, client_width: el.clientWidth,
@@ -2024,6 +2067,28 @@ mod tests {
         assert_eq!(OVERFLOW_ALLOWLIST, &[".tablist"]);
     }
 
+    /// F233 (review 232 §2): the bound is approved at 2px, and only for
+    /// `.modal .field select` - a wider bound, or a second entry, needs
+    /// its own review the same way `OVERFLOW_ALLOWLIST`'s own test above
+    /// guards against a quiet re-add.
+    #[test]
+    fn modal_field_select_is_the_bounded_overflow_allowlists_only_named_entry_at_2px() {
+        assert_eq!(BOUNDED_OVERFLOW_ALLOWLIST, &[(".modal .field select", 2.0)]);
+    }
+
+    #[test]
+    fn json_bounded_overflow_array_renders_a_valid_js_array_literal() {
+        assert_eq!(json_bounded_overflow_array(&[]), "[]");
+        assert_eq!(
+            json_bounded_overflow_array(&[(".a", 2.0)]),
+            "[{selector: \".a\", max: 2}]"
+        );
+        assert_eq!(
+            json_bounded_overflow_array(&[(".a", 2.0), (".b", 1.5)]),
+            "[{selector: \".a\", max: 2}, {selector: \".b\", max: 1.5}]"
+        );
+    }
+
     /// Review 219's own round found exactly this shape live: an allowlist
     /// entry containing a double quote (`[aria-disabled="true"]`)
     /// produced `"[aria-disabled="true"]"` once wrapped by
@@ -2051,6 +2116,15 @@ mod tests {
                      attribute selector's value instead"
                 );
             }
+        }
+        for (selector, _max) in BOUNDED_OVERFLOW_ALLOWLIST {
+            assert!(
+                !selector.contains('"'),
+                "{selector:?} has a double quote, which collides with \
+                 json_bounded_overflow_array's own wrapping quotes once \
+                 embedded in the measurement script - use single quotes \
+                 for an attribute selector's value instead"
+            );
         }
     }
 
