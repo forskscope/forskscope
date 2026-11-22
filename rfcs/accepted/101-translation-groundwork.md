@@ -13,9 +13,19 @@ This document is the design for that acceptance.
 **Accepted.** 2026-11-21 by the project owner ("Yes. Both accepted.").
 **Scheduling.** Stage A (the measurement) in the `0.200.0` cycle (handoff
 110); stages B and C in `0.201.0` (owner's scope, 2026-11-21).
+**Amended.** 2026-11-22 by the architect (review 232, after stage A):
+- the catalog format is decided;
+- the Deep Compare summary is a list;
+- user data in placeholders is isolated;
+- the HTML report is in scope;
+- the About diagnostics stay English.
+
+See *Stage A's decisions*.
 **Touches.**
 - `crates/forskscope-ui`: `i18n.rs`, and every call site that assembles a
   sentence;
+- `crates/forskscope-report`: the HTML report's own `tr()` and its
+  assembled labels (added 2026-11-22, review 232);
 - `xtask`: the `i18n` audit, and RFC-098's layout matrix;
 - `CONTRIBUTING.md`: the language policy (§5);
 - `docs/src/maintainers/`: the architecture and testing pages.
@@ -194,6 +204,38 @@ that may arrive before stage C.
 4. **RFC-098's gate green with the pseudo-language,** after its triage.
 5. **The plural rules tested** against CLDR's examples.
 
+## Stage A's decisions (2026-11-22, review 232)
+
+Measured in reply 198: Fluent adds nine runtime crates and +215.7 KiB to
+the Linux binary. Our parser is 135 lines, with no runtime dependency.
+
+1. **The catalog format is our own,** parsed at build time (§3). Its
+   placeholder syntax, `{ $name }`, is Fluent's, so a later conversion is
+   mechanical.
+2. **The Japanese rewrites that change structure** (stage A's list, items
+   2, 5 and 12–17) **go to the owner as one list,** before and after,
+   before they land. **The owner decides each wording.**
+3. **The Deep Compare summary is a list, not a sentence:**
+   - one plural-aware message per item;
+   - joined by a list separator from each language's catalog.
+   
+   **The audit allows that pattern by name.** Anything else that joins
+   translated results still fails.
+4. **A placeholder that carries user data** (a name, a path, error text)
+   **is isolated:**
+   - in the interface, by an isolating element (`<bdi>` or
+     `unicode-bidi: isolate`), **never by inserting isolate characters**,
+     which RFC-100 flags;
+   - where markup isn't possible, it goes in as it is, with F235's
+     escaping of controls.
+   
+   **Tested** with a Hebrew file name in an English and a Japanese
+   sentence.
+5. **The HTML report's own `tr()` is in scope** (see *Touches*).
+6. **The About dialog's diagnostic block stays in English on purpose:**
+   it's copied into bug reports. The audit names it as an exception, with
+   that reason.
+
 ## Open questions
 
-- **The catalog format** is settled by stage A's measurement (§3).
+None. Stage A settled the format.
