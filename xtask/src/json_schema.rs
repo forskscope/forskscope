@@ -1,12 +1,27 @@
 //! `cargo xtask json-schema` (RFC-094 §3, RFC-096 §5): builds `forskscope`,
 //! runs its `compare --format json` subcommand against a real file pair
 //! and a real folder pair, and validates both emitted documents against
-//! `docs/schemas/forskscope.comparison.v1.json` — a minimal JSON Schema
-//! subset interpreter, not a hardcoded duplicate of the schema's rules, so
-//! a change to the schema file changes what this gate accepts. Falsify by
-//! renaming a field in `forskscope-report::report::json`'s output (the
-//! schema still requires the old name) or in the schema file itself (it
-//! then requires a field the program never emits).
+//! a *strict* variant of `docs/schemas/forskscope.comparison.v1.json` — a
+//! minimal JSON Schema subset interpreter, not a hardcoded duplicate of
+//! the schema's rules, so a change to the schema file changes what this
+//! gate accepts. Falsify by renaming a field in `forskscope-report::
+//! report::json`'s output (the schema still requires the old name) or in
+//! the schema file itself (it then requires a field the program never
+//! emits).
+//!
+//! F236 (review 231 §2): the *published* schema never sets
+//! `additionalProperties: false` and never puts a field added after
+//! `/1`'s first release in `required` — a document from an older build
+//! missing that field, or a newer build carrying one this copy doesn't
+//! know yet, both still validate against it (RFC-094's own "adding a
+//! field keeps `/1`" promise, which the strict shape this gate used to
+//! validate against directly was quietly breaking). This gate still
+//! wants to catch an actually wrong field name or a stray undeclared one
+//! in what *this build* emits, so it derives its own strict copy
+//! ([`derive_strict`]: every object with `properties` gets
+//! `additionalProperties: false` and all of its properties made
+//! `required`) and validates against that instead of the published
+//! schema directly.
 //!
 //! Only the subset of JSON Schema (2020-12) the schema file actually
 //! uses: `$ref` (local `#/$defs/...` only), `oneOf`, `const`, `enum`,
@@ -25,6 +40,7 @@ pub fn run(root: &Path) {
         .unwrap_or_else(|e| panic!("reading {}: {e}", schema_path.display()));
     let schema: Value = serde_json::from_str(&schema_text)
         .unwrap_or_else(|e| panic!("{}: invalid JSON: {e}", schema_path.display()));
+    let strict_schema = derive_strict(&schema);
 
     let build = Command::new("cargo")
         .args(["build", "--quiet", "-p", "forskscope"])
@@ -48,8 +64,8 @@ pub fn run(root: &Path) {
     fs::write(scratch.join("right.txt"), "one\nTWO\n").unwrap();
     let file_doc = run_compare_json(&bin, &scratch.join("left.txt"), &scratch.join("right.txt"));
     validate(
-        &schema,
-        &schema,
+        &strict_schema,
+        &strict_schema,
         &file_doc,
         "<file document>",
         &mut problems,
@@ -68,8 +84,8 @@ pub fn run(root: &Path) {
     fs::write(right_dir.join("right_only.txt"), "d\n").unwrap();
     let dir_doc = run_compare_json(&bin, &left_dir, &right_dir);
     validate(
-        &schema,
-        &schema,
+        &strict_schema,
+        &strict_schema,
         &dir_doc,
         "<directory document>",
         &mut problems,
@@ -90,9 +106,53 @@ pub fn run(root: &Path) {
 
     println!(
         "json-schema check passed: a real file comparison and a real directory comparison, \
-         both run through forskscope compare --format json, validate against \
-         docs/schemas/forskscope.comparison.v1.json."
+         both run through forskscope compare --format json, validate against a strict variant \
+         of docs/schemas/forskscope.comparison.v1.json (every field required, no undeclared \
+         field allowed)."
     );
+}
+
+/// Derives a strict copy of a published-schema object `schema` for this
+/// gate's own use: every object schema that declares `properties` gets
+/// `additionalProperties: false` and every one of its property names
+/// added to `required` (deduplicated, keeping any that were already
+/// there) — so this build's own emitted documents are still held to
+/// "every field this build actually emits is present, and nothing
+/// else is", without that shape living in the *published* file RFC-094's
+/// own compatibility promise covers (F236, review 231 §2).
+///
+/// An object whose own `additionalProperties` is already a schema (the
+/// dynamic `directory_document.counts` map, keyed by a `status_identifier`
+/// this gate can't enumerate in advance) has no `properties` key, so it
+/// is left exactly as published — tightening it here would reject a
+/// real, valid status key this call's own fixtures simply didn't produce.
+fn derive_strict(schema: &Value) -> Value {
+    match schema {
+        Value::Object(map) => {
+            let mut out = serde_json::Map::new();
+            for (key, value) in map {
+                out.insert(key.clone(), derive_strict(value));
+            }
+            if let Some(Value::Object(properties)) = out.get("properties") {
+                let mut required: Vec<Value> = out
+                    .get("required")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default();
+                for key in properties.keys() {
+                    let key = Value::String(key.clone());
+                    if !required.contains(&key) {
+                        required.push(key);
+                    }
+                }
+                out.insert("required".to_string(), Value::Array(required));
+                out.insert("additionalProperties".to_string(), Value::Bool(false));
+            }
+            Value::Object(out)
+        }
+        Value::Array(items) => Value::Array(items.iter().map(derive_strict).collect()),
+        other => other.clone(),
+    }
 }
 
 fn run_compare_json(bin: &Path, left: &Path, right: &Path) -> Value {
@@ -389,5 +449,91 @@ mod tests {
             }
         }
         walk(&schema, &schema);
+    }
+
+    /// F236 (review 231 §2): a document shaped like `0.199.0`'s own
+    /// output - before `bidi_controls` existed - still validates against
+    /// the *published* schema, since that field isn't `required` there.
+    fn file_doc_0_199_0_shaped() -> Value {
+        json!({
+            "schema": "forskscope.comparison/1",
+            "kind": "file",
+            "left": { "name": "left.txt", "size": 4, "sha256": null, "encoding": "utf-8" },
+            "right": { "name": "right.txt", "size": 4, "sha256": null, "encoding": "utf-8" },
+            "identical": false,
+            "counts": { "changes": 1, "lines_removed": 1, "lines_added": 1 },
+            "changes": [],
+            "notes": []
+        })
+    }
+
+    #[test]
+    fn a_0_199_0_shaped_document_with_no_bidi_controls_validates_against_the_published_schema() {
+        let root = crate::workspace_root();
+        let schema_text =
+            fs::read_to_string(root.join("docs/schemas/forskscope.comparison.v1.json")).unwrap();
+        let schema: Value = serde_json::from_str(&schema_text).unwrap();
+        let doc = file_doc_0_199_0_shaped();
+        let mut problems = Vec::new();
+        validate(&schema, &schema, &doc, "doc", &mut problems);
+        assert!(problems.is_empty(), "{problems:?}");
+    }
+
+    /// The same document, with one undeclared extra field on `left` -
+    /// clean against the published schema (F236's own promise), but
+    /// still caught by this gate's own strict, derived variant.
+    #[test]
+    fn an_undeclared_extra_field_still_fails_the_derived_strict_variant() {
+        let root = crate::workspace_root();
+        let schema_text =
+            fs::read_to_string(root.join("docs/schemas/forskscope.comparison.v1.json")).unwrap();
+        let schema: Value = serde_json::from_str(&schema_text).unwrap();
+
+        let mut doc = file_doc_0_199_0_shaped();
+        doc["left"]["unknown_future_field"] = json!("from a later release");
+
+        let mut published_problems = Vec::new();
+        validate(&schema, &schema, &doc, "doc", &mut published_problems);
+        assert!(published_problems.is_empty(), "{published_problems:?}");
+
+        let strict = derive_strict(&schema);
+        let mut strict_problems = Vec::new();
+        validate(&strict, &strict, &doc, "doc", &mut strict_problems);
+        assert!(
+            strict_problems
+                .iter()
+                .any(|p| p.contains("unexpected field `unknown_future_field`")),
+            "{strict_problems:?}"
+        );
+    }
+
+    #[test]
+    fn derive_strict_requires_every_property_and_forbids_additional_ones() {
+        let schema = tiny_schema();
+        let strict = derive_strict(&schema);
+        let side = &strict["$defs"]["side"];
+        assert_eq!(side["additionalProperties"], json!(false));
+        let required = side["required"].as_array().unwrap();
+        assert!(required.contains(&json!("name")));
+        assert!(required.contains(&json!("size")));
+    }
+
+    /// `directory_document.counts` is a dynamic map
+    /// (`additionalProperties: { "type": "integer", ... }`, no
+    /// `properties` key) - `derive_strict` must leave it alone, not
+    /// turn its open-ended key set into a fixed, forbidding one.
+    #[test]
+    fn derive_strict_leaves_a_dynamic_map_schema_untouched() {
+        let root = crate::workspace_root();
+        let schema_text =
+            fs::read_to_string(root.join("docs/schemas/forskscope.comparison.v1.json")).unwrap();
+        let schema: Value = serde_json::from_str(&schema_text).unwrap();
+        let strict = derive_strict(&schema);
+        let counts = &strict["$defs"]["directory_document"]["properties"]["counts"];
+        assert_eq!(
+            counts["additionalProperties"],
+            json!({ "type": "integer", "minimum": 0 })
+        );
+        assert!(counts.get("required").is_none());
     }
 }

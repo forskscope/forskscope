@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://forskscope.dev/schemas/forskscope.comparison.v1.json",
   "title": "ForskScope comparison document (forskscope.comparison/1)",
-  "description": "What `forskscope compare --format json` prints, and the structured content `forskscope mcp`'s `compare` tool returns when asked for JSON (RFC-094 §3, RFC-096 §5). Adding a field keeps this schema at /1; removing a field, or changing its meaning, moves to /2 with its own schema file.",
+  "description": "What `forskscope compare --format json` prints, and the structured content `forskscope mcp`'s `compare` tool returns when asked for JSON (RFC-094 §3, RFC-096 §5). Adding a field keeps this schema at /1; removing a field, or changing its meaning, moves to /2 with its own schema file. F236: a document from an older /1 build may be missing a field this copy of the schema adds later, and one from a newer /1 build may carry a field this copy doesn't know about yet - so no field here is `required` if a prior /1 release shipped without it, and no object sets `additionalProperties: false`. A validator that wants to flag an unrecognized field as a mistake, rather than simply ignore it, needs its own separately-derived strict copy; this published schema is deliberately not that copy.",
   "oneOf": [
     { "$ref": "#/$defs/file_document" },
     { "$ref": "#/$defs/directory_document" }
@@ -13,8 +13,7 @@
     },
     "side_info": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["name", "size", "sha256", "encoding", "bidi_controls"],
+      "required": ["name", "size", "sha256", "encoding"],
       "properties": {
         "name": { "type": "string" },
         "size": { "type": "integer", "minimum": 0 },
@@ -32,7 +31,6 @@
     },
     "change_line": {
       "type": "object",
-      "additionalProperties": false,
       "required": ["old_line", "new_line", "kind", "text"],
       "properties": {
         "old_line": { "type": ["integer", "null"], "minimum": 0 },
@@ -43,7 +41,6 @@
     },
     "change_hunk": {
       "type": "object",
-      "additionalProperties": false,
       "required": ["old_start", "old_len", "new_start", "new_len", "lines"],
       "properties": {
         "old_start": { "type": "integer", "minimum": 0 },
@@ -72,7 +69,6 @@
     },
     "file_document": {
       "type": "object",
-      "additionalProperties": false,
       "required": [
         "schema",
         "kind",
@@ -91,7 +87,6 @@
         "identical": { "type": "boolean" },
         "counts": {
           "type": "object",
-          "additionalProperties": false,
           "required": ["changes", "lines_removed", "lines_added"],
           "properties": {
             "changes": { "type": "integer", "minimum": 0 },
@@ -111,7 +106,6 @@
     },
     "directory_entry": {
       "type": "object",
-      "additionalProperties": false,
       "required": [
         "path",
         "status",
@@ -136,7 +130,6 @@
     },
     "omitted_entry": {
       "type": "object",
-      "additionalProperties": false,
       "required": ["path", "reason"],
       "properties": {
         "path": { "type": "string" },
@@ -145,7 +138,6 @@
     },
     "directory_document": {
       "type": "object",
-      "additionalProperties": false,
       "required": [
         "schema",
         "kind",
