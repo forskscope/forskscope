@@ -665,14 +665,35 @@ select option { background: var(--surface); color: var(--text); }
   padding-top: 1rem; padding-left: 1rem; padding-right: 1rem;
 }
 .modal h2 { margin: 0 0 .75rem; font-size: 1rem; }
+/* F232: the row's own `min-height` matches `button`'s own
+   (`--control-h`, 02-layout-shell.css) - `select` carries no such rule of
+   its own (button-only), so a flex row with no explicit height at all
+   relies on the browser computing its auto height from its tallest
+   child; measured live (800x560/200%, the Text size row, en, every
+   theme): the `<select>` itself reports no overflow at all (its own
+   scrollHeight/clientHeight match, 33px), but the row around it still
+   came back with clientHeight 27 against that same 33 needed - the row's
+   own auto-height, not any one child's, falling short of its tallest
+   child. An explicit floor on the row itself doesn't depend on
+   understanding why the browser's auto-height came up short here; it
+   just stops it from ever being able to. */
 .modal .field {
   display: flex; justify-content: space-between; align-items: center;
-  margin: .5rem 0; gap: .75rem;
+  margin: .5rem 0; gap: .75rem; min-height: var(--control-h);
 }
 /* F205: a long label (English or Japanese) and the control it names must
    never touch — the label is the one that wraps, since the control stays
    legible only at or near its natural width. */
-.modal .field > span:first-child { flex: 1 1 auto; min-width: 0; }
+/* F232: `min-width: 0` lets the flex item shrink below its text's own
+   single-line width, which is what lets it wrap at all - but default
+   `overflow-wrap: normal` only ever breaks *between* words, so a box a
+   few pixels narrower than one word's own rendered width (measured live,
+   800x560/200%, "Explorer layout": 51px assigned, 54px needed) overflows
+   that one word horizontally instead of wrapping again. `anywhere` lets
+   it break inside the word when it must, which is the rest of the time
+   never - most labels wrap at a space long before any word is tight
+   enough for this to matter. */
+.modal .field > span:first-child { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 /* F228: the three checkboxes' own field names its words with a real
    `<label for>` now, not a bare `span` - RFC-098's own hit-area check
    unions an `<input>` with exactly that association
@@ -687,7 +708,7 @@ select option { background: var(--surface); color: var(--text); }
    same shape, for the same reason. */
 .modal .field > label:first-child {
   flex: 1 1 auto; min-width: 0; min-height: 24px;
-  display: flex; align-items: center;
+  display: flex; align-items: center; overflow-wrap: anywhere;
 }
 .modal .field > select,
 .modal .field > input { flex-shrink: 0; }
