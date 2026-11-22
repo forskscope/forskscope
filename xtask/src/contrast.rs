@@ -114,6 +114,13 @@ const PAIRS: &[Pair] = &[
     Pair { label: "--accent on --surface-2",        fg: "var(--accent)", bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     Pair { label: "--accent on --surface-3",        fg: "var(--accent)", bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     Pair { label: "--warn on --surface",            fg: "var(--warn)",   bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
+    // RFC-100 §2: the bidi-control marker's own solid fill - inverted
+    // (--surface as text, --warn as the fill, not the reverse), computed
+    // safe for every theme at both contrast levels (11-view-diff.css's
+    // own doc comment has the numbers) specifically because it's opaque:
+    // unlike --warn-as-text above, this pair doesn't depend on which
+    // hunk or span the marker lands inside.
+    Pair { label: "--surface on .bidi-marker (--warn fill)", fg: "var(--surface)", bg: "var(--warn)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     Pair { label: "--warn on --surface-2",          fg: "var(--warn)",   bg: "var(--surface-2)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     Pair { label: "--warn on --surface-3",          fg: "var(--warn)",   bg: "var(--surface-3)", assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },
     Pair { label: "--ok on --surface",              fg: "var(--ok)",     bg: "var(--surface)",   assumed_over: None, min: TEXT_MIN, high_min: Some(HIGH_TEXT_MIN) },

@@ -36,7 +36,16 @@ fn a_real_fingerprint_produces_the_real_checksum() {
 fn build_file_report_attaches_exactly_the_checksums_it_was_given() {
     let diff = compute_diff("old\n", "new\n", DiffOptions::default());
     let left = crate::report::checksum_if_fingerprinted(Some(b"old\n"), true);
-    let report = build_file_report(&diff, None, None, ReportOptions::default(), left, None);
+    let report = build_file_report(
+        &diff,
+        None,
+        None,
+        ReportOptions::default(),
+        left,
+        None,
+        0,
+        0,
+    );
     assert_eq!(
         report.left_checksum.as_ref().unwrap().sha256_hex,
         crate::checksum::sha256_hex(b"old\n")

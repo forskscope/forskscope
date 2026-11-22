@@ -77,3 +77,13 @@ Press **Ctrl+F** or click the **🔍 Search** button to open the search bar. Typ
 ## Character-level diff
 
 For replace hunks (a line changed rather than added or deleted), you can see exactly which characters changed. Click **Inline diff: off** in the advanced toolbar to turn inline highlighting on. A second click turns it off again.
+
+---
+
+## Bidirectional control characters
+
+Unicode has a handful of invisible characters that change the *direction* text is read in — left-to-right or right-to-left — without showing anything themselves. Normal right-to-left text (Hebrew, Arabic and others) doesn't need them: it reads in the correct order within its own line automatically. These characters show up on their own, usually when something — deliberately or not — has placed one in a file that otherwise has no reason to contain one. The "Trojan Source" technique (CVE-2021-42574) uses them to make source code *read* one way to a person and *run* another way to a compiler: a comment that looks like it ends early, or a string that looks like it ends sooner than it does.
+
+ForskScope never lets one of these reach the screen as itself. Instead, each one shows as a small bordered label in place of the character — `RLO`, `LRI`, and so on — in the warning colour, with a full name (for example "right-to-left override character") as its accessible name and tooltip. The label is what gets copied if you select and copy that text, never the invisible character. A file containing one of these also gets a line in the status bar: "Contains *N* direction-control characters".
+
+This changes nothing about what's *in* the file — saving, applying a change with **Use**, merging, and exporting a patch all work on the real, unmodified text. It only changes what you *see*, so a line can never display differently from what it actually contains.

@@ -155,6 +155,13 @@ impl LoadedDocument {
         self.text.as_ref().is_some_and(|t| t.had_decode_errors)
     }
 
+    /// How many of RFC-100 §1's bidirectional control characters this
+    /// side's decoded text contains (RFC-100 §4) — `0` for a side with
+    /// no `text`, the same convention [`Self::had_decode_errors`] uses.
+    pub fn bidi_controls(&self) -> usize {
+        crate::bidi::count_bidi_controls(self.diff_text())
+    }
+
     /// This document's [`EditabilityClass`], derived from its `kind` and
     /// what was observed while decoding it.
     pub fn editability(&self) -> EditabilityClass {

@@ -89,6 +89,8 @@ struct Fixtures {
     merge_local: PathBuf,
     merge_remote: PathBuf,
     merge_merged: PathBuf,
+    bidi_left: PathBuf,
+    bidi_right: PathBuf,
 }
 
 /// Review 220 §2.5: a run invoked bare (no `session.sh`, no `xvfb-run
@@ -202,6 +204,7 @@ pub fn run(root: &Path, opts: &RunOptions) {
     let (file_left, file_right) = write_file_comparison_fixture(&fixtures_dir);
     let (folder_left, folder_right) = write_folder_fixture(&fixtures_dir);
     let (merge_local, merge_remote, merge_merged) = write_mergetool_fixture(&fixtures_dir);
+    let (bidi_left, bidi_right) = write_bidi_fixture(&fixtures_dir);
     let fixtures = Fixtures {
         file_left,
         file_right,
@@ -210,6 +213,8 @@ pub fn run(root: &Path, opts: &RunOptions) {
         merge_local,
         merge_remote,
         merge_merged,
+        bidi_left,
+        bidi_right,
     };
 
     let bin = build_binary(root, opts.release);
@@ -645,6 +650,50 @@ fn write_folder_fixture(dir: &Path) -> (PathBuf, PathBuf) {
     (left, right)
 }
 
+/// RFC-100 §1's own twelve bidirectional control characters, duplicated
+/// here rather than depended on: xtask deliberately stays outside the
+/// main workspace (DEC-005/F119, this file's own `[workspace]` table),
+/// so it cannot depend on `forskscope-compare` the way the engine and UI
+/// crates do. This literal must stay in sync with `forskscope-compare::
+/// bidi::BIDI_CONTROLS` by hand - the same relationship `TEXT_SIZE_ALLOWLIST`
+/// already has with `xtask::css_shared::FONT_SIZE_ALLOWLIST` (layout_probe.rs's
+/// own doc comment).
+const BIDI_CONTROL_CHARS: [char; 12] = [
+    '\u{061C}', '\u{200E}', '\u{200F}', '\u{202A}', '\u{202B}', '\u{202C}', '\u{202D}', '\u{202E}',
+    '\u{2066}', '\u{2067}', '\u{2068}', '\u{2069}',
+];
+
+/// RFC-100's own layout-matrix fixture: a file pair holding every one of
+/// §1's bidirectional control characters, generated here rather than
+/// stored (the same "never copied from elsewhere" rule the handoff gives
+/// for the engine's own test fixtures) - one unchanged line carrying all
+/// twelve (exercises the plain-render path's markers), one changed line
+/// that drops one of them on the right side (exercises the
+/// character-refined path's markers, and gives the matrix an actual
+/// change to measure). Returns `(left, right)`.
+fn write_bidi_fixture(dir: &Path) -> (PathBuf, PathBuf) {
+    fs::create_dir_all(dir).unwrap_or_else(|e| panic!("cannot create {}: {e}", dir.display()));
+    let left = dir.join("bidi-left.txt");
+    let right = dir.join("bidi-right.txt");
+    let mut all_controls = String::from("all twelve: ");
+    for c in BIDI_CONTROL_CHARS {
+        all_controls.push(c);
+    }
+    let changed_left = format!("changed line: one{}two", '\u{202E}');
+    let changed_right = "changed line: one two".to_string();
+    fs::write(
+        &left,
+        format!("{all_controls}\n{changed_left}\nunchanged tail\n"),
+    )
+    .unwrap_or_else(|e| panic!("cannot write {}: {e}", left.display()));
+    fs::write(
+        &right,
+        format!("{all_controls}\n{changed_right}\nunchanged tail\n"),
+    )
+    .unwrap_or_else(|e| panic!("cannot write {}: {e}", right.display()));
+    (left, right)
+}
+
 /// A three-way merge triple (local/remote/merged), one conflicting region.
 /// Returns `(local, remote, merged)`, opened by stage B's own mergetool
 /// view.
@@ -702,6 +751,9 @@ fn all_views_json(fixtures: &Fixtures) -> serde_json::Value {
             "ignore_dirs": many_ignore_entries("dir"),
         },
         {"kind": "shortcuts"},
+        // RFC-100 §Fixtures: the marker's layout and contrast, covered by
+        // every check this matrix already runs against every other view.
+        {"kind": "bidi-fixture", "left": fixtures.bidi_left, "right": fixtures.bidi_right},
     ])
 }
 

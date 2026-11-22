@@ -101,6 +101,12 @@ pub struct FileComparisonReport {
     pub profile_name: String,
     pub left_checksum: Option<FileChecksum>,
     pub right_checksum: Option<FileChecksum>,
+    /// RFC-100 §4: how many of RFC-100 §1's bidirectional control
+    /// characters each side's decoded text contains. `0` until
+    /// [`Self::with_bidi_controls`] sets it — `from_diff` has no access
+    /// to the original decoded text, only the post-diff `DiffDocument`.
+    pub left_bidi_controls: usize,
+    pub right_bidi_controls: usize,
 }
 
 /// Compare options that differ from `DiffOptions::default()`, in display
@@ -178,6 +184,8 @@ impl FileComparisonReport {
             profile_name,
             left_checksum: None,
             right_checksum: None,
+            left_bidi_controls: 0,
+            right_bidi_controls: 0,
             options: opts,
         }
     }
@@ -192,6 +200,15 @@ impl FileComparisonReport {
     ) -> Self {
         self.left_checksum = left;
         self.right_checksum = right;
+        self
+    }
+
+    /// Attach each side's bidi-control count (RFC-100 §4), computed by
+    /// the caller from the original decoded text — `from_diff` never
+    /// sees it, only the already-diffed `DiffDocument`.
+    pub fn with_bidi_controls(mut self, left: usize, right: usize) -> Self {
+        self.left_bidi_controls = left;
+        self.right_bidi_controls = right;
         self
     }
 
@@ -269,6 +286,7 @@ pub fn checksum_if_fingerprinted(
 /// writes nothing. A thin `from_diff` + `with_checksums` combination, kept
 /// as its own function so the GUI's export job has one call to make
 /// instead of two.
+#[allow(clippy::too_many_arguments)]
 pub fn build_file_report(
     diff: &DiffDocument,
     left_path: Option<&Path>,
@@ -276,7 +294,10 @@ pub fn build_file_report(
     report_options: ReportOptions,
     left_checksum: Option<FileChecksum>,
     right_checksum: Option<FileChecksum>,
+    left_bidi_controls: usize,
+    right_bidi_controls: usize,
 ) -> FileComparisonReport {
     FileComparisonReport::from_diff(diff, left_path, right_path, report_options)
         .with_checksums(left_checksum, right_checksum)
+        .with_bidi_controls(left_bidi_controls, right_bidi_controls)
 }

@@ -1,7 +1,8 @@
 //! DiffDecorationSet tests (RFC-024 §"Visual contract", §"CSS class contract").
 
 use crate::diff_decoration::{
-    DiffDecorationSet, DiffSide, InlineDecorationKind, LineDecorationKind,
+    BidiMarkedPart, DiffDecorationSet, DiffSide, InlineDecorationKind, LineDecorationKind,
+    split_bidi_marks,
 };
 use forskscope_compare::diff::{DiffOptions, compute_diff};
 
@@ -182,6 +183,116 @@ fn all_line_decoration_kinds_have_non_empty_aria_labels() {
         assert!(
             !kind.aria_label().is_empty(),
             "{kind:?} must have an aria label"
+        );
+    }
+}
+
+// ── split_bidi_marks (RFC-100 §2) ──────────────────────────────────────────────
+
+#[test]
+fn plain_text_with_no_controls_is_one_unsplit_part() {
+    let parts = split_bidi_marks("ordinary text, nothing special");
+    assert_eq!(
+        parts,
+        vec![BidiMarkedPart::Plain(
+            "ordinary text, nothing special".to_string()
+        )]
+    );
+}
+
+#[test]
+fn a_single_control_in_the_middle_splits_into_three_parts() {
+    let text = "before\u{202E}after";
+    let parts = split_bidi_marks(text);
+    assert_eq!(
+        parts,
+        vec![
+            BidiMarkedPart::Plain("before".to_string()),
+            BidiMarkedPart::Marker {
+                token: "RLO",
+                name: "right-to-left override character",
+            },
+            BidiMarkedPart::Plain("after".to_string()),
+        ]
+    );
+}
+
+#[test]
+fn a_control_at_the_very_start_or_end_has_no_empty_plain_part_either_side() {
+    let leading = split_bidi_marks("\u{2066}text");
+    assert_eq!(
+        leading,
+        vec![
+            BidiMarkedPart::Marker {
+                token: "LRI",
+                name: "left-to-right isolate character",
+            },
+            BidiMarkedPart::Plain("text".to_string()),
+        ]
+    );
+    let trailing = split_bidi_marks("text\u{2069}");
+    assert_eq!(
+        trailing,
+        vec![
+            BidiMarkedPart::Plain("text".to_string()),
+            BidiMarkedPart::Marker {
+                token: "PDI",
+                name: "pop directional isolate character",
+            },
+        ]
+    );
+}
+
+#[test]
+fn adjacent_controls_produce_no_plain_part_between_them() {
+    let parts = split_bidi_marks("a\u{202E}\u{2066}b");
+    assert_eq!(
+        parts,
+        vec![
+            BidiMarkedPart::Plain("a".to_string()),
+            BidiMarkedPart::Marker {
+                token: "RLO",
+                name: "right-to-left override character",
+            },
+            BidiMarkedPart::Marker {
+                token: "LRI",
+                name: "left-to-right isolate character",
+            },
+            BidiMarkedPart::Plain("b".to_string()),
+        ]
+    );
+}
+
+#[test]
+fn no_part_ever_holds_the_control_character_itself() {
+    let text = "a\u{202E}b\u{2066}c\u{200E}d";
+    for part in split_bidi_marks(text) {
+        if let BidiMarkedPart::Plain(s) = part {
+            assert!(
+                !s.chars().any(forskscope_compare::is_bidi_control),
+                "a Plain part must never contain a bidi control character: {s:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn every_rfc_100_control_splits_with_its_own_token_and_name() {
+    for c in forskscope_compare::BIDI_CONTROLS {
+        let text = format!("x{}y", c.ch);
+        let parts = split_bidi_marks(&text);
+        assert_eq!(
+            parts,
+            vec![
+                BidiMarkedPart::Plain("x".to_string()),
+                BidiMarkedPart::Marker {
+                    token: c.marker,
+                    name: c.name,
+                },
+                BidiMarkedPart::Plain("y".to_string()),
+            ],
+            "{:?} did not split as expected",
+            c.ch
         );
     }
 }

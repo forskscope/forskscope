@@ -702,6 +702,8 @@ pub fn export_file_report(
             let right_path = tab.right_path.clone();
             let left_bytes = tab.left_doc.text.as_ref().map(|t| t.raw_bytes.clone());
             let right_bytes = tab.right_doc.text.as_ref().map(|t| t.raw_bytes.clone());
+            let left_bidi_controls = tab.left_doc.bidi_controls();
+            let right_bidi_controls = tab.right_doc.bidi_controls();
             // Review 174 §6: a checksum appears only where a reader can
             // reproduce it by running `sha256sum` on a real file.
             // `fingerprint_at_load` is `None` for exactly one case in this
@@ -766,6 +768,8 @@ pub fn export_file_report(
                         report_options,
                         left_checksum,
                         right_checksum,
+                        left_bidi_controls,
+                        right_bidi_controls,
                     );
                     // RFC-095 §4.4: same correction as the directory
                     // report's own (export_dir_report.rs) - `Absolute`

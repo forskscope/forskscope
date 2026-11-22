@@ -524,6 +524,13 @@ select option { background: var(--surface); color: var(--text); }
 .statusbar .save-target { flex-shrink: 10; color: var(--muted); }
 .statusbar .enc { flex-shrink: 0; }
 .statusbar .dirty { color: var(--warn); flex-shrink: 0; }
+/* RFC-100 §4: the warning colour is a cue, not the only signal - the
+   words themselves say what's there, same reasoning as .dirty above.
+   Unlike .dirty/.enc/.stats (short, fixed-format), this phrase's own
+   length varies with the count - "whole, or not at all" (below), the
+   same category .local-only/.mode-indicator already use, not the
+   never-truncate category these fixed-format items are in. */
+.statusbar .bidi-notice { color: var(--warn); flex-shrink: 0; }
 .statusbar .stats { color: var(--ok); font-size: 12px; flex-shrink: 0; }
 .statusbar .save-target-no-backup { color: var(--warn); cursor: default; flex-shrink: 0; }
 .local-only { cursor: default; user-select: none; flex-shrink: 0; }
@@ -548,6 +555,19 @@ select option { background: var(--surface); color: var(--text); }
    past both observed failure points, margin included; mergetool's own
    longer text is why local-only's own threshold sits so far above
    mode-indicator's. */
+/* RFC-100 §4: gives way before .local-only - this phrase's own length
+   varies with the count (unbounded in principle), and what it reports
+   is already shown where it matters (the marker tokens themselves, in
+   the diff), so losing only the status-bar summary under a narrow,
+   zoomed window costs less than losing the passive reassurance below
+   would. Threshold found live: 800x560, every text size - 150% clean,
+   175% (the first to fail) needs this. */
+@media (max-width: 650px) {
+  .statusbar .bidi-notice {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+}
 @media (max-width: 520px) {
   .statusbar .local-only {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -1588,6 +1608,16 @@ code.path-display {
      real use of a diff tool, and the gutter/mark columns either side stay
      unselectable (their own user-select: none, unchanged). */
   user-select: text;
+  /* RFC-100 §3: a left-to-right paragraph, with its own text isolated
+     from the rest of the page - right-to-left text in a compared file
+     (Hebrew, Arabic and others) still orders correctly *within* its own
+     line, by the browser's bidirectional algorithm, but nothing in it
+     can move the gutter, the marks, the *Use* button or the next line.
+     Per-line automatic direction is a deliberate non-goal (§3): this
+     stays `ltr`, never guessed from the line's own content, the same
+     choice code editors make. */
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 /* ---- hunk backgrounds ----
@@ -1650,6 +1680,43 @@ code.path-display {
   padding: 0 0.5ch;
   font-size: 12px;
   color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 3px;
+}
+
+/* RFC-100 §2: a bidirectional control character, shown as this small
+   token in place of the character itself - never the character, so it
+   can't reorder anything. The warning colour is a cue, not the only
+   signal: the accessible name (role="img", aria-label) and the status
+   bar's own words (RFC-100 §4) carry it in words too.
+
+   Found live, this handoff: a marker can land inside any hunk kind's own
+   coloured row, not only on the plain surface an Equal line sits on - a
+   bordered, text-coloured token (`color: var(--warn)`, the same shape
+   `.inline-skipped` already uses safely, always on a plain surface)
+   measured below 4.5:1 in `.in-del` (an inline-refined Replace pair's
+   deleted span) under cv-rgsafe, every theme - and reusing `.diff-mark`'s
+   own per-hunk marks in its place still fell short of the stricter
+   *text* floor this needs (this carries a real, non-decorative glyph
+   name, not a hidden symbol: measured live, `--rep-mark`'s own standard
+   value read only 5.00-6.39:1 against *High*'s 7:1, since it was only
+   ever tuned to the lower mark floor, 4.5). Solid fill instead,
+   `background: var(--warn)` with `color: var(--surface)` on top of it:
+   its own two colours are the only pair that matters, regardless of
+   which hunk or span it sits inside, since the fill itself is opaque -
+   no compounding, no per-hunk override, nothing `contrast.rs` has to
+   re-verify for every background this could land on. Computed for every
+   theme × contrast level (neither token varies by colour vision):
+   dark 8.39/10.08, light 5.55/8.82, night 7.50/8.90 (standard/High) -
+   clears 4.5 and 7 with margin everywhere. */
+.bidi-marker {
+  display: inline-block;
+  margin: 0 0.2ch;
+  padding: 0 0.4ch;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--warn);
   border: 1px solid var(--warn);
   border-radius: 3px;
 }

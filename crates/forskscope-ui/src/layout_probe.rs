@@ -222,6 +222,15 @@ pub enum ViewPlan {
     /// *Shortcuts* (`store.modal.set(Modal::KeyboardRef)`), the tab bar's
     /// own "? Shortcuts" button.
     Shortcuts,
+    /// RFC-100's own layout-matrix fixture (handoff 108 §Fixtures): a
+    /// file comparison, opened the same way [`Self::FileComparison`] is,
+    /// whose fixture pair holds every one of RFC-100 §1's bidirectional
+    /// control characters — measured as a view of its own, not folded
+    /// into `FileComparison`'s own rows, the same reason [`Self::
+    /// MergeTool`]'s own doc comment gives (shares `DiffWorkspace`, but a
+    /// distinct fixture needs a distinct name to find its own findings
+    /// by).
+    BidiFixture { left: PathBuf, right: PathBuf },
 }
 
 /// Where the measurement script walks every combination's own DOM from —
@@ -251,6 +260,7 @@ impl ViewPlan {
             Self::DeepCompare { .. } => "deep-compare",
             Self::MergeTool { .. } => "mergetool",
             Self::Shortcuts => "shortcuts",
+            Self::BidiFixture { .. } => "bidi-fixture",
         }
     }
 
@@ -264,8 +274,11 @@ impl ViewPlan {
     fn ready_selector(&self) -> &'static str {
         match self {
             // `ui/view/diff.rs`'s `DiffWorkspace` root (`div.diff-wrap`),
-            // shared by plain compare and mergetool mode alike.
-            Self::FileComparison { .. } | Self::MergeTool { .. } => ".diff-wrap",
+            // shared by plain compare, mergetool mode and the bidi
+            // fixture alike (the last two both render through it too).
+            Self::FileComparison { .. } | Self::MergeTool { .. } | Self::BidiFixture { .. } => {
+                ".diff-wrap"
+            }
             // `ui/view/settings/modal.rs`'s own dialog heading id.
             Self::Settings { .. } => "#settings-title",
             // `ui/view/explorer.rs`'s real (non-private-mode-empty) root.
@@ -662,6 +675,10 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
             store.modal.set(Modal::None);
             open_compare(store, left.clone(), right.clone());
         }
+        ViewPlan::BidiFixture { left, right } => {
+            store.modal.set(Modal::None);
+            open_compare(store, left.clone(), right.clone());
+        }
         ViewPlan::Settings {
             ignore_extensions,
             ignore_dirs,
@@ -770,7 +787,10 @@ async fn open_view_followup(view: &ViewPlan) {
 
 fn close_view(store: &mut Store, view: &ViewPlan) {
     match view {
-        ViewPlan::FileComparison { .. } | ViewPlan::MergeTool { .. } | ViewPlan::Explorer => {}
+        ViewPlan::FileComparison { .. }
+        | ViewPlan::MergeTool { .. }
+        | ViewPlan::Explorer
+        | ViewPlan::BidiFixture { .. } => {}
         // Found live, first full-matrix run: `app.rs`'s own view match
         // picks Deep Compare whenever `active_dir` is `Some`, *before*
         // even looking at `active` (the file-tab index) - left set, it

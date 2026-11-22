@@ -10,6 +10,7 @@
 //! by `cargo xtask crate-boundaries` (RFC-093 §2), not just documented
 //! here.
 
+pub mod bidi;
 pub mod cancel;
 pub mod diff;
 pub mod dir;
@@ -23,6 +24,9 @@ pub mod path;
 #[cfg(feature = "spreadsheet")]
 pub mod xlsx;
 
+pub use bidi::{
+    BIDI_CONTROLS, BidiControl, count_bidi_controls, is_bidi_control, marker_for, name_for,
+};
 pub use cancel::CancellationToken;
 pub use diff::{
     CaseSensitivity, CompareProfile, DiffAlgorithm, DiffDocument, DiffHunk, DiffOptions, DiffRow,

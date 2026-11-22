@@ -245,8 +245,10 @@ fn RowLeft(
                 if let Some(ref lbl) = sr_label { span { class: "sr-only", "{lbl}: " } }
                 if skipped { SkippedBadge { lang } }
                 if let Some(ref spans) = inline_left {
-                    for s in spans.iter() { span { class: icls(s.kind), "{s.text}" } }
-                } else if let Some(ref l) = left { "{l}" }
+                    for s in spans.iter() {
+                        span { class: icls(s.kind), BidiText { text: s.text.clone(), lang } }
+                    }
+                } else if let Some(ref l) = left { BidiText { text: l.clone(), lang } }
             }
         }
     }
@@ -310,8 +312,10 @@ fn RowRight(
                 if let Some(ref lbl) = sr_label { span { class: "sr-only", "{lbl}: " } }
                 if skipped { SkippedBadge { lang } }
                 if let Some(ref spans) = inline_right {
-                    for s in spans.iter() { span { class: icls(s.kind), "{s.text}" } }
-                } else if let Some(ref r) = right { "{r}" }
+                    for s in spans.iter() {
+                        span { class: icls(s.kind), BidiText { text: s.text.clone(), lang } }
+                    }
+                } else if let Some(ref r) = right { BidiText { text: r.clone(), lang } }
             }
         }
     }
@@ -425,6 +429,37 @@ fn refine_once(left: &str, right: &str) -> Option<InlineDiff> {
         cache.insert(key, refined.clone());
     });
     Some(refined)
+}
+
+/// RFC-100 §2: `text`, with every bidirectional control character
+/// (RFC-100 §1) shown as a visible marker token in place of the
+/// character — the character itself never reaches the page, so none can
+/// reorder anything here or on the next line. Every other row-rendering
+/// path (`RowLeft`/`RowRight`, both the plain and the character-refined
+/// branch) renders its line text through this, never through a bare
+/// `"{text}"` interpolation, so the merge view (which shares this same
+/// `HunkBlock`/`RowLeft`/`RowRight` rendering) gets it for free.
+#[component]
+fn BidiText(text: String, lang: Lang) -> Element {
+    rsx! {
+        for part in forskscope_ui_logic::diff_decoration::split_bidi_marks(&text) {
+            match part {
+                forskscope_ui_logic::diff_decoration::BidiMarkedPart::Plain(s) => rsx! { "{s}" },
+                forskscope_ui_logic::diff_decoration::BidiMarkedPart::Marker { token, name } => {
+                    let label = t(lang, name);
+                    rsx! {
+                        span {
+                            class: "bidi-marker",
+                            role: "img",
+                            aria_label: "{label}",
+                            title: "{label}",
+                            "{token}"
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// The marker on a row whose pair was too long to refine.
@@ -634,6 +669,73 @@ mod tests {
         assert!(
             labels.iter().any(|l| l.contains("unchanged lines")),
             "expected the collapse button's accessible name among {labels:?}"
+        );
+    }
+
+    /// RFC-100 §2's own verification: no listed character reaches the
+    /// rendered page, in either the plain (an unchanged line, `char_mode:
+    /// false`) or the character-refined (a replaced pair, `char_mode:
+    /// true`) rendering path — both go through `RowLeft`'s own branches.
+    /// Falsify by reverting `BidiText`'s own call sites in `RowLeft`
+    /// (`"{l}"` in place of `BidiText { text: l.clone(), lang }`, and the
+    /// matching change for the inline-spans branch): this then finds the
+    /// raw RLO character inside a `CreateTextNode` value and fails.
+    #[test]
+    fn no_bidi_control_character_reaches_the_rendered_page_plain_or_refined() {
+        fn root() -> Element {
+            use_context_provider(|| {
+                Store::new(
+                    crate::state::AppSettings::default(),
+                    Default::default(),
+                    false,
+                )
+            });
+            use_context_provider(|| Signal::new(SearchCtx::default()));
+            // One Equal line carrying an RLO (the plain-render path), one
+            // Replace pair carrying an LRI on the left side only (the
+            // character-refined path, `char_mode: true`).
+            let left = "same\u{202E}line\nreplaced\u{2066}left\n";
+            let right = "same\u{202E}line\nreplaced right\n";
+            let diff = forskscope_compare::compute_diff(
+                left,
+                right,
+                forskscope_compare::DiffOptions::default(),
+            );
+            let merge = forskscope_edit::MergeSession::from_diff(&diff);
+            rsx! {
+                for hunk in merge.hunks().iter().cloned() {
+                    HunkBlock {
+                        index: 0, hunk, col: HunkCol::Left,
+                        char_mode: true, context_lines: 3, focused: false,
+                        can_save: true, is_expanded: true,
+                        on_expand: move |_: u64| {},
+                    }
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let texts: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        for text in &texts {
+            assert!(
+                !text.chars().any(forskscope_compare::is_bidi_control),
+                "a bidi control character reached a rendered text node: {text:?}"
+            );
+        }
+        assert!(
+            texts.iter().any(|t| t.contains("RLO")),
+            "expected the RLO marker token among the rendered text nodes: {texts:?}"
+        );
+        assert!(
+            texts.iter().any(|t| t.contains("LRI")),
+            "expected the LRI marker token among the rendered text nodes: {texts:?}"
         );
     }
 }

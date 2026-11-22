@@ -27,6 +27,26 @@ fn identity(s: &str) -> String {
     s.to_string()
 }
 
+/// RFC-100 §4: `text`, with every bidirectional control character
+/// (RFC-100 §1) printed as `<U+XXXX>` instead of the character itself —
+/// the CLI's own plain-text escaping, since there is no marker token or
+/// CSS here, only characters a terminal or a piped file would otherwise
+/// render (or reorder) as-is.
+fn escape_bidi_controls(text: &str) -> String {
+    if !text.chars().any(forskscope_compare::is_bidi_control) {
+        return text.to_string();
+    }
+    let mut out = String::new();
+    for ch in text.chars() {
+        if forskscope_compare::is_bidi_control(ch) {
+            let _ = write!(out, "<U+{:04X}>", ch as u32);
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
 fn render_hunk(out: &mut String, hunk: &ChangeHunk) {
     let _ = writeln!(
         out,
@@ -40,9 +60,31 @@ fn render_hunk(out: &mut String, hunk: &ChangeHunk) {
             out,
             "  {left:>5} {right:>5} {} {}",
             mark_for(line.kind),
-            line.content
+            escape_bidi_controls(&line.content)
         );
     }
+}
+
+/// RFC-100 §4: "one notice line per affected side" — the CLI's own
+/// richer breakdown (the HTML/status-bar notice combines both sides into
+/// one line; the CLI has the room for two).
+fn bidi_side_notices(report: &FileComparisonReport) -> Vec<String> {
+    let mut notices = Vec::new();
+    for (label, n) in [
+        ("Left", report.left_bidi_controls),
+        ("Right", report.right_bidi_controls),
+    ] {
+        if n == 0 {
+            continue;
+        }
+        let word = if n == 1 {
+            "direction-control character"
+        } else {
+            "direction-control characters"
+        };
+        notices.push(format!("{label}: contains {n} {word}"));
+    }
+    notices
 }
 
 /// Review 183 §3.1: a non-default compare option (`--ignore-case`,
@@ -78,11 +120,15 @@ pub fn render_file_report_text(report: &FileComparisonReport) -> String {
         }
     }
 
-    if !report.warnings.is_empty() {
+    let bidi_notices = bidi_side_notices(report);
+    if !report.warnings.is_empty() || !bidi_notices.is_empty() {
         let _ = writeln!(out);
         let _ = writeln!(out, "Notes");
         for w in &report.warnings {
             let _ = writeln!(out, "  - {w}");
+        }
+        for n in &bidi_notices {
+            let _ = writeln!(out, "  - {n}");
         }
     }
 
@@ -438,5 +484,47 @@ mod tests {
         let text = render_dir_report_text(&report);
         assert!(text.contains("Unreadable: 1"), "{text}");
         assert!(!text.contains("No files."), "{text}");
+    }
+
+    // ── RFC-100 §4: the CLI's own escaping and per-side notice ────────────────
+
+    #[test]
+    fn a_bidi_control_character_in_a_changed_line_is_escaped_not_printed_raw() {
+        let diff = compute_diff("plain\n", "has\u{202E}an RLO\n", DiffOptions::default());
+        let report =
+            FileComparisonReport::from_diff(&diff, None, None, opts()).with_bidi_controls(0, 1);
+        let text = render_file_report_text(&report);
+        assert!(
+            !text.contains('\u{202E}'),
+            "the raw control character must never appear in the text output:\n{text}"
+        );
+        assert!(
+            text.contains("<U+202E>"),
+            "expected the escaped form in the change line:\n{text}"
+        );
+    }
+
+    #[test]
+    fn one_notice_line_per_affected_side_names_which_side_and_how_many() {
+        let diff = compute_diff("a\n", "b\n", DiffOptions::default());
+        let report =
+            FileComparisonReport::from_diff(&diff, None, None, opts()).with_bidi_controls(2, 1);
+        let text = render_file_report_text(&report);
+        assert!(
+            text.contains("Left: contains 2 direction-control characters"),
+            "{text}"
+        );
+        assert!(
+            text.contains("Right: contains 1 direction-control character"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn no_bidi_notice_line_when_neither_side_has_any() {
+        let diff = compute_diff("a\n", "b\n", DiffOptions::default());
+        let report = FileComparisonReport::from_diff(&diff, None, None, opts());
+        let text = render_file_report_text(&report);
+        assert!(!text.contains("direction-control"), "{text}");
     }
 }

@@ -32,6 +32,12 @@ pub struct SideInfo {
     pub size: u64,
     pub sha256: Option<String>,
     pub encoding: String,
+    /// RFC-100 §4: how many of RFC-100 §1's bidirectional control
+    /// characters this side's decoded text contains — additive to
+    /// `forskscope.comparison/1` (new field, same schema version). The
+    /// file's own text elsewhere in this document stays exact: JSON
+    /// escaping already makes these characters safe to carry as-is.
+    pub bidi_controls: usize,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -150,20 +156,30 @@ pub fn file_comparison_document(
     left_encoding: &str,
     right_encoding: &str,
 ) -> FileComparisonDocument {
-    let side = |display: &str, checksum: &Option<super::FileChecksum>, encoding: &str| SideInfo {
+    let side = |display: &str,
+                checksum: &Option<super::FileChecksum>,
+                encoding: &str,
+                bidi_controls: usize| SideInfo {
         name: display.to_string(),
         size: checksum.as_ref().map(|c| c.size).unwrap_or(0),
         sha256: checksum.as_ref().map(|c| c.sha256_hex.clone()),
         encoding: encoding.to_string(),
+        bidi_controls,
     };
     FileComparisonDocument {
         schema: COMPARISON_SCHEMA,
         kind: "file",
-        left: side(&report.left_display, &report.left_checksum, left_encoding),
+        left: side(
+            &report.left_display,
+            &report.left_checksum,
+            left_encoding,
+            report.left_bidi_controls,
+        ),
         right: side(
             &report.right_display,
             &report.right_checksum,
             right_encoding,
+            report.right_bidi_controls,
         ),
         identical: report.is_identical,
         counts: FileCounts {

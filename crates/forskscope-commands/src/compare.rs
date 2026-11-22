@@ -333,6 +333,8 @@ fn compare_files(opts: &Options) -> Result<ExecOutcome, String> {
                 report_options(opts),
                 left_checksum,
                 right_checksum,
+                left.bidi_controls(),
+                right.bidi_controls(),
             );
             match opts.format {
                 Format::Text => render_file_report_text(&report),
@@ -418,6 +420,10 @@ fn compare_files_status_only(
                     size,
                     sha256,
                     encoding: format!("n/a ({})", kind_label(kind)),
+                    // Status-only path (binary/workbook): no decoded text to
+                    // count bidi controls in at all, same reason the
+                    // encoding label itself reads "n/a".
+                    bidi_controls: 0,
                 }
             };
             let doc = FileComparisonDocument {

@@ -326,3 +326,55 @@ impl DiffDecorationSet {
         self.hunks.is_empty()
     }
 }
+
+// ── Bidirectional control markers (RFC-100 §2) ────────────────────────────────
+
+/// One piece of a line's text, after splitting out every bidirectional
+/// control character (RFC-100 §1) into its own marker — never holding
+/// the control character itself, so the component that renders this
+/// never has a chance to pass one through.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BidiMarkedPart {
+    /// Ordinary text, exactly as it appeared between two controls (or at
+    /// either end of the line) — never empty.
+    Plain(String),
+    /// One control character, replaced by its marker token (e.g. `"RLO"`)
+    /// and English accessible name (e.g. `"right-to-left override
+    /// character"`) — the component translates `name` through `t(lang,
+    /// ...)`, same as every other user-visible string.
+    Marker {
+        token: &'static str,
+        name: &'static str,
+    },
+}
+
+/// Splits `text` into alternating [`BidiMarkedPart::Plain`] runs and
+/// [`BidiMarkedPart::Marker`]s, one per bidirectional control character
+/// `forskscope_compare::bidi` lists (RFC-100 §1) — in order, so
+/// concatenating the parts' own text back together (markers included,
+/// literally) reconstructs `text`'s character sequence 1:1 except for
+/// the controls themselves. Returns `[Plain(text)]` unchanged (one
+/// allocation, no splitting) when `text` holds none.
+pub fn split_bidi_marks(text: &str) -> Vec<BidiMarkedPart> {
+    if !text.chars().any(forskscope_compare::is_bidi_control) {
+        return vec![BidiMarkedPart::Plain(text.to_string())];
+    }
+    let mut parts = Vec::new();
+    let mut plain = String::new();
+    for ch in text.chars() {
+        match forskscope_compare::marker_for(ch) {
+            Some(token) => {
+                if !plain.is_empty() {
+                    parts.push(BidiMarkedPart::Plain(std::mem::take(&mut plain)));
+                }
+                let name = forskscope_compare::name_for(ch).unwrap_or("");
+                parts.push(BidiMarkedPart::Marker { token, name });
+            }
+            None => plain.push(ch),
+        }
+    }
+    if !plain.is_empty() {
+        parts.push(BidiMarkedPart::Plain(plain));
+    }
+    parts
+}

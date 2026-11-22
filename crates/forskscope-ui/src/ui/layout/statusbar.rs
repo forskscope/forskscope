@@ -9,6 +9,22 @@ use crate::state::Store;
 /// RFC-091 §2/§3, acceptance criterion 7: the exact text for each
 /// non-installed mode. `None` for `Installed` — today's behaviour is to
 /// show nothing here, the RFC's texts cover every *other* case.
+/// RFC-100 §4: the status bar's own words for a file containing one or
+/// more of RFC-101 §1's bidirectional control characters — `None` when
+/// `n` is `0` (nothing to say). Counts both sides together: the status
+/// bar has room for one compact line, not a per-side breakdown (the CLI
+/// and JSON output carry that, §4).
+fn bidi_notice_text(lang: crate::state::Lang, n: usize) -> Option<String> {
+    if n == 0 {
+        return None;
+    }
+    if n == 1 {
+        Some(t(lang, "Contains 1 direction-control character"))
+    } else {
+        Some(t(lang, "Contains {n} direction-control characters").replace("{n}", &n.to_string()))
+    }
+}
+
 fn mode_text(lang: crate::state::Lang, mode: &ModeDisplay) -> Option<String> {
     match mode {
         ModeDisplay::Installed => None,
@@ -64,19 +80,24 @@ pub fn StatusBar() -> Element {
                     no_backup,
                 )
             });
+            let bidi_notice = bidi_notice_text(
+                lang,
+                tab.left_doc.bidi_controls() + tab.right_doc.bidi_controls(),
+            );
             (
                 format!("{left} ↔ {right}"),
                 enc,
                 stat_str,
                 dirty,
                 save_target,
+                bidi_notice,
             )
         })
     });
 
     rsx! {
         div { class: "statusbar", role: "status",
-            if let Some((pair, enc, stats, dirty, save_target)) = context {
+            if let Some((pair, enc, stats, dirty, save_target, bidi_notice)) = context {
                 // Review 204 §2.2 (F218): only `.pair` and `.save-target`
                 // ever ellipsize (02-layout-shell.css) — `title` keeps each
                 // one's full text as an accessible name once it does. `enc`/
@@ -87,6 +108,9 @@ pub fn StatusBar() -> Element {
                 span { class: "pair", title: "{pair}", "{pair}" }
                 if !enc.is_empty() { span { class: "enc", "{enc}" } }
                 if !stats.is_empty() { span { class: "stats", "{stats}" } }
+                if let Some(ref notice) = bidi_notice {
+                    span { class: "bidi-notice", "{notice}" }
+                }
                 if dirty { span { class: "dirty", {t(lang, "unsaved")} } }
                 if let Some((short, full, no_backup)) = save_target {
                     span { class: "save-target", title: "{full}",

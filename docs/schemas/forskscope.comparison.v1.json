@@ -14,12 +14,17 @@
     "side_info": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "size", "sha256", "encoding"],
+      "required": ["name", "size", "sha256", "encoding", "bidi_controls"],
       "properties": {
         "name": { "type": "string" },
         "size": { "type": "integer", "minimum": 0 },
         "sha256": { "type": ["string", "null"] },
-        "encoding": { "type": "string" }
+        "encoding": { "type": "string" },
+        "bidi_controls": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "RFC-100 §4: how many of RFC-100 §1's bidirectional control characters this side's decoded text contains."
+        }
       }
     },
     "change_line_kind": {

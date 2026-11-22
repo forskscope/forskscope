@@ -728,3 +728,43 @@ fn a_save_refused_by_the_recheck_leaves_the_previous_backup_untouched() {
         "no content temp and no staged backup may be left behind"
     );
 }
+
+// ── RFC-100 §5: the markers are display only ──────────────────────────────────
+
+/// RFC-100 §5: "the markers are display only" - `save_text` never sees
+/// the view layer's `BidiText`/marker rendering at all, only whatever
+/// `String` the caller passes as `content`, so a file containing every
+/// one of RFC-100 §1's bidirectional control characters must round-trip
+/// through a save byte for byte, exactly like any other content. This
+/// does not exercise the view layer - see `forskscope-ui::ui::view::
+/// hunk::tests::no_bidi_control_character_reaches_the_rendered_page_plain_or_refined`
+/// for that half; this half is "and what's saved is untouched".
+#[test]
+fn saving_a_file_with_every_bidi_control_character_round_trips_byte_for_byte() {
+    let dir = temp_dir("bidi-round-trip");
+    let target = dir.join("out.txt");
+    let mut content = String::from("before");
+    for c in forskscope_compare::BIDI_CONTROLS {
+        content.push(c.ch);
+    }
+    content.push_str("after\n");
+    let request = SaveRequest {
+        target: target.clone(),
+        content: content.clone(),
+        encoding_label: "UTF-8".into(),
+        bom: BomPresence::Absent,
+        precondition: TargetPrecondition::Force,
+        backup: BackupPolicy::None,
+    };
+    save_text(&request).unwrap();
+    let saved = fs::read_to_string(&target).unwrap();
+    assert_eq!(
+        saved, content,
+        "every bidi control character must survive a save exactly, not a marker or an escape"
+    );
+    assert_eq!(
+        saved.as_bytes(),
+        content.as_bytes(),
+        "byte for byte, not just char for char"
+    );
+}

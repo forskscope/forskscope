@@ -695,6 +695,26 @@ fn ja(key: &str) -> Option<&'static str> {
             "一部のハンクは大きすぎたため、文字単位の差分表示を省略しました。"
         }
 
+        // RFC-100 §2: the accessible name for each bidirectional control
+        // character's marker - one per crates/forskscope-compare/src/bidi.rs
+        // entry, kept in the same order.
+        "Arabic letter mark character" => "アラビア文字マーク文字",
+        "left-to-right mark character" => "左から右へのマーク文字",
+        "right-to-left mark character" => "右から左へのマーク文字",
+        "left-to-right embedding character" => "左から右への埋め込み文字",
+        "right-to-left embedding character" => "右から左への埋め込み文字",
+        "pop directional formatting character" => "方向書式のポップ文字",
+        "left-to-right override character" => "左から右への上書き文字",
+        "right-to-left override character" => "右から左への上書き文字",
+        "left-to-right isolate character" => "左から右への分離体文字",
+        "right-to-left isolate character" => "右から左への分離体文字",
+        "first strong isolate character" => "最初の強い文字による分離体文字",
+        "pop directional isolate character" => "方向分離体のポップ文字",
+        // RFC-100 §4: the status bar's own notice, singular and plural
+        // (Japanese needs only the "other" form, RFC-101 §2).
+        "Contains 1 direction-control character" => "方向制御文字が1個含まれています",
+        "Contains {n} direction-control characters" => "方向制御文字が{n}個含まれています",
+
         _ => return None,
     };
     Some(v)
@@ -997,6 +1017,33 @@ mod tests {
             untranslated.is_empty(),
             "these labels' ja() entry is identical to the English key, not a real \
              translation: {untranslated:?}"
+        );
+    }
+
+    /// RFC-100 §2: `BidiText` (`ui::view::hunk`) calls `t(lang, name)` with
+    /// `name` read from `forskscope_compare::BIDI_CONTROLS` at runtime, not
+    /// a literal `t(lang, "...")` the i18n audit's static scan can see -
+    /// the same gap `theme_choices`/`contrast_choices` have above, checked
+    /// the same way: against the real table, not a copy of it.
+    #[test]
+    fn every_bidi_control_name_has_a_real_distinct_ja_translation() {
+        let mut missing = Vec::new();
+        let mut untranslated = Vec::new();
+        for c in forskscope_compare::BIDI_CONTROLS {
+            match ja(c.name) {
+                None => missing.push(c.name),
+                Some(translated) if translated == c.name => untranslated.push(c.name),
+                Some(_) => {}
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "these bidi control names have no ja() entry at all: {missing:?}"
+        );
+        assert!(
+            untranslated.is_empty(),
+            "these bidi control names' ja() entry is identical to the English key, \
+             not a real translation: {untranslated:?}"
         );
     }
 }

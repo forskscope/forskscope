@@ -108,7 +108,10 @@ th, td {{ border: 1px solid #d0d7de; padding: 0.3em 0.6em; text-align: left; fon
 .diff-row {{ display: flex; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 0.9em; white-space: pre-wrap; word-break: break-all; }}
 .diff-lineno {{ flex: 0 0 4.5em; color: #57606a; text-align: right; padding-right: 0.6em; user-select: none; }}
 .diff-mark {{ flex: 0 0 1.4em; text-align: center; font-weight: bold; }}
-.diff-content {{ flex: 1 1 auto; padding-right: 0.6em; }}
+/* RFC-100 §3: a left-to-right paragraph, isolated from the rest of the
+   page - the same reasoning and the same choice (never guessed per-line)
+   as the live app's own .cell rule (03-components.css). */
+.diff-content {{ flex: 1 1 auto; padding-right: 0.6em; direction: ltr; unicode-bidi: isolate; }}
 .hunk-ctx .diff-content {{ color: #1f2328; }}
 .hunk-del {{ background: {del_bg}; }}
 .hunk-del .diff-mark {{ color: {del_mark}; }}
@@ -119,6 +122,12 @@ th, td {{ border: 1px solid #d0d7de; padding: 0.3em 0.6em; text-align: left; fon
 mark.ins {{ background: {ins_bg}; text-decoration: underline; }}
 mark.del {{ background: {del_bg}; text-decoration: line-through; }}
 .checksum {{ font-family: ui-monospace, monospace; font-size: 0.9em; word-break: break-all; }}
+/* RFC-100 §2/§4: a bidirectional control character's marker, and the
+   notice above the diff - {rep_mark} is this report's own warning-toned
+   colour (see Palette's own doc comment: the replace-hunk mark reuses
+   it for the same reason). */
+.bidi-marker {{ display: inline-block; margin: 0 0.1em; padding: 0 0.3em; font-size: 0.85em; font-weight: bold; color: {rep_mark}; border: 1px solid {rep_mark}; border-radius: 3px; }}
+.bidi-notice {{ color: {rep_mark}; font-weight: bold; }}
 @media print {{
   body {{ max-width: none; margin: 0; }}
   .hunk {{ break-inside: avoid; }}
@@ -165,16 +174,54 @@ fn row_class(kind: ChangeLineKind, is_replace_hunk: bool) -> &'static str {
     }
 }
 
+/// `text`, HTML-escaped, with every RFC-100 §1 bidirectional control
+/// character replaced by a small bordered marker token (its own
+/// `<span>`, outside the escaped run so it is never itself re-escaped) —
+/// never the character itself, so it can't reorder anything in a report
+/// that may be opened, printed, or forwarded anywhere. English-only
+/// name/title, matching this report's own established scope (no `tr`
+/// closure reaches this deep — it operates on file *content*, not UI
+/// chrome, same reasoning `render_content`'s own doc comment already
+/// gives for every name and line being escaped unconditionally).
+fn escape_html_marking_bidi(text: &str) -> String {
+    if !text.chars().any(forskscope_compare::is_bidi_control) {
+        return escape_html(text);
+    }
+    let mut out = String::new();
+    let mut plain = String::new();
+    for ch in text.chars() {
+        match forskscope_compare::marker_for(ch) {
+            Some(token) => {
+                if !plain.is_empty() {
+                    out.push_str(&escape_html(&plain));
+                    plain.clear();
+                }
+                let name = forskscope_compare::name_for(ch).unwrap_or_default();
+                let _ = write!(
+                    out,
+                    "<span class=\"bidi-marker\" title=\"{}\">{token}</span>",
+                    escape_html(name)
+                );
+            }
+            None => plain.push(ch),
+        }
+    }
+    if !plain.is_empty() {
+        out.push_str(&escape_html(&plain));
+    }
+    out
+}
+
 /// Render one line's content, wrapping any inline highlight spans in
 /// `<mark>` — escaped span-by-span so a span boundary can never split an
 /// HTML entity in half.
 fn render_content(line: &super::changes::ChangeLine) -> String {
     match &line.spans {
-        None => escape_html(&line.content),
+        None => escape_html_marking_bidi(&line.content),
         Some(spans) => {
             let mut out = String::new();
             for span in spans {
-                let escaped = escape_html(&span.text);
+                let escaped = escape_html_marking_bidi(&span.text);
                 match span.kind {
                     forskscope_compare::diff::InlineKind::Equal => out.push_str(&escaped),
                     forskscope_compare::diff::InlineKind::Insert => {
@@ -335,6 +382,22 @@ fn localized_summary_sentence(
         .replace("{a}", &a.to_string())
 }
 
+/// RFC-100 §4: the same words the live app's status bar shows (combined
+/// across both sides, not a per-side breakdown — the CLI's own text
+/// output is where that breakdown lives, since it has the room).
+/// `None` when neither side has any.
+fn bidi_notice(report: &FileComparisonReport, tr: &dyn Fn(&str) -> String) -> Option<String> {
+    let n = report.left_bidi_controls + report.right_bidi_controls;
+    if n == 0 {
+        return None;
+    }
+    if n == 1 {
+        Some(tr("Contains 1 direction-control character"))
+    } else {
+        Some(tr("Contains {n} direction-control characters").replace("{n}", &n.to_string()))
+    }
+}
+
 /// Review 183 §3.2: the old sentence was a single fixed string naming
 /// the *default* caps (50 files, 5 MiB) even when `--max-files`/
 /// `--max-change-bytes` set different ones, and used plural wording
@@ -439,6 +502,10 @@ pub fn render_file_report(
         "<p>{}</p>",
         escape_html(&localized_summary_sentence(report, tr))
     );
+
+    if let Some(notice) = bidi_notice(report, tr) {
+        let _ = writeln!(out, "<p class=\"bidi-notice\">{}</p>", escape_html(&notice));
+    }
 
     if !report.change_hunks.is_empty() {
         let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("The changes")));
@@ -1259,5 +1326,58 @@ mod tests {
         // compared", never "Comparing…".
         assert!(html.contains("Not compared"));
         assert!(!html.contains("Comparing"));
+    }
+
+    // ── RFC-100 §2/§4: the HTML report's own markers and notice ───────────────
+
+    #[test]
+    fn escape_html_marking_bidi_replaces_the_control_with_a_marker_span_never_the_character() {
+        let out = escape_html_marking_bidi("before\u{202E}after");
+        assert!(
+            !out.contains('\u{202E}'),
+            "the raw control character must never reach the output: {out}"
+        );
+        assert!(out.contains("<span class=\"bidi-marker\""), "{out}");
+        assert!(out.contains(">RLO<"), "{out}");
+        assert!(out.contains("before"), "{out}");
+        assert!(out.contains("after"), "{out}");
+    }
+
+    #[test]
+    fn escape_html_marking_bidi_still_escapes_ordinary_html_metacharacters() {
+        let out = escape_html_marking_bidi("<script>\u{202E}</script>");
+        assert!(!out.contains("<script>"), "{out}");
+        assert!(out.contains("&lt;script&gt;"), "{out}");
+    }
+
+    #[test]
+    fn the_bidi_notice_combines_both_sides_and_is_absent_when_neither_has_any() {
+        let diff = forskscope_compare::diff::compute_diff(
+            "a\n",
+            "b\n",
+            forskscope_compare::diff::DiffOptions::default(),
+        );
+        let report = crate::report::FileComparisonReport::from_diff(
+            &diff,
+            None,
+            None,
+            crate::report::ReportOptions::default(),
+        )
+        .with_bidi_controls(2, 1);
+        let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        assert!(
+            html.contains("Contains 3 direction-control characters"),
+            "{html}"
+        );
+
+        let clean_report = crate::report::FileComparisonReport::from_diff(
+            &diff,
+            None,
+            None,
+            crate::report::ReportOptions::default(),
+        );
+        let clean_html =
+            render_file_report(&clean_report, "0.0.0", "now", false, &|s| s.to_string());
+        assert!(!clean_html.contains("direction-control"), "{clean_html}");
     }
 }

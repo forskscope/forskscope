@@ -43,6 +43,12 @@ Check whether whitespace differences are the culprit:
 
 ---
 
+## Why does a line show `RLO`, `LRI`, or another three-letter label?
+
+That's a bidirectional control character — an invisible Unicode character that changes which direction text reads in, without showing anything itself. ForskScope shows each one as a small labelled token instead of hiding it, because these characters can otherwise make a line *display* differently from what it actually contains (the "Trojan Source" technique, CVE-2021-42574, relies on exactly that). The label doesn't change the file: saving, **Use**, merging and patch export all work on the real text, unchanged. See [Comparing Files § Bidirectional control characters](comparing-files.md#bidirectional-control-characters) for the full list and what each one means.
+
+---
+
 ## How do I compare files with different names?
 
 1. Click a file in the left pane to select it (single click — it doesn't need

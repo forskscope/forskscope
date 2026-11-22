@@ -299,6 +299,16 @@
      real use of a diff tool, and the gutter/mark columns either side stay
      unselectable (their own user-select: none, unchanged). */
   user-select: text;
+  /* RFC-100 §3: a left-to-right paragraph, with its own text isolated
+     from the rest of the page - right-to-left text in a compared file
+     (Hebrew, Arabic and others) still orders correctly *within* its own
+     line, by the browser's bidirectional algorithm, but nothing in it
+     can move the gutter, the marks, the *Use* button or the next line.
+     Per-line automatic direction is a deliberate non-goal (§3): this
+     stays `ltr`, never guessed from the line's own content, the same
+     choice code editors make. */
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 /* ---- hunk backgrounds ----
@@ -361,6 +371,43 @@
   padding: 0 0.5ch;
   font-size: 12px;
   color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 3px;
+}
+
+/* RFC-100 §2: a bidirectional control character, shown as this small
+   token in place of the character itself - never the character, so it
+   can't reorder anything. The warning colour is a cue, not the only
+   signal: the accessible name (role="img", aria-label) and the status
+   bar's own words (RFC-100 §4) carry it in words too.
+
+   Found live, this handoff: a marker can land inside any hunk kind's own
+   coloured row, not only on the plain surface an Equal line sits on - a
+   bordered, text-coloured token (`color: var(--warn)`, the same shape
+   `.inline-skipped` already uses safely, always on a plain surface)
+   measured below 4.5:1 in `.in-del` (an inline-refined Replace pair's
+   deleted span) under cv-rgsafe, every theme - and reusing `.diff-mark`'s
+   own per-hunk marks in its place still fell short of the stricter
+   *text* floor this needs (this carries a real, non-decorative glyph
+   name, not a hidden symbol: measured live, `--rep-mark`'s own standard
+   value read only 5.00-6.39:1 against *High*'s 7:1, since it was only
+   ever tuned to the lower mark floor, 4.5). Solid fill instead,
+   `background: var(--warn)` with `color: var(--surface)` on top of it:
+   its own two colours are the only pair that matters, regardless of
+   which hunk or span it sits inside, since the fill itself is opaque -
+   no compounding, no per-hunk override, nothing `contrast.rs` has to
+   re-verify for every background this could land on. Computed for every
+   theme × contrast level (neither token varies by colour vision):
+   dark 8.39/10.08, light 5.55/8.82, night 7.50/8.90 (standard/High) -
+   clears 4.5 and 7 with margin everywhere. */
+.bidi-marker {
+  display: inline-block;
+  margin: 0 0.2ch;
+  padding: 0 0.4ch;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--warn);
   border: 1px solid var(--warn);
   border-radius: 3px;
 }
