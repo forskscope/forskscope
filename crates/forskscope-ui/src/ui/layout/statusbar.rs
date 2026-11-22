@@ -10,7 +10,7 @@ use crate::state::Store;
 /// non-installed mode. `None` for `Installed` — today's behaviour is to
 /// show nothing here, the RFC's texts cover every *other* case.
 /// RFC-100 §4: the status bar's own words for a file containing one or
-/// more of RFC-101 §1's bidirectional control characters — `None` when
+/// more of RFC-100 §1's bidirectional control characters — `None` when
 /// `n` is `0` (nothing to say). Counts both sides together: the status
 /// bar has room for one compact line, not a per-side breakdown (the CLI
 /// and JSON output carry that, §4).
