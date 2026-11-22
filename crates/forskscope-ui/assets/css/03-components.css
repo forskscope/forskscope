@@ -74,35 +74,52 @@
   padding-top: 1rem; padding-left: 1rem; padding-right: 1rem;
 }
 .modal h2 { margin: 0 0 .75rem; font-size: 1rem; }
-/* F232: the row's own `min-height` matches `button`'s own
-   (`--control-h`, 02-layout-shell.css) - `select` carries no such rule of
-   its own (button-only), so a flex row with no explicit height at all
-   relies on the browser computing its auto height from its tallest
-   child; measured live (800x560/200%, the Text size row, en, every
-   theme): the `<select>` itself reports no overflow at all (its own
-   scrollHeight/clientHeight match, 33px), but the row around it still
-   came back with clientHeight 27 against that same 33 needed - the row's
-   own auto-height, not any one child's, falling short of its tallest
-   child. An explicit floor on the row itself doesn't depend on
-   understanding why the browser's auto-height came up short here; it
-   just stops it from ever being able to. */
+/* F232, root-caused per review 232 §1.2: `.modal`, this row's own parent,
+   is a plain block scroll container (no `display: flex` of its own), so
+   neither an ancestor's `flex-direction` nor this row's own `flex-shrink`
+   (tried alone, without the `min-height` below: no effect, live) can be
+   the cause - the row isn't a flex *item* of anything. The cause is the
+   engine's own auto-height for this flex row's *first* layout at a given
+   text size: measured live (800x560/200%, the Text size row, en, every
+   theme), a run that never changes language before reaching this view at
+   200% comes back with the row's clientHeight at 27 against its own
+   scrollHeight of 33 (the `<select>` itself reports no overflow at all -
+   this is the row's own auto-height, not any one child's) - but a run
+   that switches language even once before that same measurement (in
+   either direction, `en`->`ja` or `ja`->`en`) always comes back clean.
+   That is the one difference between RFC-098's own two sweeps at this
+   exact view and size: the layout sweep alternates `en`/`ja` for every
+   text size it visits, the contrast sweep holds `en` the entire run - so
+   only the contrast sweep's own Settings measurement ever lands on this
+   row's *first* layout with no language change behind it. A real user
+   who sets 200% once and never opens the language switcher (there isn't
+   one in this app; the OS locale is fixed at launch) would reach the
+   same first-layout path, so this is real, not the probe mid-change -
+   but there's no CSS ancestor or flex property to fix it at, since
+   nothing here is a sizing contract this engine is failing to honour;
+   it's a one-time miscount on this flex row's first layout pass,
+   corrected only by an unrelated reflow this view may never get. The
+   floor below is kept for that reason, now understood rather than
+   guessed. */
 .modal .field {
-  display: flex; justify-content: space-between; align-items: center;
-  margin: .5rem 0; gap: .75rem; min-height: var(--control-h);
+  display: flex; flex-wrap: wrap; justify-content: space-between;
+  align-items: center; margin: .5rem 0; gap: .75rem;
+  min-height: var(--control-h);
 }
 /* F205: a long label (English or Japanese) and the control it names must
    never touch — the label is the one that wraps, since the control stays
    legible only at or near its natural width. */
-/* F232: `min-width: 0` lets the flex item shrink below its text's own
-   single-line width, which is what lets it wrap at all - but default
-   `overflow-wrap: normal` only ever breaks *between* words, so a box a
-   few pixels narrower than one word's own rendered width (measured live,
-   800x560/200%, "Explorer layout": 51px assigned, 54px needed) overflows
-   that one word horizontally instead of wrapping again. `anywhere` lets
-   it break inside the word when it must, which is the rest of the time
-   never - most labels wrap at a space long before any word is tight
-   enough for this to matter. */
-.modal .field > span:first-child { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+/* Review 232 §1.1: `min-width: 0` (F232's own first attempt) let the box
+   shrink narrower than even its own longest word, which `overflow-wrap:
+   anywhere` then broke mid-letter to avoid an overflow - unreadable for
+   exactly the audience RFC-097 was written for, and unnecessary for
+   Japanese, which already breaks between characters with no property
+   needed. `min-width: min-content` is the floor that actually matches
+   F205's own intent: the label wraps between words, never inside one,
+   and if its longest word and the control genuinely can't fit on one
+   row together, the row's own `flex-wrap: wrap` above sends the control
+   to its own line instead of squeezing the word. */
+.modal .field > span:first-child { flex: 1 1 auto; min-width: min-content; }
 /* F228: the three checkboxes' own field names its words with a real
    `<label for>` now, not a bare `span` - RFC-098's own hit-area check
    unions an `<input>` with exactly that association
@@ -116,8 +133,8 @@
    union at all; `.profile-name`'s own fix (03-components.css) is the
    same shape, for the same reason. */
 .modal .field > label:first-child {
-  flex: 1 1 auto; min-width: 0; min-height: 24px;
-  display: flex; align-items: center; overflow-wrap: anywhere;
+  flex: 1 1 auto; min-width: min-content; min-height: 24px;
+  display: flex; align-items: center;
 }
 .modal .field > select,
 .modal .field > input { flex-shrink: 0; }
