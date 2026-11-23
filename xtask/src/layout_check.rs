@@ -720,8 +720,7 @@ fn write_bidi_names_fixture(dir: &Path) -> (PathBuf, PathBuf) {
     let left = dir.join("bidi-names-left");
     let right = dir.join("bidi-names-right");
     fs::create_dir_all(&left).unwrap_or_else(|e| panic!("cannot create {}: {e}", left.display()));
-    fs::create_dir_all(&right)
-        .unwrap_or_else(|e| panic!("cannot create {}: {e}", right.display()));
+    fs::create_dir_all(&right).unwrap_or_else(|e| panic!("cannot create {}: {e}", right.display()));
 
     let spoofed_name = format!("invoice{}fdp.exe", '\u{202E}');
     fs::write(left.join(&spoofed_name), b"left\n")
