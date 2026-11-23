@@ -101,10 +101,29 @@ pub(crate) fn config_dir() -> Option<PathBuf> {
     match DATA_LOCATION.get() {
         Some(DataLocation::Portable(dir)) => Some(dir.clone()),
         Some(DataLocation::Private) => None,
-        Some(DataLocation::Installed) | None => {
-            dirs_next::config_dir().map(|d| d.join("forskscope"))
-        }
+        Some(DataLocation::Installed) | None => real_config_dir(),
     }
+}
+
+/// F237: split out so the real, platform `dirs_next::config_dir()` lookup
+/// has exactly one `cfg(test)` guard. `DATA_LOCATION` is a process-wide
+/// `OnceLock` only `main()` ever sets (never set by `cargo test`), so this
+/// arm is reached by any test that calls [`config_dir`] directly without
+/// first giving `DATA_LOCATION` a Portable/Private value — the same silent
+/// real-folder write `config_file_path`'s own fallback was found making.
+#[cfg(not(test))]
+fn real_config_dir() -> Option<PathBuf> {
+    dirs_next::config_dir().map(|d| d.join("forskscope"))
+}
+
+#[cfg(test)]
+fn real_config_dir() -> Option<PathBuf> {
+    panic!(
+        "startup_mode::config_dir() called with DATA_LOCATION unset or Installed in a test \
+         — this would resolve the real platform config directory. Set DATA_LOCATION to \
+         Portable/Private for this test, or reach settings/session through \
+         ConfigRootOverrideGuard instead."
+    )
 }
 
 /// The folder batch-copy manifests are written to. `None` in Private mode,
@@ -124,10 +143,24 @@ pub(crate) fn manifest_dir() -> Option<PathBuf> {
                 Some(dir.join("manifests"))
             }
         }
-        Some(DataLocation::Installed) | None => {
-            dirs_next::data_dir().map(|d| d.join("forskscope").join("manifests"))
-        }
+        Some(DataLocation::Installed) | None => real_manifest_dir(),
     }
+}
+
+/// F237: same split as [`real_config_dir`], for the data folder manifests
+/// are written under.
+#[cfg(not(test))]
+fn real_manifest_dir() -> Option<PathBuf> {
+    dirs_next::data_dir().map(|d| d.join("forskscope").join("manifests"))
+}
+
+#[cfg(test)]
+fn real_manifest_dir() -> Option<PathBuf> {
+    panic!(
+        "startup_mode::manifest_dir() called with DATA_LOCATION unset or Installed in a test \
+         — this would resolve the real platform data directory. Set DATA_LOCATION to \
+         Portable/Private for this test instead."
+    )
 }
 
 #[cfg(test)]
@@ -187,5 +220,25 @@ mod tests {
             mode_display_for(Some(&DataLocation::Portable(dir.clone())), Some(false)),
             ModeDisplay::PortableReadOnly(dir)
         );
+    }
+
+    // ── F237: config_dir/manifest_dir fail closed, not just config_file_path's
+    // own override check — a test calling either directly, with DATA_LOCATION
+    // unset or Installed, must not silently resolve the real platform
+    // folder. `DATA_LOCATION` is only ever `.set()` by `main()` (grepped: no
+    // test in this workspace sets it), so it is reliably `None` here —
+    // falsify by reverting either function's `Installed | None` arm to call
+    // `dirs_next::config_dir()`/`dirs_next::data_dir()` directly: both tests
+    // below then return `Some(..)` instead of panicking.
+    #[test]
+    #[should_panic(expected = "config_dir() called")]
+    fn config_dir_panics_with_no_data_location_set_in_a_test() {
+        let _ = config_dir();
+    }
+
+    #[test]
+    #[should_panic(expected = "manifest_dir() called")]
+    fn manifest_dir_panics_with_no_data_location_set_in_a_test() {
+        let _ = manifest_dir();
     }
 }

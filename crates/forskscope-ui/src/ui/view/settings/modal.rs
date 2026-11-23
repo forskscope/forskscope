@@ -1056,6 +1056,16 @@ mod tests {
         use std::any::Any;
         use std::rc::Rc;
 
+        // F237: the real onchange handler below persists settings; without
+        // this, config_file_path now panics instead of resolving the real
+        // platform config folder.
+        let config_home = std::env::temp_dir().join(format!(
+            "fsk-ui-settings-modal-checkbox-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&config_home).unwrap();
+        let _config_root = crate::state::ConfigRootOverrideGuard::set(config_home);
+
         // `Store::new` creates `Signal`s "in scope" at `ScopeId::ROOT`,
         // which needs a live runtime to register against - built inside
         // `root`, same as every other test in this file, never before
@@ -1135,6 +1145,16 @@ mod tests {
         use dioxus::html::{PlatformEventData, SerializedFormData};
         use std::any::Any;
         use std::rc::Rc;
+
+        // F237: the real onchange handler below persists settings; without
+        // this, config_file_path now panics instead of resolving the real
+        // platform config folder.
+        let config_home = std::env::temp_dir().join(format!(
+            "fsk-ui-settings-modal-profile-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&config_home).unwrap();
+        let _config_root = crate::state::ConfigRootOverrideGuard::set(config_home);
 
         thread_local! {
             static STORE2: std::cell::Cell<Option<Store>> = const { std::cell::Cell::new(None) };

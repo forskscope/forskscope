@@ -215,6 +215,39 @@ jobs:
       - name: cargo test (workspace)
         run: cargo test --workspace
 
+      # F237 (review 236, handoff 113): `cargo test --workspace` was found
+      # writing settings.json/session.json into the real platform config
+      # folder on every local run — a test reaching config_file_path (or
+      # config_dir/manifest_dir) without a ConfigRootOverrideGuard in place
+      # silently resolved the real folder instead. Those resolvers now
+      # panic under cfg(test) with no override/DATA_LOCATION in place
+      # (state.rs, startup_mode.rs), which already fails the step above for
+      # any test still missing one — this step is the belt-and-suspenders
+      # check behind that: four empty, disposable folders, and a failure
+      # if the suite puts anything into them at all, so a future regression
+      # that somehow dodges the panic (a path this crate's own cfg(test)
+      # guard doesn't cover) is still caught here rather than only on the
+      # owner's own machine.
+      - name: Test suite never writes outside its own empty XDG folders (F237)
+        run: |
+          mkdir -p /tmp/f237-empty-xdg/config /tmp/f237-empty-xdg/data /tmp/f237-empty-xdg/cache /tmp/f237-empty-xdg/state
+          XDG_CONFIG_HOME=/tmp/f237-empty-xdg/config \
+          XDG_DATA_HOME=/tmp/f237-empty-xdg/data \
+          XDG_CACHE_HOME=/tmp/f237-empty-xdg/cache \
+          XDG_STATE_HOME=/tmp/f237-empty-xdg/state \
+          cargo test --workspace
+          XDG_CONFIG_HOME=/tmp/f237-empty-xdg/config \
+          XDG_DATA_HOME=/tmp/f237-empty-xdg/data \
+          XDG_CACHE_HOME=/tmp/f237-empty-xdg/cache \
+          XDG_STATE_HOME=/tmp/f237-empty-xdg/state \
+          cargo test -p forskscope --lib --features layout-probe
+          leftover="$(find /tmp/f237-empty-xdg -mindepth 1)"
+          if [ -n "$leftover" ]; then
+            echo "::error::the test suite wrote into its own empty XDG folders - F237's own regression:"
+            echo "$leftover"
+            exit 1
+          fi
+
       # RFC-094 §3, RFC-096 §5: validates a real forskscope compare
       # --format json document (a file comparison and a folder comparison)
       # against docs/schemas/forskscope.comparison.v1.json - after the

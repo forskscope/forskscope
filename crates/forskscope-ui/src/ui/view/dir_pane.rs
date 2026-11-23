@@ -811,6 +811,16 @@ mod tests {
     // call, including a Back/Forward replay, was.
     #[test]
     fn back_then_forward_returns_to_the_page_that_was_left() {
+        // F237: apply_navigation below persists settings (remember_explorer_dirs
+        // defaults on); without this, config_file_path now panics instead of
+        // resolving the real folder.
+        let config_home = std::env::temp_dir().join(format!(
+            "fsk-ui-dir-pane-back-forward-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&config_home).unwrap();
+        let _config_root = crate::state::ConfigRootOverrideGuard::set(config_home);
+
         with_test_store(|store| {
             let mut history = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
             let current_dir = Signal::new_in_scope(PathBuf::from("/a"), ScopeId::ROOT);

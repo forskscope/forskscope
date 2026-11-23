@@ -1325,6 +1325,12 @@ fn activate_adjacent_tab_cycles_through_explorer_files_and_dirs_wrapping() {
     let dir_right = dir.join("right-dir");
     fs::create_dir_all(&dir_left).unwrap();
     fs::create_dir_all(&dir_right).unwrap();
+    // F237: open_compare/open_dir_compare below each save the session
+    // (via set_active_tab) — without this, config_file_path now panics
+    // rather than silently resolving the real platform config folder.
+    let config_home = dir.join("config");
+    fs::create_dir_all(&config_home).unwrap();
+    let _config_root = crate::state::ConfigRootOverrideGuard::set(config_home);
 
     crate::state::with_test_store(|store| {
         open_compare(store, left1, right1);
@@ -1411,6 +1417,11 @@ fn activate_tab_at_the_explorer_position_clears_both_active_indices() {
     let right = dir.join("right.txt");
     fs::write(&left, "a\n").unwrap();
     fs::write(&right, "b\n").unwrap();
+    // F237: open_compare below saves the session; without this,
+    // config_file_path now panics instead of resolving the real folder.
+    let config_home = dir.join("config");
+    fs::create_dir_all(&config_home).unwrap();
+    let _config_root = crate::state::ConfigRootOverrideGuard::set(config_home);
 
     crate::state::with_test_store(|store| {
         open_compare(store, left, right);
@@ -1434,6 +1445,12 @@ fn activate_tab_at_a_dir_tab_position_selects_it_and_clears_the_file_index() {
     let dir_right = dir.join("right-dir");
     fs::create_dir_all(&dir_left).unwrap();
     fs::create_dir_all(&dir_right).unwrap();
+    // F237: open_compare/open_dir_compare below each save the session;
+    // without this, config_file_path now panics instead of resolving the
+    // real folder.
+    let config_home = dir.join("config");
+    fs::create_dir_all(&config_home).unwrap();
+    let _config_root = crate::state::ConfigRootOverrideGuard::set(config_home);
 
     crate::state::with_test_store(|store| {
         open_compare(store, left, right);

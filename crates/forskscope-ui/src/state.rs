@@ -79,12 +79,27 @@ thread_local! {
 /// default is an inert fallback for a path this crate's own code never
 /// actually constructs for I/O in that mode, not a correctness dependency.
 pub(crate) fn config_file_path(file_name: &str) -> PathBuf {
-    CONFIG_ROOT_OVERRIDE
-        .with(|o| o.borrow().clone())
-        .map(|root| root.join("forskscope"))
+    let override_root = CONFIG_ROOT_OVERRIDE.with(|o| o.borrow().clone());
+    // F237: under cfg(test), a missing override is a bug, not a case to
+    // fall back from — `cargo test --workspace` was found writing
+    // settings.json/session.json into the real platform config folder on
+    // every local run, because this function's production fallback
+    // resolved a real folder whenever a test reached it without first
+    // setting a ConfigRootOverrideGuard. Panicking turns that silent
+    // real-folder write into an immediate test failure naming the fix.
+    #[cfg(test)]
+    let root = override_root.unwrap_or_else(|| {
+        panic!(
+            "config_file_path(\"{file_name}\") called with no ConfigRootOverrideGuard in \
+             place — this test would otherwise resolve and write a real per-user folder. \
+             Set one first: `let _guard = ConfigRootOverrideGuard::set(scratch_dir);`"
+        )
+    });
+    #[cfg(not(test))]
+    let root = override_root
         .or_else(crate::startup_mode::config_dir)
-        .unwrap_or_else(|| PathBuf::from(".").join("forskscope"))
-        .join(file_name)
+        .unwrap_or_else(|| PathBuf::from("."));
+    root.join("forskscope").join(file_name)
 }
 
 /// F95: a test-only, thread-local override of the root [`config_file_path`]
@@ -508,8 +523,13 @@ mod tests {
         );
     }
 
+    /// F237: the override must not outlive its guard — falsified by
+    /// deleting `ConfigRootOverrideGuard`'s own `Drop` impl, which then
+    /// leaves `CONFIG_ROOT_OVERRIDE` set and this call returns instead of
+    /// panicking.
     #[test]
-    fn config_file_path_falls_back_once_the_override_guard_drops() {
+    #[should_panic(expected = "ConfigRootOverrideGuard")]
+    fn config_file_path_panics_once_the_override_guard_drops() {
         let root = std::path::PathBuf::from("/f95-override-root");
         {
             let _guard = ConfigRootOverrideGuard::set(root.clone());
@@ -518,10 +538,8 @@ mod tests {
                 root.join("forskscope").join("session.json")
             );
         }
-        assert_ne!(
-            config_file_path("session.json"),
-            root.join("forskscope").join("session.json"),
-            "the override must not outlive its guard"
-        );
+        // The guard has dropped — F237: this must now panic rather than
+        // silently resolve a real per-user folder.
+        config_file_path("session.json");
     }
 }

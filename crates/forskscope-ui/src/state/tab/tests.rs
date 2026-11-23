@@ -161,6 +161,14 @@ fn swap_sides_rederives_save_target_from_the_new_right_input() {
     let tab = normal_mode_tab();
     let original_right_path = tab.right_path.clone().unwrap();
     let original_left_path = tab.left_path.clone().unwrap();
+    // F237: swap_sides below saves the session; without this,
+    // config_file_path now panics instead of resolving the real folder.
+    let config_home = std::env::temp_dir().join(format!(
+        "fsk-ui-swap-sides-rederives-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&config_home).unwrap();
+    let _config_root = crate::state::ConfigRootOverrideGuard::set(config_home);
 
     with_test_store(|store| {
         store.tabs.write().push(tab);
@@ -210,6 +218,14 @@ fn swap_sides_leaves_save_target_untouched_in_mergetool_mode() {
         merged: merged.clone(),
     };
     tab.save_target = Some(original_save_target.clone());
+    // F237: swap_sides below saves the session; without this,
+    // config_file_path now panics instead of resolving the real folder.
+    let config_home = std::env::temp_dir().join(format!(
+        "fsk-ui-swap-sides-mergetool-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&config_home).unwrap();
+    let _config_root = crate::state::ConfigRootOverrideGuard::set(config_home);
 
     with_test_store(|store| {
         store.tabs.write().push(tab);

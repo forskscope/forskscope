@@ -530,13 +530,31 @@ mod tests {
         crate::keyboard::test_support::key_event(key, modifiers)
     }
 
+    /// F237: every navigation test below reaches `apply_navigation`, which
+    /// persists settings whenever `remember_explorer_dirs` is on
+    /// (`AppSettings::default()`'s value) — without a
+    /// `ConfigRootOverrideGuard`, `config_file_path` now panics rather than
+    /// resolving the real platform config folder. `tag` keeps each test's
+    /// scratch folder distinct, since tests run on separate threads of the
+    /// same process.
+    fn with_configured_test_store<R>(
+        tag: &str,
+        f: impl FnOnce(&mut crate::state::Store) -> R,
+    ) -> R {
+        let config_home =
+            std::env::temp_dir().join(format!("fsk-ui-explorer-tree-{tag}-{}", std::process::id()));
+        std::fs::create_dir_all(&config_home).unwrap();
+        let _guard = crate::state::ConfigRootOverrideGuard::set(config_home);
+        with_test_store(f)
+    }
+
     // F100 falsification 1: removing the Home binding (or hardcoding it to
     // a no-op) fails this — it asserts the *action* (the focused pane's
     // directory becomes the home directory), not merely that the key was
     // consumed.
     #[test]
     fn alt_home_navigates_the_focused_pane_to_the_home_directory() {
-        with_test_store(|store| {
+        with_configured_test_store("alt-home", |store| {
             let focused_pane = Signal::new_in_scope(FocusedPane::Left, ScopeId::ROOT);
             let left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
             let left_dir = Signal::new_in_scope(PathBuf::from("/somewhere/deep"), ScopeId::ROOT);
@@ -574,7 +592,7 @@ mod tests {
     // `Alt+↑` already guards against.
     #[test]
     fn alt_home_targets_the_right_pane_when_the_right_pane_is_focused() {
-        with_test_store(|store| {
+        with_configured_test_store("alt-home-right", |store| {
             let focused_pane = Signal::new_in_scope(FocusedPane::Right, ScopeId::ROOT);
             let left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
             let left_dir = Signal::new_in_scope(PathBuf::from("/left/unmoved"), ScopeId::ROOT);
@@ -608,7 +626,7 @@ mod tests {
     /// Forward step below finds nothing and the assertion fails (F72's bug).
     #[test]
     fn alt_arrows_go_back_then_forward_in_the_focused_pane() {
-        with_test_store(|store| {
+        with_configured_test_store("alt-arrows", |store| {
             let focused_pane = Signal::new_in_scope(FocusedPane::Left, ScopeId::ROOT);
             let mut left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
             let left_dir = Signal::new_in_scope(PathBuf::from("/b"), ScopeId::ROOT);
@@ -657,7 +675,7 @@ mod tests {
     /// not the left one. Falsify by hardcoding `is_left = true` in the new branch.
     #[test]
     fn alt_left_targets_the_right_pane_when_the_right_pane_is_focused() {
-        with_test_store(|store| {
+        with_configured_test_store("alt-left-right", |store| {
             let focused_pane = Signal::new_in_scope(FocusedPane::Right, ScopeId::ROOT);
             let left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
             let left_dir = Signal::new_in_scope(PathBuf::from("/left/unmoved"), ScopeId::ROOT);
@@ -692,7 +710,7 @@ mod tests {
     /// It does not cover the real webview dispatch, which is checked in the app.
     #[test]
     fn alt_up_goes_to_the_parent_of_the_focused_pane() {
-        with_test_store(|store| {
+        with_configured_test_store("alt-up", |store| {
             let focused_pane = Signal::new_in_scope(FocusedPane::Left, ScopeId::ROOT);
             let left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
             let left_dir = Signal::new_in_scope(PathBuf::from("/a/b"), ScopeId::ROOT);
@@ -720,7 +738,7 @@ mod tests {
     /// in that branch: the right pane stays put and this fails.
     #[test]
     fn alt_up_goes_to_the_parent_of_the_right_pane_when_it_is_focused() {
-        with_test_store(|store| {
+        with_configured_test_store("alt-up-right", |store| {
             let focused_pane = Signal::new_in_scope(FocusedPane::Right, ScopeId::ROOT);
             let left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
             let left_dir = Signal::new_in_scope(PathBuf::from("/l/m"), ScopeId::ROOT);
@@ -787,7 +805,7 @@ mod tests {
     // does for Home.
     #[test]
     fn apply_picked_folder_targets_the_focused_pane() {
-        with_test_store(|store| {
+        with_configured_test_store("apply-picked-folder", |store| {
             let left_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
             let left_dir = Signal::new_in_scope(PathBuf::from("/left/unmoved"), ScopeId::ROOT);
             let right_hist = Signal::new_in_scope(NavHistory::default(), ScopeId::ROOT);
