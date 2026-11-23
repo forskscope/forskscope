@@ -109,6 +109,31 @@ pub fn count_bidi_controls(text: &str) -> usize {
     text.chars().filter(|&c| is_bidi_control(c)).count()
 }
 
+/// F235: `text`, with every bidirectional control character printed as
+/// `<U+XXXX>` instead of the character itself — the one escaping shared
+/// by every place that can't hold markup (a window title, an `aria-
+/// label`, a CLI error message, the plain-text report): there is no
+/// marker token or CSS available there, only characters a terminal, a
+/// title bar or a screen reader would otherwise render, reorder or
+/// announce as-is. The interface instead renders a styled `<span
+/// class="bidi-marker">` (`BidiText`/`escape_html_marking_bidi`) — this
+/// function is for everywhere that can't.
+pub fn escape_to_plain_marker(text: &str) -> String {
+    if !text.chars().any(is_bidi_control) {
+        return text.to_string();
+    }
+    let mut out = String::new();
+    for ch in text.chars() {
+        if is_bidi_control(ch) {
+            use std::fmt::Write as _;
+            let _ = write!(out, "<U+{:04X}>", ch as u32);
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,6 +223,26 @@ mod tests {
         assert_eq!(count_bidi_controls("one\u{202E}two"), 1);
         let text = "a\u{202E}b\u{2066}c\u{202E}d";
         assert_eq!(count_bidi_controls(text), 3, "two RLOs and one LRI");
+    }
+
+    #[test]
+    fn escape_to_plain_marker_leaves_plain_text_untouched() {
+        assert_eq!(escape_to_plain_marker("plain text"), "plain text");
+        assert_eq!(escape_to_plain_marker(""), "");
+    }
+
+    #[test]
+    fn escape_to_plain_marker_escapes_every_control_by_its_own_code_point() {
+        for c in BIDI_CONTROLS {
+            let escaped = escape_to_plain_marker(&c.ch.to_string());
+            assert_eq!(escaped, format!("<U+{:04X}>", c.ch as u32), "{:?}", c.ch);
+        }
+    }
+
+    #[test]
+    fn escape_to_plain_marker_escapes_only_the_control_amid_plain_text() {
+        let text = "invoice\u{202E}fdp.exe";
+        assert_eq!(escape_to_plain_marker(text), "invoice<U+202E>fdp.exe");
     }
 
     // ── RFC-100 verification §1: three pairs shaped like the "Trojan

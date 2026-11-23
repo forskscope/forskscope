@@ -25,7 +25,8 @@ pub mod path;
 pub mod xlsx;
 
 pub use bidi::{
-    BIDI_CONTROLS, BidiControl, count_bidi_controls, is_bidi_control, marker_for, name_for,
+    BIDI_CONTROLS, BidiControl, count_bidi_controls, escape_to_plain_marker, is_bidi_control,
+    marker_for, name_for,
 };
 pub use cancel::CancellationToken;
 pub use diff::{
