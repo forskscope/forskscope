@@ -123,9 +123,10 @@ not a comparison result.
 Every document starts `{"schema": "forskscope.comparison/1", "kind":
 "file"|"directory", ...}`. The schema name is versioned on purpose:
 adding a field keeps `/1`; removing a field, or changing what one means,
-moves to `/2` with a new schema file. The full shape is a JSON Schema
-file in the repository, checked against what `forskscope compare`
-actually prints by `cargo xtask json-schema`:
+moves to `/2` with a new schema file. A `/1` document may gain fields;
+ignore those you don't know. The full shape is a JSON Schema file in the
+repository, checked against what `forskscope compare` actually prints by
+`cargo xtask json-schema`:
 
 ```text
 docs/schemas/forskscope.comparison.v1.json
