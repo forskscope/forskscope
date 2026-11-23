@@ -21,6 +21,7 @@ use forskscope_ui_logic::{DeepCompareSummary, DeepFilter, apply_filter};
 use crate::i18n::t;
 use crate::keyboard::focus_handle;
 use crate::state::{DirOp, Lang, Modal, Store, open_compare};
+use crate::ui::view::BidiText;
 use crate::ui::view::digest_epoch::{DigestEpoch, EpochStamp};
 
 /// The export buttons' tooltip, distinguishing the two disabled reasons
@@ -558,7 +559,13 @@ fn DeepRow(
     // status" - an explicit row-level `aria_label` rather than letting the
     // row's accessible name fall out of its children's text (which would
     // also run the action buttons' own labels into it on the selected row).
-    let row_label = format!("{path_str}, {label}");
+    // F235: `aria_label` is a plain AT string (no markup support), so it
+    // gets the `<U+XXXX>` escape; the visible `.deep-path` span below
+    // marks the same name with `BidiText` instead.
+    let row_label = format!(
+        "{}, {label}",
+        forskscope_compare::escape_to_plain_marker(&path_str)
+    );
     let rel_for_handle = entry.rel_path.clone();
     let rel_for_select = entry.rel_path.clone();
     let e2d = entry.clone();
@@ -616,7 +623,7 @@ fn DeepRow(
                     title: "{label}",
                     "{icon}"
                 }
-                span { class: "deep-path", "{path_str}" }
+                span { class: "deep-path", BidiText { text: path_str.clone(), lang } }
                 span { class: "dir-size", {size_label(&entry)} }
             }
             if is_selected && (can_cmp || copy_left_to_right || copy_right_to_left) {
@@ -1507,6 +1514,61 @@ mod tests {
                 && v.contains("sub/changed.txt")
                 && v.contains("Different")),
             "the selected row's own label must carry its path and status, got {attrs:?}"
+        );
+    }
+
+    /// F235: a bidi control character in a Deep Compare row's own
+    /// `rel_path` never reaches the rendered page raw — `.deep-path`
+    /// shows `BidiText`'s own marker, and the row's own `aria-label`
+    /// shows the `<U+XXXX>` escape instead. Falsify by reverting
+    /// `DeepRow`'s `BidiText { text: path_str.clone(), lang }` back to a
+    /// bare `"{path_str}"`, or its `escape_to_plain_marker(&path_str)`
+    /// call back to the bare `path_str`: the corresponding assertion
+    /// below then fails.
+    #[test]
+    fn a_bidi_control_character_in_a_deep_rows_own_path_never_reaches_the_rendered_page_raw() {
+        let e = entry_with_status("invoice\u{202E}fdp.exe", RecStatus::Changed);
+        let mut vdom = VirtualDom::new_with_props(root_with, (e, None));
+        let mutations = vdom.rebuild_to_vec();
+
+        let texts: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        for text in &texts {
+            assert!(
+                !text.chars().any(forskscope_compare::is_bidi_control),
+                "a bidi control character reached a rendered text node: {text:?}"
+            );
+        }
+        assert!(
+            texts.iter().any(|t| t.contains("RLO")),
+            "expected the RLO marker token among the rendered text nodes: {texts:?}"
+        );
+
+        let labels: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "aria-label",
+                    value,
+                    ..
+                } => Some(format!("{value:?}")),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            !labels.iter().any(|l| l.contains('\u{202E}')),
+            "the raw control character must never reach aria-label either: {labels:?}"
+        );
+        assert!(
+            labels.iter().any(|l| l.contains("<U+202E>")),
+            "expected the <U+202E> escape among the aria-label values: {labels:?}"
         );
     }
 }

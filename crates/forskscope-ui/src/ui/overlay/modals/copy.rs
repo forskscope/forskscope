@@ -5,6 +5,7 @@ use dioxus::prelude::*;
 use crate::i18n::t;
 use crate::state::{BatchCopySpec, BatchResultSpec, DirOp, Modal, Store};
 use crate::ui::component::notice::{Notice, NoticeKind};
+use crate::ui::view::BidiText;
 
 #[component]
 pub fn ConfirmDirOpModal(op: DirOp) -> Element {
@@ -16,8 +17,8 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Copy file"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
                 h2 { {t(lang, "Copy this file?")} }
-                div { class: "field", span { {t(lang, "From")} } code { class: "path-display", "{src}" } }
-                div { class: "field", span { {t(lang, "To")} }   code { class: "path-display", "{dst}" } }
+                div { class: "field", span { {t(lang, "From")} } code { class: "path-display", BidiText { text: src.clone(), lang } } }
+                div { class: "field", span { {t(lang, "To")} }   code { class: "path-display", BidiText { text: dst.clone(), lang } } }
                 if op.dst.exists() {
                     Notice { kind: NoticeKind::Ok,
                         {t(lang, "The destination exists. A .bak backup will be created first.")}
@@ -159,12 +160,12 @@ pub fn BatchResultModal(spec: BatchResultSpec) -> Element {
                 h2 { "{title}" }
                 if let Some(ref mp) = spec.manifest_path {
                     Notice { kind: NoticeKind::Ok, {t(lang, "Manifest saved:")} }
-                    code { class: "path-display", {mp.display().to_string()} }
+                    code { class: "path-display", BidiText { text: mp.display().to_string(), lang } }
                 }
                 if !spec.failure_details.is_empty() {
                     Notice { kind: NoticeKind::Error, {t(lang, "Errors:")} }
                     for detail in spec.failure_details.iter() {
-                        code { class: "path-display", "{detail}" }
+                        code { class: "path-display", BidiText { text: detail.clone(), lang } }
                     }
                 }
                 div { class: "actions",
@@ -176,5 +177,93 @@ pub fn BatchResultModal(spec: BatchResultSpec) -> Element {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use dioxus::prelude::*;
+
+    use super::{BatchResultModal, ConfirmDirOpModal};
+    use crate::state::{AppSettings, BatchResultSpec, DirOp, Store};
+
+    fn text_nodes(mutations: &dioxus_core::Mutations) -> Vec<String> {
+        mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// F235: a bidi control character in a pending copy's own `src`/`dst`
+    /// never reaches the rendered confirmation modal raw — both
+    /// `.path-display` codes show `BidiText`'s own marker instead.
+    /// Falsify by reverting either `BidiText` call site in
+    /// `ConfirmDirOpModal` back to a bare interpolation: the raw
+    /// character then reaches a `CreateTextNode` and this fails.
+    #[test]
+    fn a_bidi_control_character_in_a_pending_copys_own_paths_never_reaches_the_rendered_page_raw() {
+        fn root() -> Element {
+            use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+            rsx! {
+                ConfirmDirOpModal {
+                    op: DirOp {
+                        src: "/tmp/invoice\u{202E}fdp.exe".into(),
+                        dst: "/tmp/dst".into(),
+                        label: "copy".to_string(),
+                    },
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let texts = text_nodes(&mutations);
+        for text in &texts {
+            assert!(
+                !text.chars().any(forskscope_compare::is_bidi_control),
+                "a bidi control character reached a rendered text node: {text:?}"
+            );
+        }
+        assert!(
+            texts.iter().any(|t| t.contains("RLO")),
+            "expected the RLO marker token among the rendered text nodes: {texts:?}"
+        );
+    }
+
+    /// F235: the same coverage, for a batch-copy failure detail line.
+    #[test]
+    fn a_bidi_control_character_in_a_batch_failure_detail_never_reaches_the_rendered_page_raw() {
+        fn root() -> Element {
+            use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+            rsx! {
+                BatchResultModal {
+                    spec: BatchResultSpec {
+                        succeeded: 0,
+                        failed: 1,
+                        skipped: 0,
+                        manifest_path: None,
+                        failure_details: vec![
+                            "/tmp/invoice\u{202E}fdp.exe: permission denied".to_string(),
+                        ],
+                    },
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let texts = text_nodes(&mutations);
+        for text in &texts {
+            assert!(
+                !text.chars().any(forskscope_compare::is_bidi_control),
+                "a bidi control character reached a rendered text node: {text:?}"
+            );
+        }
+        assert!(
+            texts.iter().any(|t| t.contains("RLO")),
+            "expected the RLO marker token among the rendered text nodes: {texts:?}"
+        );
     }
 }

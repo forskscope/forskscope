@@ -440,7 +440,7 @@ fn refine_once(left: &str, right: &str) -> Option<InlineDiff> {
 /// `"{text}"` interpolation, so the merge view (which shares this same
 /// `HunkBlock`/`RowLeft`/`RowRight` rendering) gets it for free.
 #[component]
-fn BidiText(text: String, lang: Lang) -> Element {
+pub(crate) fn BidiText(text: String, lang: Lang) -> Element {
     rsx! {
         for part in forskscope_ui_logic::diff_decoration::split_bidi_marks(&text) {
             match part {

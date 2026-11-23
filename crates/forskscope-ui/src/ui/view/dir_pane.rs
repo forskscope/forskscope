@@ -17,6 +17,7 @@ use dioxus_core::spawn_forever;
 use crate::i18n::t;
 use crate::keyboard::focus_handle;
 use crate::state::Lang;
+use crate::ui::view::BidiText;
 use dioxus_swdir_tree::ThreadExecutor;
 use dioxus_swdir_tree::{LoadPayload, ScanExecutor, ScanFuture, ScanJob};
 
@@ -206,7 +207,13 @@ pub fn PathBar(
     let path_str = path.display().to_string();
     let path_str_reset = path_str.clone();
     let path_str_blur = path_str.clone();
-    let group_label = format!("{side_label} — {}", short_name(&path));
+    // F235: `aria_label` is a plain AT string, no markup support, so the
+    // folder name is escaped with `<U+XXXX>` here rather than marked with
+    // `BidiText` (used below for the bar's own visible breadcrumb text).
+    let group_label = format!(
+        "{side_label} — {}",
+        forskscope_compare::escape_to_plain_marker(&short_name(&path))
+    );
 
     let mut edit_mode: Signal<bool> = use_signal(|| false);
     let mut input_val: Signal<String> = use_signal(|| path_str.clone());
@@ -313,14 +320,19 @@ pub fn PathBar(
                         for (idx, (seg_path, label)) in segs.iter().enumerate() {
                             if idx > 0 { span { class: "bc-sep", " / " } }
                             if idx == n - 1 {
-                                span { class: "bc-current", title: "{label}",
+                                // F235: `title` is a plain tooltip string (no
+                                // markup), so it gets the `<U+XXXX>` escape;
+                                // the visible segment text uses `BidiText`.
+                                span { class: "bc-current",
+                                    title: "{forskscope_compare::escape_to_plain_marker(label)}",
                                     onclick: move |_| edit_mode.set(true),
-                                    {trunc_label(label, 20)} }
+                                    BidiText { text: trunc_label(label, 20), lang } }
                             } else {
                                 { let t = seg_path.clone(); let full = label.clone();
-                                  rsx! { button { class: "bc-seg", title: "{full}",
+                                  rsx! { button { class: "bc-seg",
+                                      title: "{forskscope_compare::escape_to_plain_marker(&full)}",
                                       onclick: move |_| on_navigate.call(t.clone()),
-                                      {trunc_label(&full, 20)} } } }
+                                      BidiText { text: trunc_label(&full, 20), lang } } } }
                             }
                         }
                     }
@@ -611,7 +623,11 @@ pub fn TreeRow(
                 span { class: "tree-caret", aria_hidden: "true", "{caret}" }
             }
             span { class: "tree-icon",  "{icon}" }
-            span { class: "tree-label", "{name}" }
+            // F235: this row's own accessible name comes from its text
+            // content (no separate `aria_label` override), so marking the
+            // label here covers both the visible text and the row's own
+            // name, the same way diff rows already work via `BidiText`.
+            span { class: "tree-label", BidiText { text: name.clone(), lang } }
             if binary_blocked {
                 // F74 review 072 §3: `title` on a bare `span` (role
                 // `generic`) is not reliably surfaced as accessible text -
@@ -1199,6 +1215,113 @@ mod tests {
                 |(n, v)| *n == "aria-label" && (v == "Expand folder" || v == "Collapse folder")
             ),
             "a file row must not carry a folder caret label; found one among {attrs:?}"
+        );
+    }
+
+    /// F235: a bidi control character in a file's own name never reaches
+    /// the rendered tree row raw — `.tree-label` shows `BidiText`'s own
+    /// marker instead. Falsify by reverting `TreeRow`'s `BidiText { text:
+    /// name.clone(), lang }` back to a bare `"{name}"`: the raw character
+    /// then reaches a `CreateTextNode` and this fails.
+    #[test]
+    fn a_bidi_control_character_in_a_tree_rows_own_name_never_reaches_the_rendered_page_raw() {
+        fn root() -> Element {
+            rsx! {
+                TreeRow {
+                    lang: Lang::En, path: PathBuf::from("/tmp/invoice\u{202E}fdp.exe"),
+                    is_dir: false, is_expanded: false, is_selected: false, depth: 0,
+                    status: None,
+                    on_toggle: move |_| {}, on_select: move |_| {},
+                    on_dblclick: move |_| {}, on_verify: move |_| {},
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let texts: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        for text in &texts {
+            assert!(
+                !text.chars().any(forskscope_compare::is_bidi_control),
+                "a bidi control character reached a rendered text node: {text:?}"
+            );
+        }
+        assert!(
+            texts.iter().any(|t| t.contains("RLO")),
+            "expected the RLO marker token among the rendered text nodes: {texts:?}"
+        );
+    }
+
+    /// F235: the path bar's own current breadcrumb segment and its
+    /// `title` tooltip both treat a bidi control character in the
+    /// current folder's name — the visible text with `BidiText`'s own
+    /// marker, the plain-text `title` with the `<U+XXXX>` escape.
+    #[test]
+    fn a_bidi_control_character_in_the_path_bars_current_folder_never_reaches_the_rendered_page_raw()
+     {
+        fn root() -> Element {
+            rsx! {
+                PathBar {
+                    path: PathBuf::from("/tmp/invoice\u{202E}fdp.exe"),
+                    can_back: true,
+                    can_forward: true,
+                    on_back: move |_| {},
+                    on_forward: move |_| {},
+                    on_navigate: move |_: PathBuf| {},
+                    lang: Lang::En,
+                    is_focused: false,
+                    on_focus: move |_| {},
+                    side_label: "Left pane".to_string(),
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+
+        let texts: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        for text in &texts {
+            assert!(
+                !text.chars().any(forskscope_compare::is_bidi_control),
+                "a bidi control character reached a rendered text node: {text:?}"
+            );
+        }
+        assert!(
+            texts.iter().any(|t| t.contains("RLO")),
+            "expected the RLO marker token among the rendered text nodes: {texts:?}"
+        );
+
+        let title_attrs: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "title",
+                    value: dioxus_core::AttributeValue::Text(s),
+                    ..
+                } => Some(s.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            !title_attrs.iter().any(|t| t.contains('\u{202E}')),
+            "the raw control character must never reach a title attribute either: {title_attrs:?}"
+        );
+        assert!(
+            title_attrs.iter().any(|t| t.contains("<U+202E>")),
+            "expected the <U+202E> escape among the title attributes: {title_attrs:?}"
         );
     }
 

@@ -6,6 +6,7 @@ use dioxus::prelude::*;
 use super::{CompareAction, PickKind, compare_action};
 use crate::i18n::t;
 use crate::state::{Lang, Store, open_compare, open_dir_compare};
+use crate::ui::view::BidiText;
 use crate::ui::view::dir_pane::{short_name, status_kind_label};
 use forskscope_ui_logic::RowStatusKind;
 
@@ -75,19 +76,19 @@ pub fn ExplorerFooter(
                                 }
                             },
                             (Some(l), None) => rsx! {
-                                span { class: "targets-pick", {short_name(l.path())} }
+                                span { class: "targets-pick", BidiText { text: short_name(l.path()), lang } }
                                 span { class: "targets-sep", " ↔ " }
                                 span { class: "targets-hint", {t(lang, "Choose a file or folder on the right")} }
                             },
                             (None, Some(r)) => rsx! {
                                 span { class: "targets-hint", {t(lang, "Choose a file or folder on the left")} }
                                 span { class: "targets-sep", " ↔ " }
-                                span { class: "targets-pick", {short_name(r.path())} }
+                                span { class: "targets-pick", BidiText { text: short_name(r.path()), lang } }
                             },
                             (Some(l), Some(r)) => rsx! {
-                                span { class: "targets-pick", {short_name(l.path())} }
+                                span { class: "targets-pick", BidiText { text: short_name(l.path()), lang } }
                                 span { class: "targets-sep", " ↔ " }
-                                span { class: "targets-pick", {short_name(r.path())} }
+                                span { class: "targets-pick", BidiText { text: short_name(r.path()), lang } }
                             },
                         }
                     }
@@ -182,6 +183,42 @@ mod tests {
         assert!(
             !all_text.contains("Size matches; contents not compared"),
             "must not also show the file-form wording for the same entry, got {all_text:?}"
+        );
+    }
+
+    /// F235: a bidi control character in a picked target's own file name
+    /// never reaches the rendered "Targets" line raw — `.targets-pick`
+    /// shows `BidiText`'s own marker instead. Falsify by reverting any
+    /// one of `ExplorerFooter`'s `BidiText { text: short_name(...), lang }`
+    /// call sites back to a bare interpolation: the raw character then
+    /// reaches a `CreateTextNode` and this fails.
+    #[test]
+    fn a_bidi_control_character_in_a_picked_targets_own_name_never_reaches_the_rendered_page_raw() {
+        fn root_with_pick() -> Element {
+            use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+            let left_pick = Signal::new_in_scope(
+                Some(super::PickKind::File(std::path::PathBuf::from(
+                    "/tmp/invoice\u{202E}fdp.exe",
+                ))),
+                ScopeId::ROOT,
+            );
+            let right_pick = Signal::new_in_scope(None, ScopeId::ROOT);
+            rsx! {
+                ExplorerFooter { lang: Lang::En, left_pick, right_pick, status_key: Vec::new() }
+            }
+        }
+        let mut vdom = VirtualDom::new(root_with_pick);
+        let mutations = vdom.rebuild_to_vec();
+        let all_texts = texts(&mutations);
+        for text in &all_texts {
+            assert!(
+                !text.chars().any(forskscope_compare::is_bidi_control),
+                "a bidi control character reached a rendered text node: {text:?}"
+            );
+        }
+        assert!(
+            all_texts.iter().any(|t| t.contains("RLO")),
+            "expected the RLO marker token among the rendered text nodes: {all_texts:?}"
         );
     }
 }

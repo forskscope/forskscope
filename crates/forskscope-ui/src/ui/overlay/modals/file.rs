@@ -16,6 +16,7 @@ use crate::state::{
     LargeLoadPrompt, LargeLoadTarget, Modal, Store, open_compare_request_with_options, reload_tab,
     reload_tab_with_options, set_diff_options, set_encoding, swap_sides,
 };
+use crate::ui::view::BidiText;
 use crate::ui::view::diff::{SaveAsPrecheck, confirm_overwrite, precheck_save_as_target, save_as};
 use crate::ui::view::diff_actions::handle_save_recovery_action;
 
@@ -35,7 +36,7 @@ pub fn OverwriteModal(index: usize, target: PathBuf) -> Element {
             div { class: "modal",
                 h2 { {t(lang, "File changed on disk")} }
                 p { {t(lang, "The target file was modified after it was loaded. Overwrite anyway?")} }
-                code { class: "path-display", "{path_display}" }
+                code { class: "path-display", BidiText { text: path_display.clone(), lang } }
                 div { class: "actions",
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
                     button {
@@ -110,7 +111,7 @@ pub fn ConfirmSaveAsOverwriteModal(index: usize, target: PathBuf) -> Element {
             div { class: "modal",
                 h2 { {t(lang, "Overwrite existing file?")} }
                 p { {t(lang, "A file already exists at this path.")} }
-                code { class: "path-display", "{path_display}" }
+                code { class: "path-display", BidiText { text: path_display.clone(), lang } }
                 div { class: "actions",
                     button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
                     button {
@@ -315,7 +316,7 @@ pub fn SaveErrorModal(index: usize, target: PathBuf, view: SaveErrorView) -> Ele
                 h2 { "{view.title}" }
                 p { "{view.body}" }
                 if let Some(path) = &view.path {
-                    code { class: "path-display", "{path}" }
+                    code { class: "path-display", BidiText { text: path.clone(), lang: Lang::En } }
                 }
                 div { class: "actions",
                     for button in view.buttons.iter() {
@@ -413,5 +414,90 @@ mod large_load_text_tests {
         let p = prompt(false, true);
         let (title, body, label) = large_load_text(Lang::Ja, &p);
         assert_eq!((title, body, label), (p.title, p.body, p.confirm_label));
+    }
+}
+
+#[cfg(test)]
+mod f235_bidi_name_markup_tests {
+    use dioxus::prelude::*;
+
+    use super::{OverwriteModal, SaveErrorModal};
+    use crate::state::{AppSettings, Store};
+    use forskscope_ui_logic::SaveErrorView;
+
+    fn text_nodes(mutations: &dioxus_core::Mutations) -> Vec<String> {
+        mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// F235: a bidi control character in an overwrite target's own path
+    /// never reaches the rendered confirmation modal raw — `.path-
+    /// display` shows `BidiText`'s own marker instead. Falsify by
+    /// reverting `OverwriteModal`'s `BidiText { text: path_display.clone(),
+    /// lang }` back to a bare `"{path_display}"`: the raw character then
+    /// reaches a `CreateTextNode` and this fails.
+    #[test]
+    fn a_bidi_control_character_in_an_overwrite_targets_own_path_never_reaches_the_rendered_page_raw()
+     {
+        fn root() -> Element {
+            use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+            rsx! {
+                OverwriteModal { index: 0usize, target: "/tmp/invoice\u{202E}fdp.exe".into() }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let texts = text_nodes(&mutations);
+        for text in &texts {
+            assert!(
+                !text.chars().any(forskscope_compare::is_bidi_control),
+                "a bidi control character reached a rendered text node: {text:?}"
+            );
+        }
+        assert!(
+            texts.iter().any(|t| t.contains("RLO")),
+            "expected the RLO marker token among the rendered text nodes: {texts:?}"
+        );
+    }
+
+    /// F235: the same coverage, for `SaveErrorModal`'s own `view.path` —
+    /// this modal is hardcoded `Lang::En` (not translated), so `BidiText`
+    /// is called with `Lang::En` explicitly at that one call site.
+    #[test]
+    fn a_bidi_control_character_in_a_save_errors_own_path_never_reaches_the_rendered_page_raw() {
+        fn root() -> Element {
+            use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+            rsx! {
+                SaveErrorModal {
+                    index: 0usize,
+                    target: "/tmp/invoice\u{202E}fdp.exe".into(),
+                    view: SaveErrorView {
+                        title: "Could not save".to_string(),
+                        body: "Something went wrong.".to_string(),
+                        path: Some("/tmp/invoice\u{202E}fdp.exe".to_string()),
+                        buttons: Vec::new(),
+                    },
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let texts = text_nodes(&mutations);
+        for text in &texts {
+            assert!(
+                !text.chars().any(forskscope_compare::is_bidi_control),
+                "a bidi control character reached a rendered text node: {text:?}"
+            );
+        }
+        assert!(
+            texts.iter().any(|t| t.contains("RLO")),
+            "expected the RLO marker token among the rendered text nodes: {texts:?}"
+        );
     }
 }

@@ -21,6 +21,7 @@ use dioxus::prelude::*;
 use crate::i18n::t;
 use crate::keyboard::focus_handle;
 use crate::state::{self, Modal, Store, tab_nav};
+use crate::ui::view::BidiText;
 
 #[component]
 pub fn TabBar() -> Element {
@@ -187,12 +188,17 @@ fn FileTabItem(
     // RFC-087 §1: "not colour alone" — a dot or a spinner is decorative
     // (`aria_hidden`); the accessible name itself carries the state in
     // words, the same split F187's filter dot established.
+    //
+    // F235: `aria_label` is a plain OS/AT string, like the window title —
+    // no markup support, so the name is escaped with `<U+XXXX>` here, not
+    // marked with `BidiText` (that's only for the visible `span` below).
+    let escaped_title = forskscope_compare::escape_to_plain_marker(&title);
     let label = if is_loading {
-        format!("{title}, {}", t(lang, "loading"))
+        format!("{escaped_title}, {}", t(lang, "loading"))
     } else if is_dirty {
-        format!("{title}, {}", t(lang, "unsaved"))
+        format!("{escaped_title}, {}", t(lang, "unsaved"))
     } else {
-        title.clone()
+        escaped_title
     };
 
     rsx! {
@@ -225,7 +231,7 @@ fn FileTabItem(
             span { class: "tab-title",
                 if is_loading { span { class: "tab-loading-spinner", aria_hidden: "true", "⟳ " } }
                 else if is_dirty { span { class: "dirty-dot", aria_hidden: "true", "●" } }
-                "{title}"
+                BidiText { text: title.clone(), lang }
             }
         }
     }
@@ -475,6 +481,134 @@ mod tests {
             "Settings must come after Shortcuts in DOM order, got texts {texts:?}"
         );
     }
+
+    /// F235: a bidi control character in a file tab's own title never
+    /// reaches the rendered page raw — the visible `.tab-title` text
+    /// shows `BidiText`'s own marker instead, and the tab's `aria-label`
+    /// shows the `<U+XXXX>` escape (no markup there, like the window
+    /// title). Falsify by reverting `FileTabItem`'s `BidiText { text:
+    /// title.clone(), lang }` back to a bare `"{title}"`: the raw
+    /// character then reaches a `CreateTextNode` and this fails.
+    #[test]
+    fn a_bidi_control_character_in_the_file_tab_title_never_reaches_the_rendered_page_raw() {
+        fn root() -> Element {
+            let store = use_context_provider(|| {
+                let mut tab = dirty_tab();
+                tab.title = "invoice\u{202E}fdp.exe".to_string();
+                let mut store = Store::new(AppSettings::default(), Default::default(), false);
+                store.tabs.write().push(tab);
+                store.active.set(Some(0));
+                store
+            });
+            let _ = store;
+            rsx! { TabBar {} }
+        }
+
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+
+        let texts: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        for text in &texts {
+            assert!(
+                !text.chars().any(forskscope_compare::is_bidi_control),
+                "a bidi control character reached a rendered text node: {text:?}"
+            );
+        }
+        assert!(
+            texts.iter().any(|t| t.contains("RLO")),
+            "expected the RLO marker token among the rendered text nodes: {texts:?}"
+        );
+
+        let labels: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "aria-label",
+                    value,
+                    ..
+                } => Some(format!("{value:?}")),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            !labels.iter().any(|l| l.contains('\u{202E}')),
+            "the raw control character must never reach aria-label either: {labels:?}"
+        );
+        assert!(
+            labels.iter().any(|l| l.contains("<U+202E>")),
+            "expected the <U+202E> escape among the aria-label values: {labels:?}"
+        );
+    }
+
+    /// F235: the same coverage, for a directory tab's own title (built by
+    /// `state::dir_tab_title` from each root's own `file_name`).
+    #[test]
+    fn a_bidi_control_character_in_a_directory_tab_title_never_reaches_the_rendered_page_raw() {
+        fn root() -> Element {
+            let store = use_context_provider(|| {
+                let mut store = Store::new(AppSettings::default(), Default::default(), false);
+                store.dir_tabs.write().push((
+                    std::path::PathBuf::from("/tmp/left"),
+                    std::path::PathBuf::from("/tmp/invoice\u{202E}fdp.exe"),
+                ));
+                store.active_dir.set(Some(0));
+                store
+            });
+            let _ = store;
+            rsx! { TabBar {} }
+        }
+
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+
+        let texts: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        for text in &texts {
+            assert!(
+                !text.chars().any(forskscope_compare::is_bidi_control),
+                "a bidi control character reached a rendered text node: {text:?}"
+            );
+        }
+        assert!(
+            texts.iter().any(|t| t.contains("RLO")),
+            "expected the RLO marker token among the rendered text nodes: {texts:?}"
+        );
+
+        let labels: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "aria-label",
+                    value,
+                    ..
+                } => Some(format!("{value:?}")),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            !labels.iter().any(|l| l.contains('\u{202E}')),
+            "the raw control character must never reach aria-label either: {labels:?}"
+        );
+        assert!(
+            labels.iter().any(|l| l.contains("<U+202E>")),
+            "expected the <U+202E> escape among the aria-label values: {labels:?}"
+        );
+    }
 }
 
 #[component]
@@ -497,10 +631,15 @@ fn DirTabItem(
         state::dir_tab_title(l, r)
     };
 
+    // F235: `aria_label` is a plain AT string, no markup support, so the
+    // name is escaped with `<U+XXXX>` here; the visible `span` below
+    // marks it with `BidiText` instead.
+    let aria_title = forskscope_compare::escape_to_plain_marker(&title);
+
     rsx! {
         TabItem {
             position, total, file_count, dir_count, is_active,
-            aria_label: title.clone(),
+            aria_label: aria_title,
             onclick: move |_| state::activate_tab_at(&mut store, position, file_count, dir_count),
             on_delete: move |_| {
                 crate::state::close_dir_tab(&mut store, index);
@@ -520,7 +659,7 @@ fn DirTabItem(
                     "×"
                 }
             },
-            span { class: "tab-title", "📁 {title}" }
+            span { class: "tab-title", "📁 ", BidiText { text: title.clone(), lang } }
         }
     }
 }

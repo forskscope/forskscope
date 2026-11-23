@@ -91,6 +91,8 @@ struct Fixtures {
     merge_merged: PathBuf,
     bidi_left: PathBuf,
     bidi_right: PathBuf,
+    bidi_names_left: PathBuf,
+    bidi_names_right: PathBuf,
 }
 
 /// Review 220 §2.5: a run invoked bare (no `session.sh`, no `xvfb-run
@@ -205,6 +207,7 @@ pub fn run(root: &Path, opts: &RunOptions) {
     let (folder_left, folder_right) = write_folder_fixture(&fixtures_dir);
     let (merge_local, merge_remote, merge_merged) = write_mergetool_fixture(&fixtures_dir);
     let (bidi_left, bidi_right) = write_bidi_fixture(&fixtures_dir);
+    let (bidi_names_left, bidi_names_right) = write_bidi_names_fixture(&fixtures_dir);
     let fixtures = Fixtures {
         file_left,
         file_right,
@@ -215,6 +218,8 @@ pub fn run(root: &Path, opts: &RunOptions) {
         merge_merged,
         bidi_left,
         bidi_right,
+        bidi_names_left,
+        bidi_names_right,
     };
 
     let bin = build_binary(root, opts.release);
@@ -694,6 +699,46 @@ fn write_bidi_fixture(dir: &Path) -> (PathBuf, PathBuf) {
     (left, right)
 }
 
+/// F235's own layout-matrix fixture: a folder pair, each holding one file
+/// per [`BIDI_CONTROL_CHARS`] entry (same name on both sides, since the
+/// *content* is irrelevant here - this fixture is about what Deep
+/// Compare's own rows do with a bidi-control character in a NAME) plus
+/// the classic Trojan Source spoofing shape, `invoice<U+202E>fdp.exe`
+/// (an RLO reorders the rest of the name for display). Generated here
+/// rather than stored, same reasoning as `write_bidi_fixture`. Returns
+/// `(left_dir, right_dir)`.
+///
+/// Never created outside `target/` (this fixture lives under
+/// `dir`, always a path inside the run's own `--out-dir`, itself inside
+/// `target/` by this xtask's own convention) - a name a filesystem
+/// refuses (none do on Linux; untested on Windows, where some of these
+/// characters may not be refused either, since none of them are in
+/// Windows' own reserved-character set) is reported by panicking with
+/// the OS error, never silently worked around by renaming or skipping
+/// it.
+fn write_bidi_names_fixture(dir: &Path) -> (PathBuf, PathBuf) {
+    let left = dir.join("bidi-names-left");
+    let right = dir.join("bidi-names-right");
+    fs::create_dir_all(&left).unwrap_or_else(|e| panic!("cannot create {}: {e}", left.display()));
+    fs::create_dir_all(&right)
+        .unwrap_or_else(|e| panic!("cannot create {}: {e}", right.display()));
+
+    let spoofed_name = format!("invoice{}fdp.exe", '\u{202E}');
+    fs::write(left.join(&spoofed_name), b"left\n")
+        .unwrap_or_else(|e| panic!("cannot write {}/{spoofed_name}: {e}", left.display()));
+    fs::write(right.join(&spoofed_name), b"right, changed\n")
+        .unwrap_or_else(|e| panic!("cannot write {}/{spoofed_name}: {e}", right.display()));
+
+    for (i, c) in BIDI_CONTROL_CHARS.iter().enumerate() {
+        let name = format!("name-{i:02}-{c}-control.txt");
+        fs::write(left.join(&name), b"same\n")
+            .unwrap_or_else(|e| panic!("cannot write {}/{name}: {e}", left.display()));
+        fs::write(right.join(&name), b"same\n")
+            .unwrap_or_else(|e| panic!("cannot write {}/{name}: {e}", right.display()));
+    }
+    (left, right)
+}
+
 /// A three-way merge triple (local/remote/merged), one conflicting region.
 /// Returns `(local, remote, merged)`, opened by stage B's own mergetool
 /// view.
@@ -754,6 +799,14 @@ fn all_views_json(fixtures: &Fixtures) -> serde_json::Value {
         // RFC-100 §Fixtures: the marker's layout and contrast, covered by
         // every check this matrix already runs against every other view.
         {"kind": "bidi-fixture", "left": fixtures.bidi_left, "right": fixtures.bidi_right},
+        // F235: the same coverage, for a bidi control in a NAME - Deep
+        // Compare's own rows are exactly where a folder's entry names are
+        // shown, the same check every other view already runs against.
+        {
+            "kind": "deep-compare",
+            "left": fixtures.bidi_names_left,
+            "right": fixtures.bidi_names_right,
+        },
     ])
 }
 

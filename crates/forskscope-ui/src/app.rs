@@ -462,11 +462,23 @@ pub fn App() -> Element {
 /// `set_title` call; the effect above is `window_title`'s only caller.
 /// `selected` is `None` for the Explorer, `Some(title)` for a file or
 /// folder comparison; `dirty` is only ever true for a file comparison.
+///
+/// F235: `selected`'s own name(s) are escaped with `<U+XXXX>` (never the
+/// raw character) before they reach the OS's own window-title API — this
+/// is the one place in the app that can't use `BidiText`'s marker markup
+/// at all, since an OS window title (and, through it, the taskbar and
+/// window-switcher) is a plain string with no markup support.
 fn window_title(selected: Option<&str>, dirty: bool) -> String {
     match selected {
         None => "ForskScope".to_string(),
-        Some(title) if dirty => format!("● {title} — ForskScope"),
-        Some(title) => format!("{title} — ForskScope"),
+        Some(title) => {
+            let title = forskscope_compare::escape_to_plain_marker(title);
+            if dirty {
+                format!("● {title} — ForskScope")
+            } else {
+                format!("{title} — ForskScope")
+            }
+        }
     }
 }
 
@@ -494,6 +506,21 @@ mod tests {
             window_title(Some("src ↔ src"), false),
             "src ↔ src — ForskScope",
             "a folder comparison"
+        );
+    }
+
+    /// F235: a name carrying a bidi-control character (the classic
+    /// spoofing shape) never reaches the OS window title as the raw
+    /// character — only its `<U+XXXX>` escape does. Falsify by removing
+    /// the `escape_to_plain_marker` call: this assertion then fails,
+    /// comparing an escaped expectation against a title holding the raw
+    /// U+202E still in it.
+    #[test]
+    fn a_bidi_control_character_in_the_title_is_escaped_not_raw() {
+        let spoofed = "invoice\u{202E}fdp.exe ↔ invoice.pdf";
+        assert_eq!(
+            window_title(Some(spoofed), false),
+            "invoice<U+202E>fdp.exe ↔ invoice.pdf — ForskScope"
         );
     }
 }
