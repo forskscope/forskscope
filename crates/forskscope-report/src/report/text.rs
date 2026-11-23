@@ -27,24 +27,14 @@ fn identity(s: &str) -> String {
     s.to_string()
 }
 
-/// RFC-100 §4: `text`, with every bidirectional control character
+/// RFC-100 §4, F235: `text`, with every bidirectional control character
 /// (RFC-100 §1) printed as `<U+XXXX>` instead of the character itself —
 /// the CLI's own plain-text escaping, since there is no marker token or
 /// CSS here, only characters a terminal or a piped file would otherwise
-/// render (or reorder) as-is.
+/// render (or reorder) as-is. Delegates to `forskscope_compare`'s shared
+/// primitive (F235 reuses this for names, not just diff content).
 fn escape_bidi_controls(text: &str) -> String {
-    if !text.chars().any(forskscope_compare::is_bidi_control) {
-        return text.to_string();
-    }
-    let mut out = String::new();
-    for ch in text.chars() {
-        if forskscope_compare::is_bidi_control(ch) {
-            let _ = write!(out, "<U+{:04X}>", ch as u32);
-        } else {
-            out.push(ch);
-        }
-    }
-    out
+    forskscope_compare::escape_to_plain_marker(text)
 }
 
 fn render_hunk(out: &mut String, hunk: &ChangeHunk) {
@@ -106,8 +96,16 @@ fn render_how_section(out: &mut String, non_default_options: &[(String, String)]
 pub fn render_file_report_text(report: &FileComparisonReport) -> String {
     let mut out = String::new();
     let _ = writeln!(out, "What was compared");
-    let _ = writeln!(out, "  Left:  {}", report.left_display);
-    let _ = writeln!(out, "  Right: {}", report.right_display);
+    let _ = writeln!(
+        out,
+        "  Left:  {}",
+        escape_bidi_controls(&report.left_display)
+    );
+    let _ = writeln!(
+        out,
+        "  Right: {}",
+        escape_bidi_controls(&report.right_display)
+    );
     let _ = writeln!(out);
     render_how_section(&mut out, &report.non_default_options);
     let _ = writeln!(out, "{}", report.one_sentence_summary());
@@ -139,8 +137,16 @@ pub fn render_file_report_text(report: &FileComparisonReport) -> String {
 pub fn render_dir_report_text(report: &DirComparisonReport) -> String {
     let mut out = String::new();
     let _ = writeln!(out, "What was compared");
-    let _ = writeln!(out, "  Left:  {}", report.left_display);
-    let _ = writeln!(out, "  Right: {}", report.right_display);
+    let _ = writeln!(
+        out,
+        "  Left:  {}",
+        escape_bidi_controls(&report.left_display)
+    );
+    let _ = writeln!(
+        out,
+        "  Right: {}",
+        escape_bidi_controls(&report.right_display)
+    );
     let _ = writeln!(out);
 
     let main_counts = [
@@ -190,7 +196,7 @@ pub fn render_dir_report_text(report: &DirComparisonReport) -> String {
             let _ = writeln!(
                 out,
                 "  {} — {}",
-                row.path,
+                escape_bidi_controls(&row.path),
                 status_key(row.rec_status, false)
             );
         }
@@ -205,7 +211,7 @@ pub fn render_dir_report_text(report: &DirComparisonReport) -> String {
         let _ = writeln!(out);
         let _ = writeln!(out, "The changes");
         for row in changed_with_hunks {
-            let _ = writeln!(out, "{}:", row.path);
+            let _ = writeln!(out, "{}:", escape_bidi_controls(&row.path));
             for hunk in row.change_hunks.as_ref().unwrap() {
                 render_hunk(&mut out, hunk);
             }
@@ -225,7 +231,7 @@ pub fn render_dir_report_text(report: &DirComparisonReport) -> String {
             )
         );
         for name in &report.change_hunks_omitted {
-            let _ = writeln!(out, "    - {name}");
+            let _ = writeln!(out, "    - {}", escape_bidi_controls(name));
         }
     }
 
@@ -526,5 +532,34 @@ mod tests {
         let report = FileComparisonReport::from_diff(&diff, None, None, opts());
         let text = render_file_report_text(&report);
         assert!(!text.contains("direction-control"), "{text}");
+    }
+
+    // ── F235: a bidi control in a NAME (not diff content) is escaped too ──────
+
+    #[test]
+    fn a_bidi_control_in_a_compared_files_own_name_is_escaped_in_the_what_was_compared_lines() {
+        let diff = compute_diff("same\n", "same\n", DiffOptions::default());
+        let left = PathBuf::from("invoice\u{202E}fdp.exe");
+        let report = FileComparisonReport::from_diff(&diff, Some(&left), None, opts());
+        let text = render_file_report_text(&report);
+        assert!(
+            !text.contains('\u{202E}'),
+            "the raw control character must never appear in a name either:\n{text}"
+        );
+        assert!(text.contains("invoice<U+202E>fdp.exe"), "{text}");
+    }
+
+    #[test]
+    fn a_bidi_control_in_a_changed_rows_own_path_is_escaped_in_the_files_listing() {
+        let entries = vec![RecEntry {
+            rel_path: PathBuf::from("a\u{202E}b.txt"),
+            status: RecStatus::LeftOnly,
+            left_size: Some(1),
+            right_size: None,
+        }];
+        let report = DirComparisonReport::from_entries(&entries, None, None, None, opts());
+        let text = render_dir_report_text(&report);
+        assert!(!text.contains('\u{202E}'), "{text}");
+        assert!(text.contains("a<U+202E>b.txt"), "{text}");
     }
 }

@@ -457,13 +457,13 @@ pub fn render_file_report(
         out,
         "<tr><th>{}</th><td>{}</td></tr>",
         escape_html(&tr("Left")),
-        escape_html(&report.left_display)
+        escape_html_marking_bidi(&report.left_display)
     );
     let _ = writeln!(
         out,
         "<tr><th>{}</th><td>{}</td></tr>",
         escape_html(&tr("Right")),
-        escape_html(&report.right_display)
+        escape_html_marking_bidi(&report.right_display)
     );
     if let Some(c) = &report.left_checksum {
         render_checksum_row(&mut out, &format!("{} {}", tr("Left"), tr("SHA-256")), c);
@@ -579,13 +579,13 @@ pub fn render_dir_report(
         out,
         "<tr><th>{}</th><td>{}</td></tr>",
         escape_html(&tr("Left")),
-        escape_html(&report.left_display)
+        escape_html_marking_bidi(&report.left_display)
     );
     let _ = writeln!(
         out,
         "<tr><th>{}</th><td>{}</td></tr>",
         escape_html(&tr("Right")),
-        escape_html(&report.right_display)
+        escape_html_marking_bidi(&report.right_display)
     );
     let _ = writeln!(out, "</table>");
     let main_counts = [
@@ -706,7 +706,7 @@ pub fn render_dir_report(
     if !changed_with_hunks.is_empty() {
         let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("The changes")));
         for row in changed_with_hunks {
-            let _ = writeln!(out, "<h3>{}</h3>", escape_html(&row.path));
+            let _ = writeln!(out, "<h3>{}</h3>", escape_html_marking_bidi(&row.path));
             for hunk in row.change_hunks.as_ref().unwrap() {
                 render_hunk(&mut out, hunk);
             }
@@ -727,7 +727,7 @@ pub fn render_dir_report(
         );
         let _ = writeln!(out, "<ul>");
         for name in &report.change_hunks_omitted {
-            let _ = writeln!(out, "<li>{}</li>", escape_html(name));
+            let _ = writeln!(out, "<li>{}</li>", escape_html_marking_bidi(name));
         }
         let _ = writeln!(out, "</ul>");
     }
@@ -778,7 +778,7 @@ fn render_dir_file_row(
     let _ = writeln!(
         out,
         "<tr><td>{}</td><td>{}</td>{sizes}<td>{checksums}</td></tr>",
-        escape_html(&row.path),
+        escape_html_marking_bidi(&row.path),
         // review 174 §3: the same `status_key` Deep Compare's live view
         // reads - `report::text` (review 182 §2) reads it too, so no
         // renderer can show a word that drifts from another's. A report
@@ -1379,5 +1379,49 @@ mod tests {
         let clean_html =
             render_file_report(&clean_report, "0.0.0", "now", false, &|s| s.to_string());
         assert!(!clean_html.contains("direction-control"), "{clean_html}");
+    }
+
+    // ── F235: a bidi control in a NAME, not just diff content, becomes a
+    // marker in the HTML report too ────────────────────────────────────────
+
+    #[test]
+    fn a_bidi_control_in_a_compared_files_own_name_is_a_marker_in_the_what_was_compared_table() {
+        let diff = forskscope_compare::diff::compute_diff(
+            "same\n",
+            "same\n",
+            forskscope_compare::diff::DiffOptions::default(),
+        );
+        let left = std::path::PathBuf::from("invoice\u{202E}fdp.exe");
+        let report = crate::report::FileComparisonReport::from_diff(
+            &diff,
+            Some(&left),
+            None,
+            crate::report::ReportOptions::default(),
+        );
+        let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        assert!(!html.contains('\u{202E}'), "{html}");
+        assert!(html.contains("<span class=\"bidi-marker\""), "{html}");
+        assert!(html.contains(">RLO<"), "{html}");
+    }
+
+    #[test]
+    fn a_bidi_control_in_a_changed_rows_own_path_is_a_marker_in_the_dir_reports_files_table() {
+        let entries = vec![forskscope_compare::dir::RecEntry {
+            rel_path: std::path::PathBuf::from("a\u{202E}b.txt"),
+            status: forskscope_compare::dir::RecStatus::LeftOnly,
+            left_size: Some(1),
+            right_size: None,
+        }];
+        let report = crate::report::DirComparisonReport::from_entries(
+            &entries,
+            None,
+            None,
+            None,
+            crate::report::ReportOptions::default(),
+        );
+        let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        assert!(!html.contains('\u{202E}'), "{html}");
+        assert!(html.contains("<span class=\"bidi-marker\""), "{html}");
+        assert!(html.contains(">RLO<"), "{html}");
     }
 }
