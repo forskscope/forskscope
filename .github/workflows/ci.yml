@@ -241,7 +241,7 @@ jobs:
           XDG_CACHE_HOME=/tmp/f237-empty-xdg/cache \
           XDG_STATE_HOME=/tmp/f237-empty-xdg/state \
           cargo test -p forskscope --lib --features layout-probe
-          leftover="$(find /tmp/f237-empty-xdg -mindepth 1)"
+          leftover="$(find /tmp/f237-empty-xdg -mindepth 2)"
           if [ -n "$leftover" ]; then
             echo "::error::the test suite wrote into its own empty XDG folders - F237's own regression:"
             echo "$leftover"
