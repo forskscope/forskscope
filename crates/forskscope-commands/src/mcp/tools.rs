@@ -337,11 +337,15 @@ fn call_show_to_person_starting(
         let _ = child.wait();
     });
 
+    // F235: this text is read by whoever (or whatever agent) asked for
+    // the comparison, same concern RFC-100/F235 cover for a terminal or
+    // a title bar - a bidi control in either name is escaped as
+    // `<U+XXXX>`, never passed through raw.
     Ok(ToolCallResult {
         content_text: format!(
             "Opened {} and {} in ForskScope.",
-            display_name_only(&left),
-            display_name_only(&right)
+            forskscope_compare::escape_to_plain_marker(&display_name_only(&left)),
+            forskscope_compare::escape_to_plain_marker(&display_name_only(&right))
         ),
         structured_content: None,
     })
@@ -514,6 +518,38 @@ mod tests {
             format!("ARG:{}\nARG:{}\n", left.display(), right.display()),
             "the stand-in must receive exactly the two paths, as separate arguments"
         );
+    }
+
+    #[test]
+    fn a_bidi_control_in_either_names_own_file_name_is_escaped_in_the_opened_message() {
+        let stage = tempfile::tempdir().unwrap();
+        let log_path = stage.path().join("argv.log");
+        let script = stage.path().join("stand-in.sh");
+        write_script(
+            &script,
+            &format!("#!/bin/sh\nfor a in \"$@\"; do echo \"ARG:$a\"; done > {log_path:?}\n"),
+        );
+
+        let root = tempfile::tempdir().unwrap();
+        let left = root.path().join("invoice\u{202E}fdp.exe");
+        let right = root.path().join("b.txt");
+        std::fs::write(&left, "x").unwrap();
+        std::fs::write(&right, "y").unwrap();
+        let roots = Roots::new(vec![root.path().to_path_buf()]);
+
+        let arguments = json!({
+            "left": left.to_str().unwrap(),
+            "right": right.to_str().unwrap(),
+        });
+        let result =
+            call_show_to_person_starting_retrying_busy(&arguments, &roots, &script).unwrap();
+        let json = result.to_json();
+        let text = json["content"][0]["text"].as_str().unwrap();
+        assert!(
+            !text.contains('\u{202E}'),
+            "the raw control character must never reach this text: {text}"
+        );
+        assert!(text.contains("invoice<U+202E>fdp.exe"), "{text}");
     }
 
     #[test]

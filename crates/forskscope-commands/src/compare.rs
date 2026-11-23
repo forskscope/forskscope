@@ -63,6 +63,7 @@ pub(crate) struct Options {
 /// code; the `mcp` module (review 182 §1) wraps the same `output` as a
 /// tool result instead. Shared so neither path re-derives the other's
 /// comparison logic (`execute`, below) — never a second copy of it.
+#[derive(Debug)]
 pub(crate) struct ExecOutcome {
     pub(crate) output: String,
     pub(crate) identical: bool,
@@ -125,19 +126,30 @@ fn print_help() {
 /// passes a token nothing ever cancels.
 pub(crate) fn execute(opts: &Options, token: &CancellationToken) -> Result<ExecOutcome, String> {
     let left_meta =
-        fs::metadata(&opts.left).map_err(|e| format!("{}: {e}", opts.left.display()))?;
+        fs::metadata(&opts.left).map_err(|e| format!("{}: {e}", esc_path(&opts.left)))?;
     let right_meta =
-        fs::metadata(&opts.right).map_err(|e| format!("{}: {e}", opts.right.display()))?;
+        fs::metadata(&opts.right).map_err(|e| format!("{}: {e}", esc_path(&opts.right)))?;
 
     match (left_meta.is_dir(), right_meta.is_dir()) {
         (true, true) => compare_dirs(opts, token),
         (false, false) => compare_files(opts),
         _ => Err(format!(
             "cannot compare a file against a folder ({}, {})",
-            opts.left.display(),
-            opts.right.display()
+            esc_path(&opts.left),
+            esc_path(&opts.right)
         )),
     }
+}
+
+/// F235: a path's display form, with every bidirectional control
+/// character escaped as `<U+XXXX>` — every error message this module
+/// prints to the terminal goes through this, never a bare `.display()`,
+/// since the raw name is exactly RFC-100's own terminal-spoofing case.
+/// Never used for `--format json` (exact, unescaped, same as content)
+/// or `--format patch` (a name there is consumed by another tool's own
+/// patch-apply, which needs the real bytes, not a decoy).
+fn esc_path(path: &Path) -> String {
+    forskscope_compare::escape_to_plain_marker(&path.display().to_string())
 }
 
 // ── Argument parsing ─────────────────────────────────────────────────────────
@@ -291,9 +303,9 @@ fn compare_files(opts: &Options) -> Result<ExecOutcome, String> {
         allow_missing: false,
     };
     let left =
-        load_path(&opts.left, load_opts).map_err(|e| format!("{}: {e}", opts.left.display()))?;
+        load_path(&opts.left, load_opts).map_err(|e| format!("{}: {e}", esc_path(&opts.left)))?;
     let right =
-        load_path(&opts.right, load_opts).map_err(|e| format!("{}: {e}", opts.right.display()))?;
+        load_path(&opts.right, load_opts).map_err(|e| format!("{}: {e}", esc_path(&opts.right)))?;
 
     let both_text = matches!(left.kind, FileKind::Text) && matches!(right.kind, FileKind::Text);
     if !both_text {
@@ -402,10 +414,14 @@ fn compare_files_status_only(
                 to_unified(&doc)
             }
         }
+        // F235: escaped here only - `left_name`/`right_name` themselves
+        // stay raw, since the same two strings also feed `--format json`
+        // (exact, unescaped, like content) and `--format patch` (a name
+        // there is consumed by another tool's own patch-apply).
         Format::Text => format!(
             "{} and {} are {} ({} content — status only, RFC-094)\n",
-            left_name,
-            right_name,
+            forskscope_compare::escape_to_plain_marker(&left_name),
+            forskscope_compare::escape_to_plain_marker(&right_name),
             if identical { "identical" } else { "different" },
             kind_label(left_kind),
         ),
@@ -476,10 +492,10 @@ fn compare_dirs(opts: &Options, token: &CancellationToken) -> Result<ExecOutcome
         return Err("comparison was cancelled".to_string());
     }
     if scan.left_root_unreadable {
-        return Err(format!("{}: could not be read", opts.left.display()));
+        return Err(format!("{}: could not be read", esc_path(&opts.left)));
     }
     if scan.right_root_unreadable {
-        return Err(format!("{}: could not be read", opts.right.display()));
+        return Err(format!("{}: could not be read", esc_path(&opts.right)));
     }
 
     let outcome = build_dir_report(
@@ -496,7 +512,8 @@ fn compare_dirs(opts: &Options, token: &CancellationToken) -> Result<ExecOutcome
         BuildOutcome::Cancelled => return Err("comparison was cancelled".to_string()),
         BuildOutcome::Stale(path) => {
             return Err(format!(
-                "{path}: changed while being read; refusing a stale result"
+                "{}: changed while being read; refusing a stale result",
+                forskscope_compare::escape_to_plain_marker(&path)
             ));
         }
     };
@@ -556,5 +573,98 @@ pub(crate) fn display_name(path: &Path, mode: ReportPathMode) -> String {
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| path.display().to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── F235: a bidi control in a NAME never reaches a terminal-bound
+    // error message or the `--format text` status line raw — the exact
+    // spoofing case RFC-100 itself was written for, now covering names
+    // too, not just diff content. `--format json` keeps the raw name
+    // (checked separately, asserting the control survives) since it
+    // must stay exact, like content.
+
+    #[test]
+    fn a_missing_lefts_own_bidi_control_name_is_escaped_in_the_error_message() {
+        let dir = tempfile::tempdir().unwrap();
+        let right = dir.path().join("right.txt");
+        fs::write(&right, "x").unwrap();
+        let left = dir.path().join("missing\u{202E}fdp.exe");
+        let opts = Options {
+            left,
+            right,
+            format: Format::Text,
+            ..Options::default_for_test()
+        };
+        let err = execute(&opts, &CancellationToken::new()).unwrap_err();
+        assert!(
+            !err.contains('\u{202E}'),
+            "the raw control character must never reach a terminal-bound message: {err}"
+        );
+        assert!(err.contains("missing<U+202E>fdp.exe"), "{err}");
+    }
+
+    #[test]
+    fn a_file_vs_folder_refusal_escapes_both_names() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a\u{202E}b.txt");
+        fs::write(&file, "x").unwrap();
+        let folder = dir.path().join("folder");
+        fs::create_dir(&folder).unwrap();
+        let opts = Options {
+            left: file,
+            right: folder,
+            format: Format::Text,
+            ..Options::default_for_test()
+        };
+        let err = execute(&opts, &CancellationToken::new()).unwrap_err();
+        assert!(!err.contains('\u{202E}'), "{err}");
+        assert!(err.contains("a<U+202E>b.txt"), "{err}");
+    }
+
+    #[test]
+    fn status_only_text_format_escapes_the_name_json_keeps_it_exact() {
+        let dir = tempfile::tempdir().unwrap();
+        let left = dir.path().join("l\u{202E}eft.bin");
+        let right = dir.path().join("right.bin");
+        fs::write(&left, [0u8, 1, 2]).unwrap();
+        fs::write(&right, [0u8, 1, 3]).unwrap();
+        let text_opts = Options {
+            left: left.clone(),
+            right: right.clone(),
+            format: Format::Text,
+            ..Options::default_for_test()
+        };
+        let out = execute(&text_opts, &CancellationToken::new()).unwrap();
+        assert!(!out.output.contains('\u{202E}'), "{}", out.output);
+        assert!(out.output.contains("l<U+202E>eft.bin"), "{}", out.output);
+
+        let json_opts = Options {
+            left,
+            right,
+            format: Format::Json,
+            ..Options::default_for_test()
+        };
+        let out = execute(&json_opts, &CancellationToken::new()).unwrap();
+        assert!(
+            out.output.contains('\u{202E}'),
+            "JSON stays exact, like content: {}",
+            out.output
+        );
+    }
+
+    impl Options {
+        /// Every other field at its parsed default - only what each test
+        /// above overrides matters.
+        fn default_for_test() -> Self {
+            parse(&[
+                "/__f235_test_left__".to_string(),
+                "/__f235_test_right__".to_string(),
+            ])
+            .unwrap()
+        }
     }
 }
