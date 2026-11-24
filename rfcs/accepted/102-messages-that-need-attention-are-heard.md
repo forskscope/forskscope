@@ -16,6 +16,8 @@ scope, warnings included.
 - stage A (the list, and the Windows measurement) runs alongside RFC-101
   stage B (handoff 115);
 - stage B follows the owner's review (handoff 116).
+**Amended.** 2026-11-25, by the owner's answers to stage A's list: the
+large-file notice is reclassified as info (§1).
 **Touches.**
 - `crates/forskscope-ui`: the notice (toast) component, `state.rs`'s
   `Notice`, focus handling, and the CSS;
@@ -62,8 +64,12 @@ what deserves it.
 | **Info** | a toast; dismisses itself | unchanged: passive |
 | **Success** | a toast; dismisses itself (some offer *Open*) | unchanged: passive |
 
-**Every call site keeps its own severity.** Stage A lists them all, so the
-owner can see which messages will take focus.
+**Every call site keeps its own severity,** with one exception the owner
+decided after stage A's list (2026-11-25): **"Large file — inline diff
+disabled." becomes an info notice.** It describes the view, needs no
+action, and appears on every open of a medium-sized file. The other
+warning, an unrecognised encoding replaced by UTF-8, still takes focus,
+because it concerns the user's data.
 
 ### 2. How a notice takes focus
 
