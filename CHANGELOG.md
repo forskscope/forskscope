@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.200.1] — Unreleased
+
 ## [0.200.0] — 2026-11-24
 
 **What a file holds, shown as it is.**
