@@ -7,14 +7,13 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Accepted (7)
+## Accepted (6)
 
 Review complete; the implementer may start. Distinct from **Proposed**, which
 is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 
 | RFC | Title | State |
 |-----|-------|-------|
-| 100 | [Bidirectional Text in Diffs — Show the Invisible, Keep Each Line in Place](./accepted/100-bidirectional-text-in-diffs.md) | Accepted 2026-11-21 |
 | 101 | [Translation Groundwork — Whole Sentences, Plurals, Catalogs and a Pseudo-Language](./accepted/101-translation-groundwork.md) | Accepted 2026-11-21 |
 | 074 | [v1 Release Stabilization Program](./accepted/074-v1-release-stabilization-program.md) | Accepted |
 | 078 | [Platform Runtime Acceptance and Release Evidence](./accepted/078-platform-runtime-acceptance.md) | Accepted |
@@ -22,10 +21,11 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 081 | [AUR Publication Automation](./accepted/081-aur-publication-automation.md) | Accepted |
 | 095 | [ForskScope as a Flatpak on Flathub](./accepted/095-flatpak-on-flathub.md) | Accepted 2026-10-21 |
 
-## Implemented (74)
+## Implemented (75)
 
 | ID | Title | Shipped in |
 |----|-------|------------|
+| 100 | [Bidirectional Text in Diffs — Show the Invisible, Keep Each Line in Place](./done/100-bidirectional-text-in-diffs.md) | Implemented — `0.200.0` |
 | 099 | [Quieter Close Buttons, a Title Bar That Follows the Theme, and Ignore Lists as Badges](./done/099-quieter-controls-and-ignore-lists.md) | Implemented — `0.199.0` |
 | 098 | [Layout Checks in CI — Every Size, Language and Theme, on Every Push](./done/098-layout-checks-in-ci.md) | Implemented — `0.199.0` |
 | 097 | [Readable for Everyone — Text Size, Contrast and Visible Controls](./done/097-readable-for-everyone.md) | Implemented — `0.197.0`, `0.198.0` |

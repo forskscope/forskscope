@@ -5,7 +5,53 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.199.1] — Unreleased
+## [0.200.0] — 2026-11-24
+
+**What a file holds, shown as it is.**
+
+### Added
+
+- **Hidden direction characters are shown.** Unicode's bidirectional
+  control characters (such as U+202E, right-to-left override) are
+  invisible and reorder the text around them, so a line could look
+  different from what it contains — the "Trojan Source" technique. The
+  diff now shows each one as a small labelled marker (`RLO`, `LRI`, …)
+  instead of applying it, the status bar says how many a file contains,
+  and the HTML report and `forskscope compare`'s text output show them
+  too. Saving, *Use*, merging and patches keep the file's real text
+  (RFC-100, F234).
+- **File and folder names get the same treatment** wherever the app
+  shows one: the Explorer, the path bar, tabs, the status bar, Deep
+  Compare, dialogs, reports, and the command line. The window title,
+  which your taskbar shows, escapes them as `<U+202E>`. Opening, copying
+  and saving still use the real name (F235).
+- **The JSON output gains `bidi_controls`** for each side: how many such
+  characters it contains.
+
+### Changed
+
+- **Each line of a diff keeps its text inside its own line,** so nothing
+  in it can move the line numbers, the marks or the next line. Hebrew and
+  Arabic text still reads in its own order within the line.
+- **Settings labels wrap only between words,** and a control moves below
+  its label when the two don't fit side by side (F232).
+
+### Fixed
+
+- **The published JSON schema accepts fields added in later `/1`
+  releases,** as the guide promises; a script validating with an older
+  copy no longer rejects newer output (F236, since 0.195.0).
+
+### Internal
+
+- **The test suite never writes the developer's real ForskScope settings
+  or session** any more, and CI fails if a test run writes any user
+  folder (F237).
+- **Security advisories closed** with compatible patch releases: `url`
+  2.5.9 (RUSTSEC-2026-0592) and `cookie` 0.18.3 (RUSTSEC-2026-0594).
+- **Translation groundwork, measured:** the catalog format for upcoming
+  translations is decided (RFC-101, stage A).
+
 
 ## [0.199.0] — 2026-11-21
 

@@ -1,6 +1,6 @@
 # RFC 100: Bidirectional Text in Diffs — Show the Invisible, Keep Each Line in Place
 
-**Status.** Accepted.
+**Status.** Implemented in `0.200.0` (handoff 108; review 231). Names followed as F235 (handoff 111; review 233).
 **Proposed.** 2026-11-21 by the architect, for **F234**. The owner asked
 about right-to-left support. The answer separated a right-to-left
 *interface*, which is deferred, from right-to-left *content* in the files
