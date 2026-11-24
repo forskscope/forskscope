@@ -50,17 +50,17 @@ pub(crate) fn status_kind_label(kind: RowStatusKind, lang: Lang, is_dir: bool) -
         // wording on both row kinds — a file reaches this only via a real
         // digest read (`DigestEqual`), a directory only via tier 2
         // (`TreeIdentical`), so both have equal claim to the longer form.
-        RowStatusKind::Equal => t(lang, "Identical — contents compared"),
-        RowStatusKind::Different => t(lang, "Different"),
-        RowStatusKind::LeftOnly => t(lang, "Only on the left"),
-        RowStatusKind::RightOnly => t(lang, "Only on the right"),
-        RowStatusKind::Computing => t(lang, "Comparing…"),
-        RowStatusKind::Error => t(lang, "Comparison failed"),
-        RowStatusKind::NotCompared => t(lang, "Directory contents not compared — use Deep Compare"),
+        RowStatusKind::Equal => t(lang, "identical-contents-compared"),
+        RowStatusKind::Different => t(lang, "different"),
+        RowStatusKind::LeftOnly => t(lang, "only-on-the-left"),
+        RowStatusKind::RightOnly => t(lang, "only-on-the-right"),
+        RowStatusKind::Computing => t(lang, "comparing"),
+        RowStatusKind::Error => t(lang, "comparison-failed"),
+        RowStatusKind::NotCompared => t(lang, "directory-contents-not-compared-use-deep-compare"),
         RowStatusKind::MetadataMatch if is_dir => {
-            t(lang, "Names and sizes match; contents not compared")
+            t(lang, "names-and-sizes-match-contents-not-compared")
         }
-        RowStatusKind::MetadataMatch => t(lang, "Size matches; contents not compared"),
+        RowStatusKind::MetadataMatch => t(lang, "size-matches-contents-not-compared"),
     }
 }
 
@@ -285,9 +285,9 @@ pub fn PathBar(
                 role: "group",
                 aria_label: "{group_label}",
                 onclick: move |_| on_focus.call(()),
-                button { class: "path-btn", title: t(lang, "Back"), aria_label: t(lang, "Back"), disabled: !can_back,    onclick: move |_| on_back.call(()),    "←" }
-                button { class: "path-btn", title: t(lang, "Forward"), aria_label: t(lang, "Forward"), disabled: !can_forward, onclick: move |_| on_forward.call(()), "→" }
-                button { class: "path-btn", title: t(lang, "Go up one directory"), aria_label: t(lang, "Go up one directory"),
+                button { class: "path-btn", title: t(lang, "back"), aria_label: t(lang, "back"), disabled: !can_back,    onclick: move |_| on_back.call(()),    "←" }
+                button { class: "path-btn", title: t(lang, "forward"), aria_label: t(lang, "forward"), disabled: !can_forward, onclick: move |_| on_forward.call(()), "→" }
+                button { class: "path-btn", title: t(lang, "go-up-one-directory"), aria_label: t(lang, "go-up-one-directory"),
                     onclick: move |_| {
                         let p = path.parent().map(|p| p.to_path_buf());
                         if let Some(p) = p { on_navigate.call(p); }
@@ -340,7 +340,7 @@ pub fn PathBar(
 
                 button {
                     class: "path-btn path-more-btn",
-                    title: t(lang, "More"), aria_label: t(lang, "More"),
+                    title: t(lang, "more"), aria_label: t(lang, "more"),
                     aria_haspopup: "menu",
                     aria_expanded: if *menu_open.read() { "true" } else { "false" },
                     onmounted: move |e| more_btn_handle.set(Some(e.data())),
@@ -357,7 +357,7 @@ pub fn PathBar(
             }
             if *menu_open.read() {
                 div { class: "pathbar-menu-catcher", onclick: move |_| menu_open.set(false) }
-                div { class: "pathbar-menu", role: "menu", aria_label: t(lang, "More"),
+                div { class: "pathbar-menu", role: "menu", aria_label: t(lang, "more"),
                     button {
                         role: "menuitem", class: "pathbar-menu-item",
                         onmounted: move |e| {
@@ -370,7 +370,7 @@ pub fn PathBar(
                         },
                         onkeydown: move |e| { menu_item_keydown(&e, 0, menu_open, item_handles, more_btn_handle); },
                         onclick: home_item,
-                        span { class: "pathbar-menu-label", {t(lang, "Home folder")} }
+                        span { class: "pathbar-menu-label", {t(lang, "home-folder")} }
                         span { class: "pathbar-menu-shortcut", "Alt+Home" }
                     }
                     button {
@@ -378,7 +378,7 @@ pub fn PathBar(
                         onmounted: move |e| item_handles.write()[1] = Some(e.data()),
                         onkeydown: move |e| { menu_item_keydown(&e, 1, menu_open, item_handles, more_btn_handle); },
                         onclick: open_folder_item,
-                        span { class: "pathbar-menu-label", {t(lang, "Open folder…")} }
+                        span { class: "pathbar-menu-label", {t(lang, "open-folder")} }
                         span { class: "pathbar-menu-shortcut", "Ctrl+O" }
                     }
                     button {
@@ -386,8 +386,8 @@ pub fn PathBar(
                         onmounted: move |e| item_handles.write()[2] = Some(e.data()),
                         onkeydown: move |e| { menu_item_keydown(&e, 2, menu_open, item_handles, more_btn_handle); },
                         onclick: edit_path_item,
-                        span { class: "pathbar-menu-label", {t(lang, "Edit path")} }
-                        span { class: "pathbar-menu-shortcut", {t(lang, "click the name")} }
+                        span { class: "pathbar-menu-label", {t(lang, "edit-path")} }
+                        span { class: "pathbar-menu-shortcut", {t(lang, "click-the-name")} }
                     }
                 }
             }
@@ -614,7 +614,7 @@ pub fn TreeRow(
                 // and a mouse/touch target with a real role.
                 span {
                     class: "tree-caret", role: "button", tabindex: "-1",
-                    aria_label: if is_expanded { t(lang, "Collapse folder") } else { t(lang, "Expand folder") },
+                    aria_label: if is_expanded { t(lang, "collapse-folder") } else { t(lang, "expand-folder") },
                     aria_expanded: if is_expanded { "true" } else { "false" },
                     onclick: move |e| { e.stop_propagation(); on_toggle.call(()); },
                     "{caret}"
@@ -639,8 +639,8 @@ pub fn TreeRow(
                 span {
                     class: "tree-status st-binary",
                     role: "img",
-                    aria_label: t(lang, "Binary file. Binary comparison is off — enable it in Settings → Advanced."),
-                    title: t(lang, "Binary file. Binary comparison is off — enable it in Settings → Advanced."),
+                    aria_label: t(lang, "binary-file-binary-comparison-is-off-enable-it-in-settings"),
+                    title: t(lang, "binary-file-binary-comparison-is-off-enable-it-in-settings"),
                     "bin"
                 }
             } else if let Some(kind) = status_kind {
@@ -667,9 +667,9 @@ pub fn TreeRow(
             if status_kind == Some(RowStatusKind::MetadataMatch) {
                 button {
                     class: "tree-verify-btn",
-                    title: t(lang, "Read every byte to find out for certain."),
+                    title: t(lang, "read-every-byte-to-find-out-for-certain"),
                     onclick: move |e| { e.stop_propagation(); on_verify.call(()); },
-                    {t(lang, "Verify")}
+                    {t(lang, "verify")}
                 }
             }
         }

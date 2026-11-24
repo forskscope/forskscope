@@ -69,18 +69,18 @@ pub fn ExportDirReportModal(
 
     let current_phase = phase.read().clone();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Export report"), onmounted: super::super::overlay::modals::focus_autofocus_button,
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "export-report"), onmounted: super::super::overlay::modals::focus_autofocus_button,
             div { class: "modal",
-                h2 { {t(lang, "Export report")} }
+                h2 { {t(lang, "export-report")} }
 
                 match current_phase {
                     DirExportPhase::ChoosingOptions => rsx! {
                         SelectField {
-                            title: t(lang, "Format"),
+                            title: t(lang, "format"),
                             value: format_value(*format.read()).to_string(),
                             options: vec![
-                                SelectOption::new("html", t(lang, "HTML report")),
-                                SelectOption::new("patch", t(lang, "Unified diff (.patch)")),
+                                SelectOption::new("html", t(lang, "html-report")),
+                                SelectOption::new("patch", t(lang, "unified-diff-patch")),
                             ],
                             onchange: move |v: String| {
                                 format.set(if v == "patch" { ReportExportFormat::Patch } else { ReportExportFormat::Html });
@@ -89,24 +89,24 @@ pub fn ExportDirReportModal(
                         button {
                             class: "disclosure",
                             onclick: move |_| { let v = *more_options.read(); more_options.set(!v); },
-                            if *more_options.read() { {t(lang, "Less ▲")} } else { {t(lang, "More options ▸")} }
+                            if *more_options.read() { {t(lang, "less")} } else { {t(lang, "more-options-2")} }
                         }
                         if *more_options.read() {
                             div { class: "field",
                                 SelectField {
-                                    title: t(lang, "Paths"),
+                                    title: t(lang, "paths"),
                                     value: path_mode_value(*path_mode.read()).to_string(),
                                     options: vec![
-                                        SelectOption::new("name-only", t(lang, "File names only")),
-                                        SelectOption::new("relative", t(lang, "Paths relative to the compared folders")),
-                                        SelectOption::new("absolute", t(lang, "Full paths")),
+                                        SelectOption::new("name-only", t(lang, "file-names-only")),
+                                        SelectOption::new("relative", t(lang, "paths-relative-to-the-compared-folders")),
+                                        SelectOption::new("absolute", t(lang, "full-paths")),
                                     ],
                                     onchange: move |v: String| path_mode.set(path_mode_from_value(&v)),
                                 }
                             }
                         }
                         div { class: "actions",
-                            button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                            button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "cancel")} }
                             button {
                                 onclick: move |_| {
                                     let fmt = *format.read();
@@ -132,16 +132,16 @@ pub fn ExportDirReportModal(
                                     // teardown.
                                     spawn_forever(start_dir_export(store, request, phase, cancel_token));
                                 },
-                                {t(lang, "Export")}
+                                {t(lang, "export")}
                             }
                         }
                     },
                     DirExportPhase::Working { done, total } => rsx! {
                         p {
                             {if total > 0 {
-                                format!("{} {done}/{total}…", t(lang, "Reading and hashing files"))
+                                format!("{} {done}/{total}…", t(lang, "reading-and-hashing-files"))
                             } else {
-                                t(lang, "Working…")
+                                t(lang, "working")
                             }}
                         }
                         div { class: "actions",
@@ -151,7 +151,7 @@ pub fn ExportDirReportModal(
                                         token.cancel();
                                     }
                                 },
-                                {t(lang, "Cancel")}
+                                {t(lang, "cancel")}
                             }
                         }
                     },
@@ -234,11 +234,11 @@ async fn start_dir_export(
                     match crate::ui::view::diff_actions::write_export_file(
                         &path,
                         text.as_bytes(),
-                        &t(lang, "Could not save the patch"),
+                        &t(lang, "could-not-save-the-patch"),
                     ) {
                         Ok(()) => store.notify_success_with_open(
-                            t(lang, "Report saved."),
-                            t(lang, "Open"),
+                            t(lang, "report-saved"),
+                            t(lang, "open"),
                             path.display().to_string(),
                         ),
                         Err(msg) => store.notify(msg),
@@ -248,9 +248,9 @@ async fn start_dir_export(
                 // core's own rule, surfaced here rather than silently
                 // producing an incomplete patch.
                 Ok(Err(e)) => {
-                    store.notify(format!("{}: {e}", t(lang, "Could not build the patch")))
+                    store.notify(format!("{}: {e}", t(lang, "could-not-build-the-patch")))
                 }
-                Err(e) => store.notify(format!("{}: {e}.", t(lang, "Could not save the patch"))),
+                Err(e) => store.notify(format!("{}: {e}.", t(lang, "could-not-save-the-patch"))),
             }
         }
         ReportExportFormat::Html => {
@@ -329,11 +329,11 @@ async fn start_dir_export(
                     match crate::ui::view::diff_actions::write_export_file(
                         &path,
                         html.as_bytes(),
-                        &t(lang, "Could not save the report"),
+                        &t(lang, "could-not-save-the-report"),
                     ) {
                         Ok(()) => store.notify_success_with_open(
-                            t(lang, "Report saved."),
-                            t(lang, "Open"),
+                            t(lang, "report-saved"),
+                            t(lang, "open"),
                             path.display().to_string(),
                         ),
                         Err(msg) => store.notify(msg),
@@ -347,10 +347,10 @@ async fn start_dir_export(
                     "{} ({path})",
                     t(
                         lang,
-                        "A file changed since it was compared. Compare again, then export."
+                        "a-file-changed-since-it-was-compared-compare-again-then"
                     )
                 )),
-                Err(e) => store.notify(format!("{}: {e}.", t(lang, "Could not save the report"))),
+                Err(e) => store.notify(format!("{}: {e}.", t(lang, "could-not-save-the-report"))),
             }
         }
     }

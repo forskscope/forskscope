@@ -2,7 +2,7 @@
 
 use dioxus::prelude::*;
 
-use crate::i18n::t;
+use crate::i18n::{t, tf};
 use crate::state::{BatchCopySpec, BatchResultSpec, DirOp, Modal, Store};
 use crate::ui::component::notice::{Notice, NoticeKind};
 use crate::ui::view::BidiText;
@@ -14,18 +14,18 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
     let src = op.src.display().to_string();
     let dst = op.dst.display().to_string();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Copy file"), onmounted: super::focus_autofocus_button,
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "copy-file"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
-                h2 { {t(lang, "Copy this file?")} }
-                div { class: "field", span { {t(lang, "From")} } code { class: "path-display", BidiText { text: src.clone(), lang } } }
-                div { class: "field", span { {t(lang, "To")} }   code { class: "path-display", BidiText { text: dst.clone(), lang } } }
+                h2 { {t(lang, "copy-this-file")} }
+                div { class: "field", span { {t(lang, "from")} } code { class: "path-display", BidiText { text: src.clone(), lang } } }
+                div { class: "field", span { {t(lang, "to")} }   code { class: "path-display", BidiText { text: dst.clone(), lang } } }
                 if op.dst.exists() {
                     Notice { kind: NoticeKind::Ok,
-                        {t(lang, "The destination exists. A .bak backup will be created first.")}
+                        {t(lang, "the-destination-exists-a-bak-backup-will-be-created-first")}
                     }
                 }
                 div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "cancel")} }
                     button {
                         onclick: move |_| {
                             use forskscope_edit::dir::{BatchItem, BatchFailurePolicy, batch_copy};
@@ -39,7 +39,7 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
                             ) {
                                 Ok(manifest) => {
                                     if manifest.failed() == 0 {
-                                        store.notify_success(t(store.lang(), "Copied."));
+                                        store.notify_success(t(store.lang(), "copied"));
                                         store.modal.set(Modal::None);
                                         return;
                                     }
@@ -64,7 +64,7 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
                             };
                             store.modal.set(Modal::BatchResult(result_spec));
                         },
-                        {t(lang, "Copy file")}
+                        {t(lang, "copy-file")}
                     }
                 }
             }
@@ -79,16 +79,16 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
     let count = spec.items.len();
     let label = spec.label.clone();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Batch copy"), onmounted: super::focus_autofocus_button,
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "batch-copy"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
-                h2 { {format!("{} {count} {}?", t(lang, "Copy"), t(lang, "files"))} }
+                h2 { {tf(lang, "batch-copy-confirm-title", &[], Some(count as i64))} }
                 p { "{label}" }
-                Notice { kind: NoticeKind::Info, {t(lang, "Existing files will receive a .bak backup.")} }
+                Notice { kind: NoticeKind::Info, {t(lang, "existing-files-will-receive-a-bak-backup")} }
                 Notice { kind: NoticeKind::Ok,
-                    {t(lang, "A manifest will be saved so copies can be reviewed or reversed.")}
+                    {t(lang, "a-manifest-will-be-saved-so-copies-can-be-reviewed-or")}
                 }
                 div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "cancel")} }
                     button {
                         onclick: move |_| {
                             use forskscope_edit::dir::{BatchItem, BatchFailurePolicy, batch_copy};
@@ -125,7 +125,7 @@ pub fn BatchCopyModal(spec: BatchCopySpec) -> Element {
                             };
                             store.modal.set(Modal::BatchResult(result_spec));
                         },
-                        {t(lang, "Copy all")}
+                        {t(lang, "copy-all")}
                     }
                 }
             }
@@ -138,32 +138,33 @@ pub fn BatchResultModal(spec: BatchResultSpec) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     let title = if spec.all_succeeded() {
-        format!(
-            "{} {} {}",
-            t(lang, "Copied"),
-            spec.succeeded,
-            t(lang, "files")
+        tf(
+            lang,
+            "batch-result-all-succeeded-title",
+            &[],
+            Some(spec.succeeded as i64),
         )
     } else {
-        format!(
-            "{}: {} {}, {} {}",
-            t(lang, "Copy finished"),
-            spec.succeeded,
-            t(lang, "succeeded"),
-            spec.failed,
-            t(lang, "failed")
+        tf(
+            lang,
+            "batch-result-partial-title",
+            &[
+                ("succeeded", &spec.succeeded.to_string()),
+                ("failed", &spec.failed.to_string()),
+            ],
+            None,
         )
     };
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Copy result"),
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "copy-result"),
             div { class: "modal",
                 h2 { "{title}" }
                 if let Some(ref mp) = spec.manifest_path {
-                    Notice { kind: NoticeKind::Ok, {t(lang, "Manifest saved:")} }
+                    Notice { kind: NoticeKind::Ok, {t(lang, "manifest-saved")} }
                     code { class: "path-display", BidiText { text: mp.display().to_string(), lang } }
                 }
                 if !spec.failure_details.is_empty() {
-                    Notice { kind: NoticeKind::Error, {t(lang, "Errors:")} }
+                    Notice { kind: NoticeKind::Error, {t(lang, "errors")} }
                     for detail in spec.failure_details.iter() {
                         code { class: "path-display", BidiText { text: detail.clone(), lang } }
                     }
@@ -172,7 +173,7 @@ pub fn BatchResultModal(spec: BatchResultSpec) -> Element {
                     button {
                         autofocus: true,
                         onclick: move |_| store.modal.set(Modal::None),
-                        {t(lang, "Close")}
+                        {t(lang, "close")}
                     }
                 }
             }

@@ -72,13 +72,13 @@ pub fn SettingsRecoveryModal(resolution: SettingsRuntimeResolution) -> Element {
     let Some(dialog) = view.dialog else {
         return rsx! {};
     };
-    let (title, body) = settings_dialog_text(lang, &resolution.outcome);
+    let (title, body_id, body_args, isolate) = settings_dialog_text(lang, &resolution.outcome);
 
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "{title}",
             div { class: "modal",
                 h2 { "{title}" }
-                p { "{body}" }
+                p { crate::ui::view::TranslatedText { lang, id: body_id, args: body_args, isolate } }
                 div { class: "actions",
                     for (i , action) in dialog.actions.iter().copied().enumerate() {
                         button {
@@ -97,53 +97,48 @@ pub fn SettingsRecoveryModal(resolution: SettingsRuntimeResolution) -> Element {
     }
 }
 
-fn settings_dialog_text(lang: Lang, outcome: &SettingsRuntimeOutcome) -> (String, String) {
+type DialogBody = (
+    String,
+    &'static str,
+    Vec<(&'static str, String)>,
+    Vec<&'static str>,
+);
+
+/// RFC-101 stage B (handoff 114): each outcome is one whole-sentence
+/// catalog message now, never pieces joined in English word order.
+/// `settings-incompatible-schema`'s wording is TODAY's, unchanged -
+/// review 232 §3.2 flags it for the owner's review (reply 202a); every
+/// other id here already carries the architect-approved rewrite.
+///
+/// Returns the body as (id, args, isolate) rather than an already-
+/// substituted `String`: `schema` and `detail` carry data from the file
+/// itself (a schema name, raw error text) — review 232 §3.4 — so the
+/// caller renders them through `TranslatedText`, which isolates each
+/// `isolate`-named placeholder in its own `<bdi>` instead of splicing it
+/// into one opaque string with no markup at all.
+fn settings_dialog_text(lang: Lang, outcome: &SettingsRuntimeOutcome) -> DialogBody {
     match outcome {
         SettingsRuntimeOutcome::Incompatible { schema, version } => (
-            t(lang, "Settings file is from a newer version"),
-            format!(
-                "{} \"{}\" {} {}, {} {}",
-                t(lang, "This settings file uses"),
-                schema,
-                t(lang, "schema version"),
-                version,
-                t(
-                    lang,
-                    "which this version of ForskScope does not understand. The file has not been modified."
-                ),
-                t(lang, "Changes you make this session will not be saved."),
-            ),
+            t(lang, "settings-file-is-from-a-newer-version"),
+            "settings-incompatible-schema",
+            vec![("schema", schema.clone()), ("version", version.to_string())],
+            vec!["schema"],
         ),
         SettingsRuntimeOutcome::CorruptPreserved { detail } => (
-            t(lang, "Settings file could not be read"),
-            format!(
-                "{}: {}. {}",
-                t(
-                    lang,
-                    "The settings file is preserved but could not be parsed"
-                ),
-                detail,
-                t(
-                    lang,
-                    "Changes you make this session will not be saved unless you reset it."
-                ),
-            ),
+            t(lang, "settings-file-could-not-be-read"),
+            "settings-corrupt-preserved",
+            vec![("detail", detail.to_string())],
+            vec!["detail"],
         ),
         SettingsRuntimeOutcome::Migrated(SettingsMigrationCommitOutcome::Failed { detail }) => (
-            t(lang, "Settings could not be upgraded"),
-            format!(
-                "{} ({}). {}",
-                t(
-                    lang,
-                    "Your settings were read and are in use for this session, but they could not be saved in the new format"
-                ),
-                detail,
-                t(lang, "Changes will not be saved until this is resolved."),
-            ),
+            t(lang, "settings-could-not-be-upgraded"),
+            "settings-migration-failed",
+            vec![("detail", detail.clone())],
+            vec!["detail"],
         ),
         // Fresh/Current/Migrated(Committed|DeferredByConflict) never produce a
         // dialog — `view.dialog` is `None` and the caller returns early.
-        _ => (String::new(), String::new()),
+        _ => (String::new(), "", Vec::new(), Vec::new()),
     }
 }
 
@@ -187,13 +182,13 @@ pub fn SessionRecoveryModal(resolution: SessionRuntimeResolution) -> Element {
     let Some(dialog) = view.dialog else {
         return rsx! {};
     };
-    let (title, body) = session_dialog_text(lang, &resolution.outcome);
+    let (title, body_id, body_args, isolate) = session_dialog_text(lang, &resolution.outcome);
 
     rsx! {
         div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "{title}",
             div { class: "modal",
                 h2 { "{title}" }
-                p { "{body}" }
+                p { crate::ui::view::TranslatedText { lang, id: body_id, args: body_args, isolate } }
                 div { class: "actions",
                     for (i , action) in dialog.actions.iter().copied().enumerate() {
                         button {
@@ -212,51 +207,31 @@ pub fn SessionRecoveryModal(resolution: SessionRuntimeResolution) -> Element {
     }
 }
 
-fn session_dialog_text(lang: Lang, outcome: &SessionRuntimeOutcome) -> (String, String) {
+/// Same reasoning as [`settings_dialog_text`]: `session-incompatible-schema`
+/// keeps today's wording (flagged for the owner, reply 202a); the other
+/// two carry the architect-approved rewrite. `schema`/`detail` are
+/// isolated in the rendered body the same way (review 232 §3.4).
+fn session_dialog_text(lang: Lang, outcome: &SessionRuntimeOutcome) -> DialogBody {
     match outcome {
         SessionRuntimeOutcome::Incompatible { schema, version } => (
-            t(lang, "Session file is from a newer version"),
-            format!(
-                "{} \"{}\" {} {}, {} {}",
-                t(lang, "This session file uses"),
-                schema,
-                t(lang, "schema version"),
-                version,
-                t(
-                    lang,
-                    "which this version of ForskScope does not understand. The file has not been modified."
-                ),
-                t(lang, "Changes you make this session will not be saved."),
-            ),
+            t(lang, "session-file-is-from-a-newer-version"),
+            "session-incompatible-schema",
+            vec![("schema", schema.clone()), ("version", version.to_string())],
+            vec!["schema"],
         ),
         SessionRuntimeOutcome::CorruptPreserved { detail } => (
-            t(lang, "Session file could not be read"),
-            format!(
-                "{}: {}. {}",
-                t(
-                    lang,
-                    "The session file is preserved but could not be parsed"
-                ),
-                detail,
-                t(
-                    lang,
-                    "Changes you make this session will not be saved unless you reset it."
-                ),
-            ),
+            t(lang, "session-file-could-not-be-read"),
+            "session-corrupt-preserved",
+            vec![("detail", detail.to_string())],
+            vec!["detail"],
         ),
         SessionRuntimeOutcome::Migrated(SessionMigrationCommitOutcome::Failed { detail }) => (
-            t(lang, "Session could not be upgraded"),
-            format!(
-                "{} ({}). {}",
-                t(
-                    lang,
-                    "Your session was read and is in use for this run, but it could not be saved in the new format"
-                ),
-                detail,
-                t(lang, "Changes will not be saved until this is resolved."),
-            ),
+            t(lang, "session-could-not-be-upgraded"),
+            "session-migration-failed",
+            vec![("detail", detail.clone())],
+            vec!["detail"],
         ),
-        _ => (String::new(), String::new()),
+        _ => (String::new(), "", Vec::new(), Vec::new()),
     }
 }
 

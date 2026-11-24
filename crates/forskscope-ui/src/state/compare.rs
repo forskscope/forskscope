@@ -19,7 +19,7 @@ use forskscope_ui_logic::{
     SaveDestination, completion_decision, guard_for_sizes,
 };
 
-use crate::i18n::t;
+use crate::i18n::{t, tf};
 use crate::state::tab::{CompareLaunchMode, CompareTab, TabState, tab_title};
 use crate::state::types::{LargeLoadPrompt, LargeLoadTarget};
 use crate::state::{Modal, Store, settings::Lang};
@@ -249,7 +249,7 @@ pub(crate) fn reload_tab_with_options(store: &mut Store, index: usize, opts: Dif
         let mut tabs = tabs_signal.write();
         let result = match result {
             Ok(result) => prepared_result(result),
-            Err(_) => LoadResult::Error(t(lang, "Could not open")),
+            Err(_) => LoadResult::Error(t(lang, "could-not-open")),
         };
         commit_load_result(&mut tabs, token, result);
     });
@@ -405,7 +405,7 @@ pub(crate) fn open_compare_request_with_options(
         let mut tabs = tabs_signal.write();
         let result = match load_result {
             Ok(result) => prepared_result(result),
-            Err(_join_err) => LoadResult::Error(t(lang, "Could not open")),
+            Err(_join_err) => LoadResult::Error(t(lang, "could-not-open")),
         };
         commit_load_result(&mut tabs, token, result);
         // No save_session call needed here: the session payload only ever
@@ -445,15 +445,13 @@ fn display_name_only(path: &Path) -> String {
 /// as it is.
 fn open_error(lang: Lang, path: &Path, error: &forskscope_compare::CoreError) -> String {
     let name = display_name_only(path);
-    let mut message = format!("{} \"{name}\" — {error}.", t(lang, "Could not open"));
+    let error_text = error.to_string();
+    let args = [("name", name.as_str()), ("error", error_text.as_str())];
     if wants_access_guidance(error) {
-        message.push(' ');
-        message.push_str(&t(
-            lang,
-            "Check that the file exists and you have read permission.",
-        ));
+        tf(lang, "could-not-open-error-with-guidance", &args, None)
+    } else {
+        tf(lang, "could-not-open-error", &args, None)
     }
-    message
 }
 
 /// Load, classify, diff, and derive the save target for one comparison off
@@ -486,7 +484,7 @@ pub(super) fn load_and_diff(
     if (l_bin || r_bin) && !enable_binary {
         return Err(t(
             lang,
-            "Binary comparison is off. Enable it in Settings → Advanced.",
+            "binary-comparison-is-off-enable-it-in-settings-advanced",
         ));
     }
 
@@ -495,7 +493,7 @@ pub(super) fn load_and_diff(
     if (l_bin && r_text) || (l_text && r_bin) {
         return Err(t(
             lang,
-            "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary.",
+            "cannot-compare-one-file-is-binary-and-the-other-is-text",
         ));
     }
 
@@ -519,7 +517,7 @@ pub(super) fn load_and_diff(
             };
             format!(
                 "{} — {detail}",
-                t(lang, "Could not compare the spreadsheets")
+                t(lang, "could-not-compare-the-spreadsheets")
             )
         })?;
         ld.text = Some(pair.left);
@@ -727,31 +725,34 @@ fn file_folder_mismatch_message(
     // variable, so the audit can see both shapes as used at all.
     let left_name = format!("\"{}\"", display_name_only(left));
     let right_name = format!("\"{}\"", display_name_only(right));
-    let template = if file_is_left {
-        t(
+    let args = [("left", left_name.as_str()), ("right", right_name.as_str())];
+    if file_is_left {
+        tf(
             lang,
-            "A file can only be compared with a file, and a folder with a folder. {left} is a file; {right} is a folder.",
+            "a-file-can-only-be-compared-with-a-file-and-a-folder-with-a",
+            &args,
+            None,
         )
     } else {
-        t(
+        tf(
             lang,
-            "A file can only be compared with a file, and a folder with a folder. {left} is a folder; {right} is a file.",
+            "a-file-can-only-be-compared-with-a-file-and-a-folder-with-a-2",
+            &args,
+            None,
         )
-    };
-    template
-        .replace("{left}", &left_name)
-        .replace("{right}", &right_name)
+    }
 }
 
 /// The three-argument (mergetool) shape of the same refusal — Git never
 /// passes a folder there, so this names which of the three paths was one.
 fn mergetool_folder_message(lang: Lang, path: &Path) -> String {
     let name = format!("\"{}\"", display_name_only(path));
-    t(
+    tf(
         lang,
-        "Git's merge tool compares files only. {name} is a folder.",
+        "git-s-merge-tool-compares-files-only-name-is-a-folder",
+        &[("name", &name)],
+        None,
     )
-    .replace("{name}", &name)
 }
 
 /// Opens a file tab exactly as a normal compare would, but already in

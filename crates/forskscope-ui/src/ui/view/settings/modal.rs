@@ -55,12 +55,12 @@ fn IgnoreListField(
             on_change.call(outcome.csv);
             live_message.set(format!(
                 "{}: {}",
-                t(lang, "Added"),
+                t(lang, "added"),
                 outcome.added.join(", ")
             ));
             duplicate_notice.set(false);
         } else if !outcome.duplicates.is_empty() {
-            live_message.set(t(lang, "Already in the list"));
+            live_message.set(t(lang, "already-in-the-list"));
             duplicate_notice.set(true);
         }
         typed.set(String::new());
@@ -76,13 +76,13 @@ fn IgnoreListField(
                             span { "{entry}" }
                             button {
                                 class: "icon-btn",
-                                aria_label: format!("{} {entry}", t(lang, "Remove")),
+                                aria_label: format!("{} {entry}", t(lang, "remove")),
                                 onclick: {
                                     let entry = entry.clone();
                                     let csv = csv.clone();
                                     move |_| {
                                         on_change.call(remove_entry(&csv, &entry, kind));
-                                        live_message.set(format!("{}: {entry}", t(lang, "Removed")));
+                                        live_message.set(format!("{}: {entry}", t(lang, "removed")));
                                         duplicate_notice.set(false);
                                     }
                                 },
@@ -155,7 +155,7 @@ fn IgnoreListField(
             // together with its first message is not.
             p { class: "sr-only", role: "status", "aria-live": "polite", "{live_message}" }
             if *duplicate_notice.read() {
-                p { class: "ignore-list-notice", "aria-hidden": "true", {t(lang, "Already in the list")} }
+                p { class: "ignore-list-notice", "aria-hidden": "true", {t(lang, "already-in-the-list")} }
             }
         }
     }
@@ -172,7 +172,7 @@ pub fn SettingsModal() -> Element {
     let mut show_advanced = use_signal(|| false);
 
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Settings"),
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "settings"),
             tabindex: "-1",
             onclick: move |_| store.modal.set(Modal::None),
             onkeydown: move |e: Event<KeyboardData>| {
@@ -193,12 +193,12 @@ pub fn SettingsModal() -> Element {
             div { class: "modal", onclick: move |e| e.stop_propagation(),
                 // Header row: title + About button (RFC-057).
                 div { class: "modal-header-row",
-                    h2 { id: "settings-title", {t(lang, "Settings")} }
+                    h2 { id: "settings-title", {t(lang, "settings")} }
                     // The control inherits the shared button style on purpose: F150
                     // had cancelled it, so the control was invisible as a button.
                     button {
-                        title: t(lang, "About ForskScope"),
-                        aria_label: t(lang, "About ForskScope"),
+                        title: t(lang, "about-forskscope"),
+                        aria_label: t(lang, "about-forskscope"),
                         onclick: move |_| store.modal.set(Modal::About),
                         "ℹ"
                     }
@@ -208,7 +208,7 @@ pub fn SettingsModal() -> Element {
                 // here, so a change made from inside this dialog is not
                 // mistaken for one that will survive the run.
                 if crate::startup_mode::is_private() {
-                    p { class: "notice", {t(lang, "Private: nothing is saved")} }
+                    p { class: "notice", {t(lang, "private-nothing-is-saved")} }
                 }
 
                 // ── Appearance ────────────────────────────────────────────────
@@ -218,7 +218,7 @@ pub fn SettingsModal() -> Element {
                 // already applies its own text scale automatically, so this
                 // is a plain, relative scale on top of whatever that is.
                 div { class: "field",
-                    span { {t(lang, "Text size")} }
+                    span { {t(lang, "text-size")} }
                     SelectField {
                         value: cur.text_size.to_string(),
                         aria_describedby: "text-size-help",
@@ -238,10 +238,10 @@ pub fn SettingsModal() -> Element {
                 // RFC-097 stage 3 §6: a visible line, not a `title` tooltip a
                 // sighted user who never hovers would never see (review 203).
                 p { class: "field-help", id: "text-size-help",
-                    {t(lang, "Enlarges everything in ForskScope, on top of your system's text size. Diff font size (below) sets the code panes relative to it.")}
+                    {t(lang, "enlarges-everything-in-forskscope-on-top-of-your-system-s")}
                 }
                 div { class: "field",
-                    span { {t(lang, "Theme")} }
+                    span { {t(lang, "theme")} }
                     SelectField {
                         value: tv(cur.theme).to_string(),
                         options: {
@@ -272,7 +272,7 @@ pub fn SettingsModal() -> Element {
                 // placement RFC-088 gave Colour vision ("a user who needs
                 // it must find it without knowing it exists").
                 div { class: "field",
-                    span { {t(lang, "Contrast")} }
+                    span { {t(lang, "contrast")} }
                     SelectField {
                         value: cur.contrast.as_str().to_string(),
                         options: contrast_choices().into_iter()
@@ -286,12 +286,12 @@ pub fn SettingsModal() -> Element {
                     }
                 }
                 div { class: "field",
-                    span { {t(lang, "Colour vision")} }
+                    span { {t(lang, "colour-vision")} }
                     SelectField {
                         value: cur.colour_vision.as_str().to_string(),
                         options: vec![
-                            SelectOption::new("standard", t(lang, "Standard")),
-                            SelectOption::new("red-green-safe", t(lang, "Red–green safe (blue and orange)")),
+                            SelectOption::new("standard", t(lang, "standard")),
+                            SelectOption::new("red-green-safe", t(lang, "red-green-safe-blue-and-orange")),
                         ],
                         onchange: move |v: String| {
                             store.settings.write().colour_vision =
@@ -301,7 +301,7 @@ pub fn SettingsModal() -> Element {
                     }
                 }
                 div { class: "field",
-                    span { {t(lang, "Language")} }
+                    span { {t(lang, "language")} }
                     SelectField {
                         value: lv(cur.language).to_string(),
                         options: vec![
@@ -315,7 +315,7 @@ pub fn SettingsModal() -> Element {
                     }
                 }
                 div { class: "field",
-                    span { {t(lang, "Diff font size")} }
+                    span { {t(lang, "diff-font-size")} }
                     input {
                         r#type: "number", min: "8", max: "32",
                         value: "{cur.diff_font_size}",
@@ -328,7 +328,7 @@ pub fn SettingsModal() -> Element {
                     }
                 }
                 div { class: "field",
-                    span { {t(lang, "Diff font family")} }
+                    span { {t(lang, "diff-font-family")} }
                     {
                         let ff_value = match cur.diff_font_family {
                             crate::state::DiffFontFamily::Monospace  => "monospace",
@@ -341,9 +341,9 @@ pub fn SettingsModal() -> Element {
                             SelectField {
                                 value: ff_value.to_string(),
                                 options: vec![
-                                    SelectOption::new("monospace", t(lang, "Monospace (default)")),
-                                    SelectOption::new("sans-serif", t(lang, "Sans-serif")),
-                                    SelectOption::new("serif", t(lang, "Serif")),
+                                    SelectOption::new("monospace", t(lang, "monospace-default")),
+                                    SelectOption::new("sans-serif", t(lang, "sans-serif")),
+                                    SelectOption::new("serif", t(lang, "serif")),
                                     SelectOption::new("courier-new", "Courier New"),
                                     SelectOption::new("consolas", "Consolas / Menlo"),
                                 ],
@@ -368,8 +368,8 @@ pub fn SettingsModal() -> Element {
                 button {
                     class: "advanced-toggle",
                     onclick: move |_| { let v = *show_advanced.read(); show_advanced.set(!v); },
-                    if *show_advanced.read() { "▾ " {t(lang, "Hide advanced")} }
-                    else                     { "▸ " {t(lang, "Advanced")} }
+                    if *show_advanced.read() { "▾ " {t(lang, "hide-advanced")} }
+                    else                     { "▸ " {t(lang, "advanced")} }
                 }
 
                 if *show_advanced.read() {
@@ -384,7 +384,7 @@ pub fn SettingsModal() -> Element {
                     // finding stayed - `for`/`id` is what the check
                     // (and native screen readers) both already know.
                     div { class: "field",
-                        label { r#for: "binary-cmp-checkbox", {t(lang, "Enable binary comparison")} }
+                        label { r#for: "binary-cmp-checkbox", {t(lang, "enable-binary-comparison")} }
                         input {
                             r#type: "checkbox",
                             id: "binary-cmp-checkbox",
@@ -397,18 +397,18 @@ pub fn SettingsModal() -> Element {
                         }
                     }
                     p { class: "field-help", id: "binary-cmp-help",
-                        {t(lang, "When off, binary files cannot be compared and are shown as non-actionable in the Explorer.")}
+                        {t(lang, "when-off-binary-files-cannot-be-compared-and-are-shown-as")}
                     }
                     div { class: "field",
-                        span { {t(lang, "Explorer layout")} }
+                        span { {t(lang, "explorer-layout")} }
                         {
                             let layout_value = if cur.explorer_compact { "compact" } else { "aligned" };
                             rsx! {
                                 SelectField {
                                     value: layout_value.to_string(),
                                     options: vec![
-                                        SelectOption::new("aligned", t(lang, "Aligned")),
-                                        SelectOption::new("compact", t(lang, "Compact (no spacer rows, default)")),
+                                        SelectOption::new("aligned", t(lang, "aligned")),
+                                        SelectOption::new("compact", t(lang, "compact-no-spacer-rows-default")),
                                     ],
                                     onchange: move |v: String| {
                                         store.settings.write().explorer_compact = v == "compact";
@@ -419,7 +419,7 @@ pub fn SettingsModal() -> Element {
                         }
                     }
                     div { class: "field",
-                        label { r#for: "remember-dirs-checkbox", {t(lang, "Remember Explorer directories")} }
+                        label { r#for: "remember-dirs-checkbox", {t(lang, "remember-explorer-directories")} }
                         input {
                             r#type: "checkbox",
                             id: "remember-dirs-checkbox",
@@ -442,18 +442,18 @@ pub fn SettingsModal() -> Element {
                         }
                     }
                     p { class: "field-help", id: "remember-dirs-help",
-                        {t(lang, "When on, the Explorer reopens the last directory shown in each pane. When off, it always starts at your home directory.")}
+                        {t(lang, "when-on-the-explorer-reopens-the-last-directory-shown-in")}
                     }
                     div { class: "field",
-                        span { {t(lang, "Context lines")} }
+                        span { {t(lang, "context-lines")} }
                         {
                             let context_lines = cur.context_lines;
                             rsx! {
                                 SelectField {
                                     value: context_lines.to_string(),
                                     options: vec![
-                                        SelectOption::new("0", t(lang, "0 (show all)")),
-                                        SelectOption::new("3", t(lang, "3 (default)")),
+                                        SelectOption::new("0", t(lang, "0-show-all")),
+                                        SelectOption::new("3", t(lang, "3-default")),
                                         SelectOption::new("5", "5"),
                                         SelectOption::new("10", "10"),
                                     ],
@@ -471,9 +471,9 @@ pub fn SettingsModal() -> Element {
                     // ── Ignore patterns (RFC-056; badges, RFC-099 §3) ──────────
                     IgnoreListField {
                         lang,
-                        label: t(lang, "Ignore file extensions"),
+                        label: t(lang, "ignore-file-extensions"),
                         label_id: "ignore-extensions-label",
-                        placeholder: t(lang, "Add an extension (no dot needed)"),
+                        placeholder: t(lang, "add-an-extension-no-dot-needed"),
                         kind: IgnoreListKind::Extension,
                         csv: cur.ignore_extensions.clone(),
                         on_change: move |value| {
@@ -483,9 +483,9 @@ pub fn SettingsModal() -> Element {
                     }
                     IgnoreListField {
                         lang,
-                        label: t(lang, "Ignore directory names"),
+                        label: t(lang, "ignore-directory-names"),
                         label_id: "ignore-dirs-label",
-                        placeholder: t(lang, "Add a folder name or pattern"),
+                        placeholder: t(lang, "add-a-folder-name-or-pattern"),
                         kind: IgnoreListKind::DirPattern,
                         csv: cur.ignore_dirs.clone(),
                         on_change: move |value| {
@@ -499,7 +499,7 @@ pub fn SettingsModal() -> Element {
                     // not only the tree. The help line below says so, per the
                     // handoff: this is not a display-only setting.
                     div { class: "field",
-                        label { r#for: "hide-dotfiles-checkbox", {t(lang, "Hide hidden files")} }
+                        label { r#for: "hide-dotfiles-checkbox", {t(lang, "hide-hidden-files")} }
                         input {
                             r#type: "checkbox",
                             id: "hide-dotfiles-checkbox",
@@ -512,16 +512,16 @@ pub fn SettingsModal() -> Element {
                         }
                     }
                     p { class: "field-help", id: "hide-dotfiles-help",
-                        {t(lang, "Also excludes hidden files and folders from comparisons — recursive compare, Deep Compare, and the Explorer's quick folder check. Off by default, so .gitignore, .env, and similar files are included.")}
+                        {t(lang, "also-excludes-hidden-files-and-folders-from-comparisons")}
                     }
 
                     // ── Compare profiles (RFC-087 §3: a radio group) ───────────
                     div { class: "field",
-                        span { {t(lang, "Compare profiles")} }
+                        span { {t(lang, "compare-profiles")} }
                         div {
                             class: "profile-list",
                             role: "radiogroup",
-                            aria_label: t(lang, "Active compare profile"),
+                            aria_label: t(lang, "active-compare-profile"),
                             for (i, p) in cur.profiles.iter().enumerate() {
                                 div {
                                     class: if cur.active_profile == i { "profile-row active" } else { "profile-row" },
@@ -542,8 +542,8 @@ pub fn SettingsModal() -> Element {
                                     if !p.built_in {
                                         button {
                                             class: "profile-delete icon-btn",
-                                            title: t(lang, "Delete profile"),
-                                            aria_label: t(lang, "Delete profile"),
+                                            title: t(lang, "delete-profile"),
+                                            aria_label: t(lang, "delete-profile"),
                                             onclick: move |_| crate::state::remove_profile(&mut store, i),
                                             "×"
                                         }
@@ -554,7 +554,7 @@ pub fn SettingsModal() -> Element {
                                 button {
                                     class: "new-profile-btn",
                                     onclick: move |_| show_new_profile.set(true),
-                                    {t(lang, "+ New profile")}
+                                    {t(lang, "new-profile")}
                                 }
                             } else {
                                 AddProfileInline { on_done: move |_| show_new_profile.set(false) }
@@ -567,7 +567,7 @@ pub fn SettingsModal() -> Element {
                     button {
                         autofocus: true,
                         onclick: move |_| store.modal.set(Modal::None),
-                        {t(lang, "Close")}
+                        {t(lang, "close")}
                     }
                 }
             }

@@ -30,6 +30,7 @@ mod colour_vision;
 mod contrast;
 mod crate_boundaries;
 mod css_shared;
+mod i18n_audit;
 mod json_schema;
 mod keyboard_docs;
 mod layout_check;
@@ -41,7 +42,6 @@ mod ui_logic_docs;
 mod xlsx_fixtures;
 
 use std::{
-    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
     process::{self, Command, Output},
@@ -472,143 +472,15 @@ fn resolve_version_via(package: &str, via: &str) -> String {
     ));
 }
 
-/// Checks that every `t(lang, "key")` call site in `forskscope-ui` has a
-/// Japanese translation. It does **not** check that every user-visible
-/// string is routed through `t()` in the first place (F39, G-006 narrowed
-/// 2026-08-13): a string that never reaches a `t(...)` call is invisible to
-/// this scan by construction, not merely uncovered. Known bypasses today are
-/// `store.notify(err.to_string())` sites carrying `CoreError`/`AppError`
-/// `Display` output — filesystem/OS error text and other dependency-
-/// generated messages, not authored UI copy — which cannot be pre-translated
-/// because their content does not exist until the error occurs. See
-/// `docs/src/maintainers/testing.md`'s i18n section for the full list and
-/// reasoning.
+/// RFC-101 stage B (handoff 114): the catalog-format audit —
+/// `i18n_audit::run`'s own doc comment has the full check list. Replaces
+/// the old `i18n.rs`-match-table audit (every language has every
+/// message; no unused message; placeholders and plural forms match; no
+/// two translated pieces joined, except the named exceptions) — a
+/// strictly larger set of checks than the single "used keys have a
+/// Japanese translation" this used to run.
 fn run_i18n_audit() {
-    let root = workspace_root();
-    let i18n_file = root.join("crates/forskscope-ui/src/i18n.rs");
-    let i18n = fs::read_to_string(&i18n_file)
-        .unwrap_or_else(|e| panic!("cannot read {}: {e}", i18n_file.display()));
-    let translated = extract_ja_translation_keys(&i18n);
-
-    let ui_src = root.join("crates/forskscope-ui/src");
-    let mut used = BTreeSet::new();
-    collect_i18n_usage_keys(&ui_src, &mut used);
-
-    let missing: Vec<&String> = used
-        .iter()
-        .filter(|key| !translated.contains(*key))
-        .collect();
-    if !missing.is_empty() {
-        eprintln!("missing Japanese translations for UI keys:");
-        for key in missing {
-            eprintln!("  - {key}");
-        }
-        process::exit(1);
-    }
-
-    println!(
-        "i18n audit passed: {} UI keys are covered by Japanese translations.",
-        used.len()
-    );
-}
-
-fn extract_ja_translation_keys(source: &str) -> BTreeSet<String> {
-    source
-        .lines()
-        .filter_map(|line| {
-            let trimmed = line.trim_start();
-            trimmed
-                .strip_prefix('"')
-                .and_then(|rest| rest.find('"').map(|end| rest[..end].to_string()))
-        })
-        .collect()
-}
-
-fn collect_i18n_usage_keys(dir: &Path, keys: &mut BTreeSet<String>) {
-    for entry in fs::read_dir(dir).unwrap_or_else(|e| panic!("cannot read {}: {e}", dir.display()))
-    {
-        let path = entry
-            .unwrap_or_else(|e| panic!("cannot read entry in {}: {e}", dir.display()))
-            .path();
-        if path.is_dir() {
-            collect_i18n_usage_keys(&path, keys);
-        } else if path.extension().and_then(|s| s.to_str()) == Some("rs")
-            && path.file_name().and_then(|s| s.to_str()) != Some("i18n.rs")
-        {
-            let source = fs::read_to_string(&path)
-                .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
-            extract_t_invocation_strings(&source, keys);
-        }
-    }
-}
-
-fn extract_t_invocation_strings(source: &str, keys: &mut BTreeSet<String>) {
-    let bytes = source.as_bytes();
-    let mut i = 0;
-    while i + 2 <= bytes.len() {
-        if bytes[i] == b't'
-            && bytes.get(i + 1) == Some(&b'(')
-            && i.checked_sub(1)
-                .and_then(|prev| bytes.get(prev))
-                .is_none_or(|ch| !is_ident_byte(*ch))
-        {
-            let mut cursor = i + 2;
-            let mut depth = 1usize;
-            while cursor < bytes.len() && depth > 0 {
-                match bytes[cursor] {
-                    b'"' => {
-                        let (value, next) = parse_string_literal(source, cursor);
-                        keys.insert(value);
-                        cursor = next;
-                    }
-                    b'(' => {
-                        depth += 1;
-                        cursor += 1;
-                    }
-                    b')' => {
-                        depth -= 1;
-                        cursor += 1;
-                    }
-                    _ => cursor += 1,
-                }
-            }
-            i = cursor;
-        } else {
-            i += 1;
-        }
-    }
-}
-
-fn is_ident_byte(ch: u8) -> bool {
-    ch.is_ascii_alphanumeric() || ch == b'_'
-}
-
-fn parse_string_literal(source: &str, start: usize) -> (String, usize) {
-    let bytes = source.as_bytes();
-    let mut out = String::new();
-    let mut cursor = start + 1;
-    while cursor < bytes.len() {
-        match bytes[cursor] {
-            b'\\' => {
-                if let Some(next) = bytes.get(cursor + 1) {
-                    out.push(*next as char);
-                    cursor += 2;
-                } else {
-                    cursor += 1;
-                }
-            }
-            b'"' => return (out, cursor + 1),
-            byte => {
-                let ch = source[cursor..]
-                    .chars()
-                    .next()
-                    .unwrap_or_else(|| panic!("invalid UTF-8 boundary at byte {cursor}"));
-                out.push(ch);
-                cursor += ch.len_utf8().max((byte as char).len_utf8());
-            }
-        }
-    }
-    (out, cursor)
+    i18n_audit::run(&workspace_root());
 }
 
 fn run_version_sync(expected_version: Option<&str>) {

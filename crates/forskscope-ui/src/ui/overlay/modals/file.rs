@@ -10,7 +10,7 @@ use dioxus::prelude::*;
 use forskscope_compare::DiffOptions;
 use forskscope_ui_logic::SaveErrorView;
 
-use crate::i18n::t;
+use crate::i18n::{t, tf};
 use crate::state::Lang;
 use crate::state::{
     LargeLoadPrompt, LargeLoadTarget, Modal, Store, open_compare_request_with_options, reload_tab,
@@ -32,16 +32,16 @@ pub fn OverwriteModal(index: usize, target: PathBuf) -> Element {
         .display()
         .to_string();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "File changed on disk"), onmounted: super::focus_autofocus_button,
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "file-changed-on-disk"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
-                h2 { {t(lang, "File changed on disk")} }
-                p { {t(lang, "The target file was modified after it was loaded. Overwrite anyway?")} }
+                h2 { {t(lang, "file-changed-on-disk")} }
+                p { {t(lang, "the-target-file-was-modified-after-it-was-loaded-overwrite")} }
                 code { class: "path-display", BidiText { text: path_display.clone(), lang } }
                 div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "cancel")} }
                     button {
                         onclick: move |_| confirm_overwrite(&mut store, index, target.clone()),
-                        {t(lang, "Overwrite")}
+                        {t(lang, "overwrite")}
                     }
                 }
             }
@@ -55,15 +55,15 @@ pub fn SaveAsModal(index: usize, initial_path: String) -> Element {
     let lang = store.lang();
     let mut path = use_signal(|| initial_path);
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Save As"),
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "save-as"),
             div { class: "modal",
-                h2 { {t(lang, "Save As")} }
+                h2 { {t(lang, "save-as")} }
                 div { class: "field",
-                    span { {t(lang, "Path")} }
+                    span { {t(lang, "path")} }
                     input { autofocus: true, value: "{path}", oninput: move |e| path.set(e.value()), style: "width:100%;" }
                 }
                 div { class: "actions",
-                    button { onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { onclick: move |_| store.modal.set(Modal::None), {t(lang, "cancel")} }
                     button {
                         disabled: path.read().trim().is_empty(),
                         onclick: move |_| {
@@ -87,7 +87,7 @@ pub fn SaveAsModal(index: usize, initial_path: String) -> Element {
                                 SaveAsPrecheck::Blocked(message) => store.notify(message),
                             }
                         },
-                        {t(lang, "Save")}
+                        {t(lang, "save")}
                     }
                 }
             }
@@ -107,18 +107,18 @@ pub fn ConfirmSaveAsOverwriteModal(index: usize, target: PathBuf) -> Element {
         .display()
         .to_string();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Save As"), onmounted: super::focus_autofocus_button,
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "save-as"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
-                h2 { {t(lang, "Overwrite existing file?")} }
-                p { {t(lang, "A file already exists at this path.")} }
+                h2 { {t(lang, "overwrite-existing-file")} }
+                p { {t(lang, "a-file-already-exists-at-this-path")} }
                 code { class: "path-display", BidiText { text: path_display.clone(), lang } }
                 div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "cancel")} }
                     button {
                         onclick: move |_| {
                             save_as(&mut store, index, target.display().to_string());
                         },
-                        {t(lang, "Overwrite")}
+                        {t(lang, "overwrite")}
                     }
                 }
             }
@@ -134,18 +134,18 @@ pub fn ConfirmDiffOptionChangeModal(index: usize, options: DiffOptions) -> Eleme
     let mut store = use_context::<Store>();
     let lang = store.lang();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Change diff options"), onmounted: super::focus_autofocus_button,
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "change-diff-options"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
-                h2 { {t(lang, "Change diff options?")} }
-                p { {t(lang, "Unsaved merge changes will be discarded when diff options change.")} }
+                h2 { {t(lang, "change-diff-options-2")} }
+                p { {t(lang, "unsaved-merge-changes-will-be-discarded-when-diff-options")} }
                 div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "cancel")} }
                     button {
                         onclick: move |_| {
                             set_diff_options(&mut store, index, options);
                             store.modal.set(Modal::None);
                         },
-                        {t(lang, "Discard and Change")}
+                        {t(lang, "discard-and-change")}
                     }
                 }
             }
@@ -160,18 +160,18 @@ pub fn ConfirmEncodingChangeModal(index: usize, label: String) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Change encoding"), onmounted: super::focus_autofocus_button,
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "change-encoding"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
-                h2 { {t(lang, "Change encoding?")} }
-                p { {t(lang, "Unsaved merge changes will be discarded when the encoding changes.")} }
+                h2 { {t(lang, "change-encoding-2")} }
+                p { {t(lang, "unsaved-merge-changes-will-be-discarded-when-the-encoding")} }
                 div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "cancel")} }
                     button {
                         onclick: move |_| {
                             set_encoding(&mut store, index, label.clone());
                             store.modal.set(Modal::None);
                         },
-                        {t(lang, "Discard and Change")}
+                        {t(lang, "discard-and-change")}
                     }
                 }
             }
@@ -184,15 +184,15 @@ pub fn ReloadModal(index: usize) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Reload files"), onmounted: super::focus_autofocus_button,
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "reload-files"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
-                h2 { {t(lang, "Reload files?")} }
-                p { {t(lang, "Unsaved merge changes will be discarded.")} }
+                h2 { {t(lang, "reload-files-2")} }
+                p { {t(lang, "unsaved-merge-changes-will-be-discarded")} }
                 div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "cancel")} }
                     button {
                         onclick: move |_| { reload_tab(&mut store, index); store.modal.set(Modal::None); },
-                        {t(lang, "Discard and Reload")}
+                        {t(lang, "discard-and-reload")}
                     }
                 }
             }
@@ -205,15 +205,15 @@ pub fn SwapModal(index: usize) -> Element {
     let mut store = use_context::<Store>();
     let lang = store.lang();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Swap sides"), onmounted: super::focus_autofocus_button,
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "swap-sides"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
-                h2 { {t(lang, "Swap sides?")} }
-                p { {t(lang, "Unsaved merge changes will be discarded when sides are swapped.")} }
+                h2 { {t(lang, "swap-sides-2")} }
+                p { {t(lang, "unsaved-merge-changes-will-be-discarded-when-sides-are")} }
                 div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "cancel")} }
                     button {
                         onclick: move |_| { swap_sides(&mut store, index); store.modal.set(Modal::None); },
-                        {t(lang, "Discard and Swap")}
+                        {t(lang, "discard-and-swap")}
                     }
                 }
             }
@@ -241,21 +241,21 @@ pub(crate) fn large_load_text(lang: Lang, prompt: &LargeLoadPrompt) -> (String, 
         / (1024 * 1024))
         .to_string();
     let body = if prompt.spreadsheet {
-        t(
+        tf(
             lang,
-            "One or both workbooks exceed the recommended comparison size ({n} MiB). Comparing them may be slow. The comparison is exact, or it is refused if a workbook is too large to compare; it is never approximate.",
+            "one-or-both-workbooks-exceed-the-recommended-comparison",
+            &[("n", &mib)],
+            None,
         )
     } else {
-        t(
+        tf(
             lang,
-            "One or both files exceed the recommended diff limit ({n} MiB). Diffing may be slow. The line diff stops after 5 seconds and says so if its result is approximate, and character-level highlighting is switched off.",
+            "one-or-both-files-exceed-the-recommended-diff-limit-n-mib",
+            &[("n", &mib)],
+            None,
         )
     };
-    (
-        t(lang, "File is large"),
-        body.replace("{n}", &mib),
-        t(lang, "Diff anyway"),
-    )
+    (t(lang, "file-is-large"), body, t(lang, "diff-anyway"))
 }
 
 /// F84: confirmed via `Modal::ConfirmLargeLoad` (`LoadGuard::ConfirmPrompt`,
@@ -277,7 +277,7 @@ pub fn LargeLoadModal(prompt: LargeLoadPrompt) -> Element {
                 h2 { "{title}" }
                 p { "{body}" }
                 div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "cancel")} }
                     button {
                         onclick: move |_| {
                             let prompt = prompt.clone();

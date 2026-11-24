@@ -18,7 +18,7 @@ use forskscope_compare::dir::{
 };
 use forskscope_ui_logic::{DeepCompareSummary, DeepFilter, apply_filter};
 
-use crate::i18n::t;
+use crate::i18n::{t, tf};
 use crate::keyboard::focus_handle;
 use crate::state::{DirOp, Lang, Modal, Store, open_compare};
 use crate::ui::view::BidiText;
@@ -38,9 +38,9 @@ fn export_disabled_tooltip(
     if !disabled {
         t(lang, enabled_text)
     } else if listing_cancelled {
-        t(lang, "Compare again, then export.")
+        t(lang, "compare-again-then-export")
     } else {
-        t(lang, "Finish comparing, or Cancel, before exporting.")
+        t(lang, "finish-comparing-or-cancel-before-exporting")
     }
 }
 
@@ -308,6 +308,13 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
     let state = *cancel_state.read();
     let still_comparing = export_disabled(state, is_scan, in_flight);
     let listing_cancelled = state == CancelState::DuringListing;
+    // RFC-101 stage B, item 17 (reply 198 §2, review 232 §3.3): the one
+    // translated separator for the whole summary list below, computed
+    // once and reused — never re-looked-up next to a second translated
+    // message inside the same `format!`, which is exactly the join
+    // RFC-101 §1 forbids. FLAGGED for the owner (202a): kept exactly as
+    // it reads today until approved.
+    let deep_compare_sep = format!(" {} ", t(lang, "deep-compare-list-separator"));
     let visible: Vec<RecEntry> = apply_filter(&snap, f).into_iter().cloned().collect();
     let all_entries: Vec<RecEntry> = snap.iter().cloned().collect();
     drop(snap);
@@ -315,24 +322,24 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
     rsx! {
         div { class: "deep-compare",
             div { class: "deep-roots",
-                span { class: "deep-root-label", {t(lang, "Left")}": " }
+                span { class: "deep-root-label", {t(lang, "left")}": " }
                 span { class: "deep-root-path",
                     {forskscope_desktop::platform::display_path(&left_root).display().to_string()}
                 }
                 span { class: "deep-root-sep", " ↔ " }
-                span { class: "deep-root-label", {t(lang, "Right")}": " }
+                span { class: "deep-root-label", {t(lang, "right")}": " }
                 span { class: "deep-root-path",
                     {forskscope_desktop::platform::display_path(&right_root).display().to_string()}
                 }
             }
             div { class: "deep-compare-toolbar",
-                span { class: "deep-label", {t(lang, "Deep compare")} }
+                span { class: "deep-label", {t(lang, "deep-compare-2")} }
                 button { class: DeepFilter::Different.button_class(f),
-                    onclick: move |_| filter.set(DeepFilter::Different), {t(lang, "Different")} }
+                    onclick: move |_| filter.set(DeepFilter::Different), {t(lang, "different")} }
                 button { class: DeepFilter::All.button_class(f),
-                    onclick: move |_| filter.set(DeepFilter::All), {t(lang, "All")} }
+                    onclick: move |_| filter.set(DeepFilter::All), {t(lang, "all")} }
                 button { class: DeepFilter::Equal.button_class(f),
-                    onclick: move |_| filter.set(DeepFilter::Equal), {t(lang, "Equal only")} }
+                    onclick: move |_| filter.set(DeepFilter::Equal), {t(lang, "equal-only")} }
                 span { class: "spacer" }
                 BatchCopyButtons { entries, left_root: left_root.clone(), right_root: right_root.clone() }
                 // RFC-092 §1: two separate buttons here (unlike a file
@@ -353,7 +360,7 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                             ));
                         }
                     },
-                    {t(lang, "Export report…")}
+                    {t(lang, "export-report-2")}
                 }
                 button {
                     disabled: still_comparing,
@@ -369,7 +376,7 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                             ));
                         }
                     },
-                    {t(lang, "Export patch…")}
+                    {t(lang, "export-patch-2")}
                 }
                 // Visible only while something is genuinely still running
                 // and nothing has been cancelled yet - once `state` leaves
@@ -379,7 +386,7 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                 // forever.
                 if state == CancelState::None && (is_scan || in_flight) {
                     button {
-                        title: t(lang, "Stop comparing — entries not yet compared stay as they are, and can still be exported."),
+                        title: t(lang, "stop-comparing-entries-not-yet-compared-stay-as-they-are"),
                         onclick: move |_| {
                             // Cancels the shared token without changing
                             // `scan_roots` - the effect above only restarts
@@ -401,34 +408,41 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                                 CancelState::DuringDigest
                             });
                         },
-                        {t(lang, "Cancel")}
+                        {t(lang, "cancel")}
                     }
                 }
             }
             if is_scan {
-                div { class: "deep-scanning", {t(lang, "Scanning…")} }
+                div { class: "deep-scanning", {t(lang, "scanning")} }
             } else if listing_cancelled {
                 // Review 174 §2b: phase 1 never finished - `entries` is
                 // empty or partial, so the table below would otherwise
                 // show a misleadingly small or empty listing as if it were
                 // complete. Neither export button is reachable in this
                 // state either (`still_comparing` above).
-                div { class: "deep-cancelled", {t(lang, "Cancelled — compare again to see the folders.")} }
+                div { class: "deep-cancelled", {t(lang, "cancelled-compare-again-to-see-the-folders")} }
             } else {
                 div { class: "deep-stats",
-                    {format!("{} {} · {} {} · {} {} · {} {}",
-                        changed,    t(lang, "different"),
-                        equal,      t(lang, "equal"),
-                        left_only,  t(lang, "left only"),
-                        right_only, t(lang, "right only"))}
+                    {
+                        [
+                            tf(lang, "deep-compare-different-count", &[], Some(changed as i64)),
+                            tf(lang, "deep-compare-equal-count", &[], Some(equal as i64)),
+                            tf(lang, "deep-compare-left-only-count", &[], Some(left_only as i64)),
+                            tf(lang, "deep-compare-right-only-count", &[], Some(right_only as i64)),
+                        ]
+                        .join(&deep_compare_sep)
+                    }
                     if unreadable > 0 {
                         span { class: "deep-progress",
-                            {format!(" · {} {}", unreadable, t(lang, "unreadable"))}
+                            {format!(
+                                "{deep_compare_sep}{}",
+                                tf(lang, "deep-compare-unreadable-count", &[], Some(unreadable as i64)),
+                            )}
                         }
                     }
                     if computing > 0 || in_flight {
                         span { class: "deep-progress",
-                            {format!(" · {} {}/{}…", t(lang, "checking"), done, tc)}
+                            {format!(" · {} {}/{}…", t(lang, "checking-2"), done, tc)}
                         }
                     }
                 }
@@ -443,7 +457,7 @@ pub fn DeepCompareView(left_root: PathBuf, right_root: PathBuf, lang: Lang) -> E
                 // buttons next in the DOM.
                 div {
                     class: "deep-table", role: "grid",
-                    aria_label: t(lang, "Folder comparison results"),
+                    aria_label: t(lang, "folder-comparison-results"),
                     for (idx, entry) in visible.iter().enumerate() {
                         DeepRow {
                             entry: entry.clone(), lang,
@@ -635,7 +649,7 @@ fn DeepRow(
                                 let (lp, rp) = left_then_right(&e2, &lr_cmp, &rr_cmp);
                                 open_compare(&mut store, lp, rp);
                             },
-                            {t(lang, "Compare")}
+                            {t(lang, "compare")}
                         }
                     }
                     if copy_left_to_right {
@@ -646,13 +660,13 @@ fn DeepRow(
                             rsx! {
                                 button {
                                     class: "deep-compare-btn",
-                                    title: t(lang, "Copy to right"),
+                                    title: t(lang, "copy-to-right"),
                                     onclick: move |e| {
                                         e.stop_propagation();
                                         let (src, dst) = left_then_right(&entry3, &l, &r);
                                         store.modal.set(Modal::ConfirmDirOp(DirOp { src, dst, label: String::new() }));
                                     },
-                                    {t(lang, "Copy to right")}
+                                    {t(lang, "copy-to-right")}
                                 }
                             }
                         }
@@ -665,13 +679,13 @@ fn DeepRow(
                             rsx! {
                                 button {
                                     class: "deep-compare-btn",
-                                    title: t(lang, "Copy to left"),
+                                    title: t(lang, "copy-to-left"),
                                     onclick: move |e| {
                                         e.stop_propagation();
                                         let (src, dst) = right_then_left(&entry4, &l, &r);
                                         store.modal.set(Modal::ConfirmDirOp(DirOp { src, dst, label: String::new() }));
                                     },
-                                    {t(lang, "Copy to left")}
+                                    {t(lang, "copy-to-left")}
                                 }
                             }
                         }
@@ -870,29 +884,29 @@ fn BatchCopyButtons(
         if tr_count > 0 {
             button {
                 class: "filter-btn",
-                title: format!("{} {tr_count} {}", t(lang, "Copy to right"), t(lang, "files")),
+                title: tf(lang, "deep-compare-copy-to-right-title", &[], Some(tr_count as i64)),
                 onclick: move |_| {
                     use crate::state::{BatchCopySpec, Modal};
                     store.modal.set(Modal::ConfirmBatchCopy(BatchCopySpec {
                         items: to_right.clone(),
-                        label: format!("{} {tr_count} {}", t(lang, "Copy to right"), t(lang, "files")),
+                        label: tf(lang, "deep-compare-copy-to-right-title", &[], Some(tr_count as i64)),
                     }));
                 },
-                {format!("{} {tr_count}", t(lang, "Copy to right"))}
+                {tf(lang, "deep-compare-copy-to-right-short", &[], Some(tr_count as i64))}
             }
         }
         if tl_count > 0 {
             button {
                 class: "filter-btn",
-                title: format!("{} {tl_count} {}", t(lang, "Copy to left"), t(lang, "files")),
+                title: tf(lang, "deep-compare-copy-to-left-title", &[], Some(tl_count as i64)),
                 onclick: move |_| {
                     use crate::state::{BatchCopySpec, Modal};
                     store.modal.set(Modal::ConfirmBatchCopy(BatchCopySpec {
                         items: to_left.clone(),
-                        label: format!("{} {tl_count} {}", t(lang, "Copy to left"), t(lang, "files")),
+                        label: tf(lang, "deep-compare-copy-to-left-title", &[], Some(tl_count as i64)),
                     }));
                 },
-                {format!("{} {tl_count}", t(lang, "Copy to left"))}
+                {tf(lang, "deep-compare-copy-to-left-short", &[], Some(tl_count as i64))}
             }
         }
     }

@@ -1,0 +1,517 @@
+0-show-all = 0 (show all)
+3-default = 3 (default)
+a-file-already-exists-at-this-path = A file already exists at this path.
+a-file-can-only-be-compared-with-a-file-and-a-folder-with-a = A file can only be compared with a file, and a folder with a folder. { $left } is a file; { $right } is a folder.
+a-file-can-only-be-compared-with-a-file-and-a-folder-with-a-2 = A file can only be compared with a file, and a folder with a folder. { $left } is a folder; { $right } is a file.
+a-file-changed-since-it-was-compared-compare-again-then = A file changed since it was compared. Compare again, then export.
+a-manifest-will-be-saved-so-copies-can-be-reviewed-or = A manifest will be saved so copies can be reviewed or reversed.
+a-sheet-was-too-large-to-align-rows-and-was-compared = A sheet was too large to align rows and was compared position by position, so an inserted row may appear as many changes.
+about-forskscope = About ForskScope
+active-compare-profile = Active compare profile
+add = Add
+add-a-folder-name-or-pattern = Add a folder name or pattern
+add-an-extension-no-dot-needed = Add an extension (no dot needed)
+added = Added
+advanced = Advanced
+aligned = Aligned
+all = All
+already-in-the-list = Already in the list
+also-excludes-hidden-files-and-folders-from-comparisons = Also excludes hidden files and folders from comparisons — recursive compare, Deep Compare, and the Explorer's quick folder check. Off by default, so .gitignore, .env, and similar files are included.
+app = App
+applied = Applied
+apply-focused-change-left-right = Apply focused change (left → right)
+arch = Arch
+automatically-for-small-changes = Automatically for small changes
+back = Back
+back-forward-directory-history-focused-pane = Back / forward directory history (focused pane)
+batch-copy = Batch copy
+binary-comparison-is-off-enable-it-in-settings-advanced = Binary comparison is off. Enable it in Settings → Advanced.
+binary-file-binary-comparison-is-off-enable-it-in-settings = Binary file. Binary comparison is off — enable it in Settings → Advanced.
+binary-file-read-only-comparison-hex-preview = Binary file — read-only comparison (hex preview).
+both-files-not-found-read-only = Both files not found — read-only.
+cancel = Cancel
+cancelled-compare-again-to-see-the-folders = Cancelled — compare again to see the folders.
+cannot-compare-one-file-is-binary-and-the-other-is-text = Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary.
+change-diff-options = Change diff options
+change-diff-options-2 = Change diff options?
+change-encoding = Change encoding
+change-encoding-2 = Change encoding?
+changed = Changed
+character-level-highlighting = Character-level highlighting
+character-level-highlighting-is-not-available-for-this = Character-level highlighting is not available for this comparison.
+check-for-updates = Check for updates
+checking = Checking…
+checking-2 = checking
+choose-a-file-or-folder-on-each-side-to-compare = Choose a file or folder on each side to compare
+choose-a-file-or-folder-on-the-left = Choose a file or folder on the left
+choose-a-file-or-folder-on-the-right = Choose a file or folder on the right
+choose-a-folder-for-each-side-then-select-items-to-compare = Choose a folder for each side, then select items to compare.
+clear-filter = Clear filter
+click-the-name = click the name
+close = Close
+close-comparison = Close comparison
+close-comparison-2 = Close comparison?
+close-modal-search-bar = Close modal / search bar
+close-search-bar = Close search bar
+close-tab = Close tab
+close-the-active-comparison-tab = Close the active comparison tab
+close-the-focused-tab-tab-list-focused = Close the focused tab (tab list focused)
+collapse-folder = Collapse folder
+colour-vision = Colour vision
+compact-no-spacer-rows-default = Compact (no spacer rows, default)
+compare = Compare
+compare-again-then-export = Compare again, then export.
+compare-files-or-folders = Compare files or folders
+compare-profiles = Compare profiles
+compare-selected-directories = Compare selected directories
+compare-selected-files = Compare selected files
+comparing = Comparing…
+comparison = comparison
+comparison-failed = Comparison failed
+context-lines = Context lines
+contrast = Contrast
+copied = Copied.
+copy-all = Copy all
+copy-diagnostics = Copy diagnostics
+copy-file = Copy file
+copy-result = Copy result
+copy-this-file = Copy this file?
+copy-to-left = Copy to left
+copy-to-right = Copy to right
+could-not-build-the-patch = Could not build the patch
+could-not-check-for-updates-no-network-connection = Could not check for updates: no network connection.
+could-not-check-for-updates-rate-limited-try-again-later = Could not check for updates: rate-limited, try again later.
+could-not-check-for-updates-the-reply-could-not-be-read = Could not check for updates: the reply could not be read.
+could-not-check-for-updates-unexpected-response-http-code = Could not check for updates: unexpected response (HTTP { $code }).
+could-not-compare-the-spreadsheets = Could not compare the spreadsheets
+could-not-open = Could not open
+could-not-save-the-patch = Could not save the patch
+could-not-save-the-report = Could not save the report
+cpus = CPUs
+data-location = Data location
+decrease-text-size = Decrease text size
+deep-compare = Deep Compare
+deep-compare-2 = Deep compare
+delete-profile = Delete profile
+deleted = Deleted
+diff-algorithm = Diff algorithm
+diff-anyway = Diff anyway
+diff-font-family = Diff font family
+diff-font-size = Diff font size
+diff-timed-out-result-may-be-approximate = Diff timed out — result may be approximate.
+diff-view = Diff view
+different = Different
+directory-contents-not-compared-use-deep-compare = Directory contents not compared — use Deep Compare
+discard-and-change = Discard and Change
+discard-and-close = Discard and close
+discard-and-reload = Discard and Reload
+discard-and-swap = Discard and Swap
+edit-path = Edit path
+enable-binary-comparison = Enable binary comparison
+encoding-re-decode-if-this-looks-wrong = Encoding — re-decode if this looks wrong
+enlarges-everything-in-forskscope-on-top-of-your-system-s = Enlarges everything in ForskScope, on top of your system's text size. Diff font size (below) sets the code panes relative to it.
+equal-only = Equal only
+errors = Errors:
+existing-files-will-receive-a-bak-backup = Existing files will receive a .bak backup.
+expand-folder = Expand folder
+expand-or-collapse-the-focused-folder-does-nothing-on-a-file = Expand or collapse the focused folder; does nothing on a file
+explorer = Explorer
+explorer-layout = Explorer layout
+export = Export
+export-a-comparison-report = Export a comparison report
+export-patch = Export patch
+export-patch-2 = Export patch…
+export-report = Export report
+export-report-2 = Export report…
+export-unified-diff-patch-file = Export unified-diff patch file
+f7-previous-change = F7 — Previous change
+f8-next-change = F8 — Next change
+file-changed-on-disk = File changed on disk
+file-comparison = File comparison
+file-is-large = File is large
+file-names-only = File names only
+file-type-not-supported-for-merge-read-only = File type not supported for merge — read-only.
+files-are-identical = Files are identical
+files-are-identical-nothing-to-export = Files are identical — nothing to export.
+files-stay-on-this-computer-forskscope-does-not-upload-them = Files stay on this computer. ForskScope does not upload them.
+filter = Filter
+filter-by-name = Filter by name…
+filter-on = Filter (on)
+finish-comparing-or-cancel-before-exporting = Finish comparing, or Cancel, before exporting.
+first-last-tab-tab-list-focused = First / last tab (tab list focused)
+folder-comparison-results = Folder comparison results
+format = Format
+forskscope-needs-access-to-your-home-folder-to-browse-and = ForskScope needs access to your home folder to browse and compare your files.
+forskscope-needs-the-microsoft-edge-webview2-runtime-which = ForskScope needs the Microsoft Edge WebView2 Runtime, which is not installed on this computer. Open the download page?
+forskscope-the-microsoft-edge-webview2-runtime-is-not = forskscope: the Microsoft Edge WebView2 Runtime is not installed
+forward = Forward
+from = From
+full-paths = Full paths
+git-s-merge-tool-compares-files-only-name-is-a-folder = Git's merge tool compares files only. { $name } is a folder.
+go-to-home-directory-focused-pane = Go to home directory (focused pane)
+go-up-one-directory = Go up one directory
+go-up-one-directory-focused-pane = Go up one directory (focused pane)
+has-unsaved-changes-discard-them-and-close = has unsaved changes. Discard them and close?
+hide-advanced = Hide advanced
+hide-binary = Hide binary
+hide-hidden-files = Hide hidden files
+hide-identical = Hide identical
+home-folder = Home folder
+home-folder-access-needed = Home folder access needed
+html-report = HTML report
+identical-contents-compared = Identical — contents compared
+ignore-case = Ignore case
+ignore-directory-names = Ignore directory names
+ignore-file-extensions = Ignore file extensions
+ignore-line-ending-differences-crlf-lf = Ignore line-ending differences (CRLF/LF)
+ignore-whitespace = Ignore whitespace
+increase-text-size = Increase text size
+inserted = Inserted
+keyboard-shortcuts = Keyboard shortcuts
+keyboard-shortcuts-ctrl = Keyboard shortcuts (Ctrl+/)
+language = Language
+large-file-inline-diff-disabled-and-deadline-shortened = Large file — inline diff disabled and deadline shortened.
+left = Left
+left-old = Left / Old
+left-pane = Left pane
+less = Less ▲
+loading = Loading
+loading-2 = loading
+local-only = Local only
+long-line = Long line
+manifest-saved = Manifest saved:
+merge = merge
+merge-save-unavailable-for-this-file-type = Merge/save unavailable for this file type.
+mode = Mode
+monospace-default = Monospace (default)
+more = More
+more-2 = More ▼
+more-options = More options
+more-options-2 = More options ▸
+move-focus-in-explorer-list = Move focus in explorer list
+move-the-selected-row = Move the selected row
+move-together = Move together
+n-unchanged-lines-click-to-expand = ··· { $n } unchanged lines — click to expand ···
+names-and-sizes-match-contents-not-compared = Names and sizes match; contents not compared
+navigation = Navigation
+never = Never
+new-profile = + New profile
+next-change = Next change
+next-match = Next match
+next-match-enter-f3 = Next match (Enter / F3)
+next-previous-search-match = Next / previous search match
+next-tab-from-anywhere-wraps-includes-explorer = Next tab, from anywhere (wraps, includes Explorer)
+no-backup = No backup
+no-backup-can-be-kept-for-this-file = No backup can be kept for this file.
+no-comparison = No comparison.
+no-matches = No matches
+not-compared-not-a-worksheet = Not compared (not a worksheet):
+nothing-leaves-this-computer = Nothing leaves this computer.
+on = on
+one-or-both-files-exceed-the-recommended-diff-limit-n-mib = One or both files exceed the recommended diff limit ({ $n } MiB). Diffing may be slow. The line diff stops after 5 seconds and says so if its result is approximate, and character-level highlighting is switched off.
+one-or-both-workbooks-exceed-the-recommended-comparison = One or both workbooks exceed the recommended comparison size ({ $n } MiB). Comparing them may be slow. The comparison is exact, or it is refused if a workbook is too large to compare; it is never approximate.
+one-side-is-missing-read-only = One side is missing — read-only.
+only-on-the-left = Only on the left
+only-on-the-right = Only on the right
+open = Open
+open-a-folder-focused-pane = Open a folder (focused pane)
+open-close-inline-search = Open / close inline search
+open-folder = Open folder…
+open-release-page = Open release page
+open-tabs = Open tabs
+open-the-comparison-for-the-selected-row-if-available = Open the comparison for the selected row, if available
+or-use-a-permissions-manager-such-as-flatseal-then-restart = Or use a permissions manager such as Flatseal. Then restart ForskScope.
+os = OS
+overwrite = Overwrite
+overwrite-existing-file = Overwrite existing file?
+path = Path
+paths = Paths
+paths-relative-to-the-compared-folders = Paths relative to the compared folders
+portable = Portable
+portable-read-only-changes-are-not-saved = Portable (read-only): changes are not saved
+previous-change = Previous change
+previous-match = Previous match
+previous-match-shift-enter = Previous match (Shift+Enter)
+previous-next-change = Previous / next change
+previous-next-tab-tab-list-focused = Previous / next tab (tab list focused)
+previous-tab-from-anywhere-wraps-includes-explorer = Previous tab, from anywhere (wraps, includes Explorer)
+private-nothing-is-saved = Private: nothing is saved
+profile-name = Profile name
+read-every-byte-to-find-out-for-certain = Read every byte to find out for certain.
+reading-and-hashing-files = Reading and hashing files
+red-green-safe-blue-and-orange = Red–green safe (blue and orange)
+redo = Redo
+redo-last-undone-merge = Redo last undone merge
+redo-last-undone-merge-action-ctrl-y = Redo last undone merge action (Ctrl+Y)
+reload-both-files-from-disk = Reload both files from disk
+reload-files = Reload files
+reload-files-2 = Reload files?
+reload-files-from-disk = Reload files from disk
+reloaded = Reloaded.
+remember-explorer-directories = Remember Explorer directories
+remove = Remove
+removed = Removed
+report-saved = Report saved.
+reports-cover-text-comparisons-for-now = Reports cover text comparisons for now.
+reset-text-size-to-100 = Reset text size to 100%
+result = Result:
+right = Right
+right-new = Right / New
+right-pane = Right pane
+right-side-text-encoding = Right-side text encoding
+rust = Rust
+sans-serif = Sans-serif
+save = Save
+save-as = Save As
+save-merge-result = Save merge result
+save-merge-result-ctrl-s = Save merge result (Ctrl+S)
+save-or-undo-your-changes-first-a-report-describes-the = Save or undo your changes first: a report describes the saved files.
+save-target = Save target
+saved = Saved.
+saved-but-the-requested-encoding-was-not-recognized-used = Saved, but the requested encoding was not recognized — used UTF-8 instead.
+scanning = Scanning…
+search = Search
+search-2 = Search…
+search-within-diff = Search within diff
+search-within-diff-ctrl-f = Search within diff (Ctrl+F)
+select-a-file-or-directory-on-each-side-to-compare = Select a file or directory on each side to compare
+select-file-as-comparison-candidate = Select file as comparison candidate
+serif = Serif
+session-could-not-be-upgraded = Session could not be upgraded
+session-file-could-not-be-read = Session file could not be read
+session-file-is-from-a-newer-version = Session file is from a newer version
+settings = Settings
+settings-could-not-be-upgraded = Settings could not be upgraded
+settings-file-could-not-be-read = Settings file could not be read
+settings-file-is-from-a-newer-version = Settings file is from a newer version
+several-sheets-could-have-been-renamed-so-none-was-matched = Several sheets could have been renamed, so none was matched; they appear as added and removed.
+shortcuts = Shortcuts
+show-n-unchanged-lines = Show { $n } unchanged lines
+size-matches-contents-not-compared = Size matches; contents not compared
+some-hunks-were-too-large-for-character-level-diff = Some hunks were too large for character-level diff.
+some-rows-share-an-alignment-key-so-rows-may-be-paired = Some rows share an alignment key, so rows may be paired wrongly.
+spreadsheet-comparison-is-read-only = Spreadsheet comparison is read-only.
+standard = Standard
+stop-comparing-entries-not-yet-compared-stay-as-they-are = Stop comparing — entries not yet compared stay as they are, and can still be exported.
+swap-sides = Swap sides
+swap-sides-2 = Swap sides?
+switch-focused-pane-left-right = Switch focused pane (left ↔ right)
+tabs = Tabs
+text-size = Text size
+the-comparison-reported-a-warning = The comparison reported a warning:
+the-destination-exists-a-bak-backup-will-be-created-first = The destination exists. A .bak backup will be created first.
+the-target-file-was-modified-after-it-was-loaded-overwrite = The target file was modified after it was loaded. Overwrite anyway?
+theme = Theme
+this-build-is-newer-than-the-latest-release-version = This build is newer than the latest release ({ $version }).
+this-keyboard-reference = This keyboard reference
+to = To
+to-restore-it-run = To restore it, run:
+toggle-character-level-inline-diff = Toggle character-level inline diff
+toggle-ignore-case = Toggle ignore case
+toggle-ignore-whitespace = Toggle ignore whitespace
+toggle-word-wrap = Toggle word wrap
+too-long-for-character-level-highlighting = Too long for character-level highlighting
+undo = Undo
+undo-last-merge = Undo last merge
+undo-last-merge-action-ctrl-z = Undo last merge action (Ctrl+Z)
+unified-diff-patch = Unified diff (.patch)
+unsaved = unsaved
+unsaved-merge-changes-will-be-discarded = Unsaved merge changes will be discarded.
+unsaved-merge-changes-will-be-discarded-when-diff-options = Unsaved merge changes will be discarded when diff options change.
+unsaved-merge-changes-will-be-discarded-when-sides-are = Unsaved merge changes will be discarded when sides are swapped.
+unsaved-merge-changes-will-be-discarded-when-the-encoding = Unsaved merge changes will be discarded when the encoding changes.
+update-through-the-microsoft-store = Update through the Microsoft Store
+update-with-your-aur-helper = Update with your AUR helper
+updates-come-from-flathub-through-your-software-centre = Updates come from Flathub, through your software centre.
+use = Use
+use-this-change-apply-left-to-right = Use this change (apply left to right)
+verify = Verify
+version = Version
+version-is-available = { $version } is available.
+when-i-turn-it-on = When I turn it on
+when-off-binary-files-cannot-be-compared-and-are-shown-as = When off, binary files cannot be compared and are shown as non-actionable in the Explorer.
+when-on-the-explorer-reopens-the-last-directory-shown-in = When on, the Explorer reopens the last directory shown in each pane. When off, it always starts at your home directory.
+when-one-pane-moves-to-a-folder-the-other-moves-to-the = When one pane moves to a folder, the other moves to the matching folder, if it has one.
+working = Working…
+you-have-the-latest-version-version = You have the latest version ({ $version }).
+
+# RFC-101 stage B (handoff 114): dynamic-lookup ids, read from a
+# `&'static str` field in another crate (forskscope-compare's
+# BIDI_CONTROLS, forskscope-ui-logic's theme/contrast SelectChoice) at a
+# handful of call sites, rather than a literal t(lang, "id") the i18n
+# audit's static scan can see — tested directly against this table
+# (i18n/mod.rs's own dynamic-lookup tests), not a copy of it.
+bidi-alm = Arabic letter mark character
+bidi-lrm = left-to-right mark character
+bidi-rlm = right-to-left mark character
+bidi-lre = left-to-right embedding character
+bidi-rle = right-to-left embedding character
+bidi-pdf = pop directional formatting character
+bidi-lro = left-to-right override character
+bidi-rlo = right-to-left override character
+bidi-lri = left-to-right isolate character
+bidi-rli = right-to-left isolate character
+bidi-fsi = first strong isolate character
+bidi-pdi = pop directional isolate character
+theme-choice-system = System
+theme-choice-system-unavailable = System (not available here; Dark is used)
+theme-choice-dark = Dark
+theme-choice-light = Light
+theme-choice-night = Night
+contrast-choice-system = System
+contrast-choice-standard = Standard
+contrast-choice-high = High
+
+# i18n/mod.rs's own unit-test fixtures only - no real call site uses
+# these ids (the test functions that do are themselves their "used"
+# call site, so `cargo xtask i18n`'s "no unused message" check sees
+# them as used, not orphaned).
+test-fixture-plain = Plain test message
+test-fixture-placeholder = Hello, { $name }!
+test-fixture-plural.one = { $count } test item
+test-fixture-plural.other = { $count } test items
+
+# RFC-101 stage B (handoff 114), reply 198 S2: the ~18 assembled messages,
+# rewritten as whole sentences. settings-incompatible-schema and
+# session-incompatible-schema (items 2, 5) keep TODAY's wording verbatim
+# - flagged for the owner's review (202a) - every other one below uses
+# the architect-approved rewrite (review 232 S3.2).
+settings-incompatible-schema = This settings file uses "{ $schema }" schema version { $version }, which this version of ForskScope does not understand. The file has not been modified. Changes you make this session will not be saved.
+settings-corrupt-preserved = The settings file is preserved but could not be parsed ({ $detail }). Changes you make this session will not be saved unless you reset it.
+settings-migration-failed = Your settings were read and are in use for this session, but they could not be saved in the new format ({ $detail }). Changes will not be saved until this is resolved.
+session-incompatible-schema = This session file uses "{ $schema }" schema version { $version }, which this version of ForskScope does not understand. The file has not been modified. Changes you make this session will not be saved.
+session-corrupt-preserved = The session file is preserved but could not be parsed ({ $detail }). Changes you make this session will not be saved unless you reset it.
+session-migration-failed = Your session was read and is in use for this run, but it could not be saved in the new format ({ $detail }). Changes will not be saved until this is resolved.
+toolbar-inline-diff-state = Inline diff: { $state }
+toolbar-wrap-state = Wrap: { $state }
+toolbar-ignore-whitespace-state = Ignore whitespace: { $state }
+toolbar-ignore-case-state = Ignore case: { $state }
+
+# Items 12-14 (reply 198 S2): FLAGGED for the owner's wording review
+# (202a) - Japanese kept exactly as it reads today until approved.
+batch-copy-confirm-title = Copy { $count } files?
+batch-result-all-succeeded-title = Copied { $count } files
+batch-result-partial-title = Copy finished: { $succeeded } succeeded, { $failed } failed
+
+# Item 17 (reply 198 S2, review 232 S3.3): the Deep Compare summary is a
+# list of independent, plural-aware messages, joined by a translated
+# separator - never one joined `format!`. FLAGGED for the owner (202a):
+# wording and the Japanese separator both kept exactly as they read today
+# until approved - these English forms already read the same under
+# either plural category, so giving them real one/other forms here is
+# not itself a wording change.
+deep-compare-different-count.one = { $count } different
+deep-compare-different-count.other = { $count } different
+deep-compare-equal-count.one = { $count } equal
+deep-compare-equal-count.other = { $count } equal
+deep-compare-left-only-count.one = { $count } left only
+deep-compare-left-only-count.other = { $count } left only
+deep-compare-right-only-count.one = { $count } right only
+deep-compare-right-only-count.other = { $count } right only
+deep-compare-unreadable-count.one = { $count } unreadable
+deep-compare-unreadable-count.other = { $count } unreadable
+deep-compare-list-separator = ·
+
+# Items 15-16 (reply 198 §2): FLAGGED - today's wording kept until the
+# owner approves (202a).
+deep-compare-copy-to-right-title = Copy to right { $count } files
+deep-compare-copy-to-right-short = Copy to right { $count }
+deep-compare-copy-to-left-title = Copy to left { $count } files
+deep-compare-copy-to-left-short = Copy to left { $count }
+
+# Item 1 (reply 198 §2): not flagged - architect-approved rewrite
+# (punctuation/placement only, no meaning change). Two whole-sentence
+# variants, chosen by whether the error needs the access-guidance
+# sentence, rather than joining a second translated piece onto the first.
+could-not-open-error = Could not open "{ $name }": { $error }.
+could-not-open-error-with-guidance = Could not open "{ $name }": { $error }. Check that the file exists and you have read permission.
+
+# Item 18 (reply 198 §2): not flagged - consolidates the spreadsheet
+# warning's sentence and the "Sheets:"/detail suffixes into one catalog
+# entry per combination, instead of translated pieces glued by push_str.
+warning-duplicate-alignment-key-with-sheets = Some rows share an alignment key, so rows may be paired wrongly. Sheets: { $names }
+warning-alignment-fell-back-with-sheets = A sheet was too large to align rows and was compared position by position, so an inserted row may appear as many changes. Sheets: { $names }
+warning-ambiguous-sheet-match-with-sheets = Several sheets could have been renamed, so none was matched; they appear as added and removed. Sheets: { $names }
+warning-sheet-not-compared-with-sheets = Not compared (not a worksheet): { $names }
+warning-other-detail = The comparison reported a warning: { $detail }
+warning-other-detail-with-sheets = The comparison reported a warning: { $detail } Sheets: { $names }
+warning-other-with-sheets = The comparison reported a warning: Sheets: { $names }
+
+# RFC-101 §2's own flagship example: real CLDR plurals instead of a
+# hand-rolled if/else (search.rs).
+search-matches.one = { $count } match
+search-matches.other = { $count } matches
+
+contains-direction-control-characters.one = Contains { $count } direction-control character
+contains-direction-control-characters.other = Contains { $count } direction-control characters
+
+# RFC-101 stage B, review 232 §3.5: forskscope-report's own tr()
+# closure (html.rs) is added to RFC-101's Touches - these ids are
+# used only through that closure (forskscope-report has no access
+# to this crate's t()/tf() directly; it calls a caller-supplied
+# &dyn Fn(&str) -> String), so they're exempt from this crate's own
+# audit's unused-message check the same way the dynamic-lookup ids
+# are (see xtask's DYNAMIC_LOOKUP_IDS).
+report-compare-profile = Compare profile
+report-comparison-report = Comparison report
+report-files = Files
+report-generated = Generated
+report-how = How
+report-left = Left
+report-left-size = Left size
+report-no-differences-the-two-files-are-identical = No differences — the two files are identical.
+report-no-files = No files.
+report-notes = Notes
+report-path = Path
+report-right = Right
+report-right-size = Right size
+report-sha-256 = SHA-256
+report-status = Status
+report-summary = Summary
+report-the-changes = The changes
+report-what-was-compared = What was compared
+report-run-cmd-on-a-file-to-confirm-it-is-the-file-this-report = Run {cmd} on a file to confirm it is the file this report describes. This does not prove the report itself is unaltered.
+only-on-the-left-empty-folder = Only on the left (empty folder)
+only-on-the-right-empty-folder = Only on the right (empty folder)
+identical = Identical
+not-compared = Not compared
+unreadable = Unreadable
+symlink-not-followed = Symlink not followed
+report-whitespace = Whitespace
+report-case = Case
+report-newlines = Newlines
+report-algorithm = Algorithm
+report-ignored = ignored
+report-n-change = {n} change.
+report-n-change-a-line-added = {n} change: {a} line added.
+report-n-change-a-lines-added = {n} change: {a} lines added.
+report-n-change-d-line-removed = {n} change: {d} line removed.
+report-n-change-d-line-removed-a-line-added = {n} change: {d} line removed, {a} line added.
+report-n-change-d-line-removed-a-lines-added = {n} change: {d} line removed, {a} lines added.
+report-n-change-d-lines-removed = {n} change: {d} lines removed.
+report-n-change-d-lines-removed-a-line-added = {n} change: {d} lines removed, {a} line added.
+report-n-change-d-lines-removed-a-lines-added = {n} change: {d} lines removed, {a} lines added.
+report-n-changes = {n} changes.
+report-n-changes-a-line-added = {n} changes: {a} line added.
+report-n-changes-a-lines-added = {n} changes: {a} lines added.
+report-n-changes-d-line-removed = {n} changes: {d} line removed.
+report-n-changes-d-line-removed-a-line-added = {n} changes: {d} line removed, {a} line added.
+report-n-changes-d-line-removed-a-lines-added = {n} changes: {d} line removed, {a} lines added.
+report-n-changes-d-lines-removed = {n} changes: {d} lines removed.
+report-n-changes-d-lines-removed-a-line-added = {n} changes: {d} lines removed, {a} line added.
+report-n-changes-d-lines-removed-a-lines-added = {n} changes: {d} lines removed, {a} lines added.
+report-n-changed-file-s-content-is-not-shown-in-this-report-the = {n} changed file's content is not shown in this report (the cap of {max_files} file or {max_size} of change text was reached):
+report-n-changed-file-s-content-is-not-shown-in-this-report-the-2 = {n} changed file's content is not shown in this report (the cap of {max_files} files or {max_size} of change text was reached):
+report-n-changed-files-content-is-not-shown-in-this-report-the-cap = {n} changed files' content is not shown in this report (the cap of {max_files} file or {max_size} of change text was reached):
+report-n-changed-files-content-is-not-shown-in-this-report-the-cap-2 = {n} changed files' content is not shown in this report (the cap of {max_files} files or {max_size} of change text was reached):
+report-contains-1-direction-control-character = Contains 1 direction-control character
+report-contains-n-direction-control-characters = Contains {n} direction-control characters
+
+# report::file::FileComparisonReport::from_diff's own DiffWarning words
+# and profile_name fallback - English text shared with report::text
+# (no tr() at all there, same split as status_key/option_label_id), ids
+# used only by html.rs's own translation step.
+report-large-file-inline-diff-disabled = Large file — inline diff disabled.
+report-some-hunks-were-too-large-for-inline-diff = Some hunks were too large for inline diff.
+report-profile-name-default = Default
+report-profile-name-custom = Custom

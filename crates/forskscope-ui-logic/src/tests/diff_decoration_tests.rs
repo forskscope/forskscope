@@ -210,7 +210,7 @@ fn a_single_control_in_the_middle_splits_into_three_parts() {
             BidiMarkedPart::Plain("before".to_string()),
             BidiMarkedPart::Marker {
                 token: "RLO",
-                name: "right-to-left override character",
+                name: "bidi-rlo",
             },
             BidiMarkedPart::Plain("after".to_string()),
         ]
@@ -225,7 +225,7 @@ fn a_control_at_the_very_start_or_end_has_no_empty_plain_part_either_side() {
         vec![
             BidiMarkedPart::Marker {
                 token: "LRI",
-                name: "left-to-right isolate character",
+                name: "bidi-lri",
             },
             BidiMarkedPart::Plain("text".to_string()),
         ]
@@ -237,7 +237,7 @@ fn a_control_at_the_very_start_or_end_has_no_empty_plain_part_either_side() {
             BidiMarkedPart::Plain("text".to_string()),
             BidiMarkedPart::Marker {
                 token: "PDI",
-                name: "pop directional isolate character",
+                name: "bidi-pdi",
             },
         ]
     );
@@ -252,11 +252,11 @@ fn adjacent_controls_produce_no_plain_part_between_them() {
             BidiMarkedPart::Plain("a".to_string()),
             BidiMarkedPart::Marker {
                 token: "RLO",
-                name: "right-to-left override character",
+                name: "bidi-rlo",
             },
             BidiMarkedPart::Marker {
                 token: "LRI",
-                name: "left-to-right isolate character",
+                name: "bidi-lri",
             },
             BidiMarkedPart::Plain("b".to_string()),
         ]

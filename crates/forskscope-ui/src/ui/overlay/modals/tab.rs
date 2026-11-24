@@ -17,17 +17,17 @@ pub fn CloseTabModal(index: usize) -> Element {
         .map(|t| t.title.clone())
         .unwrap_or_default();
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Close comparison"), onmounted: super::focus_autofocus_button,
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "close-comparison"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
-                h2 { {t(lang, "Close comparison?")} }
+                h2 { {t(lang, "close-comparison-2")} }
                 p {
                     "\""
                     BidiText { text: title.clone(), lang }
                     "\" "
-                    {t(lang, "has unsaved changes. Discard them and close?")}
+                    {t(lang, "has-unsaved-changes-discard-them-and-close")}
                 }
                 div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "cancel")} }
                     button {
                         onclick: move |_| {
                             close_tab(&mut store, index);
@@ -41,7 +41,7 @@ pub fn CloseTabModal(index: usize) -> Element {
                             // plain `spawn` here lost the race.
                             store.focus_active_tab();
                         },
-                        {t(lang, "Discard and close")}
+                        {t(lang, "discard-and-close")}
                     }
                 }
             }

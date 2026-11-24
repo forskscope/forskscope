@@ -57,8 +57,11 @@ use forskscope_desktop::settings::display::{Contrast, TEXT_SIZE_STEPS, nearest_t
 
 /// One option in a `<select>` picker.
 ///
-/// `value` is passed to the `<option value="…">` attribute; `label` is the
-/// visible text.
+/// `value` is passed to the `<option value="…">` attribute; `label` is a
+/// stable catalog id (RFC-101 stage B, handoff 114) — `forskscope-ui`'s
+/// `t(lang, c.label)` (`ui::view::settings::modal`) looks it up in
+/// `crates/forskscope-ui/i18n/<lang>.catalog`, same as every other
+/// message, which requires a slug id, never English text, as its key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectChoice {
     pub value: &'static str,
@@ -88,26 +91,26 @@ pub fn theme_choices(system_offered: bool, saved_is_unavailable_system: bool) ->
     if system_offered {
         choices.push(SelectChoice {
             value: ThemeId::System.as_str(),
-            label: "System",
+            label: "theme-choice-system",
         });
     } else if saved_is_unavailable_system {
         choices.push(SelectChoice {
             value: ThemeId::System.as_str(),
-            label: "System (not available here; Dark is used)",
+            label: "theme-choice-system-unavailable",
         });
     }
     choices.extend([
         SelectChoice {
             value: ThemeId::Dark.as_str(),
-            label: "Dark",
+            label: "theme-choice-dark",
         },
         SelectChoice {
             value: ThemeId::Light.as_str(),
-            label: "Light",
+            label: "theme-choice-light",
         },
         SelectChoice {
             value: ThemeId::Night.as_str(),
-            label: "Night",
+            label: "theme-choice-night",
         },
     ]);
     choices
@@ -122,15 +125,15 @@ pub fn contrast_choices() -> Vec<SelectChoice> {
     vec![
         SelectChoice {
             value: Contrast::System.as_str(),
-            label: "System",
+            label: "contrast-choice-system",
         },
         SelectChoice {
             value: Contrast::Standard.as_str(),
-            label: "Standard",
+            label: "contrast-choice-standard",
         },
         SelectChoice {
             value: Contrast::High.as_str(),
-            label: "High",
+            label: "contrast-choice-high",
         },
     ]
 }
@@ -218,7 +221,7 @@ mod tests {
             .find(|c| c.value == "system")
             .expect("a saved, unavailable system choice must still be listed");
         assert_eq!(
-            system.label, "System (not available here; Dark is used)",
+            system.label, "theme-choice-system-unavailable",
             "the label must say what will actually render, not just \"System\""
         );
     }
@@ -237,7 +240,7 @@ mod tests {
         );
         assert_eq!(
             choices.iter().find(|c| c.value == "system").unwrap().label,
-            "System",
+            "theme-choice-system",
             "offered must win over the unavailable label"
         );
     }

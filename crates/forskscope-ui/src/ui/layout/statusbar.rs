@@ -2,7 +2,7 @@
 
 use dioxus::prelude::*;
 
-use crate::i18n::t;
+use crate::i18n::{t, tf};
 use crate::startup_mode::{self, ModeDisplay};
 use crate::state::Store;
 use crate::ui::view::BidiText;
@@ -19,21 +19,22 @@ fn bidi_notice_text(lang: crate::state::Lang, n: usize) -> Option<String> {
     if n == 0 {
         return None;
     }
-    if n == 1 {
-        Some(t(lang, "Contains 1 direction-control character"))
-    } else {
-        Some(t(lang, "Contains {n} direction-control characters").replace("{n}", &n.to_string()))
-    }
+    Some(tf(
+        lang,
+        "contains-direction-control-characters",
+        &[],
+        Some(n as i64),
+    ))
 }
 
 fn mode_text(lang: crate::state::Lang, mode: &ModeDisplay) -> Option<String> {
     match mode {
         ModeDisplay::Installed => None,
-        ModeDisplay::Portable(_) => Some(t(lang, "Portable")),
+        ModeDisplay::Portable(_) => Some(t(lang, "portable")),
         ModeDisplay::PortableReadOnly(_) => {
-            Some(t(lang, "Portable (read-only): changes are not saved"))
+            Some(t(lang, "portable-read-only-changes-are-not-saved"))
         }
-        ModeDisplay::Private => Some(t(lang, "Private: nothing is saved")),
+        ModeDisplay::Private => Some(t(lang, "private-nothing-is-saved")),
     }
 }
 
@@ -127,13 +128,13 @@ pub fn StatusBar() -> Element {
                     // text and marks only the name with `BidiText`.
                     span { class: "save-target",
                         title: "{forskscope_compare::escape_to_plain_marker(&full)}",
-                        {t(lang, "Save target")}": "
+                        {t(lang, "save-target")}": "
                         BidiText { text: short, lang }
                     }
                     if no_backup {
                         span { class: "save-target-no-backup",
-                            title: t(lang, "No backup can be kept for this file."),
-                            "⚠ " {t(lang, "No backup")}
+                            title: t(lang, "no-backup-can-be-kept-for-this-file"),
+                            "⚠ " {t(lang, "no-backup")}
                         }
                     }
                 }
@@ -154,8 +155,8 @@ pub fn StatusBar() -> Element {
                     }
                 }
             }
-            span { class: "local-only", title: t(lang, "Files stay on this computer. ForskScope does not upload them."),
-                "🔒 " {t(lang, "Local only")} }
+            span { class: "local-only", title: t(lang, "files-stay-on-this-computer-forskscope-does-not-upload-them"),
+                "🔒 " {t(lang, "local-only")} }
         }
     }
 }

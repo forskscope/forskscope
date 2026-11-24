@@ -717,22 +717,22 @@ pub fn Explorer() -> Element {
                 div { class: "explorer-empty",
                     div { class: "explorer-empty-icon", "🔒" }
                     p { class: "explorer-empty-title",
-                        {t(lang, "Home folder access needed")}
+                        {t(lang, "home-folder-access-needed")}
                     }
                     p { class: "explorer-empty-hint",
                         {t(
                             lang,
-                            "ForskScope needs access to your home folder to browse and compare your files.",
+                            "forskscope-needs-access-to-your-home-folder-to-browse-and",
                         )}
                     }
-                    p { class: "explorer-empty-hint", {t(lang, "To restore it, run:")} }
+                    p { class: "explorer-empty-hint", {t(lang, "to-restore-it-run")} }
                     code { class: "path-display",
                         "flatpak override --user --filesystem=home io.github.forskscope.forskscope"
                     }
                     p { class: "explorer-empty-hint",
                         {t(
                             lang,
-                            "Or use a permissions manager such as Flatseal. Then restart ForskScope.",
+                            "or-use-a-permissions-manager-such-as-flatseal-then-restart",
                         )}
                     }
                 }
@@ -1225,7 +1225,7 @@ pub fn Explorer() -> Element {
                         lang,
                         is_focused: focused_pane.read().is_left(),
                         on_focus: move |_| focused_pane.set(FocusedPane::Left),
-                        side_label: t(lang, "Left pane"),
+                        side_label: t(lang, "left-pane"),
                     }
                     PathBar {
                         path: right_dir.read().cloned(),
@@ -1237,7 +1237,7 @@ pub fn Explorer() -> Element {
                         lang,
                         is_focused: focused_pane.read().is_right(),
                         on_focus: move |_| focused_pane.set(FocusedPane::Right),
-                        side_label: t(lang, "Right pane"),
+                        side_label: t(lang, "right-pane"),
                     }
                 }
 

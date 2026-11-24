@@ -8,7 +8,7 @@
 use dioxus::html::input_data::keyboard_types::Key;
 use dioxus::prelude::*;
 
-use crate::i18n::t;
+use crate::i18n::{t, tf};
 use forskscope_ui_logic::MatchIndex;
 
 // ── SearchCtx ─────────────────────────────────────────────────────────────────
@@ -52,20 +52,14 @@ pub fn SearchBar() -> Element {
 
     let count_label = if query_empty || total == 0 {
         if !query_empty {
-            t(lang, "No matches")
+            t(lang, "no-matches")
         } else {
             String::new()
         }
     } else {
         match focused {
             Some(n) => format!("{n} / {total}"),
-            None => {
-                if total == 1 {
-                    format!("{total} {}", t(lang, "match"))
-                } else {
-                    format!("{total} {}", t(lang, "matches"))
-                }
-            }
+            None => tf(lang, "search-matches", &[], Some(total as i64)),
         }
     };
 
@@ -74,10 +68,10 @@ pub fn SearchBar() -> Element {
             input {
                 class: "search-input",
                 r#type: "text",
-                placeholder: t(lang, "Search…"),
+                placeholder: t(lang, "search-2"),
                 autofocus: true,
                 value: "{ctx.read().query}",
-                "aria-label": t(lang, "Search within diff"),
+                "aria-label": t(lang, "search-within-diff"),
                 oninput: move |e| {
                     ctx.write().query = e.value();
                     // Index rebuilt by DiffWorkspace on the next render cycle
@@ -91,8 +85,8 @@ pub fn SearchBar() -> Element {
                 id: "search-prev-btn",
                 class: "search-nav",
                 disabled: total == 0,
-                title: t(lang, "Previous match (Shift+Enter)"),
-                "aria-label": t(lang, "Previous match"),
+                title: t(lang, "previous-match-shift-enter"),
+                "aria-label": t(lang, "previous-match"),
                 onclick: move |_| {
                     ctx.write().index.retreat();
                     scroll_to_focused(&ctx.read());
@@ -103,8 +97,8 @@ pub fn SearchBar() -> Element {
                 id: "search-next-btn",
                 class: "search-nav",
                 disabled: total == 0,
-                title: t(lang, "Next match (Enter / F3)"),
-                "aria-label": t(lang, "Next match"),
+                title: t(lang, "next-match-enter-f3"),
+                "aria-label": t(lang, "next-match"),
                 onclick: move |_| {
                     ctx.write().index.advance();
                     scroll_to_focused(&ctx.read());
@@ -123,7 +117,7 @@ pub fn SearchBar() -> Element {
 
             button {
                 class: "search-close icon-btn",
-                "aria-label": t(lang, "Close search bar"),
+                "aria-label": t(lang, "close-search-bar"),
                 onclick: move |_| {
                     let mut c = ctx.write();
                     c.active = false;

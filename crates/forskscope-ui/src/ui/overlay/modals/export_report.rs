@@ -43,16 +43,16 @@ pub fn ExportReportModal(index: usize) -> Element {
     let mut more_options = use_signal(|| false);
 
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "Export report"), onmounted: super::focus_autofocus_button,
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "export-report"), onmounted: super::focus_autofocus_button,
             div { class: "modal",
-                h2 { {t(lang, "Export report")} }
+                h2 { {t(lang, "export-report")} }
 
                 SelectField {
-                    title: t(lang, "Format"),
+                    title: t(lang, "format"),
                     value: format_value(*format.read()).to_string(),
                     options: vec![
-                        SelectOption::new("html", t(lang, "HTML report")),
-                        SelectOption::new("patch", t(lang, "Unified diff (.patch)")),
+                        SelectOption::new("html", t(lang, "html-report")),
+                        SelectOption::new("patch", t(lang, "unified-diff-patch")),
                     ],
                     onchange: move |v: String| {
                         format.set(if v == "patch" { ReportExportFormat::Patch } else { ReportExportFormat::Html });
@@ -62,17 +62,17 @@ pub fn ExportReportModal(index: usize) -> Element {
                 button {
                     class: "disclosure",
                     onclick: move |_| { let v = *more_options.read(); more_options.set(!v); },
-                    if *more_options.read() { {t(lang, "Less ▲")} } else { {t(lang, "More options ▸")} }
+                    if *more_options.read() { {t(lang, "less")} } else { {t(lang, "more-options-2")} }
                 }
                 if *more_options.read() {
                     div { class: "field",
                         SelectField {
-                            title: t(lang, "Paths"),
+                            title: t(lang, "paths"),
                             value: path_mode_value(*path_mode.read()).to_string(),
                             options: vec![
-                                SelectOption::new("name-only", t(lang, "File names only")),
-                                SelectOption::new("relative", t(lang, "Paths relative to the compared folders")),
-                                SelectOption::new("absolute", t(lang, "Full paths")),
+                                SelectOption::new("name-only", t(lang, "file-names-only")),
+                                SelectOption::new("relative", t(lang, "paths-relative-to-the-compared-folders")),
+                                SelectOption::new("absolute", t(lang, "full-paths")),
                             ],
                             onchange: move |v: String| path_mode.set(path_mode_from_value(&v)),
                         }
@@ -80,7 +80,7 @@ pub fn ExportReportModal(index: usize) -> Element {
                 }
 
                 div { class: "actions",
-                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "Cancel")} }
+                    button { autofocus: true, onclick: move |_| store.modal.set(Modal::None), {t(lang, "cancel")} }
                     button {
                         onclick: move |_| {
                             let fmt = *format.read();
@@ -88,7 +88,7 @@ pub fn ExportReportModal(index: usize) -> Element {
                             export_file_report(&mut store, index, fmt, mode);
                             store.modal.set(Modal::None);
                         },
-                        {t(lang, "Export")}
+                        {t(lang, "export")}
                     }
                 }
             }

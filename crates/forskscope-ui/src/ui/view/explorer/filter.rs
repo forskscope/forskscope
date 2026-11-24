@@ -55,10 +55,10 @@ pub fn FilterBar(
             button {
                 class: "filter-toggle",
                 aria_expanded: if *filter_open.read() { "true" } else { "false" },
-                title: t(lang, if in_effect { "Filter (on)" } else { "Filter" }),
-                aria_label: t(lang, if in_effect { "Filter (on)" } else { "Filter" }),
+                title: t(lang, if in_effect { "filter-on" } else { "Filter" }),
+                aria_label: t(lang, if in_effect { "filter-on" } else { "Filter" }),
                 onclick: move |_| { let v = *filter_open.read(); filter_open.set(!v); },
-                {t(lang, "Filter")}
+                {t(lang, "filter")}
                 // F187: always rendered, so nothing else on the row shifts
                 // sideways when a filter turns on or off — only its own
                 // colour changes, never its presence.
@@ -68,7 +68,7 @@ pub fn FilterBar(
                 input {
                     class: "filter-input",
                     r#type: "search",
-                    placeholder: t(lang, "Filter by name…"),
+                    placeholder: t(lang, "filter-by-name"),
                     value: "{filter_query}",
                     oninput: move |e| filter_query.set(e.value()),
                     onkeydown: move |e| filter_input_keydown(&e),
@@ -76,18 +76,18 @@ pub fn FilterBar(
                 label { class: "filter-check",
                     input { r#type: "checkbox", checked: *filter_hide_bin.read(),
                         onchange: move |e| filter_hide_bin.set(e.checked()) }
-                    span { {t(lang, "Hide binary")} }
+                    span { {t(lang, "hide-binary")} }
                 }
                 label { class: "filter-check",
                     input { r#type: "checkbox", checked: *filter_hide_eq.read(),
                         onchange: move |e| filter_hide_eq.set(e.checked()) }
-                    span { {t(lang, "Hide identical")} }
+                    span { {t(lang, "hide-identical")} }
                 }
                 if !filter_query.read().is_empty() || *filter_hide_bin.read() || *filter_hide_eq.read() {
                     button {
                         class: "filter-clear icon-btn",
-                        title: t(lang, "Clear filter"),
-                        aria_label: t(lang, "Clear filter"),
+                        title: t(lang, "clear-filter"),
+                        aria_label: t(lang, "clear-filter"),
                         onclick: move |_| {
                             filter_query.set(String::new());
                             filter_hide_bin.set(false);
@@ -100,10 +100,10 @@ pub fn FilterBar(
             button {
                 class: "filter-toggle",
                 aria_pressed: if *sync_locations.read() { "true" } else { "false" },
-                title: t(lang, "When one pane moves to a folder, the other moves to the matching folder, if it has one."),
-                aria_label: t(lang, "Move together"),
+                title: t(lang, "when-one-pane-moves-to-a-folder-the-other-moves-to-the"),
+                aria_label: t(lang, "move-together"),
                 onclick: move |_| { let v = *sync_locations.read(); sync_locations.set(!v); },
-                {t(lang, "Move together")}
+                {t(lang, "move-together")}
             }
         }
     }

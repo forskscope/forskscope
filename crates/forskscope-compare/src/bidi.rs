@@ -12,6 +12,11 @@
 pub struct BidiControl {
     pub ch: char,
     pub marker: &'static str,
+    /// RFC-101 stage B (handoff 114): a stable catalog id (`"bidi-{marker
+    /// lowercased}"`), not the English name itself — `forskscope-ui`'s
+    /// `t(lang, c.name)` (`BidiText`, `ui::view::hunk`) looks this up in
+    /// `crates/forskscope-ui/i18n/<lang>.catalog`, same as every other
+    /// message, which requires a slug id, never English text, as its key.
     pub name: &'static str,
 }
 
@@ -24,62 +29,62 @@ pub const BIDI_CONTROLS: &[BidiControl] = &[
     BidiControl {
         ch: '\u{061C}',
         marker: "ALM",
-        name: "Arabic letter mark character",
+        name: "bidi-alm",
     },
     BidiControl {
         ch: '\u{200E}',
         marker: "LRM",
-        name: "left-to-right mark character",
+        name: "bidi-lrm",
     },
     BidiControl {
         ch: '\u{200F}',
         marker: "RLM",
-        name: "right-to-left mark character",
+        name: "bidi-rlm",
     },
     BidiControl {
         ch: '\u{202A}',
         marker: "LRE",
-        name: "left-to-right embedding character",
+        name: "bidi-lre",
     },
     BidiControl {
         ch: '\u{202B}',
         marker: "RLE",
-        name: "right-to-left embedding character",
+        name: "bidi-rle",
     },
     BidiControl {
         ch: '\u{202C}',
         marker: "PDF",
-        name: "pop directional formatting character",
+        name: "bidi-pdf",
     },
     BidiControl {
         ch: '\u{202D}',
         marker: "LRO",
-        name: "left-to-right override character",
+        name: "bidi-lro",
     },
     BidiControl {
         ch: '\u{202E}',
         marker: "RLO",
-        name: "right-to-left override character",
+        name: "bidi-rlo",
     },
     BidiControl {
         ch: '\u{2066}',
         marker: "LRI",
-        name: "left-to-right isolate character",
+        name: "bidi-lri",
     },
     BidiControl {
         ch: '\u{2067}',
         marker: "RLI",
-        name: "right-to-left isolate character",
+        name: "bidi-rli",
     },
     BidiControl {
         ch: '\u{2068}',
         marker: "FSI",
-        name: "first strong isolate character",
+        name: "bidi-fsi",
     },
     BidiControl {
         ch: '\u{2069}',
         marker: "PDI",
-        name: "pop directional isolate character",
+        name: "bidi-pdi",
     },
 ];
 
@@ -94,10 +99,9 @@ pub fn marker_for(ch: char) -> Option<&'static str> {
     BIDI_CONTROLS.iter().find(|c| c.ch == ch).map(|c| c.marker)
 }
 
-/// The English accessible name for `ch` (e.g. `"right-to-left override
-/// character"`) — translated by the caller through `t(lang, ...)`, same
-/// as every other user-visible string. `None` if it isn't one of
-/// [`BIDI_CONTROLS`].
+/// The accessible-name catalog id for `ch` (e.g. `"bidi-rlo"`) — looked
+/// up by the caller through `t(lang, ...)`, same as every other
+/// user-visible string. `None` if it isn't one of [`BIDI_CONTROLS`].
 pub fn name_for(ch: char) -> Option<&'static str> {
     BIDI_CONTROLS.iter().find(|c| c.ch == ch).map(|c| c.name)
 }

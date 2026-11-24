@@ -15,7 +15,7 @@ use forskscope_compare::diff::{
 };
 use forskscope_edit::merge::{HunkState, MergeHunk};
 
-use crate::i18n::t;
+use crate::i18n::{t, tf};
 use crate::state::{Lang, Store};
 use crate::ui::view::search::{SearchCtx, line_matches};
 
@@ -119,9 +119,9 @@ pub fn HunkBlock(
                         // F196: a real button, not a div — Enter and Space
                         // now expand it natively; before this, no keyboard
                         // route existed to reach it at all.
-                        aria_label: t(lang, "Show {n} unchanged lines").replace("{n}", &hidden.to_string()),
+                        aria_label: tf(lang, "show-n-unchanged-lines", &[("n", &hidden.to_string())], None),
                         onclick: move |_| on_expand.call(hunk_id),
-                        {t(lang, "··· {n} unchanged lines — click to expand ···").replace("{n}", &hidden.to_string())}
+                        {tf(lang, "n-unchanged-lines-click-to-expand", &[("n", &hidden.to_string())], None)}
                     }
                     for (_, row) in tail_rows { RowLeft {
                         left: row.left.as_ref().map(|l| l.content.clone()),
@@ -225,9 +225,9 @@ fn RowLeft(
     // the review fixture. A blank row carries nothing to say, so it gets no
     // label; a row with real content still says "Changed: <line>" as before.
     let sr_label: Option<String> = if kind == HunkKind::Delete {
-        Some(t(lang, "Deleted"))
+        Some(t(lang, "deleted"))
     } else if wants_replace_label(kind, left.is_some()) {
-        Some(t(lang, "Changed"))
+        Some(t(lang, "changed"))
     } else {
         None
     };
@@ -292,9 +292,9 @@ fn RowRight(
     // F35: see the matching note in RowLeft — a blank counterpart row (no
     // content on this side) gets no label instead of a bare "Changed".
     let sr_label: Option<String> = if kind == HunkKind::Insert {
-        Some(t(lang, "Inserted"))
+        Some(t(lang, "inserted"))
     } else if wants_replace_label(kind, right.is_some()) {
-        Some(t(lang, "Changed"))
+        Some(t(lang, "changed"))
     } else {
         None
     };
@@ -344,13 +344,13 @@ fn ActCell(
                                 let _ = tab.merge.apply_left_to_right(hunk_id);
                             }
                         },
-                        title: t(lang, "Use this change (apply left to right)"),
-                        aria_label: t(lang, "Use this change (apply left to right)"),
+                        title: t(lang, "use-this-change-apply-left-to-right"),
+                        aria_label: t(lang, "use-this-change-apply-left-to-right"),
                         "▶"
-                        span { class: "apply-btn-label", {t(lang, "Use")} }
+                        span { class: "apply-btn-label", {t(lang, "use")} }
                     }
                 } else if i == 0 && applied {
-                    span { class: "applied", aria_label: t(lang, "Applied"), "✓" }
+                    span { class: "applied", aria_label: t(lang, "applied"), "✓" }
                 }
             }
         }
@@ -465,14 +465,14 @@ pub(crate) fn BidiText(text: String, lang: Lang) -> Element {
 /// The marker on a row whose pair was too long to refine.
 #[component]
 fn SkippedBadge(lang: Lang) -> Element {
-    let label = t(lang, "Too long for character-level highlighting");
+    let label = t(lang, "too-long-for-character-level-highlighting");
     rsx! {
         span {
             class: "inline-skipped",
             role: "img",
             aria_label: "{label}",
             title: "{label}",
-            {t(lang, "Long line")}
+            {t(lang, "long-line")}
         }
     }
 }

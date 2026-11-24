@@ -27,9 +27,9 @@ pub fn ExplorerFooter(
     let action = compare_action(&lp, &rp);
     let can_compare = action != CompareAction::None;
     let compare_tooltip = match &action {
-        CompareAction::Files(..) => t(lang, "Compare selected files"),
-        CompareAction::Dirs(..) => t(lang, "Compare selected directories"),
-        CompareAction::None => t(lang, "Select a file or directory on each side to compare"),
+        CompareAction::Files(..) => t(lang, "compare-selected-files"),
+        CompareAction::Dirs(..) => t(lang, "compare-selected-directories"),
+        CompareAction::None => t(lang, "select-a-file-or-directory-on-each-side-to-compare"),
     };
 
     rsx! {
@@ -72,16 +72,16 @@ pub fn ExplorerFooter(
                         match (&*lp, &*rp) {
                             (None, None) => rsx! {
                                 span { class: "targets-hint",
-                                    {t(lang, "Choose a file or folder on each side to compare")}
+                                    {t(lang, "choose-a-file-or-folder-on-each-side-to-compare")}
                                 }
                             },
                             (Some(l), None) => rsx! {
                                 span { class: "targets-pick", BidiText { text: short_name(l.path()), lang } }
                                 span { class: "targets-sep", " ↔ " }
-                                span { class: "targets-hint", {t(lang, "Choose a file or folder on the right")} }
+                                span { class: "targets-hint", {t(lang, "choose-a-file-or-folder-on-the-right")} }
                             },
                             (None, Some(r)) => rsx! {
-                                span { class: "targets-hint", {t(lang, "Choose a file or folder on the left")} }
+                                span { class: "targets-hint", {t(lang, "choose-a-file-or-folder-on-the-left")} }
                                 span { class: "targets-sep", " ↔ " }
                                 span { class: "targets-pick", BidiText { text: short_name(r.path()), lang } }
                             },
@@ -107,7 +107,7 @@ pub fn ExplorerFooter(
                             CompareAction::None => {}
                         }
                     },
-                    {t(lang, "Compare")} " ▶"
+                    {t(lang, "compare")} " ▶"
                 }
             }
         }

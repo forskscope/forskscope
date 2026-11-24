@@ -40,12 +40,12 @@ pub fn TabBar() -> Element {
             div {
                 class: "tablist",
                 role: "tablist",
-                aria_label: t(lang, "Open tabs"),
+                aria_label: t(lang, "open-tabs"),
                 TabItem {
                     position: 0, total, file_count, dir_count, is_active: explorer_active,
-                    aria_label: t(lang, "Explorer"),
+                    aria_label: t(lang, "explorer"),
                     onclick: move |_| state::activate_tab_at(&mut store, 0, file_count, dir_count),
-                    span { class: "tab-title", {t(lang, "Explorer")} }
+                    span { class: "tab-title", {t(lang, "explorer")} }
                 }
                 for i in 0..file_count {
                     FileTabItem {
@@ -73,12 +73,12 @@ pub fn TabBar() -> Element {
             span { class: "spacer" }
             button {
                 onclick: move |_| store.modal.set(Modal::KeyboardRef),
-                aria_label: t(lang, "Keyboard shortcuts (Ctrl+/)"),
-                "? " {t(lang, "Shortcuts")}
+                aria_label: t(lang, "keyboard-shortcuts-ctrl"),
+                "? " {t(lang, "shortcuts")}
             }
             button {
                 onclick: move |_| store.modal.set(Modal::Settings),
-                {t(lang, "Settings")}
+                {t(lang, "settings")}
             }
         }
     }
@@ -194,7 +194,7 @@ fn FileTabItem(
     // marked with `BidiText` (that's only for the visible `span` below).
     let escaped_title = forskscope_compare::escape_to_plain_marker(&title);
     let label = if is_loading {
-        format!("{escaped_title}, {}", t(lang, "loading"))
+        format!("{escaped_title}, {}", t(lang, "loading-2"))
     } else if is_dirty {
         format!("{escaped_title}, {}", t(lang, "unsaved"))
     } else {
@@ -218,7 +218,7 @@ fn FileTabItem(
                     // doc comment for why this button is a sibling of the
                     // tab, not nested inside it.
                     aria_hidden: "true",
-                    title: t(lang, "Close tab"),
+                    title: t(lang, "close-tab"),
                     onclick: move |e| {
                         e.stop_propagation();
                         // Loading tabs close without a dirty-check (RFC-065) —
@@ -651,7 +651,7 @@ fn DirTabItem(
                     tabindex: "-1",
                     // RFC-087 §1 / see `TabItem`'s doc comment.
                     aria_hidden: "true",
-                    title: t(lang, "Close tab"),
+                    title: t(lang, "close-tab"),
                     onclick: move |e| {
                         e.stop_propagation();
                         crate::state::close_dir_tab(&mut store, index);

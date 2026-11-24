@@ -46,12 +46,12 @@ pub fn DiffWorkspace(index: usize) -> Element {
             (state, title)
         };
         match state {
-            None => return rsx! { Notice { kind: NoticeKind::Info, {t(lang, "No comparison.")} } },
+            None => return rsx! { Notice { kind: NoticeKind::Info, {t(lang, "no-comparison")} } },
             Some(crate::state::TabState::Loading) => {
                 return rsx! {
                     div { class: "diff-loading",
                         span { class: "diff-loading-spinner", "⟳" }
-                        span { {t(lang, "Loading")} " " {title} "…" }
+                        span { {t(lang, "loading")} " " {title} "…" }
                     }
                 };
             }
@@ -66,7 +66,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
         let tabs = store.tabs.read();
         match tabs.get(index) {
             Some(tab) => TabSnapshot::from_tab(tab, font_size, font_family, context_lines, lang),
-            None => return rsx! { Notice { kind: NoticeKind::Info, {t(lang, "No comparison.")} } },
+            None => return rsx! { Notice { kind: NoticeKind::Info, {t(lang, "no-comparison")} } },
         }
     };
 
@@ -125,7 +125,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
         div {
             class: "diff-wrap",
             role: "region",
-            aria_label: t(lang, "File comparison"),
+            aria_label: t(lang, "file-comparison"),
             DiffHeader { index }
             Toolbar { index, snap: snap.clone(), lang }
             SearchBar {}
@@ -136,12 +136,12 @@ pub fn DiffWorkspace(index: usize) -> Element {
                 Notice { kind: NoticeKind::Info, {snap.readonly_notice.clone()} }
             }
             if snap.identical {
-                Notice { kind: NoticeKind::Ok, {t(lang, "Files are identical")} }
+                Notice { kind: NoticeKind::Ok, {t(lang, "files-are-identical")} }
             }
             div { class: "diff-pane-labels", aria_hidden: "true",
-                span { class: "pane-label-left", id: "pane-label-left-{index}", {t(lang, "Left / Old")} }
+                span { class: "pane-label-left", id: "pane-label-left-{index}", {t(lang, "left-old")} }
                 span { class: "pane-label-act" }
-                span { class: "pane-label-right", id: "pane-label-right-{index}", {t(lang, "Right / New")} }
+                span { class: "pane-label-right", id: "pane-label-right-{index}", {t(lang, "right-new")} }
             }
             div {
                 class: "{wrap_class}",
@@ -168,7 +168,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
                     // was there (confirmed: review 203's own regression check,
                     // pixel-exact at 100% in 1000x700).
                     div { class: "diff-col-left-wrap",
-                    span { class: "pane-label-inline", id: "pane-label-left-inline-{index}", aria_hidden: "true", {t(lang, "Left / Old")} }
+                    span { class: "pane-label-inline", id: "pane-label-left-inline-{index}", aria_hidden: "true", {t(lang, "left-old")} }
                     div {
                         class: "diff-col-left", id: "diff-col-left-{index}",
                         // Review 220 §4 (F217): the two candidate labels for
@@ -220,7 +220,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
                     } // .diff-col-table
                 }
                     div { class: "diff-col-right-wrap",
-                    span { class: "pane-label-inline", id: "pane-label-right-inline-{index}", aria_hidden: "true", {t(lang, "Right / New")} }
+                    span { class: "pane-label-inline", id: "pane-label-right-inline-{index}", aria_hidden: "true", {t(lang, "right-new")} }
                     div {
                         class: "diff-col-right", id: "diff-col-right-{index}",
                         "data-layout-labels": "pane-label-right-{index} pane-label-right-inline-{index}",
@@ -339,7 +339,7 @@ fn DiffHeader(index: usize) -> Element {
         // to writing here.
         if let Some(merged) = merged {
             div { class: "diff-mergetool-result", title: "{merged}",
-                {t(lang, "Result:")}
+                {t(lang, "result")}
                 " "
                 span { class: "result-path", {trunc(&merged)} }
             }
@@ -413,29 +413,19 @@ const MAX_SHEETS_NAMED: usize = 5;
 
 /// One localised line for a spreadsheet warning: what may be wrong, then the
 /// sheets it concerns (F131).
+/// RFC-101 stage B, item 18 (reply 198 §2): not flagged - one whole-
+/// sentence catalog message per (kind, detail?, names?) combination,
+/// never the kind's own translated sentence glued to a second translated
+/// "Sheets:" word by `push_str`. `names`/`detail` are raw, untranslated
+/// data either way (a sheet name, the parser's own message), so they
+/// stay ordinary `{ $name }`-style placeholders throughout.
 fn spreadsheet_warning_text(
     lang: crate::state::Lang,
     warning: &forskscope_compare::xlsx::SpreadsheetWarning,
 ) -> String {
-    use crate::i18n::t;
+    use crate::i18n::{t, tf};
     use forskscope_compare::xlsx::SpreadsheetWarningKind as K;
 
-    let sentence = match warning.kind {
-        K::DuplicateAlignmentKey => t(
-            lang,
-            "Some rows share an alignment key, so rows may be paired wrongly.",
-        ),
-        K::AlignmentFellBack => t(
-            lang,
-            "A sheet was too large to align rows and was compared position by position, so an inserted row may appear as many changes.",
-        ),
-        K::AmbiguousSheetMatch => t(
-            lang,
-            "Several sheets could have been renamed, so none was matched; they appear as added and removed.",
-        ),
-        K::SheetNotCompared => t(lang, "Not compared (not a worksheet):"),
-        K::Other => t(lang, "The comparison reported a warning:"),
-    };
     let mut names: Vec<String> = warning
         .sheets
         .iter()
@@ -445,20 +435,61 @@ fn spreadsheet_warning_text(
     if warning.sheets.len() > MAX_SHEETS_NAMED {
         names.push(format!("(+{})", warning.sheets.len() - MAX_SHEETS_NAMED));
     }
-    let mut out = sentence;
-    if let Some(detail) = &warning.detail {
-        out.push(' ');
-        out.push_str(detail);
+    let names_text = names.join(", ");
+    let has_names = !names.is_empty();
+
+    match warning.kind {
+        K::DuplicateAlignmentKey if has_names => tf(
+            lang,
+            "warning-duplicate-alignment-key-with-sheets",
+            &[("names", &names_text)],
+            None,
+        ),
+        K::DuplicateAlignmentKey => t(
+            lang,
+            "some-rows-share-an-alignment-key-so-rows-may-be-paired",
+        ),
+        K::AlignmentFellBack if has_names => tf(
+            lang,
+            "warning-alignment-fell-back-with-sheets",
+            &[("names", &names_text)],
+            None,
+        ),
+        K::AlignmentFellBack => t(lang, "a-sheet-was-too-large-to-align-rows-and-was-compared"),
+        K::AmbiguousSheetMatch if has_names => tf(
+            lang,
+            "warning-ambiguous-sheet-match-with-sheets",
+            &[("names", &names_text)],
+            None,
+        ),
+        K::AmbiguousSheetMatch => t(
+            lang,
+            "several-sheets-could-have-been-renamed-so-none-was-matched",
+        ),
+        K::SheetNotCompared if has_names => tf(
+            lang,
+            "warning-sheet-not-compared-with-sheets",
+            &[("names", &names_text)],
+            None,
+        ),
+        K::SheetNotCompared => t(lang, "not-compared-not-a-worksheet"),
+        K::Other => match (&warning.detail, has_names) {
+            (Some(detail), true) => tf(
+                lang,
+                "warning-other-detail-with-sheets",
+                &[("detail", detail), ("names", &names_text)],
+                None,
+            ),
+            (Some(detail), false) => tf(lang, "warning-other-detail", &[("detail", detail)], None),
+            (None, true) => tf(
+                lang,
+                "warning-other-with-sheets",
+                &[("names", &names_text)],
+                None,
+            ),
+            (None, false) => t(lang, "the-comparison-reported-a-warning"),
+        },
     }
-    if !names.is_empty() {
-        if !matches!(warning.kind, K::SheetNotCompared) {
-            out.push(' ');
-            out.push_str(&t(lang, "Sheets:"));
-        }
-        out.push(' ');
-        out.push_str(&names.join(", "));
-    }
-    out
 }
 
 impl TabSnapshot {
@@ -486,13 +517,11 @@ impl TabSnapshot {
             .map(|w| match w {
                 DiffWarning::LargeFilePolicyApplied => t(
                     lang,
-                    "Large file — inline diff disabled and deadline shortened.",
+                    "large-file-inline-diff-disabled-and-deadline-shortened",
                 ),
-                DiffWarning::DeadlineExpired => {
-                    t(lang, "Diff timed out — result may be approximate.")
-                }
+                DiffWarning::DeadlineExpired => t(lang, "diff-timed-out-result-may-be-approximate"),
                 DiffWarning::InlineSkippedHunkTooLarge => {
-                    t(lang, "Some hunks were too large for character-level diff.")
+                    t(lang, "some-hunks-were-too-large-for-character-level-diff")
                 }
             })
             .collect();
@@ -502,7 +531,7 @@ impl TabSnapshot {
         if tab.char_mode && forskscope_compare::diff::skipped_inline_pairs(&tab.diff) > 0 {
             warnings.push(t(
                 lang,
-                "Some hunks were too large for character-level diff.",
+                "some-hunks-were-too-large-for-character-level-diff",
             ));
         }
         // F131: what the spreadsheet parser doubted, in the strip that already
@@ -519,22 +548,20 @@ impl TabSnapshot {
             String::new()
         } else {
             match (&tab.left_doc.kind, &tab.right_doc.kind) {
-                (FileKind::Missing, FileKind::Missing) => {
-                    t(lang, "Both files not found — read-only.")
-                }
+                (FileKind::Missing, FileKind::Missing) => t(lang, "both-files-not-found-read-only"),
                 (FileKind::Binary, _) | (_, FileKind::Binary) => {
-                    t(lang, "Binary file — read-only comparison (hex preview).")
+                    t(lang, "binary-file-read-only-comparison-hex-preview")
                 }
                 (FileKind::ExcelXlsx, _) | (_, FileKind::ExcelXlsx) => {
-                    t(lang, "Spreadsheet comparison is read-only.")
+                    t(lang, "spreadsheet-comparison-is-read-only")
                 }
                 (FileKind::Missing, _) | (_, FileKind::Missing) => {
-                    t(lang, "One side is missing — read-only.")
+                    t(lang, "one-side-is-missing-read-only")
                 }
                 (FileKind::Unsupported { .. }, _) | (_, FileKind::Unsupported { .. }) => {
-                    t(lang, "File type not supported for merge — read-only.")
+                    t(lang, "file-type-not-supported-for-merge-read-only")
                 }
-                _ => t(lang, "Merge/save unavailable for this file type."),
+                _ => t(lang, "merge-save-unavailable-for-this-file-type"),
             }
         };
         Self {

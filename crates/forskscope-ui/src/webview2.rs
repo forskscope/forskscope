@@ -39,12 +39,12 @@ pub fn decide(version: Result<String, String>, lang: Lang) -> Decision {
                 "{} ({error})",
                 t(
                     lang,
-                    "forskscope: the Microsoft Edge WebView2 Runtime is not installed"
+                    "forskscope-the-microsoft-edge-webview2-runtime-is-not"
                 )
             ),
             dialog_text: t(
                 lang,
-                "ForskScope needs the Microsoft Edge WebView2 Runtime, which is not installed on this computer. Open the download page?",
+                "forskscope-needs-the-microsoft-edge-webview2-runtime-which",
             ),
         },
     }

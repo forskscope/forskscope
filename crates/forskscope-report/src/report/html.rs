@@ -295,10 +295,64 @@ fn render_hunk(out: &mut String, hunk: &ChangeHunk) {
 /// since nothing in this renderer converts Markdown to HTML. Callers must
 /// not run this result through `escape_html` again, or the inserted
 /// `<code>` markup would itself get escaped.
+/// `FileComparisonReport::non_default_options`'s own `(k, v)` pairs
+/// (`report::file::non_default_options_summary`) are English words, not
+/// catalog ids — that function's other consumer, `report::text` (English
+/// only, no `tr()` at all), prints them straight to stdout, so they
+/// can't become ids without breaking the plain-text format the same way
+/// `status_key` becoming one would have (see `report::text`'s own
+/// `plain_status_word`). This is this renderer's own half of that split:
+/// the id for the one word `tr()` should resolve, or the word itself
+/// unchanged if it's not one of the known labels ("ignored", or an
+/// `Algorithm` variant's `Debug` name — neither is meant to be
+/// translated; falling through to the word itself matches `tr`'s own
+/// "unknown key degrades to itself" policy for those).
+fn option_label_id(word: &str) -> &str {
+    match word {
+        "Whitespace" => "report-whitespace",
+        "Case" => "report-case",
+        "Newlines" => "report-newlines",
+        "Algorithm" => "report-algorithm",
+        "ignored" => "report-ignored",
+        other => other,
+    }
+}
+
+/// `FileComparisonReport::from_diff`'s `warnings: Vec<String>` is English
+/// text, not catalog ids, for the same reason `option_label_id` exists:
+/// `report::text` (English only) prints these straight to stdout with no
+/// `tr()` at all. This is this renderer's own half of the split - the id
+/// for one of the three known `DiffWarning` sentences, or the text
+/// itself unchanged if it's something else (defensive; every warning
+/// `from_diff` can produce today is one of these three).
+fn warning_label_id(text: &str) -> &str {
+    match text {
+        "Large file — inline diff disabled." => "report-large-file-inline-diff-disabled",
+        "Some hunks were too large for inline diff." => {
+            "report-some-hunks-were-too-large-for-inline-diff"
+        }
+        "Diff timed out — result may be approximate." => {
+            "diff-timed-out-result-may-be-approximate"
+        }
+        other => other,
+    }
+}
+
+/// `profile_name`'s fallback value (`report::file::FileComparisonReport::
+/// from_diff`) is the fixed English word "Default" or "Custom" when the
+/// caller named no real profile; a *real* profile name is the user's own
+/// arbitrary text and must pass through unchanged (never translated,
+/// same as any other user data `tr()` can't match).
+fn profile_name_id(name: &str) -> &str {
+    match name {
+        "Default" => "report-profile-name-default",
+        "Custom" => "report-profile-name-custom",
+        other => other,
+    }
+}
+
 fn checksum_caveat(tr: &dyn Fn(&str) -> String) -> String {
-    let template = tr(
-        "Run {cmd} on a file to confirm it is the file this report describes. This does not prove the report itself is unaltered.",
-    );
+    let template = tr("report-run-cmd-on-a-file-to-confirm-it-is-the-file-this-report");
     escape_html(&template).replace("{cmd}", "<code>sha256sum</code>")
 }
 
@@ -321,47 +375,90 @@ fn render_checksum_row(out: &mut String, label: &str, checksum: &FileChecksum) {
 /// facts from the report's raw fields instead, one translated word next to
 /// each raw number, the same concatenation convention the rest of the UI
 /// uses for a count in a label (e.g. `deep_compare.rs`'s `{} {count} {}`).
-/// The English template *key* for `(n, d, a)` — hunks changed, lines
-/// removed, lines added — with the correct singular/plural word already
-/// baked into the literal text (review 174 §4: "whole-sentence templates
-/// per language... with singular forms in English"). `{n}`/`{d}`/`{a}`
-/// stay as literal placeholder text; `tr()` translates this whole string
-/// as one unit (English gets it back verbatim; Japanese's `ja()` match
-/// has its own entry for each of the 18 shapes this can produce — see
-/// `i18n.rs`), then the placeholders are substituted. Deliberately not a
+/// The catalog *id* for `(n, d, a)` — hunks changed, lines removed, lines
+/// added — one of 18 whole-sentence shapes, singular/plural word already
+/// baked into which id this picks (review 174 §4: "whole-sentence
+/// templates per language... with singular forms in English"). `tr()`
+/// resolves the id to a template whose `{n}`/`{d}`/`{a}` stay as literal
+/// placeholder text (English and Japanese both have their own entry for
+/// all 18 shapes — RFC-101 stage B, review 232 §3.5 — rather than a
 /// composed-from-words sentence: Japanese's own template has different
 /// punctuation and word order throughout, not just translated words in
 /// the same slots English uses — concatenating translated fragments can't
-/// produce that.
+/// produce that), then the placeholders are substituted.
 ///
 /// No "hunks replaced": a count of *hunks* next to counts of *lines* reads
 /// as more change stacked on top of the lines already counted, and the
 /// change list below already shows which hunks are replacements.
-fn summary_template_key(n: usize, d: usize, a: usize) -> String {
+fn summary_template_key(n: usize, d: usize, a: usize) -> &'static str {
     let n_word = if n == 1 { "change" } else { "changes" };
     match (d > 0, a > 0) {
         (true, true) => {
             let d_word = if d == 1 {
-                "line removed"
+                "line-removed"
             } else {
-                "lines removed"
+                "lines-removed"
             };
-            let a_word = if a == 1 { "line added" } else { "lines added" };
-            format!("{{n}} {n_word}: {{d}} {d_word}, {{a}} {a_word}.")
+            let a_word = if a == 1 { "line-added" } else { "lines-added" };
+            match (n_word, d_word, a_word) {
+                ("change", "line-removed", "line-added") => {
+                    "report-n-change-d-line-removed-a-line-added"
+                }
+                ("change", "line-removed", "lines-added") => {
+                    "report-n-change-d-line-removed-a-lines-added"
+                }
+                ("change", "lines-removed", "line-added") => {
+                    "report-n-change-d-lines-removed-a-line-added"
+                }
+                ("change", "lines-removed", "lines-added") => {
+                    "report-n-change-d-lines-removed-a-lines-added"
+                }
+                ("changes", "line-removed", "line-added") => {
+                    "report-n-changes-d-line-removed-a-line-added"
+                }
+                ("changes", "line-removed", "lines-added") => {
+                    "report-n-changes-d-line-removed-a-lines-added"
+                }
+                ("changes", "lines-removed", "line-added") => {
+                    "report-n-changes-d-lines-removed-a-line-added"
+                }
+                ("changes", "lines-removed", "lines-added") => {
+                    "report-n-changes-d-lines-removed-a-lines-added"
+                }
+                _ => unreachable!("n_word/d_word/a_word are each one of exactly two values"),
+            }
         }
         (true, false) => {
             let d_word = if d == 1 {
-                "line removed"
+                "line-removed"
             } else {
-                "lines removed"
+                "lines-removed"
             };
-            format!("{{n}} {n_word}: {{d}} {d_word}.")
+            match (n_word, d_word) {
+                ("change", "line-removed") => "report-n-change-d-line-removed",
+                ("change", "lines-removed") => "report-n-change-d-lines-removed",
+                ("changes", "line-removed") => "report-n-changes-d-line-removed",
+                ("changes", "lines-removed") => "report-n-changes-d-lines-removed",
+                _ => unreachable!("n_word/d_word are each one of exactly two values"),
+            }
         }
         (false, true) => {
-            let a_word = if a == 1 { "line added" } else { "lines added" };
-            format!("{{n}} {n_word}: {{a}} {a_word}.")
+            let a_word = if a == 1 { "line-added" } else { "lines-added" };
+            match (n_word, a_word) {
+                ("change", "line-added") => "report-n-change-a-line-added",
+                ("change", "lines-added") => "report-n-change-a-lines-added",
+                ("changes", "line-added") => "report-n-changes-a-line-added",
+                ("changes", "lines-added") => "report-n-changes-a-lines-added",
+                _ => unreachable!("n_word/a_word are each one of exactly two values"),
+            }
         }
-        (false, false) => format!("{{n}} {n_word}."),
+        (false, false) => {
+            if n_word == "change" {
+                "report-n-change"
+            } else {
+                "report-n-changes"
+            }
+        }
     }
 }
 
@@ -370,13 +467,13 @@ fn localized_summary_sentence(
     tr: &dyn Fn(&str) -> String,
 ) -> String {
     if report.is_identical {
-        return tr("No differences — the two files are identical.");
+        return tr("report-no-differences-the-two-files-are-identical");
     }
     let n = report.hunks_changed;
     let d = report.lines_deleted;
     let a = report.lines_added;
     let key = summary_template_key(n, d, a);
-    tr(&key)
+    tr(key)
         .replace("{n}", &n.to_string())
         .replace("{d}", &d.to_string())
         .replace("{a}", &a.to_string())
@@ -392,9 +489,9 @@ fn bidi_notice(report: &FileComparisonReport, tr: &dyn Fn(&str) -> String) -> Op
         return None;
     }
     if n == 1 {
-        Some(tr("Contains 1 direction-control character"))
+        Some(tr("report-contains-1-direction-control-character"))
     } else {
-        Some(tr("Contains {n} direction-control characters").replace("{n}", &n.to_string()))
+        Some(tr("report-contains-n-direction-control-characters").replace("{n}", &n.to_string()))
     }
 }
 
@@ -405,16 +502,13 @@ fn bidi_notice(report: &FileComparisonReport, tr: &dyn Fn(&str) -> String) -> Op
 /// omitted) and `max_files` (the cap actually applied) are pluralized
 /// independently of each other, the same way `summary_template_key`
 /// pluralizes `d`/`a` independently of `n`.
-fn cap_omission_template_key(n: usize, max_files: usize) -> String {
-    let n_word = if n == 1 {
-        "changed file's content is"
-    } else {
-        "changed files' content is"
-    };
-    let max_files_word = if max_files == 1 { "file" } else { "files" };
-    format!(
-        "{{n}} {n_word} not shown in this report (the cap of {{max_files}} {max_files_word} or {{max_size}} of change text was reached):"
-    )
+fn cap_omission_template_key(n: usize, max_files: usize) -> &'static str {
+    match (n == 1, max_files == 1) {
+        (true, true) => "report-n-changed-file-s-content-is-not-shown-in-this-report-the",
+        (true, false) => "report-n-changed-file-s-content-is-not-shown-in-this-report-the-2",
+        (false, true) => "report-n-changed-files-content-is-not-shown-in-this-report-the-cap",
+        (false, false) => "report-n-changed-files-content-is-not-shown-in-this-report-the-cap-2",
+    }
 }
 
 fn localized_cap_omission_sentence(
@@ -424,7 +518,7 @@ fn localized_cap_omission_sentence(
     tr: &dyn Fn(&str) -> String,
 ) -> String {
     let key = cap_omission_template_key(n, max_files);
-    tr(&key)
+    tr(key)
         .replace("{n}", &n.to_string())
         .replace("{max_files}", &max_files.to_string())
         .replace("{max_size}", &super::dir::fmt_size(max_change_bytes as u64))
@@ -440,48 +534,64 @@ pub fn render_file_report(
     tr: &dyn Fn(&str) -> String,
 ) -> String {
     let p = palette(color_vision_safe);
-    let mut out = head(&tr("Comparison report"), p);
+    let mut out = head(&tr("report-comparison-report"), p);
 
-    let _ = writeln!(out, "<h1>{}</h1>", escape_html(&tr("Comparison report")));
+    let _ = writeln!(
+        out,
+        "<h1>{}</h1>",
+        escape_html(&tr("report-comparison-report"))
+    );
     let _ = writeln!(
         out,
         "<p>{} {} — ForskScope {}</p>",
-        escape_html(&tr("Generated")),
+        escape_html(&tr("report-generated")),
         escape_html(generated_at),
         escape_html(app_version)
     );
 
-    let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("What was compared")));
+    let _ = writeln!(
+        out,
+        "<h2>{}</h2>",
+        escape_html(&tr("report-what-was-compared"))
+    );
     let _ = writeln!(out, "<table>");
     let _ = writeln!(
         out,
         "<tr><th>{}</th><td>{}</td></tr>",
-        escape_html(&tr("Left")),
+        escape_html(&tr("report-left")),
         escape_html_marking_bidi(&report.left_display)
     );
     let _ = writeln!(
         out,
         "<tr><th>{}</th><td>{}</td></tr>",
-        escape_html(&tr("Right")),
+        escape_html(&tr("report-right")),
         escape_html_marking_bidi(&report.right_display)
     );
     if let Some(c) = &report.left_checksum {
-        render_checksum_row(&mut out, &format!("{} {}", tr("Left"), tr("SHA-256")), c);
+        render_checksum_row(
+            &mut out,
+            &format!("{} {}", tr("report-left"), tr("report-sha-256")),
+            c,
+        );
     }
     if let Some(c) = &report.right_checksum {
-        render_checksum_row(&mut out, &format!("{} {}", tr("Right"), tr("SHA-256")), c);
+        render_checksum_row(
+            &mut out,
+            &format!("{} {}", tr("report-right"), tr("report-sha-256")),
+            c,
+        );
     }
     let _ = writeln!(out, "</table>");
     if report.left_checksum.is_some() || report.right_checksum.is_some() {
         let _ = writeln!(out, "<p class=\"note\">{}</p>", checksum_caveat(tr));
     }
 
-    let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("How")));
+    let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("report-how")));
     let _ = writeln!(
         out,
         "<p>{}: {}</p>",
-        escape_html(&tr("Compare profile")),
-        escape_html(&tr(&report.profile_name))
+        escape_html(&tr("report-compare-profile")),
+        escape_html(&tr(profile_name_id(&report.profile_name)))
     );
     if !report.non_default_options.is_empty() {
         let _ = writeln!(out, "<ul>");
@@ -489,14 +599,14 @@ pub fn render_file_report(
             let _ = writeln!(
                 out,
                 "<li>{}: {}</li>",
-                escape_html(&tr(k)),
-                escape_html(&tr(v))
+                escape_html(&tr(option_label_id(k))),
+                escape_html(&tr(option_label_id(v)))
             );
         }
         let _ = writeln!(out, "</ul>");
     }
 
-    let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("Summary")));
+    let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("report-summary")));
     let _ = writeln!(
         out,
         "<p>{}</p>",
@@ -508,17 +618,17 @@ pub fn render_file_report(
     }
 
     if !report.change_hunks.is_empty() {
-        let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("The changes")));
+        let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("report-the-changes")));
         for hunk in &report.change_hunks {
             render_hunk(&mut out, hunk);
         }
     }
 
     if !report.warnings.is_empty() {
-        let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("Notes")));
+        let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("report-notes")));
         let _ = writeln!(out, "<ul>");
         for w in &report.warnings {
-            let _ = writeln!(out, "<li>{}</li>", escape_html(&tr(w)));
+            let _ = writeln!(out, "<li>{}</li>", escape_html(&tr(warning_label_id(w))));
         }
         let _ = writeln!(out, "</ul>");
     }
@@ -562,29 +672,37 @@ pub fn render_dir_report(
     tr: &dyn Fn(&str) -> String,
 ) -> String {
     let p = palette(color_vision_safe);
-    let mut out = head(&tr("Comparison report"), p);
+    let mut out = head(&tr("report-comparison-report"), p);
 
-    let _ = writeln!(out, "<h1>{}</h1>", escape_html(&tr("Comparison report")));
+    let _ = writeln!(
+        out,
+        "<h1>{}</h1>",
+        escape_html(&tr("report-comparison-report"))
+    );
     let _ = writeln!(
         out,
         "<p>{} {} — ForskScope {}</p>",
-        escape_html(&tr("Generated")),
+        escape_html(&tr("report-generated")),
         escape_html(generated_at),
         escape_html(app_version)
     );
 
-    let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("What was compared")));
+    let _ = writeln!(
+        out,
+        "<h2>{}</h2>",
+        escape_html(&tr("report-what-was-compared"))
+    );
     let _ = writeln!(out, "<table>");
     let _ = writeln!(
         out,
         "<tr><th>{}</th><td>{}</td></tr>",
-        escape_html(&tr("Left")),
+        escape_html(&tr("report-left")),
         escape_html_marking_bidi(&report.left_display)
     );
     let _ = writeln!(
         out,
         "<tr><th>{}</th><td>{}</td></tr>",
-        escape_html(&tr("Right")),
+        escape_html(&tr("report-right")),
         escape_html_marking_bidi(&report.right_display)
     );
     let _ = writeln!(out, "</table>");
@@ -633,7 +751,7 @@ pub fn render_dir_report(
     // files." directly above "Unreadable: 1", contradicting itself.
     match (&main_line, &extra_line) {
         (None, None) => {
-            let _ = writeln!(out, "<p>{}</p>", escape_html(&tr("No files.")));
+            let _ = writeln!(out, "<p>{}</p>", escape_html(&tr("report-no-files")));
         }
         _ => {
             if let Some(line) = &main_line {
@@ -646,12 +764,12 @@ pub fn render_dir_report(
     }
 
     if let Some(name) = &report.profile_name {
-        let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("How")));
+        let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("report-how")));
         let _ = writeln!(
             out,
             "<p>{}: {}</p>",
-            escape_html(&tr("Compare profile")),
-            escape_html(&tr(name))
+            escape_html(&tr("report-compare-profile")),
+            escape_html(&tr(profile_name_id(name)))
         );
         if !report.non_default_options.is_empty() {
             let _ = writeln!(out, "<ul>");
@@ -659,32 +777,32 @@ pub fn render_dir_report(
                 let _ = writeln!(
                     out,
                     "<li>{}: {}</li>",
-                    escape_html(&tr(k)),
-                    escape_html(&tr(v))
+                    escape_html(&tr(option_label_id(k))),
+                    escape_html(&tr(option_label_id(v)))
                 );
             }
             let _ = writeln!(out, "</ul>");
         }
     }
 
-    let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("Files")));
+    let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("report-files")));
     let _ = writeln!(out, "<table>");
     let show_sizes = report.options.include_sizes;
     let _ = writeln!(
         out,
         "<tr><th>{}</th><th>{}</th>{}<th>{}</th></tr>",
-        escape_html(&tr("Path")),
-        escape_html(&tr("Status")),
+        escape_html(&tr("report-path")),
+        escape_html(&tr("report-status")),
         if show_sizes {
             format!(
                 "<th>{}</th><th>{}</th>",
-                escape_html(&tr("Left size")),
-                escape_html(&tr("Right size"))
+                escape_html(&tr("report-left-size")),
+                escape_html(&tr("report-right-size"))
             )
         } else {
             String::new()
         },
-        escape_html(&tr("SHA-256"))
+        escape_html(&tr("report-sha-256"))
     );
     for row in &report.file_rows {
         render_dir_file_row(&mut out, row, show_sizes, tr);
@@ -704,7 +822,7 @@ pub fn render_dir_report(
         .filter(|r| r.change_hunks.as_ref().is_some_and(|h| !h.is_empty()))
         .collect();
     if !changed_with_hunks.is_empty() {
-        let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("The changes")));
+        let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("report-the-changes")));
         for row in changed_with_hunks {
             let _ = writeln!(out, "<h3>{}</h3>", escape_html_marking_bidi(&row.path));
             for hunk in row.change_hunks.as_ref().unwrap() {
@@ -714,7 +832,7 @@ pub fn render_dir_report(
     }
 
     if !report.change_hunks_omitted.is_empty() {
-        let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("Notes")));
+        let _ = writeln!(out, "<h2>{}</h2>", escape_html(&tr("report-notes")));
         let _ = writeln!(
             out,
             "<p>{}</p>",
@@ -797,6 +915,81 @@ fn render_dir_file_row(
 mod tests {
     use super::*;
 
+    /// Test-only: the real English text for every catalog id this
+    /// renderer can ask `tr()` for - used in place of a pure identity
+    /// closure wherever a test needs to see actual rendered English,
+    /// not the id itself (RFC-101 stage B moved these ids' real text
+    /// out of this crate and into `forskscope-ui`'s catalogs).
+    fn en(s: &str) -> String {
+        match s {
+            "report-compare-profile" => "Compare profile".to_string(),
+            "report-comparison-report" => "Comparison report".to_string(),
+            "report-files" => "Files".to_string(),
+            "report-generated" => "Generated".to_string(),
+            "report-how" => "How".to_string(),
+            "report-left" => "Left".to_string(),
+            "report-left-size" => "Left size".to_string(),
+            "report-no-differences-the-two-files-are-identical" => "No differences — the two files are identical.".to_string(),
+            "report-no-files" => "No files.".to_string(),
+            "report-notes" => "Notes".to_string(),
+            "report-path" => "Path".to_string(),
+            "report-right" => "Right".to_string(),
+            "report-right-size" => "Right size".to_string(),
+            "report-sha-256" => "SHA-256".to_string(),
+            "report-status" => "Status".to_string(),
+            "report-summary" => "Summary".to_string(),
+            "report-the-changes" => "The changes".to_string(),
+            "report-what-was-compared" => "What was compared".to_string(),
+            "report-run-cmd-on-a-file-to-confirm-it-is-the-file-this-report" => "Run {cmd} on a file to confirm it is the file this report describes. This does not prove the report itself is unaltered.".to_string(),
+            "report-only-on-the-left-empty-folder" => "Only on the left (empty folder)".to_string(),
+            "report-only-on-the-right-empty-folder" => "Only on the right (empty folder)".to_string(),
+            "report-identical" => "Identical".to_string(),
+            "report-not-compared" => "Not compared".to_string(),
+            "report-unreadable" => "Unreadable".to_string(),
+            "report-symlink-not-followed" => "Symlink not followed".to_string(),
+            "report-whitespace" => "Whitespace".to_string(),
+            "report-case" => "Case".to_string(),
+            "report-newlines" => "Newlines".to_string(),
+            "report-algorithm" => "Algorithm".to_string(),
+            "report-ignored" => "ignored".to_string(),
+            "report-n-change" => "{n} change.".to_string(),
+            "report-n-change-a-line-added" => "{n} change: {a} line added.".to_string(),
+            "report-n-change-a-lines-added" => "{n} change: {a} lines added.".to_string(),
+            "report-n-change-d-line-removed" => "{n} change: {d} line removed.".to_string(),
+            "report-n-change-d-line-removed-a-line-added" => "{n} change: {d} line removed, {a} line added.".to_string(),
+            "report-n-change-d-line-removed-a-lines-added" => "{n} change: {d} line removed, {a} lines added.".to_string(),
+            "report-n-change-d-lines-removed" => "{n} change: {d} lines removed.".to_string(),
+            "report-n-change-d-lines-removed-a-line-added" => "{n} change: {d} lines removed, {a} line added.".to_string(),
+            "report-n-change-d-lines-removed-a-lines-added" => "{n} change: {d} lines removed, {a} lines added.".to_string(),
+            "report-n-changes" => "{n} changes.".to_string(),
+            "report-n-changes-a-line-added" => "{n} changes: {a} line added.".to_string(),
+            "report-n-changes-a-lines-added" => "{n} changes: {a} lines added.".to_string(),
+            "report-n-changes-d-line-removed" => "{n} changes: {d} line removed.".to_string(),
+            "report-n-changes-d-line-removed-a-line-added" => "{n} changes: {d} line removed, {a} line added.".to_string(),
+            "report-n-changes-d-line-removed-a-lines-added" => "{n} changes: {d} line removed, {a} lines added.".to_string(),
+            "report-n-changes-d-lines-removed" => "{n} changes: {d} lines removed.".to_string(),
+            "report-n-changes-d-lines-removed-a-line-added" => "{n} changes: {d} lines removed, {a} line added.".to_string(),
+            "report-n-changes-d-lines-removed-a-lines-added" => "{n} changes: {d} lines removed, {a} lines added.".to_string(),
+            "report-n-changed-file-s-content-is-not-shown-in-this-report-the" => "{n} changed file's content is not shown in this report (the cap of {max_files} file or {max_size} of change text was reached):".to_string(),
+            "report-n-changed-file-s-content-is-not-shown-in-this-report-the-2" => "{n} changed file's content is not shown in this report (the cap of {max_files} files or {max_size} of change text was reached):".to_string(),
+            "report-n-changed-files-content-is-not-shown-in-this-report-the-cap" => "{n} changed files' content is not shown in this report (the cap of {max_files} file or {max_size} of change text was reached):".to_string(),
+            "report-n-changed-files-content-is-not-shown-in-this-report-the-cap-2" => "{n} changed files' content is not shown in this report (the cap of {max_files} files or {max_size} of change text was reached):".to_string(),
+            "report-contains-1-direction-control-character" => "Contains 1 direction-control character".to_string(),
+            "report-contains-n-direction-control-characters" => "Contains {n} direction-control characters".to_string(),
+            "identical" => "Identical".to_string(),
+            "different" => "Different".to_string(),
+            "only-on-the-left" => "Only on the left".to_string(),
+            "only-on-the-right" => "Only on the right".to_string(),
+            "only-on-the-left-empty-folder" => "Only on the left (empty folder)".to_string(),
+            "only-on-the-right-empty-folder" => "Only on the right (empty folder)".to_string(),
+            "comparing" => "Comparing…".to_string(),
+            "not-compared" => "Not compared".to_string(),
+            "unreadable" => "Unreadable".to_string(),
+            "symlink-not-followed" => "Symlink not followed".to_string(),
+            other => other.to_string(),
+        }
+    }
+
     // ── RFC-092 §3's two deliberate defences, each tested to fail alone ────
 
     #[test]
@@ -834,7 +1027,7 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_file_report(&report, "0.0.0", "now", false, &en);
         // A fixed literal, not `CSP_META` itself - comparing against the
         // same constant the page is built from would pass even if that
         // constant were emptied out (caught live: it did, until this was
@@ -857,7 +1050,7 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_file_report(&report, "0.0.0", "now", false, &en);
         assert!(!html.contains("<script>"));
         assert!(!html.contains("<img src=x"));
         assert!(html.contains("&lt;script&gt;"));
@@ -875,7 +1068,7 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_file_report(&report, "0.0.0", "now", false, &en);
         assert!(!html.contains("<script"));
         assert!(!html.contains("http://"));
         assert!(!html.contains("https://"));
@@ -893,7 +1086,7 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let without = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let without = render_file_report(&report, "0.0.0", "now", false, &en);
         // The CSS rule `.checksum { ... }` is always present; what must be
         // absent is the *caveat sentence*, shown only once a checksum is
         // actually attached and rendered.
@@ -903,7 +1096,7 @@ mod tests {
             Some(FileChecksum::of_bytes(b"a\n")),
             Some(FileChecksum::of_bytes(b"b\n")),
         );
-        let with = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let with = render_file_report(&report, "0.0.0", "now", false, &en);
         assert!(with.contains(&crate::checksum::sha256_hex(b"a\n")));
         assert!(with.contains(&crate::checksum::sha256_hex(b"b\n")));
     }
@@ -959,7 +1152,7 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_file_report(&report, "0.0.0", "now", false, &en);
         assert!(
             html.contains('\u{2212}'),
             "a minus mark on the deleted line"
@@ -973,25 +1166,33 @@ mod tests {
 
     #[test]
     fn summary_template_key_matches_the_reviews_own_examples() {
-        // "3 changes: 2 lines removed, 3 lines added." (review 174 §4)
+        // "3 changes: 2 lines removed, 3 lines added." (review 174 §4) -
+        // RFC-101 stage B: the function now returns the catalog id for
+        // that sentence, not the sentence itself (en.catalog/ja.catalog
+        // carry the actual wording; the i18n audit and its own
+        // falsifications cover that it's exactly right).
         assert_eq!(
             summary_template_key(3, 2, 3),
-            "{n} changes: {d} lines removed, {a} lines added."
+            "report-n-changes-d-lines-removed-a-lines-added"
         );
         // "1 change: 1 line added." (review 174 §4)
-        assert_eq!(summary_template_key(1, 0, 1), "{n} change: {a} line added.");
+        assert_eq!(
+            summary_template_key(1, 0, 1),
+            "report-n-change-a-line-added"
+        );
     }
 
     #[test]
     fn singular_and_plural_are_resolved_independently_per_number() {
-        // n, d and a each get their own singular/plural word, not just n's.
+        // n, d and a each get their own singular/plural id component, not
+        // just n's.
         assert_eq!(
             summary_template_key(5, 1, 3),
-            "{n} changes: {d} line removed, {a} lines added."
+            "report-n-changes-d-line-removed-a-lines-added"
         );
         assert_eq!(
             summary_template_key(1, 4, 1),
-            "{n} change: {d} lines removed, {a} line added."
+            "report-n-change-d-lines-removed-a-line-added"
         );
     }
 
@@ -999,17 +1200,17 @@ mod tests {
     fn a_zero_count_is_omitted_never_shown_as_zero() {
         assert_eq!(
             summary_template_key(2, 2, 0),
-            "{n} changes: {d} lines removed."
+            "report-n-changes-d-lines-removed"
         );
         assert_eq!(
             summary_template_key(2, 0, 2),
-            "{n} changes: {a} lines added."
+            "report-n-changes-a-lines-added"
         );
-        assert_eq!(summary_template_key(2, 0, 0), "{n} changes.");
+        assert_eq!(summary_template_key(2, 0, 0), "report-n-changes");
     }
 
     #[test]
-    fn no_hunks_or_replaced_jargon_appears_in_any_template() {
+    fn no_hunks_or_replaced_jargon_appears_in_any_template_id() {
         for n in 1..=3 {
             for d in 0..=2 {
                 for a in 0..=2 {
@@ -1034,7 +1235,12 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_file_report(&report, "0.0.0", "now", false, &|s| match s {
+            "report-n-change-d-line-removed-a-line-added" => {
+                "{n} change: {d} line removed, {a} line added.".to_string()
+            }
+            other => other.to_string(),
+        });
         assert!(html.contains("1 change: 1 line removed, 1 line added."));
     }
 
@@ -1063,7 +1269,7 @@ mod tests {
             "now",
             false,
             &|s| match s {
-                "{n} changes: {d} lines removed, {a} lines added." => {
+                "report-n-changes-d-lines-removed-a-lines-added" => {
                     "{n} か所の変更（削除 {d} 行、追加 {a} 行）。".to_string()
                 }
                 other => other.to_string(),
@@ -1092,14 +1298,14 @@ mod tests {
             crate::report::ReportOptions::default(),
         );
         let html = render_file_report(&report, "0.0.0", "now", false, &|s| {
-            if s == "Comparison report" {
+            if s == "report-comparison-report" {
                 "比較レポート".to_string()
             } else {
                 s.to_string()
             }
         });
         assert!(html.contains("比較レポート"));
-        assert!(!html.contains(">Comparison report<"));
+        assert!(!html.contains(">report-comparison-report<"));
     }
 
     #[test]
@@ -1114,8 +1320,8 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let standard = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
-        let safe = render_file_report(&report, "0.0.0", "now", true, &|s| s.to_string());
+        let standard = render_file_report(&report, "0.0.0", "now", false, &en);
+        let safe = render_file_report(&report, "0.0.0", "now", true, &en);
         assert_ne!(standard, safe);
         assert!(standard.contains(STANDARD.del_mark));
         assert!(safe.contains(RED_GREEN_SAFE.del_mark));
@@ -1133,7 +1339,7 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_file_report(&report, "0.0.0", "now", false, &en);
         assert!(html.starts_with("<!doctype html>"));
         assert!(html.trim_end().ends_with("</html>"));
         assert!(html.contains("identical"));
@@ -1165,7 +1371,7 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_dir_report(&report, "0.0.0", "now", false, &en);
         assert!(html.contains("a.txt"));
         assert!(html.contains("b.txt"));
         // Review 174 §3: the app's own words - the same ones
@@ -1193,7 +1399,7 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_dir_report(&report, "0.0.0", "now", false, &en);
         assert!(html.contains("No files."));
         assert!(!html.contains("Identical: 0"));
         assert!(!html.contains("Different: 0"));
@@ -1222,7 +1428,7 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_dir_report(&report, "0.0.0", "now", false, &en);
         assert!(html.contains("Unreadable: 1"), "{html}");
         assert!(!html.contains("No files."), "{html}");
     }
@@ -1246,7 +1452,7 @@ mod tests {
             crate::report::ReportOptions::default(),
         );
         report.change_hunks_omitted.push("huge.txt".into());
-        let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_dir_report(&report, "0.0.0", "now", false, &en);
         assert!(html.contains("huge.txt"));
         assert!(html.contains("1")); // the cap count
     }
@@ -1272,7 +1478,7 @@ mod tests {
             crate::report::ReportOptions::default(),
         );
         report.change_hunks_omitted.push("huge.txt".into());
-        let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_dir_report(&report, "0.0.0", "now", false, &en);
         assert!(html.contains("1 changed file&#39;s content"), "{html}");
         assert!(!html.contains("1 changed files"), "{html}");
         assert!(html.contains("the cap of 50 files or 5.0 MiB"), "{html}");
@@ -1297,7 +1503,7 @@ mod tests {
         let mut report =
             crate::report::DirComparisonReport::from_entries(&entries, None, None, None, options);
         report.change_hunks_omitted.push("huge.txt".into());
-        let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_dir_report(&report, "0.0.0", "now", false, &en);
         assert!(html.contains("the cap of 1 file or 1.0 KiB"), "{html}");
         assert!(!html.contains("cap of 1 files"), "{html}");
     }
@@ -1320,7 +1526,7 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_dir_report(&report, "0.0.0", "now", false, &en);
         // Review 174 §2a/§3: the app's own word, via status_key - a report
         // never renders mid-scan, so a Computing entry always reads "Not
         // compared", never "Comparing…".
@@ -1364,7 +1570,7 @@ mod tests {
             crate::report::ReportOptions::default(),
         )
         .with_bidi_controls(2, 1);
-        let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_file_report(&report, "0.0.0", "now", false, &en);
         assert!(
             html.contains("Contains 3 direction-control characters"),
             "{html}"
@@ -1376,8 +1582,7 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let clean_html =
-            render_file_report(&clean_report, "0.0.0", "now", false, &|s| s.to_string());
+        let clean_html = render_file_report(&clean_report, "0.0.0", "now", false, &en);
         assert!(!clean_html.contains("direction-control"), "{clean_html}");
     }
 
@@ -1398,7 +1603,7 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let html = render_file_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_file_report(&report, "0.0.0", "now", false, &en);
         assert!(!html.contains('\u{202E}'), "{html}");
         assert!(html.contains("<span class=\"bidi-marker\""), "{html}");
         assert!(html.contains(">RLO<"), "{html}");
@@ -1419,7 +1624,7 @@ mod tests {
             None,
             crate::report::ReportOptions::default(),
         );
-        let html = render_dir_report(&report, "0.0.0", "now", false, &|s| s.to_string());
+        let html = render_dir_report(&report, "0.0.0", "now", false, &en);
         assert!(!html.contains('\u{202E}'), "{html}");
         assert!(html.contains("<span class=\"bidi-marker\""), "{html}");
         assert!(html.contains(">RLO<"), "{html}");

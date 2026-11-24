@@ -94,10 +94,11 @@ pub struct RecEntry {
 /// The single source of a `RecStatus`'s status word — review 174 §3: the
 /// app's own words, one function, so Deep Compare's live view
 /// (`deep_compare.rs`'s `status_label`) and a comparison report
-/// (`report::html`) can never drift apart. Returns an **i18n key** (English
-/// text), not a translation — the caller passes it through `t(lang, ...)`
-/// (UI) or a translator closure (core's report renderer); this function
-/// itself has no i18n dependency, matching core's GUI-independence.
+/// (`report::html`) can never drift apart. Returns an **i18n catalog id**
+/// (RFC-101 stage B, handoff 114: a stable slug, not English text), not a
+/// translation — the caller passes it through `t(lang, ...)` (UI) or a
+/// translator closure (core's report renderer); this function itself has
+/// no i18n dependency, matching core's GUI-independence.
 ///
 /// `in_progress` distinguishes `RecStatus::Computing`'s two honest
 /// readings (review 174 §2a): `true` while a scan is actually still
@@ -108,30 +109,30 @@ pub struct RecEntry {
 /// finished or been cancelled, never both-at-once with the export itself.
 pub fn status_key(status: RecStatus, in_progress: bool) -> &'static str {
     match status {
-        RecStatus::Changed => "Different",
-        RecStatus::LeftOnly => "Only on the left",
-        RecStatus::RightOnly => "Only on the right",
+        RecStatus::Changed => "different",
+        RecStatus::LeftOnly => "only-on-the-left",
+        RecStatus::RightOnly => "only-on-the-right",
         // F135: distinct wording from the plain one-sided labels above -
         // this row is an empty directory, not a file, and the label says
         // so rather than letting the glyph (deliberately the same one)
         // carry that distinction alone.
-        RecStatus::LeftOnlyDir => "Only on the left (empty folder)",
-        RecStatus::RightOnlyDir => "Only on the right (empty folder)",
-        RecStatus::Equal => "Identical",
+        RecStatus::LeftOnlyDir => "only-on-the-left-empty-folder",
+        RecStatus::RightOnlyDir => "only-on-the-right-empty-folder",
+        RecStatus::Equal => "identical",
         RecStatus::Computing => {
             if in_progress {
-                "Comparing…"
+                "comparing"
             } else {
-                "Not compared"
+                "not-compared"
             }
         }
-        RecStatus::Unreadable => "Unreadable",
+        RecStatus::Unreadable => "unreadable",
         // F80: core does not follow cross-root symlinks (the entry is
         // reported, not compared, per RecStatus::Symlink's own doc comment)
         // - the honest label says the link was not followed, not merely
         // that one exists, so it does not read as a verdict about the
         // target.
-        RecStatus::Symlink => "Symlink not followed",
+        RecStatus::Symlink => "symlink-not-followed",
     }
 }
 

@@ -20,11 +20,38 @@ use super::changes::ChangeHunk;
 use super::dir::DirComparisonReport;
 use super::file::FileComparisonReport;
 use super::html::{counts_line, mark_for};
-use forskscope_compare::dir::{RecStatus, status_key};
+use forskscope_compare::dir::RecStatus;
 
 /// `counts_line`'s translator parameter, with nothing to translate.
 fn identity(s: &str) -> String {
     s.to_string()
+}
+
+/// This module's own English status word for `status` — **not**
+/// `forskscope_compare::dir::status_key`, which now returns a catalog id
+/// (RFC-101 stage B, handoff 114) meant for a translator, not this
+/// module's own untranslated, direct-to-stdout text. Same words
+/// `status_key` returned before that change (review 174 §3's original
+/// wording), kept here on purpose for the one caller with no i18n layer
+/// at all.
+fn plain_status_word(status: RecStatus, in_progress: bool) -> &'static str {
+    match status {
+        RecStatus::Changed => "Different",
+        RecStatus::LeftOnly => "Only on the left",
+        RecStatus::RightOnly => "Only on the right",
+        RecStatus::LeftOnlyDir => "Only on the left (empty folder)",
+        RecStatus::RightOnlyDir => "Only on the right (empty folder)",
+        RecStatus::Equal => "Identical",
+        RecStatus::Computing => {
+            if in_progress {
+                "Comparing…"
+            } else {
+                "Not compared"
+            }
+        }
+        RecStatus::Unreadable => "Unreadable",
+        RecStatus::Symlink => "Symlink not followed",
+    }
 }
 
 /// RFC-100 §4, F235: `text`, with every bidirectional control character
@@ -150,14 +177,26 @@ pub fn render_dir_report_text(report: &DirComparisonReport) -> String {
     let _ = writeln!(out);
 
     let main_counts = [
-        (status_key(RecStatus::Equal, false), report.equal),
-        (status_key(RecStatus::Changed, false), report.changed),
-        (status_key(RecStatus::LeftOnly, false), report.left_only),
-        (status_key(RecStatus::RightOnly, false), report.right_only),
+        (plain_status_word(RecStatus::Equal, false), report.equal),
+        (plain_status_word(RecStatus::Changed, false), report.changed),
+        (
+            plain_status_word(RecStatus::LeftOnly, false),
+            report.left_only,
+        ),
+        (
+            plain_status_word(RecStatus::RightOnly, false),
+            report.right_only,
+        ),
     ];
     let extra_counts = [
-        (status_key(RecStatus::Symlink, false), report.symlinks),
-        (status_key(RecStatus::Unreadable, false), report.unreadable),
+        (
+            plain_status_word(RecStatus::Symlink, false),
+            report.symlinks,
+        ),
+        (
+            plain_status_word(RecStatus::Unreadable, false),
+            report.unreadable,
+        ),
     ];
     let main_line = counts_line(&identity, &main_counts);
     let extra_line = counts_line(&identity, &extra_counts);
@@ -197,7 +236,7 @@ pub fn render_dir_report_text(report: &DirComparisonReport) -> String {
                 out,
                 "  {} — {}",
                 escape_bidi_controls(&row.path),
-                status_key(row.rec_status, false)
+                plain_status_word(row.rec_status, false)
             );
         }
     }

@@ -4,7 +4,7 @@
 use dioxus::prelude::*;
 
 use super::TabSnapshot;
-use crate::i18n::t;
+use crate::i18n::{t, tf};
 use crate::state::{
     Lang, Modal, Store, change_diff_options, change_encoding, reload_tab, swap_sides,
 };
@@ -30,14 +30,14 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
             // RFC-097 stage 3 §1: a symbol alone wasn't enough — the words
             // stay beside the kept symbol, not in place of it.
             button {
-                aria_label: t(lang, "F7 — Previous change"),
+                aria_label: t(lang, "f7-previous-change"),
                 onclick: move |_| crate::ui::view::diff_actions::move_focus(&mut store, index, -1),
-                "◀ " {t(lang, "Previous change")}
+                "◀ " {t(lang, "previous-change")}
             }
             button {
-                aria_label: t(lang, "F8 — Next change"),
+                aria_label: t(lang, "f8-next-change"),
                 onclick: move |_| crate::ui::view::diff_actions::move_focus(&mut store, index,  1),
-                "▶ " {t(lang, "Next change")}
+                "▶ " {t(lang, "next-change")}
             }
             span { class: "info", "{pos}" }
             span { class: "spacer" }
@@ -47,8 +47,8 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     onclick: move |_| {
                         if let Some(tab) = store.tabs.write().get_mut(index) { let _ = tab.merge.undo(); }
                     },
-                    aria_label: t(lang, "Undo last merge action (Ctrl+Z)"),
-                    {t(lang, "Undo")}
+                    aria_label: t(lang, "undo-last-merge-action-ctrl-z"),
+                    {t(lang, "undo")}
                 }
                 // RFC-097 stage 3 §4: beside Undo now, not under More — same
                 // enabled/disabled logic (`!snap.can_redo`), Ctrl+Y unchanged.
@@ -57,14 +57,14 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     onclick: move |_| {
                         if let Some(tab) = store.tabs.write().get_mut(index) { let _ = tab.merge.redo(); }
                     },
-                    aria_label: t(lang, "Redo last undone merge action (Ctrl+Y)"),
-                    {t(lang, "Redo")}
+                    aria_label: t(lang, "redo-last-undone-merge-action-ctrl-y"),
+                    {t(lang, "redo")}
                 }
                 button {
                     disabled: !snap.is_dirty,
                     onclick: move |_| save_tab(&mut store, index),
-                    aria_label: t(lang, "Save merge result (Ctrl+S)"),
-                    {t(lang, "Save")}
+                    aria_label: t(lang, "save-merge-result-ctrl-s"),
+                    {t(lang, "save")}
                 }
                 button {
                     onclick: move |_| {
@@ -79,29 +79,29 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                             .map(|p| p.display().to_string()).unwrap_or_default();
                         store.modal.set(Modal::SaveAs(index, path));
                     },
-                    {t(lang, "Save As")}
+                    {t(lang, "save-as")}
                 }
             }
             button {
-                title: t(lang, "Reload both files from disk"),
-                aria_label: t(lang, "Reload files from disk"),
+                title: t(lang, "reload-both-files-from-disk"),
+                aria_label: t(lang, "reload-files-from-disk"),
                 onclick: move |_| {
                     let dirty = store.tabs.read().get(index).map(|t| t.merge.is_dirty()).unwrap_or(false);
                     if dirty { store.modal.set(Modal::ConfirmReload(index)); }
-                    else { reload_tab(&mut store, index); store.notify_success(t(store.lang(), "Reloaded.")); }
+                    else { reload_tab(&mut store, index); store.notify_success(t(store.lang(), "reloaded")); }
                 },
                 "↺"
             }
             button {
                 id: "search-open-btn",
-                aria_label: t(lang, "Search within diff (Ctrl+F)"),
+                aria_label: t(lang, "search-within-diff-ctrl-f"),
                 onclick: move |_| { search_ctx.write().active ^= true; },
-                "🔍 " {t(lang, "Search")}
+                "🔍 " {t(lang, "search")}
             }
             if snap.can_save {
                 button {
                     onclick: move |_| { let v = *advanced.read(); advanced.set(!v); },
-                    if *advanced.read() { {t(lang, "Less ▲")} } else { {t(lang, "More ▼")} }
+                    if *advanced.read() { {t(lang, "less")} } else { {t(lang, "more-2")} }
                 }
             }
             {
@@ -113,19 +113,19 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 // for a non-saveable tab. Lives in the primary row for
                 // that reason, not literally beside "Export patch".
                 let (disabled, tooltip) = if !snap.right_is_text {
-                    (true, t(lang, "Reports cover text comparisons for now."))
+                    (true, t(lang, "reports-cover-text-comparisons-for-now"))
                 } else if snap.is_dirty {
-                    (true, t(lang, "Save or undo your changes first: a report describes the saved files."))
+                    (true, t(lang, "save-or-undo-your-changes-first-a-report-describes-the"))
                 } else {
-                    (false, t(lang, "Export a comparison report"))
+                    (false, t(lang, "export-a-comparison-report"))
                 };
                 rsx! {
                     button {
                         disabled,
                         title: "{tooltip}",
-                        aria_label: t(lang, "Export report"),
+                        aria_label: t(lang, "export-report"),
                         onclick: move |_| store.modal.set(Modal::ExportReport(index)),
-                        {t(lang, "Export report…")}
+                        {t(lang, "export-report-2")}
                     }
                 }
             }
@@ -136,9 +136,9 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
             div { class: "diff-toolbar advanced",
                 button {
                     aria_pressed: if snap.char_mode { "true" } else { "false" },
-                    aria_label: t(lang, "Toggle character-level inline diff"),
+                    aria_label: t(lang, "toggle-character-level-inline-diff"),
                     disabled: !snap.inline_available,
-                    title: if snap.inline_available { String::new() } else { t(lang, "Character-level highlighting is not available for this comparison.") },
+                    title: if snap.inline_available { String::new() } else { t(lang, "character-level-highlighting-is-not-available-for-this") },
                     onclick: move |_| {
                         if let Some(tab) = store.tabs.write().get_mut(index)
                             && crate::ui::view::diff::inline_available(&tab.diff_options)
@@ -146,15 +146,15 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                             tab.char_mode ^= true;
                         }
                     },
-                    {format!("{}: {}", t(lang, "Inline diff"), t(lang, if snap.char_mode { "on" } else { "off" }))}
+                    {tf(lang, "toolbar-inline-diff-state", &[("state", &t(lang, if snap.char_mode { "on" } else { "off" }))], None)}
                 }
                 button {
                     aria_pressed: if snap.word_wrap { "true" } else { "false" },
-                    aria_label: t(lang, "Toggle word wrap"),
+                    aria_label: t(lang, "toggle-word-wrap"),
                     onclick: move |_| {
                         if let Some(tab) = store.tabs.write().get_mut(index) { tab.word_wrap ^= true; }
                     },
-                    {format!("{}: {}", t(lang, "Wrap"), t(lang, if snap.word_wrap { "on" } else { "off" }))}
+                    {tf(lang, "toolbar-wrap-state", &[("state", &t(lang, if snap.word_wrap { "on" } else { "off" }))], None)}
                 }
                 button {
                     onclick: move |_| {
@@ -162,11 +162,11 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                         if dirty { store.modal.set(Modal::ConfirmSwap(index)); }
                         else { swap_sides(&mut store, index); }
                     },
-                    {format!("⇄ {}", t(lang, "Swap sides"))}
+                    {format!("⇄ {}", t(lang, "swap-sides"))}
                 }
                 button {
                     aria_pressed: if snap.ignore_whitespace { "true" } else { "false" },
-                    aria_label: t(lang, "Toggle ignore whitespace"),
+                    aria_label: t(lang, "toggle-ignore-whitespace"),
                     onclick: move |_| {
                         // F40: computed here and handed to change_diff_options,
                         // which guards against discarding applied merge work
@@ -180,11 +180,11 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                             change_diff_options(&mut store, index, next);
                         }
                     },
-                    {format!("{}: {}", t(lang, "Ignore whitespace"), t(lang, if snap.ignore_whitespace { "on" } else { "off" }))}
+                    {tf(lang, "toolbar-ignore-whitespace-state", &[("state", &t(lang, if snap.ignore_whitespace { "on" } else { "off" }))], None)}
                 }
                 button {
                     aria_pressed: if snap.ignore_case { "true" } else { "false" },
-                    aria_label: t(lang, "Toggle ignore case"),
+                    aria_label: t(lang, "toggle-ignore-case"),
                     onclick: move |_| {
                         let next = store.tabs.read().get(index).map(|t| {
                             let mut o = t.diff_options;
@@ -195,10 +195,10 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                             change_diff_options(&mut store, index, next);
                         }
                     },
-                    {format!("{}: {}", t(lang, "Ignore case"), t(lang, if snap.ignore_case { "on" } else { "off" }))}
+                    {tf(lang, "toolbar-ignore-case-state", &[("state", &t(lang, if snap.ignore_case { "on" } else { "off" }))], None)}
                 }
                 SelectField {
-                    title: t(lang, "Diff algorithm"),
+                    title: t(lang, "diff-algorithm"),
                     value: algo_val(snap.algorithm).to_string(),
                     options: vec![
                         SelectOption::new("myers", "Myers"),
@@ -223,10 +223,10 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                     },
                 }
                 button {
-                    title: t(lang, "Export unified-diff patch file"),
-                    aria_label: t(lang, "Export patch"),
+                    title: t(lang, "export-unified-diff-patch-file"),
+                    aria_label: t(lang, "export-patch"),
                     onclick: move |_| { export_patch(&mut store, index); },
-                    {t(lang, "Export patch")}
+                    {t(lang, "export-patch")}
                 }
                 if snap.right_is_text {
                     {
@@ -250,8 +250,8 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                         );
                         rsx! {
                             SelectField {
-                                title: t(lang, "Encoding — re-decode if this looks wrong"),
-                                aria_label: t(lang, "Right-side text encoding"),
+                                title: t(lang, "encoding-re-decode-if-this-looks-wrong"),
+                                aria_label: t(lang, "right-side-text-encoding"),
                                 value: snap.right_encoding_label.clone(),
                                 options,
                                 onchange: move |v: String| change_encoding(&mut store, index, v),
@@ -426,7 +426,7 @@ mod tests {
         // Only the `rsx!`/component source above this test module, not this
         // module's own test text - cut at the `#[cfg(test)]` marker.
         let component_src = src.split("#[cfg(test)]").next().unwrap();
-        let needle = format!("{}{}", "{t", "(lang, \"Redo\")}");
+        let needle = format!("{}{}", "{t", "(lang, \"redo\")}");
         let count = component_src.matches(needle.as_str()).count();
         assert_eq!(
             count, 1,

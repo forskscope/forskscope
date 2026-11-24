@@ -134,12 +134,12 @@ pub fn ExplorerTree(
             if rows.is_empty() {
                 div { class: "explorer-empty",
                     div { class: "explorer-empty-icon", "📂" }
-                    p { class: "explorer-empty-title", {t(lang, "Compare files or folders")} }
+                    p { class: "explorer-empty-title", {t(lang, "compare-files-or-folders")} }
                     p { class: "explorer-empty-hint",
-                        {t(lang, "Choose a folder for each side, then select items to compare.")}
+                        {t(lang, "choose-a-folder-for-each-side-then-select-items-to-compare")}
                     }
                     p { class: "explorer-empty-local",
-                        "🔒 " {t(lang, "Nothing leaves this computer.")}
+                        "🔒 " {t(lang, "nothing-leaves-this-computer")}
                     }
                 }
             }

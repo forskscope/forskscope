@@ -394,10 +394,10 @@ fn handle_result(
             if outcome.encoding_fallback_to_utf8 {
                 store.notify_warning(t(
                     store.lang(),
-                    "Saved, but the requested encoding was not recognized — used UTF-8 instead.",
+                    "saved-but-the-requested-encoding-was-not-recognized-used",
                 ));
             } else {
-                store.notify_success(t(store.lang(), "Saved."));
+                store.notify_success(t(store.lang(), "saved"));
             }
         }
         Err(CoreError::Conflict { .. }) => {
@@ -540,7 +540,7 @@ pub fn export_patch(store: &mut Store, index: usize) {
     let Some(patch) = patch_doc else {
         // Identical files — nothing to export. Notify but don't error.
         drop(tabs);
-        store.notify_info(t(store.lang(), "Files are identical — nothing to export."));
+        store.notify_info(t(store.lang(), "files-are-identical-nothing-to-export"));
         return;
     };
 
@@ -578,7 +578,7 @@ pub fn export_patch(store: &mut Store, index: usize) {
             if let Err(msg) = write_export_file(
                 path,
                 patch_text.as_bytes(),
-                &t(lang, "Could not save the patch"),
+                &t(lang, "could-not-save-the-patch"),
             ) {
                 store.notify(msg);
             }
@@ -655,7 +655,7 @@ pub fn export_file_report(
         drop(tabs);
         store.notify(t(
             lang,
-            "Save or undo your changes first: a report describes the saved files.",
+            "save-or-undo-your-changes-first-a-report-describes-the",
         ));
         return;
     }
@@ -674,7 +674,7 @@ pub fn export_file_report(
         if state != forskscope_compare::ExternalFileState::Clean {
             store.notify(t(
                 lang,
-                "A file changed since it was compared. Compare again, then export.",
+                "a-file-changed-since-it-was-compared-compare-again-then",
             ));
             return;
         }
@@ -802,19 +802,19 @@ pub fn export_file_report(
                     Ok(html) => match write_export_file(
                         &path,
                         html.as_bytes(),
-                        &t(lang, "Could not save the report"),
+                        &t(lang, "could-not-save-the-report"),
                     ) {
                         Ok(()) => {
                             store.notify_success_with_open(
-                                t(lang, "Report saved."),
-                                t(lang, "Open"),
+                                t(lang, "report-saved"),
+                                t(lang, "open"),
                                 path.display().to_string(),
                             );
                         }
                         Err(msg) => store.notify(msg),
                     },
                     Err(e) => {
-                        store.notify(format!("{}: {e}.", t(lang, "Could not save the report")))
+                        store.notify(format!("{}: {e}.", t(lang, "could-not-save-the-report")))
                     }
                 }
             });

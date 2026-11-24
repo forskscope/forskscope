@@ -22,7 +22,7 @@ use forskscope_ui_logic::{
     release_page_url, update_action,
 };
 
-use crate::i18n::t;
+use crate::i18n::{t, tf};
 use crate::startup_mode::{self, ModeDisplay};
 use crate::state::{Lang, Modal, Store};
 use crate::update_check::check_for_updates;
@@ -34,12 +34,12 @@ use crate::update_check::check_for_updates;
 fn mode_and_location(lang: Lang) -> Option<(String, Option<String>)> {
     match startup_mode::mode_display() {
         ModeDisplay::Installed => None,
-        ModeDisplay::Portable(dir) => Some((t(lang, "Portable"), Some(dir.display().to_string()))),
+        ModeDisplay::Portable(dir) => Some((t(lang, "portable"), Some(dir.display().to_string()))),
         ModeDisplay::PortableReadOnly(dir) => Some((
-            t(lang, "Portable (read-only): changes are not saved"),
+            t(lang, "portable-read-only-changes-are-not-saved"),
             Some(dir.display().to_string()),
         )),
-        ModeDisplay::Private => Some((t(lang, "Private: nothing is saved"), None)),
+        ModeDisplay::Private => Some((t(lang, "private-nothing-is-saved"), None)),
     }
 }
 
@@ -54,35 +54,42 @@ fn app_channel() -> AppChannel {
 /// would say the same thing in two places.
 fn update_check_message(lang: Lang, state: &UpdateCheckState) -> String {
     match state {
-        UpdateCheckState::Checking => t(lang, "Checking…"),
-        UpdateCheckState::UpToDate { current } => {
-            t(lang, "You have the latest version ({version}).")
-                .replace("{version}", &current.to_string())
-        }
-        UpdateCheckState::NewerAvailable { latest, .. } => {
-            t(lang, "{version} is available.").replace("{version}", &latest.to_string())
-        }
-        UpdateCheckState::AheadOfRelease { latest, .. } => t(
+        UpdateCheckState::Checking => t(lang, "checking"),
+        UpdateCheckState::UpToDate { current } => tf(
             lang,
-            "This build is newer than the latest release ({version}).",
-        )
-        .replace("{version}", &latest.to_string()),
+            "you-have-the-latest-version-version",
+            &[("version", &current.to_string())],
+            None,
+        ),
+        UpdateCheckState::NewerAvailable { latest, .. } => tf(
+            lang,
+            "version-is-available",
+            &[("version", &latest.to_string())],
+            None,
+        ),
+        UpdateCheckState::AheadOfRelease { latest, .. } => tf(
+            lang,
+            "this-build-is-newer-than-the-latest-release-version",
+            &[("version", &latest.to_string())],
+            None,
+        ),
         UpdateCheckState::CouldNotCheck(reason) => match reason {
             CheckFailureReason::Unreachable => {
-                t(lang, "Could not check for updates: no network connection.")
+                t(lang, "could-not-check-for-updates-no-network-connection")
             }
             CheckFailureReason::RateLimited => t(
                 lang,
-                "Could not check for updates: rate-limited, try again later.",
+                "could-not-check-for-updates-rate-limited-try-again-later",
             ),
-            CheckFailureReason::HttpStatus(code) => t(
+            CheckFailureReason::HttpStatus(code) => tf(
                 lang,
-                "Could not check for updates: unexpected response (HTTP {code}).",
-            )
-            .replace("{code}", &code.to_string()),
+                "could-not-check-for-updates-unexpected-response-http-code",
+                &[("code", &code.to_string())],
+                None,
+            ),
             CheckFailureReason::Unparseable => t(
                 lang,
-                "Could not check for updates: the reply could not be read.",
+                "could-not-check-for-updates-the-reply-could-not-be-read",
             ),
         },
     }
@@ -101,15 +108,15 @@ fn newer_available_action(lang: Lang, channel: AppChannel, latest: Version) -> E
                     onclick: move |_| {
                         let _ = open_url(&url);
                     },
-                    {t(lang, "Open release page")}
+                    {t(lang, "open-release-page")}
                 }
             }
         }
         UpdateAction::UseAurHelper => rsx! {
-            span { {t(lang, "Update with your AUR helper")} }
+            span { {t(lang, "update-with-your-aur-helper")} }
         },
         UpdateAction::UseMicrosoftStore => rsx! {
-            span { {t(lang, "Update through the Microsoft Store")} }
+            span { {t(lang, "update-through-the-microsoft-store")} }
         },
     }
 }
@@ -148,9 +155,9 @@ pub fn AboutModal() -> Element {
     let mut update_state = use_signal(|| None::<UpdateCheckState>);
     let checking = matches!(&*update_state.read(), Some(UpdateCheckState::Checking));
     let button_label = if checking {
-        t(lang, "Checking…")
+        t(lang, "checking")
     } else {
-        t(lang, "Check for updates")
+        t(lang, "check-for-updates")
     };
     let channel = app_channel();
     // RFC-095 §4.6: in a Flatpak, updates come from Flathub through the
@@ -159,25 +166,25 @@ pub fn AboutModal() -> Element {
     let in_flatpak = forskscope_desktop::platform::flatpak().in_flatpak;
 
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "About ForskScope"),
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: t(lang, "about-forskscope"),
             div { class: "modal",
                 h2 { "ForskScope v{info.app_version}" }
                 div { class: "about-grid",
-                    span { class: "about-key", {t(lang, "Version")} } span { "{info.app_version}" }
-                    span { class: "about-key", {t(lang, "Rust")}    } span { "{info.rustc_version}" }
-                    span { class: "about-key", {t(lang, "OS")}      } span { "{info.os}" }
-                    span { class: "about-key", {t(lang, "Arch")}    } span { "{info.arch}" }
-                    span { class: "about-key", {t(lang, "CPUs")}    } span { "{info.logical_cpus}" }
+                    span { class: "about-key", {t(lang, "version")} } span { "{info.app_version}" }
+                    span { class: "about-key", {t(lang, "rust")}    } span { "{info.rustc_version}" }
+                    span { class: "about-key", {t(lang, "os")}      } span { "{info.os}" }
+                    span { class: "about-key", {t(lang, "arch")}    } span { "{info.arch}" }
+                    span { class: "about-key", {t(lang, "cpus")}    } span { "{info.logical_cpus}" }
                     if let Some((mode, location)) = &mode_and_location {
-                        span { class: "about-key", {t(lang, "Mode")} } span { "{mode}" }
+                        span { class: "about-key", {t(lang, "mode")} } span { "{mode}" }
                         if let Some(location) = location {
-                            span { class: "about-key", {t(lang, "Data location")} } span { "{location}" }
+                            span { class: "about-key", {t(lang, "data-location")} } span { "{location}" }
                         }
                     }
                 }
                 if in_flatpak {
                     p { class: "update-check-message",
-                        {t(lang, "Updates come from Flathub, through your software centre.")}
+                        {t(lang, "updates-come-from-flathub-through-your-software-centre")}
                     }
                 } else {
                     div { class: "update-check",
@@ -214,12 +221,12 @@ pub fn AboutModal() -> Element {
                                 ).await;
                             });
                         },
-                        {t(lang, "Copy diagnostics")}
+                        {t(lang, "copy-diagnostics")}
                     }
                     button {
                         autofocus: true,
                         onclick: move |_| store.modal.set(Modal::None),
-                        {t(lang, "Close")}
+                        {t(lang, "close")}
                     }
                 }
             }

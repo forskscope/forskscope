@@ -42,7 +42,7 @@ pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
     rsx! {
         div { class: "add-profile-form",
             input {
-                placeholder: t(lang, "Profile name"),
+                placeholder: t(lang, "profile-name"),
                 value: "{name}",
                 oninput: move |e| name.set(e.value()),
                 style: "flex:1;"
@@ -50,17 +50,17 @@ pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
             label { class: "profile-check",
                 input { r#type: "checkbox", checked: *ignore_ws.read(),
                     onchange: move |e| ignore_ws.set(e.checked()) }
-                span { {t(lang, "Ignore whitespace")} }
+                span { {t(lang, "ignore-whitespace")} }
             }
             label { class: "profile-check",
                 input { r#type: "checkbox", checked: *ignore_case.read(),
                     onchange: move |e| ignore_case.set(e.checked()) }
-                span { {t(lang, "Ignore case")} }
+                span { {t(lang, "ignore-case")} }
             }
             label { class: "profile-check",
                 input { r#type: "checkbox", checked: *ignore_newlines.read(),
                     onchange: move |e| ignore_newlines.set(e.checked()) }
-                span { {t(lang, "Ignore line-ending differences (CRLF/LF)")} }
+                span { {t(lang, "ignore-line-ending-differences-crlf-lf")} }
             }
             {
                 let algo_value = match *algorithm.read() {
@@ -89,12 +89,12 @@ pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
             button {
                 class: "more-options-toggle",
                 onclick: move |_| { let v = *more_options.read(); more_options.set(!v); },
-                if *more_options.read() { "▾ " {t(lang, "More options")} }
-                else                    { "▸ " {t(lang, "More options")} }
+                if *more_options.read() { "▾ " {t(lang, "more-options")} }
+                else                    { "▸ " {t(lang, "more-options")} }
             }
             if *more_options.read() {
                 div { class: "add-profile-more-options",
-                    label { r#for: "profile-inline-mode", {t(lang, "Character-level highlighting")} }
+                    label { r#for: "profile-inline-mode", {t(lang, "character-level-highlighting")} }
                     {
                         let inline_value = match *inline_mode.read() {
                             InlineMode::EagerForSmallHunks => "eager",
@@ -106,9 +106,9 @@ pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
                                 id: "profile-inline-mode".to_string(),
                                 value: inline_value.to_string(),
                                 options: vec![
-                                    SelectOption::new("lazy", t(lang, "When I turn it on")),
-                                    SelectOption::new("eager", t(lang, "Automatically for small changes")),
-                                    SelectOption::new("never", t(lang, "Never")),
+                                    SelectOption::new("lazy", t(lang, "when-i-turn-it-on")),
+                                    SelectOption::new("eager", t(lang, "automatically-for-small-changes")),
+                                    SelectOption::new("never", t(lang, "never")),
                                 ],
                                 onchange: move |v: String| {
                                     inline_mode.set(match v.as_str() {
@@ -142,11 +142,11 @@ pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
                         on_done.call(());
                     }
                 },
-                {t(lang, "Add")}
+                {t(lang, "add")}
             }
             button {
                 onclick: move |_| on_done.call(()),
-                {t(lang, "Cancel")}
+                {t(lang, "cancel")}
             }
         }
     }
