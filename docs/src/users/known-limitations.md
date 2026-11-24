@@ -147,6 +147,21 @@ sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev
 
 ---
 
+### Linux: status messages aren't spoken by screen readers
+
+ForskScope marks its status messages (notices, search counts, the
+Explorer's status, changes to an ignore list) as live regions, the
+standard way to have a screen reader announce text that appears without
+moving focus. On Linux, WebKitGTK doesn't send the accessibility event
+that screen readers act on for any form of live region, so Orca announces
+none of them. Focus changes are announced normally. Measured with
+WebKitGTK 2.54.3 and Orca 51.2.
+
+Until a WebKitGTK release changes this, the next ForskScope release makes
+the messages that need your attention take focus, so they're spoken.
+
+---
+
 ### macOS: unsigned binary warning
 
 The release binary is not notarized. macOS Gatekeeper will show a warning on

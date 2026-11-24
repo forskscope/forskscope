@@ -63,3 +63,18 @@ ForskScope: it follows the system on Windows, macOS and Linux.
 See [Settings → Colour vision](settings.md#colour-vision): a red–green-safe
 diff palette, and every change is marked with a glyph as well as colour, in
 both palettes.
+
+## Screen readers
+
+Every control has a name a screen reader can read, and the whole app works
+from the keyboard (see the [Keyboard reference](../intermediate/keyboard.md)).
+
+**On Linux, status messages aren't spoken.** Messages that appear on their
+own (a notice such as *Could not save settings*, the number of search
+matches, the Explorer's status, a change to an ignore list) are marked for
+screen readers in the standard way, but the web engine ForskScope uses on
+Linux (WebKitGTK) doesn't pass them on, so Orca stays silent. What has
+focus *is* spoken. Measured with WebKitGTK 2.54.3 and Orca 51.2; see
+[Known limitations](known-limitations.md#linux-status-messages-arent-spoken-by-screen-readers).
+Making the messages that need your attention take focus, so they're
+spoken, is planned for the next release.
