@@ -12,7 +12,8 @@ The owner accepted that direction the same day ("All accepted. Proceed.").
 This document is the design for that acceptance.
 **Accepted.** 2026-11-21 by the project owner ("Yes. Both accepted.").
 **Scheduling.** Stage A (the measurement) in the `0.200.0` cycle (handoff
-110); stages B and C in `0.201.0` (owner's scope, 2026-11-21).
+110). Stage B in `0.201.0` (handoff 114); stage C in `0.202.0`, so its
+first triage can't stall `0.201.0` (owner's scope, 2026-11-24).
 **Amended.** 2026-11-22 by the architect (review 232, after stage A):
 - the catalog format is decided;
 - the Deep Compare summary is a list;

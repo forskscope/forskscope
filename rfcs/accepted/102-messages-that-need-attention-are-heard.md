@@ -1,6 +1,6 @@
 # RFC 102: Messages That Need Attention Are Heard — Errors and Warnings Take Focus
 
-**Status.** Proposed.
+**Status.** Accepted.
 **Proposed.** 2026-11-24 by the architect, for **F226**. The owner accepted
 the follow-up direction the same day ("Your recommendations are
 accepted"):
@@ -10,7 +10,12 @@ accepted"):
 - measure Windows.
 
 This document is the design for the second and fourth.
-**Scheduling.** `0.201.0`, with RFC-101 stages B–C.
+**Accepted.** 2026-11-24 by the project owner ("Yes."), with `0.201.0`'s
+scope, warnings included.
+**Scheduling.** `0.201.0`:
+- stage A (the list, and the Windows measurement) runs alongside RFC-101
+  stage B (handoff 115);
+- stage B follows the owner's review (handoff 116).
 **Touches.**
 - `crates/forskscope-ui`: the notice (toast) component, `state.rs`'s
   `Notice`, focus handling, and the CSS;

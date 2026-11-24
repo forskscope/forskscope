@@ -7,13 +7,14 @@ Lifecycle: [RFC 000](./done/000-rfc-lifecycle-policy.md). Numbers never reused.
 > (RFC 042) and the non-goals addendum. New feature work introduced after the
 > v0.34 audit is numbered from RFC 054 onward.
 
-## Accepted (6)
+## Accepted (7)
 
 Review complete; the implementer may start. Distinct from **Proposed**, which
 is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 
 | RFC | Title | State |
 |-----|-------|-------|
+| 102 | [Messages That Need Attention Are Heard — Errors and Warnings Take Focus](./accepted/102-messages-that-need-attention-are-heard.md) | Accepted 2026-11-24 |
 | 101 | [Translation Groundwork — Whole Sentences, Plurals, Catalogs and a Pseudo-Language](./accepted/101-translation-groundwork.md) | Accepted 2026-11-21 |
 | 074 | [v1 Release Stabilization Program](./accepted/074-v1-release-stabilization-program.md) | Accepted |
 | 078 | [Platform Runtime Acceptance and Release Evidence](./accepted/078-platform-runtime-acceptance.md) | Accepted |
@@ -101,7 +102,7 @@ is still open for review. Adopted 2026-09-02 — RFC-000's 5-folder variant.
 | 076 | [Versioned Runtime Settings and Session Persistence](./done/076-versioned-runtime-persistence.md) | post-v0.165.1 stabilization |
 | 077 | [Git Mergetool Save-Target Model](./done/077-mergetool-save-target-model.md) | post-v0.165.1 stabilization |
 
-## Proposed (10)
+## Proposed (9)
 
 These are the RFCs not yet accepted, all from the early design phase:
 
@@ -112,11 +113,10 @@ These are the RFCs not yet accepted, all from the early design phase:
 - **Governance and roadmap:** RFC-041 and 042.
 
 RFCs from the 2026 stabilization program and later are under **Accepted** or
-**Implemented**, not here, except RFC-102, which is new and awaits the owner.
+**Implemented**, not here.
 
 | ID | Title | Category | Progress |
 |----|-------|----------|----------|
-| 102 | [Messages That Need Attention Are Heard — Errors and Warnings Take Focus](./proposed/102-messages-that-need-attention-are-heard.md) | Accessibility | Proposed 2026-11-24 (F226) — awaiting the owner |
 | 004 | [Editor Adapter and CodeMirror Bridge](./proposed/004-editor-adapter-and-codemirror-bridge.md) | Editor adapter | Not started — requires GTK/WebView |
 | 010 | [Packaging, Diagnostics, QA, and Release Gates](./proposed/010-packaging-diagnostics-qa.md) | Platform/packaging | Not started — requires cross-platform CI |
 | 016 | [Editor Bridge Security and Contract](./proposed/016-editor-bridge-security-and-contract.md) | Editor adapter | Blocked on RFC-004 |
