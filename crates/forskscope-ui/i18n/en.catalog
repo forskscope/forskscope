@@ -83,7 +83,7 @@ could-not-check-for-updates-no-network-connection = Could not check for updates:
 could-not-check-for-updates-rate-limited-try-again-later = Could not check for updates: rate-limited, try again later.
 could-not-check-for-updates-the-reply-could-not-be-read = Could not check for updates: the reply could not be read.
 could-not-check-for-updates-unexpected-response-http-code = Could not check for updates: unexpected response (HTTP { $code }).
-could-not-compare-the-spreadsheets = Could not compare the spreadsheets
+could-not-compare-the-spreadsheets-detail = Could not compare the spreadsheets — { $detail }
 could-not-open = Could not open
 could-not-save-the-patch = Could not save the patch
 could-not-save-the-report = Could not save the report
@@ -515,3 +515,59 @@ report-large-file-inline-diff-disabled = Large file — inline diff disabled.
 report-some-hunks-were-too-large-for-inline-diff = Some hunks were too large for inline diff.
 report-profile-name-default = Default
 report-profile-name-custom = Custom
+
+# F238 (review 238 §1.4): forskscope-ui-logic's LoadIdentityError has no
+# i18n of its own (RFC-093 crate-boundaries) - mapped to a catalog id
+# here, in the UI. Practically unreachable (every variant needs a 64-bit
+# counter to wrap), but RFC-101 §1 says every user-visible message.
+could-not-open-tab-id-invalid = Could not open: an internal tab identifier was invalid.
+could-not-open-load-generation-invalid = Could not open: an internal load identifier was invalid.
+could-not-open-load-generation-exhausted = Could not open: this tab has been reloaded too many times in one session.
+could-not-open-tab-id-exhausted = Could not open: too many comparisons have been opened in one session.
+
+# F238 (review 238 §1.4): these two toasts bypassed translation entirely -
+# a bare format! with no t()/tf() call at all.
+could-not-save-session = Could not save session: { $error }
+could-not-save-settings = Could not save settings: { $error }
+
+# F238 (review 238 §1.4): describe_block's four reasons never ran
+# through t()/tf() at all.
+cannot-save-here-binary = Cannot save here: the target is a binary file.
+cannot-save-here-spreadsheet = Cannot save here: the target is a spreadsheet file.
+cannot-save-here-not-a-plain-file = Cannot save here: { $reason }.
+cannot-save-here-unreadable = Cannot save here: { $message }
+
+# F238 (review 238 §1.4): UserMessage::for_kind's short texts
+# (forskscope-compare) never passed through translation - that crate
+# keeps no i18n of its own (RFC-093 crate boundaries), so each
+# AppErrorKind maps to one of these ids here, in the UI, instead
+# (app_error_kind_short_id in diff_actions.rs). Only .short is in
+# scope (203a's own finding); .detail/button labels are a separate,
+# larger system out of this reply.
+app-error-path-not-found = File not found
+app-error-path-not-file = Not a file
+app-error-path-not-directory = Not a directory
+app-error-permission-denied = Permission denied
+app-error-symlink-unsupported = Symbolic links are not supported
+app-error-file-read-failed = Could not read file
+app-error-file-write-failed = Could not write file
+app-error-encoding-detection-failed = Encoding unknown
+app-error-decode-lossy = Decoding may be lossy
+app-error-encode-lossy = Cannot save: unsupported characters
+app-error-unsavable-after-decode-loss = Cannot save: file was read with substitutions
+app-error-binary-not-comparable = Binary file
+app-error-file-too-large = File is large
+app-error-diff-failed = Comparison failed
+app-error-inline-diff-too-large = Inline diff skipped
+app-error-save-conflict = Save conflict
+app-error-external-modification-detected = File changed on disk
+app-error-backup-failed = Backup failed
+app-error-background-job-failed = Background task failed
+app-error-background-job-cancelled = Task cancelled
+app-error-session-too-new = Session from newer version
+app-error-session-corrupted = Session file corrupted
+app-error-vcs-unavailable = VCS not available
+app-error-vcs-command-failed = VCS error
+app-error-spreadsheet-read-failed = Could not read spreadsheet
+app-error-encrypted-workbook = Encrypted workbook
+app-error-internal-fault = Internal error

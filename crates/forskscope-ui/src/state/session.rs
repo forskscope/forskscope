@@ -12,6 +12,7 @@ use forskscope_desktop::persist::schema::session::{
 use forskscope_desktop::persist::schema::{PersistenceCommitError, PersistenceIoError};
 use forskscope_ui_logic::SessionRecoveryView;
 
+use crate::i18n::tf;
 use crate::state::compare::open_compare;
 use crate::state::{Modal, Notice, Store, config_file_path};
 
@@ -42,7 +43,14 @@ pub fn save_session(store: &Store) {
     );
     if let Err(e) = result {
         let mut store = *store;
-        store.notify(format!("Could not save session: {e}"));
+        let lang = store.lang();
+        let error = e.to_string();
+        store.notify(tf(
+            lang,
+            "could-not-save-session",
+            &[("error", &error)],
+            None,
+        ));
     }
 }
 

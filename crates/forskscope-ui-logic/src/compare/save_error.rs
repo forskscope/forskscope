@@ -14,7 +14,7 @@
 //! correctly. This module's job is to assign a button label to each and
 //! expose it as a plain struct the component can iterate.
 
-use forskscope_compare::error::{AppError, RecoveryAction};
+use forskscope_compare::error::{AppError, AppErrorKind, RecoveryAction};
 
 // ── RecoveryButton ────────────────────────────────────────────────────────────
 
@@ -65,7 +65,13 @@ pub fn action_label(action: RecoveryAction) -> &'static str {
 /// Everything the save-error dialog needs to render.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SaveErrorView {
-    /// Dialog title (short, fits the title bar).
+    /// The error this view was built from — F238 (review 238 §1.4):
+    /// `forskscope-ui-logic` keeps no i18n of its own (RFC-093 crate
+    /// boundaries), so `title` below still carries `AppError`'s English
+    /// text; the component maps `kind` to a catalog id and renders that
+    /// translated text instead of `title` whenever it displays this view.
+    pub kind: AppErrorKind,
+    /// Dialog title (short, fits the title bar) — English only; see `kind`.
     pub title: String,
     /// Body text — one or two sentences explaining the problem.
     pub body: String,
@@ -97,6 +103,7 @@ impl SaveErrorView {
             .collect();
 
         Self {
+            kind: err.kind,
             title: msg.short.clone(),
             body: msg.detail.clone(),
             path,

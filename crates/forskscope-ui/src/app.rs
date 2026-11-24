@@ -79,7 +79,7 @@ pub fn App() -> Element {
             .get()
             .cloned()
             .unwrap_or(StartupRequest::Explorer);
-        match classify_startup_request(startup_request, store.lang(), fs_probe) {
+        match classify_startup_request(startup_request, fs_probe) {
             StartupAction::Explorer => {
                 // No explicit startup pair — restore the previous session (RFC-035).
                 restore_tabs(&mut store, &session_resolution);

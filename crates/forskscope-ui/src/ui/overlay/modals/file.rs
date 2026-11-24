@@ -18,7 +18,7 @@ use crate::state::{
 };
 use crate::ui::view::BidiText;
 use crate::ui::view::diff::{SaveAsPrecheck, confirm_overwrite, precheck_save_as_target, save_as};
-use crate::ui::view::diff_actions::handle_save_recovery_action;
+use crate::ui::view::diff_actions::{app_error_kind_short_id, handle_save_recovery_action};
 
 /// `target` is the exact path the conflicting save attempted — the tab's own
 /// save target for a plain save conflict, or the Save As destination for a
@@ -304,16 +304,21 @@ pub fn LargeLoadModal(prompt: LargeLoadPrompt) -> Element {
 /// never reaches this dialog, see `OverwriteModal`). `view.buttons` is
 /// already in the order and primary-button selection `SaveErrorView`
 /// decided; this component renders it as-is rather than re-deriving which
-/// action is "first". Not run through `t()`: `SaveErrorView`'s text comes
-/// from `UserMessage`/`action_label`, English-only by the same precedent
-/// `handle_result`'s old `Err(e) => store.notify(e.to_string())` arm set.
+/// action is "first". `view.body` and the button labels still come from
+/// `UserMessage`/`action_label`, English-only (`.detail` and the
+/// recovery-button labels are a separate, larger system, out of review
+/// 238 §1.4's scope) — but the dialog's own title (F238) is translated
+/// here from `view.kind`, never `view.title` (`forskscope-ui-logic`'s
+/// hardcoded English, kept only so a caller not displaying this view
+/// still has the English text available).
 #[component]
 pub fn SaveErrorModal(index: usize, target: PathBuf, view: SaveErrorView) -> Element {
     let mut store = use_context::<Store>();
+    let title = t(store.lang(), app_error_kind_short_id(view.kind));
     rsx! {
-        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "{view.title}", onmounted: super::focus_autofocus_button,
+        div { class: "scrim", role: "dialog", aria_modal: "true", aria_label: "{title}", onmounted: super::focus_autofocus_button,
             div { class: "modal",
-                h2 { "{view.title}" }
+                h2 { "{title}" }
                 p { "{view.body}" }
                 if let Some(path) = &view.path {
                     code { class: "path-display", BidiText { text: path.clone(), lang: Lang::En } }
@@ -467,8 +472,8 @@ mod f235_bidi_name_markup_tests {
     }
 
     /// F235: the same coverage, for `SaveErrorModal`'s own `view.path` —
-    /// this modal is hardcoded `Lang::En` (not translated), so `BidiText`
-    /// is called with `Lang::En` explicitly at that one call site.
+    /// `path`/`BidiText` stay hardcoded `Lang::En` (not translated); only
+    /// the dialog's title is (F238, via `view.kind`).
     #[test]
     fn a_bidi_control_character_in_a_save_errors_own_path_never_reaches_the_rendered_page_raw() {
         fn root() -> Element {
@@ -478,6 +483,7 @@ mod f235_bidi_name_markup_tests {
                     index: 0usize,
                     target: "/tmp/invoice\u{202E}fdp.exe".into(),
                     view: SaveErrorView {
+                        kind: forskscope_compare::error::AppErrorKind::InternalFault,
                         title: "Could not save".to_string(),
                         body: "Something went wrong.".to_string(),
                         path: Some("/tmp/invoice\u{202E}fdp.exe".to_string()),

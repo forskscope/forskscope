@@ -19,10 +19,10 @@ use forskscope_ui_logic::{
     SaveDestination, completion_decision, guard_for_sizes,
 };
 
-use crate::i18n::{t, tf};
+use crate::i18n::{TranslatableMessage, t};
 use crate::state::tab::{CompareLaunchMode, CompareTab, TabState, tab_title};
 use crate::state::types::{LargeLoadPrompt, LargeLoadTarget};
-use crate::state::{Modal, Store, settings::Lang};
+use crate::state::{Modal, Store};
 
 // ── F84: pre-load size guard (RFC-013 §"Large file prompt") ────────────────────
 
@@ -51,10 +51,17 @@ fn is_spreadsheet_pair(left: &Path, right: &Path) -> bool {
 /// established in this codebase).
 enum LoadDecision {
     /// Proceed now with `opts` (inline-suppressed if the guard demanded
-    /// it). `banner` is the non-blocking notice to show first, if any.
+    /// it). `warn_large_file`, when set, means the guard wants the
+    /// non-blocking large-file notice shown first — never
+    /// `LoadGuard::WarnBanner`'s own `message` field directly: that's
+    /// `forskscope-ui-logic`'s hardcoded English (RFC-093 crate-
+    /// boundaries: that crate keeps no i18n of its own), and F238
+    /// (review 238 §1.4) mapped it to a catalog id here, in the UI,
+    /// instead — the same one `forskscope-report` already maps this
+    /// exact English text to for the exported report.
     Go {
         opts: DiffOptions,
-        banner: Option<String>,
+        warn_large_file: bool,
     },
     /// Block: nothing has been loaded. `opts` is the inline-suppressed
     /// options a confirmed resume must use (`ConfirmPrompt` always implies
@@ -77,11 +84,11 @@ fn decide_load(left_bytes: u64, right_bytes: u64, opts: DiffOptions) -> LoadDeci
     match guard {
         LoadGuard::Proceed => LoadDecision::Go {
             opts: adjusted,
-            banner: None,
+            warn_large_file: false,
         },
-        LoadGuard::WarnBanner { message, .. } => LoadDecision::Go {
+        LoadGuard::WarnBanner { .. } => LoadDecision::Go {
             opts: adjusted,
-            banner: Some(message),
+            warn_large_file: true,
         },
         LoadGuard::ConfirmPrompt {
             title,
@@ -101,7 +108,7 @@ fn decide_load(left_bytes: u64, right_bytes: u64, opts: DiffOptions) -> LoadDeci
 
 enum LoadResult {
     Ready(Box<PreparedCompare>),
-    Error(String),
+    Error(crate::i18n::TranslatableMessage),
 }
 
 /// Install a prepared load only when its complete runtime token is still live.
@@ -147,7 +154,7 @@ fn commit_load_result(
     decision
 }
 
-fn prepared_result(result: Result<PreparedCompare, String>) -> LoadResult {
+fn prepared_result(result: Result<PreparedCompare, TranslatableMessage>) -> LoadResult {
     match result {
         Ok(prepared) => LoadResult::Ready(Box::new(prepared)),
         Err(message) => LoadResult::Error(message),
@@ -174,8 +181,12 @@ pub fn reload_tab(store: &mut Store, index: usize) {
     };
     let decision = decide_load(size_or_zero(&left_path), size_or_zero(&right_path), opts);
     match decision {
-        LoadDecision::Go { opts, banner } => {
-            if let Some(message) = banner {
+        LoadDecision::Go {
+            opts,
+            warn_large_file,
+        } => {
+            if warn_large_file {
+                let message = t(store.lang(), "report-large-file-inline-diff-disabled");
                 store.notify_warning(message);
             }
             reload_tab_with_options(store, index, opts);
@@ -215,7 +226,7 @@ pub(crate) fn reload_tab_with_options(store: &mut Store, index: usize, opts: Dif
         let generation = match tab.load_generation.next() {
             Ok(generation) => generation,
             Err(error) => {
-                tab.state = TabState::Error(error.to_string());
+                tab.state = TabState::Error(load_identity_error_message(&error));
                 return;
             }
         };
@@ -237,19 +248,17 @@ pub(crate) fn reload_tab_with_options(store: &mut Store, index: usize, opts: Dif
     };
     let enable_binary = store.settings.read().enable_binary_comparison;
 
-    let lang = store.lang();
     let mut tabs_signal = store.tabs;
 
     // spawn_forever: reload must survive any component remounting during load.
     spawn_forever(async move {
         let result =
-            tokio::task::spawn_blocking(move || load_and_diff(request, opts, lang, enable_binary))
-                .await;
+            tokio::task::spawn_blocking(move || load_and_diff(request, opts, enable_binary)).await;
 
         let mut tabs = tabs_signal.write();
         let result = match result {
             Ok(result) => prepared_result(result),
-            Err(_) => LoadResult::Error(t(lang, "could-not-open")),
+            Err(_) => LoadResult::Error(TranslatableMessage::new("could-not-open")),
         };
         commit_load_result(&mut tabs, token, result);
     });
@@ -293,8 +302,12 @@ pub fn open_compare_request(store: &mut Store, request: CompareRequest) {
         opts,
     );
     match decision {
-        LoadDecision::Go { opts, banner } => {
-            if let Some(message) = banner {
+        LoadDecision::Go {
+            opts,
+            warn_large_file,
+        } => {
+            if warn_large_file {
+                let message = t(store.lang(), "report-large-file-inline-diff-disabled");
                 store.notify_warning(message);
             }
             open_compare_request_with_options(store, request, opts);
@@ -331,7 +344,8 @@ pub(crate) fn open_compare_request_with_options(
     let id = match store.allocate_compare_tab_id() {
         Ok(id) => id,
         Err(error) => {
-            store.notify(error.to_string());
+            let lang = store.lang();
+            store.notify(load_identity_error_message(&error).render(lang));
             return;
         }
     };
@@ -392,20 +406,18 @@ pub(crate) fn open_compare_request_with_options(
     super::session::set_active_tab(store, Some(idx));
 
     let mut tabs_signal = store.tabs;
-    let lang = store.lang();
     let token = LoadToken::new(id, generation);
 
     // spawn_forever: the task must survive the Explorer unmounting when the
     // new tab opens and replaces it with DiffWorkspace (RFC-065).
     spawn_forever(async move {
         let load_result =
-            tokio::task::spawn_blocking(move || load_and_diff(request, opts, lang, enable_binary))
-                .await;
+            tokio::task::spawn_blocking(move || load_and_diff(request, opts, enable_binary)).await;
 
         let mut tabs = tabs_signal.write();
         let result = match load_result {
             Ok(result) => prepared_result(result),
-            Err(_join_err) => LoadResult::Error(t(lang, "could-not-open")),
+            Err(_join_err) => LoadResult::Error(TranslatableMessage::new("could-not-open")),
         };
         commit_load_result(&mut tabs, token, result);
         // No save_session call needed here: the session payload only ever
@@ -440,18 +452,52 @@ fn display_name_only(path: &Path) -> String {
         .unwrap_or_else(|| path.display().to_string())
 }
 
-/// The text for a side that could not be opened. Guidance is appended here,
-/// by the error's class, and nowhere else: the error tab shows this message
-/// as it is.
-fn open_error(lang: Lang, path: &Path, error: &forskscope_compare::CoreError) -> String {
+/// The message for a side that could not be opened. Guidance is appended
+/// here, by the error's class, and nowhere else: the error tab shows this
+/// message as it is. `name`/`error` carry the file itself and the raw OS
+/// error text — review 232 §3.4 — isolated once this is finally rendered
+/// through `TranslatedText`.
+/// F238 (review 238 §1.4): `LoadIdentityError` (`forskscope-ui-logic`) has
+/// no i18n of its own (RFC-093 crate-boundaries) — mapped to a catalog id
+/// here, in the UI, same as `forskscope-compare`'s `AppErrorKind` below.
+fn load_identity_error_message(
+    error: &forskscope_ui_logic::LoadIdentityError,
+) -> TranslatableMessage {
+    use forskscope_ui_logic::LoadIdentityError;
+    // Each arm names its own literal id, not through a variable, so
+    // `cargo xtask i18n`'s usage scan can see all four as used (same
+    // reasoning as `file_folder_mismatch_message` below).
+    match error {
+        LoadIdentityError::InvalidTabId => {
+            TranslatableMessage::new("could-not-open-tab-id-invalid")
+        }
+        LoadIdentityError::InvalidGeneration => {
+            TranslatableMessage::new("could-not-open-load-generation-invalid")
+        }
+        LoadIdentityError::GenerationExhausted => {
+            TranslatableMessage::new("could-not-open-load-generation-exhausted")
+        }
+        LoadIdentityError::TabIdExhausted => {
+            TranslatableMessage::new("could-not-open-tab-id-exhausted")
+        }
+    }
+}
+
+fn open_error(path: &Path, error: &forskscope_compare::CoreError) -> TranslatableMessage {
     let name = display_name_only(path);
     let error_text = error.to_string();
-    let args = [("name", name.as_str()), ("error", error_text.as_str())];
-    if wants_access_guidance(error) {
-        tf(lang, "could-not-open-error-with-guidance", &args, None)
+    // Each branch names its own literal id, not through a variable
+    // (same reasoning as `file_folder_mismatch_message` below).
+    let message = if wants_access_guidance(error) {
+        TranslatableMessage::new("could-not-open-error-with-guidance")
     } else {
-        tf(lang, "could-not-open-error", &args, None)
-    }
+        TranslatableMessage::new("could-not-open-error")
+    };
+    message
+        .arg("name", name)
+        .isolating("name")
+        .arg("error", error_text)
+        .isolating("error")
 }
 
 /// Load, classify, diff, and derive the save target for one comparison off
@@ -463,9 +509,8 @@ fn open_error(lang: Lang, path: &Path, error: &forskscope_compare::CoreError) ->
 pub(super) fn load_and_diff(
     request: CompareRequest,
     opts: DiffOptions,
-    lang: Lang,
     enable_binary: bool,
-) -> Result<PreparedCompare, String> {
+) -> Result<PreparedCompare, TranslatableMessage> {
     let CompareRequest {
         left_input: left,
         right_input: right,
@@ -475,15 +520,14 @@ pub(super) fn load_and_diff(
         allow_missing: true,
     };
 
-    let mut ld = load_path(&left, options).map_err(|e| open_error(lang, &left, &e))?;
+    let mut ld = load_path(&left, options).map_err(|e| open_error(&left, &e))?;
 
-    let mut rd = load_path(&right, options).map_err(|e| open_error(lang, &right, &e))?;
+    let mut rd = load_path(&right, options).map_err(|e| open_error(&right, &e))?;
 
     let l_bin = matches!(ld.kind, FileKind::Binary);
     let r_bin = matches!(rd.kind, FileKind::Binary);
     if (l_bin || r_bin) && !enable_binary {
-        return Err(t(
-            lang,
+        return Err(TranslatableMessage::new(
             "binary-comparison-is-off-enable-it-in-settings-advanced",
         ));
     }
@@ -491,8 +535,7 @@ pub(super) fn load_and_diff(
     let l_text = matches!(ld.kind, FileKind::Text);
     let r_text = matches!(rd.kind, FileKind::Text);
     if (l_bin && r_text) || (l_text && r_bin) {
-        return Err(t(
-            lang,
+        return Err(TranslatableMessage::new(
             "cannot-compare-one-file-is-binary-and-the-other-is-text",
         ));
     }
@@ -515,10 +558,9 @@ pub(super) fn load_and_diff(
                 forskscope_compare::CoreError::Unsupported { message } => message,
                 other => other.to_string(),
             };
-            format!(
-                "{} — {detail}",
-                t(lang, "could-not-compare-the-spreadsheets")
-            )
+            TranslatableMessage::new("could-not-compare-the-spreadsheets-detail")
+                .arg("detail", detail)
+                .isolating("detail")
         })?;
         ld.text = Some(pair.left);
         rd.text = Some(pair.right);
@@ -647,7 +689,7 @@ pub enum StartupAction {
     Refused {
         left: PathBuf,
         right: PathBuf,
-        message: String,
+        message: TranslatableMessage,
     },
 }
 
@@ -657,7 +699,6 @@ pub enum StartupAction {
 /// file+folder, folder+file, and a missing path.
 pub fn classify_startup_request(
     request: forskscope_ui_logic::StartupRequest,
-    lang: Lang,
     probe: impl Fn(&Path) -> PathKind,
 ) -> StartupAction {
     use forskscope_ui_logic::StartupRequest;
@@ -666,12 +707,12 @@ pub fn classify_startup_request(
         StartupRequest::Compare { left, right } => match (probe(&left), probe(&right)) {
             (PathKind::Folder, PathKind::Folder) => StartupAction::CompareFolders { left, right },
             (PathKind::File, PathKind::Folder) => StartupAction::Refused {
-                message: file_folder_mismatch_message(lang, &left, &right, true),
+                message: file_folder_mismatch_message(&left, &right, true),
                 left,
                 right,
             },
             (PathKind::Folder, PathKind::File) => StartupAction::Refused {
-                message: file_folder_mismatch_message(lang, &left, &right, false),
+                message: file_folder_mismatch_message(&left, &right, false),
                 left,
                 right,
             },
@@ -691,7 +732,7 @@ pub fn classify_startup_request(
                 .cloned();
             match folder {
                 Some(path) => StartupAction::Refused {
-                    message: mergetool_folder_message(lang, &path),
+                    message: mergetool_folder_message(&path),
                     left: local,
                     right: remote,
                 },
@@ -710,49 +751,44 @@ pub fn classify_startup_request(
 /// template shapes (one per which side is the file), matching this
 /// codebase's established template-then-substitute pattern for a sentence
 /// whose word order a translation cannot simply mirror.
+/// "A file can only be compared with a file, and a folder with a folder.",
+/// naming which side is which by its own display name — `left`/`right`
+/// carry a path the user chose and are isolated once rendered (review
+/// 232 §3.4).
 fn file_folder_mismatch_message(
-    lang: Lang,
     left: &Path,
     right: &Path,
     file_is_left: bool,
-) -> String {
+) -> TranslatableMessage {
     // The quotes go in the *substituted* value, not the key - `xtask
     // i18n`'s own key extraction is line-based and not escape-aware, so a
     // key containing an escaped quote truncates there and can never
     // match between "used" and "translated" (see `docs/src/maintainers/
-    // testing.md`'s i18n section). Each branch below passes its own
-    // literal straight to the translator function, not through a
-    // variable, so the audit can see both shapes as used at all.
+    // testing.md`'s i18n section). The two ids below are both literal
+    // strings right here, not through a variable, so the audit can see
+    // both shapes as used at all.
     let left_name = format!("\"{}\"", display_name_only(left));
     let right_name = format!("\"{}\"", display_name_only(right));
-    let args = [("left", left_name.as_str()), ("right", right_name.as_str())];
-    if file_is_left {
-        tf(
-            lang,
-            "a-file-can-only-be-compared-with-a-file-and-a-folder-with-a",
-            &args,
-            None,
-        )
+    let message = if file_is_left {
+        TranslatableMessage::new("a-file-can-only-be-compared-with-a-file-and-a-folder-with-a")
     } else {
-        tf(
-            lang,
-            "a-file-can-only-be-compared-with-a-file-and-a-folder-with-a-2",
-            &args,
-            None,
-        )
-    }
+        TranslatableMessage::new("a-file-can-only-be-compared-with-a-file-and-a-folder-with-a-2")
+    };
+    message
+        .arg("left", left_name)
+        .isolating("left")
+        .arg("right", right_name)
+        .isolating("right")
 }
 
 /// The three-argument (mergetool) shape of the same refusal — Git never
 /// passes a folder there, so this names which of the three paths was one.
-fn mergetool_folder_message(lang: Lang, path: &Path) -> String {
+/// `name` carries the path and is isolated once rendered.
+fn mergetool_folder_message(path: &Path) -> TranslatableMessage {
     let name = format!("\"{}\"", display_name_only(path));
-    tf(
-        lang,
-        "git-s-merge-tool-compares-files-only-name-is-a-folder",
-        &[("name", &name)],
-        None,
-    )
+    TranslatableMessage::new("git-s-merge-tool-compares-files-only-name-is-a-folder")
+        .arg("name", name)
+        .isolating("name")
 }
 
 /// Opens a file tab exactly as a normal compare would, but already in
@@ -765,12 +801,13 @@ pub fn open_startup_mismatch_error(
     store: &mut Store,
     left: PathBuf,
     right: PathBuf,
-    message: String,
+    message: TranslatableMessage,
 ) {
     let id = match store.allocate_compare_tab_id() {
         Ok(id) => id,
         Err(error) => {
-            store.notify(error.to_string());
+            let lang = store.lang();
+            store.notify(load_identity_error_message(&error).render(lang));
             return;
         }
     };

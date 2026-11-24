@@ -23,7 +23,13 @@ pub enum TabState {
     /// Load and diff complete. Tab shows the diff view.
     Ready,
     /// Load or diff failed. Tab shows a recoverable error message.
-    Error(String),
+    ///
+    /// Review 238 §1.3: kept structured (`crate::i18n::TranslatableMessage`,
+    /// not a pre-rendered `String`) so a placeholder carrying user data (a
+    /// file name, a path) reaches its own `<bdi>` when the error tab
+    /// finally renders it, instead of being spliced into one opaque
+    /// string the moment the error is built.
+    Error(crate::i18n::TranslatableMessage),
 }
 
 /// How a tab was launched, and — for Git mergetool mode — the distinct

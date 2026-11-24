@@ -1,6 +1,7 @@
 use std::fs;
 
 use super::*;
+use crate::state::settings::Lang;
 use forskscope_desktop::persist::schema::PersistenceLoad;
 use forskscope_desktop::persist::schema::session::SessionRepository;
 use forskscope_ui_logic::{CompareTabId, LoadGeneration, StartupRequest};
@@ -124,12 +125,15 @@ fn current_failure_changes_only_its_own_tab() {
     let decision = commit_load_result(
         &mut tabs,
         second_token,
-        LoadResult::Error("second failed".into()),
+        LoadResult::Error(TranslatableMessage::new("second-failed")),
     );
 
     assert_eq!(decision, CompletionDecision::Accept);
     assert_eq!(tabs[0].state, TabState::Loading);
-    assert_eq!(tabs[1].state, TabState::Error("second failed".into()));
+    assert_eq!(
+        tabs[1].state,
+        TabState::Error(TranslatableMessage::new("second-failed"))
+    );
 }
 
 #[test]
@@ -147,7 +151,7 @@ fn obsolete_failure_does_not_replace_newer_ready_result() {
     let decision = commit_load_result(
         &mut tabs,
         old_token,
-        LoadResult::Error("obsolete failure".into()),
+        LoadResult::Error(TranslatableMessage::new("obsolete-failure")),
     );
 
     assert_eq!(decision, CompletionDecision::RejectGenerationMismatch);
@@ -205,7 +209,6 @@ fn normal_compare_save_target_is_the_right_input_must_match_its_own_fingerprint(
     let prepared = load_and_diff(
         normal_request(left, right.clone()),
         DiffOptions::default(),
-        Lang::En,
         false,
     )
     .unwrap();
@@ -229,13 +232,8 @@ fn normal_compare_save_target_is_must_be_absent_when_right_is_missing() {
     fs::write(&left, "a\n").unwrap();
     let _ = fs::remove_file(&right);
 
-    let prepared = load_and_diff(
-        normal_request(left, right),
-        DiffOptions::default(),
-        Lang::En,
-        false,
-    )
-    .unwrap();
+    let prepared =
+        load_and_diff(normal_request(left, right), DiffOptions::default(), false).unwrap();
 
     match prepared.save_target.state {
         SaveTargetState::Writable { expectation, .. } => {
@@ -253,13 +251,8 @@ fn normal_compare_can_save_and_diff_are_unaffected_by_the_prepared_compare_refac
     fs::write(&left, "one\ntwo\n").unwrap();
     fs::write(&right, "one\nTWO\n").unwrap();
 
-    let prepared = load_and_diff(
-        normal_request(left, right),
-        DiffOptions::default(),
-        Lang::En,
-        false,
-    )
-    .unwrap();
+    let prepared =
+        load_and_diff(normal_request(left, right), DiffOptions::default(), false).unwrap();
 
     assert!(
         prepared.save_capability.is_saveable(),
@@ -279,15 +272,10 @@ fn binary_comparison_disabled_error_message_is_unchanged() {
     fs::write(&left, [0u8, 1, 2, 3]).unwrap();
     fs::write(&right, "text\n").unwrap();
 
-    let result = load_and_diff(
-        normal_request(left, right),
-        DiffOptions::default(),
-        Lang::En,
-        false,
-    );
+    let result = load_and_diff(normal_request(left, right), DiffOptions::default(), false);
 
     assert_eq!(
-        result.unwrap_err(),
+        result.unwrap_err().render(Lang::En),
         "Binary comparison is off. Enable it in Settings → Advanced."
     );
 }
@@ -300,15 +288,10 @@ fn binary_vs_text_mismatch_error_message_is_unchanged() {
     fs::write(&left, [0u8, 1, 2, 3]).unwrap();
     fs::write(&right, "text\n").unwrap();
 
-    let result = load_and_diff(
-        normal_request(left, right),
-        DiffOptions::default(),
-        Lang::En,
-        true,
-    );
+    let result = load_and_diff(normal_request(left, right), DiffOptions::default(), true);
 
     assert_eq!(
-        result.unwrap_err(),
+        result.unwrap_err().render(Lang::En),
         "Cannot compare: one file is binary and the other is text. Compare text with text, or binary with binary."
     );
 }
@@ -327,13 +310,8 @@ fn a_mixed_text_and_xlsx_pair_compares_the_xlsx_side_as_empty() {
     fs::write(&left, "text\n").unwrap();
     fs::write(&right, b"not a real workbook").unwrap();
 
-    let prepared = load_and_diff(
-        normal_request(left, right),
-        DiffOptions::default(),
-        Lang::En,
-        false,
-    )
-    .unwrap();
+    let prepared =
+        load_and_diff(normal_request(left, right), DiffOptions::default(), false).unwrap();
 
     assert_eq!(prepared.left.diff_text(), "text\n");
     assert_eq!(prepared.right.diff_text(), "");
@@ -356,13 +334,8 @@ fn both_sides_xlsx_produces_a_real_structural_diff_not_an_empty_one() {
     let left = fixtures.join("old.xlsx");
     let right = fixtures.join("new.xlsx");
 
-    let prepared = load_and_diff(
-        normal_request(left, right),
-        DiffOptions::default(),
-        Lang::En,
-        false,
-    )
-    .unwrap();
+    let prepared =
+        load_and_diff(normal_request(left, right), DiffOptions::default(), false).unwrap();
 
     assert!(
         !prepared.left.diff_text().is_empty(),
@@ -395,7 +368,6 @@ fn a_spreadsheet_warning_reaches_the_prepared_comparison() {
                 fixtures.join(case).join("new.xlsx"),
             ),
             DiffOptions::default(),
-            Lang::En,
             false,
         )
         .unwrap()
@@ -424,19 +396,14 @@ fn an_uncomparable_xlsx_pair_is_an_error_not_an_identical_result() {
     fs::write(&left, b"not a real workbook").unwrap();
     fs::write(&right, b"also not a real workbook").unwrap();
 
-    let result = load_and_diff(
-        normal_request(left, right),
-        DiffOptions::default(),
-        Lang::En,
-        false,
-    );
+    let result = load_and_diff(normal_request(left, right), DiffOptions::default(), false);
 
     let message = match result {
         Ok(prepared) => panic!(
             "an uncomparable pair must not load; got identical={}",
             prepared.diff.is_identical()
         ),
-        Err(message) => message,
+        Err(message) => message.render(Lang::En),
     };
     assert!(
         message.starts_with("Could not compare the spreadsheets"),
@@ -465,7 +432,6 @@ fn mergetool_save_target_is_the_merged_path_not_the_compared_remote() {
     let prepared = load_and_diff(
         mergetool_request(local, remote.clone(), merged.clone()),
         DiffOptions::default(),
-        Lang::En,
         false,
     )
     .unwrap();
@@ -499,7 +465,6 @@ fn mergetool_save_target_is_must_be_absent_when_merged_does_not_exist_yet() {
     let prepared = load_and_diff(
         mergetool_request(local, remote, merged),
         DiffOptions::default(),
-        Lang::En,
         false,
     )
     .unwrap();
@@ -531,7 +496,6 @@ fn mergetool_compares_local_and_remote_not_local_and_merged() {
     let prepared = load_and_diff(
         mergetool_request(local, remote, merged),
         DiffOptions::default(),
-        Lang::En,
         false,
     )
     .unwrap();
@@ -566,7 +530,6 @@ fn save_target_matches_right_input_after_load_and_reload() {
         let prepared = load_and_diff(
             normal_request(left.clone(), right.clone()),
             DiffOptions::default(),
-            Lang::En,
             false,
         )
         .unwrap();
@@ -739,7 +702,13 @@ const LARGE_FILE_BYTES: usize = 5 * 1024 * 1024;
 fn decide_load_dispatches_through_the_real_guard_for_every_size_class() {
     let small = decide_load(1_024, 1_024, DiffOptions::default());
     assert!(
-        matches!(small, LoadDecision::Go { banner: None, .. }),
+        matches!(
+            small,
+            LoadDecision::Go {
+                warn_large_file: false,
+                ..
+            }
+        ),
         "a small pair must proceed silently"
     );
 
@@ -783,9 +752,8 @@ fn the_large_file_banner_is_true_the_toggle_is_unavailable() {
     match decide_load(medium, 1_024, DiffOptions::default()) {
         LoadDecision::Go {
             opts,
-            banner: Some(message),
+            warn_large_file: true,
         } => {
-            assert!(message.contains("inline diff disabled"), "{message}");
             assert!(
                 !inline_available(&opts),
                 "the banner says inline diff is disabled, so the toggle must be"
@@ -901,7 +869,6 @@ fn a_file_that_decoded_with_replacement_characters_cannot_be_saved_without_the_g
     let prepared = load_and_diff(
         normal_request(left.clone(), right.clone()),
         DiffOptions::default(),
-        Lang::En,
         false,
     )
     .unwrap();
@@ -971,7 +938,6 @@ fn a_missing_right_side_can_be_created_by_saving() {
     let prepared = load_and_diff(
         normal_request(left.clone(), right.clone()),
         DiffOptions::default(),
-        Lang::En,
         false,
     )
     .unwrap();
@@ -1050,7 +1016,6 @@ fn a_binary_or_spreadsheet_side_is_still_not_saveable() {
     let prepared = load_and_diff(
         normal_request(left_bin, right_bin),
         DiffOptions::default(),
-        Lang::En,
         true, // enable_binary — otherwise load_and_diff refuses earlier for a different reason
     )
     .unwrap();
@@ -1072,13 +1037,8 @@ fn a_binary_or_spreadsheet_side_is_still_not_saveable() {
 
     let xlsx = dir.join("right.xlsx");
     fs::write(&xlsx, b"not a real workbook").unwrap();
-    let prepared = load_and_diff(
-        normal_request(left, xlsx),
-        DiffOptions::default(),
-        Lang::En,
-        false,
-    )
-    .unwrap();
+    let prepared =
+        load_and_diff(normal_request(left, xlsx), DiffOptions::default(), false).unwrap();
     assert!(
         !prepared.save_capability.is_saveable(),
         "a spreadsheet side must still block saving: {:?}",
@@ -1113,7 +1073,6 @@ fn a_cleanly_decoded_non_utf8_file_is_not_swept_into_the_new_guard() {
     let prepared = load_and_diff(
         normal_request(left.clone(), right.clone()),
         DiffOptions::default(),
-        Lang::En,
         false,
     )
     .unwrap();
@@ -1172,10 +1131,12 @@ fn a_cleanly_decoded_non_utf8_file_is_not_swept_into_the_new_guard() {
 
 const ACCESS_GUIDANCE: &str = "Check that the file exists and you have read permission.";
 
-/// The error text `load_and_diff` returns; panics with `why` if it succeeds.
+/// The error text `load_and_diff` returns (rendered in English — these
+/// tests check wording/guidance, not placeholder isolation, which has its
+/// own coverage above); panics with `why` if it succeeds.
 fn load_error(request: CompareRequest, enable_binary: bool, why: &str) -> String {
-    match load_and_diff(request, DiffOptions::default(), Lang::En, enable_binary) {
-        Err(message) => message,
+    match load_and_diff(request, DiffOptions::default(), enable_binary) {
+        Err(message) => message.render(Lang::En),
         Ok(_) => panic!("{why}"),
     }
 }
@@ -1201,7 +1162,7 @@ fn access_guidance_is_appended_only_to_errors_about_existence_or_permission() {
         IoOperation::Metadata,
         IoOperation::ListDir,
     ] {
-        let message = open_error(Lang::En, path, &io_error(op));
+        let message = open_error(path, &io_error(op)).render(Lang::En);
         assert!(message.contains(ACCESS_GUIDANCE), "{op:?}: {message}");
         assert!(
             message.contains("Could not open \"report.txt\""),
@@ -1219,7 +1180,7 @@ fn access_guidance_is_appended_only_to_errors_about_existence_or_permission() {
         },
         io_error(IoOperation::Write),
     ] {
-        let message = open_error(Lang::En, path, &error);
+        let message = open_error(path, &error).render(Lang::En);
         assert!(
             !message.contains(ACCESS_GUIDANCE),
             "the file is fine, so no advice about it: {message}"
@@ -1490,7 +1451,7 @@ fn two_files_proceed_as_requested_unchanged() {
         right: PathBuf::from("r.txt"),
     };
     assert_eq!(
-        classify_startup_request(request.clone(), Lang::En, probe),
+        classify_startup_request(request.clone(), probe),
         StartupAction::AsRequested(request)
     );
 }
@@ -1503,7 +1464,7 @@ fn two_folders_open_deep_compare_instead_of_a_file_tab() {
         right: PathBuf::from("r"),
     };
     assert_eq!(
-        classify_startup_request(request, Lang::En, probe),
+        classify_startup_request(request, probe),
         StartupAction::CompareFolders {
             left: PathBuf::from("l"),
             right: PathBuf::from("r"),
@@ -1518,7 +1479,7 @@ fn a_file_left_and_a_folder_right_is_refused_naming_both_sides() {
         left: PathBuf::from("l.txt"),
         right: PathBuf::from("r"),
     };
-    match classify_startup_request(request, Lang::En, probe) {
+    match classify_startup_request(request, probe) {
         StartupAction::Refused {
             left,
             right,
@@ -1526,11 +1487,26 @@ fn a_file_left_and_a_folder_right_is_refused_naming_both_sides() {
         } => {
             assert_eq!(left, PathBuf::from("l.txt"));
             assert_eq!(right, PathBuf::from("r"));
-            assert!(message.contains("l.txt"), "{message}");
-            assert!(message.contains('r'), "{message}");
+            // `left`/`right` are isolated placeholders (review 238 §1.3) -
+            // checked structurally here, not by substring-searching a
+            // rendered string.
+            assert_eq!(
+                message.id,
+                "a-file-can-only-be-compared-with-a-file-and-a-folder-with-a"
+            );
+            assert!(message.isolate.contains(&"left"));
+            assert!(message.isolate.contains(&"right"));
+            let left_arg = message
+                .args
+                .iter()
+                .find(|(n, _)| *n == "left")
+                .map(|(_, v)| v.as_str());
+            assert_eq!(left_arg, Some("\"l.txt\""));
+            let rendered = message.render(Lang::En);
+            assert!(rendered.contains("l.txt"), "{rendered}");
             assert!(
-                message.contains("A file can only be compared with a file"),
-                "{message}"
+                rendered.contains("A file can only be compared with a file"),
+                "{rendered}"
             );
         }
         other => panic!("expected Refused, got {other:?}"),
@@ -1544,7 +1520,7 @@ fn a_folder_left_and_a_file_right_is_refused_naming_both_sides() {
         left: PathBuf::from("l"),
         right: PathBuf::from("r.txt"),
     };
-    match classify_startup_request(request, Lang::En, probe) {
+    match classify_startup_request(request, probe) {
         StartupAction::Refused {
             left,
             right,
@@ -1552,7 +1528,11 @@ fn a_folder_left_and_a_file_right_is_refused_naming_both_sides() {
         } => {
             assert_eq!(left, PathBuf::from("l"));
             assert_eq!(right, PathBuf::from("r.txt"));
-            assert!(message.contains("r.txt"), "{message}");
+            assert_eq!(
+                message.id,
+                "a-file-can-only-be-compared-with-a-file-and-a-folder-with-a-2"
+            );
+            assert!(message.render(Lang::En).contains("r.txt"));
         }
         other => panic!("expected Refused, got {other:?}"),
     }
@@ -1570,7 +1550,7 @@ fn a_missing_path_keeps_todays_open_error_not_a_new_refusal() {
         right: PathBuf::from("also-missing.txt"),
     };
     assert_eq!(
-        classify_startup_request(request.clone(), Lang::En, probe),
+        classify_startup_request(request.clone(), probe),
         StartupAction::AsRequested(request)
     );
 }
@@ -1579,7 +1559,7 @@ fn a_missing_path_keeps_todays_open_error_not_a_new_refusal() {
 fn explorer_classifies_as_explorer() {
     let probe = probe_from(&[]);
     assert_eq!(
-        classify_startup_request(StartupRequest::Explorer, Lang::En, probe),
+        classify_startup_request(StartupRequest::Explorer, probe),
         StartupAction::Explorer
     );
 }
@@ -1597,7 +1577,7 @@ fn mergetools_three_files_proceed_as_requested_unchanged() {
         merged: PathBuf::from("merged.txt"),
     };
     assert_eq!(
-        classify_startup_request(request.clone(), Lang::En, probe),
+        classify_startup_request(request.clone(), probe),
         StartupAction::AsRequested(request)
     );
 }
@@ -1617,7 +1597,7 @@ fn a_folder_among_mergetools_three_arguments_is_refused() {
         remote: PathBuf::from("remote.txt"),
         merged: PathBuf::from("merged"),
     };
-    match classify_startup_request(request, Lang::En, probe) {
+    match classify_startup_request(request, probe) {
         StartupAction::Refused {
             left,
             right,
@@ -1625,7 +1605,12 @@ fn a_folder_among_mergetools_three_arguments_is_refused() {
         } => {
             assert_eq!(left, PathBuf::from("local.txt"));
             assert_eq!(right, PathBuf::from("remote.txt"));
-            assert!(message.contains("merged"), "{message}");
+            assert_eq!(
+                message.id,
+                "git-s-merge-tool-compares-files-only-name-is-a-folder"
+            );
+            assert!(message.isolate.contains(&"name"));
+            assert!(message.render(Lang::En).contains("merged"));
         }
         other => panic!("expected Refused, got {other:?}"),
     }
@@ -1638,11 +1623,12 @@ fn the_japanese_refusal_messages_are_real_translations_not_the_english_fallback(
         left: PathBuf::from("l.txt"),
         right: PathBuf::from("r"),
     };
-    match classify_startup_request(request, Lang::Ja, probe) {
+    match classify_startup_request(request, probe) {
         StartupAction::Refused { message, .. } => {
+            let rendered = message.render(Lang::Ja);
             assert!(
-                message.contains("比較"),
-                "the Japanese message must actually be translated: {message}"
+                rendered.contains("比較"),
+                "the Japanese message must actually be translated: {rendered}"
             );
         }
         other => panic!("expected Refused, got {other:?}"),
@@ -1658,11 +1644,12 @@ fn the_japanese_refusal_messages_are_real_translations_not_the_english_fallback(
         remote: PathBuf::from("remote.txt"),
         merged: PathBuf::from("merged"),
     };
-    match classify_startup_request(request, Lang::Ja, probe) {
+    match classify_startup_request(request, probe) {
         StartupAction::Refused { message, .. } => {
+            let rendered = message.render(Lang::Ja);
             assert!(
-                message.contains("マージツール"),
-                "the Japanese message must actually be translated: {message}"
+                rendered.contains("マージツール"),
+                "the Japanese message must actually be translated: {rendered}"
             );
         }
         other => panic!("expected Refused, got {other:?}"),

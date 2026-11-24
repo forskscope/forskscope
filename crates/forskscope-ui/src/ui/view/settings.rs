@@ -45,7 +45,14 @@ pub fn persist(mut store: Store) {
     let merged = build_save_payload(&store.settings.read(), &store.settings_v2_base.read());
     store.settings_v2_base.set(merged.clone());
     if let Err(e) = persist_settings(&merged, &repository()) {
-        store.notify(format!("Could not save settings: {e}"));
+        let lang = store.lang();
+        let error = e.to_string();
+        store.notify(crate::i18n::tf(
+            lang,
+            "could-not-save-settings",
+            &[("error", &error)],
+            None,
+        ));
     }
 }
 

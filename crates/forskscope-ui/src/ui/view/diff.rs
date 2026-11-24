@@ -56,7 +56,7 @@ pub fn DiffWorkspace(index: usize) -> Element {
                 };
             }
             Some(crate::state::TabState::Error(msg)) => {
-                return rsx! { TabError { msg } };
+                return rsx! { TabError { lang, msg } };
             }
             Some(crate::state::TabState::Ready) => {}
         }
@@ -352,11 +352,24 @@ fn DiffHeader(index: usize) -> Element {
 /// under a size refusal, a binary-versus-text error, and a workbook that exists
 /// and is readable. Guidance belongs to the error that earns it and is part of
 /// its message (`compare.rs`'s `open_error`), so a bare message stays bare.
+///
+/// `msg` stays structured (review 238 §1.3) all the way to here, so a
+/// placeholder holding user data (a file name, a path, raw OS error text)
+/// is isolated through `TranslatedText` rather than spliced into one
+/// opaque string the moment the error was built.
 #[component]
-pub(crate) fn TabError(msg: String) -> Element {
+pub(crate) fn TabError(lang: crate::state::Lang, msg: crate::i18n::TranslatableMessage) -> Element {
     rsx! {
         div { class: "diff-error",
-            Notice { kind: NoticeKind::Error, "⚠ " {msg} }
+            Notice { kind: NoticeKind::Error,
+                "⚠ "
+                crate::ui::view::TranslatedText {
+                    lang,
+                    id: msg.id,
+                    args: msg.args.clone(),
+                    isolate: msg.isolate.clone(),
+                }
+            }
         }
     }
 }
@@ -661,7 +674,11 @@ mod tab_error_tests {
     #[test]
     fn the_error_tab_shows_the_message_and_no_advice_of_its_own() {
         fn root() -> Element {
-            rsx! { TabError { msg: "Could not compare the spreadsheets — too large".to_string() } }
+            let msg =
+                crate::i18n::TranslatableMessage::new("could-not-compare-the-spreadsheets-detail")
+                    .arg("detail", "too large")
+                    .isolating("detail");
+            rsx! { TabError { lang: crate::state::Lang::En, msg } }
         }
         let text = rendered_text(root).join("|");
         assert!(text.contains("too large"), "{text}");

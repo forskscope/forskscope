@@ -86,35 +86,57 @@ pub fn t(lang: Lang, id: &str) -> String {
 /// to the template itself as `{ $count }`, so a caller never passes it
 /// twice).
 ///
-/// Panics if `id` names a plural message and `count` is `None` — there is
-/// no sensible form to pick, and showing the raw template to a user is
-/// worse than failing loudly at the one call site that forgot it. Passing
-/// a `count` for a message that *isn't* plural is not a caller mistake:
-/// plenty of messages show a `{ $count }` with no plural variation at all
-/// (the same wording for one or many, by design, not yet upgraded to a
-/// plural form, or deliberately not needing one) — `count` only ever
-/// drives the plural *selection*, and is always separately available as
-/// an ordinary `{ $count }` substitution either way.
+/// A plural message reached with `count: None` is a genuine caller bug —
+/// there is no sensible form to pick — but review 238 §1.2 is explicit
+/// that it must never crash a *release* build over it: `debug_assert!`
+/// catches it loudly in debug and test builds (where it is always a real
+/// mistake worth fixing before it ships), while a release build instead
+/// falls back to the language's own `other` form, with `{ $count }` left
+/// empty — there is no number to show, and leaking the raw placeholder
+/// text would be worse. `cargo xtask i18n` also checks, statically, that
+/// every `tf(` call naming a plural id passes a count at all (never a
+/// literal `None`), which is the real fix for this class of bug — this
+/// runtime fallback is the belt-and-suspenders behind that, for whatever
+/// it can't see (a non-literal id, for instance).
+///
+/// Passing a `count` for a message that *isn't* plural is not a caller
+/// mistake: plenty of messages show a `{ $count }` with no plural
+/// variation at all (the same wording for one or many, by design, not yet
+/// upgraded to a plural form, or deliberately not needing one) — `count`
+/// only ever drives the plural *selection*, and is always separately
+/// available as an ordinary `{ $count }` substitution either way.
 pub fn tf(lang: Lang, id: &str, args: &[(&str, &str)], count: Option<i64>) -> String {
     let forms = lookup(lang, id).or_else(|| lookup(Lang::En, id));
     let Some(forms) = forms else {
         return substitute(id, args, count);
     };
-    let template = match forms {
-        StaticForms::Single(text) => *text,
-        StaticForms::Plural(forms) => {
-            let Some(n) = count else {
-                panic!("tf({id:?}): this message is plural but no count was given");
-            };
-            let category = plural::category(lang, n);
-            forms
-                .iter()
-                .find(|(f, _)| *f == category)
-                .or_else(|| forms.iter().find(|(f, _)| *f == "other"))
-                .map(|(_, t)| *t)
-                .unwrap_or(id)
-        }
+    let forms = match forms {
+        StaticForms::Single(text) => return substitute(text, args, count),
+        StaticForms::Plural(forms) => forms,
     };
+    let Some(n) = count else {
+        debug_assert!(
+            false,
+            "tf({id:?}): this message is plural but no count was given"
+        );
+        let template = forms
+            .iter()
+            .find(|(f, _)| *f == "other")
+            .map(|(_, t)| *t)
+            .unwrap_or(id);
+        let mut out = template.replace("{ $count }", "");
+        for (name, value) in args {
+            out = out.replace(&format!("{{ ${name} }}"), value);
+        }
+        return out;
+    };
+    let category = plural::category(lang, n);
+    let template = forms
+        .iter()
+        .find(|(f, _)| *f == category)
+        .or_else(|| forms.iter().find(|(f, _)| *f == "other"))
+        .map(|(_, t)| *t)
+        .unwrap_or(id);
     substitute(template, args, count)
 }
 
@@ -127,6 +149,59 @@ fn substitute(template: &str, args: &[(&str, &str)], count: Option<i64>) -> Stri
         out = out.replace(&format!("{{ ${name} }}"), value);
     }
     out
+}
+
+/// A `tf()`-shaped message kept **structured** rather than pre-rendered
+/// into a flat `String` — review 238 §1.3: a value that has to live in
+/// state before it's rendered (`TabState::Error`, the load-failure path
+/// `state/compare.rs` builds) needs this, not just a call site that
+/// renders immediately, so a placeholder carrying user data (a name, a
+/// path, error text) can still reach its own `<bdi>` through
+/// [`crate::ui::view::TranslatedText`] once it's finally shown, instead
+/// of being spliced into one opaque string the moment it's created.
+/// [`Self::render`] flattens it to a plain string for the few places
+/// where no markup is possible at all (an attribute, a window title).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct TranslatableMessage {
+    pub id: &'static str,
+    pub args: Vec<(&'static str, String)>,
+    pub isolate: Vec<&'static str>,
+}
+
+impl TranslatableMessage {
+    pub fn new(id: &'static str) -> Self {
+        Self {
+            id,
+            args: Vec::new(),
+            isolate: Vec::new(),
+        }
+    }
+
+    /// Adds `name` to the substitution args. Chain with [`Self::isolating`]
+    /// when `value` carries user data.
+    pub fn arg(mut self, name: &'static str, value: impl Into<String>) -> Self {
+        self.args.push((name, value.into()));
+        self
+    }
+
+    /// Marks a placeholder already added via [`Self::arg`] as carrying
+    /// user data — [`crate::ui::view::TranslatedText`] wraps it in its
+    /// own `<bdi>` rather than splicing it in as plain text.
+    pub fn isolating(mut self, name: &'static str) -> Self {
+        self.isolate.push(name);
+        self
+    }
+
+    /// Flattens to a plain string, same as a direct `tf()` call — for an
+    /// attribute or a window title, where no markup is possible at all
+    /// (review 232 §3.4's own "where markup isn't possible, it goes in
+    /// as it is" rule). Never for rendered body text: use
+    /// [`crate::ui::view::TranslatedText`] there instead, so an
+    /// `isolate`-marked placeholder keeps its isolation.
+    pub fn render(&self, lang: Lang) -> String {
+        let args: Vec<(&str, &str)> = self.args.iter().map(|(n, v)| (*n, v.as_str())).collect();
+        tf(lang, self.id, &args, None)
+    }
 }
 
 /// One piece of a template, in order — either literal text to show as
@@ -498,9 +573,28 @@ mod tests {
     /// with no count must panic, not silently show `{ $count }` to a user
     /// (the same reasoning F237 applied to a missing config-root guard).
     #[test]
+    #[cfg(debug_assertions)]
     #[should_panic(expected = "this message is plural but no count was given")]
     fn tf_panics_for_a_plural_message_with_no_count() {
         tf(Lang::En, "test-fixture-plural", &[], None);
+    }
+
+    /// Review 238 §1.2: the other half of the same call - in a *release*
+    /// build (`debug_assertions` off, so the `debug_assert!` above
+    /// compiles to nothing), this must not panic at all: falls back to
+    /// the `other` form, with `{ $count }` left empty rather than
+    /// leaking raw template syntax. Only runs under `cargo test
+    /// --release` (where `cfg(not(debug_assertions))` actually holds) -
+    /// an ordinary `cargo test` compiles this module out entirely, same
+    /// as the behavior it tests.
+    #[test]
+    #[cfg(not(debug_assertions))]
+    fn tf_falls_back_to_the_other_form_with_no_count_in_release() {
+        let out = tf(Lang::En, "test-fixture-plural", &[], None);
+        // "{ $count } test items" with the placeholder token itself
+        // removed - the space that followed it in the template is not
+        // part of that token, so it stays.
+        assert_eq!(out, " test items");
     }
 
     /// RFC-100 §2: `BidiText` calls `t(lang, name)` with `name` read from

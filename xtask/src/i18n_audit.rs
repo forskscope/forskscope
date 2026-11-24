@@ -137,6 +137,37 @@ const DYNAMIC_LOOKUP_IDS: &[&str] = &[
     "report-n-changed-file-s-content-is-not-shown-in-this-report-the-2",
     "report-n-changed-files-content-is-not-shown-in-this-report-the-cap",
     "report-n-changed-files-content-is-not-shown-in-this-report-the-cap-2",
+    // F238 (review 238 §1.4): `app_error_kind_short_id` (`diff_actions.rs`)
+    // maps an `AppErrorKind` (computed, not a literal) to one of these -
+    // the literal ids live only in that function's own match arms, never
+    // at a `t`/`tf` call site directly.
+    "app-error-path-not-found",
+    "app-error-path-not-file",
+    "app-error-path-not-directory",
+    "app-error-permission-denied",
+    "app-error-symlink-unsupported",
+    "app-error-file-read-failed",
+    "app-error-file-write-failed",
+    "app-error-encoding-detection-failed",
+    "app-error-decode-lossy",
+    "app-error-encode-lossy",
+    "app-error-unsavable-after-decode-loss",
+    "app-error-binary-not-comparable",
+    "app-error-file-too-large",
+    "app-error-diff-failed",
+    "app-error-inline-diff-too-large",
+    "app-error-save-conflict",
+    "app-error-external-modification-detected",
+    "app-error-backup-failed",
+    "app-error-background-job-failed",
+    "app-error-background-job-cancelled",
+    "app-error-session-too-new",
+    "app-error-session-corrupted",
+    "app-error-vcs-unavailable",
+    "app-error-vcs-command-failed",
+    "app-error-spreadsheet-read-failed",
+    "app-error-encrypted-workbook",
+    "app-error-internal-fault",
 ];
 
 /// The plural forms each language's CLDR cardinal rule requires, for any
@@ -317,17 +348,71 @@ fn find_translated_text_literal_ids(source: &str) -> Vec<String> {
     ids
 }
 
+/// `TranslatableMessage::new("literal-id")` (review 238 §1.3) is a third
+/// way a literal id reaches a translation — a value built now, rendered
+/// later, never itself a call to `t(`/`tf(`. Same shape and same
+/// reasoning as [`find_translated_text_literal_ids`]: a literal-text scan
+/// for the constructor's own opening quote, not a balanced-paren parse,
+/// since `::new("id")` only ever takes the one string argument.
+fn find_translatable_message_literal_ids(source: &str) -> Vec<String> {
+    let mut ids = Vec::new();
+    let bytes = source.as_bytes();
+    let needle = b"TranslatableMessage::new(";
+    let mut i = 0;
+    while let Some(found) = find_bytes(bytes, needle, i) {
+        // The argument may start on the next line (`::new(\n    "id",\n)`),
+        // so skip whitespace before expecting the opening quote - unlike
+        // `find_translated_text_literal_ids`'s `id: "..."` shape, which
+        // this codebase always keeps on one line.
+        let mut start = found + needle.len();
+        while start < bytes.len() && bytes[start].is_ascii_whitespace() {
+            start += 1;
+        }
+        if bytes.get(start) != Some(&b'"') {
+            i = found + needle.len();
+            continue;
+        }
+        start += 1;
+        let mut j = start;
+        while j < bytes.len() && bytes[j] != b'"' {
+            if bytes[j] == b'\\' {
+                j += 2;
+            } else {
+                j += 1;
+            }
+        }
+        if j <= bytes.len() {
+            ids.push(source[start..j.min(bytes.len())].to_string());
+        }
+        i = j + 1;
+    }
+    ids
+}
+
 /// Scans `source` for every call to `t(...)` or `tf(...)`, returning
 /// `(call_start, call_end, id)` for each — `id` is the first string
 /// literal inside the call's own balanced parens, which is always the
 /// message id for both functions (the only other argument before it,
 /// `lang`, is never itself a string literal).
-fn find_translate_calls(source: &str) -> Vec<(usize, usize, String)> {
+/// One `t(`/`tf(` call this scan found. `tf_last_arg` is only ever `Some`
+/// for a `tf(` call (never `t(`, which has no count argument) — the
+/// trimmed text of its 4th, top-level argument, used by the "every
+/// plural `tf(` passes a count" check below. `None` either because this
+/// is a `t(` call, or because the argument list couldn't be split
+/// cleanly (conservative: never reported as a violation on uncertainty).
+struct TranslateCall {
+    start: usize,
+    id: String,
+    tf_last_arg: Option<String>,
+}
+
+fn find_translate_calls(source: &str) -> Vec<TranslateCall> {
     let mut results = Vec::new();
     let bytes = source.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
-        let prefix = if is_call_start(bytes, i, b"tf(") {
+        let is_tf = is_call_start(bytes, i, b"tf(");
+        let prefix = if is_tf {
             Some("tf(")
         } else if is_call_start(bytes, i, b"t(") {
             Some("t(")
@@ -338,9 +423,13 @@ fn find_translate_calls(source: &str) -> Vec<(usize, usize, String)> {
             i += 1;
             continue;
         };
-        let mut cursor = i + prefix.len();
+        let args_start = i + prefix.len();
+        let mut cursor = args_start;
         let mut depth = 1usize;
         let mut id: Option<String> = None;
+        // Top-level (depth-1, i.e. this call's own argument list, not a
+        // nested one) comma positions, for splitting into arguments.
+        let mut top_level_commas: Vec<usize> = Vec::new();
         while cursor < bytes.len() && depth > 0 {
             match bytes[cursor] {
                 b'"' => {
@@ -358,19 +447,36 @@ fn find_translate_calls(source: &str) -> Vec<(usize, usize, String)> {
                     }
                     cursor = j + 1;
                 }
-                b'(' => {
+                b'(' | b'[' | b'{' => {
                     depth += 1;
                     cursor += 1;
                 }
-                b')' => {
+                b')' | b']' | b'}' => {
                     depth -= 1;
+                    cursor += 1;
+                }
+                b',' if depth == 1 => {
+                    top_level_commas.push(cursor);
                     cursor += 1;
                 }
                 _ => cursor += 1,
             }
         }
         if let Some(id) = id {
-            results.push((i, cursor, id));
+            let tf_last_arg = if is_tf {
+                top_level_commas.last().map(|&last_comma| {
+                    source[last_comma + 1..cursor.saturating_sub(1)]
+                        .trim()
+                        .to_string()
+                })
+            } else {
+                None
+            };
+            results.push(TranslateCall {
+                start: i,
+                id,
+                tf_last_arg,
+            });
         }
         // Advance past just the prefix, not the whole call's span: a
         // nested `t(`/`tf(` inside this call's own arguments (e.g.
@@ -427,6 +533,68 @@ fn find_translated_joins(source: &str) -> Vec<usize> {
                 violations.push(start);
             }
             i = end.max(args_start + 1);
+        }
+    }
+    violations
+}
+
+/// F238 (review 238 §1.4): "a `Notice::…(` or `notify…(` argument that
+/// isn't a `t`/`tf` result" — the exact shape every message on 203a's
+/// list had (a bare string literal, or a `format!`/interpolation built
+/// with none of its own pieces translated). Flags:
+/// - the call's first argument starting with a string literal (`"..`) —
+///   unambiguously bypasses the catalog entirely, the shape F238's whole
+///   list was;
+/// - `format!(` as the first argument *when its own span contains no
+///   `t(`/`tf(` call at all* — a raw, untranslated build. A `format!`
+///   that already splices a `t(`/`tf(` result with raw interpolated data
+///   (`format!("{}: {e}", t(lang, "..."))`, this codebase's own
+///   established "translate the template, leave dynamic data as data"
+///   shape — distinct from [`find_translated_joins`]'s "two or more
+///   results joined" violation) is never flagged.
+/// A plain identifier or method chain (`store.notify(message)`,
+/// `.render(lang)`) is never flagged either: tracing whether *that*
+/// traces back to a `t`/`tf` call needs real dataflow analysis this
+/// scanner doesn't have, so (like every other check here) it stays
+/// conservative rather than guessing.
+fn find_untranslated_notice_calls(source: &str) -> Vec<usize> {
+    let mut violations = Vec::new();
+    let bytes = source.as_bytes();
+    const CALLS: &[&str] = &[
+        ".notify(",
+        ".notify_warning(",
+        ".notify_success(",
+        ".notify_info(",
+        ".notify_success_with_open(",
+        "Notice::error(",
+        "Notice::warning(",
+        "Notice::success(",
+        "Notice::info(",
+    ];
+    for call in CALLS {
+        let needle = call.as_bytes();
+        let mut i = 0;
+        while let Some(found) = find_bytes(bytes, needle, i) {
+            let args_start = found + needle.len();
+            let mut arg_start = args_start;
+            while arg_start < bytes.len() && bytes[arg_start].is_ascii_whitespace() {
+                arg_start += 1;
+            }
+            if bytes.get(arg_start) == Some(&b'"') {
+                violations.push(found);
+                i = arg_start + 1;
+                continue;
+            }
+            if bytes[arg_start..].starts_with(b"format!(") {
+                let span_start = arg_start + "format!(".len();
+                let (end, count) = count_translate_calls_in_span(source, span_start);
+                if count == 0 {
+                    violations.push(found);
+                }
+                i = end.max(span_start + 1);
+                continue;
+            }
+            i = args_start;
         }
     }
     violations
@@ -529,17 +697,54 @@ pub fn run(root: &Path) {
     all_rs_files(&ui_src, &mut rs_files);
     let mut used: BTreeSet<String> = DYNAMIC_LOOKUP_IDS.iter().map(|s| s.to_string()).collect();
     let mut join_violations: Vec<(PathBuf, usize)> = Vec::new();
+    let mut missing_count_violations: Vec<(PathBuf, usize, String)> = Vec::new();
+    let mut notice_violations: Vec<(PathBuf, usize)> = Vec::new();
     for path in &rs_files {
         let source = fs::read_to_string(path)
             .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
-        for (_, _, id) in find_translate_calls(&source) {
-            used.insert(id);
+        // `#[cfg(test)] mod tests { .. }`'s own deliberate `tf(.., None)`
+        // calls exist specifically to exercise the no-count fail path
+        // (`tf_panics_for_a_plural_message_with_no_count`,
+        // `tf_falls_back_to_the_other_form_with_no_count_in_release`) -
+        // a real mistake worth catching, not that. Everything from the
+        // first `#[cfg(test)]` marker onward is test code; this one
+        // check skips it (the "no message is unused" check above still
+        // counts a test-only call as real usage, unaffected).
+        let test_mod_start = source.find("#[cfg(test)]");
+        for call in find_translate_calls(&source) {
+            used.insert(call.id.clone());
+            let in_test_mod = test_mod_start.is_some_and(|t| call.start >= t);
+            if !in_test_mod
+                && let Some(last_arg) = &call.tf_last_arg
+                && last_arg == "None"
+                && let Some(Forms::Plural(_)) = catalogs.get("en").and_then(|c| c.get(&call.id))
+            {
+                missing_count_violations.push((path.clone(), call.start, call.id));
+            }
         }
         for id in find_translated_text_literal_ids(&source) {
             used.insert(id);
         }
+        for id in find_translatable_message_literal_ids(&source) {
+            used.insert(id);
+        }
         for pos in find_translated_joins(&source) {
             join_violations.push((path.clone(), pos));
+        }
+        // F238 (review 238 §1.4): skip `layout_probe.rs` entirely - a
+        // `cfg(feature = "layout-probe")`-gated, test-only diagnostic
+        // module, never reachable in a normal or release build, whose
+        // one literal toast is itself prefixed "layout-probe:" to mark
+        // it as synthetic, not real user-facing text - and skip test
+        // code the same way the missing-count check above does.
+        let is_layout_probe = path.file_name().and_then(|n| n.to_str()) == Some("layout_probe.rs");
+        if !is_layout_probe {
+            for pos in find_untranslated_notice_calls(&source) {
+                let in_test_mod = test_mod_start.is_some_and(|t| pos >= t);
+                if !in_test_mod {
+                    notice_violations.push((path.clone(), pos));
+                }
+            }
         }
     }
     if let Some(en) = catalogs.get("en") {
@@ -548,6 +753,17 @@ pub fn run(root: &Path) {
                 failures.push(format!("en.catalog's {id:?} is never used by any t()/tf() call site (and is not in DYNAMIC_LOOKUP_IDS)"));
             }
         }
+    }
+    for (path, pos, id) in &missing_count_violations {
+        let line_no = fs::read_to_string(path)
+            .map(|s| s[..*pos].matches('\n').count() + 1)
+            .unwrap_or(0);
+        failures.push(format!(
+            "{}:{line_no}: tf(lang, {id:?}, .., None) - {id:?} is a plural message, so this \
+             call must pass a real count, never a literal None (tf()'s own runtime fallback \
+             covers what this static check can't see, but this one it can)",
+            path.display()
+        ));
     }
 
     // ── Placeholders and plural forms match ─────────────────────────────
@@ -602,6 +818,17 @@ pub fn run(root: &Path) {
             "{}:{line_no}: a format!/write!/push_str call joins two or more t()/tf() results - \
              RFC-101 §1 forbids this except the Deep Compare list and the About dialog's \
              diagnostics (both already outside this scanner's own shape, see its doc comment)",
+            path.display()
+        ));
+    }
+    for (path, pos) in &notice_violations {
+        let line_no = fs::read_to_string(path)
+            .map(|s| s[..*pos].matches('\n').count() + 1)
+            .unwrap_or(0);
+        failures.push(format!(
+            "{}:{line_no}: a Notice::…()/notify…() call's message is a bare string literal or \
+             an untranslated format! - every user-visible toast/notice must be a t()/tf() \
+             result (review 238 §1.4/F238)",
             path.display()
         ));
     }

@@ -18,9 +18,9 @@ use forskscope_edit::save::{
 };
 use forskscope_ui_logic::SaveErrorView;
 
-use crate::i18n::t;
+use crate::i18n::{t, tf};
 use crate::state::tab::CompareTab;
-use crate::state::{Modal, Store};
+use crate::state::{Lang, Modal, Store};
 
 // ─── Public action functions ──────────────────────────────────────────────────
 
@@ -137,7 +137,9 @@ pub fn precheck_save_as_target(
             expectation: TargetExpectation::MustMatch(_),
             ..
         } => SaveAsPrecheck::Overwrite,
-        SaveTargetState::Blocked { reason } => SaveAsPrecheck::Blocked(describe_block(&reason)),
+        SaveTargetState::Blocked { reason } => {
+            SaveAsPrecheck::Blocked(describe_block(store.lang(), &reason))
+        }
     }
 }
 
@@ -165,7 +167,10 @@ fn dispatch(store: &mut Store, index: usize, outcome: RequestOutcome) {
             handle_result(store, index, &request, result);
         }
         RequestOutcome::NotSaveable => {}
-        RequestOutcome::Blocked(reason) => store.notify(describe_block(&reason)),
+        RequestOutcome::Blocked(reason) => {
+            let message = describe_block(store.lang(), &reason);
+            store.notify(message);
+        }
         RequestOutcome::RequiresGuard(target) => {
             // F88a/RFC-082 §D3 §4: known purely from already-loaded state
             // (unlike F87's lossy-encode check, which needs the actual
@@ -337,23 +342,68 @@ fn current_bom(tab: &CompareTab) -> BomPresence {
 }
 
 /// User-facing message for a save destination `build_request` refused
-/// (review 048 C2). Not run through `t()`: matches the English-only
-/// precedent `handle_result`'s `Err(e)` arm below originally set (F99:
-/// that arm has since been migrated to route through
-/// `AppError`/`SaveErrorView` rather than a raw `e.to_string()`, but the
-/// English-only convention it established stands).
-fn describe_block(reason: &SaveTargetBlockReason) -> String {
+/// (review 048 C2). F238 (review 238 §1.4): this used to bypass `t()`
+/// entirely — a toast only, never rendered through `TranslatedText`, so
+/// `reason`/`message` (the OS's own text) go in as plain substitutions,
+/// same as `tf()` itself (review 232 §3.4's "where markup isn't possible,
+/// it goes in as it is" rule) rather than needing isolation here.
+fn describe_block(lang: Lang, reason: &SaveTargetBlockReason) -> String {
     match reason {
-        SaveTargetBlockReason::Binary => "Cannot save here: the target is a binary file.".into(),
-        SaveTargetBlockReason::Spreadsheet => {
-            "Cannot save here: the target is a spreadsheet file.".into()
-        }
-        SaveTargetBlockReason::NotAPlainFile { reason } => {
-            format!("Cannot save here: {reason}.")
-        }
-        SaveTargetBlockReason::Unreadable { message } => {
-            format!("Cannot save here: {message}")
-        }
+        SaveTargetBlockReason::Binary => tf(lang, "cannot-save-here-binary", &[], None),
+        SaveTargetBlockReason::Spreadsheet => tf(lang, "cannot-save-here-spreadsheet", &[], None),
+        SaveTargetBlockReason::NotAPlainFile { reason } => tf(
+            lang,
+            "cannot-save-here-not-a-plain-file",
+            &[("reason", reason)],
+            None,
+        ),
+        SaveTargetBlockReason::Unreadable { message } => tf(
+            lang,
+            "cannot-save-here-unreadable",
+            &[("message", message)],
+            None,
+        ),
+    }
+}
+
+/// F238 (review 238 §1.4): `UserMessage::for_kind`'s short texts
+/// (`forskscope-compare`) never passed through translation — that crate
+/// keeps no i18n of its own (RFC-093 crate boundaries), so the catalog id
+/// for a kind's short text is looked up here, in the UI, instead of ever
+/// reading `AppError::message.short` for display. Each arm names its own
+/// literal id, not through a variable, so `cargo xtask i18n`'s usage scan
+/// can see every one as used. `.detail` and the recovery-button labels
+/// are a separate, larger system (`SaveErrorView`/`action_label`) not in
+/// 203a's own finding and out of this reply's scope.
+pub(crate) fn app_error_kind_short_id(kind: AppErrorKind) -> &'static str {
+    match kind {
+        AppErrorKind::PathNotFound => "app-error-path-not-found",
+        AppErrorKind::PathNotFile => "app-error-path-not-file",
+        AppErrorKind::PathNotDirectory => "app-error-path-not-directory",
+        AppErrorKind::PermissionDenied => "app-error-permission-denied",
+        AppErrorKind::SymlinkUnsupported => "app-error-symlink-unsupported",
+        AppErrorKind::FileReadFailed => "app-error-file-read-failed",
+        AppErrorKind::FileWriteFailed => "app-error-file-write-failed",
+        AppErrorKind::EncodingDetectionFailed => "app-error-encoding-detection-failed",
+        AppErrorKind::DecodeLossy => "app-error-decode-lossy",
+        AppErrorKind::EncodeLossy => "app-error-encode-lossy",
+        AppErrorKind::UnsavableAfterDecodeLoss => "app-error-unsavable-after-decode-loss",
+        AppErrorKind::BinaryNotComparable => "app-error-binary-not-comparable",
+        AppErrorKind::FileTooLarge => "app-error-file-too-large",
+        AppErrorKind::DiffFailed => "app-error-diff-failed",
+        AppErrorKind::InlineDiffTooLarge => "app-error-inline-diff-too-large",
+        AppErrorKind::SaveConflict => "app-error-save-conflict",
+        AppErrorKind::ExternalModificationDetected => "app-error-external-modification-detected",
+        AppErrorKind::BackupFailed => "app-error-backup-failed",
+        AppErrorKind::BackgroundJobFailed => "app-error-background-job-failed",
+        AppErrorKind::BackgroundJobCancelled => "app-error-background-job-cancelled",
+        AppErrorKind::SessionTooNew => "app-error-session-too-new",
+        AppErrorKind::SessionCorrupted => "app-error-session-corrupted",
+        AppErrorKind::VcsUnavailable => "app-error-vcs-unavailable",
+        AppErrorKind::VcsCommandFailed => "app-error-vcs-command-failed",
+        AppErrorKind::SpreadsheetReadFailed => "app-error-spreadsheet-read-failed",
+        AppErrorKind::EncryptedWorkbook => "app-error-encrypted-workbook",
+        AppErrorKind::InternalFault => "app-error-internal-fault",
     }
 }
 
@@ -929,7 +979,7 @@ mod tests {
             },
         ];
         for reason in reasons {
-            assert!(!describe_block(&reason).is_empty());
+            assert!(!describe_block(Lang::En, &reason).is_empty());
         }
     }
 
@@ -938,12 +988,12 @@ mod tests {
         let reason = SaveTargetBlockReason::NotAPlainFile {
             reason: "not a regular file".into(),
         };
-        assert!(describe_block(&reason).contains("not a regular file"));
+        assert!(describe_block(Lang::En, &reason).contains("not a regular file"));
 
         let reason = SaveTargetBlockReason::Unreadable {
             message: "permission denied".into(),
         };
-        assert!(describe_block(&reason).contains("permission denied"));
+        assert!(describe_block(Lang::En, &reason).contains("permission denied"));
     }
 
     // ── F52: save-error recovery dialog (handoff 012) ──────────────────────

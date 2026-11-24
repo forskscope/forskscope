@@ -16,7 +16,7 @@
 
 use dioxus::prelude::*;
 
-use forskscope_compare::error::{AppError, AppErrorKind};
+use forskscope_compare::error::AppErrorKind;
 use forskscope_desktop::persist::schema::PersistenceCommitError;
 use forskscope_desktop::persist::schema::session::runtime::{
     MigrationCommitOutcome as SessionMigrationCommitOutcome, SessionRuntimeOutcome,
@@ -49,17 +49,24 @@ use crate::state::{AppSettings, Lang, Store, advance_recovery_queue};
 /// `SaveConflict` kind (closest match: the file changed on disk since it
 /// was read) and `Io` to `FileWriteFailed`.
 ///
-/// Only `message.short` is used, not `.detail`: `UserMessage`'s own doc
-/// says `short` fits a toast and `detail` fits a dialog body, and
-/// `store.notify` only ever shows a toast here — there is no dialog
-/// surface to put `detail` in without inventing one, which is out of this
-/// handoff's scope.
-fn recovery_failure_message(e: &PersistenceCommitError) -> String {
+/// Only the short text is used, not `UserMessage`'s `.detail`: `short`
+/// fits a toast and `detail` fits a dialog body, and `store.notify` only
+/// ever shows a toast here — there is no dialog surface to put `detail`
+/// in without inventing one, which is out of this handoff's scope.
+///
+/// F238 (review 238 §1.4): never reads `AppError::new(..).message.short`
+/// directly any more — that's `forskscope-compare`'s hardcoded English
+/// (RFC-093 crate boundaries: that crate keeps no i18n of its own).
+/// `app_error_kind_short_id` maps the kind to a catalog id instead.
+fn recovery_failure_message(lang: Lang, e: &PersistenceCommitError) -> String {
     let kind = match e {
         PersistenceCommitError::Conflict => AppErrorKind::SaveConflict,
         PersistenceCommitError::Io(_) => AppErrorKind::FileWriteFailed,
     };
-    AppError::new(kind, e.to_string()).message.short
+    t(
+        lang,
+        crate::ui::view::diff_actions::app_error_kind_short_id(kind),
+    )
 }
 
 // ── Settings ────────────────────────────────────────────────────────────────
@@ -164,7 +171,7 @@ fn settings_recovery_action(
                         store.settings.set(AppSettings::from_v2(&resolution.value));
                         store.settings_write_disabled.set(false);
                     }
-                    Err(e) => store.notify(recovery_failure_message(&e)),
+                    Err(e) => store.notify(recovery_failure_message(store.lang(), &e)),
                 }
             }
             advance_recovery_queue(store);
@@ -254,7 +261,7 @@ fn session_recovery_action(
                     Ok(()) => {
                         store.session_write_disabled.set(false);
                     }
-                    Err(e) => store.notify(recovery_failure_message(&e)),
+                    Err(e) => store.notify(recovery_failure_message(store.lang(), &e)),
                 }
             }
             advance_recovery_queue(store);
@@ -272,7 +279,7 @@ mod tests {
     #[test]
     fn recovery_failure_message_maps_conflict_to_a_friendly_string_not_the_raw_one() {
         let e = PersistenceCommitError::Conflict;
-        let msg = recovery_failure_message(&e);
+        let msg = recovery_failure_message(Lang::En, &e);
         assert_ne!(
             msg,
             e.to_string(),
@@ -284,7 +291,7 @@ mod tests {
     #[test]
     fn recovery_failure_message_maps_io_to_a_friendly_string_not_the_raw_one() {
         let e = PersistenceCommitError::Io("No such file or directory (os error 2)".into());
-        let msg = recovery_failure_message(&e);
+        let msg = recovery_failure_message(Lang::En, &e);
         assert_ne!(
             msg,
             e.to_string(),
