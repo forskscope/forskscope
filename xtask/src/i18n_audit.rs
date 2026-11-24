@@ -552,6 +552,7 @@ fn find_translated_joins(source: &str) -> Vec<usize> {
 ///   established "translate the template, leave dynamic data as data"
 ///   shape — distinct from [`find_translated_joins`]'s "two or more
 ///   results joined" violation) is never flagged.
+///
 /// A plain identifier or method chain (`store.notify(message)`,
 /// `.render(lang)`) is never flagged either: tracing whether *that*
 /// traces back to a `t`/`tf` call needs real dataflow analysis this
