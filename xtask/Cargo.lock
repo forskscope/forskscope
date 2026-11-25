@@ -296,7 +296,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.201.0"
+version = "0.201.1"
 dependencies = [
  "rust_xlsxwriter",
  "serde_json",
