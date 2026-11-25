@@ -487,14 +487,23 @@ code.path-display {
    High value too. */
 .contrast-high .path-btn:disabled { color: var(--muted-standard); }
 .path-more-btn { margin-left: .15rem; color: var(--muted); }
-/* F240 (review 241 §3, option A): `justify-content: flex-end` right-
-   anchors the row - when its content is wider than the bar (every
-   segment already at its own floor), the overflow is pushed past the
-   *left* edge instead of the right, so `overflow: hidden` clips the
-   segments nearest the root first and the current folder (the last
-   child, `flex-shrink: 0` above) stays the one thing always inside the
-   bar. */
-.path-segments { display: flex; align-items: center; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; justify-content: flex-end; }
+/* F240 (review 241 §3, option A). Plain `.path-segments` keeps the
+   default `justify-content: flex-start` - a shallow, uncut path reads
+   from its root, so it starts right after "/", not pushed to the far
+   end of the bar. `.path-segments.truncated` (below) is the only one
+   that right-anchors. */
+.path-segments { display: flex; align-items: center; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
+/* F240 (review 242 §2): found live - `justify-content: flex-end`
+   unconditionally (the first version of this fix) also right-anchored
+   every *shallow*, uncut path, pushing it away from the root button
+   with a blank gap instead of starting right after it. Scoped to this
+   modifier class instead, set in `dir_pane.rs` from the same
+   `is_truncated` signal the "…" button already reads: right-anchor
+   (clip the root side) only while something is actually cut; a
+   shallow path keeps the browser default, flush against the root. */
+.path-segments.truncated {
+  justify-content: flex-end;
+}
 /* `min-width: 24px`, not `0`: a segment must still shrink to fit a long
    path (F205's own reason this override exists), but never below the
    click-target floor §5 asks for - 24px is small enough that a genuinely

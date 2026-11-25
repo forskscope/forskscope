@@ -963,6 +963,14 @@ fn write_explorer_dir_settings(data_dir: &Path, explorer_dir: &Path) {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
+    // `remember_explorer_dirs` has its own `#[serde(default = "default_true")]`
+    // (`forskscope-desktop/src/persist/schema/settings.rs`) - found live,
+    // leaving it out anyway, the file was NOT read as seeding
+    // `last_left_dir`/`last_right_dir` at all (`Explorer`'s own panes
+    // opened at `$HOME` instead, confirmed by reading the rendered
+    // breadcrumb text directly). Naming it explicitly here is what
+    // actually works - confirmed the same way, not assumed from the
+    // struct's own default attribute.
     let json = serde_json::json!({
         "schema_name": "settings",
         "schema_version": 2,
@@ -972,6 +980,7 @@ fn write_explorer_dir_settings(data_dir: &Path, explorer_dir: &Path) {
         "payload": {
             "last_left_dir": explorer_dir,
             "last_right_dir": explorer_dir,
+            "remember_explorer_dirs": true,
         },
     });
     fs::write(
@@ -1517,6 +1526,7 @@ fn report(
             "overlap",
             "current_folder_clipped",
             "overflow_button_mismatch",
+            "shallow_path_shifted",
         ] {
             if let Some(list) = row.get(kind).and_then(|v| v.as_array()) {
                 for finding in list {

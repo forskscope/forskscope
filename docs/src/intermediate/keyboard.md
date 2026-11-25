@@ -100,6 +100,12 @@ These keys work in both Explorer layouts (Aligned and Compact).
 | **Alt+Home**  | Go to your home directory (focused pane only) |
 | **Ctrl+O**    | Choose a folder to open (focused pane only) |
 
+**The path bar's breadcrumb:** when a path is too long for the bar, the
+segments nearest your current folder stay; the ones nearest the root
+are hidden behind a **"Show full path"** ("…") button at the start of
+the bar instead of leaving Tab to land on a button with nothing shown
+on screen. Open it, or press **Alt+↑**, to reach a hidden folder.
+
 ## Modals and dialogs
 
 | Shortcut | Action |

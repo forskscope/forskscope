@@ -511,6 +511,13 @@ pub struct ResultRow {
     /// exactly when something is cut, never otherwise. No allowance.
     #[serde(default)]
     pub overflow_button_mismatch: Vec<Measurement>,
+    /// F240 (review 242 §2): with nothing truncated, `.path-segments`'
+    /// own first child found more than a few pixels from the row's own
+    /// left edge - a shallow, uncut path must start right after the
+    /// root button, not right-anchored the way a genuinely cut row is.
+    /// No allowance.
+    #[serde(default)]
+    pub shallow_path_shifted: Vec<Measurement>,
 }
 
 fn parse_lang(s: &str) -> Lang {
@@ -944,6 +951,7 @@ async fn measure_one(
                 toast_check: ToastCheck::default(),
                 current_folder_clipped: Vec::new(),
                 overflow_button_mismatch: Vec::new(),
+                shallow_path_shifted: Vec::new(),
             };
         }
     };
@@ -974,6 +982,7 @@ async fn measure_one(
             toast_check: m.toast_check,
             current_folder_clipped: m.current_folder_clipped,
             overflow_button_mismatch: m.overflow_button_mismatch,
+            shallow_path_shifted: m.shallow_path_shifted,
         },
         Err(e) => ResultRow {
             view: view.name().to_string(),
@@ -1000,6 +1009,7 @@ async fn measure_one(
             toast_check: ToastCheck::default(),
             current_folder_clipped: Vec::new(),
             overflow_button_mismatch: Vec::new(),
+            shallow_path_shifted: Vec::new(),
         },
     }
 }
@@ -1125,6 +1135,8 @@ struct MeasurementOutcome {
     current_folder_clipped: Vec<Measurement>,
     #[serde(default)]
     overflow_button_mismatch: Vec<Measurement>,
+    #[serde(default)]
+    shallow_path_shifted: Vec<Measurement>,
 }
 
 /// Selector for every element the hit-area/off-screen checks treat as an
@@ -2044,6 +2056,35 @@ fn measurement_script(
       }}
     }}
 
+    // F240 (review 242 §2): found live - the first version of
+    // `.path-segments`' own right-anchoring applied unconditionally,
+    // which pushed a *shallow*, uncut path away from the root button
+    // with a blank gap instead of starting right after it, as a path
+    // bar reading left-to-right from its own root should. With nothing
+    // truncated, the row's own first child (`.bc-root` when the path
+    // has one, otherwise the first segment) must start within a few
+    // pixels of `.path-segments`' own left edge - right-anchoring
+    // (`.truncated`, `03-components.css`) is for a genuinely cut row
+    // only. No allowance.
+    const shallow_path_shifted = [];
+    for (let i = 0; i < pathSegmentsEls.length; i++) {{
+      const container = pathSegmentsEls[i];
+      const overflowing = container.scrollWidth > container.clientWidth + 1;
+      if (overflowing) {{ continue; }}
+      const firstChild = container.firstElementChild;
+      if (!firstChild) {{ continue; }}
+      const cr = container.getBoundingClientRect();
+      const fr = firstChild.getBoundingClientRect();
+      const gap = fr.left - cr.left;
+      if (Math.abs(gap) > 4) {{
+        shallow_path_shifted.push({{
+          element: describe(container, -1), text: '',
+          detail: 'first child starts ' + Math.round(gap) + 'px from the row left edge ' +
+            '(' + Math.round(cr.left) + ') with nothing truncated - expected flush against it',
+        }});
+      }}
+    }}
+
     // Review 218 §2: a probe-level proof that `.toast`, when raised, is
     // actually hit at its own centre point - not covered by `.scrim` or
     // anything else. `elementFromPoint` answers "what's really on top
@@ -2065,7 +2106,7 @@ fn measurement_script(
     dioxus.send(JSON.stringify({{
       settled, settle_ms, overflow, clipped, off_screen, hit_area, small_text,
       rendered_contrast, label_placement, dialog_occlusion, overlap, toast_check,
-      current_folder_clipped, overflow_button_mismatch,
+      current_folder_clipped, overflow_button_mismatch, shallow_path_shifted,
     }}));
     }} catch (e) {{
       dioxus.send(JSON.stringify({{

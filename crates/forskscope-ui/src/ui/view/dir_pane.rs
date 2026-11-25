@@ -312,7 +312,15 @@ pub fn PathBar(
                         if let Some(p) = p { on_navigate.call(p); }
                     }, "↑" }
 
-                div { class: "path-segments",
+                div {
+                    // F240 (review 242 §2): `.truncated` (the right-
+                    // anchoring, root-side-clipping rule) applies only
+                    // while `is_truncated` - found live, the first
+                    // version applied it unconditionally and pushed
+                    // every *shallow*, uncut path away from the root
+                    // button with a blank gap instead of starting right
+                    // after it.
+                    class: if *is_truncated.read() { "path-segments truncated" } else { "path-segments" },
                     id: "{path_segments_id}",
                     // F240 (review 241 §3): starts the live overflow
                     // bridge exactly once - `onmounted` fires once per
