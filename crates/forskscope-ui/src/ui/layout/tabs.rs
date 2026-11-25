@@ -45,7 +45,9 @@ pub fn TabBar() -> Element {
                     position: 0, total, file_count, dir_count, is_active: explorer_active,
                     aria_label: t(lang, "explorer"),
                     onclick: move |_| state::activate_tab_at(&mut store, 0, file_count, dir_count),
-                    span { class: "tab-title", {t(lang, "explorer")} }
+                    span { class: "tab-title",
+                        span { class: "tab-title-text", {t(lang, "explorer")} }
+                    }
                 }
                 for i in 0..file_count {
                     FileTabItem {
@@ -231,7 +233,7 @@ fn FileTabItem(
             span { class: "tab-title",
                 if is_loading { span { class: "tab-loading-spinner", aria_hidden: "true", "⟳ " } }
                 else if is_dirty { span { class: "dirty-dot", aria_hidden: "true", "●" } }
-                BidiText { text: title.clone(), lang }
+                span { class: "tab-title-text", BidiText { text: title.clone(), lang } }
             }
         }
     }
@@ -659,7 +661,7 @@ fn DirTabItem(
                     "×"
                 }
             },
-            span { class: "tab-title", "📁 ", BidiText { text: title.clone(), lang } }
+            span { class: "tab-title", "📁 ", span { class: "tab-title-text", BidiText { text: title.clone(), lang } } }
         }
     }
 }

@@ -405,10 +405,19 @@ select option { background: var(--surface); color: var(--text); }
 /* RFC-087: a real roving-tabindex focus ring — only the active tab is ever
    a Tab stop, so this only ever shows on the one tab that can have it. */
 .tab:focus-visible { outline: var(--focus-ring) solid var(--focus); outline-offset: -2px; }
+/* F239-shaped (review 239 §4's own finding, found by its tightened
+   layout-probe check against this element too, not just `.bc-seg`):
+   `text-overflow: ellipsis` never took effect here either - `.tab-title`
+   is itself a flex container (for the loading-spinner/dirty-dot icon
+   beside the title), and the property only ever applies to a
+   block/inline-block/list-item box with its own overflowing text, never
+   to a flex container. `min-width: 0` lets this flex item actually
+   shrink inside `.tab`'s own row; the title text itself goes in
+   `.tab-title-text`, below, a real inline-block the ellipsis can act on. */
 .tab-title {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
+  cursor: pointer;
   padding: .35rem .5rem .35rem .6rem; user-select: none;
-  display: flex; align-items: center; gap: .25rem;
+  display: flex; align-items: center; gap: .25rem; min-width: 0;
   /* RFC-099 §1's own icon-btn change (review 216 §5) removed the bigger
      of two independent overflow sources in `.tab-slot` (36px tall, from
      the general `button` rule's own `min-height`); this is the other
@@ -419,6 +428,10 @@ select option { background: var(--surface); color: var(--text); }
      and padding are subtracted. `line-height: 1` (the same fix already
      applied to `.icon-btn`) brings a 14px line box down to 14px. */
   line-height: 1;
+}
+.tab-title-text {
+  display: inline-block; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; min-width: 0; max-width: 100%;
 }
 /* RFC-097 stage 3 §3: full strength on every tab, always - revealed by
    state (there is none to reveal by here; it's simply always relevant),
