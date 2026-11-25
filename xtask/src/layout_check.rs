@@ -232,6 +232,15 @@ pub fn run(root: &Path, opts: &RunOptions) {
     let (bidi_left, bidi_right) = write_bidi_fixture(&fixtures_dir);
     let (bidi_names_left, bidi_names_right) = write_bidi_names_fixture(&fixtures_dir);
     let deep_path = write_deep_path_fixture(&fixtures_dir);
+    // Review 243 §2's own third item: one line in CI's own log naming
+    // the deep-path fixture's own resolved path - said once, plainly,
+    // rather than left to "0 failures" to imply it was ever reached at
+    // all (`seed_not_applied`'s whole point is that a clean run alone
+    // never used to prove that).
+    println!(
+        "layout-check: Explorer's deep-path fixture: {}",
+        deep_path.display()
+    );
     let fixtures = Fixtures {
         file_left,
         file_right,
