@@ -222,7 +222,21 @@ pub enum ViewPlan {
     /// The Explorer workspace, the default view (`Modal::None`, no tab
     /// open) — nothing to navigate to, since it's where the app already
     /// is at startup.
-    Explorer,
+    ///
+    /// `raise_toast`/`raise_passive_toast`/`passive_toast_delay_ms`:
+    /// F241 (handoff 116, round 4) - the same fields `Settings` carries,
+    /// here so a notice can be measured with no dialog open at all
+    /// (RFC-102 §2 promises focus "inside an open dialog" too, which
+    /// only ever existed through `Settings`; this is what "none" needs
+    /// to stand for).
+    Explorer {
+        #[serde(default)]
+        raise_toast: bool,
+        #[serde(default)]
+        raise_passive_toast: bool,
+        #[serde(default)]
+        passive_toast_delay_ms: Option<u64>,
+    },
     /// Deep Compare, opened the same way the Explorer's own folder-compare
     /// action does (`state::open_dir_compare`). RFC-097 stage 3 §3's own
     /// first-row auto-selection ("the first row is selected when the list
@@ -280,7 +294,7 @@ impl ViewPlan {
         match self {
             Self::FileComparison { .. } => "file-comparison",
             Self::Settings { .. } => "settings",
-            Self::Explorer => "explorer",
+            Self::Explorer { .. } => "explorer",
             Self::DeepCompare { .. } => "deep-compare",
             Self::MergeTool { .. } => "mergetool",
             Self::Shortcuts => "shortcuts",
@@ -306,7 +320,7 @@ impl ViewPlan {
             // `ui/view/settings/modal.rs`'s own dialog heading id.
             Self::Settings { .. } => "#settings-title",
             // `ui/view/explorer.rs`'s real (non-private-mode-empty) root.
-            Self::Explorer => ".explorer-browse",
+            Self::Explorer { .. } => ".explorer-browse",
             // `ui/view/deep_compare.rs`: the scan has finished and RFC-097
             // stage 3 §3's own first-row auto-selection has landed, not
             // merely `.deep-compare` (present the instant the scanning
@@ -712,6 +726,34 @@ async fn run(mut store: Store, desktop: dioxus_desktop::DesktopContext, plan_pat
     }
 }
 
+/// Shared by `Settings` and `Explorer`'s own `open_view` arms (F241,
+/// handoff 116 round 4 — the same two flags now exist on both, so an
+/// error or a passive notice can be measured with or without a dialog
+/// open). `raise_toast` fires immediately; `raise_passive_toast` fires
+/// immediately too *unless* `passive_toast_delay_ms` is set, in which
+/// case `open_view_followup` fires it instead — see that function's own
+/// doc comment for why.
+fn raise_immediate_toast(
+    store: &mut Store,
+    raise_toast: bool,
+    raise_passive_toast: bool,
+    passive_toast_delay_ms: Option<u64>,
+) {
+    if raise_toast {
+        store.notify(crate::i18n::TranslatableMessage::new(
+            "layout-probe: Could not save settings: test toast",
+        ));
+    }
+    if raise_passive_toast && passive_toast_delay_ms.is_none() {
+        // RFC-102 §3 (handoff 116, review 239): a real passive notice,
+        // through the real app's own PassiveLiveRegion -
+        // "test-fixture-plain" is an existing i18n-test-only id
+        // (crate::i18n::tests), not real user-facing text, so this
+        // adds no new catalog id and no audit surface.
+        store.notify_success(crate::i18n::TranslatableMessage::new("test-fixture-plain"));
+    }
+}
+
 fn open_view(store: &mut Store, view: &ViewPlan) {
     match view {
         ViewPlan::FileComparison { left, right } => {
@@ -736,28 +778,31 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
                 store.settings.write().ignore_dirs = v.clone();
             }
             store.modal.set(Modal::Settings);
-            if *raise_toast {
-                store.notify(crate::i18n::TranslatableMessage::new(
-                    "layout-probe: Could not save settings: test toast",
-                ));
-            }
             // Review 241 §2: with `passive_toast_delay_ms` set, firing
-            // this here - synchronously, before an external driver has
-            // even connected to this process - defeats the whole point
-            // of the delay. `open_view_followup` (async, after this
-            // function returns) fires it instead, once the delay has
-            // elapsed.
-            if *raise_passive_toast && passive_toast_delay_ms.is_none() {
-                // RFC-102 §3 (handoff 116, review 239): a real passive
-                // notice, through the real app's own PassiveLiveRegion -
-                // "test-fixture-plain" is an existing i18n-test-only id
-                // (crate::i18n::tests), not real user-facing text, so
-                // this adds no new catalog id and no audit surface.
-                store.notify_success(crate::i18n::TranslatableMessage::new("test-fixture-plain"));
-            }
+            // the passive notice here - synchronously, before an
+            // external driver has even connected to this process -
+            // defeats the whole point of the delay. `open_view_followup`
+            // (async, after this function returns) fires it instead,
+            // once the delay has elapsed.
+            raise_immediate_toast(
+                store,
+                *raise_toast,
+                *raise_passive_toast,
+                *passive_toast_delay_ms,
+            );
         }
-        ViewPlan::Explorer => {
+        ViewPlan::Explorer {
+            raise_toast,
+            raise_passive_toast,
+            passive_toast_delay_ms,
+        } => {
             store.modal.set(Modal::None);
+            raise_immediate_toast(
+                store,
+                *raise_toast,
+                *raise_passive_toast,
+                *passive_toast_delay_ms,
+            );
         }
         ViewPlan::DeepCompare { left, right } => {
             store.modal.set(Modal::None);
@@ -791,13 +836,23 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
 /// set, `raise_passive_toast`'s own delayed firing (review 241 §2). A
 /// no-op `document::eval` for every other view.
 async fn open_view_followup(store: &mut Store, view: &ViewPlan) {
-    if let ViewPlan::Settings {
-        raise_passive_toast: true,
-        passive_toast_delay_ms: Some(ms),
-        ..
-    } = view
-    {
-        tokio::time::sleep(std::time::Duration::from_millis(*ms)).await;
+    // F241 (handoff 116 round 4): `Explorer` now carries the same two
+    // fields `Settings` does, so this needs to match either.
+    let delay_ms = match view {
+        ViewPlan::Settings {
+            raise_passive_toast: true,
+            passive_toast_delay_ms: Some(ms),
+            ..
+        }
+        | ViewPlan::Explorer {
+            raise_passive_toast: true,
+            passive_toast_delay_ms: Some(ms),
+            ..
+        } => Some(*ms),
+        _ => None,
+    };
+    if let Some(ms) = delay_ms {
+        tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
         // See `open_view`'s own matching branch for why this is here,
         // not there.
         store.notify_success(crate::i18n::TranslatableMessage::new("test-fixture-plain"));
@@ -862,7 +917,7 @@ fn close_view(store: &mut Store, view: &ViewPlan) {
     match view {
         ViewPlan::FileComparison { .. }
         | ViewPlan::MergeTool { .. }
-        | ViewPlan::Explorer
+        | ViewPlan::Explorer { .. }
         | ViewPlan::BidiFixture { .. } => {}
         // Found live, first full-matrix run: `app.rs`'s own view match
         // picks Deep Compare whenever `active_dir` is `Some`, *before*
@@ -2395,6 +2450,40 @@ mod tests {
         else {
             panic!("expected Settings");
         };
+        assert_eq!(passive_toast_delay_ms, None);
+    }
+
+    /// F241 (handoff 116 round 4): `Explorer` carries the same raise
+    /// fields `Settings` always has, so a notice can be measured with
+    /// no dialog open at all.
+    #[test]
+    fn explorer_plan_deserializes_its_raise_fields_and_defaults_them() {
+        let raw = r#"{"kind": "explorer", "raise_toast": true, "raise_passive_toast": true, "passive_toast_delay_ms": 5000}"#;
+        let view: ViewPlan = serde_json::from_str(raw).expect("must parse");
+        let ViewPlan::Explorer {
+            raise_toast,
+            raise_passive_toast,
+            passive_toast_delay_ms,
+        } = view
+        else {
+            panic!("expected Explorer");
+        };
+        assert!(raise_toast);
+        assert!(raise_passive_toast);
+        assert_eq!(passive_toast_delay_ms, Some(5000));
+
+        let raw = r#"{"kind": "explorer"}"#;
+        let view: ViewPlan = serde_json::from_str(raw).expect("must parse");
+        let ViewPlan::Explorer {
+            raise_toast,
+            raise_passive_toast,
+            passive_toast_delay_ms,
+        } = view
+        else {
+            panic!("expected Explorer");
+        };
+        assert!(!raise_toast);
+        assert!(!raise_passive_toast);
         assert_eq!(passive_toast_delay_ms, None);
     }
 
