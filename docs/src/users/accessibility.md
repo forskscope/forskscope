@@ -79,11 +79,12 @@ returns focus exactly where it was; anything you were typing is kept.
 **Other notices — a success or an informational message — stay passive**
 (the number of search matches, the Explorer's status, a change to an
 ignore list, "Large file — inline diff disabled."): they never take focus,
-so you can keep typing or navigating right through one. **On Windows,
-they're spoken too**, through one permanent screen-reader region. **Not
-yet on Linux:** the web engine ForskScope uses there (WebKitGTK) doesn't
-pass the accessibility event any form of that region needs, so Orca stays
+so you can keep typing or navigating right through one. **Not yet on
+Linux:** the web engine ForskScope uses there (WebKitGTK) doesn't pass
+the accessibility event any form of that region needs, so Orca stays
 silent for these specifically — focus-taking messages are unaffected.
-Measured with WebKitGTK 2.54.3 and Orca 51.2, and with WebView2 and
-Windows UI Automation; see
+**On Windows, the same region is designed to announce them,** confirmed
+reliable on a focused test page; confirming it with the shipped app
+itself is still in progress. Measured with WebKitGTK 2.54.3 and Orca
+51.2; see
 [Known limitations](known-limitations.md#linux-passive-notices-arent-spoken-by-screen-readers).

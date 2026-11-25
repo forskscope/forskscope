@@ -160,10 +160,15 @@ screen-reader-only live region, the standard way to have a screen reader
 read text that appears without moving focus. On Linux, WebKitGTK doesn't
 send the accessibility event any form of live region depends on, so Orca
 stays silent for these specifically. **On Windows, the same region is
-announced reliably** (measured through UI Automation, three shapes tried:
-only a region cleared then updated in place fires consistently — the one
-this region uses). Measured with WebKitGTK 2.54.3 and Orca 51.2, and with
-WebView2 on `windows-latest` GitHub Actions runners.
+designed to announce them reliably** (measured through UI Automation on
+a focused test page, three shapes tried: only a region cleared then
+updated in place fires consistently — the one this region uses).
+**Confirming that through the shipped app itself, not just the test
+page, is still in progress** — a `windows-latest` GitHub Actions run
+built to do exactly that could not establish a clean read of keyboard
+focus on that runner's own non-interactive desktop session, so neither
+a pass nor a fail came of it; this note will be updated once it does.
+Measured with WebKitGTK 2.54.3 and Orca 51.2.
 
 Until a WebKitGTK release changes this, passive notices on Linux are
 visible on screen but not announced. Nothing else is affected: every
