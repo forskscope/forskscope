@@ -1,6 +1,6 @@
 # RFC 102: Messages That Need Attention Are Heard — Errors and Warnings Take Focus
 
-**Status.** Accepted.
+**Status.** Implemented in `0.201.0` (handoffs 115, 116; reviews 238–243). Passive notices on Windows are still being confirmed (F241).
 **Proposed.** 2026-11-24 by the architect, for **F226**. The owner accepted
 the follow-up direction the same day ("Your recommendations are
 accepted"):

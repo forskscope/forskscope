@@ -5,7 +5,48 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [0.200.1] — Unreleased
+## [0.201.0] — 2026-11-26
+
+**Every message a whole sentence, and heard.**
+
+### Changed
+
+- **Errors and warnings take focus,** so a screen reader speaks them:
+  on Linux with Orca, and on Windows, with or without a dialog open. The
+  notice looks as before; Escape or *Dismiss* closes it and returns you
+  to where you were, with anything you were typing kept. Success and
+  information notices still don't interrupt you (RFC-102).
+- **"Large file — inline diff disabled." is now an information notice,**
+  so it no longer takes focus each time you open a medium-sized file.
+- **Every message is a whole sentence,** translated as one, so Japanese
+  word order reads naturally — for example, the copy confirmations and
+  Deep Compare's summary (差分 3 件・同一 10 件・…). Counts use the right
+  singular or plural form (RFC-101).
+- **The path bar keeps the current folder in view.** In a deep path or a
+  narrow window, the folders nearest the root give way first, behind a
+  "…" button that opens the full path; a long folder name ends in "…"
+  and starts with its real first letters, and a screen reader reads the
+  whole name (F239, F240).
+- **Long tab titles end in "…"** instead of being cut off mid-letter.
+
+### Fixed
+
+- **Dozens of messages showed English in the Japanese interface:**
+  "Could not save settings", "Cannot save here: …", the save-error
+  dialog's text and buttons, the settings recovery dialogs' buttons, and
+  others. All are translated now (F238).
+- **A file or folder name inside a message** can't reorder the text
+  around it.
+
+### Internal
+
+- **Translations live in one catalog file per language,** checked when
+  the app is built: every language has every message, placeholders
+  match, plural forms are complete, and no message is assembled from
+  pieces.
+- **The layout check** now catches an ellipsis that can't actually
+  appear, and fails a test whose seeded folder didn't load.
+
 
 ## [0.200.0] — 2026-11-24
 
