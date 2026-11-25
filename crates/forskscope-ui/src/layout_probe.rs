@@ -187,6 +187,15 @@ pub enum ViewPlan {
     /// to answer it). An error [`Notice`](crate::state::Notice) never
     /// auto-dismisses, so it stays up for this view's whole text-size/
     /// language loop, not just the combination that raised it.
+    ///
+    /// `raise_passive_toast`, if set, calls [`Store::notify_success`]
+    /// instead — RFC-102 §3 (handoff 116, review 239): a probe-level way
+    /// to drive the real app's own permanent [`PassiveLiveRegion`]
+    /// (`app.rs`) with a real passive notice, for the Windows UIA run
+    /// handoff 116 asks for, reusing 203's job. Never both at once with
+    /// `raise_toast` in the same plan — a real passive notice is exactly
+    /// what must *not* take focus, so a focus-taking one up at the same
+    /// time would defeat the point of testing it.
     Settings {
         #[serde(default)]
         ignore_extensions: Option<String>,
@@ -194,6 +203,8 @@ pub enum ViewPlan {
         ignore_dirs: Option<String>,
         #[serde(default)]
         raise_toast: bool,
+        #[serde(default)]
+        raise_passive_toast: bool,
     },
     /// The Explorer workspace, the default view (`Modal::None`, no tab
     /// open) — nothing to navigate to, since it's where the app already
@@ -683,6 +694,7 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
             ignore_extensions,
             ignore_dirs,
             raise_toast,
+            raise_passive_toast,
         } => {
             if let Some(v) = ignore_extensions {
                 store.settings.write().ignore_extensions = v.clone();
@@ -695,6 +707,14 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
                 store.notify(crate::i18n::TranslatableMessage::new(
                     "layout-probe: Could not save settings: test toast",
                 ));
+            }
+            if *raise_passive_toast {
+                // RFC-102 §3 (handoff 116, review 239): a real passive
+                // notice, through the real app's own PassiveLiveRegion -
+                // "test-fixture-plain" is an existing i18n-test-only id
+                // (crate::i18n::tests), not real user-facing text, so
+                // this adds no new catalog id and no audit surface.
+                store.notify_success(crate::i18n::TranslatableMessage::new("test-fixture-plain"));
             }
         }
         ViewPlan::Explorer => {
@@ -2030,6 +2050,7 @@ mod tests {
             ignore_extensions: None,
             ignore_dirs: None,
             raise_toast: false,
+            raise_passive_toast: false,
         };
         for selector in [fc.ready_selector(), settings.ready_selector()] {
             assert!(
@@ -2162,6 +2183,35 @@ mod tests {
             panic!("expected Settings");
         };
         assert!(!raise_toast);
+    }
+
+    /// RFC-102 §3 (handoff 116, review 239): mirrors
+    /// `settings_plan_deserializes_raise_toast_and_defaults_it_false`
+    /// for the new `raise_passive_toast` field the Windows UIA run
+    /// needs.
+    #[test]
+    fn settings_plan_deserializes_raise_passive_toast_and_defaults_it_false() {
+        let raw = r#"{"kind": "settings", "raise_passive_toast": true}"#;
+        let view: ViewPlan = serde_json::from_str(raw).expect("must parse");
+        let ViewPlan::Settings {
+            raise_passive_toast,
+            ..
+        } = view
+        else {
+            panic!("expected Settings");
+        };
+        assert!(raise_passive_toast);
+
+        let raw = r#"{"kind": "settings"}"#;
+        let view: ViewPlan = serde_json::from_str(raw).expect("must parse");
+        let ViewPlan::Settings {
+            raise_passive_toast,
+            ..
+        } = view
+        else {
+            panic!("expected Settings");
+        };
+        assert!(!raise_passive_toast);
     }
 
     #[test]
