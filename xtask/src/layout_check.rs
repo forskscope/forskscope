@@ -93,6 +93,11 @@ struct Fixtures {
     bidi_right: PathBuf,
     bidi_names_left: PathBuf,
     bidi_names_right: PathBuf,
+    /// F240 (review 241 §3, option A): both Explorer panes' seeded
+    /// `last_left_dir`/`last_right_dir` (`launch_and_wait`'s own
+    /// `write_explorer_dir_settings`) - a single deep path, not a pair,
+    /// since this exists to exercise the path *bar*, not a comparison.
+    deep_path: PathBuf,
 }
 
 /// Review 220 §2.5: a run invoked bare (no `session.sh`, no `xvfb-run
@@ -208,6 +213,7 @@ pub fn run(root: &Path, opts: &RunOptions) {
     let (merge_local, merge_remote, merge_merged) = write_mergetool_fixture(&fixtures_dir);
     let (bidi_left, bidi_right) = write_bidi_fixture(&fixtures_dir);
     let (bidi_names_left, bidi_names_right) = write_bidi_names_fixture(&fixtures_dir);
+    let deep_path = write_deep_path_fixture(&fixtures_dir);
     let fixtures = Fixtures {
         file_left,
         file_right,
@@ -220,6 +226,7 @@ pub fn run(root: &Path, opts: &RunOptions) {
         bidi_right,
         bidi_names_left,
         bidi_names_right,
+        deep_path,
     };
 
     let bin = build_binary(root, opts.release);
@@ -246,7 +253,7 @@ pub fn run(root: &Path, opts: &RunOptions) {
         );
 
         println!("layout-check: running layout checks, window {window_label}...");
-        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf, &display);
+        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf, &display, &fixtures.deep_path);
         per_window_ms.push((format!("layout {window_label}"), elapsed.as_millis()));
 
         for row in read_jsonl(&results_path) {
@@ -276,7 +283,7 @@ pub fn run(root: &Path, opts: &RunOptions) {
         println!(
             "layout-check: running rendered contrast, window {window_label} at {text_size}%..."
         );
-        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf, &display);
+        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf, &display, &fixtures.deep_path);
         per_window_ms.push((
             format!("contrast {window_label}@{text_size}%"),
             elapsed.as_millis(),
@@ -655,6 +662,44 @@ fn write_folder_fixture(dir: &Path) -> (PathBuf, PathBuf) {
     (left, right)
 }
 
+/// F240 (review 241 §3, option A): a single, deeply nested directory -
+/// built, not real data, the same reasoning [`write_bidi_fixture`]'s own
+/// doc comment gives - so the Explorer view this file's own matrix
+/// already runs reliably reaches the "too many breadcrumb segments for
+/// the bar" case option A exists for, at every window width
+/// [`DEFAULT_WINDOWS`] already tries, not just whatever depth this
+/// machine's own checkout path happens to be. Sixteen levels, each
+/// named distinctly enough that a screenshot or a `current_folder_
+/// clipped`/`overflow_button_mismatch` finding's own `element`/`text`
+/// reads back unambiguously. Returns the leaf - the one path both the
+/// left and right Explorer panes open at, via [`launch_and_wait`]'s own
+/// `last_left_dir`/`last_right_dir` seeding.
+fn write_deep_path_fixture(dir: &Path) -> PathBuf {
+    let mut path = dir.join("deep-path");
+    for name in [
+        "alpha-one",
+        "bravo-two",
+        "charlie-three",
+        "delta-four",
+        "echo-five",
+        "foxtrot-six",
+        "golf-seven",
+        "hotel-eight",
+        "india-nine",
+        "juliett-ten",
+        "kilo-eleven",
+        "lima-twelve",
+        "mike-thirteen",
+        "november-fourteen",
+        "oscar-fifteen",
+        "the-current-folder",
+    ] {
+        path = path.join(name);
+    }
+    fs::create_dir_all(&path).unwrap_or_else(|e| panic!("cannot create {}: {e}", path.display()));
+    path
+}
+
 /// RFC-100 §1's own twelve bidirectional control characters, duplicated
 /// here rather than depended on: xtask deliberately stays outside the
 /// main workspace (DEC-005/F119, this file's own `[workspace]` table),
@@ -879,17 +924,62 @@ fn write_contrast_plan(
 /// explicitly (review 224 §2.1) - `GDK_BACKEND=x11` alone never sets
 /// `DISPLAY`, so without this a launch silently keeps whatever
 /// `$DISPLAY` this process itself inherited, real desktop included.
+/// F240 (review 241 §3, option A): seeds `--data-dir`'s own
+/// `settings.json` with `last_left_dir`/`last_right_dir` set to
+/// `explorer_dir`, before `launch_and_wait` spawns the app - the
+/// *only* reliable point to do this. `app.rs`'s own `(None, None) =>
+/// Explorer {}` arm mounts `Explorer` (and reads
+/// `store.settings.read().last_left_dir` into a `use_signal` that only
+/// evaluates once, at that mount) on the very first render, which
+/// happens synchronously before `layout_probe::run`'s own async task -
+/// gated on the already-created `DesktopContext` - ever gets to run a
+/// single `open_view`; a `Store` write from inside the probe itself
+/// would always arrive one mount too late. `session.sh`'s own
+/// `--open`/`--open-mode dirs` seeds the real-UI driver the identical
+/// way, for the identical reason (its own comment on `last_left`/
+/// `last_right`). Every other `PersistedSettings` field keeps its own
+/// default (`#[serde(default = ...)]` on all of them,
+/// `forskscope-desktop/src/persist/schema/settings.rs`) - this plan
+/// harness controls theme/contrast/colour-vision/text-size through the
+/// plan JSON itself, not through this file, and must not fight that.
+fn write_explorer_dir_settings(data_dir: &Path, explorer_dir: &Path) {
+    let dir = data_dir.join("forskscope");
+    fs::create_dir_all(&dir).unwrap_or_else(|e| panic!("cannot create {}: {e}", dir.display()));
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let json = serde_json::json!({
+        "schema_name": "settings",
+        "schema_version": 2,
+        "app_version": "0.0.0-layout-check",
+        "created_unix": now,
+        "updated_unix": now,
+        "payload": {
+            "last_left_dir": explorer_dir,
+            "last_right_dir": explorer_dir,
+        },
+    });
+    fs::write(
+        dir.join("settings.json"),
+        serde_json::to_string_pretty(&json).expect("settings.json is representable as JSON"),
+    )
+    .unwrap_or_else(|e| panic!("cannot write {}: {e}", dir.join("settings.json").display()));
+}
+
 fn launch_and_wait(
     bin: &Path,
     plan_path: &Path,
     data_dir: &Path,
     bus_conf: &Path,
     display: &str,
+    explorer_dir: &Path,
 ) -> Duration {
     fs::create_dir_all(data_dir.join("xdg/config")).unwrap();
     fs::create_dir_all(data_dir.join("xdg/state")).unwrap();
     fs::create_dir_all(data_dir.join("xdg/cache")).unwrap();
     fs::create_dir_all(data_dir.join("xdg/data")).unwrap();
+    write_explorer_dir_settings(data_dir, explorer_dir);
 
     let start = Instant::now();
     let mut child = Command::new("dbus-run-session")
@@ -1411,6 +1501,8 @@ fn report(
             "label_placement",
             "dialog_occlusion",
             "overlap",
+            "current_folder_clipped",
+            "overflow_button_mismatch",
         ] {
             if let Some(list) = row.get(kind).and_then(|v| v.as_array()) {
                 for finding in list {

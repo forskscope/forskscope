@@ -283,6 +283,7 @@ settings-file-could-not-be-read = 設定ファイルを読み込めませんで�
 settings-file-is-from-a-newer-version = 設定ファイルは新しいバージョン向けです
 several-sheets-could-have-been-renamed-so-none-was-matched = 名前が変更された可能性のあるシートが複数あり、どれも対応付けられませんでした。追加と削除として表示されています。
 shortcuts = ショートカット
+show-full-path = フルパスを表示
 show-n-unchanged-lines = { $n } 行の変更なしを表示
 size-matches-contents-not-compared = サイズは一致しています。中身は比較されていません
 some-hunks-were-too-large-for-character-level-diff = 一部のハンクが大きすぎるため、文字単位の差分を省略しました。

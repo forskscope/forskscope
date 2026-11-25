@@ -205,6 +205,19 @@ pub enum ViewPlan {
         raise_toast: bool,
         #[serde(default)]
         raise_passive_toast: bool,
+        /// Review 241 §2: `raise_passive_toast` normally fires the
+        /// instant the dialog opens - too soon for an external UIA
+        /// driver to have registered its own event listener on the
+        /// app's window yet (that driver has to connect to the process
+        /// and find the window first, which takes real wall-clock time
+        /// no plan can skip). When set, `raise_passive_toast`'s own
+        /// `Store::notify_success` waits this many milliseconds
+        /// (`open_view_followup`, after the dialog has already opened)
+        /// before firing, so a listener registered right after launch
+        /// is reliably in place first. `layout-probe`-only - never
+        /// reached by a release build.
+        #[serde(default)]
+        passive_toast_delay_ms: Option<u64>,
     },
     /// The Explorer workspace, the default view (`Modal::None`, no tab
     /// open) — nothing to navigate to, since it's where the app already
@@ -486,6 +499,18 @@ pub struct ResultRow {
     /// being folded in and losing that approval's exact shape.
     #[serde(default)]
     pub toast_check: ToastCheck,
+    /// F240 (review 241 §3, option A): a `.bc-current` box
+    /// (`crates/forskscope-ui/src/ui/view/dir_pane.rs`) found outside
+    /// its own `.path-segments` row's bounds - the current folder's name
+    /// must always be fully inside the bar. No allowance.
+    #[serde(default)]
+    pub current_folder_clipped: Vec<Measurement>,
+    /// F240 (review 241 §3, option A): `.bc-overflow-btn` ("…", the
+    /// *Show full path* button) present while its own `.path-segments`
+    /// does not overflow, or absent while it does - the "…" must exist
+    /// exactly when something is cut, never otherwise. No allowance.
+    #[serde(default)]
+    pub overflow_button_mismatch: Vec<Measurement>,
 }
 
 fn parse_lang(s: &str) -> Lang {
@@ -620,7 +645,7 @@ async fn run(mut store: Store, desktop: dioxus_desktop::DesktopContext, plan_pat
 
     for view in &plan.views {
         open_view(&mut store, view);
-        open_view_followup(view).await;
+        open_view_followup(&mut store, view).await;
         for &text_size in &plan.text_sizes {
             // Captured *before* the write just below schedules the
             // render that calls `set_zoom_level` (`app.rs`'s own
@@ -695,6 +720,7 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
             ignore_dirs,
             raise_toast,
             raise_passive_toast,
+            passive_toast_delay_ms,
         } => {
             if let Some(v) = ignore_extensions {
                 store.settings.write().ignore_extensions = v.clone();
@@ -708,7 +734,13 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
                     "layout-probe: Could not save settings: test toast",
                 ));
             }
-            if *raise_passive_toast {
+            // Review 241 §2: with `passive_toast_delay_ms` set, firing
+            // this here - synchronously, before an external driver has
+            // even connected to this process - defeats the whole point
+            // of the delay. `open_view_followup` (async, after this
+            // function returns) fires it instead, once the delay has
+            // elapsed.
+            if *raise_passive_toast && passive_toast_delay_ms.is_none() {
                 // RFC-102 §3 (handoff 116, review 239): a real passive
                 // notice, through the real app's own PassiveLiveRegion -
                 // "test-fixture-plain" is an existing i18n-test-only id
@@ -748,9 +780,21 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
 /// Run once, right after [`open_view`], for a view whose own content
 /// needs a real DOM click, not a signal write, to appear at all —
 /// today, only `Settings`' own `.advanced-toggle` (its `show_advanced`
-/// is a plain local UI signal). A no-op `document::eval` for every other
-/// view.
-async fn open_view_followup(view: &ViewPlan) {
+/// is a plain local UI signal) and, when `passive_toast_delay_ms` is
+/// set, `raise_passive_toast`'s own delayed firing (review 241 §2). A
+/// no-op `document::eval` for every other view.
+async fn open_view_followup(store: &mut Store, view: &ViewPlan) {
+    if let ViewPlan::Settings {
+        raise_passive_toast: true,
+        passive_toast_delay_ms: Some(ms),
+        ..
+    } = view
+    {
+        tokio::time::sleep(std::time::Duration::from_millis(*ms)).await;
+        // See `open_view`'s own matching branch for why this is here,
+        // not there.
+        store.notify_success(crate::i18n::TranslatableMessage::new("test-fixture-plain"));
+    }
     if let ViewPlan::Settings { .. } = view {
         // Found live, first `--inject label-placement` attempt: a bare
         // `document.querySelector('.advanced-toggle')?.click()`, with
@@ -898,6 +942,8 @@ async fn measure_one(
                 overlap: Vec::new(),
                 error: Some(format!("eval did not return: {e:?}")),
                 toast_check: ToastCheck::default(),
+                current_folder_clipped: Vec::new(),
+                overflow_button_mismatch: Vec::new(),
             };
         }
     };
@@ -926,6 +972,8 @@ async fn measure_one(
             overlap: m.overlap,
             error: m.error,
             toast_check: m.toast_check,
+            current_folder_clipped: m.current_folder_clipped,
+            overflow_button_mismatch: m.overflow_button_mismatch,
         },
         Err(e) => ResultRow {
             view: view.name().to_string(),
@@ -950,6 +998,8 @@ async fn measure_one(
             overlap: Vec::new(),
             error: Some(format!("could not parse measurement JSON {raw:?}: {e}")),
             toast_check: ToastCheck::default(),
+            current_folder_clipped: Vec::new(),
+            overflow_button_mismatch: Vec::new(),
         },
     }
 }
@@ -1071,6 +1121,10 @@ struct MeasurementOutcome {
     error: Option<String>,
     #[serde(default)]
     toast_check: ToastCheck,
+    #[serde(default)]
+    current_folder_clipped: Vec<Measurement>,
+    #[serde(default)]
+    overflow_button_mismatch: Vec<Measurement>,
 }
 
 /// Selector for every element the hit-area/off-screen checks treat as an
@@ -1106,7 +1160,18 @@ const INTERACTIVE_SELECTOR: &str = r#"button, [role="button"], a[href], input, s
 /// is now checked directly instead, not through this allowlist-and-
 /// scroll-size mechanism at all (the dedicated check right before
 /// `dialog_occlusion`, below).
-const OVERFLOW_ALLOWLIST: &[&str] = &[".tablist"];
+///
+/// `.path-segments`: F240 (review 241 §3, option A) made this element's
+/// own overflow a deliberate, by-design outcome - too many breadcrumb
+/// segments for the bar is expected, not a defect, as long as the
+/// current folder stays fully visible and the "…" button correctly
+/// marks the cut. Those are exactly `current_folder_clipped` and
+/// `overflow_button_mismatch`'s own job (two dedicated checks, right
+/// before `dialog_occlusion` below) - the same reasoning F224's own
+/// entry above gives for not using this generic, scroll-size-only
+/// mechanism once a check exists that can tell a correctly-handled
+/// overflow from a real one.
+const OVERFLOW_ALLOWLIST: &[&str] = &[".tablist", ".path-segments"];
 
 /// Named selectors allowed to overflow, but only up to a bound in CSS
 /// pixels on each axis — not an unconditional exemption like
@@ -1933,6 +1998,52 @@ fn measurement_script(
       }}
     }}
 
+    // F240 (review 241 §3, option A): the current folder's own box
+    // (`.bc-current`, `flex-shrink: 0` in `03-components.css`) must sit
+    // fully inside its own `.path-segments` row - the defect this check
+    // exists for is exactly the row's `overflow: hidden` clipping part
+    // of it away, the same shape the dialog-in-viewport check above
+    // uses (a box's own rect against its container's, not a scroll
+    // size). No allowance - this is the one thing option A's whole
+    // design promises.
+    const current_folder_clipped = [];
+    const pathSegmentsEls = document.querySelectorAll('.path-segments');
+    for (let i = 0; i < pathSegmentsEls.length; i++) {{
+      const container = pathSegmentsEls[i];
+      const current = container.querySelector('.bc-current');
+      if (!current) {{ continue; }}
+      const cr = container.getBoundingClientRect();
+      const fr = current.getBoundingClientRect();
+      if (fr.width > 0 && (fr.left < cr.left - 1 || fr.right > cr.right + 1)) {{
+        current_folder_clipped.push({{
+          element: describe(current, -1), text: ownText(current).slice(0, 80),
+          detail: 'current folder box [' + Math.round(fr.left) + ',' + Math.round(fr.right) +
+            '] is not fully inside .path-segments [' + Math.round(cr.left) + ',' + Math.round(cr.right) + ']',
+        }});
+      }}
+    }}
+
+    // F240 (review 241 §3, option A): the "…" button (`.bc-overflow-btn`)
+    // must exist exactly when `.path-segments` is genuinely clipping
+    // something - never shown over nothing missing, never missing while
+    // something is cut. `is_truncated` (`dir_pane.rs`) is a live signal
+    // this script can't read directly, so this checks the same
+    // scrollWidth/clientWidth overflow the signal is itself driven by.
+    const overflow_button_mismatch = [];
+    for (let i = 0; i < pathSegmentsEls.length; i++) {{
+      const container = pathSegmentsEls[i];
+      const overflowing = container.scrollWidth > container.clientWidth + 1;
+      const hasButton = container.querySelector('.bc-overflow-btn') !== null;
+      if (overflowing !== hasButton) {{
+        overflow_button_mismatch.push({{
+          element: describe(container, -1), text: '',
+          detail: overflowing
+            ? '.path-segments overflows but no .bc-overflow-btn is rendered'
+            : '.bc-overflow-btn is rendered but .path-segments does not overflow',
+        }});
+      }}
+    }}
+
     // Review 218 §2: a probe-level proof that `.toast`, when raised, is
     // actually hit at its own centre point - not covered by `.scrim` or
     // anything else. `elementFromPoint` answers "what's really on top
@@ -1954,6 +2065,7 @@ fn measurement_script(
     dioxus.send(JSON.stringify({{
       settled, settle_ms, overflow, clipped, off_screen, hit_area, small_text,
       rendered_contrast, label_placement, dialog_occlusion, overlap, toast_check,
+      current_folder_clipped, overflow_button_mismatch,
     }}));
     }} catch (e) {{
       dioxus.send(JSON.stringify({{
@@ -2051,6 +2163,7 @@ mod tests {
             ignore_dirs: None,
             raise_toast: false,
             raise_passive_toast: false,
+            passive_toast_delay_ms: None,
         };
         for selector in [fc.ready_selector(), settings.ready_selector()] {
             assert!(
@@ -2088,15 +2201,18 @@ mod tests {
     /// check) and said as much in its own doc comment; `.tablist` is the
     /// first named entry, found live when its own responsive `overflow:
     /// visible` (a deliberate spill, nothing lost) first surfaced as a
-    /// false overflow finding under the stacked layout. A `.scrim` entry
-    /// (reply 189b) was refused by review 221 §2.2 - it would have
-    /// exempted the exact regression F224 is about, not just a false
-    /// positive - so it's checked by name as *absent*, not present:
-    /// `.tablist` alone, so a future edit that quietly re-adds an
-    /// allowance for the dialog backdrop is caught too.
+    /// false overflow finding under the stacked layout. `.path-segments`
+    /// (F240, review 241 §3) is the second, for the same "deliberate,
+    /// checked elsewhere" reason, not a blind re-add - see its own doc
+    /// comment above. A `.scrim` entry (reply 189b) was refused by
+    /// review 221 §2.2 - it would have exempted the exact regression
+    /// F224 is about, not just a false positive - so it's checked by
+    /// name as *absent*, not present: exactly these two, so a future
+    /// edit that quietly re-adds an allowance for the dialog backdrop
+    /// (or anything else) is caught too.
     #[test]
-    fn tablist_is_the_overflow_allowlists_only_named_entry() {
-        assert_eq!(OVERFLOW_ALLOWLIST, &[".tablist"]);
+    fn tablist_and_path_segments_are_the_overflow_allowlists_only_named_entries() {
+        assert_eq!(OVERFLOW_ALLOWLIST, &[".tablist", ".path-segments"]);
     }
 
     /// F233 (review 232 §2): the bound is approved at 2px, and only for
@@ -2212,6 +2328,33 @@ mod tests {
             panic!("expected Settings");
         };
         assert!(!raise_passive_toast);
+    }
+
+    /// Review 241 §2: the Windows retry's own delay, read from the plan.
+    #[test]
+    fn settings_plan_deserializes_passive_toast_delay_ms_and_defaults_it_none() {
+        let raw =
+            r#"{"kind": "settings", "raise_passive_toast": true, "passive_toast_delay_ms": 5000}"#;
+        let view: ViewPlan = serde_json::from_str(raw).expect("must parse");
+        let ViewPlan::Settings {
+            passive_toast_delay_ms,
+            ..
+        } = view
+        else {
+            panic!("expected Settings");
+        };
+        assert_eq!(passive_toast_delay_ms, Some(5000));
+
+        let raw = r#"{"kind": "settings", "raise_passive_toast": true}"#;
+        let view: ViewPlan = serde_json::from_str(raw).expect("must parse");
+        let ViewPlan::Settings {
+            passive_toast_delay_ms,
+            ..
+        } = view
+        else {
+            panic!("expected Settings");
+        };
+        assert_eq!(passive_toast_delay_ms, None);
     }
 
     #[test]

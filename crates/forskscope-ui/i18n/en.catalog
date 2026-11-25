@@ -283,6 +283,7 @@ settings-file-could-not-be-read = Settings file could not be read
 settings-file-is-from-a-newer-version = Settings file is from a newer version
 several-sheets-could-have-been-renamed-so-none-was-matched = Several sheets could have been renamed, so none was matched; they appear as added and removed.
 shortcuts = Shortcuts
+show-full-path = Show full path
 show-n-unchanged-lines = Show { $n } unchanged lines
 size-matches-contents-not-compared = Size matches; contents not compared
 some-hunks-were-too-large-for-character-level-diff = Some hunks were too large for character-level diff.

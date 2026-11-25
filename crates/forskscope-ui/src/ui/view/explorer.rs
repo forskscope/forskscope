@@ -1226,6 +1226,7 @@ pub fn Explorer() -> Element {
                         is_focused: focused_pane.read().is_left(),
                         on_focus: move |_| focused_pane.set(FocusedPane::Left),
                         side_label: t(lang, "left-pane"),
+                        pane_id: "left",
                     }
                     PathBar {
                         path: right_dir.read().cloned(),
@@ -1238,6 +1239,7 @@ pub fn Explorer() -> Element {
                         is_focused: focused_pane.read().is_right(),
                         on_focus: move |_| focused_pane.set(FocusedPane::Right),
                         side_label: t(lang, "right-pane"),
+                        pane_id: "right",
                     }
                 }
 

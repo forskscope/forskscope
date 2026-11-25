@@ -200,6 +200,12 @@ pub fn PathBar(
     /// removed `role="heading"` cell used to do, kept current as the pane
     /// navigates because it is computed from `path` on every render.
     side_label: String,
+    /// F240 (review 241 §3): a plain ASCII slug ("left"/"right"), never
+    /// translated — used only to give this pane's `.path-segments` a
+    /// stable DOM `id` the overflow bridge's JS can look up by. Two
+    /// `PathBar`s render per `Explorer`, so a bare literal id would
+    /// collide between them.
+    pane_id: &'static str,
 ) -> Element {
     // Pre-compute everything before closures consume values.
     let segs = path_segs(&path);
@@ -219,6 +225,19 @@ pub fn PathBar(
     let mut input_val: Signal<String> = use_signal(|| path_str.clone());
     let mut input_err: Signal<bool> = use_signal(|| false);
     let mut menu_open: Signal<bool> = use_signal(|| false);
+    // F240 (review 241 §3, option A): whether `.path-segments` is
+    // currently clipping something - driven live by the JS bridge
+    // started from its own `onmounted` below, the same
+    // spawn+eval+`dioxus.send`/`recv()` loop shape
+    // `state/settings.rs`'s `spawn_media_query_bridge` already uses for
+    // `matchMedia`, here watching `ResizeObserver` (the bar's own width
+    // changing) and `MutationObserver` (navigation changing which
+    // segments are rendered) instead. Starts `false`: the first real
+    // measurement arrives a tick after mount, same as every other
+    // JS-sourced signal in this codebase (RFC-102's `PassiveLiveRegion`,
+    // the contrast/colour-scheme bridges).
+    let mut is_truncated: Signal<bool> = use_signal(|| false);
+    let path_segments_id = format!("path-segments-{pane_id}");
 
     // F185 §2.1's menu: each focusable target's own `MountedData` handle,
     // captured via its `onmounted` (the same mechanism
@@ -294,6 +313,37 @@ pub fn PathBar(
                     }, "↑" }
 
                 div { class: "path-segments",
+                    id: "{path_segments_id}",
+                    // F240 (review 241 §3): starts the live overflow
+                    // bridge exactly once - `onmounted` fires once per
+                    // element mount (the same guarantee `app.rs`'s own
+                    // `#app-root` `onmounted` relies on for
+                    // `spawn_system_preference_bridges`), and this div
+                    // is never recreated by a plain navigation (its
+                    // `id` and position in the tree don't change), so
+                    // the bridge outlives every path change within one
+                    // `PathBar` instance. `plain spawn`, not
+                    // `spawn_forever`: this task genuinely should stop
+                    // if the pane itself unmounts, unlike the one-shot
+                    // evals `spawn_forever`'s own call sites use.
+                    onmounted: move |_| {
+                        let el_id = path_segments_id.clone();
+                        spawn(async move {
+                            let js = format!(
+                                "const el = document.getElementById('{el_id}'); \
+                                 if (el) {{ \
+                                   const check = () => dioxus.send(el.scrollWidth > el.clientWidth + 1); \
+                                   check(); \
+                                   new ResizeObserver(check).observe(el); \
+                                   new MutationObserver(check).observe(el, {{ childList: true, subtree: true, characterData: true }}); \
+                                 }}"
+                            );
+                            let mut eval = dioxus::document::eval(&js);
+                            while let Ok(truncated) = eval.recv::<bool>().await {
+                                is_truncated.set(truncated);
+                            }
+                        });
+                    },
                     if *edit_mode.read() {
                         input {
                             class: if *input_err.read() { "path-input error" } else { "path-input" },
@@ -309,10 +359,30 @@ pub fn PathBar(
                             },
                         }
                     } else {
+                        // F240 (review 241 §3, option A): shown exactly
+                        // when `is_truncated` is true - never an inert
+                        // leading space, never absent while something
+                        // really is cut (the probe check in
+                        // `layout_probe.rs` falsifies both directions
+                        // live). Opens the same inline edit mode
+                        // *Edit path* already gives keyboard/mouse
+                        // access to: the simplest way to make every
+                        // segment, hidden or not, reachable, since it
+                        // shows the whole path as plain, selectable
+                        // text rather than a second menu to build and
+                        // maintain.
+                        if *is_truncated.read() {
+                            button { class: "bc-overflow-btn",
+                                title: t(lang, "show-full-path"),
+                                aria_label: t(lang, "show-full-path"),
+                                onclick: move |_| edit_mode.set(true),
+                                "…" }
+                        }
                         // Root prefix icon — navigates to filesystem root on click.
                         if path.has_root() {
                             { let root = PathBuf::from("/");
                               rsx! { button { class: "bc-root", title: "/",
+                                  tabindex: if *is_truncated.read() { "-1" },
                                   onclick: move |_| on_navigate.call(root.clone()),
                                   "/" } } }
                             if n > 0 { span { class: "bc-sep", " " } }
@@ -340,11 +410,24 @@ pub fn PathBar(
                                 // reader reads it complete even once
                                 // CSS, or `trunc_label`'s own 20-
                                 // character cap, visually truncates it.
+                                //
+                                // F240 (review 241 §3): `tabindex="-1"`
+                                // exactly while `is_truncated` - an
+                                // ancestor segment that isn't currently
+                                // visible (clipped at the root side,
+                                // `03-components.css`) would otherwise
+                                // still sit in the Tab order with
+                                // nothing on screen to show focus
+                                // landed on it. The "…" button above
+                                // (and *Edit path*, which it opens)
+                                // reaches every segment instead, while
+                                // this is active.
                                 { let t = seg_path.clone(); let full = label.clone();
                                   let full_escaped = forskscope_compare::escape_to_plain_marker(&full);
                                   rsx! { button { class: "bc-seg",
                                       title: "{full_escaped}",
                                       aria_label: "{full_escaped}",
+                                      tabindex: if *is_truncated.read() { "-1" },
                                       onclick: move |_| on_navigate.call(t.clone()),
                                       span { class: "bc-seg-label",
                                           BidiText { text: trunc_label(&full, 20), lang } } } } }
@@ -1073,6 +1156,7 @@ mod tests {
                     is_focused: false,
                     on_focus: move |_| {},
                     side_label: "Left pane".to_string(),
+                    pane_id: "left",
                 }
             }
         }
@@ -1122,6 +1206,68 @@ mod tests {
         );
     }
 
+    /// F240 (review 241 §3, option A): `is_truncated` starts `false` (the
+    /// real measurement only arrives once the JS bridge's `eval` resolves,
+    /// which never happens in this `VirtualDom`-only harness — no real
+    /// document to measure), so a fresh mount is exactly the
+    /// "nothing is cut" case the "…" button must stay out of. Falsified:
+    /// temporarily rendered the button unconditionally, confirmed this
+    /// assertion fails, reverted.
+    #[test]
+    fn the_show_full_path_button_does_not_render_when_nothing_is_truncated() {
+        let aria_labels = path_bar_aria_labels();
+        assert!(
+            !aria_labels.iter().any(|l| l == "Show full path"),
+            "the overflow button must not render while nothing is \
+             truncated, found among {aria_labels:?}"
+        );
+    }
+
+    /// F240 (review 241 §3, option A): same reasoning as the test above —
+    /// a fresh mount has `is_truncated == false`, so no breadcrumb button
+    /// should be taken out of the Tab order. Falsified: temporarily made
+    /// the root/`.bc-seg` buttons' `tabindex` unconditional `"-1"`,
+    /// confirmed this assertion fails, reverted.
+    #[test]
+    fn no_breadcrumb_button_is_detabbed_when_nothing_is_truncated() {
+        fn root() -> Element {
+            rsx! {
+                PathBar {
+                    path: PathBuf::from("/home/a/b/c"),
+                    can_back: true,
+                    can_forward: true,
+                    on_back: move |_| {},
+                    on_forward: move |_| {},
+                    on_navigate: move |_: PathBuf| {},
+                    lang: Lang::En,
+                    is_focused: false,
+                    on_focus: move |_| {},
+                    side_label: "Left pane".to_string(),
+                    pane_id: "left",
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let tabindexes: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "tabindex",
+                    value: dioxus_core::AttributeValue::Text(s),
+                    ..
+                } => Some(s.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            tabindexes.is_empty(),
+            "expected no tabindex=-1 attribute while nothing is \
+             truncated, found {tabindexes:?}"
+        );
+    }
+
     /// F239 (review 239 §4, handoff 117): a `.bc-seg` breadcrumb segment's
     /// accessible name is its own `aria-label`, carrying the whole,
     /// untruncated folder name — never the visible text content alone,
@@ -1145,6 +1291,7 @@ mod tests {
                     is_focused: false,
                     on_focus: move |_| {},
                     side_label: "Left pane".to_string(),
+                    pane_id: "left",
                 }
             }
         }
@@ -1352,6 +1499,7 @@ mod tests {
                     is_focused: false,
                     on_focus: move |_| {},
                     side_label: "Left pane".to_string(),
+                    pane_id: "left",
                 }
             }
         }

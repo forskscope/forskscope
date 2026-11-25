@@ -1045,7 +1045,33 @@ code.path-display {
 }
 .bc-root:hover { color: var(--accent); background: var(--surface-3); }
 .bc-sep { color: var(--muted); padding: 0 .05rem; }
-.bc-current { color: var(--text); font-weight: 600; padding: .1rem .2rem; }
+/* F240 (review 241 §3, option A): the current folder never shrinks away
+   (`flex-shrink: 0`) and is never the one `.path-segments`' own
+   `overflow: hidden` clips - everything nearer the root goes first
+   instead (`.path-segments`' own `justify-content: flex-end`, below).
+   `max-width: 100%` plus its own `overflow`/`text-overflow` give it a
+   floor just like F239 gave `.bc-seg`: an ellipsis of its own for the
+   one case even a flex-shrink-0, right-anchored row can't avoid - the
+   current folder's own name alone wider than the whole bar. As a flex
+   item (not a flex container, unlike `.bc-seg`), it needs no separate
+   label child for the ellipsis to act on - F239's problem was `.bc-seg`
+   laying out its own child with `justify-content`, which `.bc-current`
+   never did. */
+.bc-current {
+  color: var(--text); font-weight: 600; padding: .1rem .2rem;
+  flex-shrink: 0; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* F240: same 24px-target shape as `.bc-root`/`.path-btn` - shown only
+   when `.path-segments` is genuinely clipping something (PathBar's own
+   `is_truncated` signal), so it is never an empty, inert space. */
+.bc-overflow-btn {
+  background: none; border: none; color: var(--accent); cursor: pointer;
+  padding: .1rem .2rem; border-radius: 3px; font-size: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; min-height: 24px; flex-shrink: 0;
+}
+.bc-overflow-btn:hover { background: var(--surface-3); }
 
 /* F185: `.path-bar` itself keeps `overflow: hidden` (the breadcrumb relies
    on it to clip overflowing ancestor segments, RFC "single row, never
@@ -1085,7 +1111,14 @@ code.path-display {
    High value too. */
 .contrast-high .path-btn:disabled { color: var(--muted-standard); }
 .path-more-btn { margin-left: .15rem; color: var(--muted); }
-.path-segments { display: flex; align-items: center; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
+/* F240 (review 241 §3, option A): `justify-content: flex-end` right-
+   anchors the row - when its content is wider than the bar (every
+   segment already at its own floor), the overflow is pushed past the
+   *left* edge instead of the right, so `overflow: hidden` clips the
+   segments nearest the root first and the current folder (the last
+   child, `flex-shrink: 0` above) stays the one thing always inside the
+   bar. */
+.path-segments { display: flex; align-items: center; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; justify-content: flex-end; }
 /* `min-width: 24px`, not `0`: a segment must still shrink to fit a long
    path (F205's own reason this override exists), but never below the
    click-target floor §5 asks for - 24px is small enough that a genuinely
