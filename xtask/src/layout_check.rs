@@ -253,7 +253,14 @@ pub fn run(root: &Path, opts: &RunOptions) {
         );
 
         println!("layout-check: running layout checks, window {window_label}...");
-        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf, &display, &fixtures.deep_path);
+        let elapsed = launch_and_wait(
+            &bin,
+            &plan_path,
+            &data_dir,
+            &bus_conf,
+            &display,
+            &fixtures.deep_path,
+        );
         per_window_ms.push((format!("layout {window_label}"), elapsed.as_millis()));
 
         for row in read_jsonl(&results_path) {
@@ -283,7 +290,14 @@ pub fn run(root: &Path, opts: &RunOptions) {
         println!(
             "layout-check: running rendered contrast, window {window_label} at {text_size}%..."
         );
-        let elapsed = launch_and_wait(&bin, &plan_path, &data_dir, &bus_conf, &display, &fixtures.deep_path);
+        let elapsed = launch_and_wait(
+            &bin,
+            &plan_path,
+            &data_dir,
+            &bus_conf,
+            &display,
+            &fixtures.deep_path,
+        );
         per_window_ms.push((
             format!("contrast {window_label}@{text_size}%"),
             elapsed.as_millis(),
