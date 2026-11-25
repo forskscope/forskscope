@@ -54,6 +54,11 @@ impl ModalState {
 pub(crate) enum GlobalKeyAction {
     Ignore,
     CloseModal,
+    /// RFC-102 §2: Escape, with a focus-taking (error/warning) toast
+    /// open, closes *it* — the toast sits above any open modal (z-index
+    /// 110, F225) and takes focus the same way, so this is checked
+    /// before `CloseModal`/the modal-swallow rule, modal open or not.
+    CloseToast,
     MoveFocus(i32),
     SearchNext,
     SearchPrev,
@@ -91,8 +96,21 @@ pub(crate) fn global_key_action(
     mods: Modifiers,
     modal: ModalState,
     has_active_tab: bool,
+    toast_takes_focus: bool,
 ) -> GlobalKeyAction {
     use GlobalKeyAction as A;
+
+    // RFC-102 §2: checked first, modal or not - the toast sits above
+    // everything else and takes focus the same way, so every other
+    // global shortcut (including the ordinary modal-Escape/swallow
+    // rules right below) stays swallowed while it holds focus.
+    if toast_takes_focus {
+        return if *key == Key::Escape {
+            A::CloseToast
+        } else {
+            A::Ignore
+        };
+    }
 
     if *key == Key::Escape {
         return if modal.is_open() && modal != ModalState::Recovery {
@@ -383,6 +401,7 @@ mod tests {
                 Modifiers::CONTROL,
                 ModalState::Other,
                 true,
+                false
             ),
             GlobalKeyAction::Ignore,
         );
@@ -396,6 +415,7 @@ mod tests {
                 Modifiers::CONTROL,
                 ModalState::None,
                 true,
+                false
             ),
             GlobalKeyAction::Save,
         );
@@ -404,7 +424,13 @@ mod tests {
     #[test]
     fn escape_closes_an_ordinary_modal() {
         assert_eq!(
-            global_key_action(&Key::Escape, Modifiers::empty(), ModalState::Other, true),
+            global_key_action(
+                &Key::Escape,
+                Modifiers::empty(),
+                ModalState::Other,
+                true,
+                false
+            ),
             GlobalKeyAction::CloseModal,
         );
     }
@@ -415,7 +441,13 @@ mod tests {
     #[test]
     fn escape_does_not_dismiss_a_recovery_modal() {
         assert_eq!(
-            global_key_action(&Key::Escape, Modifiers::empty(), ModalState::Recovery, true),
+            global_key_action(
+                &Key::Escape,
+                Modifiers::empty(),
+                ModalState::Recovery,
+                true,
+                false
+            ),
             GlobalKeyAction::Ignore,
         );
     }
@@ -423,7 +455,88 @@ mod tests {
     #[test]
     fn escape_does_nothing_with_no_modal_open() {
         assert_eq!(
-            global_key_action(&Key::Escape, Modifiers::empty(), ModalState::None, true),
+            global_key_action(
+                &Key::Escape,
+                Modifiers::empty(),
+                ModalState::None,
+                true,
+                false
+            ),
+            GlobalKeyAction::Ignore,
+        );
+    }
+
+    // ── RFC-102 §2: a focus-taking toast takes priority over everything ────
+
+    /// Falsify by removing the `toast_takes_focus` early branch from
+    /// `global_key_action` — Escape with no modal open would then (still
+    /// correctly) do nothing, so this alone doesn't prove the branch is
+    /// there; `escape_closes_the_toast_even_with_an_ordinary_modal_open`
+    /// right below is the one that actually falsifies it (removing the
+    /// branch would make that one return `CloseModal` instead).
+    #[test]
+    fn escape_closes_a_focus_taking_toast_with_no_modal_open() {
+        assert_eq!(
+            global_key_action(
+                &Key::Escape,
+                Modifiers::empty(),
+                ModalState::None,
+                true,
+                true
+            ),
+            GlobalKeyAction::CloseToast,
+        );
+    }
+
+    /// The toast sits above any open modal (z-index 110, F225) and takes
+    /// focus the same way - Escape must close *it*, not the modal
+    /// underneath. Falsify by removing the `toast_takes_focus` branch (or
+    /// moving it after the ordinary Escape/modal branch): this then
+    /// returns `CloseModal` instead.
+    #[test]
+    fn escape_closes_the_toast_even_with_an_ordinary_modal_open() {
+        assert_eq!(
+            global_key_action(
+                &Key::Escape,
+                Modifiers::empty(),
+                ModalState::Other,
+                true,
+                true
+            ),
+            GlobalKeyAction::CloseToast,
+        );
+    }
+
+    /// Even a recovery modal's own Escape-swallow (review 076 patch 6,
+    /// `escape_does_not_dismiss_a_recovery_modal`) doesn't apply once a
+    /// focus-taking toast is up - the toast is a separate, later notice,
+    /// and still takes Escape first.
+    #[test]
+    fn escape_closes_the_toast_even_with_a_recovery_modal_open() {
+        assert_eq!(
+            global_key_action(
+                &Key::Escape,
+                Modifiers::empty(),
+                ModalState::Recovery,
+                true,
+                true
+            ),
+            GlobalKeyAction::CloseToast,
+        );
+    }
+
+    /// Every other global shortcut stays swallowed while the toast holds
+    /// focus - the same P0-1 reasoning an ordinary modal already gets.
+    #[test]
+    fn every_other_shortcut_is_ignored_while_a_focus_taking_toast_is_open() {
+        assert_eq!(
+            global_key_action(
+                &Key::Character("s".into()),
+                Modifiers::CONTROL,
+                ModalState::None,
+                true,
+                true
+            ),
             GlobalKeyAction::Ignore,
         );
     }
@@ -436,15 +549,22 @@ mod tests {
                 Modifiers::CONTROL,
                 ModalState::None,
                 false,
+                false
             ),
             GlobalKeyAction::Ignore,
         );
         assert_eq!(
-            global_key_action(&Key::F7, Modifiers::empty(), ModalState::None, false),
+            global_key_action(&Key::F7, Modifiers::empty(), ModalState::None, false, false),
             GlobalKeyAction::Ignore,
         );
         assert_eq!(
-            global_key_action(&Key::Enter, Modifiers::empty(), ModalState::None, false),
+            global_key_action(
+                &Key::Enter,
+                Modifiers::empty(),
+                ModalState::None,
+                false,
+                false
+            ),
             GlobalKeyAction::Ignore,
         );
     }
@@ -457,6 +577,7 @@ mod tests {
                 Modifiers::empty(),
                 ModalState::None,
                 true,
+                false
             ),
             GlobalKeyAction::Ignore,
         );
@@ -465,11 +586,11 @@ mod tests {
     #[test]
     fn f7_and_f8_move_focus() {
         assert_eq!(
-            global_key_action(&Key::F7, Modifiers::empty(), ModalState::None, true),
+            global_key_action(&Key::F7, Modifiers::empty(), ModalState::None, true, false),
             GlobalKeyAction::MoveFocus(-1),
         );
         assert_eq!(
-            global_key_action(&Key::F8, Modifiers::empty(), ModalState::None, true),
+            global_key_action(&Key::F8, Modifiers::empty(), ModalState::None, true, false),
             GlobalKeyAction::MoveFocus(1),
         );
     }
@@ -477,11 +598,11 @@ mod tests {
     #[test]
     fn f3_moves_to_the_next_match_and_shift_f3_to_the_previous() {
         assert_eq!(
-            global_key_action(&Key::F3, Modifiers::empty(), ModalState::None, true),
+            global_key_action(&Key::F3, Modifiers::empty(), ModalState::None, true, false),
             GlobalKeyAction::SearchNext,
         );
         assert_eq!(
-            global_key_action(&Key::F3, Modifiers::SHIFT, ModalState::None, true),
+            global_key_action(&Key::F3, Modifiers::SHIFT, ModalState::None, true, false),
             GlobalKeyAction::SearchPrev,
         );
     }
@@ -489,7 +610,13 @@ mod tests {
     #[test]
     fn enter_applies_the_focused_hunk() {
         assert_eq!(
-            global_key_action(&Key::Enter, Modifiers::empty(), ModalState::None, true),
+            global_key_action(
+                &Key::Enter,
+                Modifiers::empty(),
+                ModalState::None,
+                true,
+                false
+            ),
             GlobalKeyAction::ApplyFocusedHunk,
         );
     }
@@ -510,6 +637,7 @@ mod tests {
                     Modifiers::CONTROL,
                     ModalState::None,
                     true,
+                    false
                 ),
                 expected,
                 "Ctrl+{ch} must map to {expected:?}",
@@ -525,6 +653,7 @@ mod tests {
                 Modifiers::CONTROL,
                 ModalState::None,
                 true,
+                false
             ),
             GlobalKeyAction::Ignore,
         );
@@ -539,7 +668,13 @@ mod tests {
     #[test]
     fn ctrl_tab_switches_tabs_with_no_active_tab() {
         assert_eq!(
-            global_key_action(&Key::Tab, Modifiers::CONTROL, ModalState::None, false),
+            global_key_action(
+                &Key::Tab,
+                Modifiers::CONTROL,
+                ModalState::None,
+                false,
+                false
+            ),
             GlobalKeyAction::NextTab,
         );
         assert_eq!(
@@ -548,6 +683,7 @@ mod tests {
                 Modifiers::CONTROL | Modifiers::SHIFT,
                 ModalState::None,
                 false,
+                false
             ),
             GlobalKeyAction::PrevTab,
         );
@@ -567,6 +703,7 @@ mod tests {
                     Modifiers::CONTROL,
                     ModalState::None,
                     false,
+                    false
                 ),
                 GlobalKeyAction::TextSizeUp,
                 "Ctrl+{ch} must step text size up",
@@ -581,6 +718,7 @@ mod tests {
                 &Key::Character("-".into()),
                 Modifiers::CONTROL,
                 ModalState::None,
+                false,
                 false
             ),
             GlobalKeyAction::TextSizeDown,
@@ -594,6 +732,7 @@ mod tests {
                 &Key::Character("0".into()),
                 Modifiers::CONTROL,
                 ModalState::None,
+                false,
                 false
             ),
             GlobalKeyAction::TextSizeReset,
@@ -609,7 +748,13 @@ mod tests {
     fn text_size_shortcuts_work_in_any_modal_state() {
         for modal in [ModalState::Other, ModalState::Recovery] {
             assert_eq!(
-                global_key_action(&Key::Character("=".into()), Modifiers::CONTROL, modal, true),
+                global_key_action(
+                    &Key::Character("=".into()),
+                    Modifiers::CONTROL,
+                    modal,
+                    true,
+                    false
+                ),
                 GlobalKeyAction::TextSizeUp,
                 "Ctrl+= must work with {modal:?} open",
             );
@@ -632,6 +777,7 @@ mod tests {
                 Modifiers::CONTROL | Modifiers::SHIFT,
                 ModalState::None,
                 false,
+                false
             ),
             GlobalKeyAction::TextSizeUp,
         );
@@ -644,7 +790,8 @@ mod tests {
                 &Key::Character("=".into()),
                 Modifiers::empty(),
                 ModalState::None,
-                true
+                true,
+                false
             ),
             GlobalKeyAction::Ignore,
         );
@@ -653,11 +800,23 @@ mod tests {
     #[test]
     fn ctrl_page_down_and_up_also_switch_tabs_with_no_active_tab() {
         assert_eq!(
-            global_key_action(&Key::PageDown, Modifiers::CONTROL, ModalState::None, false),
+            global_key_action(
+                &Key::PageDown,
+                Modifiers::CONTROL,
+                ModalState::None,
+                false,
+                false
+            ),
             GlobalKeyAction::NextTab,
         );
         assert_eq!(
-            global_key_action(&Key::PageUp, Modifiers::CONTROL, ModalState::None, false),
+            global_key_action(
+                &Key::PageUp,
+                Modifiers::CONTROL,
+                ModalState::None,
+                false,
+                false
+            ),
             GlobalKeyAction::PrevTab,
         );
     }
@@ -665,7 +824,7 @@ mod tests {
     #[test]
     fn tab_switching_also_works_with_an_active_tab() {
         assert_eq!(
-            global_key_action(&Key::Tab, Modifiers::CONTROL, ModalState::None, true),
+            global_key_action(&Key::Tab, Modifiers::CONTROL, ModalState::None, true, false),
             GlobalKeyAction::NextTab,
         );
     }
@@ -676,11 +835,23 @@ mod tests {
     #[test]
     fn tab_switching_is_ignored_while_a_modal_is_open() {
         assert_eq!(
-            global_key_action(&Key::Tab, Modifiers::CONTROL, ModalState::Other, false),
+            global_key_action(
+                &Key::Tab,
+                Modifiers::CONTROL,
+                ModalState::Other,
+                false,
+                false
+            ),
             GlobalKeyAction::Ignore,
         );
         assert_eq!(
-            global_key_action(&Key::Tab, Modifiers::CONTROL, ModalState::Recovery, false),
+            global_key_action(
+                &Key::Tab,
+                Modifiers::CONTROL,
+                ModalState::Recovery,
+                false,
+                false
+            ),
             GlobalKeyAction::Ignore,
         );
     }
@@ -688,7 +859,7 @@ mod tests {
     #[test]
     fn plain_tab_with_no_control_is_not_a_tab_switch() {
         assert_eq!(
-            global_key_action(&Key::Tab, Modifiers::empty(), ModalState::None, true),
+            global_key_action(&Key::Tab, Modifiers::empty(), ModalState::None, true, false),
             GlobalKeyAction::Ignore,
         );
     }
@@ -740,7 +911,13 @@ mod tests {
     #[test]
     fn enter_still_applies_the_focused_hunk_when_no_control_owns_it() {
         assert_eq!(
-            global_key_action(&Key::Enter, Modifiers::empty(), ModalState::None, true),
+            global_key_action(
+                &Key::Enter,
+                Modifiers::empty(),
+                ModalState::None,
+                true,
+                false
+            ),
             GlobalKeyAction::ApplyFocusedHunk,
         );
     }

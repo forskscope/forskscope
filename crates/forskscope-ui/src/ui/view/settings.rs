@@ -45,14 +45,11 @@ pub fn persist(mut store: Store) {
     let merged = build_save_payload(&store.settings.read(), &store.settings_v2_base.read());
     store.settings_v2_base.set(merged.clone());
     if let Err(e) = persist_settings(&merged, &repository()) {
-        let lang = store.lang();
-        let error = e.to_string();
-        store.notify(crate::i18n::tf(
-            lang,
-            "could-not-save-settings",
-            &[("error", &error)],
-            None,
-        ));
+        store.notify(
+            crate::i18n::TranslatableMessage::new("could-not-save-settings")
+                .arg("error", e.to_string())
+                .isolating("error"),
+        );
     }
 }
 
@@ -181,7 +178,8 @@ pub fn load_settings(
 /// function used to also produce.
 pub fn recovery_notice(resolution: &SettingsRuntimeResolution) -> Option<Notice> {
     let view = SettingsRecoveryView::from_resolution(resolution);
-    view.migration_notice.map(|n| Notice::success(n.message))
+    view.migration_notice
+        .map(|n| Notice::success(crate::i18n::TranslatableMessage::new(n.message_id)))
 }
 
 /// The blocking-dialog counterpart of [`recovery_notice`] (RFC-076 patch 6):

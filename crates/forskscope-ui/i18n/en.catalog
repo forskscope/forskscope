@@ -78,15 +78,12 @@ copy-result = Copy result
 copy-this-file = Copy this file?
 copy-to-left = Copy to left
 copy-to-right = Copy to right
-could-not-build-the-patch = Could not build the patch
 could-not-check-for-updates-no-network-connection = Could not check for updates: no network connection.
 could-not-check-for-updates-rate-limited-try-again-later = Could not check for updates: rate-limited, try again later.
 could-not-check-for-updates-the-reply-could-not-be-read = Could not check for updates: the reply could not be read.
 could-not-check-for-updates-unexpected-response-http-code = Could not check for updates: unexpected response (HTTP { $code }).
 could-not-compare-the-spreadsheets-detail = Could not compare the spreadsheets — { $detail }
 could-not-open = Could not open
-could-not-save-the-patch = Could not save the patch
-could-not-save-the-report = Could not save the report
 cpus = CPUs
 data-location = Data location
 decrease-text-size = Decrease text size
@@ -632,3 +629,17 @@ recovery-dialog-action-exit = Exit
 recovery-dialog-action-continue-with-defaults = Continue with defaults
 recovery-dialog-action-continue-without-saving = Continue without saving
 recovery-dialog-action-reset-and-back-up = Reset and back up
+
+# RFC-102 stage B (handoff 116, review 239 §2.1): Notice now carries a
+# TranslatableMessage, so every notify() site that used to join a
+# translated prefix with raw data via format! needs its own id with
+# isolated placeholders instead.
+could-not-save-the-patch-detail = Could not save the patch "{ $path }" — { $error }.
+could-not-save-the-patch-task-failed = Could not save the patch: { $error }.
+could-not-save-the-report-detail = Could not save the report "{ $path }" — { $error }.
+could-not-save-the-report-task-failed = Could not save the report: { $error }.
+could-not-build-the-patch-detail = Could not build the patch: { $error }
+a-file-changed-since-it-was-compared-compare-again-then-detail = A file changed since it was compared. Compare again, then export. ({ $path })
+
+session-upgraded = Your session was upgraded to the current format.
+settings-upgraded = Your settings were upgraded to the current format.

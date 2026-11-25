@@ -214,13 +214,24 @@ pub enum Modal {
 // ── Toast / notice ────────────────────────────────────────────────────────────
 
 /// Severity of a user-facing notice / toast (RFC-063 C5).
-#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum NoticeSeverity {
     Success,
     Info,
     Warning,
     Error,
+}
+
+impl NoticeSeverity {
+    /// RFC-102 §1: an error or warning takes keyboard focus when it
+    /// appears (so a screen reader speaks it on every platform,
+    /// including Linux, where live regions are silent — F226); success
+    /// and info notices stay passive, announced only through the one
+    /// permanent live region (`app.rs`'s `PassiveLiveRegion`, §3), never
+    /// by moving focus.
+    pub fn takes_focus(self) -> bool {
+        matches!(self, Self::Warning | Self::Error)
+    }
 }
 
 /// A single action button a toast can offer, beside its own dismiss-on-click
@@ -236,42 +247,65 @@ pub struct NoticeAction {
     pub path: String,
 }
 
-/// A user-facing notice shown as a toast.
+/// A user-facing notice shown as a toast (RFC-102 §2/§3) and, for a
+/// passive severity, also announced through the one permanent live
+/// region (`app.rs`'s `PassiveLiveRegion`). `message` stays structured
+/// (review 239 §2.1) — a toast is a `div` in the page, markup is
+/// possible, and a notice with user data (`{ $error }`, a path, a
+/// reason) must isolate it the same way the error tab and the recovery
+/// dialogs already do.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Notice {
-    pub message: String,
+    pub message: crate::i18n::TranslatableMessage,
     pub severity: NoticeSeverity,
     pub action: Option<NoticeAction>,
+    /// Unique per construction (RFC-102 §2: "two errors in quick
+    /// succession: the newer replaces the older ... focus stays on the
+    /// toast") — used as the toast's own `key` in `app.rs`, so a second
+    /// focus-taking notice replacing the first is a genuinely new DOM
+    /// node (its `onmounted` fires again, re-focusing *Dismiss*/the
+    /// action button), never a same-node attribute patch Dioxus could
+    /// otherwise choose not to remount.
+    pub id: u64,
+}
+
+fn next_notice_id() -> u64 {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    NEXT.fetch_add(1, Ordering::Relaxed)
 }
 
 impl Notice {
-    pub fn success(msg: impl Into<String>) -> Self {
+    pub fn success(msg: crate::i18n::TranslatableMessage) -> Self {
         Self {
-            message: msg.into(),
+            message: msg,
             severity: NoticeSeverity::Success,
             action: None,
+            id: next_notice_id(),
         }
     }
-    pub fn info(msg: impl Into<String>) -> Self {
+    pub fn info(msg: crate::i18n::TranslatableMessage) -> Self {
         Self {
-            message: msg.into(),
+            message: msg,
             severity: NoticeSeverity::Info,
             action: None,
+            id: next_notice_id(),
         }
     }
-    #[allow(dead_code)]
-    pub fn warning(msg: impl Into<String>) -> Self {
+    pub fn warning(msg: crate::i18n::TranslatableMessage) -> Self {
         Self {
-            message: msg.into(),
+            message: msg,
             severity: NoticeSeverity::Warning,
             action: None,
+            id: next_notice_id(),
         }
     }
-    pub fn error(msg: impl Into<String>) -> Self {
+    pub fn error(msg: crate::i18n::TranslatableMessage) -> Self {
         Self {
-            message: msg.into(),
+            message: msg,
             severity: NoticeSeverity::Error,
             action: None,
+            id: next_notice_id(),
         }
     }
     /// Attach the toast's one allowed action (RFC-092 §2's "Open").
@@ -391,17 +425,17 @@ impl Store {
     pub(crate) fn allocate_compare_tab_id(&mut self) -> Result<CompareTabId, LoadIdentityError> {
         self.compare_tab_ids.write().allocate()
     }
-    pub fn notify(&mut self, msg: impl Into<String>) {
+    pub fn notify(&mut self, msg: crate::i18n::TranslatableMessage) {
         self.toast.set(Some(Notice::error(msg)));
     }
-    pub fn notify_success(&mut self, msg: impl Into<String>) {
+    pub fn notify_success(&mut self, msg: crate::i18n::TranslatableMessage) {
         self.toast.set(Some(Notice::success(msg)));
     }
     /// RFC-092 §2: after a successful export, a success toast that also
     /// offers an "Open" button for the file just saved.
     pub fn notify_success_with_open(
         &mut self,
-        msg: impl Into<String>,
+        msg: crate::i18n::TranslatableMessage,
         open_label: impl Into<String>,
         path: impl Into<String>,
     ) {
@@ -409,10 +443,10 @@ impl Store {
             Notice::success(msg).with_open_action(open_label, path),
         ));
     }
-    pub fn notify_info(&mut self, msg: impl Into<String>) {
+    pub fn notify_info(&mut self, msg: crate::i18n::TranslatableMessage) {
         self.toast.set(Some(Notice::info(msg)));
     }
-    pub fn notify_warning(&mut self, msg: impl Into<String>) {
+    pub fn notify_warning(&mut self, msg: crate::i18n::TranslatableMessage) {
         self.toast.set(Some(Notice::warning(msg)));
     }
     /// RFC-087: move keyboard focus to whichever tab is now active — "focus
@@ -491,16 +525,45 @@ pub(crate) fn with_test_store<R>(f: impl FnOnce(&mut Store) -> R) -> R {
 
 #[cfg(test)]
 mod tests {
-    use super::{ConfigRootOverrideGuard, config_file_path, with_test_store};
+    use super::{
+        ConfigRootOverrideGuard, Notice, NoticeSeverity, config_file_path, with_test_store,
+    };
     use dioxus::prelude::ReadableExt;
+
+    // ── RFC-102 §1: which severities take focus ─────────────────────────────
+
+    /// Falsify by flipping this match's arms - an error/warning notice
+    /// would then stay passive, the exact regression RFC-102 exists to
+    /// close (F226: a notice shown without moving focus is silent on
+    /// Linux, WebKitGTK 2.54.3, reply 195/review 235).
+    #[test]
+    fn errors_and_warnings_take_focus_success_and_info_stay_passive() {
+        assert!(NoticeSeverity::Error.takes_focus());
+        assert!(NoticeSeverity::Warning.takes_focus());
+        assert!(!NoticeSeverity::Success.takes_focus());
+        assert!(!NoticeSeverity::Info.takes_focus());
+    }
+
+    #[test]
+    fn every_constructed_notice_gets_a_distinct_id() {
+        let a = Notice::error(crate::i18n::TranslatableMessage::new("x"));
+        let b = Notice::error(crate::i18n::TranslatableMessage::new("x"));
+        assert_ne!(
+            a.id, b.id,
+            "two notices, even with identical content, must have distinct ids - \
+             RFC-102 §2's \"the newer replaces the older\" depends on this to force \
+             a fresh DOM node (app.rs's `key: \"notice-{{id}}\"`), so the newer one's \
+             onmounted actually re-fires and re-focuses"
+        );
+    }
 
     #[test]
     fn with_test_store_yields_a_real_usable_store() {
         with_test_store(|store| {
-            store.notify_success("hi");
+            store.notify_success(crate::i18n::TranslatableMessage::new("hi"));
             assert_eq!(
                 store.toast.read().as_ref().map(|n| n.message.clone()),
-                Some("hi".to_string())
+                Some(crate::i18n::TranslatableMessage::new("hi"))
             );
         });
     }

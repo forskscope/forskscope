@@ -12,7 +12,7 @@ use forskscope_desktop::persist::schema::session::{
 use forskscope_desktop::persist::schema::{PersistenceCommitError, PersistenceIoError};
 use forskscope_ui_logic::SessionRecoveryView;
 
-use crate::i18n::tf;
+use crate::i18n::TranslatableMessage;
 use crate::state::compare::open_compare;
 use crate::state::{Modal, Notice, Store, config_file_path};
 
@@ -43,14 +43,11 @@ pub fn save_session(store: &Store) {
     );
     if let Err(e) = result {
         let mut store = *store;
-        let lang = store.lang();
-        let error = e.to_string();
-        store.notify(tf(
-            lang,
-            "could-not-save-session",
-            &[("error", &error)],
-            None,
-        ));
+        store.notify(
+            TranslatableMessage::new("could-not-save-session")
+                .arg("error", e.to_string())
+                .isolating("error"),
+        );
     }
 }
 
@@ -195,7 +192,8 @@ pub fn load_session(repo: &SessionRepository) -> SessionRuntimeResolution {
 /// Session mirror of `crate::ui::view::settings::recovery_notice`.
 pub fn recovery_notice(resolution: &SessionRuntimeResolution) -> Option<Notice> {
     let view = SessionRecoveryView::from_resolution(resolution);
-    view.migration_notice.map(|n| Notice::success(n.message))
+    view.migration_notice
+        .map(|n| Notice::success(TranslatableMessage::new(n.message_id)))
 }
 
 /// Session mirror of `crate::ui::view::settings::recovery_modal`.

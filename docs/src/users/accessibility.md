@@ -69,12 +69,21 @@ both palettes.
 Every control has a name a screen reader can read, and the whole app works
 from the keyboard (see the [Keyboard reference](../intermediate/keyboard.md)).
 
-**On Linux, status messages aren't spoken.** Messages that appear on their
-own (a notice such as *Could not save settings*, the number of search
-matches, the Explorer's status, a change to an ignore list) are marked for
-screen readers in the standard way, but the web engine ForskScope uses on
-Linux (WebKitGTK) doesn't pass them on, so Orca stays silent. What has
-focus *is* spoken. Measured with WebKitGTK 2.54.3 and Orca 51.2; see
-[Known limitations](known-limitations.md#linux-status-messages-arent-spoken-by-screen-readers).
-Making the messages that need your attention take focus, so they're
-spoken, is planned for the next release.
+**Errors and warnings are spoken everywhere.** An error or a warning (for
+example, an unrecognised encoding replaced with UTF-8, or a failed save)
+briefly takes keyboard focus when it appears, with its own *Dismiss*
+button named and described by the message — so your screen reader speaks
+it, on every platform, Linux included. Escape, or *Dismiss*, closes it and
+returns focus exactly where it was; anything you were typing is kept.
+
+**Other notices — a success or an informational message — stay passive**
+(the number of search matches, the Explorer's status, a change to an
+ignore list, "Large file — inline diff disabled."): they never take focus,
+so you can keep typing or navigating right through one. **On Windows,
+they're spoken too**, through one permanent screen-reader region. **Not
+yet on Linux:** the web engine ForskScope uses there (WebKitGTK) doesn't
+pass the accessibility event any form of that region needs, so Orca stays
+silent for these specifically — focus-taking messages are unaffected.
+Measured with WebKitGTK 2.54.3 and Orca 51.2, and with WebView2 and
+Windows UI Automation; see
+[Known limitations](known-limitations.md#linux-passive-notices-arent-spoken-by-screen-readers).

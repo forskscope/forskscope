@@ -18,9 +18,9 @@ use forskscope_edit::save::{
 };
 use forskscope_ui_logic::SaveErrorView;
 
-use crate::i18n::{t, tf};
+use crate::i18n::{TranslatableMessage, t};
 use crate::state::tab::CompareTab;
-use crate::state::{Lang, Modal, Store};
+use crate::state::{Modal, Store};
 
 // ─── Public action functions ──────────────────────────────────────────────────
 
@@ -114,7 +114,7 @@ pub enum SaveAsPrecheck {
     Overwrite,
     /// This path can never be written to — report immediately, no
     /// confirmation dialog to dismiss first.
-    Blocked(String),
+    Blocked(TranslatableMessage),
 }
 
 pub fn precheck_save_as_target(
@@ -137,9 +137,7 @@ pub fn precheck_save_as_target(
             expectation: TargetExpectation::MustMatch(_),
             ..
         } => SaveAsPrecheck::Overwrite,
-        SaveTargetState::Blocked { reason } => {
-            SaveAsPrecheck::Blocked(describe_block(store.lang(), &reason))
-        }
+        SaveTargetState::Blocked { reason } => SaveAsPrecheck::Blocked(describe_block(&reason)),
     }
 }
 
@@ -168,8 +166,7 @@ fn dispatch(store: &mut Store, index: usize, outcome: RequestOutcome) {
         }
         RequestOutcome::NotSaveable => {}
         RequestOutcome::Blocked(reason) => {
-            let message = describe_block(store.lang(), &reason);
-            store.notify(message);
+            store.notify(describe_block(&reason));
         }
         RequestOutcome::RequiresGuard(target) => {
             // F88a/RFC-082 §D3 §4: known purely from already-loaded state
@@ -347,22 +344,22 @@ fn current_bom(tab: &CompareTab) -> BomPresence {
 /// `reason`/`message` (the OS's own text) go in as plain substitutions,
 /// same as `tf()` itself (review 232 §3.4's "where markup isn't possible,
 /// it goes in as it is" rule) rather than needing isolation here.
-fn describe_block(lang: Lang, reason: &SaveTargetBlockReason) -> String {
+fn describe_block(reason: &SaveTargetBlockReason) -> TranslatableMessage {
     match reason {
-        SaveTargetBlockReason::Binary => tf(lang, "cannot-save-here-binary", &[], None),
-        SaveTargetBlockReason::Spreadsheet => tf(lang, "cannot-save-here-spreadsheet", &[], None),
-        SaveTargetBlockReason::NotAPlainFile { reason } => tf(
-            lang,
-            "cannot-save-here-not-a-plain-file",
-            &[("reason", reason)],
-            None,
-        ),
-        SaveTargetBlockReason::Unreadable { message } => tf(
-            lang,
-            "cannot-save-here-unreadable",
-            &[("message", message)],
-            None,
-        ),
+        SaveTargetBlockReason::Binary => TranslatableMessage::new("cannot-save-here-binary"),
+        SaveTargetBlockReason::Spreadsheet => {
+            TranslatableMessage::new("cannot-save-here-spreadsheet")
+        }
+        SaveTargetBlockReason::NotAPlainFile { reason } => {
+            TranslatableMessage::new("cannot-save-here-not-a-plain-file")
+                .arg("reason", reason.clone())
+                .isolating("reason")
+        }
+        SaveTargetBlockReason::Unreadable { message } => {
+            TranslatableMessage::new("cannot-save-here-unreadable")
+                .arg("message", message.clone())
+                .isolating("message")
+        }
     }
 }
 
@@ -509,12 +506,11 @@ fn handle_result(
             // entirely): here the write succeeded, but the requested label
             // wasn't recognized, so UTF-8 was silently substituted for it.
             if outcome.encoding_fallback_to_utf8 {
-                store.notify_warning(t(
-                    store.lang(),
+                store.notify_warning(TranslatableMessage::new(
                     "saved-but-the-requested-encoding-was-not-recognized-used",
                 ));
             } else {
-                store.notify_success(t(store.lang(), "saved"));
+                store.notify_success(TranslatableMessage::new("saved"));
             }
         }
         Err(CoreError::Conflict { .. }) => {
@@ -657,7 +653,9 @@ pub fn export_patch(store: &mut Store, index: usize) {
     let Some(patch) = patch_doc else {
         // Identical files — nothing to export. Notify but don't error.
         drop(tabs);
-        store.notify_info(t(store.lang(), "files-are-identical-nothing-to-export"));
+        store.notify_info(TranslatableMessage::new(
+            "files-are-identical-nothing-to-export",
+        ));
         return;
     };
 
@@ -673,7 +671,6 @@ pub fn export_patch(store: &mut Store, index: usize) {
 
     drop(tabs);
 
-    let lang = store.lang();
     let mut store = *store;
 
     // `spawn_forever`, not `spawn`: the caller is a modal's own "Export"
@@ -692,11 +689,9 @@ pub fn export_patch(store: &mut Store, index: usize) {
 
         if let Some(file) = handle {
             let path = file.path();
-            if let Err(msg) = write_export_file(
-                path,
-                patch_text.as_bytes(),
-                &t(lang, "could-not-save-the-patch"),
-            ) {
+            if let Err(msg) =
+                write_export_file(path, patch_text.as_bytes(), ReportExportFormat::Patch)
+            {
                 store.notify(msg);
             }
         }
@@ -725,24 +720,41 @@ pub(crate) fn local_timestamp_display() -> String {
 /// calls through, after review 176 found two of them doing this with a bare
 /// `eprintln!` on failure instead of telling the user (F208).
 ///
-/// `label` is the already-translated prefix — either of the two
-/// "Could not save the..." i18n keys below, picked by the caller since
-/// that is the only part of the message that differs between call sites.
-/// On failure the returned `String` names the path and the OS reason,
-/// ready to hand straight to `Store::notify`.
+/// `format` picks which of the two "Could not save the..." detail ids to
+/// use — the only part of the message that differs between call sites
+/// (review 239 §2.1/F238: used to be an already-translated `&str` prefix
+/// the caller joined with `format!`, which can't isolate `path`/the OS
+/// error text; now a real `TranslatableMessage` with both isolated).
 ///
-/// Deliberately returns a `String`, not calling `Store::notify` itself:
-/// `Store` needs a live Dioxus scope to construct (`Signal::new_in_scope`
-/// panics outside one — F36), so a real write failure (review 176 §3: GTK's
-/// save dialog refuses a path outside the Home folder before our code ever
-/// runs, so this cannot be driven end to end through the UI) can only be
-/// asserted here, against the pure path-in / message-out contract.
+/// Deliberately returns the message rather than calling `Store::notify`
+/// itself: `Store` needs a live Dioxus scope to construct
+/// (`Signal::new_in_scope` panics outside one — F36), so a real write
+/// failure (review 176 §3: GTK's save dialog refuses a path outside the
+/// Home folder before our code ever runs, so this cannot be driven end
+/// to end through the UI) can only be asserted here, against the pure
+/// path-in / message-out contract.
 pub(crate) fn write_export_file(
     path: &std::path::Path,
     contents: &[u8],
-    label: &str,
-) -> Result<(), String> {
-    std::fs::write(path, contents).map_err(|e| format!("{label} \"{}\" — {e}.", path.display()))
+    format: ReportExportFormat,
+) -> Result<(), TranslatableMessage> {
+    std::fs::write(path, contents).map_err(|e| {
+        // Each branch names its own literal id, not through a variable,
+        // so `cargo xtask i18n`'s usage scan can see both as used.
+        let message = match format {
+            ReportExportFormat::Patch => {
+                TranslatableMessage::new("could-not-save-the-patch-detail")
+            }
+            ReportExportFormat::Html => {
+                TranslatableMessage::new("could-not-save-the-report-detail")
+            }
+        };
+        message
+            .arg("path", path.display().to_string())
+            .isolating("path")
+            .arg("error", e.to_string())
+            .isolating("error")
+    })
 }
 
 /// Export the current file comparison as an HTML report or a unified-diff
@@ -770,8 +782,7 @@ pub fn export_file_report(
 
     if tab.merge.is_dirty() {
         drop(tabs);
-        store.notify(t(
-            lang,
+        store.notify(TranslatableMessage::new(
             "save-or-undo-your-changes-first-a-report-describes-the",
         ));
         return;
@@ -789,8 +800,7 @@ pub fn export_file_report(
     for (path, fp) in &staleness_checks {
         let state = forskscope_compare::check_external_state(path, fp, false);
         if state != forskscope_compare::ExternalFileState::Clean {
-            store.notify(t(
-                lang,
+            store.notify(TranslatableMessage::new(
                 "a-file-changed-since-it-was-compared-compare-again-then",
             ));
             return;
@@ -916,23 +926,23 @@ pub fn export_file_report(
                 .await;
 
                 match html {
-                    Ok(html) => match write_export_file(
-                        &path,
-                        html.as_bytes(),
-                        &t(lang, "could-not-save-the-report"),
-                    ) {
-                        Ok(()) => {
-                            store.notify_success_with_open(
-                                t(lang, "report-saved"),
-                                t(lang, "open"),
-                                path.display().to_string(),
-                            );
+                    Ok(html) => {
+                        match write_export_file(&path, html.as_bytes(), ReportExportFormat::Html) {
+                            Ok(()) => {
+                                store.notify_success_with_open(
+                                    TranslatableMessage::new("report-saved"),
+                                    t(lang, "open"),
+                                    path.display().to_string(),
+                                );
+                            }
+                            Err(msg) => store.notify(msg),
                         }
-                        Err(msg) => store.notify(msg),
-                    },
-                    Err(e) => {
-                        store.notify(format!("{}: {e}.", t(lang, "could-not-save-the-report")))
                     }
+                    Err(e) => store.notify(
+                        TranslatableMessage::new("could-not-save-the-report-task-failed")
+                            .arg("error", e.to_string())
+                            .isolating("error"),
+                    ),
                 }
             });
         }
@@ -942,6 +952,7 @@ pub fn export_file_report(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::state::Lang;
     use forskscope_compare::document::FileFingerprint;
 
     // `build_request`/`save_tab`/`save_as`/`handle_result` all need a live
@@ -964,7 +975,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("report.html");
 
-        assert!(write_export_file(&path, b"<html></html>", "Could not save the report").is_ok());
+        assert!(write_export_file(&path, b"<html></html>", ReportExportFormat::Html).is_ok());
         assert_eq!(std::fs::read(&path).unwrap(), b"<html></html>");
 
         std::fs::remove_dir_all(&dir).ok();
@@ -982,7 +993,7 @@ mod tests {
         std::fs::set_permissions(&dir, perms).unwrap();
 
         let path = dir.join("report.html");
-        let result = write_export_file(&path, b"<html></html>", "Could not save the report");
+        let result = write_export_file(&path, b"<html></html>", ReportExportFormat::Html);
 
         // Restore before any assertion can panic and skip cleanup.
         let mut perms = std::fs::metadata(&dir).unwrap().permissions();
@@ -991,7 +1002,11 @@ mod tests {
         std::fs::set_permissions(&dir, perms).unwrap();
         std::fs::remove_dir_all(&dir).ok();
 
-        let msg = result.expect_err("a read-only folder must refuse the write");
+        let message = result.expect_err("a read-only folder must refuse the write");
+        assert_eq!(message.id, "could-not-save-the-report-detail");
+        assert!(message.isolate.contains(&"path"));
+        assert!(message.isolate.contains(&"error"));
+        let msg = message.render(Lang::En);
         assert!(
             msg.contains(&path.display().to_string()),
             "message must name the path: {msg}"
@@ -1046,7 +1061,7 @@ mod tests {
             },
         ];
         for reason in reasons {
-            assert!(!describe_block(Lang::En, &reason).is_empty());
+            assert!(!describe_block(&reason).render(Lang::En).is_empty());
         }
     }
 
@@ -1055,12 +1070,20 @@ mod tests {
         let reason = SaveTargetBlockReason::NotAPlainFile {
             reason: "not a regular file".into(),
         };
-        assert!(describe_block(Lang::En, &reason).contains("not a regular file"));
+        assert!(
+            describe_block(&reason)
+                .render(Lang::En)
+                .contains("not a regular file")
+        );
 
         let reason = SaveTargetBlockReason::Unreadable {
             message: "permission denied".into(),
         };
-        assert!(describe_block(Lang::En, &reason).contains("permission denied"));
+        assert!(
+            describe_block(&reason)
+                .render(Lang::En)
+                .contains("permission denied")
+        );
     }
 
     // ── Review 239 §2.2 (F238 remainder): app_error_kind_detail_id /
@@ -1536,7 +1559,7 @@ mod tests {
             match &*store.toast.read() {
                 Some(notice) => {
                     assert_eq!(notice.severity, crate::state::NoticeSeverity::Info);
-                    assert_eq!(notice.message, "Files are identical — nothing to export.");
+                    assert_eq!(notice.message.id, "files-are-identical-nothing-to-export");
                 }
                 None => panic!("exporting identical files must notify the user, not do nothing"),
             }

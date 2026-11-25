@@ -328,11 +328,26 @@ pub fn PathBar(
                                     onclick: move |_| edit_mode.set(true),
                                     BidiText { text: trunc_label(label, 20), lang } }
                             } else {
+                                // F239 (review 239 §4, handoff 117): the
+                                // visible text goes in its own child
+                                // (`.bc-seg-label`, a real block/inline-
+                                // block the CSS ellipsis can act on,
+                                // `03-components.css`) - `.bc-seg` itself
+                                // keeps only its flex centring and 24px
+                                // target. `aria_label` carries the whole,
+                                // untruncated name (same text as
+                                // `title`'s own tooltip), so a screen
+                                // reader reads it complete even once
+                                // CSS, or `trunc_label`'s own 20-
+                                // character cap, visually truncates it.
                                 { let t = seg_path.clone(); let full = label.clone();
+                                  let full_escaped = forskscope_compare::escape_to_plain_marker(&full);
                                   rsx! { button { class: "bc-seg",
-                                      title: "{forskscope_compare::escape_to_plain_marker(&full)}",
+                                      title: "{full_escaped}",
+                                      aria_label: "{full_escaped}",
                                       onclick: move |_| on_navigate.call(t.clone()),
-                                      BidiText { text: trunc_label(&full, 20), lang } } } }
+                                      span { class: "bc-seg-label",
+                                          BidiText { text: trunc_label(&full, 20), lang } } } } }
                             }
                         }
                     }
@@ -1104,6 +1119,55 @@ mod tests {
             aria_labels.iter().any(|l| l == "Left pane — tmp"),
             "expected the group aria-label \"Left pane — tmp\" among \
              {aria_labels:?}"
+        );
+    }
+
+    /// F239 (review 239 §4, handoff 117): a `.bc-seg` breadcrumb segment's
+    /// accessible name is its own `aria-label`, carrying the whole,
+    /// untruncated folder name — never the visible text content alone,
+    /// which both `trunc_label`'s 20-character cap and (now fixed)
+    /// `.bc-seg-label`'s own CSS ellipsis can shorten. Falsify by
+    /// removing `aria_label` from the `.bc-seg` button: `title`'s
+    /// value would still be found (unaffected), but no `aria-label`
+    /// would carry the long name, and this assertion fails.
+    #[test]
+    fn a_long_breadcrumb_segment_names_itself_fully_in_aria_label() {
+        fn root() -> Element {
+            rsx! {
+                PathBar {
+                    path: PathBuf::from("/home/a-folder-name-well-past-twenty-characters-long/leaf"),
+                    can_back: true,
+                    can_forward: true,
+                    on_back: move |_| {},
+                    on_forward: move |_| {},
+                    on_navigate: move |_: PathBuf| {},
+                    lang: Lang::En,
+                    is_focused: false,
+                    on_focus: move |_| {},
+                    side_label: "Left pane".to_string(),
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let aria_labels: Vec<String> = mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute {
+                    name: "aria-label",
+                    value: dioxus_core::AttributeValue::Text(s),
+                    ..
+                } => Some(s.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            aria_labels
+                .iter()
+                .any(|l| l == "a-folder-name-well-past-twenty-characters-long"),
+            "expected the full, untruncated folder name among the rendered \
+             aria-label attributes {aria_labels:?}"
         );
     }
 

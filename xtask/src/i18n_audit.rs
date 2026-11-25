@@ -223,6 +223,14 @@ const DYNAMIC_LOOKUP_IDS: &[&str] = &[
     "recovery-dialog-action-continue-with-defaults",
     "recovery-dialog-action-continue-without-saving",
     "recovery-dialog-action-reset-and-back-up",
+    // RFC-102 stage B (handoff 116, review 239 §2.2): MigrationNotice's
+    // own `message_id` field (session::persistence_recovery and
+    // settings::persistence_recovery, both in forskscope-ui-logic) names
+    // one of these, read at its consuming `recovery_notice` via a field
+    // access, never a literal `t`/`tf`/`TranslatableMessage::new(..)`
+    // call this scan can see.
+    "session-upgraded",
+    "settings-upgraded",
 ];
 
 /// The plural forms each language's CLDR cardinal rule requires, for any

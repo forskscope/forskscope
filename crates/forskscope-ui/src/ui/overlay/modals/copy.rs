@@ -39,7 +39,7 @@ pub fn ConfirmDirOpModal(op: DirOp) -> Element {
                             ) {
                                 Ok(manifest) => {
                                     if manifest.failed() == 0 {
-                                        store.notify_success(t(store.lang(), "copied"));
+                                        store.notify_success(crate::i18n::TranslatableMessage::new("copied"));
                                         store.modal.set(Modal::None);
                                         return;
                                     }

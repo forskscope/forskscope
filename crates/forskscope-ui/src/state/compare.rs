@@ -186,8 +186,12 @@ pub fn reload_tab(store: &mut Store, index: usize) {
             warn_large_file,
         } => {
             if warn_large_file {
-                let message = t(store.lang(), "report-large-file-inline-diff-disabled");
-                store.notify_warning(message);
+                // RFC-102 §1 (owner, 2026-11-25): reclassified from a
+                // warning to an info notice - describes the view, needs
+                // no action, and appears on every open of a medium file.
+                store.notify_info(TranslatableMessage::new(
+                    "report-large-file-inline-diff-disabled",
+                ));
             }
             reload_tab_with_options(store, index, opts);
         }
@@ -307,8 +311,12 @@ pub fn open_compare_request(store: &mut Store, request: CompareRequest) {
             warn_large_file,
         } => {
             if warn_large_file {
-                let message = t(store.lang(), "report-large-file-inline-diff-disabled");
-                store.notify_warning(message);
+                // RFC-102 §1 (owner, 2026-11-25): reclassified from a
+                // warning to an info notice - describes the view, needs
+                // no action, and appears on every open of a medium file.
+                store.notify_info(TranslatableMessage::new(
+                    "report-large-file-inline-diff-disabled",
+                ));
             }
             open_compare_request_with_options(store, request, opts);
         }
@@ -344,8 +352,7 @@ pub(crate) fn open_compare_request_with_options(
     let id = match store.allocate_compare_tab_id() {
         Ok(id) => id,
         Err(error) => {
-            let lang = store.lang();
-            store.notify(load_identity_error_message(&error).render(lang));
+            store.notify(load_identity_error_message(&error));
             return;
         }
     };
@@ -806,8 +813,7 @@ pub fn open_startup_mismatch_error(
     let id = match store.allocate_compare_tab_id() {
         Ok(id) => id,
         Err(error) => {
-            let lang = store.lang();
-            store.notify(load_identity_error_message(&error).render(lang));
+            store.notify(load_identity_error_message(&error));
             return;
         }
     };

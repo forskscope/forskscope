@@ -14,7 +14,7 @@ use forskscope_report::report::{
     BuildOutcome, ReportOptions, ReportPathMode, build_dir_report, render_dir_report,
 };
 
-use crate::i18n::t;
+use crate::i18n::{TranslatableMessage, t};
 use crate::state::{Modal, Store, settings::ColourVision};
 use crate::ui::component::select_field::{SelectField, SelectOption};
 use crate::ui::view::diff_actions::ReportExportFormat;
@@ -234,10 +234,10 @@ async fn start_dir_export(
                     match crate::ui::view::diff_actions::write_export_file(
                         &path,
                         text.as_bytes(),
-                        &t(lang, "could-not-save-the-patch"),
+                        ReportExportFormat::Patch,
                     ) {
                         Ok(()) => store.notify_success_with_open(
-                            t(lang, "report-saved"),
+                            TranslatableMessage::new("report-saved"),
                             t(lang, "open"),
                             path.display().to_string(),
                         ),
@@ -247,10 +247,16 @@ async fn start_dir_export(
                 // F79: an unreadable entry fails the whole patch, naming it -
                 // core's own rule, surfaced here rather than silently
                 // producing an incomplete patch.
-                Ok(Err(e)) => {
-                    store.notify(format!("{}: {e}", t(lang, "could-not-build-the-patch")))
-                }
-                Err(e) => store.notify(format!("{}: {e}.", t(lang, "could-not-save-the-patch"))),
+                Ok(Err(e)) => store.notify(
+                    TranslatableMessage::new("could-not-build-the-patch-detail")
+                        .arg("error", e.to_string())
+                        .isolating("error"),
+                ),
+                Err(e) => store.notify(
+                    TranslatableMessage::new("could-not-save-the-patch-task-failed")
+                        .arg("error", e.to_string())
+                        .isolating("error"),
+                ),
             }
         }
         ReportExportFormat::Html => {
@@ -329,10 +335,10 @@ async fn start_dir_export(
                     match crate::ui::view::diff_actions::write_export_file(
                         &path,
                         html.as_bytes(),
-                        &t(lang, "could-not-save-the-report"),
+                        ReportExportFormat::Html,
                     ) {
                         Ok(()) => store.notify_success_with_open(
-                            t(lang, "report-saved"),
+                            TranslatableMessage::new("report-saved"),
                             t(lang, "open"),
                             path.display().to_string(),
                         ),
@@ -343,14 +349,18 @@ async fn start_dir_export(
                 // silence - the user asked for this.
                 Ok(BuildOutcome::Cancelled) => {}
                 // RFC-092 §0: refuse before writing anything.
-                Ok(BuildOutcome::Stale(path)) => store.notify(format!(
-                    "{} ({path})",
-                    t(
-                        lang,
-                        "a-file-changed-since-it-was-compared-compare-again-then"
+                Ok(BuildOutcome::Stale(path)) => store.notify(
+                    TranslatableMessage::new(
+                        "a-file-changed-since-it-was-compared-compare-again-then-detail",
                     )
-                )),
-                Err(e) => store.notify(format!("{}: {e}.", t(lang, "could-not-save-the-report"))),
+                    .arg("path", path)
+                    .isolating("path"),
+                ),
+                Err(e) => store.notify(
+                    TranslatableMessage::new("could-not-save-the-report-task-failed")
+                        .arg("error", e.to_string())
+                        .isolating("error"),
+                ),
             }
         }
     }

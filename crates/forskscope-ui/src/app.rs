@@ -3,6 +3,7 @@
 use dioxus::prelude::*;
 use forskscope_ui_logic::StartupRequest;
 
+use crate::i18n::t;
 use crate::state::{
     StartupAction, Store, advance_recovery_queue, classify_startup_request, fs_probe,
     open_compare_request, open_dir_compare, open_startup_mismatch_error, resolve_session,
@@ -23,6 +24,43 @@ const MAIN_CSS: &str = include_str!("../assets/main.css");
 /// `use_hook`. Falls back to `StartupRequest::Explorer` if never set (e.g. a
 /// future test harness that constructs `App` without going through `main`).
 pub static STARTUP_REQUEST: std::sync::OnceLock<StartupRequest> = std::sync::OnceLock::new();
+
+/// RFC-102 §2: on a focus-taking (error/warning) toast's mount, save
+/// `document.activeElement` — but only if nothing is already saved,
+/// since a second error replacing the first (`Notice.id`'s own doc
+/// comment) must not overwrite the *original* previous focus with the
+/// first toast's own Dismiss button — then move focus to the toast's
+/// one focusable element (its Dismiss button, or its action button
+/// where it has one — `rsx!` below renders only one of the two).
+const SAVE_FOCUS_AND_FOCUS_NOTICE_JS: &str = "\
+    if (!window.__fskNoticeReturnFocus) { \
+        window.__fskNoticeReturnFocus = document.activeElement; \
+    } \
+    const el = document.querySelector('.toast [autofocus]'); \
+    if (el) { el.focus(); }";
+
+/// The other half: Escape or *Dismiss* returns focus to whatever had it
+/// before the notice appeared, falling back to the app's own starting
+/// point (`#app-root`) if that element is gone (RFC-102 §2: "If that
+/// element is gone, focus goes to the main view's own starting point").
+const RETURN_FOCUS_JS: &str = "\
+    const el = window.__fskNoticeReturnFocus; \
+    window.__fskNoticeReturnFocus = null; \
+    if (el && document.body.contains(el) && typeof el.focus === 'function') { \
+        el.focus(); \
+    } else { \
+        document.getElementById('app-root')?.focus(); \
+    }";
+
+/// RFC-102 §2: dismiss a focus-taking toast and return focus — the one
+/// path both Escape (`GlobalKeyAction::CloseToast`) and the toast's own
+/// Dismiss/action button go through, so the two can never drift apart.
+fn dismiss_focus_taking_toast(store: &mut Store) {
+    store.toast.set(None);
+    spawn(async move {
+        let _ = dioxus::document::eval(RETURN_FOCUS_JS).await;
+    });
+}
 
 #[component]
 pub fn App() -> Element {
@@ -267,6 +305,36 @@ pub fn App() -> Element {
     );
     let active = *store.active.read();
     let toast = store.toast.read().cloned();
+    let lang = store.lang();
+
+    // RFC-102 §3 (amended 2026-11-25, review 239 — the Windows
+    // measurement, reply 203): every passive (info/success) notice is
+    // announced through this one permanent, visually hidden live
+    // region, mounted once below, never through the toast itself any
+    // more ("the visible toast stays as it is, but no longer carries
+    // the live region itself, so nothing is announced twice"). Cleared,
+    // then set, for each one — the one shape the Windows measurement
+    // found `LiveRegionChanged` fires for reliably (3/3); a region
+    // inserted with its text already there, the toast's own shape,
+    // fired 0-1 times in 3.
+    let mut passive_announcement = use_signal::<Option<crate::i18n::TranslatableMessage>>(|| None);
+    use_effect(move || {
+        let notice = store.toast.read().clone();
+        if let Some(notice) = notice
+            && !notice.severity.takes_focus()
+        {
+            passive_announcement.set(None);
+            let message = notice.message.clone();
+            spawn(async move {
+                // A real tick, not just a second signal write in the same
+                // render - the DOM text node must actually clear before
+                // it is set again (shape C), which a same-frame
+                // clear-then-set would not reliably give it.
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                passive_announcement.set(Some(message));
+            });
+        }
+    });
 
     rsx! {
         style { {MAIN_CSS} }
@@ -294,10 +362,17 @@ pub fn App() -> Element {
                 let modal = ModalState::from_modal(&store.modal.read());
                 let mods = e.modifiers();
                 let active = *store.active.read();
-                let action = global_key_action(&e.key(), mods, modal, active.is_some());
+                let toast_takes_focus = store
+                    .toast
+                    .read()
+                    .as_ref()
+                    .is_some_and(|n| n.severity.takes_focus());
+                let action =
+                    global_key_action(&e.key(), mods, modal, active.is_some(), toast_takes_focus);
 
                 match action {
                     GlobalKeyAction::Ignore => {}
+                    GlobalKeyAction::CloseToast => dismiss_focus_taking_toast(&mut store),
                     GlobalKeyAction::CloseModal => store.modal.set(crate::state::Modal::None),
                     GlobalKeyAction::MoveFocus(delta) => {
                         if let Some(index) = active { move_focus(&mut store, index, delta); }
@@ -407,50 +482,144 @@ pub fn App() -> Element {
             }
             StatusBar {}
             ModalLayer {}
+            // RFC-102 §3: the one permanent, visually hidden live region,
+            // mounted unconditionally (not inside `if let Some(notice) =
+            // toast`) — a passive notice clears it, then sets it (the
+            // `use_effect` above); it never moves focus, and the toast
+            // itself no longer carries `role="status"`, so nothing is
+            // announced twice.
+            PassiveLiveRegion { lang, message: passive_announcement.read().clone() }
             if let Some(notice) = toast {
-                {
-                    let severity_class = match notice.severity {
-                        crate::state::NoticeSeverity::Success => "toast toast-success",
-                        crate::state::NoticeSeverity::Info    => "toast toast-info",
-                        crate::state::NoticeSeverity::Warning => "toast toast-warning",
-                        crate::state::NoticeSeverity::Error   => "toast toast-error",
-                    };
-                    let message = notice.message.clone();
-                    let action = notice.action.clone();
-                    // Auto-dismiss for Success and Info notices.
-                    if let Some(ms) = notice.auto_dismiss_ms() {
-                        spawn(async move {
-                            tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
-                            store.toast.set(None);
-                        });
-                    }
-                    rsx! {
-                        div {
-                            class: "{severity_class}",
-                            role: "status",
-                            aria_live: "polite",
-                            onclick: move |_| store.toast.set(None),
-                            "{message}"
-                            if let Some(action) = action {
-                                button {
-                                    class: "toast-action",
-                                    onclick: move |e| {
-                                        // RFC-092 §2: stays on the toast's own
-                                        // click-anywhere-to-dismiss, but this
-                                        // click must act (open the file), not
-                                        // merely dismiss - stop it reaching the
-                                        // outer div's onclick.
-                                        e.stop_propagation();
-                                        if let Err(err) = forskscope_desktop::external_tool::open_path(&action.path) {
-                                            eprintln!("open_path: {err} (path: {})", action.path);
-                                        }
-                                        store.toast.set(None);
-                                    },
-                                    "{action.label}"
-                                }
-                            }
+                Toast { lang, notice }
+            }
+        }
+    }
+}
+
+/// RFC-102 §3's one permanent, visually hidden live region. A separate
+/// component (not inline in `App`) so its markup is directly testable
+/// through a `VirtualDom`, the same way `TabError`/`SaveErrorModal` are.
+#[component]
+fn PassiveLiveRegion(
+    lang: crate::state::Lang,
+    message: Option<crate::i18n::TranslatableMessage>,
+) -> Element {
+    rsx! {
+        span {
+            class: "visually-hidden",
+            role: "status",
+            aria_live: "polite",
+            if let Some(message) = message {
+                crate::ui::view::TranslatedText {
+                    lang,
+                    id: message.id,
+                    args: message.args.clone(),
+                    isolate: message.isolate.clone(),
+                }
+            }
+        }
+    }
+}
+
+/// The toast itself (RFC-102 §2) — a separate component for the same
+/// testability reason as [`PassiveLiveRegion`]. An error/warning takes
+/// focus (`role="alertdialog"`, labelled by the message, autofocus on
+/// its Dismiss or action button); success/info stay passive, announced
+/// only through [`PassiveLiveRegion`], never by moving focus.
+#[component]
+fn Toast(lang: crate::state::Lang, notice: crate::state::Notice) -> Element {
+    let mut store = use_context::<Store>();
+    let severity_class = match notice.severity {
+        crate::state::NoticeSeverity::Success => "toast toast-success",
+        crate::state::NoticeSeverity::Info => "toast toast-info",
+        crate::state::NoticeSeverity::Warning => "toast toast-warning",
+        crate::state::NoticeSeverity::Error => "toast toast-error",
+    };
+    let message = notice.message.clone();
+    let action = notice.action.clone();
+    let takes_focus = notice.severity.takes_focus();
+    let msg_id = format!("notice-{}-msg", notice.id);
+    // Auto-dismiss for Success and Info notices only — RFC-102 §2: an
+    // error/warning "stays until clicked" (or Escape/Dismiss), same as
+    // today.
+    if let Some(ms) = notice.auto_dismiss_ms() {
+        spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+            store.toast.set(None);
+        });
+    }
+    rsx! {
+        div {
+            key: "notice-{notice.id}",
+            class: "{severity_class}",
+            role: if takes_focus { "alertdialog" },
+            aria_labelledby: if takes_focus { "{msg_id}" },
+            // RFC-102 §2: "typing isn't swallowed ... the text typed so
+            // far is kept" - moving DOM focus away from a text input
+            // never touches its own value signal, so this needs no
+            // special handling beyond not clearing one anywhere in this
+            // path (verified by a real test, not just asserted here).
+            onmounted: move |_| {
+                if takes_focus {
+                    spawn(async move {
+                        let _ = dioxus::document::eval(SAVE_FOCUS_AND_FOCUS_NOTICE_JS).await;
+                    });
+                }
+            },
+            onclick: move |_| {
+                if takes_focus {
+                    dismiss_focus_taking_toast(&mut store);
+                } else {
+                    store.toast.set(None);
+                }
+            },
+            span {
+                id: "{msg_id}",
+                crate::ui::view::TranslatedText {
+                    lang,
+                    id: message.id,
+                    args: message.args.clone(),
+                    isolate: message.isolate.clone(),
+                }
+            }
+            // RFC-102 §2: focus moves to *either* the Dismiss button,
+            // named "Dismiss" and described by the message, *or* the
+            // action button where the notice has one, described the
+            // same way - never both, so `action` takes priority on a
+            // focus-taking notice that happens to carry one (no call
+            // site does today; this stays correct if one ever does).
+            if takes_focus && action.is_none() {
+                button {
+                    autofocus: true,
+                    "aria-describedby": "{msg_id}",
+                    onclick: move |e| {
+                        e.stop_propagation();
+                        dismiss_focus_taking_toast(&mut store);
+                    },
+                    {t(lang, "recovery-action-dismiss")}
+                }
+            }
+            if let Some(action) = action {
+                button {
+                    class: "toast-action",
+                    autofocus: takes_focus,
+                    "aria-describedby": if takes_focus { "{msg_id}" },
+                    onclick: move |e| {
+                        // RFC-092 §2: stays on the toast's own
+                        // click-anywhere-to-dismiss, but this click must
+                        // act (open the file), not merely dismiss - stop
+                        // it reaching the outer div's onclick.
+                        e.stop_propagation();
+                        if let Err(err) = forskscope_desktop::external_tool::open_path(&action.path) {
+                            eprintln!("open_path: {err} (path: {})", action.path);
                         }
-                    }
+                        if takes_focus {
+                            dismiss_focus_taking_toast(&mut store);
+                        } else {
+                            store.toast.set(None);
+                        }
+                    },
+                    "{action.label}"
                 }
             }
         }
@@ -521,6 +690,132 @@ mod tests {
         assert_eq!(
             window_title(Some(spoofed), false),
             "invoice<U+202E>fdp.exe ↔ invoice.pdf — ForskScope"
+        );
+    }
+}
+
+#[cfg(test)]
+mod toast_markup_tests {
+    use dioxus::prelude::*;
+
+    use super::{PassiveLiveRegion, Toast};
+    use crate::i18n::TranslatableMessage;
+    use crate::state::{AppSettings, Lang, Notice, Store};
+
+    fn attribute_values(mutations: &dioxus_core::Mutations, attr_name: &str) -> Vec<String> {
+        mutations
+            .edits
+            .iter()
+            .filter_map(|m| match m {
+                dioxus_core::Mutation::SetAttribute { name, value, .. } if *name == attr_name => {
+                    Some(format!("{value:?}"))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// RFC-102 §2, verification point 2: "an error notice renders
+    /// `role=\"alertdialog\"`". Falsify by hardcoding `role: "status"`
+    /// (the old, always-passive markup) on `Toast`'s outer div: this
+    /// assertion then finds no `"alertdialog"` value at all.
+    #[test]
+    fn an_error_notice_renders_role_alertdialog() {
+        fn root() -> Element {
+            use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+            rsx! {
+                Toast {
+                    lang: Lang::En,
+                    notice: Notice::error(TranslatableMessage::new("test-fixture-plain")),
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let roles = attribute_values(&mutations, "role");
+        assert!(
+            roles.iter().any(|r| r.contains("alertdialog")),
+            "an error notice must render role=\"alertdialog\": {roles:?}"
+        );
+    }
+
+    /// RFC-102 §2, verification point 2 (the other half): "a success
+    /// notice renders neither" — no `role` attribute at all (the
+    /// permanent live region, not the toast, carries `role="status"`
+    /// for a passive notice — §3). Falsify by setting `role:
+    /// "alertdialog"` unconditionally on `Toast`'s outer div: this
+    /// assertion then finds one.
+    #[test]
+    fn a_success_notice_renders_no_role() {
+        fn root() -> Element {
+            use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+            rsx! {
+                Toast {
+                    lang: Lang::En,
+                    notice: Notice::success(TranslatableMessage::new("test-fixture-plain")),
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let roles = attribute_values(&mutations, "role");
+        assert!(
+            roles.is_empty() || roles.iter().all(|r| r.contains("None")),
+            "a success notice must render no role attribute: {roles:?}"
+        );
+    }
+
+    /// RFC-102 §2: "its Dismiss button, named \"Dismiss\" ... so a
+    /// screen reader speaks the message as focus arrives" - the button
+    /// must carry `autofocus` when the notice takes focus and has no
+    /// action. Falsify by removing `autofocus: true` from the Dismiss
+    /// button: this assertion then finds no `true` value.
+    #[test]
+    fn an_error_notices_dismiss_button_is_autofocused() {
+        fn root() -> Element {
+            use_context_provider(|| Store::new(AppSettings::default(), Default::default(), false));
+            rsx! {
+                Toast {
+                    lang: Lang::En,
+                    notice: Notice::warning(TranslatableMessage::new("test-fixture-plain")),
+                }
+            }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        let autofocus = attribute_values(&mutations, "autofocus");
+        assert!(
+            autofocus.iter().any(|v| v.contains("true")),
+            "a warning notice's Dismiss button must be autofocused: {autofocus:?}"
+        );
+    }
+
+    /// RFC-102 §3: the permanent live region renders no message text
+    /// when passed `None` (its own "cleared" state, between one notice
+    /// and the next). `role="status"` itself is a static literal with
+    /// no dynamic part (never conditional, unlike the toast's `role`) —
+    /// confirmed by reading `PassiveLiveRegion`'s own source, not by a
+    /// mutation this harness can see.
+    #[test]
+    fn the_passive_live_region_with_no_message_renders_no_text() {
+        fn text_nodes(mutations: &dioxus_core::Mutations) -> Vec<String> {
+            mutations
+                .edits
+                .iter()
+                .filter_map(|m| match m {
+                    dioxus_core::Mutation::CreateTextNode { value, .. } => Some(value.clone()),
+                    _ => None,
+                })
+                .collect()
+        }
+        fn root() -> Element {
+            rsx! { PassiveLiveRegion { lang: Lang::En, message: None } }
+        }
+        let mut vdom = VirtualDom::new(root);
+        let mutations = vdom.rebuild_to_vec();
+        assert!(
+            text_nodes(&mutations).is_empty(),
+            "with no message, the live region must render no text node"
         );
     }
 }

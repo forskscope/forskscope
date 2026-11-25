@@ -147,18 +147,28 @@ sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev
 
 ---
 
-### Linux: status messages aren't spoken by screen readers
+### Linux: passive notices aren't spoken by screen readers
 
-ForskScope marks its status messages (notices, search counts, the
-Explorer's status, changes to an ignore list) as live regions, the
-standard way to have a screen reader announce text that appears without
-moving focus. On Linux, WebKitGTK doesn't send the accessibility event
-that screen readers act on for any form of live region, so Orca announces
-none of them. Focus changes are announced normally. Measured with
-WebKitGTK 2.54.3 and Orca 51.2.
+An error or a warning always takes keyboard focus when it appears, so a
+screen reader speaks it on every platform, Linux included — this is not
+the limitation below.
 
-Until a WebKitGTK release changes this, the next ForskScope release makes
-the messages that need your attention take focus, so they're spoken.
+**A success or an informational notice stays passive** (search counts,
+the Explorer's status, a change to an ignore list, "Large file — inline
+diff disabled."): ForskScope announces it through one permanent,
+screen-reader-only live region, the standard way to have a screen reader
+read text that appears without moving focus. On Linux, WebKitGTK doesn't
+send the accessibility event any form of live region depends on, so Orca
+stays silent for these specifically. **On Windows, the same region is
+announced reliably** (measured through UI Automation, three shapes tried:
+only a region cleared then updated in place fires consistently — the one
+this region uses). Measured with WebKitGTK 2.54.3 and Orca 51.2, and with
+WebView2 on `windows-latest` GitHub Actions runners.
+
+Until a WebKitGTK release changes this, passive notices on Linux are
+visible on screen but not announced. Nothing else is affected: every
+error and warning is spoken, because it takes focus, regardless of
+platform.
 
 ---
 

@@ -692,7 +692,9 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
             }
             store.modal.set(Modal::Settings);
             if *raise_toast {
-                store.notify("layout-probe: Could not save settings: test toast");
+                store.notify(crate::i18n::TranslatableMessage::new(
+                    "layout-probe: Could not save settings: test toast",
+                ));
             }
         }
         ViewPlan::Explorer => {
@@ -1558,7 +1560,16 @@ fn measurement_script(
       // design - that's the whole point of `text-overflow: ellipsis` - so
       // it is excluded here exactly as it already is below for `clipped`,
       // not just from the text-clip check.
-      const ellipsized = cs.textOverflow === 'ellipsis';
+      //
+      // F239 (review 239 §4, handoff 117): `text-overflow: ellipsis` only
+      // ever takes effect on a block, inline-block or list-item box -
+      // never on a flex or grid container, where it is simply ignored
+      // (`.bc-seg`, F239's own real-world case, declared it while also
+      // being `display: inline-flex`, so its overflowing text was
+      // clipped on both sides, not ellipsized, and this check's old,
+      // unconditional exemption missed it entirely).
+      const ellipsized = cs.textOverflow === 'ellipsis'
+        && (cs.display === 'block' || cs.display === 'inline-block' || cs.display === 'list-item');
       const wOver = wOverRaw && !ellipsized;
       if ((wOver || hOver) && !doesNotLoseOverflow(el, overflowAllowlist)
           && !withinBoundedOverflow(el, boundedOverflowAllowlist)) {{

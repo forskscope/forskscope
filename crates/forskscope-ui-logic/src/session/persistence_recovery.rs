@@ -9,9 +9,12 @@ use forskscope_desktop::persist::schema::session::runtime::{
 /// A one-time notice that a migration was durably written. Only produced
 /// once the write actually landed — a commit deferred by conflict (review
 /// 037 N1's race) says nothing, since it will simply be retried next run.
+/// F238/review 239 §2.2: `message` used to be plain English text, built
+/// here with no i18n (RFC-093 crate boundaries) and never translated at
+/// all. Now a catalog id ("session-upgraded"), looked up in the UI.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MigrationNotice {
-    pub message: String,
+    pub message_id: &'static str,
 }
 
 /// Ordered actions for a blocking recovery dialog. `ChooseAnotherLocation`
@@ -79,7 +82,7 @@ impl SessionRecoveryView {
             },
             SessionRuntimeOutcome::Migrated(MigrationCommitOutcome::Committed { .. }) => Self {
                 migration_notice: Some(MigrationNotice {
-                    message: "Your session was upgraded to the current format.".into(),
+                    message_id: "session-upgraded",
                 }),
                 dialog: None,
             },

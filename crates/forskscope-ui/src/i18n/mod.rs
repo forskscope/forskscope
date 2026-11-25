@@ -198,6 +198,16 @@ impl TranslatableMessage {
     /// as it is" rule). Never for rendered body text: use
     /// [`crate::ui::view::TranslatedText`] there instead, so an
     /// `isolate`-marked placeholder keeps its isolation.
+    ///
+    /// Every real UI surface renders a `TranslatableMessage` through
+    /// `TranslatedText` now (the error tab, `SaveErrorModal`, the toast,
+    /// the permanent live region) — this stays available for the one
+    /// kind of place that genuinely can't (an attribute, a window
+    /// title), none of which exist yet, and is otherwise exercised only
+    /// by tests that check a message's *rendered text* directly rather
+    /// than its structure (`#[allow(dead_code)]`: a plain, non-test
+    /// `cargo build` compiles no call site at all).
+    #[allow(dead_code)]
     pub fn render(&self, lang: Lang) -> String {
         let args: Vec<(&str, &str)> = self.args.iter().map(|(n, v)| (*n, v.as_str())).collect();
         tf(lang, self.id, &args, None)
