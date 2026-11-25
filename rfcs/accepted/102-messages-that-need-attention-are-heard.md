@@ -18,6 +18,8 @@ scope, warnings included.
 - stage B follows the owner's review (handoff 116).
 **Amended.** 2026-11-25, by the owner's answers to stage A's list: the
 large-file notice is reclassified as info (§1).
+**Amended.** 2026-11-25, after stage A's Windows measurement: passive
+notices announce through one permanent, in-place live region (§3).
 **Touches.**
 - `crates/forskscope-ui`: the notice (toast) component, `state.rs`'s
   `Notice`, focus handling, and the CSS;
@@ -98,9 +100,25 @@ because it concerns the user's data.
 
 ### 3. Passive notices
 
-- **Unchanged:** a live region, never moving focus.
-- **Where the platform announces them,** they're heard; on Linux today,
-  they aren't, and the guide says so.
+**Amended 2026-11-25, after stage A's Windows measurement** (reply 203,
+review 239):
+- **The finding:** on WebView2, a region inserted with its text (the
+  toast's own shape) raised `LiveRegionChanged` 0–1 times in 3;
+- **while a permanent region updated in place** (cleared, then set),
+  and `role="alert"`, raised it every time.
+
+**So:**
+- **every passive notice is announced through one permanent, visually
+  hidden live region** (`role="status"`), mounted once with the app;
+  - **cleared, then set** for each notice;
+  - never moving focus.
+- **The visible toast stays as it is,** but no longer carries the live
+  region itself, **so nothing is announced twice.**
+- **On Windows, passive notices are then heard.** On Linux they aren't
+  (no shape is announced there, F226), and the guide says so for each
+  platform.
+- **Their text and placeholders** come from the catalog, isolated as
+  RFC-101 decides (review 239 §2.1).
 
 ### 4. Windows: measure first
 
