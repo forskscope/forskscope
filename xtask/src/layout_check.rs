@@ -205,9 +205,27 @@ pub fn run(root: &Path, opts: &RunOptions) {
     let _ = fs::remove_dir_all(&opts.out_dir);
     fs::create_dir_all(&opts.out_dir)
         .unwrap_or_else(|e| panic!("cannot create {}: {e}", opts.out_dir.display()));
-    let bus_conf = write_no_activation_conf(&opts.out_dir);
+    // Review 243 §2: `--out-dir` is relative by default
+    // (`target/layout-check`), and the launched app's own working
+    // directory, routed through `dbus-run-session` with no explicit
+    // `.current_dir()` of its own, isn't guaranteed to resolve a
+    // relative `--data-dir` the same way this process's own CWD does -
+    // `write_explorer_dir_settings`'s own seeded `last_left_dir` landed
+    // in a `settings.json` this process wrote correctly, but the child
+    // process given that same relative `--data-dir` string read a
+    // *different* file (or none), falling back to `$HOME` instead
+    // (`205e`'s own guard, `seed_not_applied`, is what actually caught
+    // this - confirmed by reading the settings.json this process wrote
+    // directly: correct, every time). Canonicalizing once, here, makes
+    // every path derived from it absolute and immune to whatever CWD
+    // the child process is actually launched with.
+    let out_dir = opts
+        .out_dir
+        .canonicalize()
+        .unwrap_or_else(|e| panic!("cannot canonicalize {}: {e}", opts.out_dir.display()));
+    let bus_conf = write_no_activation_conf(&out_dir);
 
-    let fixtures_dir = opts.out_dir.join("fixtures");
+    let fixtures_dir = out_dir.join("fixtures");
     let (file_left, file_right) = write_file_comparison_fixture(&fixtures_dir);
     let (folder_left, folder_right) = write_folder_fixture(&fixtures_dir);
     let (merge_local, merge_remote, merge_merged) = write_mergetool_fixture(&fixtures_dir);
@@ -235,13 +253,9 @@ pub fn run(root: &Path, opts: &RunOptions) {
     let mut per_window_ms: Vec<(String, u128)> = Vec::new();
 
     for &window_label in DEFAULT_WINDOWS {
-        let plan_path = opts
-            .out_dir
-            .join(format!("plan-layout-{window_label}.json"));
-        let results_path = opts
-            .out_dir
-            .join(format!("results-layout-{window_label}.jsonl"));
-        let data_dir = opts.out_dir.join(format!("data-layout-{window_label}"));
+        let plan_path = out_dir.join(format!("plan-layout-{window_label}.json"));
+        let results_path = out_dir.join(format!("results-layout-{window_label}.jsonl"));
+        let data_dir = out_dir.join(format!("data-layout-{window_label}"));
 
         write_layout_checks_plan(
             &plan_path,
@@ -269,15 +283,10 @@ pub fn run(root: &Path, opts: &RunOptions) {
     }
 
     for &(window_label, text_size) in CONTRAST_LAYOUTS {
-        let plan_path = opts
-            .out_dir
-            .join(format!("plan-contrast-{window_label}-{text_size}.json"));
-        let results_path = opts
-            .out_dir
-            .join(format!("results-contrast-{window_label}-{text_size}.jsonl"));
-        let data_dir = opts
-            .out_dir
-            .join(format!("data-contrast-{window_label}-{text_size}"));
+        let plan_path = out_dir.join(format!("plan-contrast-{window_label}-{text_size}.json"));
+        let results_path =
+            out_dir.join(format!("results-contrast-{window_label}-{text_size}.jsonl"));
+        let data_dir = out_dir.join(format!("data-contrast-{window_label}-{text_size}"));
 
         write_contrast_plan(
             &plan_path,
@@ -311,7 +320,7 @@ pub fn run(root: &Path, opts: &RunOptions) {
     let (any_failures, failing_rows) = report(&all_rows, &per_window_ms);
     if !failing_rows.is_empty() {
         capture_failures(
-            &opts.out_dir,
+            &out_dir,
             &fixtures,
             &bin,
             &bus_conf,
@@ -711,7 +720,20 @@ fn write_deep_path_fixture(dir: &Path) -> PathBuf {
         path = path.join(name);
     }
     fs::create_dir_all(&path).unwrap_or_else(|e| panic!("cannot create {}: {e}", path.display()));
-    path
+    // Review 243 §2: `opts.out_dir` (hence `dir`, hence this whole path)
+    // is whatever string `--out-dir` was given - relative by default
+    // (`target/layout-check`). `write_explorer_dir_settings`'s own
+    // seeded `last_left_dir` needs to resolve the same way regardless
+    // of the launched child process's own working directory (routed
+    // through `dbus-run-session`, not spawned with any explicit `.
+    // current_dir()` of its own) - canonicalizing here, once, at the
+    // source, is what the `seed_not_applied` guard below this round's
+    // own `expect_dir` reads needed to actually prove: the first version
+    // of that guard itself fired on a relative-vs-resolved mismatch,
+    // not a real unapplied seed, the moment it could finally tell the
+    // difference at all.
+    path.canonicalize()
+        .unwrap_or_else(|e| panic!("cannot canonicalize {}: {e}", path.display()))
 }
 
 /// RFC-100 §1's own twelve bidirectional control characters, duplicated
@@ -839,7 +861,11 @@ fn many_ignore_entries(prefix: &str) -> String {
 /// against every view regardless of which axis group is sweeping.
 fn all_views_json(fixtures: &Fixtures) -> serde_json::Value {
     serde_json::json!([
-        {"kind": "explorer"},
+        // Review 243 §2: `expect_dir` matches `write_explorer_dir_settings`'s
+        // own seeded `last_left_dir`/`last_right_dir` exactly (both
+        // this and that come from `fixtures.deep_path`) - the guard
+        // against a silently-unread seed going silent itself.
+        {"kind": "explorer", "expect_dir": fixtures.deep_path},
         {"kind": "file-comparison", "left": fixtures.file_left, "right": fixtures.file_right},
         {"kind": "deep-compare", "left": fixtures.folder_left, "right": fixtures.folder_right},
         {
@@ -963,14 +989,22 @@ fn write_explorer_dir_settings(data_dir: &Path, explorer_dir: &Path) {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    // `remember_explorer_dirs` has its own `#[serde(default = "default_true")]`
-    // (`forskscope-desktop/src/persist/schema/settings.rs`) - found live,
-    // leaving it out anyway, the file was NOT read as seeding
-    // `last_left_dir`/`last_right_dir` at all (`Explorer`'s own panes
-    // opened at `$HOME` instead, confirmed by reading the rendered
-    // breadcrumb text directly). Naming it explicitly here is what
-    // actually works - confirmed the same way, not assumed from the
-    // struct's own default attribute.
+    // Review 243 §2's own finding: `remember_explorer_dirs` alone (the
+    // first version of this function) still left every run opening
+    // `$HOME` - a `data-debug-settings` dump (`app.rs`, added and
+    // removed for this one diagnosis) showed `PersistedSettings` itself
+    // failing to deserialize at all (`load_settings`'s own `Err(_) =>
+    // Corrupt` branch, `forskscope-desktop/src/persist/schema/
+    // settings.rs`), silently defaulting *everything* - `remember_
+    // explorer_dirs` only looked "applied" because its own default
+    // happens to match what was written. `theme`, `language`,
+    // `diff_font_size`, `context_lines`, `profiles` and `active_profile`
+    // carry no `#[serde(default...)]` of their own on that struct -
+    // every one of them is required for the payload to parse as
+    // `Current` at all, not just the ones this function cares about.
+    // `ui_builtin_profiles()`'s own first entry, by hand (xtask can't
+    // depend on the crate that builds it, the same DEC-005/F119 reason
+    // `BIDI_CONTROL_CHARS` is duplicated above).
     let json = serde_json::json!({
         "schema_name": "settings",
         "schema_version": 2,
@@ -978,6 +1012,22 @@ fn write_explorer_dir_settings(data_dir: &Path, explorer_dir: &Path) {
         "created_unix": now,
         "updated_unix": now,
         "payload": {
+            "theme": "dark",
+            "language": "en",
+            "diff_font_size": 14,
+            "context_lines": 3,
+            "profiles": [
+                {
+                    "name": "Exact (default)",
+                    "whitespace": "significant",
+                    "newlines": "significant",
+                    "case": "sensitive",
+                    "inline_mode": "lazy",
+                    "algorithm": "myers",
+                    "built_in": true,
+                },
+            ],
+            "active_profile": 0,
             "last_left_dir": explorer_dir,
             "last_right_dir": explorer_dir,
             "remember_explorer_dirs": true,
@@ -1527,6 +1577,7 @@ fn report(
             "current_folder_clipped",
             "overflow_button_mismatch",
             "shallow_path_shifted",
+            "seed_not_applied",
         ] {
             if let Some(list) = row.get(kind).and_then(|v| v.as_array()) {
                 for finding in list {

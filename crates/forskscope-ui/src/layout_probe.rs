@@ -236,6 +236,18 @@ pub enum ViewPlan {
         raise_passive_toast: bool,
         #[serde(default)]
         passive_toast_delay_ms: Option<u64>,
+        /// Review 243 §2: what `last_left_dir`/`last_right_dir` (the
+        /// data dir's own `settings.json`, seeded outside this plan
+        /// entirely — `xtask`'s `write_explorer_dir_settings`) was
+        /// supposed to open both Explorer panes at. When set, the
+        /// `seed_not_applied` check fails loudly if a pane's own
+        /// `.path-segments[data-full-path]` doesn't match it — the
+        /// guard a silently-unread seed (`205e`'s own finding:
+        /// `remember_explorer_dirs` missing from that file meant every
+        /// run since `205c` opened `$HOME` instead) needed, so a third
+        /// one can't happen the same way twice more.
+        #[serde(default)]
+        expect_dir: Option<String>,
     },
     /// Deep Compare, opened the same way the Explorer's own folder-compare
     /// action does (`state::open_dir_compare`). RFC-097 stage 3 §3's own
@@ -532,6 +544,11 @@ pub struct ResultRow {
     /// No allowance.
     #[serde(default)]
     pub shallow_path_shifted: Vec<Measurement>,
+    /// Review 243 §2: the guard against a third silently-unread seed -
+    /// `ViewPlan::Explorer`'s own `expect_dir`, when set, against
+    /// `.path-segments[data-full-path]`. No allowance.
+    #[serde(default)]
+    pub seed_not_applied: Vec<Measurement>,
 }
 
 fn parse_lang(s: &str) -> Lang {
@@ -795,6 +812,7 @@ fn open_view(store: &mut Store, view: &ViewPlan) {
             raise_toast,
             raise_passive_toast,
             passive_toast_delay_ms,
+            expect_dir: _,
         } => {
             store.modal.set(Modal::None);
             raise_immediate_toast(
@@ -970,6 +988,12 @@ async fn measure_one(
         RENDERED_CONTRAST_MARK_MIN
     };
     let zoom = f64::from(text_size) / 100.0;
+    // Review 243 §2: only `Explorer` carries `expect_dir` - every other
+    // view has nothing of this shape to check.
+    let expect_dir = match view {
+        ViewPlan::Explorer { expect_dir, .. } => expect_dir.clone(),
+        _ => None,
+    };
     let script = measurement_script(
         view.ready_selector(),
         required_text_contrast,
@@ -977,6 +1001,7 @@ async fn measure_one(
         zoom,
         before_zoom_width,
         text_size,
+        expect_dir,
     );
     let (raw, recv_retries) = match retry_recv(&script).await {
         Ok(r) => r,
@@ -1007,6 +1032,7 @@ async fn measure_one(
                 current_folder_clipped: Vec::new(),
                 overflow_button_mismatch: Vec::new(),
                 shallow_path_shifted: Vec::new(),
+                seed_not_applied: Vec::new(),
             };
         }
     };
@@ -1038,6 +1064,7 @@ async fn measure_one(
             current_folder_clipped: m.current_folder_clipped,
             overflow_button_mismatch: m.overflow_button_mismatch,
             shallow_path_shifted: m.shallow_path_shifted,
+            seed_not_applied: m.seed_not_applied,
         },
         Err(e) => ResultRow {
             view: view.name().to_string(),
@@ -1065,6 +1092,7 @@ async fn measure_one(
             current_folder_clipped: Vec::new(),
             overflow_button_mismatch: Vec::new(),
             shallow_path_shifted: Vec::new(),
+            seed_not_applied: Vec::new(),
         },
     }
 }
@@ -1192,6 +1220,8 @@ struct MeasurementOutcome {
     overflow_button_mismatch: Vec<Measurement>,
     #[serde(default)]
     shallow_path_shifted: Vec<Measurement>,
+    #[serde(default)]
+    seed_not_applied: Vec<Measurement>,
 }
 
 /// Selector for every element the hit-area/off-screen checks treat as an
@@ -1346,6 +1376,7 @@ fn measurement_script(
     zoom: f64,
     before_zoom_width: Option<f64>,
     text_size: u32,
+    expect_dir: Option<String>,
 ) -> String {
     let interactive_selector = INTERACTIVE_SELECTOR;
     let overflow_allowlist = json_string_array(OVERFLOW_ALLOWLIST);
@@ -1355,6 +1386,14 @@ fn measurement_script(
     let rendered_contrast_allowlist = json_string_array(RENDERED_CONTRAST_ALLOWLIST);
     let rendered_contrast_mark_selector = json_string_array(RENDERED_CONTRAST_MARK_SELECTOR);
     let before_zoom_width_js = before_zoom_width.map_or("null".to_string(), |v| v.to_string());
+    // Review 243 §2: `serde_json::to_string` on a `String` is also valid
+    // JS string-literal syntax (the same reason `describe`'s own output
+    // elsewhere in this file is never hand-quoted) - safe for whatever
+    // characters a real directory name carries, not just the plain
+    // ASCII this round's own fixture happens to use.
+    let expect_dir_js = expect_dir.map_or("null".to_string(), |d| {
+        serde_json::to_string(&d).unwrap_or_else(|_| "null".to_string())
+    });
     format!(
         r#"(function() {{
   function settle(readySelector, quietMs, timeoutMs) {{
@@ -2140,6 +2179,32 @@ fn measurement_script(
       }}
     }}
 
+    // Review 243 §2: a plan's own seeded `last_left_dir`/`last_right_dir`
+    // (`xtask`'s `write_explorer_dir_settings`, outside this script's
+    // own reach entirely) going silently unread left no visible sign in
+    // any other finding - `$HOME` happened to be deep enough that
+    // `current_folder_clipped`/`overflow_button_mismatch` still fired
+    // normally against the wrong path (`205e`'s own finding). Checked
+    // directly here instead: `expect_dir` (from the plan's own
+    // `ViewPlan::Explorer`) against `.path-segments[data-full-path]`
+    // (`dir_pane.rs`, `layout-probe`-only) - a mismatch means the seed
+    // was not applied, named as exactly that, not folded into some
+    // other check's own unrelated name.
+    const seed_not_applied = [];
+    const expectDir = {expect_dir_js};
+    if (expectDir !== null) {{
+      for (let i = 0; i < pathSegmentsEls.length; i++) {{
+        const container = pathSegmentsEls[i];
+        const actual = container.getAttribute('data-full-path');
+        if (actual !== expectDir) {{
+          seed_not_applied.push({{
+            element: describe(container, -1), text: '',
+            detail: 'seed not applied: expected "' + expectDir + '", pane shows "' + actual + '"',
+          }});
+        }}
+      }}
+    }}
+
     // Review 218 §2: a probe-level proof that `.toast`, when raised, is
     // actually hit at its own centre point - not covered by `.scrim` or
     // anything else. `elementFromPoint` answers "what's really on top
@@ -2161,7 +2226,7 @@ fn measurement_script(
     dioxus.send(JSON.stringify({{
       settled, settle_ms, overflow, clipped, off_screen, hit_area, small_text,
       rendered_contrast, label_placement, dialog_occlusion, overlap, toast_check,
-      current_folder_clipped, overflow_button_mismatch, shallow_path_shifted,
+      current_folder_clipped, overflow_button_mismatch, shallow_path_shifted, seed_not_applied,
     }}));
     }} catch (e) {{
       dioxus.send(JSON.stringify({{
@@ -2271,7 +2336,7 @@ mod tests {
 
     #[test]
     fn measurement_script_embeds_the_given_selector_once() {
-        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0, None, 100);
+        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0, None, 100, None);
         assert!(script.contains("querySelector('.diff-wrap')"));
     }
 
@@ -2374,7 +2439,7 @@ mod tests {
 
     #[test]
     fn measurement_script_checks_the_toast_with_element_from_point() {
-        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0, None, 100);
+        let script = measurement_script(".diff-wrap", 4.5, 3.0, 1.0, None, 100, None);
         assert!(script.contains("elementFromPoint"));
         assert!(script.contains("querySelector('.toast')"));
         assert!(script.contains("toast_check"));
@@ -2464,6 +2529,7 @@ mod tests {
             raise_toast,
             raise_passive_toast,
             passive_toast_delay_ms,
+            expect_dir,
         } = view
         else {
             panic!("expected Explorer");
@@ -2471,6 +2537,7 @@ mod tests {
         assert!(raise_toast);
         assert!(raise_passive_toast);
         assert_eq!(passive_toast_delay_ms, Some(5000));
+        assert_eq!(expect_dir, None);
 
         let raw = r#"{"kind": "explorer"}"#;
         let view: ViewPlan = serde_json::from_str(raw).expect("must parse");
@@ -2478,6 +2545,7 @@ mod tests {
             raise_toast,
             raise_passive_toast,
             passive_toast_delay_ms,
+            expect_dir,
         } = view
         else {
             panic!("expected Explorer");
@@ -2485,6 +2553,18 @@ mod tests {
         assert!(!raise_toast);
         assert!(!raise_passive_toast);
         assert_eq!(passive_toast_delay_ms, None);
+        assert_eq!(expect_dir, None);
+    }
+
+    /// Review 243 §2: the guard itself.
+    #[test]
+    fn explorer_plan_deserializes_expect_dir() {
+        let raw = r#"{"kind": "explorer", "expect_dir": "/home/you/projects"}"#;
+        let view: ViewPlan = serde_json::from_str(raw).expect("must parse");
+        let ViewPlan::Explorer { expect_dir, .. } = view else {
+            panic!("expected Explorer");
+        };
+        assert_eq!(expect_dir, Some("/home/you/projects".to_string()));
     }
 
     #[test]

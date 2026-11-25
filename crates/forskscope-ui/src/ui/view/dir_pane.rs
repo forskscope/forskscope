@@ -322,6 +322,22 @@ pub fn PathBar(
                     // after it.
                     class: if *is_truncated.read() { "path-segments truncated" } else { "path-segments" },
                     id: "{path_segments_id}",
+                    // F240 (review 243 §2): read only by the
+                    // `layout-probe` build's own `seed_not_applied`
+                    // check (`layout_probe.rs`) - a plan's seeded
+                    // `last_left_dir`/`last_right_dir` silently going
+                    // unread (`205e`'s own finding: `$HOME` opened
+                    // instead of the deep-path fixture, for every run
+                    // since `205c`) left no visible sign in any
+                    // previous finding, since `$HOME` happened to be
+                    // deep enough to still exercise `current_folder_
+                    // clipped`/`overflow_button_mismatch` by accident.
+                    // `cfg!(...)`, not a real `#[cfg]` attribute - never
+                    // compiled into a release build either way, but
+                    // this keeps the whole expression one ordinary Rust
+                    // value instead of two different attribute lists
+                    // under an attribute macro.
+                    "data-full-path": if cfg!(feature = "layout-probe") { "{path_str}" },
                     // F240 (review 241 §3): starts the live overflow
                     // bridge exactly once - `onmounted` fires once per
                     // element mount (the same guarantee `app.rs`'s own
