@@ -571,3 +571,64 @@ app-error-vcs-command-failed = VCS error
 app-error-spreadsheet-read-failed = Could not read spreadsheet
 app-error-encrypted-workbook = Encrypted workbook
 app-error-internal-fault = Internal error
+
+# Review 239 §2.2 (F238 remainder): UserMessage::for_kind's detail texts,
+# mapped the same way its short texts already are (app_error_kind_short_id)
+# - static text per AppErrorKind, in the UI, since forskscope-compare
+# keeps no i18n of its own. BackgroundJobCancelled has no entry here -
+# for_kind's own detail for that kind is "" (nothing to translate), and
+# this catalog's own parser rejects an empty value after " = ", so
+# app_error_kind_detail_id returns None for it instead.
+app-error-detail-path-not-found = The file may have been moved or deleted.
+app-error-detail-path-not-file = The path exists but is not a regular file.
+app-error-detail-path-not-directory = The path exists but is not a directory.
+app-error-detail-permission-denied = ForskScope cannot read this file. Check the file permissions.
+app-error-detail-symlink-unsupported = Follow the link manually and open the target file.
+app-error-detail-file-read-failed = An I/O error occurred while reading the file.
+app-error-detail-file-write-failed = An I/O error occurred while saving.
+app-error-detail-encoding-detection-failed = The file encoding could not be detected.
+app-error-detail-decode-lossy = Some characters could not be decoded in the detected encoding.
+app-error-detail-encode-lossy = Some characters in this file cannot be represented in the target encoding.
+app-error-detail-unsavable-after-decode-loss = This file was read with replacement characters for bytes that could not be decoded. Saving it now will not reproduce the original file exactly.
+app-error-detail-binary-not-comparable = This file cannot be compared as text.
+app-error-detail-file-too-large = This file may take a long time to compare.
+app-error-detail-diff-failed = An error occurred while computing the diff.
+app-error-detail-inline-diff-too-large = This hunk is too large for character-level diff.
+app-error-detail-save-conflict = The file was modified by another process since it was loaded.
+app-error-detail-external-modification-detected = The file was modified externally. Saving now would overwrite those changes.
+app-error-detail-backup-failed = Could not create a backup before overwriting.
+app-error-detail-background-job-failed = The background comparison task encountered an error.
+app-error-detail-session-too-new = This session was saved by a newer version of ForskScope. Upgrade the app to open it.
+app-error-detail-session-corrupted = The session file could not be read. It may be from an incompatible version.
+app-error-detail-vcs-unavailable = No supported version control system was found at this path.
+app-error-detail-vcs-command-failed = A version control operation failed.
+app-error-detail-spreadsheet-read-failed = The .xlsx file could not be opened.
+app-error-detail-encrypted-workbook = This spreadsheet is password-protected and cannot be compared.
+app-error-detail-internal-fault = An unexpected error occurred. Please report this.
+
+# The dynamic EncodeLossy detail (RFC-082 §D4): "characters"/"encoding"
+# are isolated placeholders, carried forward as data (AppError::
+# encode_detail), never forskscope-compare's own English sentence.
+app-error-detail-encode-lossy-dynamic = { $characters } cannot be represented in { $encoding }. Save as UTF-8 to keep them, or go back and edit the file to remove them.
+
+# Review 239 §2.2 (F238 remainder): RecoveryAction/RecoveryDialogAction
+# button labels - action_label() used to return this English text
+# directly (save_error.rs), or wrap it in t() as if it were already an
+# id (session/settings persistence_recovery.rs) - a silent fallback to
+# English either way, not a working translation.
+recovery-action-dismiss = Dismiss
+recovery-action-choose-another-file = Choose another file
+recovery-action-reload = Reload
+recovery-action-save-as = Save As…
+recovery-action-save-as-utf8 = Save as UTF-8
+recovery-action-overwrite-anyway = Overwrite anyway
+recovery-action-open-limited-diff = Open with limits
+recovery-action-open-as-binary = Open as binary
+recovery-action-retry = Retry
+recovery-action-retry-without-inline = Retry without inline diff
+recovery-action-start-fresh = Start fresh
+recovery-action-report-bug = Report bug
+recovery-dialog-action-exit = Exit
+recovery-dialog-action-continue-with-defaults = Continue with defaults
+recovery-dialog-action-continue-without-saving = Continue without saving
+recovery-dialog-action-reset-and-back-up = Reset and back up

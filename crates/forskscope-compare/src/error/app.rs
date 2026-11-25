@@ -410,14 +410,22 @@ fn describe_unmappable_characters(
     sample_characters: &[char],
     additional_count: usize,
 ) -> String {
+    let characters = join_unmappable_characters(sample_characters, additional_count);
+    format!(
+        "{characters} cannot be represented in {encoding_label}. Save as UTF-8 to keep them, or go back and edit the file to remove them."
+    )
+}
+
+/// The data half of [`describe_unmappable_characters`] — a flat, already
+/// display-joined list of the unmappable characters, with no English
+/// words of its own, so [`EncodeDetail`] can carry it forward for the UI
+/// to place inside its own, translated sentence.
+fn join_unmappable_characters(sample_characters: &[char], additional_count: usize) -> String {
     let mut listed: Vec<String> = sample_characters.iter().map(|c| format!("'{c}'")).collect();
     if additional_count > 0 {
         listed.push(format!("{additional_count} more"));
     }
-    let characters = listed.join(", ");
-    format!(
-        "{characters} cannot be represented in {encoding_label}. Save as UTF-8 to keep them, or go back and edit the file to remove them."
-    )
+    listed.join(", ")
 }
 
 // ── AppError — structured error envelope (RFC-017 §5) ────────────────────────
@@ -463,12 +471,33 @@ impl Default for ErrorId {
     }
 }
 
+/// The per-instance pieces behind `AppErrorKind::EncodeLossy`'s dynamic
+/// detail (RFC-082 §D4: naming the actual unmappable characters and
+/// target encoding, not a generic "some characters" sentence) — carried
+/// forward *as data*, not pre-rendered into an English sentence, so the
+/// UI (which keeps the only i18n in this codebase — `forskscope-compare`
+/// keeps none, RFC-093 crate boundaries) can build a translated,
+/// placeholder-isolated message from them instead of showing
+/// [`UserMessage::detail`]'s own English text (review 239 §2.2/F238).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EncodeDetail {
+    pub encoding_label: String,
+    /// Already joined for display (`describe_unmappable_characters`'s own
+    /// formatting) — a flat list of quoted characters and, if the sample
+    /// cap was reached, a "N more" tail. Not itself translatable text
+    /// (no English words in it), so forming it here is fine; the
+    /// sentence *around* it is the UI's job.
+    pub characters: String,
+}
+
 /// The complete structured error envelope presented to the UI (RFC-017 §5).
 ///
 /// Constructed via [`AppError::from_core`] or [`AppError::new`].
 /// The UI reads `severity` to choose the surface (toast vs dialog vs banner),
 /// `recovery` to render action buttons, and `message` for the dialog copy.
-/// `technical` is only shown in the copy-diagnostics panel.
+/// `technical` is only shown in the copy-diagnostics panel. `encode_detail`
+/// is `Some` only for `EncodeLossy` built from a real `CoreError::Encode` —
+/// see [`EncodeDetail`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppError {
     pub error_id: ErrorId,
@@ -477,6 +506,7 @@ pub struct AppError {
     pub message: UserMessage,
     pub technical: TechnicalDetail,
     pub recovery: Vec<RecoveryAction>,
+    pub encode_detail: Option<EncodeDetail>,
 }
 
 impl AppError {
@@ -490,6 +520,20 @@ impl AppError {
             format!("{kind:?}").to_lowercase().replace(' ', "_"),
             err.to_string(),
         );
+        let encode_detail = if let CoreError::Encode {
+            encoding_label,
+            sample_characters,
+            additional_count,
+            ..
+        } = err
+        {
+            Some(EncodeDetail {
+                encoding_label: encoding_label.clone(),
+                characters: join_unmappable_characters(sample_characters, *additional_count),
+            })
+        } else {
+            None
+        };
         Self {
             error_id: ErrorId::new(),
             kind,
@@ -497,6 +541,7 @@ impl AppError {
             message,
             technical,
             recovery,
+            encode_detail,
         }
     }
 
@@ -517,6 +562,7 @@ impl AppError {
                 technical_detail.into(),
             ),
             recovery,
+            encode_detail: None,
         }
     }
 

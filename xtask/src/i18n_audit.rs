@@ -168,6 +168,61 @@ const DYNAMIC_LOOKUP_IDS: &[&str] = &[
     "app-error-spreadsheet-read-failed",
     "app-error-encrypted-workbook",
     "app-error-internal-fault",
+    // Review 239 §2.2 (F238 remainder): app_error_kind_detail_id
+    // (`diff_actions.rs`) maps the same computed `AppErrorKind` to one
+    // of these - same reasoning as the short-text ids just above.
+    // ("app-error-detail-encode-lossy-dynamic" is a literal at its own
+    // `TranslatableMessage::new(..)` call site and needs no entry here.)
+    "app-error-detail-path-not-found",
+    "app-error-detail-path-not-file",
+    "app-error-detail-path-not-directory",
+    "app-error-detail-permission-denied",
+    "app-error-detail-symlink-unsupported",
+    "app-error-detail-file-read-failed",
+    "app-error-detail-file-write-failed",
+    "app-error-detail-encoding-detection-failed",
+    "app-error-detail-decode-lossy",
+    "app-error-detail-encode-lossy",
+    "app-error-detail-unsavable-after-decode-loss",
+    "app-error-detail-binary-not-comparable",
+    "app-error-detail-file-too-large",
+    "app-error-detail-diff-failed",
+    "app-error-detail-inline-diff-too-large",
+    "app-error-detail-save-conflict",
+    "app-error-detail-external-modification-detected",
+    "app-error-detail-backup-failed",
+    "app-error-detail-background-job-failed",
+    "app-error-detail-session-too-new",
+    "app-error-detail-session-corrupted",
+    "app-error-detail-vcs-unavailable",
+    "app-error-detail-vcs-command-failed",
+    "app-error-detail-spreadsheet-read-failed",
+    "app-error-detail-encrypted-workbook",
+    "app-error-detail-internal-fault",
+    // Review 239 §2.2 (F238 remainder): `action_label` (three functions:
+    // `compare::save_error`, `session::persistence_recovery`,
+    // `settings::persistence_recovery`, all in forskscope-ui-logic) maps
+    // a computed `RecoveryAction`/`RecoveryDialogAction` to one of
+    // these - same shape, same reasoning, as every other dynamic-lookup
+    // entry above. `"cancel"` (already in this catalog, already used
+    // literally elsewhere) is reused for `RecoveryAction::Cancel`, not
+    // repeated here.
+    "recovery-action-dismiss",
+    "recovery-action-choose-another-file",
+    "recovery-action-reload",
+    "recovery-action-save-as",
+    "recovery-action-save-as-utf8",
+    "recovery-action-overwrite-anyway",
+    "recovery-action-open-limited-diff",
+    "recovery-action-open-as-binary",
+    "recovery-action-retry",
+    "recovery-action-retry-without-inline",
+    "recovery-action-start-fresh",
+    "recovery-action-report-bug",
+    "recovery-dialog-action-exit",
+    "recovery-dialog-action-continue-with-defaults",
+    "recovery-dialog-action-continue-without-saving",
+    "recovery-dialog-action-reset-and-back-up",
 ];
 
 /// The plural forms each language's CLDR cardinal rule requires, for any

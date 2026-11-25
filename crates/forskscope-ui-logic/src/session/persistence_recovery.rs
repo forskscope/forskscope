@@ -32,14 +32,23 @@ pub enum RecoveryDialogAction {
     ResetAndBackupOriginal,
 }
 
-/// Short button label for a [`RecoveryDialogAction`] (mirrors
-/// [`crate::compare::save_error::action_label`]'s established pattern).
+/// Catalog id for a [`RecoveryDialogAction`]'s button label (review 239
+/// §2.2/F238: this used to return the English text directly, and the
+/// call site wrapped it in `t()` as if it already were an id — a silent
+/// fallback-to-English bug, not a working translation). Shares its ids
+/// with [`crate::settings::persistence_recovery::action_label`] — same
+/// four actions, same English text, so one catalog entry each rather
+/// than two identical ones.
 pub fn action_label(action: RecoveryDialogAction) -> &'static str {
     match action {
-        RecoveryDialogAction::Exit => "Exit",
-        RecoveryDialogAction::ContinueWithTemporaryDefaults => "Continue with defaults",
-        RecoveryDialogAction::ContinueWithoutSaving => "Continue without saving",
-        RecoveryDialogAction::ResetAndBackupOriginal => "Reset and back up",
+        RecoveryDialogAction::Exit => "recovery-dialog-action-exit",
+        RecoveryDialogAction::ContinueWithTemporaryDefaults => {
+            "recovery-dialog-action-continue-with-defaults"
+        }
+        RecoveryDialogAction::ContinueWithoutSaving => {
+            "recovery-dialog-action-continue-without-saving"
+        }
+        RecoveryDialogAction::ResetAndBackupOriginal => "recovery-dialog-action-reset-and-back-up",
     }
 }
 

@@ -11,7 +11,9 @@
 //! strings.
 
 pub mod app;
-pub use app::{AppError, AppErrorKind, ErrorId, RecoveryAction, TechnicalDetail, UserMessage};
+pub use app::{
+    AppError, AppErrorKind, EncodeDetail, ErrorId, RecoveryAction, TechnicalDetail, UserMessage,
+};
 
 use std::fmt;
 use std::path::PathBuf;

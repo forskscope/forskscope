@@ -14,7 +14,7 @@
 //! correctly. This module's job is to assign a button label to each and
 //! expose it as a plain struct the component can iterate.
 
-use forskscope_compare::error::{AppError, AppErrorKind, RecoveryAction};
+use forskscope_compare::error::{AppError, AppErrorKind, EncodeDetail, RecoveryAction};
 
 // ── RecoveryButton ────────────────────────────────────────────────────────────
 
@@ -23,40 +23,44 @@ use forskscope_compare::error::{AppError, AppErrorKind, RecoveryAction};
 pub struct RecoveryButton {
     /// Semantic action this button triggers.
     pub action: RecoveryAction,
-    /// Short label shown on the button face.
-    pub label: &'static str,
+    /// Catalog id for this button's own label (review 239 §2.2/F238) —
+    /// `forskscope-ui-logic` keeps no i18n of its own (RFC-093 crate
+    /// boundaries), so this names *which* id, never the label text
+    /// itself; the component looks it up with `t()`.
+    pub label_id: &'static str,
     /// If `true`, render as the visually prominent primary button.
     pub is_primary: bool,
 }
 
 impl RecoveryButton {
-    fn new(action: RecoveryAction, label: &'static str, is_primary: bool) -> Self {
+    fn new(action: RecoveryAction, label_id: &'static str, is_primary: bool) -> Self {
         Self {
             action,
-            label,
+            label_id,
             is_primary,
         }
     }
 }
 
-/// Human-readable button label for a [`RecoveryAction`].
-///
-/// Kept short enough for a dialog button — 3 words or fewer.
+/// Catalog id for a [`RecoveryAction`]'s button label (review 239
+/// §2.2/F238 — this used to return the English text directly).
+/// `"cancel"` is the one id shared with every other plain Cancel button
+/// in this codebase; the rest are this dialog's own.
 pub fn action_label(action: RecoveryAction) -> &'static str {
     match action {
-        RecoveryAction::Dismiss => "Dismiss",
-        RecoveryAction::ChooseAnotherFile => "Choose another file",
-        RecoveryAction::Reload => "Reload",
-        RecoveryAction::SaveAs => "Save As…",
-        RecoveryAction::SaveAsUtf8 => "Save as UTF-8",
-        RecoveryAction::OverwriteAnyway => "Overwrite anyway",
-        RecoveryAction::OpenLimitedDiff => "Open with limits",
-        RecoveryAction::OpenAsBinary => "Open as binary",
-        RecoveryAction::Retry => "Retry",
-        RecoveryAction::RetryWithoutInline => "Retry without inline diff",
-        RecoveryAction::Cancel => "Cancel",
-        RecoveryAction::StartFresh => "Start fresh",
-        RecoveryAction::ReportBug => "Report bug",
+        RecoveryAction::Dismiss => "recovery-action-dismiss",
+        RecoveryAction::ChooseAnotherFile => "recovery-action-choose-another-file",
+        RecoveryAction::Reload => "recovery-action-reload",
+        RecoveryAction::SaveAs => "recovery-action-save-as",
+        RecoveryAction::SaveAsUtf8 => "recovery-action-save-as-utf8",
+        RecoveryAction::OverwriteAnyway => "recovery-action-overwrite-anyway",
+        RecoveryAction::OpenLimitedDiff => "recovery-action-open-limited-diff",
+        RecoveryAction::OpenAsBinary => "recovery-action-open-as-binary",
+        RecoveryAction::Retry => "recovery-action-retry",
+        RecoveryAction::RetryWithoutInline => "recovery-action-retry-without-inline",
+        RecoveryAction::Cancel => "cancel",
+        RecoveryAction::StartFresh => "recovery-action-start-fresh",
+        RecoveryAction::ReportBug => "recovery-action-report-bug",
     }
 }
 
@@ -73,8 +77,17 @@ pub struct SaveErrorView {
     pub kind: AppErrorKind,
     /// Dialog title (short, fits the title bar) — English only; see `kind`.
     pub title: String,
-    /// Body text — one or two sentences explaining the problem.
+    /// Body text — one or two sentences explaining the problem. English
+    /// only; the component maps `kind` (and `encode_detail`, when set)
+    /// to a catalog id instead of showing this directly (review 239
+    /// §2.2/F238).
     pub body: String,
+    /// Set only for `EncodeLossy` built from a real `CoreError::Encode`
+    /// (RFC-082 §D4) — the per-instance characters/encoding `body`'s
+    /// English text was built from, carried forward as data so the
+    /// component can place them inside its own translated, isolated
+    /// sentence instead.
+    pub encode_detail: Option<EncodeDetail>,
     /// Optional file path shown below the body (the affected file).
     pub path: Option<String>,
     /// Ordered recovery buttons. The first `is_primary = true` button is
@@ -106,6 +119,7 @@ impl SaveErrorView {
             kind: err.kind,
             title: msg.short.clone(),
             body: msg.detail.clone(),
+            encode_detail: err.encode_detail.clone(),
             path,
             buttons,
         }
@@ -150,22 +164,28 @@ mod tests {
             RecoveryAction::StartFresh,
             RecoveryAction::ReportBug,
         ] {
-            let label = action_label(action);
-            assert!(!label.is_empty(), "{action:?} must have a non-empty label");
+            let label_id = action_label(action);
+            assert!(
+                !label_id.is_empty(),
+                "{action:?} must have a non-empty label id"
+            );
         }
     }
 
     #[test]
-    fn dismiss_label_is_dismiss() {
-        assert_eq!(action_label(RecoveryAction::Dismiss), "Dismiss");
+    fn dismiss_label_is_the_dismiss_id() {
+        assert_eq!(
+            action_label(RecoveryAction::Dismiss),
+            "recovery-action-dismiss"
+        );
     }
 
     #[test]
     fn overwrite_label_mentions_overwrite() {
-        let label = action_label(RecoveryAction::OverwriteAnyway);
+        let label_id = action_label(RecoveryAction::OverwriteAnyway);
         assert!(
-            label.to_lowercase().contains("overwrite"),
-            "OverwriteAnyway label should mention overwrite: {label}"
+            label_id.contains("overwrite"),
+            "OverwriteAnyway's id should mention overwrite: {label_id}"
         );
     }
 
@@ -273,13 +293,13 @@ mod tests {
     }
 
     #[test]
-    fn each_button_has_non_empty_label() {
+    fn each_button_has_non_empty_label_id() {
         let e = err(AppErrorKind::ExternalModificationDetected);
         let v = SaveErrorView::from_error(&e, None);
         for btn in &v.buttons {
             assert!(
-                !btn.label.is_empty(),
-                "{:?} button must have label",
+                !btn.label_id.is_empty(),
+                "{:?} button must have a label id",
                 btn.action
             );
         }

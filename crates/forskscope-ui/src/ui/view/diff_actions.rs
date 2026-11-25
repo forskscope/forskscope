@@ -407,6 +407,73 @@ pub(crate) fn app_error_kind_short_id(kind: AppErrorKind) -> &'static str {
     }
 }
 
+/// F238 remainder (review 239 §2.2): `UserMessage::for_kind`'s *detail*
+/// texts, mapped the same way `app_error_kind_short_id` already maps the
+/// short ones. `None` only for `BackgroundJobCancelled` — `for_kind`'s
+/// own detail for that kind is `""`, nothing to translate, and this
+/// catalog's own parser rejects an empty value after `" = "` (confirmed
+/// by reading `catalog.rs`'s `parse`, not assumed).
+pub(crate) fn app_error_kind_detail_id(kind: AppErrorKind) -> Option<&'static str> {
+    Some(match kind {
+        AppErrorKind::PathNotFound => "app-error-detail-path-not-found",
+        AppErrorKind::PathNotFile => "app-error-detail-path-not-file",
+        AppErrorKind::PathNotDirectory => "app-error-detail-path-not-directory",
+        AppErrorKind::PermissionDenied => "app-error-detail-permission-denied",
+        AppErrorKind::SymlinkUnsupported => "app-error-detail-symlink-unsupported",
+        AppErrorKind::FileReadFailed => "app-error-detail-file-read-failed",
+        AppErrorKind::FileWriteFailed => "app-error-detail-file-write-failed",
+        AppErrorKind::EncodingDetectionFailed => "app-error-detail-encoding-detection-failed",
+        AppErrorKind::DecodeLossy => "app-error-detail-decode-lossy",
+        AppErrorKind::EncodeLossy => "app-error-detail-encode-lossy",
+        AppErrorKind::UnsavableAfterDecodeLoss => "app-error-detail-unsavable-after-decode-loss",
+        AppErrorKind::BinaryNotComparable => "app-error-detail-binary-not-comparable",
+        AppErrorKind::FileTooLarge => "app-error-detail-file-too-large",
+        AppErrorKind::DiffFailed => "app-error-detail-diff-failed",
+        AppErrorKind::InlineDiffTooLarge => "app-error-detail-inline-diff-too-large",
+        AppErrorKind::SaveConflict => "app-error-detail-save-conflict",
+        AppErrorKind::ExternalModificationDetected => {
+            "app-error-detail-external-modification-detected"
+        }
+        AppErrorKind::BackupFailed => "app-error-detail-backup-failed",
+        AppErrorKind::BackgroundJobFailed => "app-error-detail-background-job-failed",
+        AppErrorKind::BackgroundJobCancelled => return None,
+        AppErrorKind::SessionTooNew => "app-error-detail-session-too-new",
+        AppErrorKind::SessionCorrupted => "app-error-detail-session-corrupted",
+        AppErrorKind::VcsUnavailable => "app-error-detail-vcs-unavailable",
+        AppErrorKind::VcsCommandFailed => "app-error-detail-vcs-command-failed",
+        AppErrorKind::SpreadsheetReadFailed => "app-error-detail-spreadsheet-read-failed",
+        AppErrorKind::EncryptedWorkbook => "app-error-detail-encrypted-workbook",
+        AppErrorKind::InternalFault => "app-error-detail-internal-fault",
+    })
+}
+
+/// The translated body message for a [`SaveErrorView`] (review 239
+/// §2.2/F238): the static per-kind detail, except `EncodeLossy` built
+/// from a real `CoreError::Encode`, where `encode_detail`'s own
+/// characters/encoding are isolated placeholders in their own sentence
+/// (RFC-082 §D4) rather than the static fallback text.
+pub(crate) fn save_error_body_message(
+    kind: AppErrorKind,
+    encode_detail: &Option<forskscope_compare::error::EncodeDetail>,
+) -> crate::i18n::TranslatableMessage {
+    if let Some(detail) = encode_detail {
+        return crate::i18n::TranslatableMessage::new("app-error-detail-encode-lossy-dynamic")
+            .arg("characters", detail.characters.clone())
+            .isolating("characters")
+            .arg("encoding", detail.encoding_label.clone())
+            .isolating("encoding");
+    }
+    match app_error_kind_detail_id(kind) {
+        Some(id) => crate::i18n::TranslatableMessage::new(id),
+        // BackgroundJobCancelled only: no real id (see
+        // app_error_kind_detail_id's own doc comment) - an empty id
+        // falls back to itself, i.e. empty text, in both tf() and
+        // TranslatedText's template_segments (confirmed by reading
+        // both, not assumed), matching for_kind's own "" detail exactly.
+        None => crate::i18n::TranslatableMessage::new(""),
+    }
+}
+
 /// On success, replaces `tab.save_target` with `MustMatch(outcome.new_fingerprint)`
 /// at the path just written — never `tab.right_doc.fingerprint_at_load`, and
 /// never `tab.right_path` (RFC-077: "do not change the compared right input
@@ -994,6 +1061,99 @@ mod tests {
             message: "permission denied".into(),
         };
         assert!(describe_block(Lang::En, &reason).contains("permission denied"));
+    }
+
+    // ── Review 239 §2.2 (F238 remainder): app_error_kind_detail_id /
+    //    save_error_body_message ───────────────────────────────────────────
+
+    #[test]
+    fn every_kind_but_background_job_cancelled_has_a_detail_id() {
+        use forskscope_compare::error::AppErrorKind as K;
+        for kind in [
+            K::PathNotFound,
+            K::PathNotFile,
+            K::PathNotDirectory,
+            K::PermissionDenied,
+            K::SymlinkUnsupported,
+            K::FileReadFailed,
+            K::FileWriteFailed,
+            K::EncodingDetectionFailed,
+            K::DecodeLossy,
+            K::EncodeLossy,
+            K::UnsavableAfterDecodeLoss,
+            K::BinaryNotComparable,
+            K::FileTooLarge,
+            K::DiffFailed,
+            K::InlineDiffTooLarge,
+            K::SaveConflict,
+            K::ExternalModificationDetected,
+            K::BackupFailed,
+            K::BackgroundJobFailed,
+            K::SessionTooNew,
+            K::SessionCorrupted,
+            K::VcsUnavailable,
+            K::VcsCommandFailed,
+            K::SpreadsheetReadFailed,
+            K::EncryptedWorkbook,
+            K::InternalFault,
+        ] {
+            assert!(
+                app_error_kind_detail_id(kind).is_some(),
+                "{kind:?} must have a detail id"
+            );
+        }
+        assert_eq!(
+            app_error_kind_detail_id(
+                forskscope_compare::error::AppErrorKind::BackgroundJobCancelled
+            ),
+            None,
+            "for_kind's own detail for this kind is empty - nothing to translate"
+        );
+    }
+
+    #[test]
+    fn save_error_body_message_uses_the_static_detail_id_with_no_encode_detail() {
+        let msg =
+            save_error_body_message(forskscope_compare::error::AppErrorKind::FileTooLarge, &None);
+        assert_eq!(msg.id, "app-error-detail-file-too-large");
+        assert!(msg.args.is_empty());
+    }
+
+    #[test]
+    fn save_error_body_message_isolates_the_dynamic_encode_detail_when_present() {
+        let detail = forskscope_compare::error::EncodeDetail {
+            encoding_label: "Shift_JIS".into(),
+            characters: "'✓', 2 more".into(),
+        };
+        let msg = save_error_body_message(
+            forskscope_compare::error::AppErrorKind::EncodeLossy,
+            &Some(detail),
+        );
+        assert_eq!(msg.id, "app-error-detail-encode-lossy-dynamic");
+        assert!(msg.isolate.contains(&"characters"));
+        assert!(msg.isolate.contains(&"encoding"));
+        let characters = msg
+            .args
+            .iter()
+            .find(|(n, _)| *n == "characters")
+            .map(|(_, v)| v.as_str());
+        assert_eq!(characters, Some("'✓', 2 more"));
+        let encoding = msg
+            .args
+            .iter()
+            .find(|(n, _)| *n == "encoding")
+            .map(|(_, v)| v.as_str());
+        assert_eq!(encoding, Some("Shift_JIS"));
+    }
+
+    #[test]
+    fn save_error_body_message_for_background_job_cancelled_renders_empty() {
+        let msg = save_error_body_message(
+            forskscope_compare::error::AppErrorKind::BackgroundJobCancelled,
+            &None,
+        );
+        assert_eq!(msg.render(Lang::En), "");
+        assert_eq!(msg.render(Lang::Ja), "");
     }
 
     // ── F52: save-error recovery dialog (handoff 012) ──────────────────────
