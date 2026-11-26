@@ -60,7 +60,21 @@
   box-shadow: inset 3px 0 0 0 var(--accent);
 }
 .deep-row:focus-visible { outline: var(--focus-ring) solid var(--focus); outline-offset: -2px; }
-.deep-cell { display: flex; align-items: center; gap: .5rem; flex: 1; min-width: 0; }
+/* No `min-width: 0` here (deliberately - CI's own narrower font found
+   this the hard way): `.dir-status`'s own `flex-shrink: 0` (below)
+   means it never renders smaller than its own natural width, but that
+   guarantee is only as good as `.deep-cell`'s own allocated box being
+   at least that wide to begin with - with `min-width: 0` here, a
+   narrow enough row (CI's own font rendering, not this machine's,
+   left `.deep-actions` sharing a line with `.deep-cell` instead of
+   wrapping away from it, confirmed in that run's own raw numbers)
+   could still squeeze the whole cell down to less than the icon
+   alone needs, which overflowed regardless of the icon's own floor.
+   The default automatic minimum size now does the opposite job on
+   purpose: `.deep-path`/`.dir-size` (both `min-width: 0` themselves)
+   contribute nothing to it, so `.deep-cell`'s own floor becomes
+   exactly `.dir-status`'s own un-shrinkable width - never less. */
+.deep-cell { display: flex; align-items: center; gap: .5rem; flex: 1; }
 /* `flex-wrap: wrap` here too: even alone on its own row (the wrap on
    `.deep-row` above), the three buttons together can still be wider
    than the row itself at 200% pseudo-language - the third one (`Copy
