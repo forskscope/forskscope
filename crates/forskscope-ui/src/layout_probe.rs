@@ -554,6 +554,7 @@ pub struct ResultRow {
 fn parse_lang(s: &str) -> Lang {
     match s {
         "ja" => Lang::Ja,
+        "pseudo" => Lang::Pseudo,
         _ => Lang::En,
     }
 }
@@ -2247,6 +2248,7 @@ mod tests {
     fn parse_lang_defaults_to_english_for_an_unrecognized_code() {
         assert_eq!(parse_lang("en"), Lang::En);
         assert_eq!(parse_lang("ja"), Lang::Ja);
+        assert_eq!(parse_lang("pseudo"), Lang::Pseudo);
         assert_eq!(parse_lang("xx"), Lang::En);
     }
 

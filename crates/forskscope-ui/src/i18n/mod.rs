@@ -32,6 +32,8 @@
 #[cfg(test)]
 pub(crate) mod catalog;
 mod plural;
+#[cfg(feature = "layout-probe")]
+mod pseudo;
 
 use crate::state::Lang;
 
@@ -69,11 +71,49 @@ fn lookup(lang: Lang, id: &str) -> Option<&'static StaticForms> {
     let table: &[(&str, StaticForms)] = match lang {
         Lang::En => CATALOG_EN,
         Lang::Ja => CATALOG_JA,
+        // Never actually reached: `tf()` intercepts `Lang::Pseudo`
+        // before it would call this function (the pseudo text is
+        // generated from `CATALOG_EN`'s own text, not stored in a
+        // table of its own — see `pseudo::pseudo_template`'s own doc
+        // comment for why there is deliberately no `pseudo.catalog`
+        // file). English's own table is the logically sound fallback
+        // if this arm is ever reached some other way.
+        #[cfg(feature = "layout-probe")]
+        Lang::Pseudo => CATALOG_EN,
     };
     table
         .binary_search_by_key(&id, |(i, _)| *i)
         .ok()
         .map(|idx| &table[idx].1)
+}
+
+/// RFC-101 stage C (handoff 118): `Lang::Pseudo` is generated from
+/// `CATALOG_EN`'s own text at call time, not looked up in a table of
+/// its own — see [`pseudo::pseudo_template`]'s own doc comment for why
+/// there is deliberately no `pseudo.catalog` file. Mirrors `tf()`'s own
+/// shape (English lookup, plural-form selection, `substitute`), with
+/// [`pseudo::pseudo_template`] applied to the chosen template before
+/// substitution so a placeholder's own *value* (the caller-supplied
+/// data) is never itself pseudo-ized, only the surrounding message
+/// text is.
+#[cfg(feature = "layout-probe")]
+fn tf_pseudo(id: &str, args: &[(&str, &str)], count: Option<i64>) -> String {
+    let Some(forms) = lookup(Lang::En, id) else {
+        return substitute(&pseudo::pseudo_template(id), args, count);
+    };
+    let template = match forms {
+        StaticForms::Single(text) => *text,
+        StaticForms::Plural(forms) => {
+            let category = plural::category(Lang::Pseudo, count.unwrap_or(0));
+            forms
+                .iter()
+                .find(|(f, _)| *f == category)
+                .or_else(|| forms.iter().find(|(f, _)| *f == "other"))
+                .map(|(_, t)| *t)
+                .unwrap_or(id)
+        }
+    };
+    substitute(&pseudo::pseudo_template(template), args, count)
 }
 
 /// Translate a plain message with no placeholders and no count.
@@ -106,6 +146,10 @@ pub fn t(lang: Lang, id: &str) -> String {
 /// only ever drives the plural *selection*, and is always separately
 /// available as an ordinary `{ $count }` substitution either way.
 pub fn tf(lang: Lang, id: &str, args: &[(&str, &str)], count: Option<i64>) -> String {
+    #[cfg(feature = "layout-probe")]
+    if let Lang::Pseudo = lang {
+        return tf_pseudo(id, args, count);
+    }
     let forms = lookup(lang, id).or_else(|| lookup(Lang::En, id));
     let Some(forms) = forms else {
         return substitute(id, args, count);
@@ -730,5 +774,29 @@ mod tests {
             "these labels' Japanese entry is identical to English, not a real \
              translation: {untranslated:?}"
         );
+    }
+
+    /// Handoff 118 §1's own unit test list: "every catalog id has a
+    /// pseudo form." Walks `CATALOG_EN` directly (every real id, not a
+    /// hand-picked sample) - a `Single` form needs no count; a `Plural`
+    /// form is read with both a `1` and a `2` count, since `tf_pseudo`
+    /// picks English's own category for either.
+    #[test]
+    #[cfg(feature = "layout-probe")]
+    fn every_catalog_id_has_a_pseudo_form() {
+        for (id, forms) in CATALOG_EN {
+            let counts: &[Option<i64>] = match forms {
+                StaticForms::Single(_) => &[None],
+                StaticForms::Plural(_) => &[Some(1), Some(2)],
+            };
+            for &count in counts {
+                let out = tf(Lang::Pseudo, id, &[], count);
+                assert!(
+                    out.starts_with('⟦') && out.ends_with('⟧'),
+                    "{id:?} (count {count:?}) did not come back wrapped: {out:?}"
+                );
+                assert!(!out.is_empty(), "{id:?} (count {count:?}) came back empty");
+            }
+        }
     }
 }
