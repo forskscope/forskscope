@@ -103,11 +103,44 @@ fn spread_padding(len: usize) -> String {
     out
 }
 
+/// One side's full padding, with a single boundary space against the
+/// message itself, spent out of the same `len` budget
+/// [`spread_padding`] renders into filler words - review 247 §2.2:
+/// `pseudo_template` used to join its padding straight onto the
+/// message with nothing between them, so the padding's own nearest
+/// filler character fused onto the message's own first or last
+/// letter, turning a real word into one unbreakable run with whatever
+/// filler ran up against it (how `.kb-desc`'s own word came to be too
+/// wide for its column). `left_padding`/`right_padding` (below) each
+/// carve one character off their own `len` for that boundary space,
+/// rather than adding it on top - `pseudo_template`'s own 40%-stretch
+/// accounting is unaffected.
+fn left_padding(len: usize) -> String {
+    if len == 0 {
+        return String::new();
+    }
+    let mut out = spread_padding(len - 1);
+    out.push(' ');
+    out
+}
+
+/// The right-hand mirror of [`left_padding`]: the boundary space comes
+/// first here, immediately against the message's own last character,
+/// with [`spread_padding`]'s own filler words after it.
+fn right_padding(len: usize) -> String {
+    if len == 0 {
+        return String::new();
+    }
+    let mut out = String::from(' ');
+    out.push_str(&spread_padding(len - 1));
+    out
+}
+
 /// Accents every Latin letter in `english` outside a `{ ... }`
 /// placeholder span (copied through verbatim, so `{ $count }` still
 /// substitutes correctly), stretches the result by 40% with
-/// [`spread_padding`] split across both sides, and wraps the whole
-/// thing in `⟦…⟧`.
+/// [`left_padding`]/[`right_padding`] split across both sides, and
+/// wraps the whole thing in `⟦…⟧`.
 pub(crate) fn pseudo_template(english: &str) -> String {
     let mut accented = String::new();
     let mut chars = english.chars().peekable();
@@ -133,9 +166,9 @@ pub(crate) fn pseudo_template(english: &str) -> String {
 
     let mut out = String::with_capacity(accented.len() + pad_needed + 2);
     out.push('⟦');
-    out.push_str(&spread_padding(left_pad_len));
+    out.push_str(&left_padding(left_pad_len));
     out.push_str(&accented);
-    out.push_str(&spread_padding(right_pad_len));
+    out.push_str(&right_padding(right_pad_len));
     out.push('⟧');
     out
 }
@@ -301,6 +334,85 @@ mod tests {
             assert!(!padding.starts_with(' '), "len {len}: {padding:?}");
             assert!(!padding.ends_with(' '), "len {len}: {padding:?}");
             assert!(!padding.contains("  "), "len {len}: {padding:?}");
+        }
+    }
+
+    /// Review 247 §2.2: the padding never touches a letter of the
+    /// message - `left_padding`'s own output, whenever there's any
+    /// padding at all, ends in the boundary space (never a filler
+    /// character), and `right_padding`'s own output starts with it.
+    /// Checked directly against both functions across a wide range of
+    /// lengths, not just `pseudo_template`'s own end-to-end shape.
+    #[test]
+    fn left_and_right_padding_always_end_in_the_boundary_space() {
+        for len in 1..=200usize {
+            let left = left_padding(len);
+            assert!(
+                left.ends_with(' '),
+                "left_padding({len}) = {left:?} doesn't end in a space"
+            );
+            let right = right_padding(len);
+            assert!(
+                right.starts_with(' '),
+                "right_padding({len}) = {right:?} doesn't start with a space"
+            );
+        }
+    }
+
+    /// The same invariant, still carrying the exact-`len` budget
+    /// [`spread_padding`] itself already guarantees - `left_padding`/
+    /// `right_padding` only redistribute one character of it as the
+    /// boundary space, never add to it.
+    #[test]
+    fn left_and_right_padding_still_render_exactly_len_characters() {
+        for len in 0..=200usize {
+            assert_eq!(
+                left_padding(len).chars().count(),
+                len,
+                "left_padding({len})"
+            );
+            assert_eq!(
+                right_padding(len).chars().count(),
+                len,
+                "right_padding({len})"
+            );
+        }
+    }
+
+    /// End-to-end, on real messages: `pseudo_template`'s own output
+    /// never has a filler character sitting directly against the
+    /// message's own first or last (accented) letter - the actual
+    /// defect this round fixes (a real word plus a directly-glued
+    /// filler run, too wide for `.kb-desc`'s own column). Built from
+    /// the same accenting `pseudo_template` itself does, not a
+    /// hand-picked expected string, so this holds for any message.
+    #[test]
+    fn the_padding_never_fuses_onto_the_message_in_a_real_template() {
+        for english in [
+            "Settings",
+            "This is a considerably longer sentence, to see the boundary hold at this length too.",
+            "Explorer layout",
+        ] {
+            let accented: String = english.chars().map(accent_char).collect();
+            let out = pseudo_template(english);
+            let inner = out
+                .strip_prefix('⟦')
+                .and_then(|s| s.strip_suffix('⟧'))
+                .expect("wrapped in brackets");
+            assert!(
+                inner.contains(&accented),
+                "{english:?}: {inner:?} doesn't contain the accented message {accented:?} intact"
+            );
+            let before = &inner[..inner.find(&accented).unwrap()];
+            let after = &inner[inner.find(&accented).unwrap() + accented.len()..];
+            assert!(
+                before.is_empty() || before.ends_with(' '),
+                "{english:?}: {inner:?} - a filler character sits directly before the message"
+            );
+            assert!(
+                after.is_empty() || after.starts_with(' '),
+                "{english:?}: {inner:?} - a filler character sits directly after the message"
+            );
         }
     }
 }

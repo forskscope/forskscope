@@ -7,8 +7,20 @@ use forskscope_compare::WhitespaceMode;
 use forskscope_compare::diff::InlineMode;
 
 use crate::i18n::t;
-use crate::state::Store;
+use crate::state::{Lang, Store};
 use crate::ui::component::select_field::{SelectField, SelectOption};
+use crate::ui::view::diff_actions::diff_algorithm_options;
+
+/// Review 247 §2.1: the re-diff-timing picker's own options, its own
+/// named function for the same reason `diff_algorithm_options` (above)
+/// is one - one list `select_field.rs`'s own cap test can walk.
+pub(crate) fn inline_mode_options(lang: Lang) -> Vec<SelectOption> {
+    vec![
+        SelectOption::new("lazy", t(lang, "when-i-turn-it-on")),
+        SelectOption::new("eager", t(lang, "automatically-for-small-changes")),
+        SelectOption::new("never", t(lang, "never")),
+    ]
+}
 
 /// Inline form for adding a new compare profile (revealed on demand, RFC-057).
 ///
@@ -71,11 +83,7 @@ pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
                 rsx! {
                     SelectField {
                         value: algo_value.to_string(),
-                        options: vec![
-                            SelectOption::new("myers", "Myers"),
-                            SelectOption::new("patience", "Patience"),
-                            SelectOption::new("histogram", "Histogram"),
-                        ],
+                        options: diff_algorithm_options(),
                         onchange: move |v: String| {
                             algorithm.set(match v.as_str() {
                                 "patience"  => crate::state::DiffAlgorithmSetting::Patience,
@@ -105,11 +113,7 @@ pub fn AddProfileInline(on_done: EventHandler<()>) -> Element {
                             SelectField {
                                 id: "profile-inline-mode".to_string(),
                                 value: inline_value.to_string(),
-                                options: vec![
-                                    SelectOption::new("lazy", t(lang, "when-i-turn-it-on")),
-                                    SelectOption::new("eager", t(lang, "automatically-for-small-changes")),
-                                    SelectOption::new("never", t(lang, "never")),
-                                ],
+                                options: inline_mode_options(lang),
                                 onchange: move |v: String| {
                                     inline_mode.set(match v.as_str() {
                                         "eager" => InlineMode::EagerForSmallHunks,

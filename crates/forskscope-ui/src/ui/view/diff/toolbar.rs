@@ -9,7 +9,7 @@ use crate::state::{
     Lang, Modal, Store, change_diff_options, change_encoding, reload_tab, swap_sides,
 };
 use crate::ui::component::select_field::{SelectField, SelectOption};
-use crate::ui::view::diff_actions::{algo_val, export_patch, save_tab};
+use crate::ui::view::diff_actions::{algo_val, diff_algorithm_options, export_patch, save_tab};
 use crate::ui::view::search::SearchCtx;
 
 #[component]
@@ -200,11 +200,7 @@ pub fn Toolbar(index: usize, snap: TabSnapshot, lang: Lang) -> Element {
                 SelectField {
                     title: t(lang, "diff-algorithm"),
                     value: algo_val(snap.algorithm).to_string(),
-                    options: vec![
-                        SelectOption::new("myers", "Myers"),
-                        SelectOption::new("patience", "Patience"),
-                        SelectOption::new("histogram", "Histogram"),
-                    ],
+                    options: diff_algorithm_options(),
                     onchange: move |v: String| {
                         use forskscope_compare::DiffAlgorithm;
                         let algorithm = match v.as_str() {

@@ -128,16 +128,113 @@ mod tests {
         );
     }
 
-    /// The real catalog's own longest known option label - confirmed
-    /// here, not just asserted in a comment, so a future edit that
-    /// makes it (or a longer one) grow past the cap fails loudly
-    /// rather than silently clipping real, translated text a user
-    /// actually reads.
+    /// Review 247 §2.1: not one hand-picked label, but *every* option
+    /// label every `SelectField` in this app can build, for every real
+    /// language (the pseudo-language excluded on purpose - its own
+    /// stretch is the point) - walked from the same, real functions the
+    /// rendered page calls, not a parallel hand-copied list. Fails
+    /// loudly, naming the picker and the label, the moment any one of
+    /// them grows past the cap: a translator going over it is exactly
+    /// the language-policy review that should catch it, same as any
+    /// other catalog-length concern; this gate is what makes sure it
+    /// does, for a `<select>` specifically, rather than clipping the
+    /// name silently in the open list and leaving a screen reader to
+    /// read the cut name.
     #[test]
-    fn the_longest_known_real_option_label_is_never_truncated() {
-        let longest = "Paths relative to the compared folders";
-        assert!(longest.chars().count() < MAX_LABEL_CHARS);
-        assert_eq!(truncated_label(longest), longest);
+    fn every_real_option_label_in_every_real_picker_fits_under_the_cap() {
+        use crate::state::Lang;
+        use crate::ui::view::diff_actions::{
+            diff_algorithm_options, export_format_options, export_path_mode_options,
+        };
+        use crate::ui::view::settings::modal::{
+            colour_vision_options, context_lines_options, diff_font_family_options,
+            explorer_layout_options, language_options,
+        };
+        use crate::ui::view::settings::profile::inline_mode_options;
+        use forskscope_ui_logic::{contrast_choices, theme_choices};
+
+        let mut labels: Vec<(&'static str, String)> = Vec::new();
+        for lang in [Lang::En, Lang::Ja] {
+            for opt in colour_vision_options(lang) {
+                labels.push(("colour vision", opt.label));
+            }
+            for opt in diff_font_family_options(lang) {
+                labels.push(("diff font family", opt.label));
+            }
+            for opt in explorer_layout_options(lang) {
+                labels.push(("Explorer layout", opt.label));
+            }
+            for opt in context_lines_options(lang) {
+                labels.push(("context lines", opt.label));
+            }
+            for opt in inline_mode_options(lang) {
+                labels.push(("re-diff timing", opt.label));
+            }
+            for opt in export_format_options(lang) {
+                labels.push(("export format", opt.label));
+            }
+            for opt in export_path_mode_options(lang) {
+                labels.push(("export path style", opt.label));
+            }
+            // Every combination `theme_choices`' own two bools can
+            // produce - a System choice added, an unavailable-System
+            // choice added, or neither - each a real path the app can
+            // reach, not just the one its one caller happens to pass
+            // today.
+            for (system_offered, saved_unavailable) in
+                [(false, false), (true, false), (false, true), (true, true)]
+            {
+                for choice in theme_choices(system_offered, saved_unavailable) {
+                    labels.push(("theme", crate::i18n::t(lang, choice.label)));
+                }
+            }
+            for choice in contrast_choices() {
+                labels.push(("contrast", crate::i18n::t(lang, choice.label)));
+            }
+        }
+        // Literal text, not translated, so it doesn't vary by language -
+        // walked once, not per language.
+        for opt in language_options() {
+            labels.push(("language", opt.label));
+        }
+        for opt in diff_algorithm_options() {
+            labels.push(("diff algorithm", opt.label));
+        }
+        for label in forskscope_compare::COMMON_ENCODING_LABELS {
+            labels.push(("encoding", (*label).to_string()));
+        }
+
+        assert!(
+            labels.len() > 20,
+            "suspiciously few labels walked: {}",
+            labels.len()
+        );
+        for (picker, label) in &labels {
+            assert_label_fits_the_cap(picker, label);
+        }
+    }
+
+    /// The assertion `every_real_option_label_in_every_real_picker_fits_
+    /// under_the_cap` (above) runs for every label it walks - pulled out
+    /// so the next test can falsify it directly: prove the check itself
+    /// would catch a violation, not just that today's real data happens
+    /// to pass.
+    fn assert_label_fits_the_cap(picker: &str, label: &str) {
+        assert!(
+            label.chars().count() <= MAX_LABEL_CHARS,
+            "{picker}: {label:?} is {} characters, over the {MAX_LABEL_CHARS}-character cap",
+            label.chars().count()
+        );
+    }
+
+    /// Falsify `assert_label_fits_the_cap` directly: a label shaped like
+    /// a real (not pseudo-stretched) one that's simply grown one
+    /// character past the cap must fail, by name, not just "some test
+    /// somewhere failed".
+    #[test]
+    #[should_panic(expected = "over the 42-character cap")]
+    fn a_real_label_one_character_over_the_cap_fails_the_walk() {
+        assert_label_fits_the_cap("falsification", &"x".repeat(MAX_LABEL_CHARS + 1));
     }
 
     /// A pseudo-language-shaped label (stretched well past any real

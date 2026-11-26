@@ -616,6 +616,49 @@ pub(crate) fn algo_val(a: forskscope_compare::DiffAlgorithm) -> &'static str {
     }
 }
 
+/// The diff-algorithm picker's own options - shared by the diff
+/// toolbar's `SelectField` and the compare-profile editor's own
+/// identical one, so there is exactly one list to keep in sync, and
+/// one list `select_field.rs`'s own cap test (review 247 §2.1) can
+/// walk. Algorithm names, not translated text.
+pub(crate) fn diff_algorithm_options() -> Vec<crate::ui::component::select_field::SelectOption> {
+    use crate::ui::component::select_field::SelectOption;
+    vec![
+        SelectOption::new("myers", "Myers"),
+        SelectOption::new("patience", "Patience"),
+        SelectOption::new("histogram", "Histogram"),
+    ]
+}
+
+/// The export dialog's format picker - shared by the file-comparison
+/// and the directory-report export dialogs, which offer the identical
+/// choice (review 247 §2.1's own "the export dialog's" entry).
+pub(crate) fn export_format_options(
+    lang: crate::state::Lang,
+) -> Vec<crate::ui::component::select_field::SelectOption> {
+    use crate::ui::component::select_field::SelectOption;
+    vec![
+        SelectOption::new("html", t(lang, "html-report")),
+        SelectOption::new("patch", t(lang, "unified-diff-patch")),
+    ]
+}
+
+/// The export dialog's path-style picker - same sharing reason as
+/// [`export_format_options`] above.
+pub(crate) fn export_path_mode_options(
+    lang: crate::state::Lang,
+) -> Vec<crate::ui::component::select_field::SelectOption> {
+    use crate::ui::component::select_field::SelectOption;
+    vec![
+        SelectOption::new("name-only", t(lang, "file-names-only")),
+        SelectOption::new(
+            "relative",
+            t(lang, "paths-relative-to-the-compared-folders"),
+        ),
+        SelectOption::new("absolute", t(lang, "full-paths")),
+    ]
+}
+
 /// `PatchOptions` for an export, with `context_lines` following the user's
 /// settings rather than the library default — the wiring this function
 /// exists to make directly testable (RFC-084 §3).

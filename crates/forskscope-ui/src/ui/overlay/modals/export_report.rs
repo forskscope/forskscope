@@ -8,8 +8,10 @@ use forskscope_report::report::ReportPathMode;
 
 use crate::i18n::t;
 use crate::state::{Modal, Store};
-use crate::ui::component::select_field::{SelectField, SelectOption};
-use crate::ui::view::diff_actions::{ReportExportFormat, export_file_report};
+use crate::ui::component::select_field::SelectField;
+use crate::ui::view::diff_actions::{
+    ReportExportFormat, export_file_report, export_format_options, export_path_mode_options,
+};
 
 fn path_mode_value(mode: ReportPathMode) -> &'static str {
     match mode {
@@ -50,10 +52,7 @@ pub fn ExportReportModal(index: usize) -> Element {
                 SelectField {
                     title: t(lang, "format"),
                     value: format_value(*format.read()).to_string(),
-                    options: vec![
-                        SelectOption::new("html", t(lang, "html-report")),
-                        SelectOption::new("patch", t(lang, "unified-diff-patch")),
-                    ],
+                    options: export_format_options(lang),
                     onchange: move |v: String| {
                         format.set(if v == "patch" { ReportExportFormat::Patch } else { ReportExportFormat::Html });
                     },
@@ -69,11 +68,7 @@ pub fn ExportReportModal(index: usize) -> Element {
                         SelectField {
                             title: t(lang, "paths"),
                             value: path_mode_value(*path_mode.read()).to_string(),
-                            options: vec![
-                                SelectOption::new("name-only", t(lang, "file-names-only")),
-                                SelectOption::new("relative", t(lang, "paths-relative-to-the-compared-folders")),
-                                SelectOption::new("absolute", t(lang, "full-paths")),
-                            ],
+                            options: export_path_mode_options(lang),
                             onchange: move |v: String| path_mode.set(path_mode_from_value(&v)),
                         }
                     }

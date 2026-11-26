@@ -15,6 +15,54 @@ use crate::state::settings::{host_os, system_theme_offered};
 use crate::state::{Contrast, Lang, Modal, Store};
 use crate::ui::component::select_field::{SelectField, SelectOption};
 
+/// Review 247 §2.1: every `SelectField` option list this dialog builds,
+/// as its own named, pure function - rather than an inline `vec![]` only
+/// the rendered page ever saw - so `select_field.rs`'s own test can walk
+/// every one of them, for every real language, and fail if an option's
+/// label grows past its own cap. One function per picker, named for the
+/// picker, each taking only what the option *text* depends on (most take
+/// only `lang`; none take live settings state, since the text a picker
+/// offers never depends on which one is currently selected).
+pub(crate) fn colour_vision_options(lang: Lang) -> Vec<SelectOption> {
+    vec![
+        SelectOption::new("standard", t(lang, "standard")),
+        SelectOption::new("red-green-safe", t(lang, "red-green-safe-blue-and-orange")),
+    ]
+}
+
+pub(crate) fn language_options() -> Vec<SelectOption> {
+    vec![
+        SelectOption::new("en", "English"),
+        SelectOption::new("ja", "日本語"),
+    ]
+}
+
+pub(crate) fn diff_font_family_options(lang: Lang) -> Vec<SelectOption> {
+    vec![
+        SelectOption::new("monospace", t(lang, "monospace-default")),
+        SelectOption::new("sans-serif", t(lang, "sans-serif")),
+        SelectOption::new("serif", t(lang, "serif")),
+        SelectOption::new("courier-new", "Courier New"),
+        SelectOption::new("consolas", "Consolas / Menlo"),
+    ]
+}
+
+pub(crate) fn explorer_layout_options(lang: Lang) -> Vec<SelectOption> {
+    vec![
+        SelectOption::new("aligned", t(lang, "aligned")),
+        SelectOption::new("compact", t(lang, "compact-no-spacer-rows-default")),
+    ]
+}
+
+pub(crate) fn context_lines_options(lang: Lang) -> Vec<SelectOption> {
+    vec![
+        SelectOption::new("0", t(lang, "0-show-all")),
+        SelectOption::new("3", t(lang, "3-default")),
+        SelectOption::new("5", "5"),
+        SelectOption::new("10", "10"),
+    ]
+}
+
 /// RFC-099 §3: one ignore-list field (*Ignore file extensions* or *Ignore
 /// directory names*), shown as badges with an input after them. `csv` is
 /// this render's own current, committed value (read from `store.settings`
@@ -289,10 +337,7 @@ pub fn SettingsModal() -> Element {
                     span { {t(lang, "colour-vision")} }
                     SelectField {
                         value: cur.colour_vision.as_str().to_string(),
-                        options: vec![
-                            SelectOption::new("standard", t(lang, "standard")),
-                            SelectOption::new("red-green-safe", t(lang, "red-green-safe-blue-and-orange")),
-                        ],
+                        options: colour_vision_options(lang),
                         onchange: move |v: String| {
                             store.settings.write().colour_vision =
                                 crate::state::ColourVision::from_id(&v).unwrap_or_default();
@@ -304,10 +349,7 @@ pub fn SettingsModal() -> Element {
                     span { {t(lang, "language")} }
                     SelectField {
                         value: lv(cur.language).to_string(),
-                        options: vec![
-                            SelectOption::new("en", "English"),
-                            SelectOption::new("ja", "日本語"),
-                        ],
+                        options: language_options(),
                         onchange: move |v: String| {
                             store.settings.write().language = lf(&v);
                             super::persist(store);
@@ -340,13 +382,7 @@ pub fn SettingsModal() -> Element {
                         rsx! {
                             SelectField {
                                 value: ff_value.to_string(),
-                                options: vec![
-                                    SelectOption::new("monospace", t(lang, "monospace-default")),
-                                    SelectOption::new("sans-serif", t(lang, "sans-serif")),
-                                    SelectOption::new("serif", t(lang, "serif")),
-                                    SelectOption::new("courier-new", "Courier New"),
-                                    SelectOption::new("consolas", "Consolas / Menlo"),
-                                ],
+                                options: diff_font_family_options(lang),
                                 onchange: move |v: String| {
                                     use crate::state::DiffFontFamily;
                                     let ff = match v.as_str() {
@@ -406,10 +442,7 @@ pub fn SettingsModal() -> Element {
                             rsx! {
                                 SelectField {
                                     value: layout_value.to_string(),
-                                    options: vec![
-                                        SelectOption::new("aligned", t(lang, "aligned")),
-                                        SelectOption::new("compact", t(lang, "compact-no-spacer-rows-default")),
-                                    ],
+                                    options: explorer_layout_options(lang),
                                     onchange: move |v: String| {
                                         store.settings.write().explorer_compact = v == "compact";
                                         super::persist(store);
@@ -451,12 +484,7 @@ pub fn SettingsModal() -> Element {
                             rsx! {
                                 SelectField {
                                     value: context_lines.to_string(),
-                                    options: vec![
-                                        SelectOption::new("0", t(lang, "0-show-all")),
-                                        SelectOption::new("3", t(lang, "3-default")),
-                                        SelectOption::new("5", "5"),
-                                        SelectOption::new("10", "10"),
-                                    ],
+                                    options: context_lines_options(lang),
                                     onchange: move |v: String| {
                                         if let Ok(n) = v.parse::<usize>() {
                                             store.settings.write().context_lines = n;
