@@ -44,7 +44,9 @@ const DEFAULT_TEXT_SIZES: &[u32] = &[100, 125, 150, 175, 200];
 /// views, not the contrast row (`write_contrast_plan`'s own hardcoded
 /// `["en"]`, unchanged: contrast checks don't read text at all, so a
 /// pseudo pass there would measure nothing new).
-const DEFAULT_LANGUAGES: &[&str] = &["en", "ja", "pseudo"];
+/// Held at `["en", "ja"]` until the pseudo pass's 95 known findings land
+/// fixed, in the same push (review 246): `"pseudo"` joins here then.
+const DEFAULT_LANGUAGES: &[&str] = &["en", "ja"];
 
 /// Rendered contrast's own two layouts (RFC-098 §3): side by side at
 /// the listing's own size, and stacked - "where elements appear and
